@@ -38,12 +38,14 @@ export function createGitSyncRepo(options: GitSyncRepoOptions): SyncRepo {
   const { root } = options
   const exec = options.exec ?? createNodeGitExec()
   const gitDir = join(root, ".git")
-  const run = async (argv: readonly string[], env?: NodeJS.ProcessEnv, stdin?: string): Promise<string> => {
+  type RunExtras = { readonly env?: NodeJS.ProcessEnv; readonly stdin?: string; readonly indexFile?: string }
+  const run = async (argv: readonly string[], { env, stdin, indexFile }: RunExtras = {}): Promise<string> => {
     const result = await exec.run(argv, {
       cwd: root,
       timeoutMs: TIMEOUT_MS,
       ...(env === undefined ? {} : { env: { ...process.env, ...env } }),
       ...(stdin === undefined ? {} : { stdin }),
+      ...(indexFile === undefined ? {} : { indexFile }),
     })
     if (result.code !== 0)
       throw new SyncCommitError(
@@ -58,19 +60,20 @@ export function createGitSyncRepo(options: GitSyncRepoOptions): SyncRepo {
   const treeOnto = async (parent: string | null, paths: readonly string[]): Promise<string> => {
     const dir = join(gitDir, "omo-sync")
     const index = join(dir, `index.${randomBytes(6).toString("hex")}`)
-    const env = { GIT_INDEX_FILE: index }
+    const inIndex = { indexFile: index }
     await mkdir(dir, { recursive: true })
     try {
-      await run(parent === null ? ["read-tree", "--empty"] : ["read-tree", parent], env)
+      await run(parent === null ? ["read-tree", "--empty"] : ["read-tree", parent], inIndex)
       // A path on disk is staged as is; a missing one is removed from the index if tracked and is a
       // no-op otherwise. `git add` on a path in neither HEAD nor the working tree exits 128, which
       // once wedged a device that received a create and a delete of a file it never had.
       const present: string[] = []
       const missing: string[] = []
       for (const path of paths) (existsSync(join(root, path)) ? present : missing).push(path)
-      if (present.length > 0) await run([LITERAL, "add", "-A", "--", ...present], env)
-      if (missing.length > 0) await run([LITERAL, "rm", "--cached", "-q", "--ignore-unmatch", "--", ...missing], env)
-      return await run(["write-tree"], env)
+      if (present.length > 0) await run([LITERAL, "add", "-A", "--", ...present], inIndex)
+      if (missing.length > 0)
+        await run([LITERAL, "rm", "--cached", "-q", "--ignore-unmatch", "--", ...missing], inIndex)
+      return await run(["write-tree"], inIndex)
     } finally {
       await rm(index, { force: true })
     }
@@ -101,11 +104,10 @@ export function createGitSyncRepo(options: GitSyncRepoOptions): SyncRepo {
       for (let attempt = 0; attempt < CAS_ATTEMPTS; attempt += 1) {
         const parent = await head()
         const tree = await treeOnto(parent, paths)
-        const commit = await run(
-          ["commit-tree", tree, ...(parent === null ? [] : ["-p", parent]), "-F", "-"],
-          author,
-          message,
-        )
+        const commit = await run(["commit-tree", tree, ...(parent === null ? [] : ["-p", parent]), "-F", "-"], {
+          env: author,
+          stdin: message,
+        })
         // A lock file a crashed writer left behind goes through the same recovery as a memory write:
         // reclaimed when its owner is proven dead, otherwise surfaced as StrandedGitLockError.
         const moved = await withStrandedGitLockRecovery(root, () => moveHead(commit, parent))
