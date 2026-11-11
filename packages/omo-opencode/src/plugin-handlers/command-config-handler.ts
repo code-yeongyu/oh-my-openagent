@@ -1,17 +1,14 @@
-import type { OhMyOpenCodeConfig } from "../config";
-import {
-  getAgentConfigKey,
-  getAgentListDisplayName,
-} from "../shared/agent-display-names";
+import type { OhMyOpenCodeConfig } from "../config"
+import { getAgentConfigKey, getAgentListDisplayName } from "../shared/agent-display-names"
 import {
   loadUserCommands,
   loadProjectCommands,
   loadOpencodeGlobalCommands,
   loadOpencodeProjectCommands,
-} from "../features/claude-code-command-loader";
-import { loadBuiltinCommands } from "../features/builtin-commands";
-import { resolveActiveBuiltinSkills } from "@oh-my-opencode/skills-loader-core/builtin-skills";
-import { getSystemMcpServerNames } from "../features/claude-code-mcp-loader";
+} from "../features/claude-code-command-loader"
+import { loadBuiltinCommands } from "../features/builtin-commands"
+import { resolveActiveBuiltinSkills } from "@oh-my-opencode/skills-loader-core/builtin-skills"
+import { getSystemMcpServerNames } from "../features/claude-code-mcp-loader"
 import {
   builtinSkillsToCommandDefinitionRecord,
   discoverConfigSourceSkills,
@@ -26,29 +23,25 @@ import {
   loadOpencodeGlobalSkills,
   loadOpencodeProjectSkills,
   skillsToCommandDefinitionRecord,
-} from "../features/opencode-skill-loader";
-import {
-  detectExternalSkillPlugin,
-  getSkillPluginConflictWarning,
-  log,
-} from "../shared";
-import type { PluginComponents } from "./plugin-components-loader";
-import { adaptHostSkillConfig } from "../shared/host-skill-config";
-import { collectDisabledSkillAliases } from "../plugin/skill-context";
-import type { LoadedSkill } from "../features/opencode-skill-loader/types";
-import { detectWorktreePath } from "@oh-my-opencode/skills-loader-core/shared/project-discovery-dirs";
+} from "../features/opencode-skill-loader"
+import { detectExternalSkillPlugin, getSkillPluginConflictWarning, log } from "../shared"
+import type { PluginComponents } from "./plugin-components-loader"
+import { adaptHostSkillConfig } from "../shared/host-skill-config"
+import { collectDisabledSkillAliases } from "../plugin/skill-context"
+import type { LoadedSkill } from "../features/opencode-skill-loader/types"
+import { detectWorktreePath } from "@oh-my-opencode/skills-loader-core/shared/project-discovery-dirs"
 
 export async function applyCommandConfig(params: {
-  config: Record<string, unknown>;
-  pluginConfig: OhMyOpenCodeConfig;
-  ctx: { directory: string };
-  pluginComponents: PluginComponents;
+  config: Record<string, unknown>
+  pluginConfig: OhMyOpenCodeConfig
+  ctx: { directory: string }
+  pluginComponents: PluginComponents
 }): Promise<void> {
-  const disabledSkills = collectDisabledSkillAliases(params.pluginConfig);
+  const disabledSkills = collectDisabledSkillAliases(params.pluginConfig)
   const builtinCommands = loadBuiltinCommands(params.pluginConfig.disabled_commands, {
     useRegisteredAgents: true,
     teamModeEnabled: params.pluginConfig.team_mode?.enabled ?? false,
-  });
+  })
   const builtinSkillCommands = builtinSkillsToCommandDefinitionRecord(
     resolveActiveBuiltinSkills({
       browserProvider: params.pluginConfig.browser_automation_engine?.provider ?? "playwright",
@@ -56,23 +49,23 @@ export async function applyCommandConfig(params: {
       teamModeEnabled: params.pluginConfig.team_mode?.enabled ?? false,
       systemMcpNames: getSystemMcpServerNames(),
     }),
-  );
+  )
   for (const disabledCommand of params.pluginConfig.disabled_commands ?? []) {
-    delete builtinSkillCommands[disabledCommand];
+    delete builtinSkillCommands[disabledCommand]
   }
-  const systemCommands = (params.config.command as Record<string, unknown>) ?? {};
+  const systemCommands = (params.config.command as Record<string, unknown>) ?? {}
 
-  const includeClaudeCommands = params.pluginConfig.claude_code?.commands ?? true;
-  const includeClaudeSkills = params.pluginConfig.claude_code?.skills ?? true;
+  const includeClaudeCommands = params.pluginConfig.claude_code?.commands ?? true
+  const includeClaudeSkills = params.pluginConfig.claude_code?.skills ?? true
 
-  const externalSkillPlugin = detectExternalSkillPlugin(params.ctx.directory);
+  const externalSkillPlugin = detectExternalSkillPlugin(params.ctx.directory)
   if (includeClaudeSkills && externalSkillPlugin.detected && externalSkillPlugin.pluginName) {
-    log(getSkillPluginConflictWarning(externalSkillPlugin.pluginName));
+    log(getSkillPluginConflictWarning(externalSkillPlugin.pluginName))
   }
 
-  const hostSkillConfig = adaptHostSkillConfig(params.config.skills);
-  const diskHostSkills = readOpencodeConfigSkills(params.ctx.directory);
-  const sourceProvenance = getSkillSourceProvenance(params.pluginConfig.skills);
+  const hostSkillConfig = adaptHostSkillConfig(params.config.skills)
+  const diskHostSkills = readOpencodeConfigSkills(params.ctx.directory)
+  const sourceProvenance = getSkillSourceProvenance(params.pluginConfig.skills)
   const [
     configSourceSkills,
     hostConfigSkills,
@@ -96,7 +89,12 @@ export async function applyCommandConfig(params: {
       configDir: params.ctx.directory,
       userSources: diskHostSkills?.userPaths,
       projectSources: diskHostSkills?.projectPaths,
-      provenance: { ...sourceProvenance, kind: "host", selectedRoot: params.ctx.directory, projectRoot: sourceProvenance?.projectRoot ?? detectWorktreePath(params.ctx.directory) ?? params.ctx.directory },
+      provenance: {
+        ...sourceProvenance,
+        kind: "host",
+        selectedRoot: params.ctx.directory,
+        projectRoot: sourceProvenance?.projectRoot ?? detectWorktreePath(params.ctx.directory) ?? params.ctx.directory,
+      },
     }),
     includeClaudeCommands ? loadUserCommands() : Promise.resolve({}),
     includeClaudeCommands ? loadProjectCommands(params.ctx.directory) : Promise.resolve({}),
@@ -108,7 +106,7 @@ export async function applyCommandConfig(params: {
     includeClaudeSkills ? loadProjectAgentsSkills(params.ctx.directory, sourceProvenance) : Promise.resolve({}),
     loadOpencodeGlobalSkills(),
     loadOpencodeProjectSkills(params.ctx.directory, sourceProvenance),
-  ]);
+  ])
 
   params.config.command = {
     "omo-mcp-env-grant": {
@@ -132,35 +130,29 @@ export async function applyCommandConfig(params: {
     ...filterDisabledSkillCommandRecord(opencodeProjectSkills, disabledSkills),
     ...params.pluginComponents.commands,
     ...filterDisabledSkillCommandRecord(params.pluginComponents.skills, disabledSkills),
-  };
+  }
 
-  remapCommandAgentFields(
-    params.config.command as Record<string, Record<string, unknown>>,
-    params.pluginConfig.agents,
-  );
+  remapCommandAgentFields(params.config.command as Record<string, Record<string, unknown>>, params.pluginConfig.agents)
 }
 
-function filterDisabledLoadedSkills(
-  skills: LoadedSkill[],
-  disabledSkills: ReadonlySet<string>,
-): LoadedSkill[] {
-  if (disabledSkills.size === 0) return skills;
-  return skills.filter((skill) => !isDisabledSkillAlias(skill, disabledSkills));
+function filterDisabledLoadedSkills(skills: LoadedSkill[], disabledSkills: ReadonlySet<string>): LoadedSkill[] {
+  if (disabledSkills.size === 0) return skills
+  return skills.filter((skill) => !isDisabledSkillAlias(skill, disabledSkills))
 }
 
 function filterDisabledSkillCommandRecord<T>(
   commands: Record<string, T>,
   disabledSkills: ReadonlySet<string>,
 ): Record<string, T> {
-  if (disabledSkills.size === 0) return commands;
+  if (disabledSkills.size === 0) return commands
 
-  const activeCommands: Record<string, T> = {};
+  const activeCommands: Record<string, T> = {}
   for (const [name, command] of Object.entries(commands)) {
     if (!isDisabledSkillName(name, disabledSkills)) {
-      activeCommands[name] = command;
+      activeCommands[name] = command
     }
   }
-  return activeCommands;
+  return activeCommands
 }
 
 function remapCommandAgentFields(
@@ -169,7 +161,7 @@ function remapCommandAgentFields(
 ): void {
   for (const cmd of Object.values(commands)) {
     if (cmd?.agent && typeof cmd.agent === "string") {
-      cmd.agent = getAgentListDisplayName(getAgentConfigKey(cmd.agent), overrides);
+      cmd.agent = getAgentListDisplayName(getAgentConfigKey(cmd.agent), overrides)
     }
   }
 }

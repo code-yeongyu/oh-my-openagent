@@ -64,7 +64,8 @@ function register(override = false): void {
 
 async function report(): Promise<unknown> {
   register(scenario === "override")
-  if (resolverSource === undefined || rpcSource !== resolverSource) throw new Error("resolver and RPC did not receive one source")
+  if (resolverSource === undefined || rpcSource !== resolverSource)
+    throw new Error("resolver and RPC did not receive one source")
   const account = await resolverSource()
   // Repeated component registration must reuse the bootstrap rather than provide the name twice.
   register(scenario === "override")
@@ -86,19 +87,31 @@ if (isMainThread && scenario === "provider-throw") {
     if (!(error instanceof Error) || !error.message.includes("already provided")) throw error
     process.stdout.write(`${JSON.stringify({ error: error.message, cliBuilt })}\n`)
   }
-} else if (isMainThread && (scenario === "worker-absent" || scenario === "worker-port-absent" || scenario === "worker-desktop")) {
+} else if (
+  isMainThread &&
+  (scenario === "worker-absent" || scenario === "worker-port-absent" || scenario === "worker-desktop")
+) {
   if (scenario === "worker-desktop") register()
-  const start = (extensionData: Readonly<Record<string, unknown>>, transferList: readonly import("node:worker_threads").Transferable[]) =>
+  const start = (
+    extensionData: Readonly<Record<string, unknown>>,
+    transferList: readonly import("node:worker_threads").Transferable[],
+  ) =>
     new Worker(new URL(import.meta.url), { workerData: { scenario, extensionData }, transferList: [...transferList] })
-  const issued = scenario === "worker-desktop" ? sessionWorkerDataRegistry.spawn(data => start(data.extensionData, data.transfer)) : undefined
-  const worker = issued?.result ?? start(scenario === "worker-port-absent" ? { [MEMORY_SYNC_WORKER_DATA]: "not-a-port" } : {}, [])
+  const issued =
+    scenario === "worker-desktop"
+      ? sessionWorkerDataRegistry.spawn((data) => start(data.extensionData, data.transfer))
+      : undefined
+  const worker =
+    issued?.result ?? start(scenario === "worker-port-absent" ? { [MEMORY_SYNC_WORKER_DATA]: "not-a-port" } : {}, [])
   try {
     const result = await new Promise<unknown>((resolve, reject) => {
-      worker.on("message", message => {
+      worker.on("message", (message) => {
         if (typeof message === "object" && message !== null && "report" in message) resolve(message.report)
       })
       worker.once("error", reject)
-      worker.once("exit", code => { if (code !== 0) reject(new Error(`worker exited ${code}`)) })
+      worker.once("exit", (code) => {
+        if (code !== 0) reject(new Error(`worker exited ${code}`))
+      })
     })
     process.stdout.write(`${JSON.stringify(result)}\n`)
   } finally {

@@ -12,12 +12,13 @@ export interface SyncSpawnReservation {
 
 export async function reserveSyncSubagentSpawn(
   executorCtx: Pick<ExecutorContext, "manager">,
-  parentContext: Pick<ParentContext, "sessionID">
+  parentContext: Pick<ParentContext, "sessionID">,
 ): Promise<SyncSpawnReservation> {
   const { manager } = executorCtx
-  const reservation = typeof manager?.reserveSubagentSpawn === "function"
-    ? await manager.reserveSubagentSpawn(parentContext.sessionID)
-    : undefined
+  const reservation =
+    typeof manager?.reserveSubagentSpawn === "function"
+      ? await manager.reserveSubagentSpawn(parentContext.sessionID)
+      : undefined
 
   if (reservation?.spawnContext) {
     return {
@@ -35,8 +36,8 @@ export async function reserveSyncSubagentSpawn(
 
   log(
     "[task] WARNING: BackgroundManager has no spawn enforcement methods (reserveSubagentSpawn / assertCanSpawn). " +
-    "Depth limits cannot be enforced for this task. This indicates an old SDK or a misconfiguration.",
-    { parentSessionID: parentContext.sessionID }
+      "Depth limits cannot be enforced for this task. This indicates an old SDK or a misconfiguration.",
+    { parentSessionID: parentContext.sessionID },
   )
   return {
     spawnContext: {

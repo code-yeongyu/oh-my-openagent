@@ -24,8 +24,11 @@ export function isSqliteBackend(): boolean {
   }
 
   const result = check()
-  if (result) { cachedResult = true }
-  else { cachedResult = FALSE_PENDING_RETRY }
+  if (result) {
+    cachedResult = true
+  } else {
+    cachedResult = FALSE_PENDING_RETRY
+  }
   return result
 }
 

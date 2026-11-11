@@ -47,8 +47,13 @@ function seamPresent(surface: unknown, path: string, kind: SenpiSeamKind): boole
   return kind === "object" ? typeof value === "object" && value !== null : typeof value === kind
 }
 
-export function absentSenpiSeams(surface: unknown, seams: Readonly<Record<string, SenpiSeamKind>> = SENPI_SEAMS): string[] {
-  return Object.entries(seams).filter(([path, kind]) => !seamPresent(surface, path, kind)).map(([path]) => path)
+export function absentSenpiSeams(
+  surface: unknown,
+  seams: Readonly<Record<string, SenpiSeamKind>> = SENPI_SEAMS,
+): string[] {
+  return Object.entries(seams)
+    .filter(([path, kind]) => !seamPresent(surface, path, kind))
+    .map(([path]) => path)
 }
 
 export function absentSenpiSeamsNotice(surface: unknown): string | undefined {
@@ -79,7 +84,10 @@ function isRemoteMonitorTarget(target: string): boolean {
   return device !== undefined && !/\.jsonl$/i.test(trimmed) && !DRIVE_LETTER.test(device) && !PATH_SEGMENT.test(device)
 }
 
-function remoteWakeUnavailable(surface: unknown, target: string): { readonly code: typeof REMOTE_WAKE_UNAVAILABLE; readonly message: string } | undefined {
+function remoteWakeUnavailable(
+  surface: unknown,
+  target: string,
+): { readonly code: typeof REMOTE_WAKE_UNAVAILABLE; readonly message: string } | undefined {
   if (!isRemoteMonitorTarget(target) || seamPresent(surface, REMOTE_WAKE_SEAM, "function")) return undefined
   return {
     code: REMOTE_WAKE_UNAVAILABLE,
@@ -92,16 +100,24 @@ function remoteWakeUnavailable(surface: unknown, target: string): { readonly cod
  * seam is absent, so the agent gets `remote_wake_unavailable` instead of "Monitor started" and a watch that never
  * fires. Registers nothing when the seam is present.
  */
-export function installRemoteWakeRefusal(pi: { on(event: string, handler: (payload: unknown) => unknown): void }): void {
+export function installRemoteWakeRefusal(pi: {
+  on(event: string, handler: (payload: unknown) => unknown): void
+}): void {
   if (seamPresent(pi, REMOTE_WAKE_SEAM, "function")) return
   pi.on("tool_call", (payload) => {
-    if (typeof payload !== "object" || payload === null || Reflect.get(payload, "toolName") !== "monitor") return undefined
+    if (typeof payload !== "object" || payload === null || Reflect.get(payload, "toolName") !== "monitor")
+      return undefined
     const input: unknown = Reflect.get(payload, "input")
     if (typeof input !== "object" || input === null) return undefined
     const action: unknown = Reflect.get(input, "action")
     const type: unknown = Reflect.get(input, "type")
     const target: unknown = Reflect.get(input, "target")
-    if ((action !== undefined && action !== "create") || (type !== undefined && type !== "rpc") || typeof target !== "string") return undefined
+    if (
+      (action !== undefined && action !== "create") ||
+      (type !== undefined && type !== "rpc") ||
+      typeof target !== "string"
+    )
+      return undefined
     const refusal = remoteWakeUnavailable(pi, target)
     return refusal === undefined ? undefined : { block: true, reason: refusal.message }
   })

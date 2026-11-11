@@ -47,7 +47,12 @@ export async function consumeAgreementsNoticeDelta(
     // No mutation or notice is needed. A differing set, including an acknowledgement,
     // must still be read again under the lock before consuming or replacing the watermark.
     const flaggedIds = new Set(flagged.map((item) => item.id))
-    if (announced !== undefined && flaggedIds.size === announced.size && [...flaggedIds].every((id) => announced.has(id))) return []
+    if (
+      announced !== undefined &&
+      flaggedIds.size === announced.size &&
+      [...flaggedIds].every((id) => announced.has(id))
+    )
+      return []
   }
   const record = await createLockRecord("agreements notice watermark")
   try {
@@ -63,7 +68,11 @@ export async function consumeAgreementsNoticeDelta(
   }
 }
 
-async function consumeUnderLock(repo: GitMemoryRepo, noticesDir: string, onWarn?: WarnSink): Promise<readonly AgreementItem[]> {
+async function consumeUnderLock(
+  repo: GitMemoryRepo,
+  noticesDir: string,
+  onWarn?: WarnSink,
+): Promise<readonly AgreementItem[]> {
   const head = await repo.head()
   if (head === null) return []
   const flagged = agreementItemsOf(await readAgreementsAt(repo, head)).filter((item) => item.status === "needs-human")
@@ -99,7 +108,12 @@ async function writeWatermark(noticesDir: string, announced: readonly string[], 
   const temporary = `${target}.tmp-${process.pid}-${randomUUID()}`
   const watermark: FlaggedWatermark = { version: 1, announced }
   try {
-    await writeFile(temporary, `${JSON.stringify(watermark)}\n`, { encoding: "utf8", mode: 0o600, flag: "wx", flush: true })
+    await writeFile(temporary, `${JSON.stringify(watermark)}\n`, {
+      encoding: "utf8",
+      mode: 0o600,
+      flag: "wx",
+      flush: true,
+    })
     await rename(temporary, target)
   } catch (error) {
     // Cleanup is best-effort: a failing rm must not replace the original write/rename error.

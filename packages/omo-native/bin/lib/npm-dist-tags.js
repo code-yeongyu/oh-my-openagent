@@ -33,7 +33,8 @@ export function fetchNpmDistTagsSync(options = {}) {
       windowsHide: true,
       env: process.env,
     })
-    if (result.error || result.status !== 0 || typeof result.stdout !== "string" || result.stdout.trim() === "") return null
+    if (result.error || result.status !== 0 || typeof result.stdout !== "string" || result.stdout.trim() === "")
+      return null
     const parsed = JSON.parse(result.stdout)
     return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null
   } catch {

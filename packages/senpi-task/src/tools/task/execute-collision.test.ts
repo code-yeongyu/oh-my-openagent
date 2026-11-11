@@ -1,7 +1,13 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
 import { collisionStore } from "../../manager/__fixtures__/collision-store"
-import { FakeRunner, categoryPlanner, cleanupProjects, settings, tempProject } from "../../manager/__fixtures__/manager-fakes"
+import {
+  FakeRunner,
+  categoryPlanner,
+  cleanupProjects,
+  settings,
+  tempProject,
+} from "../../manager/__fixtures__/manager-fakes"
 import { createTaskManager } from "../../manager"
 import { createTaskRecordStore } from "../../store"
 import { CTX, makeDeps } from "./__fixtures__/task-tool-fakes"
@@ -28,7 +34,13 @@ describe("buildTaskExecute collision handling", () => {
     const execute = buildCollisionExecute()
 
     // when
-    const result = await execute("collision-single", { prompt: "work", category: "quick", run_in_background: true }, undefined, undefined, CTX)
+    const result = await execute(
+      "collision-single",
+      { prompt: "work", category: "quick", run_in_background: true },
+      undefined,
+      undefined,
+      CTX,
+    )
 
     // then
     expect(result.details.status).toBe("running")

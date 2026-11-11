@@ -92,20 +92,23 @@ export async function readReflectionHealth(
     if (record.outcome === "failed") failuresBeforeSuccess.push(record)
   }
   const now = options.now ?? Date.now()
-  const newestFailureAt = failuresBeforeSuccess[0] === undefined
-    ? undefined
-    : Date.parse(failuresBeforeSuccess[0].finishedAt)
-  const stale = newestFailureAt !== undefined && Number.isFinite(newestFailureAt)
-    && now - newestFailureAt > REFLECTION_HEALTH_STALE_MS
+  const newestFailureAt =
+    failuresBeforeSuccess[0] === undefined ? undefined : Date.parse(failuresBeforeSuccess[0].finishedAt)
+  const stale =
+    newestFailureAt !== undefined &&
+    Number.isFinite(newestFailureAt) &&
+    now - newestFailureAt > REFLECTION_HEALTH_STALE_MS
   const recent = (stale ? [] : failuresBeforeSuccess.slice(0, 3)).map(fingerprintOf)
   const dominant = dominantFingerprint(recent)
   const lastFailure = bounded.find((record) => record.outcome === "failed")
   const lastSuccess = bounded.find((record) => record.outcome === "merged" || record.outcome === "no_changes")
   const streakSinceISO = stale ? undefined : failuresBeforeSuccess.at(-1)?.finishedAt
-  const streakRunIds = failuresBeforeSuccess.flatMap((record) => record.runId === undefined ? [] : [record.runId])
-  const streakRuntimes = [...new Set(failuresBeforeSuccess.flatMap((record) =>
-    record.launcher === undefined ? [] : [record.launcher.runtime],
-  ))]
+  const streakRunIds = failuresBeforeSuccess.flatMap((record) => (record.runId === undefined ? [] : [record.runId]))
+  const streakRuntimes = [
+    ...new Set(
+      failuresBeforeSuccess.flatMap((record) => (record.launcher === undefined ? [] : [record.launcher.runtime])),
+    ),
+  ]
   const newest = bounded[0]
 
   return {
@@ -182,13 +185,15 @@ function emptyHealth(): ReflectionHealth {
 }
 
 function isOutcome(value: unknown): value is ReflectionOutcome {
-  return value === "merged"
-    || value === "no_changes"
-    || value === "parent_dirty"
-    || value === "merge_conflict"
-    || value === "dirty_uncommitted"
-    || value === "failed"
-    || value === "timed_out"
+  return (
+    value === "merged" ||
+    value === "no_changes" ||
+    value === "parent_dirty" ||
+    value === "merge_conflict" ||
+    value === "dirty_uncommitted" ||
+    value === "failed" ||
+    value === "timed_out"
+  )
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -196,10 +201,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isReflectionLauncher(value: unknown): value is ReflectionLauncher {
-  if (!isRecord(value)
-    || typeof value.runtime !== "string"
-    || typeof value.execPath !== "string"
-    || !Number.isInteger(value.pid)
-    || Number(value.pid) <= 0) return false
+  if (
+    !isRecord(value) ||
+    typeof value.runtime !== "string" ||
+    typeof value.execPath !== "string" ||
+    !Number.isInteger(value.pid) ||
+    Number(value.pid) <= 0
+  )
+    return false
   return value.sessionId === undefined || typeof value.sessionId === "string"
 }

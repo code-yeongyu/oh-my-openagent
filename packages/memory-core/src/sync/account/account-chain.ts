@@ -37,7 +37,8 @@ export interface AccountChain {
   isMember(): boolean
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value)
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
 
 const isServedRow = (value: unknown): value is ChainRow =>
   isRecord(value) && Number.isSafeInteger(value["seq"]) && (value["kind"] === "batch" || value["kind"] === "keyring")
@@ -133,7 +134,8 @@ export async function openAccountChain(input: {
     if (authority === null) return null
     if (keysEpoch !== authority.epoch) {
       const wrap = committedWrap(state, authority.epoch, `device:${keyring.principal().id}`)
-      const material = wrap === null ? null : await ownMaterial(keyring, account, wrap, expectedHistory(authority, authority.epoch))
+      const material =
+        wrap === null ? null : await ownMaterial(keyring, account, wrap, expectedHistory(authority, authority.epoch))
       if (material === null) return null
       keys.clear()
       keys.set(material.epoch, new Uint8Array(material.current))

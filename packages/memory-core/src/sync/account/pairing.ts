@@ -32,8 +32,17 @@ const compareBytes = (left: Uint8Array, right: Uint8Array): number => {
 
 export async function approvalCode(account: string, parties: readonly [PairingParty, PairingParty]): Promise<string> {
   const devices = [...parties]
-    .sort((a, b) => compareBytes(b64urlDecode(a.principal.signing_public_key), b64urlDecode(b.principal.signing_public_key)))
-    .map((party) => ({ sealing_public_key: party.principal.sealing_public_key, signing_public_key: party.principal.signing_public_key, nonce: party.nonce }))
+    .sort((a, b) =>
+      compareBytes(b64urlDecode(a.principal.signing_public_key), b64urlDecode(b.principal.signing_public_key)),
+    )
+    .map((party) => ({
+      sealing_public_key: party.principal.sealing_public_key,
+      signing_public_key: party.principal.signing_public_key,
+      nonce: party.nonce,
+    }))
   const digest = b64urlDecode(await taggedHash("omo-sync/v1/approval-code", { account, devices }))
-  return String(new DataView(digest.buffer, digest.byteOffset, digest.byteLength).getUint32(0) % 1_000_000).padStart(6, "0")
+  return String(new DataView(digest.buffer, digest.byteOffset, digest.byteLength).getUint32(0) % 1_000_000).padStart(
+    6,
+    "0",
+  )
 }

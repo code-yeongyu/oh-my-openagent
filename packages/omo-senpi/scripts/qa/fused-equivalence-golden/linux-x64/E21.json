@@ -5123,7 +5123,27 @@
           "status": "success"
          }
         ],
-        "sandbox": "vm"
+        "sandbox": "vm",
+        "report": {
+         "disposition": {
+          "delivery": "delivered_unverified",
+          "retry": "unsafe"
+         },
+         "delivered": null,
+         "effect": "unverifiable",
+         "route": "foreground_hid",
+         "hit": null,
+         "focusRestoration": "not_needed",
+         "openedSurfaces": [],
+         "nextCall": null,
+         "note": null,
+         "warning": null,
+         "auditIds": [
+          "<audit:1>"
+         ],
+         "timings": null,
+         "legacy": false
+        }
        }
       },
       "isError": false
@@ -5170,7 +5190,27 @@
           "status": "success"
          }
         ],
-        "sandbox": "vm"
+        "sandbox": "vm",
+        "report": {
+         "disposition": {
+          "delivery": "delivered_unverified",
+          "retry": "unsafe"
+         },
+         "delivered": null,
+         "effect": "unverifiable",
+         "route": "foreground_hid",
+         "hit": null,
+         "focusRestoration": "not_needed",
+         "openedSurfaces": [],
+         "nextCall": null,
+         "note": null,
+         "warning": null,
+         "auditIds": [
+          "<audit:1>"
+         ],
+         "timings": null,
+         "legacy": false
+        }
        },
        "isError": false,
        "timestamp": "<ts:message.timestamp:15>"
@@ -5218,7 +5258,27 @@
           "status": "success"
          }
         ],
-        "sandbox": "vm"
+        "sandbox": "vm",
+        "report": {
+         "disposition": {
+          "delivery": "delivered_unverified",
+          "retry": "unsafe"
+         },
+         "delivered": null,
+         "effect": "unverifiable",
+         "route": "foreground_hid",
+         "hit": null,
+         "focusRestoration": "not_needed",
+         "openedSurfaces": [],
+         "nextCall": null,
+         "note": null,
+         "warning": null,
+         "auditIds": [
+          "<audit:1>"
+         ],
+         "timings": null,
+         "legacy": false
+        }
        },
        "isError": false,
        "timestamp": "<ts:message.timestamp:16>"
@@ -5271,7 +5331,27 @@
            "status": "success"
           }
          ],
-         "sandbox": "vm"
+         "sandbox": "vm",
+         "report": {
+          "disposition": {
+           "delivery": "delivered_unverified",
+           "retry": "unsafe"
+          },
+          "delivered": null,
+          "effect": "unverifiable",
+          "route": "foreground_hid",
+          "hit": null,
+          "focusRestoration": "not_needed",
+          "openedSurfaces": [],
+          "nextCall": null,
+          "note": null,
+          "warning": null,
+          "auditIds": [
+           "<audit:1>"
+          ],
+          "timings": null,
+          "legacy": false
+         }
         },
         "isError": false,
         "timestamp": "<ts:message.timestamp:17>"
@@ -5363,7 +5443,27 @@
            "status": "success"
           }
          ],
-         "sandbox": "vm"
+         "sandbox": "vm",
+         "report": {
+          "disposition": {
+           "delivery": "delivered_unverified",
+           "retry": "unsafe"
+          },
+          "delivered": null,
+          "effect": "unverifiable",
+          "route": "foreground_hid",
+          "hit": null,
+          "focusRestoration": "not_needed",
+          "openedSurfaces": [],
+          "nextCall": null,
+          "note": null,
+          "warning": null,
+          "auditIds": [
+           "<audit:1>"
+          ],
+          "timings": null,
+          "legacy": false
+         }
         },
         "isError": false,
         "timestamp": "<ts:toolResults.timestamp:1>"
@@ -5733,7 +5833,27 @@
            "status": "success"
           }
          ],
-         "sandbox": "vm"
+         "sandbox": "vm",
+         "report": {
+          "disposition": {
+           "delivery": "delivered_unverified",
+           "retry": "unsafe"
+          },
+          "delivered": null,
+          "effect": "unverifiable",
+          "route": "foreground_hid",
+          "hit": null,
+          "focusRestoration": "not_needed",
+          "openedSurfaces": [],
+          "nextCall": null,
+          "note": null,
+          "warning": null,
+          "auditIds": [
+           "<audit:1>"
+          ],
+          "timings": null,
+          "legacy": false
+         }
         },
         "isError": false,
         "timestamp": "<ts:messages.timestamp:6>"
@@ -6965,7 +7085,27 @@
          "status": "success"
         }
        ],
-       "sandbox": "vm"
+       "sandbox": "vm",
+       "report": {
+        "disposition": {
+         "delivery": "delivered_unverified",
+         "retry": "unsafe"
+        },
+        "delivered": null,
+        "effect": "unverifiable",
+        "route": "foreground_hid",
+        "hit": null,
+        "focusRestoration": "not_needed",
+        "openedSurfaces": [],
+        "nextCall": null,
+        "note": null,
+        "warning": null,
+        "auditIds": [
+         "<audit:1>"
+        ],
+        "timings": null,
+        "legacy": false
+       }
       },
       "isError": false,
       "timestamp": "<ts:message.timestamp:3>"

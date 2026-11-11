@@ -2,15 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { createAutoRetryHelpers } from "./auto-retry"
 import { createRuntimeFallbackHook } from "./hook"
 import type { HookDeps, RuntimeFallbackHook, RuntimeFallbackPluginInput } from "./types"
-import {
-  clearAllCompactions,
-  recordCompactionEnd,
-  recordCompactionStart,
-} from "../../shared/compaction-in-flight"
-import {
-  installRuntimeFallbackTestClock,
-  restoreRuntimeFallbackTestClock,
-} from "./test-timeout-clock.test-support"
+import { clearAllCompactions, recordCompactionEnd, recordCompactionStart } from "../../shared/compaction-in-flight"
+import { installRuntimeFallbackTestClock, restoreRuntimeFallbackTestClock } from "./test-timeout-clock.test-support"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 
 const hookConfig = {
@@ -65,30 +58,38 @@ describe("runtime fallback hook compaction re-arm guards", () => {
     const toastCalls: string[] = []
     let deps: HookDeps | undefined
     const clock = installRuntimeFallbackTestClock(0)
-    const hook = createRuntimeFallbackHook(createContext(abortCalls, toastCalls), {
-      config: {
-        enabled: true,
-        retry_on_errors: [429, 503, 529],
-        max_fallback_attempts: 3,
-        cooldown_seconds: 0,
-        timeout_seconds: 10,
-        notify_on_fallback: false,
-        restore_primary_after_cooldown: false,
+    const hook = createRuntimeFallbackHook(
+      createContext(abortCalls, toastCalls),
+      {
+        config: {
+          enabled: true,
+          retry_on_errors: [429, 503, 529],
+          max_fallback_attempts: 3,
+          cooldown_seconds: 0,
+          timeout_seconds: 10,
+          notify_on_fallback: false,
+          restore_primary_after_cooldown: false,
+        },
+        session_timeout_ms: 10_000,
       },
-      session_timeout_ms: 10_000,
-    }, {
-      createAutoRetryHelpers: (nextDeps) => {
-        deps = nextDeps
-        return createAutoRetryHelpers(nextDeps)
+      {
+        createAutoRetryHelpers: (nextDeps) => {
+          deps = nextDeps
+          return createAutoRetryHelpers(nextDeps)
+        },
       },
-    })
+    )
     const sessionID = "session-hook-progress-budget"
-    await hook.event({ event: { type: "session.created", properties: { info: { id: sessionID, model: "openai/gpt-5.4" } } } })
+    await hook.event({
+      event: { type: "session.created", properties: { info: { id: sessionID, model: "openai/gpt-5.4" } } },
+    })
     deps?.sessionAwaitingFallbackResult.add(sessionID)
     recordCompactionStart(sessionID)
 
     await clock.advanceBy(599_000)
-    await hook.event({ event: { type: "message.part.updated", properties: { sessionID, part: { sessionID, type: "text" } } } })
+    await hook.event({
+      event: { type: "message.part.updated", properties: { sessionID, part: { sessionID, type: "text" } } },
+    })
     await clock.advanceBy(1_000)
 
     expect(abortCalls).toEqual([sessionID])
@@ -100,37 +101,51 @@ describe("runtime fallback hook compaction re-arm guards", () => {
   test("#given an ended compaction #when repeated message updates arrive #then post-compaction re-arm runs once per endedAt", async () => {
     const scheduleCalls: Array<{ sessionID: string }> = []
     let deps: HookDeps | undefined
-    const hook = createRuntimeFallbackHook(createContext([], []), {}, {
-      createAutoRetryHelpers: (nextDeps) => {
-        deps = nextDeps
-        return {
-          abortSessionRequest: async () => {},
-          clearSessionFallbackTimeout: () => {},
-          scheduleSessionFallbackTimeout: (sessionID: string) => {
-            scheduleCalls.push({ sessionID })
-          },
-          autoRetryWithFallback: async () => ({ accepted: true, status: "dispatched" as const }),
-          resolveAgentForSessionFromContext: async () => undefined,
-          cleanupStaleSessions: () => {},
-        }
+    const hook = createRuntimeFallbackHook(
+      createContext([], []),
+      {},
+      {
+        createAutoRetryHelpers: (nextDeps) => {
+          deps = nextDeps
+          return {
+            abortSessionRequest: async () => {},
+            clearSessionFallbackTimeout: () => {},
+            scheduleSessionFallbackTimeout: (sessionID: string) => {
+              scheduleCalls.push({ sessionID })
+            },
+            autoRetryWithFallback: async () => ({ accepted: true, status: "dispatched" as const }),
+            resolveAgentForSessionFromContext: async () => undefined,
+            cleanupStaleSessions: () => {},
+          }
+        },
+        createEventHandler: () => async () => {},
+        createMessageUpdateHandler: () => async () => {},
+        createChatMessageHandler: () => async () => {},
+        createFirstPromptWatchdog: () => ({
+          onUserMessage: () => {},
+          onAssistantProgress: () => {},
+          onSessionTerminal: () => {},
+          dispose: () => {},
+        }),
       },
-      createEventHandler: () => async () => {},
-      createMessageUpdateHandler: () => async () => {},
-      createChatMessageHandler: () => async () => {},
-      createFirstPromptWatchdog: () => ({
-        onUserMessage: () => {},
-        onAssistantProgress: () => {},
-        onSessionTerminal: () => {},
-        dispose: () => {},
-      }),
-    })
+    )
     const sessionID = "session-hook-ended-rearm"
     deps?.sessionAwaitingFallbackResult.add(sessionID)
     recordCompactionStart(sessionID)
     recordCompactionEnd(sessionID)
 
-    await hook.event({ event: { type: "message.updated", properties: { sessionID, info: { sessionID, role: "assistant", time: { completed: 1 } } } } })
-    await hook.event({ event: { type: "message.updated", properties: { sessionID, info: { sessionID, role: "assistant", time: { completed: 1 } } } } })
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: { sessionID, info: { sessionID, role: "assistant", time: { completed: 1 } } },
+      },
+    })
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: { sessionID, info: { sessionID, role: "assistant", time: { completed: 1 } } },
+      },
+    })
 
     expect(scheduleCalls).toEqual([{ sessionID }])
     hook.dispose?.()
@@ -145,31 +160,46 @@ describe("runtime fallback hook compaction re-arm guards", () => {
     const compactionMessage = { sessionID, id: "compaction-message", role: "assistant", agent: "compaction" }
     SessionCategoryRegistry.register(sessionID, "test")
     const clock = installRuntimeFallbackTestClock(0)
-    const hook: RuntimeFallbackHook = createRuntimeFallbackHook(createContext(abortCalls, toastCalls, {
-      onAbort: async () => {
-        if (abortCalls.length !== 1) return
-        await hook.event({ event: { type: "message.updated", properties: { info: { ...compactionMessage, error: { name: "MessageAbortedError", message: "aborted" } } } } })
-        await hook.event({ event: { type: "session.idle", properties: { sessionID } } })
+    const hook: RuntimeFallbackHook = createRuntimeFallbackHook(
+      createContext(abortCalls, toastCalls, {
+        onAbort: async () => {
+          if (abortCalls.length !== 1) return
+          await hook.event({
+            event: {
+              type: "message.updated",
+              properties: {
+                info: { ...compactionMessage, error: { name: "MessageAbortedError", message: "aborted" } },
+              },
+            },
+          })
+          await hook.event({ event: { type: "session.idle", properties: { sessionID } } })
+        },
+        onPrompt: () => {
+          promptCalls += 1
+        },
+      }),
+      {
+        config: hookConfig,
+        pluginConfig: { categories: { test: { fallback_models: ["anthropic/claude-sonnet-4-5"] } } },
+        session_timeout_ms: 10_000,
       },
-      onPrompt: () => {
-        promptCalls += 1
+      {
+        createAutoRetryHelpers: (nextDeps) => {
+          deps = nextDeps
+          return createAutoRetryHelpers(nextDeps)
+        },
       },
-    }), {
-      config: hookConfig,
-      pluginConfig: { categories: { test: { fallback_models: ["anthropic/claude-sonnet-4-5"] } } },
-      session_timeout_ms: 10_000,
-    }, {
-      createAutoRetryHelpers: (nextDeps) => {
-        deps = nextDeps
-        return createAutoRetryHelpers(nextDeps)
-      },
+    )
+    await hook.event({
+      event: { type: "session.created", properties: { info: { id: sessionID, model: "openai/gpt-5.4" } } },
     })
-    await hook.event({ event: { type: "session.created", properties: { info: { id: sessionID, model: "openai/gpt-5.4" } } } })
     deps?.sessionAwaitingFallbackResult.add(sessionID)
     await hook.event({ event: { type: "message.updated", properties: { info: compactionMessage } } })
 
     await clock.advanceBy(599_000)
-    await hook.event({ event: { type: "message.part.updated", properties: { sessionID, part: { sessionID, type: "text" } } } })
+    await hook.event({
+      event: { type: "message.part.updated", properties: { sessionID, part: { sessionID, type: "text" } } },
+    })
     await clock.advanceBy(1_000)
 
     expect(abortCalls).toEqual([sessionID])
@@ -191,22 +221,30 @@ describe("runtime fallback hook compaction re-arm guards", () => {
     const toastCalls: string[] = []
     let deps: HookDeps | undefined
     const sessionID = "session-hook-wedge-abort-window"
-    const progressEvent = { event: { type: "message.part.updated", properties: { sessionID, part: { sessionID, type: "text" } } } }
+    const progressEvent = {
+      event: { type: "message.part.updated", properties: { sessionID, part: { sessionID, type: "text" } } },
+    }
     const clock = installRuntimeFallbackTestClock(0)
-    const hook: RuntimeFallbackHook = createRuntimeFallbackHook(createContext(abortCalls, toastCalls, {
-      onAbort: async () => {
-        if (abortCalls.length === 1) await hook.event(progressEvent)
+    const hook: RuntimeFallbackHook = createRuntimeFallbackHook(
+      createContext(abortCalls, toastCalls, {
+        onAbort: async () => {
+          if (abortCalls.length === 1) await hook.event(progressEvent)
+        },
+      }),
+      {
+        config: hookConfig,
+        session_timeout_ms: 10_000,
       },
-    }), {
-      config: hookConfig,
-      session_timeout_ms: 10_000,
-    }, {
-      createAutoRetryHelpers: (nextDeps) => {
-        deps = nextDeps
-        return createAutoRetryHelpers(nextDeps)
+      {
+        createAutoRetryHelpers: (nextDeps) => {
+          deps = nextDeps
+          return createAutoRetryHelpers(nextDeps)
+        },
       },
+    )
+    await hook.event({
+      event: { type: "session.created", properties: { info: { id: sessionID, model: "openai/gpt-5.4" } } },
     })
-    await hook.event({ event: { type: "session.created", properties: { info: { id: sessionID, model: "openai/gpt-5.4" } } } })
     deps?.sessionAwaitingFallbackResult.add(sessionID)
     await hook.event(progressEvent)
 
@@ -231,42 +269,56 @@ describe("runtime fallback hook compaction re-arm guards", () => {
     let hook: RuntimeFallbackHook
     const sessionID = "session-hook-refused-dispatch-window"
     SessionCategoryRegistry.register(sessionID, "test")
-    const progressEvent = { event: { type: "message.part.updated", properties: { sessionID, part: { sessionID, type: "text" } } } }
+    const progressEvent = {
+      event: { type: "message.part.updated", properties: { sessionID, part: { sessionID, type: "text" } } },
+    }
     const clock = installRuntimeFallbackTestClock(0)
-    hook = createRuntimeFallbackHook({
-      client: {
-        session: {
-          abort: async ({ path }) => {
-            abortCalls.push(path.id)
-            if (abortCalls.length === 1) await hook.event(progressEvent)
-            return {}
+    hook = createRuntimeFallbackHook(
+      {
+        client: {
+          session: {
+            abort: async ({ path }) => {
+              abortCalls.push(path.id)
+              if (abortCalls.length === 1) await hook.event(progressEvent)
+              return {}
+            },
+            messages: async () => ({
+              data: [
+                { info: { id: "user-message", role: "user" }, parts: [{ type: "text", text: "real human prompt" }] },
+              ],
+            }),
+            promptAsync: async () => {
+              promptCalls += 1
+              throw new Error("provider rejected prompt")
+            },
           },
-          messages: async () => ({ data: [{ info: { id: "user-message", role: "user" }, parts: [{ type: "text", text: "real human prompt" }] }] }),
-          promptAsync: async () => {
-            promptCalls += 1
-            throw new Error("provider rejected prompt")
+          tui: {
+            showToast: async ({ body }) => {
+              toastCalls.push(body.message)
+              return {}
+            },
           },
         },
-        tui: {
-          showToast: async ({ body }) => {
-            toastCalls.push(body.message)
-            return {}
-          },
+        directory: "/test/dir",
+      },
+      {
+        config: hookConfig,
+        pluginConfig: {
+          categories: { test: { fallback_models: ["anthropic/claude-sonnet-4-5", "google/gemini-2.5-pro"] } },
+        },
+        session_timeout_ms: 10_000,
+      },
+      {
+        createAutoRetryHelpers: (nextDeps) => {
+          deps = nextDeps
+          return createAutoRetryHelpers(nextDeps)
         },
       },
-      directory: "/test/dir",
-    }, {
-      config: hookConfig,
-      pluginConfig: { categories: { test: { fallback_models: ["anthropic/claude-sonnet-4-5", "google/gemini-2.5-pro"] } } },
-      session_timeout_ms: 10_000,
-    }, {
-      createAutoRetryHelpers: (nextDeps) => {
-        deps = nextDeps
-        return createAutoRetryHelpers(nextDeps)
-      },
-    })
+    )
 
-    await hook.event({ event: { type: "session.created", properties: { info: { id: sessionID, model: "openai/gpt-5.4" } } } })
+    await hook.event({
+      event: { type: "session.created", properties: { info: { id: sessionID, model: "openai/gpt-5.4" } } },
+    })
     deps?.sessionAwaitingFallbackResult.add(sessionID)
     await hook.event(progressEvent)
     await clock.advanceBy(10_000)

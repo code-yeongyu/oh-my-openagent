@@ -8,7 +8,14 @@ describe("accountsOrigin", () => {
   })
 
   test("the environment overrides the default, and the flag overrides both", () => {
-    expect(accountsOrigin({}, { OMO_SERVICE_ACCOUNTS_URL: "https://signin.example.test" })).toBe("https://signin.example.test")
-    expect(accountsOrigin({ accounts: "https://flag.example.test" }, { OMO_SERVICE_ACCOUNTS_URL: "https://signin.example.test" })).toBe("https://flag.example.test")
+    expect(accountsOrigin({}, { OMO_SERVICE_ACCOUNTS_URL: "https://signin.example.test" })).toBe(
+      "https://signin.example.test",
+    )
+    expect(
+      accountsOrigin(
+        { accounts: "https://flag.example.test" },
+        { OMO_SERVICE_ACCOUNTS_URL: "https://signin.example.test" },
+      ),
+    ).toBe("https://flag.example.test")
   })
 })

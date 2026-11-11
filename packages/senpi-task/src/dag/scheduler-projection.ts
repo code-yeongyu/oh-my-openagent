@@ -43,24 +43,27 @@ export function applyDagSchedulerEvent(
       const terminalResult = TERMINAL_NODE_STATES.has(event.to)
         ? terminalResults?.pendingTerminalResults.get(event.nodeId)
         : undefined
-      const replayedResult = terminalResult === undefined && terminalResults !== undefined && event.to === "completed"
-        ? replayDagNodeResult(terminalResults.store, record.runId, event.nodeId)
-        : undefined
-      const persisted: ReturnType<typeof persistDagNodeResult> | undefined = terminalResult === undefined || terminalResults === undefined
-        ? replayedResult === undefined ? undefined : { kind: "persisted", artifact: replayedResult.artifact }
-        : persistDagNodeResult({
-            store: terminalResults.store,
-            runId: record.runId,
-            nodeId: event.nodeId,
-            record: terminalResult.record,
-            now: terminalResults.now,
-          })
+      const replayedResult =
+        terminalResult === undefined && terminalResults !== undefined && event.to === "completed"
+          ? replayDagNodeResult(terminalResults.store, record.runId, event.nodeId)
+          : undefined
+      const persisted: ReturnType<typeof persistDagNodeResult> | undefined =
+        terminalResult === undefined || terminalResults === undefined
+          ? replayedResult === undefined
+            ? undefined
+            : { kind: "persisted", artifact: replayedResult.artifact }
+          : persistDagNodeResult({
+              store: terminalResults.store,
+              runId: record.runId,
+              nodeId: event.nodeId,
+              record: terminalResult.record,
+              now: terminalResults.now,
+            })
       terminalResults?.pendingTerminalResults.delete(event.nodeId)
       // The durable copy is written here anyway; carrying a bounded preview of it onto the node
       // costs no extra IO and is what lets a midpoint snapshot audit the child's claim (#8674).
-      const outputText = terminalResult === undefined
-        ? replayedResult?.output
-        : terminalResult.record.final_response ?? ""
+      const outputText =
+        terminalResult === undefined ? replayedResult?.output : (terminalResult.record.final_response ?? "")
       return {
         ...record,
         nodes: record.nodes.map((node) => {
@@ -86,27 +89,28 @@ export function applyDagSchedulerEvent(
               : { runStats: terminalResult?.record.run_stats ?? replayedResult?.runStats }),
           }
         }),
-        diagnostics: persisted?.kind === "failed"
-          ? [
-              ...record.diagnostics,
-              {
-                kind: "journal_corrupt",
-                ...(persisted.diagnostic.runId === undefined ? {} : { runId: persisted.diagnostic.runId }),
-                path: persisted.diagnostic.path,
-                message: persisted.diagnostic.message,
-                at: persisted.diagnostic.at,
-              },
-            ]
-          : record.diagnostics,
+        diagnostics:
+          persisted?.kind === "failed"
+            ? [
+                ...record.diagnostics,
+                {
+                  kind: "journal_corrupt",
+                  ...(persisted.diagnostic.runId === undefined ? {} : { runId: persisted.diagnostic.runId }),
+                  path: persisted.diagnostic.path,
+                  message: persisted.diagnostic.message,
+                  at: persisted.diagnostic.at,
+                },
+              ]
+            : record.diagnostics,
         updatedAt: event.at,
       }
     }
     case "dag.node.task-attached":
       return {
         ...record,
-        nodes: record.nodes.map((node) => node.id === event.nodeId
-          ? { ...node, taskId: event.taskId, attempt: event.attempt }
-          : node),
+        nodes: record.nodes.map((node) =>
+          node.id === event.nodeId ? { ...node, taskId: event.taskId, attempt: event.attempt } : node,
+        ),
         updatedAt: event.at,
       }
     // Re-entry rearms the run: completedAt is stamped on every terminal status above, so leaving it
@@ -121,7 +125,7 @@ export function applyDagSchedulerEvent(
       if (event.delivery !== "revive") return { ...record, updatedAt: event.at }
       return {
         ...record,
-        nodes: record.nodes.map((node) => node.id === event.nodeId ? { ...node, taskId: event.taskId } : node),
+        nodes: record.nodes.map((node) => (node.id === event.nodeId ? { ...node, taskId: event.taskId } : node)),
         updatedAt: event.at,
       }
     // The retry and amend record mutations live in ONE shared reducer with the manager so a journal
@@ -151,11 +155,13 @@ function replayDagNodeResult(
   store: DagFileStore,
   runId: DagRunId,
   nodeId: DagNodeId,
-): {
-  readonly artifact: DagNodeResultArtifact
-  readonly output: string
-  readonly runStats?: TaskRecord["run_stats"]
-} | undefined {
+):
+  | {
+      readonly artifact: DagNodeResultArtifact
+      readonly output: string
+      readonly runStats?: TaskRecord["run_stats"]
+    }
+  | undefined {
   const result = readDagNodeResult({ store, runId, nodeId })
   if (result === null) return undefined
   const outputPath = store.paths.result(runId, nodeId)
@@ -172,10 +178,7 @@ function replayDagNodeResult(
   }
 }
 
-function readOptionalArtifact(
-  store: DagFileStore,
-  path: string,
-): DagNodeResultArtifact["stats"] | undefined {
+function readOptionalArtifact(store: DagFileStore, path: string): DagNodeResultArtifact["stats"] | undefined {
   try {
     return artifactRef(store, path, fs.readFileSync(path, "utf8"))
   } catch (error) {
@@ -184,7 +187,11 @@ function readOptionalArtifact(
   }
 }
 
-function artifactRef(store: DagFileStore, path: string, contents: string): {
+function artifactRef(
+  store: DagFileStore,
+  path: string,
+  contents: string,
+): {
   readonly relativePath: string
   readonly sha256: string
   readonly bytes: number
@@ -200,9 +207,7 @@ function transitionedNode(node: DagNode, state: DagNodeState, at: string, error?
   // Leaving a terminal state for a new execution (a revived child) drops the previous outcome:
   // error, completion time, and result metadata all describe the attempt that just ended, and the
   // durable artifact stays readable on disk until the new attempt overwrites it.
-  const base = state === "running" && TERMINAL_NODE_STATES.has(node.state)
-    ? clearedTerminalOutcome(node)
-    : node
+  const base = state === "running" && TERMINAL_NODE_STATES.has(node.state) ? clearedTerminalOutcome(node) : node
   return {
     ...base,
     state,

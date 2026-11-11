@@ -46,9 +46,7 @@ export function parseJsonLines(stdout) {
 }
 
 export function readToolEventsPayload(events) {
-  const readEvents = events.filter(
-    (event) => event?.type === "tool_execution_end" && event.toolName === "read",
-  )
+  const readEvents = events.filter((event) => event?.type === "tool_execution_end" && event.toolName === "read")
   return { count: readEvents.length, payload: JSON.stringify(readEvents) }
 }
 
@@ -67,12 +65,19 @@ function seedScenario(sandbox, gitMasterConfig) {
     skillPath,
     `---\nname: git-master\ndescription: Isolated live QA git-master skill\n---\n${SKILL_BODY_MARKER}\n\n\`\`\`bash\ngit add -A .\ngit commit -m "qa"\n\`\`\`\n`,
   )
-  writeFileSync(join(sandbox.cwd, "mock-script.json"), `${JSON.stringify({
-    steps: [
-      { type: "tool_call", name: "read", arguments: { path: skillPath } },
-      { type: "text", text: "git-master attribution QA complete" },
-    ],
-  }, null, 2)}\n`)
+  writeFileSync(
+    join(sandbox.cwd, "mock-script.json"),
+    `${JSON.stringify(
+      {
+        steps: [
+          { type: "tool_call", name: "read", arguments: { path: skillPath } },
+          { type: "text", text: "git-master attribution QA complete" },
+        ],
+      },
+      null,
+      2,
+    )}\n`,
+  )
   return sessionDir
 }
 
@@ -87,7 +92,20 @@ function runScenario(senpiBin, gitMasterConfig) {
     delete cleanEnv.PI_CODING_AGENT_DIR
     const run = spawnSync(
       senpiBin,
-      ["-e", mockProviderEntry, "-p", "--mode", "json", "--provider", "omo-mock", "--model", "mock-1", "--session-dir", sessionDir, "read the git-master skill"],
+      [
+        "-e",
+        mockProviderEntry,
+        "-p",
+        "--mode",
+        "json",
+        "--provider",
+        "omo-mock",
+        "--model",
+        "mock-1",
+        "--session-dir",
+        sessionDir,
+        "read the git-master skill",
+      ],
       {
         cwd: sandbox.cwd,
         env: {
@@ -130,7 +148,8 @@ function selfTest() {
   if (count !== 1) throw new Error("read event filter failed")
   if (!payload.includes(FOOTER_MARKER)) throw new Error("payload serialization failed")
   const trailerPayload = JSON.stringify([{ text: `git commit -m "x" --trailer "${TRAILER}"` }])
-  if (trailerPayload.split(TRAILER_ARGUMENT_MARKER).length - 1 !== 1) throw new Error("trailer marker does not match the serialized argument")
+  if (trailerPayload.split(TRAILER_ARGUMENT_MARKER).length - 1 !== 1)
+    throw new Error("trailer marker does not match the serialized argument")
   console.log("SELF-TEST OK")
 }
 
@@ -158,9 +177,7 @@ function main() {
   const optedIn = runScenario(senpiBin, { commit_footer: true })
   const prefixOff = runScenario(senpiBin, { git_env_prefix: "" })
   const coAuthorOff = runScenario(senpiBin, { include_co_authored_by: false })
-  const changedRealDirs = snapshots
-    .filter(({ dir, before }) => before !== credentialDigest(dir))
-    .map(({ dir }) => dir)
+  const changedRealDirs = snapshots.filter(({ dir, before }) => before !== credentialDigest(dir)).map(({ dir }) => dir)
   const checks = {
     default_process_exit: defaultOff.exitStatus === 0 ? "PASS" : "FAIL",
     default_read_event: defaultOff.readEventCount >= 1 && defaultOff.bodyPresent ? "PASS" : "FAIL",
