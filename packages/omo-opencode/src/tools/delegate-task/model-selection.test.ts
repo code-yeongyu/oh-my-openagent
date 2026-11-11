@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
 import { resolveModelForDelegateTask } from "./model-selection"
 import * as connectedProvidersCache from "../../shared/connected-providers-cache"
+import * as exhaustedProvidersCache from "../../shared/exhausted-providers-cache"
 
 describe("resolveModelForDelegateTask", () => {
 	let hasConnectedProvidersSpy: ReturnType<typeof spyOn> | undefined
@@ -318,6 +319,67 @@ describe("resolveModelForDelegateTask", () => {
 				expect(result).toBeDefined()
 				const resolved = result as { model: string }
 				expect(resolved.model).toBe("xai/grok-code-fast-1")
+			})
+		})
+	})
+
+	describe("#given exhausted provider state exists", () => {
+		let exhaustedIDsSpy: ReturnType<typeof spyOn> | undefined
+
+		beforeEach(() => {
+			hasConnectedProvidersSpy = spyOn(connectedProvidersCache, "hasConnectedProvidersCache").mockReturnValue(true)
+			hasProviderModelsSpy = spyOn(connectedProvidersCache, "hasProviderModelsCache").mockReturnValue(true)
+		})
+
+		afterEach(() => {
+			exhaustedIDsSpy?.mockRestore()
+		})
+
+		describe("#when availableModels is empty and the category default provider is exhausted", () => {
+			test("#then skips the exhausted provider and resolves via a non-exhausted connected fallback", () => {
+				const readConnectedProvidersSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue([
+					"anthropic",
+					"openai",
+				])
+				exhaustedIDsSpy = spyOn(exhaustedProvidersCache, "getExhaustedProviderIDs").mockReturnValue(["anthropic"])
+
+				const result = resolveModelForDelegateTask({
+					categoryDefaultModel: "anthropic/claude-sonnet-4.6",
+					fallbackChain: [
+						{ providers: ["openai"], model: "gpt-5.4", variant: "high" },
+					],
+					availableModels: new Set(),
+					systemDefaultModel: "anthropic/claude-sonnet-4.6",
+				})
+
+				expect(result).toEqual({
+					model: "openai/gpt-5.4",
+					variant: "high",
+					fallbackEntry: { providers: ["openai"], model: "gpt-5.4", variant: "high" },
+					matchedFallback: true,
+				})
+				readConnectedProvidersSpy.mockRestore()
+			})
+		})
+
+		describe("#when no provider is exhausted", () => {
+			test("#then keeps existing connected-provider behavior", () => {
+				const readConnectedProvidersSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue([
+					"anthropic",
+				])
+				exhaustedIDsSpy = spyOn(exhaustedProvidersCache, "getExhaustedProviderIDs").mockReturnValue([])
+
+				const result = resolveModelForDelegateTask({
+					categoryDefaultModel: "anthropic/claude-sonnet-4.6",
+					fallbackChain: [
+						{ providers: ["openai"], model: "gpt-5.4" },
+					],
+					availableModels: new Set(),
+					systemDefaultModel: "anthropic/claude-sonnet-4.6",
+				})
+
+				expect(result).toEqual({ model: "anthropic/claude-sonnet-4.6" })
+				readConnectedProvidersSpy.mockRestore()
 			})
 		})
 	})
