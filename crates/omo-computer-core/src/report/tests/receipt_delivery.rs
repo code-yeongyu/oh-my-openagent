@@ -1,6 +1,7 @@
-//! A receipt proves the target consumed the input, so it sits only under
-//! `delivered_verified`: never under `not_delivered/*` (whose retry claims nothing reached
-//! the target) and never under `delivered_unverified` (defined as having no receipt).
+//! A receipt is never under `not_delivered/*` (whose retry claims nothing reached the target)
+//! or `delivered_unverified` (defined as having no receipt). A landed unit's receipt stays under
+//! `delivery_uncertain/*` (LEAD ruling 2026-11-11); `unknown/unknown` is pinned as accepted
+//! pending a design ruling (#13147).
 
 use serde_json::json;
 
@@ -144,10 +145,35 @@ fn landed_unit_receipts_stay_under_an_uncertain_partial_report() {
             "{}: the rejection side still holds",
             delivery.wire()
         );
+        let rejection = format!(
+            "{:?}",
+            ReportRejection::ReceiptWithoutVerifiedDelivery { delivery }
+        );
+        let parsed = build(None, receipted());
         assert!(
-            build(None, receipted()).is_err(),
-            "{}: the wire parse still refuses",
+            parsed.as_ref().is_err_and(|why| why.contains(&rejection)),
+            "{}: the wire parse still refuses with {rejection}: {parsed:?}",
             delivery.wire()
         );
     }
+}
+
+/// PROVISIONAL: pins the CURRENT behaviour, pending a design ruling tracked by #13147. Neither
+/// LEAD ruling 2026-11-11 nor #13118 covers a receipt under `unknown/unknown`, so it is accepted
+/// as today; when #13147 is ruled, this test changes with the rule.
+#[test]
+fn receipt_under_unknown_delivery_is_accepted_pending_13147() {
+    let windows = ReportContext::new(VerbClass::Action, Some(Platform::Windows));
+    let receipted = || {
+        counted(
+            Disposition::UNKNOWN,
+            Effect::Partial,
+            vec![Evidence::barrier_consumed()],
+        )
+    };
+    let built = ActionReport::new(windows, receipted());
+    println!("unknown/unknown partial with a barrier: {built:?}");
+    assert!(built.is_ok(), "the constructor: {built:?}");
+    let parsed = build(None, receipted());
+    assert!(parsed.is_ok(), "the wire parse: {parsed:?}");
 }
