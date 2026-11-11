@@ -123,9 +123,7 @@ describe("resolveOmoConfigPaths user candidate", () => {
     const candidates = resolveOmoConfigPaths({ cwd, env: { HOME: homeDir }, platform: "linux" })
 
     // then
-    expect(candidates.map((candidate) => candidate.path)).not.toContain(
-      join(homeDir, ".config", "omo", "omo.jsonc"),
-    )
+    expect(candidates.map((candidate) => candidate.path)).not.toContain(join(homeDir, ".config", "omo", "omo.jsonc"))
     expect(candidates[0]).toEqual({ path: join(homeDir, ".omo", "omo.jsonc"), scope: "user" })
   })
 

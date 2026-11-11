@@ -1,4 +1,4 @@
-import { lstatSync, statSync } from "node:fs"
+import { existsSync, lstatSync, statSync } from "node:fs"
 import * as nodeFs from "node:fs"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path"
@@ -120,6 +120,19 @@ function findAncestorDirectories(cwd: string, homeDir: string): readonly string[
   return ancestors
 }
 
+function creationAncestors(ancestors: readonly string[], userConfigParent: string): readonly string[] {
+  const bounded: string[] = []
+  for (const ancestor of ancestors) {
+    // Never watch the user config parent or anything that contains it (a watch there receives every write
+    // in HOME), nor the filesystem root: outside HOME and outside any repo the walk would otherwise reach it,
+    // and a watch on "/" receives every change on the disk.
+    if (containsPath(ancestor, resolve(userConfigParent)) || dirname(ancestor) === ancestor) break
+    bounded.push(ancestor)
+    if (existsSync(join(ancestor, ".git"))) break
+  }
+  return bounded
+}
+
 function isExistingDirectory(path: string): boolean {
   try {
     return statSync(path).isDirectory()
@@ -150,11 +163,7 @@ function userConfigCreationTarget(path: string, userConfigDirectory: string): Om
   return {
     path,
     kind: "dir",
-    filterGlobs: [
-      `/${directoryName}`,
-      `/${directoryName}/omo.jsonc`,
-      `/${directoryName}/omo.json`,
-    ],
+    filterGlobs: [`/${directoryName}`, `/${directoryName}/omo.jsonc`, `/${directoryName}/omo.json`],
   }
 }
 
@@ -178,11 +187,9 @@ export function resolveOmoConfigWatchTargetResolution(
     ...resolvedConfigPaths
       .filter((candidate) => candidate.scope === "project")
       .map((candidate) => dirname(candidate.path)),
-    ...findProjectConfigPathsFarthestFirst(
-      options.cwd,
-      resolveHomeDir(env),
-      DEFAULT_READ_FILE_SYSTEM,
-    ).map((path) => dirname(path)),
+    ...findProjectConfigPathsFarthestFirst(options.cwd, resolveHomeDir(env), DEFAULT_READ_FILE_SYSTEM).map((path) =>
+      dirname(path),
+    ),
   ])
   const targets: OmoConfigWatchTarget[] = []
 
@@ -205,7 +212,14 @@ export function resolveOmoConfigWatchTargetResolution(
       }
     }
 
-    for (const ancestorDirectory of ancestorDirectories) targets.push(creationTarget(ancestorDirectory))
+    // A creation target watches a whole directory, and on macOS (FSEvents) every change beneath it reaches
+    // the session, so an ancestor reaching HOME woke every session on any write in HOME. Stop at the project
+    // root (the first directory holding .git), and never include the user config directory's parent (which
+    // the user-config target above already watches), any directory containing it, or the filesystem root.
+    // Existing .omo directories higher up stay watched.
+    for (const ancestorDirectory of creationAncestors(ancestorDirectories, dirname(userConfigDirectory))) {
+      targets.push(creationTarget(ancestorDirectory))
+    }
   }
 
   const senpiProtectedPaths = resolveSenpiProtectedPaths(env)

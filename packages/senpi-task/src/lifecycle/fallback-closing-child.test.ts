@@ -15,7 +15,11 @@ afterEach(cleanupProjects)
 const DEAD_OWNER = 11_001
 const SWEEPER = 22_002
 
-function seedClosingHandoff(store: TaskRecordStore, taskId: string, closing: TaskRecord["fallback_closing_child"]): void {
+function seedClosingHandoff(
+  store: TaskRecordStore,
+  taskId: string,
+  closing: TaskRecord["fallback_closing_child"],
+): void {
   seedRecord(store, {
     task_id: taskId,
     status: "running",
@@ -24,7 +28,12 @@ function seedClosingHandoff(store: TaskRecordStore, taskId: string, closing: Tas
     run_epoch: 1,
     spawn_spec: { version: 1, cwd: "/tmp", prompt: "do the original task" },
   })
-  store.mutate(taskId, (record) => ({ ...record, model: "test/next", fallback_handoff_epoch: 1, ...(closing === undefined ? {} : { fallback_closing_child: closing }) }))
+  store.mutate(taskId, (record) => ({
+    ...record,
+    model: "test/next",
+    fallback_handoff_epoch: 1,
+    ...(closing === undefined ? {} : { fallback_closing_child: closing }),
+  }))
 }
 
 function sweeper(store: TaskRecordStore, alive: Set<number>) {
@@ -57,7 +66,9 @@ describe("revival of a handoff whose owner died before the failed rung closed", 
   test("#given the failed rung's daemon session is still retained #when another session revives the handoff #then that session is closed before the next rung launches", async () => {
     // given
     const store = tempStore()
-    const closingSession: HostSessionIdentity = hostSession("st_0000c001", { session_path: "/tmp/dh-fake/sessions/failed-rung.jsonl" })
+    const closingSession: HostSessionIdentity = hostSession("st_0000c001", {
+      session_path: "/tmp/dh-fake/sessions/failed-rung.jsonl",
+    })
     seedClosingHandoff(store, "st_0000c001", { host_session: closingSession })
     const s = sweeper(store, new Set())
     s.ports.daemon.hold(closingSession.session_path)

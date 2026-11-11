@@ -3,10 +3,12 @@
 //! token, the notification outbox, and the request permits.
 
 use std::sync::Arc;
+use std::time::Instant;
 
 use senpi_desktop_core::error::{CoreResult, DesktopError};
-use senpi_desktop_core::methods::{Effect, Notification};
-use senpi_desktop_core::protocol::{ABI, PROTOCOL_VERSION};
+use senpi_desktop_core::methods::{Effect, Method, Notification};
+use senpi_desktop_core::report::ReportMode;
+use senpi_desktop_core::protocol::{ABI, FEATURES, PROTOCOL_VERSION};
 use senpi_desktop_core::protocol_results::{HelloResult, SessionOpenResult};
 use senpi_desktop_core::types::{DesktopCapabilities, DesktopSessionOptions};
 use senpi_desktop_safety::{Clock, FakeClock, MonotonicClock, ResumeToken, Supervisor};
@@ -19,6 +21,7 @@ use crate::config::EngineConfig;
 use crate::outbox::Outbox;
 use crate::rpc::{to_result, Failure};
 use crate::stop_path::{StopPaths, StopReport};
+use crate::trace::{op_method, TraceSink};
 
 /// Read-only session requests that may be in flight at once.
 pub const READ_CONCURRENCY: usize = 4;
@@ -38,6 +41,8 @@ pub struct Engine {
     shared_agent: bool,
     fake_clock: Option<Arc<FakeClock>>,
     outbox: Arc<Outbox>,
+    /// The `trace: true` request trace; idle until such an open applies.
+    trace: Arc<TraceSink>,
     read_permits: Arc<Semaphore>,
     /// One mutating request in flight at a time.
     exec_permits: Arc<Semaphore>,
@@ -91,9 +96,14 @@ impl Engine {
     ) -> CoreResult<Self> {
         let outbox = Arc::new(Outbox::default());
         let audited = Arc::clone(&outbox);
+        let trace = Arc::new(TraceSink::new());
+        let traced = Arc::clone(&trace);
         let safety = SessionSafety {
             supervisor: stop_paths.supervisor(),
-            audit: Box::new(move |event| audited.push(Notification::Audit, event)),
+            audit: Box::new(move |event| {
+                audited.push(Notification::Audit, event);
+                traced.audit(event);
+            }),
             control_slot: stop_paths.control_slot(),
         };
         let hold_release_budget = config.timeouts.close;
@@ -109,6 +119,7 @@ impl Engine {
             stop_paths,
             fake_clock,
             outbox,
+            trace,
             read_permits: Arc::new(Semaphore::new(READ_CONCURRENCY)),
             exec_permits: Arc::new(Semaphore::new(1)),
         })
@@ -122,6 +133,7 @@ impl Engine {
                 .unwrap_or("unknown")
                 .to_owned(),
             abi: ABI.to_owned(),
+            features: Some(FEATURES.iter().map(|feature| (*feature).to_owned()).collect()),
         }
     }
 
@@ -147,9 +159,23 @@ impl Engine {
         }
     }
 
+    /// Queues `epoch.changed` for every epoch move the session saw.
+    pub fn announce_epochs(&self) {
+        for change in self.session.epoch_changes() {
+            self.outbox.push(Notification::EpochChanged, &change);
+        }
+    }
+
     /// The installed fake clock, when `SENPI_DESKTOP_FAKE_CLOCK=1` set one.
     pub fn fake_clock(&self) -> Option<&FakeClock> {
         self.fake_clock.as_deref()
+    }
+
+    /// Whether `method`'s reply is an object-mode action report: the session
+    /// thread last applied an open with `reportMode: "object"` and `method`
+    /// mutates.
+    pub fn reports_action(&self, method: Method) -> bool {
+        method.reports_action() && self.session.report_mode() == ReportMode::Object
     }
 
     pub fn permits(&self, effect: Effect) -> Arc<Semaphore> {
@@ -167,23 +193,27 @@ impl Engine {
     }
 
     pub fn begin(&self, call: SessionCall) -> Started {
-        match call {
-            SessionCall::Open(options) => Started {
-                pending: self.session.open(options),
+        let (pending, kind) = match call {
+            SessionCall::Open(options) => (
+                self.session.open(options.clone()),
                 // Reported now: the reply outlives `self`.
-                open: Some(OpenReply {
+                Call::Open(Box::new(OpenReply {
                     resume_token: self.resume_token.clone(),
                     report: self.stop_paths.report(),
-                }),
-            },
-            SessionCall::Close => Started {
-                pending: self.session.close(),
-                open: None,
-            },
-            SessionCall::Op(op) => Started {
-                pending: self.session.submit(op),
-                open: None,
-            },
+                    options,
+                })),
+            ),
+            SessionCall::Close => (self.session.close(), Call::Close),
+            SessionCall::Op(op) => {
+                let method = op_method(&op);
+                (self.session.submit(op), Call::Op(method))
+            }
+        };
+        Started {
+            pending,
+            kind,
+            trace: Arc::clone(&self.trace),
+            began: Instant::now(),
         }
     }
 
@@ -199,13 +229,22 @@ impl Engine {
 struct OpenReply {
     resume_token: String,
     report: StopReport,
+    /// Applied to the trace once the session accepted them.
+    options: DesktopSessionOptions,
+}
+
+enum Call {
+    Open(Box<OpenReply>),
+    Close,
+    Op(Method),
 }
 
 /// An enqueued session request.
 pub struct Started {
     pending: Pending,
-    /// `Some` for `session.open`.
-    open: Option<OpenReply>,
+    kind: Call,
+    trace: Arc<TraceSink>,
+    began: Instant,
 }
 
 impl Started {
@@ -213,19 +252,40 @@ impl Started {
         self.pending.hold_signal()
     }
 
+    /// Whether `method`'s reply carries an action report: fixed per request,
+    /// so an open applied after it started cannot re-shape it.
+    pub fn reports_action(&self, method: Method) -> impl Fn() -> bool {
+        let mode = self.pending.request_mode();
+        move || method.reports_action() && mode.as_ref().is_some_and(|mode| mode.get() == ReportMode::Object)
+    }
+
     /// # Errors
     /// The session's error for this request.
     pub async fn wait(self) -> Result<Value, Failure> {
-        let response = self.pending.wait().await.map_err(Failure::Engine)?;
-        match (self.open, response) {
-            (Some(open), Response::Capabilities(capabilities)) => to_result(SessionOpenResult {
-                capabilities: open.report.stamp(capabilities),
-                resume_token: open.resume_token,
-            }),
-            (Some(_), other) => Err(Failure::Engine(DesktopError::internal(format!(
+        let response = self.pending.wait().await.map_err(Failure::Engine);
+        match (self.kind, response) {
+            (Call::Open(open), Ok(Response::Capabilities(capabilities))) => {
+                self.trace.configure(&open.options);
+                to_result(SessionOpenResult {
+                    capabilities: open.report.stamp(capabilities),
+                    resume_token: open.resume_token,
+                })
+            }
+            (Call::Open(_), Ok(other)) => Err(Failure::Engine(DesktopError::internal(format!(
                 "session.open answered {other:?}"
             )))),
-            (None, response) => to_result(response),
+            (Call::Close, response) => {
+                if response.is_ok() {
+                    self.trace.stop();
+                }
+                response.and_then(to_result)
+            }
+            (Call::Op(method), response) => {
+                let outcome = response.and_then(to_result);
+                self.trace.reply(method, self.began.elapsed(), &outcome);
+                outcome
+            }
+            (Call::Open(_), Err(failure)) => Err(failure),
         }
     }
 }

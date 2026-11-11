@@ -1,5 +1,14 @@
 import { afterAll, afterEach, describe, expect, it, mock } from "bun:test"
-import { chmodSync, existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
@@ -24,11 +33,7 @@ mock.module("../../shared/opencode-storage-paths", () => ({
 }))
 preserveModuleMocksForTestFile(import.meta.url)
 
-const {
-  findFirstMessageWithAgent,
-  injectHookMessage,
-  resolveMessageContext,
-} = await import("./injector")
+const { findFirstMessageWithAgent, injectHookMessage, resolveMessageContext } = await import("./injector")
 const { getCompactionPartStorageDir } = await import("../../shared/compaction-marker")
 
 type MockSDKMessage = {
@@ -145,13 +150,16 @@ describe("hook message injection boundaries", () => {
     // given
     const nestedMessageDir = join(TEST_MESSAGE_STORAGE, "project-a", "ses_nested")
     mkdirSync(nestedMessageDir, { recursive: true })
-    writeFileSync(join(nestedMessageDir, "msg_existing.json"), JSON.stringify({
-      id: "msg_existing",
-      agent: "sisyphus",
-      model: { providerID: "anthropic", modelID: "claude-opus-4", variant: "thinking" },
-      tools: { write: "deny" },
-      time: { created: 100 },
-    }))
+    writeFileSync(
+      join(nestedMessageDir, "msg_existing.json"),
+      JSON.stringify({
+        id: "msg_existing",
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-opus-4", variant: "thinking" },
+        tools: { write: "deny" },
+        time: { created: 100 },
+      }),
+    )
 
     const result = injectHookMessage("ses_nested", "fallback content", {
       path: { cwd: "/workspace/nested", root: "/workspace" },
@@ -184,13 +192,16 @@ describe("hook message injection boundaries", () => {
     // given
     const messageDir = join(TEST_MESSAGE_STORAGE, "ses_original_context")
     mkdirSync(messageDir, { recursive: true })
-    writeFileSync(join(messageDir, "msg_previous.json"), JSON.stringify({
-      id: "msg_previous",
-      agent: "fallback-agent",
-      model: { providerID: "fallback-provider", modelID: "fallback-model" },
-      tools: { write: "deny" },
-      time: { created: 1 },
-    }))
+    writeFileSync(
+      join(messageDir, "msg_previous.json"),
+      JSON.stringify({
+        id: "msg_previous",
+        agent: "fallback-agent",
+        model: { providerID: "fallback-provider", modelID: "fallback-model" },
+        tools: { write: "deny" },
+        time: { created: 1 },
+      }),
+    )
 
     // when
     const result = injectHookMessage("ses_original_context", "test content", {
@@ -216,10 +227,12 @@ describe("hook message injection boundaries", () => {
 
   it("rejects session IDs that would escape message storage", () => {
     // given
-    expect(injectHookMessage("../ses_escape", "test content", {
-      agent: "atlas",
-      model: { providerID: "openai", modelID: "gpt-5" },
-    })).toBe(false)
+    expect(
+      injectHookMessage("../ses_escape", "test content", {
+        agent: "atlas",
+        model: { providerID: "openai", modelID: "gpt-5" },
+      }),
+    ).toBe(false)
 
     // then
     expect(existsSync(join(TEST_STORAGE_ROOT, "ses_escape"))).toBe(false)
@@ -275,17 +288,23 @@ describe("hook message context resolution boundaries", () => {
     const compactionMessageID = "msg_test_injector_first_agent_compaction_marker"
     const partDir = getCompactionPartStorageDir(compactionMessageID)
     mkdirSync(partDir, { recursive: true })
-    writeFileSync(join(messageDir, "msg_0001.json"), JSON.stringify({
-      id: compactionMessageID,
-      agent: "compaction",
-      time: { created: 10 },
-    }))
+    writeFileSync(
+      join(messageDir, "msg_0001.json"),
+      JSON.stringify({
+        id: compactionMessageID,
+        agent: "compaction",
+        time: { created: 10 },
+      }),
+    )
     writeFileSync(join(partDir, "prt_0001.json"), JSON.stringify({ type: "compaction" }))
-    writeFileSync(join(messageDir, "msg_0002.json"), JSON.stringify({
-      id: "msg_0002",
-      agent: "sisyphus",
-      time: { created: 20 },
-    }))
+    writeFileSync(
+      join(messageDir, "msg_0002.json"),
+      JSON.stringify({
+        id: "msg_0002",
+        agent: "sisyphus",
+        time: { created: 20 },
+      }),
+    )
 
     // when
     const result = findFirstMessageWithAgent(messageDir)
@@ -326,15 +345,21 @@ describe("hook message context resolution boundaries", () => {
   it("uses JSON lookups for stable backend", async () => {
     // given
     const messageDir = createMessageDir()
-    writeFileSync(join(messageDir, "msg_early.json"), JSON.stringify({
-      agent: "atlas",
-      time: { created: 10 },
-    }))
-    writeFileSync(join(messageDir, "msg_late.json"), JSON.stringify({
-      agent: "sisyphus",
-      model: { providerID: "openai", modelID: "gpt-5" },
-      time: { created: 100 },
-    }))
+    writeFileSync(
+      join(messageDir, "msg_early.json"),
+      JSON.stringify({
+        agent: "atlas",
+        time: { created: 10 },
+      }),
+    )
+    writeFileSync(
+      join(messageDir, "msg_late.json"),
+      JSON.stringify({
+        agent: "sisyphus",
+        model: { providerID: "openai", modelID: "gpt-5" },
+        time: { created: 100 },
+      }),
+    )
 
     // when
     const result = await resolveMessageContext("ses_json", unsafeTestValue(createMockClient([])), messageDir)

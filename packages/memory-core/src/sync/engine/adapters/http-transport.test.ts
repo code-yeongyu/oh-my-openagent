@@ -1,6 +1,13 @@
 import { afterEach, expect, test } from "bun:test"
 
-import { b64urlOfHex, createHttpTransport, hexOfB64url, SyncAuthError, SyncHttpError, SyncNetworkError } from "./http-transport"
+import {
+  b64urlOfHex,
+  createHttpTransport,
+  hexOfB64url,
+  SyncAuthError,
+  SyncHttpError,
+  SyncNetworkError,
+} from "./http-transport"
 import { startWireServer, type WireServer } from "./wire-server.test-support"
 import { remainingTestTime } from "../../../../../../test-support/test-deadline"
 
@@ -26,7 +33,15 @@ async function pushOne(t: ReturnType<typeof createHttpTransport>, bytes: Uint8Ar
   const uploadId = await t.reserve(bytes.byteLength, digest)
   await t.upload(uploadId, bytes)
   const id = batchId()
-  const result = await t.append({ uploadId, digest, baseSeq, batchId: id, epoch: 1, link: "A".repeat(43), recordSig: "S".repeat(86) })
+  const result = await t.append({
+    uploadId,
+    digest,
+    baseSeq,
+    batchId: id,
+    epoch: 1,
+    link: "A".repeat(43),
+    recordSig: "S".repeat(86),
+  })
   pushedIds.push(id)
   return result
 }
@@ -47,7 +62,13 @@ test("reserve, upload and append land a batch the other device pulls and downloa
   expect(page.entries).toHaveLength(1)
   const [entry] = page.entries
   if (entry === undefined) throw new Error("no entry")
-  expect(entry).toMatchObject({ seq: 1, kind: "batch", digest: sha256Hex(bytes), author: "device:dev-a", batchId: pushedIds.at(-1) })
+  expect(entry).toMatchObject({
+    seq: 1,
+    kind: "batch",
+    digest: sha256Hex(bytes),
+    author: "device:dev-a",
+    batchId: pushedIds.at(-1),
+  })
   expect(entry.batchId).toMatch(/^[A-Za-z0-9_-]{22}$/)
   expect(await b.download(entry.objectId)).toEqual(bytes)
 })
@@ -56,19 +77,32 @@ test("a token that cannot be refreshed fails the request as SyncAuthError, and a
   const { server } = await pair()
   const refused = new Error("refresh refused")
   const unrefreshable = createHttpTransport({ baseUrl: server.url, token: () => Promise.reject(refused) })
-  const failure = await unrefreshable.pull(0, 500).then(() => null, (error: unknown) => error)
+  const failure = await unrefreshable.pull(0, 500).then(
+    () => null,
+    (error: unknown) => error,
+  )
   expect(failure).toBeInstanceOf(SyncAuthError)
   expect((failure as SyncAuthError).cause).toBe(refused)
   const unknownDevice = createHttpTransport({ baseUrl: server.url, token: () => "not-a-device-token" })
-  const refusal = await unknownDevice.pull(0, 500).then(() => null, (error: unknown) => error)
+  const refusal = await unknownDevice.pull(0, 500).then(
+    () => null,
+    (error: unknown) => error,
+  )
   expect(refusal).toBeInstanceOf(SyncHttpError)
   expect(refusal).toMatchObject({ code: "unauthorized", status: 401, transient: false })
 })
 
 test("a sync service that cannot be reached fails the request as SyncNetworkError, keeping the fetch error (omo #10637)", async () => {
   const refused = new TypeError("fetch failed")
-  const unreachable = createHttpTransport({ baseUrl: "http://sync.invalid", token: () => "tok", fetch: (() => Promise.reject(refused)) as unknown as typeof fetch })
-  const failure = await unreachable.pull(0, 500).then(() => null, (error: unknown) => error)
+  const unreachable = createHttpTransport({
+    baseUrl: "http://sync.invalid",
+    token: () => "tok",
+    fetch: (() => Promise.reject(refused)) as unknown as typeof fetch,
+  })
+  const failure = await unreachable.pull(0, 500).then(
+    () => null,
+    (error: unknown) => error,
+  )
   expect(failure).toBeInstanceOf(SyncNetworkError)
   expect((failure as SyncNetworkError).cause).toBe(refused)
 })
@@ -107,7 +141,10 @@ test("the event stream delivers sync.advanced heads and reports the connection",
   const connected: boolean[] = []
   let stop: () => void = () => undefined
   const first = new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("waited out the test budget for sync.advanced, never fired")), remainingTestTime())
+    const timer = setTimeout(
+      () => reject(new Error("waited out the test budget for sync.advanced, never fired")),
+      remainingTestTime(),
+    )
     stop = b.subscribe({
       onAdvanced: (head) => {
         heads.push(head)
@@ -134,11 +171,18 @@ test("#given a subscribed device #when another device is signed out through the 
   const { server, a, b } = await pair()
   let stop: () => void = () => undefined
   const changed = new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("waited out the test budget for sync.state.changed, never fired")), remainingTestTime())
+    const timer = setTimeout(
+      () => reject(new Error("waited out the test budget for sync.state.changed, never fired")),
+      remainingTestTime(),
+    )
     stop = a.subscribe({
       onAdvanced: () => undefined,
       onConnected: (up) => {
-        if (up) void fetch(`${server.url}/v1/session/sign-out`, { method: "POST", headers: { authorization: `Bearer ${server.tokenOf("b")}` } })
+        if (up)
+          void fetch(`${server.url}/v1/session/sign-out`, {
+            method: "POST",
+            headers: { authorization: `Bearer ${server.tokenOf("b")}` },
+          })
       },
       onStateChanged: () => {
         clearTimeout(timer)

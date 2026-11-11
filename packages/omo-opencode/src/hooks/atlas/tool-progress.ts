@@ -1,10 +1,6 @@
 import type { SessionState } from "./types"
 
-const TANGIBLE_PROGRESS_TOOLS = new Set([
-  "bash",
-  "edit",
-  "write",
-])
+const TANGIBLE_PROGRESS_TOOLS = new Set(["bash", "edit", "write"])
 
 const FAILURE_TITLE_PATTERN = /(?:\berror\b|\bfailed\b|\bfailure\b|\bdenied\b|\brejected\b)/i
 const FAILURE_OUTPUT_PATTERN = /^\s*(?:error|failed|failure|denied|rejected)\b/i

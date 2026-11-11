@@ -16,7 +16,8 @@ export function isRalphLoopResumeArgument(rawArguments: string): boolean {
 
 export function parseRalphLoopArguments(rawArguments: string): ParsedRalphLoopArguments {
   const taskMatch = rawArguments.match(/^(["'])(.+?)\1/)
-  const promptCandidate = taskMatch?.[2] ?? (rawArguments.startsWith("--") ? "" : rawArguments.split(/\s+--/)[0]?.trim() ?? "")
+  const promptCandidate =
+    taskMatch?.[2] ?? (rawArguments.startsWith("--") ? "" : (rawArguments.split(/\s+--/)[0]?.trim() ?? ""))
   const prompt = promptCandidate || DEFAULT_PROMPT
 
   const maxIterationMatch = rawArguments.match(/--max-iterations=(\d+)/i)

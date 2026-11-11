@@ -32,7 +32,10 @@ async function createRepo(): Promise<{ dir: string; repo: GitMemoryRepo }> {
     seedFiles: [
       { relativePath: "system/persona.md", content: "---\ndescription: Persona\n---\nsteady\n" },
       { relativePath: "system/human.md", content: "---\ndescription: Human\n---\nprefers short answers\n" },
-      { relativePath: "system/agreements.md", content: "---\ndescription: Agreements\n---\n- [global] Reply in English.\n" },
+      {
+        relativePath: "system/agreements.md",
+        content: "---\ndescription: Agreements\n---\n- [global] Reply in English.\n",
+      },
       ...Array.from({ length: 30 }, (_, note) => ({
         relativePath: `reference/topic-${note % 3}/note-${note}.md`,
         content: `---\ndescription: note ${note}\n---\nbody ${note}\n`,
@@ -112,7 +115,10 @@ describe("MemoryBlockCache persisted blocks", () => {
     await settle(first)
     const limited = { ...OPTIONS, projection: { maxEntriesPerDirectory: 2, maxBytes: 0 } }
     await writeFile(join(dir, "system", "persona.md"), "---\ndescription: Persona\n---\nchanged\n")
-    await repo.commitWrite(["system/persona.md"], "change persona", { agentId: "cache-agent", authorName: "Cache Agent" })
+    await repo.commitWrite(["system/persona.md"], "change persona", {
+      agentId: "cache-agent",
+      authorName: "Cache Agent",
+    })
     const moved = await repo.head()
 
     // when
@@ -139,11 +145,26 @@ describe("MemoryBlockCache persisted blocks", () => {
 
     // when
     const otherBuild = counting(repo)
-    await tracked(new MemoryBlockCache({ store, build: "build-b" })).compile(otherBuild.repo, TEMPLATE, OPTIONS, revision)
+    await tracked(new MemoryBlockCache({ store, build: "build-b" })).compile(
+      otherBuild.repo,
+      TEMPLATE,
+      OPTIONS,
+      revision,
+    )
     const otherIdentity = counting(repo)
-    await tracked(new MemoryBlockCache({ store, build: "build-a" })).compile(otherIdentity.repo, TEMPLATE, { agentId: "other-agent" }, revision)
+    await tracked(new MemoryBlockCache({ store, build: "build-a" })).compile(
+      otherIdentity.repo,
+      TEMPLATE,
+      { agentId: "other-agent" },
+      revision,
+    )
     const sameInputs = counting(repo)
-    await tracked(new MemoryBlockCache({ store, build: "build-a" })).compile(sameInputs.repo, TEMPLATE, OPTIONS, revision)
+    await tracked(new MemoryBlockCache({ store, build: "build-a" })).compile(
+      sameInputs.repo,
+      TEMPLATE,
+      OPTIONS,
+      revision,
+    )
 
     // then
     expect(otherBuild.work.lsTree).toBeGreaterThan(0)
@@ -204,7 +225,10 @@ describe("MemoryBlockCache persisted blocks", () => {
       expect(recompiled, failing).toBe(full)
       const storedAfterRelaunch = await storeFiles(dir)
       expect(storedAfterRelaunch.length, failing).toBe(1)
-      expect(storedAfterRelaunch.every((name) => !name.endsWith(".tmp")), failing).toBe(true)
+      expect(
+        storedAfterRelaunch.every((name) => !name.endsWith(".tmp")),
+        failing,
+      ).toBe(true)
     }
   })
 
@@ -294,7 +318,12 @@ describe("MemoryBlockCache persisted blocks", () => {
     // when
     const compiled = await Promise.race([
       stalled.compile(repo, TEMPLATE, OPTIONS, revision),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("compile waited out the test budget on a store that never loads")), remainingTestTime())),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error("compile waited out the test budget on a store that never loads")),
+          remainingTestTime(),
+        ),
+      ),
     ])
 
     // then

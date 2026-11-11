@@ -74,6 +74,7 @@ fn active_window(server: &impl XServer) -> CoreResult<Option<Window>> {
 pub(crate) fn focused(server: &impl XServer) -> CoreResult<Option<DesktopWindow>> {
     let Some(id) = active_window(server)? else { return Ok(None) };
     Ok(server.placement(id).map(|placement| DesktopWindow {
+        identity: None,
         id: id.to_string(),
         title: String::new(),
         app: String::new(),
@@ -126,6 +127,7 @@ impl<S: XServer> Enumeration<'_, S> {
             .words(id, self.pid, AtomEnum::CARDINAL.into())
             .and_then(|words| words.first().copied());
         DesktopWindow {
+            identity: None,
             id: id.to_string(),
             title,
             app,

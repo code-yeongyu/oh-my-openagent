@@ -128,9 +128,10 @@ describe("TaskManager runtime fallback visibility", () => {
       },
     })
     expect(record?.fallback_models).toEqual([])
-    expect(
-      record?.fallback_attempts?.map((attempt) => `${attempt.provider}/${attempt.model_id}`),
-    ).toEqual(["chatgpt-subscription/gpt-6-luna-fast", "opencode-go/minimax-m3"])
+    expect(record?.fallback_attempts?.map((attempt) => `${attempt.provider}/${attempt.model_id}`)).toEqual([
+      "chatgpt-subscription/gpt-6-luna-fast",
+      "opencode-go/minimax-m3",
+    ])
     fake.settle({ status: "completed", finalResponse: "done" })
     await manager.waitFor(started.task_id)
   })

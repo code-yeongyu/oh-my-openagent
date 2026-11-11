@@ -15,17 +15,8 @@ import { emitMemoryReceipt, runReceipt, type ReceiptWarn, type RunReceiptLedger 
 import { requireRunMetadata } from "./spawn-metadata"
 import { describeReflectionLauncher } from "./launcher-identity"
 import { waitForRunCompletion } from "./run-sentinel"
-import {
-  defaultSupervisorPath,
-  definedEnvironment,
-  isNodeSignal,
-  readTail,
-} from "./spawn-supervisor-support"
-import type {
-  ReflectionChildResult,
-  ReflectionSandbox,
-  ReflectionSpawnArgs,
-} from "./spawn-types"
+import { defaultSupervisorPath, definedEnvironment, isNodeSignal, readTail } from "./spawn-supervisor-support"
+import type { ReflectionChildResult, ReflectionSandbox, ReflectionSpawnArgs } from "./spawn-types"
 
 /** Prefix of the error the launcher sees when the supervisor exits without a complete outcome. */
 export const SUPERVISOR_EXIT_PREFIX = "memory run supervisor exited with"
@@ -182,7 +173,12 @@ async function runSupervisedChild(input: {
   })
   supervisor.unref()
   if (input.receiptsDir !== undefined && input.attempt === 1) {
-    await emitMemoryReceipt(input.receiptsDir, runReceipt(launchedRun(input.ledger), "launched"), undefined, input.receiptWarn)
+    await emitMemoryReceipt(
+      input.receiptsDir,
+      runReceipt(launchedRun(input.ledger), "launched"),
+      undefined,
+      input.receiptWarn,
+    )
   }
   const outcomePath = join(input.runDir, "outcome.json")
   const launchPath = join(input.runDir, "launch.json")
@@ -200,7 +196,10 @@ async function runSupervisedChild(input: {
   const outcomeWait = new AbortController()
   type RunCompletion =
     | { readonly kind: "error"; readonly error: Error }
-    | { readonly kind: "close"; readonly exit: { readonly code: number | null; readonly signal: NodeJS.Signals | null } }
+    | {
+        readonly kind: "close"
+        readonly exit: { readonly code: number | null; readonly signal: NodeJS.Signals | null }
+      }
     | { readonly kind: "outcome"; readonly result: "present" | "timeout" }
   let settle: (completion: RunCompletion) => void = () => {}
   const completion = new Promise<RunCompletion>((resolve) => {
@@ -218,13 +217,13 @@ async function runSupervisedChild(input: {
   supervisor.once("error", onError)
   supervisor.once("close", onClose)
   void waitForRunCompletion(
-      outcomePath,
-      launchPath,
-      hasCompleteOutcome,
-      createLedgerDeadlineReader(input.runDir, OUTCOME_PUBLICATION_MARGIN_MS),
-      Date.now,
-      outcomeWait.signal,
-    ).then((result) => settle({ kind: "outcome", result }))
+    outcomePath,
+    launchPath,
+    hasCompleteOutcome,
+    createLedgerDeadlineReader(input.runDir, OUTCOME_PUBLICATION_MARGIN_MS),
+    Date.now,
+    outcomeWait.signal,
+  ).then((result) => settle({ kind: "outcome", result }))
   const result = await completion.finally(() => {
     outcomeWait.abort()
     supervisor.off("error", onError)

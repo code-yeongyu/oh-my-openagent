@@ -78,13 +78,17 @@ export function createInboxDrain(options: InboxDrainOptions): InboxDrain {
       ledger: runtime.listAdmittedDeliveries(),
       session_path: options.sessionPath(),
     })
-    for (const id of reconciled.dual_runtime) options.log?.(`dual_runtime: delivery ${id} is claimed by another live process for ${options.durableId}`)
+    for (const id of reconciled.dual_runtime)
+      options.log?.(`dual_runtime: delivery ${id} is claimed by another live process for ${options.durableId}`)
     const admitted: { delivery_id: string; kind: GatewayAdmissionKind }[] = []
     for (const id of held.keys()) if (!reconciled.queued.some((row) => row.delivery_id === id)) held.delete(id)
     for (const row of reconciled.queued) {
       const gate = runtime.admissionGate()
       const heldRevision = held.get(row.delivery_id)
-      if (heldRevision !== undefined && !RELEASING_REASONS.has(event.reason) && heldRevision === gate.editor_revision) break
+      if (heldRevision !== undefined && !RELEASING_REASONS.has(event.reason) && heldRevision === gate.editor_revision) {
+        admitted.push({ delivery_id: row.delivery_id, kind: "held_draft" })
+        break
+      }
       if (!gate.can_admit) {
         held.set(row.delivery_id, gate.editor_revision)
         noticeQueued(row)
@@ -99,7 +103,12 @@ export function createInboxDrain(options: InboxDrainOptions): InboxDrain {
         admitted.push({ delivery_id: row.delivery_id, kind: reason })
         continue
       }
-      const claimed = await options.store.claim({ now: now(), delivery_id: row.delivery_id, self, lane: decision.deliverAs === "steer" ? "steer" : "follow_up" })
+      const claimed = await options.store.claim({
+        now: now(),
+        delivery_id: row.delivery_id,
+        self,
+        lane: decision.deliverAs === "steer" ? "steer" : "follow_up",
+      })
       if (claimed.kind !== "claimed") continue
       options._test?.afterClaim?.(claimed.row)
       let result: ReturnType<SessionRuntimePort["admitExternalMessage"]>
@@ -113,13 +122,25 @@ export function createInboxDrain(options: InboxDrainOptions): InboxDrain {
           ...(decision.expected_turn_id === undefined ? {} : { expected_turn_id: decision.expected_turn_id }),
         })
       } catch (error) {
-        await options.store.recordOutcome({ now: now(), delivery_id: row.delivery_id, self, outcome: { kind: "requeue" } })
-        options.log?.(`admission closed for ${options.durableId}: ${error instanceof Error ? error.message : String(error)}`)
+        await options.store.recordOutcome({
+          now: now(),
+          delivery_id: row.delivery_id,
+          self,
+          outcome: { kind: "requeue" },
+        })
+        options.log?.(
+          `admission closed for ${options.durableId}: ${error instanceof Error ? error.message : String(error)}`,
+        )
         break
       }
       options._test?.afterAdmit?.(claimed.row, result.kind)
       if (result.kind === "held_draft") {
-        await options.store.recordOutcome({ now: now(), delivery_id: row.delivery_id, self, outcome: { kind: "requeue" } })
+        await options.store.recordOutcome({
+          now: now(),
+          delivery_id: row.delivery_id,
+          self,
+          outcome: { kind: "requeue" },
+        })
         held.set(row.delivery_id, runtime.admissionGate().editor_revision)
         noticeQueued(row)
         admitted.push({ delivery_id: row.delivery_id, kind: "held_draft" })
@@ -127,18 +148,33 @@ export function createInboxDrain(options: InboxDrainOptions): InboxDrain {
       }
       if (result.kind === "queued") noticeQueued(claimed.row)
       if (result.kind === "turn_conflict") {
-        await options.store.recordOutcome({ now: now(), delivery_id: row.delivery_id, self, outcome: { kind: "refused", reason: "turn_conflict" } })
-      } else {
-        const written = result.kind === "already_admitted" && runtime.listAdmittedDeliveries().emitted.includes(row.delivery_id)
         await options.store.recordOutcome({
           now: now(),
           delivery_id: row.delivery_id,
           self,
-          outcome: { kind: written ? "applied" : "admitted", admission_kind: result.kind, turn_epoch: result.turn_epoch },
+          outcome: { kind: "refused", reason: "turn_conflict" },
+        })
+      } else {
+        const written =
+          result.kind === "already_admitted" && runtime.listAdmittedDeliveries().emitted.includes(row.delivery_id)
+        await options.store.recordOutcome({
+          now: now(),
+          delivery_id: row.delivery_id,
+          self,
+          // A delivery queued while the session waits on a question waits on that approval (#13014), as the relay leg reports it.
+          outcome: {
+            kind: written ? "applied" : "admitted",
+            admission_kind: result.kind,
+            turn_epoch: result.turn_epoch,
+            ...(result.kind === "queued" && runtime.phase() === "waiting_question"
+              ? { wait_kind: "approval" as const }
+              : {}),
+          },
         })
       }
       admitted.push({ delivery_id: row.delivery_id, kind: result.kind })
-      if (result.kind === "started" || result.kind === "steered" || result.kind === "queued") options.onAdmitted?.(row.delivery_id, result.kind)
+      if (result.kind === "started" || result.kind === "steered" || result.kind === "queued")
+        options.onAdmitted?.(row.delivery_id, result.kind)
     }
     return { admitted }
   }
@@ -159,7 +195,9 @@ export function createInboxDrain(options: InboxDrainOptions): InboxDrain {
       },
       (error: unknown) => {
         if (!isLockWaitExceeded(error) || stopped || retry !== undefined) return
-        options.log?.(`drain for ${options.durableId} is waiting on the store's write lock; retrying in ${options.store.busyTimeoutMs} ms`)
+        options.log?.(
+          `drain for ${options.durableId} is waiting on the store's write lock; retrying in ${options.store.busyTimeoutMs} ms`,
+        )
         retry = setTimeout(() => {
           retry = undefined
           if (!stopped) void run(event).catch(() => undefined)

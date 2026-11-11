@@ -28,11 +28,7 @@ export type ModelResolutionRequest = {
   }
 }
 
-export type ModelResolutionProvenance =
-  | "override"
-  | "category-default"
-  | "provider-fallback"
-  | "system-default"
+export type ModelResolutionProvenance = "override" | "category-default" | "provider-fallback" | "system-default"
 
 export type ModelResolutionResult = {
   model: string

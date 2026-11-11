@@ -6,16 +6,23 @@ import { join } from "node:path"
 
 function fixture() {
   const pr = {
-    number: 42, state: "open", title: "$(exit 1)", body: "fork metadata",
+    number: 42,
+    state: "open",
+    title: "$(exit 1)",
+    body: "fork metadata",
     head: { sha: "abc", repo: { id: 2 } },
     base: { repo: { id: 1, full_name: "owner/project" } },
   }
   const run = {
     path: ".github/workflows/pr-automation-signal.yml",
-    event: "pull_request", status: "completed", conclusion: "success",
+    event: "pull_request",
+    status: "completed",
+    conclusion: "success",
     repository: { full_name: "owner/project" },
     head_repository: { id: 2, owner: { login: "fork-owner" } },
-    head_branch: "feature", head_sha: "abc", pull_requests: [],
+    head_branch: "feature",
+    head_sha: "abc",
+    pull_requests: [],
   }
   const requests = []
   const outputs = new Map()
@@ -40,9 +47,15 @@ function fixture() {
 test("fork runs with no associated PRs resolve through server metadata", async () => {
   const f = fixture()
   expect(await resolveAutomationPR(f)).toBe(f.pr)
-  expect(f.requests).toEqual([{
-    owner: "owner", repo: "project", state: "open", head: "fork-owner:feature", per_page: 100,
-  }])
+  expect(f.requests).toEqual([
+    {
+      owner: "owner",
+      repo: "project",
+      state: "open",
+      head: "fork-owner:feature",
+      per_page: 100,
+    },
+  ])
 })
 
 test("associated PRs still require an exact current head and fork repository", async () => {
@@ -95,7 +108,10 @@ test("CLA adapter serializes API-derived PR metadata as data", async () => {
     const eventPath = join(dir, "event.json")
     expect(await prepareCLAEvent({ ...f, eventPath })).toBe(f.pr)
     expect(JSON.parse(await readFile(eventPath, "utf8"))).toEqual({
-      action: "synchronize", number: 42, pull_request: f.pr, repository: f.pr.base.repo,
+      action: "synchronize",
+      number: 42,
+      pull_request: f.pr,
+      repository: f.pr.base.repo,
     })
     expect(f.outputs.get("pr_number")).toBe(42)
   } finally {
