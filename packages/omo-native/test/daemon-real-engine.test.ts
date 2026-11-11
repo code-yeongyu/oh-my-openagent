@@ -51,19 +51,22 @@ function sandbox() {
   return { agentDir, socket, env }
 }
 
-describe("daemon real-engine sandbox", () => {
-  test("#given a group-writable umask #when the sandbox is created #then its rpc directories stay private", () => {
-    const previous = process.umask(0o002)
-    try {
-      const { agentDir } = sandbox()
-      for (const dir of [join(agentDir, "rpc"), join(agentDir, "rpc", "shards")]) {
-        expect(lstatSync(dir).mode & 0o077).toBe(0)
+// POSIX-only like every other sandbox() caller: the sandbox lives under /tmp and its check reads POSIX mode bits.
+if (process.platform !== "win32") {
+  describe("daemon real-engine sandbox", () => {
+    test("#given a group-writable umask #when the sandbox is created #then its rpc directories stay private", () => {
+      const previous = process.umask(0o002)
+      try {
+        const { agentDir } = sandbox()
+        for (const dir of [join(agentDir, "rpc"), join(agentDir, "rpc", "shards")]) {
+          expect(lstatSync(dir).mode & 0o077).toBe(0)
+        }
+      } finally {
+        process.umask(previous)
       }
-    } finally {
-      process.umask(previous)
-    }
+    })
   })
-})
+}
 
 // A cold `node` start on a loaded host can take longer than any fixed per-spawn budget (#9679), so each child runs
 // until it closes; the only bound is the test's own budget, which names the command it was waiting on.
