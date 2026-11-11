@@ -24,11 +24,14 @@ const fileBytes = async (path: string): Promise<Uint8Array> => new Uint8Array(aw
 const sha256 = (data: Uint8Array): string => createHash("sha256").update(data).digest("hex")
 
 describe("vendored strict-ed25519 in the device service client", () => {
-  test.each(Object.entries(FILES))("%s matches its pinned sha256 and the canonical copy byte for byte", async (name, expected) => {
-    const vendored = await fileBytes(join(VENDORED, name))
-    expect(sha256(vendored)).toBe(expected)
-    expect(Buffer.compare(vendored, await fileBytes(join(CANONICAL, name)))).toBe(0)
-  })
+  test.each(Object.entries(FILES))(
+    "%s matches its pinned sha256 and the canonical copy byte for byte",
+    async (name, expected) => {
+      const vendored = await fileBytes(join(VENDORED, name))
+      expect(sha256(vendored)).toBe(expected)
+      expect(Buffer.compare(vendored, await fileBytes(join(CANONICAL, name)))).toBe(0)
+    },
+  )
 
   test.each(corpus.ed25519)("Ed25519 $id $name", async (c) => {
     expect(strictEd25519Key(bytes(c.key))).toBe(c.keyValid)

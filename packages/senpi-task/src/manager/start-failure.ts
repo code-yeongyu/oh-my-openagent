@@ -18,23 +18,18 @@ const MODEL_UNAVAILABLE_MESSAGE = "The task child cannot serve this model."
 const REASON_MESSAGES: Readonly<Partial<Record<TaskStartFailureReason, string>>> = {
   model_not_in_child_profile:
     "The task child cannot serve this model: its provider is not present in the child profile.",
-  catalog_probe_timed_out:
-    "The task child could not confirm this model in time: its model catalog probe timed out.",
+  catalog_probe_timed_out: "The task child could not confirm this model in time: its model catalog probe timed out.",
   catalog_probe_failed: "The task child cannot serve this model: its model catalog probe failed.",
   host_unreachable: "The task host is unreachable (host_unreachable).",
   ensure_failed: "The task host could not be ensured (ensure_failed).",
-  ensure_timed_out:
-    "The task host did not become ready before the ensure deadline (ensure_timed_out).",
-  shard_socket_too_long:
-    "The shard socket path exceeds the platform limit (shard_socket_too_long).",
-  shard_alt_root_unsafe:
-    "The alternate shard root is unsafe (shard_alt_root_unsafe).",
+  ensure_timed_out: "The task host did not become ready before the ensure deadline (ensure_timed_out).",
+  shard_socket_too_long: "The shard socket path exceeds the platform limit (shard_socket_too_long).",
+  shard_alt_root_unsafe: "The alternate shard root is unsafe (shard_alt_root_unsafe).",
   store_index_unavailable:
     "The task store index could not be recorded, so no host was opened (store_index_unavailable).",
   host_incompatible:
     "The recorded task host is incompatible; the child was not opened anywhere else (host_incompatible).",
-  open_timed_out:
-    "The task host did not finish opening the child session in time (open_timed_out).",
+  open_timed_out: "The task host did not finish opening the child session in time (open_timed_out).",
   launch_spec_insecure:
     "The task host launch spec is writable by other users or not owned by you, so no task host was started (launch_spec_insecure).",
 }
@@ -60,15 +55,16 @@ export function describeStartFailure(error: unknown): StartFailureDescription {
   const trusted = error.failure.reason === undefined
   const cause = trusted ? causeOf(failureKind, error.failure.cause) : undefined
   const exited = trusted && cause === undefined && rejectedWhile === "exited" ? exit : undefined
-  const errorMessage = trusted && error.failure.cause instanceof RpcRequestTimeout
-    ? `Child prompt failed to start: the child did not answer ${error.failure.cause.command} within ${error.failure.cause.deadlineMs} ms. Action: inspect task_output; run it again with task.`
-    : namedSpec !== undefined
-    ? launchSpecInsecureMessage(namedSpec)
-    : cause !== undefined
-      ? causedMessage(failureKind, cause)
-      : exited !== undefined && failureKind === "child-prompt-failed"
-        ? `Child prompt failed to start: ${describeChildExit(exited)}.`
-        : publicMessage(failureKind, reason)
+  const errorMessage =
+    trusted && error.failure.cause instanceof RpcRequestTimeout
+      ? `Child prompt failed to start: the child did not answer ${error.failure.cause.command} within ${error.failure.cause.deadlineMs} ms. Action: inspect task_output; run it again with task.`
+      : namedSpec !== undefined
+        ? launchSpecInsecureMessage(namedSpec)
+        : cause !== undefined
+          ? causedMessage(failureKind, cause)
+          : exited !== undefined && failureKind === "child-prompt-failed"
+            ? `Child prompt failed to start: ${describeChildExit(exited)}.`
+            : publicMessage(failureKind, reason)
   // A host that refuses a designated child for a missing capability names the chain only in the
   // engine error; the public message above is a fixed string, so the chain never reaches the
   // record (#12778). Append it when the refusal carries one: the chain is omo-computed model
@@ -76,9 +72,7 @@ export function describeStartFailure(error: unknown): StartFailureDescription {
   // off-enum reason still leaks nothing.
   const designation = designatedModelsSuffix(failureKind, reason, error)
   const message =
-    designation === "" || errorMessage.includes(designation.trim())
-      ? errorMessage
-      : `${errorMessage}${designation}`
+    designation === "" || errorMessage.includes(designation.trim()) ? errorMessage : `${errorMessage}${designation}`
   return {
     errorMessage: message,
     failureKind,
@@ -88,9 +82,7 @@ export function describeStartFailure(error: unknown): StartFailureDescription {
       ...(reason === undefined ? {} : { failure_reason: reason }),
       ...(namedSpec === undefined ? {} : { launch_spec_path: namedSpec }),
       ...(rejectedWhile === undefined ? {} : { rejected_while: rejectedWhile }),
-      ...(exit === undefined
-        ? {}
-        : { exit_kind: exit.kind, exit_code: exit.code, exit_signal: exit.signal }),
+      ...(exit === undefined ? {} : { exit_kind: exit.kind, exit_code: exit.code, exit_signal: exit.signal }),
       ...(cause ?? {}),
     },
   }
@@ -134,10 +126,7 @@ function launchSpecInsecureMessage(path: string): string {
   return `The task host launch spec is writable by other users or not owned by you, so no task host was started (launch_spec_insecure: ${path}). Fix: run chmod 644 ${path} and make sure the file is yours.`
 }
 
-function publicMessage(
-  kind: TaskStartFailureKind,
-  reason: TaskStartFailureReason | undefined,
-): string {
+function publicMessage(kind: TaskStartFailureKind, reason: TaskStartFailureReason | undefined): string {
   const reasonMessage = reason === undefined ? undefined : REASON_MESSAGES[reason]
   if (reasonMessage !== undefined) return reasonMessage
 

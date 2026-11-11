@@ -25,9 +25,7 @@ describe("a daemon-hosted child's own fallback chain (#9512)", () => {
     const runner = runnerOver(host)
 
     // when
-    const handle = await runner.start(
-      childSpec({ fallbackModels: ["openai/gpt-5.6-sol:high", "zai/glm-5.3"] }),
-    )
+    const handle = await runner.start(childSpec({ fallbackModels: ["openai/gpt-5.6-sol:high", "zai/glm-5.3"] }))
 
     // then
     expect(openPayloads(host.commands)[0]?.["retryFallback"]).toEqual({
@@ -71,6 +69,13 @@ describe("a daemon-hosted child's own fallback chain (#9512)", () => {
     // then
     await expect(started).rejects.toThrow("task daemon unavailable (capability): missing retry_fallback_profile")
     await expect(started).rejects.toThrow("designated models (anthropic/claude-sonnet-4-5 -> openai/gpt-5.6-sol)")
+    await expect(started).rejects.toMatchObject({
+      failure: {
+        kind: "host_unavailable",
+        reason: "capability",
+        cause: { designatedChain: "anthropic/claude-sonnet-4-5 -> openai/gpt-5.6-sol" },
+      },
+    })
     const types = host.commands.map((command) => command.type)
     expect(types).not.toContain("open_session")
     expect(types).not.toContain("prompt")
@@ -91,7 +96,10 @@ describe("a daemon-hosted child's own fallback chain (#9512)", () => {
     // then
     const opens = openPayloads(host.commands)
     expect(opens).toHaveLength(2)
-    const profile = { modelFallback: true, fallbackChains: { "anthropic/claude-sonnet-4-5": ["openai/gpt-5.6-sol"], "openai/gpt-5.6-sol": [] } }
+    const profile = {
+      modelFallback: true,
+      fallbackChains: { "anthropic/claude-sonnet-4-5": ["openai/gpt-5.6-sol"], "openai/gpt-5.6-sol": [] },
+    }
     expect(opens.map((payload) => payload["retryFallback"])).toEqual([profile, profile])
     await resumed.terminate()
   })

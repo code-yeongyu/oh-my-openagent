@@ -92,7 +92,7 @@ describe("omo-senpi comment-checker binary resolver", () => {
     const expectedPathCandidate = process.platform === "win32" ? "comment-checker.exe" : "comment-checker"
     expect(resolutionOrder).toEqual(["package-api", `path:${expectedPathCandidate}`])
   })
-it("#given env, package and PATH miss #when the shared cache holds a checker #then the cached binary resolves last", () => {
+  it("#given env, package and PATH miss #when the shared cache holds a checker #then the cached binary resolves last", () => {
     // given
     const cacheDir = join(createTempCwd(), "bin")
     const cachedBinary = join(cacheDir, process.platform === "win32" ? "comment-checker.exe" : "comment-checker")

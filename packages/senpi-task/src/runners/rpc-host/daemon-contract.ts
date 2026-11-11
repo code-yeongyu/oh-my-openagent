@@ -13,10 +13,7 @@ export const TASK_HOST_SOCKET_ENV_NAMES = [
 ] as const
 
 /** The ONE public socket of the machine-wide daemon: an override, else `<agentDir>/rpc/rpc.sock`. */
-export function resolveTaskHostSocket(
-  env: Readonly<Record<string, string | undefined>>,
-  agentDir: string,
-): string {
+export function resolveTaskHostSocket(env: Readonly<Record<string, string | undefined>>, agentDir: string): string {
   for (const name of TASK_HOST_SOCKET_ENV_NAMES) {
     const configured = env[name]?.trim()
     if (configured) return configured
@@ -71,7 +68,12 @@ export class HostUnavailableError extends Error {
 
   constructor(
     reason: HostUnavailableReason,
-    options: { readonly fallbackAllowed: boolean; readonly detail?: string; readonly launchSpecPath?: string; readonly designatedChain?: string },
+    options: {
+      readonly fallbackAllowed: boolean
+      readonly detail?: string
+      readonly launchSpecPath?: string
+      readonly designatedChain?: string
+    },
   ) {
     super(`task daemon unavailable (${reason})${options.detail === undefined ? "" : `: ${options.detail}`}`)
     this.reason = reason

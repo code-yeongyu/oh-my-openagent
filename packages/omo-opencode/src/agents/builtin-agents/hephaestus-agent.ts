@@ -93,12 +93,13 @@ export function maybeCreateHephaestusConfig(input: {
     undefined,
     availableSkills,
     availableCategories,
-    useTaskSystem
+    useTaskSystem,
   )
 
   hephaestusConfig = { ...hephaestusConfig, variant: hephaestusResolvedVariant ?? "medium" }
 
-  const hepOverrideCategory = (hephaestusOverride as Record<string, unknown> | undefined)?.category as string | undefined
+  const hepOverrideCategory = (hephaestusOverride as Record<string, unknown> | undefined)?.category as
+    string | undefined
   if (hepOverrideCategory) {
     hephaestusConfig = applyCategoryOverride(hephaestusConfig, hepOverrideCategory, mergedCategories)
     if (!isHephaestusSupportedModel(hephaestusConfig.model)) {
@@ -128,7 +129,7 @@ export function maybeCreateHephaestusConfig(input: {
     hephaestusConfig.permission,
     resolvedModel,
     hephaestusOverride?.permission,
-    (hephaestusOverride as { tools?: Record<string, boolean> } | undefined)?.tools
+    (hephaestusOverride as { tools?: Record<string, boolean> } | undefined)?.tools,
   )
 
   return hephaestusConfig

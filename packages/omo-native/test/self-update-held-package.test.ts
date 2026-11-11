@@ -81,7 +81,9 @@ describe("omo update on Windows when a package file is held (#10090)", () => {
       expect(await runSelfUpdate([], h.options)).toBe(0)
       expect(h.spawned).toHaveLength(2)
       expect(h.sleeps).toEqual([2000])
-      expect(h.lines.some((line) => line.includes("@anthropic-ai/claude-agent-sdk-win32-x64") && line.includes("retrying"))).toBe(true)
+      expect(
+        h.lines.some((line) => line.includes("@anthropic-ai/claude-agent-sdk-win32-x64") && line.includes("retrying")),
+      ).toBe(true)
       expect(h.lines.at(-1)).toBe("omo 5.1.1 -> 5.1.2 (engine: senpi 2026.10.1)")
     })
   })
@@ -92,9 +94,17 @@ describe("omo update on Windows when a package file is held (#10090)", () => {
         outcomes: [{ status: 1, stderr: HELD_STDERR }],
         processes: [
           { pid: 100, name: "node.exe", commandLine: `node ${INSTALL_DIR}\\omo-ai\\bin\\omo.js update` },
-          { pid: 4242, name: "claude.exe", executablePath: `${INSTALL_DIR.toLowerCase()}\\@anthropic-ai\\claude-agent-sdk-win32-x64\\claude.exe` },
+          {
+            pid: 4242,
+            name: "claude.exe",
+            executablePath: `${INSTALL_DIR.toLowerCase()}\\@anthropic-ai\\claude-agent-sdk-win32-x64\\claude.exe`,
+          },
           { pid: 777, name: "explorer.exe", executablePath: String.raw`C:\Windows\explorer.exe` },
-          { pid: 999, name: "other.exe", executablePath: `${INSTALL_DIR}\\@anthropic-ai\\claude-agent-sdk-win32-x64-extra\\other.exe` },
+          {
+            pid: 999,
+            name: "other.exe",
+            executablePath: `${INSTALL_DIR}\\@anthropic-ai\\claude-agent-sdk-win32-x64-extra\\other.exe`,
+          },
           { pid: 888, name: "node.exe", commandLine: `node ${INSTALL_DIR}\\typescript\\lib\\tsserver.js` },
         ],
       })
@@ -126,7 +136,12 @@ describe("omo update on Windows when a package file is held (#10090)", () => {
   describe("#given the failed install left a different or unreadable omo", () => {
     test("#then it reinstalls the previous version once and says whether that worked", async () => {
       const h = harness({
-        outcomes: [{ status: 1, stderr: HELD_STDERR }, { status: 1, stderr: HELD_STDERR }, { status: 1, stderr: HELD_STDERR }, { status: 0 }],
+        outcomes: [
+          { status: 1, stderr: HELD_STDERR },
+          { status: 1, stderr: HELD_STDERR },
+          { status: 1, stderr: HELD_STDERR },
+          { status: 0 },
+        ],
         versions: ["5.1.1", "unreadable", "5.1.1"],
       })
       expect(await runSelfUpdate([], h.options)).toBe(1)
@@ -168,20 +183,34 @@ describe("omo update on Windows when a package file is held (#10090)", () => {
 
   describe("#given npm reports EPERM", () => {
     test("#then a failed mkdir is a permission failure and is not retried", async () => {
-      const h = harness({ outcomes: [{ status: 1, stderr: String.raw`npm error code EPERM
+      const h = harness({
+        outcomes: [
+          {
+            status: 1,
+            stderr: String.raw`npm error code EPERM
 npm error syscall mkdir
 npm error path C:\Program Files\nodejs\node_modules\omo-ai
-npm error Error: EPERM: operation not permitted, mkdir 'C:\Program Files\nodejs\node_modules\omo-ai'` }] })
+npm error Error: EPERM: operation not permitted, mkdir 'C:\Program Files\nodejs\node_modules\omo-ai'`,
+          },
+        ],
+      })
       expect(await runSelfUpdate([], h.options)).toBe(1)
       expect(h.spawned).toHaveLength(1)
       expect(h.sleeps).toEqual([])
     })
 
     test("#then a failed rename of an existing file is a lock and is retried", async () => {
-      const h = harness({ outcomes: [{ status: 1, stderr: String.raw`npm error code EPERM
+      const h = harness({
+        outcomes: [
+          {
+            status: 1,
+            stderr: String.raw`npm error code EPERM
 npm error syscall rename
 npm error path C:\Users\u\AppData\Roaming\npm\node_modules\omo-ai
-npm error errno -4048` }] })
+npm error errno -4048`,
+          },
+        ],
+      })
       expect(await runSelfUpdate([], h.options)).toBe(1)
       expect(h.spawned).toHaveLength(3)
       expect(h.sleeps).toEqual([2000, 5000])
@@ -202,10 +231,17 @@ npm error errno -4048` }] })
 
   describe("#given a Windows permission failure (EACCES on a protected prefix)", () => {
     test("#then it is not treated as a held file and fails once", async () => {
-      const h = harness({ outcomes: [{ status: 1, stderr: String.raw`npm error code EACCES
+      const h = harness({
+        outcomes: [
+          {
+            status: 1,
+            stderr: String.raw`npm error code EACCES
 npm error syscall mkdir
 npm error path C:\Program Files\nodejs\node_modules\omo-ai
-npm error Error: EACCES: permission denied` }] })
+npm error Error: EACCES: permission denied`,
+          },
+        ],
+      })
       expect(await runSelfUpdate([], h.options)).toBe(1)
       expect(h.spawned).toHaveLength(1)
       expect(h.sleeps).toEqual([])

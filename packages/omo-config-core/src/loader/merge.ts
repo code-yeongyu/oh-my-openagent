@@ -5,10 +5,12 @@ export function isUnsafeObjectKey(key: string): boolean {
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object"
-    && value !== null
-    && !Array.isArray(value)
-    && Object.prototype.toString.call(value) === "[object Object]"
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.prototype.toString.call(value) === "[object Object]"
+  )
 }
 
 function sanitizeOmoConfigValue(value: unknown): unknown {
@@ -33,9 +35,8 @@ export function mergeOmoConfigRecords(
     if (isUnsafeObjectKey(key)) continue
     const safeValue = sanitizeOmoConfigValue(value)
     const baseValue = result[key]
-    result[key] = isPlainObject(baseValue) && isPlainObject(safeValue)
-      ? mergeOmoConfigRecords(baseValue, safeValue)
-      : safeValue
+    result[key] =
+      isPlainObject(baseValue) && isPlainObject(safeValue) ? mergeOmoConfigRecords(baseValue, safeValue) : safeValue
   }
 
   return result

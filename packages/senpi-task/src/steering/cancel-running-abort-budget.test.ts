@@ -36,23 +36,35 @@ function manualDeadline() {
   const waiting: (() => void)[] = []
   const armed = new EventEmitter()
   return {
-    deadline: (_step: TeardownStep) => new Promise<void>((resolve) => {
-      waiting.push(resolve)
-      armed.emit("armed")
-    }),
+    deadline: (_step: TeardownStep) =>
+      new Promise<void>((resolve) => {
+        waiting.push(resolve)
+        armed.emit("armed")
+      }),
     armed: () => once(armed, "armed", { signal: AbortSignal.timeout(3_000) }),
-    expire: () => { for (const resolve of waiting.splice(0)) resolve() },
+    expire: () => {
+      for (const resolve of waiting.splice(0)) resolve()
+    },
   }
 }
 
-function steeringFor(store: TaskRecordStore, handle: ManagedChildHandle, deadline: ManualDeadline, destroyed: string[]) {
+function steeringFor(
+  store: TaskRecordStore,
+  handle: ManagedChildHandle,
+  deadline: ManualDeadline,
+  destroyed: string[],
+) {
   const port: SteeringPort = {
     store,
     liveHandle: () => handle,
     reserveForRevive: () => ({ ok: true, commit: () => undefined, release: () => undefined }),
     reviveDetached: async () => ({ ok: false, reason: "not used" }),
     dequeuePending: () => false,
-    destruction: { destroyResidentTask: async (taskId, cause) => { destroyed.push(`${taskId}:${cause}`) } },
+    destruction: {
+      destroyResidentTask: async (taskId, cause) => {
+        destroyed.push(`${taskId}:${cause}`)
+      },
+    },
     runStatsSnapshot: () => undefined,
     abortDeadline: deadline.deadline,
     now: () => Date.parse("2026-10-09T00:00:00.000Z"),

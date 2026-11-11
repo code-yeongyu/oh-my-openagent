@@ -48,12 +48,18 @@ export function formatReflectionLockLines(identity, verdict, reflectionDir, deci
   if (verdict.state === "none" || verdict.state === "live") return []
   const lock = join(reflectionDir, "active.lock")
   if (verdict.state === "dead") {
-    return [`WARN memory reflection is stuck on a stale lock (${identity}): run ${verdict.runId} still holds ${lock}, but its launcher is gone and it already recorded its outcome. Next step: open a session and send /reflect (or any message); the session settles that run and starts any queued request.`]
+    return [
+      `WARN memory reflection is stuck on a stale lock (${identity}): run ${verdict.runId} still holds ${lock}, but its launcher is gone and it already recorded its outcome. Next step: open a session and send /reflect (or any message); the session settles that run and starts any queued request.`,
+    ]
   }
   if (decision?.kind === "reap") {
-    return [`WARN memory reflection is stuck on a stale lock (${identity}): run ${verdict.runId} still holds ${lock} and ${decision.reason}. Next step: omo doctor --fix (it would apply ${decision.action}).`]
+    return [
+      `WARN memory reflection is stuck on a stale lock (${identity}): run ${verdict.runId} still holds ${lock} and ${decision.reason}. Next step: omo doctor --fix (it would apply ${decision.action}).`,
+    ]
   }
-  return [`WARN memory reflection is stuck on a stale lock (${identity}): run ${verdict.runId} still holds ${lock} and ${verdict.reason}. Next step: run /doctor in a session; if no reflection run is active, run omo doctor --fix.`]
+  return [
+    `WARN memory reflection is stuck on a stale lock (${identity}): run ${verdict.runId} still holds ${lock} and ${verdict.reason}. Next step: run /doctor in a session; if no reflection run is active, run omo doctor --fix.`,
+  ]
 }
 
 function listDurableIdentities(agentsRoot) {
@@ -98,7 +104,9 @@ function loadTaskConfigRuntime() {
 export function readGlobalMemorySettings(home = homedir(), options = {}) {
   try {
     const runtime = (options.loadTaskConfig ?? loadTaskConfigRuntime)()
-    return runtime.resolveGlobalMemorySettings({ env: { ...(options.env ?? process.env), HOME: home, USERPROFILE: home } })
+    return runtime.resolveGlobalMemorySettings({
+      env: { ...(options.env ?? process.env), HOME: home, USERPROFILE: home },
+    })
   } catch {
     return undefined
   }
@@ -119,29 +127,44 @@ export async function reflectionLockFix(options = {}) {
       return formatStaleLockFixLines(identity.name, report, locks)
     } catch (error) {
       failed = true
-      return [`FAIL ${identity.name} reflection lock fix failed: ${error instanceof Error ? error.message : String(error)}`]
+      return [
+        `FAIL ${identity.name} reflection lock fix failed: ${error instanceof Error ? error.message : String(error)}`,
+      ]
     }
   }
   const orphans = async (identity) => {
     try {
-      return orphanLines(identity.name, await sweepIdentityOrphanWorktrees(identity.root, { now: (probe.now ?? Date.now)(), dryRun }), dryRun)
+      return orphanLines(
+        identity.name,
+        await sweepIdentityOrphanWorktrees(identity.root, { now: (probe.now ?? Date.now)(), dryRun }),
+        dryRun,
+      )
     } catch (error) {
       failed = true
-      return [`FAIL ${identity.name} orphan worktree sweep failed: ${error instanceof Error ? error.message : String(error)}`]
+      return [
+        `FAIL ${identity.name} orphan worktree sweep failed: ${error instanceof Error ? error.message : String(error)}`,
+      ]
     }
   }
-  const settings = options.memorySettings ?? readGlobalMemorySettings(options.home ?? homedir(), {
-    env: options.env ?? process.env,
-    ...(options.loadTaskConfig === undefined ? {} : { loadTaskConfig: options.loadTaskConfig }),
+  const settings =
+    options.memorySettings ??
+    readGlobalMemorySettings(options.home ?? homedir(), {
+      env: options.env ?? process.env,
+      ...(options.loadTaskConfig === undefined ? {} : { loadTaskConfig: options.loadTaskConfig }),
+    })
+  const retention = createRetentionHostSweepStep({
+    ...(settings === undefined ? {} : { settings }),
+    ...(probe.now === undefined ? {} : { now: probe.now }),
+    dryRun,
   })
-  const retention = createRetentionHostSweepStep({ ...(settings === undefined ? {} : { settings }), ...(probe.now === undefined ? {} : { now: probe.now }), dryRun })
   const retain = async (identity) => {
     const lines = await retention(identity)
     if (lines.some((line) => line.startsWith("FAIL "))) failed = true
     return lines
   }
   const result = await sweepHostIdentities({ memoryRoot: memory, steps: [reap, orphans, retain], dryRun })
-  if (result.status === "busy") return { lines: ["INFO another sweep is running on this host; try again when it finishes"], failed: false }
+  if (result.status === "busy")
+    return { lines: ["INFO another sweep is running on this host; try again when it finishes"], failed: false }
   const lines = result.lines.filter((line) => !/^INFO \S+ locks reclaimed 0, kept 0$/.test(line))
   if (lines.length === 0) lines.push(dryRun ? "INFO nothing to fix" : "PASS no stale reflection locks")
   return { lines, failed }

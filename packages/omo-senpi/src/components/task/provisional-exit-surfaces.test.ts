@@ -22,7 +22,13 @@ test("provisional process exits stay running in widgets, panel records and termi
     if (record === null) throw new Error("missing task")
     const messages: ParentNotifierMessage[] = []
     const notifier = createCompletionNotifier({
-      store: f.store, stateDir: f.store.stateDir, notifier: { enqueue: (message) => { messages.push(message) } },
+      store: f.store,
+      stateDir: f.store.stateDir,
+      notifier: {
+        enqueue: (message) => {
+          messages.push(message)
+        },
+      },
     })
     // When UI readers and completion routing inspect the provisional durable record.
     expect(panelChildFromRecord(record).status).toBe("running")
@@ -30,7 +36,9 @@ test("provisional process exits stay running in widgets, panel records and termi
     expect(formatTaskRow(record)).toContain("status:running")
     expect(buildWidgetRows([record])).toHaveLength(1)
     expect(isTerminal(record.status)).toBe(false)
-    expect(notifier.notifyTerminal({ record, runInBackground: true, parentState: { kind: "idle" } }).kind).toBe("skipped")
+    expect(notifier.notifyTerminal({ record, runInBackground: true, parentState: { kind: "idle" } }).kind).toBe(
+      "skipped",
+    )
     // Then no terminal edge or user notification exists until the owning manager confirms.
     expect(edges).toEqual([])
     expect(messages).toEqual([])
@@ -40,7 +48,9 @@ test("provisional process exits stay running in widgets, panel records and termi
     expect(edges).toHaveLength(1)
     expect(edges[0]?.record.status).toBe("error")
     expect(panelChildFromRecord(failed).status).toBe("failed")
-    expect(notifier.notifyTerminal({ record: failed, runInBackground: true, parentState: { kind: "idle" } }).kind).toBe("delivered")
+    expect(notifier.notifyTerminal({ record: failed, runInBackground: true, parentState: { kind: "idle" } }).kind).toBe(
+      "delivered",
+    )
     expect(messages).toHaveLength(1)
     expect(messages[0]?.details[0]?.status).toBe("error")
   } finally {

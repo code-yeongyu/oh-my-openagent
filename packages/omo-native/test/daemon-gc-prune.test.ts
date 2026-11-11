@@ -34,10 +34,12 @@ describe("omo daemon gc store-index pruning", () => {
     })
 
     expect(exitCode).toBe(0)
-    expect(requests).toEqual([{
-      operation: "prune-store-index",
-      indexPath: join(agentDir, "rpc", "task-stores.json"),
-    }])
+    expect(requests).toEqual([
+      {
+        operation: "prune-store-index",
+        indexPath: join(agentDir, "rpc", "task-stores.json"),
+      },
+    ])
     expect(JSON.parse(stdout.text()).pruned_stores).toEqual(["/tmp/missing-store"])
   })
 })
