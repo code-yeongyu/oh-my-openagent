@@ -4,7 +4,16 @@ import { MEMORY_NOTICE_CUSTOM_TYPE } from "../../prompt"
 import { RECALL_CUSTOM_TYPE } from "../../recall-session-read"
 import { GATE_ENTRY_TYPE, NUDGED_ENTRY_TYPE } from "../notice"
 import { createSessionBranchSnapshot, HIDDEN_SESSION_CUSTOM_TYPES, sessionEntriesSince } from "./session-read"
-import { customEntry, customMessage, harness, jsonOf, memoryRepo, message, sessionContext, tempRoot } from "./test-support"
+import {
+  customEntry,
+  customMessage,
+  harness,
+  jsonOf,
+  memoryRepo,
+  message,
+  sessionContext,
+  tempRoot,
+} from "./test-support"
 
 interface EntryRow {
   readonly cursor: number
@@ -90,11 +99,20 @@ describe("sessionEntriesSince", () => {
   test("#given assistant tool calls and tool results #when listing #then they are summarized as bounded text", () => {
     const entries = [
       {
-        type: "message", id: "e0", parentId: null, timestamp: "t",
-        message: { role: "assistant", content: [{ type: "toolCall", id: "c1", name: "bash", arguments: { command: "ls" } }] },
+        type: "message",
+        id: "e0",
+        parentId: null,
+        timestamp: "t",
+        message: {
+          role: "assistant",
+          content: [{ type: "toolCall", id: "c1", name: "bash", arguments: { command: "ls" } }],
+        },
       },
       {
-        type: "message", id: "e1", parentId: null, timestamp: "t",
+        type: "message",
+        id: "e1",
+        parentId: null,
+        timestamp: "t",
         message: { role: "toolResult", toolCallId: "c1", toolName: "bash", content: [{ type: "text", text: "a.txt" }] },
       },
     ]
@@ -113,11 +131,13 @@ describe("session_entries tool", () => {
     const root = await tempRoot()
     const repo = await memoryRepo()
     const h = harness({ workspaceRoot: root, repo })
-    h.snapshot.refresh(sessionContext([
-      message("user", "one", "e0"),
-      customEntry(NUDGED_ENTRY_TYPE, "e1"),
-      message("assistant", "two", "e2"),
-    ]))
+    h.snapshot.refresh(
+      sessionContext([
+        message("user", "one", "e0"),
+        customEntry(NUDGED_ENTRY_TYPE, "e1"),
+        message("assistant", "two", "e2"),
+      ]),
+    )
 
     const page = jsonOf(await h.call("session_entries", { since: 0 }))
     expect((page.entries as EntryRow[]).map((row) => row.text)).toEqual(["two"])

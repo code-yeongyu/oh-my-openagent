@@ -1,0 +1,48 @@
+{
+  "displays": [
+    {
+      "id": "1",
+      "name": "Built-in Display",
+      "x": 0,
+      "y": 0,
+      "width": 1920,
+      "height": 1080,
+      "scale": 1,
+      "pixelX": 0,
+      "pixelY": 0,
+      "pixelWidth": 1920,
+      "pixelHeight": 1080,
+      "isPrimary": true
+    }
+  ],
+  "windows": [
+    {
+      "id": "101",
+      "title": "Office Mac",
+      "app": "Screen Sharing",
+      "pid": 4242,
+      "x": 0,
+      "y": 0,
+      "width": 800,
+      "height": 600,
+      "focused": false,
+      "elevated": null
+    },
+    {
+      "id": "202",
+      "title": "iPhone",
+      "app": "iPhone Mirroring",
+      "pid": 4343,
+      "x": 800,
+      "y": 0,
+      "width": 400,
+      "height": 800,
+      "focused": false,
+      "elevated": null
+    }
+  ],
+  "remote_screens": {
+    "4242": "keyEvents",
+    "4343": "hidReports"
+  }
+}

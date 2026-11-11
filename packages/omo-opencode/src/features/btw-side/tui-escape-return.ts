@@ -18,10 +18,7 @@ export function createBtwEscapeReturn(args: {
   }
 
   function handle(context: KeyInputContext<KeyEvent>): void {
-    if (
-      context.event.eventType !== "press" ||
-      context.event.name !== "escape"
-    ) {
+    if (context.event.eventType !== "press" || context.event.name !== "escape") {
       if (context.event.eventType !== "release") reset()
       return
     }
@@ -30,10 +27,7 @@ export function createBtwEscapeReturn(args: {
       return
     }
     const pressedAt = now()
-    if (
-      firstEscapeAt === undefined ||
-      pressedAt - firstEscapeAt > DOUBLE_ESCAPE_MAX_INTERVAL_MS
-    ) {
+    if (firstEscapeAt === undefined || pressedAt - firstEscapeAt > DOUBLE_ESCAPE_MAX_INTERVAL_MS) {
       firstEscapeAt = pressedAt
       return
     }

@@ -12,7 +12,8 @@ const native = new DesktopEngineRpcError("capture", {
   data: {
     code: "PermissionDenied",
     permission: {
-      permission: "screen_recording", app: "Test App",
+      permission: "screen_recording",
+      app: "Test App",
       settingsUrl: "x-apple.systempreferences:com.apple.preference.security",
       relaunchRequired: true,
     },
@@ -20,39 +21,66 @@ const native = new DesktopEngineRpcError("capture", {
 })
 const seeded = (() => {
   switch (scenario) {
-    case "preseed": return new Map([[root, new Set(["screen_recording"])]])
-    case "incompatible": return new Map([[root, []]])
-    case "future": return Object.freeze({ version: 2, claim: () => false })
-    case "unfrozen": return { version: 1, claim: () => false }
-    case "throwing-claim": return Object.freeze({
-      version: 1, claim() { throw new TypeError("Incompatible claim implementation") },
-    })
-    case "throwing-shape": return Object.freeze({
-      get version() { throw new TypeError("Incompatible version accessor") },
-      claim: () => false,
-    })
-    default: return undefined
+    case "preseed":
+      return new Map([[root, new Set(["screen_recording"])]])
+    case "incompatible":
+      return new Map([[root, []]])
+    case "future":
+      return Object.freeze({ version: 2, claim: () => false })
+    case "unfrozen":
+      return { version: 1, claim: () => false }
+    case "throwing-claim":
+      return Object.freeze({
+        version: 1,
+        claim() {
+          throw new TypeError("Incompatible claim implementation")
+        },
+      })
+    case "throwing-shape":
+      return Object.freeze({
+        get version() {
+          throw new TypeError("Incompatible version accessor")
+        },
+        claim: () => false,
+      })
+    default:
+      return undefined
   }
 })()
-if (seeded !== undefined) Object.defineProperty(globalThis, key, {
-  value: seeded, writable: true, configurable: scenario === "preseed",
-})
+if (seeded !== undefined)
+  Object.defineProperty(globalThis, key, {
+    value: seeded,
+    writable: true,
+    configurable: scenario === "preseed",
+  })
 
 const originalCall = DesktopService.prototype.call
-DesktopService.prototype.call = async () => { throw native }
+DesktopService.prototype.call = async () => {
+  throw native
+}
 const preserved: boolean[] = []
 let deleted: boolean | undefined
 try {
   const generation = async () => {
     const { wireComputerPermissionEvents } = await import(`./permission-events.ts?generation=${crypto.randomUUID()}`)
     const pi = Object.assign(new FakeExtensionAPI(), {
-      appendEntry() { throw new Error("Test session journal is read-only") },
+      appendEntry() {
+        throw new Error("Test session journal is read-only")
+      },
     })
-    pi.rpc = { emit: (name, data) => { events.push({ name, data }) } }
+    pi.rpc = {
+      emit: (name, data) => {
+        events.push({ name, data })
+      },
+    }
     const report = wireComputerPermissionEvents(pi, {}, { info() {}, warn() {}, error() {} })
-    await pi.dispatch("session_start", {}, {
-      sessionManager: { getSessionId: () => root, getEntries: () => [] },
-    })
+    await pi.dispatch(
+      "session_start",
+      {},
+      {
+        sessionManager: { getSessionId: () => root, getEntries: () => [] },
+      },
+    )
     const service = new TrackedDesktopService({ onPermissionRequired: report })
     return {
       async deny() {

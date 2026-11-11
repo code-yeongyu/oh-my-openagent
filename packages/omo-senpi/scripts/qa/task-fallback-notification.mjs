@@ -1,27 +1,12 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process"
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs"
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { delimiter, dirname, isAbsolute, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import {
-  createSandbox,
-  credentialDigest,
-  seedSandbox,
-} from "./drive.mjs"
-import {
-  changedRealPaths,
-  classifyRealSenpiChanges,
-  snapshotDir,
-} from "./task-e2e-analysis.mjs"
+import { createSandbox, credentialDigest, seedSandbox } from "./drive.mjs"
+import { changedRealPaths, classifyRealSenpiChanges, snapshotDir } from "./task-e2e-analysis.mjs"
 import { isAlive, killTree } from "./task-e2e-process.mjs"
 import { isolatedChildEnv, sandboxStateDir } from "./sandbox-child-env.mjs"
 
@@ -64,11 +49,11 @@ function parseArgs(argv) {
 
 function scenarioScript(tasksDir) {
   const waitForTaskTerminal = `node -e '${[
-    "const fs=require(\"node:fs\")",
+    'const fs=require("node:fs")',
     `const dir=${JSON.stringify(tasksDir)}`,
     "fs.mkdirSync(dir,{recursive:true})",
-    "const terminal=new Set([\"completed\",\"error\",\"cancelled\",\"interrupted\",\"lost\"])",
-    "const done=()=>fs.readdirSync(dir).filter(f=>f.endsWith(\".json\")).some(f=>{const r=JSON.parse(fs.readFileSync(dir+\"/\"+f,\"utf8\"));return terminal.has(r.status)&&r.notification?.notified_epoch>=r.notification?.run_epoch})",
+    'const terminal=new Set(["completed","error","cancelled","interrupted","lost"])',
+    'const done=()=>fs.readdirSync(dir).filter(f=>f.endsWith(".json")).some(f=>{const r=JSON.parse(fs.readFileSync(dir+"/"+f,"utf8"));return terminal.has(r.status)&&r.notification?.notified_epoch>=r.notification?.run_epoch})',
     "if(done())process.exit(0)",
     "const watcher=fs.watch(dir,()=>{if(done()){watcher.close();process.exit(0)}})",
     "setTimeout(()=>{watcher.close();process.exit(2)},30000)",
@@ -99,9 +84,7 @@ function scenarioScript(tasksDir) {
       },
       { type: "text", text: "parent observed terminal fallback completion" },
     ],
-    childSteps: [
-      { type: "text", text: "fallback child completed" },
-    ],
+    childSteps: [{ type: "text", text: "fallback child completed" }],
   }
 }
 
@@ -112,15 +95,22 @@ function seedScenario() {
   mkdirSync(sessionDir, { recursive: true })
   const omoDir = join(sandbox.cwd, ".omo")
   mkdirSync(omoDir, { recursive: true })
-  writeFileSync(join(omoDir, "omo.json"), `${JSON.stringify({
-    agents: {
-      "fallback-worker": {
-        model: REQUESTED_MODEL,
-        models: [FALLBACK_MODEL],
-        execution_mode: "process",
+  writeFileSync(
+    join(omoDir, "omo.json"),
+    `${JSON.stringify(
+      {
+        agents: {
+          "fallback-worker": {
+            model: REQUESTED_MODEL,
+            models: [FALLBACK_MODEL],
+            execution_mode: "process",
+          },
+        },
       },
-    },
-  }, null, 2)}\n`)
+      null,
+      2,
+    )}\n`,
+  )
   writeFileSync(
     join(sandbox.cwd, "mock-script.json"),
     `${JSON.stringify(scenarioScript(join(sandboxStateDir(sandbox), "tasks")), null, 2)}\n`,
@@ -134,9 +124,7 @@ function seedScenario() {
 
 function readTaskArtifacts(stateDir) {
   const tasksDir = join(stateDir, "tasks")
-  const taskFile = existsSync(tasksDir)
-    ? readdirSync(tasksDir).find((entry) => entry.endsWith(".json"))
-    : undefined
+  const taskFile = existsSync(tasksDir) ? readdirSync(tasksDir).find((entry) => entry.endsWith(".json")) : undefined
   if (taskFile === undefined) {
     throw new Error(`No task record found under ${tasksDir}`)
   }
@@ -190,15 +178,16 @@ function assertScenario(run, artifacts, sessionTranscript) {
     process_exit: run.status === 0,
     terminal_fallback_once: count(sessionTranscript, FALLBACK_LINE) === 1,
     no_premature_capacity_line: !parentSurface.includes("mock provider capacity exhausted"),
-    no_raw_quota_line: !parentSurface.includes("403:")
-      && !parentSurface.includes('"status":403')
-      && !parentSurface.includes("access_terminated_error")
-      && !parentSurface.includes("You've reached your usage limit"),
+    no_raw_quota_line:
+      !parentSurface.includes("403:") &&
+      !parentSurface.includes('"status":403') &&
+      !parentSurface.includes("access_terminated_error") &&
+      !parentSurface.includes("You've reached your usage limit"),
     task_completed: artifacts.record.status === "completed",
     requested_model_preserved: artifacts.record.requested_model?.display === REQUESTED_MODEL,
     actual_model_recorded: artifacts.record.resolved_model?.display === FALLBACK_MODEL,
-    configured_chain_consumed: Array.isArray(artifacts.record.fallback_models)
-      && artifacts.record.fallback_models.length === 0,
+    configured_chain_consumed:
+      Array.isArray(artifacts.record.fallback_models) && artifacts.record.fallback_models.length === 0,
     fallback_event_once: count(artifacts.eventsText, '"type":"task_model_fallback"') === 1,
   }
   return {
@@ -219,13 +208,20 @@ function writeEvidence(evidenceDir, result, artifacts, isolation, cleanup) {
   writeFileSync(join(evidenceDir, "task-events.jsonl"), artifacts.eventsText)
   writeFileSync(join(evidenceDir, "parent-session.jsonl"), result.sessionTranscript)
   writeFileSync(join(evidenceDir, "cleanup.txt"), `${cleanup}\n`)
-  writeFileSync(join(evidenceDir, "summary.json"), `${JSON.stringify({
-    result: result.result,
-    checks: result.checks,
-    isolation,
-    taskId: artifacts.taskId,
-    fallbackLine: FALLBACK_LINE,
-  }, null, 2)}\n`)
+  writeFileSync(
+    join(evidenceDir, "summary.json"),
+    `${JSON.stringify(
+      {
+        result: result.result,
+        checks: result.checks,
+        isolation,
+        taskId: artifacts.taskId,
+        fallbackLine: FALLBACK_LINE,
+      },
+      null,
+      2,
+    )}\n`,
+  )
 }
 
 function selfTest() {
@@ -301,17 +297,11 @@ function main() {
     const afterCredentials = credentialDigest(realSenpiAgentDir)
     const afterAgentDir = snapshotDir(realSenpiAgentDir)
     const changedPaths = changedRealPaths(beforeAgentDir, afterAgentDir)
-    const sandboxTokens = [
-      scenario.sandbox.root,
-      scenario.sandbox.canonicalCwd,
-      artifacts.taskId,
-    ]
+    const sandboxTokens = [scenario.sandbox.root, scenario.sandbox.canonicalCwd, artifacts.taskId]
     const classified = classifyRealSenpiChanges(changedPaths, sandboxTokens)
-    const qaAttributedPaths = classified.qaAttributedPaths.filter((path) =>
-      containsSandboxToken(path, sandboxTokens)
-    )
-    const concurrentGlobalPaths = classified.qaAttributedPaths.filter((path) =>
-      !containsSandboxToken(path, sandboxTokens)
+    const qaAttributedPaths = classified.qaAttributedPaths.filter((path) => containsSandboxToken(path, sandboxTokens))
+    const concurrentGlobalPaths = classified.qaAttributedPaths.filter(
+      (path) => !containsSandboxToken(path, sandboxTokens),
     )
     const isolation = {
       credentialDigestUnchanged: beforeCredentials === afterCredentials,
@@ -329,21 +319,21 @@ function main() {
   const sandboxRemoved = !existsSync(scenario.sandbox.root)
   const cleanup = `child_alive_before_cleanup=${report.childAlive}; sandbox_removed=${sandboxRemoved}`
   if (!sandboxRemoved) report.result.result = "FAIL"
-  writeEvidence(
-    args.evidenceDir,
-    report.result,
-    report.artifacts,
-    report.isolation,
-    cleanup,
+  writeEvidence(args.evidenceDir, report.result, report.artifacts, report.isolation, cleanup)
+  console.log(
+    JSON.stringify(
+      {
+        result: report.result.result,
+        checks: report.result.checks,
+        isolation: report.isolation,
+        cleanup,
+        taskId: report.artifacts.taskId,
+        fallbackLine: FALLBACK_LINE,
+      },
+      null,
+      2,
+    ),
   )
-  console.log(JSON.stringify({
-    result: report.result.result,
-    checks: report.result.checks,
-    isolation: report.isolation,
-    cleanup,
-    taskId: report.artifacts.taskId,
-    fallbackLine: FALLBACK_LINE,
-  }, null, 2))
   if (report.result.result !== "PASS") process.exitCode = 1
 }
 

@@ -23,7 +23,9 @@ describe("omo remote's in-process account show", () => {
     })
 
     // then
-    expect(warnings).toEqual(["memory sync: a stored sign-in could not be read while it was replaced; its sync pin was left in place"])
+    expect(warnings).toEqual([
+      "memory sync: a stored sign-in could not be read while it was replaced; its sync pin was left in place",
+    ])
     expect(result).toEqual({ exitCode: 0, stdout: "signed in as someone@example.test" })
   })
 
@@ -49,6 +51,8 @@ describe("omo remote's in-process account show", () => {
     }
 
     // then
-    expect(written).toEqual(["memory sync: a stored sign-in could not be read while it was replaced; its sync pin was left in place\n"])
+    expect(written).toEqual([
+      "memory sync: a stored sign-in could not be read while it was replaced; its sync pin was left in place\n",
+    ])
   })
 })

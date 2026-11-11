@@ -7,7 +7,16 @@ import type { ForkEvidence, RecordRef } from "../vendor/sync-format/chain.ts"
 import { recomputeForkState } from "../vendor/sync-format/fold.ts"
 import { compareRecordRef } from "../vendor/sync-format/fork-set.ts"
 import type { JsonValue } from "../vendor/sync-format/jcs.ts"
-import { ACCOUNT, appendKeyring, chain, keyringFor, keys, principalKeys, record, fixtureAnchor } from "./sync-v1.test-support.ts"
+import {
+  ACCOUNT,
+  appendKeyring,
+  chain,
+  keyringFor,
+  keys,
+  principalKeys,
+  record,
+  fixtureAnchor,
+} from "./sync-v1.test-support.ts"
 
 /**
  * A two-branch fork built from the fixture keys over the real ancestry (genesis through
@@ -24,11 +33,18 @@ export type BuiltFork = {
   readonly resolution: (tamper?: (evidence: EvidenceJson) => EvidenceJson) => Promise<KeyringEntry>
 }
 
-type EvidenceJson = { readonly branches: Array<{ readonly records: Array<Record<string, JsonValue>> }> } & Record<string, JsonValue>
+type EvidenceJson = { readonly branches: Array<{ readonly records: Array<Record<string, JsonValue>> }> } & Record<
+  string,
+  JsonValue
+>
 
-const json = <T,>(value: unknown): T => JSON.parse(JSON.stringify(value))
+const json = <T>(value: unknown): T => JSON.parse(JSON.stringify(value))
 
-const ref = (entry: KeyringEntry): RecordRef => ({ seq: entry.seq, digest: entry.digest, keyring_link: entry.keyring_link })
+const ref = (entry: KeyringEntry): RecordRef => ({
+  seq: entry.seq,
+  digest: entry.digest,
+  keyring_link: entry.keyring_link,
+})
 
 const verifiedState = async (entries: ReadonlyArray<KeyringEntry>): Promise<ChainState> => {
   const outcome = await appendEntries(emptyChain(ACCOUNT, fixtureAnchor()), entries, createRejectionCounter())
@@ -42,7 +58,11 @@ const headOf = (state: ChainState): Head => {
 }
 
 /** The recovered device's rotation after `state`; `forkResolution` is the seq a forced rotation names. */
-export const rotation = async (state: ChainState, fill: string, forkResolution: number | null = null): Promise<KeyringEntry> => {
+export const rotation = async (
+  state: ChainState,
+  fill: string,
+  forkResolution: number | null = null,
+): Promise<KeyringEntry> => {
   const before = state.authority
   if (before === null) throw new Error("no authority")
   const recovered = { id: keys.devices.recovered.principal.id, ...principalKeys(keyringFor("recovered")) }

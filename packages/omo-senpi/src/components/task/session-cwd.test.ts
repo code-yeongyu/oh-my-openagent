@@ -44,7 +44,8 @@ describe("task component session cwd anchoring", () => {
     const anchored: (string | undefined)[] = []
 
     // when
-    await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost,
+    await createTaskComponent({
+      loadJobWidgetHost: noJobWidgetHost,
       loadConfig: (options = {}) => {
         anchored.push(options.cwd)
         return loadSenpiOmoConfig(options)
@@ -62,7 +63,8 @@ describe("task component session cwd anchoring", () => {
     const anchored: (string | undefined)[] = []
 
     // when
-    await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost,
+    await createTaskComponent({
+      loadJobWidgetHost: noJobWidgetHost,
       loadConfig: (options = {}) => {
         anchored.push(options.cwd)
         return loadSenpiOmoConfig(options)

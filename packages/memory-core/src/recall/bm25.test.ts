@@ -194,10 +194,7 @@ describe("rankRecallDocumentsBm25", () => {
 
   it("#given notes of equal token count where one holds a Han run #when a Latin term matches both #then their scores are equal", () => {
     // given: five tokens each before the stand-alone Han characters, which must not count as length
-    const documents = [
-      doc("notes/zh.md", "deploy", "部署流程"),
-      doc("notes/en.md", "deploy", "one two three four"),
-    ]
+    const documents = [doc("notes/zh.md", "deploy", "部署流程"), doc("notes/en.md", "deploy", "one two three four")]
 
     // when
     const ranked = rankRecallDocumentsBm25(documents, ["deploy"])
@@ -240,7 +237,10 @@ describe("rankRecallDocumentsBm25", () => {
 
   it("#given a match only in the description #when ranked #then the description counts as document text", () => {
     // given
-    const documents = [doc("notes/a.md", "kubernetes ingress", "nothing else here"), doc("notes/b.md", "cooking", "pasta")]
+    const documents = [
+      doc("notes/a.md", "kubernetes ingress", "nothing else here"),
+      doc("notes/b.md", "cooking", "pasta"),
+    ]
 
     // when
     const ranked = rankRecallDocumentsBm25(documents, ["ingress"])
@@ -271,7 +271,10 @@ describe("rankRecallDocumentsBm25", () => {
 
   it("#given quoted planner phrases #when ranked #then quotes are ignored and the phrase words score", () => {
     // given
-    const documents = [doc("notes/a.md", "Ingress", "the ingress gateway is flaky"), doc("notes/b.md", "Other", "gateway only")]
+    const documents = [
+      doc("notes/a.md", "Ingress", "the ingress gateway is flaky"),
+      doc("notes/b.md", "Other", "gateway only"),
+    ]
 
     // when
     const ranked = rankRecallDocumentsBm25(documents, ['"ingress gateway"'])
@@ -333,7 +336,11 @@ describe("rankRecallDocumentsBm25 with expansions", () => {
     const ranked = rankRecallDocumentsBm25(documents, ["undo shipment"], { synonyms: ["revert"], related: ["canary"] })
 
     // then
-    expect(ranked.map((entry) => entry.document.path)).toEqual(["notes/c-literal.md", "notes/b-synonym.md", "notes/a-related.md"])
+    expect(ranked.map((entry) => entry.document.path)).toEqual([
+      "notes/c-literal.md",
+      "notes/b-synonym.md",
+      "notes/a-related.md",
+    ])
     const [literal, synonym, related] = ranked.map((entry) => entry.score)
     expect(synonym).toBeCloseTo((literal ?? 0) * 0.75, 10)
     expect(related).toBeCloseTo((literal ?? 0) * 0.4, 10)
@@ -359,14 +366,20 @@ describe("rankRecallDocumentsBm25 with expansions", () => {
   it("#given several notes holding every query word #when the search is widened #then they keep the order they have without expansions", () => {
     // given
     const documents = [
-      doc("notes/long.md", "Runbook", `deploy rollout rollout rollout ${Array.from({ length: 30 }, () => filler).join(" ")}`),
+      doc(
+        "notes/long.md",
+        "Runbook",
+        `deploy rollout rollout rollout ${Array.from({ length: 30 }, () => filler).join(" ")}`,
+      ),
       doc("notes/short.md", "Runbook", "deploy checklist"),
       doc("notes/warm.md", "Rollout", "rollout rollout"),
     ]
 
     // when
     const plain = rankRecallDocumentsBm25(documents, ["deploy"]).map((entry) => entry.document.path)
-    const widened = rankRecallDocumentsBm25(documents, ["deploy"], { synonyms: ["rollout"] }).map((entry) => entry.document.path)
+    const widened = rankRecallDocumentsBm25(documents, ["deploy"], { synonyms: ["rollout"] }).map(
+      (entry) => entry.document.path,
+    )
 
     // then
     expect(plain).toEqual(["notes/short.md", "notes/long.md"])
@@ -382,7 +395,10 @@ describe("rankRecallDocumentsBm25 with expansions", () => {
 
     // when
     const plain = rankRecallDocumentsBm25(documents, ["deploy rollback"])
-    const widened = rankRecallDocumentsBm25(documents, ["deploy rollback"], { synonyms: ["Deploy"], related: ["deploys"] })
+    const widened = rankRecallDocumentsBm25(documents, ["deploy rollback"], {
+      synonyms: ["Deploy"],
+      related: ["deploys"],
+    })
 
     // then
     expect(widened).toEqual(plain)
@@ -401,7 +417,9 @@ describe("rankRecallDocumentsBm25 with expansions", () => {
       const plain = rankRecallDocumentsBm25(documents, [query])
       expect(rankRecallDocumentsBm25(documents, [query], undefined)).toEqual(plain)
       expect(rankRecallDocumentsBm25(documents, [query], {})).toEqual(plain)
-      expect(rankRecallDocumentsBm25(documents, [query], { synonyms: [], keywords: [" "], noteLine: "" })).toEqual(plain)
+      expect(rankRecallDocumentsBm25(documents, [query], { synonyms: [], keywords: [" "], noteLine: "" })).toEqual(
+        plain,
+      )
     }
   })
 
@@ -413,7 +431,9 @@ describe("rankRecallDocumentsBm25 with expansions", () => {
     ]
 
     // when
-    const ranked = rankRecallDocumentsBm25(documents, ["한남동 예약"], { keywords: ["dinner reservation", "anniversary"] })
+    const ranked = rankRecallDocumentsBm25(documents, ["한남동 예약"], {
+      keywords: ["dinner reservation", "anniversary"],
+    })
 
     // then
     expect(ranked.map((entry) => entry.document.path)).toEqual(["notes/ko.md", "notes/en.md"])
@@ -436,7 +456,11 @@ describe("rankRecallDocumentsBm25 on a very long unbroken run", () => {
 describe("recallExpansionWeights", () => {
   it("#given a term in several tiers and a term of the query #when weighed #then the highest tier wins and the query term is left out", () => {
     // given
-    const expansions = { synonyms: ["canary"], related: ["canary oven", "deploy"], noteLine: "watch the canary for ten hours" }
+    const expansions = {
+      synonyms: ["canary"],
+      related: ["canary oven", "deploy"],
+      noteLine: "watch the canary for ten hours",
+    }
 
     // when
     const weights = recallExpansionWeights(expansions, new Set(["deploy"]))

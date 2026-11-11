@@ -1,5 +1,5 @@
 import { readdirSync, renameSync, rmSync } from "node:fs"
-import { join, sep } from "node:path"
+import { basename, dirname, join, sep } from "node:path"
 import { listProcesses } from "./bin/lib/doctor.js"
 import { RELEASE_VERSION } from "./compiled-update"
 
@@ -119,10 +119,28 @@ function runsFrom(commands: readonly string[], directory: string): boolean {
  */
 export function removeReplacedLauncher(launcher: string, platform: NodeJS.Platform = process.platform): void {
   if (platform !== "win32") return
+  const directory = dirname(launcher)
+  const prefix = `${basename(launcher)}.old`
+  let entries: string[]
   try {
-    rmSync(`${launcher}.old`, { force: true })
+    entries = readdirSync(directory)
   } catch {
-    // A session started from the old launcher still holds it; a later launch retries.
+    return
+  }
+  for (const entry of entries) {
+    if (
+      entry !== prefix &&
+      !(
+        entry.startsWith(`${prefix}-`) &&
+        /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(entry.slice(prefix.length + 1))
+      )
+    )
+      continue
+    try {
+      rmSync(join(directory, entry), { force: true })
+    } catch {
+      // A session started from the old launcher still holds it; a later launch retries.
+    }
   }
 }
 
