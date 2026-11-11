@@ -27,7 +27,17 @@ import { SENPI_ASTRA_ULTRAWORK_DIRECTIVE, SENPI_ULTRAWORK_DIRECTIVE } from "../u
 
 const ASTRA = "chatgpt-subscription/gpt-6-astra"
 const SOL = "openai/gpt-6.1-sol"
-const counts = { total: 1, pending: 0, blocked: 0, scheduled: 0, running: 0, completed: 1, failed: 0, cancelled: 0, skipped: 0 }
+const counts = {
+  total: 1,
+  pending: 0,
+  blocked: 0,
+  scheduled: 0,
+  running: 0,
+  completed: 1,
+  failed: 0,
+  cancelled: 0,
+  skipped: 0,
+}
 const fixtureRoots: string[] = []
 
 afterEach(() => {
@@ -36,32 +46,73 @@ afterEach(() => {
 
 function details(childModel = SOL): CompletionDetails {
   return {
-    task_id: "st_12345678", name: "verify", status: "completed", model: childModel,
-    duration_ms: 10, final_response: "done", continuation_hint: "",
+    task_id: "st_12345678",
+    name: "verify",
+    status: "completed",
+    model: childModel,
+    duration_ms: 10,
+    final_response: "done",
+    continuation_hint: "",
     dag: { run_id: "dag_1", node_id: "verify" },
   }
 }
 
 function harness(receiverModel: unknown, includeUlw = false) {
   const pi = new FakeExtensionAPI()
-  if (includeUlw) createUltraworkComponent(createSessionArming()).register(pi, {
-    config: { getFlag: () => undefined }, logger: { info() {}, warn() {}, error() {} },
-  })
+  if (includeUlw)
+    createUltraworkComponent(createSessionArming()).register(pi, {
+      config: { getFlag: () => undefined },
+      logger: { info() {}, warn() {}, error() {} },
+    })
   const runtime = new TaskRuntimeContext("/project")
   runtime.captureFrom({ model: receiverModel, isIdle: () => false })
   let scheduled: (() => void) | undefined
   const delivered: IdleInjectionMessage[] = []
-  const coordinator = new IdleInjectionCoordinator((message, options) => deliverItems(native => { delivered.push(native) }, { ...options, message }), {
-    scheduleFlush: (flush) => { scheduled = flush },
+  const coordinator = new IdleInjectionCoordinator(
+    (message, options) =>
+      deliverItems(
+        (native) => {
+          delivered.push(native)
+        },
+        { ...options, message },
+      ),
+    {
+      scheduleFlush: (flush) => {
+        scheduled = flush
+      },
+    },
+  )
+  const notifier = createParentNotifier(
+    pi,
+    coordinator,
+    () => true,
+    undefined,
+    () => runtime.parentModel(),
+  )
+  const wake = createDagWake({
+    coordinator,
+    parentState: () => runtime.parentState(),
+    getReceiverModel: () => runtime.parentModel(),
   })
-  const notifier = createParentNotifier(pi, coordinator, () => true, undefined, () => runtime.parentModel())
-  const wake = createDagWake({ coordinator, parentState: () => runtime.parentState(), getReceiverModel: () => runtime.parentModel() })
   wireDagVerificationContext(pi, runtime)
-  return { pi, runtime, notifier, wake, delivered, flush: () => { scheduled?.(); scheduled = undefined } }
+  return {
+    pi,
+    runtime,
+    notifier,
+    wake,
+    delivered,
+    flush: () => {
+      scheduled?.()
+      scheduled = undefined
+    },
+  }
 }
 
 function completeRun(target: ReturnType<typeof harness>, type = "dag.run.completed"): void {
-  target.wake.onRunEvent({ runId: "dag_1", name: "release", parentSessionId: "parent" }, { runId: "dag_1", seq: 1, type, counts })
+  target.wake.onRunEvent(
+    { runId: "dag_1", name: "release", parentSessionId: "parent" },
+    { runId: "dag_1", seq: 1, type, counts },
+  )
 }
 
 describe("DAG receiving-model routing", () => {
@@ -71,24 +122,36 @@ describe("DAG receiving-model routing", () => {
     target.notifier.enqueue(buildCompletionMessage([node]))
     completeRun(target)
     target.flush()
-    let payload: unknown = { messages: target.delivered.map(message => ({ ...message, role: "custom" })) }
-    for (const entry of target.pi.handlers.filter(entry => entry.event === "context")) {
+    let payload: unknown = { messages: target.delivered.map((message) => ({ ...message, role: "custom" })) }
+    for (const entry of target.pi.handlers.filter((entry) => entry.event === "context")) {
       const result = await entry.handler(payload, { model: { id: ASTRA } })
       if (result !== undefined) payload = result
     }
     const contents = [
-      buildCompletionMessage([{ ...node, final_response: SENPI_ASTRA_ULTRAWORK_DIRECTIVE }], ASTRA_DAG_VERIFICATION_DIRECTIVE).content,
+      buildCompletionMessage(
+        [{ ...node, final_response: SENPI_ASTRA_ULTRAWORK_DIRECTIVE }],
+        ASTRA_DAG_VERIFICATION_DIRECTIVE,
+      ).content,
       `DAG "release" completed: 1 completed, 0 failed, 0 cancelled, 0 skipped (1 total)\n\n${ASTRA_DAG_RUN_VERIFICATION_DIRECTIVE}`,
     ]
     // One wake carries both segments; each keeps its own range through the receiver's rewrite.
-    const [nodeText, runText] = contents.map(content => content ?? "")
-    const ranges = [[0, nodeText.length], [nodeText.length + 2, nodeText.length + 2 + runText.length]]
+    const [nodeText, runText] = contents.map((content) => content ?? "")
+    const ranges = [
+      [0, nodeText.length],
+      [nodeText.length + 2, nodeText.length + 2 + runText.length],
+    ]
     const sent = target.delivered[0]
     expect(target.delivered).toHaveLength(1)
-    expect(payload).toEqual({ messages: [{
-      ...sent, role: "custom", content: `${nodeText}\n\n${runText}`,
-      details: sent?.details.map((detail, index) => ({ ...detail, contentRange: ranges[index] })),
-    }] })
+    expect(payload).toEqual({
+      messages: [
+        {
+          ...sent,
+          role: "custom",
+          content: `${nodeText}\n\n${runText}`,
+          details: sent?.details.map((detail, index) => ({ ...detail, contentRange: ranges[index] })),
+        },
+      ],
+    })
     const nodeRange = sent?.details[0]?.contentRange
     expect(sent?.content.slice(0, nodeRange?.[1])).toEndWith(DAG_VERIFICATION_DIRECTIVE)
   })
@@ -111,11 +174,17 @@ describe("DAG receiving-model routing", () => {
       target.flush()
       // then: compare the selected production artifact, not its prose wording.
       expect(target.delivered).toHaveLength(1)
-      expect(target.delivered[0]?.content).toEndWith(astra ? ASTRA_DAG_VERIFICATION_DIRECTIVE : DAG_VERIFICATION_DIRECTIVE)
+      expect(target.delivered[0]?.content).toEndWith(
+        astra ? ASTRA_DAG_VERIFICATION_DIRECTIVE : DAG_VERIFICATION_DIRECTIVE,
+      )
     })
   }
 
-  for (const [before, after, astra] of [[ASTRA, SOL, false], [SOL, ASTRA, true], [ASTRA, undefined, false]] as const) {
+  for (const [before, after, astra] of [
+    [ASTRA, SOL, false],
+    [SOL, ASTRA, true],
+    [ASTRA, undefined, false],
+  ] as const) {
     test(`#given queued node and run completions on ${before} #when receiver becomes ${after} before flush #then both use the current receiver`, () => {
       // given
       const target = harness({ id: before })
@@ -136,7 +205,11 @@ describe("DAG receiving-model routing", () => {
     // given
     let model = { id: ASTRA }
     const target = harness(undefined)
-    target.runtime.captureFrom({ get model() { return model } })
+    target.runtime.captureFrom({
+      get model() {
+        return model
+      },
+    })
     target.notifier.enqueue(buildCompletionMessage([details()]))
     // when
     model = { id: SOL }
@@ -167,8 +240,16 @@ describe("DAG receiving-model routing", () => {
     const target = harness({ id: SOL })
     const store = createTaskRecordStore({ project_dir: root, task: { state_dir: join(root, "state") } })
     const record: TaskRecord = {
-      ...createTaskRecord({ parent_session_id: "parent", root_session_id: "parent", depth: 1, execution_mode: "in-process", model: SOL, notify_on_terminal: true }),
-      status: "completed", final_response: "done",
+      ...createTaskRecord({
+        parent_session_id: "parent",
+        root_session_id: "parent",
+        depth: 1,
+        execution_mode: "in-process",
+        model: SOL,
+        notify_on_terminal: true,
+      }),
+      status: "completed",
+      final_response: "done",
       owner: { kind: "dag", runId: "dag_1" as DagRunId, nodeId: "verify" as DagNodeId, fingerprint: "fixture" },
     }
     store.save(record)
@@ -195,7 +276,11 @@ describe("DAG receiving-model routing", () => {
     expect(pi.messages[0]?.message["content"]).toEndWith(ASTRA_DAG_VERIFICATION_DIRECTIVE)
   })
 
-  for (const [before, after, astra] of [[ASTRA, SOL, false], [SOL, ASTRA, true], [ASTRA, undefined, false]] as const) {
+  for (const [before, after, astra] of [
+    [ASTRA, SOL, false],
+    [SOL, ASTRA, true],
+    [ASTRA, undefined, false],
+  ] as const) {
     test(`#given a mixed wake already delivered on ${before} #when the model-call context uses ${after} #then canonical node/run policies change without changing the transcript`, async () => {
       // given
       const target = harness({ id: before })
@@ -205,16 +290,37 @@ describe("DAG receiving-model routing", () => {
       const original = target.delivered[0]
       const message = { ...original, role: "custom" }
       // when
-      const results = await target.pi.dispatch("context", { messages: [message] }, { model: after === undefined ? undefined : { id: after } })
+      const results = await target.pi.dispatch(
+        "context",
+        { messages: [message] },
+        { model: after === undefined ? undefined : { id: after } },
+      )
       // then
-      const expected = buildCompletionMessage([details()], astra ? ASTRA_DAG_VERIFICATION_DIRECTIVE : DAG_VERIFICATION_DIRECTIVE).content
-        + `\n\nDAG "release" completed: 1 completed, 0 failed, 0 cancelled, 0 skipped (1 total)\n\n${astra ? ASTRA_DAG_RUN_VERIFICATION_DIRECTIVE : DAG_VERIFICATION_DIRECTIVE}`
-      const nodeEnd = buildCompletionMessage([details()], astra ? ASTRA_DAG_VERIFICATION_DIRECTIVE : DAG_VERIFICATION_DIRECTIVE).content.length
-      expect(results).toEqual([{ messages: [{ ...message, content: expected, details: [
-        { ...message.details?.[0], contentRange: [0, nodeEnd] },
-        { ...message.details?.[1], contentRange: [nodeEnd + 2, expected.length] },
-      ] }] }])
-      expect(original?.content).toEndWith(before === ASTRA ? ASTRA_DAG_RUN_VERIFICATION_DIRECTIVE : DAG_VERIFICATION_DIRECTIVE)
+      const expected =
+        buildCompletionMessage([details()], astra ? ASTRA_DAG_VERIFICATION_DIRECTIVE : DAG_VERIFICATION_DIRECTIVE)
+          .content +
+        `\n\nDAG "release" completed: 1 completed, 0 failed, 0 cancelled, 0 skipped (1 total)\n\n${astra ? ASTRA_DAG_RUN_VERIFICATION_DIRECTIVE : DAG_VERIFICATION_DIRECTIVE}`
+      const nodeEnd = buildCompletionMessage(
+        [details()],
+        astra ? ASTRA_DAG_VERIFICATION_DIRECTIVE : DAG_VERIFICATION_DIRECTIVE,
+      ).content.length
+      expect(results).toEqual([
+        {
+          messages: [
+            {
+              ...message,
+              content: expected,
+              details: [
+                { ...message.details?.[0], contentRange: [0, nodeEnd] },
+                { ...message.details?.[1], contentRange: [nodeEnd + 2, expected.length] },
+              ],
+            },
+          ],
+        },
+      ])
+      expect(original?.content).toEndWith(
+        before === ASTRA ? ASTRA_DAG_RUN_VERIFICATION_DIRECTIVE : DAG_VERIFICATION_DIRECTIVE,
+      )
     })
   }
 
@@ -223,8 +329,18 @@ describe("DAG receiving-model routing", () => {
     const target = harness({ id: SOL })
     const messages = [
       { role: "user", content: DAG_VERIFICATION_DIRECTIVE },
-      { role: "custom", customType: "senpi-task.completion", content: DAG_VERIFICATION_DIRECTIVE, details: [{ model: ASTRA }] },
-      { role: "custom", customType: "omo-senpi.dag-run", content: DAG_VERIFICATION_DIRECTIVE, details: { status: "paused" } },
+      {
+        role: "custom",
+        customType: "senpi-task.completion",
+        content: DAG_VERIFICATION_DIRECTIVE,
+        details: [{ model: ASTRA }],
+      },
+      {
+        role: "custom",
+        customType: "omo-senpi.dag-run",
+        content: DAG_VERIFICATION_DIRECTIVE,
+        details: { status: "paused" },
+      },
     ]
     // when
     const results = await target.pi.dispatch("context", { messages }, { model: { id: ASTRA } })
@@ -236,8 +352,13 @@ describe("DAG receiving-model routing", () => {
     // given: both entries pass through the production coordinator in one wake.
     const target = harness({ id: SOL })
     const plain: CompletionDetails = {
-      task_id: "st_87654321", name: "quote", status: "completed", model: ASTRA,
-      duration_ms: 10, final_response: `Here is the requested literal:\n${DAG_VERIFICATION_DIRECTIVE}`, continuation_hint: "",
+      task_id: "st_87654321",
+      name: "quote",
+      status: "completed",
+      model: ASTRA,
+      duration_ms: 10,
+      final_response: `Here is the requested literal:\n${DAG_VERIFICATION_DIRECTIVE}`,
+      continuation_hint: "",
     }
     target.notifier.enqueue(buildCompletionMessage([details()]))
     target.notifier.enqueue(buildCompletionMessage([plain]))
@@ -251,10 +372,17 @@ describe("DAG receiving-model routing", () => {
     // then: the plain segment is byte-preserved and only the DAG segment selects the Astra policy.
     const expected = buildCompletionMessage([details()], ASTRA_DAG_VERIFICATION_DIRECTIVE).content
     expect(message.content?.endsWith(`\n\n${plainText}`)).toBe(true)
-    expect(results).toEqual([{ messages: [{ ...message, content: `${expected}\n\n${plainText}`, details: [
-      { ...message.details?.[0], contentRange: [0, expected.length] },
-      message.details?.[1],
-    ] }] }])
+    expect(results).toEqual([
+      {
+        messages: [
+          {
+            ...message,
+            content: `${expected}\n\n${plainText}`,
+            details: [{ ...message.details?.[0], contentRange: [0, expected.length] }, message.details?.[1]],
+          },
+        ],
+      },
+    ])
   })
 
   test("#given a historic untagged wake #when context switches model #then unknown segment provenance preserves its original text", async () => {
@@ -263,7 +391,11 @@ describe("DAG receiving-model routing", () => {
     target.notifier.enqueue(buildCompletionMessage([details()]))
     target.flush()
     const delivered = target.delivered[0]
-    const message = { ...delivered, role: "custom", details: delivered?.details.map(({ customType, details }) => ({ customType, details })) }
+    const message = {
+      ...delivered,
+      role: "custom",
+      details: delivered?.details.map(({ customType, details }) => ({ customType, details })),
+    }
     // when
     const results = await target.pi.dispatch("context", { messages: [message] }, { model: { id: ASTRA } })
     // then: pre-change histories carry no trustworthy segment boundaries.
@@ -286,11 +418,24 @@ describe("DAG receiving-model routing", () => {
       if (result !== undefined) payload = result
     }
     // then
-    const expectedNode = buildCompletionMessage([{ ...node, final_response: SENPI_ASTRA_ULTRAWORK_DIRECTIVE }], ASTRA_DAG_VERIFICATION_DIRECTIVE).content
-    const expected = expectedNode + `\n\nDAG "release" completed: 1 completed, 0 failed, 0 cancelled, 0 skipped (1 total)\n\n${ASTRA_DAG_RUN_VERIFICATION_DIRECTIVE}`
-    expect(payload).toEqual({ messages: [{ ...message, content: expected, details: [
-      { ...message.details?.[0], contentRange: [0, expectedNode.length] },
-      { ...message.details?.[1], contentRange: [expectedNode.length + 2, expected.length] },
-    ] }] })
+    const expectedNode = buildCompletionMessage(
+      [{ ...node, final_response: SENPI_ASTRA_ULTRAWORK_DIRECTIVE }],
+      ASTRA_DAG_VERIFICATION_DIRECTIVE,
+    ).content
+    const expected =
+      expectedNode +
+      `\n\nDAG "release" completed: 1 completed, 0 failed, 0 cancelled, 0 skipped (1 total)\n\n${ASTRA_DAG_RUN_VERIFICATION_DIRECTIVE}`
+    expect(payload).toEqual({
+      messages: [
+        {
+          ...message,
+          content: expected,
+          details: [
+            { ...message.details?.[0], contentRange: [0, expectedNode.length] },
+            { ...message.details?.[1], contentRange: [expectedNode.length + 2, expected.length] },
+          ],
+        },
+      ],
+    })
   })
 })

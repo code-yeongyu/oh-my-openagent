@@ -59,7 +59,9 @@ const RECORD_LOCK_WAIT_MS = 10_000
  */
 async function withRecordLock<T>(identityRoot: string, operation: () => Promise<T>): Promise<T> {
   await mkdir(identityRoot, { recursive: true })
-  return withLock(join(identityRoot, RECORD_LOCK_FILENAME), await createLockRecord("identity record"), operation, { waitTimeoutMs: RECORD_LOCK_WAIT_MS })
+  return withLock(join(identityRoot, RECORD_LOCK_FILENAME), await createLockRecord("identity record"), operation, {
+    waitTimeoutMs: RECORD_LOCK_WAIT_MS,
+  })
 }
 
 /**
@@ -67,7 +69,10 @@ async function withRecordLock<T>(identityRoot: string, operation: () => Promise<
  * session that never writes memory never creates the memory home. The store's first bind after it exists
  * records the spellings `/memory-merge` needs.
  */
-export async function recordIdentityBind(identityRoot: string, bind: IdentityBind): Promise<IdentityRecord | undefined> {
+export async function recordIdentityBind(
+  identityRoot: string,
+  bind: IdentityBind,
+): Promise<IdentityRecord | undefined> {
   if (!(await isDirectory(identityRoot))) return undefined
   return withRecordLock(identityRoot, () => writeIdentityBind(identityRoot, bind))
 }
@@ -85,7 +90,10 @@ async function writeIdentityBind(identityRoot: string, bind: IdentityBind): Prom
     kind: bind.kind,
     mode: bind.mode,
     source: bind.source,
-    spellings: kept === undefined || kept.spellings.includes(bind.spelling) ? [...(kept?.spellings ?? [bind.spelling])] : [...kept.spellings, bind.spelling],
+    spellings:
+      kept === undefined || kept.spellings.includes(bind.spelling)
+        ? [...(kept?.spellings ?? [bind.spelling])]
+        : [...kept.spellings, bind.spelling],
     ...(kept?.mergedInto === undefined ? {} : { mergedInto: kept.mergedInto }),
     ...(kept?.mergedHead === undefined ? {} : { mergedHead: kept.mergedHead }),
   }
@@ -93,15 +101,24 @@ async function writeIdentityBind(identityRoot: string, bind: IdentityBind): Prom
   return record
 }
 
-export function markIdentityMerged(identityRoot: string, id: string, mergedInto: string, mergedHead: string): Promise<IdentityRecord> {
+export function markIdentityMerged(
+  identityRoot: string,
+  id: string,
+  mergedInto: string,
+  mergedHead: string,
+): Promise<IdentityRecord> {
   return withRecordLock(identityRoot, () => writeIdentityMerged(identityRoot, id, mergedInto, mergedHead))
 }
 
-async function writeIdentityMerged(identityRoot: string, id: string, mergedInto: string, mergedHead: string): Promise<IdentityRecord> {
+async function writeIdentityMerged(
+  identityRoot: string,
+  id: string,
+  mergedInto: string,
+  mergedHead: string,
+): Promise<IdentityRecord> {
   const previous = await readIdentityRecord(identityRoot).catch(() => undefined)
-  const base: IdentityRecord = previous?.id === id
-    ? previous
-    : { version: 1, id, kind: "auto", mode: "path", source: "", spellings: [] }
+  const base: IdentityRecord =
+    previous?.id === id ? previous : { version: 1, id, kind: "auto", mode: "path", source: "", spellings: [] }
   const record: IdentityRecord = { ...base, mergedInto, mergedHead }
   await writeJsonAtomic(join(identityRoot, IDENTITY_RECORD_FILENAME), record)
   return record

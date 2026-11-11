@@ -1,11 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-  MAX_AGE_ENTRIES,
-  probeTreeActivity,
-  type AgeProbeEntry,
-  type AgeProbeFs,
-} from "./transient-age"
+import { MAX_AGE_ENTRIES, probeTreeActivity, type AgeProbeEntry, type AgeProbeFs } from "./transient-age"
 
 const CUTOFF = 1_000_000
 

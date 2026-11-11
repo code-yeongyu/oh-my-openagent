@@ -58,7 +58,10 @@ export function createBundledSkillsComponent(options: BundledSkillsComponentOpti
           skillPaths.push(skillFile)
         }
         if (hidden.length > 0) {
-          ctx.logger.debug?.("bundled skills hidden by disabled_skills", { component: BUNDLED_SKILLS_COMPONENT_NAME, hidden })
+          ctx.logger.debug?.("bundled skills hidden by disabled_skills", {
+            component: BUNDLED_SKILLS_COMPONENT_NAME,
+            hidden,
+          })
         }
         return { skillPaths }
       })
@@ -77,8 +80,11 @@ export function resolveBundledSkillsDir(
   env: Record<string, string | undefined> = process.env,
   options: BundledSkillsDirOptions = {},
 ): string | undefined {
-  return resolveBundledSkillsOverride(env, options.logger) ?? [
-    fileURLToPath(new URL("../skills", importerUrl)),
-    fileURLToPath(new URL("../../../plugin/skills", importerUrl)),
-  ].find((candidate) => existsSync(candidate))
+  return (
+    resolveBundledSkillsOverride(env, options.logger) ??
+    [
+      fileURLToPath(new URL("../skills", importerUrl)),
+      fileURLToPath(new URL("../../../plugin/skills", importerUrl)),
+    ].find((candidate) => existsSync(candidate))
+  )
 }

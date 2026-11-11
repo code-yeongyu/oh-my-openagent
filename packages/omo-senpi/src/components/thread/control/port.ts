@@ -24,7 +24,9 @@ export type SessionControl = {
    * The session's model catalog. `held`: answered from a copy the leg keeps (bounded in age), on which only an exact
    * provider/id is decided; `fresh` bypasses that copy.
    */
-  readonly getAvailableModels: (options?: { readonly fresh?: boolean }) => Promise<{ readonly models: readonly ModelChoice[]; readonly held: boolean }>
+  readonly getAvailableModels: (options?: {
+    readonly fresh?: boolean
+  }) => Promise<{ readonly models: readonly ModelChoice[]; readonly held: boolean }>
   readonly setModel: (provider: string, id: string) => Promise<{ readonly provider: string; readonly id: string }>
   readonly getAvailableThinkingLevels: () => Promise<readonly string[]>
   /** Refuses `thinking_level_unsupported` for a level the active model cannot run. */
@@ -45,15 +47,25 @@ export class ControlRefusal extends Error {
   }
 }
 
-export function refuse(code: ThreadErrorCode, message: string, next: string, details?: Readonly<Record<string, unknown>>): ControlRefusal {
+export function refuse(
+  code: ThreadErrorCode,
+  message: string,
+  next: string,
+  details?: Readonly<Record<string, unknown>>,
+): ControlRefusal {
   return new ControlRefusal(threadToolFailure(code, message, next, details))
 }
 
 export function controlRefusalOf(error: unknown): ThreadToolFailure | undefined {
-  return typeof error === "object" && error !== null && (error as { readonly [REFUSAL]?: unknown })[REFUSAL] === true ? (error as ControlRefusal).failure : undefined
+  return typeof error === "object" && error !== null && (error as { readonly [REFUSAL]?: unknown })[REFUSAL] === true
+    ? (error as ControlRefusal).failure
+    : undefined
 }
 
 /** The thread a result names: its id, and its device when it is on another one. */
-export function controlIdentity(control: Pick<SessionControl, "thread_id" | "device">): { readonly thread_id: string; readonly device?: string } {
+export function controlIdentity(control: Pick<SessionControl, "thread_id" | "device">): {
+  readonly thread_id: string
+  readonly device?: string
+} {
   return { thread_id: control.thread_id, ...(control.device === undefined ? {} : { device: control.device }) }
 }

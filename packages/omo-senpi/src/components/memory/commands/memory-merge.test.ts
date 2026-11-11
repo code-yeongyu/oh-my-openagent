@@ -5,7 +5,12 @@ import { readFile, writeFile, mkdir } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
-import { GitMemoryRepo, recordIdentityBind, resolveAutoIdentity, type MemoryIdentity } from "@oh-my-opencode/memory-core"
+import {
+  GitMemoryRepo,
+  recordIdentityBind,
+  resolveAutoIdentity,
+  type MemoryIdentity,
+} from "@oh-my-opencode/memory-core"
 import { MemoryFakeExtensionAPI, memorySettings } from "../memory.test-support"
 import { fakeCommandContext, fakeDeps, invoke } from "./commands.test-support"
 import { registerMemoryMergeCommand } from "./memory-merge"
@@ -86,7 +91,9 @@ describe("/memory-merge (#10070)", () => {
   test("#given an unknown flag #when /memory-merge runs #then it answers with usage and merges nothing", async () => {
     const { pi } = await desktopLayout()
 
-    expect(await invoke(pi, "memory-merge", "--force", fakeCommandContext())).toContain("usage: /memory-merge [--apply]")
+    expect(await invoke(pi, "memory-merge", "--force", fakeCommandContext())).toContain(
+      "usage: /memory-merge [--apply]",
+    )
   }, 60_000)
   test("#given a user who pinned auto_identity to path #when /memory-merge runs at the repository root #then a subfolder store kept on purpose is not offered (#12974 review r6)", async () => {
     const parent = realpathSync.native(mkdtempSync(join(tmpdir(), "omo-memory-merge-path-")))
@@ -100,10 +107,28 @@ describe("/memory-merge (#10070)", () => {
     const subStore = resolveAutoIdentity(sub, env, "path")
     await seed(target, { "notes/root.md": note("root") })
     await seed(subStore, { "notes/sub.md": note("sub") })
-    await recordIdentityBind(target.paths.root, { id: target.id, kind: "auto", mode: "path", source: main, spelling: main })
-    await recordIdentityBind(subStore.paths.root, { id: subStore.id, kind: "auto", mode: "path", source: sub, spelling: sub })
+    await recordIdentityBind(target.paths.root, {
+      id: target.id,
+      kind: "auto",
+      mode: "path",
+      source: main,
+      spelling: main,
+    })
+    await recordIdentityBind(subStore.paths.root, {
+      id: subStore.id,
+      kind: "auto",
+      mode: "path",
+      source: sub,
+      spelling: sub,
+    })
     const pi = new MemoryFakeExtensionAPI()
-    registerMemoryMergeCommand(pi, fakeDeps({ identity: target.id, identityPaths: target.paths }, { env, loadSettings: () => ({ settings: memorySettings({ auto_identity: "path" }) }) }))
+    registerMemoryMergeCommand(
+      pi,
+      fakeDeps(
+        { identity: target.id, identityPaths: target.paths },
+        { env, loadSettings: () => ({ settings: memorySettings({ auto_identity: "path" }) }) },
+      ),
+    )
 
     const text = await invoke(pi, "memory-merge", "", fakeCommandContext())
 
@@ -122,7 +147,13 @@ describe("/memory-merge (#10070)", () => {
     const target = resolveAutoIdentity(main, env, "git")
     const old = resolveAutoIdentity(thread, env, "path")
     await seed(old, { "notes/habit.md": note("thread habit") })
-    await recordIdentityBind(old.paths.root, { id: old.id, kind: "auto", mode: "path", source: thread, spelling: thread })
+    await recordIdentityBind(old.paths.root, {
+      id: old.id,
+      kind: "auto",
+      mode: "path",
+      source: thread,
+      spelling: thread,
+    })
     const pi = new MemoryFakeExtensionAPI()
     registerMemoryMergeCommand(pi, fakeDeps({ identity: target.id, identityPaths: target.paths }, { env }))
 

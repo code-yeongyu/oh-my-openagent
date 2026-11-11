@@ -19,16 +19,34 @@ describe("doctor memory fragmentation (#10070)", () => {
     const target = buildIdentityPaths(root, "project-aaaa1111")
     await mkdir(buildIdentityPaths(root, "thread-1-bbbb2222").root, { recursive: true })
     await mkdir(buildIdentityPaths(root, "thread-2-cccc3333").root, { recursive: true })
-    await recordIdentityBind(buildIdentityPaths(root, "thread-1-bbbb2222").root, { id: "thread-1-bbbb2222", kind: "auto", mode: "path", source: "/w/thread-1", spelling: "/w/thread-1" })
-    await recordIdentityBind(buildIdentityPaths(root, "thread-2-cccc3333").root, { id: "thread-2-cccc3333", kind: "auto", mode: "path", source: "/w/thread-2", spelling: "/w/thread-2" })
-    await markIdentityMerged(buildIdentityPaths(root, "thread-2-cccc3333").root, "thread-2-cccc3333", "project-aaaa1111", "abc")
+    await recordIdentityBind(buildIdentityPaths(root, "thread-1-bbbb2222").root, {
+      id: "thread-1-bbbb2222",
+      kind: "auto",
+      mode: "path",
+      source: "/w/thread-1",
+      spelling: "/w/thread-1",
+    })
+    await recordIdentityBind(buildIdentityPaths(root, "thread-2-cccc3333").root, {
+      id: "thread-2-cccc3333",
+      kind: "auto",
+      mode: "path",
+      source: "/w/thread-2",
+      spelling: "/w/thread-2",
+    })
+    await markIdentityMerged(
+      buildIdentityPaths(root, "thread-2-cccc3333").root,
+      "thread-2-cccc3333",
+      "project-aaaa1111",
+      "abc",
+    )
 
     const check = await checkMemoryFragmentation(target, () => "project-aaaa1111")
 
     expect(check).toEqual({
       name: "memory-fragmentation",
       level: "warn",
-      detail: "1 older memory store maps to this repository (thread-1-bbbb2222); /memory-merge shows what it would bring in, /memory-merge --apply merges it",
+      detail:
+        "1 older memory store maps to this repository (thread-1-bbbb2222); /memory-merge shows what it would bring in, /memory-merge --apply merges it",
     })
   })
 
@@ -41,8 +59,19 @@ describe("doctor memory fragmentation (#10070)", () => {
     await mkdir(join(thread.repo, "notes"), { recursive: true })
     await writeFile(join(thread.repo, "notes/a.md"), "---\ndescription: a\n---\n\na\n")
     await repo.commitWrite(["notes/a.md"], "a", { agentId: "thread-1-bbbb2222", authorName: "qa" })
-    await recordIdentityBind(thread.root, { id: "thread-1-bbbb2222", kind: "auto", mode: "path", source: "/w/thread-1", spelling: "/w/thread-1" })
-    await markIdentityMerged(thread.root, "thread-1-bbbb2222", "project-aaaa1111", "0000000000000000000000000000000000000000")
+    await recordIdentityBind(thread.root, {
+      id: "thread-1-bbbb2222",
+      kind: "auto",
+      mode: "path",
+      source: "/w/thread-1",
+      spelling: "/w/thread-1",
+    })
+    await markIdentityMerged(
+      thread.root,
+      "thread-1-bbbb2222",
+      "project-aaaa1111",
+      "0000000000000000000000000000000000000000",
+    )
 
     const check = await checkMemoryFragmentation(buildIdentityPaths(root, "project-aaaa1111"), () => "project-aaaa1111")
 
@@ -54,6 +83,8 @@ describe("doctor memory fragmentation (#10070)", () => {
     const root = await mkdtemp(join(tmpdir(), "omo-doctor-frag-"))
     roots.push(root)
 
-    expect((await checkMemoryFragmentation(buildIdentityPaths(root, "project-aaaa1111"), () => "elsewhere")).level).toBe("ok")
+    expect(
+      (await checkMemoryFragmentation(buildIdentityPaths(root, "project-aaaa1111"), () => "elsewhere")).level,
+    ).toBe("ok")
   })
 })

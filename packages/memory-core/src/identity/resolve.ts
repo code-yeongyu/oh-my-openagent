@@ -148,7 +148,11 @@ function coversHome(root: string, env: Record<string, string | undefined>): bool
   const home = env.HOME ?? homedir()
   if (home === "") return false
   const realHome = realPathOr(resolvePath(home))
-  return realHome === root || realHome.startsWith(`${root}${sep}`)
+  if (realHome === root) return true
+  // A filesystem root already ends in the separator; appending another makes "/" into "//" and the
+  // prefix check misses every home under it (#10070).
+  const prefix = root.endsWith(sep) ? root : `${root}${sep}`
+  return realHome.startsWith(prefix)
 }
 
 function realPathOr(path: string): string {

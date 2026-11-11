@@ -3,7 +3,9 @@ import { BUILTIN_CATEGORY_DEFAULTS } from "@oh-my-opencode/senpi-task/category-b
 const NUMBER_PROPERTY = Object.freeze({ type: "number" } as const)
 const STRING_PROPERTY = Object.freeze({ type: "string" } as const)
 
-function enumProperty<const Values extends readonly string[]>(values: Values): Readonly<{
+function enumProperty<const Values extends readonly string[]>(
+  values: Values,
+): Readonly<{
   type: "string"
   values: Values
 }> {
@@ -31,7 +33,7 @@ export const CATEGORY_CONFIG_PROPERTY_NAMES: readonly string[] = Object.freeze(
  * "how many distinct configured combinations exist" into a single GROUP BY.
  */
 export const CATEGORY_CONFIG_SCHEMA = Object.freeze({
-  "$session_id": STRING_PROPERTY,
+  $session_id: STRING_PROPERTY,
   builtin_overridden_count: NUMBER_PROPERTY,
   cat_architect: STRING_PROPERTY,
   cat_artistry: STRING_PROPERTY,

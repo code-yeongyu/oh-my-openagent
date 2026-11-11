@@ -1,4 +1,11 @@
-import { buildPaneAuthEnvironmentArgs, withPaneAuth, escapeTmuxFormat, isServerRunning, runTmuxCommand, type TmuxCommandResult } from "@oh-my-opencode/tmux-core"
+import {
+  buildPaneAuthEnvironmentArgs,
+  withPaneAuth,
+  escapeTmuxFormat,
+  isServerRunning,
+  runTmuxCommand,
+  type TmuxCommandResult,
+} from "@oh-my-opencode/tmux-core"
 import { log } from "../logger"
 import { shellSingleQuote } from "../shell-quote"
 import { resolveCallerTmuxSession } from "./resolve-caller-tmux-session"
@@ -13,7 +20,11 @@ const OMO_ATTACH_SERVER_URL_OPTION = "@omo_attach_server_url"
 const OMO_ATTACH_SESSION_ID_OPTION = "@omo_attach_session_id"
 
 export type TeamLayoutDeps = {
-  runTmuxCommand: (tmuxPath: string, args: Array<string>, options?: { retry?: number; timeoutMs?: number }) => Promise<TmuxCommandResult>
+  runTmuxCommand: (
+    tmuxPath: string,
+    args: Array<string>,
+    options?: { retry?: number; timeoutMs?: number },
+  ) => Promise<TmuxCommandResult>
   isServerRunning: typeof isServerRunning
   getTmuxPath: () => Promise<string | null | undefined>
   resolveCallerTmuxSession: typeof resolveCallerTmuxSession
@@ -45,14 +56,18 @@ export type TeamLayoutCleanupTarget = {
   paneIds?: Array<string>
 }
 
-export function canVisualize(): boolean { return process.env.TMUX !== undefined }
+export function canVisualize(): boolean {
+  return process.env.TMUX !== undefined
+}
 
 function getPaneWorkingDirectory(member: TeamLayoutMember): string {
   return member.worktreePath ?? process.cwd()
 }
 
 function buildAttachCommand(member: TeamLayoutMember, serverUrl: string): string {
-  return withPaneAuth(`opencode attach ${shellSingleQuote(serverUrl)} --session ${shellSingleQuote(member.sessionId)} --dir ${shellSingleQuote(getPaneWorkingDirectory(member))}`)
+  return withPaneAuth(
+    `opencode attach ${shellSingleQuote(serverUrl)} --session ${shellSingleQuote(member.sessionId)} --dir ${shellSingleQuote(getPaneWorkingDirectory(member))}`,
+  )
 }
 
 async function listPanesInWindow(tmuxPath: string, windowTarget: string, deps: TeamLayoutDeps): Promise<Array<string>> {
@@ -68,7 +83,21 @@ function selectExistingTeammatePane(teammatePanes: Array<string>, callerPaneId: 
 function buildSplitArgs(callerPaneId: string, teammatePanes: Array<string>, member: TeamLayoutMember): Array<string> {
   const environmentArgs = buildPaneAuthEnvironmentArgs()
   if (teammatePanes.length === 0) {
-    return ["split-window", ...environmentArgs, "-t", callerPaneId, "-h", "-d", "-l", "70%", "-P", "-F", "#{pane_id}", "-c", escapeTmuxFormat(getPaneWorkingDirectory(member))]
+    return [
+      "split-window",
+      ...environmentArgs,
+      "-t",
+      callerPaneId,
+      "-h",
+      "-d",
+      "-l",
+      "70%",
+      "-P",
+      "-F",
+      "#{pane_id}",
+      "-c",
+      escapeTmuxFormat(getPaneWorkingDirectory(member)),
+    ]
   }
 
   return [
@@ -107,7 +136,14 @@ async function createTeamLayoutInCallerWindow(
     panesByMember[member.name] = paneId
     await deps.runTmuxCommand(tmuxPath, ["select-pane", "-t", paneId, "-T", `${TEAM_PANE_TITLE_PREFIX}${member.name}`])
     await deps.runTmuxCommand(tmuxPath, ["set-option", "-p", "-t", paneId, OMO_ATTACH_SERVER_URL_OPTION, serverUrl])
-    await deps.runTmuxCommand(tmuxPath, ["set-option", "-p", "-t", paneId, OMO_ATTACH_SESSION_ID_OPTION, member.sessionId])
+    await deps.runTmuxCommand(tmuxPath, [
+      "set-option",
+      "-p",
+      "-t",
+      paneId,
+      OMO_ATTACH_SESSION_ID_OPTION,
+      member.sessionId,
+    ])
     await deps.runTmuxCommand(tmuxPath, ["send-keys", "-t", paneId, buildAttachCommand(member, serverUrl), "Enter"])
   }
 
@@ -120,7 +156,12 @@ async function createTeamLayoutInCallerWindow(
   return { focusWindowId: windowTarget, focusPanesByMember: panesByMember }
 }
 
-export async function createTeamLayout(teamRunId: string, members: Array<TeamLayoutMember>, tmuxMgr: TmuxSessionManager, deps: TeamLayoutDeps = defaultDeps): Promise<TeamLayoutResult | null> {
+export async function createTeamLayout(
+  teamRunId: string,
+  members: Array<TeamLayoutMember>,
+  tmuxMgr: TmuxSessionManager,
+  deps: TeamLayoutDeps = defaultDeps,
+): Promise<TeamLayoutResult | null> {
   if (!canVisualize()) {
     deps.log("tmux visualization unavailable, skipping")
     return null
@@ -158,7 +199,14 @@ export async function createTeamLayout(teamRunId: string, members: Array<TeamLay
       return null
     }
 
-    const focus = await createTeamLayoutInCallerWindow(tmuxPath, callerSession.paneId, callerSession.windowTarget, members, serverUrl, deps)
+    const focus = await createTeamLayoutInCallerWindow(
+      tmuxPath,
+      callerSession.paneId,
+      callerSession.windowTarget,
+      members,
+      serverUrl,
+      deps,
+    )
     if (!focus) return null
 
     return {
@@ -188,12 +236,14 @@ export async function removeTeamLayout(
     const tmuxPath = await resolvedDeps.getTmuxPath()
     if (!tmuxPath) return
 
-    const cleanupTarget = isTeamLayoutCleanupTarget(tmuxMgrOrCleanupTarget)
-      ? tmuxMgrOrCleanupTarget
-      : undefined
+    const cleanupTarget = isTeamLayoutCleanupTarget(tmuxMgrOrCleanupTarget) ? tmuxMgrOrCleanupTarget : undefined
 
     if (cleanupTarget?.ownedSession !== false) {
-      await resolvedDeps.runTmuxCommand(tmuxPath, ["kill-session", "-t", cleanupTarget?.targetSessionId ?? `omo-team-${teamRunId}`])
+      await resolvedDeps.runTmuxCommand(tmuxPath, [
+        "kill-session",
+        "-t",
+        cleanupTarget?.targetSessionId ?? `omo-team-${teamRunId}`,
+      ])
       return
     }
 
@@ -231,6 +281,8 @@ function isTeamLayoutDeps(value: TmuxSessionManager | TeamLayoutDeps | undefined
   return value !== undefined && "runTmuxCommand" in value && "getTmuxPath" in value
 }
 
-function isTeamLayoutCleanupTarget(value: TmuxSessionManager | TeamLayoutCleanupTarget | undefined): value is TeamLayoutCleanupTarget {
+function isTeamLayoutCleanupTarget(
+  value: TmuxSessionManager | TeamLayoutCleanupTarget | undefined,
+): value is TeamLayoutCleanupTarget {
   return value !== undefined && "ownedSession" in value && "targetSessionId" in value
 }

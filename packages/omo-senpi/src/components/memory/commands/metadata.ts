@@ -11,7 +11,8 @@ export const MEMORY_REPOSITORY_SUBCOMMANDS = ["set", "unset", "status", "push"] 
 
 export const LAZY_MEMORY_COMMANDS = {
   memory: {
-    description: "View committed memory: HEAD, system bodies, external names, and uncommitted changes; unlock re-checks and removes a stranded git lock.",
+    description:
+      "View committed memory: HEAD, system bodies, external names, and uncommitted changes; unlock re-checks and removes a stranded git lock.",
     argumentHint: "[unlock <lock path> [--force]]",
   },
   remember: {
@@ -35,7 +36,8 @@ export const LAZY_MEMORY_COMMANDS = {
     argumentHint: "",
   },
   "memory-merge": {
-    description: "Merge memory stores of old worktrees or spellings into this repository's store; a dry run unless --apply.",
+    description:
+      "Merge memory stores of old worktrees or spellings into this repository's store; a dry run unless --apply.",
     argumentHint: "[--apply]",
   },
   reflect: {

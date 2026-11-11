@@ -7,7 +7,41 @@ import { isSyncItemKey } from "./key"
 // Windows path semantics, never names repository metadata under any folding git applies, and is
 // already NFC. The oracle is node's own path resolution, not the grammar's code.
 
-const TOKENS = ["a", "Z", "é", "e\u0301", "김", ".", "..", "/", "//", "\\", ":", "~", "$", "git", ".git", "GIT", ".GiT", "~1", "~12", " ", ".", "\u0000", "\u200c", "\ufeff", "con", "NUL", "?", "*", "-", "_", "md", "C:", "git.exe"]
+const TOKENS = [
+  "a",
+  "Z",
+  "é",
+  "e\u0301",
+  "김",
+  ".",
+  "..",
+  "/",
+  "//",
+  "\\",
+  ":",
+  "~",
+  "$",
+  "git",
+  ".git",
+  "GIT",
+  ".GiT",
+  "~1",
+  "~12",
+  " ",
+  ".",
+  "\u0000",
+  "\u200c",
+  "\ufeff",
+  "con",
+  "NUL",
+  "?",
+  "*",
+  "-",
+  "_",
+  "md",
+  "C:",
+  "git.exe",
+]
 const CASES = 20_000
 
 function prng(seed: number): () => number {

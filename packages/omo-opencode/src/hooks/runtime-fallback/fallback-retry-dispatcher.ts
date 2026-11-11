@@ -33,12 +33,7 @@ export async function dispatchFallbackRetry(
     options.state.pendingFallbackPromptMayHaveBeenAccepted = false
   }
   const snapshot = snapshotFallbackState(options.state)
-  const result = prepareFallback(
-    options.sessionID,
-    options.state,
-    options.fallbackModels,
-    deps.config,
-  )
+  const result = prepareFallback(options.sessionID, options.state, options.fallbackModels, deps.config)
 
   if (result.success && result.newModel) {
     const rawDispatchOutcome = await helpers.autoRetryWithFallback(

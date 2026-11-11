@@ -68,7 +68,13 @@ export async function findMergePredecessors(
     // fragment of the repository it happened to be used from.
     if (record === undefined || record.spellings.length === 0 || record.kind !== "auto") continue
     if (record.spellings.some((spelling) => resolve(spelling) === targetId)) {
-      predecessors.push({ id, paths, spellings: record.spellings, ...(record.mergedInto === undefined ? {} : { mergedInto: record.mergedInto }), ...(record.mergedHead === undefined ? {} : { mergedHead: record.mergedHead }) })
+      predecessors.push({
+        id,
+        paths,
+        spellings: record.spellings,
+        ...(record.mergedInto === undefined ? {} : { mergedInto: record.mergedInto }),
+        ...(record.mergedHead === undefined ? {} : { mergedHead: record.mergedHead }),
+      })
     } else {
       unmapped.push(id)
     }
@@ -83,6 +89,9 @@ export async function findMergePredecessors(
     if ((await readdir(paths.repo).catch(() => [] as string[])).length === 0) continue
     known.add(id)
     const record = await readIdentityRecord(paths.root).catch(() => undefined)
+    // The first loop already drops an explicit profile. A path-derived directory can carry one too
+    // (the profile name hashed like that directory); candidate discovery must not offer it either.
+    if (record?.kind === "explicit") continue
     predecessors.push({
       id,
       paths,
@@ -94,7 +103,18 @@ export async function findMergePredecessors(
   return { predecessors, unmapped }
 }
 
-const CANDIDATE_WALK_SKIP = new Set([".git", "node_modules", ".omo", "dist", "build", "target", ".next", ".turbo", ".cache", "vendor"])
+const CANDIDATE_WALK_SKIP = new Set([
+  ".git",
+  "node_modules",
+  ".omo",
+  "dist",
+  "build",
+  "target",
+  ".next",
+  ".turbo",
+  ".cache",
+  "vendor",
+])
 const CANDIDATE_WALK_MAX_DEPTH = 6
 const CANDIDATE_WALK_MAX_DIRS = 5000
 
@@ -110,7 +130,10 @@ export async function repositoryCandidateDirs(spellings: readonly string[]): Pro
   const roots = new Set<string>()
   for (const dir of [...spellings, ...worktrees]) {
     for (let current = dir; ; current = dirname(current)) {
-      if ((await readdir(join(current, ".git")).catch(() => undefined)) !== undefined || (await readFile(join(current, ".git"), "utf8").catch(() => undefined)) !== undefined) {
+      if (
+        (await readdir(join(current, ".git")).catch(() => undefined)) !== undefined ||
+        (await readFile(join(current, ".git"), "utf8").catch(() => undefined)) !== undefined
+      ) {
         roots.add(current)
         break
       }
@@ -164,7 +187,11 @@ async function commonGitDir(dir: string): Promise<string | undefined> {
     if (pointer !== undefined) {
       const gitDir = isAbsolute(pointer) ? pointer : join(current, pointer)
       const commonPointer = (await readFile(join(gitDir, "commondir"), "utf8").catch(() => undefined))?.trim()
-      return commonPointer === undefined || commonPointer === "" ? gitDir : (isAbsolute(commonPointer) ? commonPointer : join(gitDir, commonPointer))
+      return commonPointer === undefined || commonPointer === ""
+        ? gitDir
+        : isAbsolute(commonPointer)
+          ? commonPointer
+          : join(gitDir, commonPointer)
     }
     if (dirname(current) === current) return undefined
   }
@@ -191,9 +218,15 @@ export async function planIdentityMerge(
   )
   // On a case-insensitive disk (default macOS) a path that differs only in letter case is the same file.
   const targetFolded = new Set([...targetBlobs.keys()].map((path) => path.toLowerCase()))
-  const mergedBefore = since === undefined
-    ? undefined
-    : new Map((await sourceRepo.lsTreeBlobs(since).catch(() => [] as readonly GitTreeBlobEntry[])).map((entry) => [entry.path, entry.oid]))
+  const mergedBefore =
+    since === undefined
+      ? undefined
+      : new Map(
+          (await sourceRepo.lsTreeBlobs(since).catch(() => [] as readonly GitTreeBlobEntry[])).map((entry) => [
+            entry.path,
+            entry.oid,
+          ]),
+        )
   const actions = [...sourceBlobs]
     .filter((entry) => !entry.path.startsWith(".") && !entry.path.startsWith(`${MERGED_ASIDE_ROOT}/`))
     .filter((entry) => mergedBefore?.get(entry.path) !== entry.oid)
@@ -205,7 +238,11 @@ export async function planIdentityMerge(
       if (existing === undefined && !foldedCollision && !entry.path.toLowerCase().startsWith("system/")) {
         return { path: entry.path, action: "add", destination: entry.path }
       }
-      return { path: entry.path, action: "keep-aside", destination: freeAsidePath(sourceId, sourceHead, entry.path, targetBlobs, targetFolded) }
+      return {
+        path: entry.path,
+        action: "keep-aside",
+        destination: freeAsidePath(sourceId, sourceHead, entry.path, targetBlobs, targetFolded),
+      }
     })
   return { sourceId, sourceHead, actions }
 }
@@ -238,7 +275,10 @@ export async function applyIdentityMerge(options: ApplyIdentityMergeOptions): Pr
   const outcome = await lock("memory-write", async (): Promise<{ readonly plan: MergePlan; readonly sha?: string }> => {
     // A repository-root identity that is new under the `git` default has no repository yet: the merge is
     // its first write, so it creates it here instead of failing every source.
-    if ((await targetRepo.head().catch(() => null)) === null && (await readdir(target.repo).catch(() => undefined)) === undefined) {
+    if (
+      (await targetRepo.head().catch(() => null)) === null &&
+      (await readdir(target.repo).catch(() => undefined)) === undefined
+    ) {
       if (options.initTarget === undefined) throw new Error(`memory merge: ${targetId} has no memory repository yet`)
       await options.initTarget(targetRepo)
     }
@@ -248,7 +288,9 @@ export async function applyIdentityMerge(options: ApplyIdentityMergeOptions): Pr
     const lockedSince = current?.mergedInto === targetId ? current.mergedHead : undefined
     if (lockedSince !== undefined && lockedSince === preview.sourceHead) return { plan: { ...preview, actions: [] } }
     const plan = await planIdentityMerge(source, target, lockedSince)
-    const writes = plan.actions.filter((action): action is Exclude<MergeAction, { action: "skip" }> => action.action !== "skip")
+    const writes = plan.actions.filter(
+      (action): action is Exclude<MergeAction, { action: "skip" }> => action.action !== "skip",
+    )
     if (writes.length === 0 || plan.sourceHead === null) return { plan }
     const oids = new Map((await sourceRepo.lsTreeBlobs(plan.sourceHead)).map((entry) => [entry.path, entry.oid]))
     const raw = await sourceRepo.readBlobBytes(writes.map((action) => requiredOid(oids, action.path)))
@@ -270,7 +312,8 @@ export async function applyIdentityMerge(options: ApplyIdentityMergeOptions): Pr
     try {
       for (const action of writes) {
         const content = contents.get(requiredOid(oids, action.path))
-        if (content === undefined) throw new Error(`memory merge: blob for ${action.path} could not be read from ${plan.sourceId}`)
+        if (content === undefined)
+          throw new Error(`memory merge: blob for ${action.path} could not be read from ${plan.sourceId}`)
         const destination = join(target.repo, action.destination)
         await mkdir(dirname(destination), { recursive: true })
         await writeFile(destination, content, "utf8")
@@ -295,7 +338,8 @@ export async function applyIdentityMerge(options: ApplyIdentityMergeOptions): Pr
       throw error
     }
   })
-  if (outcome.sha === undefined && outcome.plan.sourceHead !== null) await markIdentityMerged(source.root, outcome.plan.sourceId, targetId, outcome.plan.sourceHead)
+  if (outcome.sha === undefined && outcome.plan.sourceHead !== null)
+    await markIdentityMerged(source.root, outcome.plan.sourceId, targetId, outcome.plan.sourceHead)
   return outcome.sha === undefined
     ? { status: "nothing-to-merge", plan: outcome.plan }
     : { status: "merged", sha: outcome.sha, plan: outcome.plan }
@@ -330,5 +374,10 @@ function requiredOid(oids: ReadonlyMap<string, string>, path: string): string {
 }
 
 function identityIdOf(paths: MemoryIdentityPaths): string {
-  return paths.root.split(/[\\/]/).filter((part) => part !== "").at(-1) ?? ""
+  return (
+    paths.root
+      .split(/[\\/]/)
+      .filter((part) => part !== "")
+      .at(-1) ?? ""
+  )
 }

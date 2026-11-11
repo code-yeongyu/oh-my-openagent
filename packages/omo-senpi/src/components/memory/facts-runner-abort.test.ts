@@ -28,28 +28,36 @@ describe("facts runner shutdown abort boundary", () => {
     // given
     const { root, identity, queue } = await fixture()
     let signalStart: (() => void) | undefined
-    const startCalled = new Promise<void>((resolve) => { signalStart = resolve })
+    const startCalled = new Promise<void>((resolve) => {
+      signalStart = resolve
+    })
     let aborted = 0
     let disposed = 0
-    const runner = new FactsExtractorRunner(runnerOptions(root, identity, queue, "fact", {
-      createRunner: () => ({
-        start: async () => {
-          signalStart?.()
-          return {
-            task_id: "facts-child",
-            sessionId: "facts-child",
-            effectiveModel: () => undefined,
-            steer: async () => undefined,
-            followUp: async () => undefined,
-            abort: async () => { aborted += 1 },
-            subscribe: () => () => undefined,
-            waitForIdle: async () => await new Promise(() => undefined),
-            lastAssistantText: () => undefined,
-            dispose: () => { disposed += 1 },
-          }
-        },
+    const runner = new FactsExtractorRunner(
+      runnerOptions(root, identity, queue, "fact", {
+        createRunner: () => ({
+          start: async () => {
+            signalStart?.()
+            return {
+              task_id: "facts-child",
+              sessionId: "facts-child",
+              effectiveModel: () => undefined,
+              steer: async () => undefined,
+              followUp: async () => undefined,
+              abort: async () => {
+                aborted += 1
+              },
+              subscribe: () => () => undefined,
+              waitForIdle: async () => await new Promise(() => undefined),
+              lastAssistantText: () => undefined,
+              dispose: () => {
+                disposed += 1
+              },
+            }
+          },
+        }),
       }),
-    }))
+    )
     const launch = runner.launchPending()
     await startCalled
 
@@ -76,12 +84,14 @@ describe("facts runner shutdown abort boundary", () => {
     // reservation boundary - the composite must stop before creating the run.
     const { root, identity, queue } = await fixture()
     const aborted = new AbortController()
-    const runner = new FactsExtractorRunner(runnerOptions(root, identity, queue, "fact", {
-      createBatchId: () => {
-        aborted.abort()
-        return "11111111-1111-4111-8111-111111111111"
-      },
-    }))
+    const runner = new FactsExtractorRunner(
+      runnerOptions(root, identity, queue, "fact", {
+        createBatchId: () => {
+          aborted.abort()
+          return "11111111-1111-4111-8111-111111111111"
+        },
+      }),
+    )
 
     // when
     const result = await runner.launchPending(aborted.signal)
@@ -100,22 +110,31 @@ describe("facts runner shutdown abort boundary", () => {
     await mkdir(tombstone, { recursive: true })
     const cleanupStarted = Promise.withResolvers<void>()
     const cleanupGate = Promise.withResolvers<void>()
-    const runner = new FactsExtractorRunner(runnerOptions(root, identity, queue, "fact", {
-      resolveModelRegistry: () => { throw new Error("maintenance must not resolve a launch model") },
-      removeRunArtifact: async (path) => {
-        if (path === tombstone) {
-          cleanupStarted.resolve()
-          await cleanupGate.promise
-        }
-        await rm(path, { recursive: true, force: true })
-      },
-    }))
+    const runner = new FactsExtractorRunner(
+      runnerOptions(root, identity, queue, "fact", {
+        resolveModelRegistry: () => {
+          throw new Error("maintenance must not resolve a launch model")
+        },
+        removeRunArtifact: async (path) => {
+          if (path === tombstone) {
+            cleanupStarted.resolve()
+            await cleanupGate.promise
+          }
+          await rm(path, { recursive: true, force: true })
+        },
+      }),
+    )
     const order: string[] = []
-    const reconcile = runner.reconcilePending().then((result) => { order.push("reconcile"); return result })
+    const reconcile = runner.reconcilePending().then((result) => {
+      order.push("reconcile")
+      return result
+    })
     await cleanupStarted.promise
 
     // when
-    const cancel = runner.cancelActive().then(() => { order.push("cancel") })
+    const cancel = runner.cancelActive().then(() => {
+      order.push("cancel")
+    })
     cleanupGate.resolve()
     await Promise.all([cancel, reconcile])
 

@@ -37,14 +37,13 @@ export interface MemoryWriteRenderDeps {
 }
 
 type MemoryRenderArgs = Partial<Static<typeof MemoryToolParams>>
-type MemoryRenderContext = Parameters<NonNullable<ToolDefinition<
-  typeof MemoryToolParams, MemoryToolResultDetails, { callComponent?: Box }
->["renderCall"]>>[2]
+type MemoryRenderContext = Parameters<
+  NonNullable<ToolDefinition<typeof MemoryToolParams, MemoryToolResultDetails, { callComponent?: Box }>["renderCall"]>
+>[2]
 
 function getMemoryCallComponent(context: MemoryRenderContext): Box {
-  const component = context.lastComponent instanceof Box
-    ? context.lastComponent
-    : context.state.callComponent ?? new Box(1, 1)
+  const component =
+    context.lastComponent instanceof Box ? context.lastComponent : (context.state.callComponent ?? new Box(1, 1))
   context.state.callComponent = component
   return component
 }
@@ -57,7 +56,11 @@ function buildMemoryCall(component: Box, args: MemoryRenderArgs, theme: Theme): 
   component.addChild(new Text(`${theme.bold(MEMORY_TOOL_NAME)} ${normalizeRendererText(summary)}`.trimEnd(), 0, 0))
 }
 
-export function renderMemoryWriteCall(args: MemoryRenderArgs, theme: Theme, context: MemoryRenderContext): RenderComponent {
+export function renderMemoryWriteCall(
+  args: MemoryRenderArgs,
+  theme: Theme,
+  context: MemoryRenderContext,
+): RenderComponent {
   const component = getMemoryCallComponent(context)
   if (!context.hasResult) {
     component.setBgFn((text) => theme.bg("toolPendingBg", text))
@@ -79,7 +82,9 @@ export function createMemoryWriteRenderResult(
 ) => RenderComponent {
   return (result, options, theme, context) => {
     const args: MemoryNoticeArgs = "args" in context ? context.args : {}
-    const spec = deps.enabled() ? resultNoticeSpec(result, context.isError === true, args, (deps.now ?? Date.now)()) : undefined
+    const spec = deps.enabled()
+      ? resultNoticeSpec(result, context.isError === true, args, (deps.now ?? Date.now)())
+      : undefined
     // Result-only consumers have no call frame; preserve the standalone callback contract.
     if (!("state" in context)) {
       return spec === undefined
