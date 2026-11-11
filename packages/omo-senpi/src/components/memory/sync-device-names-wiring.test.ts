@@ -21,7 +21,11 @@ const cleanups: Array<() => Promise<void>> = []
 
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup()
-  await Promise.all(roots.splice(0).map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(
+    roots
+      .splice(0)
+      .map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })),
+  )
 })
 
 function sessionEventContext(turn: number): unknown {
@@ -53,7 +57,9 @@ async function noticeAfterSync(principals: string): Promise<string> {
   const settings = memorySettings()
   const identity = resolveMemoryIdentity(settings.agent, cwd, env)
   const repo = new GitMemoryRepo({ dir: identity.paths.repo, agentId: identity.id })
-  await repo.init({ seedFiles: [{ relativePath: "system/persona.md", content: "---\ndescription: Persona\n---\nbefore\n" }] })
+  await repo.init({
+    seedFiles: [{ relativePath: "system/persona.md", content: "---\ndescription: Persona\n---\nbefore\n" }],
+  })
   await ensureIdentityRuntimeDirs(identity.paths)
   const pi = new MemoryFakeExtensionAPI()
   createMemoryComponent({
@@ -67,17 +73,26 @@ async function noticeAfterSync(principals: string): Promise<string> {
     await pi.dispatch("session_shutdown", { type: "session_shutdown" }, sessionEventContext(3))
   })
   const start = (turn: number) =>
-    pi.dispatch("before_agent_start", { type: "before_agent_start", prompt: "continue", systemPrompt: "BASE" }, sessionEventContext(turn))
+    pi.dispatch(
+      "before_agent_start",
+      { type: "before_agent_start", prompt: "continue", systemPrompt: "BASE" },
+      sessionEventContext(turn),
+    )
   await start(1)
   const path = join(repo.dir, "system/persona.md")
   await mkdir(dirname(path), { recursive: true })
   await writeFile(path, "---\ndescription: Persona\n---\nwritten on the mini\n")
-  await repo.commitWrite(["system/persona.md"], `sync: 1 memories updated\n\nSync-Seq: 4-4\nSync-Principals: ${principals}`, {
-    agentId: identity.id,
-    authorName: "OmO Sync",
-  })
+  await repo.commitWrite(
+    ["system/persona.md"],
+    `sync: 1 memories updated\n\nSync-Seq: 4-4\nSync-Principals: ${principals}`,
+    {
+      agentId: identity.id,
+      authorName: "OmO Sync",
+    },
+  )
   const results = await start(2)
-  const result = results.find((r) => (r as BeforeAgentStartEventResult | undefined)?.message !== undefined) as BeforeAgentStartEventResult | undefined
+  const result = results.find((r) => (r as BeforeAgentStartEventResult | undefined)?.message !== undefined) as
+    BeforeAgentStartEventResult | undefined
   const content = result?.message?.content
   return typeof content === "string" ? content : JSON.stringify(content ?? "")
 }

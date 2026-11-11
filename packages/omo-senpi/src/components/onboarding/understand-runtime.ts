@@ -75,11 +75,19 @@ async function understand(
   let toolCalls = 0
   let candidates: Candidate[] = []
   const send = (body: EventBody): OnboardingUnderstandEvent => {
-    const event: OnboardingUnderstandEvent = { understandId: input.understandId, scanId: input.scanId, ...body, bytesRead, toolCalls, elapsedMs: elapsed() }
+    const event: OnboardingUnderstandEvent = {
+      understandId: input.understandId,
+      scanId: input.scanId,
+      ...body,
+      bytesRead,
+      toolCalls,
+      elapsedMs: elapsed(),
+    }
     emit(event)
     return event
   }
-  const finish = (extra: Partial<EventBody> = {}) => send({ kind: "done", candidates: candidates.map(publicCandidate), ...extra })
+  const finish = (extra: Partial<EventBody> = {}) =>
+    send({ kind: "done", candidates: candidates.map(publicCandidate), ...extra })
 
   let stepNumber = 0
   for (const group of planSteps(input.digests, budget.minSourceSessions)) {
@@ -100,16 +108,21 @@ async function understand(
     const step = describeStep(`step-${stepNumber}`, group.project, read)
     send({ kind: "step_started", step })
 
-    const runOnce = () => runStep({
-      model,
-      payload: stepPayload(read, group.project, today, budget.minSourceSessions),
-      deadlineMs: Math.min(budget.stepMs, budget.totalMs - elapsed()),
-      maxCalls: budget.toolCalls - toolCalls,
-      onCall: () => { toolCalls += 1 },
-      control,
-      projects: new Set(read.digests.map((digest) => digest.cwd)),
-      onScratchCleanup: (cleanup) => { scratchCleanups.push(cleanup) },
-    })
+    const runOnce = () =>
+      runStep({
+        model,
+        payload: stepPayload(read, group.project, today, budget.minSourceSessions),
+        deadlineMs: Math.min(budget.stepMs, budget.totalMs - elapsed()),
+        maxCalls: budget.toolCalls - toolCalls,
+        onCall: () => {
+          toolCalls += 1
+        },
+        control,
+        projects: new Set(read.digests.map((digest) => digest.cwd)),
+        onScratchCleanup: (cleanup) => {
+          scratchCleanups.push(cleanup)
+        },
+      })
     let result = await runOnce()
     if (result.status === "failed") {
       if (budget.totalMs - elapsed() <= 0) {
@@ -149,7 +162,9 @@ async function understand(
     }
     if (candidates.length >= budget.maxFacts) factsCapped = true
     const reached: OnboardingUnderstandBudgetKind[] = [
-      ...(result.status === "timeout" ? [elapsed() >= budget.totalMs ? "total_ms" as const : "step_ms" as const] : []),
+      ...(result.status === "timeout"
+        ? [elapsed() >= budget.totalMs ? ("total_ms" as const) : ("step_ms" as const)]
+        : []),
       ...(toolCalls >= budget.toolCalls ? ["tool_calls" as const] : []),
       ...(read.truncated ? ["read_bytes" as const] : []),
       ...(factsCapped ? ["max_facts" as const] : []),
@@ -177,7 +192,8 @@ function planSteps(digests: readonly SessionDigest[], minSessions: number): Step
 
 function describeStep(id: string, project: string | undefined, read: StepRead): OnboardingUnderstandStep {
   const sessions = read.digests.length
-  if (project !== undefined) return { id, label: `Read ${sessions} recent sessions in ${basename(project)}`, project, sessions }
+  if (project !== undefined)
+    return { id, label: `Read ${sessions} recent sessions in ${basename(project)}`, project, sessions }
   const projects = new Set(read.digests.map((digest) => digest.cwd)).size
   return { id, label: `Read ${sessions} recent sessions across ${projects} projects`, sessions }
 }

@@ -1,0 +1,241 @@
+{
+  "description": "computer-use v2 P9a, reportMode object: on the dense 10,000-node scenario whose root takes 50 ms to list, ax.snapshot with timeoutMs 50 returns what it read instead of Timeout: complete false, truncated true, nodesObserved 1 and the root as the one cut, rendered [... 9998 more]; ax.node on that cut ref reports subtreeTruncated and per-field evidence; ax.query reads the secure field's value as unknown and withheld; the same snapshot with a 10 s deadline and a 10,000-node budget completes (control).",
+  "scenario": "crates/senpi-desktop-backend-fake/fixtures/v2-ax-dense.json",
+  "env": {},
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session.open",
+        "params": {
+          "reportMode": "object"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "cursorOverlay": false,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "granted",
+                "axPermission": "granted",
+                "displayCount": 1,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": null,
+                "integrityLevel": null,
+                "screenLocked": false,
+                "displayAsleep": false
+              },
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "ax.snapshot",
+        "params": {
+          "target": "101",
+          "opts": {
+            "timeoutMs": 50
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "text": "- window \"Dense - Notes\" [ref=e1] app=Notes (focused) [... 9998 more]\n… truncated (1 nodes)\n… deadline 50 ms reached",
+              "nodeCount": 1,
+              "truncated": true,
+              "generation": 1,
+              "complete": false,
+              "nodesObserved": 1,
+              "cuts": [
+                {
+                  "ref": "e1",
+                  "childCount": 9998
+                }
+              ]
+            }
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "ax.node",
+        "params": {
+          "ref": "e1"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "result": {
+              "description": null,
+              "enabled": true,
+              "focused": false,
+              "actions": null,
+              "childCount": 9998,
+              "ref": "e1",
+              "role": "window",
+              "nativeRole": "AXWindow",
+              "title": "Dense - Notes",
+              "value": null,
+              "x": 100.0,
+              "y": 120.0,
+              "width": 800.0,
+              "height": 600.0,
+              "evidence": {
+                "title": "known",
+                "value": "absent",
+                "description": "absent",
+                "enabled": "known",
+                "focused": "known",
+                "bounds": "known"
+              },
+              "subtreeTruncated": true
+            }
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "ax.query",
+        "params": {
+          "target": "101",
+          "query": {
+            "role": "textfield"
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "result": [
+              {
+                "description": null,
+                "enabled": true,
+                "focused": false,
+                "actions": null,
+                "childCount": 0,
+                "ref": "e2",
+                "role": "textfield",
+                "nativeRole": "AXSecureTextField",
+                "title": "Password",
+                "value": null,
+                "x": 110.0,
+                "y": 170.0,
+                "width": 300.0,
+                "height": 24.0,
+                "evidence": {
+                  "title": "known",
+                  "value": "unknown",
+                  "description": "absent",
+                  "enabled": "known",
+                  "focused": "known",
+                  "bounds": "known"
+                },
+                "secure": true
+              },
+              {
+                "description": null,
+                "enabled": true,
+                "focused": false,
+                "actions": null,
+                "childCount": 0,
+                "ref": "e3",
+                "role": "textfield",
+                "nativeRole": "AXTextField",
+                "title": "Name",
+                "value": "Q",
+                "x": 110.0,
+                "y": 200.0,
+                "width": 300.0,
+                "height": 24.0,
+                "evidence": {
+                  "title": "known",
+                  "value": "known",
+                  "description": "absent",
+                  "enabled": "known",
+                  "focused": "known",
+                  "bounds": "known"
+                }
+              }
+            ]
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "ax.snapshot",
+        "params": {
+          "target": "101",
+          "opts": {
+            "timeoutMs": 10000,
+            "maxNodes": 10000
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "result": {
+              "text": "10,000 rendered lines",
+              "nodeCount": 10000,
+              "truncated": false,
+              "generation": 2,
+              "complete": true,
+              "nodesObserved": 10000
+            }
+          },
+          "variable": [
+            "/result/text"
+          ]
+        }
+      ]
+    }
+  ]
+}

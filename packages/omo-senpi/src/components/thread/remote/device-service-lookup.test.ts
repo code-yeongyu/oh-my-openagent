@@ -16,20 +16,29 @@ function portFor(lookup: "timeout" | "closed" | "answers") {
     },
     endpointCommand: async (_device: string, _endpoint: string, _rpc: unknown, commandId: string) => {
       calls.endpointCommand += 1
-      throw new LocalApiError("request_timeout", `command ${commandId} may have been dispatched`, { command_id: commandId })
+      throw new LocalApiError("request_timeout", `command ${commandId} may have been dispatched`, {
+        command_id: commandId,
+      })
     },
     onEvent: () => () => {},
     close: () => {},
     closed: new Promise<void>(() => {}),
   }
-  const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: () => connectDeviceService({ version: "0.0.0-test", stateDir: "/nonexistent", connect: async () => fake as never }) })
+  const port = createDeviceServiceSessions({
+    version: "0.0.0-test",
+    connect: () =>
+      connectDeviceService({ version: "0.0.0-test", stateDir: "/nonexistent", connect: async () => fake as never }),
+  })
   return { port, calls }
 }
 
 describe("device-service adapter: endpoint lookup failures versus lost replies", () => {
   test("#given b's endpoint lookup times out #when create sends to b #then nothing was sent and it is refused request_timeout", async () => {
     const { port, calls } = portFor("timeout")
-    expect(await port.endpointCommand("b", { type: "open_session", cwd: "/p" })).toEqual({ kind: "refused", reason: "request_timeout" })
+    expect(await port.endpointCommand("b", { type: "open_session", cwd: "/p" })).toEqual({
+      kind: "refused",
+      reason: "request_timeout",
+    })
     expect(calls.endpointCommand).toBe(0)
   })
 
@@ -41,7 +50,10 @@ describe("device-service adapter: endpoint lookup failures versus lost replies",
 
   test("#given the lookup answered #when session.command times out after sending #then it stays uncertain reply_lost", async () => {
     const { port, calls } = portFor("answers")
-    expect(await port.endpointCommand("b", { type: "open_session", cwd: "/p" })).toEqual({ kind: "uncertain", reason: "reply_lost" })
+    expect(await port.endpointCommand("b", { type: "open_session", cwd: "/p" })).toEqual({
+      kind: "uncertain",
+      reason: "reply_lost",
+    })
     expect(calls.endpointCommand).toBe(1)
   })
 })

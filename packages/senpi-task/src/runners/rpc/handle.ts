@@ -28,6 +28,15 @@ import { createTurnClaim } from "./turn-claim"
 import { createTaskParentControl } from "../task-parent-control"
 import { reportedEffectiveModel, type ModelIdentity } from "../pinned-model-equivalence"
 
+// A partial identity is not an observation. Recording one kept a provider-error turn from settling.
+function readWireModel(
+  model: { readonly provider?: unknown; readonly id?: unknown } | undefined,
+): ModelIdentity | undefined {
+  if (typeof model?.provider !== "string" || model.provider.length === 0) return undefined
+  if (typeof model.id !== "string" || model.id.length === 0) return undefined
+  return { provider: model.provider, id: model.id }
+}
+
 export type CreateRpcChildHandleOptions = {
   readonly inputStore?: import("../../store").TaskRecordStore
   readonly client: RpcProtocolClient
@@ -109,10 +118,16 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
   let heartbeatActivity = (): void => {}
   client.onEvent((event) => {
     heartbeatActivity()
-    if (event.type === "model_changed") model = event.model
-    if (event.type === "service_tier_changed") serviceTier = event.tier
+    if (event.type === "model_changed") {
+      const identity = readWireModel(event.model)
+      if (identity !== undefined) model = identity
+    }
+    if (event.type === "service_tier_changed" && typeof event.tier === "string" && event.tier.length > 0) {
+      serviceTier = event.tier
+    }
     if ((event.type === "message_start" || event.type === "message_end") && event.message.role === "assistant") {
-      model = { provider: event.message.provider, id: event.message.model }
+      const identity = readWireModel({ provider: event.message.provider, id: event.message.model })
+      if (identity !== undefined) model = identity
     }
     // A run the child starts on its own after its turn settled (a monitor or background job woke it)
     // is a new turn: the next outcome is that run's, never the settled one again (omo#9069).
@@ -142,7 +157,8 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
 
   const stopHeartbeat = startHeartbeat({
     intervalMs: heartbeatIntervalMs,
-    paused: () => outcome !== undefined || client.exited || child.stdin?.writableEnded === true || child.stdin?.destroyed === true,
+    paused: () =>
+      outcome !== undefined || client.exited || child.stdin?.writableEnded === true || child.stdin?.destroyed === true,
     probe: async () => {
       const response = await client.send({ type: "get_state", id: heartbeatRequestId() })
       assertOk(response, "get_state")
@@ -152,16 +168,23 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
       lastSeenAt = now()
       sessionId = readSessionId(response) ?? sessionId
       if (response.command === "get_state" && response.success) {
-        model = response.data.model
-        serviceTier = response.data.serviceTier
+        const identity = readWireModel(response.data.model)
+        if (identity !== undefined) model = identity
+        if (typeof response.data.serviceTier === "string" && response.data.serviceTier.length > 0) {
+          serviceTier = response.data.serviceTier
+        }
       }
     },
     onFailure: (error) => {
-      if (!isHarmlessRpcShutdownError(error)) log("senpi-task heartbeat get_state failed", { taskId, error: String(error) })
+      if (!isHarmlessRpcShutdownError(error))
+        log("senpi-task heartbeat get_state failed", { taskId, error: String(error) })
     },
     onUnresponsive: () => {
       settleTurn({ status: "error", failure: { kind: "child-unresponsive", message: unresponsiveMessage(taskId) } })
-      settleExit({ kind: "crashed", facts: { pid: child.pid, code: null, signal: null, stderrTail: "child-unresponsive" } })
+      settleExit({
+        kind: "crashed",
+        facts: { pid: child.pid, code: null, signal: null, stderrTail: "child-unresponsive" },
+      })
       terminationRequested = true
       void (options.terminateChild ?? terminateRpcChild)(child).catch((error: unknown) => {
         log("senpi-task unresponsive child termination failed", { taskId, error: String(error) })
@@ -183,9 +206,17 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     }
   }
 
-  child.once("error", (error) => settleExit(classifyChildExit({ code: null, signal: null, error, pid: child.pid, stderr: client.stderrTail })))
+  child.once("error", (error) =>
+    settleExit(classifyChildExit({ code: null, signal: null, error, pid: child.pid, stderr: client.stderrTail })),
+  )
   child.once("close", (code, signal) => {
-    const built = classifyChildExit({ code, signal, pid: child.pid, stderr: client.stderrTail, terminatedByRunner: terminationRequested })
+    const built = classifyChildExit({
+      code,
+      signal,
+      pid: child.pid,
+      stderr: client.stderrTail,
+      terminatedByRunner: terminationRequested,
+    })
     if (options.childEnv !== undefined) {
       recordTaskChildDeath({ env: options.childEnv, outcome: built, terminationRequested, startedAt, now: Date.now() })
     }
@@ -197,9 +228,10 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     assertOk(response, label)
   }
   const inputEffects = createInputEffects({
-    taskId, store: options.inputStore,
-    send: command => writeCommand(command, command.type),
-    read: ids => readStdioAdmissions(client, ids),
+    taskId,
+    store: options.inputStore,
+    send: (command) => writeCommand(command, command.type),
+    read: (ids) => readStdioAdmissions(client, ids),
   })
 
   const beginTurn = (): void => {
@@ -215,7 +247,9 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
   }
 
   const delivery = createInputDelivery({
-    effects: inputEffects, beginTurn, promptFailed: error => {
+    effects: inputEffects,
+    beginTurn,
+    promptFailed: (error) => {
       // A broken pipe can reject the command before close supplies the process-exit facts.
       // Let close settle that outcome so the manager can confirm it instead of publishing ERROR.
       if (!client.exited && !(error instanceof RpcRequestTimeout)) settleTurn(promptFailureOutcome(error))
@@ -228,9 +262,12 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
       : outcome === undefined
         ? new Promise<RunnerOutcome>((resolve) => outcomeWaiters.push(resolve))
         : Promise.resolve(exitTurnOutcome(outcome, finalText))
-  const control = createTaskParentControl({ width: 80, send: command => client.sendTaskParent(command) })
+  const control = createTaskParentControl({ width: 80, send: (command) => client.sendTaskParent(command) })
   const runPause = createRpcRunPause({
-    taskId, control: () => control, currentOutcome: waitForOutcome, claimNextTurn: claims.claim,
+    taskId,
+    control: () => control,
+    currentOutcome: waitForOutcome,
+    claimNextTurn: claims.claim,
   })
 
   return {
@@ -262,8 +299,15 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     adoptFinishedTurn: async (finalResponse) => {
       if (turnOutcome !== undefined || settlement.pending() !== undefined) return
       const response = await client.send({ type: "get_state" }).catch(() => undefined)
-      if (response === undefined || response.command !== "get_state" || !response.success || !sessionIsIdle(response.data)) return
-      if (turnOutcome === undefined && settlement.pending() === undefined) settleTurn({ status: "completed", finalResponse })
+      if (
+        response === undefined ||
+        response.command !== "get_state" ||
+        !response.success ||
+        !sessionIsIdle(response.data)
+      )
+        return
+      if (turnOutcome === undefined && settlement.pending() === undefined)
+        settleTurn({ status: "completed", finalResponse })
     },
     onSelfResumed: (listener) => {
       resumedListeners.add(listener)
@@ -278,7 +322,8 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     wasAbortedByUser: () => abortedByUser,
     lastSeen: () => lastSeenAt,
     exitOutcome: () => outcome,
-    waitForExit: () => (outcome ? Promise.resolve(outcome) : new Promise<ChildExitOutcome>((resolve) => exitWaiters.push(resolve))),
+    waitForExit: () =>
+      outcome ? Promise.resolve(outcome) : new Promise<ChildExitOutcome>((resolve) => exitWaiters.push(resolve)),
     dispose: async () => {
       inputEffects.stopRetrying()
       tornDown = true

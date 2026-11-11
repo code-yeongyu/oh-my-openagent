@@ -113,9 +113,7 @@ async function userFacingSources(): Promise<readonly string[]> {
   return [...sources].sort()
 }
 
-async function collectViolations(
-  detect: (line: string, file: string) => boolean,
-): Promise<readonly Violation[]> {
+async function collectViolations(detect: (line: string, file: string) => boolean): Promise<readonly Violation[]> {
   const violations: Violation[] = []
   for (const file of await userFacingSources()) {
     const contents = await Bun.file(`${REPO_ROOT}${file}`).text()

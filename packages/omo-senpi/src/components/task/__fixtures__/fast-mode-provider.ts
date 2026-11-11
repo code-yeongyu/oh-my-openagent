@@ -1,5 +1,8 @@
 import type { ExtensionAPI } from "@code-yeongyu/senpi"
-import { assistant, streamMessage } from "../../../../../senpi-task/src/runners/__fixtures__/in-process-fallback-session"
+import {
+  assistant,
+  streamMessage,
+} from "../../../../../senpi-task/src/runners/__fixtures__/in-process-fallback-session"
 
 // A local provider for the real RPC engine: no credentials or network requests.
 export default function fastModeProvider(pi: ExtensionAPI): void {
@@ -15,12 +18,15 @@ export default function fastModeProvider(pi: ExtensionAPI): void {
     }
     return [base, { ...base, id: `${id}-fast`, upstreamModelId: id, serviceTier: "priority" }]
   })
-  Reflect.apply(pi.registerProvider, pi, ["chatgpt-subscription", {
-    api: "openai-codex-responses",
-    apiKey: "synthetic-test-key",
-    models,
-    streamSimple(model: { readonly id: string }) {
-      return streamMessage(assistant(model.id, "stop", "OK", undefined, "chatgpt-subscription"))
+  Reflect.apply(pi.registerProvider, pi, [
+    "chatgpt-subscription",
+    {
+      api: "openai-codex-responses",
+      apiKey: "synthetic-test-key",
+      models,
+      streamSimple(model: { readonly id: string }) {
+        return streamMessage(assistant(model.id, "stop", "OK", undefined, "chatgpt-subscription"))
+      },
     },
-  }])
+  ])
 }

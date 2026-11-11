@@ -8,7 +8,8 @@ const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
 const DIST_PATH = join(SCRIPT_DIR, "..", "dist", "index.js")
 const IMPORT_LINE = 'import { createRequire as __omoCreateRequire } from "node:module";'
 const BUN_REQUIRE_LINE = "var __require = import.meta.require;"
-const NODE_SAFE_REQUIRE_LINE = 'var __require = typeof import.meta.require === "function" ? import.meta.require : __omoCreateRequire(import.meta.url);'
+const NODE_SAFE_REQUIRE_LINE =
+  'var __require = typeof import.meta.require === "function" ? import.meta.require : __omoCreateRequire(import.meta.url);'
 
 const original = readFileSync(DIST_PATH, "utf-8")
 

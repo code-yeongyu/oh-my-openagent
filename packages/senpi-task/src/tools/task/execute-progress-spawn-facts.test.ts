@@ -12,7 +12,14 @@ type Deferred<T> = { readonly promise: Promise<T>; resolve(value: T): void; reje
 function deferred<T>(): Deferred<T> {
   let resolve!: (value: T) => void
   let reject!: (reason: unknown) => void
-  return { promise: new Promise<T>((done, fail) => { resolve = done; reject = fail }), resolve, reject }
+  return {
+    promise: new Promise<T>((done, fail) => {
+      resolve = done
+      reject = fail
+    }),
+    resolve,
+    reject,
+  }
 }
 
 // Bounded wait on a signal: GREEN resolves through the event, RED fails with a named reason.
@@ -21,7 +28,9 @@ function withinBudget<T>(promise: Promise<T>, reason: string, budgetMs = 2_000):
   const deadline = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new Error(reason)), budgetMs)
   })
-  return Promise.race([promise, deadline]).finally(() => { if (timer !== undefined) clearTimeout(timer) })
+  return Promise.race([promise, deadline]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer)
+  })
 }
 
 function latestDetails(updates: readonly AgentToolResult<TaskToolDetails>[]): TaskToolDetails {
@@ -31,14 +40,28 @@ function latestDetails(updates: readonly AgentToolResult<TaskToolDetails>[]): Ta
 }
 
 const TASK_ID = "st_spawn_facts_1"
-const PLANNED: ResolvedModelRecord = { provider: "anthropic", model_id: "claude-plan", display: "anthropic/claude-plan", source: "category" }
+const PLANNED: ResolvedModelRecord = {
+  provider: "anthropic",
+  model_id: "claude-plan",
+  display: "anthropic/claude-plan",
+  source: "category",
+}
 // A start-time chain fallback moved the route (and the epoch) after the start report went out.
-const FALLBACK: ResolvedModelRecord = { provider: "anthropic", model_id: "claude-fallback", display: "anthropic/claude-fallback", source: "category" }
+const FALLBACK: ResolvedModelRecord = {
+  provider: "anthropic",
+  model_id: "claude-fallback",
+  display: "anthropic/claude-fallback",
+  source: "category",
+}
 const EFFECTIVE: EffectiveModelRecord = { ...FALLBACK, source: "fallback" }
 
 type ExecuteParams = Parameters<ReturnType<typeof buildTaskExecute>>[1]
 
-type SpawnFacts = { readonly run_epoch?: number; readonly resolved_model?: ResolvedModelRecord; readonly effective_model?: EffectiveModelRecord }
+type SpawnFacts = {
+  readonly run_epoch?: number
+  readonly resolved_model?: ResolvedModelRecord
+  readonly effective_model?: EffectiveModelRecord
+}
 
 type Row = {
   readonly name: string
@@ -58,22 +81,49 @@ const ROWS: readonly Row[] = [
   {
     name: "a foreground spawn whose launch outlived the start-report window",
     params: { prompt: "inspect", category: "quick" },
-    started: { kind: "started", task_id: TASK_ID, status: "running", name: "child", run_epoch: 1, resolved_model: PLANNED, starting: true },
+    started: {
+      kind: "started",
+      task_id: TASK_ID,
+      status: "running",
+      name: "child",
+      run_epoch: 1,
+      resolved_model: PLANNED,
+      starting: true,
+    },
     facts: singleFacts,
     expected: { run_epoch: 2, resolved_model: FALLBACK, effective_model: EFFECTIVE },
   },
   {
     name: "a foreground spawn queued for a slot and launched later",
     params: { prompt: "inspect", category: "quick" },
-    started: { kind: "started", task_id: TASK_ID, status: "pending", name: "child", run_epoch: 1, resolved_model: PLANNED, queue_position: 1 },
+    started: {
+      kind: "started",
+      task_id: TASK_ID,
+      status: "pending",
+      name: "child",
+      run_epoch: 1,
+      resolved_model: PLANNED,
+      queue_position: 1,
+    },
     facts: singleFacts,
     expected: { run_epoch: 2, resolved_model: FALLBACK, effective_model: EFFECTIVE },
   },
   {
     name: "a foreground batch item whose launch outlived the start-report window",
     params: { category: "quick", tasks: [{ prompt: "inspect" }, { prompt: "review" }] },
-    started: { kind: "started", task_id: TASK_ID, status: "running", name: "child", run_epoch: 1, resolved_model: PLANNED, starting: true },
-    facts: (details) => ({ run_epoch: details.items?.[0]?.run_epoch, resolved_model: details.items?.[0]?.resolved_model }),
+    started: {
+      kind: "started",
+      task_id: TASK_ID,
+      status: "running",
+      name: "child",
+      run_epoch: 1,
+      resolved_model: PLANNED,
+      starting: true,
+    },
+    facts: (details) => ({
+      run_epoch: details.items?.[0]?.run_epoch,
+      resolved_model: details.items?.[0]?.resolved_model,
+    }),
     expected: { run_epoch: 2, resolved_model: FALLBACK },
   },
 ]
@@ -93,7 +143,7 @@ describe("progress partials carry the spawn facts once the launch settles, howev
       const manager = createFakeManager({
         start: async () => ({ ...row.started, task_id: taskIds[starts++] ?? "st_spawn_facts_extra" }),
         whenLaunched: () => launch.promise,
-        get: (taskId) => taskId === TASK_ID ? current : undefined,
+        get: (taskId) => (taskId === TASK_ID ? current : undefined),
         subscribeChild: (_taskId, next) => {
           listener = next
           subscribed.resolve()
@@ -103,10 +153,16 @@ describe("progress partials carry the spawn facts once the launch settles, howev
       })
       const updates: AgentToolResult<TaskToolDetails>[] = []
       const published = deferred<void>()
-      const execution = buildTaskExecute(makeDeps(manager))("spawn-facts", row.params, undefined, (update) => {
-        updates.push(update)
-        if (row.facts(update.details).run_epoch === row.expected.run_epoch) published.resolve()
-      }, CTX)
+      const execution = buildTaskExecute(makeDeps(manager))(
+        "spawn-facts",
+        row.params,
+        undefined,
+        (update) => {
+          updates.push(update)
+          if (row.facts(update.details).run_epoch === row.expected.run_epoch) published.resolve()
+        },
+        CTX,
+      )
       try {
         await withinBudget(subscribed.promise, "the foreground spawn never subscribed to its child")
         // A child may publish progress before runner.start has returned its model facts.
@@ -118,7 +174,12 @@ describe("progress partials carry the spawn facts once the launch settles, howev
         }
 
         // when: the launch settles after the start report went out
-        current = { ...current, notification: { ...current.notification, run_epoch: 2 }, resolved_model: FALLBACK, effective_model: EFFECTIVE }
+        current = {
+          ...current,
+          notification: { ...current.notification, run_epoch: 2 },
+          resolved_model: FALLBACK,
+          effective_model: EFFECTIVE,
+        }
         launch.resolve()
         if (row.started.kind === "started" && row.started.starting === true) {
           await withinBudget(published.promise, "no partial carried the launched spawn facts after the launch settled")
@@ -153,15 +214,25 @@ describe("a rejected launch releases the held progress partials", () => {
       const subscribed = deferred<void>()
       const published = deferred<void>()
       const escaped: unknown[] = []
-      const onUnhandled = (reason: unknown): void => { escaped.push(reason) }
+      const onUnhandled = (reason: unknown): void => {
+        escaped.push(reason)
+      }
       process.on("unhandledRejection", onUnhandled)
       let listener: ManagedChildListener | undefined
       const taskIds = [TASK_ID, "st_spawn_facts_2"]
       let starts = 0
       const manager = createFakeManager({
-        start: async () => ({ kind: "started", task_id: taskIds[starts++] ?? "st_spawn_facts_extra", status: "running", name: "child", run_epoch: 1, resolved_model: PLANNED, starting: true }),
+        start: async () => ({
+          kind: "started",
+          task_id: taskIds[starts++] ?? "st_spawn_facts_extra",
+          status: "running",
+          name: "child",
+          run_epoch: 1,
+          resolved_model: PLANNED,
+          starting: true,
+        }),
         whenLaunched: () => launch.promise,
-        get: (taskId) => taskId === TASK_ID ? record : undefined,
+        get: (taskId) => (taskId === TASK_ID ? record : undefined),
         subscribeChild: (_taskId, next) => {
           listener = next
           subscribed.resolve()
@@ -170,10 +241,16 @@ describe("a rejected launch releases the held progress partials", () => {
         waitFor: () => completion.promise,
       })
       const updates: AgentToolResult<TaskToolDetails>[] = []
-      const execution = buildTaskExecute(makeDeps(manager))("spawn-facts-rejected", row.params, undefined, (update) => {
-        updates.push(update)
-        published.resolve()
-      }, CTX)
+      const execution = buildTaskExecute(makeDeps(manager))(
+        "spawn-facts-rejected",
+        row.params,
+        undefined,
+        (update) => {
+          updates.push(update)
+          published.resolve()
+        },
+        CTX,
+      )
       try {
         await withinBudget(subscribed.promise, "the foreground spawn never subscribed to its child")
         listener?.({ type: "tool_execution_start", toolName: "read", args: { path: "src/early.ts" } })

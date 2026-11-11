@@ -1,4 +1,4 @@
-declare const RELAY_TRANSPORT_ERROR_CODES: readonly ["not_connected", "server_proof_invalid", "insecure_state_dir", "refused", "request_timeout", "closed", "unsupported", "result_expired"];
+declare const RELAY_TRANSPORT_ERROR_CODES: readonly ["invalid_client_name", "not_connected", "server_proof_invalid", "insecure_state_dir", "refused", "request_timeout", "closed", "unsupported", "result_expired"];
 export type RelayTransportErrorCode = (typeof RELAY_TRANSPORT_ERROR_CODES)[number];
 export declare class RelayTransportError extends Error {
     readonly code: RelayTransportErrorCode;

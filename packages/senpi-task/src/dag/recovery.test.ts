@@ -59,7 +59,10 @@ function definition(nodes: DagDefinition["nodes"]): DagDefinition {
 function recoverableRecord(
   input: DagDefinition,
   states: Readonly<Record<string, Partial<DagNode>>>,
-  overrides: Partial<DagRunRecordV1> & { readonly leaseHolderPid?: number; readonly previousLeaseHolderPid?: number } = {},
+  overrides: Partial<DagRunRecordV1> & {
+    readonly leaseHolderPid?: number
+    readonly previousLeaseHolderPid?: number
+  } = {},
 ): DagRunRecordV1 {
   const createdAt = "2026-08-14T00:00:00.000Z"
   const compiled = compileDag(input, { at: createdAt })
@@ -158,7 +161,13 @@ class RecoveryTaskManager implements TaskManager {
     // a different fingerprint replaces only a terminal owner, never a live one.
     if (existing !== undefined) {
       if (existing.owner?.fingerprint === owner.fingerprint) {
-        return { kind: "started", reused: true, task_id: existing.task_id, status: existing.status, name: existing.name ?? existing.task_id }
+        return {
+          kind: "started",
+          reused: true,
+          task_id: existing.task_id,
+          status: existing.status,
+          name: existing.name ?? existing.task_id,
+        }
       }
       if (!TERMINAL_TASK_STATUSES.has(existing.status)) {
         return {
@@ -172,12 +181,19 @@ class RecoveryTaskManager implements TaskManager {
     const record = taskRecord(owner, "running")
     this.add(record)
     if (this.#autoCompleteStarts) queueMicrotask(() => this.complete(record.task_id))
-    return { kind: "started", reused: false, task_id: record.task_id, status: "running", name: record.name ?? record.task_id }
+    return {
+      kind: "started",
+      reused: false,
+      task_id: record.task_id,
+      status: "running",
+      name: record.name ?? record.task_id,
+    }
   }
 
   findOwnedTask(owner: Pick<DagTaskOwner, "kind" | "runId" | "nodeId">): TaskRecord | undefined {
-    return [...this.#tasks.values()].findLast(({ record }) =>
-      record.owner?.kind === owner.kind && record.owner.runId === owner.runId && record.owner.nodeId === owner.nodeId,
+    return [...this.#tasks.values()].findLast(
+      ({ record }) =>
+        record.owner?.kind === owner.kind && record.owner.runId === owner.runId && record.owner.nodeId === owner.nodeId,
     )?.record
   }
 
@@ -192,12 +208,24 @@ class RecoveryTaskManager implements TaskManager {
     return task.completion.promise
   }
 
-  start(): Promise<never> { throw new Error("not implemented") }
-  continueTask(): Promise<never> { throw new Error("not implemented") }
-  sendToTask(): Promise<never> { throw new Error("not implemented") }
-  interruptTask(): Promise<never> { throw new Error("not implemented") }
-  cancelTask(): Promise<never> { throw new Error("not implemented") }
-  list(): readonly [] { return [] }
+  start(): Promise<never> {
+    throw new Error("not implemented")
+  }
+  continueTask(): Promise<never> {
+    throw new Error("not implemented")
+  }
+  sendToTask(): Promise<never> {
+    throw new Error("not implemented")
+  }
+  interruptTask(): Promise<never> {
+    throw new Error("not implemented")
+  }
+  cancelTask(): Promise<never> {
+    throw new Error("not implemented")
+  }
+  list(): readonly [] {
+    return []
+  }
   forget(_taskId: string, _options: Parameters<TaskManager["forget"]>[1]): void {}
   // The real manager settles `waitFor` only for a child it holds resident, so this fake answers
   // "held" from the same map its completions come from: a task it can still complete is held here.
@@ -206,11 +234,21 @@ class RecoveryTaskManager implements TaskManager {
     if (record === undefined || TERMINAL_TASK_STATUSES.has(record.status)) return undefined
     return makeHandle(taskId).handle
   }
-  subscribeChild(): () => void { return () => undefined }
-  residentTaskIds(): readonly string[] { return [] }
-  residencyChanged(): Promise<void> { return new Promise<void>(() => undefined) }
-  promoteToBackground(): boolean { return false }
-  wasBackground(): boolean { return true }
+  subscribeChild(): () => void {
+    return () => undefined
+  }
+  residentTaskIds(): readonly string[] {
+    return []
+  }
+  residencyChanged(): Promise<void> {
+    return new Promise<void>(() => undefined)
+  }
+  promoteToBackground(): boolean {
+    return false
+  }
+  wasBackground(): boolean {
+    return true
+  }
 }
 
 function owner(nodeId: string, execAttempt?: number): DagTaskOwner {
@@ -218,11 +256,13 @@ function owner(nodeId: string, execAttempt?: number): DagTaskOwner {
     kind: "dag",
     runId,
     nodeId: nodeId as DagNodeId,
-    fingerprint: dagFingerprint(ownerFingerprintInput({
-      definitionFingerprint: "definition-fingerprint",
-      nodeId: nodeId as DagNodeId,
-      ...(execAttempt === undefined ? {} : { execAttempt }),
-    })),
+    fingerprint: dagFingerprint(
+      ownerFingerprintInput({
+        definitionFingerprint: "definition-fingerprint",
+        nodeId: nodeId as DagNodeId,
+        ...(execAttempt === undefined ? {} : { execAttempt }),
+      }),
+    ),
   }
 }
 
@@ -231,37 +271,44 @@ function events(store: DagFileStore): readonly DagRunEvent[] {
 }
 
 describe("RecoveryTaskManager owner identity", () => {
-  test.each(["pending", "running", "completed", "error", "cancelled", "interrupted", "lost"] as const)("#given an owned %s record #when startOwned compares fingerprints #then it reuses identical owners and replaces only settled differing owners", async (status) => {
-    const manager = new RecoveryTaskManager({ autoCompleteStarts: false })
-    const priorOwner = owner("owned")
-    manager.add(taskRecord(priorOwner, status, "task-owned-prev"))
-    const spec: ManagerStartSpec = { prompt: "do owned", parent_session_id: parentSessionId, depth: 1 }
+  test.each(["pending", "running", "completed", "error", "cancelled", "interrupted", "lost"] as const)(
+    "#given an owned %s record #when startOwned compares fingerprints #then it reuses identical owners and replaces only settled differing owners",
+    async (status) => {
+      const manager = new RecoveryTaskManager({ autoCompleteStarts: false })
+      const priorOwner = owner("owned")
+      manager.add(taskRecord(priorOwner, status, "task-owned-prev"))
+      const spec: ManagerStartSpec = { prompt: "do owned", parent_session_id: parentSessionId, depth: 1 }
 
-    const same = await manager.startOwned(spec, priorOwner)
-    expect(same).toMatchObject({ kind: "started", reused: true, task_id: "task-owned-prev", status })
+      const same = await manager.startOwned(spec, priorOwner)
+      expect(same).toMatchObject({ kind: "started", reused: true, task_id: "task-owned-prev", status })
 
-    const nextOwner = owner("owned", 1)
-    const different = await manager.startOwned(spec, nextOwner)
-    if (status === "pending" || status === "running") {
-      expect(different).toEqual({
-        kind: "owner_conflict",
-        task_id: "task-owned-prev",
-        existing_fingerprint: priorOwner.fingerprint,
-        requested_fingerprint: nextOwner.fingerprint,
-      })
-    } else {
-      expect(different).toMatchObject({ kind: "started", reused: false, task_id: "task-owned", status: "running" })
-      expect(manager.findOwnedTask(nextOwner)?.owner?.fingerprint).toBe(nextOwner.fingerprint)
-    }
-  })
+      const nextOwner = owner("owned", 1)
+      const different = await manager.startOwned(spec, nextOwner)
+      if (status === "pending" || status === "running") {
+        expect(different).toEqual({
+          kind: "owner_conflict",
+          task_id: "task-owned-prev",
+          existing_fingerprint: priorOwner.fingerprint,
+          requested_fingerprint: nextOwner.fingerprint,
+        })
+      } else {
+        expect(different).toMatchObject({ kind: "started", reused: false, task_id: "task-owned", status: "running" })
+        expect(manager.findOwnedTask(nextOwner)?.owner?.fingerprint).toBe(nextOwner.fingerprint)
+      }
+    },
+  )
 })
 
 describe("DAG crash recovery", () => {
   test("#given a paused graph with live work #when Resume installs it #then installation returns before graph settlement", async () => {
     const store = createDagFileStore({ project_dir: tempProject() })
-    const checkpoint = recoverableRecord(definition([node("only")]), {
-      only: { state: "paused", taskId: "held-child", attempt: 1 },
-    }, { pause: { reason: "user_stop", pauseSeq: 2 } })
+    const checkpoint = recoverableRecord(
+      definition([node("only")]),
+      {
+        only: { state: "paused", taskId: "held-child", attempt: 1 },
+      },
+      { pause: { reason: "user_stop", pauseSeq: 2 } },
+    )
     store.writeCheckpoint(runId, checkpoint)
     const manager = new RecoveryTaskManager()
     manager.add(taskRecord(owner("only"), "running", "held-child"))
@@ -277,9 +324,13 @@ describe("DAG crash recovery", () => {
 
   test("#given a user-stop checkpoint #when session recovery runs #then it does not claim or restart the graph", async () => {
     const store = createDagFileStore({ project_dir: tempProject() })
-    const checkpoint = recoverableRecord(definition([node("only")]), {
-      only: { state: "paused", taskId: "held-child" },
-    }, { pause: { reason: "user_stop", pauseSeq: 2 } })
+    const checkpoint = recoverableRecord(
+      definition([node("only")]),
+      {
+        only: { state: "paused", taskId: "held-child" },
+      },
+      { pause: { reason: "user_stop", pauseSeq: 2 } },
+    )
     store.writeCheckpoint(runId, checkpoint)
     const recovery = createDagRecovery({ store, taskManager: new RecoveryTaskManager(), hostPid: 101 })
     expect(await recovery.resumePausedRuns(parentSessionId)).toEqual([])
@@ -292,11 +343,15 @@ describe("DAG crash recovery", () => {
     const store = createDagFileStore({ project_dir: projectDir })
     const manager = new RecoveryTaskManager()
     const input = definition([node("done"), node("running"), node("next", ["done", "running"])])
-    const record = recoverableRecord(input, {
-      done: { state: "completed", taskId: "task-done", attempt: 1 },
-      running: { state: "running", taskId: "task-running", attempt: 1 },
-      next: { state: "blocked" },
-    }, { previousLeaseHolderPid: 9001 })
+    const record = recoverableRecord(
+      input,
+      {
+        done: { state: "completed", taskId: "task-done", attempt: 1 },
+        running: { state: "running", taskId: "task-running", attempt: 1 },
+        next: { state: "blocked" },
+      },
+      { previousLeaseHolderPid: 9001 },
+    )
     store.writeCheckpoint(runId, record)
     store.writeResult(runId, "done", "durable done output")
     manager.add(taskRecord(owner("running"), "running", "task-running"))
@@ -323,8 +378,11 @@ describe("DAG crash recovery", () => {
     expect(manager.startOwnedCalls).not.toContain("running")
     expect(manager.waitForCalls).toContain("task-running")
     expect(reattached).toContain("task-running")
-    expect(outcomes[0]?.record?.nodes.map((entry) => `${entry.id}:${entry.state}`))
-      .toEqual(["done:completed", "running:completed", "next:completed"])
+    expect(outcomes[0]?.record?.nodes.map((entry) => `${entry.id}:${entry.state}`)).toEqual([
+      "done:completed",
+      "running:completed",
+      "next:completed",
+    ])
     expect(events(store).some((event) => event.type === "dag.node.reused" && event.nodeId === "done")).toBe(true)
     expect(events(store).some((event) => event.type === "dag.run.resumed")).toBe(true)
   })
@@ -333,13 +391,23 @@ describe("DAG crash recovery", () => {
     // given - the default probe is the lifecycle port's signal-0 existence check, so THIS pid reads alive
     const projectDir = tempProject()
     const store = createDagFileStore({ project_dir: projectDir })
-    store.writeCheckpoint(runId, recoverableRecord(definition([node("only")]), {
-      only: { state: "scheduled" },
-    }, { previousLeaseHolderPid: process.pid }))
+    store.writeCheckpoint(
+      runId,
+      recoverableRecord(
+        definition([node("only")]),
+        {
+          only: { state: "scheduled" },
+        },
+        { previousLeaseHolderPid: process.pid },
+      ),
+    )
 
     // when
-    const outcomes = await createDagRecovery({ store, taskManager: new RecoveryTaskManager(), hostPid: 101 })
-      .resumePausedRuns(parentSessionId)
+    const outcomes = await createDagRecovery({
+      store,
+      taskManager: new RecoveryTaskManager(),
+      hostPid: 101,
+    }).resumePausedRuns(parentSessionId)
 
     // then - the live holder is reported so the caller can wait for that pid to exit and retry
     expect(outcomes).toEqual([{ runId, kind: "skipped", reason: "live_lease", holderPid: process.pid }])
@@ -350,13 +418,21 @@ describe("DAG crash recovery", () => {
     const projectDir = tempProject()
     const store = createDagFileStore({ project_dir: projectDir })
     const manager = new RecoveryTaskManager()
-    store.writeCheckpoint(runId, recoverableRecord(definition([node("only")]), {
-      only: { state: "scheduled" },
-    }, { previousLeaseHolderPid: 2_147_483_647 }))
+    store.writeCheckpoint(
+      runId,
+      recoverableRecord(
+        definition([node("only")]),
+        {
+          only: { state: "scheduled" },
+        },
+        { previousLeaseHolderPid: 2_147_483_647 },
+      ),
+    )
 
     // when
-    const [outcome] = await createDagRecovery({ store, taskManager: manager, hostPid: 101 })
-      .resumePausedRuns(parentSessionId)
+    const [outcome] = await createDagRecovery({ store, taskManager: manager, hostPid: 101 }).resumePausedRuns(
+      parentSessionId,
+    )
 
     // then
     expect(outcome?.kind).toBe("resumed")
@@ -368,13 +444,24 @@ describe("DAG crash recovery", () => {
     // claim must be decided by identity, not liveness (#8006 saved-session reopen in one host process)
     const store = createDagFileStore({ project_dir: tempProject() })
     const manager = new RecoveryTaskManager()
-    store.writeCheckpoint(runId, recoverableRecord(definition([node("only")]), {
-      only: { state: "scheduled" },
-    }, { previousLeaseHolderPid: 101 }))
+    store.writeCheckpoint(
+      runId,
+      recoverableRecord(
+        definition([node("only")]),
+        {
+          only: { state: "scheduled" },
+        },
+        { previousLeaseHolderPid: 101 },
+      ),
+    )
 
     // when
-    const outcomes = await createDagRecovery({ store, taskManager: manager, hostPid: 101, isProcessAlive: () => true })
-      .resumePausedRuns(parentSessionId)
+    const outcomes = await createDagRecovery({
+      store,
+      taskManager: manager,
+      hostPid: 101,
+      isProcessAlive: () => true,
+    }).resumePausedRuns(parentSessionId)
 
     // then
     expect(outcomes).toHaveLength(1)
@@ -391,9 +478,16 @@ describe("DAG crash recovery", () => {
     // process, and a recovery-built second scheduler would fold the same children twice
     const store = createDagFileStore({ project_dir: tempProject() })
     const manager = new RecoveryTaskManager()
-    store.writeCheckpoint(runId, recoverableRecord(definition([node("only")]), {
-      only: { state: "scheduled" },
-    }, { previousLeaseHolderPid: 101 }))
+    store.writeCheckpoint(
+      runId,
+      recoverableRecord(
+        definition([node("only")]),
+        {
+          only: { state: "scheduled" },
+        },
+        { previousLeaseHolderPid: 101 },
+      ),
+    )
 
     // when
     const outcomes = await createDagRecovery({
@@ -416,20 +510,33 @@ describe("DAG crash recovery", () => {
     const projectDir = tempProject()
     const store = createDagFileStore({ project_dir: projectDir })
     const manager = new RecoveryTaskManager()
-    store.writeCheckpoint(runId, recoverableRecord(definition([node("owned"), node("fresh")]), {
-      owned: { state: "scheduled" },
-      fresh: { state: "scheduled" },
-    }, { previousLeaseHolderPid: 9001 }))
+    store.writeCheckpoint(
+      runId,
+      recoverableRecord(
+        definition([node("owned"), node("fresh")]),
+        {
+          owned: { state: "scheduled" },
+          fresh: { state: "scheduled" },
+        },
+        { previousLeaseHolderPid: 9001 },
+      ),
+    )
     manager.add(taskRecord(owner("owned"), "completed", "task-owned"))
 
     // when
-    const [outcome] = await createDagRecovery({ store, taskManager: manager, hostPid: 101, isProcessAlive: () => false })
-      .resumePausedRuns(parentSessionId)
+    const [outcome] = await createDagRecovery({
+      store,
+      taskManager: manager,
+      hostPid: 101,
+      isProcessAlive: () => false,
+    }).resumePausedRuns(parentSessionId)
 
     // then
     expect(manager.startOwnedCalls).toEqual(["fresh"])
-    expect(outcome?.record?.nodes.map((entry) => `${entry.id}:${entry.taskId}:${entry.state}`))
-      .toEqual(["owned:task-owned:completed", "fresh:task-fresh:completed"])
+    expect(outcome?.record?.nodes.map((entry) => `${entry.id}:${entry.taskId}:${entry.state}`)).toEqual([
+      "owned:task-owned:completed",
+      "fresh:task-fresh:completed",
+    ])
   })
 
   test("#given an attached node whose task, owner, result, and transcript vanished #when resumed #then it fails closed without dispatch", async () => {
@@ -437,13 +544,24 @@ describe("DAG crash recovery", () => {
     const projectDir = tempProject()
     const store = createDagFileStore({ project_dir: projectDir })
     const manager = new RecoveryTaskManager()
-    store.writeCheckpoint(runId, recoverableRecord(definition([node("uncertain")]), {
-      uncertain: { state: "running", taskId: "task-missing", attempt: 1 },
-    }, { previousLeaseHolderPid: 9001 }))
+    store.writeCheckpoint(
+      runId,
+      recoverableRecord(
+        definition([node("uncertain")]),
+        {
+          uncertain: { state: "running", taskId: "task-missing", attempt: 1 },
+        },
+        { previousLeaseHolderPid: 9001 },
+      ),
+    )
 
     // when
-    const [outcome] = await createDagRecovery({ store, taskManager: manager, hostPid: 101, isProcessAlive: () => false })
-      .resumePausedRuns(parentSessionId)
+    const [outcome] = await createDagRecovery({
+      store,
+      taskManager: manager,
+      hostPid: 101,
+      isProcessAlive: () => false,
+    }).resumePausedRuns(parentSessionId)
 
     // then
     expect(outcome?.record?.nodes[0]?.state).toBe("failed")
@@ -456,14 +574,25 @@ describe("DAG crash recovery", () => {
     const projectDir = tempProject()
     const store = createDagFileStore({ project_dir: projectDir })
     const manager = new RecoveryTaskManager()
-    store.writeCheckpoint(runId, recoverableRecord(definition([node("lost")]), {
-      lost: { state: "running", taskId: "task-lost", attempt: 1 },
-    }, { previousLeaseHolderPid: 9001 }))
+    store.writeCheckpoint(
+      runId,
+      recoverableRecord(
+        definition([node("lost")]),
+        {
+          lost: { state: "running", taskId: "task-lost", attempt: 1 },
+        },
+        { previousLeaseHolderPid: 9001 },
+      ),
+    )
     manager.add(taskRecord(owner("lost"), "lost", "task-lost"))
 
     // when
-    const [outcome] = await createDagRecovery({ store, taskManager: manager, hostPid: 101, isProcessAlive: () => false })
-      .resumePausedRuns(parentSessionId)
+    const [outcome] = await createDagRecovery({
+      store,
+      taskManager: manager,
+      hostPid: 101,
+      isProcessAlive: () => false,
+    }).resumePausedRuns(parentSessionId)
 
     // then
     expect(outcome?.record?.nodes[0]?.state).toBe("failed")
@@ -471,48 +600,82 @@ describe("DAG crash recovery", () => {
     expect(manager.startOwnedCalls).toEqual([])
   })
 
-  test.each([undefined, 1])("#given a never-started lost child at execAttempt %s #when its paused DAG resumes #then a new owner fingerprint dispatches a fresh attempt", async (execAttempt) => {
-    // given - the lost record has no task-level launch stamp. Its persisted owner identity
-    // must match the checkpoint's execAttempt so forgetting the bump would reuse the lost task.
-    const projectDir = tempProject()
-    const store = createDagFileStore({ project_dir: projectDir })
-    const manager = new RecoveryTaskManager()
-    store.writeCheckpoint(runId, recoverableRecord(definition([node("queued")]), {
-      queued: { state: "scheduled", taskId: "task-queued-prev", attempt: 1, ...(execAttempt === undefined ? {} : { execAttempt }) },
-    }, { previousLeaseHolderPid: 9001 }))
-    const priorOwner = owner("queued", execAttempt)
-    const lost = taskRecord(priorOwner, "lost", "task-queued-prev")
-    expect(lost).not.toHaveProperty("started_at")
-    manager.add(lost)
+  test.each([undefined, 1])(
+    "#given a never-started lost child at execAttempt %s #when its paused DAG resumes #then a new owner fingerprint dispatches a fresh attempt",
+    async (execAttempt) => {
+      // given - the lost record has no task-level launch stamp. Its persisted owner identity
+      // must match the checkpoint's execAttempt so forgetting the bump would reuse the lost task.
+      const projectDir = tempProject()
+      const store = createDagFileStore({ project_dir: projectDir })
+      const manager = new RecoveryTaskManager()
+      store.writeCheckpoint(
+        runId,
+        recoverableRecord(
+          definition([node("queued")]),
+          {
+            queued: {
+              state: "scheduled",
+              taskId: "task-queued-prev",
+              attempt: 1,
+              ...(execAttempt === undefined ? {} : { execAttempt }),
+            },
+          },
+          { previousLeaseHolderPid: 9001 },
+        ),
+      )
+      const priorOwner = owner("queued", execAttempt)
+      const lost = taskRecord(priorOwner, "lost", "task-queued-prev")
+      expect(lost).not.toHaveProperty("started_at")
+      manager.add(lost)
 
-    // when
-    const [outcome] = await createDagRecovery({ store, taskManager: manager, hostPid: 101, isProcessAlive: () => false })
-      .resumePausedRuns(parentSessionId)
+      // when
+      const [outcome] = await createDagRecovery({
+        store,
+        taskManager: manager,
+        hostPid: 101,
+        isProcessAlive: () => false,
+      }).resumePausedRuns(parentSessionId)
 
-    // then - the never-started node is dispatched as attempt 2 instead of failing the run
-    expect(outcome?.kind).toBe("resumed")
-    expect(outcome?.record?.status).toBe("completed")
-    expect(outcome?.record?.nodes[0]).toMatchObject({ state: "completed", taskId: "task-queued", attempt: 2 })
-    expect(manager.startOwnedCalls).toEqual(["queued"])
-    expect(manager.ownerFingerprints).toEqual([owner("queued", (execAttempt ?? 0) + 1).fingerprint])
-    expect(manager.ownerFingerprints[0]).not.toBe(priorOwner.fingerprint)
-    expect(manager.findOwnedTask(priorOwner)?.task_id).toBe("task-queued")
-    expect(events(store).some((event) => event.type === "dag.node.retried" &&
-      event.nodeId === "queued" &&
-      event.priorTaskId === "task-queued-prev" &&
-      event.execAttempt === (execAttempt ?? 0) + 1)).toBe(true)
-  })
+      // then - the never-started node is dispatched as attempt 2 instead of failing the run
+      expect(outcome?.kind).toBe("resumed")
+      expect(outcome?.record?.status).toBe("completed")
+      expect(outcome?.record?.nodes[0]).toMatchObject({ state: "completed", taskId: "task-queued", attempt: 2 })
+      expect(manager.startOwnedCalls).toEqual(["queued"])
+      expect(manager.ownerFingerprints).toEqual([owner("queued", (execAttempt ?? 0) + 1).fingerprint])
+      expect(manager.ownerFingerprints[0]).not.toBe(priorOwner.fingerprint)
+      expect(manager.findOwnedTask(priorOwner)?.task_id).toBe("task-queued")
+      expect(
+        events(store).some(
+          (event) =>
+            event.type === "dag.node.retried" &&
+            event.nodeId === "queued" &&
+            event.priorTaskId === "task-queued-prev" &&
+            event.execAttempt === (execAttempt ?? 0) + 1,
+        ),
+      ).toBe(true)
+    },
+  )
 
   test("#given a paused run with one in-flight and one queued node lost by the dead process #when resumed #then only the in-flight node fails task_lost and the queued node runs fresh", async () => {
     // given
     const projectDir = tempProject()
     const store = createDagFileStore({ project_dir: projectDir })
     const manager = new RecoveryTaskManager()
-    store.writeCheckpoint(runId, recoverableRecord(definition([node("inflight"), node("queued")]), {
-      inflight: { state: "running", taskId: "task-inflight", attempt: 1 },
-      queued: { state: "scheduled", taskId: "task-queued-prev", attempt: 1 },
-    }, { previousLeaseHolderPid: 9001 }))
-    const inflight = { ...taskRecord(owner("inflight"), "lost", "task-inflight"), started_at: "2026-08-14T00:00:01.000Z" }
+    store.writeCheckpoint(
+      runId,
+      recoverableRecord(
+        definition([node("inflight"), node("queued")]),
+        {
+          inflight: { state: "running", taskId: "task-inflight", attempt: 1 },
+          queued: { state: "scheduled", taskId: "task-queued-prev", attempt: 1 },
+        },
+        { previousLeaseHolderPid: 9001 },
+      ),
+    )
+    const inflight = {
+      ...taskRecord(owner("inflight"), "lost", "task-inflight"),
+      started_at: "2026-08-14T00:00:01.000Z",
+    }
     manager.add(inflight)
     const priorOwner = owner("queued")
     const queued = taskRecord(priorOwner, "lost", "task-queued-prev")
@@ -520,8 +683,12 @@ describe("DAG crash recovery", () => {
     manager.add(queued)
 
     // when
-    const [outcome] = await createDagRecovery({ store, taskManager: manager, hostPid: 101, isProcessAlive: () => false })
-      .resumePausedRuns(parentSessionId)
+    const [outcome] = await createDagRecovery({
+      store,
+      taskManager: manager,
+      hostPid: 101,
+      isProcessAlive: () => false,
+    }).resumePausedRuns(parentSessionId)
 
     // then - the run fails solely through the genuinely in-flight node; the queued node completes
     expect(outcome?.kind).toBe("resumed")
@@ -540,9 +707,16 @@ describe("DAG crash recovery", () => {
     // scheduler's whole admission batch settled and attached the running task to its node.
     const store = createDagFileStore({ project_dir: tempProject() })
     const manager = new RecoveryTaskManager()
-    store.writeCheckpoint(runId, recoverableRecord(definition([node("launched")]), {
-      launched: { state: "scheduled", attempt: 0 },
-    }, { previousLeaseHolderPid: 9001 }))
+    store.writeCheckpoint(
+      runId,
+      recoverableRecord(
+        definition([node("launched")]),
+        {
+          launched: { state: "scheduled", attempt: 0 },
+        },
+        { previousLeaseHolderPid: 9001 },
+      ),
+    )
     const lost = {
       ...taskRecord(owner("launched"), "lost", "task-launched"),
       started_at: "2026-08-14T00:00:01.000Z",
@@ -552,12 +726,20 @@ describe("DAG crash recovery", () => {
     manager.add(lost)
 
     // when
-    const [outcome] = await createDagRecovery({ store, taskManager: manager, hostPid: 101, isProcessAlive: () => false })
-      .resumePausedRuns(parentSessionId)
+    const [outcome] = await createDagRecovery({
+      store,
+      taskManager: manager,
+      hostPid: 101,
+      isProcessAlive: () => false,
+    }).resumePausedRuns(parentSessionId)
 
     // then
     expect(outcome?.record?.status).toBe("failed")
-    expect(outcome?.record?.nodes[0]).toMatchObject({ state: "failed", taskId: "task-launched", error: { code: "task_lost" } })
+    expect(outcome?.record?.nodes[0]).toMatchObject({
+      state: "failed",
+      taskId: "task-launched",
+      error: { code: "task_lost" },
+    })
     expect(manager.startOwnedCalls).toEqual([])
     expect(events(store).some((event) => event.type === "dag.node.retried")).toBe(false)
   })
@@ -566,129 +748,223 @@ describe("DAG crash recovery", () => {
     { status: "lost", launched: true },
     { status: "completed", launched: true },
     { status: "lost", launched: false },
-  ] as const)("#given a retained prior-attempt taskId and a newer %o owner #when resumed #then recovery uses the selected owner's outcome and retry identity", async ({ status, launched }) => {
-    // given - retried kept the old taskId until the replacement's admission batch attaches it.
-    const store = createDagFileStore({ project_dir: tempProject() })
-    const manager = new RecoveryTaskManager()
-    store.writeCheckpoint(runId, recoverableRecord(definition([node("replacement")]), {
-      replacement: { state: "scheduled", taskId: "task-old", attempt: 1, execAttempt: 1 },
-    }, { previousLeaseHolderPid: 9001 }))
-    manager.add(taskRecord(owner("replacement"), "lost", "task-old"))
-    const replacement = {
-      ...taskRecord(owner("replacement", 1), status, "task-new"),
-      created_at: "2026-08-14T00:00:02.000Z",
-      ...(launched ? { started_at: "2026-08-14T00:00:03.000Z" } : {}),
-    }
-    manager.add(replacement)
-    expect(manager.findOwnedTask(owner("replacement", 1))).toEqual(replacement)
+  ] as const)(
+    "#given a retained prior-attempt taskId and a newer %o owner #when resumed #then recovery uses the selected owner's outcome and retry identity",
+    async ({ status, launched }) => {
+      // given - retried kept the old taskId until the replacement's admission batch attaches it.
+      const store = createDagFileStore({ project_dir: tempProject() })
+      const manager = new RecoveryTaskManager()
+      store.writeCheckpoint(
+        runId,
+        recoverableRecord(
+          definition([node("replacement")]),
+          {
+            replacement: { state: "scheduled", taskId: "task-old", attempt: 1, execAttempt: 1 },
+          },
+          { previousLeaseHolderPid: 9001 },
+        ),
+      )
+      manager.add(taskRecord(owner("replacement"), "lost", "task-old"))
+      const replacement = {
+        ...taskRecord(owner("replacement", 1), status, "task-new"),
+        created_at: "2026-08-14T00:00:02.000Z",
+        ...(launched ? { started_at: "2026-08-14T00:00:03.000Z" } : {}),
+      }
+      manager.add(replacement)
+      expect(manager.findOwnedTask(owner("replacement", 1))).toEqual(replacement)
 
-    // when
-    const [outcome] = await createDagRecovery({ store, taskManager: manager, hostPid: 101, isProcessAlive: () => false })
-      .resumePausedRuns(parentSessionId)
+      // when
+      const [outcome] = await createDagRecovery({
+        store,
+        taskManager: manager,
+        hostPid: 101,
+        isProcessAlive: () => false,
+      }).resumePausedRuns(parentSessionId)
 
-    // then
-    if (launched) {
+      // then
+      if (launched) {
+        expect(outcome?.record?.nodes[0]).toMatchObject({
+          state: status === "lost" ? "failed" : "completed",
+          taskId: "task-new",
+          execAttempt: 1,
+          ...(status === "lost" ? { error: { code: "task_lost" } } : {}),
+        })
+        expect(manager.startOwnedCalls).toEqual([])
+        expect(events(store).some((event) => event.type === "dag.node.retried")).toBe(false)
+      } else {
+        expect(outcome?.record?.nodes[0]).toMatchObject({
+          state: "completed",
+          taskId: "task-replacement",
+          execAttempt: 2,
+        })
+        expect(manager.startOwnedCalls).toEqual(["replacement"])
+        expect(manager.ownerFingerprints).toEqual([owner("replacement", 2).fingerprint])
+        expect(events(store).filter((event) => event.type === "dag.node.retried")).toEqual([
+          expect.objectContaining({ nodeId: "replacement", priorTaskId: "task-new", execAttempt: 2 }),
+        ])
+      }
+    },
+  )
+
+  test.each(["switch-cancelled", "continuation-failed"] as const)(
+    "#given legacy respawn fails after launch with %s #when its scheduled DAG recovers #then persisted launch evidence prevents another execution",
+    async (failure) => {
+      // given - real manager ports stamp launch before the RPC runner; legacy reconciliation owns loss.
+      const project = tempProject()
+      const taskStore = createTaskRecordStore({ project_dir: project })
+      const pending: TaskRecord = {
+        ...createTaskRecord(
+          {
+            parent_session_id: parentSessionId,
+            root_session_id: rootSessionId,
+            depth: 1,
+            execution_mode: "process",
+            model: "fake-model",
+            notify_on_terminal: false,
+            owner: owner("respawned"),
+          },
+          Date.parse("2026-08-14T00:00:00.000Z"),
+        ),
+        pid: 9001,
+        spawn_spec: { version: 1, cwd: project, prompt: "do respawned" },
+      }
+      taskStore.save(pending)
+      const sessionDir = resolveChildSessionDir(join(taskStore.stateDir, "children", pending.task_id), pending.task_id)
+      fs.mkdirSync(sessionDir, { recursive: true })
+      fs.writeFileSync(
+        join(sessionDir, "session.jsonl"),
+        `${JSON.stringify({ type: "message", message: { role: "user", content: "continue" } })}\n`,
+      )
+      const now = () => Date.parse("2026-08-14T00:00:01.000Z")
+      const config = settings()
+      const launchObservations: Array<TaskRecord | null> = []
+      const calls: string[] = []
+      const handle: RpcChildHandle = {
+        ...makeHandle(pending.task_id).handle,
+        pid: 9002,
+        subscribe: () => () => undefined,
+        waitForIdle: async () => undefined,
+        terminate: async () => {
+          calls.push("terminate")
+        },
+        dispose: async () => {
+          calls.push("dispose")
+        },
+        exitOutcome: () => undefined,
+        waitForExit: async () => ({ kind: "clean", facts: { pid: 9002, code: 0, signal: null, stderrTail: "" } }),
+        lastSeen: () => undefined,
+        switchSession: async () => {
+          calls.push("switch")
+          return { cancelled: failure === "switch-cancelled" }
+        },
+        followUp: async () => {
+          calls.push("continue")
+          throw new Error("injected continuation failure")
+        },
+      }
+      const runner = {
+        start: async () => {
+          throw new Error("unexpected fresh launch")
+        },
+      }
+      createTaskManager({
+        store: taskStore,
+        runners: { "in-process": runner, process: runner },
+        rpcRespawnRunner: {
+          start: async () => {
+            launchObservations.push(createTaskRecordStore({ project_dir: project }).load(pending.task_id))
+            taskStore.mutate(pending.task_id, (fresh) => ({ ...fresh, child_session_id: handle.sessionId }))
+            return handle
+          },
+        },
+        planner: categoryPlanner(),
+        config,
+        cwd: project,
+        hostPid: 101,
+        now,
+      })
+      const lifecycle = createTaskLifecycle({
+        hostEndpoint: NO_HOST_ENDPOINT,
+        store: taskStore,
+        registry: new FakeRegistry(),
+        config,
+        hostPid: 101,
+        now,
+        signaller: {
+          isAlive: () => false,
+          signal: () => {
+            throw new Error("unexpected signal")
+          },
+        },
+      })
+
+      // when - no scoped parent: exercise the legacy global sweep and its failed-respawn branch.
+      const reconciled = await lifecycle.reconcileOnSessionStart()
+      lifecycle.dispose?.()
+      const lost = createTaskRecordStore({ project_dir: project }).load(pending.task_id)
+      if (lost === null) throw new Error("expected persisted lost task")
+      expect(reconciled.outcomes).toContainEqual(expect.objectContaining({ task_id: pending.task_id, kind: "lost" }))
+      expect(lost.status).toBe("lost")
+      const manager = new RecoveryTaskManager()
+      manager.add(lost)
+      const store = createDagFileStore({ project_dir: project })
+      store.writeCheckpoint(
+        runId,
+        recoverableRecord(
+          definition([node("respawned")]),
+          {
+            respawned: { state: "scheduled" },
+          },
+          { previousLeaseHolderPid: 101 },
+        ),
+      )
+      const [outcome] = await createDagRecovery({
+        store,
+        taskManager: manager,
+        hostPid: 202,
+        isProcessAlive: () => false,
+      }).resumePausedRuns(parentSessionId)
+
+      // then - both the store and DAG observe the same launched/lost task, never a fresh attempt.
+      expect(launchObservations).toHaveLength(1)
+      expect(launchObservations[0]?.started_at).toBe(new Date(now()).toISOString())
+      expect(calls).toEqual(
+        failure === "switch-cancelled"
+          ? ["switch", "terminate", "dispose"]
+          : ["switch", "continue", "terminate", "dispose"],
+      )
+      expect(lost).toMatchObject({
+        started_at: new Date(now()).toISOString(),
+        child_session_id: handle.sessionId,
+        residency_state: "disposed",
+      })
       expect(outcome?.record?.nodes[0]).toMatchObject({
-        state: status === "lost" ? "failed" : "completed", taskId: "task-new", execAttempt: 1,
-        ...(status === "lost" ? { error: { code: "task_lost" } } : {}),
+        state: "failed",
+        taskId: pending.task_id,
+        error: { code: "task_lost" },
       })
       expect(manager.startOwnedCalls).toEqual([])
       expect(events(store).some((event) => event.type === "dag.node.retried")).toBe(false)
-    } else {
-      expect(outcome?.record?.nodes[0]).toMatchObject({ state: "completed", taskId: "task-replacement", execAttempt: 2 })
-      expect(manager.startOwnedCalls).toEqual(["replacement"])
-      expect(manager.ownerFingerprints).toEqual([owner("replacement", 2).fingerprint])
-      expect(events(store).filter((event) => event.type === "dag.node.retried")).toEqual([
-        expect.objectContaining({ nodeId: "replacement", priorTaskId: "task-new", execAttempt: 2 }),
-      ])
-    }
-  })
-
-  test.each(["switch-cancelled", "continuation-failed"] as const)("#given legacy respawn fails after launch with %s #when its scheduled DAG recovers #then persisted launch evidence prevents another execution", async (failure) => {
-    // given - real manager ports stamp launch before the RPC runner; legacy reconciliation owns loss.
-    const project = tempProject()
-    const taskStore = createTaskRecordStore({ project_dir: project })
-    const pending: TaskRecord = {
-      ...createTaskRecord({
-        parent_session_id: parentSessionId, root_session_id: rootSessionId, depth: 1,
-        execution_mode: "process", model: "fake-model", notify_on_terminal: false, owner: owner("respawned"),
-      }, Date.parse("2026-08-14T00:00:00.000Z")),
-      pid: 9001,
-      spawn_spec: { version: 1, cwd: project, prompt: "do respawned" },
-    }
-    taskStore.save(pending)
-    const sessionDir = resolveChildSessionDir(join(taskStore.stateDir, "children", pending.task_id), pending.task_id)
-    fs.mkdirSync(sessionDir, { recursive: true })
-    fs.writeFileSync(join(sessionDir, "session.jsonl"), `${JSON.stringify({ type: "message", message: { role: "user", content: "continue" } })}\n`)
-    const now = () => Date.parse("2026-08-14T00:00:01.000Z")
-    const config = settings()
-    const launchObservations: Array<TaskRecord | null> = []
-    const calls: string[] = []
-    const handle: RpcChildHandle = {
-      ...makeHandle(pending.task_id).handle,
-      pid: 9002,
-      subscribe: () => () => undefined,
-      waitForIdle: async () => undefined,
-      terminate: async () => { calls.push("terminate") },
-      dispose: async () => { calls.push("dispose") },
-      exitOutcome: () => undefined,
-      waitForExit: async () => ({ kind: "clean", facts: { pid: 9002, code: 0, signal: null, stderrTail: "" } }),
-      lastSeen: () => undefined,
-      switchSession: async () => { calls.push("switch"); return { cancelled: failure === "switch-cancelled" } },
-      followUp: async () => { calls.push("continue"); throw new Error("injected continuation failure") },
-    }
-    const runner = { start: async () => { throw new Error("unexpected fresh launch") } }
-    createTaskManager({
-      store: taskStore, runners: { "in-process": runner, process: runner },
-      rpcRespawnRunner: { start: async () => {
-        launchObservations.push(createTaskRecordStore({ project_dir: project }).load(pending.task_id))
-        taskStore.mutate(pending.task_id, (fresh) => ({ ...fresh, child_session_id: handle.sessionId }))
-        return handle
-      } },
-      planner: categoryPlanner(), config, cwd: project, hostPid: 101, now,
-    })
-    const lifecycle = createTaskLifecycle({
-      hostEndpoint: NO_HOST_ENDPOINT,
-      store: taskStore, registry: new FakeRegistry(), config, hostPid: 101, now,
-      signaller: { isAlive: () => false, signal: () => { throw new Error("unexpected signal") } },
-    })
-
-    // when - no scoped parent: exercise the legacy global sweep and its failed-respawn branch.
-    const reconciled = await lifecycle.reconcileOnSessionStart()
-    lifecycle.dispose?.()
-    const lost = createTaskRecordStore({ project_dir: project }).load(pending.task_id)
-    if (lost === null) throw new Error("expected persisted lost task")
-    expect(reconciled.outcomes).toContainEqual(expect.objectContaining({ task_id: pending.task_id, kind: "lost" }))
-    expect(lost.status).toBe("lost")
-    const manager = new RecoveryTaskManager()
-    manager.add(lost)
-    const store = createDagFileStore({ project_dir: project })
-    store.writeCheckpoint(runId, recoverableRecord(definition([node("respawned")]), {
-      respawned: { state: "scheduled" },
-    }, { previousLeaseHolderPid: 101 }))
-    const [outcome] = await createDagRecovery({ store, taskManager: manager, hostPid: 202, isProcessAlive: () => false })
-      .resumePausedRuns(parentSessionId)
-
-    // then - both the store and DAG observe the same launched/lost task, never a fresh attempt.
-    expect(launchObservations).toHaveLength(1)
-    expect(launchObservations[0]?.started_at).toBe(new Date(now()).toISOString())
-    expect(calls).toEqual(failure === "switch-cancelled" ? ["switch", "terminate", "dispose"] : ["switch", "continue", "terminate", "dispose"])
-    expect(lost).toMatchObject({ started_at: new Date(now()).toISOString(), child_session_id: handle.sessionId, residency_state: "disposed" })
-    expect(outcome?.record?.nodes[0]).toMatchObject({ state: "failed", taskId: pending.task_id, error: { code: "task_lost" } })
-    expect(manager.startOwnedCalls).toEqual([])
-    expect(events(store).some((event) => event.type === "dag.node.retried")).toBe(false)
-  })
+    },
+  )
 
   test("#given a pending child freshly launched by scoped lifecycle recovery #when lost while its DAG node is still scheduled #then the persisted launch folds task_lost without dispatch", async () => {
     // given - use the real lifecycle ports, manager and record store, not a hand-stamped record.
     const project = tempProject()
     const taskStore = createTaskRecordStore({ project_dir: project })
     const pending = {
-      ...createTaskRecord({
-        parent_session_id: parentSessionId, root_session_id: rootSessionId, depth: 1,
-        execution_mode: "in-process", model: "fake-model", notify_on_terminal: false,
-        owner: owner("revived"),
-      }, Date.parse("2026-08-14T00:00:00.000Z")),
+      ...createTaskRecord(
+        {
+          parent_session_id: parentSessionId,
+          root_session_id: rootSessionId,
+          depth: 1,
+          execution_mode: "in-process",
+          model: "fake-model",
+          notify_on_terminal: false,
+          owner: owner("revived"),
+        },
+        Date.parse("2026-08-14T00:00:00.000Z"),
+      ),
       residency_state: "persisted_only" as const,
       spawn_spec: { version: 1 as const, cwd: project, prompt: "do revived" },
     }
@@ -696,34 +972,64 @@ describe("DAG crash recovery", () => {
     const now = () => Date.parse("2026-08-14T00:00:01.000Z")
     const config = settings()
     const launchObservations: Array<TaskRecord | null> = []
-    const runner = { start: async () => {
-      launchObservations.push(createTaskRecordStore({ project_dir: project }).load(pending.task_id))
-      return makeHandle(pending.task_id).handle
-    } }
+    const runner = {
+      start: async () => {
+        launchObservations.push(createTaskRecordStore({ project_dir: project }).load(pending.task_id))
+        return makeHandle(pending.task_id).handle
+      },
+    }
     createTaskManager({
-      store: taskStore, runners: { "in-process": runner, process: runner },
-      planner: categoryPlanner(), config, cwd: project, hostPid: 101, now,
+      store: taskStore,
+      runners: { "in-process": runner, process: runner },
+      planner: categoryPlanner(),
+      config,
+      cwd: project,
+      hostPid: 101,
+      now,
     })
-    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store: taskStore, registry: new FakeRegistry(), config, hostPid: 101, now })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store: taskStore,
+      registry: new FakeRegistry(),
+      config,
+      hostPid: 101,
+      now,
+    })
     const revived = await lifecycle.reconcileOnSessionStart(parentSessionId)
     lifecycle.dispose?.()
     expect(revived.outcomes).toContainEqual(expect.objectContaining({ task_id: pending.task_id, kind: "resumed" }))
-    taskStore.mutate(pending.task_id, (fresh) => markRecordLostForReconciliation(fresh, {
-      timestamp: "2026-08-14T00:00:02.000Z", error_message: "host died",
-    }).record)
+    taskStore.mutate(
+      pending.task_id,
+      (fresh) =>
+        markRecordLostForReconciliation(fresh, {
+          timestamp: "2026-08-14T00:00:02.000Z",
+          error_message: "host died",
+        }).record,
+    )
     const lost = createTaskRecordStore({ project_dir: project }).load(pending.task_id)
     if (lost === null) throw new Error("expected persisted lost task")
     expect(lost.status).toBe("lost")
     const manager = new RecoveryTaskManager()
     manager.add(lost)
     const store = createDagFileStore({ project_dir: project })
-    store.writeCheckpoint(runId, recoverableRecord(definition([node("revived")]), {
-      revived: { state: "scheduled" },
-    }, { previousLeaseHolderPid: 101 }))
+    store.writeCheckpoint(
+      runId,
+      recoverableRecord(
+        definition([node("revived")]),
+        {
+          revived: { state: "scheduled" },
+        },
+        { previousLeaseHolderPid: 101 },
+      ),
+    )
 
     // when
-    const [outcome] = await createDagRecovery({ store, taskManager: manager, hostPid: 202, isProcessAlive: () => false })
-      .resumePausedRuns(parentSessionId)
+    const [outcome] = await createDagRecovery({
+      store,
+      taskManager: manager,
+      hostPid: 202,
+      isProcessAlive: () => false,
+    }).resumePausedRuns(parentSessionId)
 
     // then
     expect(outcome?.record?.nodes[0]).toMatchObject({ state: "failed", error: { code: "task_lost" } })
@@ -734,31 +1040,45 @@ describe("DAG crash recovery", () => {
     expect(lost.started_at).toBe(new Date(now()).toISOString())
   })
 
-  test.each([2, 3, 4])("#given a never-started lost node at execAttempt %s #when resumed #then automatic readmission stops at the execution-attempt cap", async (execAttempt) => {
-    // given - display attempt is deliberately unrelated to the persisted execution counter.
-    const store = createDagFileStore({ project_dir: tempProject() })
-    const manager = new RecoveryTaskManager()
-    store.writeCheckpoint(runId, recoverableRecord(definition([node("queued")]), {
-      queued: { state: "scheduled", taskId: "task-queued-prev", attempt: 9, execAttempt },
-    }, { previousLeaseHolderPid: 9001 }))
-    manager.add(taskRecord(owner("queued", execAttempt), "lost", "task-queued-prev"))
+  test.each([2, 3, 4])(
+    "#given a never-started lost node at execAttempt %s #when resumed #then automatic readmission stops at the execution-attempt cap",
+    async (execAttempt) => {
+      // given - display attempt is deliberately unrelated to the persisted execution counter.
+      const store = createDagFileStore({ project_dir: tempProject() })
+      const manager = new RecoveryTaskManager()
+      store.writeCheckpoint(
+        runId,
+        recoverableRecord(
+          definition([node("queued")]),
+          {
+            queued: { state: "scheduled", taskId: "task-queued-prev", attempt: 9, execAttempt },
+          },
+          { previousLeaseHolderPid: 9001 },
+        ),
+      )
+      manager.add(taskRecord(owner("queued", execAttempt), "lost", "task-queued-prev"))
 
-    // when
-    const [outcome] = await createDagRecovery({ store, taskManager: manager, hostPid: 101, isProcessAlive: () => false })
-      .resumePausedRuns(parentSessionId)
+      // when
+      const [outcome] = await createDagRecovery({
+        store,
+        taskManager: manager,
+        hostPid: 101,
+        isProcessAlive: () => false,
+      }).resumePausedRuns(parentSessionId)
 
-    // then
-    if (execAttempt < 3) {
-      expect(outcome?.record?.status).toBe("completed")
-      expect(outcome?.record?.nodes[0]).toMatchObject({ state: "completed", attempt: 10, execAttempt: 3 })
-      expect(manager.ownerFingerprints).toEqual([owner("queued", 3).fingerprint])
-    } else {
-      expect(outcome?.record?.status).toBe("failed")
-      expect(outcome?.record?.nodes[0]).toMatchObject({ state: "failed", execAttempt, error: { code: "task_lost" } })
-      expect(manager.startOwnedCalls).toEqual([])
-      expect(events(store).some((event) => event.type === "dag.node.retried")).toBe(false)
-    }
-  })
+      // then
+      if (execAttempt < 3) {
+        expect(outcome?.record?.status).toBe("completed")
+        expect(outcome?.record?.nodes[0]).toMatchObject({ state: "completed", attempt: 10, execAttempt: 3 })
+        expect(manager.ownerFingerprints).toEqual([owner("queued", 3).fingerprint])
+      } else {
+        expect(outcome?.record?.status).toBe("failed")
+        expect(outcome?.record?.nodes[0]).toMatchObject({ state: "failed", execAttempt, error: { code: "task_lost" } })
+        expect(manager.startOwnedCalls).toEqual([])
+        expect(events(store).some((event) => event.type === "dag.node.retried")).toBe(false)
+      }
+    },
+  )
 
   test("#given a paused run owned by a dead foreign session #when its fork adopts it #then the resume is journaled on the run's own ledger", async () => {
     // given - this exact configuration used to pin the orphaning as correct (skipped, still
@@ -766,10 +1086,17 @@ describe("DAG crash recovery", () => {
     // dag.run.resumed event, not just a rewritten checkpoint.
     const projectDir = tempProject()
     const store = createDagFileStore({ project_dir: projectDir })
-    store.writeCheckpoint(runId, recoverableRecord(definition([node("foreign")]), {}, {
-      parentSessionId: "foreign-session",
-      previousLeaseHolderPid: 9001,
-    }))
+    store.writeCheckpoint(
+      runId,
+      recoverableRecord(
+        definition([node("foreign")]),
+        {},
+        {
+          parentSessionId: "foreign-session",
+          previousLeaseHolderPid: 9001,
+        },
+      ),
+    )
 
     // when
     const outcomes = await createDagRecovery({
@@ -791,9 +1118,16 @@ describe("DAG crash recovery", () => {
     const storeA = createDagFileStore({ project_dir: projectDir })
     const storeB = createDagFileStore({ project_dir: projectDir })
     const input = definition([node("active")])
-    storeA.writeCheckpoint(runId, recoverableRecord(input, {
-      active: { state: "running", taskId: "task-active", attempt: 1 },
-    }, { previousLeaseHolderPid: 9001 }))
+    storeA.writeCheckpoint(
+      runId,
+      recoverableRecord(
+        input,
+        {
+          active: { state: "running", taskId: "task-active", attempt: 1 },
+        },
+        { previousLeaseHolderPid: 9001 },
+      ),
+    )
     const managerA = new RecoveryTaskManager({ autoCompleteStarts: false })
     const managerB = new RecoveryTaskManager({ autoCompleteStarts: false })
     managerA.add(taskRecord(owner("active"), "running", "task-active"))
@@ -825,9 +1159,16 @@ describe("DAG crash recovery", () => {
       run_stats: { runtime_ms: 47, turns: 4, tool_calls: 3, output_tokens: 19 },
     }
     manager.add(completed)
-    baseStore.writeCheckpoint(runId, recoverableRecord(definition([node("wal-artifact")]), {
-      "wal-artifact": { state: "running", taskId: "task-wal-artifact", attempt: 1 },
-    }, { previousLeaseHolderPid: 9001 }))
+    baseStore.writeCheckpoint(
+      runId,
+      recoverableRecord(
+        definition([node("wal-artifact")]),
+        {
+          "wal-artifact": { state: "running", taskId: "task-wal-artifact", attempt: 1 },
+        },
+        { previousLeaseHolderPid: 9001 },
+      ),
+    )
     let crashAfterTerminalWal = true
     const crashingStore: DagFileStore = {
       ...baseStore,
@@ -841,12 +1182,14 @@ describe("DAG crash recovery", () => {
     }
 
     // when
-    await expect(createDagRecovery({
-      store: crashingStore,
-      taskManager: manager,
-      hostPid: 101,
-      isProcessAlive: () => false,
-    }).resumePausedRuns(parentSessionId)).rejects.toThrow("injected crash after terminal WAL append")
+    await expect(
+      createDagRecovery({
+        store: crashingStore,
+        taskManager: manager,
+        hostPid: 101,
+        isProcessAlive: () => false,
+      }).resumePausedRuns(parentSessionId),
+    ).rejects.toThrow("injected crash after terminal WAL append")
     const reopenedStore = createDagFileStore({ project_dir: projectDir })
     const [outcome] = await createDagRecovery({
       store: reopenedStore,
@@ -856,16 +1199,18 @@ describe("DAG crash recovery", () => {
     }).resumePausedRuns(parentSessionId)
 
     // then
-    const checkpoint = reopenedStore.readCheckpoint<DagRunRecordV1 & {
-      readonly nodes: readonly (DagNode & {
-        readonly resultArtifact?: {
-          readonly relativePath: string
-          readonly sha256: string
-          readonly bytes: number
-          readonly stats?: { readonly relativePath: string; readonly sha256: string; readonly bytes: number }
-        }
-      })[]
-    }>(runId)
+    const checkpoint = reopenedStore.readCheckpoint<
+      DagRunRecordV1 & {
+        readonly nodes: readonly (DagNode & {
+          readonly resultArtifact?: {
+            readonly relativePath: string
+            readonly sha256: string
+            readonly bytes: number
+            readonly stats?: { readonly relativePath: string; readonly sha256: string; readonly bytes: number }
+          }
+        })[]
+      }
+    >(runId)
     const recovered = checkpoint?.nodes[0]
     const artifact = recovered?.resultArtifact
     const statsPath = reopenedStore.paths.result(runId, "wal-artifact").replace(/\.txt$/, ".stats.json")
@@ -897,9 +1242,16 @@ describe("DAG crash recovery", () => {
       run_stats: { runtime_ms: 31, turns: 3, tool_calls: 2, output_tokens: 11 },
     }
     manager.add(completed)
-    baseStore.writeCheckpoint(runId, recoverableRecord(definition([node("artifact")]), {
-      artifact: { state: "running", taskId: "task-artifact", attempt: 1 },
-    }, { previousLeaseHolderPid: 9001 }))
+    baseStore.writeCheckpoint(
+      runId,
+      recoverableRecord(
+        definition([node("artifact")]),
+        {
+          artifact: { state: "running", taskId: "task-artifact", attempt: 1 },
+        },
+        { previousLeaseHolderPid: 9001 },
+      ),
+    )
     let runLockDepth = 0
     let resultCopiesUnderLock = 0
     let crashTerminalCheckpoint = true
@@ -949,18 +1301,23 @@ describe("DAG crash recovery", () => {
     }).resumePausedRuns(parentSessionId)
 
     // then
-    const checkpoint = reopenedStore.readCheckpoint<DagRunRecordV1 & {
-      readonly nodes: readonly (DagNode & {
-        readonly resultArtifact?: {
-          readonly relativePath: string
-          readonly sha256: string
-          readonly bytes: number
-          readonly stats?: { readonly relativePath: string; readonly sha256: string; readonly bytes: number }
-        }
-      })[]
-    }>(runId)
+    const checkpoint = reopenedStore.readCheckpoint<
+      DagRunRecordV1 & {
+        readonly nodes: readonly (DagNode & {
+          readonly resultArtifact?: {
+            readonly relativePath: string
+            readonly sha256: string
+            readonly bytes: number
+            readonly stats?: { readonly relativePath: string; readonly sha256: string; readonly bytes: number }
+          }
+        })[]
+      }
+    >(runId)
     const artifact = checkpoint?.nodes[0]?.resultArtifact
-    const statsRaw = fs.readFileSync(reopenedStore.paths.result(runId, "artifact").replace(/\.txt$/, ".stats.json"), "utf8")
+    const statsRaw = fs.readFileSync(
+      reopenedStore.paths.result(runId, "artifact").replace(/\.txt$/, ".stats.json"),
+      "utf8",
+    )
     expect(outcome?.kind).toBe("resumed")
     expect(resultCopiesUnderLock).toBeGreaterThan(0)
     expect(reopenedStore.readResult(runId, "artifact")).toBe("recovered artifact output")
@@ -981,9 +1338,16 @@ describe("DAG crash recovery", () => {
     // given
     const projectDir = tempProject()
     const store = createDagFileStore({ project_dir: projectDir })
-    store.writeCheckpoint(runId, recoverableRecord(definition([node("active")]), {
-      active: { state: "running", taskId: "task-active", attempt: 1 },
-    }, { status: "running", leaseHolderPid: 101 }))
+    store.writeCheckpoint(
+      runId,
+      recoverableRecord(
+        definition([node("active")]),
+        {
+          active: { state: "running", taskId: "task-active", attempt: 1 },
+        },
+        { status: "running", leaseHolderPid: 101 },
+      ),
+    )
     const order: string[] = []
     const recovery = createDagRecovery({
       store,
@@ -997,7 +1361,9 @@ describe("DAG crash recovery", () => {
     const paused = recovery.pauseRunsForShutdown(parentSessionId)
 
     // then
-    const checkpoint = store.readCheckpoint<DagRunRecordV1 & { leaseHolderPid?: number; previousLeaseHolderPid?: number }>(runId)
+    const checkpoint = store.readCheckpoint<
+      DagRunRecordV1 & { leaseHolderPid?: number; previousLeaseHolderPid?: number }
+    >(runId)
     expect(paused).toEqual([runId])
     expect(order).toEqual(["stop"])
     expect(checkpoint?.status).toBe("paused")
@@ -1014,18 +1380,26 @@ describe("DAG recovery attempt-scoped ownership", () => {
     const store = createDagFileStore({ project_dir: projectDir })
     const manager = new RecoveryTaskManager()
     const input = definition([node("legacy-done"), node("legacy-next", ["legacy-done"])])
-    const legacyRecord = recoverableRecord(input, {
-      "legacy-done": { state: "completed", taskId: "task-legacy-done", attempt: 1 },
-      "legacy-next": { state: "scheduled" },
-    }, { previousLeaseHolderPid: 9001 })
+    const legacyRecord = recoverableRecord(
+      input,
+      {
+        "legacy-done": { state: "completed", taskId: "task-legacy-done", attempt: 1 },
+        "legacy-next": { state: "scheduled" },
+      },
+      { previousLeaseHolderPid: 9001 },
+    )
     expect(legacyRecord.amendHistory).toBeUndefined()
     expect(legacyRecord.nodes.every((entry) => entry.execAttempt === undefined)).toBe(true)
     store.writeCheckpoint(runId, legacyRecord)
     store.writeResult(runId, "legacy-done", "legacy output")
 
     // when
-    const [outcome] = await createDagRecovery({ store, taskManager: manager, hostPid: 101, isProcessAlive: () => false })
-      .resumePausedRuns(parentSessionId)
+    const [outcome] = await createDagRecovery({
+      store,
+      taskManager: manager,
+      hostPid: 101,
+      isProcessAlive: () => false,
+    }).resumePausedRuns(parentSessionId)
 
     // then
     expect(outcome?.kind).toBe("resumed")
@@ -1042,9 +1416,16 @@ describe("DAG recovery attempt-scoped ownership", () => {
     const projectDir = tempProject()
     const store = createDagFileStore({ project_dir: projectDir })
     const manager = new RecoveryTaskManager()
-    store.writeCheckpoint(runId, recoverableRecord(definition([node("drifted")]), {
-      drifted: { state: "running", taskId: "task-stale", attempt: 1 },
-    }, { previousLeaseHolderPid: 9001 }))
+    store.writeCheckpoint(
+      runId,
+      recoverableRecord(
+        definition([node("drifted")]),
+        {
+          drifted: { state: "running", taskId: "task-stale", attempt: 1 },
+        },
+        { previousLeaseHolderPid: 9001 },
+      ),
+    )
     const persistedOwner: DagTaskOwner = {
       kind: "dag",
       runId,
@@ -1054,19 +1435,27 @@ describe("DAG recovery attempt-scoped ownership", () => {
     manager.add(taskRecord(persistedOwner, "completed", "task-owned-drifted"))
 
     // when
-    const [outcome] = await createDagRecovery({ store, taskManager: manager, hostPid: 101, isProcessAlive: () => false })
-      .resumePausedRuns(parentSessionId)
+    const [outcome] = await createDagRecovery({
+      store,
+      taskManager: manager,
+      hostPid: 101,
+      isProcessAlive: () => false,
+    }).resumePausedRuns(parentSessionId)
 
     // then
     const node0 = outcome?.record?.nodes[0]
     expect(node0).toMatchObject({ state: "completed", taskId: "task-owned-drifted", attempt: 2 })
     expect(node0?.execAttempt).toBeUndefined()
     expect(manager.startOwnedCalls).toEqual([])
-    expect(dagFingerprint(ownerFingerprintInput({
-      definitionFingerprint: "definition-fingerprint",
-      nodeId: "drifted" as DagNodeId,
-      ...(node0?.execAttempt === undefined ? {} : { execAttempt: node0.execAttempt }),
-    }))).toBe(persistedOwner.fingerprint)
+    expect(
+      dagFingerprint(
+        ownerFingerprintInput({
+          definitionFingerprint: "definition-fingerprint",
+          nodeId: "drifted" as DagNodeId,
+          ...(node0?.execAttempt === undefined ? {} : { execAttempt: node0.execAttempt }),
+        }),
+      ),
+    ).toBe(persistedOwner.fingerprint)
   })
 
   test("#given a retried pending node with execAttempt #when resumed #then it starts fresh under the attempt-scoped fingerprint", async () => {
@@ -1074,23 +1463,36 @@ describe("DAG recovery attempt-scoped ownership", () => {
     const projectDir = tempProject()
     const store = createDagFileStore({ project_dir: projectDir })
     const manager = new RecoveryTaskManager()
-    store.writeCheckpoint(runId, recoverableRecord(definition([node("retried")]), {
-      retried: { state: "pending", taskId: "task-retried-1", attempt: 1, execAttempt: 2 },
-    }, { previousLeaseHolderPid: 9001 }))
+    store.writeCheckpoint(
+      runId,
+      recoverableRecord(
+        definition([node("retried")]),
+        {
+          retried: { state: "pending", taskId: "task-retried-1", attempt: 1, execAttempt: 2 },
+        },
+        { previousLeaseHolderPid: 9001 },
+      ),
+    )
 
     // when
-    const [outcome] = await createDagRecovery({ store, taskManager: manager, hostPid: 101, isProcessAlive: () => false })
-      .resumePausedRuns(parentSessionId)
+    const [outcome] = await createDagRecovery({
+      store,
+      taskManager: manager,
+      hostPid: 101,
+      isProcessAlive: () => false,
+    }).resumePausedRuns(parentSessionId)
 
     // then
     expect(outcome?.record?.nodes[0]?.state).toBe("completed")
     expect(manager.startOwnedCalls).toEqual(["retried"])
     expect(manager.ownerFingerprints).toEqual([
-      dagFingerprint(ownerFingerprintInput({
-        definitionFingerprint: "definition-fingerprint",
-        nodeId: "retried" as DagNodeId,
-        execAttempt: 2,
-      })),
+      dagFingerprint(
+        ownerFingerprintInput({
+          definitionFingerprint: "definition-fingerprint",
+          nodeId: "retried" as DagNodeId,
+          execAttempt: 2,
+        }),
+      ),
     ])
   })
 })
@@ -1104,11 +1506,18 @@ describe("resumePausedRuns immediate fork-source adoption", () => {
   test("#given a foreign paused run with a dead lease holder #when a fork from that session resumes #then it adopts, re-homes, and completes the run", async () => {
     // given
     const store = createDagFileStore({ project_dir: tempProject() })
-    store.writeCheckpoint(runId, recoverableRecord(definition([node("adopt-me")]), {}, {
-      parentSessionId: "session-gone",
-      rootSessionId: "session-gone",
-      previousLeaseHolderPid: 9001,
-    }))
+    store.writeCheckpoint(
+      runId,
+      recoverableRecord(
+        definition([node("adopt-me")]),
+        {},
+        {
+          parentSessionId: "session-gone",
+          rootSessionId: "session-gone",
+          previousLeaseHolderPid: 9001,
+        },
+      ),
+    )
 
     // when
     const outcomes = await createDagRecovery({
@@ -1130,11 +1539,18 @@ describe("resumePausedRuns immediate fork-source adoption", () => {
   test("#given a foreign paused run whose lease holder is alive #when a fork from that session resumes #then the run is left untouched", async () => {
     // given a foreign session that is still running (its pause is mid-resume or residency-held)
     const store = createDagFileStore({ project_dir: tempProject() })
-    store.writeCheckpoint(runId, recoverableRecord(definition([node("held")]), {}, {
-      parentSessionId: "session-alive",
-      rootSessionId: "session-alive",
-      previousLeaseHolderPid: 9001,
-    }))
+    store.writeCheckpoint(
+      runId,
+      recoverableRecord(
+        definition([node("held")]),
+        {},
+        {
+          parentSessionId: "session-alive",
+          rootSessionId: "session-alive",
+          previousLeaseHolderPid: 9001,
+        },
+      ),
+    )
 
     // when
     const outcomes = await createDagRecovery({
@@ -1154,10 +1570,17 @@ describe("resumePausedRuns immediate fork-source adoption", () => {
   test("#given a foreign paused run with no recorded lease holder #when a fork from that session resumes #then abandonment is unproven and the run is left untouched", async () => {
     // given a paused record that never went through the shutdown pause (no pid on record)
     const store = createDagFileStore({ project_dir: tempProject() })
-    store.writeCheckpoint(runId, recoverableRecord(definition([node("unproven")]), {}, {
-      parentSessionId: "session-unknown",
-      rootSessionId: "session-unknown",
-    }))
+    store.writeCheckpoint(
+      runId,
+      recoverableRecord(
+        definition([node("unproven")]),
+        {},
+        {
+          parentSessionId: "session-unknown",
+          rootSessionId: "session-unknown",
+        },
+      ),
+    )
 
     // when
     const outcomes = await createDagRecovery({
@@ -1177,11 +1600,18 @@ describe("resumePausedRuns immediate fork-source adoption", () => {
   test("#given a foreign paused run whose lease holder is this process #when its fork resumes #then self-adoption is safe and the run completes", async () => {
     // given a run this very process paused under a previous session id (alive, but it is us)
     const store = createDagFileStore({ project_dir: tempProject() })
-    store.writeCheckpoint(runId, recoverableRecord(definition([node("self")]), {}, {
-      parentSessionId: "session-previous",
-      rootSessionId: "session-previous",
-      previousLeaseHolderPid: 101,
-    }))
+    store.writeCheckpoint(
+      runId,
+      recoverableRecord(
+        definition([node("self")]),
+        {},
+        {
+          parentSessionId: "session-previous",
+          rootSessionId: "session-previous",
+          previousLeaseHolderPid: 101,
+        },
+      ),
+    )
 
     // when
     const outcomes = await createDagRecovery({

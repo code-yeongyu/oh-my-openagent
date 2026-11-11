@@ -39,20 +39,15 @@ export async function pollForCompletion(
   ctx: RunContext,
   eventState: EventState,
   abortController: AbortController,
-  options: PollOptions = {}
+  options: PollOptions = {},
 ): Promise<number> {
   const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS
-  const requiredConsecutive =
-    options.requiredConsecutive ?? DEFAULT_REQUIRED_CONSECUTIVE
-  const rawMinStabilizationMs =
-    options.minStabilizationMs ?? MIN_STABILIZATION_MS
-  const minStabilizationMs =
-    rawMinStabilizationMs > 0 ? rawMinStabilizationMs : MIN_STABILIZATION_MS
-  const eventWatchdogMs =
-    options.eventWatchdogMs ?? DEFAULT_EVENT_WATCHDOG_MS
+  const requiredConsecutive = options.requiredConsecutive ?? DEFAULT_REQUIRED_CONSECUTIVE
+  const rawMinStabilizationMs = options.minStabilizationMs ?? MIN_STABILIZATION_MS
+  const minStabilizationMs = rawMinStabilizationMs > 0 ? rawMinStabilizationMs : MIN_STABILIZATION_MS
+  const eventWatchdogMs = options.eventWatchdogMs ?? DEFAULT_EVENT_WATCHDOG_MS
   const secondaryMeaningfulWorkTimeoutMs =
-    options.secondaryMeaningfulWorkTimeoutMs ??
-    DEFAULT_SECONDARY_MEANINGFUL_WORK_TIMEOUT_MS
+    options.secondaryMeaningfulWorkTimeoutMs ?? DEFAULT_SECONDARY_MEANINGFUL_WORK_TIMEOUT_MS
   const requireMeaningfulWork = options.requireMeaningfulWork ?? false
   const now = options.now ?? Date.now
   const sleep = options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)))
@@ -82,12 +77,8 @@ export async function pollForCompletion(
       }
       errorCycleCount++
       if (errorCycleCount >= ERROR_GRACE_CYCLES) {
-        console.error(
-          pc.red(`\n\nSession ended with error: ${eventState.lastError}`)
-        )
-        console.error(
-          pc.yellow("Check if todos were completed before the error.")
-        )
+        console.error(pc.red(`\n\nSession ended with error: ${eventState.lastError}`))
+        console.error(pc.yellow("Check if todos were completed before the error."))
         return 1
       }
       continue
@@ -100,11 +91,7 @@ export async function pollForCompletion(
       const timeSinceLastEvent = now() - eventState.lastEventTimestamp
       if (timeSinceLastEvent > eventWatchdogMs) {
         console.log(
-          pc.yellow(
-            `\n  No events for ${Math.round(
-              timeSinceLastEvent / 1000
-            )}s, verifying session status...`
-          )
+          pc.yellow(`\n  No events for ${Math.round(timeSinceLastEvent / 1000)}s, verifying session status...`),
         )
 
         mainSessionStatus = await getMainSessionStatus(ctx)
@@ -156,7 +143,7 @@ export async function pollForCompletion(
         }
 
         console.error(
-          pc.red("\n\nSession never produced assistant output, tool activity, or reasoning after the prompt started.")
+          pc.red("\n\nSession never produced assistant output, tool activity, or reasoning after the prompt started."),
         )
         return 1
       }
@@ -170,9 +157,9 @@ export async function pollForCompletion(
           console.log(
             pc.yellow(
               `\n  No meaningful work events for ${Math.round(
-                secondaryMeaningfulWorkTimeoutMs / 1000
-              )}s but session has active work - assuming in progress`
-            )
+                secondaryMeaningfulWorkTimeoutMs / 1000,
+              )}s but session has active work - assuming in progress`,
+            ),
           )
         }
       }
@@ -223,9 +210,7 @@ async function hasActiveSessionWork(ctx: RunContext): Promise<boolean> {
   return hasActiveChildren || hasActiveTodos
 }
 
-async function getMainSessionStatus(
-  ctx: RunContext
-): Promise<"idle" | "busy" | "retry" | null> {
+async function getMainSessionStatus(ctx: RunContext): Promise<"idle" | "busy" | "retry" | null> {
   try {
     const statusesRes = await ctx.client.session.status({
       query: { directory: ctx.directory },

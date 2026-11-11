@@ -10,8 +10,7 @@ import { createChildExtensionEvents } from "../child-extension-events"
 
 type RpcHandleWithTerminalFacts = RpcChildHandle & {
   terminalAssistantMessage():
-    | { readonly text?: string; readonly stopReason?: string; readonly errorMessage?: string }
-    | undefined
+    { readonly text?: string; readonly stopReason?: string; readonly errorMessage?: string } | undefined
   wasAbortedByUser(): boolean
 }
 
@@ -50,21 +49,63 @@ function event(value: unknown): AgentSessionEvent {
   return value as AgentSessionEvent
 }
 
+describe("createRpcChildHandle reported model", () => {
+  test("#given model and tier events #when an assistant message names no model #then the reported model stays the observed pair", () => {
+    // given
+    const harness = createHarness()
+    harness.emit(event({ type: "model_changed", model: { provider: "chatgpt-subscription", id: "gpt-6-luna" } }))
+    harness.emit(event({ type: "service_tier_changed", tier: "priority" }))
+
+    // when
+    harness.emit(
+      event({
+        type: "message_end",
+        message: { role: "assistant", content: [], stopReason: "error", errorMessage: "provider unavailable" },
+      }),
+    )
+
+    // then
+    expect(harness.handle.reportedModel).toEqual({
+      provider: "chatgpt-subscription",
+      id: "gpt-6-luna",
+      serviceTier: "priority",
+    })
+  })
+
+  test("#given no prior model #when an assistant message names provider and id #then that identity is reported", () => {
+    // given
+    const harness = createHarness()
+
+    // when
+    harness.emit(
+      event({
+        type: "message_start",
+        message: { role: "assistant", provider: "chatgpt-subscription", model: "gpt-6-luna", content: [] },
+      }),
+    )
+
+    // then
+    expect(harness.handle.reportedModel).toEqual({ provider: "chatgpt-subscription", id: "gpt-6-luna" })
+  })
+})
+
 describe("createRpcChildHandle terminal turn observation", () => {
   test("#given an assistant provider error followed by terminal agent_end #when idle settles #then text and failure fields are retained", async () => {
     // given
     const harness = createHarness()
 
     // when
-    harness.emit(event({
-      type: "message_end",
-      message: {
-        role: "assistant",
-        content: [{ type: "text", text: "partial" }],
-        stopReason: "error",
-        errorMessage: "401 unauthorized; re-authenticate",
-      },
-    }))
+    harness.emit(
+      event({
+        type: "message_end",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "partial" }],
+          stopReason: "error",
+          errorMessage: "401 unauthorized; re-authenticate",
+        },
+      }),
+    )
     harness.emit(event({ type: "agent_end", willRetry: false }))
     harness.emit(event({ type: "agent_idle" }))
     await harness.handle.waitForIdle()
@@ -95,10 +136,12 @@ describe("createRpcChildHandle terminal turn observation", () => {
   test("#given a completed resident turn #when a follow-up revives it #then terminal facts reset for the new turn while last text remains available", async () => {
     // given
     const harness = createHarness()
-    harness.emit(event({
-      type: "message_end",
-      message: { role: "assistant", content: [{ type: "text", text: "first" }], stopReason: "stop" },
-    }))
+    harness.emit(
+      event({
+        type: "message_end",
+        message: { role: "assistant", content: [{ type: "text", text: "first" }], stopReason: "stop" },
+      }),
+    )
     harness.emit(event({ type: "agent_end", willRetry: false }))
     harness.emit(event({ type: "agent_idle" }))
     await harness.handle.waitForIdle()

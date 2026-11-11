@@ -5,15 +5,10 @@ import path from "node:path"
 describe("cli-program", () => {
   test("install command exposes 'setup' as an alias so the historical install path keeps working", async () => {
     // given
-    const cliProgramSource = await readFile(
-      path.resolve(import.meta.dir, "cli-program.ts"),
-      "utf-8",
-    )
+    const cliProgramSource = await readFile(path.resolve(import.meta.dir, "cli-program.ts"), "utf-8")
 
     // when
-    const installBlock = cliProgramSource.match(
-      /program\s*\n\s*\.command\("install"\)([\s\S]*?)\.action\(/,
-    )
+    const installBlock = cliProgramSource.match(/program\s*\n\s*\.command\("install"\)([\s\S]*?)\.action\(/)
 
     // then
     expect(installBlock).not.toBeNull()
@@ -22,15 +17,10 @@ describe("cli-program", () => {
 
   test("cleanup command exposes Codex cleanup for lazycodex migrations", async () => {
     // given
-    const cliProgramSource = await readFile(
-      path.resolve(import.meta.dir, "cleanup-command.ts"),
-      "utf-8",
-    )
+    const cliProgramSource = await readFile(path.resolve(import.meta.dir, "cleanup-command.ts"), "utf-8")
 
     // when
-    const cleanupBlock = cliProgramSource.match(
-      /program\s*\n\s*\.command\("cleanup"\)([\s\S]*?)\.action\(/,
-    )
+    const cleanupBlock = cliProgramSource.match(/program\s*\n\s*\.command\("cleanup"\)([\s\S]*?)\.action\(/)
 
     // then
     expect(cleanupBlock).not.toBeNull()
@@ -42,15 +32,10 @@ describe("cli-program", () => {
 
   test("cleanup command exposes uninstall as the user-facing alias", async () => {
     // given
-    const cliProgramSource = await readFile(
-      path.resolve(import.meta.dir, "cleanup-command.ts"),
-      "utf-8",
-    )
+    const cliProgramSource = await readFile(path.resolve(import.meta.dir, "cleanup-command.ts"), "utf-8")
 
     // when
-    const cleanupBlock = cliProgramSource.match(
-      /program\s*\n\s*\.command\("cleanup"\)([\s\S]*?)\.action\(/,
-    )
+    const cleanupBlock = cliProgramSource.match(/program\s*\n\s*\.command\("cleanup"\)([\s\S]*?)\.action\(/)
 
     // then
     expect(cleanupBlock).not.toBeNull()
@@ -59,15 +44,10 @@ describe("cli-program", () => {
 
   test("config migrate command exposes dry-run and JSON-only controls", async () => {
     // given
-    const cliProgramSource = await readFile(
-      path.resolve(import.meta.dir, "cli-program.ts"),
-      "utf-8",
-    )
+    const cliProgramSource = await readFile(path.resolve(import.meta.dir, "cli-program.ts"), "utf-8")
 
     // when
-    const migrateBlock = cliProgramSource.match(
-      /\.command\("config"\)([\s\S]*?)configureRuntimeCommands/,
-    )
+    const migrateBlock = cliProgramSource.match(/\.command\("config"\)([\s\S]*?)configureRuntimeCommands/)
 
     // then
     expect(migrateBlock).not.toBeNull()
@@ -79,15 +59,10 @@ describe("cli-program", () => {
 
   test("doctor command exposes explicit platform selection for Codex-only diagnostics", async () => {
     // given
-    const cliProgramSource = await readFile(
-      path.resolve(import.meta.dir, "cli-program.ts"),
-      "utf-8",
-    )
+    const cliProgramSource = await readFile(path.resolve(import.meta.dir, "cli-program.ts"), "utf-8")
 
     // when
-    const doctorBlock = cliProgramSource.match(
-      /program\s*\n\s*\.command\("doctor"\)([\s\S]*?)\.action\(/,
-    )
+    const doctorBlock = cliProgramSource.match(/program\s*\n\s*\.command\("doctor"\)([\s\S]*?)\.action\(/)
 
     // then
     expect(doctorBlock).not.toBeNull()
@@ -101,15 +76,10 @@ describe("cli-program", () => {
 
 test("program configures explicit '-h, --help' help option for consistent help-flag ordering", async () => {
   // given
-  const cliProgramSource = await readFile(
-    path.resolve(import.meta.dir, "cli-program.ts"),
-    "utf-8",
-  )
+  const cliProgramSource = await readFile(path.resolve(import.meta.dir, "cli-program.ts"), "utf-8")
 
   // when
-  const programBlock = cliProgramSource.match(
-    /program\s*\n((?:\s*\.\w+\([^)]*\)\s*\n?)*)/,
-  )
+  const programBlock = cliProgramSource.match(/program\s*\n((?:\s*\.\w+\([^)]*\)\s*\n?)*)/)
 
   // then
   expect(programBlock).not.toBeNull()
@@ -118,10 +88,7 @@ test("program configures explicit '-h, --help' help option for consistent help-f
 
 test("program registers runtime commands", async () => {
   // given
-  const cliProgramSource = await readFile(
-    path.resolve(import.meta.dir, "cli-program.ts"),
-    "utf-8",
-  )
+  const cliProgramSource = await readFile(path.resolve(import.meta.dir, "cli-program.ts"), "utf-8")
 
   // when
   const registersRuntimeCommands = cliProgramSource.includes("configureRuntimeCommands(program)")
