@@ -21,7 +21,10 @@ import {
 
 type Draft = Omit<MemoryCleanupFinding, "id" | "touches">
 
-export async function planMemoryCleanup(repoDir: string, options: MemoryCleanupOptions = {}): Promise<MemoryCleanupPlan> {
+export async function planMemoryCleanup(
+  repoDir: string,
+  options: MemoryCleanupOptions = {},
+): Promise<MemoryCleanupPlan> {
   const resolved = resolveCleanupOptions(options)
   const corpus = await scanCleanupCorpus(repoDir)
   const declarations = readDeclarations(corpus)
@@ -34,7 +37,11 @@ export async function planMemoryCleanup(repoDir: string, options: MemoryCleanupO
   const consider = (draft: Draft): void => {
     const vetoed = [draft.subject, draft.related].filter((path): path is string => path !== undefined && skip.has(path))
     if (vetoed.length > 0) {
-      kept.push({ kind: "skipped-by-option", detail: `${draft.class} ${draft.subject}: ${vetoed.join(", ")} listed in --skip`, paths: vetoed })
+      kept.push({
+        kind: "skipped-by-option",
+        detail: `${draft.class} ${draft.subject}: ${vetoed.join(", ")} listed in --skip`,
+        paths: vetoed,
+      })
       return
     }
     const archives = draft.actions.filter((action) => action.kind === "archive").map((action) => action.path)
@@ -51,7 +58,14 @@ export async function planMemoryCleanup(repoDir: string, options: MemoryCleanupO
         subject: candidate.subject,
         related: candidate.successor,
         evidence: candidate.evidence,
-        actions: [{ kind: "archive", path: candidate.subject, reason: `superseded by ${candidate.successor}`, successor: candidate.successor }],
+        actions: [
+          {
+            kind: "archive",
+            path: candidate.subject,
+            reason: `superseded by ${candidate.successor}`,
+            successor: candidate.successor,
+          },
+        ],
       })
     }
     kept.push(...supersession.kept)
@@ -62,20 +76,36 @@ export async function planMemoryCleanup(repoDir: string, options: MemoryCleanupO
         class: "stale",
         subject: candidate.subject,
         evidence: candidate.evidence,
-        actions: [{ kind: "archive", path: candidate.subject, reason: `stale: ${candidate.evidence.map((item) => item.detail).join("; ")}` }],
+        actions: [
+          {
+            kind: "archive",
+            path: candidate.subject,
+            reason: `stale: ${candidate.evidence.map((item) => item.detail).join("; ")}`,
+          },
+        ],
       })
     }
   }
   if (only.has("duplicate")) {
     for (const candidate of findDuplicates(corpus, resolved.similarity, claimed)) {
       const merge: CleanupAction[] =
-        candidate.distinctive.length === 0 ? [] : [{ kind: "merge", into: candidate.canonical, from: candidate.subject, paragraphs: candidate.distinctive }]
+        candidate.distinctive.length === 0
+          ? []
+          : [{ kind: "merge", into: candidate.canonical, from: candidate.subject, paragraphs: candidate.distinctive }]
       consider({
         class: "duplicate",
         subject: candidate.subject,
         related: candidate.canonical,
         evidence: candidate.evidence,
-        actions: [...merge, { kind: "archive", path: candidate.subject, reason: `duplicate of ${candidate.canonical}`, successor: candidate.canonical }],
+        actions: [
+          ...merge,
+          {
+            kind: "archive",
+            path: candidate.subject,
+            reason: `duplicate of ${candidate.canonical}`,
+            successor: candidate.canonical,
+          },
+        ],
       })
     }
   }
@@ -87,7 +117,11 @@ export async function planMemoryCleanup(repoDir: string, options: MemoryCleanupO
         subject: candidate.a,
         related: candidate.b,
         evidence: candidate.evidence,
-        actions: candidate.marks.map((path) => ({ kind: "mark-conflict", path, other: path === candidate.a ? candidate.b : candidate.a })),
+        actions: candidate.marks.map((path) => ({
+          kind: "mark-conflict",
+          path,
+          other: path === candidate.a ? candidate.b : candidate.a,
+        })),
       })
     }
     kept.push(...conflicts.kept)
@@ -97,13 +131,18 @@ export async function planMemoryCleanup(repoDir: string, options: MemoryCleanupO
   const held: HeldFinding[] = []
   for (const draft of drafts) {
     const touches = touchedPaths(draft, corpus)
-    const finding = { ...draft, id: `${draft.class}:${draft.subject}${draft.related === undefined ? "" : `:${draft.related}`}`, touches }
+    const finding = {
+      ...draft,
+      id: `${draft.class}:${draft.subject}${draft.related === undefined ? "" : `:${draft.related}`}`,
+      touches,
+    }
     const reason = holdReason(finding, corpus, resolved)
     if (reason === undefined) findings.push(finding)
     else held.push({ ...finding, held: reason })
   }
   const order = { superseded: 0, stale: 1, duplicate: 2, conflict: 3 } as const
-  const byClass = (a: MemoryCleanupFinding, b: MemoryCleanupFinding): number => order[a.class] - order[b.class] || a.subject.localeCompare(b.subject)
+  const byClass = (a: MemoryCleanupFinding, b: MemoryCleanupFinding): number =>
+    order[a.class] - order[b.class] || a.subject.localeCompare(b.subject)
   findings.sort(byClass)
   held.sort(byClass)
 
@@ -168,12 +207,17 @@ function touchedPaths(draft: Draft, corpus: CleanupCorpus): string[] {
   return [...touched].sort()
 }
 
-function holdReason(finding: MemoryCleanupFinding, corpus: CleanupCorpus, options: ResolvedCleanupOptions): string | undefined {
+function holdReason(
+  finding: MemoryCleanupFinding,
+  corpus: CleanupCorpus,
+  options: ResolvedCleanupOptions,
+): string | undefined {
   for (const path of finding.touches) {
     const note = corpus.notes.get(path)
     const role = ownedBy(finding, path) ? "would write" : "would repoint a link in"
     if (note?.readOnly === true) return `${role} ${path}, which is read_only`
-    if (!options.includeLoadBearing && LOAD_BEARING_PATHS.has(path)) return `${role} ${path} (load-bearing; pass --include-load-bearing)`
+    if (!options.includeLoadBearing && LOAD_BEARING_PATHS.has(path))
+      return `${role} ${path} (load-bearing; pass --include-load-bearing)`
   }
   return undefined
 }
@@ -189,7 +233,11 @@ function countByHome(corpus: CleanupCorpus): Record<string, number> {
 
 const tokensOf = (bytes: number): number => Math.ceil(bytes / 4)
 
-function budgetOf(corpus: CleanupCorpus, findings: readonly MemoryCleanupFinding[], options: ResolvedCleanupOptions): MemoryCleanupBudget {
+function budgetOf(
+  corpus: CleanupCorpus,
+  findings: readonly MemoryCleanupFinding[],
+  options: ResolvedCleanupOptions,
+): MemoryCleanupBudget {
   const systemNotes = [...corpus.notes.values()].filter((note) => note.path.startsWith("system/"))
   const before = systemNotes.reduce((sum, note) => sum + tokensOf(note.bytes), 0)
   let after = before

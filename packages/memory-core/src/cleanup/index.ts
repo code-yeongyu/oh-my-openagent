@@ -1,5 +1,10 @@
 // Barrel exports only.
-export { applyMemoryCleanup, MemoryCleanupStaleError, type ApplyMemoryCleanupOptions, type MemoryCleanupApplyResult } from "./apply"
+export {
+  applyMemoryCleanup,
+  MemoryCleanupStaleError,
+  type ApplyMemoryCleanupOptions,
+  type MemoryCleanupApplyResult,
+} from "./apply"
 export { scanCleanupCorpus, type CleanupCorpus, type CleanupNote, type NoteLink, type SkippedFile } from "./corpus"
 export { planMemoryCleanup } from "./plan"
 export { renderMemoryCleanupReport, type RenderMemoryCleanupReportOptions } from "./report"

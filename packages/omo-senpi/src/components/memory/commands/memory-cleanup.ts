@@ -15,15 +15,30 @@ import {
 
 import type { ParsedCommandArgs } from "./args"
 import { hasGitRepo, openRepo } from "./repo"
-import { respond, sessionIdOf, type MemoryCommandContext, type MemoryCommandDeps, type MemoryCommandIdentity } from "./types"
+import {
+  respond,
+  sessionIdOf,
+  type MemoryCommandContext,
+  type MemoryCommandDeps,
+  type MemoryCommandIdentity,
+} from "./types"
 
 export const MEMORY_CLEANUP_BOOLEAN_FLAGS = ["apply", "include-load-bearing", "json"] as const
 
 export const MEMORY_CLEANUP_USAGE = `usage: /memory cleanup [--apply] [--include-load-bearing] [--only ${MEMORY_CLEANUP_CLASSES.join(",")}] [--skip <path>[,<path>]] [--json]`
 
-export async function runMemoryCleanup(deps: MemoryCommandDeps, ctx: MemoryCommandContext, identity: MemoryCommandIdentity, parsed: ParsedCommandArgs): Promise<string> {
+export async function runMemoryCleanup(
+  deps: MemoryCommandDeps,
+  ctx: MemoryCommandContext,
+  identity: MemoryCommandIdentity,
+  parsed: ParsedCommandArgs,
+): Promise<string> {
   if (!hasGitRepo(identity)) {
-    return respond(ctx, `no memory repository for ${identity.identity} at ${identity.identityPaths.repo}; run /memfs init or /init to create one`, "error")
+    return respond(
+      ctx,
+      `no memory repository for ${identity.identity} at ${identity.identityPaths.repo}; run /memfs init or /init to create one`,
+      "error",
+    )
   }
   const only = classesOf(parsed.flags.get("only"))
   if (typeof only === "string") return respond(ctx, `${only}\n${MEMORY_CLEANUP_USAGE}`, "error")
@@ -50,7 +65,10 @@ export async function runMemoryCleanup(deps: MemoryCommandDeps, ctx: MemoryComma
       ...(sessionId === undefined ? {} : { provenance: { sessionId, userTurns: 0 } }),
     })
     if (applied.applied) deps.bustPromptCache()
-    return respond(ctx, json ? JSON.stringify({ plan, applied }, null, 2) : renderMemoryCleanupReport(plan, { applied }))
+    return respond(
+      ctx,
+      json ? JSON.stringify({ plan, applied }, null, 2) : renderMemoryCleanupReport(plan, { applied }),
+    )
   } catch (error) {
     return respond(ctx, error instanceof Error ? error.message : String(error), "error")
   }

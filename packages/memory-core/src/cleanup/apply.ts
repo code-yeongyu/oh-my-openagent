@@ -20,13 +20,20 @@ export interface ApplyMemoryCleanupOptions {
 
 export type MemoryCleanupApplyResult =
   | { readonly applied: false; readonly reason: "nothing-to-do" }
-  | { readonly applied: true; readonly commit: MemoryWriteCommit; readonly written: readonly string[]; readonly removed: readonly string[] }
+  | {
+      readonly applied: true
+      readonly commit: MemoryWriteCommit
+      readonly written: readonly string[]
+      readonly removed: readonly string[]
+    }
 
 /** The repository moved under a plan: a note the plan would write no longer matches what the report described. */
 export class MemoryCleanupStaleError extends Error {
   override readonly name = "MemoryCleanupStaleError"
   constructor(readonly changed: readonly string[]) {
-    super(`memory cleanup: ${changed.length} note(s) changed since the report was written (${changed.join(", ")}); run the dry run again and read it before applying`)
+    super(
+      `memory cleanup: ${changed.length} note(s) changed since the report was written (${changed.join(", ")}); run the dry run again and read it before applying`,
+    )
   }
 }
 
@@ -94,12 +101,20 @@ async function buildChanges(plan: MemoryCleanupPlan, corpus: CleanupCorpus, repo
           if (note === undefined) throw new Error(`memory cleanup: ${action.path} is not a live note`)
           sections.push(archiveSection(note, action, finding, now))
           removals.add(action.path)
-          successors.set(action.path, finding.class === "duplicate" && action.successor !== undefined ? { kind: "moved", path: action.successor } : { kind: "archived" })
+          successors.set(
+            action.path,
+            finding.class === "duplicate" && action.successor !== undefined
+              ? { kind: "moved", path: action.successor }
+              : { kind: "archived" },
+          )
           break
         }
         case "mark-conflict": {
           const content = read(action.path)
-          current.set(action.path, withConflictMark({ content, frontmatter: parseMemoryFile(content).frontmatter }, action.other))
+          current.set(
+            action.path,
+            withConflictMark({ content, frontmatter: parseMemoryFile(content).frontmatter }, action.other),
+          )
           break
         }
       }

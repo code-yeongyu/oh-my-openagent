@@ -17,7 +17,11 @@ export interface SupersessionResult {
   readonly kept: readonly KeptNote[]
 }
 
-export function findSuperseded(corpus: CleanupCorpus, declarations: Declarations, threshold: number): SupersessionResult {
+export function findSuperseded(
+  corpus: CleanupCorpus,
+  declarations: Declarations,
+  threshold: number,
+): SupersessionResult {
   const candidates: SupersededCandidate[] = []
   const subjects = new Set<string>()
   const mutual: (readonly [string, string])[] = []
@@ -46,7 +50,9 @@ export function findSuperseded(corpus: CleanupCorpus, declarations: Declarations
       const olderKeys = keysOf.get(older.note.path) ?? new Set<string>()
       if (olderKeys.size === 0) continue
       const newer = successors.filter((version) => version.version > older.version)
-      const covering = [...newer].reverse().find((version) => containment(olderKeys, keysOf.get(version.note.path) ?? new Set()) >= threshold)
+      const covering = [...newer]
+        .reverse()
+        .find((version) => containment(olderKeys, keysOf.get(version.note.path) ?? new Set()) >= threshold)
       const newest = newer[newer.length - 1]
       if (newest === undefined) continue
       if (covering === undefined) {
@@ -91,6 +97,7 @@ function datedSeries(notes: readonly CleanupNote[]): ReadonlyMap<string, readonl
     if (versions) versions.push(entry)
     else series.set(dated.series, [entry])
   }
-  for (const versions of series.values()) versions.sort((a, b) => a.version.localeCompare(b.version) || a.note.path.localeCompare(b.note.path))
+  for (const versions of series.values())
+    versions.sort((a, b) => a.version.localeCompare(b.version) || a.note.path.localeCompare(b.note.path))
   return new Map([...series].filter(([, versions]) => versions.length > 1))
 }

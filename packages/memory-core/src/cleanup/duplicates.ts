@@ -14,7 +14,11 @@ export interface DuplicateCandidate {
 /** A paragraph shared by more notes than this is boilerplate (a section heading, a template line), not a fact. */
 const BOILERPLATE_NOTES = 10
 
-export function findDuplicates(corpus: CleanupCorpus, similarity: number, claimed: ReadonlySet<string>): DuplicateCandidate[] {
+export function findDuplicates(
+  corpus: CleanupCorpus,
+  similarity: number,
+  claimed: ReadonlySet<string>,
+): DuplicateCandidate[] {
   const notes = [...corpus.notes.values()].filter((note) => !claimed.has(note.path)).sort(byPath)
   const archived = new Set<string>()
   const candidates: DuplicateCandidate[] = []
@@ -27,7 +31,9 @@ export function findDuplicates(corpus: CleanupCorpus, similarity: number, claime
       subject: other.path,
       canonical: canonical.path,
       evidence: [evidence, canonicalEvidence(canonical, corpus)],
-      distinctive: other.paragraphs.filter((paragraph) => !canonicalKeys.has(paragraph.key)).map((paragraph) => paragraph.text),
+      distinctive: other.paragraphs
+        .filter((paragraph) => !canonicalKeys.has(paragraph.key))
+        .map((paragraph) => paragraph.text),
     })
   }
 
@@ -41,7 +47,11 @@ export function findDuplicates(corpus: CleanupCorpus, similarity: number, claime
   for (const group of byBody.values()) {
     const [first, ...rest] = group
     if (first === undefined) continue
-    for (const other of rest) emit(first, other, { kind: "identical-body", detail: "same body once markup, case and whitespace are normalised" })
+    for (const other of rest)
+      emit(first, other, {
+        kind: "identical-body",
+        detail: "same body once markup, case and whitespace are normalised",
+      })
   }
 
   const keysOf = comparableKeys(notes)
@@ -95,14 +105,26 @@ export function comparableKeys(notes: readonly CleanupNote[]): ReadonlyMap<strin
   }
   const keys = new Map<string, ReadonlySet<string>>()
   for (const note of notes) {
-    keys.set(note.path, new Set(note.paragraphs.map((paragraph) => paragraph.key).filter((key) => (frequency.get(key) ?? 0) <= BOILERPLATE_NOTES)))
+    keys.set(
+      note.path,
+      new Set(
+        note.paragraphs
+          .map((paragraph) => paragraph.key)
+          .filter((key) => (frequency.get(key) ?? 0) <= BOILERPLATE_NOTES),
+      ),
+    )
   }
   return keys
 }
 
 /** Negative when `a` is the better canonical: more inbound links, then more paragraphs, then more bytes, then path order. */
 function rank(a: CleanupNote, b: CleanupNote, corpus: CleanupCorpus): number {
-  return inbound(b.path, corpus) - inbound(a.path, corpus) || b.paragraphs.length - a.paragraphs.length || b.bytes - a.bytes || a.path.localeCompare(b.path)
+  return (
+    inbound(b.path, corpus) - inbound(a.path, corpus) ||
+    b.paragraphs.length - a.paragraphs.length ||
+    b.bytes - a.bytes ||
+    a.path.localeCompare(b.path)
+  )
 }
 
 function canonicalEvidence(canonical: CleanupNote, corpus: CleanupCorpus): CleanupEvidence {

@@ -45,11 +45,26 @@ describe("memory cleanup", () => {
       { relativePath: "reference/self/queue-depth-first-20261104.md", content: memory("Queue depth lesson", LESSON) },
       {
         relativePath: "reference/tooling/read-order-line-20261105.md",
-        content: memory("Order line lesson", `${LESSON}\n\nMeasured 2026-11-05 on two hosts: a 48-line queue at load 16.\n`),
+        content: memory(
+          "Order line lesson",
+          `${LESSON}\n\nMeasured 2026-11-05 on two hosts: a 48-line queue at load 16.\n`,
+        ),
       },
-      { relativePath: "reference/project/lane-state.md", content: memory("Lane state", "See [[reference/self/queue-depth-first-20261104.md]] before placing.") },
-      { relativePath: "reference/project/placement.md", content: memory("Placement", "Placement rule of record: [[reference/tooling/read-order-line-20261105.md]].") },
-      { relativePath: "reference/project/grants.md", content: memory("Grants", "Grant handling follows [[reference/tooling/read-order-line-20261105.md]] on every host.") },
+      {
+        relativePath: "reference/project/lane-state.md",
+        content: memory("Lane state", "See [[reference/self/queue-depth-first-20261104.md]] before placing."),
+      },
+      {
+        relativePath: "reference/project/placement.md",
+        content: memory("Placement", "Placement rule of record: [[reference/tooling/read-order-line-20261105.md]]."),
+      },
+      {
+        relativePath: "reference/project/grants.md",
+        content: memory(
+          "Grants",
+          "Grant handling follows [[reference/tooling/read-order-line-20261105.md]] on every host.",
+        ),
+      },
     ])
 
     // when
@@ -65,7 +80,9 @@ describe("memory cleanup", () => {
     expect(archive).toContain("## Archived reference/self/queue-depth-first-20261104.md (memory cleanup 2026-11-09)")
     expect(archive).toContain("- Reason: duplicate of reference/tooling/read-order-line-20261105.md")
     expect(archive).toContain("load average counts I/O-blocked threads")
-    expect(await read(dir, "reference/project/lane-state.md")).toContain("[[reference/tooling/read-order-line-20261105.md]]")
+    expect(await read(dir, "reference/project/lane-state.md")).toContain(
+      "[[reference/tooling/read-order-line-20261105.md]]",
+    )
     expect((await auditMemoryRepo(dir)).counts.link_dangling).toBe(0)
     expect(await repo.status()).toBe("")
   })
@@ -76,7 +93,10 @@ describe("memory cleanup", () => {
     const { dir, repo } = await repoWith([
       { relativePath: "reference/a.md", content: memory("A", LESSON) },
       { relativePath: "reference/b.md", content: memory("B", `${LESSON}\n\n${extra}`) },
-      { relativePath: "reference/c.md", content: memory("C", "Links: [[reference/a.md]] and [[reference/a.md]] again.") },
+      {
+        relativePath: "reference/c.md",
+        content: memory("C", "Links: [[reference/a.md]] and [[reference/a.md]] again."),
+      },
     ])
 
     // when
@@ -96,12 +116,21 @@ describe("memory cleanup", () => {
   it("#given a note that declares it supersedes an older one #when applied #then the older is archived naming its successor and the evidence line", async () => {
     // given
     const { dir, repo } = await repoWith([
-      { relativePath: "reference/system/hc-off-roadmap-20261105.md", content: memory("hc off", "hc support is off the roadmap; ignore it.") },
+      {
+        relativePath: "reference/system/hc-off-roadmap-20261105.md",
+        content: memory("hc off", "hc support is off the roadmap; ignore it."),
+      },
       {
         relativePath: "reference/system/hc-back-on-roadmap-20261108.md",
-        content: memory("hc back", "hc is on the roadmap again. This note supersedes [[reference/system/hc-off-roadmap-20261105.md]]."),
+        content: memory(
+          "hc back",
+          "hc is on the roadmap again. This note supersedes [[reference/system/hc-off-roadmap-20261105.md]].",
+        ),
       },
-      { relativePath: "reference/project/plan.md", content: memory("Plan", "Current ruling: [[reference/system/hc-off-roadmap-20261105.md]].") },
+      {
+        relativePath: "reference/project/plan.md",
+        content: memory("Plan", "Current ruling: [[reference/system/hc-off-roadmap-20261105.md]]."),
+      },
     ])
 
     // when
@@ -116,7 +145,9 @@ describe("memory cleanup", () => {
     expect(archive).toContain("- Reason: superseded by reference/system/hc-back-on-roadmap-20261108.md")
     expect(archive).toContain("- Replaced by: [[reference/system/hc-back-on-roadmap-20261108.md]]")
     expect(archive).toContain("hc support is off the roadmap; ignore it.")
-    expect(await read(dir, "reference/project/plan.md")).toContain("[[ARCHIVE.md|reference/system/hc-off-roadmap-20261105.md (archived)]]")
+    expect(await read(dir, "reference/project/plan.md")).toContain(
+      "[[ARCHIVE.md|reference/system/hc-off-roadmap-20261105.md (archived)]]",
+    )
     expect((await auditMemoryRepo(dir)).counts.link_dangling).toBe(0)
   })
 
@@ -125,14 +156,23 @@ describe("memory cleanup", () => {
     const body = (extra: string) => `${LESSON}\n\n${extra}`
     const { dir } = await repoWith([
       { relativePath: "reference/ops/host-state-20261104.md", content: memory("Host state 04", LESSON) },
-      { relativePath: "reference/ops/host-state-20261105.md", content: memory("Host state 05", body("Newer measurement added on the fifth with the same depth reading.")) },
+      {
+        relativePath: "reference/ops/host-state-20261105.md",
+        content: memory("Host state 05", body("Newer measurement added on the fifth with the same depth reading.")),
+      },
       {
         relativePath: "reference/ops/other-20261101.md",
-        content: memory("Other 01", "First paragraph about the relay sign-in path on the first host.\n\nSecond paragraph about the keychain prompt and its dialog."),
+        content: memory(
+          "Other 01",
+          "First paragraph about the relay sign-in path on the first host.\n\nSecond paragraph about the keychain prompt and its dialog.",
+        ),
       },
       {
         relativePath: "reference/ops/other-20261102.md",
-        content: memory("Other 02", "A completely different paragraph about desktop release collection.\n\nAnother one about the notarization check order."),
+        content: memory(
+          "Other 02",
+          "A completely different paragraph about desktop release collection.\n\nAnother one about the notarization check order.",
+        ),
       },
     ])
 
@@ -150,20 +190,32 @@ describe("memory cleanup", () => {
   it("#given an old note that is still true #when planned #then it is not stale, while an expired horizon and a LIFTED name are", async () => {
     // given
     const { dir } = await repoWith([
-      { relativePath: "reference/ops/fleet-roster-20250101.md", content: memory("Fleet roster", "The fleet is three machines; this fact has not changed.") },
+      {
+        relativePath: "reference/ops/fleet-roster-20250101.md",
+        content: memory("Fleet roster", "The fleet is three machines; this fact has not changed."),
+      },
       {
         relativePath: "system/interim-hold-20261106.md",
         content: `---\ndescription: Interim hold\nexpires: 2026-11-07T13:30:00Z\n---\nHold every placement until the window closes.\n`,
       },
-      { relativePath: "reference/ops/seoul-hold-20261105-LIFTED.md", content: memory("Seoul hold lifted", "The hold was lifted on the sixth.") },
-      { relativePath: "system/still-open-20261101.md", content: `---\ndescription: Still open\nexpires: 2026-12-01\n---\nThis horizon has not passed.\n` },
+      {
+        relativePath: "reference/ops/seoul-hold-20261105-LIFTED.md",
+        content: memory("Seoul hold lifted", "The hold was lifted on the sixth."),
+      },
+      {
+        relativePath: "system/still-open-20261101.md",
+        content: `---\ndescription: Still open\nexpires: 2026-12-01\n---\nThis horizon has not passed.\n`,
+      },
     ])
 
     // when
     const plan = await planMemoryCleanup(dir, { now: NOW })
 
     // then
-    expect(plan.findings.map((finding) => finding.subject).sort()).toEqual(["reference/ops/seoul-hold-20261105-LIFTED.md", "system/interim-hold-20261106.md"])
+    expect(plan.findings.map((finding) => finding.subject).sort()).toEqual([
+      "reference/ops/seoul-hold-20261105-LIFTED.md",
+      "system/interim-hold-20261106.md",
+    ])
     const expired = plan.findings.find((finding) => finding.subject === "system/interim-hold-20261106.md")
     expect(expired?.evidence[0]?.detail).toContain("expires: 2026-11-07T13:30:00Z passed")
     expect(plan.budget.tokensAfter).toBeLessThan(plan.budget.tokensBefore)
@@ -174,9 +226,15 @@ describe("memory cleanup", () => {
     const { dir, repo } = await repoWith([
       {
         relativePath: "reference/rules/sionic-allowed.md",
-        content: memory("Allowed", "The work laptop takes receipt rows. This contradicts [[reference/rules/sionic-excluded.md]]."),
+        content: memory(
+          "Allowed",
+          "The work laptop takes receipt rows. This contradicts [[reference/rules/sionic-excluded.md]].",
+        ),
       },
-      { relativePath: "reference/rules/sionic-excluded.md", content: memory("Excluded", "The work laptop is out of scope for every receipt row.") },
+      {
+        relativePath: "reference/rules/sionic-excluded.md",
+        content: memory("Excluded", "The work laptop is out of scope for every receipt row."),
+      },
     ])
 
     // when
@@ -186,8 +244,12 @@ describe("memory cleanup", () => {
     // then
     expect(first.plan.findings.map((finding) => finding.class)).toEqual(["conflict"])
     expect(first.applied.applied).toBe(true)
-    expect(await read(dir, "reference/rules/sionic-allowed.md")).toContain("conflicts_with: reference/rules/sionic-excluded.md")
-    expect(await read(dir, "reference/rules/sionic-excluded.md")).toContain("conflicts_with: reference/rules/sionic-allowed.md")
+    expect(await read(dir, "reference/rules/sionic-allowed.md")).toContain(
+      "conflicts_with: reference/rules/sionic-excluded.md",
+    )
+    expect(await read(dir, "reference/rules/sionic-excluded.md")).toContain(
+      "conflicts_with: reference/rules/sionic-allowed.md",
+    )
     expect(await read(dir, "reference/rules/sionic-excluded.md")).toContain("out of scope for every receipt row")
     expect(second.plan.findings).toEqual([])
     expect(second.plan.kept.map((note) => note.kind)).toEqual(["conflict-marked"])
@@ -202,7 +264,10 @@ describe("memory cleanup", () => {
       { relativePath: "reference/old-20261101.md", content: memory("Old", "Ruling one about the relay.") },
       {
         relativePath: "reference/new-20261108.md",
-        content: memory("New", "Ruling two about the relay; superseded by nothing. [[reference/new-20261108.md]] supersedes [[reference/old-20261101.md]]."),
+        content: memory(
+          "New",
+          "Ruling two about the relay; superseded by nothing. [[reference/new-20261108.md]] supersedes [[reference/old-20261101.md]].",
+        ),
       },
       { relativePath: "reference/gone-LIFTED.md", content: memory("Gone", "A hold that was lifted.") },
       { relativePath: "reference/x.md", content: memory("X", "X conflicts with [[reference/y.md]] on the port.") },
@@ -230,8 +295,14 @@ describe("memory cleanup", () => {
       { relativePath: "system/human.md", content: memory("Human", "Standing rule: [[reference/old-20261101.md]].") },
       { relativePath: "system/persona.md", content: memory("Persona", "Who I am.") },
       { relativePath: "reference/old-20261101.md", content: memory("Old", "Ruling one.") },
-      { relativePath: "reference/new-20261108.md", content: memory("New", "Ruling two. Supersedes [[reference/old-20261101.md]].") },
-      { relativePath: "reference/locked.md", content: `---\ndescription: Locked\nread_only: "true"\n---\nSee [[reference/old-20261101.md]].\n` },
+      {
+        relativePath: "reference/new-20261108.md",
+        content: memory("New", "Ruling two. Supersedes [[reference/old-20261101.md]]."),
+      },
+      {
+        relativePath: "reference/locked.md",
+        content: `---\ndescription: Locked\nread_only: "true"\n---\nSee [[reference/old-20261101.md]].\n`,
+      },
     ])
 
     // when
@@ -245,7 +316,10 @@ describe("memory cleanup", () => {
     expect(forced.findings).toEqual([])
     expect(forced.held[0]?.held).toContain("read_only")
     expect(text).toContain("## held (1)")
-    expect(await applyMemoryCleanup({ repo, lock, plan: held, author })).toEqual({ applied: false, reason: "nothing-to-do" })
+    expect(await applyMemoryCleanup({ repo, lock, plan: held, author })).toEqual({
+      applied: false,
+      reason: "nothing-to-do",
+    })
     expect(await read(dir, "system/human.md")).toContain("[[reference/old-20261101.md]]")
   })
 
@@ -254,7 +328,10 @@ describe("memory cleanup", () => {
     const { dir } = await repoWith([
       { relativePath: "system/human.md", content: memory("Human", "Standing rule: [[reference/old-20261101.md]].") },
       { relativePath: "reference/old-20261101.md", content: memory("Old", "Ruling one.") },
-      { relativePath: "reference/new-20261108.md", content: memory("New", "Ruling two. Supersedes [[reference/old-20261101.md]].") },
+      {
+        relativePath: "reference/new-20261108.md",
+        content: memory("New", "Ruling two. Supersedes [[reference/old-20261101.md]]."),
+      },
     ])
 
     // when
@@ -263,9 +340,16 @@ describe("memory cleanup", () => {
 
     // then
     expect(held.findings).toEqual([])
-    expect(held.held[0]?.held).toBe("would repoint a link in system/human.md (load-bearing; pass --include-load-bearing)")
+    expect(held.held[0]?.held).toBe(
+      "would repoint a link in system/human.md (load-bearing; pass --include-load-bearing)",
+    )
     expect(forced.findings.map((finding) => finding.subject)).toEqual(["reference/old-20261101.md"])
-    expect(forced.findings[0]?.touches).toEqual(["ARCHIVE.md", "reference/new-20261108.md", "reference/old-20261101.md", "system/human.md"])
+    expect(forced.findings[0]?.touches).toEqual([
+      "ARCHIVE.md",
+      "reference/new-20261108.md",
+      "reference/old-20261101.md",
+      "system/human.md",
+    ])
   })
 
   it("#given a note edited after the report was written #when applied #then the plan is refused as stale and nothing is committed", async () => {

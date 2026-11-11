@@ -17,7 +17,12 @@ export interface ConflictResult {
   readonly kept: readonly KeptNote[]
 }
 
-export function findConflicts(corpus: CleanupCorpus, declarations: Declarations, mutual: readonly (readonly [string, string])[], claimed: ReadonlySet<string>): ConflictResult {
+export function findConflicts(
+  corpus: CleanupCorpus,
+  declarations: Declarations,
+  mutual: readonly (readonly [string, string])[],
+  claimed: ReadonlySet<string>,
+): ConflictResult {
   const pairs = new Map<string, { readonly a: string; readonly b: string; readonly evidence: CleanupEvidence[] }>()
   const add = (x: string, y: string, evidence: CleanupEvidence): void => {
     const [a, b] = x < y ? [x, y] : [y, x]
@@ -29,14 +34,19 @@ export function findConflicts(corpus: CleanupCorpus, declarations: Declarations,
   for (const declaration of declarations.conflicts) {
     add(declaration.from, declaration.to, { kind: "declared", detail: declaration.text, at: declaration.at })
   }
-  for (const [a, b] of mutual) add(a, b, { kind: "mutual-supersession", detail: `${a} and ${b} each declare the other superseded` })
+  for (const [a, b] of mutual)
+    add(a, b, { kind: "mutual-supersession", detail: `${a} and ${b} each declare the other superseded` })
 
   const candidates: ConflictCandidate[] = []
   const kept: KeptNote[] = []
   for (const pair of [...pairs.values()].sort((x, y) => x.a.localeCompare(y.a) || x.b.localeCompare(y.b))) {
     const archived = [pair.a, pair.b].filter((path) => claimed.has(path))
     if (archived.length > 0) {
-      kept.push({ kind: "party-archived", detail: `${archived.join(", ")} already archived by another finding; conflict not marked`, paths: [pair.a, pair.b] })
+      kept.push({
+        kind: "party-archived",
+        detail: `${archived.join(", ")} already archived by another finding; conflict not marked`,
+        paths: [pair.a, pair.b],
+      })
       continue
     }
     const noteA = corpus.notes.get(pair.a)
@@ -44,7 +54,11 @@ export function findConflicts(corpus: CleanupCorpus, declarations: Declarations,
     if (noteA === undefined || noteB === undefined) continue
     const marks = [...(marked(noteA, pair.b) ? [] : [pair.a]), ...(marked(noteB, pair.a) ? [] : [pair.b])]
     if (marks.length === 0) {
-      kept.push({ kind: "conflict-marked", detail: `${pair.a} and ${pair.b} already carry ${CONFLICTS_WITH_KEY}; both stay`, paths: [pair.a, pair.b] })
+      kept.push({
+        kind: "conflict-marked",
+        detail: `${pair.a} and ${pair.b} already carry ${CONFLICTS_WITH_KEY}; both stay`,
+        paths: [pair.a, pair.b],
+      })
       continue
     }
     candidates.push({ a: pair.a, b: pair.b, evidence: pair.evidence, marks })

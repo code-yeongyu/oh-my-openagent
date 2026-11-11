@@ -11,8 +11,10 @@ export const MEMORY_REPOSITORY_SUBCOMMANDS = ["set", "unset", "status", "push"] 
 
 export const LAZY_MEMORY_COMMANDS = {
   memory: {
-    description: "View committed memory: HEAD, system bodies, external names, and uncommitted changes; cleanup reports duplicates, superseded, stale and conflicting notes (dry run; --apply archives, never deletes); unlock re-checks and removes a stranded git lock.",
-    argumentHint: "[cleanup [--apply] [--include-load-bearing] [--only <classes>] [--skip <paths>] [--json] | unlock <lock path> [--force]]",
+    description:
+      "View committed memory: HEAD, system bodies, external names, and uncommitted changes; cleanup reports duplicates, superseded, stale and conflicting notes (dry run; --apply archives, never deletes); unlock re-checks and removes a stranded git lock.",
+    argumentHint:
+      "[cleanup [--apply] [--include-load-bearing] [--only <classes>] [--skip <paths>] [--json] | unlock <lock path> [--force]]",
   },
   remember: {
     description: "Persist text to long-term memory via a memory-tool turn.",

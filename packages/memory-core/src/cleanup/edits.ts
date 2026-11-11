@@ -9,7 +9,8 @@ import type { CleanupAction, MemoryCleanupFinding } from "./types"
 type MergeAction = Extract<CleanupAction, { kind: "merge" }>
 type ArchiveAction = Extract<CleanupAction, { kind: "archive" }>
 
-export const ARCHIVE_DESCRIPTION = "Archived memory notes: retired by cleanup or reflection with the reason and the note that replaced each one."
+export const ARCHIVE_DESCRIPTION =
+  "Archived memory notes: retired by cleanup or reflection with the reason and the note that replaced each one."
 
 export function dayOf(now: number): string {
   return new Date(now).toISOString().slice(0, 10)
@@ -51,13 +52,20 @@ export function withConflictMark(note: Pick<CleanupNote, "content" | "frontmatte
   return marked
 }
 
-export function archiveSection(note: CleanupNote, action: ArchiveAction, finding: MemoryCleanupFinding, now: number): string {
+export function archiveSection(
+  note: CleanupNote,
+  action: ArchiveAction,
+  finding: MemoryCleanupFinding,
+  now: number,
+): string {
   const lines = [
     `## Archived ${note.path} (memory cleanup ${dayOf(now)})`,
     "",
     `- Reason: ${action.reason}`,
     ...(action.successor === undefined ? [] : [`- Replaced by: [[${action.successor}]]`]),
-    ...finding.evidence.map((item) => `- Evidence (${item.kind})${item.at === undefined ? "" : ` at ${item.at}`}: ${item.detail}`),
+    ...finding.evidence.map(
+      (item) => `- Evidence (${item.kind})${item.at === undefined ? "" : ` at ${item.at}`}: ${item.detail}`,
+    ),
     `- Original description: ${note.frontmatter.description}`,
     ...headerExtras(note),
     "",
@@ -76,6 +84,9 @@ function headerExtras(note: CleanupNote): string[] {
 }
 
 export function appendToArchive(existing: string | undefined, sections: readonly string[]): string {
-  const base = existing === undefined || existing.trim() === "" ? renderMemoryFile({ description: ARCHIVE_DESCRIPTION }, "# Archive\n") : existing
+  const base =
+    existing === undefined || existing.trim() === ""
+      ? renderMemoryFile({ description: ARCHIVE_DESCRIPTION }, "# Archive\n")
+      : existing
   return `${base.replace(/\s+$/, "")}\n\n${sections.join("\n")}`
 }

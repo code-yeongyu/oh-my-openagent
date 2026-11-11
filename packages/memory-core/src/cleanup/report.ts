@@ -12,12 +12,18 @@ const CLASS_TITLES = {
   conflict: "conflict: notes that contradict each other (kept and marked, no winner picked)",
 } as const
 
-export function renderMemoryCleanupReport(plan: MemoryCleanupPlan, options: RenderMemoryCleanupReportOptions = {}): string {
+export function renderMemoryCleanupReport(
+  plan: MemoryCleanupPlan,
+  options: RenderMemoryCleanupReportOptions = {},
+): string {
   const mode = options.applied === undefined ? "dry run" : options.applied.applied ? "applied" : "nothing to apply"
   const homes = Object.entries(plan.scanned.byHome)
     .map(([home, count]) => `${home} ${count}`)
     .join(", ")
-  const lines = [`# Memory cleanup (${mode}) - ${plan.repoDir}`, `scanned ${plan.scanned.notes} note(s) (${homes || "none"}); ARCHIVE.md and notes/ are never candidates`]
+  const lines = [
+    `# Memory cleanup (${mode}) - ${plan.repoDir}`,
+    `scanned ${plan.scanned.notes} note(s) (${homes || "none"}); ARCHIVE.md and notes/ are never candidates`,
+  ]
   if (plan.scanned.skipped.length > 0) {
     lines.push(`skipped ${plan.scanned.skipped.length} unreadable file(s), never touched:`)
     for (const file of plan.scanned.skipped) lines.push(`  - ${file.path}: ${file.reason}`)
@@ -30,7 +36,10 @@ export function renderMemoryCleanupReport(plan: MemoryCleanupPlan, options: Rend
   }
   lines.push("", `## held (${plan.held.length}) - reported, not applied`)
   if (plan.held.length === 0) lines.push("- none")
-  for (const finding of plan.held) lines.push(`- ${finding.class} ${finding.subject}${finding.related === undefined ? "" : ` -> ${finding.related}`}: ${finding.held}`)
+  for (const finding of plan.held)
+    lines.push(
+      `- ${finding.class} ${finding.subject}${finding.related === undefined ? "" : ` -> ${finding.related}`}: ${finding.held}`,
+    )
   lines.push("", `## kept (${plan.kept.length}) - information only, no action`)
   if (plan.kept.length === 0) lines.push("- none")
   for (const note of plan.kept) lines.push(`- ${note.kind}: ${note.detail}`)
@@ -43,9 +52,12 @@ export function renderMemoryCleanupReport(plan: MemoryCleanupPlan, options: Rend
 function renderFinding(finding: MemoryCleanupFinding): string[] {
   const head = finding.related === undefined ? finding.subject : `${finding.subject} -> ${finding.related}`
   const lines = [`- ${head}`]
-  for (const item of finding.evidence) lines.push(`    evidence (${item.kind})${item.at === undefined ? "" : ` at ${item.at}`}: ${item.detail}`)
+  for (const item of finding.evidence)
+    lines.push(`    evidence (${item.kind})${item.at === undefined ? "" : ` at ${item.at}`}: ${item.detail}`)
   for (const action of finding.actions) lines.push(`    apply: ${describeAction(action)}`)
-  const repointed = finding.touches.filter((path) => path !== "ARCHIVE.md" && !finding.actions.some((action) => writes(action, path)))
+  const repointed = finding.touches.filter(
+    (path) => path !== "ARCHIVE.md" && !finding.actions.some((action) => writes(action, path)),
+  )
   if (repointed.length > 0) lines.push(`    apply: repoint link(s) in ${repointed.join(", ")}`)
   return lines
 }
@@ -75,7 +87,8 @@ function describeAction(action: CleanupAction): string {
 function renderBudget(plan: MemoryCleanupPlan): string {
   const { tokensBefore, tokensAfter, budgetTokens, systemFiles } = plan.budget
   const delta = tokensAfter - tokensBefore
-  const of = budgetTokens === undefined ? "" : ` of ${budgetTokens} (${Math.round((tokensBefore / budgetTokens) * 100)}%)`
+  const of =
+    budgetTokens === undefined ? "" : ` of ${budgetTokens} (${Math.round((tokensBefore / budgetTokens) * 100)}%)`
   const afterOf = budgetTokens === undefined ? "" : ` (${Math.round((tokensAfter / budgetTokens) * 100)}%)`
   const change = delta === 0 ? "no change" : `${delta > 0 ? "+" : ""}${delta}`
   return `system/ ${systemFiles} file(s) ~${tokensBefore} tokens${of} -> ~${tokensAfter}${afterOf} after apply (${change}; bytes/4, link rewrites not counted)`
@@ -90,8 +103,14 @@ function renderSummary(plan: MemoryCleanupPlan): string {
 function renderFooter(plan: MemoryCleanupPlan, options: RenderMemoryCleanupReportOptions): string[] {
   const applied = options.applied
   if (applied === undefined) {
-    return plan.findings.length === 0 ? ["nothing to apply."] : ["Read the findings above, then run again with --apply (add --skip <path> for any finding you veto)."]
+    return plan.findings.length === 0
+      ? ["nothing to apply."]
+      : ["Read the findings above, then run again with --apply (add --skip <path> for any finding you veto)."]
   }
   if (!applied.applied) return ["nothing to apply."]
-  return [`${applied.commit.message}`, `written: ${applied.written.join(", ") || "none"}`, `archived: ${applied.removed.join(", ") || "none"}`]
+  return [
+    `${applied.commit.message}`,
+    `written: ${applied.written.join(", ") || "none"}`,
+    `archived: ${applied.removed.join(", ") || "none"}`,
+  ]
 }

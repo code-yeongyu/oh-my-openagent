@@ -99,7 +99,12 @@ export interface MemoryCleanupPlan {
 export const DEFAULT_CLEANUP_SIMILARITY = 0.9
 export const DEFAULT_CLEANUP_CONTAINMENT = 0.9
 
-export const LOAD_BEARING_PATHS: ReadonlySet<string> = new Set(["system/persona.md", "system/human.md", "system/identity.md", "system/agreements.md"])
+export const LOAD_BEARING_PATHS: ReadonlySet<string> = new Set([
+  "system/persona.md",
+  "system/human.md",
+  "system/identity.md",
+  "system/agreements.md",
+])
 
 export function resolveCleanupOptions(options: MemoryCleanupOptions): ResolvedCleanupOptions {
   return {
