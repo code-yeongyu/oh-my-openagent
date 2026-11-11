@@ -57,15 +57,20 @@ export SPT_QA_USER=<QA account> SPT_COMMIT=<commit of this directory> SPT_BUN=<a
 P=<this directory, staged under $CU_RUN>
 bash $P/sp-t-identity.sh create                 # once per run; writes $CU_RUN/t3-signing/IDENTITY
 bun $P/probe-sp-t.ts --setup                    # spawner, two generations (current, previous), the prompt probe
-bun $P/probe-sp-t.ts --request-grant            # H3: the dialog for "OmO Computer Use"; grant it in System Settings
+bun $P/probe-sp-t.ts --measure --out $P/macos-tcc.tsv   # no grant, no prompt: person rows read WAITING-PERSON
+# only in a slot with a person at the QA session (SPT_PERSON_PRESENT=1):
+bun $P/probe-sp-t.ts --request-grant            # H3: the dialog for "OmO Computer Use"; the person grants it
 bun $P/probe-sp-t.ts --check-grant              # expects accessibility 1
-bun $P/probe-sp-t.ts --measure --out $P/macos-tcc.tsv
+bun $P/probe-sp-t.ts --measure --out $P/macos-tcc.tsv   # now also the grant and prompt rows
 bun $P/probe-sp-t.ts --verify $P/macos-tcc.tsv  # from a clean shell: every verdict identical, VERIFY_OK, exit 0
 bun $P/probe-sp-t.ts --cleanup                  # receipts: procs 0, dir REMOVED; keeps the identity and the H3 grant
 ```
 
-The `prompt.*` rows print an `OPERATOR:` line: a dialog naming "OmO Computer Use SP-T prompt probe" may appear in
-the QA session and is answered Deny. The T3 identity and the H3 grant stay for the later macOS rows and are removed
+No agent clicks a TCC grant or answers a permission prompt. The rows that need the H3 grant (`client-type.*`,
+`swap.*`, `rebuild.*`) or a Deny answer (`prompt.*`) read `WAITING-PERSON` with the reason and launch nothing unless
+`SPT_PERSON_PRESENT=1` is set for a slot with a person at the QA session; `--request-grant` refuses without it. In
+such a slot the `prompt.*` rows print an `OPERATOR:` line: a dialog naming "OmO Computer Use SP-T prompt probe"
+appears in the QA session and the person answers Deny. The T3 identity and the H3 grant stay for the later macOS rows and are removed
 at the final teardown (`sp-t-identity.sh delete`, and `tccutil reset` of the helper bundle id).
 
 Any single row re-measures with the command in its `rerun` column. On a host without the preconditions (for example

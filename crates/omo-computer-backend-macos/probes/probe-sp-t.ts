@@ -15,6 +15,13 @@
 //   --verify <ledger>            measure every row of this host again; exit 0 only if every verdict is identical
 //   --cleanup                    remove probe-only state (work tree, LaunchServices entries, prompt-probe rows)
 //   --leg <spec.json>            internal: one launch, run inside the GUI session or an ssh child
+//
+// No agent clicks a TCC grant or answers a permission prompt. Rows that need the H3 grant or a Deny answer read
+// WAITING-PERSON and launch nothing unless SPT_PERSON_PRESENT=1 (a person at the QA session for that slot), and
+// --request-grant refuses without it.
+//
+// Sections, in file order: types and constants | process helpers | preconditions | work tree | legs |
+// classification | measurements | the row table | ledger | cleanup | main
 import {
   chmodSync,
   existsSync,
@@ -27,6 +34,8 @@ import {
   writeFileSync,
 } from "node:fs"
 import { basename, join } from "node:path"
+
+// ---------------------------------------------------------------------------------------------- types and constants
 
 const PROBE_DIR = import.meta.dir
 const BUNDLE_ID = "ai.sisyphuslabs.omo-computer-helper"
@@ -44,6 +53,17 @@ type Os = 15 | 26
 type HostRole = "h1" | "h2" | "h4"
 type LaunchAction = "open-path" | "open-name" | "disclaim" | "plain"
 type Context = "gui" | "ssh"
+type PersonNeed = "grant" | "deny"
+
+const PERSON_REASON: Record<PersonNeed, string> = {
+  grant:
+    "waiting for a person: needs the H3 grant (Accessibility, Screen Recording, Input Monitoring to the helper bundle) given by a person at the QA session; no agent clicks a TCC grant",
+  deny: "waiting for a person: raises a TCC dialog that a person at the QA session answers Deny; no agent answers a permission prompt",
+}
+
+function personPresent(): boolean {
+  return process.env.SPT_PERSON_PRESENT === "1"
+}
 
 interface Measured {
   verdict: string
@@ -58,6 +78,7 @@ interface RowDef {
   host: HostRole
   os: Os
   needs?: "h2" | "h4"
+  person?: PersonNeed
   measure: (env: HostEnv, log: EvidenceLog) => Promise<Measured>
 }
 
@@ -504,9 +525,9 @@ async function grantPresent(env: HostEnv, log: EvidenceLog): Promise<boolean> {
 }
 
 const AWAITING_H3: Measured = {
-  verdict: "UNMEASURED",
+  verdict: "WAITING-PERSON",
   measured: {},
-  note: "awaiting H3: Accessibility is not granted to the helper bundle (run --request-grant, then --check-grant)",
+  note: `${PERSON_REASON.grant} (measured: Accessibility is not granted to the helper bundle)`,
 }
 
 function clientType(path: "open" | "disclaim") {
@@ -795,13 +816,20 @@ const C = {
 function osRows(os: Os): RowDef[] {
   const host: HostRole = os === 26 ? "h1" : "h2"
   const needs = os === 15 ? ("h2" as const) : undefined
-  const row = (slug: string, question: string, condition: string, measure: RowDef["measure"]): RowDef => ({
+  const row = (
+    slug: string,
+    question: string,
+    condition: string,
+    measure: RowDef["measure"],
+    person?: PersonNeed,
+  ): RowDef => ({
     id: `${slug}.m${os}`,
     question,
     condition,
     host,
     os,
     needs,
+    ...(person ? { person } : {}),
     measure,
   })
   return [
@@ -810,9 +838,9 @@ function osRows(os: Os): RowDef[] {
     row("domain.ssh-disclaim", Q.domain, C.sshDisclaim, domainRow("ssh", "disclaim")),
     row("charged.ssh-open", Q.charged, C.sshOpen, charged("ssh", "open")),
     row("charged.ssh-disclaim", Q.charged, C.sshDisclaim, charged("ssh", "disclaim")),
-    row("prompt.gui-open-control", Q.prompt, C.guiOpenPromptControl, promptRow("gui", "open")),
-    row("prompt.ssh-open", Q.prompt, C.sshOpen, promptRow("ssh", "open")),
-    row("prompt.ssh-disclaim", Q.prompt, C.sshDisclaim, promptRow("ssh", "disclaim")),
+    row("prompt.gui-open-control", Q.prompt, C.guiOpenPromptControl, promptRow("gui", "open"), "deny"),
+    row("prompt.ssh-open", Q.prompt, C.sshOpen, promptRow("ssh", "open"), "deny"),
+    row("prompt.ssh-disclaim", Q.prompt, C.sshDisclaim, promptRow("ssh", "disclaim"), "deny"),
     row("charged.gui-open", Q.charged, C.guiOpen, charged("gui", "open")),
     row("charged.gui-disclaim", Q.charged, C.guiDisclaim, charged("gui", "disclaim")),
     row("charged.gui-plain-control", Q.charged, C.guiPlain, charged("gui", "plain")),
@@ -821,11 +849,11 @@ function osRows(os: Os): RowDef[] {
     row("identity-path.gui-open", Q.identityPath, C.guiOpen, identityPathRow("open")),
     row("identity-path.gui-disclaim", Q.identityPath, C.guiDisclaim, identityPathRow("disclaim")),
     row("by-name-open-a.gui", Q.byName, C.byName, byNameOpen),
-    row("client-type.gui-open", Q.clientType, C.guiOpen, clientType("open")),
-    row("client-type.gui-disclaim", Q.clientType, C.guiDisclaim, clientType("disclaim")),
-    row("swap.gui-open", Q.swap, C.guiOpen, swapSurvives("open")),
-    row("swap.gui-disclaim", Q.swap, C.guiDisclaim, swapSurvives("disclaim")),
-    row("rebuild.gui-open", Q.rebuild, C.rebuild, rebuildSurvives),
+    row("client-type.gui-open", Q.clientType, C.guiOpen, clientType("open"), "grant"),
+    row("client-type.gui-disclaim", Q.clientType, C.guiDisclaim, clientType("disclaim"), "grant"),
+    row("swap.gui-open", Q.swap, C.guiOpen, swapSurvives("open"), "grant"),
+    row("swap.gui-disclaim", Q.swap, C.guiDisclaim, swapSurvives("disclaim"), "grant"),
+    row("rebuild.gui-open", Q.rebuild, C.rebuild, rebuildSurvives, "grant"),
   ]
 }
 
@@ -864,17 +892,22 @@ function evidencePath(id: string): string {
 
 function skeletonLine(def: RowDef): string[] {
   const awaiting = def.needs === "h4" ? "awaiting H4" : def.needs === "h2" ? "awaiting H2" : ""
+  const person = def.person ? PERSON_REASON[def.person] : ""
+  const verdict = awaiting ? "UNMEASURED" : person ? "WAITING-PERSON" : "PENDING"
+  const note = awaiting
+    ? `${awaiting}: the host is not confirmed${person ? `; then ${person}` : ""}`
+    : person || "measured on the QA host in phase B"
   return [
     def.id,
     def.question,
     def.condition,
     HOSTS[def.host] + (def.host === "h1" || def.host === "h2" ? ` (macOS ${def.os})` : ""),
-    awaiting ? "UNMEASURED" : "PENDING",
+    verdict,
     rerun(def.id),
-    awaiting ? `none: ${awaiting}` : "none: not measured yet",
+    awaiting ? `none: ${awaiting}` : person ? "none: waiting for a person" : "none: not measured yet",
     "-",
     evidencePath(def.id),
-    awaiting ? `${awaiting}: the host is not confirmed` : "measured on the QA host in phase B",
+    note,
   ]
 }
 
@@ -909,6 +942,8 @@ async function measureRow(def: RowDef, env: HostEnv): Promise<{ line: string[]; 
         measured: {},
         note: `awaiting ${def.host.toUpperCase()}: this host is not the row's host (${env.build})`,
       }
+    else if (def.person && !personPresent())
+      measured = { verdict: "WAITING-PERSON", measured: {}, note: `${PERSON_REASON[def.person]}; no leg was launched` }
     else measured = await def.measure(env, log)
   } catch (error) {
     if (error instanceof Precondition)
@@ -1016,6 +1051,10 @@ async function main(argv: string[]): Promise<number> {
   if (flag("--setup")) {
     console.log(`setup done: current=${currentApp(env)}`)
     return 0
+  }
+  if (flag("--request-grant") && !personPresent()) {
+    console.error(`SP-T WAITING-PERSON: ${PERSON_REASON.grant}`)
+    return 2
   }
   if (flag("--request-grant") || flag("--check-grant")) {
     const log = new EvidenceLog()
