@@ -193,7 +193,7 @@ function formatNotInstalled(result: Extract<ServerLookupResult, { status: "not_i
     ...(searchedFrom === undefined
       ? []
       : [
-          `Searched project tool directories from ${searchedFrom} up to its repository root, then PATH.`,
+          `Searched project tool directories from ${searchedFrom} up to its repository root (or the filesystem root outside a repository), then PATH.`,
           "If the file you are working on belongs to a different project, its locally installed server is outside this lookup: start the session in that project instead of installing.",
         ]),
     "",

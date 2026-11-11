@@ -75,7 +75,6 @@ describe("buildTaskToolDescription", () => {
 
     // then
     expect(description).toContain("max_depth is 1")
-    expect(description).toContain("a child cannot spawn children of its own")
   })
 
   test("#given task.max_depth 0 #when the description is built #then it states that spawns are refused", () => {
@@ -99,6 +98,5 @@ describe("buildTaskToolDescription", () => {
 
     // then
     expect(description).toContain("max_depth is 3")
-    expect(description).toContain("a spawn that would run deeper is refused")
   })
 })

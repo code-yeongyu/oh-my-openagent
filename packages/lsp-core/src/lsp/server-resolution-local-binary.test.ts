@@ -181,6 +181,6 @@ describe("not-installed message repo-local guidance", () => {
 
     // then
     expect(result.searchedFrom).toBe(root)
-    expect(message).toContain(`Searched project tool directories from ${root} up to its repository root, then PATH.`)
+    expect(message).toContain(`Searched project tool directories from ${root} up to its repository root (or the filesystem root outside a repository), then PATH.`)
   })
 })
