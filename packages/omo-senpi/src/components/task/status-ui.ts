@@ -141,15 +141,17 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
       return
     }
     const records = cachedRecords
-    const background = deps.manager.wasBackground === undefined
-      ? []
-      : records.filter((record) => deps.manager.wasBackground?.(record.task_id) === true)
+    const background =
+      deps.manager.wasBackground === undefined
+        ? []
+        : records.filter((record) => deps.manager.wasBackground?.(record.task_id) === true)
     const renderedAt = now()
     const liveStats = deps.manager.runStatsSnapshot?.bind(deps.manager)
     const terminalWidth = deps.terminalWidth?.() ?? process.stdout.columns
-    const rows = deps.manager.wasBackground === undefined
-      ? buildWidgetRows(records)
-      : backgroundWidgetRows(background, liveActivity, renderedAt, liveStats, terminalWidth)
+    const rows =
+      deps.manager.wasBackground === undefined
+        ? buildWidgetRows(records)
+        : backgroundWidgetRows(background, liveActivity, renderedAt, liveStats, terminalWidth)
     if (rows.length === 0) {
       clearLiveRefresh()
       ui.setWidget(UI_KEY, undefined)
@@ -157,7 +159,10 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
     }
     ui.setWidget(UI_KEY, rows, { placement: "belowEditor" })
     // Only a live child needs the 250 ms repaint; a parked one renders a still row.
-    if (deps.manager.wasBackground !== undefined && background.some((record) => !isTerminal(record.status) && !isSuspended(record))) {
+    if (
+      deps.manager.wasBackground !== undefined &&
+      background.some((record) => !isTerminal(record.status) && !isSuspended(record))
+    ) {
       scheduleLiveRefresh()
     } else clearLiveRefresh()
   }
@@ -194,12 +199,15 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
     }
     for (const taskId of activeBackgroundIds) {
       if (subscriptions.has(taskId)) continue
-      subscriptions.set(taskId, deps.manager.subscribeChild(taskId, (event) => {
-        const activity = activityFromEvent(event)
-        if (activity === undefined) return
-        liveActivity.set(taskId, activity)
-        scheduleSync()
-      }))
+      subscriptions.set(
+        taskId,
+        deps.manager.subscribeChild(taskId, (event) => {
+          const activity = activityFromEvent(event)
+          if (activity === undefined) return
+          liveActivity.set(taskId, activity)
+          scheduleSync()
+        }),
+      )
     }
   }
 
@@ -235,10 +243,11 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
 
   return {
     scheduleSync,
-    syncNow: () => containRenderFault(() => {
-      treeCost.ensureSeeded()
-      syncNow()
-    }),
+    syncNow: () =>
+      containRenderFault(() => {
+        treeCost.ensureSeeded()
+        syncNow()
+      }),
     observeRecord: (change) => containRenderFault(() => treeCost.observe(change)),
     dispose,
   }

@@ -89,6 +89,3 @@ function call(owner: unknown, method: string): unknown {
     return undefined
   }
 }
-
-
-

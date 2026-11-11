@@ -10,14 +10,22 @@ export interface ToolkitGrant {
   readonly tokenFile: string
 }
 
-export function createDesktopToolkitComponent(options: { readonly timeoutMs?: number; readonly loadSdk?: () => Promise<unknown> } = {}): OmoSenpiComponent {
+export function createDesktopToolkitComponent(
+  options: { readonly timeoutMs?: number; readonly loadSdk?: () => Promise<unknown> } = {},
+): OmoSenpiComponent {
   return {
     name: "desktop-toolkit",
     async register(pi, ctx) {
       if (typeof pi.registerTool !== "function") return
       const context = pi.sessionContext
-      if (pi.rpc !== undefined && typeof context === "object" && context !== null &&
-        "omo_toolkits" in context && typeof context.omo_toolkits === "string" && context.omo_toolkits.trim() !== "") {
+      if (
+        pi.rpc !== undefined &&
+        typeof context === "object" &&
+        context !== null &&
+        "omo_toolkits" in context &&
+        typeof context.omo_toolkits === "string" &&
+        context.omo_toolkits.trim() !== ""
+      ) {
         const { createDesktopToolkitRuntime } = await import("#omo-desktop-toolkit-runtime")
         return createDesktopToolkitRuntime(options).register(pi, ctx)
       }
@@ -25,14 +33,22 @@ export function createDesktopToolkitComponent(options: { readonly timeoutMs?: nu
       pi.registerTool({
         name: "omo_desktop_toolkit",
         label: "Desktop toolkit",
-        description: "Internal channel for skills: ask the app for a toolkit it hosts for this thread. Not for direct use.",
+        description:
+          "Internal channel for skills: ask the app for a toolkit it hosts for this thread. Not for direct use.",
         parameters: {
-          type: "object", properties: { op: { type: "string", enum: ["acquire"] }, toolkit: { type: "string" } },
-          required: ["op", "toolkit"], additionalProperties: false,
+          type: "object",
+          properties: { op: { type: "string", enum: ["acquire"] }, toolkit: { type: "string" } },
+          required: ["op", "toolkit"],
+          additionalProperties: false,
         },
-        exposure: "eval", permissionParser: () => [], executionMode: "parallel",
+        exposure: "eval",
+        permissionParser: () => [],
+        executionMode: "parallel",
         async execute(_id: string, params: { readonly op?: unknown; readonly toolkit?: unknown }) {
-          const reason = params.op === "acquire" && typeof params.toolkit === "string" && params.toolkit !== "" ? "unavailable" : "invalid_request"
+          const reason =
+            params.op === "acquire" && typeof params.toolkit === "string" && params.toolkit !== ""
+              ? "unavailable"
+              : "invalid_request"
           const details = { ok: false, reason }
           return { content: [{ type: "text", text: JSON.stringify(details) }], details }
         },

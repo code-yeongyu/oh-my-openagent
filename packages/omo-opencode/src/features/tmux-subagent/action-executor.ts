@@ -1,12 +1,6 @@
 import type { TmuxConfig } from "../../config/schema"
 import type { PaneAction, WindowState } from "./types"
-import {
-  applyLayout,
-  spawnTmuxPane,
-  closeTmuxPane,
-  enforceMainPaneWidth,
-  replaceTmuxPane,
-} from "../../shared/tmux"
+import { applyLayout, spawnTmuxPane, closeTmuxPane, enforceMainPaneWidth, replaceTmuxPane } from "../../shared/tmux"
 import { getTmuxPath } from "../../tools/interactive-bash/tmux-path-resolver"
 import { queryWindowState } from "./pane-state-querier"
 import { log } from "../../shared"
@@ -28,10 +22,7 @@ export interface ExecuteContext {
   sourcePaneId?: string
 }
 
-async function enforceMainPane(
-  windowState: WindowState,
-  config: TmuxConfig,
-): Promise<void> {
+async function enforceMainPane(windowState: WindowState, config: TmuxConfig): Promise<void> {
   if (!windowState.mainPane) return
   await enforceMainPaneWidth(windowState.mainPane.paneId, windowState.windowWidth, {
     mainPaneSize: config.main_pane_size,
@@ -77,10 +68,7 @@ function isPaneInSourceWindow(paneId: string, windowState: WindowState): boolean
   return windowState.agentPanes.some((pane) => pane.paneId === paneId)
 }
 
-export async function executeAction(
-  action: PaneAction,
-  ctx: ExecuteContext
-): Promise<ActionResult> {
+export async function executeAction(action: PaneAction, ctx: ExecuteContext): Promise<ActionResult> {
   if (action.type === "close") {
     const closingPaneInSourceWindow = isPaneInSourceWindow(action.paneId, ctx.windowState)
     const success = await closeTmuxPane(action.paneId)
@@ -94,11 +82,11 @@ export async function executeAction(
     const result = await replaceTmuxPane(
       action.paneId,
       action.newSessionId,
-		action.description,
-		ctx.config,
-		ctx.serverUrl,
-		ctx.directory,
-	)
+      action.description,
+      ctx.config,
+      ctx.serverUrl,
+      ctx.directory,
+    )
     if (result.success) {
       await enforceLayoutAndMainPane(ctx)
     }
@@ -110,13 +98,13 @@ export async function executeAction(
 
   const result = await spawnTmuxPane(
     action.sessionId,
-		action.description,
-		ctx.config,
-		ctx.serverUrl,
-		ctx.directory,
-		action.targetPaneId,
-		action.splitDirection
-	)
+    action.description,
+    ctx.config,
+    ctx.serverUrl,
+    ctx.directory,
+    action.targetPaneId,
+    action.splitDirection,
+  )
 
   if (result.success) {
     await enforceLayoutAndMainPane(ctx)
@@ -128,10 +116,7 @@ export async function executeAction(
   }
 }
 
-export async function executeActions(
-  actions: PaneAction[],
-  ctx: ExecuteContext
-): Promise<ExecuteActionsResult> {
+export async function executeActions(actions: PaneAction[], ctx: ExecuteContext): Promise<ExecuteActionsResult> {
   const results: Array<{ action: PaneAction; result: ActionResult }> = []
   let spawnedPaneId: string | undefined
 

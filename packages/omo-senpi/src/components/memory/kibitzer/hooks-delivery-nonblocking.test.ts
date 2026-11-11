@@ -15,7 +15,10 @@ const identity = createMemoryIdentityContext({
 const host = { sessionManager: { getSessionId: () => "session-13074", getBranch: () => [], getEntries: () => [] } }
 const readResult = { toolName: "read", toolCallId: "call-1", content: [{ type: "text", text: "data" }] }
 
-function hookOptions(onToolResult: KibitzerHooksOptions["delivery"]["onToolResult"], warnings: string[]): KibitzerHooksOptions {
+function hookOptions(
+  onToolResult: KibitzerHooksOptions["delivery"]["onToolResult"],
+  warnings: string[],
+): KibitzerHooksOptions {
   return {
     env: {},
     sink: { onPrompt: () => {}, onToolCall: () => {}, onToolResult: () => {}, onSettled: () => {} },
@@ -29,7 +32,14 @@ function hookOptions(onToolResult: KibitzerHooksOptions["delivery"]["onToolResul
     },
     resolveContext: () => identity,
     resolveSessionId: () => "session-13074",
-    logger: { warn: (message: string) => { warnings.push(message) }, info: () => {}, error: () => {}, debug: () => {} },
+    logger: {
+      warn: (message: string) => {
+        warnings.push(message)
+      },
+      info: () => {},
+      error: () => {},
+      debug: () => {},
+    },
   }
 }
 
@@ -38,7 +48,13 @@ describe("Kibitzer tool_result delivery never holds the PostToolUse hook (#13074
     // given
     const pi = new FakeExtensionAPI()
     let started = 0
-    registerKibitzerHooks(pi, hookOptions(() => { started++; return new Promise<void>(() => {}) }, []))
+    registerKibitzerHooks(
+      pi,
+      hookOptions(() => {
+        started++
+        return new Promise<void>(() => {})
+      }, []),
+    )
 
     // when
     const outcome = await Promise.race([
@@ -56,8 +72,13 @@ describe("Kibitzer tool_result delivery never holds the PostToolUse hook (#13074
     const pi = new FakeExtensionAPI()
     const warnings: string[] = []
     let fail: (error: Error) => void = () => {}
-    const failed = new Promise<void>((_resolve, reject) => { fail = reject })
-    registerKibitzerHooks(pi, hookOptions(() => failed, warnings))
+    const failed = new Promise<void>((_resolve, reject) => {
+      fail = reject
+    })
+    registerKibitzerHooks(
+      pi,
+      hookOptions(() => failed, warnings),
+    )
 
     // when
     const results = await pi.dispatch("tool_result", readResult, host)

@@ -94,10 +94,14 @@ function rankByStrategy(
   strategy: RecallStrategy,
 ): RankedCandidate[] {
   if (strategy === "bm25") return rankBm25(documents, queries, options, undefined).candidates
-  if (strategy === "hybrid") return pinPhraseLeader(
-    fuseCandidates(rankSubstringCandidates(documents, parsedQueries, options), rankBm25(documents, queries, options, undefined).candidates),
-    phraseLeaderPath(documents, parsedQueries, options),
-  )
+  if (strategy === "hybrid")
+    return pinPhraseLeader(
+      fuseCandidates(
+        rankSubstringCandidates(documents, parsedQueries, options),
+        rankBm25(documents, queries, options, undefined).candidates,
+      ),
+      phraseLeaderPath(documents, parsedQueries, options),
+    )
   return rankSubstringCandidates(documents, parsedQueries, options)
 }
 
@@ -120,12 +124,14 @@ function widenCandidates(
   const widened = rankBm25(documents, queries, options, options.expansions)
   const holdsEveryWord = new Set(widened.fullMatches)
   if (strategy !== "bm25") {
-    for (const candidate of rankSubstringCandidates(documents, parsedQueries, options)) holdsEveryWord.add(candidate.path)
+    for (const candidate of rankSubstringCandidates(documents, parsedQueries, options))
+      holdsEveryWord.add(candidate.path)
   }
   const kept = unwidened.filter((candidate) => holdsEveryWord.has(candidate.path))
   const keptPaths = new Set(kept.map((candidate) => candidate.path))
-  return [...kept, ...widened.candidates.filter((candidate) => !keptPaths.has(candidate.path))]
-    .map((candidate, rank) => ({ ...candidate, score: 1 / (1 + 1 / (RRF_K + rank + 1)) }))
+  return [...kept, ...widened.candidates.filter((candidate) => !keptPaths.has(candidate.path))].map(
+    (candidate, rank) => ({ ...candidate, score: 1 / (1 + 1 / (RRF_K + rank + 1)) }),
+  )
 }
 
 function isExcluded(path: string, options: SelectRecallOptions): boolean {
@@ -193,7 +199,8 @@ function rankBm25(
       path: document.path,
       description: document.description,
       // The tokens are NFKC, so the window is searched in the NFKC body to stay anchored.
-      excerpt: () => buildExcerpt(document.body.normalize("NFKC"), queryTokens, hanCharacters, addedTokens, addedHanCharacters),
+      excerpt: () =>
+        buildExcerpt(document.body.normalize("NFKC"), queryTokens, hanCharacters, addedTokens, addedHanCharacters),
       score: 1 / (1 + score),
     })
   }
@@ -232,7 +239,8 @@ function fuseCandidates(substring: readonly RankedCandidate[], bm25: readonly Ra
 }
 
 function isNonCjkMultiWord(parsed: ParsedQuery): boolean {
-  const multiWord = parsed.terms.length + parsed.phrases.length > 1 || parsed.phrases.some((phrase) => /\s/.test(phrase.trim()))
+  const multiWord =
+    parsed.terms.length + parsed.phrases.length > 1 || parsed.phrases.some((phrase) => /\s/.test(phrase.trim()))
   return multiWord && !hasCjk([...parsed.terms, ...parsed.phrases].join(" "))
 }
 
@@ -256,7 +264,11 @@ function phraseLeaderPath(
     for (const parsed of multiWord) {
       const score = matchScoreNormalized(haystack, parsed)
       if (score === null) continue
-      if (leader === undefined || score < leader.score || (score === leader.score && document.path.localeCompare(leader.path) < 0)) {
+      if (
+        leader === undefined ||
+        score < leader.score ||
+        (score === leader.score && document.path.localeCompare(leader.path) < 0)
+      ) {
         leader = { path: document.path, score }
       }
     }

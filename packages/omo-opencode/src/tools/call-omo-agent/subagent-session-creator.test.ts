@@ -7,10 +7,7 @@ import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 describe("call-omo-agent resolveOrCreateSessionId", () => {
   const originalPlatform = process.platform
 
-  function buildInput(options: {
-    parentDirectory?: string
-    contextDirectory: string
-  }): {
+  function buildInput(options: { parentDirectory?: string; contextDirectory: string }): {
     ctx: Parameters<typeof resolveOrCreateSessionId>[0]
     args: Parameters<typeof resolveOrCreateSessionId>[1]
     toolContext: Parameters<typeof resolveOrCreateSessionId>[2]

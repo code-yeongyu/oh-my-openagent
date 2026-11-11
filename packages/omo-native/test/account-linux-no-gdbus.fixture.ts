@@ -12,7 +12,9 @@ const values = new Map<string, string>()
 Object.defineProperty(Bun, "secrets", {
   value: {
     get: async ({ name }: { readonly name: string }) => values.get(name) ?? null,
-    set: async ({ name, value }: { readonly name: string; readonly value: string }) => { values.set(name, value) },
+    set: async ({ name, value }: { readonly name: string; readonly value: string }) => {
+      values.set(name, value)
+    },
     delete: async ({ name }: { readonly name: string }) => values.delete(name),
     [Symbol.for("omo.test.injectedSecrets")]: true,
   },

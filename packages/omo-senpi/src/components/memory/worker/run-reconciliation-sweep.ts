@@ -49,7 +49,9 @@ export async function sweepReflectionRunOrphans(context: ReflectionOrphanSweepCo
     })
     for (const receipt of receipts) {
       context.logger?.warn(
-        receipt.removed ? "Discarded an orphaned reflection leftover" : "Could not discard an orphaned reflection leftover",
+        receipt.removed
+          ? "Discarded an orphaned reflection leftover"
+          : "Could not discard an orphaned reflection leftover",
         {
           kind: receipt.kind,
           target: receipt.target,
@@ -85,7 +87,9 @@ async function collectLiveRunIds(context: ReflectionOrphanSweepContext): Promise
 
 async function runDirectoryNames(path: string): Promise<readonly string[]> {
   try {
-    return (await readdir(path, { withFileTypes: true })).filter((entry) => entry.isDirectory() && !entry.name.startsWith(".")).map((entry) => entry.name)
+    return (await readdir(path, { withFileTypes: true }))
+      .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))
+      .map((entry) => entry.name)
   } catch (error) {
     if (error instanceof Error && "code" in error && error.code === "ENOENT") return []
     throw error
