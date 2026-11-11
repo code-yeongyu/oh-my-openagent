@@ -199,6 +199,22 @@ mod tests {
     }
 
     #[test]
+    fn an_interrupted_call_carries_its_disposition_on_the_wire() {
+        let interrupted = omo_computer_session::Refused {
+            refusal: Refusal::new(EngineCode::TransactionFailed, "recovery_required"),
+            call_id: Some("k-1".to_owned()),
+            receipt: None,
+            interrupted: Some(omo_computer_core::report::Disposition::UNCERTAIN_UNSAFE),
+        };
+        let Failure { data, .. } = refused_call(&interrupted);
+        let data = data.expect("data");
+        assert_eq!(data["callId"], json!("k-1"));
+        assert_eq!(data["disposition"], json!({ "delivery": "delivery_uncertain", "retry": "unsafe" }));
+        let plain = refused_call(&Refusal::new(EngineCode::TransactionFailed, "marker_unavailable").into());
+        assert!(plain.data.expect("data").get("disposition").is_none(), "a refusal before any send carries none");
+    }
+
+    #[test]
     fn a_reasoned_refusal_carries_its_reason() {
         let refusal = Refusal::new(EngineCode::InvalidTarget, "drag_destination");
         assert!(refusal.computer_code().is_ok(), "the pair has a table row");
