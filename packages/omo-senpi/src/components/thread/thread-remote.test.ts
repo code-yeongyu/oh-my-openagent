@@ -244,7 +244,7 @@ describe("#12833: a name reaches a thread on another device by its title", () =>
     state,
   })
 
-  test("#given b lists a live session titled with the name #when thread_send names it from this device #then it reaches b's session; this device's own row and an ended session are never matched by title", async () => {
+  test("#given b lists live and ended sessions #when their names are addressed #then the live session receives the send and the ended session resolves without a live owner", async () => {
     const a = account({
       rows: [
         titled("b", "dur-on-b", "Release Train"),
@@ -267,9 +267,10 @@ describe("#12833: a name reaches a thread on another device by its title", () =>
       kind: "ok",
       thread_id: "dur-local",
     })
-    expect(await run("thread_send", { thread: "stale", message: "x" })).toMatchObject({
-      kind: "error",
-      error: { code: "not_found" },
+    expect(await run("thread_close", { thread: "stale" })).toMatchObject({
+      kind: "ok",
+      thread_id: "dur-old-on-b",
+      closed: false,
     })
   })
 
@@ -439,7 +440,7 @@ describe("#12833: a name reaches a thread on another device by its title", () =>
 })
 
 describe("the device service is not connected, or the alias registry is not there yet", () => {
-  test("#given remote sessions turned off on this device #when a tool names this device's thread by name and another device's by id #then both answer exactly as without a remote surface: the local one works and the other is not_found", async () => {
+  test("#given remote sessions turned off on this device #when a tool addresses a thread #then local names work and misses stay not_found while an explicit device operation reports unavailability", async () => {
     const a = account({ plan: "disabled" })
     const { run } = surface(a.remote)
     expect(await run("thread_send", { thread: "local peer", message: "local" })).toMatchObject({
@@ -509,7 +510,9 @@ describe("remote == local: the same call answers the same on b as on this device
   ] as const)(
     "#given %s #when it runs on this device and on b #then both answers are the same",
     async (_label, tool, args) => {
-      const a = account()
+      const a = account({
+        rows: [B_ROW, { ...B_ROW, session_id: "rk-other", durable_id: "dur-other-on-b", title: "other peer" }],
+      })
       const other: ThreadHostSession = {
         sessionId: "route-other",
         durableSessionId: "dur-other",
