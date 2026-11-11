@@ -1,6 +1,7 @@
 import type { GitMasterConfig } from "../../types"
 import { assertValidGitEnvPrefix } from "../../config/git-env-prefix"
 import { detectShellType, buildEnvPrefix, type ShellType } from "../../shared/shell-env"
+import { resolveGitAttribution, type GitAttributionCheckOptions } from "@oh-my-opencode/utils"
 
 const BASH_CODE_BLOCK_PATTERN = /```bash\r?\n([\s\S]*?)```/g
 const LEADING_GIT_COMMAND_PATTERN = /^([ \t]*(?:[A-Za-z_][A-Za-z0-9_]*=[^ \t]+\s+)*)git(?=[ \t]|$)/gm
@@ -84,14 +85,17 @@ export function buildAttributedCommitExample(
  * Commit attribution: the `Co-authored-by` trailer is on by default (`include_co_authored_by`)
  * and the body footer is opt-in (`commit_footer`, default off). Author and committer stay the
  * operator's own git identity.
+ * Env and Git-config overrides can suppress both, or turn the footer on.
  */
 export function injectGitMasterConfig(
 	template: string,
 	config?: GitMasterConfig,
 	shellType: ShellType = detectShellType(),
+	options?: GitAttributionCheckOptions,
 ): string {
-	const commitFooter = config?.commit_footer ?? false
-	const includeCoAuthor = config?.include_co_authored_by ?? true
+	const attribution = resolveGitAttribution(config, options)
+	const commitFooter = attribution.commitFooter
+	const includeCoAuthor = attribution.includeCoAuthoredBy
 	const gitEnvPrefix = assertValidGitEnvPrefix(config?.git_env_prefix ?? "GIT_MASTER=1")
 
 	const shellPrefix = gitEnvPrefix ? buildShellAwareGitPrefix(gitEnvPrefix, shellType) : ""

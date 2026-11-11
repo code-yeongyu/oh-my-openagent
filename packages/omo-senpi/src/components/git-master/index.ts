@@ -51,8 +51,9 @@ export function createGitMasterAttributionComponent(
         (payload: unknown): { content: ReadonlyArray<Record<string, unknown>> } | undefined => {
           const event = asGitMasterReadResultEvent(payload)
           if (event === undefined) return undefined
-          const settings = loadSettings(pi.cwd ?? process.cwd())
-          const additions = resolveGitMasterSkillAdditions(settings)
+          const cwd = pi.cwd ?? process.cwd()
+          const settings = loadSettings(cwd)
+          const additions = resolveGitMasterSkillAdditions(settings, { cwd })
           if (additions === undefined) return undefined
           ctx.logger.info("omo-senpi git-master settings applied", {
             commitFooter: settings.commit_footer,
