@@ -427,3 +427,47 @@ fn a_filled_member_meets_its_length_and_tuple_bounds() {
         panic!("the filled value does not fit its type: {error}: {filled}")
     });
 }
+
+/// A filled ledgered member also meets `exclusiveMinimum`, `maximum` and `pattern`.
+#[test]
+fn a_filled_member_meets_its_range_and_pattern_bounds() {
+    let schema = serde_json::json!({"$defs": {}});
+    let node = serde_json::json!({
+        "type": "object",
+        "required": ["count", "level", "ratio", "digest", "reference"],
+        "properties": {
+            "count": {"type": "integer", "exclusiveMinimum": 0},
+            "level": {"type": "integer", "maximum": -3},
+            "ratio": {"type": "number", "minimum": 0.5, "maximum": 0.75},
+            "digest": {"type": "string", "pattern": "^[a-f0-9]{16}$"},
+            "reference": {"type": "string", "pattern": "^s\\d+:e\\d+$"},
+        },
+    });
+    let filled = example(&schema, &node);
+    assert!(
+        filled["count"].as_i64().is_some_and(|count| count > 0),
+        "count ignores exclusiveMinimum: {filled}"
+    );
+    assert!(
+        filled["level"].as_i64().is_some_and(|level| level <= -3),
+        "level ignores maximum: {filled}"
+    );
+    assert!(
+        filled["ratio"]
+            .as_f64()
+            .is_some_and(|ratio| (0.5..=0.75).contains(&ratio)),
+        "ratio ignores its range: {filled}"
+    );
+    let digest = filled["digest"].as_str().unwrap_or_default();
+    assert!(
+        digest.len() == 16
+            && digest
+                .chars()
+                .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()),
+        "digest ignores its pattern: {filled}"
+    );
+    assert_eq!(
+        filled["reference"], "s0:e0",
+        "reference ignores its pattern: {filled}"
+    );
+}
