@@ -54,13 +54,7 @@ impl<'ast> Visit<'ast> for FunctionWalk {
         let fields = pattern
             .fields
             .iter()
-            .map(|field| {
-                let name = match &field.member {
-                    Member::Named(ident) => ident.to_string(),
-                    Member::Unnamed(index) => index.index.to_string(),
-                };
-                (name, (*field.pat).clone())
-            })
+            .map(|field| (member_name(&field.member), (*field.pat).clone()))
             .collect();
         self.patterns.push(Pattern {
             ty: owner_type(&pattern.path),
@@ -107,7 +101,65 @@ fn judge(pat: &Pat, used: &BTreeSet<String>, rest: bool) -> (bool, String) {
             }
         }
         Pat::Wild(_) => (false, "ignored with `_`".to_owned()),
-        _ => (true, String::new()),
+        nested => nested_unread(nested, used).map_or((true, String::new()), |why| {
+            (false, format!("destructured inline: {why}"))
+        }),
+    }
+}
+
+/// A field destructured inline is read only if every leaf binding inside the nested pattern
+/// is used and no `_` or `..` drops part of it; the nested type being read elsewhere does not
+/// count. Literal leaves are matched, so they read. Returns why the pattern drops a value.
+fn nested_unread(pat: &Pat, used: &BTreeSet<String>) -> Option<String> {
+    match pat {
+        Pat::Ident(binding) => {
+            let name = binding.ident.to_string();
+            if !used.contains(&name) {
+                return Some(format!("`{name}` is bound but never used"));
+            }
+            binding
+                .subpat
+                .as_ref()
+                .and_then(|(_, inner)| nested_unread(inner, used))
+        }
+        Pat::Wild(_) => Some("a value is ignored with `_`".to_owned()),
+        Pat::Rest(_) => Some("the pattern uses `..`".to_owned()),
+        Pat::Struct(inner) => {
+            if inner.rest.is_some() {
+                return Some("the pattern uses `..`".to_owned());
+            }
+            inner.fields.iter().find_map(|field| {
+                nested_unread(&field.pat, used)
+                    .map(|why| format!("{}: {why}", member_name(&field.member)))
+            })
+        }
+        Pat::TupleStruct(inner) => inner
+            .elems
+            .iter()
+            .find_map(|elem| nested_unread(elem, used)),
+        Pat::Tuple(inner) => inner
+            .elems
+            .iter()
+            .find_map(|elem| nested_unread(elem, used)),
+        Pat::Slice(inner) => inner
+            .elems
+            .iter()
+            .find_map(|elem| nested_unread(elem, used)),
+        Pat::Or(inner) => inner
+            .cases
+            .iter()
+            .find_map(|case| nested_unread(case, used)),
+        Pat::Paren(inner) => nested_unread(&inner.pat, used),
+        Pat::Reference(inner) => nested_unread(&inner.pat, used),
+        Pat::Type(inner) => nested_unread(&inner.pat, used),
+        _ => None,
+    }
+}
+
+fn member_name(member: &Member) -> String {
+    match member {
+        Member::Named(ident) => ident.to_string(),
+        Member::Unnamed(index) => index.index.to_string(),
     }
 }
 
