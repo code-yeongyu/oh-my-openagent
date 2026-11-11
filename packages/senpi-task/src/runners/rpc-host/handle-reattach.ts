@@ -68,10 +68,17 @@ export async function recoverLostTransport(subject: ReattachSubject, reattach: H
   const turnWasInFlight = subject.turnInFlight()
   const lost = subject.session()
   const { taskId } = subject
-  observe(taskId, () => subject.onTransportLost?.({ taskId, socket: lost.socket, instanceId: lost.instanceId, turnWasInFlight }))
+  observe(taskId, () =>
+    subject.onTransportLost?.({ taskId, socket: lost.socket, instanceId: lost.instanceId, turnWasInFlight }),
+  )
   const report = (outcome: ReattachOutcome, newInstanceId?: string): void =>
     observe(taskId, () =>
-      subject.onReattachOutcome?.({ taskId, socket: lost.socket, outcome, ...(newInstanceId === undefined ? {} : { newInstanceId }) }),
+      subject.onReattachOutcome?.({
+        taskId,
+        socket: lost.socket,
+        outcome,
+        ...(newInstanceId === undefined ? {} : { newInstanceId }),
+      }),
     )
   let next: HostSessionReattached | HostSessionReattachRefused | undefined
   try {

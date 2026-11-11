@@ -28,18 +28,29 @@ async function crashFixture(failRespawn = false, failContinuation = false, stall
   const armed = Promise.withResolvers<void>()
   const sessionPath = join(f.store.stateDir, "saved", "child.jsonl")
   mkdirSync(dirname(sessionPath), { recursive: true })
-  writeFileSync(sessionPath, [
-    JSON.stringify({ type: "session", id: "saved-child" }),
-    JSON.stringify({ type: "message", message: { role: "user", content: "Finish investigating the saved findings" } }),
-    JSON.stringify({ type: "message", message: { role: "toolResult", content: "findings already collected" } }),
-  ].join("\n") + "\n")
+  writeFileSync(
+    sessionPath,
+    [
+      JSON.stringify({ type: "session", id: "saved-child" }),
+      JSON.stringify({
+        type: "message",
+        message: { role: "user", content: "Finish investigating the saved findings" },
+      }),
+      JSON.stringify({ type: "message", message: { role: "toolResult", content: "findings already collected" } }),
+    ].join("\n") + "\n",
+  )
   const identity = { routingId: "routing-original", sessionPath, instanceId: "generation-original" }
   // Build the real handle with the manager-assigned identity before the loss.
   const running: ReturnType<typeof createHostSessionHandle>[] = []
   f.runner.start = async (spec) => {
     const handle = createHostSessionHandle({
-      client: original, session: identity, taskId: spec.taskId,
-      heartbeatIntervalMs: 60_000, now: () => 0, closeGraceMs: 0, openDisposition: "attached",
+      client: original,
+      session: identity,
+      taskId: spec.taskId,
+      heartbeatIntervalMs: 60_000,
+      now: () => 0,
+      closeGraceMs: 0,
+      openDisposition: "attached",
       transportRecovery: {
         clock: {
           schedule: (ms, expire) => {
@@ -51,10 +62,15 @@ async function crashFixture(failRespawn = false, failContinuation = false, stall
       },
       reattach: failContinuation
         ? async () => ({
-            client: fakeSessionPort(() => Promise.reject(Object.assign(new Error("transport closed during delivery"), { code: "rpc_transport_gone" }))),
-            session: identity, attached: false,
+            client: fakeSessionPort(() =>
+              Promise.reject(
+                Object.assign(new Error("transport closed during delivery"), { code: "rpc_transport_gone" }),
+              ),
+            ),
+            session: identity,
+            attached: false,
           })
-        : async () => stallReattach ? Promise.withResolvers<undefined>().promise : undefined,
+        : async () => (stallReattach ? Promise.withResolvers<undefined>().promise : undefined),
     })
     running.push(handle)
     return adaptRpcHandle(handle)
@@ -72,17 +88,26 @@ async function crashFixture(failRespawn = false, failContinuation = false, stall
         sessionPath: path,
       })
       return respawnManagedTask({
-        beforeLaunch: () => undefined, record, sessionPath: path, stateDir: f.store.stateDir,
+        beforeLaunch: () => undefined,
+        record,
+        sessionPath: path,
+        stateDir: f.store.stateDir,
         runners: { "in-process": f.runner, process: f.runner },
         rpcRunner: {
           start: async (spec) => {
             specs.push(spec)
             if (failRespawn) throw new Error("supervisor pid 4242 shard deadbeef cannot reopen")
-            replacement.switchSession = async (path) => { switched.push(path); return { cancelled: false } }
+            replacement.switchSession = async (path) => {
+              switched.push(path)
+              return { cancelled: false }
+            }
             const next = createHostSessionHandle({
               client: replacement,
               session: { ...identity, routingId: "routing-new", instanceId: "generation-new" },
-              taskId: spec.task_id, heartbeatIntervalMs: 60_000, now: () => 0, closeGraceMs: 0,
+              taskId: spec.task_id,
+              heartbeatIntervalMs: 60_000,
+              now: () => 0,
+              closeGraceMs: 0,
               openDisposition: "reopened",
             })
             resumed.push(next)
@@ -94,8 +119,14 @@ async function crashFixture(failRespawn = false, failContinuation = false, stall
   })
   const id = await f.start()
   f.store.mutate(id, (record) => ({
-    ...record, description: "Investigate saved findings",
-    host_session: { socket: original.socketPath, routing_id: identity.routingId, session_path: sessionPath, instance_id: identity.instanceId },
+    ...record,
+    description: "Investigate saved findings",
+    host_session: {
+      socket: original.socketPath,
+      routing_id: identity.routingId,
+      session_path: sessionPath,
+      instance_id: identity.instanceId,
+    },
   }))
   const dispose = async () => {
     lifecycle.dispose?.()
@@ -115,15 +146,21 @@ describe("host crash uses existing bounded child recovery (#10023)", () => {
       await attempted
       expect(f.specs).toHaveLength(1)
       expect(f.launchRecords).toEqual([{ prompt: "do the thing", sessionPath: f.sessionPath }])
-      expect(f.specs[0]).toMatchObject({ cwd: f.store.load(f.id)?.spawn_spec?.cwd, prompt: "", resumeSessionPath: f.sessionPath })
+      expect(f.specs[0]).toMatchObject({
+        cwd: f.store.load(f.id)?.spawn_spec?.cwd,
+        prompt: "",
+        resumeSessionPath: f.sessionPath,
+      })
       expect(f.switched).toEqual([f.sessionPath])
       // The continuation is an identified input (#10129): a durable id bound to this task.
-      expect(f.replacement.sent).toEqual([{
-        type: "prompt",
-        streamingBehavior: "followUp",
-        message: expect.any(String),
-        clientMessageId: expect.stringMatching(new RegExp(`^${f.id}:\\d+:\\d+$`)),
-      }])
+      expect(f.replacement.sent).toEqual([
+        {
+          type: "prompt",
+          streamingBehavior: "followUp",
+          message: expect.any(String),
+          clientMessageId: expect.stringMatching(new RegExp(`^${f.id}:\\d+:\\d+$`)),
+        },
+      ])
       const continuation = f.replacement.sent[0]
       expect(continuation?.type === "prompt" ? continuation.message : undefined).not.toBe(f.launchRecords[0]?.prompt)
       expect(f.store.load(f.id)?.status).toBe("running")

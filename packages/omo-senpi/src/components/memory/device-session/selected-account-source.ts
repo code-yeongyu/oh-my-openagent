@@ -16,10 +16,12 @@ export function accountSourceFromSelection(options: {
   let selected: Promise<MemorySyncSelection> | undefined
   let cliSource: DeviceAccountSource | undefined
   let current: DesktopSyncAccount | undefined
-  // One open in flight per source: resolves that overlap before an account is current share it, so the claimed
-  // channel carries one descriptor request, not one per caller (#12799).
+  // Concurrent resolves with no current account share one open, so the channel sees one descriptor request (#12799).
   let opening: Promise<DesktopSyncAccount> | undefined
-  const unavailable = (reason: DesktopSyncUnavailable["reason"]): DesktopSyncUnavailable => ({ kind: "unavailable", reason })
+  const unavailable = (reason: DesktopSyncUnavailable["reason"]): DesktopSyncUnavailable => ({
+    kind: "unavailable",
+    reason,
+  })
   return async (): Promise<DeviceAccount | null> => {
     selected ??= options.selection()
     const selection = await selected
@@ -31,7 +33,7 @@ export function accountSourceFromSelection(options: {
     const channel = selection.channel
     if (channel.signal.aborted) return unavailable("private_channel_unavailable")
     const seen = current
-    if (seen !== undefined && await seen.isCurrent()) return seen
+    if (seen !== undefined && (await seen.isCurrent())) return seen
     // A resolve that overlapped this check may already have stored a fresh account: that one is the answer, and it
     // is never overwritten by this caller's verdict on the account it saw (#12804).
     if (current !== seen) {
@@ -41,8 +43,13 @@ export function accountSourceFromSelection(options: {
       // The account is stored by the open itself, before `opening` clears, so no resolve ever finds neither set
       // and opens a second time while the first open's waiters are still resuming (#12804).
       opening ??= open(channel)
-        .then((account) => { current = account; return account })
-        .finally(() => { opening = undefined })
+        .then((account) => {
+          current = account
+          return account
+        })
+        .finally(() => {
+          opening = undefined
+        })
       return await opening
     } catch (error) {
       if (channel.signal.aborted) return unavailable("private_channel_unavailable")

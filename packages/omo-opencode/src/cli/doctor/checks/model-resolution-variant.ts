@@ -5,10 +5,7 @@ export function formatModelWithVariant(model: string, variant?: string): string 
   return variant ? `${model} (${variant})` : model
 }
 
-function getAgentOverride(
-  agentName: string,
-  config: OmoConfig
-): { variant?: string; category?: string } | undefined {
+function getAgentOverride(agentName: string, config: OmoConfig): { variant?: string; category?: string } | undefined {
   const agentOverrides = config.agents
   if (!agentOverrides) return undefined
 
@@ -21,7 +18,7 @@ function getAgentOverride(
 export function getEffectiveVariant(
   agentName: string,
   requirement: ModelRequirement,
-  config: OmoConfig
+  config: OmoConfig,
 ): string | undefined {
   const agentOverride = getAgentOverride(agentName, config)
 
@@ -44,7 +41,7 @@ export function getEffectiveVariant(
 export function getCategoryEffectiveVariant(
   categoryName: string,
   requirement: ModelRequirement,
-  config: OmoConfig
+  config: OmoConfig,
 ): string | undefined {
   const categoryVariant = config.categories?.[categoryName]?.variant
   if (categoryVariant) {

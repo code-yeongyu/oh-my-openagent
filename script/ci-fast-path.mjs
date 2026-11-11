@@ -82,15 +82,14 @@ function parseBoolean(value) {
 
 function readChangedPaths(input) {
   if (input.length === 0) return []
-  return input.toString("utf8").split("\0").filter((path) => path.length > 0)
+  return input
+    .toString("utf8")
+    .split("\0")
+    .filter((path) => path.length > 0)
 }
 
 function isWebPath(path) {
-  return (
-    path.startsWith("packages/web/") ||
-    path.startsWith("docs/") ||
-    path === ".github/workflows/web-ci.yml"
-  )
+  return path.startsWith("packages/web/") || path.startsWith("docs/") || path === ".github/workflows/web-ci.yml"
 }
 
 // The non-runtime paths: an explicit
@@ -148,10 +147,7 @@ export function classifyCiMode({
   // (exactly two parents) whose subject matches the generated release shape.
   const isRealMerge = mergeParentCount === 2
   const generatedReleasePush =
-    classificationEvent === "push" &&
-    diffAvailable &&
-    isRealMerge &&
-    generatedReleaseMerge.test(subject)
+    classificationEvent === "push" && diffAvailable && isRealMerge && generatedReleaseMerge.test(subject)
   const webOnly = diffAvailable && changedPaths.length > 0 && changedPaths.every(isWebPath)
   const runtimeTouching = !diffAvailable || changedPaths.some(isRuntimePath)
   // Ubuntu-first is a pull-request optimization for every change that touches

@@ -44,7 +44,11 @@ function write(path: string, content: string): void {
   writeFileSync(path, content)
 }
 
-async function createDatabase(path: string, version: number, rows: Array<[string, string, string | null]>): Promise<void> {
+async function createDatabase(
+  path: string,
+  version: number,
+  rows: Array<[string, string, string | null]>,
+): Promise<void> {
   mkdirSync(dirname(path), { recursive: true })
   const DatabaseSync = await loadDatabaseSync()
   // withDatabase closes the handle on every exit path (including a throwing exec/run) and tracks it
@@ -62,7 +66,9 @@ async function createDatabase(path: string, version: number, rows: Array<[string
     // close() under Bun 1.4 (oven-sh/bun#40001), and the reader that opens the same file next
     // would then block on the Windows file lock.
     for (const [provider, type, disabled] of rows) {
-      db.exec(`INSERT INTO auth_credentials (provider, credential_type, data, disabled_cause) VALUES (${sqlLiteral(provider)}, ${sqlLiteral(type)}, 'SQLITE-SECRET', ${sqlLiteral(disabled)})`)
+      db.exec(
+        `INSERT INTO auth_credentials (provider, credential_type, data, disabled_cause) VALUES (${sqlLiteral(provider)}, ${sqlLiteral(type)}, 'SQLITE-SECRET', ${sqlLiteral(disabled)})`,
+      )
     }
   })
 }
@@ -78,28 +84,49 @@ function createFixture(): Fixture {
 }
 
 async function populateAll(fixture: Fixture): Promise<void> {
-  write(join(fixture.agentDir, "auth.json"), JSON.stringify({
-    "senpi-beta": { type: "oauth", access: "SENPI-SECRET" },
-    "senpi-alpha": { type: "api_key", key: "SENPI-SECRET" },
-  }))
-  write(join(fixture.agentDir, "models.json"), JSON.stringify({ providers: {
-    "senpi-model-b": {}, "senpi-model-a": {},
-  } }))
-  write(join(fixture.xdg, "opencode", "auth.json"), JSON.stringify({
-    "open-oauth": { type: "oauth", access: "OPENCODE-SECRET" },
-    "open-api": { type: "api", key: "OPENCODE-SECRET" },
-  }))
+  write(
+    join(fixture.agentDir, "auth.json"),
+    JSON.stringify({
+      "senpi-beta": { type: "oauth", access: "SENPI-SECRET" },
+      "senpi-alpha": { type: "api_key", key: "SENPI-SECRET" },
+    }),
+  )
+  write(
+    join(fixture.agentDir, "models.json"),
+    JSON.stringify({
+      providers: {
+        "senpi-model-b": {},
+        "senpi-model-a": {},
+      },
+    }),
+  )
+  write(
+    join(fixture.xdg, "opencode", "auth.json"),
+    JSON.stringify({
+      "open-oauth": { type: "oauth", access: "OPENCODE-SECRET" },
+      "open-api": { type: "api", key: "OPENCODE-SECRET" },
+    }),
+  )
   await createDatabase(join(fixture.home, ".omp", "agent", "agent.db"), 7, [
-    ["omp-api", "api_key", null], ["omp-disabled", "oauth", "expired"],
+    ["omp-api", "api_key", null],
+    ["omp-disabled", "oauth", "expired"],
   ])
   write(join(fixture.home, ".omp", "agent", "models.db"), "models-fixture")
-  await createDatabase(join(fixture.home, ".gjc", "agent", "agent.db"), 4, [
-    ["gjc-oauth", "oauth", null],
-  ])
-  write(join(fixture.home, ".gjc", "agent", "config.yml"), [
-    "modelRoles:", "  default: anthropic/fixture", "  fast: openai/fixture",
-    "enabledModels:", "  - fixture-one", "  - fixture-two", "cycleOrder:", "  - default", "",
-  ].join("\n"))
+  await createDatabase(join(fixture.home, ".gjc", "agent", "agent.db"), 4, [["gjc-oauth", "oauth", null]])
+  write(
+    join(fixture.home, ".gjc", "agent", "config.yml"),
+    [
+      "modelRoles:",
+      "  default: anthropic/fixture",
+      "  fast: openai/fixture",
+      "enabledModels:",
+      "  - fixture-one",
+      "  - fixture-two",
+      "cycleOrder:",
+      "  - default",
+      "",
+    ].join("\n"),
+  )
 }
 
 async function detect(fixture: Fixture, overrides = {}) {
@@ -123,30 +150,44 @@ function snapshotTree(root: string): { files: string[]; hashes: Record<string, s
   visit(root)
   return {
     files,
-    hashes: Object.fromEntries(files.map((file) => [
-      file, createHash("sha256").update(readFileSync(join(root, file))).digest("hex"),
-    ])),
+    hashes: Object.fromEntries(
+      files.map((file) => [
+        file,
+        createHash("sha256")
+          .update(readFileSync(join(root, file)))
+          .digest("hex"),
+      ]),
+    ),
   }
 }
 
 function createLauncherFixture(fixture: Fixture): string {
   const packageRoot = join(fixture.root, "app")
   cpSync(join(SOURCE_ROOT, "bin"), join(packageRoot, "bin"), { recursive: true })
-  write(join(packageRoot, "package.json"), JSON.stringify({
-    name: "omo-ai", version: "1.2.3-test.0", type: "module",
-    dependencies: { "@code-yeongyu/senpi": "2026.8.9" },
-  }))
+  write(
+    join(packageRoot, "package.json"),
+    JSON.stringify({
+      name: "omo-ai",
+      version: "1.2.3-test.0",
+      type: "module",
+      dependencies: { "@code-yeongyu/senpi": "2026.8.9" },
+    }),
+  )
   const senpiRoot = join(packageRoot, "node_modules", "@code-yeongyu", "senpi")
-  write(join(senpiRoot, "package.json"), JSON.stringify({
-    name: "@code-yeongyu/senpi", version: "2026.8.9", type: "module", exports: { ".": "./dist/index.js" },
-  }))
+  write(
+    join(senpiRoot, "package.json"),
+    JSON.stringify({
+      name: "@code-yeongyu/senpi",
+      version: "2026.8.9",
+      type: "module",
+      exports: { ".": "./dist/index.js" },
+    }),
+  )
   write(join(senpiRoot, "dist", "index.js"), "export const fixture = true\n")
   write(join(senpiRoot, "dist", "cli.js"), "process.exit(0)\n")
   write(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")
-  for (const artifact of [
-    "plugin/package.json", "plugin/extensions/omo.js", "plugin/runtime/lsp-daemon/dist/cli.js",
-
-  ]) write(join(packageRoot, artifact), "fixture\n")
+  for (const artifact of ["plugin/package.json", "plugin/extensions/omo.js", "plugin/runtime/lsp-daemon/dist/cli.js"])
+    write(join(packageRoot, artifact), "fixture\n")
   return join(packageRoot, "bin", "omo.js")
 }
 
@@ -158,7 +199,9 @@ function runLauncher(launcher: string, fixture: Fixture, args: string[], tty = f
   delete inherited.OMO_CODING_AGENT_DIR
   delete inherited.PI_CODING_AGENT_DIR
   const env = {
-    ...inherited, HOME: fixture.home, SENPI_CODING_AGENT_DIR: fixture.agentDir,
+    ...inherited,
+    HOME: fixture.home,
+    SENPI_CODING_AGENT_DIR: fixture.agentDir,
     XDG_DATA_HOME: fixture.xdg,
   }
   // spawnSync only returns after the child has exited and been reaped, so no live child owns the
@@ -191,82 +234,103 @@ afterEach(() => {
 
 describe("omo setup sibling detection", () => {
   describe("#given all four harness stores", () => {
-    test.skipIf(!SQLITE_AVAILABLE)("#when detected #then the exact report contains ids and types but no values", async () => {
-      const fixture = createFixture()
-      await populateAll(fixture)
-      const report = formatSetupReport(await detect(fixture))
-      expect(report).toBe([
-        "HARNESS | INSTALLED | PROVIDERS | CREDENTIAL TYPES | MODELS",
-        "senpi | yes | senpi-alpha, senpi-beta | api_key, oauth | providers: senpi-model-a, senpi-model-b",
-        "opencode | yes | open-api, open-oauth | api, oauth | none",
-        "oh-my-pi | yes | omp-api, omp-disabled | api_key, oauth | models.db: yes",
-        "gajae-code | yes | gjc-oauth | oauth | enabledModels: fixture-one, fixture-two; modelRoles: default, fast",
-        "Run `omo setup --yes` to import available API credentials.",
-        "",
-      ].join("\n"))
-      for (const secret of SECRET_SENTINELS) expect(report).not.toContain(secret)
-    })
+    test.skipIf(!SQLITE_AVAILABLE)(
+      "#when detected #then the exact report contains ids and types but no values",
+      async () => {
+        const fixture = createFixture()
+        await populateAll(fixture)
+        const report = formatSetupReport(await detect(fixture))
+        expect(report).toBe(
+          [
+            "HARNESS | INSTALLED | PROVIDERS | CREDENTIAL TYPES | MODELS",
+            "senpi | yes | senpi-alpha, senpi-beta | api_key, oauth | providers: senpi-model-a, senpi-model-b",
+            "opencode | yes | open-api, open-oauth | api, oauth | none",
+            "oh-my-pi | yes | omp-api, omp-disabled | api_key, oauth | models.db: yes",
+            "gajae-code | yes | gjc-oauth | oauth | enabledModels: fixture-one, fixture-two; modelRoles: default, fast",
+            "Run `omo setup --yes` to import available API credentials.",
+            "",
+          ].join("\n"),
+        )
+        for (const secret of SECRET_SENTINELS) expect(report).not.toContain(secret)
+      },
+    )
 
-    test.skipIf(!SQLITE_AVAILABLE)("#when detection runs twice #then every source hash and directory listing stays identical", async () => {
-      const fixture = createFixture()
-      await populateAll(fixture)
-      const before = snapshotTree(fixture.root)
-      await detect(fixture)
-      await detect(fixture)
-      const after = snapshotTree(fixture.root)
-      expect(after).toEqual(before)
-      expect(after.files.some((path) => path.endsWith("-wal") || path.endsWith("-shm"))).toBe(false)
-    })
+    test.skipIf(!SQLITE_AVAILABLE)(
+      "#when detection runs twice #then every source hash and directory listing stays identical",
+      async () => {
+        const fixture = createFixture()
+        await populateAll(fixture)
+        const before = snapshotTree(fixture.root)
+        await detect(fixture)
+        await detect(fixture)
+        const after = snapshotTree(fixture.root)
+        expect(after).toEqual(before)
+        expect(after.files.some((path) => path.endsWith("-wal") || path.endsWith("-shm"))).toBe(false)
+      },
+    )
   })
 
   describe("#given each store is absent in turn", () => {
-    test.skipIf(!SQLITE_AVAILABLE)("#when detected #then that harness reports installed no without crashing", async () => {
-      const cases = [
-        ["senpi", (fixture: Fixture) => join(fixture.agentDir, "auth.json")],
-        ["opencode", (fixture: Fixture) => join(fixture.xdg, "opencode", "auth.json")],
-        ["oh-my-pi", (fixture: Fixture) => join(fixture.home, ".omp", "agent", "agent.db")],
-        ["gajae-code", (fixture: Fixture) => join(fixture.home, ".gjc", "agent", "agent.db")],
-      ] as const
-      for (const [name, storePath] of cases) {
-        const fixture = createFixture()
-        // This case proves absence, so keep every store absent. Populating the three unrelated
-        // stores would open six SQLite handles across the four iterations without strengthening
-        // the contract, and can consume the entire test timeout when the root suite is saturated.
-        expect(existsSync(storePath(fixture))).toBe(false)
-        const report = formatSetupReport(await detect(fixture))
-        expect(report).toContain(`${name} | no | none | none |`)
-      }
-    })
+    test.skipIf(!SQLITE_AVAILABLE)(
+      "#when detected #then that harness reports installed no without crashing",
+      async () => {
+        const cases = [
+          ["senpi", (fixture: Fixture) => join(fixture.agentDir, "auth.json")],
+          ["opencode", (fixture: Fixture) => join(fixture.xdg, "opencode", "auth.json")],
+          ["oh-my-pi", (fixture: Fixture) => join(fixture.home, ".omp", "agent", "agent.db")],
+          ["gajae-code", (fixture: Fixture) => join(fixture.home, ".gjc", "agent", "agent.db")],
+        ] as const
+        for (const [name, storePath] of cases) {
+          const fixture = createFixture()
+          // This case proves absence, so keep every store absent. Populating the three unrelated
+          // stores would open six SQLite handles across the four iterations without strengthening
+          // the contract, and can consume the entire test timeout when the root suite is saturated.
+          expect(existsSync(storePath(fixture))).toBe(false)
+          const report = formatSetupReport(await detect(fixture))
+          expect(report).toContain(`${name} | no | none | none |`)
+        }
+      },
+    )
   })
 
   describe("#given an unknown sqlite auth schema", () => {
-    test.skipIf(!SQLITE_AVAILABLE)("#when detected #then it reports detection-only and parses no credentials", async () => {
-      const fixture = createFixture()
-      await createDatabase(join(fixture.home, ".omp", "agent", "agent.db"), 99, [["must-not-parse", "api_key", null]])
-      const inventory = await detect(fixture)
-      const omp = inventory.harnesses.find((item) => item.id === "oh-my-pi")!
-      expect(omp.providers).toHaveLength(0)
-      expect(omp.credentialTypes).toHaveLength(0)
-      expect(omp.notices.join("\n")).toBe("auth schema version 99 is unknown; credentials not inspected")
-    })
+    test.skipIf(!SQLITE_AVAILABLE)(
+      "#when detected #then it reports detection-only and parses no credentials",
+      async () => {
+        const fixture = createFixture()
+        await createDatabase(join(fixture.home, ".omp", "agent", "agent.db"), 99, [["must-not-parse", "api_key", null]])
+        const inventory = await detect(fixture)
+        const omp = inventory.harnesses.find((item) => item.id === "oh-my-pi")!
+        expect(omp.providers).toHaveLength(0)
+        expect(omp.credentialTypes).toHaveLength(0)
+        expect(omp.notices.join("\n")).toBe("auth schema version 99 is unknown; credentials not inspected")
+      },
+    )
   })
 
   describe("#given node:sqlite is unavailable", () => {
-    test.skipIf(!SQLITE_AVAILABLE)("#when detected #then sqlite stores degrade to file presence and remain successful", async () => {
-      const fixture = createFixture()
-      write(join(fixture.agentDir, "auth.json"), "{}")
-      write(join(fixture.xdg, "opencode", "auth.json"), "{}")
-      // The throwing loader makes SQLite detection presence-only; real databases add no coverage.
-      write(join(fixture.home, ".omp", "agent", "agent.db"), "sqlite-unavailable")
-      write(join(fixture.home, ".gjc", "agent", "agent.db"), "sqlite-unavailable")
-      const inventory = await detect(fixture, { loadSqlite: async () => { throw new Error("not available") } })
-      for (const id of ["oh-my-pi", "gajae-code"]) {
-        const harness = inventory.harnesses.find((item) => item.id === id)!
-        expect(harness.installed).toBe(true)
-        expect(harness.providers).toHaveLength(0)
-        expect(harness.notices.join("\n")).toBe("node:sqlite unavailable; file presence only")
-      }
-    })
+    test.skipIf(!SQLITE_AVAILABLE)(
+      "#when detected #then sqlite stores degrade to file presence and remain successful",
+      async () => {
+        const fixture = createFixture()
+        write(join(fixture.agentDir, "auth.json"), "{}")
+        write(join(fixture.xdg, "opencode", "auth.json"), "{}")
+        // The throwing loader makes SQLite detection presence-only; real databases add no coverage.
+        write(join(fixture.home, ".omp", "agent", "agent.db"), "sqlite-unavailable")
+        write(join(fixture.home, ".gjc", "agent", "agent.db"), "sqlite-unavailable")
+        const inventory = await detect(fixture, {
+          loadSqlite: async () => {
+            throw new Error("not available")
+          },
+        })
+        for (const id of ["oh-my-pi", "gajae-code"]) {
+          const harness = inventory.harnesses.find((item) => item.id === id)!
+          expect(harness.installed).toBe(true)
+          expect(harness.providers).toHaveLength(0)
+          expect(harness.notices.join("\n")).toBe("node:sqlite unavailable; file presence only")
+        }
+      },
+    )
   })
 
   describe("#given no credentials found and a sibling is installed", () => {
@@ -293,37 +357,40 @@ describe("omo setup sibling detection", () => {
       expect(result.stdout).not.toContain("INFO no credentials found")
     })
 
-    test.skipIf(process.platform === "win32")("#when default launch is on a TTY #then the hint is answered from the cache, cold first then warm", async () => {
-      const fixture = createFixture()
-      const launcher = createLauncherFixture(fixture)
-      write(join(fixture.xdg, "opencode", "auth.json"), "{}")
-      const nonTty = runLauncher(launcher, fixture, [])
-      expect(`${nonTty.stdout}${nonTty.stderr}`).not.toContain("run `omo setup`")
-      // Cold cache: the first interactive launch must not block on live detection; it answers from
-      // the empty default and kicks off the detached refresh that writes the cache.
-      const cold = runLauncher(launcher, fixture, [], true)
-      expect(`${cold.stdout}${cold.stderr}`).not.toContain("sibling credentials detected")
-      const cachePath = join(fixture.agentDir, "harness-detect-cache.json")
-      await waitFor(
-        () => existsSync(cachePath) && JSON.parse(readFileSync(cachePath, "utf8")).suggestion === true,
-        "the detached refresh child to warm the cache",
-      )
-      const tty = runLauncher(launcher, fixture, [], true)
-      const output = `${tty.stdout}${tty.stderr}`
-      expect(tty.status).toBe(0)
-      expect(output.match(/sibling credentials detected; run `omo setup`/g)?.length).toBe(1)
-      write(join(fixture.agentDir, "auth.json"), JSON.stringify({ senpi: { type: "api_key", key: "SENPI-SECRET" } }))
-      // Stale fingerprint: this launch still answers from the cache (the one-launch staleness the
-      // design accepts), then the refresh child catches the cache up.
-      const stale = runLauncher(launcher, fixture, [], true)
-      expect(`${stale.stdout}${stale.stderr}`).toContain("sibling credentials detected")
-      await waitFor(
-        () => existsSync(cachePath) && JSON.parse(readFileSync(cachePath, "utf8")).suggestion === false,
-        "the detached refresh child to catch the cache up",
-      )
-      const configured = runLauncher(launcher, fixture, [], true)
-      expect(`${configured.stdout}${configured.stderr}`).not.toContain("sibling credentials detected")
-    })
+    test.skipIf(process.platform === "win32")(
+      "#when default launch is on a TTY #then the hint is answered from the cache, cold first then warm",
+      async () => {
+        const fixture = createFixture()
+        const launcher = createLauncherFixture(fixture)
+        write(join(fixture.xdg, "opencode", "auth.json"), "{}")
+        const nonTty = runLauncher(launcher, fixture, [])
+        expect(`${nonTty.stdout}${nonTty.stderr}`).not.toContain("run `omo setup`")
+        // Cold cache: the first interactive launch must not block on live detection; it answers from
+        // the empty default and kicks off the detached refresh that writes the cache.
+        const cold = runLauncher(launcher, fixture, [], true)
+        expect(`${cold.stdout}${cold.stderr}`).not.toContain("sibling credentials detected")
+        const cachePath = join(fixture.agentDir, "harness-detect-cache.json")
+        await waitFor(
+          () => existsSync(cachePath) && JSON.parse(readFileSync(cachePath, "utf8")).suggestion === true,
+          "the detached refresh child to warm the cache",
+        )
+        const tty = runLauncher(launcher, fixture, [], true)
+        const output = `${tty.stdout}${tty.stderr}`
+        expect(tty.status).toBe(0)
+        expect(output.match(/sibling credentials detected; run `omo setup`/g)?.length).toBe(1)
+        write(join(fixture.agentDir, "auth.json"), JSON.stringify({ senpi: { type: "api_key", key: "SENPI-SECRET" } }))
+        // Stale fingerprint: this launch still answers from the cache (the one-launch staleness the
+        // design accepts), then the refresh child catches the cache up.
+        const stale = runLauncher(launcher, fixture, [], true)
+        expect(`${stale.stdout}${stale.stderr}`).toContain("sibling credentials detected")
+        await waitFor(
+          () => existsSync(cachePath) && JSON.parse(readFileSync(cachePath, "utf8")).suggestion === false,
+          "the detached refresh child to catch the cache up",
+        )
+        const configured = runLauncher(launcher, fixture, [], true)
+        expect(`${configured.stdout}${configured.stderr}`).not.toContain("sibling credentials detected")
+      },
+    )
   })
 
   describe("#given malformed auth JSON", () => {

@@ -5,7 +5,12 @@ import { createFallbackState } from "./fallback-state"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { installRuntimeFallbackTestClock, restoreRuntimeFallbackTestClock } from "./test-timeout-clock.test-support"
-import { clearAllCompactions, isCompactionInFlight, recordCompactionEnd, recordCompactionStart } from "../../shared/compaction-in-flight"
+import {
+  clearAllCompactions,
+  isCompactionInFlight,
+  recordCompactionEnd,
+  recordCompactionStart,
+} from "../../shared/compaction-in-flight"
 
 type ToastCall = {
   readonly title: string
@@ -13,7 +18,10 @@ type ToastCall = {
   readonly variant: string
 }
 
-function createContext(toasts: ToastCall[] = [], showToast?: RuntimeFallbackPluginInput["client"]["tui"]["showToast"]): RuntimeFallbackPluginInput {
+function createContext(
+  toasts: ToastCall[] = [],
+  showToast?: RuntimeFallbackPluginInput["client"]["tui"]["showToast"],
+): RuntimeFallbackPluginInput {
   return {
     client: {
       session: {
@@ -22,21 +30,26 @@ function createContext(toasts: ToastCall[] = [], showToast?: RuntimeFallbackPlug
         promptAsync: async () => ({}),
       },
       tui: {
-        showToast: showToast ?? (async (input) => {
-          toasts.push({
-            title: input.body.title,
-            message: input.body.message,
-            variant: input.body.variant,
-          })
-          return {}
-        }),
+        showToast:
+          showToast ??
+          (async (input) => {
+            toasts.push({
+              title: input.body.title,
+              message: input.body.message,
+              variant: input.body.variant,
+            })
+            return {}
+          }),
       },
     },
     directory: "/test/dir",
   }
 }
 
-function createDeps(toasts: ToastCall[] = [], showToast?: RuntimeFallbackPluginInput["client"]["tui"]["showToast"]): HookDeps {
+function createDeps(
+  toasts: ToastCall[] = [],
+  showToast?: RuntimeFallbackPluginInput["client"]["tui"]["showToast"],
+): HookDeps {
   return {
     ctx: createContext(toasts, showToast),
     config: {
@@ -180,11 +193,7 @@ describe("createFallbackTimeoutHelpers", () => {
     expect(state.fallbackIndex).toBe(-1)
     expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(false)
     expect(deps.sessionFallbackTimeouts.has(sessionID)).toBe(false)
-    expect(abortSources).toEqual([
-      "session.timeout",
-      "session.timeout",
-      "session.timeout.fallback-exhausted",
-    ])
+    expect(abortSources).toEqual(["session.timeout", "session.timeout", "session.timeout.fallback-exhausted"])
     expect(toasts).toEqual([
       {
         title: "Model Fallback Failed",
@@ -277,7 +286,11 @@ describe("createFallbackTimeoutHelpers", () => {
     state.failedModels.set("google/gemini-2.5-pro", Date.now())
     deps.sessionStates.set(sessionID, state)
     deps.sessionAwaitingFallbackResult.add(sessionID)
-    const helpers = createFallbackTimeoutHelpers(deps, async () => {}, async () => ({ accepted: true, status: "dispatched" }))
+    const helpers = createFallbackTimeoutHelpers(
+      deps,
+      async () => {},
+      async () => ({ accepted: true, status: "dispatched" }),
+    )
     const clock = installRuntimeFallbackTestClock()
 
     // when
@@ -286,7 +299,9 @@ describe("createFallbackTimeoutHelpers", () => {
 
     // then
     expect(state.attemptCount).toBeLessThan(deps.config.max_fallback_attempts)
-    expect(toasts.map((toast) => toast.message)).toEqual(["No fallback model could be reached (no available fallback models)"])
+    expect(toasts.map((toast) => toast.message)).toEqual([
+      "No fallback model could be reached (no available fallback models)",
+    ])
   })
 
   test("#given timeout callback awaits abort #when manual model change replaces state #then the stale generation never dispatches", async () => {
@@ -306,10 +321,11 @@ describe("createFallbackTimeoutHelpers", () => {
     let retryCalls = 0
     const helpers = createFallbackTimeoutHelpers(
       deps,
-      async () => new Promise<void>((resolve) => {
-        resolveAbort = resolve
-        markAbortStarted?.()
-      }),
+      async () =>
+        new Promise<void>((resolve) => {
+          resolveAbort = resolve
+          markAbortStarted?.()
+        }),
       async () => {
         retryCalls += 1
         return { accepted: true, status: "dispatched" }
@@ -351,7 +367,9 @@ describe("createFallbackTimeoutHelpers", () => {
     }
     const helpers = createFallbackTimeoutHelpers(
       deps,
-      async () => { abortCalls += 1 },
+      async () => {
+        abortCalls += 1
+      },
       async () => {
         retryCalls += 1
         return { accepted: true, status: "dispatched" }
@@ -462,7 +480,9 @@ describe("createFallbackTimeoutHelpers", () => {
     let abortCalls = 0
     const helpers = createFallbackTimeoutHelpers(
       deps,
-      async () => { abortCalls += 1 },
+      async () => {
+        abortCalls += 1
+      },
       async () => ({ accepted: true, status: "dispatched" }),
     )
     const clock = installRuntimeFallbackTestClock(0)
@@ -497,7 +517,9 @@ describe("createFallbackTimeoutHelpers", () => {
     }
     const helpers = createFallbackTimeoutHelpers(
       deps,
-      async () => { abortCalls += 1 },
+      async () => {
+        abortCalls += 1
+      },
       async () => {
         retryCalls += 1
         return { accepted: true, status: "dispatched" }
@@ -557,7 +579,9 @@ describe("createFallbackTimeoutHelpers", () => {
     }
     const helpers = createFallbackTimeoutHelpers(
       deps,
-      async () => { abortCalls += 1 },
+      async () => {
+        abortCalls += 1
+      },
       async () => ({ accepted: false, status: "blocked", reason: "refused" }),
     )
     const clock = installRuntimeFallbackTestClock(0)

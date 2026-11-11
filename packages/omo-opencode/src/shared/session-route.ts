@@ -1,8 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import {
-  promptSyncWithModelSuggestionRetry,
-  promptWithModelSuggestionRetry,
-} from "./model-suggestion-retry"
+import { promptSyncWithModelSuggestionRetry, promptWithModelSuggestionRetry } from "./model-suggestion-retry"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "./prompt-async-gate"
 import { isAmbiguousPostDispatchPromptFailure } from "./prompt-failure-classifier"
 
@@ -29,20 +26,14 @@ export function routePromptRetry(args: PromptRetryArgs, directory: string): Prom
   }
 }
 
-export function routePromptSyncRetry(
-  args: PromptSyncRetryArgs,
-  directory: string,
-): PromptSyncRetryArgs {
+export function routePromptSyncRetry(args: PromptSyncRetryArgs, directory: string): PromptSyncRetryArgs {
   return {
     ...args,
     query: { directory },
   }
 }
 
-export function routeSessionMessages(
-  args: SessionMessagesArgs,
-  directory: string,
-): SessionMessagesArgs {
+export function routeSessionMessages(args: SessionMessagesArgs, directory: string): SessionMessagesArgs {
   return {
     ...args,
     query: { directory },

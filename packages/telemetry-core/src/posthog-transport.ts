@@ -41,13 +41,16 @@ class PostHogTelemetryTransport implements TelemetryTransport {
   }
 
   async shutdown(): Promise<void> {
-    await Promise.all([this.#client.shutdown(), this.#immediate?.then((sender) => sender.shutdown(), () => undefined)])
+    await Promise.all([
+      this.#client.shutdown(),
+      this.#immediate?.then(
+        (sender) => sender.shutdown(),
+        () => undefined,
+      ),
+    ])
   }
 }
 
-export function createDefaultPostHogTransport(
-  apiKey: string,
-  options: PostHogTransportOptions,
-): TelemetryTransport {
+export function createDefaultPostHogTransport(apiKey: string, options: PostHogTransportOptions): TelemetryTransport {
   return new PostHogTelemetryTransport(apiKey, options)
 }

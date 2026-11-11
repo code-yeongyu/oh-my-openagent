@@ -8,7 +8,6 @@ import { recallBm25IndexFor, recallTermFigures } from "./bm25-index"
 import { RecallCorpusCache, type RecallDocument, recallMemoryFigures } from "./provider"
 import { removeTree } from "../../../../test-support/remove-tree"
 
-
 const tempDirs: string[] = []
 
 afterEach(async () => {
@@ -29,7 +28,10 @@ async function createRepo(): Promise<GitMemoryRepo> {
 }
 
 function textBytes(documents: readonly RecallDocument[]): number {
-  return documents.reduce((sum, document) => sum + 2 * (document.path.length + document.description.length + document.body.length), 0)
+  return documents.reduce(
+    (sum, document) => sum + 2 * (document.path.length + document.description.length + document.body.length),
+    0,
+  )
 }
 
 // The memory report (senpi#2564) reads these figures on demand to attribute a session's heap to the

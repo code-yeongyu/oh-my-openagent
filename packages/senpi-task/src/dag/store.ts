@@ -5,9 +5,23 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "nod
 
 import { defaultSignaller } from "../lifecycle/context"
 import { resolveStateDir } from "../store/state-dir"
-import { DAG_SETTINGS_DEFAULTS, isSafeDagPathSegment, type DagEventLane, type DagRunEvent, type DagRunId, type DagRunStatus, type DagSettings, isTerminalDagRunStatus } from "./types"
+import {
+  DAG_SETTINGS_DEFAULTS,
+  isSafeDagPathSegment,
+  type DagEventLane,
+  type DagRunEvent,
+  type DagRunId,
+  type DagRunStatus,
+  type DagSettings,
+  isTerminalDagRunStatus,
+} from "./types"
 import type { DagRunEventType } from "./events"
-import { decodePausedNodes, decodePausedTransition, encodePausedNodes, encodePausedTransition } from "./paused-node-encoding"
+import {
+  decodePausedNodes,
+  decodePausedTransition,
+  encodePausedNodes,
+  encodePausedTransition,
+} from "./paused-node-encoding"
 
 const SCHEMA_VERSION = 1
 const LOCK_RETRY_MS = 10
@@ -267,16 +281,22 @@ export function createDagFileStore(config: DagStoreConfig, options: StoreOptions
       assertSafeSegment(runId, "run id")
       return withLock(paths.runLock(runId), runId, operation, isProcessAlive, now, fsyncWrites)
     },
-    withKeyLock: (parentSessionId, runKey, operation) => withLock(
-      paths.keyLock(parentSessionId, runKey), undefined, operation, isProcessAlive, now, fsyncWrites,
-    ),
-    withTaskOwnerLock: (taskOwner, runId, operation) => withLock(
-      paths.taskOwnerLock(taskOwner), runId, operation, isProcessAlive, now, fsyncWrites,
-    ),
-    withSessionRunCapacity: (parentSessionId, runId, operation) => withLock(sessionCapacityLock(paths, parentSessionId), undefined, () => {
-      assertSessionRunCapacity(paths, parentSessionId, runId, maxRunsPerSession, now)
-      return operation()
-    }, isProcessAlive, now, fsyncWrites),
+    withKeyLock: (parentSessionId, runKey, operation) =>
+      withLock(paths.keyLock(parentSessionId, runKey), undefined, operation, isProcessAlive, now, fsyncWrites),
+    withTaskOwnerLock: (taskOwner, runId, operation) =>
+      withLock(paths.taskOwnerLock(taskOwner), runId, operation, isProcessAlive, now, fsyncWrites),
+    withSessionRunCapacity: (parentSessionId, runId, operation) =>
+      withLock(
+        sessionCapacityLock(paths, parentSessionId),
+        undefined,
+        () => {
+          assertSessionRunCapacity(paths, parentSessionId, runId, maxRunsPerSession, now)
+          return operation()
+        },
+        isProcessAlive,
+        now,
+        fsyncWrites,
+      ),
     pruneExpired(pruneNow = now()) {
       const cutoff = pruneNow - retentionDays * 24 * 60 * 60 * 1000
       const pruned: DagRunId[] = []
@@ -289,7 +309,7 @@ export function createDagFileStore(config: DagStoreConfig, options: StoreOptions
         const value = readJsonFile(path, entry.name.slice(0, -5) as DagRunId, now)
         if (value === null) continue
         const checkpoint = value as RetentionCheckpoint
-        const runId = checkpoint.runId ?? entry.name.slice(0, -5) as DagRunId
+        const runId = checkpoint.runId ?? (entry.name.slice(0, -5) as DagRunId)
         assertSupportedSchema(checkpoint, path, runId, now)
         if (!isTerminalDagRunStatus(checkpoint.status)) continue
         const terminalAt = checkpoint.completedAt ?? checkpoint.updatedAt
@@ -360,19 +380,26 @@ function writeCheckpointWithinSessionLimit(
     writeJsonAtomic(path, checkpoint, platform, fsyncWrites)
     return
   }
-  withLock(sessionCapacityLock(paths, parentSessionId), undefined, () => {
-    if (fs.existsSync(path)) {
+  withLock(
+    sessionCapacityLock(paths, parentSessionId),
+    undefined,
+    () => {
+      if (fs.existsSync(path)) {
+        writeJsonAtomic(path, checkpoint, platform, fsyncWrites)
+        return
+      }
+      try {
+        assertSessionRunCapacity(paths, parentSessionId, runId, maxRunsPerSession, now)
+      } catch (error) {
+        fs.rmSync(join(paths.root, "skills", `${runId}.json`), { force: true })
+        throw error
+      }
       writeJsonAtomic(path, checkpoint, platform, fsyncWrites)
-      return
-    }
-    try {
-      assertSessionRunCapacity(paths, parentSessionId, runId, maxRunsPerSession, now)
-    } catch (error) {
-      fs.rmSync(join(paths.root, "skills", `${runId}.json`), { force: true })
-      throw error
-    }
-    writeJsonAtomic(path, checkpoint, platform, fsyncWrites)
-  }, isProcessAlive, now, fsyncWrites)
+    },
+    isProcessAlive,
+    now,
+    fsyncWrites,
+  )
 }
 
 function sessionCapacityLock(paths: DagStorePaths, parentSessionId: string): string {
@@ -508,10 +535,7 @@ function forEachJsonLine(path: string, visit: (value: unknown) => void): void {
   })
 }
 
-function forEachRawLine(
-  path: string,
-  visit: (line: Buffer, endOffset: number, complete: boolean) => void,
-): void {
+function forEachRawLine(path: string, visit: (line: Buffer, endOffset: number, complete: boolean) => void): void {
   if (!fs.existsSync(path)) return
   const fd = fs.openSync(path, "r")
   const buffer = Buffer.allocUnsafe(READ_BUFFER_BYTES)
@@ -579,7 +603,12 @@ function assertSupportedSchema(value: unknown, path: string, runId: DagRunId | u
   }
 }
 
-function corrupt(path: string, runId: DagRunId | undefined, message: string, now: () => number): DagJournalCorruptError {
+function corrupt(
+  path: string,
+  runId: DagRunId | undefined,
+  message: string,
+  now: () => number,
+): DagJournalCorruptError {
   return new DagJournalCorruptError({
     kind: "journal_corrupt",
     ...(runId === undefined ? {} : { runId }),
@@ -757,8 +786,11 @@ function reclaimObservedLock(
     fs.closeSync(fd)
     fd = undefined
     const currentHolder = readLockHolder(path)
-    if (currentHolder === undefined || !sameLockHolder(observedHolder, currentHolder) ||
-      (currentHolder.pid !== undefined && isProcessAlive(currentHolder.pid))) {
+    if (
+      currentHolder === undefined ||
+      !sameLockHolder(observedHolder, currentHolder) ||
+      (currentHolder.pid !== undefined && isProcessAlive(currentHolder.pid))
+    ) {
       return { kind: "holder_changed" }
     }
     fs.renameSync(successorPath, path)
@@ -790,8 +822,7 @@ function tryAcquireReclaimMutex(
     return { holder: { pid: process.pid, content }, clearedStaleMutex: false }
   }
   const observedHolder = readLockHolder(path)
-  if (observedHolder === undefined ||
-    (observedHolder.pid !== undefined && isProcessAlive(observedHolder.pid))) {
+  if (observedHolder === undefined || (observedHolder.pid !== undefined && isProcessAlive(observedHolder.pid))) {
     return { holder: undefined, clearedStaleMutex: false }
   }
   const clearedStaleMutex = removeObservedLock(
@@ -834,8 +865,12 @@ function removeWindowsContendedFile(path: string): void {
       fs.rmSync(path, { force: true })
       return
     } catch (error) {
-      if (process.platform !== "win32" || attempt >= WINDOWS_CLEANUP_RETRIES ||
-        (!hasCode(error, "EPERM") && !hasCode(error, "EBUSY"))) throw error
+      if (
+        process.platform !== "win32" ||
+        attempt >= WINDOWS_CLEANUP_RETRIES ||
+        (!hasCode(error, "EPERM") && !hasCode(error, "EBUSY"))
+      )
+        throw error
       Atomics.wait(sleeper, 0, 0, WINDOWS_CLEANUP_RETRY_MS)
     }
   }

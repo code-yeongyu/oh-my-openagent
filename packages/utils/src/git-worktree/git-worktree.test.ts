@@ -5,12 +5,7 @@ import { formatFileChanges, parseGitDiffNumstat, parseGitStatusPorcelain } from 
 
 describe("git-worktree", () => {
   test("#given status porcelain output #when parsing #then maps paths to statuses", () => {
-    const porcelain = [
-      " M src/a.ts",
-      "A  src/b.ts",
-      "?? src/c.ts",
-      "D  src/d.ts",
-    ].join("\n")
+    const porcelain = [" M src/a.ts", "A  src/b.ts", "?? src/c.ts", "D  src/d.ts"].join("\n")
 
     const map = parseGitStatusPorcelain(porcelain)
     expect(map.get("src/a.ts")).toBe("modified")
@@ -50,26 +45,29 @@ describe("git-worktree", () => {
   })
 
   test("#given notepad path #when formatting omo plan changes #then does not report notepad updated", () => {
-    const summary = formatFileChanges([
-      { path: ".omo/plans/work.md", added: 1, removed: 0, status: "modified" },
-    ], ".omo/notepads/work/notes.md")
+    const summary = formatFileChanges(
+      [{ path: ".omo/plans/work.md", added: 1, removed: 0, status: "modified" }],
+      ".omo/notepads/work/notes.md",
+    )
 
     expect(summary).not.toContain("[NOTEPAD UPDATED]")
   })
 
   test("#given notepad path #when formatting omo notepad changes #then reports notepad updated", () => {
-    const summary = formatFileChanges([
-      { path: ".omo/notepads/work/notes.md", added: 1, removed: 0, status: "modified" },
-    ], ".omo/notepads/work/notes.md")
+    const summary = formatFileChanges(
+      [{ path: ".omo/notepads/work/notes.md", added: 1, removed: 0, status: "modified" }],
+      ".omo/notepads/work/notes.md",
+    )
 
     expect(summary).toContain("[NOTEPAD UPDATED]")
     expect(summary).toContain(".omo/notepads/work/notes.md")
   })
 
   test("#given notepad path #when formatting another omo notepad change #then does not report active notepad updated", () => {
-    const summary = formatFileChanges([
-      { path: ".omo/notepads/other/notes.md", added: 1, removed: 0, status: "modified" },
-    ], ".omo/notepads/work/notes.md")
+    const summary = formatFileChanges(
+      [{ path: ".omo/notepads/other/notes.md", added: 1, removed: 0, status: "modified" }],
+      ".omo/notepads/work/notes.md",
+    )
 
     expect(summary).not.toContain("[NOTEPAD UPDATED]")
   })

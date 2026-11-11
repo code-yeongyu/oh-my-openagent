@@ -4,9 +4,7 @@ import { log } from "../../../shared/logger"
 
 const DEFAULT_REFRESH_TIMEOUT_MS = 5000
 
-export async function refreshModelCapabilitiesOnStartup(
-  config: ModelCapabilitiesConfig | undefined,
-): Promise<void> {
+export async function refreshModelCapabilitiesOnStartup(config: ModelCapabilitiesConfig | undefined): Promise<void> {
   if (config?.enabled === false) {
     return
   }

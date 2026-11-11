@@ -40,14 +40,23 @@ describe("runInProcessMemoryChild", () => {
     // given
     let resolveStart: ((child: ChildHandle) => void) | undefined
     let resolveStarted: (() => void) | undefined
-    const started = new Promise<void>((resolve) => { resolveStarted = resolve })
+    const started = new Promise<void>((resolve) => {
+      resolveStarted = resolve
+    })
     let aborted = 0
     let disposed = 0
     let resolveDisposed: (() => void) | undefined
-    const disposedSignal = new Promise<void>((resolve) => { resolveDisposed = resolve })
+    const disposedSignal = new Promise<void>((resolve) => {
+      resolveDisposed = resolve
+    })
     const late = handle({
-      abort: async () => { aborted += 1 },
-      dispose: () => { disposed += 1; resolveDisposed?.() },
+      abort: async () => {
+        aborted += 1
+      },
+      dispose: () => {
+        disposed += 1
+        resolveDisposed?.()
+      },
     })
     const resultPromise = runInProcessMemoryChild({
       runId: "deadline",
@@ -56,7 +65,9 @@ describe("runInProcessMemoryChild", () => {
       createRunner: () => ({
         start: async () => {
           resolveStarted?.()
-          return await new Promise<ChildHandle>((resolve) => { resolveStart = resolve })
+          return await new Promise<ChildHandle>((resolve) => {
+            resolveStart = resolve
+          })
         },
       }),
       setup: async () => undefined,
@@ -78,10 +89,14 @@ describe("runInProcessMemoryChild", () => {
   test("#given setup still pending when the deadline fires #when setup later resolves #then runner.start is never invoked", async () => {
     // given
     let releaseSetup: (() => void) | undefined
-    const setupReleased = new Promise<void>((resolve) => { releaseSetup = resolve })
+    const setupReleased = new Promise<void>((resolve) => {
+      releaseSetup = resolve
+    })
     let startCalls = 0
     let resolveSetupContinuation: (() => void) | undefined
-    const setupContinuation = new Promise<void>((resolve) => { resolveSetupContinuation = resolve })
+    const setupContinuation = new Promise<void>((resolve) => {
+      resolveSetupContinuation = resolve
+    })
     const resultPromise = runInProcessMemoryChild({
       runId: "setup-deadline",
       deadlineMs: 1,
@@ -94,7 +109,9 @@ describe("runInProcessMemoryChild", () => {
       }),
       setup: () => setupReleased,
       buildStart: () => startSpec(),
-      onSetupSettled: () => { resolveSetupContinuation?.() },
+      onSetupSettled: () => {
+        resolveSetupContinuation?.()
+      },
     })
 
     // when: the deadline wins before setup is released
@@ -113,7 +130,9 @@ describe("runInProcessMemoryChild", () => {
     const childState = state()
     let resolveStart: ((child: ChildHandle) => void) | undefined
     let resolveStarted: (() => void) | undefined
-    const started = new Promise<void>((resolve) => { resolveStarted = resolve })
+    const started = new Promise<void>((resolve) => {
+      resolveStarted = resolve
+    })
     let aborted = 0
     let disposed = 0
     let observed = 0
@@ -124,21 +143,31 @@ describe("runInProcessMemoryChild", () => {
       createRunner: () => ({
         start: async () => {
           resolveStarted?.()
-          return await new Promise<ChildHandle>((resolve) => { resolveStart = resolve })
+          return await new Promise<ChildHandle>((resolve) => {
+            resolveStart = resolve
+          })
         },
       }),
       setup: async () => undefined,
       buildStart: () => startSpec(),
-      onHandle: () => { observed += 1 },
+      onHandle: () => {
+        observed += 1
+      },
     })
     await started
     childState.cancel?.()
 
     // when: the late start resolves after cancel has been invoked
-    resolveStart?.(handle({
-      abort: async () => { aborted += 1 },
-      dispose: () => { disposed += 1 },
-    }))
+    resolveStart?.(
+      handle({
+        abort: async () => {
+          aborted += 1
+        },
+        dispose: () => {
+          disposed += 1
+        },
+      }),
+    )
     const result = await resultPromise
 
     // then
@@ -164,7 +193,9 @@ describe("runInProcessMemoryChild", () => {
       }),
       setup: async () => undefined,
       buildStart: () => startSpec(),
-      onSetupSettled: () => { childState.cancel?.() },
+      onSetupSettled: () => {
+        childState.cancel?.()
+      },
     })
 
     // when: cancel lands after setup and before start, while the runtime import is in flight
@@ -180,21 +211,30 @@ describe("runInProcessMemoryChild", () => {
     let aborted = 0
     let disposed = 0
     let resolveHandled: (() => void) | undefined
-    const handled = new Promise<void>((resolve) => { resolveHandled = resolve })
+    const handled = new Promise<void>((resolve) => {
+      resolveHandled = resolve
+    })
     const resultPromise = runInProcessMemoryChild({
       runId: "idle-cancel",
       deadlineMs: 10_000,
       state: childState,
       createRunner: () => ({
-        start: async () => handle({
-          abort: async () => { aborted += 1 },
-          dispose: () => { disposed += 1 },
-          waitForIdle: async () => await new Promise(() => undefined),
-        }),
+        start: async () =>
+          handle({
+            abort: async () => {
+              aborted += 1
+            },
+            dispose: () => {
+              disposed += 1
+            },
+            waitForIdle: async () => await new Promise(() => undefined),
+          }),
       }),
       setup: async () => undefined,
       buildStart: () => startSpec(),
-      onHandle: () => { resolveHandled?.() },
+      onHandle: () => {
+        resolveHandled?.()
+      },
     })
     await handled
 
@@ -214,7 +254,11 @@ describe("runInProcessMemoryChild", () => {
       runId: "create-failed",
       deadlineMs: 10_000,
       state: state(),
-      createRunner: () => ({ start: async () => { throw new Error("boot failed") } }),
+      createRunner: () => ({
+        start: async () => {
+          throw new Error("boot failed")
+        },
+      }),
       setup: async () => undefined,
       buildStart: () => startSpec(),
     })
@@ -235,7 +279,9 @@ describe("runInProcessMemoryChild", () => {
       createRunner: () => ({ start: async () => handle() }),
       setup: async () => undefined,
       buildStart: () => startSpec(),
-      onHandle: () => { observed += 1 },
+      onHandle: () => {
+        observed += 1
+      },
     })
 
     // when: the child finishes
