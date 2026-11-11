@@ -12,7 +12,6 @@ interface SDKMessage {
   parts: unknown[]
 }
 
-
 export function getMessageIds(sessionID: string): string[] {
   const messageDir = getMessageDir(sessionID)
   if (!messageDir || !existsSync(messageDir)) return []

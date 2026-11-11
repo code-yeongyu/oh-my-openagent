@@ -44,7 +44,9 @@ export function buildNoticeBox(
 }
 
 export function noticeTone(color: ThemeColor): NoticeTone {
-  return color === "muted" ? "dim" : color === "accent" || color === "warning" || color === "error" || color === "success" || color === "dim"
-    ? color
-    : "dim"
+  return color === "muted"
+    ? "dim"
+    : color === "accent" || color === "warning" || color === "error" || color === "success" || color === "dim"
+      ? color
+      : "dim"
 }

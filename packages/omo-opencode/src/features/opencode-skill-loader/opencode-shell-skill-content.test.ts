@@ -33,7 +33,9 @@ describe("git-master prompt and non-interactive-env agree on the shell OpenCode 
   test("#given OpenCode is configured to run pwsh #when git-master resolves #then both use PowerShell syntax", async () => {
     configureShell("pwsh")
 
-    const content = resolveSkillContent("git-master", { gitMasterConfig: { commit_footer: false, git_env_prefix: "GIT_MASTER=1" } })
+    const content = resolveSkillContent("git-master", {
+      gitMasterConfig: { commit_footer: false, git_env_prefix: "GIT_MASTER=1" },
+    })
 
     expect(content).toContain("$env:GIT_MASTER='1';")
     expect(await hookPrefix()).toStartWith("$env:")
@@ -42,7 +44,9 @@ describe("git-master prompt and non-interactive-env agree on the shell OpenCode 
   test("#given OpenCode is configured to run bash #when git-master resolves #then both use unix syntax", async () => {
     configureShell("bash")
 
-    const content = resolveSkillContent("git-master", { gitMasterConfig: { commit_footer: false, git_env_prefix: "GIT_MASTER=1" } })
+    const content = resolveSkillContent("git-master", {
+      gitMasterConfig: { commit_footer: false, git_env_prefix: "GIT_MASTER=1" },
+    })
 
     expect(content).toContain("GIT_MASTER=1 git")
     expect(content).not.toContain("$env:GIT_MASTER")

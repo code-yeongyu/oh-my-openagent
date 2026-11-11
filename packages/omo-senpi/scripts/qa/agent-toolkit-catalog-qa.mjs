@@ -21,16 +21,26 @@ class HostStub {
     handlers.push(handler)
     this.handlers.set(event, handlers)
   }
-  registerFlag(name, options) { this.flags.set(name, options.default) }
-  getFlag(name) { return this.flags.get(name) }
-  registerTool(tool) { this.tools.set(tool.name, tool) }
-  registerRemovedToolHint(name, hint) { this.removedToolHints.set(name, hint) }
+  registerFlag(name, options) {
+    this.flags.set(name, options.default)
+  }
+  getFlag(name) {
+    return this.flags.get(name)
+  }
+  registerTool(tool) {
+    this.tools.set(tool.name, tool)
+  }
+  registerRemovedToolHint(name, hint) {
+    this.removedToolHints.set(name, hint)
+  }
   registerCommand() {}
   registerMessageRenderer() {}
   registerMcpServer() {}
   sendMessage() {}
   sendUserMessage() {}
-  getAllTools() { return [...this.tools.values()] }
+  getAllTools() {
+    return [...this.tools.values()]
+  }
 
   async execute(name) {
     const tool = this.tools.get(name)
@@ -54,16 +64,28 @@ try {
   for (const key of ["HOME", "USERPROFILE", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"]) {
     process.env[key] = sandbox
   }
-  for (const key of ["OMO_CODING_AGENT_DIR", "SENPI_CODING_AGENT_DIR", "PI_CODING_AGENT_DIR"]) process.env[key] = agentDir
+  for (const key of ["OMO_CODING_AGENT_DIR", "SENPI_CODING_AGENT_DIR", "PI_CODING_AGENT_DIR"])
+    process.env[key] = agentDir
   for (const key of ["OMO_PACKAGE_DIR", "SENPI_PACKAGE_DIR", "PI_PACKAGE_DIR", "XAI_API_KEY"]) delete process.env[key]
   const bundle = await import(pathToFileURL(bundlePath).href)
   assert.equal(typeof bundle.composeOmoSenpiExtension, "function")
-  assert.ok(bundle.omoSenpiComponents.some(component => component.name === "ulw-loop"))
+  assert.ok(bundle.omoSenpiComponents.some((component) => component.name === "ulw-loop"))
   await bundle.composeOmoSenpiExtension(bundle.omoSenpiComponents, {
-    logger: { info() {}, warn(message) { warnings.push(message) }, error(message, details) { errors.push({ message, details }) } },
+    logger: {
+      info() {},
+      warn(message) {
+        warnings.push(message)
+      },
+      error(message, details) {
+        errors.push({ message, details })
+      },
+    },
   })(pi)
   assert.deepEqual(errors, [], "all packaged components must register successfully")
-  const catalog = pi.getAllTools().map(tool => tool.name).sort()
+  const catalog = pi
+    .getAllTools()
+    .map((tool) => tool.name)
+    .sort()
   assert.ok(catalog.length > 0, "composition must produce a real catalog")
   assert.ok(!catalog.includes("omo_agent_toolkit"))
   const hint = pi.removedToolHints.get("omo_agent_toolkit")
@@ -76,10 +98,20 @@ try {
   assert.equal((await pi.execute("qa_catalog_control")).error.code, "inactive_tool")
   pi.activeTools.add("qa_catalog_control")
   assert.deepEqual(await pi.execute("qa_catalog_control"), { ok: true })
-  proof = { verdict: "PASS", surface: "built-bundle-host-stub", catalog, removedToolHint: hint, removedResult, inactiveControl: "inactive_tool", warnings, isolatedAgentDir: agentDir }
+  proof = {
+    verdict: "PASS",
+    surface: "built-bundle-host-stub",
+    catalog,
+    removedToolHint: hint,
+    removedResult,
+    inactiveControl: "inactive_tool",
+    warnings,
+    isolatedAgentDir: agentDir,
+  }
 } finally {
   try {
-    for (const handler of pi.handlers.get("session_shutdown") ?? []) await handler({ type: "session_shutdown", reason: "quit" })
+    for (const handler of pi.handlers.get("session_shutdown") ?? [])
+      await handler({ type: "session_shutdown", reason: "quit" })
   } finally {
     process.chdir(previousCwd)
     for (const key of Object.keys(process.env)) if (!(key in previousEnv)) delete process.env[key]
@@ -88,4 +120,6 @@ try {
   }
 }
 assert.ok(!existsSync(sandbox))
-console.log(JSON.stringify({ ...proof, cleanup: { sandboxRemoved: true, cwdRestored: process.cwd() === previousCwd } }, null, 2))
+console.log(
+  JSON.stringify({ ...proof, cleanup: { sandboxRemoved: true, cwdRestored: process.cwd() === previousCwd } }, null, 2),
+)

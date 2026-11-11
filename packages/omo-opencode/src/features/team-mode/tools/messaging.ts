@@ -30,7 +30,7 @@ const TeamSendMessageArgsSchema = z.object({
   to: z.string().min(1),
   body: z.string(),
   kind: z.enum(MESSAGE_TOOL_KINDS).optional(),
-  correlationId: z.preprocess((value) => value === "" ? undefined : value, z.uuid().optional()),
+  correlationId: z.preprocess((value) => (value === "" ? undefined : value), z.uuid().optional()),
   summary: z.string().optional(),
   references: z.array(TeamReferenceArgsSchema).optional(),
 })
@@ -47,12 +47,20 @@ export function createTeamSendMessageTool(
       to: tool.schema.string().describe("Recipient name or * for broadcast"),
       body: tool.schema.string().describe("Message body"),
       kind: tool.schema.enum(MESSAGE_TOOL_KINDS).optional().default("message").describe("Message kind"),
-      correlationId: tool.schema.string().optional().describe("Optional UUID correlation ID. Do not use task IDs like 'task-1'."),
+      correlationId: tool.schema
+        .string()
+        .optional()
+        .describe("Optional UUID correlation ID. Do not use task IDs like 'task-1'."),
       summary: tool.schema.string().optional().describe("Optional summary"),
-      references: tool.schema.array(tool.schema.object({
-        path: tool.schema.string(),
-        description: tool.schema.string().optional(),
-      })).optional().describe("Optional references as [{ path, description? }]"),
+      references: tool.schema
+        .array(
+          tool.schema.object({
+            path: tool.schema.string(),
+            description: tool.schema.string().optional(),
+          }),
+        )
+        .optional()
+        .describe("Optional references as [{ path, description? }]"),
     },
     execute: async (rawArgs, context) => {
       const args = TeamSendMessageArgsSchema.parse(rawArgs)
@@ -79,7 +87,11 @@ export function createTeamSendMessageTool(
         references: args.references,
       })
 
-      if (message.kind === "shutdown_request" || message.kind === "shutdown_approved" || message.kind === "shutdown_rejected") {
+      if (
+        message.kind === "shutdown_request" ||
+        message.kind === "shutdown_approved" ||
+        message.kind === "shutdown_rejected"
+      ) {
         throw new Error("must use lifecycle tools for shutdown kinds")
       }
 

@@ -33,3 +33,5 @@ export { buildIdentityPaths } from "../identity/layout"
 export { measureUnreflectedJournalBytes } from "../retention/past-retention"
 /** @public */
 export { DEFAULT_RUNTIME_RETENTION } from "../retention/policy"
+/** @public */
+export { readLastRetentionLogEntry } from "../retention/log"

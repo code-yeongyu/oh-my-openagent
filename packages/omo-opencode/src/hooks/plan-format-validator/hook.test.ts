@@ -236,15 +236,17 @@ Describe the first implementation section here.
 
   test("preserves task-ID rows and blocked rows the progress counter counts", async () => {
     // given
-    const fixture = createFixture([
-      "# Plan",
-      "## TODOs",
-      "- [x] T1.1 Build the parser",
-      "- [~] T1.2 \u2014 Push, blocked on the user",
-      "## Final Verification Wave",
-      "- [ ] F1 \u2014 Plan compliance audit",
-      "- [ ] H1 \u2014 User approval",
-    ].join("\n"))
+    const fixture = createFixture(
+      [
+        "# Plan",
+        "## TODOs",
+        "- [x] T1.1 Build the parser",
+        "- [~] T1.2 \u2014 Push, blocked on the user",
+        "## Final Verification Wave",
+        "- [ ] F1 \u2014 Plan compliance audit",
+        "- [ ] H1 \u2014 User approval",
+      ].join("\n"),
+    )
 
     try {
       // when

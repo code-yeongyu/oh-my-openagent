@@ -1,8 +1,5 @@
 import { spawn } from "@oh-my-opencode/utils/runtime"
-import {
-  createReplyListenerDaemonEnv,
-  REPLY_LISTENER_DAEMON_IDENTITY_MARKER,
-} from "./reply-listener-process"
+import { createReplyListenerDaemonEnv, REPLY_LISTENER_DAEMON_IDENTITY_MARKER } from "./reply-listener-process"
 import { REPLY_LISTENER_STARTUP_TOKEN_ENV } from "./reply-listener-state"
 
 export interface ReplyListenerSpawnProcess {
@@ -10,10 +7,7 @@ export interface ReplyListenerSpawnProcess {
   unref(): void
 }
 
-export function spawnReplyListenerDaemon(
-  daemonScript: string,
-  startupToken: string,
-): ReplyListenerSpawnProcess {
+export function spawnReplyListenerDaemon(daemonScript: string, startupToken: string): ReplyListenerSpawnProcess {
   return spawn(["bun", "run", daemonScript, REPLY_LISTENER_DAEMON_IDENTITY_MARKER], {
     detached: true,
     stdio: ["ignore", "ignore", "ignore"],

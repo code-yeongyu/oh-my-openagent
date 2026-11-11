@@ -86,7 +86,11 @@ describe("installHooks", () => {
     const bashOnly = [/<<</, /echo -e/, /(^|[\s=(])\$'/, /disown/, /env bash/]
 
     // when
-    await writeFiles(dir, { "pre-commit": PRE_COMMIT_HOOK_SCRIPT, "commit-msg": COMMIT_MSG_HOOK_SCRIPT, "post-commit": POST_COMMIT_HOOK_SCRIPT })
+    await writeFiles(dir, {
+      "pre-commit": PRE_COMMIT_HOOK_SCRIPT,
+      "commit-msg": COMMIT_MSG_HOOK_SCRIPT,
+      "post-commit": POST_COMMIT_HOOK_SCRIPT,
+    })
 
     // then
     for (const script of [PRE_COMMIT_HOOK_SCRIPT, COMMIT_MSG_HOOK_SCRIPT, POST_COMMIT_HOOK_SCRIPT]) {
@@ -128,11 +132,12 @@ describe("pre-commit hook", () => {
       "system/persona.md": VALID,
       "reference/notes.md": "---\ndescription: Notes\nlimit: 5000\n---\n\nnotes\n",
       "system/outage.md": "---\ndescription: Outage\nexpires: 2026-10-27T06:33Z\n---\n\noutage\n",
-      "system/freeze.md": "---\ndescription: Freeze\nexpires: \"2026-10-28\"\n---\n\nfreeze\n",
+      "system/freeze.md": '---\ndescription: Freeze\nexpires: "2026-10-28"\n---\n\nfreeze\n',
       "memory/system/legacy.md": "---\ndescription: Legacy layout\n---\n\nlegacy\n",
       "skills/deploy/SKILL.md": "---\nname: deploy\ndescription: Use when deploying\nunknown_key: fine\n---\n\nsteps\n",
-      "skills/quoted/SKILL.md": "---\ndescription: \"Use when shipping: verify, merge\"\nversion: 0.2.0\n---\n\nsteps\n",
-      "people/sarah/card.md": "---\ndescription: Sarah - cofounder\nkind: person\naliases: [\"Sarah\"]\n---\n\nIDENTITY: cofounder\n",
+      "skills/quoted/SKILL.md": '---\ndescription: "Use when shipping: verify, merge"\nversion: 0.2.0\n---\n\nsteps\n',
+      "people/sarah/card.md":
+        '---\ndescription: Sarah - cofounder\nkind: person\naliases: ["Sarah"]\n---\n\nIDENTITY: cofounder\n',
       "README.md": "no frontmatter here\n",
     })
 
@@ -144,13 +149,18 @@ describe("pre-commit hook", () => {
   it("#given a note stamped with a claim receipt by the memory tool #when it is committed #then the hook accepts the provenance header (#10488)", async () => {
     // given: exactly what the memory tool writes for a user receipt and for a downgraded claim
     const dir = await createRepo()
-    const stamp = (claim: ClaimReceipt): string => renderMemoryFile(stampReceipt(undefined, { description: "Cleanup" }, "body\n", claim), "body\n")
+    const stamp = (claim: ClaimReceipt): string =>
+      renderMemoryFile(stampReceipt(undefined, { description: "Cleanup" }, "body\n", claim), "body\n")
 
     // when
-    const result = await commit(dir, {
-      "reference/approved.md": stamp({ source: "user", userQuote: "Yes delete it.", approves: "0123456789abcdef" }),
-      "reference/suggested.md": stamp({ source: "agent", downgraded: true }),
-    }, "memory write\n\nOmo-Writer: memory-tool")
+    const result = await commit(
+      dir,
+      {
+        "reference/approved.md": stamp({ source: "user", userQuote: "Yes delete it.", approves: "0123456789abcdef" }),
+        "reference/suggested.md": stamp({ source: "agent", downgraded: true }),
+      },
+      "memory write\n\nOmo-Writer: memory-tool",
+    )
 
     // then
     expect(result.stdout + result.stderr).not.toContain("unknown frontmatter key")

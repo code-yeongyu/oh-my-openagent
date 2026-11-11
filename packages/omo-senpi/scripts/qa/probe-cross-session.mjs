@@ -8,7 +8,6 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { withTelemetryOptOut } from "./telemetry-opt-out-env.mjs"
 
-
 const scriptPath = fileURLToPath(import.meta.url)
 const repoRoot = join(dirname(scriptPath), "../../../..")
 // Native no longer stages a toolkit CLI. This probe drives the component's CLI from source with the
@@ -87,10 +86,7 @@ function runNoSessionScenario() {
     assert(unscopedPlan, "the unscoped legacy plan fixture was not created")
 
     const child = runChild(cwd, NO_SESSION)
-    assert(
-      child.messageCount === 0,
-      `host without session identity continued ${child.messageCount} times, expected 0`,
-    )
+    assert(child.messageCount === 0, `host without session identity continued ${child.messageCount} times, expected 0`)
     return { sessionId: null, messageCount: child.messageCount, unscopedPlan, toolkitRefusedUnscoped: true }
   } finally {
     rmSync(cwd, { recursive: true, force: true })
@@ -142,17 +138,16 @@ function writeLegacyUnscopedPlan(cwd) {
       2,
     )}\n`,
   )
-  writeFileSync(join(dir, "ledger.jsonl"), `${JSON.stringify({ at: now, kind: "plan_created", message: "1 goal(s) created" })}\n`)
+  writeFileSync(
+    join(dir, "ledger.jsonl"),
+    `${JSON.stringify({ at: now, kind: "plan_created", message: "1 goal(s) created" })}\n`,
+  )
 }
 
 async function runExtensionChild(sessionId) {
   const [{ dispatchRunEnd, FakeExtensionAPI }, { createUlwLoopComponent }] = await Promise.all([
-    import(
-      pathToFileURL(join(repoRoot, "packages/omo-senpi/test-support/fake-extension-api.ts")).href
-    ),
-    import(
-      pathToFileURL(join(repoRoot, "packages/omo-senpi/src/components/ulw-loop/index.ts")).href
-    ),
+    import(pathToFileURL(join(repoRoot, "packages/omo-senpi/test-support/fake-extension-api.ts")).href),
+    import(pathToFileURL(join(repoRoot, "packages/omo-senpi/src/components/ulw-loop/index.ts")).href),
   ])
   const pi = new FakeExtensionAPI()
   await createUlwLoopComponent().register(pi, {
@@ -164,7 +159,8 @@ async function runExtensionChild(sessionId) {
     config: { getFlag: () => false },
   })
 
-  await dispatchRunEnd(pi,
+  await dispatchRunEnd(
+    pi,
     { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
     {
       cwd: process.cwd(),

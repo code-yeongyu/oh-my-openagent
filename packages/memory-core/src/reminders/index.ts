@@ -10,4 +10,4 @@ export {
   type Reminder,
   type ReminderKind,
   type RemindersState,
-} from "./reminders";
+} from "./reminders"
