@@ -71,7 +71,11 @@ describe("stale-owner recovery racing the owner's release", () => {
   test("#given the owner's release still holds the record open #when the waiter's unlink hits a Windows sharing error #then the waiter retries instead of failing", async () => {
     // #given
     const { lockPath } = await slotHeldByExitedChild()
-    restores.push(setLockCandidateFsForTests({ isSharingError: (error) => error instanceof Error && "code" in error && error.code === "EPERM" }))
+    restores.push(
+      setLockCandidateFsForTests({
+        isSharingError: (error) => error instanceof Error && "code" in error && error.code === "EPERM",
+      }),
+    )
     releaseByOwnerBeforeReclaim(lockPath, async () => {
       throw Object.assign(new Error(`EPERM: operation not permitted, unlink '${lockPath}'`), { code: "EPERM" })
     })
