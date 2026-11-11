@@ -46,9 +46,12 @@ export function propagateResult(result) {
  *
  * Windows has no POSIX signals: `process.on("SIGTERM")` never fires there and `subprocess.kill`
  * would terminate the child abruptly, so nothing is forwarded and the wait is the whole behavior.
+ *
+ * `terminateWhen` (a promise) asks the child to leave with SIGTERM once it settles; the wait and the
+ * result are unchanged, so a child that handles the signal still decides its own exit.
  */
 export function runChild(command, args, options = {}) {
-  const { captureStderr = false, onSpawn, ...spawnOptions } = options
+  const { captureStderr = false, onSpawn, terminateWhen, ...spawnOptions } = options
   const env = spawnOptions.env ?? process.env
   const shellHandoff = spawnOptions.shell
     ? privateFdHandoffFor(env, env[PRIVATE_FDS_ENV], process.platform, { shell: true })
@@ -82,6 +85,9 @@ export function runChild(command, args, options = {}) {
     }
 
     let settled = false
+    void terminateWhen?.then(() => {
+      if (!settled) child.kill("SIGTERM")
+    })
     let graceTimer
     const listeners = []
 

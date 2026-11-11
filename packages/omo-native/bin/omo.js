@@ -44,7 +44,8 @@ try {
           console.error(`omo: ${error.message}`)
           process.exitCode = 1
         },
-        exit: () => process.exit(),
+        reportEnd: line => process.stderr.write(`${line}\n`),
+        exit: code => process.exit(code),
       })
     } else if (process.argv[2] === "remote") {
       const { runRemoteCommand } = await import("./lib/service-auth.generated.js")

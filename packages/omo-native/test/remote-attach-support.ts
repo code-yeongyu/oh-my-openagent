@@ -6,6 +6,7 @@ import { join } from "node:path"
 
 import { connectDeviceService, type DeviceService } from "../../device-service-core/src/index.ts"
 import { startFakeOwner, type FakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
+import { eventOf } from "../../device-service-core/test/local-api/conformance/fake-owner-state.ts"
 import { defaultWorld, PEER, SESSION_ID, type World } from "../../device-service-core/test/local-api/conformance/world.ts"
 import { type RemoteAttachEndpoint, serveRemoteAttach } from "../remote-attach"
 
@@ -26,6 +27,11 @@ export const cleanupAttachFixtures = async (): Promise<void> => {
   for (const service of services.splice(0)) service.close()
   for (const owner of owners.splice(0)) await owner.stop()
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
+}
+
+/** The service ends every attach it serves with `reason`, as it does when the host's engine closes the session. */
+export const detachAll = (reason: string): void => {
+  for (const conn of ownerState().conns) for (const attach of conn.attaches) conn.send(eventOf("session.detached", { attach, reason }))
 }
 
 export const privateDir = (prefix: string): string => {

@@ -7,6 +7,7 @@ import { join, win32 } from "node:path"
 import type { CommandStateEvent, JsonObject, RemoteAttach, RemoteAttachEvent, SnapshotBody } from "../device-service-core/src/index.ts"
 import { outcomeFailure, outcomeOf } from "../omo-senpi/src/components/thread/remote/outcome"
 import { MirroredDialogs } from "./remote-attach-dialogs"
+import { attachEnded, type RemoteAttachEnded } from "./remote-attach-end"
 
 // `omo remote attach` serves one remote session to the engine's unchanged attach TUI (`--attach <socket> --session
 // <ref>`): a private endpoint that speaks the RPC subset the TUI uses, answered from the device service's attach.
@@ -30,6 +31,11 @@ export type RemoteAttachEndpoint = {
   readonly socketPath: string
   /** Pass as `--session`. */
   readonly sessionRef: string
+  /**
+   * Settles once the remote side ended the attach. The TUI has been told on its connection, which stays open so the
+   * notice is what it shows; the caller asks the TUI to leave and reports the end.
+   */
+  readonly ended: Promise<RemoteAttachEnded>
   readonly close: () => Promise<void>
 }
 
@@ -109,7 +115,6 @@ class Presentation {
         return
       case "detached":
         this.notify(`The remote session ended (${event.reason})`, "warning")
-        this.socket.end()
         return
     }
   }
@@ -236,7 +241,7 @@ function serveLines(socket: Socket, onLine: (line: string) => void): void {
 }
 
 /**
- * Serves `attach` on a fresh private endpoint (directory 0700, secret 0600) until `close()` or the attach ends.
+ * Serves `attach` on a fresh private endpoint (directory 0700, secret 0600) until `close()`.
  * Each connection that proves the secret gets the session; the device service's attach stays open across reconnects.
  */
 export async function serveRemoteAttach(
@@ -289,8 +294,6 @@ export async function serveRemoteAttach(
         resolve()
       })
     }))
-  void attach.detached.then(() => {
-    for (const socket of sockets) socket.end()
-  })
-  return { socketPath, sessionRef: attach.sessionId, close }
+  const ended = attach.detached.then(reason => attachEnded(options.label, reason))
+  return { socketPath, sessionRef: attach.sessionId, ended, close }
 }
