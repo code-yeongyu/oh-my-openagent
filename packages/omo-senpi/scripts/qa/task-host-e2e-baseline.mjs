@@ -2,10 +2,19 @@
 // the change is measured against a real prior build rather than against memory. The mainline has no
 // `daemon` subcommand at all, and its `process` children are one `--mode rpc` process each.
 import { createScenarioSandbox } from "./task-host-e2e-sandbox.mjs"
-import { cleanupScenario, lastJsonLine, perChildRpcProcesses, readTaskRecords, runBin, spawnParent, waitFor } from "./task-host-e2e-process.mjs"
+import {
+  cleanupScenario,
+  lastJsonLine,
+  perChildRpcProcesses,
+  readTaskRecords,
+  runBin,
+  spawnParent,
+  waitFor,
+} from "./task-host-e2e-process.mjs"
 import { CHILD_BUSY, hostConfig, spawnScript } from "./task-host-e2e-support.mjs"
 
-const LOAD_1000 = "node packages/omo-senpi/scripts/qa/task-14/load-1000.mjs --bin <baseline> --host '<baseline> --mode rpc --multi-session --listen unix://<tmp>/load.sock'"
+const LOAD_1000 =
+  "node packages/omo-senpi/scripts/qa/task-14/load-1000.mjs --bin <baseline> --host '<baseline> --mode rpc --multi-session --listen unix://<tmp>/load.sock'"
 
 export async function baselineScenarios(run) {
   const sandbox = createScenarioSandbox(run, "sBL", {
@@ -16,10 +25,13 @@ export async function baselineScenarios(run) {
   const parsed = lastJsonLine(status.stdout)
   const daemonSubcommandPresent = parsed?.socket !== undefined || parsed?.reachable !== undefined
   const parent = spawnParent(sandbox, run.mockEntry, "spawn two per-child rpc children")
-  const perChild = await waitFor(() => {
-    const processes = perChildRpcProcesses(sandbox)
-    return processes.length >= 2 ? processes : undefined
-  }, { timeoutMs: 180_000, intervalMs: 1_000 })
+  const perChild = await waitFor(
+    () => {
+      const processes = perChildRpcProcesses(sandbox)
+      return processes.length >= 2 ? processes : undefined
+    },
+    { timeoutMs: 180_000, intervalMs: 1_000 },
+  )
   const observed = perChild ?? perChildRpcProcesses(sandbox)
   const records = readTaskRecords(sandbox)
   try {

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { Database } from "bun:sqlite"
 
+import { createRemoteThreadFixture } from "../thread-remote-fixture"
 import { createGatewayEngine, resolveFromEntries, type GatewayDeliverRequest } from "./engine"
 import { gatewayDatabasePath } from "./paths"
 import type { GatewayStore } from "./store"
@@ -17,10 +18,17 @@ afterEach(async () => {
 
 function summary(result: GatewayDeliveryResult | undefined): string {
   if (result === undefined) return "none"
-  return result.kind === "ok" ? `${result.delivery.kind}${result.deduplicated === true ? "+dedup" : ""}` : `error:${result.error.code}`
+  return result.kind === "ok"
+    ? `${result.delivery.kind}${result.deduplicated === true ? "+dedup" : ""}`
+    : `error:${result.error.code}`
 }
 
-const request = (key: string): GatewayDeliverRequest => ({ sender: { kind: "session", durable_id: "A" }, target: "B", text: `stuck ${key}`, idempotency_key: key })
+const request = (key: string): GatewayDeliverRequest => ({
+  sender: { kind: "session", durable_id: "A" },
+  target: "B",
+  text: `stuck ${key}`,
+  idempotency_key: key,
+})
 
 describe("receipt_write_failures_leave_the_store_serving", () => {
   test("#given one process whose two deliveries both lost their receipt writes #when it retries both keys and sends a third #then every call answers and nothing is sent twice", async () => {
@@ -29,8 +37,17 @@ describe("receipt_write_failures_leave_the_store_serving", () => {
     h.session("A")
     const b = h.session("B")
     const sender = h.store()
-    const lockWait = () => Object.assign(new Error("gateway store lock wait exceeded"), { code: "gateway_lock_wait_exceeded" })
-    const stuck = h.engineFor({ ...sender, completeReceipt: async () => { throw lockWait() }, abandonReceipt: async () => { throw lockWait() } } satisfies GatewayStore)
+    const lockWait = () =>
+      Object.assign(new Error("gateway store lock wait exceeded"), { code: "gateway_lock_wait_exceeded" })
+    const stuck = h.engineFor({
+      ...sender,
+      completeReceipt: async () => {
+        throw lockWait()
+      },
+      abandonReceipt: async () => {
+        throw lockWait()
+      },
+    } satisfies GatewayStore)
     const retrying = h.engineFor(sender)
 
     const first = await settled(stuck.deliver(request("admitted")))
@@ -47,7 +64,13 @@ describe("receipt_write_failures_leave_the_store_serving", () => {
       second: second.error?.message,
       inProgress: summary(inProgress.value),
       third: summary(third.value),
-    }).toEqual({ first: "gateway store lock wait exceeded", replay: "started+dedup", second: "gateway store lock wait exceeded", inProgress: "error:idempotency_in_progress", third: "queued_offline" })
+    }).toEqual({
+      first: "gateway store lock wait exceeded",
+      replay: "started+dedup",
+      second: "gateway store lock wait exceeded",
+      inProgress: "error:idempotency_in_progress",
+      third: "queued_offline",
+    })
     const rows = await b.store.list({ target_durable_id: "B" })
     expect(rows.map((row) => [row.body, row.state, b.runtime.enqueueCount(row.delivery_id)])).toEqual([
       ["stuck admitted", "applied", 1],
@@ -90,7 +113,8 @@ describe("receipt_write_failures_leave_the_store_serving", () => {
       for (const key of ["one", "two"]) {
         const lost = await settled(engine.deliver(request(key)))
         release()
-        outcomes[`${key}:send`] = lost.error === undefined ? `resolved:${summary(lost.value)}` : String((lost.error as { code?: string }).code)
+        outcomes[`${key}:send`] =
+          lost.error === undefined ? `resolved:${summary(lost.value)}` : String((lost.error as { code?: string }).code)
         outcomes[`${key}:retry`] = summary((await settled(h.engineFor(sender).deliver(request(key)))).value)
       }
       await settled(b.drain.drain({ reason: "start" }))
@@ -104,7 +128,8 @@ describe("receipt_write_failures_leave_the_store_serving", () => {
         "two:send": "gateway_lock_wait_exceeded",
         "two:retry": "error:idempotency_in_progress",
         "one:after_admit": "started+dedup",
-        third: "queued",
+        // "two" steered into the turn "one" started (the default lane), so nothing waits when that turn ends: "three" starts the next.
+        third: "started",
       })
       expect(events.filter((kind) => kind === "lock_wait_exceeded").length).toBe(4)
       const rows = await b.store.list({ target_durable_id: "B" })
@@ -114,4 +139,38 @@ describe("receipt_write_failures_leave_the_store_serving", () => {
       holder.close()
     }
   }, 30_000)
+})
+
+describe("#13041: a lost-ACK retry rebuilds the answer from the row, waiting_on and its device included", () => {
+  test("#given a send to B waiting on a question whose receipt write failed (the receipt stays prepared, the row is admitted) #when the same key is retried #then the rebuilt answer names waiting_on approval and the device the send stamped", async () => {
+    const h = createGatewayHarness({ remote: createRemoteThreadFixture().account().remote })
+    harness = h
+    h.session("A")
+    const b = h.session("B")
+    b.runtime.beginUserTurn()
+    b.runtime.phaseValue = "waiting_question"
+    const sender = h.store()
+    const lockWait = () =>
+      Object.assign(new Error("gateway store lock wait exceeded"), { code: "gateway_lock_wait_exceeded" })
+    const stuck = h.engineFor({
+      ...sender,
+      completeReceipt: async () => {
+        throw lockWait()
+      },
+      abandonReceipt: async () => {
+        throw lockWait()
+      },
+    } satisfies GatewayStore)
+    const waiting = { ...request("waits"), mode: "follow_up" as const }
+
+    expect((await settled(stuck.deliver(waiting))).error?.message).toBe("gateway store lock wait exceeded")
+    await h.quiesce()
+    const rebuilt = await h.engineFor(sender).deliver(waiting)
+
+    expect(rebuilt).toMatchObject({
+      kind: "ok",
+      deduplicated: true,
+      delivery: { kind: "queued", waiting_on: { kind: "approval", device: "here" } },
+    })
+  })
 })

@@ -15,10 +15,13 @@ function rpcSpec(owner?: object) {
   const taskId = owner === undefined ? "st_plain_rpc" : "st_dag_rpc"
   const stateDir = join(stateRoot, "children", taskId)
   mkdirSync(join(stateRoot, "tasks"), { recursive: true })
-  writeFileSync(join(stateRoot, "tasks", `${taskId}.json`), `${JSON.stringify({
-    task_id: taskId,
-    ...(owner === undefined ? {} : { owner }),
-  })}\n`)
+  writeFileSync(
+    join(stateRoot, "tasks", `${taskId}.json`),
+    `${JSON.stringify({
+      task_id: taskId,
+      ...(owner === undefined ? {} : { owner }),
+    })}\n`,
+  )
   return {
     task_id: taskId,
     cwd: stateRoot,

@@ -8,27 +8,17 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { delimiter, dirname, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
+import { readDirectives } from "../../plugin/scripts/embed-directive.mjs"
 import { createSandbox, digestDirectory, seedSandbox } from "./drive.mjs"
 import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const mockProviderEntry = join(scriptDir, "mock-provider", "index.ts")
-const generatedDirectivePath = resolve(scriptDir, "../../src/components/ultrawork/generated-directive.ts")
 
 const SCENARIOS = [
   { name: "astra-receiver", model: "gpt-6-astra", expect: "astra" },
   { name: "baseline-receiver", model: "mock-1", expect: "baseline" },
 ]
-
-function loadGeneratedDirectives() {
-  const source = readFileSync(generatedDirectivePath, "utf8")
-  const read = (name) => {
-    const match = source.match(new RegExp(`export const ${name} = (".*") as const`))
-    if (match === null) throw new Error(`${name} missing from generated-directive.ts`)
-    return JSON.parse(match[1])
-  }
-  return { baseline: read("SENPI_ULTRAWORK_DIRECTIVE"), astra: read("SENPI_ASTRA_ULTRAWORK_DIRECTIVE") }
-}
 
 function collectFiles(dir, out) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -53,7 +43,11 @@ function hiddenDirectives(agentDir) {
       } catch {
         continue
       }
-      if (entry?.type === "custom_message" && entry.customType === "omo-ultrawork:directive" && typeof entry.content === "string") {
+      if (
+        entry?.type === "custom_message" &&
+        entry.customType === "omo-ultrawork:directive" &&
+        typeof entry.content === "string"
+      ) {
         found.push(entry.content)
       }
     }
@@ -82,7 +76,12 @@ function runScenario(resolvedSenpi, scenario, directives, evidenceDir) {
       ["-e", mockProviderEntry, "-p", "--provider", "omo-mock", "--model", scenario.model, "ulw say hello"],
       {
         cwd: sandbox.cwd,
-        env: { ...isolatedChildEnv(process.env, sandbox.agentDir), SENPI_CODING_AGENT_DIR: sandbox.agentDir, XDG_CONFIG_HOME: sandbox.xdgConfigHome, OMO_SENPI_QA: "1" },
+        env: {
+          ...isolatedChildEnv(process.env, sandbox.agentDir),
+          SENPI_CODING_AGENT_DIR: sandbox.agentDir,
+          XDG_CONFIG_HOME: sandbox.xdgConfigHome,
+          OMO_SENPI_QA: "1",
+        },
         encoding: "utf8",
         timeout: 90_000,
       },
@@ -100,7 +99,10 @@ function runScenario(resolvedSenpi, scenario, directives, evidenceDir) {
     if (evidenceDir !== undefined) {
       mkdirSync(evidenceDir, { recursive: true })
       writeFileSync(join(evidenceDir, `${scenario.name}.delivered.txt`), content)
-      writeFileSync(join(evidenceDir, `${scenario.name}.stdout.txt`), `${run.stdout ?? ""}\n--- stderr ---\n${run.stderr ?? ""}`)
+      writeFileSync(
+        join(evidenceDir, `${scenario.name}.stdout.txt`),
+        `${run.stdout ?? ""}\n--- stderr ---\n${run.stderr ?? ""}`,
+      )
     }
     return {
       name: scenario.name,
@@ -126,7 +128,8 @@ function main() {
     console.log(JSON.stringify({ result: "SKIP", reason: "senpi-binary-unavailable" }))
     return
   }
-  const directives = loadGeneratedDirectives()
+  // The same derivation embed-directive.mjs --check holds generated-directive.ts to.
+  const directives = readDirectives()
   const scenarios = SCENARIOS.map((scenario) => runScenario(resolvedSenpi, scenario, directives, evidenceDir))
   const afterDigest = digestDirectory(realAgentDir)
   const report = {

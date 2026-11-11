@@ -1,8 +1,6 @@
 const { afterAll, afterEach, beforeEach, describe, expect, mock, test } = require("bun:test")
-const {
-  preserveModuleMocksForTestFile,
-  restoreModuleMocksForTestFile,
-} = await import("../../testing/module-mock-lifecycle")
+const { preserveModuleMocksForTestFile, restoreModuleMocksForTestFile } =
+  await import("../../testing/module-mock-lifecycle")
 
 const capturedOptions: Array<Record<string, unknown>> = []
 

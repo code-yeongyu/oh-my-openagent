@@ -214,9 +214,7 @@ describe("parseWorktreeList", () => {
   })
 
   test("normalizes worktree paths so separator and dot segments cannot split identity", () => {
-    const records = parseWorktreeList(
-      ["worktree /tmp/sweep/./wt-x", "HEAD 1", "branch refs/heads/main"].join("\n"),
-    )
+    const records = parseWorktreeList(["worktree /tmp/sweep/./wt-x", "HEAD 1", "branch refs/heads/main"].join("\n"))
     expect(records[0]?.path).toBe(path.normalize("/tmp/sweep/wt-x"))
   })
 })
@@ -246,100 +244,108 @@ describe("parseOlderThanDays", () => {
 })
 
 describe("sweepWorktrees classification", () => {
-  test("classifies merged, unmerged, dirty, locked, excluded, missing, and detached worktrees", async () => {
-    const { base, repo } = await createFixture()
+  test(
+    "classifies merged, unmerged, dirty, locked, excluded, missing, and detached worktrees",
+    async () => {
+      const { base, repo } = await createFixture()
 
-    const merged = path.join(base, "wt-merged")
-    const unmerged = path.join(base, "wt-unmerged")
-    const dirty = path.join(base, "wt-dirty")
-    const locked = path.join(base, "wt-locked")
-    const external = path.join(base, "external", "wt-external")
-    const missing = path.join(base, "wt-missing")
-    const detached = path.join(base, "wt-detached")
+      const merged = path.join(base, "wt-merged")
+      const unmerged = path.join(base, "wt-unmerged")
+      const dirty = path.join(base, "wt-dirty")
+      const locked = path.join(base, "wt-locked")
+      const external = path.join(base, "external", "wt-external")
+      const missing = path.join(base, "wt-missing")
+      const detached = path.join(base, "wt-detached")
 
-    await addMergedWorktree(repo, "merged-branch", merged)
-    await addUnmergedWorktree(repo, "unmerged-branch", unmerged)
-    await addMergedWorktree(repo, "dirty-branch", dirty)
-    await fs.writeFile(path.join(dirty, "scratch.txt"), "local change\n")
-    await addMergedWorktree(repo, "locked-branch", locked)
-    git(repo, ["worktree", "lock", locked])
-    await fs.mkdir(path.dirname(external), { recursive: true })
-    await addMergedWorktree(repo, "external-branch", external)
-    await addMergedWorktree(repo, "missing-branch", missing)
-    await fs.rm(missing, { recursive: true, force: true })
-    const mergedTip = git(repo, ["rev-parse", "merged-branch"]).trim()
-    git(repo, ["worktree", "add", "--detach", detached, mergedTip], {
-      phase: "creating detached worktree",
-    })
+      await addMergedWorktree(repo, "merged-branch", merged)
+      await addUnmergedWorktree(repo, "unmerged-branch", unmerged)
+      await addMergedWorktree(repo, "dirty-branch", dirty)
+      await fs.writeFile(path.join(dirty, "scratch.txt"), "local change\n")
+      await addMergedWorktree(repo, "locked-branch", locked)
+      git(repo, ["worktree", "lock", locked])
+      await fs.mkdir(path.dirname(external), { recursive: true })
+      await addMergedWorktree(repo, "external-branch", external)
+      await addMergedWorktree(repo, "missing-branch", missing)
+      await fs.rm(missing, { recursive: true, force: true })
+      const mergedTip = git(repo, ["rev-parse", "merged-branch"]).trim()
+      git(repo, ["worktree", "add", "--detach", detached, mergedTip], {
+        phase: "creating detached worktree",
+      })
 
-    const result = await sweepWorktrees({
-      repos: [repo],
-      excludePrefixes: [path.join(base, "external")],
-    })
+      const result = await sweepWorktrees({
+        repos: [repo],
+        excludePrefixes: [path.join(base, "external")],
+      })
 
-    expect(result.repos).toHaveLength(1)
-    const report = result.repos[0]!
-    expect(report.defaultBranch).toBe("main")
+      expect(result.repos).toHaveLength(1)
+      const report = result.repos[0]!
+      expect(report.defaultBranch).toBe("main")
 
-    const mergedItem = decisionFor(report, merged)
-    expect(mergedItem.decision).toBe("SWEEP")
-    expect(mergedItem.ref).toBe("merged-branch")
+      const mergedItem = decisionFor(report, merged)
+      expect(mergedItem.decision).toBe("SWEEP")
+      expect(mergedItem.ref).toBe("merged-branch")
 
-    expect(decisionFor(report, unmerged)).toEqual({
-      path: unmerged,
-      ref: "unmerged-branch",
-      decision: "KEEP",
-      reason: "unmerged",
-    })
-    expect(decisionFor(report, dirty).reason).toBe("dirty")
-    expect(decisionFor(report, locked).reason).toBe("locked")
-    expect(decisionFor(report, external).reason).toBe("external")
-    expect(decisionFor(report, missing).decision).toBe("PRUNE")
-    // Detached trees are judged by their HEAD sha, which is merged here.
-    expect(decisionFor(report, detached)).toEqual({
-      path: detached,
-      ref: mergedTip,
-      decision: "SWEEP",
-    })
+      expect(decisionFor(report, unmerged)).toEqual({
+        path: unmerged,
+        ref: "unmerged-branch",
+        decision: "KEEP",
+        reason: "unmerged",
+      })
+      expect(decisionFor(report, dirty).reason).toBe("dirty")
+      expect(decisionFor(report, locked).reason).toBe("locked")
+      expect(decisionFor(report, external).reason).toBe("external")
+      expect(decisionFor(report, missing).decision).toBe("PRUNE")
+      // Detached trees are judged by their HEAD sha, which is merged here.
+      expect(decisionFor(report, detached)).toEqual({
+        path: detached,
+        ref: mergedTip,
+        decision: "SWEEP",
+      })
 
-    // The main worktree itself is never a candidate.
-    expect(report.classifications.some((item) => item.path === repo)).toBe(false)
+      // The main worktree itself is never a candidate.
+      expect(report.classifications.some((item) => item.path === repo)).toBe(false)
 
-    expect(result.sweepCount).toBe(2)
-    expect(result.keepCount).toBe(4)
-    expect(result.pruneCount).toBe(1)
-    expect(result.apply).toBe(false)
+      expect(result.sweepCount).toBe(2)
+      expect(result.keepCount).toBe(4)
+      expect(result.pruneCount).toBe(1)
+      expect(result.apply).toBe(false)
 
-    // Dry-run removed nothing.
-    expect(await fs.stat(merged)).toBeTruthy()
-    expect(git(repo, ["worktree", "list", "--porcelain"])).toContain(toPosix(missing))
-  }, { timeout: 30_000 })
+      // Dry-run removed nothing.
+      expect(await fs.stat(merged)).toBeTruthy()
+      expect(git(repo, ["worktree", "list", "--porcelain"])).toContain(toPosix(missing))
+    },
+    { timeout: 30_000 },
+  )
 
-  test("detects the default branch through origin/HEAD when present", async () => {
-    const base = await newTmpDir("wt-sweep-origin-")
-    const seed = path.join(base, "seed")
-    const origin = path.join(base, "origin.git")
-    const clone = path.join(base, "clone")
+  test(
+    "detects the default branch through origin/HEAD when present",
+    async () => {
+      const base = await newTmpDir("wt-sweep-origin-")
+      const seed = path.join(base, "seed")
+      const origin = path.join(base, "origin.git")
+      const clone = path.join(base, "clone")
 
-    await fs.mkdir(seed)
-    git(seed, ["init", "-b", "trunk"])
-    await commit(seed, "initial")
-    git(seed, ["clone", "--bare", seed, origin])
-    git(seed, ["clone", origin, clone])
+      await fs.mkdir(seed)
+      git(seed, ["init", "-b", "trunk"])
+      await commit(seed, "initial")
+      git(seed, ["clone", "--bare", seed, origin])
+      git(seed, ["clone", origin, clone])
 
-    git(clone, ["checkout", "-b", "feature"])
-    await commit(clone, "feature commit")
-    git(clone, ["checkout", "trunk"])
-    git(clone, ["merge", "--ff-only", "feature"])
-    const feature = path.join(base, "wt-feature")
-    git(clone, ["worktree", "add", feature, "feature"])
+      git(clone, ["checkout", "-b", "feature"])
+      await commit(clone, "feature commit")
+      git(clone, ["checkout", "trunk"])
+      git(clone, ["merge", "--ff-only", "feature"])
+      const feature = path.join(base, "wt-feature")
+      git(clone, ["worktree", "add", feature, "feature"])
 
-    const result = await sweepWorktrees({ repos: [clone] })
-    const report = result.repos[0]!
+      const result = await sweepWorktrees({ repos: [clone] })
+      const report = result.repos[0]!
 
-    expect(report.defaultBranch).toBe("trunk")
-    expect(decisionFor(report, feature).decision).toBe("SWEEP")
-  }, { timeout: 30_000 })
+      expect(report.defaultBranch).toBe("trunk")
+      expect(decisionFor(report, feature).decision).toBe("SWEEP")
+    },
+    { timeout: 30_000 },
+  )
 
   test("falls back to master when origin/HEAD and main are absent", async () => {
     const { base, repo } = await createFixture("wt-sweep-master-")
@@ -357,54 +363,58 @@ describe("sweepWorktrees classification", () => {
 })
 
 describe("sweepWorktrees --older-than", () => {
-  test("unmerged worktrees are kept when newer than the cutoff and swept when older and clean", async () => {
-    const { base, repo } = await createFixture("wt-sweep-age-")
-    const young = path.join(base, "wt-young")
-    const old = path.join(base, "wt-old")
-    const oldDirty = path.join(base, "wt-old-dirty")
+  test(
+    "unmerged worktrees are kept when newer than the cutoff and swept when older and clean",
+    async () => {
+      const { base, repo } = await createFixture("wt-sweep-age-")
+      const young = path.join(base, "wt-young")
+      const old = path.join(base, "wt-old")
+      const oldDirty = path.join(base, "wt-old-dirty")
 
-    // All three branches can share one unmerged commit. Creating that commit once
-    // avoids repeating checkout/commit cycles, which made this test exceed Bun's
-    // default timeout on slower Windows runners.
-    git(repo, ["worktree", "add", "-b", "young-branch", young, "main"])
-    await commit(young, "unmerged commit")
-    git(repo, ["worktree", "add", "-b", "old-branch", old, "young-branch"])
-    git(repo, ["worktree", "add", "-b", "old-dirty-branch", oldDirty, "young-branch"])
+      // All three branches can share one unmerged commit. Creating that commit once
+      // avoids repeating checkout/commit cycles, which made this test exceed Bun's
+      // default timeout on slower Windows runners.
+      git(repo, ["worktree", "add", "-b", "young-branch", young, "main"])
+      await commit(young, "unmerged commit")
+      git(repo, ["worktree", "add", "-b", "old-branch", old, "young-branch"])
+      git(repo, ["worktree", "add", "-b", "old-dirty-branch", oldDirty, "young-branch"])
 
-    // Set both sides of the cutoff explicitly so filesystem timestamp granularity
-    // and fixture setup duration cannot change the age classification.
-    await fs.writeFile(path.join(oldDirty, "scratch.txt"), "local change\n")
-    const youngTime = new Date(Date.now() + DAY_MS)
-    const staleTime = new Date(Date.now() - 10 * DAY_MS)
-    await Promise.all([
-      fs.utimes(young, youngTime, youngTime),
-      fs.utimes(old, staleTime, staleTime),
-      fs.utimes(oldDirty, staleTime, staleTime),
-    ])
+      // Set both sides of the cutoff explicitly so filesystem timestamp granularity
+      // and fixture setup duration cannot change the age classification.
+      await fs.writeFile(path.join(oldDirty, "scratch.txt"), "local change\n")
+      const youngTime = new Date(Date.now() + DAY_MS)
+      const staleTime = new Date(Date.now() - 10 * DAY_MS)
+      await Promise.all([
+        fs.utimes(young, youngTime, youngTime),
+        fs.utimes(old, staleTime, staleTime),
+        fs.utimes(oldDirty, staleTime, staleTime),
+      ])
 
-    const result = await sweepWorktrees({ repos: [repo], olderThanDays: 7 })
+      const result = await sweepWorktrees({ repos: [repo], olderThanDays: 7 })
 
-    const report = result.repos[0]!
-    expect(decisionFor(report, young)).toEqual({
-      path: young,
-      ref: "young-branch",
-      decision: "KEEP",
-      reason: "unmerged",
-    })
-    expect(decisionFor(report, old)).toEqual({
-      path: old,
-      ref: "old-branch",
-      decision: "SWEEP",
-    })
-    expect(decisionFor(report, oldDirty)).toEqual({
-      path: oldDirty,
-      ref: "old-dirty-branch",
-      decision: "KEEP",
-      reason: "dirty",
-    })
-    expect(result.sweepCount).toBe(1)
-    expect(result.keepCount).toBe(2)
-  }, { timeout: GIT_HEAVY_TEST_TIMEOUT_MS })
+      const report = result.repos[0]!
+      expect(decisionFor(report, young)).toEqual({
+        path: young,
+        ref: "young-branch",
+        decision: "KEEP",
+        reason: "unmerged",
+      })
+      expect(decisionFor(report, old)).toEqual({
+        path: old,
+        ref: "old-branch",
+        decision: "SWEEP",
+      })
+      expect(decisionFor(report, oldDirty)).toEqual({
+        path: oldDirty,
+        ref: "old-dirty-branch",
+        decision: "KEEP",
+        reason: "dirty",
+      })
+      expect(result.sweepCount).toBe(1)
+      expect(result.keepCount).toBe(2)
+    },
+    { timeout: GIT_HEAVY_TEST_TIMEOUT_MS },
+  )
 
   test("olderThanDays 0 never sweeps unmerged worktrees regardless of age", async () => {
     const { base, repo } = await createFixture("wt-sweep-age0-")
@@ -419,139 +429,161 @@ describe("sweepWorktrees --older-than", () => {
 })
 
 describe("sweepWorktrees --apply", () => {
-  test("removes sweep candidates with git worktree remove and prunes stale metadata", async () => {
-    const { base, repo } = await createFixture("wt-sweep-apply-")
-    const merged = path.join(base, "wt-merged")
-    const missing = path.join(base, "wt-missing")
-    const kept = path.join(base, "wt-kept")
+  test(
+    "removes sweep candidates with git worktree remove and prunes stale metadata",
+    async () => {
+      const { base, repo } = await createFixture("wt-sweep-apply-")
+      const merged = path.join(base, "wt-merged")
+      const missing = path.join(base, "wt-missing")
+      const kept = path.join(base, "wt-kept")
 
-    await addMergedWorktree(repo, "merged-branch", merged)
-    await addMergedWorktree(repo, "missing-branch", missing)
-    await addUnmergedWorktree(repo, "unmerged-branch", kept)
-    await fs.rm(missing, { recursive: true, force: true })
+      await addMergedWorktree(repo, "merged-branch", merged)
+      await addMergedWorktree(repo, "missing-branch", missing)
+      await addUnmergedWorktree(repo, "unmerged-branch", kept)
+      await fs.rm(missing, { recursive: true, force: true })
 
-    const result = await sweepWorktrees({ repos: [repo], apply: true })
+      const result = await sweepWorktrees({ repos: [repo], apply: true })
 
-    expect(result.apply).toBe(true)
-    const report = result.repos[0]!
-    expect(report.removed).toEqual([merged])
-    expect(report.failed).toEqual([])
+      expect(result.apply).toBe(true)
+      const report = result.repos[0]!
+      expect(report.removed).toEqual([merged])
+      expect(report.failed).toEqual([])
 
-    await expect(fs.stat(merged)).rejects.toThrow()
-    expect(await fs.stat(kept)).toBeTruthy()
-    const porcelain = git(repo, ["worktree", "list", "--porcelain"])
-    expect(porcelain).not.toContain(toPosix(missing))
-    expect(porcelain).not.toContain(toPosix(merged))
-    expect(porcelain).toContain(toPosix(kept))
-  }, { timeout: GIT_HEAVY_TEST_TIMEOUT_MS })
+      await expect(fs.stat(merged)).rejects.toThrow()
+      expect(await fs.stat(kept)).toBeTruthy()
+      const porcelain = git(repo, ["worktree", "list", "--porcelain"])
+      expect(porcelain).not.toContain(toPosix(missing))
+      expect(porcelain).not.toContain(toPosix(merged))
+      expect(porcelain).toContain(toPosix(kept))
+    },
+    { timeout: GIT_HEAVY_TEST_TIMEOUT_MS },
+  )
 
-  test("leaves locked and dirty worktrees in place even under --apply", async () => {
-    const { base, repo } = await createFixture("wt-sweep-apply2-")
-    const locked = path.join(base, "wt-locked")
-    const dirty = path.join(base, "wt-dirty")
+  test(
+    "leaves locked and dirty worktrees in place even under --apply",
+    async () => {
+      const { base, repo } = await createFixture("wt-sweep-apply2-")
+      const locked = path.join(base, "wt-locked")
+      const dirty = path.join(base, "wt-dirty")
 
-    await addMergedWorktree(repo, "locked-branch", locked)
-    git(repo, ["worktree", "lock", locked])
-    await addMergedWorktree(repo, "dirty-branch", dirty)
-    await fs.writeFile(path.join(dirty, "scratch.txt"), "local change\n")
+      await addMergedWorktree(repo, "locked-branch", locked)
+      git(repo, ["worktree", "lock", locked])
+      await addMergedWorktree(repo, "dirty-branch", dirty)
+      await fs.writeFile(path.join(dirty, "scratch.txt"), "local change\n")
 
-    const result = await sweepWorktrees({ repos: [repo], apply: true })
-    const report = result.repos[0]!
+      const result = await sweepWorktrees({ repos: [repo], apply: true })
+      const report = result.repos[0]!
 
-    expect(report.removed).toEqual([])
-    expect(await fs.stat(locked)).toBeTruthy()
-    expect(await fs.stat(dirty)).toBeTruthy()
-    expect(result.sweepCount).toBe(0)
-  }, { timeout: GIT_HEAVY_TEST_TIMEOUT_MS })
+      expect(report.removed).toEqual([])
+      expect(await fs.stat(locked)).toBeTruthy()
+      expect(await fs.stat(dirty)).toBeTruthy()
+      expect(result.sweepCount).toBe(0)
+    },
+    { timeout: GIT_HEAVY_TEST_TIMEOUT_MS },
+  )
 
-  test("started from inside a linked worktree keeps that worktree and still removes its merged siblings", async () => {
-    const { base, repo } = await createFixture("wt-sweep-inside-")
-    const first = path.join(base, "wt-first")
-    const second = path.join(base, "wt-second")
-    const third = path.join(base, "wt-third")
+  test(
+    "started from inside a linked worktree keeps that worktree and still removes its merged siblings",
+    async () => {
+      const { base, repo } = await createFixture("wt-sweep-inside-")
+      const first = path.join(base, "wt-first")
+      const second = path.join(base, "wt-second")
+      const third = path.join(base, "wt-third")
 
-    await addMergedWorktree(repo, "first-branch", first)
-    await addMergedWorktree(repo, "second-branch", second)
-    await addMergedWorktree(repo, "third-branch", third)
+      await addMergedWorktree(repo, "first-branch", first)
+      await addMergedWorktree(repo, "second-branch", second)
+      await addMergedWorktree(repo, "third-branch", third)
 
-    const result = await sweepWorktrees({ cwd: second, apply: true })
-    const report = result.repos[0]!
+      const result = await sweepWorktrees({ cwd: second, apply: true })
+      const report = result.repos[0]!
 
-    expect(report.repo).toBe(repo)
-    expect(decisionFor(report, second)).toMatchObject({ decision: "KEEP", reason: "current" })
-    expect(report.failed).toEqual([])
-    expect([...report.removed].sort()).toEqual([first, third].sort())
-    expect(await fs.stat(second)).toBeTruthy()
-    const porcelain = git(repo, ["worktree", "list", "--porcelain"])
-    expect(porcelain).toContain(toPosix(second))
-    expect(porcelain).not.toContain(toPosix(first))
-    expect(porcelain).not.toContain(toPosix(third))
-  }, { timeout: GIT_HEAVY_TEST_TIMEOUT_MS })
+      expect(report.repo).toBe(repo)
+      expect(decisionFor(report, second)).toMatchObject({ decision: "KEEP", reason: "current" })
+      expect(report.failed).toEqual([])
+      expect([...report.removed].sort()).toEqual([first, third].sort())
+      expect(await fs.stat(second)).toBeTruthy()
+      const porcelain = git(repo, ["worktree", "list", "--porcelain"])
+      expect(porcelain).toContain(toPosix(second))
+      expect(porcelain).not.toContain(toPosix(first))
+      expect(porcelain).not.toContain(toPosix(third))
+    },
+    { timeout: GIT_HEAVY_TEST_TIMEOUT_MS },
+  )
 
-  test("dry-run from inside a linked worktree reports it as KEEP(current) and removes nothing", async () => {
-    const { base, repo } = await createFixture("wt-sweep-inside-dry-")
-    const first = path.join(base, "wt-first")
-    const second = path.join(base, "wt-second")
+  test(
+    "dry-run from inside a linked worktree reports it as KEEP(current) and removes nothing",
+    async () => {
+      const { base, repo } = await createFixture("wt-sweep-inside-dry-")
+      const first = path.join(base, "wt-first")
+      const second = path.join(base, "wt-second")
 
-    await addMergedWorktree(repo, "first-branch", first)
-    await addMergedWorktree(repo, "second-branch", second)
+      await addMergedWorktree(repo, "first-branch", first)
+      await addMergedWorktree(repo, "second-branch", second)
 
-    const result = await sweepWorktrees({ cwd: second })
-    const report = result.repos[0]!
+      const result = await sweepWorktrees({ cwd: second })
+      const report = result.repos[0]!
 
-    expect(report.repo).toBe(repo)
-    expect(decisionFor(report, first)).toMatchObject({ decision: "SWEEP" })
-    expect(decisionFor(report, second)).toMatchObject({ decision: "KEEP", reason: "current" })
-    expect(report.removed).toEqual([])
-    expect(await fs.stat(first)).toBeTruthy()
-  }, { timeout: GIT_HEAVY_TEST_TIMEOUT_MS })
+      expect(report.repo).toBe(repo)
+      expect(decisionFor(report, first)).toMatchObject({ decision: "SWEEP" })
+      expect(decisionFor(report, second)).toMatchObject({ decision: "KEEP", reason: "current" })
+      expect(report.removed).toEqual([])
+      expect(await fs.stat(first)).toBeTruthy()
+    },
+    { timeout: GIT_HEAVY_TEST_TIMEOUT_MS },
+  )
 
-  test("a locked worktree the sweep was started from keeps the locked reason", async () => {
-    const { base, repo } = await createFixture("wt-sweep-inside-locked-")
-    const second = path.join(base, "wt-second")
+  test(
+    "a locked worktree the sweep was started from keeps the locked reason",
+    async () => {
+      const { base, repo } = await createFixture("wt-sweep-inside-locked-")
+      const second = path.join(base, "wt-second")
 
-    await addMergedWorktree(repo, "second-branch", second)
-    git(repo, ["worktree", "lock", second])
+      await addMergedWorktree(repo, "second-branch", second)
+      git(repo, ["worktree", "lock", second])
 
-    const result = await sweepWorktrees({ cwd: second, apply: true })
-    const report = result.repos[0]!
+      const result = await sweepWorktrees({ cwd: second, apply: true })
+      const report = result.repos[0]!
 
-    expect(decisionFor(report, second)).toMatchObject({ decision: "KEEP", reason: "locked" })
-    expect(report.removed).toEqual([])
-  }, { timeout: GIT_HEAVY_TEST_TIMEOUT_MS })
+      expect(decisionFor(report, second)).toMatchObject({ decision: "KEEP", reason: "locked" })
+      expect(report.removed).toEqual([])
+    },
+    { timeout: GIT_HEAVY_TEST_TIMEOUT_MS },
+  )
 })
 
 describe("worktreeSweep output", () => {
-  test("prints one machine-parseable line per tree then a summary, and exits 0", async () => {
-    const { base, repo } = await createFixture("wt-sweep-output-")
-    const merged = path.join(base, "wt-merged")
-    const unmerged = path.join(base, "wt-unmerged")
-    await addMergedWorktree(repo, "merged-branch", merged)
-    await addUnmergedWorktree(repo, "unmerged-branch", unmerged)
+  test(
+    "prints one machine-parseable line per tree then a summary, and exits 0",
+    async () => {
+      const { base, repo } = await createFixture("wt-sweep-output-")
+      const merged = path.join(base, "wt-merged")
+      const unmerged = path.join(base, "wt-unmerged")
+      await addMergedWorktree(repo, "merged-branch", merged)
+      await addUnmergedWorktree(repo, "unmerged-branch", unmerged)
 
-    const chunks: string[] = []
-    const originalWrite = process.stdout.write.bind(process.stdout)
-    process.stdout.write = ((chunk: unknown) => {
-      chunks.push(String(chunk))
-      return true
-    }) as typeof process.stdout.write
-    let exitCode: number
-    try {
-      exitCode = await worktreeSweep({ repos: [repo] })
-    } finally {
-      process.stdout.write = originalWrite
-    }
+      const chunks: string[] = []
+      const originalWrite = process.stdout.write.bind(process.stdout)
+      process.stdout.write = ((chunk: unknown) => {
+        chunks.push(String(chunk))
+        return true
+      }) as typeof process.stdout.write
+      let exitCode: number
+      try {
+        exitCode = await worktreeSweep({ repos: [repo] })
+      } finally {
+        process.stdout.write = originalWrite
+      }
 
-    expect(exitCode).toBe(0)
-    const lines = chunks.join("").trim().split("\n")
-    expect(lines[0]).toBe(`REPO ${repo} default=main`)
-    expect(lines).toContain(`SWEEP ${merged} merged-branch`)
-    expect(lines).toContain(`KEEP(unmerged) ${unmerged} unmerged-branch`)
-    const summary = lines[lines.length - 1]!
-    expect(summary).toBe(
-      "SUMMARY mode=dry-run repos=1 sweep=1 keep=1 prune=0 removed=0 failed=0",
-    )
-  }, { timeout: GIT_HEAVY_TEST_TIMEOUT_MS })
+      expect(exitCode).toBe(0)
+      const lines = chunks.join("").trim().split("\n")
+      expect(lines[0]).toBe(`REPO ${repo} default=main`)
+      expect(lines).toContain(`SWEEP ${merged} merged-branch`)
+      expect(lines).toContain(`KEEP(unmerged) ${unmerged} unmerged-branch`)
+      const summary = lines[lines.length - 1]!
+      expect(summary).toBe("SUMMARY mode=dry-run repos=1 sweep=1 keep=1 prune=0 removed=0 failed=0")
+    },
+    { timeout: GIT_HEAVY_TEST_TIMEOUT_MS },
+  )
 
   test("returns exit code 1 and a stderr message for a non-repository path", async () => {
     const base = await newTmpDir("wt-sweep-bad-")
@@ -574,12 +606,10 @@ describe("worktreeSweep output", () => {
 
 describe("format helpers", () => {
   test("formatClassification and formatSummary stay machine-parseable", () => {
-    expect(
-      formatClassification({ path: "/tmp/w", ref: "feature", decision: "KEEP", reason: "locked" }),
-    ).toBe("KEEP(locked) /tmp/w feature")
-    expect(formatClassification({ path: "/tmp/w", ref: "feature", decision: "SWEEP" })).toBe(
-      "SWEEP /tmp/w feature",
+    expect(formatClassification({ path: "/tmp/w", ref: "feature", decision: "KEEP", reason: "locked" })).toBe(
+      "KEEP(locked) /tmp/w feature",
     )
+    expect(formatClassification({ path: "/tmp/w", ref: "feature", decision: "SWEEP" })).toBe("SWEEP /tmp/w feature")
     expect(formatClassification({ path: "/tmp/w", ref: "", decision: "PRUNE" })).toBe("PRUNE /tmp/w")
   })
 

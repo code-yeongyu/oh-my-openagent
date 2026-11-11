@@ -1,14 +1,6 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { createHash } from "node:crypto"
-import {
-  lstatSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs"
+import { lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import { join, relative, resolve } from "node:path"
 import { type ChildProcess, spawn, spawnSync } from "node:child_process"
 
@@ -65,8 +57,12 @@ function run(command: string, args: readonly string[], env: NodeJS.ProcessEnv, d
     runningChildren.add(child)
     let stdout = ""
     let stderr = ""
-    child.stdout.setEncoding("utf8").on("data", (chunk: string) => { stdout += chunk })
-    child.stderr.setEncoding("utf8").on("data", (chunk: string) => { stderr += chunk })
+    child.stdout.setEncoding("utf8").on("data", (chunk: string) => {
+      stdout += chunk
+    })
+    child.stderr.setEncoding("utf8").on("data", (chunk: string) => {
+      stderr += chunk
+    })
     const deadline = setTimeout(() => {
       child.kill("SIGKILL")
       reject(new Error(`${command} ${args.join(" ")} did not exit within the ${deadlineMs} ms test budget`))
@@ -85,18 +81,22 @@ function run(command: string, args: readonly string[], env: NodeJS.ProcessEnv, d
 }
 
 async function ensureShard(socket: string, env: NodeJS.ProcessEnv) {
-  const result = await run("node", [
-    resolveSenpi().cliPath,
-    "host",
-    "ensure",
-    "--json",
-    "--socket",
-    socket,
-    "--launch-spec",
-    LAUNCH_SPEC,
-    "--policy",
-    "upgrade",
-  ], env)
+  const result = await run(
+    "node",
+    [
+      resolveSenpi().cliPath,
+      "host",
+      "ensure",
+      "--json",
+      "--socket",
+      socket,
+      "--launch-spec",
+      LAUNCH_SPEC,
+      "--policy",
+      "upgrade",
+    ],
+    env,
+  )
   expect(result.exitCode).toBe(0)
   const payload = JSON.parse(result.stdout) as { pid: number }
   ownedPids.add(payload.pid)
@@ -226,59 +226,74 @@ if (process.platform !== "win32") {
       const { agentDir } = sandbox()
       mkdirSync(join(agentDir, "rpc-host-daemon"), { recursive: true })
 
-      await expect(assertReadOnlyState(agentDir, () => {
-        runProductionStatus({
-          engine: {
-            run: () => ({ exitCode: 3, stdout: JSON.stringify({ endpoints: [] }), stderr: "" }),
-          },
-          agentDir,
-          env: {},
-          json: true,
-          stdout: { write() {} },
-          stderr: { write() {} },
-          _test: {
-            afterRead: () => {
-              writeFileSync(join(agentDir, "rpc-host-daemon", "status-was-here"), "mutant\n")
+      await expect(
+        assertReadOnlyState(agentDir, () => {
+          runProductionStatus({
+            engine: {
+              run: () => ({ exitCode: 3, stdout: JSON.stringify({ endpoints: [] }), stderr: "" }),
             },
-          },
-        })
-      })).rejects.toThrow("daemon status changed state")
+            agentDir,
+            env: {},
+            json: true,
+            stdout: { write() {} },
+            stderr: { write() {} },
+            _test: {
+              afterRead: () => {
+                writeFileSync(join(agentDir, "rpc-host-daemon", "status-was-here"), "mutant\n")
+              },
+            },
+          })
+        }),
+      ).rejects.toThrow("daemon status changed state")
     })
 
-    test("#given a short idle shard #when status reads keep arriving #then observing reads do not keep it alive", async () => {
-      const { socket, env } = sandbox()
-      const supervisorPid = await ensureShard(socket, {
-        ...env,
-        SENPI_RPC_HOST_IDLE_EXIT_MS: String(OBSERVED_IDLE_EXIT_MS),
-      })
+    test(
+      "#given a short idle shard #when status reads keep arriving #then observing reads do not keep it alive",
+      async () => {
+        const { socket, env } = sandbox()
+        const supervisorPid = await ensureShard(socket, {
+          ...env,
+          SENPI_RPC_HOST_IDLE_EXIT_MS: String(OBSERVED_IDLE_EXIT_MS),
+        })
 
-      let reachableReads = 0
-      while (reachableReads < REQUIRED_REACHABLE_READS) {
-        if (!pidAlive(supervisorPid)) {
-          throw new Error(`shard exited after ${reachableReads} of ${REQUIRED_REACHABLE_READS} status reads that saw it reachable`)
+        let reachableReads = 0
+        while (reachableReads < REQUIRED_REACHABLE_READS) {
+          if (!pidAlive(supervisorPid)) {
+            throw new Error(
+              `shard exited after ${reachableReads} of ${REQUIRED_REACHABLE_READS} status reads that saw it reachable`,
+            )
+          }
+          if (await statusSawReachableShard(env)) reachableReads += 1
         }
-        if (await statusSawReachableShard(env)) reachableReads += 1
-      }
 
-      // The supervisor is detached by `host ensure`, so there is no exit event to await: it is watched by pid.
-      // The backoff between reads only limits spawn load on a busy runner; it is not a timing assertion, and the
-      // reads keep arriving well inside the idle window.
-      const exitDeadline = Date.now() + OBSERVED_IDLE_EXIT_MS * 3
-      let readsAwaitingExit = 0
-      let backoffMs = 100
-      while (pidAlive(supervisorPid)) {
-        if (Date.now() > exitDeadline) {
-          throw new Error(`shard pid ${supervisorPid} still alive after ${readsAwaitingExit} more status reads; observing reads must not reset its idle timer`)
+        // The supervisor is detached by `host ensure`, so there is no exit event to await: it is watched by pid.
+        // The backoff between reads only limits spawn load on a busy runner; it is not a timing assertion, and the
+        // reads keep arriving well inside the idle window.
+        const exitDeadline = Date.now() + OBSERVED_IDLE_EXIT_MS * 3
+        let readsAwaitingExit = 0
+        let backoffMs = 100
+        while (pidAlive(supervisorPid)) {
+          if (Date.now() > exitDeadline) {
+            throw new Error(
+              `shard pid ${supervisorPid} still alive after ${readsAwaitingExit} more status reads; observing reads must not reset its idle timer`,
+            )
+          }
+          await runStatus(env)
+          readsAwaitingExit += 1
+          Atomics.wait(
+            new Int32Array(new SharedArrayBuffer(4)),
+            0,
+            0,
+            Math.min(backoffMs, Math.max(0, exitDeadline - Date.now())),
+          )
+          backoffMs = Math.min(backoffMs * 2, 500)
         }
-        await runStatus(env)
-        readsAwaitingExit += 1
-        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, Math.min(backoffMs, Math.max(0, exitDeadline - Date.now())))
-        backoffMs = Math.min(backoffMs * 2, 500)
-      }
 
-      expect(reachableReads).toBe(REQUIRED_REACHABLE_READS)
-      ownedPids.delete(supervisorPid)
-    }, OBSERVED_IDLE_EXIT_MS * 6)
+        expect(reachableReads).toBe(REQUIRED_REACHABLE_READS)
+        ownedPids.delete(supervisorPid)
+      },
+      OBSERVED_IDLE_EXIT_MS * 6,
+    )
   })
 }
 

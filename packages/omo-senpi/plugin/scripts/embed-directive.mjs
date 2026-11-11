@@ -58,12 +58,15 @@ export function parseVariantBlocks(body) {
     const [line, name, kind] = match
     if (kind === "start") {
       if (open !== null) throw new Error(`senpi ultrawork directive: marker "${name}" opens inside "${open.name}"`)
-      if (blocks.some((block) => block.name === name)) throw new Error(`senpi ultrawork directive: marker "${name}" appears twice`)
+      if (blocks.some((block) => block.name === name))
+        throw new Error(`senpi ultrawork directive: marker "${name}" appears twice`)
       open = { name, markerStart: match.index, contentStart: match.index + line.length }
       continue
     }
     if (open === null || open.name !== name) {
-      throw new Error(`senpi ultrawork directive: marker "${name}" closes ${open === null ? "nothing" : `"${open.name}"`}`)
+      throw new Error(
+        `senpi ultrawork directive: marker "${name}" closes ${open === null ? "nothing" : `"${open.name}"`}`,
+      )
     }
     blocks.push({ ...open, contentEnd: match.index, markerEnd: match.index + line.length })
     open = null
@@ -78,7 +81,8 @@ export function parseVariantSections(rawVariant) {
   const normalized = normalizeNewlines(rawVariant)
   const headings = [...normalized.matchAll(/^## ([a-z0-9-]+)\n/gm)]
   if (headings.length === 0) throw new Error("senpi ultrawork astra variant has no `## <name>` section")
-  if (headings[0].index !== 0) throw new Error("senpi ultrawork astra variant has text before its first `## <name>` section")
+  if (headings[0].index !== 0)
+    throw new Error("senpi ultrawork astra variant has text before its first `## <name>` section")
   headings.forEach((heading, index) => {
     const name = heading[1]
     if (sections.has(name)) throw new Error(`senpi ultrawork astra variant defines "${name}" twice`)
@@ -100,7 +104,9 @@ function assertNoForbiddenTokens(body) {
     }
   }
   if (violations.length > 0) {
-    throw new Error(`senpi ultrawork directive source contains forbidden non-senpi tokens:\n  - ${violations.join("\n  - ")}`)
+    throw new Error(
+      `senpi ultrawork directive source contains forbidden non-senpi tokens:\n  - ${violations.join("\n  - ")}`,
+    )
   }
 }
 
@@ -137,25 +143,106 @@ export function transformDirective(rawSkill, astraVariant) {
   return `${out.trim()}\n`
 }
 
+function splitLines(value) {
+  return value.match(/[^\n]*\n|[^\n]+$/g) ?? []
+}
+
+/**
+ * Line-level split of two texts into the parts they share and the spans where they differ:
+ * a string part is common to both, a `[baseline, astra]` pair holds each side's text of one
+ * differing span. Joining the strings with side 0 (or side 1) of every pair gives back
+ * `baseline` (or `astra`) byte for byte; the split is checked before it is returned.
+ */
+export function splitSharedParts(baseline, astra) {
+  const left = splitLines(baseline)
+  const right = splitLines(astra)
+  // common[i][j]: length of the longest common line subsequence of left[i..] and right[j..].
+  const common = Array.from({ length: left.length + 1 }, () => new Uint32Array(right.length + 1))
+  for (let i = left.length - 1; i >= 0; i -= 1) {
+    for (let j = right.length - 1; j >= 0; j -= 1) {
+      common[i][j] = left[i] === right[j] ? common[i + 1][j + 1] + 1 : Math.max(common[i + 1][j], common[i][j + 1])
+    }
+  }
+  const parts = []
+  let shared = ""
+  let onlyLeft = ""
+  let onlyRight = ""
+  const flushShared = () => {
+    if (shared !== "") parts.push(shared)
+    shared = ""
+  }
+  const flushPair = () => {
+    if (onlyLeft !== "" || onlyRight !== "") parts.push([onlyLeft, onlyRight])
+    onlyLeft = ""
+    onlyRight = ""
+  }
+  let i = 0
+  let j = 0
+  while (i < left.length || j < right.length) {
+    if (i < left.length && j < right.length && left[i] === right[j]) {
+      flushPair()
+      shared += left[i]
+      i += 1
+      j += 1
+    } else if (j < right.length && (i >= left.length || common[i][j + 1] >= common[i + 1][j])) {
+      flushShared()
+      onlyRight += right[j]
+      j += 1
+    } else {
+      flushShared()
+      onlyLeft += left[i]
+      i += 1
+    }
+  }
+  flushPair()
+  flushShared()
+  if (joinSharedParts(parts, 0) !== baseline || joinSharedParts(parts, 1) !== astra) {
+    throw new Error("senpi ultrawork directive: shared-part split does not rebuild both directives")
+  }
+  return parts
+}
+
+/** The generated module's join, kept identical to the `joinDirective` it emits. */
+export function joinSharedParts(parts, variant) {
+  return parts.map((part) => (typeof part === "string" ? part : part[variant])).join("")
+}
+
 function renderGeneratedModule(directive, astraDirective) {
   return [
     "export const FORBIDDEN_DIRECTIVE_TOKENS = [",
     ...forbiddenDirectiveTokens.map((token) => `  ${JSON.stringify(token)},`),
     "] as const",
     "",
-    `export const SENPI_ULTRAWORK_DIRECTIVE = ${JSON.stringify(directive)} as const`,
+    "// Both directives are stored once: a string part is shared, a pair holds the baseline and",
+    "// the Astra text of one span where they differ (#9913).",
+    "const DIRECTIVE_PARTS: readonly (string | readonly [string, string])[] = [",
+    ...splitSharedParts(directive, astraDirective).map((part) => `  ${JSON.stringify(part)},`),
+    "]",
     "",
-    `export const SENPI_ASTRA_ULTRAWORK_DIRECTIVE = ${JSON.stringify(astraDirective)} as const`,
+    "function joinDirective(variant: 0 | 1): string {",
+    '  return DIRECTIVE_PARTS.map((part) => (typeof part === "string" ? part : part[variant])).join("")',
+    "}",
+    "",
+    "// Pure: a bundle that imports this module without reading a directive drops the parts and both joins.",
+    "export const SENPI_ULTRAWORK_DIRECTIVE = /* @__PURE__ */ joinDirective(0)",
+    "",
+    "export const SENPI_ASTRA_ULTRAWORK_DIRECTIVE = /* @__PURE__ */ joinDirective(1)",
     "",
   ].join("\n")
 }
 
-function readExpectedModule() {
+/** The baseline and Astra directives derived from the shipped skill sources. */
+export function readDirectives() {
   const source = readFileSync(sourcePath, "utf8")
-  return renderGeneratedModule(
-    transformDirective(source),
-    transformDirective(source, readFileSync(astraVariantPath, "utf8")),
-  )
+  return {
+    baseline: transformDirective(source),
+    astra: transformDirective(source, readFileSync(astraVariantPath, "utf8")),
+  }
+}
+
+function readExpectedModule() {
+  const { baseline, astra } = readDirectives()
+  return renderGeneratedModule(baseline, astra)
 }
 
 function main(argv) {

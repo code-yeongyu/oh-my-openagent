@@ -88,7 +88,7 @@ export function normalizeHashlineEdits(rawEdits: RawHashlineEdit[]): HashlineEdi
         return normalizePrependEdit(edit, index)
       default:
         throw new Error(
-          `Edit ${index}: unsupported op "${String(edit.op)}". Legacy format was removed; use op/pos/end/lines.`
+          `Edit ${index}: unsupported op "${String(edit.op)}". Legacy format was removed; use op/pos/end/lines.`,
         )
     }
   })

@@ -1,12 +1,4 @@
-import {
-  appendFileSync,
-  chmodSync,
-  existsSync,
-  renameSync,
-  statSync,
-  unlinkSync,
-  writeFileSync,
-} from "fs"
+import { appendFileSync, chmodSync, existsSync, renameSync, statSync, unlinkSync, writeFileSync } from "fs"
 import {
   ensureReplyListenerStateDir,
   REPLY_LISTENER_SECURE_FILE_MODE,

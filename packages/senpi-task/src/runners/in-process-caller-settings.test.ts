@@ -2,7 +2,12 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import { readFileSync } from "node:fs"
 
-import { ALT_PROVIDER, createCallerSettingsWorld, PROVIDER, type CallerSettingsWorld } from "./__fixtures__/caller-settings-world"
+import {
+  ALT_PROVIDER,
+  createCallerSettingsWorld,
+  PROVIDER,
+  type CallerSettingsWorld,
+} from "./__fixtures__/caller-settings-world"
 import { InProcessRunner } from "./in-process"
 
 // The configured stream-start guard is tiny; the engine default is 300 s. A guard that has not fired
@@ -84,12 +89,19 @@ describe("in-process child honors the caller's settings", () => {
       { retry: { modelFallback: true, fallbackChains: { [`${PROVIDER}/primary`]: [`${PROVIDER}/global-fallback`] } } },
       { primary: "quota", "own-fallback": "complete", "global-fallback": "complete" },
     )
-    const ownFallback = { source: "category" as const, provider: ALT_PROVIDER, model_id: "own-fallback", display: `${ALT_PROVIDER}/own-fallback` }
-    const handle = await new InProcessRunner().start(world.spec({
-      selectedModel: `${PROVIDER}/primary`,
-      fallbackModels: [ownFallback],
-      retry: { maxRetries: 0 },
-    }))
+    const ownFallback = {
+      source: "category" as const,
+      provider: ALT_PROVIDER,
+      model_id: "own-fallback",
+      display: `${ALT_PROVIDER}/own-fallback`,
+    }
+    const handle = await new InProcessRunner().start(
+      world.spec({
+        selectedModel: `${PROVIDER}/primary`,
+        fallbackModels: [ownFallback],
+        retry: { maxRetries: 0 },
+      }),
+    )
 
     // when
     const outcome = await handle.waitForIdle()
@@ -103,18 +115,28 @@ describe("in-process child honors the caller's settings", () => {
   test("#given a child ran to completion under the caller's settings #when the run is over #then the caller's settings file is byte-identical", async () => {
     // given
     world = await createCallerSettingsWorld(
-      { httpIdleTimeoutMs: 660_000, retry: { modelFallback: true, fallbackChains: { [`${PROVIDER}/primary`]: [`${PROVIDER}/own-fallback`] } } },
+      {
+        httpIdleTimeoutMs: 660_000,
+        retry: { modelFallback: true, fallbackChains: { [`${PROVIDER}/primary`]: [`${PROVIDER}/own-fallback`] } },
+      },
       { primary: "quota", "own-fallback": "complete" },
     )
     const before = readFileSync(world.settingsPath, "utf8")
-    const ownFallback = { source: "category" as const, provider: ALT_PROVIDER, model_id: "own-fallback", display: `${ALT_PROVIDER}/own-fallback` }
+    const ownFallback = {
+      source: "category" as const,
+      provider: ALT_PROVIDER,
+      model_id: "own-fallback",
+      display: `${ALT_PROVIDER}/own-fallback`,
+    }
 
     // when
-    const handle = await new InProcessRunner().start(world.spec({
-      selectedModel: `${PROVIDER}/primary`,
-      fallbackModels: [ownFallback],
-      retry: { maxRetries: 0 },
-    }))
+    const handle = await new InProcessRunner().start(
+      world.spec({
+        selectedModel: `${PROVIDER}/primary`,
+        fallbackModels: [ownFallback],
+        retry: { maxRetries: 0 },
+      }),
+    )
     await handle.waitForIdle()
     handle.dispose()
 

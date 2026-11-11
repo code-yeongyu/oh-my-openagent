@@ -21,8 +21,18 @@ describe("supervisor fast path", () => {
   })
 
   test("selects the argv the compiled entry hands a shard supervisor", () => {
-    expect(isInternalSupervisorLaunch(["--extension", "/runtime/plugin", INTERNAL_SUPERVISOR_FLAG, "--socket", "/tmp/p.sock"])).toBe(true)
-    expect(isInternalSupervisorLaunch(["--extension", "/runtime/plugin", "--mode", "rpc", "--multi-session"])).toBe(false)
+    expect(
+      isInternalSupervisorLaunch([
+        "--extension",
+        "/runtime/plugin",
+        INTERNAL_SUPERVISOR_FLAG,
+        "--socket",
+        "/tmp/p.sock",
+      ]),
+    ).toBe(true)
+    expect(isInternalSupervisorLaunch(["--extension", "/runtime/plugin", "--mode", "rpc", "--multi-session"])).toBe(
+      false,
+    )
   })
 
   test("falls through when the engine declines an argv that only mentions the sentinel", async () => {

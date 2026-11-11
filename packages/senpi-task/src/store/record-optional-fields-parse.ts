@@ -1,7 +1,14 @@
 import { BACKGROUND_MODES, type BackgroundMode, type TaskRecord } from "../state"
 import { AWAITING_INPUT_REASONS } from "../state/types"
 import { parseOptionalHostSession } from "./record-blocks-parse"
-import { isRecord, readNumber, readOptionalBoolean, readOptionalNumber, readOptionalString, readString } from "./scalar-read"
+import {
+  isRecord,
+  readNumber,
+  readOptionalBoolean,
+  readOptionalNumber,
+  readOptionalString,
+  readString,
+} from "./scalar-read"
 
 // The optional run-lifecycle blocks of a task record: each parser returns undefined for an absent
 // field and throws on a malformed one, like the rest of record-parse.ts.
@@ -11,8 +18,9 @@ export function parseOptionalAwaitingInput(record: Record<string, unknown>): Tas
   if (value === undefined) return undefined
   if (!isRecord(value)) throw new Error("awaiting_input is not an object")
   const reason = readString(value, "reason")
-  if (!(AWAITING_INPUT_REASONS as readonly string[]).includes(reason)) throw new Error(`awaiting_input.reason is not a known reason: ${reason}`)
-  return { reason: reason as NonNullable<TaskRecord["awaiting_input"]>['reason'], since: readString(value, "since") }
+  if (!(AWAITING_INPUT_REASONS as readonly string[]).includes(reason))
+    throw new Error(`awaiting_input.reason is not a known reason: ${reason}`)
+  return { reason: reason as NonNullable<TaskRecord["awaiting_input"]>["reason"], since: readString(value, "since") }
 }
 
 export function parseOptionalCancelRequest(record: Record<string, unknown>): TaskRecord["cancel_requested"] {
@@ -48,7 +56,9 @@ export function parseOptionalStartQueued(record: Record<string, unknown>): TaskR
   }
 }
 
-export function parseOptionalReviveDeliveryUncertainty(record: Record<string, unknown>): TaskRecord["revive_delivery_uncertain"] {
+export function parseOptionalReviveDeliveryUncertainty(
+  record: Record<string, unknown>,
+): TaskRecord["revive_delivery_uncertain"] {
   const value = record["revive_delivery_uncertain"]
   if (value === undefined) return undefined
   if (!isRecord(value)) throw new Error("revive_delivery_uncertain is not an object")
@@ -74,6 +84,7 @@ export function readOptionalBackgroundMode(record: Record<string, unknown>): Bac
 // A negative or non-finite figure is not a spend: it is rejected like any malformed field.
 export function readOptionalPriorRunsCost(record: Record<string, unknown>): number | undefined {
   const value = readOptionalNumber(record, "prior_runs_cost_usd")
-  if (value !== undefined && (!Number.isFinite(value) || value < 0)) throw new Error("prior_runs_cost_usd must be a finite non-negative number")
+  if (value !== undefined && (!Number.isFinite(value) || value < 0))
+    throw new Error("prior_runs_cost_usd must be a finite non-negative number")
   return value
 }

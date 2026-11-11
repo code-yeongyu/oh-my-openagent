@@ -12,12 +12,12 @@ describe("host-session record messageability", () => {
   }
 
   test("terminal rpc_detached host-session with reachable daemon is revive", () => {
-    expect(
-      messageability("completed", "rpc_detached", "process", false, "host-session", hostSession, () => true),
-    ).toBe("revive")
-    expect(
-      messageability("error", "rpc_detached", "process", false, "host-session", hostSession, () => true),
-    ).toBe("revive")
+    expect(messageability("completed", "rpc_detached", "process", false, "host-session", hostSession, () => true)).toBe(
+      "revive",
+    )
+    expect(messageability("error", "rpc_detached", "process", false, "host-session", hostSession, () => true)).toBe(
+      "revive",
+    )
     expect(
       messageability("interrupted", "rpc_detached", "process", false, "host-session", hostSession, () => true),
     ).toBe("revive")
@@ -28,21 +28,21 @@ describe("host-session record messageability", () => {
   // from its transcript and delivering is exactly what retaining it is for, so `running` is revive
   // here. A `pending` child was never opened, so it still has nothing to reopen.
   test("running rpc_detached host-session with a reachable daemon is revive", () => {
-    expect(
-      messageability("running", "rpc_detached", "process", false, "host-session", hostSession, () => true),
-    ).toBe("revive")
+    expect(messageability("running", "rpc_detached", "process", false, "host-session", hostSession, () => true)).toBe(
+      "revive",
+    )
   })
 
   test("pending rpc_detached host-session is not-continuable", () => {
-    expect(
-      messageability("pending", "rpc_detached", "process", false, "host-session", hostSession, () => true),
-    ).toBe("not-continuable")
+    expect(messageability("pending", "rpc_detached", "process", false, "host-session", hostSession, () => true)).toBe(
+      "not-continuable",
+    )
   })
 
   test("killed terminal host-session is not-continuable", () => {
-    expect(
-      messageability("error", "rpc_detached", "process", true, "host-session", hostSession, () => true),
-    ).toBe("not-continuable")
+    expect(messageability("error", "rpc_detached", "process", true, "host-session", hostSession, () => true)).toBe(
+      "not-continuable",
+    )
   })
 
   test("terminal host-session with unreachable daemon is not-continuable", () => {

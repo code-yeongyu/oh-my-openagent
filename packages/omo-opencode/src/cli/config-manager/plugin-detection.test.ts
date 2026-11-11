@@ -41,7 +41,11 @@ describe("detectCurrentConfig - single package detection", () => {
 
   it("detects both legacy and canonical plugin entries", () => {
     // given
-    writeFileSync(testConfigPath, JSON.stringify({ plugin: ["oh-my-opencode", "oh-my-openagent@3.11.0"] }, null, 2) + "\n", "utf-8")
+    writeFileSync(
+      testConfigPath,
+      JSON.stringify({ plugin: ["oh-my-opencode", "oh-my-openagent@3.11.0"] }, null, 2) + "\n",
+      "utf-8",
+    )
 
     // when
     const result = detectCurrentConfig()
@@ -64,9 +68,17 @@ describe("detectCurrentConfig - single package detection", () => {
   it("detects OpenCode Go from the existing omo config", () => {
     // given
     writeFileSync(testConfigPath, JSON.stringify({ plugin: ["oh-my-opencode"] }, null, 2) + "\n", "utf-8")
-    writeFileSync(testOmoConfigPath, JSON.stringify({
-      "[opencode]": { agents: { atlas: { model: "opencode-go/kimi-k2.6" } } },
-    }, null, 2) + "\n", "utf-8")
+    writeFileSync(
+      testOmoConfigPath,
+      JSON.stringify(
+        {
+          "[opencode]": { agents: { atlas: { model: "opencode-go/kimi-k2.6" } } },
+        },
+        null,
+        2,
+      ) + "\n",
+      "utf-8",
+    )
 
     // when
     const result = detectCurrentConfig()
@@ -134,7 +146,9 @@ describe("addPluginToOpenCodeConfig - single package writes", () => {
     // Mock npm dist-tags lookup so tests don't make real network calls that
     // timeout under CI load. Individual tests override this with version-pinned
     // expectations when they need to assert on the version-tagged entry.
-    getPluginNameWithVersionSpy = spyOn(pluginNameWithVersion, "getPluginNameWithVersion").mockResolvedValue("oh-my-openagent")
+    getPluginNameWithVersionSpy = spyOn(pluginNameWithVersion, "getPluginNameWithVersion").mockResolvedValue(
+      "oh-my-openagent",
+    )
   })
 
   afterEach(() => {
@@ -172,7 +186,9 @@ describe("addPluginToOpenCodeConfig - single package writes", () => {
 
   it("updates a version-pinned legacy entry to the requested version", async () => {
     // given
-    const getPluginNameWithVersionSpy = spyOn(pluginNameWithVersion, "getPluginNameWithVersion").mockResolvedValue("oh-my-openagent@3.16.0")
+    const getPluginNameWithVersionSpy = spyOn(pluginNameWithVersion, "getPluginNameWithVersion").mockResolvedValue(
+      "oh-my-openagent@3.16.0",
+    )
     writeFileSync(testConfigPath, JSON.stringify({ plugin: ["oh-my-opencode@3.15.0"] }, null, 2) + "\n", "utf-8")
 
     // when
@@ -187,7 +203,11 @@ describe("addPluginToOpenCodeConfig - single package writes", () => {
 
   it("removes stale legacy entry when canonical and legacy entries both exist", async () => {
     // given
-    writeFileSync(testConfigPath, JSON.stringify({ plugin: ["oh-my-openagent", "oh-my-opencode"] }, null, 2) + "\n", "utf-8")
+    writeFileSync(
+      testConfigPath,
+      JSON.stringify({ plugin: ["oh-my-openagent", "oh-my-opencode"] }, null, 2) + "\n",
+      "utf-8",
+    )
 
     // when
     const result = await addPluginToOpenCodeConfig("3.11.0")
@@ -200,7 +220,9 @@ describe("addPluginToOpenCodeConfig - single package writes", () => {
 
   it("preserves a canonical entry when the same version is re-installed", async () => {
     // given
-    const getPluginNameWithVersionSpy = spyOn(pluginNameWithVersion, "getPluginNameWithVersion").mockResolvedValue("oh-my-openagent@3.10.0")
+    const getPluginNameWithVersionSpy = spyOn(pluginNameWithVersion, "getPluginNameWithVersion").mockResolvedValue(
+      "oh-my-openagent@3.10.0",
+    )
     writeFileSync(testConfigPath, JSON.stringify({ plugin: ["oh-my-openagent@3.10.0"] }, null, 2) + "\n", "utf-8")
 
     // when
@@ -215,7 +237,9 @@ describe("addPluginToOpenCodeConfig - single package writes", () => {
 
   it("blocks a downgrade for a version-pinned canonical entry", async () => {
     // given
-    const getPluginNameWithVersionSpy = spyOn(pluginNameWithVersion, "getPluginNameWithVersion").mockResolvedValue("oh-my-openagent@3.15.0")
+    const getPluginNameWithVersionSpy = spyOn(pluginNameWithVersion, "getPluginNameWithVersion").mockResolvedValue(
+      "oh-my-openagent@3.15.0",
+    )
     writeFileSync(testConfigPath, JSON.stringify({ plugin: ["oh-my-openagent@3.16.0"] }, null, 2) + "\n", "utf-8")
 
     // when

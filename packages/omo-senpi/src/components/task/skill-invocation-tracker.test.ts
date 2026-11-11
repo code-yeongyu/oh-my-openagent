@@ -69,7 +69,14 @@ describe("createSkillInvocationTracker", () => {
     // when
     await pi.dispatch(
       "tool_result",
-      { type: "tool_result", toolCallId: "c2", toolName: "grep", input: { path: "/repo/plugin/skills/ulw-plan/SKILL.md" }, content: [], isError: false },
+      {
+        type: "tool_result",
+        toolCallId: "c2",
+        toolName: "grep",
+        input: { path: "/repo/plugin/skills/ulw-plan/SKILL.md" },
+        content: [],
+        isError: false,
+      },
       CTX_A,
     )
 
@@ -147,7 +154,11 @@ describe("createSkillInvocationTracker - user-request channel", () => {
     const tracker = createSkillInvocationTracker(pi)
 
     // when
-    await pi.dispatch("input", { text: "ulw plan \uc73c\ub85c \uc791\uc5c5\uacc4\ud68d\uc11c \ub9cc\ub4e4\uc5b4\uc918" }, CTX_A)
+    await pi.dispatch(
+      "input",
+      { text: "ulw plan \uc73c\ub85c \uc791\uc5c5\uacc4\ud68d\uc11c \ub9cc\ub4e4\uc5b4\uc918" },
+      CTX_A,
+    )
 
     // then
     expect(tracker.stateFor("sess-a").hasUserRequested("ulw-plan")).toBe(true)
@@ -175,7 +186,9 @@ describe("createSkillInvocationTracker - user-request channel", () => {
     // when
     await pi.dispatch(
       "input",
-      { text: "fix the login bug\n<ultrawork-mode>\nTrigger ONLY when a ulw-plan run produced a plan file.\n</ultrawork-mode>" },
+      {
+        text: "fix the login bug\n<ultrawork-mode>\nTrigger ONLY when a ulw-plan run produced a plan file.\n</ultrawork-mode>",
+      },
       CTX_A,
     )
 
@@ -211,7 +224,11 @@ describe("createSkillInvocationTracker - plan-artifact channel", () => {
     const tracker = createSkillInvocationTracker(pi)
 
     // when
-    await pi.dispatch("tool_result", toolResult("write", { path: "/repo/.local-ignore/worktrees/wt1/.omo/plans/feature.md" }), CTX_A)
+    await pi.dispatch(
+      "tool_result",
+      toolResult("write", { path: "/repo/.local-ignore/worktrees/wt1/.omo/plans/feature.md" }),
+      CTX_A,
+    )
 
     // then
     expect(tracker.stateFor("sess-a").hasPlanArtifact()).toBe(true)
@@ -236,7 +253,11 @@ describe("createSkillInvocationTracker - plan-artifact channel", () => {
     const tracker = createSkillInvocationTracker(pi)
 
     // when
-    await pi.dispatch("tool_result", toolResult("read", { path: "/other/checkout/.omo/plans/child-authored.md" }), CTX_A)
+    await pi.dispatch(
+      "tool_result",
+      toolResult("read", { path: "/other/checkout/.omo/plans/child-authored.md" }),
+      CTX_A,
+    )
 
     // then
     expect(tracker.stateFor("sess-a").hasPlanArtifact()).toBe(true)
@@ -250,7 +271,9 @@ describe("createSkillInvocationTracker - plan-artifact channel", () => {
     // when
     await pi.dispatch(
       "tool_result",
-      toolResult("apply_patch", { input: "*** Begin Patch\n*** Add File: .omo/plans/release.md\n+# Plan\n*** End Patch" }),
+      toolResult("apply_patch", {
+        input: "*** Begin Patch\n*** Add File: .omo/plans/release.md\n+# Plan\n*** End Patch",
+      }),
       CTX_A,
     )
 
@@ -320,7 +343,12 @@ describe("createSkillInvocationTracker - own-words plan request", () => {
     const tracker = createSkillInvocationTracker(pi)
 
     // when
-    for (const text of ["fix the login bug", "\ubc84\uadf8 \uace0\uccd0\uc918", "run the tests and report", "what does this function do?"]) {
+    for (const text of [
+      "fix the login bug",
+      "\ubc84\uadf8 \uace0\uccd0\uc918",
+      "run the tests and report",
+      "what does this function do?",
+    ]) {
       await pi.dispatch("input", { type: "input", text, source: "interactive" }, CTX_A)
     }
 
@@ -357,7 +385,11 @@ describe("createSkillInvocationTracker - own-words plan request", () => {
     const tracker = createSkillInvocationTracker(pi)
 
     // when
-    await pi.dispatch("input", { type: "input", text: "\uacc4\ud68d \uc791\uc131\ud574\uc918", source: "interactive" }, CTX_A)
+    await pi.dispatch(
+      "input",
+      { type: "input", text: "\uacc4\ud68d \uc791\uc131\ud574\uc918", source: "interactive" },
+      CTX_A,
+    )
 
     // then
     expect(tracker.stateFor("sess-a").hasUserRequested("ulw-plan")).toBe(true)
@@ -371,7 +403,11 @@ describe("createSkillInvocationTracker - own-words plan request", () => {
     // when
     await pi.dispatch(
       "input",
-      { type: "input", text: "<ultrawork-mode>\nmake a plan first, then execute\n</ultrawork-mode>\nfix the bug", source: "interactive" },
+      {
+        type: "input",
+        text: "<ultrawork-mode>\nmake a plan first, then execute\n</ultrawork-mode>\nfix the bug",
+        source: "interactive",
+      },
       CTX_A,
     )
 
@@ -479,7 +515,11 @@ describe("createSkillInvocationTracker - expanded skill block channel", () => {
     // when
     await pi.dispatch(
       "input",
-      { type: "input", text: '<skill name="ulw-execute" location="/skills/ulw-execute/SKILL.md"> Execute the plan.', source: "interactive" },
+      {
+        type: "input",
+        text: '<skill name="ulw-execute" location="/skills/ulw-execute/SKILL.md"> Execute the plan.',
+        source: "interactive",
+      },
       CTX_A,
     )
 

@@ -81,6 +81,15 @@ impl Supervisor {
         Ok(())
     }
 
+    /// Calls `observer` after every committed stop, on the thread that
+    /// committed it. The supervisor keeps only a weak reference, so dropping
+    /// the caller's `Arc` unregisters it.
+    pub fn observe_stops(&self, observer: &std::sync::Arc<dyn Fn() + Send + Sync>) {
+        let mut observers = self.stop_observers.lock();
+        observers.retain(|observer| observer.strong_count() > 0);
+        observers.push(std::sync::Arc::downgrade(observer));
+    }
+
     /// Complete a stop off the event callback. Never acknowledge an uncommitted
     /// stop. A stuck input scope cannot prevent saving the latch before exit.
     pub fn trigger_stop(&self, source: StopSource) {
@@ -163,6 +172,10 @@ impl Supervisor {
         drop(stopped_by);
         for signal in signals {
             signal.stopped();
+        }
+        let observers: Vec<_> = self.stop_observers.lock().iter().filter_map(Weak::upgrade).collect();
+        for observer in observers {
+            observer();
         }
         true
     }

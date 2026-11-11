@@ -10,8 +10,7 @@ export type PendingId = string
 export type PairingCode = string
 
 export type SyncRpcProblem =
-  | { readonly kind: "refused"; readonly reason: string }
-  | { readonly kind: "unavailable"; readonly reason: string }
+  { readonly kind: "refused"; readonly reason: string } | { readonly kind: "unavailable"; readonly reason: string }
 
 export interface JoinProgress {
   readonly pendingId: PendingId
@@ -19,9 +18,13 @@ export interface JoinProgress {
   readonly code: PairingCode | null
 }
 
+/**
+ * `rootChanged`: the ceremony pinned a different memory root than this device held before its keys
+ * were discarded (#12280): a notice the desktop shows, never a refusal. Additive on the wire.
+ */
 export type SyncEnableResponse =
-  | { readonly kind: "joined" }
-  | { readonly kind: "first_device_created" }
+  | { readonly kind: "joined"; readonly rootChanged?: true }
+  | { readonly kind: "first_device_created"; readonly rootChanged?: true }
   | { readonly kind: "needs_first_device" }
   | { readonly kind: "join_required"; readonly pairing: JoinProgress }
   | { readonly kind: "expired" }
@@ -34,9 +37,7 @@ export interface PendingDeviceApproval {
   readonly revealed: boolean
 }
 
-export type SyncPendingResponse =
-  | { readonly pending: readonly PendingDeviceApproval[] }
-  | SyncRpcProblem
+export type SyncPendingResponse = { readonly pending: readonly PendingDeviceApproval[] } | SyncRpcProblem
 
 export type SyncApproveRequest =
   | { readonly action: "begin"; readonly pendingId: PendingId }
