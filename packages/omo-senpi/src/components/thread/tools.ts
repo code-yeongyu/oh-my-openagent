@@ -350,7 +350,8 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
         })
         if (plan.kind === "done") return await withAlias(options.remote, value.alias, plan.result, plan.device)
         // An alias no account holds names the thread on its device instead (#13104); a given name wins.
-        const name = plan.localAlias === undefined ? value.name : (value.name ?? value.alias)
+        // Trimmed like thread_rename's alias-as-name, so " x " and "x" name the thread the same way.
+        const name = plan.localAlias === undefined ? value.name : (value.name ?? value.alias?.trim())
         if (name !== undefined) {
           const conflict = checkNameConflict(await plan.host.visible(), name)
           if (conflict.kind === "error") return { kind: "error", error: conflict } as ThreadToolResult
@@ -380,9 +381,10 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
         if (recorded.kind !== "ok" || !("thread" in recorded) || value.alias === undefined) return recorded
         const local = { alias_scope: "local", alias_unavailable: claimed.local } as const
         if (value.name !== undefined) return { ...recorded, ...local } as ThreadToolResult
+        const localName = value.alias.trim()
         const named = await nameCreatedThread(
           recorded.thread.thread_id,
-          value.alias,
+          localName,
           await plan.host.visible(),
           callerId,
         )
@@ -392,8 +394,8 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
                 ...recorded,
                 thread: {
                   ...recorded.thread,
-                  name: value.alias,
-                  link: threadLink(recorded.thread.thread_id, value.alias),
+                  name: localName,
+                  link: threadLink(recorded.thread.thread_id, localName),
                 },
                 ...local,
               }

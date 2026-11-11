@@ -22,6 +22,14 @@ describe("an alias with no account", () => {
     expect(a.registryCalls).toEqual(["resolve"])
   })
 
+  // #13112 review LOW: the alias-as-name is trimmed like thread_rename's, so a padded alias never names a thread " x ".
+  test("#given the alias registry answers sign_in #when thread_create sets a padded alias #then the thread is named by the trimmed alias", async () => {
+    const a = account({ registryDown: "signed_out" })
+    const { run, openSession } = surface(a.remote)
+    expect(await run("thread_create", { alias: "  about-me " })).toMatchObject({ kind: "ok", alias_scope: "local" })
+    expect(openSession.mock.calls[0]?.[0]?.name).toStrictEqual("about-me")
+  })
+
   test("#given the alias registry answers sign_in #when thread_create sets an alias and a name #then the name is kept and the alias is reported local only", async () => {
     const a = account({ registryDown: "signed_out" })
     const { run, openSession } = surface(a.remote)

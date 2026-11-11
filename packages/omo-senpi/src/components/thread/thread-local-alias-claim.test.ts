@@ -22,6 +22,14 @@ describe("an alias whose claim asks for a sign-in", () => {
     expect(a.registryCalls).toEqual(["resolve", "claim"])
   })
 
+  test("#given claim answers sign_in #when thread_create sets a padded alias #then the created thread is named by the trimmed alias", async () => {
+    const a = account({ claimDown: "signed_out" })
+    const { run, setSessionName } = surface(a.remote)
+    const result = await run("thread_create", { alias: " about-me  " })
+    expect(result).toMatchObject({ kind: "ok", alias_scope: "local", thread: { name: "about-me" } })
+    expect(setSessionName.mock.calls.map((call) => [call[0], call[1]])).toStrictEqual([["route-created", "about-me"]])
+  })
+
   test("#given claim answers sign_in #when thread_create sets an alias and a name #then the name is kept and the alias is reported local only", async () => {
     const a = account({ claimDown: "signed_out" })
     const { run, openSession, setSessionName } = surface(a.remote)
