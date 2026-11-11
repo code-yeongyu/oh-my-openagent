@@ -54,7 +54,10 @@ export async function recordIdentityBind(identityRoot: string, bind: IdentityBin
     kind: bind.kind,
     mode: bind.mode,
     source: bind.source,
-    spellings: kept === undefined || kept.spellings.includes(bind.spelling) ? [...(kept?.spellings ?? [bind.spelling])] : [...kept.spellings, bind.spelling],
+    spellings:
+      kept === undefined || kept.spellings.includes(bind.spelling)
+        ? [...(kept?.spellings ?? [bind.spelling])]
+        : [...kept.spellings, bind.spelling],
   }
   await writeJsonAtomic(join(identityRoot, IDENTITY_RECORD_FILENAME), record)
   return record

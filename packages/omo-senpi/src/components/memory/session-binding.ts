@@ -121,7 +121,12 @@ export function createSessionBinder(deps: SessionBinderDeps): SessionBinder {
       return { config, resolved: resolvedId, adoption: result }
     }
     let attempt = adoptUnder(sessionConfig)
-    if (attempt.adoption.kind === "conflict" && previous !== undefined && surface.cwd !== undefined && surface.cwd !== cwd) {
+    if (
+      attempt.adoption.kind === "conflict" &&
+      previous !== undefined &&
+      surface.cwd !== undefined &&
+      surface.cwd !== cwd
+    ) {
       const hostAttempt = adoptUnder(deps.resolveConfig(loadConfig({ cwd })))
       if (hostAttempt.adoption.kind !== "conflict") attempt = hostAttempt
     }
@@ -165,28 +170,39 @@ export function createSessionBinder(deps: SessionBinderDeps): SessionBinder {
       identityPaths: run.paths,
       durableRoot: run.durableRoot,
       binding,
-      projectScope: { memoryRoot, autoIdentity: sessionConfig.auto_identity },
+      projectScope: { memoryRoot, autoIdentity: bindConfig.auto_identity },
     })
     memoryModuleSupervisor.acquire()
     if (!oneShot) {
       state.syncRepo = identity.paths.repo
+      // The space key is the agent that named this identity. On a host-config fallback that is the
+      // host agent; the session folder's rejected agent would open a different space. Enablement
+      // stays the session folder's.
       void syncRunner.acquire(identity.id, identity.paths, sessionConfig.sync, {
-        profile: sessionConfig.agent,
+        profile: bindConfig.agent,
         projectDir: sessionCwd,
       })
     }
     // `identity.json` is what `/memory-merge` maps old identities from (#10070), so it records only binds
     // whose identity this config actually derived; a rebind to a recorded identity says nothing new about
     // how that identity came to be. A failed write is logged, never a failed bind.
-    if (adoption.kind === "resolved") void deps.work.track(() => recordIdentityBind(run.paths.root, {
-      id: identity.id,
-      kind: autoAgent ? "auto" : "explicit",
-      mode: bindConfig.auto_identity,
-      source: sessionCwd,
-      spelling: sessionCwd,
-    })).catch((error: unknown) => {
-      ctx.logger.warn("omo-senpi memory identity record write failed", { sessionId: surface.id, error: error instanceof Error ? error.message : String(error) })
-    })
+    if (adoption.kind === "resolved")
+      void deps.work
+        .track(() =>
+          recordIdentityBind(run.paths.root, {
+            id: identity.id,
+            kind: autoAgent ? "auto" : "explicit",
+            mode: bindConfig.auto_identity,
+            source: sessionCwd,
+            spelling: sessionCwd,
+          }),
+        )
+        .catch((error: unknown) => {
+          ctx.logger.warn("omo-senpi memory identity record write failed", {
+            sessionId: surface.id,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        })
     // Disposable bookkeeping: a session closed without a conversation leaves no file (senpi#3263).
     pi.appendEntry(MEMORY_BINDING_CUSTOM_TYPE, binding, { startupBookkeeping: true })
     // Bind-time reconcile floats past the bind by design, but its rejection must not
