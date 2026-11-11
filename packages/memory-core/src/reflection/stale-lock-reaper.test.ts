@@ -35,6 +35,7 @@ const PAYLOAD = ["reflection-persona.md", "reflection-task.md", "transcript-payl
 function probe(pids: Record<number, ProcessLiveness> = {}): StaleLockProbe {
   return {
     hostname: () => HOST,
+    hostId: () => null,
     now: () => NOW,
     getPidLiveness: (pid) => pids[pid] ?? "dead",
     getProcessStartIdentity: async () => null,
@@ -435,6 +436,111 @@ describe("stale reflection-lock reaper, minimal settle from the CLI (#11976)", (
 
     // then
     expect(report.decision).toMatchObject({ kind: "stuck", reason: expect.stringContaining("other-host") })
+    expect(treeHash(paths.root)).toBe(before)
+  })
+
+  test("#given the same hostname but a foreign machine id #when the launcher pid is locally dead #then the reservation is kept", async () => {
+    const paths = reaperIdentity()
+    activeLock(paths, { launcherHostId: "foreign-machine" })
+    const before = treeHash(paths.root)
+
+    const report = await runStaleLockReaper({
+      runtimeDir: paths.runtime,
+      probe: { ...probe(), hostId: () => "local-machine" },
+    })
+
+    expect(report.decision.kind).toBe("stuck")
+    expect(treeHash(paths.root)).toBe(before)
+  })
+
+  test("#given a renamed host with the same machine id #when its launcher is dead #then its reservation can be reclaimed", async () => {
+    const paths = reaperIdentity()
+    activeLock(paths, { launcherHostname: "old-hostname", launcherHostId: "local-machine" })
+
+    const report = await runStaleLockReaper({
+      runtimeDir: paths.runtime,
+      probe: { ...probe(), hostId: () => "local-machine" },
+    })
+
+    expect(report.decision).toMatchObject({ kind: "reap", action: "launch-interrupted" })
+    expect(existsSync(join(paths.reflection, "active.lock"))).toBe(false)
+  })
+
+  test("#given a torn lock with a foreign machine id and the same hostname #when the launcher pid is locally dead #then the lock is kept", async () => {
+    const paths = reaperIdentity()
+    const torn = `{"runId":"${RUN}","launcherPid":11096,"launcherHostname":"${HOST}","launcherHostId":"foreign-machine",`
+    writeJson(join(paths.reflection, "active.lock"), torn)
+    writeJson(join(runDir(paths, RUN), "ledger.json"), validLedger(RUN))
+    age(join(paths.reflection, "active.lock"), 2 * 60 * 60_000)
+    const before = treeHash(paths.root)
+
+    const report = await runStaleLockReaper({
+      runtimeDir: paths.runtime,
+      probe: { ...probe(), hostId: () => "local-machine" },
+    })
+
+    expect(report.decision.kind).toBe("stuck")
+    expect(treeHash(paths.root)).toBe(before)
+  })
+
+  test.each(["", '"launch', '"launcherHostId":', '"launcherHostId":"foreign-'])(
+    "#given a torn same-host lock cut at %s #when the current machine has an id #then the lock is kept",
+    async (suffix) => {
+      const paths = reaperIdentity()
+      const torn = `{"runId":"${RUN}","launcherPid":11096,"launcherHostname":"${HOST}",${suffix}`
+      writeJson(join(paths.reflection, "active.lock"), torn)
+      age(join(paths.reflection, "active.lock"), 2 * 60 * 60_000)
+      const before = treeHash(paths.root)
+
+      const report = await runStaleLockReaper({
+        runtimeDir: paths.runtime,
+        probe: { ...probe(), hostId: () => "local-machine" },
+      })
+
+      expect(report.decision.kind).toBe("stuck")
+      expect(treeHash(paths.root)).toBe(before)
+    },
+  )
+
+  test("#given a torn machine id and no local id #when the reaper runs #then the lock is kept", async () => {
+    const paths = reaperIdentity()
+    const torn = `{"runId":"${RUN}","launcherPid":11096,"launcherHostname":"${HOST}","launcherHostId":"foreign-`
+    writeJson(join(paths.reflection, "active.lock"), torn)
+    age(join(paths.reflection, "active.lock"), 2 * 60 * 60_000)
+    const before = treeHash(paths.root)
+
+    const report = await runStaleLockReaper({ runtimeDir: paths.runtime, probe: probe() })
+
+    expect(report.decision.kind).toBe("stuck")
+    expect(treeHash(paths.root)).toBe(before)
+  })
+
+  test("#given a torn lock with this machine's complete id #when its launcher is dead #then it can be reaped", async () => {
+    const paths = reaperIdentity()
+    const torn = `{"runId":"${RUN}","launcherPid":11096,"launcherHostname":"${HOST}","launcherHostId":"local-machine",`
+    writeJson(join(paths.reflection, "active.lock"), torn)
+    age(join(paths.reflection, "active.lock"), 2 * 60 * 60_000)
+
+    const report = await runStaleLockReaper({
+      runtimeDir: paths.runtime,
+      probe: { ...probe(), hostId: () => "local-machine" },
+    })
+
+    expect(report.action).toBe("reaped")
+    expect(existsSync(join(paths.reflection, "active.lock"))).toBe(false)
+  })
+
+  test("#given an unreadable active lock and a run directory #when the reaper runs #then the run is not treated as stranded", async () => {
+    const paths = reaperIdentity()
+    mkdirSync(join(paths.reflection, "active.lock"))
+    writeJson(join(runDir(paths, RUN), "ledger.json"), validLedger(RUN))
+    const before = treeHash(paths.root)
+
+    const report = await runStaleLockReaper({ runtimeDir: paths.runtime, probe: probe() })
+
+    expect(report.action).toBe("kept")
+    expect(report.stranded).toEqual([])
+    expect(report.warnings).toHaveLength(1)
     expect(treeHash(paths.root)).toBe(before)
   })
 

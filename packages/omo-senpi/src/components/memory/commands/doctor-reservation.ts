@@ -2,7 +2,7 @@
 // gone (the post-#7095 repair state reconcile now reclaims automatically at session start).
 
 import { existsSync, readFile } from "@oh-my-opencode/memory-core/fs"
-import { hostname } from "node:os"
+import { isReflectionHostLocal } from "@oh-my-opencode/memory-core"
 import { join } from "node:path"
 
 import type { DoctorCheck } from "./doctor-checks"
@@ -36,6 +36,7 @@ export async function checkGhostReservation(
   const reservedAtMs = typeof record.reservedAt === "string" ? Date.parse(record.reservedAt) : Number.NaN
   const launcherPid = typeof record.launcherPid === "number" ? record.launcherPid : undefined
   const launcherHostname = typeof record.launcherHostname === "string" ? record.launcherHostname : undefined
+  const launcherHostId = typeof record.launcherHostId === "string" ? record.launcherHostId : undefined
   if (launcherPid === undefined || launcherHostname === undefined || !Number.isFinite(reservedAtMs)) {
     return {
       name: "reservation",
@@ -45,8 +46,9 @@ export async function checkGhostReservation(
   }
   if (Date.now() - reservedAtMs <= 60_000)
     return { name: "reservation", level: "ok", detail: `reservation ${runId} is recent` }
-  if (launcherHostname !== hostname())
+  if (!(await isReflectionHostLocal(launcherHostname, launcherHostId, {}))) {
     return { name: "reservation", level: "ok", detail: `reservation ${runId} is owned by ${launcherHostname}` }
+  }
   const alive = (deps.isProcessAlive ?? defaultIsProcessAlive)(launcherPid)
   if (alive)
     return { name: "reservation", level: "ok", detail: `reservation ${runId} launcher pid ${launcherPid} is alive` }

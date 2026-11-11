@@ -4,10 +4,9 @@
 // minimal writers here. Anything not proven gone is kept and reported. `omo doctor` runs a generated
 // bundle of this file, so every rule carries a `rule:` tag with a scenario the parity test replays.
 
-import { hostname as readHostname } from "node:os"
 import { basename, join } from "node:path"
 
-import { mkdir, readdir, readFile, stat, unlink } from "../fs/resilient"
+import { mkdir, readdir, readFile, stat } from "../fs/resilient"
 import { removeTree } from "../fs/remove-tree"
 import { LockContentionError, withLock } from "../locks/acquire"
 import { sweepDeadOwnerLocks } from "../locks/dead-owner-sweep"
@@ -26,6 +25,8 @@ import { parseReservationRunLedger } from "./run-ledger"
 import { classifyRecordedProcess, classifyRecordedProcessLenient, type RecordedProcessClassifier } from "./run-process"
 import {
   classifyReflectionLockHolder,
+  getStableLocalHostId,
+  isReflectionHostLocal,
   reflectionLauncherLiveness,
   type ReflectionLockProbe,
   type ReflectionLockVerdict,
@@ -229,6 +230,8 @@ export const TORN_LOCK_MIN_AGE_MS = 60 * 60_000
 
 const TORN_LAUNCHER_PID = /"launcherPid"\s*:\s*(\d+)/
 const TORN_LAUNCHER_HOST = /"launcherHostname"\s*:\s*"([^"]*)"/
+const TORN_LAUNCHER_HOST_ID = /"launcherHostId"\s*:\s*"([^"]*)"/
+const TORN_LAUNCHER_HOST_ID_FIELD = /"launcherHostId"\s*:/
 const TORN_LAUNCHER_START = /"launcherProcessStart"\s*:\s*"([^"]*)"/
 
 // The fail-closed conditions under which a torn active.lock may be moved aside (DESIGN.r2 4.4, M4);
@@ -242,7 +245,14 @@ async function tornLockBlocker(
   const lockAt = await modifiedAt(join(reflectionDir, "active.lock"), probe)
   if (lockAt === undefined || now - lockAt <= TORN_LOCK_MIN_AGE_MS) return "it is recent" // rule:torn-recent
   const host = TORN_LAUNCHER_HOST.exec(bytes)?.[1]
-  if (host !== undefined && host !== (probe.hostname ?? readHostname)()) return `its launcher is on host ${host}` // rule:torn-other-host
+  const hostId = TORN_LAUNCHER_HOST_ID.exec(bytes)?.[1]
+  if (host !== undefined) {
+    const localHostId = await (probe.hostId ?? getStableLocalHostId)()
+    if (!(await isReflectionHostLocal(host, hostId, { ...probe, hostId: () => localHostId })))
+      return `its launcher is on host ${host}` // rule:torn-other-host
+    if (!hostId && (localHostId || TORN_LAUNCHER_HOST_ID_FIELD.test(bytes)))
+      return "its launcher machine identity is incomplete" // rule:torn-host-id-unknown
+  }
   const pid = TORN_LAUNCHER_PID.exec(bytes)?.[1]
   // The reservation writes the pid before the hostname, so a pid with no complete host may be another host's.
   if (pid !== undefined && host === undefined) return "its launcher host is unknown" // rule:torn-host-unknown
@@ -291,12 +301,13 @@ async function decideStuck(
   const fields = fieldsOf(parsed.value)
   const launcherPid = typeof fields.launcherPid === "number" ? fields.launcherPid : undefined
   const launcherHostname = typeof fields.launcherHostname === "string" ? fields.launcherHostname : undefined
+  const launcherHostId = typeof fields.launcherHostId === "string" ? fields.launcherHostId : undefined
   if (launcherPid === undefined || launcherHostname === undefined) {
     if (!isReservedRun(parsed.value))
       return tornLock(reflectionDir, lock.text, "active.lock is not a reservation", probe)
     return { kind: "stuck", runId: verdict.runId, reason: "its launcher identity is missing; a session reconciles it" } // rule:legacy-lock
   }
-  if (launcherHostname !== (probe.hostname ?? readHostname)()) return passThrough
+  if (!(await isReflectionHostLocal(launcherHostname, launcherHostId, probe))) return passThrough
   if ((await reflectionLauncherLiveness(launcherPid, fields.launcherProcessStart, probe)) !== "dead") return passThrough
   const runId = verdict.runId
   const runDir = join(reflectionDir, "runs", runId)
@@ -774,10 +785,15 @@ async function strandedRuns(context: ReaperContext, apply: boolean): Promise<Str
   const runsDir = join(context.reflectionDir, "runs")
   const reserved = new Set<string>()
   for (const name of ["active.lock", "pending.json"]) {
-    const raw = await readFile(join(context.reflectionDir, name), "utf8").catch(() => undefined)
-    const parsed = raw === undefined ? undefined : parseJson(raw)
-    if (parsed?.ok === true && typeof fieldsOf(parsed.value).runId === "string")
-      reserved.add(fieldsOf(parsed.value).runId as string)
+    const read = await readText(join(context.reflectionDir, name), {})
+    if (read.kind === "missing") continue
+    const parsed = read.kind === "text" ? parseJson(read.text) : undefined
+    const runId = parsed?.ok === true ? fieldsOf(parsed.value).runId : undefined
+    if (name === "active.lock" && typeof runId !== "string") {
+      context.warnings.push("active.lock could not identify its run; stranded-run recovery was skipped")
+      return []
+    }
+    if (typeof runId === "string") reserved.add(runId)
   }
   const reports: StrandedRunReport[] = []
   for (const runId of await listDirectory(runsDir, {})) {

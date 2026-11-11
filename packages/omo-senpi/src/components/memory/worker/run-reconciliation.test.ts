@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { readFile, rm, writeFile } from "node:fs/promises"
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import { createLockRecord, parseLockRecord, reflectionSchedulerLockPath, withLock } from "@oh-my-opencode/memory-core"
@@ -12,6 +12,7 @@ import {
   cleanupReconciliationFixtures,
   commitOrphanWorktree,
   contendedReservation,
+  FIXTURE_HOST,
   reconciliationFixture as fixture,
   retireRunGeneration,
   queuePendingReservation,
@@ -356,7 +357,7 @@ describe("reflection and dream run reconciliation", () => {
     const untouched = await reconcileReflectionRuns({
       identity: unknown.identity,
       reservation: unknown.store,
-      hostname: () => "fixture-host",
+      hostname: () => FIXTURE_HOST,
       now: () => Date.parse("2026-08-10T00:01:01.001Z"),
       getPidLiveness: () => "alive",
       getProcessStartIdentity: async () => null,
@@ -364,7 +365,7 @@ describe("reflection and dream run reconciliation", () => {
     const reused = await reconcileReflectionRuns({
       identity: unknown.identity,
       reservation: unknown.store,
-      hostname: () => "fixture-host",
+      hostname: () => FIXTURE_HOST,
       now: () => Date.parse("2026-08-10T00:01:01.001Z"),
       getPidLiveness: () => "alive",
       getProcessStartIdentity: async () => "different-start",
@@ -402,7 +403,7 @@ describe("reflection and dream run reconciliation", () => {
         launch: (run) => {
           launched.push(run.runId)
         },
-        hostname: () => "fixture-host",
+        hostname: () => FIXTURE_HOST,
         now: () => Date.parse("2026-08-10T00:01:01.001Z"),
         getPidLiveness: () => "dead",
       })
@@ -437,7 +438,7 @@ describe("reflection and dream run reconciliation", () => {
       const results = await reconcileReflectionRuns({
         identity: item.identity,
         reservation: item.store,
-        hostname: () => "fixture-host",
+        hostname: () => FIXTURE_HOST,
         now: () => Date.parse("2026-08-10T00:01:01.001Z"),
         getPidLiveness: () => "dead",
       })
@@ -477,7 +478,7 @@ describe("reflection and dream run reconciliation", () => {
         identity: item.identity,
         reservation: item.store,
         launch: (run) => launched.push(run.runId),
-        hostname: () => "fixture-host",
+        hostname: () => FIXTURE_HOST,
         now: () => Date.parse("2026-08-10T00:01:01.001Z"),
         getPidLiveness: () => "dead",
       })
@@ -500,7 +501,7 @@ describe("reflection and dream run reconciliation", () => {
     const results = await reconcileReflectionRuns({
       identity: item.identity,
       reservation: item.store,
-      hostname: () => "fixture-host",
+      hostname: () => FIXTURE_HOST,
       now: () => Date.parse("2026-08-10T00:01:01.001Z"),
       getPidLiveness: () => "dead",
     })
@@ -525,5 +526,34 @@ describe("reflection and dream run reconciliation", () => {
         })
       ).code,
     ).not.toBe(0)
+  }, 30_000)
+
+  test("#given extra run directories #when one pass reconciles #then the reservation lock is taken once for that scan", async () => {
+    const countReads = async (extraDirs: number): Promise<number> => {
+      const item = await fixture()
+      const runs = join(item.identity.paths.reflection, "runs")
+      for (let index = 0; index < extraDirs; index += 1) {
+        await mkdir(join(runs, `run-extra-${index}`), { recursive: true, mode: 0o700 })
+      }
+      let reads = 0
+      const readState = item.store.readState.bind(item.store)
+      item.store.readState = async (options) => {
+        reads += 1
+        return await readState(options)
+      }
+      await reconcileReflectionRuns({
+        identity: item.identity,
+        reservation: item.store,
+        hostname: () => FIXTURE_HOST,
+        hostId: () => null,
+        now: () => Date.parse("2026-08-10T00:01:01.001Z"),
+        getPidLiveness: () => "dead",
+      })
+      return reads
+    }
+
+    const one = await countReads(0)
+    const many = await countReads(2)
+    expect(many).toBe(one)
   }, 30_000)
 })

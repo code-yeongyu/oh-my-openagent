@@ -11,6 +11,7 @@ import { join } from "node:path"
 
 import { readFile } from "../fs/resilient"
 import {
+  execFileText,
   getPidLiveness,
   getProcessStartIdentity,
   startIdentitiesComparable,
@@ -26,6 +27,7 @@ export type ReflectionLockVerdict =
 export interface ReflectionLockProbe {
   readonly readText?: (path: string) => Promise<string>
   readonly hostname?: () => string
+  readonly hostId?: () => string | null | Promise<string | null>
   readonly getPidLiveness?: (pid: number) => ProcessLiveness
   readonly getProcessStartIdentity?: (pid: number) => Promise<string | null>
 }
@@ -78,6 +80,53 @@ function isRunOutcome(value: unknown, runId: string): boolean {
   )
 }
 
+/** Extracts the firmware UUID from `ioreg -c IOPlatformExpertDevice` output. */
+export function parsePlatformUuid(ioreg: string | null): string | null {
+  return ioreg?.match(/"IOPlatformUUID"\s*=\s*"([^"]*)"/)?.[1]?.trim() || null
+}
+
+/** Single flight, and only an answer is remembered: caching a miss would pin a busy process to "unknown machine". */
+export function createMachineIdResolver(read: () => Promise<string | null>): () => Promise<string | null> {
+  let cached: Promise<string | null> | undefined
+  return () => {
+    if (cached !== undefined) return cached
+    cached = read().then(
+      (value) => {
+        if (value === null) cached = undefined
+        return value
+      },
+      (error: unknown) => {
+        cached = undefined
+        throw error
+      },
+    )
+    return cached
+  }
+}
+
+/** This machine's identity, or `null` where no probe exists. The prefix makes `active.lock` self-describing. */
+export const getStableLocalHostId = createMachineIdResolver(async () => {
+  if (process.platform !== "darwin") return null
+  // An absolute path keeps this probe working when the host has no PATH.
+  const uuid = parsePlatformUuid(await execFileText("/usr/sbin/ioreg", ["-rd1", "-c", "IOPlatformExpertDevice"], 1_000))
+  return uuid && `darwin-uuid:${uuid}`
+})
+
+/**
+ * Two known ids must match, so machines sharing a hostname stay distinct while one renamed by DHCP
+ * still matches. A missing id on either side falls back to the hostname, because an unknown id never
+ * proves another host.
+ */
+export async function isReflectionHostLocal(
+  hostname: string,
+  hostId: string | undefined,
+  probe: ReflectionLockProbe,
+): Promise<boolean> {
+  const currentHostname = (probe.hostname ?? readHostname)()
+  const currentHostId = await (probe.hostId ?? getStableLocalHostId)()
+  return typeof hostId === "string" && hostId && currentHostId ? hostId === currentHostId : hostname === currentHostname
+}
+
 function stuck(runId: string, reason: string): ReflectionLockVerdict {
   return { state: "stuck", runId, reason }
 }
@@ -110,10 +159,12 @@ export async function classifyReflectionLockHolder(
   const runId = typeof fields.runId === "string" ? fields.runId : "unknown"
   const launcherPid = typeof fields.launcherPid === "number" ? fields.launcherPid : undefined
   const launcherHostname = typeof fields.launcherHostname === "string" ? fields.launcherHostname : undefined
+  const launcherHostId = typeof fields.launcherHostId === "string" ? fields.launcherHostId : undefined
   if (launcherPid === undefined || launcherHostname === undefined)
     return stuck(runId, "its launcher identity is missing") // rule:launcher-identity
-  if (launcherHostname !== (probe.hostname ?? readHostname)())
+  if (!(await isReflectionHostLocal(launcherHostname, launcherHostId, probe))) {
     return stuck(runId, `it is owned by host ${launcherHostname}, which cannot be checked from here`) // rule:other-host
+  }
   const launcher = await reflectionLauncherLiveness(launcherPid, fields.launcherProcessStart, probe)
   if (launcher === "alive") return { state: "live", runId } // rule:launcher-alive
   if (launcher === "unknown") return stuck(runId, `launcher pid ${launcherPid} could not be checked`) // rule:launcher-unknown
