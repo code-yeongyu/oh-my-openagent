@@ -245,12 +245,12 @@ describe("the device service is not connected, or the alias registry is not ther
     expect(a.sent).toEqual([])
   })
 
-  test("#given no alias registry #when thread_create sets an alias #then it is host_unavailable and nothing is created; a create without an alias works", async () => {
+  test("#given no alias registry #when thread_create sets an alias #then the thread is created here with the alias as its local name (#13104); opening an existing thread with an alias stays host_unavailable", async () => {
     const a = account({ noRegistry: true })
     const { run, openSession } = surface(a.remote)
-    expect(await run("thread_create", { alias: "x" })).toMatchObject({ kind: "error", error: { code: "host_unavailable" } })
-    expect(openSession).not.toHaveBeenCalled()
-    expect(await run("thread_create", {})).toMatchObject({ kind: "ok", thread: { thread_id: "dur-created-here" } })
+    expect(await run("thread_create", { alias: "x" })).toMatchObject({ kind: "ok", thread: { thread_id: "dur-created-here" }, alias_scope: "local", alias_unavailable: "no_registry" })
+    expect(openSession.mock.calls[0]?.[0]).toMatchObject({ name: "x" })
+    expect(await run("thread_create", { thread: "local peer", alias: "y" })).toMatchObject({ kind: "error", error: { code: "host_unavailable" } })
   })
 })
 
