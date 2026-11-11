@@ -990,8 +990,6 @@
       "packages/omo-senpi/plugin/scripts/build-install.mjs": ["buildInstallCli", "checkInstallCliCurrent"],
       // pre-existing at origin dev 4686e425b5: unused export(s) traceBundleInputs, INSTALL_LIFECYCLES
       "packages/omo-senpi/plugin/scripts/bundle-inputs.mjs": ["traceBundleInputs", "INSTALL_LIFECYCLES"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) stageAstGrepMcpRuntime
-      "packages/omo-senpi/plugin/scripts/stage-ast-grep-mcp-runtime.mjs": ["stageAstGrepMcpRuntime"],
       // pre-existing at origin dev 4686e425b5: unused export(s) checkRuntimeDistFresh
       "packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs": ["checkRuntimeDistFresh"],
       // pre-existing at origin dev 4686e425b5: unused export(s) syncSkills
