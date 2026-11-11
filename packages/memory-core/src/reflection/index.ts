@@ -10,12 +10,7 @@ export * from "./machine"
 export * from "./park"
 export * from "./park-file"
 export * from "./quarantine"
-export {
-  classifyReflectionLockHolder,
-  getStableLocalHostId,
-  isReflectionHostLocal,
-  reflectionLauncherLiveness,
-} from "./stale-holder"
+export { classifyReflectionLockHolder, isReflectionHostLocal } from "./stale-holder"
 export type { ReflectionLockProbe, ReflectionLockVerdict } from "./stale-holder"
 export * from "./abandoned"
 export * from "./run-id-high-water"
