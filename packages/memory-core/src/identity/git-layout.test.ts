@@ -157,7 +157,10 @@ describe("resolveLinkedWorktreeSource", () => {
   it("#given a common dir with core.worktree set #when resolved #then that working tree is the source", () => {
     // given
     const commonDir = resolve("/gitdirs/project")
-    const { worktree, tree } = worktreeOf(commonDir, '[core]\n\tbare = false\n\tworktree = "../../repos/main" ; set by hand\n')
+    const { worktree, tree } = worktreeOf(
+      commonDir,
+      '[core]\n\tbare = false\n\tworktree = "../../repos/main" ; set by hand\n',
+    )
     const probe = fakeProbe(tree)
     // when
     const source = resolveLinkedWorktreeSource(worktree, probe)

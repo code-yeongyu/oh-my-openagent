@@ -34,7 +34,11 @@ export const testWireProjection: OtlpWireProjection = (_event, properties) => {
   if (typeof session === "string" && session.length > 0) attributes["session.id"] = session
   for (const [key, value] of Object.entries(properties)) {
     if (!isWireAttributeKey(key)) continue
-    if (typeof value === "string" || typeof value === "boolean" || (typeof value === "number" && Number.isFinite(value))) {
+    if (
+      typeof value === "string" ||
+      typeof value === "boolean" ||
+      (typeof value === "number" && Number.isFinite(value))
+    ) {
       attributes[`omo.${key}`] = value
     }
   }

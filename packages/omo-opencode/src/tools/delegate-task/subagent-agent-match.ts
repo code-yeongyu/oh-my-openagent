@@ -42,8 +42,7 @@ function shouldUseHiddenPlanAgent(
     return false
   }
 
-  return sisyphusAgentConfig?.planner_enabled !== false
-    && sisyphusAgentConfig?.replace_plan !== false
+  return sisyphusAgentConfig?.planner_enabled !== false && sisyphusAgentConfig?.replace_plan !== false
 }
 
 export async function resolveSubagentAgentMatch(
@@ -59,9 +58,8 @@ export async function resolveSubagentAgentMatch(
   const serverPrimaryAgent = findPrimaryAgentMatch(agents, requestedAgent)
   const serverMatchedAgent = findCallableAgentMatch(agents, requestedAgent)
 
-  const mergedAgents = executorCtx.claudeCodeAgentsEnabled === false
-    ? agents
-    : mergeWithClaudeCodeAgents(agents, executorCtx.directory)
+  const mergedAgents =
+    executorCtx.claudeCodeAgentsEnabled === false ? agents : mergeWithClaudeCodeAgents(agents, executorCtx.directory)
   const matchedPrimaryAgent = findPrimaryAgentMatch(mergedAgents, requestedAgent)
   const useHiddenPlanFallback = shouldUseHiddenPlanAgent(
     requestedAgent,
@@ -94,9 +92,7 @@ export async function resolveSubagentAgentMatch(
   }
 
   const usePrimary = options.allowPrimaryAgentDelegation && matchedPrimaryAgent !== undefined
-  let matchedAgent = usePrimary
-    ? matchedPrimaryAgent
-    : findCallableAgentMatch(mergedAgents, requestedAgent)
+  let matchedAgent = usePrimary ? matchedPrimaryAgent : findCallableAgentMatch(mergedAgents, requestedAgent)
 
   if (useHiddenPlanFallback) {
     matchedAgent = {

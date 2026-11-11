@@ -22,7 +22,9 @@ describe("shutdown teardown failure containment", () => {
           entered.resolve(spec.taskId)
           return release.promise.then(() => ({
             ...child.handle,
-            dispose: async () => { disposed = true },
+            dispose: async () => {
+              disposed = true
+            },
           }))
         },
         settleTeardowns: () => {
@@ -42,7 +44,10 @@ describe("shutdown teardown failure containment", () => {
       try {
         // when: teardown fails while admission stays held; only virtual time expires the bound.
         const shutdown = manager.settleLaunchesForShutdown?.(shutdownBoundMs) ?? Promise.resolve()
-        const outcome = shutdown.then(() => "resolved", (error: unknown) => error)
+        const outcome = shutdown.then(
+          () => "resolved",
+          (error: unknown) => error,
+        )
         await Promise.race([teardown.promise, watchdog.promise])
         // A check-phase event drains the failure's promise jobs before the virtual deadline fires.
         await Promise.race([setImmediate(), watchdog.promise])

@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 
 import { _setModelResolutionLogImplementationForTesting } from "./model-resolution-pipeline"
-import { resolveModelWithFallback, type ExtendedModelResolutionInput, type ModelResolutionResult } from "./model-resolver"
+import {
+  resolveModelWithFallback,
+  type ExtendedModelResolutionInput,
+  type ModelResolutionResult,
+} from "./model-resolver"
 
 const logMock = mock(() => {})
 
@@ -40,15 +44,16 @@ describe("resolveModelWithFallback provider scoping", () => {
     // then
     expect(resolved.model).toBe("anthropic/claude-sonnet-4-6")
     expect(resolved.source).toBe("provider-fallback")
-    expect(logMock).not.toHaveBeenCalledWith("Model resolved via fallback chain (cross-provider fuzzy match)", expect.anything())
+    expect(logMock).not.toHaveBeenCalledWith(
+      "Model resolved via fallback chain (cross-provider fuzzy match)",
+      expect.anything(),
+    )
   })
 
   test("prefers specified provider over same-name model from another provider", () => {
     // given
     const input: ExtendedModelResolutionInput = {
-      fallbackChain: [
-        { providers: ["zai-coding-plan"], model: "glm-5" },
-      ],
+      fallbackChain: [{ providers: ["zai-coding-plan"], model: "glm-5" }],
       availableModels: new Set(["zai-coding-plan/glm-5", "opencode/glm-5"]),
       systemDefaultModel: "google/gemini-3.1-pro",
     }
@@ -65,9 +70,7 @@ describe("resolveModelWithFallback provider scoping", () => {
   test("does not preserve variant from an unmatched provider-scoped entry", () => {
     // given
     const input: ExtendedModelResolutionInput = {
-      fallbackChain: [
-        { providers: ["zai-coding-plan"], model: "glm-5", variant: "high" },
-      ],
+      fallbackChain: [{ providers: ["zai-coding-plan"], model: "glm-5", variant: "high" }],
       availableModels: new Set(["opencode/glm-5"]),
       systemDefaultModel: "google/gemini-3.1-pro",
     }

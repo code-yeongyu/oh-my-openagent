@@ -16,7 +16,11 @@ interface SystemTreeNode {
 export function renderSystemTree(files: readonly CompiledSystemFile[]): string {
   const root: SystemTreeNode = { children: new Map() }
   for (const file of files) {
-    const parts = file.relativePath.replace(/^system\//, "").replace(/\.md$/, "").split("/").filter(Boolean)
+    const parts = file.relativePath
+      .replace(/^system\//, "")
+      .replace(/\.md$/, "")
+      .split("/")
+      .filter(Boolean)
     let node = root
     for (const part of parts) {
       let child = node.children.get(part)
@@ -34,12 +38,7 @@ export function renderSystemTree(files: readonly CompiledSystemFile[]): string {
   return lines.join("\n")
 }
 
-function renderSystemNode(
-  node: SystemTreeNode,
-  lines: string[],
-  indent: number,
-  pathParts: readonly string[],
-): void {
+function renderSystemNode(node: SystemTreeNode, lines: string[], indent: number, pathParts: readonly string[]): void {
   const pad = "  ".repeat(indent)
   const entries = [...node.children.entries()].sort(([a], [b]) => a.localeCompare(b))
   for (const [label, child] of entries) {
@@ -47,7 +46,9 @@ function renderSystemNode(
     const safeLabel = redactSecretLikeMaterial(label)
     lines.push(`${pad}<${safeLabel}>`)
     if (child.file) {
-      lines.push(`${pad}  <projection>${MEMORY_DIR}/system/${childParts.map(redactSecretLikeMaterial).join("/")}.md</projection>`)
+      lines.push(
+        `${pad}  <projection>${MEMORY_DIR}/system/${childParts.map(redactSecretLikeMaterial).join("/")}.md</projection>`,
+      )
       if (child.file.description.trim()) {
         lines.push(`${pad}  <description>${child.file.description.trim()}</description>`)
       }

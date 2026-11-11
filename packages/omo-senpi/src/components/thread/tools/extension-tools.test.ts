@@ -21,19 +21,29 @@ afterEach(async () => {
 })
 
 const fixtureModule = new URL("../gateway/testing/session-callable-extension.mjs", import.meta.url)
-const migrations = [[
-  "CREATE TABLE gw_opens (id INTEGER PRIMARY KEY, args TEXT NOT NULL)",
-  "CREATE TABLE gw_requests (id TEXT PRIMARY KEY, status TEXT NOT NULL)",
-  "CREATE TABLE gw_items (binding_id TEXT PRIMARY KEY, status TEXT NOT NULL)",
-]]
+const migrations = [
+  [
+    "CREATE TABLE gw_opens (id INTEGER PRIMARY KEY, args TEXT NOT NULL)",
+    "CREATE TABLE gw_requests (id TEXT PRIMARY KEY, status TEXT NOT NULL)",
+    "CREATE TABLE gw_items (binding_id TEXT PRIMARY KEY, status TEXT NOT NULL)",
+  ],
+]
 const openDeclaration: SessionCallableOp = {
   op: "openThread",
   toolName: "open",
   description: "Open a chat thread for a session.",
-  parameters: { type: "object", additionalProperties: false, required: ["target_session_durable_id"], properties: { target_session_durable_id: { type: "string" } } },
+  parameters: {
+    type: "object",
+    additionalProperties: false,
+    required: ["target_session_durable_id"],
+    properties: { target_session_durable_id: { type: "string" } },
+  },
   targetArg: "target_session_durable_id",
 }
-const registration = (moduleUrl: string, sessionCallable: readonly SessionCallableOp[] = [openDeclaration]): StoreExtensionRegistration => ({
+const registration = (
+  moduleUrl: string,
+  sessionCallable: readonly SessionCallableOp[] = [openDeclaration],
+): StoreExtensionRegistration => ({
   name: "gw",
   moduleUrl,
   migrations,
@@ -54,28 +64,52 @@ function storeAt(agentDir: string): GatewayStore {
 }
 
 function hostWith(sessions: ThreadHostSession[]): ThreadHost {
-  const unused = async () => { throw new Error("not used by these tests") }
+  const unused = async () => {
+    throw new Error("not used by these tests")
+  }
   return {
     socket: "/tmp/extension-tools-test.sock",
     listSessions: async () => sessions,
     openSession: async () => sessions[sessions.length - 1],
     getMessages: async () => [],
     getState: async () => ({ isStreaming: false }),
-    prompt: unused, interrupt: unused, setSessionName: unused, setModel: unused,
-    getAvailableModels: async () => [], setThinkingLevel: unused, getAvailableThinkingLevels: async () => [],
+    prompt: unused,
+    interrupt: unused,
+    setSessionName: unused,
+    setModel: unused,
+    getAvailableModels: async () => [],
+    setThinkingLevel: unused,
+    getAvailableThinkingLevels: async () => [],
   } as ThreadHost
 }
 
-const caller = { sessionId: "route-caller", durableSessionId: "dur-caller", cwd: process.cwd(), name: "caller", status: "open" as const }
+const caller = {
+  sessionId: "route-caller",
+  durableSessionId: "dur-caller",
+  cwd: process.cwd(),
+  name: "caller",
+  status: "open" as const,
+}
 const ectxFor = (runtimeId: string) => ({ sessionManager: { getSessionId: () => runtimeId } })
-const resultOf = (output: { details: { result: unknown } }) => output.details.result as { kind: string; code?: string; value?: { received?: Record<string, unknown> } }
+const resultOf = (output: { details: { result: unknown } }) =>
+  output.details.result as { kind: string; code?: string; value?: { received?: Record<string, unknown> } }
 
-async function surface(sessions: ThreadHostSession[], moduleUrl = fixtureModule.href, sessionCallable?: readonly SessionCallableOp[]) {
+async function surface(
+  sessions: ThreadHostSession[],
+  moduleUrl = fixtureModule.href,
+  sessionCallable?: readonly SessionCallableOp[],
+) {
   const agentDir = tempDir("extension-tools-")
   const store = storeAt(agentDir)
   expect(await store.registerStoreExtension(registration(moduleUrl, sessionCallable))).toMatchObject({ kind: "ok" })
   const host = hostWith(sessions)
-  const options = { host, store, stateDirectory: tempDir("extension-tools-state-"), callerSessionId: () => UNKNOWN_CALLER, callerWorkspaceRoot: () => process.cwd() }
+  const options = {
+    host,
+    store,
+    stateDirectory: tempDir("extension-tools-state-"),
+    callerSessionId: () => UNKNOWN_CALLER,
+    callerWorkspaceRoot: () => process.cwd(),
+  }
   const tools = await buildExtensionTools(options)
   return { agentDir, store, host, tools, options }
 }
@@ -93,10 +127,14 @@ function sessionStartHost(preRegistered: Readonly<Record<string, Record<string, 
       if (awaited !== undefined && awaited.name === tool.name) awaited.done()
     },
     getAllTools: () => [...tools.keys()].map((name) => ({ name })),
-    on(event: string, handler: () => void) { if (event === "session_start") handlers.push(handler) },
+    on(event: string, handler: () => void) {
+      if (event === "session_start") handlers.push(handler)
+    },
     /** Fires session_start and resolves once `until` is registered (the registration pass is one synchronous loop). */
     start(until: string): Promise<void> {
-      const done = new Promise<void>((resolve) => { waiting = { name: until, done: resolve } })
+      const done = new Promise<void>((resolve) => {
+        waiting = { name: until, done: resolve }
+      })
       for (const handler of handlers) handler()
       return done
     },
@@ -104,13 +142,35 @@ function sessionStartHost(preRegistered: Readonly<Record<string, Record<string, 
 }
 
 function insertDescriptor(agentDir: string, name: string, toolName: string): void {
-  const descriptor = { moduleUrl: fixtureModule.href, migrations: [], sessionCallable: [{ op: "openThread", toolName, description: "planted", parameters: { type: "object", additionalProperties: false, properties: {} } }] }
+  const descriptor = {
+    moduleUrl: fixtureModule.href,
+    migrations: [],
+    sessionCallable: [
+      {
+        op: "openThread",
+        toolName,
+        description: "planted",
+        parameters: { type: "object", additionalProperties: false, properties: {} },
+      },
+    ],
+  }
   const db = new Database(gatewayDatabasePath(agentDir))
-  try { db.query("INSERT INTO extension_registrations (name, descriptor_json, updated_at) VALUES (?, ?, 0)").run(name, JSON.stringify(descriptor)) } finally { db.close() }
+  try {
+    db.query("INSERT INTO extension_registrations (name, descriptor_json, updated_at) VALUES (?, ?, 0)").run(
+      name,
+      JSON.stringify(descriptor),
+    )
+  } finally {
+    db.close()
+  }
 }
 
 test("#given a persisted declaration with a tool op and an internal op #when a session builds its tools #then the tool op exists under ext_<extension>_<toolName> and the internal op gets no tool", async () => {
-  const internal: SessionCallableOp = { op: "workItemStatus", internal: true, parameters: { type: "object", additionalProperties: false, properties: { status: { type: "string" } } } }
+  const internal: SessionCallableOp = {
+    op: "workItemStatus",
+    internal: true,
+    parameters: { type: "object", additionalProperties: false, properties: { status: { type: "string" } } },
+  }
   const { tools, store } = await surface([caller], fixtureModule.href, [openDeclaration, internal])
   expect(tools.map((tool) => tool.name)).toEqual(["ext_gw_open"])
   // placement contract (engine `ToolDefinition.runs`): a thread-family session tool runs on the loop side
@@ -119,13 +179,24 @@ test("#given a persisted declaration with a tool op and an internal op #when a s
 })
 
 test("#given declarations named bash and task, one composing a name the session already has, two rows composing the same name, and an extension with no declarations #when the session starts #then core tools stay intact, namespaced tools register, and each collision is skipped and logged once", async () => {
-  const workItem: SessionCallableOp = { op: "workItemStatus", toolName: "bash", description: "Report status.", parameters: { type: "object", additionalProperties: false, properties: { status: { type: "string" } } } }
+  const workItem: SessionCallableOp = {
+    op: "workItemStatus",
+    toolName: "bash",
+    description: "Report status.",
+    parameters: { type: "object", additionalProperties: false, properties: { status: { type: "string" } } },
+  }
   const { agentDir, store, options } = await surface([caller], fixtureModule.href, [openDeclaration, workItem])
-  expect(await store.registerStoreExtension({ name: "rules", moduleUrl: fixtureModule.href, migrations: [] })).toMatchObject({ kind: "ok" })
+  expect(
+    await store.registerStoreExtension({ name: "rules", moduleUrl: fixtureModule.href, migrations: [] }),
+  ).toMatchObject({ kind: "ok" })
   insertDescriptor(agentDir, "evil", "task")
   insertDescriptor(agentDir, "ab", "cc_dd")
   insertDescriptor(agentDir, "ab_cc", "dd")
-  const core = { bash: { name: "bash" }, task: { name: "task" }, ext_gw_open: { name: "ext_gw_open", owner: "another component" } }
+  const core = {
+    bash: { name: "bash" },
+    task: { name: "task" },
+    ext_gw_open: { name: "ext_gw_open", owner: "another component" },
+  }
   const host = sessionStartHost(core)
   const logs: string[] = []
   registerExtensionTools(host, options, (line) => logs.push(line))
@@ -144,43 +215,110 @@ test("#given declarations named bash and task, one composing a name the session 
 
 test("#given the production shape (the engine's getSessionId() is the caller's durable id) #when the tool runs #then the op receives that durable id", async () => {
   const { tools } = await surface([caller])
-  const output = await tools[0].execute("call-1", { target_session_durable_id: "dur-child" }, undefined, undefined, ectxFor("dur-caller") as never)
-  expect(resultOf(output)).toMatchObject({ kind: "ok", value: { received: { caller_session_durable_id: "dur-caller" } } })
+  const output = await tools[0].execute(
+    "call-1",
+    { target_session_durable_id: "dur-child" },
+    undefined,
+    undefined,
+    ectxFor("dur-caller") as never,
+  )
+  expect(resultOf(output)).toMatchObject({
+    kind: "ok",
+    value: { received: { caller_session_durable_id: "dur-caller" } },
+  })
 })
 
 const onHost = (socket: string, sessions: ThreadHostSession[]) => ({ socket, list_sessions: { sessions } })
-const onOtherHost = { sessionId: "rpc-1", durableSessionId: "dur-other", cwd: process.cwd(), name: "other", status: "open" as const }
-const onThirdHost = { sessionId: "rpc-1", durableSessionId: "dur-third", cwd: process.cwd(), name: "third", status: "open" as const }
+const onOtherHost = {
+  sessionId: "rpc-1",
+  durableSessionId: "dur-other",
+  cwd: process.cwd(),
+  name: "other",
+  status: "open" as const,
+}
+const onThirdHost = {
+  sessionId: "rpc-1",
+  durableSessionId: "dur-third",
+  cwd: process.cwd(),
+  name: "third",
+  status: "open" as const,
+}
 
 test.each([
-  ["the caller's own host is unreachable and one other host lists a live rpc-1", [{ socket: "/tmp/caller-host.sock", error: new Error("unreachable") }, onHost("/tmp/other-host.sock", [onOtherHost])]],
-  ["two hosts each list a live rpc-1 with a different durable id", [onHost("/tmp/other-host.sock", [onOtherHost]), onHost("/tmp/third-host.sock", [onThirdHost])]],
-])("#given %s #when the engine names the caller by the routing id rpc-1 #then it resolves to no session and the tool answers caller_context_missing", async (_label, hosts) => {
-  const { store, tools } = await surface([caller])
-  const view = { sessions: hosts.flatMap((host) => ("list_sessions" in host ? host.list_sessions.sessions : [])), hosts, disk: [] }
-  const routed = await buildExtensionTools({ host: { ...hostWith([]), listView: async () => view }, store, stateDirectory: tempDir("extension-tools-routing-"), callerSessionId: () => UNKNOWN_CALLER, callerWorkspaceRoot: () => process.cwd() })
-  expect(tools.map((tool) => tool.name)).toEqual(routed.map((tool) => tool.name))
-  const output = await routed[0].execute("call-1", { target_session_durable_id: "dur-child" }, undefined, undefined, ectxFor("rpc-1") as never)
-  expect(resultOf(output)).toMatchObject({ kind: "refused", code: "caller_context_missing" })
-})
+  [
+    "the caller's own host is unreachable and one other host lists a live rpc-1",
+    [
+      { socket: "/tmp/caller-host.sock", error: new Error("unreachable") },
+      onHost("/tmp/other-host.sock", [onOtherHost]),
+    ],
+  ],
+  [
+    "two hosts each list a live rpc-1 with a different durable id",
+    [onHost("/tmp/other-host.sock", [onOtherHost]), onHost("/tmp/third-host.sock", [onThirdHost])],
+  ],
+])(
+  "#given %s #when the engine names the caller by the routing id rpc-1 #then it resolves to no session and the tool answers caller_context_missing",
+  async (_label, hosts) => {
+    const { store, tools } = await surface([caller])
+    const view = {
+      sessions: hosts.flatMap((host) => ("list_sessions" in host ? host.list_sessions.sessions : [])),
+      hosts,
+      disk: [],
+    }
+    const routed = await buildExtensionTools({
+      host: { ...hostWith([]), listView: async () => view },
+      store,
+      stateDirectory: tempDir("extension-tools-routing-"),
+      callerSessionId: () => UNKNOWN_CALLER,
+      callerWorkspaceRoot: () => process.cwd(),
+    })
+    expect(tools.map((tool) => tool.name)).toEqual(routed.map((tool) => tool.name))
+    const output = await routed[0].execute(
+      "call-1",
+      { target_session_durable_id: "dur-child" },
+      undefined,
+      undefined,
+      ectxFor("rpc-1") as never,
+    )
+    expect(resultOf(output)).toMatchObject({ kind: "refused", code: "caller_context_missing" })
+  },
+)
 
 // A thread that carries the UNKNOWN_CALLER placeholder as its durable id: only the guard, never a missing entry, refuses it.
-const placeholder = { sessionId: "route-placeholder", durableSessionId: UNKNOWN_CALLER, cwd: process.cwd(), name: "placeholder", status: "open" as const }
+const placeholder = {
+  sessionId: "route-placeholder",
+  durableSessionId: UNKNOWN_CALLER,
+  cwd: process.cwd(),
+  name: "placeholder",
+  status: "open" as const,
+}
 
 test.each([
   ["no execution context (the component's UNKNOWN_CALLER fallback)", undefined],
   ["a runtime id no address book entry knows", ectxFor("route-stranger")],
-])("#given %s #when the tool runs #then it answers caller_context_missing and the op never runs", async (_label, ectx) => {
-  const { tools } = await surface([caller, placeholder])
-  const output = await tools[0].execute("call-1", { target_session_durable_id: "dur-child" }, undefined, undefined, ectx as never)
-  expect(resultOf(output)).toMatchObject({ code: "caller_context_missing" })
-})
+])(
+  "#given %s #when the tool runs #then it answers caller_context_missing and the op never runs",
+  async (_label, ectx) => {
+    const { tools } = await surface([caller, placeholder])
+    const output = await tools[0].execute(
+      "call-1",
+      { target_session_durable_id: "dur-child" },
+      undefined,
+      undefined,
+      ectx as never,
+    )
+    expect(resultOf(output)).toMatchObject({ code: "caller_context_missing" })
+  },
+)
 
 test("#given a declaration whose module records every import #when a fresh process's session starts #then its tools register and nothing is imported; only the first call imports the module", async () => {
   const dir = tempDir("extension-tools-spy-")
   const spy = join(dir, "spy-extension.mjs")
   const imports = join(dir, "imports.log")
-  writeFileSync(spy, `import { appendFileSync } from "node:fs"\nappendFileSync(${JSON.stringify(imports)}, "import\\n")\n${await Bun.file(fixtureModule).text()}`)
+  writeFileSync(
+    spy,
+    `import { appendFileSync } from "node:fs"\nappendFileSync(${JSON.stringify(imports)}, "import\\n")\n${await Bun.file(fixtureModule).text()}`,
+  )
   const importCount = () => readFileSync(imports, "utf8").split("\n").filter(Boolean).length
   const { agentDir, options } = await surface([caller], `file://${spy}`)
   expect(importCount()).toBe(1)
@@ -191,13 +329,29 @@ test("#given a declaration whose module records every import #when a fresh proce
   const registered = host.tools.get("ext_gw_open")
   if (registered === undefined) throw new Error("ext_gw_open was not registered at session_start")
   const tool = registered as unknown as AnyTool
-  expect(resultOf(await tool.execute("call-1", { target_session_durable_id: "dur-child" }, undefined, undefined, ectxFor("dur-caller") as never))).toMatchObject({ kind: "ok" })
+  expect(
+    resultOf(
+      await tool.execute(
+        "call-1",
+        { target_session_durable_id: "dur-child" },
+        undefined,
+        undefined,
+        ectxFor("dur-caller") as never,
+      ),
+    ),
+  ).toMatchObject({ kind: "ok" })
   expect(importCount()).toBe(2)
 }, 10_000)
 
 test("#given args that try to name the caller #when the tool runs #then it is refused before validation and the op never runs", async () => {
   const { tools } = await surface([caller])
-  const output = await tools[0].execute("call-1", { target_session_durable_id: "dur-child", caller_session_durable_id: "dur-lead" }, undefined, undefined, ectxFor("dur-caller") as never)
+  const output = await tools[0].execute(
+    "call-1",
+    { target_session_durable_id: "dur-child", caller_session_durable_id: "dur-lead" },
+    undefined,
+    undefined,
+    ectxFor("dur-caller") as never,
+  )
   expect(resultOf(output)).toMatchObject({ code: "invalid_arguments" })
 })
 
@@ -208,30 +362,75 @@ test("#given a declaration whose module was deleted #when a session builds its t
   const { tools } = await surface([caller], `file://${gone}`)
   rmSync(gone)
   expect(tools.map((tool) => tool.name)).toEqual(["ext_gw_open"])
-  const output = await tools[0].execute("call-1", { target_session_durable_id: "dur-child" }, undefined, undefined, ectxFor("dur-caller") as never)
+  const output = await tools[0].execute(
+    "call-1",
+    { target_session_durable_id: "dur-child" },
+    undefined,
+    undefined,
+    ectxFor("dur-caller") as never,
+  )
   expect(resultOf(output)).toMatchObject({ code: "extension_import_failed" })
 })
 
 test("#given the caller creates a child with thread_create #when it opens a thread for that child #then caller_created_target is stamped; for a peer it did not create, it is omitted", async () => {
-  const child = { sessionId: "route-child", durableSessionId: "dur-child", cwd: process.cwd(), name: "child", status: "open" as const }
-  const peer = { sessionId: "route-peer", durableSessionId: "dur-peer", cwd: process.cwd(), name: "peer", status: "open" as const }
+  const child = {
+    sessionId: "route-child",
+    durableSessionId: "dur-child",
+    cwd: process.cwd(),
+    name: "child",
+    status: "open" as const,
+  }
+  const peer = {
+    sessionId: "route-peer",
+    durableSessionId: "dur-peer",
+    cwd: process.cwd(),
+    name: "peer",
+    status: "open" as const,
+  }
   const sessions: ThreadHostSession[] = [caller, peer]
   const { store, host, tools } = await surface(sessions)
-  const threadTools = createThreadTools({ host, store, stateDirectory: tempDir("extension-tools-create-"), callerSessionId: () => UNKNOWN_CALLER, callerWorkspaceRoot: () => process.cwd() })
+  const threadTools = createThreadTools({
+    host,
+    store,
+    stateDirectory: tempDir("extension-tools-create-"),
+    callerSessionId: () => UNKNOWN_CALLER,
+    callerWorkspaceRoot: () => process.cwd(),
+  })
   sessions.push(child)
   const create = threadTools.find((tool) => tool.name === "thread_create")
   if (create === undefined) throw new Error("thread_create tool missing")
-  expect(resultOf(await create.execute("call-c", { name: "new-child" }, undefined, undefined, ectxFor("dur-caller") as never))).toMatchObject({ kind: "ok" })
-  const own = resultOf(await tools[0].execute("call-1", { target_session_durable_id: "dur-child" }, undefined, undefined, ectxFor("dur-caller") as never))
+  expect(
+    resultOf(
+      await create.execute("call-c", { name: "new-child" }, undefined, undefined, ectxFor("dur-caller") as never),
+    ),
+  ).toMatchObject({ kind: "ok" })
+  const own = resultOf(
+    await tools[0].execute(
+      "call-1",
+      { target_session_durable_id: "dur-child" },
+      undefined,
+      undefined,
+      ectxFor("dur-caller") as never,
+    ),
+  )
   expect(own.value?.received).toMatchObject({ caller_created_target: true })
-  const other = resultOf(await tools[0].execute("call-2", { target_session_durable_id: "dur-peer" }, undefined, undefined, ectxFor("dur-caller") as never))
+  const other = resultOf(
+    await tools[0].execute(
+      "call-2",
+      { target_session_durable_id: "dur-peer" },
+      undefined,
+      undefined,
+      ectxFor("dur-caller") as never,
+    ),
+  )
   expect(Object.hasOwn(other.value?.received ?? {}, "caller_created_target")).toBe(false)
 })
 
 test("#given a store at the previous schema version with data #when it opens #then it migrates to the new tables and keeps every existing row", async () => {
   const agentDir = tempDir("extension-tools-migrate-")
   const path = gatewayDatabasePath(agentDir)
-  const previous = GATEWAY_MIGRATIONS.length - 1
+  // Back to the store before v10 (toolkit_replay_receipts) and v11 (deliveries.wait_kind): both re-run on open.
+  const previous = GATEWAY_MIGRATIONS.length - 2
   {
     const seed = storeAt(agentDir)
     await seed.identity()
@@ -242,16 +441,27 @@ test("#given a store at the previous schema version with data #when it opens #th
   try {
     db.exec("DROP TABLE IF EXISTS toolkit_replay_receipts;")
     db.exec("DELETE FROM extension_objects WHERE name = 'toolkit_replay_receipts'")
+    db.exec("ALTER TABLE deliveries DROP COLUMN wait_kind")
     db.exec(`PRAGMA user_version = ${previous}`)
     db.query("INSERT INTO gateway_meta (key, value) VALUES ('fixture-keep', 'kept')").run()
-  } finally { db.close() }
+  } finally {
+    db.close()
+  }
   const reopened = storeAt(agentDir)
   await reopened.identity()
   const check = new Database(path, { readonly: true })
   try {
     expect(check.query("SELECT value FROM gateway_meta WHERE key = 'fixture-keep'").get()).toEqual({ value: "kept" })
-    expect(check.query("SELECT name FROM sqlite_schema WHERE type = 'table' AND name = 'toolkit_replay_receipts'").all()).toEqual([{ name: "toolkit_replay_receipts" }])
+    expect(
+      check.query("SELECT name FROM sqlite_schema WHERE type = 'table' AND name = 'toolkit_replay_receipts'").all(),
+    ).toEqual([{ name: "toolkit_replay_receipts" }])
     // The new version reserves it as a core object again, so no extension can register a name that prefixes it.
-    expect(check.query("SELECT owner FROM extension_objects WHERE type = 'table' AND name = 'toolkit_replay_receipts'").all()).toEqual([{ owner: null }])
-  } finally { check.close() }
+    expect(
+      check
+        .query("SELECT owner FROM extension_objects WHERE type = 'table' AND name = 'toolkit_replay_receipts'")
+        .all(),
+    ).toEqual([{ owner: null }])
+  } finally {
+    check.close()
+  }
 })

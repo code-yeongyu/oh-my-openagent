@@ -7,6 +7,7 @@ import { join } from "node:path"
 import { Worker } from "node:worker_threads"
 
 import { claimOnboardingOwned, readOnboardingState, type ClaimOwnerSeams } from "./claim-owner"
+import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
 
 // A dead claim taken over by N claimants at once (#10481 review LOW 1). Two claimants run on this
 // thread with every fs step they make in the state dir intercepted; the others run the real claim on
@@ -14,7 +15,6 @@ import { claimOnboardingOwned, readOnboardingState, type ClaimOwnerSeams } from 
 // step. Sweeping the gap over every step makes each interleaving deterministic.
 const NOW = Date.parse("2026-10-19T00:00:00.000Z")
 const DEAD_OWNER = 4242
-const SIGNAL_TIMEOUT_MS = 10_000
 const contenderPath = new URL("./claim-takeover-contender.ts", import.meta.url).href
 
 const realFs = {
@@ -57,9 +57,15 @@ function seamsFor(pid: number, alive: Record<number, string>): ClaimOwnerSeams {
   }
 }
 
-async function startThreadContender(stateDir: string, pid: number, alive: Record<number, string>): Promise<ThreadContender> {
+async function startThreadContender(
+  stateDir: string,
+  pid: number,
+  alive: Record<number, string>,
+): Promise<ThreadContender> {
   const signal = new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT * 2))
-  const worker = new Worker(new URL(contenderPath), { workerData: { stateDir, pid, alive, now: NOW, signal: signal.buffer } })
+  const worker = new Worker(new URL(contenderPath), {
+    workerData: { stateDir, pid, alive, now: NOW, signal: signal.buffer },
+  })
   await new Promise<void>((resolve, reject) => {
     worker.once("message", () => resolve())
     worker.once("error", reject)
@@ -72,7 +78,8 @@ function runToCompletion(contender: ThreadContender): boolean {
   Atomics.store(contender.signal, 0, 1)
   Atomics.notify(contender.signal, 0)
   while (Atomics.load(contender.signal, 1) === 0) {
-    if (Atomics.wait(contender.signal, 1, 0, SIGNAL_TIMEOUT_MS) === "timed-out") throw new Error(`contender ${contender.pid} did not finish`)
+    if (Atomics.wait(contender.signal, 1, 0, remainingTestTime()) === "timed-out")
+      throw new Error(`contender ${contender.pid} did not finish within the test budget`)
   }
   return Atomics.load(contender.signal, 1) === 1
 }
@@ -82,11 +89,23 @@ function runToCompletion(contender: ThreadContender): boolean {
  * the fs step numbered in `releaseAt` (or at the end when the run has fewer steps). The marker is
  * observed after every step: once a live claimant's claim lands, it must stay there, byte for byte.
  */
-async function runInterleaving(inThread: readonly number[], threaded: readonly number[], releaseAt: readonly number[]): Promise<Outcome & { steps: number }> {
+async function runInterleaving(
+  inThread: readonly number[],
+  threaded: readonly number[],
+  releaseAt: readonly number[],
+): Promise<Outcome & { steps: number }> {
   const stateDir = fs.mkdtempSync(join(tmpdir(), "omo-claim-takeover-"))
   dirs.push(stateDir)
   const marker = join(stateDir, "onboarding-completed")
-  realFs.writeFileSync(marker, JSON.stringify({ claimedAt: new Date(NOW).toISOString(), version: 2, owner: { pid: DEAD_OWNER, processStart: "proc-start-epoch:1" }, nonce: "dead" }))
+  realFs.writeFileSync(
+    marker,
+    JSON.stringify({
+      claimedAt: new Date(NOW).toISOString(),
+      version: 2,
+      owner: { pid: DEAD_OWNER, processStart: "proc-start-epoch:1" },
+      nonce: "dead",
+    }),
+  )
   const alive = aliveMap([...inThread, ...threaded])
   const contenders = await Promise.all(threaded.map((pid) => startThreadContender(stateDir, pid, alive)))
   const winners: number[] = []
@@ -102,9 +121,12 @@ async function runInterleaving(inThread: readonly number[], threaded: readonly n
       current = null
     }
     if (held !== null && current !== held) {
-      violations.push(`${when}: the live claim ${held} was ${current === null ? "removed (marker absent)" : `replaced by ${current}`}`)
+      violations.push(
+        `${when}: the live claim ${held} was ${current === null ? "removed (marker absent)" : `replaced by ${current}`}`,
+      )
     }
-    if (held === null && current !== null && current.includes("\"pid\":") && !current.includes(`"pid":${DEAD_OWNER}`)) held = current
+    if (held === null && current !== null && current.includes('"pid":') && !current.includes(`"pid":${DEAD_OWNER}`))
+      held = current
   }
   const releaseDue = (): void => {
     contenders.forEach((contender, index) => {
@@ -130,7 +152,9 @@ async function runInterleaving(inThread: readonly number[], threaded: readonly n
   const spies = [intercept("renameSync"), intercept("linkSync"), intercept("unlinkSync"), intercept("writeFileSync")]
   try {
     const results = await Promise.all(inThread.map((pid) => claimOnboardingOwned(stateDir, seamsFor(pid, alive))))
-    results.forEach((won, index) => { if (won) winners.push(inThread[index]!) })
+    results.forEach((won, index) => {
+      if (won) winners.push(inThread[index]!)
+    })
   } finally {
     for (const spy of spies) spy.mockRestore()
   }
@@ -152,15 +176,22 @@ async function runInterleaving(inThread: readonly number[], threaded: readonly n
   return { winners, violations, finalOwner, inProgress, steps }
 }
 
-async function sweep(inThread: readonly number[], threaded: readonly number[], schedule: (gap: number) => number[]): Promise<string[]> {
+async function sweep(
+  inThread: readonly number[],
+  threaded: readonly number[],
+  schedule: (gap: number) => number[],
+): Promise<string[]> {
   const failures: string[] = []
   for (let gap = 0; gap < 64; gap += 1) {
     const releaseAt = schedule(gap)
     const outcome = await runInterleaving(inThread, threaded, releaseAt)
     const label = `release before steps [${releaseAt.join(", ")}]`
-    if (outcome.winners.length !== 1) failures.push(`${label}: ${outcome.winners.length} winners (${outcome.winners.join(", ")})`)
-    else if (outcome.finalOwner !== outcome.winners[0]) failures.push(`${label}: winner ${outcome.winners[0]} but the marker names ${String(outcome.finalOwner)}`)
-    if (!outcome.inProgress) failures.push(`${label}: the state reads not in progress while ${outcome.winners.join(", ")} holds the claim`)
+    if (outcome.winners.length !== 1)
+      failures.push(`${label}: ${outcome.winners.length} winners (${outcome.winners.join(", ")})`)
+    else if (outcome.finalOwner !== outcome.winners[0])
+      failures.push(`${label}: winner ${outcome.winners[0]} but the marker names ${String(outcome.finalOwner)}`)
+    if (!outcome.inProgress)
+      failures.push(`${label}: the state reads not in progress while ${outcome.winners.join(", ")} holds the claim`)
     for (const violation of outcome.violations) failures.push(`${label}: ${violation}`)
     if (Math.min(...releaseAt) >= outcome.steps) return failures
   }
@@ -170,11 +201,13 @@ async function sweep(inThread: readonly number[], threaded: readonly number[], s
 
 describe("dead onboarding claim takeover by many claimants", () => {
   test("#given a dead claim #when three processes claim at once, the third landing at any step of the others' takeover #then exactly one wins and its claim is never removed or replaced", async () => {
+    useTestTimeout(60_000)
     const failures = await sweep([5101, 5102], [5103], (gap) => [gap])
     expect(failures).toEqual([])
   }, 60_000)
 
   test("#given a dead claim #when five processes claim at once, three landing together or one after another at any step #then exactly one wins and its claim is never removed or replaced", async () => {
+    useTestTimeout(120_000)
     const together = await sweep([5201, 5202], [5203, 5204, 5205], (gap) => [gap, gap, gap])
     const staggered = await sweep([5301, 5302], [5303, 5304, 5305], (gap) => [gap, gap + 1, gap + 2])
     expect([...together, ...staggered]).toEqual([])

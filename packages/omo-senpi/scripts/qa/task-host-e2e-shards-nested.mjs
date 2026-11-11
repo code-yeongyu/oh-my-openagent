@@ -96,29 +96,38 @@ async function normalNested(config, artifacts) {
   writeFileSync(join(routeGrandchild, "mock-script.json"), `${JSON.stringify(scripts.grandchild, null, 2)}\n`)
   const parent = startParent(sandbox, project, "spawn a nested child")
   try {
-    const childReady = await observeState(sandbox.root, () => {
-      const records = taskRecords(project)
-      return records.length === 1 &&
-        records[0].status === "running" &&
-        typeof records[0].host_session?.socket === "string" &&
-        endpointFacts(sandbox).length === 1
-        ? records[0]
-        : undefined
-    }, { timeoutMs: 180_000 })
+    const childReady = await observeState(
+      sandbox.root,
+      () => {
+        const records = taskRecords(project)
+        return records.length === 1 &&
+          records[0].status === "running" &&
+          typeof records[0].host_session?.socket === "string" &&
+          endpointFacts(sandbox).length === 1
+          ? records[0]
+          : undefined
+      },
+      { timeoutMs: 180_000 },
+    )
     if (childReady === undefined) throw new Error("nested child did not reach the hold")
     const before = endpointFacts(sandbox)[0]
     const generations = generationNames(sandbox, before.socket)
     const crashes = crashRows(sandbox, before.socket).length
     writeFileSync(release, "go\n")
-    const records = await observeState(sandbox.root, () => {
-      const rows = taskRecords(project)
-      return rows.length === 2 &&
-        rows.every((record) =>
-          ["running", "completed"].includes(record.status) &&
-          typeof record.host_session?.socket === "string")
-        ? rows
-        : undefined
-    }, { timeoutMs: 180_000 })
+    const records = await observeState(
+      sandbox.root,
+      () => {
+        const rows = taskRecords(project)
+        return rows.length === 2 &&
+          rows.every(
+            (record) =>
+              ["running", "completed"].includes(record.status) && typeof record.host_session?.socket === "string",
+          )
+          ? rows
+          : undefined
+      },
+      { timeoutMs: 180_000 },
+    )
     if (records === undefined) throw new Error("grandchild did not open")
     const after = endpointFacts(sandbox)[0]
     const sockets = [...new Set(records.map((record) => record.host_session?.socket))]
@@ -163,15 +172,19 @@ async function unavailableNested(config, artifacts) {
   })
   let stopped = false
   try {
-    const childReady = await observeState(sandbox.root, () => {
-      const rows = taskRecords(project)
-      return rows.length === 1 &&
-        rows[0].status === "running" &&
-        typeof rows[0].host_session?.socket === "string" &&
-        endpointFacts(sandbox).length === 1
-        ? rows[0]
-        : undefined
-    }, { timeoutMs: 180_000 })
+    const childReady = await observeState(
+      sandbox.root,
+      () => {
+        const rows = taskRecords(project)
+        return rows.length === 1 &&
+          rows[0].status === "running" &&
+          typeof rows[0].host_session?.socket === "string" &&
+          endpointFacts(sandbox).length === 1
+          ? rows[0]
+          : undefined
+      },
+      { timeoutMs: 180_000 },
+    )
     if (childReady === undefined) throw new Error("own-endpoint child did not reach the hold")
     const before = endpointFacts(sandbox)[0]
     const generations = generationNames(sandbox, before.socket)
@@ -179,22 +192,31 @@ async function unavailableNested(config, artifacts) {
     process.kill(before.supervisor, "SIGSTOP")
     stopped = true
     writeFileSync(release, "go\n")
-    const failure = await observeState(sandbox.root, () => {
-      const rows = taskRecords(project)
-      return rows.find((record) =>
-        record.error_message?.includes("own_host_unreachable") ||
-        record.failure_reason === "own_host_unreachable" ||
-        record.suspension_reason === "own_host_unreachable")
-    }, { timeoutMs: 60_000 })
+    const failure = await observeState(
+      sandbox.root,
+      () => {
+        const rows = taskRecords(project)
+        return rows.find(
+          (record) =>
+            record.error_message?.includes("own_host_unreachable") ||
+            record.failure_reason === "own_host_unreachable" ||
+            record.suspension_reason === "own_host_unreachable",
+        )
+      },
+      { timeoutMs: 60_000 },
+    )
     process.kill(before.supervisor, "SIGCONT")
     stopped = false
     const facts = {
-      failure: failure === undefined ? null : {
-        status: failure.status,
-        failure_reason: failure.failure_reason ?? null,
-        suspension_reason: failure.suspension_reason ?? null,
-        error_message: failure.error_message ?? null,
-      },
+      failure:
+        failure === undefined
+          ? null
+          : {
+              status: failure.status,
+              failure_reason: failure.failure_reason ?? null,
+              suspension_reason: failure.suspension_reason ?? null,
+              error_message: failure.error_message ?? null,
+            },
       generationsUnchanged: JSON.stringify(generations) === JSON.stringify(generationNames(sandbox, before.socket)),
       crashesUnchanged: crashes === crashRows(sandbox, before.socket).length,
       supervisorUnchanged: endpointFacts(sandbox)[0]?.supervisor === before.supervisor,
@@ -216,10 +238,18 @@ async function unavailableNested(config, artifacts) {
 export async function runNestedMatrix(config, artifacts) {
   const normal = await normalNested(config, artifacts)
   const unavailable = await unavailableNested(config, artifacts)
-  const normalPass = normal.sockets.length === 1 && normal.sockets[0] !== undefined &&
-    normal.instanceUnchanged && normal.supervisorUnchanged && normal.generationsUnchanged && normal.crashesUnchanged
-  const unavailablePass = unavailable.failure !== null && unavailable.generationsUnchanged &&
-    unavailable.crashesUnchanged && unavailable.supervisorUnchanged
+  const normalPass =
+    normal.sockets.length === 1 &&
+    normal.sockets[0] !== undefined &&
+    normal.instanceUnchanged &&
+    normal.supervisorUnchanged &&
+    normal.generationsUnchanged &&
+    normal.crashesUnchanged
+  const unavailablePass =
+    unavailable.failure !== null &&
+    unavailable.generationsUnchanged &&
+    unavailable.crashesUnchanged &&
+    unavailable.supervisorUnchanged
   const normalEvidence = [join(artifacts, "nested-normal.json")]
   const unavailableEvidence = [join(artifacts, "nested-unreachable.json")]
   return {
@@ -231,6 +261,11 @@ export async function runNestedMatrix(config, artifacts) {
       : { status: "fail", evidence: normalEvidence, reason: "nested spawn changed the endpoint", facts: normal },
     own_endpoint_unreachable_fails_closed: unavailablePass
       ? pass(unavailableEvidence, unavailable)
-      : { status: "fail", evidence: unavailableEvidence, reason: "silent own endpoint did not fail closed", facts: unavailable },
+      : {
+          status: "fail",
+          evidence: unavailableEvidence,
+          reason: "silent own endpoint did not fail closed",
+          facts: unavailable,
+        },
   }
 }

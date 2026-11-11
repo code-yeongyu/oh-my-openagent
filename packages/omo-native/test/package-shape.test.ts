@@ -60,9 +60,7 @@ describe("omo-ai published package shape", () => {
 
     describe("#when the repository field is audited", () => {
       test("#then it points at the canonical github url", () => {
-        expect(manifest.repository?.url).toBe(
-          "git+https://github.com/code-yeongyu/oh-my-openagent.git",
-        )
+        expect(manifest.repository?.url).toBe("git+https://github.com/code-yeongyu/oh-my-openagent.git")
       })
     })
 

@@ -9,7 +9,8 @@ const scriptDir = dirname(fileURLToPath(import.meta.url))
 const pluginRoot = dirname(scriptDir)
 const packageRoot = dirname(pluginRoot)
 const repoRoot = resolve(packageRoot, "..", "..")
-const defaultSourceEntry = process.env.OMO_AST_GREP_MCP_ENTRY ?? join(repoRoot, "packages", "ast-grep-mcp", "dist", "cli.js")
+const defaultSourceEntry =
+  process.env.OMO_AST_GREP_MCP_ENTRY ?? join(repoRoot, "packages", "ast-grep-mcp", "dist", "cli.js")
 const defaultTargetEntry = process.env.OMO_AST_GREP_MCP_TARGET ?? join(pluginRoot, "runtime", "ast-grep-mcp", "cli.js")
 
 export async function stageAstGrepMcpRuntime(options = {}) {
@@ -36,11 +37,15 @@ export async function stageAstGrepMcpRuntime(options = {}) {
     const stagedSha256 = await sha256(tempEntry)
     await writeFile(
       tempManifest,
-      `${JSON.stringify({
-        sha256: stagedSha256,
-        mode: stagedStat.mode & 0o777,
-        stagedAtUtc: new Date().toISOString(),
-      }, null, 2)}\n`,
+      `${JSON.stringify(
+        {
+          sha256: stagedSha256,
+          mode: stagedStat.mode & 0o777,
+          stagedAtUtc: new Date().toISOString(),
+        },
+        null,
+        2,
+      )}\n`,
       "utf8",
     )
 
@@ -112,7 +117,9 @@ export async function checkAstGrepMcpRuntimeFresh(options = {}) {
     )
   }
   if (platform !== "win32" && manifest.mode !== stagedMode) {
-    throw new Error(`ast-grep-mcp runtime stale: manifest mode ${manifest.mode} does not match staged mode ${stagedMode}`)
+    throw new Error(
+      `ast-grep-mcp runtime stale: manifest mode ${manifest.mode} does not match staged mode ${stagedMode}`,
+    )
   }
   return { ok: true, sourceEntry, targetEntry, manifestPath, sha256: sourceSha256, mode: stagedMode }
 }
@@ -158,7 +165,9 @@ async function validateEntry(entry, kind) {
 }
 
 async function sha256(path) {
-  return createHash("sha256").update(await readFile(path)).digest("hex")
+  return createHash("sha256")
+    .update(await readFile(path))
+    .digest("hex")
 }
 
 async function fileExists(path) {

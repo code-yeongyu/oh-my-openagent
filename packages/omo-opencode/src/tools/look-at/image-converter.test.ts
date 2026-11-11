@@ -75,12 +75,10 @@ describe("image-converter command execution safety", () => {
     writeFileSync(inputPath, "fake-heic-data")
     const { convertImageToJpeg } = await loadImageConverter()
 
-    execFileSyncSpy.mockImplementation(
-      ((command: string, args: string[]) => {
-        writeConvertedOutput(command, args)
-        return ""
-      }) as typeof childProcess.execFileSync,
-    )
+    execFileSyncSpy.mockImplementation(((command: string, args: string[]) => {
+      writeConvertedOutput(command, args)
+      return ""
+    }) as typeof childProcess.execFileSync)
 
     const outputPath = convertImageToJpeg(inputPath, "image/heic")
 
@@ -109,12 +107,10 @@ describe("image-converter command execution safety", () => {
     writeFileSync(inputPath, "fake-heic-data")
     const { convertImageToJpeg, cleanupConvertedImage } = await loadImageConverter()
 
-    execFileSyncSpy.mockImplementation(
-      ((command: string, args: string[]) => {
-        writeConvertedOutput(command, args)
-        return ""
-      }) as typeof childProcess.execFileSync,
-    )
+    execFileSyncSpy.mockImplementation(((command: string, args: string[]) => {
+      writeConvertedOutput(command, args)
+      return ""
+    }) as typeof childProcess.execFileSync)
 
     const outputPath = convertImageToJpeg(inputPath, "image/heic")
     const conversionDirectory = dirname(outputPath)
@@ -136,14 +132,12 @@ describe("image-converter command execution safety", () => {
       writeFileSync(inputPath, "fake-heic-data")
       const { convertImageToJpeg, cleanupConvertedImage } = await loadImageConverter()
 
-      execFileSyncSpy.mockImplementation(
-        ((command: string, args: string[]) => {
-          if (command === "magick") {
-            writeFileSync(args[2], "jpeg")
-          }
-          return ""
-        }) as typeof childProcess.execFileSync,
-      )
+      execFileSyncSpy.mockImplementation(((command: string, args: string[]) => {
+        if (command === "magick") {
+          writeFileSync(args[2], "jpeg")
+        }
+        return ""
+      }) as typeof childProcess.execFileSync)
 
       const outputPath = convertImageToJpeg(inputPath, "image/heic")
 
@@ -165,12 +159,10 @@ describe("image-converter command execution safety", () => {
     writeFileSync(inputPath, "fake-heic-data")
     const { convertImageToJpeg, cleanupConvertedImage } = await loadImageConverter()
 
-    execFileSyncSpy.mockImplementation(
-      ((command: string, args: string[]) => {
-        writeConvertedOutput(command, args)
-        return ""
-      }) as typeof childProcess.execFileSync,
-    )
+    execFileSyncSpy.mockImplementation(((command: string, args: string[]) => {
+      writeConvertedOutput(command, args)
+      return ""
+    }) as typeof childProcess.execFileSync)
 
     const outputPath = convertImageToJpeg(inputPath, "image/heic")
 
@@ -206,9 +198,7 @@ describe("image-converter command execution safety", () => {
         }
         const temporaryOutputPath = Reflect.get(error, "temporaryOutputPath")
         expect(temporaryOutputPath).toBeDefined()
-        expect(
-          typeof temporaryOutputPath === "string" && temporaryOutputPath.endsWith("converted.jpg")
-        ).toBe(true)
+        expect(typeof temporaryOutputPath === "string" && temporaryOutputPath.endsWith("converted.jpg")).toBe(true)
       }
 
       if (existsSync(inputPath)) unlinkSync(inputPath)
@@ -224,18 +214,16 @@ describe("image-converter command execution safety", () => {
       writeFileSync(inputPath, "fake-heic-data")
       const { convertImageToJpeg } = await loadImageConverter()
 
-      execFileSyncSpy.mockImplementation(
-        ((_command: string, args: string[]) => {
-          const outputPath = args[2]
-          if (typeof outputPath !== "string") {
-            throw new Error("expected ImageMagick output path")
-          }
-          writeFileSync(outputPath, "partial-jpeg")
-          lockedConversionDirectory = dirname(outputPath)
-          chmodSync(lockedConversionDirectory, 0o500)
-          throw new Error("conversion process failed")
-        }) as typeof childProcess.execFileSync,
-      )
+      execFileSyncSpy.mockImplementation(((_command: string, args: string[]) => {
+        const outputPath = args[2]
+        if (typeof outputPath !== "string") {
+          throw new Error("expected ImageMagick output path")
+        }
+        writeFileSync(outputPath, "partial-jpeg")
+        lockedConversionDirectory = dirname(outputPath)
+        chmodSync(lockedConversionDirectory, 0o500)
+        throw new Error("conversion process failed")
+      }) as typeof childProcess.execFileSync)
 
       const runConversion = () => convertImageToJpeg(inputPath, "image/heic")
 

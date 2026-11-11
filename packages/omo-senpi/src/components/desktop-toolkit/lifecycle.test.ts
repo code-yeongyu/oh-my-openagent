@@ -19,7 +19,9 @@ describe("desktop thread discovery lifecycle", () => {
       }
       const discovery = host.flushStartup()
       const request = await host.requested
-      expect(host.handlers.get(TOOLKIT_GRANT_RPC)?.({ requestId: request.requestId, grant: stub.grant })).toEqual({ accepted: true })
+      expect(host.handlers.get(TOOLKIT_GRANT_RPC)?.({ requestId: request.requestId, grant: stub.grant })).toEqual({
+        accepted: true,
+      })
       await discovery
       await host.registered
       expect(host.tools()).toHaveLength(1)
@@ -35,9 +37,12 @@ describe("desktop thread discovery lifecycle", () => {
       let first = true
       const host = await setup({
         timeoutMs: failure === "timeout" ? 100 : 1_000,
-        reply: () => first && failure !== "discovery"
-          ? failure === "refusal" ? { refusal: { reason: "denied" } } : undefined
-          : { grant: stub.grant },
+        reply: () =>
+          first && failure !== "discovery"
+            ? failure === "refusal"
+              ? { refusal: { reason: "denied" } }
+              : undefined
+            : { grant: stub.grant },
       })
       await host.start()
       expect(host.tools()).toHaveLength(0)
@@ -124,7 +129,9 @@ describe("desktop thread discovery lifecycle", () => {
     const discovery = host.start()
     const request = await host.requested
     await host.shutdown()
-    expect(host.handlers.get(TOOLKIT_GRANT_RPC)?.({ requestId: request.requestId, grant: stub.grant })).toEqual({ accepted: false })
+    expect(host.handlers.get(TOOLKIT_GRANT_RPC)?.({ requestId: request.requestId, grant: stub.grant })).toEqual({
+      accepted: false,
+    })
     await discovery
     expect(host.tools()).toHaveLength(0)
   })

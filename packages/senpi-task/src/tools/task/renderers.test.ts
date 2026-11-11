@@ -149,26 +149,43 @@ describe("taskResultLines", () => {
     ["ordinary standard SKU", "luna", "standard", "luna", "standard", false],
     ["unpaired fast SKU", "composer-fast", "standard", "composer-fast", "standard", false],
     ["unrelated effective model", "luna-fast", "priority", "other", "standard", false],
-  ] as const)("priority tier rendering: %s", (_label, resolvedId, resolvedTier, effectiveId, effectiveTier, downgrade) => {
-    // given
-    const details = {
-      task_id: "st_tier", mode: "spawn" as const, status: "completed", model: "vendor/luna-fast",
-      resolved_model: resolvedId === undefined ? undefined : {
-        provider: "vendor", model_id: resolvedId, display: resolvedId, source: "explicit" as const, service_tier: resolvedTier,
-      },
-      effective_model: {
-        provider: "vendor", model_id: effectiveId, display: effectiveId, source: "explicit" as const, service_tier: effectiveTier,
-      },
-    }
-    // when
-    const plain = taskResultLines(details)
-    const rendered = renderTaskResultComponent(details, ANSI_THEME).render(80)
-    // then
-    const expected = `task model:vendor/${resolvedId ?? "luna-fast"}${downgrade ? " tier:standard" : ""} completed id:st_tier`
-    expect(plain).toEqual([expected])
-    expect(rendered.map(line => Bun.stripANSI(line))).toEqual([expected])
-    for (const line of rendered) expect(rendererVisibleWidth(line)).toBeLessThanOrEqual(80)
-  })
+  ] as const)(
+    "priority tier rendering: %s",
+    (_label, resolvedId, resolvedTier, effectiveId, effectiveTier, downgrade) => {
+      // given
+      const details = {
+        task_id: "st_tier",
+        mode: "spawn" as const,
+        status: "completed",
+        model: "vendor/luna-fast",
+        resolved_model:
+          resolvedId === undefined
+            ? undefined
+            : {
+                provider: "vendor",
+                model_id: resolvedId,
+                display: resolvedId,
+                source: "explicit" as const,
+                service_tier: resolvedTier,
+              },
+        effective_model: {
+          provider: "vendor",
+          model_id: effectiveId,
+          display: effectiveId,
+          source: "explicit" as const,
+          service_tier: effectiveTier,
+        },
+      }
+      // when
+      const plain = taskResultLines(details)
+      const rendered = renderTaskResultComponent(details, ANSI_THEME).render(80)
+      // then
+      const expected = `task model:vendor/${resolvedId ?? "luna-fast"}${downgrade ? " tier:standard" : ""} completed id:st_tier`
+      expect(plain).toEqual([expected])
+      expect(rendered.map((line) => Bun.stripANSI(line))).toEqual([expected])
+      for (const line of rendered) expect(rendererVisibleWidth(line)).toBeLessThanOrEqual(80)
+    },
+  )
 
   test(" w2batch #given aggregate item details #when rendered #then each item receives its own ordered result line", () => {
     // given
@@ -398,8 +415,19 @@ describe("taskResultLines", () => {
         source: "category" as const,
       },
       fallback_attempts: [
-        { provider: "kimi-coding", model_id: "kimi-for-coding-highspeed", display: "kimi-for-coding-highspeed", source: "category" as const },
-        { provider: "chatgpt-subscription", model_id: "gpt-5.6-luna-fast", display: "gpt-5.6-luna-fast", reasoning_effort: "high", source: "category" as const },
+        {
+          provider: "kimi-coding",
+          model_id: "kimi-for-coding-highspeed",
+          display: "kimi-for-coding-highspeed",
+          source: "category" as const,
+        },
+        {
+          provider: "chatgpt-subscription",
+          model_id: "gpt-5.6-luna-fast",
+          display: "gpt-5.6-luna-fast",
+          reasoning_effort: "high",
+          source: "category" as const,
+        },
       ],
       run_in_background: false,
     }

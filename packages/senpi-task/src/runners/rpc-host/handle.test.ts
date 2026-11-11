@@ -286,14 +286,23 @@ describe("createHostSessionHandle over a daemon session", () => {
     await handle.dispose()
   })
 
-  for (const [reason, answered] of [["client_close", true], ["error", true], ["handoff_parked", false], ["idle_evicted", false]] as const) {
+  for (const [reason, answered] of [
+    ["client_close", true],
+    ["error", true],
+    ["handoff_parked", false],
+    ["idle_evicted", false],
+  ] as const) {
     test(`#given the host closes the session with reason ${reason} #when the cancel asks whether the host ended it #then it answers ${answered}`, async () => {
       // given
       const host = await fakeHost()
       const client = hostClient(host)
       const handle = await openHostSessionHandle({ client, sessionPath: `/tmp/sessions/answered-${reason}.jsonl` })
 
-      const settled = answered ? handle.waitForExit() : new Promise<void>((resolve) => { handle.onParked(() => resolve()) })
+      const settled = answered
+        ? handle.waitForExit()
+        : new Promise<void>((resolve) => {
+            handle.onParked(() => resolve())
+          })
 
       // when
       host.closeSession(handle.hostSession.routingId, reason)
