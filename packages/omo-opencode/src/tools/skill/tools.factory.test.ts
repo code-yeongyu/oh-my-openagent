@@ -6,6 +6,7 @@ import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
 import * as skillContent from "../../features/opencode-skill-loader/skill-content"
 import * as commandDiscovery from "../slashcommand/command-discovery"
 import type { CommandInfo } from "../slashcommand/types"
+import { getSessionLoadedSkills } from "../../shared/session-loaded-skills"
 
 const discoverCommandsSync = mock(() => [])
 
@@ -197,5 +198,41 @@ describe("createSkillTool", () => {
     // then
     expect(skillTool.description).toContain("<name>/lazy-skill</name>")
     expect(skillTool.description).toContain("<name>/seeded-command</name>")
+  })
+
+  it("records loaded skill bodies for the session so compaction can re-inject them", async () => {
+    // given
+    const sessionID = "ses-factory-record-skill"
+    const skillTool = await createSkillTool({})
+
+    // when
+    await skillTool.execute({ name: "lazy-skill" }, createMockContext(sessionID))
+
+    // then
+    const recorded = getSessionLoadedSkills(sessionID)
+    expect(recorded).toHaveLength(1)
+    expect(recorded[0]?.name).toBe("lazy-skill")
+    expect(recorded[0]?.body).toContain("Test skill template for lazy-skill")
+  })
+
+  it("does not record slash-command loads as session skills", async () => {
+    // given
+    const sessionID = "ses-factory-command-not-recorded"
+    const command: CommandInfo = {
+      name: "seeded-command",
+      metadata: {
+        name: "seeded-command",
+        description: "Seeded command",
+      },
+      content: "Seeded command body",
+      scope: "project",
+    }
+    const skillTool = await createSkillTool({ skills: [], commands: [command] })
+
+    // when
+    await skillTool.execute({ name: "seeded-command" }, createMockContext(sessionID))
+
+    // then
+    expect(getSessionLoadedSkills(sessionID)).toEqual([])
   })
 })
