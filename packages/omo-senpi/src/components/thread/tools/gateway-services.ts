@@ -11,6 +11,7 @@ import { resolveProvenance } from "../gateway/provenance-resolver"
 import { addressBook, sendAddressBook } from "./internals"
 import type { ThreadHostView, ThreadToolSurfaceOptions } from "./ports"
 import { sendView } from "./send-view"
+import { stampThisDevice } from "../remote/this-device"
 
 /** A host without the gateway port reaches no endpoint: every gateway send lands `queued_offline`. */
 const UNREACHABLE: GatewayEndpointPort = {
@@ -58,7 +59,8 @@ export function createGatewayServices(options: ThreadToolSurfaceOptions, view: (
   const now = options.now ?? store.now
   const endpoints = options.host.gateway ?? UNREACHABLE
   const entries = async () => toGatewayAddressEntries(addressBook(options, await view()))
-  const senderProvenance = () => resolveProvenance({ cwd: options.callerWorkspaceRoot(), env: options.env, ...(options.loadProvenanceWorkspaces === undefined ? {} : { loadWorkspaces: options.loadProvenanceWorkspaces }), ...(options.onProvenanceWarning === undefined ? {} : { onWarning: options.onProvenanceWarning }) })
+  // Both transports read this one provenance, so a local and a relayed delivery name the same sender device (#13004).
+  const senderProvenance = (): Promise<Provenance> => stampThisDevice(resolveProvenance({ cwd: options.callerWorkspaceRoot(), env: options.env, ...(options.loadProvenanceWorkspaces === undefined ? {} : { loadWorkspaces: options.loadProvenanceWorkspaces }), ...(options.onProvenanceWarning === undefined ? {} : { onWarning: options.onProvenanceWarning }) }), options.remote)
   const engine = createGatewayEngine({ store, endpoints, resolve, now, senderProvenance })
   const locate = async (durableId: string): Promise<GatewayEndpointRef | null> => {
     const entry = (await entries()).find((candidate) => candidate.thread_id === durableId)

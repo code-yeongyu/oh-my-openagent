@@ -376,6 +376,16 @@ describe("causal_cycle_hop_rate_and_fanout_budgets", () => {
     expect({ hop: lateView?.row.hop, sameRoot: lateView?.row.root_id === firstView?.row.root_id }).toEqual({ hop: 2, sameRoot: false })
   })
 
+  // #13004 (decision 0027 section 3): a run's cause is the delivery it consumed on either transport. One that no row here
+  // holds (it came from another device) continues the hop under a new root; nothing asks where it came from.
+  test("#given a run consumed a delivery no row here holds #when it sends #then the send is delivered under a new root with the inbound hop continued", async () => {
+    const h = open()
+    for (const id of ["A", "B"]) h.session(id)
+    const sent = okId(await send(h, "A", "B", "continue", { cause_delivery_id: "d-from-another-device", inbound_hop: 2 }))
+    const view = await h.get("A").store.deliveryView(sent)
+    expect({ hop: view?.row.hop, root: view?.row.root_id.startsWith("root-") }).toEqual({ hop: 3, root: true })
+  })
+
   test("#given one root #when a session keeps fanning out under it across turns #then the 64th and later deliveries of the root are still accepted", async () => {
     const h = open()
     h.session("A")

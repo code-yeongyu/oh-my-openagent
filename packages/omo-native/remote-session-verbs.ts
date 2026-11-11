@@ -12,6 +12,8 @@ import { pathToFileURL } from "node:url"
 import { createGatewayStore, GATEWAY_STORE_WORKER_BUNDLE_NAME } from "../omo-senpi/src/components/thread/gateway/store"
 import { resolveProvenance } from "../omo-senpi/src/components/thread/gateway/provenance-resolver"
 import { createRelayTransport } from "../omo-senpi/src/components/thread/remote/relay-transport"
+import { stampThisDevice } from "../omo-senpi/src/components/thread/remote/this-device"
+import type { Provenance } from "../omo-senpi/src/components/thread/gateway/types"
 import { threadLink } from "../omo-senpi/src/components/thread/thread-link"
 import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { packageRoot } from "./bin/lib/package-paths.js"
@@ -135,6 +137,11 @@ async function openOn(
   return show({ ...opened, model: model.model } as ThreadToolResult, "")
 }
 
+/** The provenance a person's `omo remote send` carries: this device stamped as on every delivery path (#13004). */
+export function personSenderProvenance(remote: RemoteThreadSurface, cwd = process.cwd(), env: NodeJS.ProcessEnv = process.env): () => Promise<Provenance> {
+  return () => stampThisDevice(resolveProvenance({ cwd, env }), remote)
+}
+
 async function sendTo(
   remote: RemoteThreadSurface,
   row: RemoteSessionRow,
@@ -148,7 +155,7 @@ async function sendTo(
   // under a key minted per invocation (a person's retry is a new send, so nothing dedupes it).
   const anchor = gatewayWorkerAnchor(dependencies.packageRoot ?? packageRoot)
   const store = createGatewayStore({ agentDir: canonicalAgentDir(), ...(anchor === undefined ? {} : { workerModuleUrl: anchor }) })
-  const transport = createRelayTransport({ remote, store, senderProvenance: () => resolveProvenance({ cwd: process.cwd(), env: process.env }) })
+  const transport = createRelayTransport({ remote, store, senderProvenance: personSenderProvenance(remote) })
   const person = { kind: "person" as const, uid: process.getuid?.() ?? 0, user: userInfo().username }
   const deliver = async (): Promise<ThreadToolResult> => {
     const sent = await transport.deliver({ sender: person, caller_id: `person:${person.uid}`, target: { kind: "remote", row }, text: request.message, mode: request.delivery ?? "follow_up", ...(request.expected_turn_id === undefined ? {} : { expected_turn_id: request.expected_turn_id }), idempotency_key: randomUUID(), args: { target: label, text: request.message, delivery: request.delivery } })
