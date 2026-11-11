@@ -78,3 +78,19 @@ fn unknown_scenario_key_is_scenario_invalid() {
     assert_eq!(reference.kind, InvalidKind::Reference);
     assert_eq!(reference.pointer, "/identity/999");
 }
+
+#[test]
+fn non_object_root_is_scenario_invalid() {
+    for root in ["[]", r#"[[],[{"id":"1"}]]"#, "null", "7", r#""windows""#] {
+        let invalid = FakeScenario::from_json(root).expect_err("only an object is a scenario");
+        assert_eq!(
+            (invalid.kind, invalid.pointer.as_str()),
+            (InvalidKind::Shape, ""),
+            "{root}"
+        );
+        assert!(
+            FakeBackend::from_json(root).is_err(),
+            "no backend is built from {root}"
+        );
+    }
+}

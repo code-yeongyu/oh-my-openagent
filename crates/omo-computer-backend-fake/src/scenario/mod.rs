@@ -106,6 +106,13 @@ impl FakeScenario {
     /// # Errors
     /// [`ScenarioInvalid`] with the pointer of the first problem.
     pub fn from_value(value: &Value) -> Result<Self, ScenarioInvalid> {
+        if !value.is_object() {
+            return Err(ScenarioInvalid {
+                kind: InvalidKind::Shape,
+                pointer: String::new(),
+                reason: "the scenario root must be a JSON object".to_owned(),
+            });
+        }
         let scenario =
             Self::deserialize(value).map_err(|error| invalid::from_serde(value, &error))?;
         references::check(&scenario)?;
