@@ -110,12 +110,6 @@ impl GateRefusal {
         }
     }
 
-    /// Always true: every gate refuses before the first OS call.
-    #[must_use]
-    pub const fn nothing_sent(&self) -> bool {
-        true
-    }
-
     /// The row's `nextCall`.
     ///
     /// # Errors

@@ -5,7 +5,9 @@ mod commit;
 mod listener;
 
 use omo_computer_core::backend::{BackendResult, StopListener};
-use omo_computer_core::capabilities::DeafReason;
+use omo_computer_core::capabilities::{
+    DeafReason, StopPathCapability, StopPathKind as CapabilityKind,
+};
 use omo_computer_core::results::StopPathStatus;
 
 pub use commit::{Exit, Holds, NoHolds, ProcessExit, StopOutcome};
@@ -13,7 +15,7 @@ use listener::Slot;
 
 use crate::latch::SuspendReason;
 use crate::marker::MarkerStore;
-use crate::stop_path::{GlobalListener, RelayBeat, StopPathView, StopPolicy};
+use crate::stop_path::{GlobalListener, RelayBeat, StopPathKind, StopPathView, StopPolicy};
 use crate::timing::HEARTBEAT_FRESH_MS;
 
 pub struct Supervisor {
@@ -115,6 +117,29 @@ impl Supervisor {
             relay,
             policy: self.policy,
         }
+    }
+
+    /// `capabilities().stopPath` as the engine sees it: the relay and its policy always; once
+    /// `stopPath.start` ran, the admitting path and the listener's deaf / stale state (a
+    /// parked listener reads `deaf` with `deafReason:"listener-parked"`) replace the
+    /// backend's static report.
+    pub fn describe(&self, now_ms: u64, capability: &mut StopPathCapability) {
+        let view = self.view(now_ms);
+        capability.host_relay_live = view.relay == RelayBeat::Fresh;
+        capability.allow_host_relay_only = view.policy.allow_host_relay_only;
+        if !self.slot.is_armed() {
+            return;
+        }
+        capability.kind = match view.admit() {
+            Ok(StopPathKind::Global) => CapabilityKind::Global,
+            Ok(StopPathKind::HostRelay) => CapabilityKind::HostRelay,
+            Err(_) => CapabilityKind::None,
+        };
+        capability.stale = matches!(view.global, GlobalListener::Stale { .. });
+        (capability.deaf, capability.deaf_reason) = match view.global {
+            GlobalListener::Deaf { reason } => (true, reason.or(capability.deaf_reason)),
+            _ => (false, None),
+        };
     }
 
     /// The v1 `stopPath.*` reply.

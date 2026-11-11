@@ -116,7 +116,6 @@ fn a_foreground_verb_without_the_grant_refuses_control_required() {
         (refusal.gate, wire(&refusal.refusal)),
         (Gate::Lease, ("ControlRequired", None))
     );
-    assert!(refusal.nothing_sent());
 }
 
 #[test]

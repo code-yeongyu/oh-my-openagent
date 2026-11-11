@@ -21,7 +21,6 @@ fn every_gate_and_stage_pair_resolves_through_the_table() {
             let row = refusal.row().unwrap_or_else(|e| panic!("{gate:?}: {e}"));
             assert_ne!(row.nothing_sent, NothingSent::No, "{gate:?} {refusal:?}");
             let refused = GateRefusal::new(gate, refusal);
-            assert!(refused.nothing_sent());
             assert!(matches!(
                 refused.next_call(),
                 Ok(NextCall::Call(_) | NextCall::Nothing { .. })

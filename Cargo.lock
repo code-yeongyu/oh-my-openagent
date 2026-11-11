@@ -2049,6 +2049,7 @@ dependencies = [
  "libc",
  "omo-computer-backend-fake",
  "omo-computer-core",
+ "omo-computer-session",
  "serde",
  "serde_json",
  "tempfile",

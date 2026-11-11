@@ -2,7 +2,7 @@
 //! and the one admission call the session makes before every backend input call.
 
 use omo_computer_core::backend::{Backend, BackendResult, Refusal, StopListener, WindowFilter};
-use omo_computer_core::capabilities::DeafReason;
+use omo_computer_core::capabilities::{DeafReason, StopPathCapability};
 use omo_computer_core::listing::WindowInfo;
 use omo_computer_core::params::Point;
 use omo_computer_core::paths::Roots;
@@ -191,6 +191,11 @@ impl Guard {
     #[must_use]
     pub fn status(&self) -> StopPathStatus {
         self.supervisor.status(self.now_ms())
+    }
+
+    /// `capabilities().stopPath` with the engine's own stop-path state over the backend's.
+    pub fn describe(&self, capability: &mut StopPathCapability) {
+        self.supervisor.describe(self.now_ms(), capability);
     }
 
     /// Polls the stop listener (a physical stop latches here) and runs a due re-arm.

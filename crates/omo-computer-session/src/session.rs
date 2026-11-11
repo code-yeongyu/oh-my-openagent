@@ -110,7 +110,8 @@ impl Session {
     /// The capabilities in the open session's report mode; with no session, the v1 shape.
     #[must_use]
     pub fn capabilities(&self) -> CapabilitiesReply {
-        let capabilities = self.backend.capabilities();
+        let mut capabilities = self.backend.capabilities();
+        self.guard.describe(&mut capabilities.stop_path);
         match self.opened.as_ref().map(|opened| opened.report_mode) {
             Some(ReportMode::Object) => CapabilitiesReply::Object(Box::new(capabilities)),
             Some(ReportMode::Null) | None => CapabilitiesReply::Legacy(Box::new(legacy_capabilities(

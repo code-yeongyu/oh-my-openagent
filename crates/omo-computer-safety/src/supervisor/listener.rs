@@ -117,6 +117,11 @@ impl Slot {
         pressed
     }
 
+    /// Whether `stopPath.start` has run.
+    pub(super) const fn is_armed(&self) -> bool {
+        !matches!(self, Self::Unarmed)
+    }
+
     pub(super) fn global(&self, now_ms: u64) -> GlobalListener {
         match self {
             Self::Unarmed | Self::Absent => GlobalListener::None,

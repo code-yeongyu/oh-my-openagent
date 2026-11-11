@@ -200,5 +200,4 @@ fn self_set_includes_a_brain_only_session_terminal() {
     .expect_err("SelfTarget");
     assert_eq!(refused.refusal.code.wire(), fixture.expect.code);
     assert_eq!(refused.refusal.reason, Some(fixture.expect.reason.as_str()));
-    assert!(refused.nothing_sent());
 }

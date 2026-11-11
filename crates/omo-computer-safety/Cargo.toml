@@ -17,4 +17,5 @@ libc.workspace = true
 
 [dev-dependencies]
 omo-computer-backend-fake = { path = "../omo-computer-backend-fake" }
+omo-computer-session = { path = "../omo-computer-session" }
 tempfile.workspace = true

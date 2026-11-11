@@ -2,7 +2,9 @@
 //! that parks.
 
 use omo_computer_core::backend::{BackendResult, Refusal, StopListener};
-use omo_computer_core::capabilities::DeafReason;
+use omo_computer_core::capabilities::{
+    DeafReason, StopPathCapability, StopPathKind as CapabilityKind,
+};
 use omo_computer_core::error::{EngineCode, Reason};
 
 use super::{NoHolds, Supervisor};
@@ -196,5 +198,49 @@ fn a_deaf_listener_refuses_under_any_policy_and_recovers_when_it_hears() {
         supervisor.view(20).admit(),
         Ok(StopPathKind::Global),
         "the next exec lands on the global path"
+    );
+}
+
+/// `capabilities().stopPath` reads a parked listener as deaf with its reason, and a re-armed
+/// one as the live global path; before `stopPath.start` the backend's report stands.
+#[test]
+fn a_parked_listener_reads_deaf_in_capabilities_stop_path() {
+    let backend = StopPathCapability {
+        kind: CapabilityKind::Global,
+        host_relay_live: false,
+        allow_host_relay_only: false,
+        listener: "fake".to_owned(),
+        deaf: false,
+        stale: false,
+        deaf_reason: None,
+    };
+    let mut supervisor = local();
+    let mut reported = backend.clone();
+    supervisor.describe(0, &mut reported);
+    assert_eq!(reported, backend, "unarmed: the backend's report stands");
+    supervisor.arm(listener(vec![Err(gone())]), None, 0);
+    supervisor.observe(0, &mut never_rearms, &mut NoHolds);
+    let mut at = 0;
+    for delay in RE_ARM_LADDER_MS {
+        at += delay;
+        supervisor.observe(at, &mut never_rearms, &mut NoHolds);
+    }
+    let mut parked = backend.clone();
+    supervisor.describe(at, &mut parked);
+    assert_eq!(
+        (parked.kind, parked.deaf, parked.stale, parked.deaf_reason),
+        (
+            CapabilityKind::None,
+            true,
+            false,
+            Some(DeafReason::ListenerParked)
+        )
+    );
+    supervisor.arm(listener(Vec::new()), None, at);
+    let mut rearmed = parked;
+    supervisor.describe(at, &mut rearmed);
+    assert_eq!(
+        (rearmed.kind, rearmed.deaf, rearmed.deaf_reason),
+        (CapabilityKind::Global, false, None)
     );
 }

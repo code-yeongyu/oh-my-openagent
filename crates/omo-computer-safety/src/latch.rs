@@ -2,7 +2,7 @@
 
 verdicts! {
     /// Why the latch is set.
-    SuspendReason [7] {
+    SuspendReason [6] {
         /// A marker was present (or unreadable) when the engine started.
         StopMarker => Suspended(StopMarker),
         /// The physical stop chord, heard by the listen-only listener.
@@ -13,10 +13,8 @@ verdicts! {
         Api => Suspended(Api),
         /// A fleet stop.
         Fleet => Suspended(Fleet),
-        /// The hand tool host's own latch copy is set.
+        /// The hand tool host's latch is set (`hand.status{latch}` at `session.open`).
         HostLatch => Suspended(HostLatch),
-        /// The hand's latch, as a brain reads it.
-        HandLatch => Suspended(HandLatch),
     }
 }
 

@@ -18,6 +18,9 @@ pub mod stop_path;
 pub mod supervisor;
 pub mod timing;
 
+#[cfg(test)]
+mod session_sink_tests;
+
 pub use gate::{gate, Admitted, DragPoint, Gate, GateFacts, GateRefusal, Tables, Tier, VerbKind};
 pub use guard::{Call, Clock, Guard, MonotonicClock, Observed, OwnProcess, ProcessSource};
 pub use latch::SuspendReason;

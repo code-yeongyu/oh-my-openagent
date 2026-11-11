@@ -9,6 +9,9 @@
     "gnome-shell:unlock-dialog",
     "gnome-shell:lock-screen",
     "ksecretprompt",
+    "gcr-prompter",
+    "xdg-desktop-portal*",
+    "org.freedesktop.impl.portal.desktop.*",
     "swaylock",
     "hyprlock",
     "kscreenlocker_greet",
@@ -20,7 +23,8 @@
     "gnome-shell:panel",
     "gnome-shell:overview",
     "plasmashell:panel",
-    "waybar"
+    "waybar",
+    "swaybar"
   ],
   "processes": [
     "gnome-shell",
@@ -42,7 +46,10 @@
     "keepassxc",
     "org.keepassxc.KeePassXC",
     "org.gnome.seahorse.Application",
-    "kwalletmanager5"
+    "kwalletmanager5",
+    "gnome-keyring*",
+    "kwalletd6",
+    "org.kde.kwalletd6"
   ],
   "dangerousChords": [
     "ctrl+alt+backspace",

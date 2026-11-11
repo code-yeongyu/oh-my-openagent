@@ -37,7 +37,6 @@ fn run(gates: &[Gate]) -> (Gate, Refusal) {
         set(*gate, &mut facts, &mut targets);
     }
     let refused = gate(&facts, &tables(&set_), || targets).expect_err("a gate fires");
-    assert!(refused.nothing_sent());
     assert!(
         refused.next_call().is_ok(),
         "{:?} has a row",
