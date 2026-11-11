@@ -28,6 +28,7 @@ pub use ax_tree::{NODES_PER_MS, PAD_ROLE};
 pub use backend::{FakeBackend, StopPathScript};
 pub use capabilities::BACKEND_NAME;
 pub use clock::{ClockSeamInvalid, FakeClock, CLOCK_SEAM};
+pub use desktop::MAX_COMPOSITE_PIXELS;
 pub use faults::Fault;
 pub use method::FakeMethod;
 pub use persona::Persona;

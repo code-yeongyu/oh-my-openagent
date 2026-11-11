@@ -2,7 +2,9 @@
 //! records and unanswered AX writes: each one fails if the old test's behaviour breaks.
 
 use crate::{fixtures_dir, FakeBackend, FakeScenario, FocusRecordKind, FocusRecordOutcome};
-use omo_computer_core::backend::{AxBackend, Ref, Semantic, SnapshotRequest, Target};
+use omo_computer_core::backend::{
+    AxBackend, Backend, CaptureOptions, Ref, Semantic, SnapshotRequest, Target,
+};
 use omo_computer_core::error::EngineCode;
 use omo_computer_core::params::ObserveOptions;
 
@@ -122,4 +124,40 @@ fn ax_cannot_complete_queues_exactly_one_write_per_entry() {
             .count(),
         3
     );
+}
+
+#[test]
+fn oversized_composite_refuses_before_allocating() {
+    let display = |size: u32| {
+        format!(
+            r#"{{"displays":[{{"id":"1","name":"huge","x":0,"y":0,"width":{size},"height":{size},"scale":1.0,"pixelX":0,"pixelY":0,"pixelWidth":{size},"pixelHeight":{size},"isPrimary":true}}]}}"#
+        )
+    };
+    let options = CaptureOptions {
+        cursor: true,
+        crosshair: None,
+        region: None,
+    };
+    // 20,000 x 20,000 = 400,000,000 pixels: over the cap, so nothing is allocated.
+    let mut huge = FakeBackend::from_json(&display(20_000)).expect("the scenario loads");
+    let refused = huge
+        .capture(&Target::Desktop, &options)
+        .expect_err("over the composite cap");
+    assert_eq!(
+        refused,
+        omo_computer_core::backend::Refusal::bare(EngineCode::CaptureFailed)
+    );
+    let row = refused.row().expect("CaptureFailed has a bare row");
+    assert_eq!(row.nothing_sent, omo_computer_core::error::NothingSent::Yes);
+    assert!(
+        huge.sink().is_empty(),
+        "a refused capture writes no sink line"
+    );
+    // The control: the same scenario below the cap captures (1,000 x 1,000).
+    let mut small = FakeBackend::from_json(&display(1_000)).expect("the scenario loads");
+    let frame = small
+        .capture(&Target::Desktop, &options)
+        .expect("under the cap");
+    assert_eq!((frame.width, frame.height), (1_000, 1_000));
+    assert!(u64::from(20_000_u32) * u64::from(20_000_u32) > crate::MAX_COMPOSITE_PIXELS);
 }

@@ -21,6 +21,12 @@ use crate::scenario::{FakeDisplay, FakeWindow};
 use crate::sink::quoted;
 use crate::state::FakeState;
 
+/// The most pixels one capture may hold: the composite cap of the design's
+/// `d-vision.md` '## Screenshot pipeline' (`MAX_COMPOSITE_PIXELS` = 268,435,456). Row 12's
+/// limits table carries no pixel cap, so the fake names it here; the frame row owns the
+/// engine's own copy.
+pub const MAX_COMPOSITE_PIXELS: u64 = 268_435_456;
+
 fn display_info(display: &FakeDisplay) -> DisplayInfo {
     DisplayInfo {
         id: display.id.clone(),
@@ -163,6 +169,9 @@ impl Backend for FakeBackend {
             let (rect, scale) = capture_rect(state, target)?;
             let rect = options.region.unwrap_or(rect);
             let (width, height) = (pixels(rect.width * scale), pixels(rect.height * scale));
+            if u64::from(width) * u64::from(height) > MAX_COMPOSITE_PIXELS {
+                return Err(Refusal::bare(EngineCode::CaptureFailed));
+            }
             let gray = if state.scenario.legacy_capture {
                 0x60
             } else {

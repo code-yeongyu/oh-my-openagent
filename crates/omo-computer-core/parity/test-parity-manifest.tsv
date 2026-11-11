@@ -121,7 +121,7 @@ senpi-desktop-backend-fake	rust	senpi-desktop-backend-fake::tests::capture::wind
 senpi-desktop-backend-fake	rust	senpi-desktop-backend-fake::tests::capture::scripted_resize_invalidates_the_previous_window_frame	pending	crates/senpi-desktop-backend-fake/tests/capture.rs:56
 senpi-desktop-backend-fake	rust	senpi-desktop-backend-fake::tests::capture::capture_unavailable_scenario_fails_capture	ported:omo-computer-backend-fake::desktop::tests::faults_delays_and_presses_run_before_the_call	crates/senpi-desktop-backend-fake/tests/capture.rs:80
 senpi-desktop-backend-fake	rust	senpi-desktop-backend-fake::tests::capture::capture_of_an_unknown_window_is_window_not_found	pending	crates/senpi-desktop-backend-fake/tests/capture.rs:90
-senpi-desktop-backend-fake	rust	senpi-desktop-backend-fake::tests::capture::oversized_composite_fails_before_allocating	pending	crates/senpi-desktop-backend-fake/tests/capture.rs:99
+senpi-desktop-backend-fake	rust	senpi-desktop-backend-fake::tests::capture::oversized_composite_fails_before_allocating	ported:omo-computer-backend-fake::scripting::ported_tests::oversized_composite_refuses_before_allocating	crates/senpi-desktop-backend-fake/tests/capture.rs:99
 senpi-desktop-backend-fake	rust	senpi-desktop-backend-fake::tests::input::input_unavailable_scenario_refuses_pointer_and_records_nothing	pending	crates/senpi-desktop-backend-fake/tests/input.rs:53
 senpi-desktop-backend-fake	rust	senpi-desktop-backend-fake::tests::input::background_window_input_unavailable_is_background_unavailable	pending	crates/senpi-desktop-backend-fake/tests/input.rs:71
 senpi-desktop-backend-fake	rust	senpi-desktop-backend-fake::tests::input::unadvertised_delivery_mode_is_refused	pending	crates/senpi-desktop-backend-fake/tests/input.rs:84
