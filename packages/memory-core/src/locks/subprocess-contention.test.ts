@@ -23,7 +23,6 @@ const workerPath = fileURLToPath(new URL("./subprocess-worker.ts", import.meta.u
 const temporaryDirectories: string[] = []
 const children = new Set<ChildProcess>()
 
-const EXIT_TIMEOUT_MS = 5_000
 const TEARDOWN_GRACE_MS = 2_000
 
 function track<T extends ChildProcess>(child: T): T {
@@ -287,7 +286,7 @@ process.stdin.resume()
       // #then: the ORIGINAL worker is terminal on every platform. Termination is awaited with a
       // zombie-aware liveness probe against the captured identity rather than asserted from a
       // single point-in-time probe, because the worker's death trails the wrapper's by a beat.
-      expect(await pidTerminalWithin(workerIdentity, EXIT_TIMEOUT_MS)).toBe(true)
+      expect(await pidTerminalWithin(workerIdentity, remainingTestTime())).toBe(true)
     } finally {
       await killAndAwait(wrapper)
       // Identity-guarded: never signal a pid that has since been reused by another process.
