@@ -62,15 +62,24 @@ bun $P/probe-sp-t.ts --measure --out $P/macos-tcc.tsv   # no grant, no prompt: p
 bun $P/probe-sp-t.ts --request-grant            # H3: the dialog for "OmO Computer Use"; the person grants it
 bun $P/probe-sp-t.ts --check-grant              # expects accessibility 1
 bun $P/probe-sp-t.ts --measure --out $P/macos-tcc.tsv   # now also the grant and prompt rows
-bun $P/probe-sp-t.ts --verify $P/macos-tcc.tsv  # from a clean shell: every verdict identical, VERIFY_OK, exit 0
+bun $P/probe-sp-t.ts --verify $P/macos-tcc.tsv  # from a clean shell, in the same person slot; see below
 bun $P/probe-sp-t.ts --cleanup                  # receipts: procs 0, dir REMOVED; keeps the identity and the H3 grant
 ```
 
 No agent clicks a TCC grant or answers a permission prompt. The rows that need the H3 grant (`client-type.*`,
-`swap.*`, `rebuild.*`) or a Deny answer (`prompt.*`) read `WAITING-PERSON` with the reason and launch nothing unless
-`SPT_PERSON_PRESENT=1` is set for a slot with a person at the QA session; `--request-grant` refuses without it. In
-such a slot the `prompt.*` rows print an `OPERATOR:` line: a dialog naming "OmO Computer Use SP-T prompt probe"
-appears in the QA session and the person answers Deny. The T3 identity and the H3 grant stay for the later macOS rows and are removed
+`swap.*`, `rebuild.*`), a Deny answer (`prompt.*`), or the Input Monitoring grant and a key press (`untagged.*`) read
+`WAITING-PERSON` with the reason and launch nothing unless `SPT_PERSON_PRESENT=1` is set for a slot with a person at
+the QA session; `--request-grant` refuses without it. In such a slot the `prompt.*` rows print an `OPERATOR:` line: a
+dialog naming "OmO Computer Use SP-T prompt probe" appears in the QA session and the person answers Deny.
+
+`--verify` re-measures every row of this host and compares only the verdict column:
+
+- Without `SPT_PERSON_PRESENT=1` the person rows re-measure as `WAITING-PERSON`. That matches a ledger written
+  without a person (exit 0, `VERIFY_OK`), but against a ledger that holds their measured verdicts it prints `DIFF` for
+  each of them and ends `VERIFY_FAILED` (exit 1).
+- With `SPT_PERSON_PRESENT=1` every row is measured again, so the `prompt.*` rows raise the Deny dialog again and the
+  `untagged.*` rows wait for the key press again: run it only in a person slot. Every verdict identical gives
+  `VERIFY_OK` and exit 0. The T3 identity and the H3 grant stay for the later macOS rows and are removed
 at the final teardown (`sp-t-identity.sh delete`, and `tccutil reset` of the helper bundle id).
 
 Any single row re-measures with the command in its `rerun` column. On a host without the preconditions (for example

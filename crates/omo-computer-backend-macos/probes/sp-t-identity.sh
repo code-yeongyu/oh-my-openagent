@@ -2,8 +2,11 @@
 # SP-T helper: the run-local T3 signing identity (macOS only).
 #
 #   sp-t-identity.sh create   self-signed code-signing certificate in a dedicated keychain FILE under
-#                             $CU_RUN/t3-signing/ (never the login keychain, never added to the search list,
-#                             no trust setting, so no dialog); writes its name to $CU_RUN/t3-signing/IDENTITY
+#                             $CU_RUN/t3-signing/ (never the login keychain, no trust setting, so no dialog);
+#                             writes its name to $CU_RUN/t3-signing/IDENTITY. `security create-keychain` also
+#                             adds the new keychain to the user's search list, so the list is saved before the
+#                             create and restored with `list-keychains -s` right after it and again on every exit
+#                             path (EXIT trap); the run fails if the keychain is still on the list afterwards.
 #   sp-t-identity.sh show     prints the identity name, its SHA-1 and what `security` sees in the keychain file
 #   sp-t-identity.sh delete   final teardown only: deletes the keychain file and the directory
 #
@@ -22,7 +25,20 @@ create)
 	umask 077
 	mkdir -p "$dir"
 	tmp=$(mktemp -d "$dir/.create.XXXXXX")
-	trap 'rm -rf "$tmp"' EXIT
+	saved_list="$tmp/search-list.before"
+	security list-keychains -d user >"$saved_list"
+	restore_search_list() {
+		[ -f "$saved_list" ] || return 0
+		local line paths=()
+		while IFS= read -r line; do
+			line=${line#"${line%%[![:space:]]*}"}
+			line=${line#\"}
+			line=${line%\"}
+			[ -z "$line" ] || paths+=("$line")
+		done <"$saved_list"
+		security list-keychains -d user -s ${paths[@]+"${paths[@]}"}
+	}
+	trap 'restore_search_list; rm -rf "$tmp"' EXIT
 	name="OmO CU v3 T3 test signing $(date -u +%Y%m%dT%H%M%SZ)"
 	openssl rand -hex 24 >"$dir/keychain-password"
 	p12pass=$(openssl rand -hex 24)
@@ -46,6 +62,8 @@ CNF
 	openssl pkcs12 -export ${legacy[@]+"${legacy[@]}"} -inkey "$tmp/key.pem" -in "$tmp/cert.pem" -name "$name" \
 		-out "$tmp/id.p12" -passout "pass:$p12pass"
 	security create-keychain -p "$(cat "$dir/keychain-password")" "$keychain"
+	restore_search_list
+	if security list-keychains -d user | grep -qF "$keychain"; then die "the T3 keychain is still on the user search list"; fi
 	security set-keychain-settings "$keychain" # no auto-lock timeout, no lock on sleep
 	security unlock-keychain -p "$(cat "$dir/keychain-password")" "$keychain"
 	security import "$tmp/id.p12" -k "$keychain" -f pkcs12 -P "$p12pass" -T /usr/bin/codesign >/dev/null

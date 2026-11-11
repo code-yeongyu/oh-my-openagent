@@ -53,12 +53,13 @@ type Os = 15 | 26
 type HostRole = "h1" | "h2" | "h4"
 type LaunchAction = "open-path" | "open-name" | "disclaim" | "plain"
 type Context = "gui" | "ssh"
-type PersonNeed = "grant" | "deny"
+type PersonNeed = "grant" | "deny" | "tap"
 
 const PERSON_REASON: Record<PersonNeed, string> = {
   grant:
     "waiting for a person: needs the H3 grant (Accessibility, Screen Recording, Input Monitoring to the helper bundle) given by a person at the QA session; no agent clicks a TCC grant",
   deny: "waiting for a person: raises a TCC dialog that a person at the QA session answers Deny; no agent answers a permission prompt",
+  tap: "waiting for a person: the session tap needs the H3 Input Monitoring grant to the helper bundle (CGEventTapCreate raises the Input Monitoring prompt without it) and a person pressing the key through the route; no agent clicks a TCC grant",
 }
 
 function personPresent(): boolean {
@@ -105,6 +106,8 @@ interface LegSpec {
   done: string
   spawner: string
   timeoutMs: number
+  // set for the untagged-route legs: the launcher runs `tap <seconds> <result>` instead of `report`
+  tapSeconds?: number
 }
 
 interface ProbeReport {
@@ -129,6 +132,7 @@ interface LegResult {
   report: ProbeReport | null
   waitedMs: number
   startedAt: number
+  tapFile?: string
 }
 
 class EvidenceLog {
@@ -324,16 +328,20 @@ async function leg(specPath: string): Promise<number> {
     String(process.pid),
     ...(spec.prompt ? ["--prompt", spec.prompt] : []),
   ]
+  const tapping = spec.tapSeconds !== undefined
+  const launcherArgs = tapping ? ["tap", String(spec.tapSeconds), spec.result] : reportArgs
   const argv =
     spec.action === "open-path"
-      ? ["open", spec.target, "--args", ...reportArgs]
+      ? ["open", spec.target, "--args", ...launcherArgs]
       : spec.action === "open-name"
-        ? ["open", "-a", spec.target, "--args", ...reportArgs]
-        : [spec.spawner, "spawn", spec.action, join(spec.target, EXE_REL), ...reportArgs]
+        ? ["open", "-a", spec.target, "--args", ...launcherArgs]
+        : [spec.spawner, "spawn", spec.action, join(spec.target, EXE_REL), ...launcherArgs]
   const launch = await run(argv)
   let report: ProbeReport | null = null
   while (Date.now() - startedAt < spec.timeoutMs) {
-    if (existsSync(spec.result)) {
+    if (tapping) {
+      if (existsSync(spec.result) && readFileSync(spec.result, "utf8").includes('"tapDone":true')) break
+    } else if (existsSync(spec.result)) {
       report = JSON.parse(readFileSync(spec.result, "utf8")) as ProbeReport
       break
     }
@@ -347,10 +355,11 @@ async function leg(specPath: string): Promise<number> {
     report,
     waitedMs: Date.now() - startedAt,
     startedAt,
+    ...(tapping ? { tapFile: spec.result } : {}),
   }
   writeFileSync(`${spec.done}.tmp`, JSON.stringify(result))
   await run(["mv", `${spec.done}.tmp`, spec.done])
-  return report ? 0 : 1
+  return report || tapping ? 0 : 1
 }
 
 let legCounter = 0
@@ -362,6 +371,7 @@ async function runLeg(
   action: LaunchAction,
   target: string,
   prompt: LegSpec["prompt"] = "",
+  tapSeconds?: number,
 ): Promise<LegResult> {
   const p = paths(env)
   const tag = `${context}-${action}-${Date.now()}-${legCounter++}`
@@ -370,10 +380,11 @@ async function runLeg(
     target,
     prompt,
     tag,
-    result: join(p.results, `${tag}.report.json`),
+    result: join(p.results, tapSeconds === undefined ? `${tag}.report.json` : `${tag}.tap.jsonl`),
     done: join(p.results, `${tag}.done.json`),
     spawner: p.spawner,
-    timeoutMs: LEG_TIMEOUT_MS,
+    timeoutMs: tapSeconds === undefined ? LEG_TIMEOUT_MS : (tapSeconds + 15) * 1000,
+    ...(tapSeconds === undefined ? {} : { tapSeconds }),
   }
   const specPath = join(p.results, `${tag}.spec.json`)
   writeFileSync(specPath, JSON.stringify(spec))
@@ -386,7 +397,7 @@ async function runLeg(
         "bash",
         join(PROBE_DIR, "sp-t-gui-leg.sh"),
         label,
-        String(LEG_TIMEOUT_MS / 1000 + 10),
+        String(spec.timeoutMs / 1000 + 10),
         spec.done,
         join(p.results, `${tag}.launchd.log`),
         "--",
@@ -656,22 +667,26 @@ function promptRow(context: Context, path: "open" | "disclaim") {
     console.log(
       `OPERATOR: a TCC dialog naming "${DISPLAY_NAME} SP-T prompt probe" may appear on the QA session; answer Deny.`,
     )
-    const result = await runLeg(env, log, context, actionFor(path), p.prompt, "ax")
-    if (!result.report) return noReport(result, "prompt")
-    await sleep(3000)
-    const warn = await run(["pgrep", "-x", "universalAccessAuthWarn"])
-    const lines = await tccLog(env, log, result.startedAt, [
-      PROMPT_BUNDLE_ID,
-      "universalAccessAuthWarn",
-      `pid=${result.report.pid}`,
-    ])
-    const prompting = lines.some((l) => /AUTHREQ_PROMPTING|prompting|universalAccessAuthWarn/i.test(l))
-    const after = await run(asQa(env, ["tccutil", "reset", "Accessibility", PROMPT_BUNDLE_ID]))
-    log.add("reset prompt-probe rows after the prompt", after)
-    return {
-      verdict: `PROMPT=${prompting || warn.code === 0 ? "shown" : "none"}`,
-      measured: { ...base(result.report, result), promptLines: lines.length, authWarnProcess: warn.code === 0 },
-      note: "a separate never-granted identifier (the prompt probe) asks AXIsProcessTrustedWithOptions(prompt); read from the tccd prompting lines and the universalAccessAuthWarn process",
+    try {
+      const result = await runLeg(env, log, context, actionFor(path), p.prompt, "ax")
+      if (!result.report) return noReport(result, "prompt")
+      await sleep(3000)
+      const warn = await run(["pgrep", "-x", "universalAccessAuthWarn"])
+      const lines = await tccLog(env, log, result.startedAt, [
+        PROMPT_BUNDLE_ID,
+        "universalAccessAuthWarn",
+        `pid=${result.report.pid}`,
+      ])
+      const prompting = lines.some((l) => /AUTHREQ_PROMPTING|prompting|universalAccessAuthWarn/i.test(l))
+      return {
+        verdict: `PROMPT=${prompting || warn.code === 0 ? "shown" : "none"}`,
+        measured: { ...base(result.report, result), promptLines: lines.length, authWarnProcess: warn.code === 0 },
+        note: "a separate never-granted identifier (the prompt probe) asks AXIsProcessTrustedWithOptions(prompt); read from the tccd prompting lines and the universalAccessAuthWarn process",
+      }
+    } finally {
+      // every exit path, including a leg with no report or a thrown error, leaves no Deny row for the prompt probe
+      const after = await run(asQa(env, ["tccutil", "reset", "Accessibility", PROMPT_BUNDLE_ID]))
+      log.add("reset prompt-probe rows after the prompt", after)
     }
   }
 }
@@ -727,45 +742,26 @@ function untagged(route: "hypervisor-vkbd" | "vhid") {
         measured: {},
         note: `${awaiting}: set SPT_HW_ROUTE=${route} on a host where that route exists`,
       }
-    const p = paths(env)
-    const tapFile = join(p.results, `tap-${route}-${Date.now()}.jsonl`)
     const seconds = Number(process.env.SPT_TAP_SECONDS ?? "20")
     console.log(`OPERATOR: press the "a" key through the ${route} route within ${seconds}s.`)
-    const doneFile = `${tapFile}.done`
-    const exe = join(currentApp(env), EXE_REL)
-    const driver = await run(
-      [
-        "bash",
-        join(PROBE_DIR, "sp-t-gui-leg.sh"),
-        `ai.sisyphuslabs.sp-t.tap.${Date.now()}`,
-        String(seconds + 15),
-        doneFile,
-        `${tapFile}.log`,
-        "--",
-        "/bin/sh",
-        "-c",
-        `"$0" tap "$1" "$2"; touch "$3"`,
-        exe,
-        String(seconds),
-        tapFile,
-        doneFile,
-      ],
-      { env: { SPT_QA_USER: env.qaUser, SPT_GUI_ROUTE: env.sameUser ? "self" : "sudo" } },
-    )
-    log.add("tap driver", driver)
-    const events = existsSync(tapFile)
-      ? readFileSync(tapFile, "utf8")
-          .split("\n")
-          .filter(Boolean)
-          .map((l) => JSON.parse(l) as { type?: number; sourcePid?: number; sourceStateId?: number; error?: string })
-      : []
+    // the tap runs inside the helper bundle launched BY PATH through LaunchServices, like the other legs, so the
+    // bundle is its own responsible process and TCC checks Input Monitoring for the helper bundle's identity
+    const leg = await runLeg(env, log, "gui", "open-path", currentApp(env), "", seconds)
+    const tapFile = leg.tapFile
+    const events =
+      tapFile && existsSync(tapFile)
+        ? readFileSync(tapFile, "utf8")
+            .split("\n")
+            .filter(Boolean)
+            .map((l) => JSON.parse(l) as { type?: number; sourcePid?: number; sourceStateId?: number; error?: string })
+        : []
     log.add("tap events", events)
     const keys = events.filter((e) => e.type === 10)
     if (events.some((e) => e.error))
       return {
         verdict: "UNMEASURED",
-        measured: {},
-        note: "the session tap could not be created (Input Monitoring/Accessibility for the helper bundle)",
+        measured: { launchExit: leg.launch.code },
+        note: "the session tap could not be created inside the helper bundle launched by path (its own responsible process): Input Monitoring is not granted to the helper bundle",
       }
     if (keys.length === 0)
       return { verdict: "NO_EVENT", measured: { events: events.length }, note: "no keyDown reached the session tap" }
@@ -781,7 +777,7 @@ function untagged(route: "hypervisor-vkbd" | "vhid") {
         sourcePids: [...new Set(keys.map((e) => e.sourcePid))].join(","),
         stateIds: [...new Set(keys.map((e) => e.sourceStateId))].join(","),
       },
-      note: "listen-only kCGSessionEventTap inside the helper bundle; untagged = kCGEventSourceUnixProcessID 0 on every keyDown",
+      note: "listen-only kCGSessionEventTap inside the helper bundle launched by path (open <bundle> --args tap; the bundle is its own responsible process); untagged = kCGEventSourceUnixProcessID 0 on every keyDown",
     }
   }
 }
@@ -867,6 +863,7 @@ const ROWS: RowDef[] = [
     host: "h2",
     os: 26,
     needs: "h2",
+    person: "tap",
     measure: untagged("hypervisor-vkbd"),
   },
   {
@@ -876,6 +873,7 @@ const ROWS: RowDef[] = [
     host: "h4",
     os: 26,
     needs: "h4",
+    person: "tap",
     measure: untagged("vhid"),
   },
 ]

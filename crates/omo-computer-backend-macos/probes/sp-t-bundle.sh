@@ -194,20 +194,22 @@ static CGEventRef tap_cb(CGEventTapProxy proxy, CGEventType type, CGEventRef eve
 	return event;
 }
 
-/* tap <seconds> <result>: listen-only session tap; one JSON line per key event (the untagged-route rows) */
+/* tap <seconds> <result>: listen-only session tap; one JSON line per key event, then {"tapDone":true} (the untagged-route rows;
+   launched by path through LaunchServices so the bundle is its own responsible process) */
 static int tap_keys(int argc, char **argv) {
 	if (argc < 4) { fprintf(stderr, "tap: tap <seconds> <result>\n"); return 2; }
 	tap_out = fopen(argv[3], "w");
 	if (!tap_out) { perror("tap: open result"); return 3; }
 	CGEventMask mask = CGEventMaskBit(kCGEventKeyDown) | CGEventMaskBit(kCGEventKeyUp) | CGEventMaskBit(kCGEventFlagsChanged);
 	CFMachPortRef port = CGEventTapCreate(kCGSessionEventTap, kCGHeadInsertEventTap, kCGEventTapOptionListenOnly, mask, tap_cb, NULL);
-	if (!port) { fprintf(tap_out, "{\"error\":\"tap_create_failed\"}\n"); fclose(tap_out); return 4; }
+	if (!port) { fprintf(tap_out, "{\"error\":\"tap_create_failed\"}\n{\"tapDone\":true}\n"); fclose(tap_out); return 4; }
 	CFRunLoopSourceRef source = CFMachPortCreateRunLoopSource(NULL, port, 0);
 	CFRunLoopAddSource(CFRunLoopGetCurrent(), source, kCFRunLoopCommonModes);
 	CGEventTapEnable(port, true);
 	fprintf(tap_out, "{\"tapReady\":true}\n");
 	fflush(tap_out);
 	CFRunLoopRunInMode(kCFRunLoopDefaultMode, atof(argv[2]), false);
+	fprintf(tap_out, "{\"tapDone\":true}\n");
 	fclose(tap_out);
 	return 0;
 }
