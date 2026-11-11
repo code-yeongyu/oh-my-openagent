@@ -82,6 +82,8 @@ describe("monitor open on a remote session target", () => {
       return await session.preflightToolCall({ type: "toolCall", id: "monitor-1", name: "monitor", arguments: args }, args)
     } finally {
       session.dispose()
+      // senpi's fallback logger finishes its first-start removal asynchronously; removing the agent dir before it settles leaks it (#9766).
+      await session.whenToolChildClosed()
     }
   }
 
