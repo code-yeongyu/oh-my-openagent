@@ -1,5 +1,5 @@
 import type { ApproveOutcome } from "@oh-my-opencode/memory-core/sync-engine"
-import type { SyncEnableResponse, SyncRpcProblem } from "./sync-rpc-contract"
+import type { SyncEnableResponse, SyncRpcProblem, SyncUnavailableCode } from "./sync-rpc-contract"
 import type {
   SyncRpcAccount,
   SyncRpcAuthority,
@@ -9,9 +9,10 @@ import type {
   SyncRpcOptions,
 } from "./sync-rpc-ports"
 
-export const unavailable = (): SyncRpcProblem => ({
+export const unavailable = (code?: SyncUnavailableCode): SyncRpcProblem => ({
   kind: "unavailable",
   reason: "Memory sync authority is unavailable.",
+  ...(code === undefined ? {} : { code }),
 })
 export const refused = (): SyncRpcProblem => ({
   kind: "refused",
@@ -28,7 +29,11 @@ export function serviceProblem(error: unknown): SyncRpcProblem {
     : unavailable()
 }
 
-export class RetiredSyncOperation extends Error {}
+export class RetiredSyncOperation extends Error {
+  constructor(readonly code: SyncUnavailableCode = "retired") {
+    super(code)
+  }
+}
 
 /** A record that runs a ceremony and takes a claim; a "read" record never does. */
 export type CeremonyOperation = Operation & { readonly kind: "enable" | "approve" }
