@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test"
 import { ZodError } from "zod"
-import { SYNC_REPLY_MAX_ITEMS, decodeRecoveryWraps, decodeSyncEntries, decodeSyncKeys } from "./desktopSyncPortSchema"
+import {
+  SYNC_REPLY_MAX_ITEMS,
+  SyncDevices,
+  decodeRecoveryWraps,
+  decodeSyncEntries,
+  decodeSyncKeys,
+} from "./desktopSyncPortSchema"
 
 const principal = { kind: "device", id: "d", signing_public_key: "s", sealing_public_key: "p" }
 const row = {
@@ -23,6 +29,18 @@ const keyring = {
   wraps: [],
 }
 const wrap = { record: { seq: 1, digest: "g", keyring_link: "k" }, entry: { epoch: 0, id: "w", wrap: "x" } }
+const device = {
+  id: "d",
+  name: "n",
+  kind: "cli",
+  platform: "linux",
+  createdAt: "t",
+  lastSeenAt: "t",
+  current: false,
+  syncing: false,
+  revokedAt: null,
+  syncPrincipal: null,
+}
 const many = <T>(item: T, n: number): T[] => Array.from({ length: n }, () => item)
 
 const expectTooBig = (run: () => unknown) => {
@@ -42,6 +60,7 @@ describe("desktop sync reply size cap", () => {
     expectTooBig(() => decodeSyncKeys({ entries: many(keyring, SYNC_REPLY_MAX_ITEMS + 1) }))
     expectTooBig(() => decodeRecoveryWraps({ wraps: many(wrap, SYNC_REPLY_MAX_ITEMS + 1) }))
     expectTooBig(() => decodeSyncKeys({ entries: [{ ...keyring, wraps: many(wrap.entry, SYNC_REPLY_MAX_ITEMS + 1) }] }))
+    expectTooBig(() => SyncDevices.parse({ devices: many(device, SYNC_REPLY_MAX_ITEMS + 1) }))
   })
 
   test("#given a reply exactly at the cap #when it is parsed #then it is accepted", () => {

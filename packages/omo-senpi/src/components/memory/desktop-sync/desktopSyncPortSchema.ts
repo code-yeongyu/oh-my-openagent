@@ -85,21 +85,23 @@ export const SyncDescriptor = z.object({
 })
 export type SyncDescriptor = z.infer<typeof SyncDescriptor>
 export const SyncDevices = z.object({
-  devices: z.array(
-    z.object({
-      id: z.string(),
-      name: z.string(),
-      kind: z.enum(["desktop", "cli"]),
-      platform: z.enum(["macos", "linux", "windows"]),
-      createdAt: z.string(),
-      lastSeenAt: z.string(),
-      approximateLocation: z.string().optional(),
-      current: z.boolean(),
-      syncing: z.boolean(),
-      revokedAt: z.string().nullable(),
-      syncPrincipal: z.string().nullable(),
-    }),
-  ),
+  devices: z
+    .array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        kind: z.enum(["desktop", "cli"]),
+        platform: z.enum(["macos", "linux", "windows"]),
+        createdAt: z.string(),
+        lastSeenAt: z.string(),
+        approximateLocation: z.string().optional(),
+        current: z.boolean(),
+        syncing: z.boolean(),
+        revokedAt: z.string().nullable(),
+        syncPrincipal: z.string().nullable(),
+      }),
+    )
+    .max(SYNC_REPLY_MAX_ITEMS),
 })
 const reply = z.union([
   z.strictObject({ kind: z.literal("json"), status: SyncInteger, body: z.unknown() }),
