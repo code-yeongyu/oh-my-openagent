@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process"
 import { randomBytes } from "node:crypto"
-import { closeSync, existsSync, lstatSync, openSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { closeSync, existsSync, lstatSync, openSync, readdirSync, readFileSync, rmSync, type Stats, symlinkSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import type { DenyLivePlan } from "./plan"
@@ -127,7 +127,18 @@ function sweepStaleProbes(dir: string): void {
   for (const name of readdirSync(dir)) {
     if (!name.startsWith(PROBE_PREFIX)) continue
     const path = join(dir, name)
-    if (Date.now() - lstatSync(path).mtimeMs > STALE_PROBE_MS) rmSync(path, { force: true })
+    // Another preflight may remove its own probe between the listing and this read.
+    const mtimeMs = statOrUndefined(path)?.mtimeMs
+    if (mtimeMs !== undefined && Date.now() - mtimeMs > STALE_PROBE_MS) rmSync(path, { force: true })
+  }
+}
+
+function statOrUndefined(path: string): Stats | undefined {
+  try {
+    return lstatSync(path)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined
+    throw error
   }
 }
 

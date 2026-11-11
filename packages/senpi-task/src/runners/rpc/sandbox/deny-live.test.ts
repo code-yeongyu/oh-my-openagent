@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -93,6 +93,23 @@ describe.skipIf(!usable)("deny-live sandbox on a real backend", () => {
 
   test("#given a real install with config files in the agent dir #when preflight runs #then it proves the confinement", () => {
     expect(preflightDenyLive(w.plan, w.seccomp, w.home)).toMatchObject({ ok: true })
+  })
+
+  test("#given probe files a killed parent left behind #when preflight runs #then only the ones older than a minute are swept, whatever pid they name", () => {
+    // given: one stale probe named for this live process, one fresh probe named for a pid that cannot exist
+    const stale = join(w.plan.liveRoot, `.omo-sandbox-probe-${process.pid}-stale-live`)
+    const fresh = join(w.plan.liveRoot, ".omo-sandbox-probe-999999999-fresh-dead")
+    writeFileSync(stale, "x")
+    writeFileSync(fresh, "x")
+    const twoMinutesAgo = new Date(Date.now() - 120_000)
+    utimesSync(stale, twoMinutesAgo, twoMinutesAgo)
+
+    // when
+    preflightDenyLive(w.plan, w.seccomp, w.home)
+
+    // then
+    expect(existsSync(stale)).toBe(false)
+    expect(existsSync(fresh)).toBe(true)
   })
 
   test("#given a wrapper that does not confine #when preflight runs #then it refuses on a deny check", () => {

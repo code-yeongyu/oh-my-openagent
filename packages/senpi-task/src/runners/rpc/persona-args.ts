@@ -17,14 +17,6 @@ export class PersonaTooLargeError extends Error {
   }
 }
 
-/** Whether a spec carries a persona a child must get: instructions or any tool policy. */
-export function hasPersona(persona: RpcPersona): boolean {
-  return (
-    (persona.instructions !== undefined && persona.instructions.length > 0) ||
-    persona.toolAllowlist !== undefined ||
-    (persona.toolDenylist !== undefined && persona.toolDenylist.length > 0)
-  )
-}
 
 /**
  * The persona an in-process child gets from `buildChildSessionOptions` (instructions as the appended
