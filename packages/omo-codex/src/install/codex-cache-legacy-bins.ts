@@ -35,7 +35,11 @@ export async function removeLegacyCodexComponentBins(binDir: string, platform: L
   }
 }
 
-async function removeLegacyCodexComponentBin(linkPath: string, component: LegacyCodexComponent, platform: LinkPlatform): Promise<void> {
+async function removeLegacyCodexComponentBin(
+  linkPath: string,
+  component: LegacyCodexComponent,
+  platform: LinkPlatform,
+): Promise<void> {
   try {
     const stat = await lstat(linkPath)
     if (platform !== "win32") {

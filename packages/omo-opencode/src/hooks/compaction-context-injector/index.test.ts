@@ -214,6 +214,5 @@ describe("createCompactionContextInjector", () => {
       expect(restored).toBe(false)
       expect(promptAsyncMock).not.toHaveBeenCalled()
     })
-
   })
 })

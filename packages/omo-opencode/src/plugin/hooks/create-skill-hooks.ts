@@ -19,21 +19,13 @@ export function createSkillHooks(args: {
   mergedSkills: LoadedSkill[]
   availableSkills: AvailableSkill[]
 }): SkillHooks {
-  const {
-    ctx,
-    pluginConfig,
-    isHookEnabled,
-    safeHookEnabled,
-    mergedSkills,
-    availableSkills,
-  } = args
+  const { ctx, pluginConfig, isHookEnabled, safeHookEnabled, mergedSkills, availableSkills } = args
 
   const safeHook = <T>(hookName: HookName, factory: () => T): T | null =>
     safeCreateHook(hookName, factory, { enabled: safeHookEnabled })
 
   const categorySkillReminder = isHookEnabled("category-skill-reminder")
-    ? safeHook("category-skill-reminder", () =>
-        createCategorySkillReminderHook(ctx, availableSkills))
+    ? safeHook("category-skill-reminder", () => createCategorySkillReminderHook(ctx, availableSkills))
     : null
 
   const autoSlashCommand = isHookEnabled("auto-slash-command")
@@ -43,7 +35,8 @@ export function createSkillHooks(args: {
           pluginsEnabled: pluginConfig.claude_code?.plugins ?? true,
           enabledPluginsOverride: pluginConfig.claude_code?.plugins_override,
           directory: ctx.directory,
-        }))
+        }),
+      )
     : null
 
   return { categorySkillReminder, autoSlashCommand }

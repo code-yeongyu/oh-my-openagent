@@ -74,8 +74,7 @@ export function formatMomusReviewArtifact(input: {
 function isInsideDirectory(root: string, candidate: string): boolean {
   const relativePath = relative(root, candidate)
   return (
-    relativePath === "" ||
-    (relativePath !== ".." && !relativePath.startsWith(`..${sep}`) && !isAbsolute(relativePath))
+    relativePath === "" || (relativePath !== ".." && !relativePath.startsWith(`..${sep}`) && !isAbsolute(relativePath))
   )
 }
 
@@ -160,12 +159,7 @@ function nextReviewSequence(reviewsDir: string): number {
 }
 
 function hasErrorCode(error: unknown, code: string): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code: unknown }).code === code
-  )
+  return typeof error === "object" && error !== null && "code" in error && (error as { code: unknown }).code === code
 }
 
 function artifactFileFlags(): number {

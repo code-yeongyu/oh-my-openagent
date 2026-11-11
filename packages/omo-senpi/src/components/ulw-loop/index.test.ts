@@ -50,13 +50,23 @@ describe("omo-senpi ulw-loop continuation", () => {
       logger,
       config: { getFlag: () => false },
     })
-    const inputResults = await pi.dispatch("input", { type: "input", text: "hello", source: "user" }, sessionEventCtx("/repo"))
-    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo"))
+    const inputResults = await pi.dispatch(
+      "input",
+      { type: "input", text: "hello", source: "user" },
+      sessionEventCtx("/repo"),
+    )
+    await dispatchRunEnd(
+      pi,
+      { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+      sessionEventCtx("/repo"),
+    )
 
     // No plan exists under /repo, so the hook stays out of the way without any CLI probe.
     expect(inputResults).toEqual([{ action: "continue" }])
     expect(pi.userMessages).toEqual([])
-    expect(logger.entries.map((entry) => entry.message)).not.toContain("omo-senpi ulw-loop inactive; omo binary not found")
+    expect(logger.entries.map((entry) => entry.message)).not.toContain(
+      "omo-senpi ulw-loop inactive; omo binary not found",
+    )
     expect(pi.tools.map((tool) => tool.name)).not.toContain("omo_agent_toolkit")
     expect(pi.removedToolHints.get("omo_agent_toolkit")).toMatch(/OMO_AGENT_TOOLKIT_SDK_ROOT/)
   })
@@ -97,7 +107,11 @@ describe("omo-senpi ulw-loop continuation", () => {
   it("#given incomplete goals #when continuation agent_end fires #then sends exactly one hidden followUp", async () => {
     const { pi } = await registerWithRunner([activeStatus()])
 
-    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo"))
+    await dispatchRunEnd(
+      pi,
+      { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+      sessionEventCtx("/repo"),
+    )
 
     expect(pi.userMessages).toEqual([])
     expect(pi.messages).toEqual([
@@ -120,7 +134,11 @@ describe("omo-senpi ulw-loop continuation", () => {
     const { pi, logger } = await registerWithRunner(changingActiveStatuses(9))
 
     for (let index = 0; index < 9; index += 1) {
-      await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo"))
+      await dispatchRunEnd(
+        pi,
+        { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+        sessionEventCtx("/repo"),
+      )
     }
 
     expect(pi.messages).toHaveLength(8)
@@ -136,10 +154,22 @@ describe("omo-senpi ulw-loop continuation", () => {
     const { pi } = await registerWithRunner(changingActiveStatuses(10))
 
     for (let index = 0; index < 8; index += 1) {
-      await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo"))
+      await dispatchRunEnd(
+        pi,
+        { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+        sessionEventCtx("/repo"),
+      )
     }
-    await pi.dispatch("input", { type: "input", text: "still working", source: "interactive" }, sessionEventCtx("/repo"))
-    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo"))
+    await pi.dispatch(
+      "input",
+      { type: "input", text: "still working", source: "interactive" },
+      sessionEventCtx("/repo"),
+    )
+    await dispatchRunEnd(
+      pi,
+      { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+      sessionEventCtx("/repo"),
+    )
 
     expect(pi.messages).toHaveLength(9)
   })
@@ -148,9 +178,21 @@ describe("omo-senpi ulw-loop continuation", () => {
     const status = activeStatus("G001")
     const { pi, calls } = await registerWithRunner([status, status, status])
 
-    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo"))
-    await pi.dispatch("input", { type: "input", text: "resume after user input", source: "interactive" }, sessionEventCtx("/repo"))
-    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo"))
+    await dispatchRunEnd(
+      pi,
+      { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+      sessionEventCtx("/repo"),
+    )
+    await pi.dispatch(
+      "input",
+      { type: "input", text: "resume after user input", source: "interactive" },
+      sessionEventCtx("/repo"),
+    )
+    await dispatchRunEnd(
+      pi,
+      { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+      sessionEventCtx("/repo"),
+    )
 
     expect(calls).toHaveLength(2)
     expect(pi.messages).toHaveLength(2)
@@ -161,8 +203,16 @@ describe("omo-senpi ulw-loop continuation", () => {
     const status = activeStatus("G001")
     const { pi, logger } = await registerWithRunner([status, status])
 
-    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo"))
-    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo"))
+    await dispatchRunEnd(
+      pi,
+      { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+      sessionEventCtx("/repo"),
+    )
+    await dispatchRunEnd(
+      pi,
+      { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+      sessionEventCtx("/repo"),
+    )
 
     expect(pi.messages).toHaveLength(1)
     expect(logger.entries).toContainEqual({
@@ -194,10 +244,18 @@ describe("omo-senpi ulw-loop continuation", () => {
     const { pi, calls } = await registerWithRunner(changingActiveStatuses(9))
 
     for (let index = 0; index < 8; index += 1) {
-      await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo"))
+      await dispatchRunEnd(
+        pi,
+        { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+        sessionEventCtx("/repo"),
+      )
     }
     await pi.dispatch("input", { type: "input", text: "ulw-loop", source: "extension" }, sessionEventCtx("/repo"))
-    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo"))
+    await dispatchRunEnd(
+      pi,
+      { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+      sessionEventCtx("/repo"),
+    )
 
     expect(calls).toHaveLength(8)
     expect(pi.messages).toHaveLength(8)
@@ -206,7 +264,11 @@ describe("omo-senpi ulw-loop continuation", () => {
   it("#given status reports all complete #when continuation fires #then no followUp is sent", async () => {
     const { pi } = await registerWithRunner([completeStatus()])
 
-    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo"))
+    await dispatchRunEnd(
+      pi,
+      { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+      sessionEventCtx("/repo"),
+    )
 
     expect(pi.userMessages).toEqual([])
   })

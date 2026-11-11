@@ -139,7 +139,7 @@ task(subagent_type="explore", run_in_background=true, prompt="TASK: act as a cod
 This is an explicit exhaustive-research assignment. Your default retrieval budget and stop-when-answered rules do not apply — run the full protocol below and report every lead.
 SCOPE: find everything in this codebase related to <angle>: <what complete looks like>.
 PROTOCOL: grep 3+ keyword variations; structural search; LSP references; globs; git history (-S and --grep). Cross-validate across tools. Report absolute paths and file:line patterns.
-End your reply with the ## EXPAND tail: '- LEAD: <discovery> — WHY: <why> — ANGLE: <search>' per lead, or 'none — <reason>'.")
+Tag every claim OBSERVED: <URL | file:line | command>. End your reply with the ## EXPAND tail: '- LEAD: <discovery> — WHY: <why> — ANGLE: <search>' per lead, '- DEAD END: <lead> — PROBED: <what exhausted it>', or 'none — <reason>'.")
 ```
 
 ## Phase 2 — Expand until convergence
@@ -154,7 +154,7 @@ This loop is what makes the mode research rather than search. Collect returns as
 task(category="deep-low", load_skills=["browser"], run_in_background=true, prompt="TASK: expansion wave <N> — investigate: <lead>.
 PARENT: <which return surfaced it>. This is an explicit exhaustive-research assignment; budgets do not apply.
 <role protocol for the lead's territory — web protocol for external leads, explore protocol for codebase leads>
-End your reply with the ## EXPAND tail.")
+Tag every claim OBSERVED: <URL | file:line | command>. End your reply with the ## EXPAND tail.")
 ```
 
 ### Excursions — dive deep on a new find, then surface back out
