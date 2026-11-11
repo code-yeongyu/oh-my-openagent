@@ -19,10 +19,13 @@ const builtinModuleNames = new Set(builtinModules.filter((moduleName) => !module
 export const generatedCodexInstallerPath = generatedEntrypoint
 
 // The freshness marker records a digest of the installer SOURCES, never of the bundled output.
-// Output bytes shift with the bundler version (CI pins a different Bun than a dev box), so a
-// byte comparison would fail on a perfectly current bundle. Source bytes do not shift, so this
-// flips only when someone edits installer source without regenerating the committed bundle.
-// Same reasoning as `// omo-senpi-build:` in packages/omo-senpi/plugin/scripts/build-extension.mjs.
+// Source bytes do not shift with the bundler, so the marker flips when installer source changes
+// and the committed bundle was not regenerated. Output bytes are a separate contract, owned by
+// codex-install-bundle-freshness.test.ts: a scratch rebuild must match the git index, so
+// `bun run build:codex-install` is a no-op on the pinned Bun. A Bun upgrade can change those
+// bytes; regenerate and commit the bundle in that bump. The bundle stays out of `bun fmt`
+// (.prettierignore). Formatting rewrites this bundler shape, and the next build reverts it.
+// Senpi's committed extensions use the same pair: ignore, plus `build-extension.mjs --check`.
 export const CODEX_INSTALL_BUILD_MARKER_PREFIX = "// omo-codex-install:"
 
 const BUILD_SETTINGS = JSON.stringify({ target: "node", format: "esm", minify: false, packages: "bundle" })

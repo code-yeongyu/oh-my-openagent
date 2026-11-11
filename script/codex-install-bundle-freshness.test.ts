@@ -1,8 +1,12 @@
 import { describe, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
+import { mkdtemp, readFile, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import {
+  buildCodexInstaller,
   bundledWorkspaceSources,
   digestCodexInstallerSources,
   parseCodexInstallerArtifact,
@@ -21,6 +25,26 @@ function readTrackedBundle(): string {
     throw new Error(`git show :${trackedBundlePath} failed: ${result.stderr.toString()}`)
   }
   return result.stdout.toString()
+}
+
+// A formatted bundle can keep a self-consistent marker and the same source digest. Only a rebuild
+// catches that, and only against the index: test:codex rewrites the working tree first.
+function describeBundleMismatch(actual: string, expected: string): string {
+  if (actual === expected) return ""
+  const actualLines = actual.split("\n")
+  const expectedLines = expected.split("\n")
+  const limit = Math.max(actualLines.length, expectedLines.length)
+  for (let index = 0; index < limit; index++) {
+    if (actualLines[index] === expectedLines[index]) continue
+    const actualLine = actualLines[index] ?? "<missing>"
+    const expectedLine = expectedLines[index] ?? "<missing>"
+    return [
+      `line ${index + 1} differs (actual ${actualLines.length} lines, expected ${expectedLines.length})`,
+      `actual: ${actualLine.slice(0, 200)}`,
+      `expected: ${expectedLine.slice(0, 200)}`,
+    ].join("\n")
+  }
+  return `byte length differs: actual ${actual.length}, expected ${expected.length}`
 }
 
 describe("committed Codex installer bundle", () => {
@@ -51,5 +75,27 @@ describe("committed Codex installer bundle", () => {
       bundle: trackedBundlePath,
       sourceDigest: currentSourceDigest,
     })
+  })
+
+  test("#given the tracked installer bundle #when it is rebuilt twice into scratch files #then both copies match the tracked bytes", async () => {
+    // given
+    const tracked = readTrackedBundle()
+    const scratch = await mkdtemp(join(tmpdir(), "omo-codex-install-bytes-"))
+    const firstPath = join(scratch, "first.mjs")
+    const secondPath = join(scratch, "second.mjs")
+
+    try {
+      // when
+      await buildCodexInstaller({ outputPath: firstPath })
+      await buildCodexInstaller({ outputPath: secondPath })
+      const first = await readFile(firstPath, "utf8")
+      const second = await readFile(secondPath, "utf8")
+
+      // then
+      expect(describeBundleMismatch(first, tracked)).toBe("")
+      expect(describeBundleMismatch(second, first)).toBe("")
+    } finally {
+      await rm(scratch, { recursive: true, force: true })
+    }
   })
 })
