@@ -8,7 +8,7 @@ mod refusing;
 mod sources;
 mod types;
 
-pub use refusal::{BackendResult, Refusal, RefusalCode};
+pub use refusal::{BackendResult, Refusal};
 pub use refusing::{refusing_capabilities, unknown_session_state};
 pub use sources::{AxEventSource, EpochSource, NoAxEvents, NoEpochSource, Presence, StopListener};
 pub use types::{
@@ -18,6 +18,7 @@ pub use types::{
 };
 
 use crate::capabilities::Capabilities;
+use crate::error::EngineCode;
 use crate::results::{DisplayInfo, PermissionState};
 
 /// The desktop backend of one OS (or the fake).
@@ -28,22 +29,16 @@ pub trait Backend: Send {
     }
 
     /// # Errors
-    /// `Unavailable{windows_unsupported}` by default.
+    /// `Internal{windows_unsupported}` (`COMPUTER_UNAVAILABLE`) by default.
     fn windows(&mut self, filter: &WindowFilter) -> BackendResult<WindowList> {
         let _ = filter;
-        Err(Refusal::new(
-            RefusalCode::Unavailable,
-            "windows_unsupported",
-        ))
+        Err(Refusal::new(EngineCode::Internal, "windows_unsupported"))
     }
 
     /// # Errors
-    /// `Unavailable{displays_unsupported}` by default.
+    /// `Internal{displays_unsupported}` (`COMPUTER_UNAVAILABLE`) by default.
     fn displays(&mut self) -> BackendResult<Vec<DisplayInfo>> {
-        Err(Refusal::new(
-            RefusalCode::Unavailable,
-            "displays_unsupported",
-        ))
+        Err(Refusal::new(EngineCode::Internal, "displays_unsupported"))
     }
 
     /// # Errors
@@ -51,7 +46,7 @@ pub trait Backend: Send {
     fn capture(&mut self, target: &Target, options: &CaptureOptions) -> BackendResult<FrameBytes> {
         let _ = (target, options);
         Err(Refusal::new(
-            RefusalCode::CaptureUnavailable,
+            EngineCode::CaptureUnavailable,
             "capture_unsupported",
         ))
     }
@@ -59,10 +54,10 @@ pub trait Backend: Send {
     /// The one side-effect sink.
     ///
     /// # Errors
-    /// `Unavailable{input_unsupported}` by default, with nothing sent.
+    /// `Internal{input_unsupported}` (`COMPUTER_UNAVAILABLE`) by default, with nothing sent.
     fn post_input(&mut self, input: &TaggedInput, route: Route) -> BackendResult<Delivered> {
         let _ = (input, route);
-        Err(Refusal::new(RefusalCode::Unavailable, "input_unsupported"))
+        Err(Refusal::new(EngineCode::Internal, "input_unsupported"))
     }
 
     /// A listen-only, injected-immune stop listener.
@@ -70,10 +65,7 @@ pub trait Backend: Send {
     /// # Errors
     /// `StopPathUnavailable{no_listener}` by default.
     fn stop_listener(&mut self) -> BackendResult<Box<dyn StopListener>> {
-        Err(Refusal::new(
-            RefusalCode::StopPathUnavailable,
-            "no_listener",
-        ))
+        Err(Refusal::new(EngineCode::StopPathUnavailable, "no_listener"))
     }
 
     /// The tri-state permission read; never prompts. Unknown by default, which is never granted.
@@ -90,7 +82,7 @@ pub trait Backend: Send {
         Box::new(NoEpochSource)
     }
 
-    /// The presence surface; `None` reads `PresenceUnavailable`.
+    /// The presence surface; `None` reads `ControlRequired{no_presence_surface}` (`COMPUTER_PRESENCE_UNAVAILABLE`).
     fn presence(&mut self) -> Option<Box<dyn Presence>> {
         None
     }
@@ -99,31 +91,31 @@ pub trait Backend: Send {
 /// The accessibility half of a backend.
 pub trait AxBackend {
     /// # Errors
-    /// `AxUnavailable{snapshot_unsupported}` by default.
+    /// `AxUnsupported{snapshot_unsupported}` by default.
     fn snapshot(&mut self, request: &SnapshotRequest) -> BackendResult<AxSnapshot> {
         let _ = request;
         Err(Refusal::new(
-            RefusalCode::AxUnavailable,
+            EngineCode::AxUnsupported,
             "snapshot_unsupported",
         ))
     }
 
     /// # Errors
-    /// `AxUnavailable{resolve_unsupported}` by default.
+    /// `AxUnsupported{resolve_unsupported}` by default.
     fn resolve(&mut self, reference: &Ref) -> BackendResult<Resolved> {
         let _ = reference;
         Err(Refusal::new(
-            RefusalCode::AxUnavailable,
+            EngineCode::AxUnsupported,
             "resolve_unsupported",
         ))
     }
 
     /// # Errors
-    /// `AxUnavailable{perform_unsupported}` by default, with nothing sent.
+    /// `AxUnsupported{perform_unsupported}` by default, with nothing sent.
     fn perform(&mut self, reference: &Ref, action: &Semantic) -> BackendResult<Delivered> {
         let _ = (reference, action);
         Err(Refusal::new(
-            RefusalCode::AxUnavailable,
+            EngineCode::AxUnsupported,
             "perform_unsupported",
         ))
     }
@@ -136,4 +128,4 @@ pub trait AxBackend {
 
 /// The refusal a missing presence surface reads as.
 pub const PRESENCE_UNAVAILABLE: Refusal =
-    Refusal::new(RefusalCode::PresenceUnavailable, "no_presence_surface");
+    Refusal::new(EngineCode::ControlRequired, "no_presence_surface");
