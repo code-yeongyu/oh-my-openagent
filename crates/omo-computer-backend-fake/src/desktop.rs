@@ -168,7 +168,12 @@ impl Backend for FakeBackend {
         self.call(FakeMethod::Capture, |state, _| {
             let (rect, scale) = capture_rect(state, target)?;
             let rect = options.region.unwrap_or(rect);
-            let (width, height) = (pixels(rect.width * scale), pixels(rect.height * scale));
+            let (scaled_width, scaled_height) = (rect.width * scale, rect.height * scale);
+            // `pixels` maps a non-finite length to 0, which would report an empty success.
+            if !scaled_width.is_finite() || !scaled_height.is_finite() {
+                return Err(Refusal::bare(EngineCode::CaptureFailed));
+            }
+            let (width, height) = (pixels(scaled_width), pixels(scaled_height));
             if u64::from(width) * u64::from(height) > MAX_COMPOSITE_PIXELS {
                 return Err(Refusal::bare(EngineCode::CaptureFailed));
             }

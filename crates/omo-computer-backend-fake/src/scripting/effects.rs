@@ -56,10 +56,12 @@ impl FakeBackend {
                 .and_then(|list| list.get(position));
             let outcome = scripted.copied().unwrap_or(FocusRecordOutcome::TookEffect);
             state.focus_record_pos.insert(kind, position + 1);
-            self.sink.record(
-                format!("focus_record kind={kind:?} window={window} outcome={outcome:?}")
-                    .to_lowercase(),
-            );
+            // Only the enum debug names are folded; the window id keeps its case.
+            self.sink.record(format!(
+                "focus_record kind={} window={window} outcome={}",
+                format!("{kind:?}").to_lowercase(),
+                format!("{outcome:?}").to_lowercase(),
+            ));
             Ok(outcome)
         })
     }
