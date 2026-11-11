@@ -78,6 +78,34 @@ describe("composeReleaseBody", () => {
   test("#given no contributors #when composed #then no blank block is inserted", () => {
     expect(composeReleaseBody("notes", "", "footer")).toBe("notes\n\nfooter\n")
   })
+
+  test("#given fragment text citing a private-shaped reference #when composed #then it is neutralized and public ones stay", () => {
+    const body = composeReleaseBody(
+      "- fixed (acme-svc#9, senpi#6412)",
+      "- @a: thanks (acme-svc#9)",
+      "```bash\nbun add -g omo-ai\n```",
+    )
+    expect(body).toContain("- fixed (tracked internally, senpi#6412)")
+    expect(body).toContain("- @a: thanks (tracked internally)")
+    expect(body).not.toContain("acme-svc")
+    expect(body).toContain("bun add -g omo-ai")
+  })
+
+  test("#given fragment and contributor text with private GitHub URLs #when composed #then no private URL survives and public ones stay", () => {
+    const publicLink = "[omo#12](https://github.com/code-yeongyu/oh-my-openagent/pull/12)"
+    const body = composeReleaseBody(
+      "- fixed [acme-svc#628](https://github.com/acme-org/acme-svc/issues/628) and https://github.com/acme-org/acme-svc/pull/9. " +
+        publicLink,
+      "- @a: see https://github.com/acme-org/acme-svc/commit/abc1234",
+      "footer",
+    )
+    expect(body).toBe(
+      "- fixed tracked internally and tracked internally. " +
+        publicLink +
+        "\n\n- @a: see tracked internally\n\nfooter\n",
+    )
+    expect(body).not.toContain("acme-")
+  })
 })
 
 describe("installFooter", () => {
@@ -90,19 +118,5 @@ describe("installFooter", () => {
   test("#given a prerelease version #then the footer installs the beta tag", async () => {
     const { installFooter } = await import("./print-release-notes")
     expect(installFooter("5.0.0-beta.91")).toContain("bun add -g omo-ai@beta")
-  })
-})
-
-describe("composeReleaseBody", () => {
-  test("#given fragment text citing a private-shaped reference #when composed #then it is neutralized and public ones stay", () => {
-    const body = composeReleaseBody(
-      "- fixed (acme-svc#9, senpi#6412)",
-      "- @a: thanks (acme-svc#9)",
-      "```bash\nbun add -g omo-ai\n```",
-    )
-    expect(body).toContain("- fixed (tracked internally, senpi#6412)")
-    expect(body).toContain("- @a: thanks (tracked internally)")
-    expect(body).not.toContain("acme-svc")
-    expect(body).toContain("bun add -g omo-ai")
   })
 })
