@@ -16,6 +16,11 @@ import { ENGINE_MODELS, startHttpProviders } from "./model-chain-http"
 
 const HOST_READY_LINE = "senpi rpc listening on"
 const HOST_READY_TIMEOUT_MS = 30_000
+// #12638: a process child gets its designated chain by `set_retry_fallback` within a deadline (10 s by default),
+// and past it the first prompt goes out on the engine's own fallback settings, which here name the parent's
+// model. A loaded host that took longer to start the child recorded that extra call. The cases run with a 60 s
+// timeout, so the chain gets nearly all of it: they wait for the engine's answer instead of racing a window.
+const CHAIN_DEADLINE_MS = 50_000
 
 export type EngineRunnerKind = "process" | "host"
 
@@ -72,8 +77,13 @@ type Engine = Omit<EngineRunner, "calls">
 
 function processEngine(env: Readonly<Record<string, string>>, hiddenCapabilities: readonly string[]): Engine {
   const children: ChildProcess[] = []
+  const warnings: string[] = []
   const runner = new RpcProcessRunner({
     modelAdmission: async () => {},
+    fallbackChainDeadlineMs: CHAIN_DEADLINE_MS,
+    onWarning: (message) => {
+      warnings.push(message)
+    },
     buildSpawn: (spec) => buildRpcSpawn(spec, { parentEnv: env, resolveSenpiExecutable: () => null }),
     spawnChild: (descriptor) => {
       const child = spawn(descriptor.command, [...descriptor.args], { cwd: descriptor.cwd, env: descriptor.env, stdio: ["pipe", "pipe", "pipe"] })
@@ -90,6 +100,8 @@ function processEngine(env: Readonly<Record<string, string>>, hiddenCapabilities
       await runner.settleTeardowns()
       // A finished child stays resident; it must be gone before the world's directories are removed.
       await Promise.all(children.splice(0).map(stopChild))
+      // A chain that was not applied makes any model-call assertion meaningless, so it fails the case by name.
+      if (warnings.length > 0) throw new Error(`process runner warned: ${warnings.join("; ")}`)
     },
   }
 }
