@@ -69,6 +69,29 @@ export function currentLaunchScope(): LaunchScope | undefined {
   return launchScope.getStore()
 }
 
+/**
+ * The process-wide model registry as last read from a live ctx. No session owns the registry, so a
+ * launch whose ctx has since retired still resolves models through it (#13070); session facts are never kept.
+ */
+export function createRegistryMemory(): {
+  readonly note: (registry: ChildModelRegistry | undefined) => void
+  readonly remember: (facts: LaunchFacts) => LaunchFacts
+  readonly retiredFacts: () => LaunchFacts
+} {
+  let known: ChildModelRegistry | undefined
+  const note = (registry: ChildModelRegistry | undefined): void => {
+    if (registry !== undefined) known = registry
+  }
+  return {
+    note,
+    remember: (facts) => {
+      note(facts.modelRegistry)
+      return facts
+    },
+    retiredFacts: () => ({ ...NO_LAUNCH_FACTS, modelRegistry: known }),
+  }
+}
+
 /** Facts for a launch from the current ctx, restricted to what the run's own conversations may see. */
 export function factsForScope(scope: LaunchScope, currentSessionId: string | undefined, live: LaunchFacts): LaunchFacts {
   if (scope.snapshot !== undefined) return scope.snapshot

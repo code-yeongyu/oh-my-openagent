@@ -14,8 +14,9 @@ import {
   type MemoryIdentityRuntimeDeps,
 } from "./identity-runtime"
 import { createMemoryJournalWiring, type MemoryJournalWiring } from "./journal-wiring"
+import { resolveMemoryModelRegistry } from "./model-registry-resolver"
 import { resolveMemorySessionModel } from "./session-model-resolver"
-import { NO_LAUNCH_FACTS, currentLaunchScope, factsForScope, readLaunchFacts, withLaunchScope, type LaunchFacts } from "./launch-facts"
+import { createRegistryMemory, currentLaunchScope, factsForScope, readLaunchFacts, withLaunchScope, type LaunchFacts } from "./launch-facts"
 import { isStaleExtensionContextError } from "./stale-extension-context"
 import { resolveReflectionTriggerConfig, type ReflectionTriggerSession } from "./trigger-wiring"
 import { isRecord, sessionIdFrom } from "./wiring-context"
@@ -52,6 +53,8 @@ export function createMemoryRuntimeWiring(
   const journals = new Map<string, MemoryJournalWiring>()
   const factsWirings = new Map<string, MemoryFactsWiring>()
 
+  const registryMemory = createRegistryMemory()
+
   const resolveContext = (sessionId: string): MemoryIdentityContext | undefined =>
     options.sessions.get(sessionId)?.context
 
@@ -63,14 +66,14 @@ export function createMemoryRuntimeWiring(
     const current = lastEventCtx.current
     let live: LaunchFacts
     try {
-      live = readLaunchFacts(current)
+      live = registryMemory.remember(readLaunchFacts(current))
     } catch (error) {
       if (!isStaleExtensionContextError(error)) throw error
-      live = NO_LAUNCH_FACTS
+      live = registryMemory.retiredFacts()
     }
     // Outside any launch (a facts launch without a captured selection) no session's own details apply:
     // only the process-wide model registry, never whichever session happens to be current.
-    if (scope === undefined) return { ...NO_LAUNCH_FACTS, modelRegistry: live.modelRegistry }
+    if (scope === undefined) return { ...registryMemory.retiredFacts(), modelRegistry: live.modelRegistry }
     let currentSessionId: string | undefined
     try {
       currentSessionId = sessionIdFrom(current)
@@ -102,7 +105,7 @@ export function createMemoryRuntimeWiring(
 
   function snapshotLaunchFacts(eventCtx: unknown): LaunchFacts | undefined {
     try {
-      return readLaunchFacts(eventCtx)
+      return registryMemory.remember(readLaunchFacts(eventCtx))
     } catch (error) {
       if (!isStaleExtensionContextError(error)) {
         options.logger?.warn("memory reflection could not read its session details at trigger time; the launch reads them later", { error: error instanceof Error ? error.message : String(error) })
@@ -187,6 +190,11 @@ export function createMemoryRuntimeWiring(
     const cached = runtimes.get(identity.identity)
     if (cached !== undefined) return cached
     const create = options.createRuntime ?? createIdentityRuntime
+    try {
+      registryMemory.note(resolveMemoryModelRegistry(lastEventCtx.current))
+    } catch (error) {
+      if (!isStaleExtensionContextError(error)) throw error
+    }
     const runtime = create(identity, {
       loadConfig: options.loadConfig,
       cwd: options.cwd,
