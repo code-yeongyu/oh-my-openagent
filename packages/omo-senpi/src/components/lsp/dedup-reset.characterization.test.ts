@@ -221,7 +221,7 @@ describe("omo-senpi lsp post-edit dedup and reset (characterization X8b)", () =>
     await pi.dispatch("session_shutdown", { type: "session_shutdown" }, ctx)
     const afterShutdown = await appended(pi, "src/f.ts", ctx)
 
-    const nudge = (path: string) => [`\n\nLSP errors detected in ${path}, please fix:\n${NOT_INSTALLED_TEXT}`]
+    const nudge = (path: string) => [`\n\nLSP note for ${path} (the edit itself is not affected):\n${NOT_INSTALLED_TEXT}`]
     expect(first).toEqual(nudge("src/a.ts"))
     expect(repeat).toEqual([])
     expect(afterTurn).toEqual([])
