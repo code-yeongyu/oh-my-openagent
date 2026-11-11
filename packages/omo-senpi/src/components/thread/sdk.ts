@@ -21,6 +21,7 @@ import { addressBook, hostView, resolution, resolveEntries, resolveStoredSession
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "./tools/ports"
 import { listThreads, readThread } from "./tools/read-ops"
 import type { RemoteThreadSurface } from "./remote/ports"
+import { stampThisDevice } from "./remote/this-device"
 
 export type ThreadSdkOptions = {
   readonly agentDir: string
@@ -124,7 +125,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     env,
     ...(engineStatusAll === undefined ? {} : { statusAll: async () => parseHostStatusAll(await engineStatusAll()) }),
   })
-  const store = options.store ?? createGatewayStore({ agentDir: options.agentDir, senderProvenance: () => resolveProvenance({ cwd: options.cwd, env, ...(options.provenanceWorkspaces === undefined ? {} : { workspaces: options.provenanceWorkspaces }) }), resolveTarget: (address, request) => resolveForExtension(address, request), ...(options.workerModuleUrl === undefined ? {} : { workerModuleUrl: options.workerModuleUrl }) })
+  const store = options.store ?? createGatewayStore({ agentDir: options.agentDir, senderProvenance: () => stampThisDevice(resolveProvenance({ cwd: options.cwd, env, ...(options.provenanceWorkspaces === undefined ? {} : { workspaces: options.provenanceWorkspaces }) }), options.remote), resolveTarget: (address, request) => resolveForExtension(address, request), ...(options.workerModuleUrl === undefined ? {} : { workerModuleUrl: options.workerModuleUrl }) })
   const now = options.now ?? store.now
   const workspaces = options.provenanceWorkspaces
   const surface: ThreadToolSurfaceOptions = { host, store, env, ...(workspaces === undefined ? {} : { loadProvenanceWorkspaces: () => workspaces }), stateDirectory: options.agentDir, sessionsDirectory: () => join(options.agentDir, "sessions"), callerSessionId: () => UNKNOWN_CALLER, callerWorkspaceRoot: () => options.cwd, now }

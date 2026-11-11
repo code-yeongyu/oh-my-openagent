@@ -12,6 +12,10 @@ import { validateCompletion } from "./completion-validation"
 import { preflightReflectionDescriptions } from "./description-preflight"
 import { createReflectionWorktree, finalizeReflectionWorktree } from "./worktree"
 
+// Explicit budget for CPU- or git-bound work that runs 1.5-2.6 s and can pass 5 s on a loaded host: a local
+// multi-file `bun test` gives every file after the first Bun's 5 s default, since only CI passes --timeout (#12453).
+const SLOW_TEST_TIMEOUT_MS = process.platform === "win32" ? 30_000 : 20_000
+
 const roots: string[] = []
 const path = "reference/note.md"
 const body = "\n# Durable note\r\n\r\nBody stays byte-identical.  \r\n"
@@ -100,7 +104,7 @@ describe("reflection description preflight", () => {
       expect(await validateCompletion(worktree, worktree.baseSha)).toMatchObject({ status: "valid" })
       expect(await preflightReflectionDescriptions(worktree, worktree.baseSha)).toEqual([])
       expect(await child.head()).toBe(commits[0]?.sha)
-    })
+    }, SLOW_TEST_TIMEOUT_MS)
   }
 
   it("#given an oversized summary and duplicate key #when preflight runs #then the invalid note and tip remain untouched", async () => {

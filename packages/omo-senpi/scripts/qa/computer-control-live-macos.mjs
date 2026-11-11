@@ -14,8 +14,9 @@
 //                        (SkyLight); with --disable-skylight it expects CaptureUnavailable reason off-space.
 //   two-window-typing    macOS key priming (plan row 16): opens two TextEdit documents in the background, A key, then
 //                        types into B three times with macos_key_priming on. Passes when A's text is unchanged, B is
-//                        its original plus every typed piece, and A is TextEdit's key window again after each call.
-//                        Its variant does the same with A's text area focused first. Priming runs only in a
+//                        its original plus every typed piece, and A is TextEdit's key window again once all three
+//                        calls ended (checked once, after the last one). Its variant does the same with A's text
+//                        area focused first (focus only, no selection in A). Priming runs only in a
 //                        reportMode:"object" session, so until omo opens those (plan row 36) this FAILS with
 //                        BackgroundUnavailable; that is not a priming failure.
 //

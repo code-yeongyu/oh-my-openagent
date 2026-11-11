@@ -22,7 +22,7 @@ import { compareVersions } from "./version.ts"
 export { type DeviceServiceHost, deviceServiceAssetName, deviceServiceHost } from "./release-assets.ts"
 export { DEVICE_SERVICE_RELEASE_KEYS, verifyReleaseSignature } from "./release-signature.ts"
 
-const DEVICE_SERVICE_ORIGIN = "https://get.omo.dev"
+export const DEVICE_SERVICE_ORIGIN = "https://get.omo.dev"
 
 export type FetchRelease = (url: string, init?: { readonly signal?: AbortSignal }) => Promise<Response>
 

@@ -376,6 +376,21 @@ pub trait AxBackend {
     fn focus(&mut self, h: &AxHandle) -> CoreResult<()>;
     fn element_at(&mut self, x: f64, y: f64) -> CoreResult<Option<AxHandle>>;
     fn focused_element(&mut self) -> CoreResult<Option<AxHandle>>;
+
+    /// The element with keyboard focus inside the app `pid`, read from that
+    /// app itself: where background keys sent to it land. The system-wide
+    /// [`Self::focused_element`] names only the frontmost app's. Backends
+    /// without a per-app read keep this default, the system-wide focus.
+    fn app_focused_element(&mut self, _pid: u32) -> CoreResult<Option<AxHandle>> {
+        self.focused_element()
+    }
+
+    /// Whether `h` is itself a secure text field, read from its role and
+    /// subrole. Backends that cannot tell keep this default, `false`.
+    fn is_secure_text_field(&mut self, _h: &AxHandle) -> CoreResult<bool> {
+        Ok(false)
+    }
+
     fn attributes(&mut self, h: &AxHandle) -> CoreResult<Vec<(String, String)>>;
 
     /// [`Self::props`] for object-mode sessions, with how each field was read
