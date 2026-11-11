@@ -93,8 +93,16 @@ impl Hello {
 /// `sha256(lock-file identity || 0x00 || uid as decimal)`.
 #[must_use]
 pub fn machine_id(lock_file_identity: &[u8], uid: u32) -> String {
-    let _ = (lock_file_identity, uid, Sha256::digest(b""));
-    String::new()
+    let mut hasher = Sha256::new();
+    hasher.update(lock_file_identity);
+    hasher.update([0u8]);
+    hasher.update(uid.to_string().as_bytes());
+    hasher
+        .finalize()
+        .iter()
+        .take(8)
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
 }
 
 /// The major of an ABI line `<name>/<major>[.<minor>]`, or `None` for a malformed line.

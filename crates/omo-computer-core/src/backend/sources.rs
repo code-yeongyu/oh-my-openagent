@@ -47,7 +47,10 @@ pub struct NoEpochSource;
 
 impl EpochSource for NoEpochSource {
     fn next_change(&mut self) -> BackendResult<Option<EpochChange>> {
-        Err(Refusal::new(RefusalCode::Unavailable, "stub"))
+        Err(Refusal::new(
+            RefusalCode::Unavailable,
+            "epoch_source_unsupported",
+        ))
     }
 }
 
@@ -57,6 +60,9 @@ pub struct NoAxEvents;
 
 impl AxEventSource for NoAxEvents {
     fn next_event(&mut self) -> BackendResult<Option<AxEvent>> {
-        Err(Refusal::new(RefusalCode::Unavailable, "stub"))
+        Err(Refusal::new(
+            RefusalCode::AxUnavailable,
+            "ax_events_unsupported",
+        ))
     }
 }
