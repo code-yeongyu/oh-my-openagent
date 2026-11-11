@@ -4,7 +4,7 @@ import { SOCKET_FILE } from "./local-api/access.ts"
 import { connectLocalApi, type ConnectOptions, type LocalApiClient } from "./local-api/client.ts"
 import { connectLocal, ENDPOINT_FILE } from "./local-api/transport.ts"
 import type { ListingResult, ListingRevision } from "./local-api/client-assembly.ts"
-import type { Capability, ControlAttachState, DeviceRef, DeviceRow, MachineBinding, SessionFilter, Status } from "./local-api/protocol.ts"
+import type { Capability, ControlAttachState, DeviceRef, DeviceRow, SessionFilter, Status } from "./local-api/protocol.ts"
 import { type CommandResult, openAttach, PROGRESS_STATES, type RemoteAttach } from "./remote-attach.ts"
 import { followDelegatedChannel } from "./delegated-channel.ts"
 import { LocalApiError } from "./local-api/errors.ts"
@@ -128,11 +128,6 @@ export type DeviceService = {
   /** The service forgets the device and reports signed_out; it keeps running. */
   readonly forget: () => Promise<void>
   readonly thisDevice: () => Promise<DeviceRef | null>
-  /**
-   * The machine binding for an account's salt (omo-service#1016): relayd hashes its own read of the machine id, and
-   * names the identity it already holds so a sign-in presents those keys instead of registering a second device.
-   */
-  readonly machineBinding: (machineSalt: string) => Promise<MachineBinding>
   readonly devices: () => Promise<readonly DeviceRow[]>
   /** One listing round across the account's devices; `onRevision` sees each complete revision as it lands. */
   readonly sessions: (filter?: SessionFilter, onRevision?: (revision: ListingRevision) => void) => Promise<ListingResult>
@@ -239,7 +234,6 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
       await client.request("device.forget", {})
     },
     thisDevice: async () => (await client.request("device.info", {})).device,
-    machineBinding: machineSalt => client.request("device.machine_binding", { machine_salt: machineSalt }),
     devices: async () => (await client.request("devices.list", {})).devices,
     sessions: newestRowsListing(client),
     attach: (device, sessionId) => openAttach(client, device, sessionId),

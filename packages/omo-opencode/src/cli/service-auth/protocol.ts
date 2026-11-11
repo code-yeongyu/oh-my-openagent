@@ -55,7 +55,6 @@ const envelopeSchema = z.object({
     detail: z.unknown().optional(),
   }),
 })
-const machineSaltSchema = z.object({ reason: z.literal("machine_hash_required"), machineSalt: nonempty })
 const limitSchema = z.object({
   reason: z.literal("device_limit"), managementToken: nonempty,
   used: z.number().int().nonnegative(), limit: z.number().int().nonnegative(),
@@ -82,7 +81,6 @@ const REFUSAL_CODES = [
   "authorization_pending", "slow_down", "access_denied", "expired_token", "rate_limited",
   "internal", "unavailable", "forbidden", "invalid_request", "not_found",
   "client_upgrade_required", "writer_floor_mismatch", "service_upgrade_required", "refresh_recovery_expired",
-  "machine_hash_required", "machine_mismatch",
 ] as const
 export type RefusalCode = (typeof REFUSAL_CODES)[number] | "unknown"
 const isKnownRefusal = (code: string): code is (typeof REFUSAL_CODES)[number] => (REFUSAL_CODES as readonly string[]).includes(code)
@@ -105,7 +103,7 @@ export function refusalGuidance(code: RefusalCode, status: number): RefusalGuida
     case "entitlement_required": case "forbidden": case "access_denied": case "authorization_pending":
       return "account_refused"
     case "client_upgrade_required": case "writer_floor_mismatch": case "service_upgrade_required": case "refresh_recovery_expired":
-    case "machine_hash_required": case "machine_mismatch": case "unknown":
+    case "unknown":
       if (status === 401) return "sign_in_again"
       if (status === 429) return "wait"
       if (status >= 500) return "service_trouble"
@@ -128,16 +126,13 @@ export class ApiRefusal extends SignInError {
   readonly code: RefusalCode
   readonly #detail: z.infer<typeof limitSchema> | undefined
   readonly #retryAfter: string | null
-  /** The account's machine salt a machine_hash_required refusal carries (omo-service#1016). */
-  readonly machineSalt: string | undefined
-  constructor(code: string, readonly status: number, detail?: z.infer<typeof limitSchema>, retryAfter: string | null = null, machineSalt?: string) {
+  constructor(code: string, readonly status: number, detail?: z.infer<typeof limitSchema>, retryAfter: string | null = null) {
     const known: RefusalCode = isKnownRefusal(code) ? code : "unknown"
     // Server messages and unknown codes can contain credentials; never echo either.
     super(refusalMessage(refusalGuidance(known, status)), status === 429 || status >= 500)
     this.code = known
     this.#detail = detail
     this.#retryAfter = retryAfter
-    this.machineSalt = machineSalt
   }
   get detail() { return this.#detail }
   retryDelay(now: number, fallback: number): number {
@@ -192,10 +187,8 @@ export async function requestApi(api: string, path: string, init: RequestInit, s
   if (!envelope.success) throw new InvalidApiResponse(response.status)
   const error = envelope.data.error
   const detail = limitSchema.safeParse(error.detail)
-  const salt = machineSaltSchema.safeParse(error.detail)
   throw new ApiRefusal(error.code, response.status,
-    error.code === "entitlement_required" && detail.success ? detail.data : undefined, response.headers.get("retry-after"),
-    error.code === "machine_hash_required" && salt.success ? salt.data.machineSalt : undefined)
+    error.code === "entitlement_required" && detail.success ? detail.data : undefined, response.headers.get("retry-after"))
 }
 
 export const jsonRequest = (body: unknown): RequestInit => ({

@@ -35,7 +35,6 @@ const answers: { readonly [T in RequestType]: ResponseData[T] } = {
   "device.adopt": { device: { id: PEER, name: "studio" } },
   "device.forget": {},
   "device.info": { device: { id: PEER, name: "studio" } },
-  "device.machine_binding": { machine_hash: null, device: null, merge_device_ids: [] },
   "endpoints.register": {},
   "endpoints.unregister": {},
   "devices.list": { devices: [deviceRow] },

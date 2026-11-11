@@ -136,10 +136,7 @@ export function createSession(options: {
     signal,
     transaction: locked,
     async ready() { await store.read() },
-    /** The stored sign-in whose keys a machine-bound sign-in reuses; null when nothing readable is stored. */
-    stored: (): Promise<Credentials | null> => store.read().catch(() => null),
-    /** `adopt: false` when the device service already holds exactly these keys (one machine, one device). */
-    async save(value: Credentials, options: { readonly adopt?: boolean } = {}) {
+    async save(value: Credentials) {
       await locked(async () => {
         let stored: Credentials | null
         try {
@@ -156,7 +153,7 @@ export function createSession(options: {
       })
       // After the marker is gone, so a stale marker from an earlier sign-out cannot park this sign-in; from the value
       // in memory, never read back from the store.
-      if (options.adopt !== false) await deviceService?.adopt(value)
+      await deviceService?.adopt(value)
     },
     /** The marker an explicit `omo logout` left, or null; only an empty store makes it meaningful. */
     signedOutMarker: () => readSignedOutMarker(markerPath),

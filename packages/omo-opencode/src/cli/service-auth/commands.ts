@@ -7,7 +7,6 @@ import { deviceName, devicePlatform } from "./device-name"
 import { loginDevice } from "./device-flow"
 import { createCredentialStore, INTERACTIVE_READ_WAIT } from "./keystore"
 import { BrowserUnavailable, loginLoopback } from "./loopback"
-import { localMachineHash, type MachineDeviceService, prepareMachineSignIn } from "./machine-binding"
 import { type ChooseDevice, type ListedDevice, RequestFailure, serviceOrigin, SignInError } from "./protocol"
 import { resolveMemoryRoot, syncPinDir } from "@oh-my-opencode/memory-core/sync-device-retire"
 
@@ -34,11 +33,7 @@ async function ensureServiceAvailable(session: Pick<Session, "request">, api: st
 type Options = { readonly api?: string; readonly accounts?: string; readonly device?: boolean; readonly browser?: boolean }
 
 /** What the host adds to the account commands: its device service for an API origin (design D r9 sections 4-5). */
-export type ServiceAuthHooks = {
-  readonly deviceService?: (api: string) => DeviceServiceHandoff
-  /** This machine's device service as a sign-in binds to it (omo-service#1016): one machine, one device. */
-  readonly machineDevice?: () => MachineDeviceService
-}
+export type ServiceAuthHooks = { readonly deviceService?: (api: string) => DeviceServiceHandoff }
 
 export function deviceChoices(devices: readonly ListedDevice[]) {
   return devices.map(device => ({ value: device.id, label: terminalText(device.name) }))
@@ -92,17 +87,13 @@ async function run(action: "login" | "logout" | "whoami", options: Options, hook
       return
     }
     await ensureServiceAvailable(session, api)
-    const machineDevice = hooks.machineDevice?.()
-    const machine = async (current: Session) => prepareMachineSignIn({
-      stored: await current.stored(), local: localMachineHash(process.env), deviceService: machineDevice,
-    })
     const name = deviceName()
     const platform = devicePlatform()
     if (!options.device && options.browser !== false) {
       try {
         await loginLoopback(session, {
           accounts: accountsOrigin(options, process.env),
-          name, platform, open: openSignInBrowser, chooseDevice, machine,
+          name, platform, open: openSignInBrowser, chooseDevice,
         })
         console.log("Signed in to OmO.")
         return
@@ -111,7 +102,7 @@ async function run(action: "login" | "logout" | "whoami", options: Options, hook
       }
     }
     await loginDevice(session, {
-      name, platform, chooseDevice, machine,
+      name, platform, chooseDevice,
       show: code => {
         console.log(`Open ${code.verificationUri}`)
         console.log(`User code: ${code.userCode}`)
