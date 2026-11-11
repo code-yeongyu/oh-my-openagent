@@ -11,11 +11,20 @@ import os from "node:os"
 import path from "node:path"
 
 type Verdict = "closed" | "open-with-row" | "needs-installer" | "UNMEASURED" | "CONTRADICTS" | "CHANGED"
-type Measured = { verdict: Verdict; measured: string; detail?: unknown }
-type Row = { id: string; gap: string; condition: string; owner: string; measure: (ctx: Ctx) => Promise<Measured> }
+// notRun: the row needs an opt-in this run did not give (the root leg without --allow-sudo).
+type Measured = { verdict: Verdict; measured: string; detail?: unknown; notRun?: true }
+type Row = {
+  id: string
+  gap: string
+  condition: string
+  owner: string
+  rootLeg?: true
+  measure: (ctx: Ctx) => Promise<Measured>
+}
 type SourceCheck = { kind: "present" | "absent"; pattern: string; paths: string[] }
-type SourceSpec = { bunshinSrc: string; rows: Record<string, { checks: SourceCheck[]; holds: Verdict }> }
-type Ctx = { bin: string; home: string; spec: SourceSpec; specPath: string }
+// The local file carries only the search patterns; each row's expected verdict lives in this script.
+type SourceSpec = { bunshinSrc: string; rows: Record<string, { checks: SourceCheck[] }> }
+type Ctx = { bin: string; home: string; spec: SourceSpec; specPath: string; allowSudo: boolean }
 
 const LEDGER_HEADER = ["id", "gap", "condition", "measured", "verdict", "rerun", "host_build", "owner", "evidence"]
 const SCRIPT = "crates/omo-computer-engine/probes/probe-sp-b.ts"
@@ -27,7 +36,7 @@ const fail = (line: string, code = 2): never => {
 }
 
 const run = async (cmd: string[], env?: Record<string, string>) => {
-  const proc = Bun.spawn(cmd, { stdout: "pipe", stderr: "pipe", env })
+  const proc = Bun.spawn(cmd, env ? { stdout: "pipe", stderr: "pipe", env } : { stdout: "pipe", stderr: "pipe" })
   const [stdout, stderr, code] = await Promise.all([
     new Response(proc.stdout).text(),
     new Response(proc.stderr).text(),
@@ -69,7 +78,7 @@ const manifestWith = async (ctx: Ctx, name: string, desc: unknown) => {
   return manifest.capabilities.find((entry) => entry.name === name)
 }
 
-const sourceRow = async (ctx: Ctx, id: string): Promise<Measured> => {
+const sourceRow = async (ctx: Ctx, id: string, expect: Verdict): Promise<Measured> => {
   const row = ctx.spec.rows[id]
   if (!row) return { verdict: "CHANGED", measured: `no source check for ${id} in the local check file` }
   const results = []
@@ -80,7 +89,7 @@ const sourceRow = async (ctx: Ctx, id: string): Promise<Measured> => {
     results.push({ ...check, hits: hits.length, ok: check.kind === "present" ? hits.length > 0 : hits.length === 0 })
   }
   const okCount = results.filter((r) => r.ok).length
-  const verdict = okCount === results.length ? row.holds : "CHANGED"
+  const verdict = okCount === results.length ? expect : "CHANGED"
   return { verdict, measured: `${okCount}/${results.length} local source checks hold`, detail: results }
 }
 
@@ -93,6 +102,47 @@ const unmeasured =
 
 const onMac = () => process.platform === "darwin"
 const onWindows = () => process.platform === "win32"
+
+type RootLeg = {
+  mode: string
+  pdeathsigAfterDrop: number
+  hostWatch: string
+  launcherEnded: string
+  launcherGoneMs: number
+  engineGoneMs: number
+  residualPids: number[]
+}
+// The helper exits 3 when python3 is missing; that is a precondition, never a measurement.
+const ROOT_HELPER_NO_PYTHON = 3
+
+// One stand-in leg as root. "pidfd" proves the pidfd watch alone (the launcher must end by its own
+// exit 137); "pdeathsig" proves the re-armed parent-death signal alone (the launcher must end by SIGKILL).
+const rootLeg = async (ctx: Ctx, mode: "pidfd" | "pdeathsig"): Promise<Measured> => {
+  if (!ctx.allowSudo)
+    return { verdict: "UNMEASURED", measured: "root leg not run: pass --allow-sudo to measure it", notRun: true }
+  const uid = String(process.getuid?.() ?? 1000)
+  const gid = String(process.getgid?.() ?? 1000)
+  const r = await run(["sudo", "-n", "/bin/sh", HELPER, uid, gid, mode])
+  if (r.code === ROOT_HELPER_NO_PYTHON) fail("SP-B precondition missing: python3 not found for the root leg")
+  if (r.code !== 0) return { verdict: "CONTRADICTS", measured: `helper exited ${r.code}: ${r.stderr.trim()}` }
+  const d: RootLeg = JSON.parse(r.stdout.trim().split("\n").at(-1) ?? "{}")
+  const wantEnd = mode === "pidfd" ? "exit 137" : "signal 9"
+  const ok =
+    d.pdeathsigAfterDrop === 0 &&
+    d.launcherEnded === wantEnd &&
+    (mode !== "pidfd" || d.hostWatch === "pidfd") &&
+    d.launcherGoneMs >= 0 &&
+    d.launcherGoneMs <= 2000 &&
+    d.engineGoneMs >= 0 &&
+    d.engineGoneMs <= 2000 &&
+    d.residualPids.length === 0
+  const watch = mode === "pidfd" ? `pidfd watch (${d.hostWatch})` : "re-armed PDEATHSIG"
+  return {
+    verdict: ok ? "open-with-row" : "CONTRADICTS",
+    measured: `PR_GET_PDEATHSIG after drop=${d.pdeathsigAfterDrop}; mechanism ${watch}: launcher ended by ${d.launcherEnded} in ${d.launcherGoneMs} ms, engine gone in ${d.engineGoneMs} ms after kill -9 of the stand-in agent; residual pids ${d.residualPids.length}`,
+    detail: d,
+  }
+}
 
 const rows: Row[] = [
   {
@@ -120,7 +170,7 @@ const rows: Row[] = [
     gap: "persistent session",
     condition: "sidecar process lifetime per call (source)",
     owner: "row 64",
-    measure: (ctx) => sourceRow(ctx, "B-01b"),
+    measure: (ctx) => sourceRow(ctx, "B-01b", "open-with-row"),
   },
   {
     id: "B-02a",
@@ -181,7 +231,7 @@ const rows: Row[] = [
     gap: "image artifact type",
     condition: "artifact reference field set (source)",
     owner: "row 63",
-    measure: (ctx) => sourceRow(ctx, "B-04b"),
+    measure: (ctx) => sourceRow(ctx, "B-04b", "open-with-row"),
   },
   {
     id: "B-05a",
@@ -200,40 +250,16 @@ const rows: Row[] = [
     gap: "root agent without a display",
     condition: "graphical session environment import (source)",
     owner: "row 62",
-    measure: (ctx) => sourceRow(ctx, "B-05b"),
+    measure: (ctx) => sourceRow(ctx, "B-05b", "open-with-row"),
   },
   {
     id: "B-05c",
     gap: "root agent without a display",
-    condition: "kernel premise of the host-death watch across the uid drop (stand-in, no bunshin)",
+    condition:
+      "stand-in launcher (no bunshin): host-death watch through the pidfd alone, PDEATHSIG cleared by the uid drop and not re-armed",
     owner: "row 62",
-    measure: async () => {
-      if (process.platform !== "linux") return { verdict: "UNMEASURED", measured: "needs Linux" }
-      const sudo = await run(["sudo", "-n", "true"])
-      if (sudo.code !== 0) return { verdict: "UNMEASURED", measured: "needs passwordless sudo on this host" }
-      const uid = String(process.getuid?.() ?? 1000)
-      const gid = String(process.getgid?.() ?? 1000)
-      const r = await run(["sudo", "-n", "/bin/sh", HELPER, uid, gid])
-      if (r.code !== 0) return { verdict: "CONTRADICTS", measured: `helper exited ${r.code}: ${r.stderr.trim()}` }
-      const d = JSON.parse(r.stdout.trim().split("\n").at(-1) ?? "{}") as {
-        pdeathsigAfterDrop: number
-        hostWatch: string
-        launcherGoneMs: number
-        engineGoneMs: number
-        residualPids: number[]
-      }
-      const ok =
-        d.pdeathsigAfterDrop === 0 &&
-        d.hostWatch === "pidfd" &&
-        d.launcherGoneMs <= 2000 &&
-        d.engineGoneMs <= 2000 &&
-        d.residualPids.length === 0
-      return {
-        verdict: ok ? "open-with-row" : "CONTRADICTS",
-        measured: `PR_GET_PDEATHSIG after drop=${d.pdeathsigAfterDrop}; hostWatch=${d.hostWatch}; launcher gone ${d.launcherGoneMs} ms, engine gone ${d.engineGoneMs} ms after kill -9 of the stand-in agent; residual pids ${d.residualPids.length}`,
-        detail: d,
-      }
-    },
+    rootLeg: true,
+    measure: (ctx) => rootLeg(ctx, "pidfd"),
   },
   {
     id: "B-05d",
@@ -242,6 +268,15 @@ const rows: Row[] = [
       "live root-agent row with the real launcher (PDEATHSIG 0, hostWatch pidfd, 0 launcher and 0 engine pids 2 s after kill -9)",
     owner: "row 62",
     measure: unmeasured("no launcher binary exists before row 62; diagnose().hostWatch is not built", () => false),
+  },
+  {
+    id: "B-05e",
+    gap: "root agent without a display",
+    condition:
+      "stand-in launcher (no bunshin): host-death through PDEATHSIG re-armed after the uid drop, no pidfd poll",
+    owner: "row 62",
+    rootLeg: true,
+    measure: (ctx) => rootLeg(ctx, "pdeathsig"),
   },
   {
     id: "B-06a",
@@ -269,7 +304,7 @@ const rows: Row[] = [
     gap: "TCC on the agent",
     condition: "responsible process for the agent's own permission checks (source)",
     owner: "row 62",
-    measure: (ctx) => sourceRow(ctx, "B-07a"),
+    measure: (ctx) => sourceRow(ctx, "B-07a", "open-with-row"),
   },
   {
     id: "B-07b",
@@ -283,7 +318,7 @@ const rows: Row[] = [
     gap: "TCC on the agent",
     condition: "macOS installer domain choice when no GUI domain exists (source)",
     owner: "row 64 prerequisite",
-    measure: (ctx) => sourceRow(ctx, "B-07c"),
+    measure: (ctx) => sourceRow(ctx, "B-07c", "needs-installer"),
   },
   {
     id: "B-07d",
@@ -330,14 +365,14 @@ const rows: Row[] = [
     gap: "capability advert",
     condition: "advert refreshed while connected (source)",
     owner: "-",
-    measure: (ctx) => sourceRow(ctx, "B-08c"),
+    measure: (ctx) => sourceRow(ctx, "B-08c", "closed"),
   },
   {
     id: "B-09",
     gap: "sidecar audit",
     condition: "per-call audit record on the sidecar path (source)",
     owner: "row 64",
-    measure: (ctx) => sourceRow(ctx, "B-09"),
+    measure: (ctx) => sourceRow(ctx, "B-09", "open-with-row"),
   },
   {
     id: "B-10a",
@@ -366,7 +401,7 @@ const rows: Row[] = [
     gap: "MCP",
     condition: "MCP anywhere in the tracked source (source)",
     owner: "row 64",
-    measure: (ctx) => sourceRow(ctx, "B-10b"),
+    measure: (ctx) => sourceRow(ctx, "B-10b", "open-with-row"),
   },
 ]
 
@@ -376,14 +411,47 @@ const parseLedger = (text: string) => {
   const lines = text.split("\n").filter((l) => l.length > 0)
   if (lines[0] !== LEDGER_HEADER.join("\t"))
     fail(`SP-B ledger malformed: line 1 is not the header ${LEDGER_HEADER.join(",")}`, 1)
-  const map = new Map<string, string>()
+  const map = new Map<string, { verdict: string; line: string }>()
   lines.slice(1).forEach((line, i) => {
     const cols = line.split("\t")
     if (cols.length !== LEDGER_HEADER.length || !cols[4] || !cols[5])
       fail(`SP-B ledger malformed: line ${i + 2} has ${cols.length} columns or an empty verdict/rerun`, 1)
-    map.set(cols[0] ?? "", cols[4] ?? "")
+    map.set(cols[0] ?? "", { verdict: cols[4] ?? "", line })
   })
   return map
+}
+
+const ledgerLine = (r: Row & Measured) =>
+  [
+    r.id,
+    r.gap,
+    r.condition,
+    r.measured,
+    r.verdict,
+    `bun ${SCRIPT} --row ${r.id}${r.rootLeg ? " --allow-sudo" : ""}`,
+    hostBuild(),
+    r.owner,
+    `$EV/task-11.bunshin-proof.txt#${r.id}`,
+  ].join("\t")
+
+// --write rewrites the whole ledger; --write with --row replaces (or adds) that one row, keeping the rest
+// and the row order of this script.
+const writeLedger = async (file: string, results: Array<Row & Measured>, single: boolean) => {
+  const kept = single ? parseLedger(await readFile(file, "utf8")) : new Map<string, { verdict: string; line: string }>()
+  for (const r of results) kept.set(r.id, { verdict: r.verdict, line: ledgerLine(r) })
+  const order = rows.map((r) => r.id)
+  const ids = [...kept.keys()].sort((a, b) => order.indexOf(a) - order.indexOf(b))
+  const body = ids.map((id) => kept.get(id)?.line ?? "")
+  await writeFile(file, `${[LEDGER_HEADER.join("\t"), ...body].join("\n")}\n`)
+}
+
+// The root leg is opt-in: it needs Linux, passwordless sudo and python3 under sudo, each a precondition.
+const checkRootPreconditions = async () => {
+  if (process.platform !== "linux") fail("SP-B precondition missing: --allow-sudo needs Linux")
+  if ((await run(["sudo", "-n", "true"])).code !== 0)
+    fail("SP-B precondition missing: --allow-sudo given but passwordless sudo is unavailable")
+  if ((await run(["sudo", "-n", "/bin/sh", "-c", "command -v python3"])).code !== 0)
+    fail("SP-B precondition missing: python3 not found for the root leg")
 }
 
 const main = async () => {
@@ -396,8 +464,10 @@ const main = async () => {
   const writeTo = flag("--write")
   const only = flag("--row")
   const detailTo = flag("--detail")
+  const allowSudo = argv.includes("--allow-sudo")
   if (!verify && !writeTo && !only)
-    fail(`usage: bun ${SCRIPT} --verify <ledger> | --write <ledger> | --row <id> [--detail <file>]`)
+    fail(`usage: bun ${SCRIPT} --verify <ledger> | --write <ledger> | --row <id> [--allow-sudo] [--detail <file>]`)
+  if (verify && writeTo) fail("SP-B: --verify and --write cannot be combined")
 
   const bin = process.env.BUNSHIN_BIN ?? Bun.which("bunshin")
   if (!bin)
@@ -412,11 +482,12 @@ const main = async () => {
   if ((await run(["git", "-C", spec.bunshinSrc, "rev-parse", "HEAD"])).code !== 0)
     fail("SP-B precondition missing: the bunshin checkout named by the source-check file is not a git checkout")
 
-  const expected = verify ? parseLedger(await readFile(verify, "utf8")) : undefined
-  const home = await mkdtemp(path.join(tmpdir(), "sp-b-"))
-  const ctx: Ctx = { bin: bin ?? "", home, spec, specPath }
   const selected = only ? rows.filter((r) => r.id === only) : rows
   if (selected.length === 0) fail(`SP-B: unknown row ${only}`)
+  if (allowSudo && selected.some((r) => r.rootLeg)) await checkRootPreconditions()
+  const expected = verify ? parseLedger(await readFile(verify, "utf8")) : undefined
+  const home = await mkdtemp(path.join(tmpdir(), "sp-b-"))
+  const ctx: Ctx = { bin: bin ?? "", home, spec, specPath, allowSudo }
   const results: Array<Row & Measured> = []
   try {
     for (const row of selected) {
@@ -430,13 +501,21 @@ const main = async () => {
   }
 
   let mismatches = 0
+  let notRun = 0
   for (const r of results) {
-    const want = expected?.get(r.id)
-    const status = expected ? (want === r.verdict ? "MATCH" : `MISMATCH expected=${want ?? "<missing>"}`) : "RESULT"
-    if (expected && want !== r.verdict) mismatches++
+    const want = expected?.get(r.id)?.verdict
+    let status = "RESULT"
+    if (expected && r.notRun && want !== r.verdict) {
+      status = `NOT-RUN expected=${want ?? "<missing>"}`
+      notRun++
+    } else if (expected) {
+      status = want === r.verdict ? "MATCH" : `MISMATCH expected=${want ?? "<missing>"}`
+      if (want !== r.verdict) mismatches++
+    }
     process.stdout.write(`${r.id}\t${r.verdict}\t${status}\t${r.measured}\n`)
   }
-  if (expected) {
+  // With --row only that row is compared; without it every ledger row must be measured.
+  if (expected && !only) {
     for (const id of expected.keys())
       if (!results.some((r) => r.id === id)) {
         mismatches++
@@ -452,25 +531,13 @@ const main = async () => {
         2,
       )}\n`,
     )
-  if (writeTo) {
-    const body = results.map((r) =>
-      [
-        r.id,
-        r.gap,
-        r.condition,
-        r.measured,
-        r.verdict,
-        `bun ${SCRIPT} --row ${r.id}`,
-        hostBuild(),
-        r.owner,
-        `$EV/task-11.bunshin-proof.txt#${r.id}`,
-      ].join("\t"),
-    )
-    await writeFile(writeTo, `${[LEDGER_HEADER.join("\t"), ...body].join("\n")}\n`)
-  }
+  if (writeTo) await writeLedger(writeTo, results, Boolean(only))
   if (expected) {
+    const tail = notRun ? ` not_run=${notRun} (root leg needs --allow-sudo)` : ""
     process.stdout.write(
-      mismatches === 0 ? `SPB_VERIFY_OK rows=${results.length}\n` : `SPB_VERIFY_FAIL mismatches=${mismatches}\n`,
+      mismatches === 0
+        ? `SPB_VERIFY_OK rows=${results.length - notRun}${tail}\n`
+        : `SPB_VERIFY_FAIL mismatches=${mismatches}${tail}\n`,
     )
     process.exit(mismatches === 0 ? 0 : 1)
   }
