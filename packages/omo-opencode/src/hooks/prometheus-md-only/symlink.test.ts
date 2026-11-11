@@ -35,10 +35,13 @@ describe("Prometheus filesystem destinations (B2, #11367)", () => {
       directory: join(root, "workspace-alias"),
       client: {},
     } as never)
-    await expect(invokeBefore(hook,
-      { tool: "write", sessionID, callID: "workspace-alias" },
-      { args: { filePath: ".omo/allowed.md" } },
-    )).resolves.toBeUndefined()
+    await expect(
+      invokeBefore(
+        hook,
+        { tool: "write", sessionID, callID: "workspace-alias" },
+        { args: { filePath: ".omo/allowed.md" } },
+      ),
+    ).resolves.toBeUndefined()
   })
 
   test("denies an unresolvable workspace root and invalid path", () => {
@@ -174,13 +177,19 @@ describe("Prometheus filesystem destinations (B2, #11367)", () => {
             scenario.destination,
             join(root, scenario.link),
             scenario.link === ".omo" || scenario.link.endsWith("redirect") || scenario.link.endsWith("loop")
-              ? "dir" : "file",
+              ? "dir"
+              : "file",
           )
         }
         const hook = createPrometheusMdOnlyHook({ directory: root, client: {} } as never)
-        const result = invokeBefore(hook,
+        const result = invokeBefore(
+          hook,
           { tool: call.tool, sessionID, callID: `call-${index}` },
-          { args: call.args("absolute" in scenario && scenario.absolute ? `${root}/${scenario.target}` : scenario.target) },
+          {
+            args: call.args(
+              "absolute" in scenario && scenario.absolute ? `${root}/${scenario.target}` : scenario.target,
+            ),
+          },
         )
         if (scenario.allowed) {
           await expect(result).resolves.toBeUndefined()

@@ -114,14 +114,16 @@ describe("buildCompletionDetails", () => {
   })
 
   test("#given killed terminal error process record #when details built #then no continuation hint is emitted", () => {
-    const details = buildCompletionDetails(completedRecord({
-      status: "error",
-      execution_mode: "process",
-      residency_state: "rpc_detached",
-      killed: true,
-      final_response: undefined,
-      error_message: "child killed",
-    }))
+    const details = buildCompletionDetails(
+      completedRecord({
+        status: "error",
+        execution_mode: "process",
+        residency_state: "rpc_detached",
+        killed: true,
+        final_response: undefined,
+        error_message: "child killed",
+      }),
+    )
 
     expect(details.continuation_hint).toBe("")
   })
@@ -174,14 +176,19 @@ describe("buildCompletionMessage", () => {
     // given
     const stateDir = tempStateDir()
     const record = completedRecord({
-      status: "error", killed: true, failure_kind: "suspended_unresumable",
-      description: "Recover logs", final_response: "partial".repeat(6_000),
+      status: "error",
+      killed: true,
+      failure_kind: "suspended_unresumable",
+      description: "Recover logs",
+      final_response: "partial".repeat(6_000),
       error_message: "The saved session is unavailable. Retry the task.",
     })
     mkdirSync(join(stateDir, "logs"))
     const tail = "last-observed-tool-result"
-    writeFileSync(join(stateDir, "logs", `${record.task_id}.jsonl`),
-      JSON.stringify({ type: "assistant_message", payload: { text: tail } }) + "\n")
+    writeFileSync(
+      join(stateDir, "logs", `${record.task_id}.jsonl`),
+      JSON.stringify({ type: "assistant_message", payload: { text: tail } }) + "\n",
+    )
     // when
     const detail = buildCompletionDetails(record, { stateDir })
     const message = buildCompletionMessage([detail])
@@ -236,10 +243,9 @@ describe("buildCompletionMessage", () => {
 
   test("#given a spilled result #when notification built #then the body names its local file", () => {
     // given
-    const details = buildCompletionDetails(
-      completedRecord({ final_response: "x".repeat(32_001) }),
-      { stateDir: tempStateDir() },
-    )
+    const details = buildCompletionDetails(completedRecord({ final_response: "x".repeat(32_001) }), {
+      stateDir: tempStateDir(),
+    })
 
     // when
     const message = buildCompletionMessage([details])
@@ -291,9 +297,11 @@ describe("dag-owned completions", () => {
 
   test("#given a dag-owned detail #when message built #then the verification directive is appended once", () => {
     // given
-    const details = buildCompletionDetails(completedRecord({
-      owner: { kind: "dag", runId: "dag_run_1" as DagRunId, nodeId: "build" as DagNodeId, fingerprint: "fp-1" },
-    }))
+    const details = buildCompletionDetails(
+      completedRecord({
+        owner: { kind: "dag", runId: "dag_run_1" as DagRunId, nodeId: "build" as DagNodeId, fingerprint: "fp-1" },
+      }),
+    )
 
     // when
     const message = buildCompletionMessage([details])
@@ -320,16 +328,20 @@ describe("dag-owned completions", () => {
   test("#given one plain and two dag details #when message built #then the directive appears exactly once", () => {
     // given
     const plain = buildCompletionDetails(completedRecord({ task_id: "st_plain", name: "plain" }))
-    const firstDag = buildCompletionDetails(completedRecord({
-      task_id: "st_dag1",
-      name: "dag-one",
-      owner: { kind: "dag", runId: "dag_run_1" as DagRunId, nodeId: "build" as DagNodeId, fingerprint: "fp-1" },
-    }))
-    const secondDag = buildCompletionDetails(completedRecord({
-      task_id: "st_dag2",
-      name: "dag-two",
-      owner: { kind: "dag", runId: "dag_run_1" as DagRunId, nodeId: "test" as DagNodeId, fingerprint: "fp-2" },
-    }))
+    const firstDag = buildCompletionDetails(
+      completedRecord({
+        task_id: "st_dag1",
+        name: "dag-one",
+        owner: { kind: "dag", runId: "dag_run_1" as DagRunId, nodeId: "build" as DagNodeId, fingerprint: "fp-1" },
+      }),
+    )
+    const secondDag = buildCompletionDetails(
+      completedRecord({
+        task_id: "st_dag2",
+        name: "dag-two",
+        owner: { kind: "dag", runId: "dag_run_1" as DagRunId, nodeId: "test" as DagNodeId, fingerprint: "fp-2" },
+      }),
+    )
 
     // when
     const message = buildCompletionMessage([plain, firstDag, secondDag])

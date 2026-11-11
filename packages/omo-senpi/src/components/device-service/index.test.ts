@@ -11,14 +11,16 @@ const SIGNED_IN_ENV = { OMO_BIN }
 
 type Notice = { readonly message: string; readonly type: string | undefined }
 
-function harness(options: Partial<DeviceServiceComponentOptions> & { readonly hasUI?: boolean; readonly mode?: string } = {}) {
+function harness(
+  options: Partial<DeviceServiceComponentOptions> & { readonly hasUI?: boolean; readonly mode?: string } = {},
+) {
   const pi = new FakeExtensionAPI()
   const deferred: StartupWork[] = []
   const warnings: string[] = []
   const notices: Notice[] = []
   const runs: string[] = []
   const ctx: ComponentContext = {
-    logger: { info() {}, warn: message => warnings.push(message), error() {} },
+    logger: { info() {}, warn: (message) => warnings.push(message), error() {} },
     config: { getFlag: () => undefined },
     deferStartupWork: (_label, work) => deferred.push(work),
   }
@@ -32,14 +34,16 @@ function harness(options: Partial<DeviceServiceComponentOptions> & { readonly ha
     env: SIGNED_IN_ENV,
     latch: { claimed: false },
     loadConfig: () => ({ config: {} }),
-    run: async omoBin => {
+    run: async (omoBin) => {
       runs.push(omoBin)
       return { state: "connected" }
     },
     ...options,
   })
   const start = () =>
-    pi.handlers.filter(({ event }) => event === "session_start").map(({ handler }) => handler({ reason: "startup" }, eventCtx))
+    pi.handlers
+      .filter(({ event }) => event === "session_start")
+      .map(({ handler }) => handler({ reason: "startup" }, eventCtx))
   const flush = async () => {
     for (const work of deferred.splice(0)) await work()
   }
@@ -68,7 +72,7 @@ describe("device-service start-up bootstrap", () => {
   test("a bootstrap that never settles never holds a later session start, which starts no second worker", async () => {
     const started: string[] = []
     const h = harness({
-      run: omoBin => {
+      run: (omoBin) => {
         started.push(omoBin)
         return new Promise<BootstrapReport | undefined>(() => {})
       },
@@ -109,10 +113,25 @@ describe("device-service start-up bootstrap", () => {
   })
 
   test.each<[string, BootstrapReport | undefined, Notice[], number]>([
-    ["a locked keychain", { state: "keychain_locked", notice: "Unlock it." }, [{ message: "Unlock it.", type: "warning" }], 0],
-    ["an install this build refuses", { state: "update_required", notice: "Update OmO." }, [{ message: "Update OmO.", type: "warning" }], 0],
+    [
+      "a locked keychain",
+      { state: "keychain_locked", notice: "Unlock it." },
+      [{ message: "Unlock it.", type: "warning" }],
+      0,
+    ],
+    [
+      "an install this build refuses",
+      { state: "update_required", notice: "Update OmO." },
+      [{ message: "Update OmO.", type: "warning" }],
+      0,
+    ],
     ["a signed-out device", { state: "signed_out", notice: "Sign in to OmO first." }, [], 0],
-    ["no credential store to read a sign-in from", { state: "store_unavailable", notice: "The credential store is not available." }, [], 0],
+    [
+      "no credential store to read a sign-in from",
+      { state: "store_unavailable", notice: "The credential store is not available." },
+      [],
+      0,
+    ],
     ["a connected device", { state: "connected" }, [], 0],
     ["a worker that answered nothing usable", undefined, [], 1],
   ])("%s ends with the notices the user can act on", async (_label, report, notices, warnings) => {

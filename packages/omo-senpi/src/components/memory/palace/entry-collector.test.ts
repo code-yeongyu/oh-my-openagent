@@ -1,11 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
 import { collectCore, collectExternal } from "./entry-collector"
-import {
-  cleanupPalaceFixtures,
-  createPalaceFixture,
-  writePalaceWorkingFile,
-} from "./palace.test-support"
+import { cleanupPalaceFixtures, createPalaceFixture, writePalaceWorkingFile } from "./palace.test-support"
 
 afterEach(cleanupPalaceFixtures)
 

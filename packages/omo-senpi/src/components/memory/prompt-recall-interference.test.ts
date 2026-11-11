@@ -20,9 +20,13 @@ test("#given a warmed projection and cold recall #when recall is ready on the ne
   })
   nudge.register(pi)
   const branch = liveBranch(2)
-  const event = { sessionManager: {
-    getSessionId: () => "session-1", getBranch: () => branch, getEntries: () => branch,
-  } }
+  const event = {
+    sessionManager: {
+      getSessionId: () => "session-1",
+      getBranch: () => branch,
+      getEntries: () => branch,
+    },
+  }
   await pi.dispatch("session_start", { type: "session_start" }, event)
   const handler = createMemoryPromptHandler({
     resolveContext: () => context,

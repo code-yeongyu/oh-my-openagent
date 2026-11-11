@@ -23,9 +23,7 @@ export function mergeInsertions(base: string, incoming: string, maxCells = DEFAU
   if (incoming === "") return base
   const la = splitLines(base)
   const lb = splitLines(incoming)
-  const lines = (la.length + 1) * (lb.length + 1) <= maxCells
-    ? supersequence(la, lb, lcs(la, lb))
-    : [...la, ...lb]
+  const lines = (la.length + 1) * (lb.length + 1) <= maxCells ? supersequence(la, lb, lcs(la, lb)) : [...la, ...lb]
   const trailingNewline = base.endsWith("\n") || incoming.endsWith("\n")
   return lines.join("\n") + (trailingNewline ? "\n" : "")
 }

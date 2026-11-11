@@ -114,7 +114,10 @@ export async function measureRuntimeSizeWithinBudget(
   }
 }
 
-export async function measureRuntimeSize(runtimeDir: string, options: { readonly signal?: AbortSignal } = {}): Promise<RuntimeSize> {
+export async function measureRuntimeSize(
+  runtimeDir: string,
+  options: { readonly signal?: AbortSignal } = {},
+): Promise<RuntimeSize> {
   const signal = options.signal
   signal?.throwIfAborted()
   const root = await lstatOrUndefined(runtimeDir)

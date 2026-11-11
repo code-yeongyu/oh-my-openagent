@@ -65,7 +65,9 @@ describe("lease parking", () => {
     const concurrency = holder()
     concurrency.park("parent", 0)
     let granted = false
-    concurrency.enqueue(model, "W", 0, () => { granted = true })
+    concurrency.enqueue(model, "W", 0, () => {
+      granted = true
+    })
     concurrency.drain()
     expect(granted).toBe(true)
   })
@@ -201,11 +203,7 @@ describe("TaskConcurrency", () => {
     ]
 
     // then
-    expect(limits).toEqual([
-      Number.POSITIVE_INFINITY,
-      Number.POSITIVE_INFINITY,
-      Number.POSITIVE_INFINITY,
-    ])
+    expect(limits).toEqual([Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY])
   })
 
   test("#given a zero default limit #when many tasks acquire #then slots never fill and nothing queues", () => {
@@ -359,7 +357,9 @@ describe("TaskConcurrency", () => {
     const concurrency = new TaskConcurrency({ default_concurrency: 1, global_concurrency: 1 })
     concurrency.tryAcquire("anthropic/claude", "st_00000001", 0)
     let granted = false
-    concurrency.enqueue("openai/gpt", "st_00000002", 0, () => { granted = true })
+    concurrency.enqueue("openai/gpt", "st_00000002", 0, () => {
+      granted = true
+    })
     concurrency.releaseLease("st_00000001", 0)
     expect(granted).toBe(true)
   })
@@ -382,7 +382,9 @@ describe("TaskConcurrency", () => {
     concurrency.tryAcquire("google/gemini", "st_00000002", 0)
     let granted = false
     concurrency.enqueue("anthropic/claude", "st_00000003", 0, () => {})
-    concurrency.enqueue("openai/gpt", "st_00000004", 0, () => { granted = true })
+    concurrency.enqueue("openai/gpt", "st_00000004", 0, () => {
+      granted = true
+    })
     concurrency.releaseLease("st_00000002", 0)
     expect(granted).toBe(true)
   })
@@ -444,7 +446,9 @@ describe("TaskConcurrency", () => {
       expect(concurrency.queuePosition(model, `task-${lane}-0`)).toBeUndefined()
     }
     expect(granted).toHaveLength(64)
-    expect(granted).toEqual([...Array(16)].flatMap((_, lane) => [...Array(4)].map((__, waiter) => `task-${lane}-${waiter}`)))
+    expect(granted).toEqual(
+      [...Array(16)].flatMap((_, lane) => [...Array(4)].map((__, waiter) => `task-${lane}-${waiter}`)),
+    )
     expect(concurrency.getRetainedKeyCounts()).toEqual({ lanes: 0, queues: 0, leases: 0 })
   })
 })

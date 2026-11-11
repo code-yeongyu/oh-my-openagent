@@ -46,13 +46,24 @@ async function toolCall(
   clock.advanceTo(call.startMs)
   await pi.dispatch(
     "tool_execution_start",
-    { type: "tool_execution_start", toolCallId: call.toolCallId, toolName: call.toolName, args: { secret: "do-not-store" } },
+    {
+      type: "tool_execution_start",
+      toolCallId: call.toolCallId,
+      toolName: call.toolName,
+      args: { secret: "do-not-store" },
+    },
     context(sessionId),
   )
   clock.advanceTo(call.endMs)
   await pi.dispatch(
     "tool_execution_end",
-    { type: "tool_execution_end", toolCallId: call.toolCallId, toolName: call.toolName, result: "do-not-store", isError: false },
+    {
+      type: "tool_execution_end",
+      toolCallId: call.toolCallId,
+      toolName: call.toolName,
+      result: "do-not-store",
+      isError: false,
+    },
     context(sessionId),
   )
 }
@@ -110,10 +121,18 @@ describe("omo-native parallel telemetry", () => {
         // when
         await pi.dispatch("turn_start", { type: "turn_start", turnIndex: 0, timestamp: 2_000 }, context("session-a"))
         clock.advanceTo(2_750)
-        await pi.dispatch("turn_end", { type: "turn_end", turnIndex: 0, message: {}, toolResults: [] }, context("session-a"))
+        await pi.dispatch(
+          "turn_end",
+          { type: "turn_end", turnIndex: 0, message: {}, toolResults: [] },
+          context("session-a"),
+        )
         await pi.dispatch("turn_start", { type: "turn_start", turnIndex: 1, timestamp: 3_000 }, context("session-a"))
         clock.advanceTo(3_250)
-        await pi.dispatch("turn_end", { type: "turn_end", turnIndex: 1, message: {}, toolResults: [] }, context("session-a"))
+        await pi.dispatch(
+          "turn_end",
+          { type: "turn_end", turnIndex: 1, message: {}, toolResults: [] },
+          context("session-a"),
+        )
         // then
         expect(registry.snapshot("session-a")?.measuredTurnDurationMsTotal).toBe(1_000)
       })
@@ -123,7 +142,11 @@ describe("omo-native parallel telemetry", () => {
         const { clock, pi, registry } = fixture()
         // when
         clock.advanceTo(9_999)
-        await pi.dispatch("turn_end", { type: "turn_end", turnIndex: 0, message: {}, toolResults: [] }, context("session-a"))
+        await pi.dispatch(
+          "turn_end",
+          { type: "turn_end", turnIndex: 0, message: {}, toolResults: [] },
+          context("session-a"),
+        )
         // then
         expect(registry.snapshot("session-a")?.measuredTurnDurationMsTotal ?? 0).toBe(0)
       })
@@ -134,7 +157,11 @@ describe("omo-native parallel telemetry", () => {
         // when
         await pi.dispatch("turn_start", { type: "turn_start", turnIndex: 0, timestamp: 5_000 }, context("session-a"))
         clock.advanceTo(4_000)
-        await pi.dispatch("turn_end", { type: "turn_end", turnIndex: 0, message: {}, toolResults: [] }, context("session-a"))
+        await pi.dispatch(
+          "turn_end",
+          { type: "turn_end", turnIndex: 0, message: {}, toolResults: [] },
+          context("session-a"),
+        )
         // then
         expect(registry.snapshot("session-a")?.measuredTurnDurationMsTotal).toBe(0)
       })
@@ -165,13 +192,29 @@ describe("omo-native parallel telemetry", () => {
         const { clock, pi, registry } = fixture()
         // when
         clock.advanceTo(1_000)
-        await pi.dispatch("tool_execution_start", { type: "tool_execution_start", toolCallId: "a", toolName: "bash", args: {} }, context("session-a"))
+        await pi.dispatch(
+          "tool_execution_start",
+          { type: "tool_execution_start", toolCallId: "a", toolName: "bash", args: {} },
+          context("session-a"),
+        )
         clock.advanceTo(1_050)
-        await pi.dispatch("tool_execution_start", { type: "tool_execution_start", toolCallId: "b", toolName: "read", args: {} }, context("session-b"))
+        await pi.dispatch(
+          "tool_execution_start",
+          { type: "tool_execution_start", toolCallId: "b", toolName: "read", args: {} },
+          context("session-b"),
+        )
         clock.advanceTo(1_200)
-        await pi.dispatch("tool_execution_end", { type: "tool_execution_end", toolCallId: "a", toolName: "bash", result: 1, isError: false }, context("session-a"))
+        await pi.dispatch(
+          "tool_execution_end",
+          { type: "tool_execution_end", toolCallId: "a", toolName: "bash", result: 1, isError: false },
+          context("session-a"),
+        )
         clock.advanceTo(1_300)
-        await pi.dispatch("tool_execution_end", { type: "tool_execution_end", toolCallId: "b", toolName: "read", result: 1, isError: false }, context("session-b"))
+        await pi.dispatch(
+          "tool_execution_end",
+          { type: "tool_execution_end", toolCallId: "b", toolName: "read", result: 1, isError: false },
+          context("session-b"),
+        )
         // then
         expect(registry.snapshot("session-a")?.assembly.waves[0]?.calls.map((call) => call.toolCallId)).toEqual(["a"])
         expect(registry.snapshot("session-b")?.assembly.waves[0]?.calls.map((call) => call.toolCallId)).toEqual(["b"])
@@ -210,11 +253,19 @@ describe("omo-native parallel telemetry", () => {
         // given
         const { clock, pi, registry } = fixture()
         clock.advanceTo(1_000)
-        await pi.dispatch("tool_execution_start", { type: "tool_execution_start", toolCallId: "a", toolName: "bash", args: {} }, context("session-a"))
+        await pi.dispatch(
+          "tool_execution_start",
+          { type: "tool_execution_start", toolCallId: "a", toolName: "bash", args: {} },
+          context("session-a"),
+        )
         // when
         await pi.dispatch("session_shutdown", { type: "session_shutdown" }, context("session-a"))
         clock.advanceTo(1_100)
-        await pi.dispatch("tool_execution_end", { type: "tool_execution_end", toolCallId: "a", toolName: "bash", result: 1, isError: false }, context("session-a"))
+        await pi.dispatch(
+          "tool_execution_end",
+          { type: "tool_execution_end", toolCallId: "a", toolName: "bash", result: 1, isError: false },
+          context("session-a"),
+        )
         await pi.dispatch("session_shutdown", { type: "session_shutdown" }, context("session-a"))
         // then
         expect(registry.size()).toBe(0)
@@ -228,8 +279,16 @@ describe("omo-native parallel telemetry", () => {
         await pi.dispatch("session_shutdown", { type: "session_shutdown" }, context("session-a"))
         // when
         clock.advanceTo(1_200)
-        await pi.dispatch("tool_execution_end", { type: "tool_execution_end", toolCallId: "a", toolName: "bash", result: 1, isError: false }, context("session-a"))
-        await pi.dispatch("turn_end", { type: "turn_end", turnIndex: 0, message: {}, toolResults: [] }, context("session-a"))
+        await pi.dispatch(
+          "tool_execution_end",
+          { type: "tool_execution_end", toolCallId: "a", toolName: "bash", result: 1, isError: false },
+          context("session-a"),
+        )
+        await pi.dispatch(
+          "turn_end",
+          { type: "turn_end", turnIndex: 0, message: {}, toolResults: [] },
+          context("session-a"),
+        )
         // then
         expect(registry.size()).toBe(0)
       })
@@ -274,7 +333,11 @@ describe("omo-native parallel telemetry", () => {
         const { clock, pi, registry } = fixture()
         clock.advanceTo(1_000)
         // when
-        await pi.dispatch("tool_execution_start", { type: "tool_execution_start", toolCallId: "a", toolName: "bash", args: {} }, {})
+        await pi.dispatch(
+          "tool_execution_start",
+          { type: "tool_execution_start", toolCallId: "a", toolName: "bash", args: {} },
+          {},
+        )
         await pi.dispatch("turn_start", { type: "turn_start", turnIndex: 0, timestamp: 1_000 }, undefined)
         // then
         expect(registry.size()).toBe(0)
@@ -289,7 +352,11 @@ describe("omo-native parallel telemetry", () => {
         const { clock, pi, registry } = fixture()
         // when
         clock.advanceTo(1_000)
-        await pi.dispatch("tool_execution_start", { type: "tool_execution_start", toolCallId: "a", toolName: "bash", args: {} }, context("session-a"))
+        await pi.dispatch(
+          "tool_execution_start",
+          { type: "tool_execution_start", toolCallId: "a", toolName: "bash", args: {} },
+          context("session-a"),
+        )
         // then
         const counters = registry.snapshot("session-a")?.assembly.counters
         expect(counters?.incomplete).toBe(1)

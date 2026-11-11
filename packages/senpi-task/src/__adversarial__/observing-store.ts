@@ -131,17 +131,26 @@ function observeLifecycleWrite(
 ): void {
   if (before !== null) {
     if (after.notification.run_epoch < before.notification.run_epoch) {
-      observations.lifecycleBreaches.push(`run_epoch regressed for ${after.task_id}: ${before.notification.run_epoch} -> ${after.notification.run_epoch}`)
+      observations.lifecycleBreaches.push(
+        `run_epoch regressed for ${after.task_id}: ${before.notification.run_epoch} -> ${after.notification.run_epoch}`,
+      )
     }
     const becameSuspended = after.residency_state === "persisted_only" || after.residency_state === "rpc_detached"
     if (becameSuspended && after.notification.run_epoch !== before.notification.run_epoch) {
-      observations.lifecycleBreaches.push(`suspension changed run_epoch for ${after.task_id}: ${before.notification.run_epoch} -> ${after.notification.run_epoch}`)
+      observations.lifecycleBreaches.push(
+        `suspension changed run_epoch for ${after.task_id}: ${before.notification.run_epoch} -> ${after.notification.run_epoch}`,
+      )
     }
   }
   if (after.status === "lost" && hasRecoveryArtifact(backing, after)) {
     observations.lifecycleBreaches.push(`recoverable task ${after.task_id} transitioned to lost`)
   }
-  if (after.killed === true || after.status === "cancelled" || after.residency_state === "evicted" || after.residency_state === "disposed") {
+  if (
+    after.killed === true ||
+    after.status === "cancelled" ||
+    after.residency_state === "evicted" ||
+    after.residency_state === "disposed"
+  ) {
     observations.forbiddenResidency.add(after.task_id)
   } else if (after.residency_state === "resident" && observations.forbiddenResidency.has(after.task_id)) {
     observations.lifecycleBreaches.push(`deliberately stopped task ${after.task_id} regained residency`)

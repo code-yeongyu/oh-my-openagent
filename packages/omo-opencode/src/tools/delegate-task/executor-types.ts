@@ -1,5 +1,11 @@
 import type { BackgroundManager } from "../../features/background-agent"
-import type { CategoriesConfig, GitMasterConfig, BrowserAutomationProvider, AgentOverrides, SisyphusAgentConfig } from "../../config/schema"
+import type {
+  CategoriesConfig,
+  GitMasterConfig,
+  BrowserAutomationProvider,
+  AgentOverrides,
+  SisyphusAgentConfig,
+} from "../../config/schema"
 import type { ModelFallbackControllerAccessor } from "../../hooks/model-fallback"
 import type { OpencodeClient } from "./types"
 
