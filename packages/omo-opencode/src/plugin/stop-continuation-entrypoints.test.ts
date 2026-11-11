@@ -169,6 +169,72 @@ describe("stop continuation entrypoints", () => {
     expect(readBoulderState(testDirectory)).not.toBeNull()
   })
 
+  test("#given ordinary prose #when it mentions /stop-continuation mid-sentence #then continuations stay active", async () => {
+    // given
+    const { calls, hooks } = createStopHooks()
+    seedBoulderState()
+    const handler = createChatMessageHandler({
+      ctx: unsafeTestValue<PluginContext>({
+        directory: testDirectory,
+        client: { tui: { showToast: async () => {} } },
+      }),
+      pluginConfig: unsafeTestValue<OhMyOpenCodeConfig>({}),
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+      },
+      hooks: unsafeTestValue(hooks),
+    })
+
+    // when
+    await handler(
+      { sessionID: "ses-stop", agent: "atlas" },
+      {
+        message: {},
+        parts: [{ type: "text", text: "What does /stop-continuation do exactly?" }],
+      },
+    )
+
+    // then
+    expect(calls.stoppedSessions).toHaveLength(0)
+    expect(calls.cancelledCountdowns).toHaveLength(0)
+    expect(calls.clearedGoals).toHaveLength(0)
+    expect(readBoulderState(testDirectory)).not.toBeNull()
+  })
+
+  test("#given path-first prose #when it mentions /stop-continuation after a path #then continuations stay active", async () => {
+    // given
+    const { calls, hooks } = createStopHooks()
+    seedBoulderState()
+    const handler = createChatMessageHandler({
+      ctx: unsafeTestValue<PluginContext>({
+        directory: testDirectory,
+        client: { tui: { showToast: async () => {} } },
+      }),
+      pluginConfig: unsafeTestValue<OhMyOpenCodeConfig>({}),
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+      },
+      hooks: unsafeTestValue(hooks),
+    })
+
+    // when
+    await handler(
+      { sessionID: "ses-stop", agent: "atlas" },
+      {
+        message: {},
+        parts: [{ type: "text", text: "check /var/log then /stop-continuation" }],
+      },
+    )
+
+    // then
+    expect(calls.stoppedSessions).toHaveLength(0)
+    expect(calls.cancelledCountdowns).toHaveLength(0)
+    expect(calls.clearedGoals).toHaveLength(0)
+    expect(readBoulderState(testDirectory)).not.toBeNull()
+  })
+
   test("#given the skill tool entrypoint #when stop-continuation runs #then existing behavior remains intact", async () => {
     // given
     const { calls, hooks } = createStopHooks()

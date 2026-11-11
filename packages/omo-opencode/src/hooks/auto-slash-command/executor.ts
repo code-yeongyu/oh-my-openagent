@@ -4,7 +4,7 @@ import { resolveFileReferencesInText } from "../../shared/file-reference-resolve
 import { discoverAllSkills, type LoadedSkill, type LazyContentLoader } from "../../features/opencode-skill-loader"
 import * as commandDiscovery from "../../tools/slashcommand/command-discovery"
 import type { CommandInfo as DiscoveredCommandInfo, CommandMetadata } from "../../tools/slashcommand/types"
-import type { ParsedSlashCommand } from "./types"
+import type { SlashCommandInvocation } from "./types"
 
 interface SkillCommandInfo {
   name: string
@@ -54,7 +54,7 @@ export interface ExecutorOptions {
 }
 
 
-async function discoverAllCommands(options?: ExecutorOptions): Promise<CommandInfo[]> {
+export async function discoverAllCommands(options?: ExecutorOptions): Promise<CommandInfo[]> {
   const discoveredCommands = commandDiscovery.discoverCommandsSync(options?.directory ?? process.cwd(), {
     pluginsEnabled: options?.pluginsEnabled,
     enabledPluginsOverride: options?.enabledPluginsOverride,
@@ -161,7 +161,7 @@ export interface ExecuteResult {
   error?: string
 }
 
-export async function executeSlashCommand(parsed: ParsedSlashCommand, options?: ExecutorOptions): Promise<ExecuteResult> {
+export async function executeSlashCommand(parsed: SlashCommandInvocation, options?: ExecutorOptions): Promise<ExecuteResult> {
   const command = await findCommand(parsed.command, options)
 
   if (!command) {
