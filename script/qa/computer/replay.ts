@@ -1,0 +1,249 @@
+#!/usr/bin/env bun
+// Replays one corpus case against an engine binary the way a consumer drives it.
+//
+//   bun script/qa/computer/replay.ts --engine <binary> --case <file> [--assert-sink-empty] [--deltas <tsv>]
+//
+// Every reply is deep-compared with the case's expected messages modulo the case's `variable`
+// JSON pointers and the lines of ORACLE-DELTAS.tsv (row 3's rule: an `additive` line accepts an
+// extra member only where its pattern matches, a member the expectation lists is always compared
+// exactly, and a `replaced` line moves the expected value at its pointer to its v3 value).
+// Prints `REPLAY_OK <case> steps=<n>` or one line per mismatch and exits 1; then the teardown
+// receipts `procs <n>` and `dir REMOVED <path>`.
+import { mkdtemp, readdir, readFile, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join, relative, resolve } from "node:path"
+
+const ROOT = resolve(import.meta.dir, "../../..")
+const DEFAULT_DELTAS = join(ROOT, "crates/omo-computer-core/parity/ORACLE-DELTAS.tsv")
+const SINK_PREFIX = "fake-sink-" // the engine's per-process sink file under OMO_COMPUTER_RUNTIME_DIR
+const MESSAGE_TIMEOUT_MS = 10_000
+const EXIT_TIMEOUT_MS = 5_000
+const TRANSPORT_ARGS = { stdio: ["--stdio"], mcp: ["--mcp"], oneshot: ["--oneshot"] } as const
+
+type Transport = keyof typeof TRANSPORT_ARGS
+type Expectation = { readonly message: unknown; readonly variable: readonly string[] }
+type Step =
+  | { readonly restart: true }
+  | { readonly restart: false; readonly send: unknown; readonly expect: readonly Expectation[]; readonly sink: number | undefined }
+type Case = { readonly transport: Transport; readonly scenario: string | undefined; readonly env: Readonly<Record<string, string>>; readonly steps: readonly Step[] }
+type Delta = { readonly kind: string; readonly pointer: string; readonly pattern: readonly string[]; readonly imported: unknown; readonly v3: unknown; matched: number }
+
+class InputError extends Error {}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+const isTransport = (value: unknown): value is Transport => typeof value === "string" && value in TRANSPORT_ARGS
+const isStrings = (value: unknown): value is string[] => Array.isArray(value) && value.every((item) => typeof item === "string")
+
+function parseStep(raw: unknown, index: number): Step {
+  if (!isRecord(raw)) throw new InputError(`step ${index + 1} is not an object`)
+  if (raw.restart === true) return { restart: true }
+  const { send, expect, sink } = raw
+  if (!isRecord(send) || !Array.isArray(expect)) throw new InputError(`step ${index + 1} needs send and expect[]`)
+  if (sink !== undefined && !(Number.isInteger(sink) && typeof sink === "number" && sink >= 0)) throw new InputError(`step ${index + 1}: sink must be a count`)
+  const expectations = expect.map((item: unknown): Expectation => {
+    if (!isRecord(item) || !("message" in item)) throw new InputError(`step ${index + 1}: an expectation needs message`)
+    const variable = item.variable ?? []
+    if (!isStrings(variable)) throw new InputError(`step ${index + 1}: variable must be pointers`)
+    return { message: item.message, variable }
+  })
+  return { restart: false, send, expect: expectations, sink }
+}
+
+function parseCase(raw: unknown): Case {
+  if (!isRecord(raw)) throw new InputError("the case is not an object")
+  const { transport, scenario, env = {}, steps } = raw
+  if (!isTransport(transport)) throw new InputError(`unknown transport ${JSON.stringify(transport)}`)
+  if (scenario !== undefined && typeof scenario !== "string") throw new InputError("scenario must be a path")
+  if (!isRecord(env) || !Object.values(env).every((value) => typeof value === "string")) throw new InputError("env must map names to strings")
+  if (!Array.isArray(steps)) throw new InputError("steps must be an array")
+  return { transport, scenario, env: Object.fromEntries(Object.entries(env).map(([k, v]) => [k, String(v)])), steps: steps.map(parseStep) }
+}
+
+const segments = (pointer: string): string[] => pointer.split("/").slice(1).map((s) => s.replaceAll("~1", "/").replaceAll("~0", "~"))
+const child = (pointer: string, key: string) => `${pointer}/${key.replaceAll("~", "~0").replaceAll("/", "~1")}`
+
+function matches(pattern: readonly string[], pointer: string): boolean {
+  const path = segments(pointer)
+  const fits = (pat: readonly string[], segs: readonly string[]) =>
+    pat.length === segs.length && pat.every((seg, i) => seg === "*" || seg === segs[i])
+  if (pattern[0] === "**") return path.length >= pattern.length - 1 && fits(pattern.slice(1), path.slice(path.length - pattern.length + 1))
+  return fits(pattern, path)
+}
+
+async function loadDeltas(file: string, casePath: string): Promise<Delta[]> {
+  const rows = (await readFile(file, "utf8")).split("\n").slice(1).filter((line) => line.trim() !== "")
+  return rows.flatMap((line) => {
+    const [target = "", pointer = "", kind = "", , , imported = "", v3 = ""] = line.split("\t")
+    if (target !== "*" && resolve(ROOT, target) !== casePath) return []
+    if (kind !== "additive" && kind !== "replaced") return []
+    const pattern = (pointer.startsWith("/") ? pointer.slice(1) : pointer).split("/")
+    const value = (text: string) => (kind === "replaced" ? JSON.parse(text) : undefined)
+    return [{ kind, pointer, pattern, imported: value(imported), v3: value(v3), matched: 0 }]
+  })
+}
+
+type Context = { readonly variable: ReadonlySet<string>; readonly deltas: readonly Delta[]; readonly fail: (pointer: string, detail: string) => void }
+const show = (value: unknown) => JSON.stringify(value)
+
+function compare(expectedRaw: unknown, actual: unknown, pointer: string, ctx: Context): void {
+  if (ctx.variable.has(pointer)) return
+  const replaced = ctx.deltas.find((d) => d.kind === "replaced" && matches(d.pattern, pointer) && Bun.deepEquals(d.imported, expectedRaw, true))
+  if (replaced) replaced.matched += 1
+  const expected = replaced ? replaced.v3 : expectedRaw
+  if (actual === undefined) return ctx.fail(pointer, `missing, expected ${show(expected)}`)
+  if (isRecord(expected) && isRecord(actual)) {
+    for (const key of Object.keys(expected)) compare(expected[key], actual[key], child(pointer, key), ctx)
+    for (const key of Object.keys(actual).filter((k) => !(k in expected))) {
+      const at = child(pointer, key)
+      if (ctx.variable.has(at)) continue
+      const additive = ctx.deltas.find((d) => d.kind === "additive" && matches(d.pattern, at))
+      if (additive) additive.matched += 1
+      else ctx.fail(at, `unexpected member ${show(actual[key])} (no ORACLE-DELTAS line matches it)`)
+    }
+    return
+  }
+  if (Array.isArray(expected) && Array.isArray(actual)) {
+    if (expected.length !== actual.length) return ctx.fail(pointer, `expected ${expected.length} items, got ${actual.length}`)
+    expected.forEach((item, i) => compare(item, actual[i], child(pointer, String(i)), ctx))
+    return
+  }
+  if (!Bun.deepEquals(expected, actual, true)) ctx.fail(pointer, `expected ${show(expected)} got ${show(actual)}`)
+}
+
+class Peer {
+  readonly proc: Bun.Subprocess<"pipe", "pipe", "inherit">
+  private readonly queue: unknown[] = []
+  private readonly waiters: Array<(message: unknown) => void> = []
+  private ended = false
+  private readonly pumped: Promise<void>
+
+  constructor(cmd: string[], env: Record<string, string>) {
+    this.proc = Bun.spawn(cmd, { cwd: ROOT, env, stdin: "pipe", stdout: "pipe", stderr: "inherit" })
+    this.pumped = this.pump()
+  }
+
+  private async pump(): Promise<void> {
+    const decoder = new TextDecoder()
+    let buffer = ""
+    for await (const chunk of this.proc.stdout) {
+      buffer += decoder.decode(chunk, { stream: true })
+      for (let at = buffer.indexOf("\n"); at >= 0; at = buffer.indexOf("\n")) {
+        this.push(buffer.slice(0, at))
+        buffer = buffer.slice(at + 1)
+      }
+    }
+    this.push(buffer)
+    this.ended = true
+    for (const waiter of this.waiters.splice(0)) waiter(undefined)
+  }
+
+  private push(line: string): void {
+    if (line.trim() === "") return
+    let message: unknown = line
+    try { message = JSON.parse(line) } catch { /* an unparsable line stays a string and mismatches */ }
+    const waiter = this.waiters.shift()
+    if (waiter) waiter(message)
+    else this.queue.push(message)
+  }
+
+  send(message: unknown): void {
+    this.proc.stdin.write(`${JSON.stringify(message)}\n`)
+    this.proc.stdin.flush()
+  }
+
+  next(): Promise<unknown> {
+    if (this.queue.length > 0 || this.ended) return Promise.resolve(this.queue.shift())
+    return new Promise((done) => {
+      const waiter = (message: unknown) => { clearTimeout(timer); done(message) }
+      const timer = setTimeout(() => { this.waiters.splice(this.waiters.indexOf(waiter), 1); done(undefined) }, MESSAGE_TIMEOUT_MS)
+      this.waiters.push(waiter)
+    })
+  }
+
+  async close(): Promise<unknown[]> {
+    this.proc.stdin.end()
+    let timer: Timer | undefined
+    const deadline = new Promise<false>((done) => { timer = setTimeout(() => done(false), EXIT_TIMEOUT_MS) })
+    const exited = await Promise.race([this.proc.exited.then(() => true), deadline])
+    clearTimeout(timer)
+    if (!exited) this.proc.kill("SIGKILL")
+    await this.proc.exited
+    await this.pumped
+    return this.queue.splice(0)
+  }
+}
+
+async function sinkCount(dir: string): Promise<number> {
+  const files = (await readdir(dir)).filter((name) => name.startsWith(SINK_PREFIX))
+  const texts = await Promise.all(files.map((name) => readFile(join(dir, name), "utf8")))
+  return texts.reduce((sum, text) => sum + text.split("\n").filter((line) => line.trim() !== "").length, 0)
+}
+
+function args(argv: readonly string[]) {
+  const value = (flag: string) => { const i = argv.indexOf(flag); return i >= 0 ? argv[i + 1] : undefined }
+  const engine = value("--engine")
+  const file = value("--case")
+  if (!engine || !file) throw new InputError("usage: replay.ts --engine <binary> --case <file> [--assert-sink-empty] [--deltas <tsv>]")
+  return { engine: resolve(engine), casePath: resolve(file), deltas: resolve(value("--deltas") ?? DEFAULT_DELTAS), assertSinkEmpty: argv.includes("--assert-sink-empty") }
+}
+
+async function replay(argv: readonly string[]): Promise<number> {
+  const opts = args(argv)
+  const rel = relative(ROOT, opts.casePath)
+  const name = rel.startsWith("..") ? opts.casePath : rel
+  const spec = parseCase(JSON.parse(await readFile(opts.casePath, "utf8")))
+  const deltas = await loadDeltas(opts.deltas, opts.casePath)
+  const runtime = await mkdtemp(join(tmpdir(), "omo-replay-"))
+  const failures: string[] = []
+  const peers: Peer[] = []
+  const inherited = Object.entries(process.env).filter((e): e is [string, string] => !e[0].startsWith("OMO_COMPUTER_") && e[1] !== undefined)
+  const env: Record<string, string> = { ...Object.fromEntries(inherited), OMO_COMPUTER_BACKEND: "fake", OMO_COMPUTER_RUNTIME_DIR: runtime, ...spec.env }
+  if (spec.scenario) env.OMO_COMPUTER_FAKE_SCENARIO = resolve(ROOT, spec.scenario)
+  const spawn = () => { const peer = new Peer([opts.engine, ...TRANSPORT_ARGS[spec.transport]], env); peers.push(peer); return peer }
+  const leftovers = (messages: unknown[]) => { for (const m of messages) failures.push(`LEFTOVER ${name} ${show(m)}`) }
+  const persistent = spec.transport !== "oneshot"
+  let completed = false
+  try {
+    let peer = persistent ? spawn() : undefined
+    for (const [index, step] of spec.steps.entries()) {
+      const label = `step=${index + 1}`
+      if (step.restart) {
+        if (peer) leftovers(await peer.close())
+        peer = persistent ? spawn() : undefined
+        continue
+      }
+      const target = peer ?? spawn()
+      target.send(step.send)
+      for (const [j, expectation] of step.expect.entries()) {
+        const message = await target.next()
+        const fail = (pointer: string, detail: string) => failures.push(`MISMATCH ${name} ${label} message=${j + 1} ${pointer || "/"}: ${detail}`)
+        if (message === undefined) { fail("", `no message within ${MESSAGE_TIMEOUT_MS} ms`); break }
+        compare(expectation.message, message, "", { variable: new Set(expectation.variable), deltas, fail })
+      }
+      if (!peer) leftovers(await target.close())
+      const found = step.sink === undefined ? undefined : await sinkCount(runtime)
+      if (found !== step.sink) failures.push(`MISMATCH ${name} ${label} sink: expected ${step.sink} entries, found ${found}`)
+    }
+    if (peer) leftovers(await peer.close())
+    const found = opts.assertSinkEmpty ? await sinkCount(runtime) : 0
+    if (found !== 0) failures.push(`MISMATCH ${name} sink: expected empty, found ${found} entries`)
+    completed = true
+  } finally {
+    for (const peer of peers) if (peer.proc.exitCode === null && peer.proc.signalCode === null) await peer.close()
+    for (const d of deltas) console.error(`DELTA ${d.kind} ${d.pointer} matched=${d.matched}`)
+    if (failures.length > 0) console.log(failures.join("\n"))
+    else if (completed) console.log(`REPLAY_OK ${name} steps=${spec.steps.length}`)
+    const alive = peers.filter((peer) => peer.proc.exitCode === null && peer.proc.signalCode === null).length
+    await rm(runtime, { recursive: true, force: true })
+    console.log(`procs ${alive}\ndir REMOVED ${runtime}`)
+  }
+  return failures.length === 0 ? 0 : 1
+}
+
+try {
+  process.exitCode = await replay(Bun.argv.slice(2))
+} catch (error) {
+  console.log(`REPLAY_ERROR ${error instanceof Error ? error.message : String(error)}`)
+  process.exitCode = error instanceof InputError ? 2 : 1
+}

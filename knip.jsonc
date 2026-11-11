@@ -2135,6 +2135,8 @@
         "script/oxlint/biome-ports.ts",
         "script/patch-node-require-shim.ts",
         "script/print-release-notes.ts",
+        // run by path as the computer-use v3 corpus replay driver
+        "script/qa/computer/replay.ts",
         "script/qa/desktop/hyprland.ts",
         "script/qa/desktop/kwin.ts",
         // run by path as the live GNOME Wayland window-input QA (docs/guide/computer-use.md)
