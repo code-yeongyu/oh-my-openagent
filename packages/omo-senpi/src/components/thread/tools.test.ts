@@ -163,6 +163,32 @@ describe("thread tool registration", () => {
     }
   })
 
+  test("#given the registered tools #when one runs #then the model still gets the JSON result while the TUI row renders a summary (#12994)", async () => {
+    const tools: Array<Record<string, unknown> & ReturnType<typeof createThreadTools>[number]> = []
+    const f = fixture()
+    registerThreadTools(
+      { registerTool: (tool) => tools.push(tool as never) },
+      { ...f, callerSessionId: () => "caller", callerWorkspaceRoot: () => process.cwd() },
+    )
+    expect(
+      tools
+        .filter((tool) => typeof tool.renderCall !== "function" || typeof tool.renderResult !== "function")
+        .map((tool) => tool.name),
+    ).toEqual([])
+
+    const list = tools.find((tool) => tool.name === "thread_list")
+    expect(typeof list?.renderResult).toBe("function")
+    if (list?.renderResult === undefined) return
+    const output = await list.execute("call-1", {}, undefined, undefined, {} as never)
+    // The model-facing content is the result JSON, byte for byte: rendering changes only what the person sees.
+    expect(output.content).toEqual([{ type: "text", text: JSON.stringify(output.details.result) }])
+    const plain = { fg: (_color: string, text: string) => text, bold: (text: string) => text } as never
+    const lines = list
+      .renderResult(output, { expanded: false, isPartial: false }, plain, { args: {}, isError: false } as never)
+      .render(200)
+    expect(lines[0]?.trimEnd()).toBe("1 thread in this workspace")
+  })
+
   test("#given live threads in two workspaces #when thread_list runs in the default scope #then only the caller's workspace is listed and all_scope widens it", async () => {
     // given: non-git directories, so workspace identity is realpath equality
     const workspaceA = mkdtempSync(join(tmpdir(), "thread-list-scope-a-"))
