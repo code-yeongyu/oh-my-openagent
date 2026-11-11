@@ -1,9 +1,9 @@
 //! JSON-RPC 2.0 framing: parses one request line, dispatches it to the session and answers
 //! one reply line. A request without an id is a notification and gets no reply.
 
-use omo_computer_core::error::EngineCode;
+use omo_computer_core::backend::Refusal;
 use omo_computer_core::methods::Method;
-use omo_computer_session::{Session, SessionError};
+use omo_computer_session::Session;
 use serde::de::DeserializeOwned;
 use serde_json::{json, Map, Value};
 
@@ -72,35 +72,26 @@ fn dispatch(session: &mut Session, name: &str, params: Value) -> Result<Value, F
             parse::<omo_computer_core::params::EmptyParams>(params)?;
             json!(session.capabilities())
         }
-        Method::Click => json!(session.click(parse(params)?).map_err(session_failure)?),
-        Method::TypeText => json!(session.type_text(parse(params)?).map_err(session_failure)?),
+        Method::Click => json!(session.click(parse(params)?).map_err(|r| refused(&r))?),
+        Method::TypeText => json!(session.type_text(parse(params)?).map_err(|r| refused(&r))?),
         _ => return Err(not_found()),
     };
     Ok(value)
 }
 
-fn engine_failure(code: EngineCode, data: Value) -> Failure {
-    failure(code.number(), code.wire(), Some(data))
-}
-
-fn session_failure(error: SessionError) -> Failure {
-    match error {
-        SessionError::NotOpen => engine_failure(
-            EngineCode::Closed,
-            json!({ "reason": "session_not_open", "nothingSent": true }),
-        ),
-        SessionError::PointRequired => engine_failure(
-            EngineCode::InvalidTarget,
-            json!({ "reason": "point_required", "nothingSent": true }),
-        ),
-        SessionError::Refused(refusal) => {
-            let spelling = refusal.code.engine_code();
-            engine_failure(
-                EngineCode::from_wire(spelling).unwrap_or(EngineCode::Internal),
-                json!({ "reason": refusal.reason, "nothingSent": refusal.nothing_sent(), "refusal": spelling }),
-            )
-        }
+/// A refusal on the wire: the closed engine code's number and name, `data.code` as v1 wrote
+/// it, and `data.reason` when the refusal carries one. Every refusal resolves to its row of
+/// the one error table (a bare refusal to its code's bare row); a pair with no row is a
+/// backend defect, reported on stderr, and still answered with the refusal's own code.
+fn refused(refusal: &Refusal) -> Failure {
+    if let Err(unknown) = refusal.row() {
+        eprintln!("omo-computer-engine: {unknown}");
     }
+    let mut data = json!({ "code": refusal.code.wire(), "hint": null });
+    if let Some(reason) = refusal.reason {
+        data["reason"] = json!(reason);
+    }
+    failure(refusal.code.number(), refusal.code.wire(), Some(data))
 }
 
 fn reply(id: &Value, outcome: Result<Value, Failure>) -> String {
@@ -121,6 +112,7 @@ fn reply(id: &Value, outcome: Result<Value, Failure>) -> String {
 mod tests {
     use omo_computer_backend_fake::FakeBackend;
     use omo_computer_core::backend::Backend;
+    use omo_computer_core::error::EngineCode;
     use serde_json::{json, Value};
 
     use super::*;
@@ -147,10 +139,20 @@ mod tests {
     }
 
     #[test]
-    fn exec_without_a_session_is_refused_with_nothing_sent() {
+    fn exec_without_a_session_answers_the_closed_row() {
         let mut session = session();
         let reply = call(&mut session, r#"{"jsonrpc":"2.0","id":1,"method":"typeText","params":{"target":"1","text":"x"}}"#);
-        assert_eq!(reply["error"]["code"], json!(EngineCode::Closed.number()));
-        assert_eq!(reply["error"]["data"]["nothingSent"], json!(true));
+        let error = &reply["error"];
+        assert_eq!(error["code"], json!(EngineCode::Closed.number()));
+        assert_eq!(error["data"], json!({ "code": "Closed", "hint": null }));
+    }
+
+    #[test]
+    fn a_reasoned_refusal_carries_its_reason() {
+        let refusal = Refusal::new(EngineCode::InvalidTarget, "drag_destination");
+        assert!(refusal.computer_code().is_ok(), "the pair has a table row");
+        let Failure { code, data, .. } = refused(&refusal);
+        assert_eq!(code, EngineCode::InvalidTarget.number());
+        assert_eq!(data, Some(json!({ "code": "InvalidTarget", "hint": null, "reason": "drag_destination" })));
     }
 }

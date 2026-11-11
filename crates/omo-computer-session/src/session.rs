@@ -8,6 +8,7 @@ use std::hash::{BuildHasher, Hasher};
 use omo_computer_core::backend::{
     Backend, InputEvent, PermissionProbe, Refusal, Route, TaggedInput,
 };
+use omo_computer_core::error::EngineCode;
 use omo_computer_core::capabilities::{Capabilities, InputMode, LegacyCapabilities};
 use omo_computer_core::params::{
     Button, ClickParams, Delivery, Point, ReportMode, SessionOpenParams, TypeTextParams,
@@ -21,16 +22,12 @@ use omo_computer_core::session_state::Tristate;
 /// `stopReason` while no stop path is armed: `session.open` arms none (`stopPath.start` does).
 pub const NO_GLOBAL_LISTENER: &str = "no-global-listener";
 
-/// Why a session call was not carried out.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SessionError {
-    /// The call needs an open session and none is open.
-    NotOpen,
-    /// The call names no point to aim at (a ref-aimed click needs the accessibility rows).
-    PointRequired,
-    /// The backend refused before sending anything.
-    Refused(Refusal),
-}
+/// An exec call with no open session: the session's bare `Closed` row.
+pub const NOT_OPEN: Refusal = Refusal::bare(EngineCode::Closed);
+
+/// A click that names no point (a ref-aimed click needs the accessibility rows): the bare
+/// `InvalidTarget` row.
+pub const POINT_REQUIRED: Refusal = Refusal::bare(EngineCode::InvalidTarget);
 
 struct Opened {
     report_mode: ReportMode,
@@ -83,8 +80,8 @@ impl Session {
     }
 
     /// # Errors
-    /// No open session, no point to aim at, or the backend refused.
-    pub fn click(&mut self, params: ClickParams) -> Result<ExecReply, SessionError> {
+    /// [`NOT_OPEN`], [`POINT_REQUIRED`], or the backend's refusal; nothing is sent on any.
+    pub fn click(&mut self, params: ClickParams) -> Result<ExecReply, Refusal> {
         let request = read_click(params);
         let Verb::Click {
             at,
@@ -96,7 +93,7 @@ impl Session {
         else {
             unreachable!("read_click always reads a click");
         };
-        let at = at.ok_or(SessionError::PointRequired)?;
+        let at = at.ok_or(POINT_REQUIRED)?;
         let route = route_for(request.target.as_deref(), request.policy.delivery);
         let button = button.unwrap_or(Button::Left);
         let mut events = vec![InputEvent::PointerMove(Point { x: at.x, y: at.y })];
@@ -110,8 +107,8 @@ impl Session {
     }
 
     /// # Errors
-    /// No open session or the backend refused.
-    pub fn type_text(&mut self, params: TypeTextParams) -> Result<ExecReply, SessionError> {
+    /// [`NOT_OPEN`] or the backend's refusal.
+    pub fn type_text(&mut self, params: TypeTextParams) -> Result<ExecReply, Refusal> {
         let V1Request::TypeText { target, text } = read_type_text(params) else {
             unreachable!("read_type_text always reads a typeText");
         };
@@ -119,12 +116,12 @@ impl Session {
         self.send(vec![InputEvent::Text(text)], route)
     }
 
-    fn send(&mut self, events: Vec<InputEvent>, route: Route) -> Result<ExecReply, SessionError> {
-        let tag = self.opened.as_ref().ok_or(SessionError::NotOpen)?.tag;
+    /// Null in both report modes for now: the object-mode `ActionReport` is built by the
+    /// rows that own receipts and dispositions.
+    fn send(&mut self, events: Vec<InputEvent>, route: Route) -> Result<ExecReply, Refusal> {
+        let tag = self.opened.as_ref().ok_or(NOT_OPEN)?.tag;
         for event in events {
-            self.backend
-                .post_input(&TaggedInput { event, tag }, route)
-                .map_err(SessionError::Refused)?;
+            self.backend.post_input(&TaggedInput { event, tag }, route)?;
         }
         Ok(ExecReply(None))
     }
@@ -214,8 +211,9 @@ mod tests {
         let sink = RecordingSink::default();
         let mut session = session(&sink);
         let result = session.type_text(params(json!({"target": "1", "text": "hi"})));
-        assert_eq!(result, Err(SessionError::NotOpen));
+        assert_eq!(result, Err(NOT_OPEN));
         assert!(sink.is_empty());
+        assert!(NOT_OPEN.computer_code().is_ok() && POINT_REQUIRED.computer_code().is_ok());
     }
 
     #[test]
@@ -239,6 +237,6 @@ mod tests {
         session.close();
         assert!(matches!(session.capabilities(), CapabilitiesReply::Legacy(_)));
         let after = session.type_text(params(json!({"target": "1", "text": "x"})));
-        assert_eq!(after, Err(SessionError::NotOpen));
+        assert_eq!(after, Err(NOT_OPEN));
     }
 }

@@ -2,4 +2,4 @@
 
 mod session;
 
-pub use session::{legacy_capabilities, Session, SessionError, NO_GLOBAL_LISTENER};
+pub use session::{legacy_capabilities, Session, NOT_OPEN, NO_GLOBAL_LISTENER, POINT_REQUIRED};
