@@ -51,9 +51,16 @@ export function createRelayControl(remote: RemoteThreadSurface, row: RemoteSessi
     title: row.title,
     visible: async () => {
       try {
-        return (await remote.sessions.sessions()).filter((entry) => entry.device === device).map((entry) => relayAddressEntry(entry))
+        return (await remote.sessions.sessions())
+          .filter((entry) => entry.device === device)
+          .map((entry) => relayAddressEntry(entry))
       } catch (error) {
-        throw refuse("host_unavailable", "The target device's thread names could not be listed.", "Retry when the device service is reachable.", { device, reason: error instanceof Error ? error.message : String(error) })
+        throw refuse(
+          "host_unavailable",
+          "The target device's thread names could not be listed.",
+          "Retry when the device service is reachable.",
+          { device, reason: error instanceof Error ? error.message : String(error) },
+        )
       }
     },
     interrupt: async (turnId) => {

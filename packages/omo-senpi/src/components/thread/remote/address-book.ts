@@ -63,12 +63,14 @@ export type RelayAddressBook = {
  */
 const REMOTE_NOT_SET_UP: ReadonlySet<string> = new Set(["not_configured", "disabled", "signed_out", "sign_in_required"])
 /** No state at all = no device service answered (not installed or not running): the relay is not set up either. */
-const remoteNotSetUp = (state: unknown): boolean => state === undefined || (typeof state === "string" && REMOTE_NOT_SET_UP.has(state))
+const remoteNotSetUp = (state: unknown): boolean =>
+  state === undefined || (typeof state === "string" && REMOTE_NOT_SET_UP.has(state))
 
 export async function relayAddressBook(remote: RemoteThreadSurface, address: string): Promise<RelayAddressBook> {
   const unavailable = await remoteAvailable(remote)
   if (unavailable !== undefined) {
-    if (unavailable.error.code === "host_unavailable" && remoteNotSetUp(unavailable.error.details?.["state"])) return { entries: [] }
+    if (unavailable.error.code === "host_unavailable" && remoteNotSetUp(unavailable.error.details?.["state"]))
+      return { entries: [] }
     return { entries: [], unavailable: unavailable.error }
   }
   const here = await remote.sessions.thisDevice()
