@@ -181,6 +181,37 @@ describe("memoryGitEnvironment (#12354)", () => {
     )
   })
 
+  test("#given a GIT_CONFIG_PARAMETERS list separated by a character git does not treat as space #when building the git environment #then the list is dropped whole, as git refuses it (#12491)", () => {
+    // given: git's isspace() is space, tab, LF and CR only; it calls each of these a bogus format
+    for (const separator of ["\f", "\v", "\u00a0"]) {
+      // when
+      const environment = memoryGitEnvironment({
+        GIT_CONFIG_PARAMETERS: `'a.b'='c'${separator}'core.hookspath'='/dev/null'`,
+      })
+
+      // then
+      expect({ separator, environment }).toEqual({ separator, environment: {} })
+    }
+    // and the four separators git accepts still split the list
+    for (const separator of [" ", "\t", "\n", "\r"]) {
+      expect(
+        memoryGitEnvironment({ GIT_CONFIG_PARAMETERS: `'a.b'='c'${separator}'core.hookspath'='/dev/null'` }),
+      ).toEqual({ GIT_CONFIG_PARAMETERS: "'a.b'='c'" })
+    }
+  })
+
+  test("#given injected keys git does not read as includes #when building the git environment #then they are kept, and include.path and includeIf.<condition>.path are dropped (#12491)", () => {
+    // given
+    const parameters =
+      "'include.sub.path'='/x' 'includeIf.path'='/x' 'include.path'='/x' 'includeIf.gitdir:/m/.path'='/x'"
+
+    // when
+    const environment = memoryGitEnvironment({ GIT_CONFIG_PARAMETERS: parameters })
+
+    // then
+    expect(environment).toEqual({ GIT_CONFIG_PARAMETERS: "'include.sub.path'='/x' 'includeIf.path'='/x'" })
+  })
+
   test.skipIf(process.platform === "win32")(
     "#given inherited url.*.insteadOf and http.extraHeader pairs beside core.hooksPath=/dev/null #when memory git runs #then those pairs apply and the hook still runs",
     async () => {

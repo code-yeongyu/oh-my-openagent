@@ -41,8 +41,12 @@ function defeatsMemoryHooks(key: string): boolean {
   if (firstDot <= 0 || lastDot === name.length - 1) return false
   const section = name.slice(0, firstDot).toLowerCase()
   const variable = name.slice(lastDot + 1).toLowerCase()
+  if (variable !== "path" && section !== "core") return false
   if (section === "core") return firstDot === lastDot && (variable === "hookspath" || variable === "fsmonitor")
-  return variable === "path" && (section === "include" || section === "includeif")
+  // git includes only `include.path` (no subsection) and `includeIf.<condition>.path` (subsection required);
+  // `include.<sub>.path` and a bare `includeIf.path` are ordinary keys to it (#12491).
+  if (section === "include") return firstDot === lastDot
+  return section === "includeif" && firstDot !== lastDot
 }
 
 /** The GIT_CONFIG_COUNT pairs git would apply, or undefined when git would refuse them (it then fails every command). */
@@ -81,6 +85,10 @@ function dequoteStep(text: string, start: number): { value: string; end: number 
   }
 }
 
+// git's isspace() (sane_ctype GIT_SPACE): only these separate GIT_CONFIG_PARAMETERS entries. JS `\s` also takes
+// form feed, vertical tab and Unicode spaces, which git calls a bogus format (#12491).
+const GIT_SPACE = /[ \t\n\r]/
+
 /** GIT_CONFIG_PARAMETERS split into its entries' source text and keys, or undefined when git would call it bogus. */
 function configParameterEntries(text: string): Array<{ source: string; key: string }> | undefined {
   const entries: Array<{ source: string; key: string }> = []
@@ -103,9 +111,9 @@ function configParameterEntries(text: string): Array<{ source: string; key: stri
       const equals = name.indexOf("=")
       if (equals >= 0) name = name.slice(0, equals)
     }
-    if (end < text.length && !/\s/.test(text[end] ?? "")) return undefined
+    if (end < text.length && !GIT_SPACE.test(text[end] ?? "")) return undefined
     entries.push({ source: text.slice(at, end), key: name })
-    while (end < text.length && /\s/.test(text[end] ?? "")) end += 1
+    while (end < text.length && GIT_SPACE.test(text[end] ?? "")) end += 1
     at = end
   }
   return entries
