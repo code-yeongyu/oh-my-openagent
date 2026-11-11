@@ -15,15 +15,31 @@ import {
 import { ElementHandle, InputTarget, RUN_REPLY_GUARDS, resolveElement, WindowHandle } from "./handles"
 
 export interface WindowFilter {
+  /** Exact match for opaque window id. */
+  readonly id?: string
   /** Case-insensitive substring of the owning app name. */
   readonly app?: string
   /** Case-insensitive substring of the window title. */
   readonly title?: string
 }
 
+const KNOWN_FILTER_KEYS = new Set(["id", "app", "title"])
+
+function assertValidFilter(filter: object): void {
+  for (const key of Object.keys(filter)) {
+    if (!KNOWN_FILTER_KEYS.has(key)) {
+      throw new ComputerRunError("assertion", `unknown filter key '${key}' - expected 'id', 'app', or 'title'`)
+    }
+  }
+}
+
 /** The SDK selector of a run filter: an empty field matches every window, as it always has here. */
-function sdkFilter(filter: WindowFilter = {}): { readonly app?: string; readonly title?: string } {
-  return { ...(filter.app ? { app: filter.app } : {}), ...(filter.title ? { title: filter.title } : {}) }
+function sdkFilter(filter: WindowFilter = {}): { readonly id?: string; readonly app?: string; readonly title?: string } {
+  return {
+    ...(filter.id ? { id: filter.id } : {}),
+    ...(filter.app ? { app: filter.app } : {}),
+    ...(filter.title ? { title: filter.title } : {}),
+  }
 }
 
 /** A window the SDK matched, paired with the engine's own record of it (user code sees the record unchanged). */
@@ -81,10 +97,18 @@ export function createDesktopFacade(scope: RunScope) {
         return Object.assign(new InputTarget(scope, `display:${selector}`, DISPLAY_METHODS), { id: selector })
       }),
     windows: (filter?: WindowFilter): Promise<readonly DesktopWindow[]> =>
-      method("windows", async () => (await matching(filter ?? {})).map(({ record }) => record)),
+      method("windows", async () => {
+        if (filter !== undefined && typeof filter === "object" && filter !== null) {
+          assertValidFilter(filter)
+        }
+        return (await matching(filter ?? {})).map(({ record }) => record)
+      }),
     /** Exactly one window by opaque id or filter; an ambiguous filter throws listing the candidates. */
     window: (selector: string | WindowFilter): Promise<WindowHandle> =>
       method("window", async () => {
+        if (typeof selector !== "string" && selector !== null && typeof selector === "object") {
+          assertValidFilter(selector)
+        }
         const found = await matching(selector)
         const [only, ...others] = found
         if (only === undefined) throw new ComputerRunError("window", `no window matches ${JSON.stringify(selector)}`)
