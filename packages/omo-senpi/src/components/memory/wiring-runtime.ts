@@ -15,6 +15,7 @@ import {
 } from "./identity-runtime"
 import { createMemoryJournalWiring, type MemoryJournalWiring } from "./journal-wiring"
 import { resolveMemorySessionModel } from "./session-model-resolver"
+import { resolveMemoryModelRegistry, type ChildModelRegistry } from "./model-registry-resolver"
 import {
   NO_LAUNCH_FACTS,
   currentLaunchScope,
@@ -58,6 +59,16 @@ export function createMemoryRuntimeWiring(
   const runtimes = new Map<string, MemoryIdentityRuntime>()
   const journals = new Map<string, MemoryJournalWiring>()
   const factsWirings = new Map<string, MemoryFactsWiring>()
+  // The registry belongs to the process, unlike the session getters that retire on shutdown.
+  let retainedRegistry: ChildModelRegistry | undefined
+
+  function retainModelRegistry(): void {
+    try {
+      retainedRegistry = resolveMemoryModelRegistry(lastEventCtx.current) ?? retainedRegistry
+    } catch (error) {
+      if (!isStaleExtensionContextError(error)) throw error
+    }
+  }
 
   const resolveContext = (sessionId: string): MemoryIdentityContext | undefined =>
     options.sessions.get(sessionId)?.context
@@ -75,16 +86,17 @@ export function createMemoryRuntimeWiring(
       if (!isStaleExtensionContextError(error)) throw error
       live = NO_LAUNCH_FACTS
     }
+    retainedRegistry = live.modelRegistry ?? retainedRegistry
     // Outside any launch (a facts launch without a captured selection) no session's own details apply:
     // only the process-wide model registry, never whichever session happens to be current.
-    if (scope === undefined) return { ...NO_LAUNCH_FACTS, modelRegistry: live.modelRegistry }
+    if (scope === undefined) return { ...NO_LAUNCH_FACTS, modelRegistry: retainedRegistry }
     let currentSessionId: string | undefined
     try {
       currentSessionId = sessionIdFrom(current)
     } catch (error) {
       if (!isStaleExtensionContextError(error)) throw error
     }
-    return factsForScope(scope, currentSessionId, live)
+    return factsForScope(scope, currentSessionId, { ...live, modelRegistry: retainedRegistry })
   }
 
   function resolveModelRegistry(): ReturnType<MemoryIdentityRuntimeDeps["resolveModelRegistry"]> {
@@ -153,6 +165,7 @@ export function createMemoryRuntimeWiring(
   }
 
   function factsWiringFor(identity: MemoryIdentityContext): MemoryFactsWiring {
+    retainModelRegistry()
     const cached = factsWirings.get(identity.identity)
     if (cached !== undefined) return cached
     const settings = resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory)
@@ -194,6 +207,7 @@ export function createMemoryRuntimeWiring(
   }
 
   function runtimeFor(identity: MemoryIdentityContext): MemoryIdentityRuntime {
+    retainModelRegistry()
     const cached = runtimes.get(identity.identity)
     if (cached !== undefined) return cached
     const create = options.createRuntime ?? createIdentityRuntime
