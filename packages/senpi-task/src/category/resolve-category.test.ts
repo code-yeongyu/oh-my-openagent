@@ -240,20 +240,6 @@ describe("resolveCategory", () => {
     expect(resolved.spec.reasoningEffort).toBe("medium")
   })
 
-  test("#given only the Vertex Garden Flash model is available #when quick resolves #then the non-reasoning Garden rung is selected", () => {
-    // given
-    const models = registry([model("vertex-garden", "deepseek-ai/deepseek-v4.1-flash-maas")])
-
-    // when
-    const result = resolveCategory("quick", {}, models)
-
-    // then
-    const resolved = expectResolved(result)
-    expect(resolved.spec.provider).toBe("vertex-garden")
-    expect(resolved.spec.modelId).toBe("deepseek-ai/deepseek-v4.1-flash-maas")
-    expect(resolved.spec.variant).toBe("off")
-  })
-
   test("#given quick primary is unavailable and the deepseek rung is available #when resolved #then delegate-core fallback chain reaches deepseek-flash", () => {
     // given
     const models = registry([model("deepseek", "deepseek-flash")])

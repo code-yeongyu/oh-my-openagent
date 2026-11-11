@@ -26,7 +26,6 @@ const FULL_CHAIN_MODELS: readonly FakeModel[] = [
   { provider: "anthropic", id: "claude-sonnet-5" },
   { provider: "qwen-token-plan", id: "qwen3.8-max-preview" },
   { provider: "deepseek", id: "deepseek-v4-pro" },
-  { provider: "vertex-garden", id: "deepseek-ai/deepseek-v4.1-flash-maas" },
   { provider: "xiaomi", id: "mimo-v2.5-pro" },
 ]
 
@@ -76,24 +75,6 @@ describe("unspecified-low chain order", () => {
       provider: "xai",
       modelId: "grok-4.7",
       variant: "xhigh",
-    })
-  })
-
-  test("#given only the Vertex Garden Flash model is available #when unspecified-low resolves #then the Garden medium rung wins", () => {
-    // given / when
-    const result = resolveCategory(
-      "unspecified-low",
-      {},
-      registry([{ provider: "vertex-garden", id: "deepseek-ai/deepseek-v4.1-flash-maas" }]),
-    )
-
-    // then
-    expect(result.kind).toBe("resolved")
-    if (result.kind !== "resolved") throw new Error("Expected unspecified-low to resolve")
-    expect(result.spec).toMatchObject({
-      provider: "vertex-garden",
-      modelId: "deepseek-ai/deepseek-v4.1-flash-maas",
-      variant: "medium",
     })
   })
 

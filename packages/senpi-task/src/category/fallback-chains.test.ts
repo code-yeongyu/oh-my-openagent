@@ -119,7 +119,6 @@ describe("CATEGORY_FALLBACK_CHAINS", () => {
           variant: "medium",
         },
         { providers: ["deepseek"], model: "deepseek-flash", variant: "off" },
-        { providers: ["vertex-garden"], model: "deepseek-v4.1-flash-maas", variant: "off" },
         {
           providers: ["qwen-token-plan", "alibaba-token-plan", "bailian-coding-plan"],
           model: "qwen3.6-flash",
@@ -157,7 +156,6 @@ describe("CATEGORY_FALLBACK_CHAINS", () => {
           variant: "high",
         },
         { providers: ["deepseek", "opencode-go"], model: "deepseek-v4-pro", variant: "max" },
-        { providers: ["vertex-garden"], model: "deepseek-v4.1-flash-maas", variant: "medium" },
         { providers: ["xiaomi", "opencode-go"], model: "mimo-v2.5-pro", variant: "high" },
       ],
       "unspecified-high": [
