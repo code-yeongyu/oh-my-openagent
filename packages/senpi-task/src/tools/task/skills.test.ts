@@ -87,6 +87,7 @@ describe("createFsSkillLoader", () => {
   test("#given extra search dirs #when a skill lives there #then it resolves from the extra dir", () => {
     // given
     const cwd = scratch()
+    mkdirSync(join(cwd, ".git"))
     const pluginRoot = scratch()
     const skillDir = join(pluginRoot, "packages", "shared-skills", "commit")
     mkdirSync(skillDir, { recursive: true })

@@ -5,6 +5,7 @@ import { join } from "node:path"
 
 import { REFLECTION_PARK_PROBE_INTERVAL_MS } from "@oh-my-opencode/memory-core"
 
+import { homeRelativePath } from "./child-log"
 import { emitReflectionParkAlert, REFLECTION_PARKED_ENTRY_TYPE, type ReflectionParkedEntry } from "./park-alert"
 import { CapturedCompletionApi } from "./runner.test-support"
 
@@ -131,10 +132,14 @@ describe("reflection park alert", () => {
     await emitReflectionParkAlert(dir, "agent-test", harness.live, harness.once)
 
     // then
+    const childLogPath = join(dir, "runs", "r1", "child-stderr.log")
+    const expected = homeRelativePath(childLogPath)
     const parked = harness.api.entries[0]!.data as ReflectionParkedEntry
-    expect(parked.recommendation).toBe(`inspect ${join(dir, "runs", "r1", "child-stderr.log")}`)
+    expect(parked.recommendation).toBe(`inspect ${expected}`)
+    expect(parked.recommendation).toContain("inspect ")
+    expect(parked.recommendation).toContain(join("runs", "r1", "child-stderr.log"))
     expect(parked.recommendation).not.toContain("<runId>")
-    expect(harness.notifications[0]).toContain(join(dir, "runs", "r1", "child-stderr.log"))
+    expect(harness.notifications[0]).toContain(expected)
   })
 
   test("#given a child failure whose run directory was pruned #when the alert is emitted #then it says the log was pruned", async () => {
@@ -146,10 +151,14 @@ describe("reflection park alert", () => {
     await emitReflectionParkAlert(dir, "agent-test", harness.live, harness.once)
 
     // then
+    const childLogPath = join(dir, "runs", "r1", "child-stderr.log")
+    const expected = homeRelativePath(childLogPath)
     const parked = harness.api.entries[0]!.data as ReflectionParkedEntry
     expect(parked.recommendation).toContain("already pruned")
-    expect(parked.recommendation).toContain(join(dir, "runs", "r1", "child-stderr.log"))
+    expect(parked.recommendation).toContain(expected)
+    expect(parked.recommendation).toContain(join("runs", "r1", "child-stderr.log"))
     expect(parked.recommendation).not.toContain("<runId>")
+    expect(harness.notifications[0]).toContain(expected)
   })
 })
 
