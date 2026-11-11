@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test"
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
+import { createServer } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -147,6 +148,31 @@ posix("reading a leaf that is a symlink fails instead of following it", async ()
     // then
     expect(reason).toBe("ELOOP")
   } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+posix("reading a socket leaf is refused as a non-regular file instead of failing the cycle", async () => {
+  const root = await mkdtemp(join(tmpdir(), "omo-sync-landing-"))
+  const server = createServer()
+  try {
+    // given
+    const key = "memory/note.md"
+    await mkdir(join(root, "memory"), { recursive: true })
+    await new Promise<void>((resolve) => {
+      server.listen(join(root, key), () => resolve())
+    })
+
+    // when
+    const reason = await readWorking(root, key).then(
+      () => undefined,
+      (error: unknown) => fsRefusal(error)?.toLowerCase(),
+    )
+
+    // then
+    expect(reason).toBe("non-regular-file")
+  } finally {
+    server.close()
     await rm(root, { recursive: true, force: true })
   }
 })

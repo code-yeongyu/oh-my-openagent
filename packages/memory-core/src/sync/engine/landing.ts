@@ -55,7 +55,9 @@ export function fsRefusal(error: unknown): string | null {
 
 // O_NONBLOCK: opening a FIFO with no writer returns at once instead of blocking, and the fstat below
 // then refuses it. O_NOFOLLOW: a leaf swapped for a symlink fails with ELOOP instead of being read
-// through. Windows has neither flag (and no FIFOs in a working tree), so they are 0 there.
+// through. A socket, or a device node with no device, fails this open with ENXIO before fstat can
+// see it; that is the same refusal. Windows has neither flag (and no FIFOs in a working tree), so
+// they are 0 there.
 const READ_WORKING_FLAGS = constants.O_RDONLY | (constants.O_NONBLOCK ?? 0) | (constants.O_NOFOLLOW ?? 0)
 
 /**
@@ -69,6 +71,9 @@ export async function readWorking(root: string, path: string): Promise<string | 
     handle = await open(join(root, path), READ_WORKING_FLAGS)
   } catch (error) {
     if (error instanceof Error && "code" in error && error.code === "ENOENT") return null
+    if (error instanceof Error && "code" in error && error.code === "ENXIO") {
+      throw new NonRegularLeafError(`not a regular file: ${path}`)
+    }
     throw error
   }
   try {
