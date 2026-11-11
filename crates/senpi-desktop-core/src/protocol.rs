@@ -8,7 +8,7 @@ use serde_json::Value;
 
 use crate::error::{CaptureUnavailableData, ErrorCode, PermissionDeniedData};
 use crate::methods::Notification;
-use crate::report::{Delivered, Disposition, FocusRestoration};
+use crate::report::{Delivered, Disposition, FocusRestoration, NextCall};
 
 /// Engine protocol version reported by `engine.hello`.
 pub const PROTOCOL_VERSION: &str = "1";
@@ -28,7 +28,15 @@ pub const ABI: &str = "senpi-desktop/1";
 /// `epoch`: an object-mode session supersedes its frames and refs and announces
 /// `epoch.changed` when the desktop changes; `interaction-lock`: input from this
 /// user's engines in every process is serialized by a machine-wide lock, and a lock
-/// held past its wait budget answers `InputBusy`.
+/// held past its wait budget answers `InputBusy`;
+/// `intervention-policy`: `session.open` takes `intervention`, and under
+/// `continue` the user's own presses in the target app are recorded but neither
+/// hold input back nor stop it (`pause`, the default, keeps `UserIntervened`);
+/// `dangerous-chord-force`: an object-mode session runs the actionability
+/// battery before accessibility actions, lists the surfaces an action opened,
+/// suggests a `nextCall` on refusals, and refuses `cmd+q`, `alt+f4` and `win+l`
+/// with `InvalidKey` reason `dangerous_chord` unless `keyChord` says
+/// `force: true`.
 pub const FEATURES: &[&str] = &[
     "action-report",
     "frame-identity",
@@ -38,6 +46,8 @@ pub const FEATURES: &[&str] = &[
     "key-priming",
     "epoch",
     "interaction-lock",
+    "intervention-policy",
+    "dangerous-chord-force",
 ];
 
 /// Standard JSON-RPC 2.0 error codes the engine emits.
@@ -190,6 +200,8 @@ pub struct EngineErrorData {
     /// `key_route_unproven`, `user_active_in_target`,
     /// `pointer_reading_toolkit`, `electron_select`,
     /// `wayland_window_targeting`; `InvalidKey`: `dangerous_chord`;
+    /// `AxUnsupported`: `disabled`, `action_unsupported`, `not_visible`,
+    /// `unstable`, `occluded` (the actionability battery);
     /// `ControlRequired`: `headless_host`, `spawn_inside_session`,
     /// `lease_missing`; `Suspended`: `stop_marker`; `Internal`:
     /// `request_too_large`, `other`.
@@ -202,6 +214,10 @@ pub struct EngineErrorData {
     pub delivered: Option<Delivered>,
     #[serde(default, rename = "focusRestoration", skip_serializing_if = "Option::is_none")]
     pub focus_restoration: Option<FocusRestoration>,
+    /// The next rung of the refusal ladder (element action, keyboard,
+    /// foreground), object mode; never followed automatically.
+    #[serde(default, rename = "nextCall", skip_serializing_if = "Option::is_none")]
+    pub next_call: Option<Box<NextCall>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

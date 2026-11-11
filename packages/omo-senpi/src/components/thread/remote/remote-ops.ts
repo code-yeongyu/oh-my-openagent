@@ -1,8 +1,4 @@
-import type { ThreadToolResult } from "../contracts"
-import { rowThreadId } from "./ports"
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
-import { REFUSAL_CODES } from "../gateway/result"
-import { threadLink } from "../thread-link"
 import type { CommandResult } from "@oh-my-opencode/device-service-core"
 import { outcomeFailure, READ_UNCERTAIN } from "./outcome"
 import type { AliasError, AliasHolder, JsonObject, RemoteSessionRow, RemoteThreadSurface } from "./ports"
@@ -78,75 +74,6 @@ export function replyData(response: JsonObject): JsonObject {
   return typeof data === "object" && data !== null && !Array.isArray(data) ? data as JsonObject : {}
 }
 
-const nonEmpty = (value: unknown): string | undefined => (typeof value === "string" && value.length > 0 ? value : undefined)
-
-/**
- * A person's own input sent to another device's session (`omo remote send`): one `prompt`, exactly as they would type it
- * there, so slash commands and prompt templates are theirs. A peer session never takes this path; its message is a
- * delivery (`relay-transport.ts`). Every result field comes from the remote engine: the turn it started, or its own
- * pending-message count.
- */
-export type RemoteSendRequest = { readonly message: string; readonly delivery?: "auto" | "steer" | "follow_up"; readonly expected_turn_id?: string }
-
-export function sendArgumentFailure(request: RemoteSendRequest): Failure | undefined {
-  if (request.expected_turn_id !== undefined && !/^\d+$/.test(request.expected_turn_id)) return fail("turn_conflict", `Turn ${request.expected_turn_id} is not a turn of the target session.`, "Read the target again and steer with the turn_id a started or steered result returned.")
-  if (request.delivery === "steer" && request.expected_turn_id === undefined) return fail("invalid_arguments", "A steer needs expected_turn_id (the target's current turn_epoch).", "Fix the arguments and send again.")
-  return undefined
-}
-
-export async function promptRemote(remote: RemoteThreadSurface, row: RemoteSessionRow, request: RemoteSendRequest): Promise<ThreadToolResult> {
-  const refused = sendArgumentFailure(request)
-  if (refused !== undefined) return refused
-  const offline = await deviceOnline(remote, row.device)
-  if (offline !== undefined) return offline
-  const text = () => ({ message: request.message })
-  if (request.delivery === "steer") {
-    const state = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
-    if (state.kind !== "ok") return outcomeFailure(state, row.device)
-    const engineState = replyData(state.response)
-    // gateway/decision.ts: a steer needs a running turn; a compacting session or one waiting on a question is not one.
-    const pendingQuestions = engineState["pendingQuestions"]
-    const midTurn = engineState["isStreaming"] === true && engineState["isCompacting"] !== true && !(Array.isArray(pendingQuestions) && pendingQuestions.length > 0)
-    if (!midTurn) return fail(REFUSAL_CODES.not_steerable.code, `A steer to ${row.session_id} was refused: not_steerable.`, REFUSAL_CODES.not_steerable.next, { device: row.device })
-    // An engine that reports no running turn id (before senpi 2026.11.2) cannot have the caller's expected_turn_id checked.
-    const current = engineState["currentTurnId"]
-    if (typeof current !== "string" || current.length === 0) return fail(REFUSAL_CODES.turn_conflict.code, `Turn ${request.expected_turn_id} of ${row.session_id} cannot be confirmed on device ${row.device}.`, REFUSAL_CODES.turn_conflict.next, { device: row.device, reason: "remote_turn_not_verifiable" })
-    if (current !== request.expected_turn_id) return fail(REFUSAL_CODES.turn_conflict.code, `Turn ${request.expected_turn_id} is not the running turn of ${row.session_id} on device ${row.device}.`, REFUSAL_CODES.turn_conflict.next, { device: row.device, current_turn_id: current })
-    // The engine checks expectedTurnId again when the steer arrives, so a turn that ended in between is refused there.
-    const steer = remote.chain.stamp({ type: "prompt", sessionId: row.session_id, ...text(), streamingBehavior: "steer", expectedTurnId: current }, 1)
-    const steered = await remote.sessions.sessionCommand(row.device, row.session_id, steer)
-    if (steered.kind === "refused" && (steered.reason === "turn_conflict" || steered.reason === "not_steerable")) return fail(REFUSAL_CODES[steered.reason].code, `A steer to ${row.session_id} was refused: ${steered.reason}.`, REFUSAL_CODES[steered.reason].next, { device: row.device })
-    if (steered.kind !== "ok") return outcomeFailure(steered, row.device)
-    return { kind: "ok", thread_id: rowThreadId(row), link: threadLink(rowThreadId(row), row.title), delivery: { kind: "steered", turn_id: current }, deduplicated: false, device: row.device }
-  }
-  // One round trip (#12320): no get_state goes first. The engine itself starts a followUp prompt on an idle session and
-  // queues it behind a running turn, deciding both in one step (senpi agent-session `_prompt`, 2026.11.2-3 and later),
-  // and its reply's disposition says which happened.
-  const record = remote.chain.stamp({ type: "prompt", sessionId: row.session_id, ...text(), streamingBehavior: "followUp" }, 1)
-  const sent = await remote.sessions.sessionCommand(row.device, row.session_id, record)
-  if (sent.kind !== "ok") return outcomeFailure(sent, row.device)
-  const reply = replyData(sent.response)
-  const turnId = reply["turnId"]
-  if (reply["disposition"] === "started" && typeof turnId === "string" && turnId.length > 0) return { kind: "ok", thread_id: rowThreadId(row), link: threadLink(rowThreadId(row), row.title), delivery: { kind: "started", turn_id: turnId }, deduplicated: false, device: row.device }
-  const after = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
-  const settled = after.kind === "ok" ? replyData(after.response) : {}
-  // An engine whose prompt reply names no turn (engines through 2026.11.5-1) reports the running turn in get_state.
-  const current = settled["currentTurnId"]
-  if (reply["disposition"] === "started" && typeof current === "string" && current.length > 0) return { kind: "ok", thread_id: rowThreadId(row), link: threadLink(rowThreadId(row), row.title), delivery: { kind: "started", turn_id: current }, deduplicated: false, device: row.device }
-  const pending = settled["pendingMessageCount"]
-  if (typeof pending !== "number" || !Number.isInteger(pending) || pending < 1) return fail("idempotency_uncertain", `Device ${row.device} accepted the message but did not report where it waits.`, "Read the thread before deciding whether to send again.", { device: row.device })
-  return { kind: "ok", thread_id: rowThreadId(row), link: threadLink(rowThreadId(row), row.title), delivery: { kind: "queued", queue_position: pending }, deduplicated: false, device: row.device }
-}
-
-/** The turn running in another device's session (`get_state.currentTurnId`), for a caller that steers whatever runs. */
-export async function runningTurnRemote(remote: RemoteThreadSurface, row: RemoteSessionRow): Promise<{ readonly kind: "ok"; readonly turn_id?: string } | Failure> {
-  const offline = await deviceOnline(remote, row.device)
-  if (offline !== undefined) return offline
-  const state = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
-  if (state.kind !== "ok") return outcomeFailure(state, row.device)
-  const current = nonEmpty(replyData(state.response)["currentTurnId"])
-  return current === undefined ? { kind: "ok" } : { kind: "ok", turn_id: current }
-}
 
 export type RemoteFollow = {
   /** "settled" once the session's run settles (`agent_settled`), "session_closed" when its close cut the run short, else the reason its attach ended first. */

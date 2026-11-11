@@ -231,7 +231,8 @@ test("#given the caller creates a child with thread_create #when it opens a thre
 test("#given a store at the previous schema version with data #when it opens #then it migrates to the new tables and keeps every existing row", async () => {
   const agentDir = tempDir("extension-tools-migrate-")
   const path = gatewayDatabasePath(agentDir)
-  const previous = GATEWAY_MIGRATIONS.length - 1
+  // Back to the store before v10 (toolkit_replay_receipts) and v11 (deliveries.wait_kind): both re-run on open.
+  const previous = GATEWAY_MIGRATIONS.length - 2
   {
     const seed = storeAt(agentDir)
     await seed.identity()
@@ -242,6 +243,7 @@ test("#given a store at the previous schema version with data #when it opens #th
   try {
     db.exec("DROP TABLE IF EXISTS toolkit_replay_receipts;")
     db.exec("DELETE FROM extension_objects WHERE name = 'toolkit_replay_receipts'")
+    db.exec("ALTER TABLE deliveries DROP COLUMN wait_kind")
     db.exec(`PRAGMA user_version = ${previous}`)
     db.query("INSERT INTO gateway_meta (key, value) VALUES ('fixture-keep', 'kept')").run()
   } finally { db.close() }
