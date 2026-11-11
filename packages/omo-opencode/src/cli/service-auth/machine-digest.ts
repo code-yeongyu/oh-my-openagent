@@ -2,7 +2,7 @@ import { createHash } from "node:crypto"
 import { readHardwareId } from "@oh-my-opencode/memory-core/hardware-id"
 
 /** The discovery capability that says the service accepts and enforces `machineDigest` (#6503 final contract section 4). */
-export const MACHINE_IDENTITY_CAPABILITY = "hardware-digest-v1"
+const MACHINE_IDENTITY_CAPABILITY = "hardware-digest-v1"
 
 /** `SHA256(UTF8("omo-machine-v1" + normalizedHardwareId))`, lowercase hex: the only form the hardware id leaves the machine in. */
 export function machineDigestOf(hardwareId: string): string {
