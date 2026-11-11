@@ -272,7 +272,7 @@ describe("X8c memory binding at session_start (characterization)", () => {
     expect(await readIdentityRecord(recorded.paths.root)).toMatchObject({ kind: "auto" })
   })
 
-  test("#given a session bound under its own folder's agent while the host folder names another explicit agent #when it is resumed #then it binds its own agent again (#12962 review r3)", async () => {
+  test("#given a session bound under its own folder's agent while the host folder names another explicit agent #when it is resumed #then it binds its own agent and syncs under that profile (#12962 review r3)", async () => {
     // given
     const hostCwd = join(tempDir("omo-x8c-host-"), "host")
     const sessionCwd = join(tempDir("omo-x8c-ws-"), "project")
@@ -280,6 +280,7 @@ describe("X8c memory binding at session_start (characterization)", () => {
     const recorded = resolveMemoryIdentity("auto", sessionCwd, env)
     const pi = new MemoryFakeExtensionAPI()
     const ctx = componentContext()
+    const syncCalls: SyncCall[] = []
     createMemoryComponent({
       env,
       loadConfig: (options) =>
@@ -288,7 +289,7 @@ describe("X8c memory binding at session_start (characterization)", () => {
         ),
       now: () => 1239,
       resolveCwd: () => hostCwd,
-      syncRunner: recordingSyncRunner([]),
+      syncRunner: recordingSyncRunner(syncCalls),
       createRuntime: () => {
         throw new Error("bind-only characterization does not create an identity runtime")
       },
@@ -308,23 +309,34 @@ describe("X8c memory binding at session_start (characterization)", () => {
       createMemoryBinding({ identity: recorded.id, repoPath: recorded.paths.repo, boundAt: 1239 }),
     ])
     expect(notifications).toEqual([])
+    expect(syncCalls).toEqual([
+      { kind: "acquire", identity: recorded.id, repo: recorded.paths.repo, profile: "auto", projectDir: sessionCwd },
+    ])
   })
 
-  test("#given a session bound under the host's explicit agent whose own folder resolves auto #when it is resumed #then it binds that agent exactly as before (#12962 review r2)", async () => {
+  test("#given a session bound under the host's explicit agent whose own folder resolves auto #when it is resumed #then it binds that agent and syncs under the host profile (#12962 review r2)", async () => {
     // given
     const hostCwd = join(tempDir("omo-x8c-host-"), "host")
     const sessionCwd = join(tempDir("omo-x8c-ws-"), "project")
     const env = { OMO_MEMORY_HOME: join(tempDir("omo-x8c-home-"), "memory") }
     const recorded = resolveMemoryIdentity("host-agent", hostCwd, env)
+    // The store exists (a bind records identity.json only for a store already on disk; binding itself stays write-free).
+    mkdirSync(recorded.paths.root, { recursive: true })
     const pi = new MemoryFakeExtensionAPI()
     const ctx = componentContext()
+    const syncCalls: SyncCall[] = []
     createMemoryComponent({
       env,
       loadConfig: (options) =>
-        loadedMemoryConfig(memorySettings({ agent: options?.cwd === sessionCwd ? "auto" : "host-agent" })),
+        loadedMemoryConfig(
+          memorySettings({
+            agent: options?.cwd === sessionCwd ? "auto" : "host-agent",
+            auto_identity: options?.cwd === sessionCwd ? "path" : "git",
+          }),
+        ),
       now: () => 1238,
       resolveCwd: () => hostCwd,
-      syncRunner: recordingSyncRunner([]),
+      syncRunner: recordingSyncRunner(syncCalls),
       createRuntime: () => {
         throw new Error("bind-only characterization does not create an identity runtime")
       },
@@ -344,6 +356,72 @@ describe("X8c memory binding at session_start (characterization)", () => {
       createMemoryBinding({ identity: recorded.id, repoPath: recorded.paths.repo, boundAt: 1238 }),
     ])
     expect(notifications).toEqual([])
+    expect(syncCalls).toEqual([
+      {
+        kind: "acquire",
+        identity: recorded.id,
+        repo: recorded.paths.repo,
+        profile: "host-agent",
+        projectDir: sessionCwd,
+      },
+    ])
+    await pi.dispatch("session_shutdown", {}, sessionContext())
+    started.splice(
+      started.findIndex((entry) => entry.pi === pi),
+      1,
+    )
+    expect(await readIdentityRecord(recorded.paths.root)).toMatchObject({ kind: "explicit", mode: "git" })
+  })
+
+  test("#given a resumed session whose folder names a different explicit agent than the host that bound it #when session_start fires #then sync stays on the host agent instead of the folder that conflicts", async () => {
+    // given
+    const hostCwd = join(tempDir("omo-x8c-host-"), "host")
+    const sessionCwd = join(tempDir("omo-x8c-ws-"), "project")
+    const env = { OMO_MEMORY_HOME: join(tempDir("omo-x8c-home-"), "memory") }
+    const recorded = resolveMemoryIdentity("host-agent", hostCwd, env)
+    const pi = new MemoryFakeExtensionAPI()
+    const ctx = componentContext()
+    const syncCalls: SyncCall[] = []
+    createMemoryComponent({
+      env,
+      loadConfig: (options) =>
+        loadedMemoryConfig(
+          memorySettings({
+            agent: options?.cwd === sessionCwd ? "session-agent" : "host-agent",
+            auto_identity: options?.cwd === sessionCwd ? "path" : "git",
+          }),
+        ),
+      now: () => 1242,
+      resolveCwd: () => hostCwd,
+      syncRunner: recordingSyncRunner(syncCalls),
+      createRuntime: () => {
+        throw new Error("bind-only characterization does not create an identity runtime")
+      },
+    }).register(pi, ctx)
+    started.push({ pi, ctx })
+    const notifications: Array<{ message: string; level: string }> = []
+
+    // when
+    await pi.dispatch(
+      "session_start",
+      {},
+      sessionContext({ entries: [boundEntry(recorded.id, recorded.paths.repo)], notifications, cwd: sessionCwd }),
+    )
+
+    // then
+    expect(notifications).toEqual([])
+    expect(pi.entries.map((entry) => entry.data)).toEqual([
+      createMemoryBinding({ identity: recorded.id, repoPath: recorded.paths.repo, boundAt: 1242 }),
+    ])
+    expect(syncCalls).toEqual([
+      {
+        kind: "acquire",
+        identity: recorded.id,
+        repo: recorded.paths.repo,
+        profile: "host-agent",
+        projectDir: sessionCwd,
+      },
+    ])
   })
 
   test("#given a session whose transcript recorded another auto identity #when session_start fires #then the recorded identity is re-bound, logged at info, and a new entry with the recorded hash and the new time is appended", async () => {

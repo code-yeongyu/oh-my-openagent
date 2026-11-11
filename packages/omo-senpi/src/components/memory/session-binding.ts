@@ -106,7 +106,9 @@ export function createSessionBinder(deps: SessionBinderDeps): SessionBinder {
     const previous = findLatestMemoryBinding(surface.readEntries())
     // A resumed session is judged under its own folder's config first. Its record may instead come from a
     // bind made before #10070, when the config was read from the host folder, so a conflict there is
-    // retried under that host config before the bind fails closed.
+    // retried under that host config before the bind fails closed. A session folder that resolves `auto`
+    // rebinds without conflicting, but the host's explicit agent is still the config that named the
+    // recorded identity: sync would otherwise join the auto space instead of that agent's named space.
     const adoptUnder = (config: OmoMemorySettings) => {
       const resolvedId = isAutoAgentValue(config.agent)
         ? resolveAutoIdentity(sessionCwd, env, config.auto_identity)
@@ -122,13 +124,19 @@ export function createSessionBinder(deps: SessionBinderDeps): SessionBinder {
     }
     let attempt = adoptUnder(sessionConfig)
     if (
-      attempt.adoption.kind === "conflict" &&
       previous !== undefined &&
       surface.cwd !== undefined &&
-      surface.cwd !== cwd
+      surface.cwd !== cwd &&
+      (attempt.adoption.kind === "conflict" || attempt.adoption.kind === "rebound")
     ) {
       const hostAttempt = adoptUnder(deps.resolveConfig(loadConfig({ cwd })))
-      if (hostAttempt.adoption.kind !== "conflict") attempt = hostAttempt
+      const hostDerivesTheRecord =
+        hostAttempt.adoption.kind === "resolved" &&
+        attempt.adoption.kind === "rebound" &&
+        hostAttempt.adoption.identity.id === attempt.adoption.identity.id
+      if ((attempt.adoption.kind === "conflict" && hostAttempt.adoption.kind !== "conflict") || hostDerivesTheRecord) {
+        attempt = hostAttempt
+      }
     }
     const { config: bindConfig, resolved, adoption } = attempt
     const autoAgent = isAutoAgentValue(bindConfig.agent)
@@ -175,10 +183,7 @@ export function createSessionBinder(deps: SessionBinderDeps): SessionBinder {
     memoryModuleSupervisor.acquire()
     if (!oneShot) {
       state.syncRepo = identity.paths.repo
-      // The space key is the agent that named this identity. On a host-config fallback that is the
-      // host agent; the session folder's rejected agent would open a different space. Enablement
-      // stays the session folder's.
-      void syncRunner.acquire(identity.id, identity.paths, sessionConfig.sync, {
+      void syncRunner.acquire(identity.id, identity.paths, bindConfig.sync, {
         profile: bindConfig.agent,
         projectDir: sessionCwd,
       })
