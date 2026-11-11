@@ -140,7 +140,7 @@ pass "OMO HOME runtime resolves before standalone fallback"
 # 9. search w/o binary => either runs successfully (binary found) OR exits 3 with hint
 # The CI may or may not have ast-grep installed; both are valid.
 set +e
-$HELPER -q search 'foo()' --lang ts /nonexistent-path-xyzzy > "$OUTPUT_DIR/s1.out" 2>&1
+$HELPER -q search 'foo()' /nonexistent-path-xyzzy --lang ts > "$OUTPUT_DIR/s1.out" 2>&1
 RC=$?
 set -e
 case "$RC" in
