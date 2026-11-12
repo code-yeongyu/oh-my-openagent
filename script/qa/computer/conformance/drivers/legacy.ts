@@ -13,11 +13,12 @@ import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { catalogFor, cellId } from "../catalog.ts"
+import { cellId } from "../catalog.ts"
 import type { Driver } from "../driver.ts"
 import type { Task } from "../taskset/tasks.ts"
 import type { Cell, CellResult } from "../vocabulary.ts"
 import { cellCode, type FixtureTarget } from "./legacy-code.ts"
+import { runControl } from "./legacy-control.ts"
 import { hostFixtures } from "./legacy-fixtures.ts"
 import { isRecord, loadShippedTool, shippedBundle, type Slot } from "./legacy-release.ts"
 
@@ -237,74 +238,14 @@ async function smoke(): Promise<number> {
   return failed ? 1 : 0
 }
 
-// `--control`: an independent check of the x11 "delivered but the application never received it" cells, on two
-// elements of different kinds. Per leg the release sends its element-routed background action on a fresh fixture; then
-// xdotool, outside the tool, raises the window and acts at the SAME global point the element's bounds give. The bounds
-// the release reported are printed beside the window geometry xdotool reads, so a wrong point is a number. Verdict
-// rule (BASELINE.md): xdotool's action registers -> the point is right and the release's delivery was lost; it does
-// not -> the bounds are off and the cells stay unclassified.
-const CONTROL_LEGS = [
-  { action: "click", expected: 1, buttons: ["click", "1"] },
-  { action: "scroll", expected: 3, buttons: ["click", "--repeat", "3", "5"] },
-] as const
-
-async function control(): Promise<number> {
-  const say = (line: string): number => (console.log(`LEGACY_CONTROL ${line}`), 1)
-  if (!("ready" in shippedTool)) return say(`status=unavailable reason=${JSON.stringify(shippedTool.unavailable)}`)
-  const fixtures = hostFixtures(process.platform, process.env, session)
-  if (!("ready" in fixtures)) return say(`status=unavailable reason=${JSON.stringify(fixtures.unavailable)}`)
-  if (process.platform !== "linux") return say("skipped: this control is for x11")
-  const xdotool = async (...args: string[]): Promise<string> => {
-    const child = Bun.spawn(["xdotool", ...args], { stdout: "pipe", stderr: "pipe" })
-    const [out, err, code] = await Promise.all([
-      new Response(child.stdout).text(),
-      new Response(child.stderr).text(),
-      child.exited,
-    ])
-    return `exit=${code} ${(out + err).trim().replaceAll("\n", " ").slice(0, 200)}`
-  }
-  for (const leg of CONTROL_LEGS) {
-    const cell = catalogFor("x11", "xorg").find(
-      (entry) =>
-        entry.toolkit === "native" &&
-        entry.action === leg.action &&
-        entry.targeting === "ax" &&
-        entry.mode === "background",
-    )
-    if (cell === undefined) throw new Error(`the catalog has no native background accessibility ${leg.action}`)
-    const target = fixtures.ready.target(cell)
-    if ("unavailable" in target) return say(`status=unavailable reason=${JSON.stringify(target.unavailable)}`)
-    try {
-      await fixtures.ready.reset(cell)
-      const outcome = await shippedTool.ready.execute(
-        `conformance-control-${leg.action}`,
-        { action: "run", code: cellCode(cell, target) },
-        hostContext(session()),
-      )
-      const value = isRecord(outcome) && isRecord(outcome.details) ? outcome.details.value : outcome
-      const afterRelease = await settled(() => fixtures.ready.read(cell), leg.expected, SETTLE_MS)
-      say(`${leg.action} release outcome=${JSON.stringify(value)} fixture=${JSON.stringify(afterRelease)}`)
-      const aim = isRecord(value) && isRecord(value.aim) && isRecord(value.aim.point) ? value.aim.point : undefined
-      if (aim === undefined || typeof aim.x !== "number" || typeof aim.y !== "number") {
-        say(`${leg.action} independent skipped: the release reported no aim point`)
-        continue
-      }
-      const name = `^${target.title}$`
-      say(`${leg.action} geometry ${await xdotool("search", "--name", name, "getwindowgeometry")}`)
-      say(`${leg.action} raise ${await xdotool("search", "--name", name, "windowactivate", "--sync")}`)
-      say(
-        `${leg.action} xdotool at ${aim.x},${aim.y} ${await xdotool("mousemove", "--sync", String(aim.x), String(aim.y), ...leg.buttons)}`,
-      )
-      const afterIndependent = await settled(() => fixtures.ready.read(cell), leg.expected, SETTLE_MS)
-      say(
-        `${leg.action} VERDICT independent=${JSON.stringify(afterIndependent)} release=${JSON.stringify(afterRelease)} expected=${leg.expected}`,
-      )
-    } finally {
-      await fixtures.ready.stop()
-    }
-  }
-  return 0
-}
-
 if (import.meta.main && process.argv.includes("--smoke")) process.exit(await smoke())
-if (import.meta.main && process.argv.includes("--control")) process.exit(await control())
+if (import.meta.main && process.argv.includes("--control"))
+  process.exit(
+    await runControl({
+      platform: process.platform,
+      tool: shippedTool,
+      fixtures: hostFixtures(process.platform, process.env, session),
+      context: () => hostContext(session()),
+      settle: (read, expected) => settled(read, expected, SETTLE_MS),
+    }),
+  )

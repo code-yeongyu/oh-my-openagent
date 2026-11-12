@@ -271,6 +271,15 @@ jobs:
           set -euo pipefail
           bun script/qa/computer/conformance/drivers/legacy.ts --smoke | tee "${RUNNER_TEMP}/computer-baseline/smoke.log"
 
+      # The control for the Windows "delivered but the application never received it" cells: the release's background
+      # typing and key chord, then independent SendInput to the same control, with the focus logged before each step.
+      - name: Control, release input then independent SendInput to the same control
+        shell: bash
+        run: |
+          set +e -uo pipefail
+          bun script/qa/computer/conformance/drivers/legacy.ts --control | tee "${RUNNER_TEMP}/computer-baseline/control.log"
+          echo "control EXIT ${PIPESTATUS[0]}"
+
       - name: Catalog and task set on the shipped runtime
         shell: bash
         run: |

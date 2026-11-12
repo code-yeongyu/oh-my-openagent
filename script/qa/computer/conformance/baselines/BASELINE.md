@@ -56,7 +56,7 @@ Task set, replayed with no model: windows 1 of 12 (choosing a menu item by title
 
 - The shipped runtime never reports whether input was sent with a refusal, so every refusal is recorded with `nothingSent: false`.
 - **x11, native, VERIFIED BY CONTROL: background pointer delivery is reported delivered and is not received.** Six background cells (click by accessibility, click by pixel, type by pixel, scroll both ways, pixel drag) report delivery while the fixture's state does not change, after a 3-second wait for it to settle. On the same element in the same run, an accessibility press is delivered and the fixture does record it, and on Windows the same click is delivered and recorded. The element, the fixture and the oracle work. The control (hosted run at `86138ba30b`) settles it on two elements of different kinds: at the same global point the release used, an independent `xdotool` click on the Press button raised `pressCount` to 1 and three wheel clicks on the Scroll target raised `scrollSteps` to 3, while the release's own background click and scroll at that point were reported `delivered` and left both at 0. The point and the element bounds are right; the release's background delivery is what was lost. Scope: the independent actions ran after the window was raised, so this verifies the background route, not foreground delivery.
-- **Windows, native: two more of the same.** Typing by pixel and a key chord report delivery while the fixture records no text and no keys.
+- **Windows, native: the same shape, not controlled.** Typing by pixel and a key chord report delivery while the fixture records no text and no keys. The x11 control does not cover these; their own control is below, and until its run is read nothing about them is a fact of the release.
 - **Windows, native:** a background pixel drag in the list is refused with `InputFailed`; the accessibility value write is refused with `AxFailed`; background typing through accessibility is refused with `AxUnsupported`.
 - **x11, native:** the accessibility value write and the key chord are refused with `AxFailed`; background typing through accessibility is refused with `AxUnsupported`.
 - **Foreground, both:** every foreground cell except the accessibility press is refused with `ControlRequired` (8 on x11, 9 on Windows), which is the shipped answer when no person can approve foreground control.
@@ -71,6 +71,16 @@ Two elements of different kinds, each on a fresh fixture: the Press button (a cl
 - `xdotool`'s action registers in the fixture: the point is right and the release's reported delivery was lost. The class becomes **verified by control**.
 - `xdotool`'s action does not register: the bounds are off. The class stays **unclassified**.
 
-Result: **verified by control** (both legs: independent 1 and 3, release 0 and 0).
+Result: **verified by control** (both legs: independent 1 and 3, release 0 and 0). Reported on #9109, which describes this defect and had not reproduced it against a real application.
+
+### Control for the Windows "delivered but not received" cells (rule fixed before its run)
+
+Two legs, each on a fresh fixture: typing by pixel into the Value field, and the key chord `ctrl+k` to the Value field. The release sends its background action. Then `send-input.ps1`, outside the tool, sends input through `SendInput`: for typing it clicks the point the release aimed at and types `conformance`; for the chord it focuses the Value field by its accessible name and presses `ctrl+k`. The foreground window and the control holding keyboard focus are logged before the release acts and before each independent step, because a typed key goes to the focused control.
+
+- The independent input registers in the fixture, `SendInput` reports every event sent, and the focus logged before it is the Value field in the fixture window: the input reached the control the release addressed, and the release's reported delivery was lost. The cell becomes **verified by control**.
+- `SendInput` reports every event sent, the focus is the Value field, and the fixture still records nothing: the fixture does not take this input, so the cell is a **harness** finding, not the release's.
+- `SendInput` sends fewer events than asked, or the focus is not the Value field: the control did not run as designed, and the cell stays **not controlled**.
+
+Result: not yet run.
 
 Only the release's own answers about actions it attempted are recorded here. Failures caused by the test harness are not, nor are results that are still being checked.
