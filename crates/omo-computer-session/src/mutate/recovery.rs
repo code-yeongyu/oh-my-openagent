@@ -67,9 +67,10 @@ impl Funnel {
                 warnings: Vec::new(),
             },
             (Some(_), false) => {
-                self.markers
-                    .clear(&issuer, &scope)
-                    .map_err(|_| Refused::from(super::MARKER_UNAVAILABLE))?;
+                if let Err(error) = self.markers.clear(&issuer, &scope) {
+                    self.warn(format!("completed marker not cleared: {error}"));
+                    return Err(super::MARKER_UNAVAILABLE.into());
+                }
                 Verdict::Proceed
             }
             (None, false) => Verdict::Refuse {
