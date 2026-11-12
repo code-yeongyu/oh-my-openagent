@@ -50,7 +50,10 @@ async function isRecoverableOwner(owner: OwnerSnapshot, now: number, incompleteL
  * (a releasing owner or a reader), but a refusal that outlasts the caller's wait (an ACL that denies
  * delete) must reach the caller: `blockedBy` becomes the cause of the eventual contention error.
  */
-export type ReclaimBlocked = { readonly blockedBy: unknown }
+export type ReclaimBlocked = { readonly blockedBy: unknown; readonly blockedRecord: BlockedRecord }
+
+/** Which record the refusal kept: the primary lock's dead owner, or the `.recovery` lock's dead holder. */
+export type BlockedRecord = "primary" | "recovery"
 
 async function reclaimStaleRecoveryLock(
   recoveryPath: string,
@@ -66,7 +69,8 @@ async function reclaimStaleRecoveryLock(
   } catch (error) {
     if (errorCode(error) === "ENOENT") return false
     // Windows refuses to rename a file another process holds open; leave it to that holder.
-    if (isUnlinkSharingError(error, currentCandidateFs().isSharingError)) return { blockedBy: error }
+    if (isUnlinkSharingError(error, currentCandidateFs().isSharingError))
+      return { blockedBy: error, blockedRecord: "recovery" }
     throw error
   }
 
@@ -132,7 +136,8 @@ export async function recoverStaleOwner(
       // means the owner already removed it, and a Windows sharing error means its release (or a
       // reader) still holds it open or delete-pending, so it is left to that holder for the next poll.
       if (errorCode(error) === "ENOENT") return true
-      if (isUnlinkSharingError(error, currentCandidateFs().isSharingError)) return { blockedBy: error }
+      if (isUnlinkSharingError(error, currentCandidateFs().isSharingError))
+        return { blockedBy: error, blockedRecord: "primary" }
       throw error
     }
     // Record the reclaimed previous owner so consumers that gate on dead-owner evidence (the

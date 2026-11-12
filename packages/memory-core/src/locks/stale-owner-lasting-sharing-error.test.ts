@@ -110,6 +110,7 @@ describe("stale-owner reclaim under a lasting Windows sharing error", () => {
     expect(error).toBeInstanceOf(LockContentionError)
     expect(causeCode(error)).toBe("EPERM")
     expect(error instanceof Error ? error.message : "").toContain("EPERM")
+    expect(error instanceof LockContentionError ? error.blockedRecord : "not a contention error").toBe("primary")
   })
 
   test("#given the dead record's unlink is refused twice #when the hold clears #then the waiter takes the lock", async () => {
@@ -149,6 +150,7 @@ describe("stale-owner reclaim under a lasting Windows sharing error", () => {
     // #then
     expect(error).toBeInstanceOf(LockContentionError)
     expect(causeCode(error)).toBe("EPERM")
+    expect(error instanceof LockContentionError ? error.blockedRecord : "not a contention error").toBe("recovery")
   })
 
   test("#given a live owner #when the wait expires #then the contention error has no cause", async () => {

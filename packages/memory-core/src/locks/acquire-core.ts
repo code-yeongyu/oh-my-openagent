@@ -3,7 +3,7 @@ import { readOwner } from "./lock-owner"
 import { forgetProvenDeadTakeover } from "./proven-dead-takeovers"
 import { publishExclusive } from "./publish"
 import { delay, lockRetryDelayMs } from "./retry-delay"
-import { recoverStaleOwner } from "./stale-owner"
+import { type BlockedRecord, recoverStaleOwner } from "./stale-owner"
 
 export type AcquireLockOptions = {
   readonly waitTimeoutMs?: number
@@ -15,22 +15,30 @@ export type AcquireLockOptions = {
 
 const INCOMPLETE_LOCK_GRACE_MS = 5_000
 
-function contentionMessage(lockPath: string, blockedBy: unknown): string {
+function contentionMessage(lockPath: string, blockedBy: unknown, blockedRecord: BlockedRecord | undefined): string {
   if (blockedBy === undefined) return `Lock is held: ${lockPath}`
   const reason = blockedBy instanceof Error ? blockedBy.message : String(blockedBy)
-  return `Lock is held: ${lockPath} (its dead owner's record could not be removed: ${reason})`
+  const record = blockedRecord === "recovery" ? "its recovery lock's dead holder" : "its dead owner's record"
+  return `Lock is held: ${lockPath} (${record} could not be removed: ${reason})`
 }
 
 export class LockContentionError extends Error {
   readonly retriable = true
 
-  /** `blockedBy`: the error that kept a proven-dead owner's record on disk at the last attempt. */
+  /**
+   * `blockedBy`: the error that kept a proven-dead record on disk at the last attempt; `blockedRecord` says
+   * whether that record was the primary lock's owner or the `.recovery` lock's holder.
+   */
   constructor(
     readonly lockPath: string,
     readonly owner: LockRecord | null,
     blockedBy?: unknown,
+    readonly blockedRecord?: BlockedRecord,
   ) {
-    super(contentionMessage(lockPath, blockedBy), blockedBy === undefined ? undefined : { cause: blockedBy })
+    super(
+      contentionMessage(lockPath, blockedBy, blockedRecord),
+      blockedBy === undefined ? undefined : { cause: blockedBy },
+    )
     this.name = "LockContentionError"
   }
 }
@@ -116,7 +124,9 @@ async function acquireLoop(
     }
     options.signal?.throwIfAborted()
     if (now() >= deadline)
-      throw new LockContentionError(lockPath, owner.record, recovery === false ? undefined : recovery.blockedBy)
+      throw recovery === false
+        ? new LockContentionError(lockPath, owner.record)
+        : new LockContentionError(lockPath, owner.record, recovery.blockedBy, recovery.blockedRecord)
     await delay(Math.min(lockRetryDelayMs(attempt, retryDelayMs), Math.max(1, deadline - now())), options.signal)
   }
 }
