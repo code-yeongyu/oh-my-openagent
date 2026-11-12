@@ -156,3 +156,20 @@ fn unbound_scope_name_refused_at_open() {
     assert!(s.open(params(json!({}))).is_ok());
     assert_eq!(s.consent().view().scope, Some(vec!["Notes".to_owned()]));
 }
+
+#[test]
+fn only_global_input_on_the_desktop_takes_the_lease_and_reserves_every_window() {
+    use omo_computer_core::backend::Route;
+    use omo_computer_core::methods::Method;
+    use omo_computer_safety::TargetRef;
+    let mut backend = FakeBackend::new(scenario(&json!({})));
+    let mut control = crate::grant::Control::default();
+    let click = control.plan(&mut backend, (Method::Click, &TargetRef::Desktop, Route::BackgroundWindow), 0);
+    assert!(click.foreground);
+    assert_eq!(click.windows, ["1", "2"]);
+    let launch = control.plan(&mut backend, (Method::AppsOpen, &TargetRef::Desktop, Route::BackgroundPid), 0);
+    assert!(!launch.foreground, "a launch lands on no pointer");
+    assert!(launch.windows.is_empty(), "and reserves no window");
+    let foreground = control.plan(&mut backend, (Method::AppsOpen, &TargetRef::Desktop, Route::ForegroundHid), 0);
+    assert!(foreground.foreground, "a foreground route still needs the lease");
+}
