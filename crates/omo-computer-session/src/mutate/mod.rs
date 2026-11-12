@@ -6,7 +6,9 @@
 
 mod binding;
 mod call;
+mod diagnostics;
 mod funnel;
+mod memory_markers;
 mod poison;
 mod record;
 mod recovery;
@@ -18,6 +20,7 @@ mod tests;
 
 pub use binding::{Binding, SecureInputProbe, SecureProbe};
 pub use call::Mutation;
+pub use memory_markers::MemoryMarkers;
 pub(crate) use route::{key_event, route_for};
 
 use std::path::{Path, PathBuf};
@@ -32,7 +35,7 @@ use crate::audit::gc::{ArtifactStore, GcLimits};
 use crate::audit::{AuditLimits, AuditSink, AuditWriter, MemoryAudit, UnavailableAudit, WriterId};
 use crate::budget::Permits;
 use crate::lock::InteractionLock;
-use crate::marker::{MarkerDir, MarkerStore, MemoryMarkers};
+use crate::marker::{MarkerDir, MarkerStore};
 use crate::Session;
 use poison::Poisoned;
 
@@ -64,6 +67,8 @@ pub struct Refused {
     pub receipt: Option<Box<Value>>,
     pub interrupted: Option<Disposition>,
     pub busy: Option<crate::settle::BusyDetail>,
+    /// `write_failed` when the refusal's own audit line could not be written.
+    pub warning: Option<String>,
 }
 
 impl From<Refusal> for Refused {
@@ -74,6 +79,7 @@ impl From<Refusal> for Refused {
             receipt: None,
             interrupted: None,
             busy: None,
+            warning: None,
         }
     }
 }
@@ -96,6 +102,8 @@ pub(crate) struct Funnel {
     permits: Permits,
     artifacts: Option<ArtifactStore>,
     secure: Box<dyn SecureProbe>,
+    #[cfg(test)]
+    warned: Vec<String>,
 }
 
 impl Funnel {
@@ -141,6 +149,8 @@ impl Funnel {
             permits: Permits::default(),
             artifacts,
             secure: Box::new(SecureInputProbe),
+            #[cfg(test)]
+            warned: Vec::new(),
         }
     }
 

@@ -69,6 +69,35 @@ fn set_mode(path: &Path, mode: u32) {
 #[cfg(not(unix))]
 fn set_mode(_path: &Path, _mode: u32) {}
 
+/// The directories a case narrowed, put back to 0700 when dropped (a panicking replay
+/// included), so the tempdir can always be removed.
+struct Restore(Vec<PathBuf>);
+
+impl Drop for Restore {
+    fn drop(&mut self) {
+        for dir in &self.0 {
+            set_mode(dir, 0o700);
+        }
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn restore_resets_narrowed_modes_when_the_replay_panics() {
+    use std::os::unix::fs::PermissionsExt;
+    let root = tempfile::tempdir().expect("tempdir");
+    let dir = root.path().join("markers");
+    fs::create_dir(&dir).expect("dir");
+    set_mode(&dir, 0o500);
+    let replayed = std::panic::catch_unwind(|| {
+        let _restore = Restore(vec![dir.clone()]);
+        panic!("a replay step failed");
+    });
+    assert!(replayed.is_err(), "the replay panicked");
+    let mode = fs::metadata(&dir).expect("dir").permissions().mode();
+    assert_eq!(mode & 0o777, 0o700, "the narrowed mode is restored");
+}
+
 /// Plants the case's `runtime.plant` under `root`, directory modes last; answers the
 /// directories whose mode was narrowed.
 fn plant(root: &Path, case: &Value) -> Vec<PathBuf> {
@@ -186,7 +215,7 @@ fn v3_r17_marker_cases_replay_standalone_in_a_fresh_runtime_root() {
             "{name} names no fixed runtime dir"
         );
         let root = tempfile::tempdir().expect("tempdir");
-        let narrowed = plant(root.path(), &case);
+        let _restore = Restore(plant(root.path(), &case));
         replay(&replayed, &case, root.path());
         if name == "v3-r17-marker-written-before-input.json" {
             let marker = fs::read_to_string(root.path().join("markers/local/default.json"))
@@ -195,9 +224,6 @@ fn v3_r17_marker_cases_replay_standalone_in_a_fresh_runtime_root() {
                 marker.contains("\"callId\":\"qa-marker-happy\""),
                 "{marker}"
             );
-        }
-        for dir in narrowed {
-            set_mode(&dir, 0o700);
         }
     }
 }
