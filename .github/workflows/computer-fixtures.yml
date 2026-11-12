@@ -150,8 +150,12 @@ jobs:
         shell: bash
         run: |
           for attempt in 1 2 3; do
-            if npm install --no-save --prefix "$RUNNER_TEMP/electron" electron@45.3.1 > electron.log 2>&1; then
+            dir="$RUNNER_TEMP/electron"
+            if npm install --no-save --prefix "$dir" electron@45.3.1 > electron.log 2>&1 \
+              && node "$dir/node_modules/electron/install.js" >> electron.log 2>&1 \
+              && binary=$(node -p "require(process.argv[1])" "$dir/node_modules/electron") && test -x "$binary"; then
               echo "result=Electron 45.3.1 fetched on attempt $attempt" >> "$GITHUB_OUTPUT"
+              echo "binary=$binary" >> "$GITHUB_OUTPUT"
               exit 0
             fi
             tail -n 5 electron.log
@@ -163,13 +167,13 @@ jobs:
 
       - name: Self-test
         shell: bash
-        run: xvfb-run -a bun script/qa/computer/conformance/fixtures/self-test.ts --fixture electron-linux -- "$RUNNER_TEMP/electron/node_modules/electron/dist/electron" script/qa/computer/conformance/fixtures/electron/main.cjs
+        run: xvfb-run -a bun script/qa/computer/conformance/fixtures/self-test.ts --fixture electron-linux -- "${{ steps.electron.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs
 
       - name: Sabotage legs (each must turn the self-test red)
         shell: bash
         run: |
           for field in value receivedKeys pressCount scrollSteps dragOrder menuSelection title savedDocuments; do
-            xvfb-run -a bun script/qa/computer/conformance/fixtures/self-test.ts --fixture electron-linux --sabotage "$field" -- "$RUNNER_TEMP/electron/node_modules/electron/dist/electron" script/qa/computer/conformance/fixtures/electron/main.cjs | tail -n 1
+            xvfb-run -a bun script/qa/computer/conformance/fixtures/self-test.ts --fixture electron-linux --sabotage "$field" -- "${{ steps.electron.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs | tail -n 1
             test "${PIPESTATUS[0]}" -eq 0
           done
 
@@ -206,8 +210,12 @@ jobs:
         shell: bash
         run: |
           for attempt in 1 2 3; do
-            if npm install --no-save --prefix "$RUNNER_TEMP/electron" electron@45.3.1 > electron.log 2>&1; then
+            dir="$RUNNER_TEMP/electron"
+            if npm install --no-save --prefix "$dir" electron@45.3.1 > electron.log 2>&1 \
+              && node "$dir/node_modules/electron/install.js" >> electron.log 2>&1 \
+              && binary=$(node -p "require(process.argv[1])" "$dir/node_modules/electron") && test -x "$binary"; then
               echo "result=Electron 45.3.1 fetched on attempt $attempt" >> "$GITHUB_OUTPUT"
+              echo "binary=$binary" >> "$GITHUB_OUTPUT"
               exit 0
             fi
             tail -n 5 electron.log
@@ -219,13 +227,13 @@ jobs:
 
       - name: Self-test
         shell: bash
-        run: bun script/qa/computer/conformance/fixtures/self-test.ts --fixture electron-windows -- "$RUNNER_TEMP/electron/node_modules/electron/dist/electron.exe" script/qa/computer/conformance/fixtures/electron/main.cjs
+        run: bun script/qa/computer/conformance/fixtures/self-test.ts --fixture electron-windows -- "${{ steps.electron.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs
 
       - name: Sabotage legs (each must turn the self-test red)
         shell: bash
         run: |
           for field in value receivedKeys pressCount scrollSteps dragOrder menuSelection title savedDocuments; do
-            bun script/qa/computer/conformance/fixtures/self-test.ts --fixture electron-windows --sabotage "$field" -- "$RUNNER_TEMP/electron/node_modules/electron/dist/electron.exe" script/qa/computer/conformance/fixtures/electron/main.cjs | tail -n 1
+            bun script/qa/computer/conformance/fixtures/self-test.ts --fixture electron-windows --sabotage "$field" -- "${{ steps.electron.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs | tail -n 1
             test "${PIPESTATUS[0]}" -eq 0
           done
 
@@ -306,4 +314,47 @@ jobs:
             - The shared page (web/) in a WebKitGTK view: each catalog action applied in the page must change exactly its report field.
             - Sabotage legs: a pinned report field must turn the self-test red, on that field's legs only.
           JOB_SUMMARY_NEXT: An ENVIRONMENT failure on the install is the runner, not the fixture; rerun. Otherwise start with the first CHECK ... FAIL or SABOTAGE ... line.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  native-macos:
+    name: fixture native-macos (macos-15)
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build with the image's swiftc
+        id: build
+        run: echo "binary=$(bash script/qa/computer/conformance/fixtures/native-macos/build.sh "$RUNNER_TEMP" | tail -n 1)" >> "$GITHUB_OUTPUT"
+
+      - name: Self-test
+        shell: bash
+        run: bun script/qa/computer/conformance/fixtures/self-test.ts --fixture native-macos -- "${{ steps.build.outputs.binary }}"
+
+      - name: Sabotage legs (each must turn the self-test red)
+        shell: bash
+        run: |
+          for field in value receivedKeys pressCount scrollSteps dragOrder menuSelection title savedDocuments; do
+            bun script/qa/computer/conformance/fixtures/self-test.ts --fixture native-macos --sabotage "$field" -- "${{ steps.build.outputs.binary }}" | tail -n 1
+            test "${PIPESTATUS[0]}" -eq 0
+          done
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Conformance fixture native-macos
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - AppKit fixture built by the image's swiftc into an app bundle, no package install, no grant needed (it never posts events).
+            - Each catalog action applied through AppKit must change exactly its report field.
+            - Sabotage legs: a pinned report field must turn the self-test red, on that field's legs only.
+          JOB_SUMMARY_NEXT: A build failure names the swiftc error; otherwise start with the first CHECK ... FAIL or SABOTAGE ... line.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

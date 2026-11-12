@@ -90,6 +90,7 @@ namespace ConformanceFixture
                 Console.Error.WriteLine("usage: ConformanceFixture.exe --report <path>");
                 return 2;
             }
+            Console.Out.NewLine = "\n";
             Application.EnableVisualStyles();
             var fixture = new Fixture(args[1]);
             DocumentForm main = fixture.Windows[0];
