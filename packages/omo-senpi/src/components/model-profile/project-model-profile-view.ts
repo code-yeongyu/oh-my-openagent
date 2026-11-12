@@ -16,7 +16,6 @@ export type ProjectModelProfileViewReply =
     }
   | { readonly kind: "refused"; readonly code: "no_session"; readonly message: string }
 
-const MODEL_PROFILE_KEYS = ["model_profile", "model_profiles", "model_pad"] as const
 // The loader folds a legacy `[senpi]` block into the canonical `[native]` one (`[native]` wins each key). A client's
 // resolver reads the harness block as `[senpi]`, the key users write, so the merged block is sent under that key.
 const LEGACY_HARNESS_BLOCK = "[senpi]"
@@ -25,9 +24,58 @@ const HARNESS_BLOCK = "[native]"
 const asRecord = (value: unknown): Readonly<Record<string, unknown>> | null =>
   typeof value === "object" && value !== null && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : null
 
+// Exactly the fields a client's resolver reads. A `models[]` entry may carry `provider_options` (API keys, auth
+// headers, credentialed base URLs), so every level is rebuilt from this allowlist instead of copied.
+const PROFILE_TEXT_KEYS = ["display_name", "description", "caution", "family", "tier"] as const
+const MODEL_ENTRY_KEYS = ["model", "reasoning"] as const
+const PAD_LABEL_KEYS = ["daily", "geeky", "normal", "heavy"] as const
+
+function pickStrings(record: Readonly<Record<string, unknown>>, keys: readonly string[]): Record<string, string> {
+  const kept: Record<string, string> = {}
+  for (const key of keys) {
+    const value = record[key]
+    if (typeof value === "string") kept[key] = value
+  }
+  return kept
+}
+
+function modelEntry(entry: unknown): unknown {
+  if (typeof entry === "string") return entry
+  const record = asRecord(entry)
+  return record === null ? null : pickStrings(record, MODEL_ENTRY_KEYS)
+}
+
+function modelProfiles(value: unknown): Record<string, unknown> | undefined {
+  const profiles = asRecord(value)
+  if (profiles === null) return undefined
+  const kept: Record<string, unknown> = {}
+  for (const [name, raw] of Object.entries(profiles)) {
+    const profile = asRecord(raw)
+    if (profile === null) continue
+    const models = profile["models"]
+    kept[name] = {
+      ...pickStrings(profile, PROFILE_TEXT_KEYS),
+      ...(Array.isArray(models) ? { models: models.map(modelEntry).filter((entry) => entry !== null) } : {}),
+    }
+  }
+  return kept
+}
+
+function modelPad(value: unknown): Record<string, unknown> | undefined {
+  const pad = asRecord(value)
+  if (pad === null) return undefined
+  const labels = asRecord(pad["labels"])
+  return labels === null ? {} : { labels: pickStrings(labels, PAD_LABEL_KEYS) }
+}
+
 function flatModelProfileKeys(config: Readonly<Record<string, unknown>>): Record<string, unknown> {
   const kept: Record<string, unknown> = {}
-  for (const key of MODEL_PROFILE_KEYS) if (config[key] !== undefined) kept[key] = config[key]
+  const active = config["model_profile"]
+  if (typeof active === "string") kept["model_profile"] = active
+  const profiles = modelProfiles(config["model_profiles"])
+  if (profiles !== undefined) kept["model_profiles"] = profiles
+  const pad = modelPad(config["model_pad"])
+  if (pad !== undefined) kept["model_pad"] = pad
   return kept
 }
 
