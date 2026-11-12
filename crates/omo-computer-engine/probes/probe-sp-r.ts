@@ -66,31 +66,53 @@ type Kind =
   | "code" // WebSocket close code, 1000..4999
   | "bool"
   | "text" // a non-empty string that is not a placeholder
+  | "label" // a name shown in the measured text, never a reason to reject a reading
   | Readonly<{ oneOf: readonly string[] }>
   | Readonly<{ opt: Kind }> // null is a measured "did not happen"; a missing field is still invalid
   | Readonly<{ list: Kind }> // non-empty
 type Rec = Readonly<Record<string, unknown>>
 type Rule = Readonly<{ schema: Readonly<Record<string, Kind>>; sample: Rec; decide: (r: Rec, note: string) => Run }>
 const PLACEHOLDERS = new Set(["", "?", "-", "timeout", "open", "open_at_90s", "nan", "undefined", "null", "none"])
-const fieldOk = (k: Kind, v: unknown): boolean => {
-  if (typeof k === "object") {
-    if ("opt" in k) return v === null || fieldOk(k.opt, v)
-    if ("list" in k) return Array.isArray(v) && v.length > 0 && v.every((x: unknown) => fieldOk(k.list, x))
-    return typeof v === "string" && k.oneOf.includes(v)
+/** Which numeric rules apply; the gate always uses STRICT, the self-test weakens one to prove its mutations catch it. */
+type Strictness = Readonly<{ finite: boolean; integer: boolean; upper: boolean }>
+const STRICT: Strictness = { finite: true, integer: true, upper: true }
+const fieldOkWith = (s: Strictness) => {
+  const ok = (k: Kind, v: unknown): boolean => {
+    if (typeof k === "object") {
+      if ("opt" in k) return v === null || ok(k.opt, v)
+      if ("list" in k) return Array.isArray(v) && v.length > 0 && v.every((x: unknown) => ok(k.list, x))
+      return typeof v === "string" && k.oneOf.includes(v)
+    }
+    if (k === "count" || k === "ms" || k === "code") {
+      if (typeof v !== "number" || Number.isNaN(v)) return false
+      if (s.finite && !Number.isFinite(v)) return false
+      if (s.integer && k !== "ms" && !Number.isInteger(v)) return false
+      if (k === "code") return v >= 1000 && (!s.upper || v <= 4999)
+      return v >= 0
+    }
+    switch (k) {
+      case "bool":
+        return typeof v === "boolean"
+      case "text":
+      case "label":
+        // A bare negative number ("-1") is the usual "not measured" placeholder, never a measured text.
+        return typeof v === "string" && !PLACEHOLDERS.has(v.trim().toLowerCase()) && !/^\s*-\d/.test(v)
+    }
   }
-  switch (k) {
-    case "count":
-      return typeof v === "number" && Number.isInteger(v) && v >= 0
-    case "ms":
-      return typeof v === "number" && Number.isFinite(v) && v >= 0
-    case "code":
-      return typeof v === "number" && Number.isInteger(v) && v >= 1000 && v <= 4999
-    case "bool":
-      return typeof v === "boolean"
-    case "text":
-      // A bare negative number ("-1") is the usual "not measured" placeholder, never a measured text.
-      return typeof v === "string" && !PLACEHOLDERS.has(v.trim().toLowerCase()) && !/^\s*-\d/.test(v)
-  }
+  return ok
+}
+const fieldOk = fieldOkWith(STRICT)
+/** The property test's mutations for one kind of field: each must make a record UNMEASURED. */
+const mutationsFor = (k: Kind): readonly (readonly [string, unknown])[] => {
+  const wrong = k === "bool" ? 1 : true
+  const base: (readonly [string, unknown])[] = [
+    ["NaN", Number.NaN],
+    ["negative", -1],
+    ["placeholder", "?"],
+    ["wrong type", wrong],
+  ]
+  if (typeof k === "object" && "list" in k) base.push(["empty list", []], ["list of NaN", [Number.NaN]])
+  return base
 }
 /** The first field of a record that its rule's schema does not accept, or null. */
 const invalidField = (rule: Rule, r: Rec): string | null => {
@@ -396,6 +418,9 @@ const RULES: Readonly<Record<string, Rule>> = {
     },
   },
 }
+/** Static: a row's source reaches the gate and returns its result untouched. */
+const rowReachesGate = (body: string): boolean =>
+  /judge\(|silentRun\(|reproveRun\(|stateRun\(|hostedRun\(|verdict: "UNMEASURED"/.test(body)
 /** The one gate: a rule decides only a record whose every field its schema accepts; anything else is UNMEASURED. */
 const judge = (rule: string, r: Rec, note: string): Run => {
   const found = RULES[rule]
@@ -407,8 +432,10 @@ const judge = (rule: string, r: Rec, note: string): Run => {
     )
   return found.decide(r, note)
 }
+/** A verdict counts only if it is UNMEASURED or the very object the gate returned. */
+const gateOnly = (r: Run): Run => r
 /** Helper output values are strings; a value that is wholly a number becomes one (anything else stays and fails). */
-const fieldsRecord = (fields: Readonly<Record<string, string>>): Rec =>
+const fieldsRecord = (fields: Readonly<Record<string, string>>, _schema: Rule["schema"] = {}): Rec =>
   Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, /^\d+(\.\d+)?$/.test(v) ? Number(v) : v]))
 type ReproveQa = Readonly<{
   before: { hibernated: number; reconnectsPerRefresh: number }
@@ -731,7 +758,6 @@ const selfTest = async (): Promise<number> => {
   )
   // Round 2, finding 1-2 (class): ONE gate. Every rule's valid sample decides; every mutation of every field of every
   // record (missing, NaN, negative, placeholder string, wrong type; empty list for lists) is UNMEASURED naming the field.
-  const wrongType = (k: Kind): unknown => (k === "bool" ? 1 : true)
   // A rule that throws on a bad record is the defect this gate exists for; count it as a failure, never a crash.
   const tryJudge = (name: string, rec: Rec): Run => {
     try {
@@ -748,13 +774,7 @@ const selfTest = async (): Promise<number> => {
       JSON.stringify(ok),
     )
     for (const [field, kind] of Object.entries(rule.schema)) {
-      const mutations: (readonly [string, unknown])[] = [
-        ["NaN", Number.NaN],
-        ["negative", -1],
-        ["placeholder", "?"],
-        ["wrong type", wrongType(kind)],
-      ]
-      if (typeof kind === "object" && "list" in kind) mutations.push(["empty list", []], ["list of NaN", [Number.NaN]])
+      const mutations = mutationsFor(kind)
       const missing = { ...rule.sample }
       delete (missing as Record<string, unknown>)[field]
       const cases: (readonly [string, Rec])[] = [
@@ -835,11 +855,7 @@ const selfTest = async (): Promise<number> => {
   check("R2 row scan found every row", rowBodies.length >= 23, `found ${rowBodies.length}`)
   for (const body of rowBodies) {
     const id = /"([A-Z]-[A-Z0-9-]+)"/.exec(body)?.[1] ?? (body.startsWith(" = ") ? "spec" : body.slice(0, 30))
-    check(
-      `R2 row ${id} reaches the gate`,
-      /judge\(|silentRun\(|reproveRun\(|stateRun\(|hostedRun\(|verdict: "UNMEASURED"/.test(body),
-      body.slice(0, 120),
-    )
+    check(`R2 row ${id} reaches the gate`, rowReachesGate(body), body.slice(0, 120))
   }
   for (const w of ["reproveRun", "silentRun", "stateRun", "hostedRun"]) {
     const at = source.indexOf(`const ${w} = `)
@@ -864,6 +880,102 @@ const selfTest = async (): Promise<number> => {
   })
   // Four socket opens and two peer-connect sites exist in the measurement code; a scan that finds fewer proves nothing.
   check("R2 bounded-open scan found every open and connect", opens >= 6, `found ${opens}`)
+  // Round 3, nit 1 (class): a label never decides whether a reading counts. Helper values are coerced to numbers only
+  // where the schema expects a number, so a numeric-looking or empty label stays a label and the reading is decided.
+  const stateFields = { ...base.fields, control: "ok", target_visible: "yes" }
+  for (const v of ["2", "1.2", "", "?", "0.1.0"]) {
+    const r = stateRun({ ok: true, fields: { ...stateFields, version: v } }, "n")
+    check(
+      `R3 L-STATE version ${JSON.stringify(v)} is a label: the reading is decided`,
+      r.errored !== true && r.verdict === "CONTRADICTS",
+      JSON.stringify(r),
+    )
+  }
+  for (const name of ["L-STATE", "R-HOSTED-1"]) {
+    const schema = RULES[name]?.schema ?? {}
+    for (const [field, kind] of Object.entries(schema)) {
+      const numeric = kind === "count" || kind === "ms" || kind === "code"
+      const v = fieldsRecord({ [field]: "12" }, schema)[field]
+      check(
+        `R3 ${name}.${field} "12" coerces to ${numeric ? "a number" : "a string"}`,
+        numeric ? v === 12 : v === "12",
+        JSON.stringify(v),
+      )
+    }
+  }
+  // Round 3, nit 2 (class): the property test must catch any weakened numeric rule. Each weakening of the validator
+  // (no finite check, no integer check, no upper code range) that changes what a kind accepts must be caught by at least
+  // one of that kind's mutations.
+  const universe = [Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, 1.5, 1000.5, 5000, 70_000, Number.NaN, -1]
+  const weakenings: readonly (readonly [string, Strictness])[] = [
+    ["no finite check", { ...STRICT, finite: false }],
+    ["no integer check", { ...STRICT, integer: false }],
+    ["no upper code range", { ...STRICT, upper: false }],
+  ]
+  for (const [wname, s] of weakenings) {
+    const weak = fieldOkWith(s)
+    for (const kind of ["count", "ms", "code"] as const) {
+      const slips = (v: unknown): boolean => !fieldOk(kind, v) && weak(kind, v)
+      if (!universe.some(slips)) continue
+      const caught = mutationsFor(kind).some(([, v]) => slips(v))
+      check(
+        `R3 property mutations for ${kind} catch "${wname}"`,
+        caught,
+        `mutations: ${mutationsFor(kind)
+          .map(([m]) => m)
+          .join(", ")}`,
+      )
+    }
+  }
+  // Round 3, nit 3 (class): a verdict is the gate's own result or it is UNMEASURED; overwriting it after the gate, by
+  // spread, by mutation or by hand, does not survive.
+  const gated = judge("R-AUTH-1", RULES["R-AUTH-1"]?.sample ?? {}, "n")
+  check("R3 the gate's own result passes", gateOnly(gated) === gated && gated.verdict === "CONFIRMS")
+  check("R3 the gate's result is frozen", Object.isFrozen(gated))
+  const overwrites: readonly (readonly [string, Run])[] = [
+    ["spread and overwrite", { ...gated, verdict: "CONTRADICTS" }],
+    ["spread unchanged", { ...gated }],
+    ["hand-made verdict", { measured: "m", verdict: "CONFIRMS", note: "n" }],
+    ["hand-made NEW-EDGE", { measured: "m", verdict: "NEW-EDGE", note: "n" }],
+  ]
+  for (const [name, r] of overwrites)
+    check(`R3 ${name} after the gate -> UNMEASURED`, failed(gateOnly(r)), JSON.stringify(gateOnly(r)))
+  check(
+    "R3 a constant UNMEASURED row passes",
+    gateOnly({ measured: "-", verdict: "UNMEASURED", note: "needs a test account" }).verdict === "UNMEASURED",
+  )
+  const fixtures: readonly (readonly [string, string, boolean])[] = [
+    ["returns judge() directly", 'async () => judge("R-AUTH-1", await mExpiry(false), relayNote),', true],
+    [
+      "block that returns judge()",
+      'async () => {\n const m = await mEvict()\n return judge("R-HIB-1", { sweep: s }, note)\n }',
+      true,
+    ],
+    [
+      "constant UNMEASURED",
+      '() => Promise.resolve({ measured: "-", verdict: "UNMEASURED", note: "needs a test account" }),',
+      true,
+    ],
+    ["spread judge() then overwrite", 'async () => ({ ...judge("R-AUTH-1", m, n), verdict: "CONFIRMS" }),', false],
+    [
+      "judge() into a variable, return a copy",
+      'async () => { const r = judge("R-AUTH-1", m, n); return { ...r, verdict: "CONFIRMS" } }',
+      false,
+    ],
+    [
+      "judge() then assign its verdict",
+      'async () => { const r = judge("R-AUTH-1", m, n); r.verdict = "CONFIRMS"; return r }',
+      false,
+    ],
+    [
+      "judge() then a hand verdict",
+      'async () => judge("R-AUTH-1", m, n) && { measured: "m", verdict: "CONFIRMS", note: n },',
+      false,
+    ],
+    ["no gate at all", 'async () => ({ measured: "m", verdict: "CONFIRMS", note: n }),', false],
+  ]
+  for (const [name, body, want] of fixtures)
+    check(`R3 row scanner: ${name} -> ${want ? "accepted" : "rejected"}`, rowReachesGate(body) === want, body)
   // M1 (helper side): the pair helper's own class checks.
   const helperTest = join(import.meta.dir, "probe-sp-r-pair-selftest.sh")
   if (!existsSync(helperTest)) check("M1 pair helper self-test exists", false, helperTest)
@@ -1569,7 +1681,7 @@ if (specs.some((s) => s.id.startsWith("R-HOSTED-1")) && !/^wss:\/\/[^/]+$/.test(
 let status = 0
 try {
   const results: (Row & Run)[] = await Promise.all(
-    specs.map(async (s) => ({ id: s.id, pipe: s.pipe, question: s.question, ...(await settle(s.run)) })),
+    specs.map(async (s) => ({ id: s.id, pipe: s.pipe, question: s.question, ...gateOnly(await settle(s.run)) })),
   )
   const build = relayBuild()
   for (const r of results) console.log(`${r.id}\t${r.verdict}\t${r.measured}`)
