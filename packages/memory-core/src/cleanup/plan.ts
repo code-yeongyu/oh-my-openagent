@@ -1,4 +1,3 @@
-import { ARCHIVE_PATH } from "../reflection/link-rewrite"
 import { findConflicts } from "./conflicts"
 import { scanCleanupCorpus, type CleanupCorpus } from "./corpus"
 import { readDeclarations } from "./declarations"
@@ -6,8 +5,8 @@ import { findDuplicates } from "./duplicates"
 import { mergeSectionBytes, markLineBytes } from "./edits"
 import { findStale } from "./staleness"
 import { findSuperseded } from "./supersession"
+import { holdReason, ownedBy, touchedPaths } from "./touches"
 import {
-  LOAD_BEARING_PATHS,
   resolveCleanupOptions,
   type CleanupAction,
   type HeldFinding,
@@ -178,57 +177,6 @@ export async function planMemoryCleanup(
     },
     snapshot,
   }
-}
-
-/** Paths an action writes directly, as opposed to notes touched only because a link inside them is repointed. */
-function ownedBy(finding: MemoryCleanupFinding, path: string): boolean {
-  return path === ARCHIVE_PATH || finding.actions.some((action) => writtenPath(action) === path)
-}
-
-function writtenPath(action: CleanupAction): string {
-  switch (action.kind) {
-    case "archive":
-      return action.path
-    case "merge":
-      return action.into
-    case "mark-conflict":
-      return action.path
-  }
-}
-
-function touchedPaths(draft: Draft, corpus: CleanupCorpus): string[] {
-  const touched = new Set<string>()
-  for (const action of draft.actions) {
-    switch (action.kind) {
-      case "archive":
-        touched.add(action.path)
-        touched.add(ARCHIVE_PATH)
-        for (const source of corpus.inbound.get(action.path) ?? []) touched.add(source)
-        break
-      case "merge":
-        touched.add(action.into)
-        break
-      case "mark-conflict":
-        touched.add(action.path)
-        break
-    }
-  }
-  return [...touched].sort()
-}
-
-function holdReason(
-  finding: MemoryCleanupFinding,
-  corpus: CleanupCorpus,
-  options: ResolvedCleanupOptions,
-): string | undefined {
-  for (const path of finding.touches) {
-    const note = corpus.notes.get(path)
-    const role = ownedBy(finding, path) ? "would write" : "would repoint a link in"
-    if (note?.readOnly === true) return `${role} ${path}, which is read_only`
-    if (!options.includeLoadBearing && LOAD_BEARING_PATHS.has(path))
-      return `${role} ${path} (load-bearing; pass --include-load-bearing)`
-  }
-  return undefined
 }
 
 function countByHome(corpus: CleanupCorpus): Record<string, number> {
