@@ -2,5 +2,6 @@
 //! Windows leg with `--include-ignored`. [`kit`] is the scripted Windows they share.
 
 mod capture;
+mod elevated;
 mod kit;
 mod ocr;
