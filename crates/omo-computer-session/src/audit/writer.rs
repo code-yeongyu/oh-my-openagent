@@ -14,7 +14,7 @@ use omo_computer_core::backend::Refusal;
 use serde_json::json;
 
 use super::line::{now_ms, AuditEvent};
-use super::segment::{anchor_event, last_line_hash, lock, stamp, truncated, Segment};
+use super::segment::{anchor_event, chain_link, lock, stamp, truncated, Segment};
 use super::sink::{AuditSink, AUDIT_UNAVAILABLE};
 
 pub const AUDIT_FILE: &str = "audit.jsonl";
@@ -132,7 +132,7 @@ impl AuditWriter {
             authority,
             degraded: false,
         };
-        let last = last_line_hash(&this.path);
+        let last = chain_link(&this.path);
         this.open_segment(last)?;
         Ok(this)
     }
@@ -186,7 +186,7 @@ impl AuditWriter {
 
     fn rotate(&mut self) -> io::Result<()> {
         let rotated = self.path.with_file_name(ROTATED_FILE);
-        let last = last_line_hash(&self.path);
+        let last = chain_link(&self.path);
         fs::rename(&self.path, rotated)?;
         self.open_segment(last)
     }

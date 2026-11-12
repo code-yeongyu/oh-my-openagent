@@ -118,3 +118,25 @@ fn a_failed_audit_append_after_a_delivered_call_is_logged() {
         session.funnel.warned
     );
 }
+
+#[test]
+fn a_marker_that_cannot_be_written_is_logged_and_sends_nothing() {
+    let run = Run::new();
+    fs::write(
+        run.dir.path().join("markers"),
+        b"a file where the markers dir goes",
+    )
+    .expect("file");
+    let mut session = run.session(Box::new(run.fake()));
+    let refused = session.click(click("c-marker")).expect_err("no marker");
+    assert_eq!(
+        wire(&refused),
+        ("TransactionFailed", Some("marker_unavailable"))
+    );
+    assert!(
+        warned(&session, "marker not written"),
+        "{:?}",
+        session.funnel.warned
+    );
+    assert!(run.sink.is_empty(), "nothing sent");
+}
