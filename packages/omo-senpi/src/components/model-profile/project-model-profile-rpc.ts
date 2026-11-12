@@ -131,7 +131,9 @@ function isHomeFolder(cwd: string, deps: ProjectModelProfileDeps): boolean {
     const homeOfUid = deps.homeOfUid ?? lookupHomeOfUid
     const ownPasswdHome = homeOfUid(ownUid)
     if (typeof ownPasswdHome === "string" && sameDirectory(ownPasswdHome, folder)) return true
-    if (ownPasswdHome === undefined && ownHomes.some((home) => atOrAbove(home, folder))) return true
+    // No passwd home for this account (a failed lookup, or a container started with a bare uid): refuse only folders at
+    // or above HOME, so a bind-mounted project below it keeps working.
+    if (typeof ownPasswdHome !== "string" && ownHomes.some((home) => atOrAbove(home, folder))) return true
     if (folder.uid === ownUid) return false
     const ownerHome = homeOfUid(folder.uid)
     return ownerHome === undefined || (ownerHome !== null && sameDirectory(ownerHome, folder))
