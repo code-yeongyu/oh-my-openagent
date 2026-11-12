@@ -155,6 +155,7 @@
     "packages/memory-core/src/cleanup/staleness.ts",
     "packages/memory-core/src/cleanup/supersession.ts",
     "packages/memory-core/src/cleanup/text.ts",
+    "packages/memory-core/src/cleanup/touches.ts",
     "packages/memory-core/src/cleanup/types.ts",
     "packages/memory-core/src/compile/block-persist.ts",
     "packages/memory-core/src/compile/cache.ts",
