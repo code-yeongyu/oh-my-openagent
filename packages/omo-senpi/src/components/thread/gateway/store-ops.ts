@@ -1293,7 +1293,7 @@ export async function migrateLegacyMailboxes(ctx: StoreContext, now: number): Pr
   for (const directory of ctx.config.legacy_mailbox_directories) {
     const key = `legacy_mailbox:${directory}`
     if (ctx.sql.one(["value"], "SELECT value FROM gateway_meta WHERE key = ?", [key]) !== undefined) continue
-    let items
+    let items: ReturnType<typeof readLegacyMailbox>
     try {
       items = readLegacyMailbox(directory)
     } catch (error) {
