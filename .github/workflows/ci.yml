@@ -344,6 +344,9 @@ jobs:
         env:
           WINDOWS_TEST_SHARD: ${{ matrix.shard }}
         run: |
+          # Feature PRs do not commit generated outputs (#9903), so these tests read a fresh build, as on POSIX.
+          bun script/build-generated.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $telemetryDirectory = Join-Path $env:RUNNER_TEMP "windows-root-test-telemetry"
           & .github/scripts/windows-ci-telemetry.ps1 `
             -ArtifactDirectory $telemetryDirectory `
@@ -837,12 +840,24 @@ jobs:
       # Linux only: digestBuildSources hashes repo-relative paths (build-extension.mjs:140,143),
       # which are backslash-separated on Windows, so the source digest is platform-dependent and
       # a committed artifact can never match on every OS. One platform is enough to catch drift.
-      - name: Verify committed Senpi plugin bundle is current
+      # #9903: feature PRs do not commit the outputs on script/generated-bundles.json, so this step builds all of
+      # them and checks the tree: on a PR a listed output may differ, anything else may not. A release branch of this
+      # repository (the release-state PR) commits the rebuild, so there the tree must match it byte for byte and the
+      # marker check still runs first. The stricter mode is the safe side for any other release/* branch.
+      - name: Verify generated outputs and committed Senpi files are current
         if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.os == 'ubuntu-latest'
         shell: bash
+        env:
+          RELEASE_STATE_CANDIDATE: ${{ startsWith(github.head_ref, 'release/') && github.event.pull_request.head.repo.full_name == github.repository && '1' || '0' }}
         run: |
           set -euo pipefail
-          node packages/omo-senpi/plugin/scripts/build-extension.mjs --check
+          mode=pr
+          if [ "$RELEASE_STATE_CANDIDATE" = "1" ]; then
+            mode=release
+            node packages/omo-senpi/plugin/scripts/build-extension.mjs --check
+          fi
+          bun script/build-generated.ts
+          bun script/check-generated-tree.ts --mode "$mode"
           # The installer embeds the required-artifact list, so a stale copy demands files the
           # plugin no longer ships and refuses to install. Nothing else in CI reads it.
           node packages/omo-senpi/plugin/scripts/build-install.mjs --check
