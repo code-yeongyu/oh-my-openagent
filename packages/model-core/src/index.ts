@@ -25,6 +25,7 @@ export * from "./model-string-parser"
 export * from "./model-sanitizer"
 export { fuzzyMatchModel, isModelAvailable } from "./model-availability"
 export { transformModelForProvider, transformModelForProviderDisplay } from "./provider-model-id-transform"
+export * from "./atlas-cloud-models"
 export * from "./fallback-chain-from-models"
 export { _setModelResolutionLogImplementationForTesting, resolveModelPipeline } from "./model-resolution-pipeline"
 export type {

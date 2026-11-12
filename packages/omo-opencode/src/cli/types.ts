@@ -17,6 +17,7 @@ export interface InstallArgs {
   minimaxCnCodingPlan?: BooleanArg
   minimaxCodingPlan?: BooleanArg
   vercelAiGateway?: BooleanArg
+  atlasCloud?: BooleanArg
   codexAutonomous?: boolean
   skipAuth?: boolean
 }
@@ -40,6 +41,7 @@ export interface InstallConfig {
   hasMinimaxCnCodingPlan: boolean
   hasMinimaxCodingPlan: boolean
   hasVercelAiGateway: boolean
+  hasAtlasCloud: boolean
   codexAutonomous: boolean
 }
 
@@ -66,4 +68,5 @@ export interface DetectedConfig {
   hasMinimaxCnCodingPlan: boolean
   hasMinimaxCodingPlan: boolean
   hasVercelAiGateway: boolean
+  hasAtlasCloud: boolean
 }

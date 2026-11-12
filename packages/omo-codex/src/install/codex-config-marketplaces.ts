@@ -62,7 +62,7 @@ export function ensureMarketplaceBlock(
   if (source.sourceType === "git") {
     lines.push(`ref = ${JSON.stringify(source.ref)}`)
   }
-  lines.push("")
+  lines.push("", "")
   const block = lines.join("\n")
   const section = findTomlSection(config, header)
   if (section) return config.slice(0, section.start) + block + config.slice(section.end)

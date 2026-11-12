@@ -136,6 +136,70 @@ describe("runCliInstaller", () => {
     }
   })
 
+  it("writes the Atlas Cloud provider when explicitly enabled", async () => {
+    const restoreSpies = [
+      spyOn(configManager, "detectCurrentConfig").mockReturnValue({
+        isInstalled: false,
+        installedVersion: null,
+        hasClaude: false,
+        isMax20: false,
+        hasOpenAI: false,
+        hasGemini: false,
+        hasCopilot: false,
+        hasCodex: false,
+        hasOpencodeZen: false,
+        hasZaiCodingPlan: false,
+        hasKimiForCoding: false,
+        hasOpencodeGo: false,
+        hasBailianCodingPlan: false,
+        hasMinimaxCnCodingPlan: false,
+        hasMinimaxCodingPlan: false,
+        hasVercelAiGateway: false,
+        hasAtlasCloud: false,
+      }),
+      spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(true),
+      spyOn(configManager, "getOpenCodeVersion").mockResolvedValue("1.4.0"),
+      spyOn(configManager, "addPluginToOpenCodeConfig").mockResolvedValue({
+        success: true,
+        configPath: "/tmp/opencode.jsonc",
+      }),
+      spyOn(configManager, "writeOmoConfig").mockReturnValue({
+        success: true,
+        configPath: "/tmp/omo.jsonc",
+      }),
+    ]
+    const atlasSpy = spyOn(configManager, "addAtlasCloudProviderToOpenCodeConfig").mockReturnValue({
+      success: true,
+      configPath: "/tmp/opencode.jsonc",
+    })
+
+    const result = await runCliInstaller(
+      {
+        tui: false,
+        platform: "opencode",
+        claude: "no",
+        openai: "no",
+        gemini: "no",
+        copilot: "no",
+        opencodeZen: "no",
+        zaiCodingPlan: "no",
+        kimiForCoding: "no",
+        opencodeGo: "no",
+        bailianCodingPlan: "no",
+        minimaxCnCodingPlan: "no",
+        minimaxCodingPlan: "no",
+        vercelAiGateway: "no",
+        atlasCloud: "yes",
+      },
+      "3.4.0",
+    )
+
+    expect(result).toBe(0)
+    expect(atlasSpy).toHaveBeenCalledTimes(1)
+    for (const spy of restoreSpies) spy.mockRestore()
+    atlasSpy.mockRestore()
+  })
+
   it("registers the TUI plugin entry after adding the OpenCode server plugin", async () => {
     const originalConfigDir = process.env.OPENCODE_CONFIG_DIR
     const configDir = mkdtempSync(join(tmpdir(), "omo-cli-tui-entry-"))

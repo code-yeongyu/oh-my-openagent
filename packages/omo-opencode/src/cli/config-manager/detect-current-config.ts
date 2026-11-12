@@ -132,6 +132,7 @@ export function detectCurrentConfig(): DetectedConfig {
     hasMinimaxCnCodingPlan: false,
     hasMinimaxCodingPlan: false,
     hasVercelAiGateway: false,
+    hasAtlasCloud: false,
   }
 
   const { format, path } = detectConfigFormat()
@@ -159,6 +160,7 @@ export function detectCurrentConfig(): DetectedConfig {
 
   const providers = openCodeConfig.provider as Record<string, unknown> | undefined
   result.hasGemini = providers ? "google" in providers : false
+  result.hasAtlasCloud = providers ? "atlascloud" in providers : false
 
   const {
     hasOpenAI,

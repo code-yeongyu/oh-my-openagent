@@ -21,8 +21,20 @@ Native Codex marketplace for the `omo` plugin.
 npx lazycodex-ai install
 ```
 
-The installer builds `omo`, copies a clean versioned cache entry into `~/.codex/plugins/cache/sisyphuslabs/omo`, installs runtime dependencies in the cache, writes a local marketplace snapshot under `~/.codex/.tmp/marketplaces/sisyphuslabs/plugins/omo`, copies bundled-agent TOMLs into `~/.codex/agents/`, registers the `sisyphuslabs` marketplace from the local built cache, and enables `[plugins."omo@sisyphuslabs"]` in `~/.codex/config.toml`.
+The installer builds `omo`, copies a clean versioned cache entry into `~/.codex/plugins/cache/sisyphuslabs/omo`, installs runtime dependencies in the cache, writes a local marketplace snapshot under `~/.codex/.tmp/marketplaces/sisyphuslabs/plugins/omo`, copies bundled-agent TOMLs into `~/.codex/agents/`, registers the `sisyphuslabs` marketplace from the local built cache, enables `[plugins."omo@sisyphuslabs"]`, and registers `[model_providers.atlascloud]` in `~/.codex/config.toml`.
 It also enables both `plugins = true` and `plugin_hooks = true` under `[features]` so bundled hook files run.
+
+### Atlas Cloud
+
+The managed provider uses `https://api.atlascloud.ai/v1`, reads its key from `ATLASCLOUD_API_KEY`, and uses the Codex Responses wire API. The installer does not persist a key or change the default model/provider. To select it explicitly:
+
+```bash
+export ATLASCLOUD_API_KEY="your-api-key"
+npx lazycodex-ai install
+codex -m moonshotai/kimi-k3 -c 'model_provider="atlascloud"'
+```
+
+An existing user-owned `atlascloud` section is preserved. Uninstall removes only an unchanged canonical installer-managed section.
 
 If your local Codex build exposes plugin install commands, you can use those instead. For older local builds, the installer replaces the manual copy fallback:
 

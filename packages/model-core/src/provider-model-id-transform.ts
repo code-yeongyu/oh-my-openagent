@@ -1,3 +1,5 @@
+import { ATLAS_CLOUD_PROVIDER_ID, resolveAtlasCloudModelID } from "./atlas-cloud-models"
+
 function inferSubProvider(model: string): string | undefined {
   if (model.startsWith("claude-")) return "anthropic"
   if (model.startsWith("gpt-")) return "openai"
@@ -23,6 +25,9 @@ function applyGatewayTransforms(model: string): string {
 }
 
 function transformModelForProviderUsingAnthropicBehavior(provider: string, model: string): string {
+  if (provider === ATLAS_CLOUD_PROVIDER_ID) {
+    return resolveAtlasCloudModelID(model)
+  }
   if (provider === "vercel") {
     const slashIndex = model.indexOf("/")
     if (slashIndex !== -1) {

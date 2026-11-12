@@ -303,6 +303,64 @@ describe("runTuiInstaller", () => {
     warnSpy.mockRestore()
   })
 
+  it("writes the Atlas Cloud provider selected in the interactive installer", async () => {
+    const restoreSpies = [
+      spyOn(p, "spinner").mockReturnValue(createMockSpinner()),
+      spyOn(p, "intro").mockImplementation(() => undefined),
+      spyOn(p.log, "info").mockImplementation(() => undefined),
+      spyOn(p.log, "warn").mockImplementation(() => undefined),
+      spyOn(p.log, "success").mockImplementation(() => undefined),
+      spyOn(p.log, "message").mockImplementation(() => undefined),
+      spyOn(p, "note").mockImplementation(() => undefined),
+      spyOn(p, "confirm").mockResolvedValue(false),
+      spyOn(p, "outro").mockImplementation(() => undefined),
+      spyOn(tuiInstallPrompts, "promptInstallPlatform").mockResolvedValue("opencode"),
+      spyOn(configManager, "detectCurrentConfig").mockReturnValue({
+        isInstalled: false,
+        installedVersion: null,
+        hasClaude: false,
+        isMax20: false,
+        hasOpenAI: false,
+        hasGemini: false,
+        hasCopilot: false,
+        hasCodex: false,
+        hasOpencodeZen: false,
+        hasZaiCodingPlan: false,
+        hasKimiForCoding: false,
+        hasOpencodeGo: false,
+        hasBailianCodingPlan: false,
+        hasMinimaxCnCodingPlan: false,
+        hasMinimaxCodingPlan: false,
+        hasVercelAiGateway: false,
+        hasAtlasCloud: false,
+      }),
+      spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(true),
+      spyOn(configManager, "getOpenCodeVersion").mockResolvedValue("1.4.0"),
+      spyOn(tuiInstallPrompts, "promptInstallConfig").mockResolvedValue(
+        createOpenCodeInstallConfig({ hasAtlasCloud: true }),
+      ),
+      spyOn(configManager, "addPluginToOpenCodeConfig").mockResolvedValue({
+        success: true,
+        configPath: "/tmp/opencode.jsonc",
+      }),
+      spyOn(configManager, "writeOmoConfig").mockReturnValue({
+        success: true,
+        configPath: "/tmp/omo.jsonc",
+      }),
+    ]
+    const atlasSpy = spyOn(configManager, "addAtlasCloudProviderToOpenCodeConfig").mockReturnValue({
+      success: true,
+      configPath: "/tmp/opencode.jsonc",
+    })
+
+    const result = await runTuiInstaller({ tui: true }, "3.16.0")
+
+    expect(result).toBe(0)
+    expect(atlasSpy).toHaveBeenCalledTimes(1)
+    for (const spy of restoreSpies) spy.mockRestore()
+    atlasSpy.mockRestore()
+  })
+
   it("warns with ultimate fallback when no providers are configured", async () => {
     const warnSpy = spyOn(p.log, "warn").mockImplementation(() => undefined)
     const restoreSpies = [
