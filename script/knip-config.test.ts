@@ -42,7 +42,7 @@ const composeError = (files: Record<string, unknown>): string =>
   })
 
 describe("knip config composed from per-directory fragments", () => {
-  test("fragments of the root, a crate and a package merge into one config; dependency trees are not read", () => {
+  test("fragments of the root, a crate, a package and a nested script directory merge into one config; dependency trees are not read", () => {
     // given each directory owning its part, plus a fragment inside node_modules
     const files = {
       "knip.base.jsonc": `// base\n${JSON.stringify(base)}`,
@@ -53,6 +53,9 @@ describe("knip config composed from per-directory fragments", () => {
         preExistingExports: { "packages/b/src/x.ts": ["unusedName"] },
       },
       "packages/b/node_modules/dep/knip.workspace.jsonc": { workspaces: { "packages/b/node_modules/dep": {} } },
+      // a nested fragment owns its directory, so its entry is accepted there and not claimed by script/
+      "script/knip.workspace.jsonc": { workspaces: { ".": { entry: ["script/run.ts"] } } },
+      "script/qa/computer/knip.workspace.jsonc": { workspaces: { ".": { entry: ["script/qa/computer/probe.ts"] } } },
     }
 
     // when composed
@@ -66,7 +69,10 @@ describe("knip config composed from per-directory fragments", () => {
         preExistingExports: { "packages/b/src/x.ts": ["unusedName"] },
       },
       workspaces: {
-        ".": { includeEntryExports: true, entry: ["postinstall.mjs", "crates/a/probes/p.ts"] },
+        ".": {
+          includeEntryExports: true,
+          entry: ["postinstall.mjs", "crates/a/probes/p.ts", "script/run.ts", "script/qa/computer/probe.ts"],
+        },
         "packages/b": { entry: ["src/index.ts"], ignoreIssues: { "src/x.ts": ["types"] } },
       },
     })
