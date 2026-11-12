@@ -95,6 +95,8 @@ describe("identity merge (#10070)", () => {
     ["skills/.git /config", "[core]\n\tbare = false\n"],
     ["skills/.git::$INDEX_ALLOCATION/config", "[core]\n\tbare = false\n"],
     ["skills/.g\u200cit/config", "[core]\n\tbare = false\n"],
+    // Plain names to isPlainTreePath (`C:` folds to `c`); only the confinement check refuses this drive-absolute path.
+    ["C:/x.md", note("carried")],
   ])(
     "#given a source tree entry named %j #when the merge is planned and applied #then both name it unplaceable and nothing in or beside the target changes beyond what the store without it merges (#12974 security)",
     async (path, content) => {
