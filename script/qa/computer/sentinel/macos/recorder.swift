@@ -64,6 +64,10 @@ final class Recorder: NSObject {
   }
 
   func arm() {
+    // Every accessibility read this process makes is capped: a read of an app that is busy (a window being created,
+    // an app being activated) otherwise blocks the main thread for seconds and stalls the 20 Hz sampler. Set on the
+    // system-wide element, this is the default for every element that does not set its own.
+    AXUIElementSetMessagingTimeout(AXUIElementCreateSystemWide(), 0.05)
     emit(["kind": "context", "userPid": Int(userPid), "targetPids": targetPids.map { Int($0) }])
     let user = AXUIElementCreateApplication(userPid)
     let focus = observe(userPid, user, [kAXFocusedUIElementChangedNotification, kAXFocusedWindowChangedNotification])
@@ -146,6 +150,7 @@ final class Recorder: NSObject {
   }
 
   func windowAdded(_ element: AXUIElement) {
+    AXUIElementSetMessagingTimeout(element, 0.05)
     var pid: pid_t = 0
     AXUIElementGetPid(element, &pid)
     var number: CGWindowID = 0
