@@ -19,6 +19,10 @@ export type FakeDeliveryService = {
   /** `delivery.pending` and `delivery.drained` are refused with this code from now on. */
   readonly refuseMarks: (code: string) => void
   readonly onAnswer: (listener: () => Promise<void>) => void
+  /** Every `delivery.answer` reply after this call is refused `unknown_delivery` (A5.1). */
+  readonly refuseAnswers: () => void
+  /** The next `delivery.drained` report is answered as kept, still expecting this command id (the backstop, A5.3). */
+  readonly expectOnDrained: (commandId: string) => void
   /** Hands a delivery to the declared consumer; resolves with the consumer's `delivery.answer` reply for that (sender device, command id). */
   readonly inbound: (event: DeliveryInboundEvent) => Promise<Record<string, unknown>>
   /** Asks the consumer `delivery.holds`; resolves with its `delivery.held` answer. */
@@ -35,6 +39,8 @@ export function createFakeDeliveryService(options: { readonly admitted: boolean 
   let serveRefusal: string | undefined
   let marksRefusal: string | undefined
   let answerListener: (() => Promise<void>) | undefined
+  let answersRefused = false
+  let expecting: string | undefined
   let inboundListener: ((event: DeliveryInboundEvent) => void) | undefined
   let holdsListener: ((event: DeliveryHoldsEvent) => void) | undefined
   const answers = new Map<string, (reply: Record<string, unknown>) => void>()
@@ -48,6 +54,11 @@ export function createFakeDeliveryService(options: { readonly admitted: boolean 
     answer: async (delivery, reply) => {
       await answerListener?.()
       const key = `${delivery.sender_device}\u0000${delivery.command_id}`
+      if (answersRefused) {
+        answers.get(key)?.({ kind: "unknown_delivery" })
+        answers.delete(key)
+        throw refusal("unknown_delivery")
+      }
       const waiting = answers.get(key)
       if (waiting === undefined) throw refusal("unknown_delivery")
       answers.delete(key)
@@ -68,6 +79,9 @@ export function createFakeDeliveryService(options: { readonly admitted: boolean 
     drained: async (pair) => {
       if (marksRefusal !== undefined) throw refusal(marksRefusal)
       calls.push({ type: "delivery.drained", ...pair })
+      const kept = expecting
+      expecting = undefined
+      return kept === undefined ? { kept: false } : { kept: true, expecting: kept }
     },
     onInbound: (listener) => {
       inboundListener = listener
@@ -94,6 +108,12 @@ export function createFakeDeliveryService(options: { readonly admitted: boolean 
     },
     onAnswer: (listener) => {
       answerListener = listener
+    },
+    refuseAnswers: () => {
+      answersRefused = true
+    },
+    expectOnDrained: (commandId) => {
+      expecting = commandId
     },
     inbound: (event) =>
       new Promise((resolve, reject) => {

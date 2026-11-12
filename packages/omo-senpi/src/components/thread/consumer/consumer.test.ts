@@ -176,6 +176,64 @@ describe("a handed delivery", () => {
   })
 })
 
+describe("A5: the consumer's side of the local delivery messages", () => {
+  test("#given the service answers unknown_delivery #when the consumer answers a record #then it keeps the row and still wakes the session, with no rollback and no retry", async () => {
+    const { h, sessions, service, woken, consumer } = setup()
+    writeSessionFile(sessions, "t")
+    await consumer.start()
+    service.refuseAnswers()
+    expect(await service.inbound({ command_id: "c-1", sender_device: "dev-a", durable_id: "t", record: record("d-1") })).toEqual({
+      kind: "unknown_delivery",
+    })
+    await consumer.idle()
+    expect(await h.store().list({ target_durable_id: "t" })).toMatchObject([{ state: "queued" }])
+    expect(woken).toEqual(["t"])
+  })
+
+  test("#given a record answered once #when the same delivery comes again under a new command id #then the answer names the command id its row is stored under, and the mark does not advance", async () => {
+    const { h, sessions, service, consumer } = setup()
+    writeSessionFile(sessions, "t")
+    await consumer.start()
+    expect(await service.inbound({ command_id: "c-1", sender_device: "dev-a", durable_id: "t", record: record("d-1") })).toMatchObject({
+      deduplicated: false,
+      stored_command_id: "c-1",
+    })
+    expect(await service.inbound({ command_id: "c-2", sender_device: "dev-a", durable_id: "t", record: record("d-1") })).toMatchObject({
+      deduplicated: true,
+      stored_command_id: "c-1",
+    })
+    expect(await h.store().intakeMarks.pending()).toEqual([{ sender_device: "dev-a", session_id: "t", last_command_id: "c-1" }])
+  })
+
+  test("#given the pair's only row was refused because the sender is no longer admitted #when the consumer reports #then drained is sent: no open row is left whatever the end state", async () => {
+    const { sessions, service, consumer } = setup({ admitted: false })
+    writeSessionFile(sessions, "t")
+    await consumer.start()
+    await service.inbound({ command_id: "c-1", sender_device: "dev-a", durable_id: "t", record: record("d-1") })
+    await consumer.idle()
+    await consumer.reportDrained()
+    expect(service.calls.filter((call) => call.type === "delivery.drained")).toEqual([
+      { type: "delivery.drained", sender_device: "dev-a", session_id: "t", last_command_id: "c-1" },
+    ])
+  })
+
+  test("#given the service keeps the mark and names a command it still expects #when this directory holds no open row for that command #then the consumer reports that command drained", async () => {
+    const { h, sessions, service, consumer } = setup()
+    writeSessionFile(sessions, "t")
+    await consumer.start()
+    await service.inbound({ command_id: "c-1", sender_device: "dev-a", durable_id: "t", record: record("d-1") })
+    const target = h.session("t")
+    await target.drain.drain({ reason: "command" })
+    await h.quiesce()
+    service.expectOnDrained("c-0")
+    await consumer.reportDrained()
+    expect(service.calls.filter((call) => call.type === "delivery.drained").map((call) => call.last_command_id)).toEqual([
+      "c-1",
+      "c-0",
+    ])
+  })
+})
+
 describe("the hand-over mark", () => {
   test("#given two deliveries of one pair #when only the first is applied #then no drained report is sent, and the report after both carries the newest command id", async () => {
     const { h, sessions, service, consumer } = setup()
