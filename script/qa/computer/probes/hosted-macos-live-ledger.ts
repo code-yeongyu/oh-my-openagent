@@ -25,7 +25,7 @@ export const LEDGER_HEADER = "question\timage\tverdict\tevidence\trerun"
 
 const LIVE_TIER_QUESTIONS: readonly Question[] = ["q2", "q3", "q4", "q6"]
 
-export function cell(text: string): string {
+function cell(text: string): string {
   return text.replace(/[\t\r\n]+/g, " ").trim()
 }
 

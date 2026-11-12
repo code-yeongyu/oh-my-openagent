@@ -56,60 +56,6 @@ jobs:
           JOB_SUMMARY_NEXT: A failed step is a probe malfunction, not a verdict; read the first error in the probe step.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
-  sp-m:
-    name: cu-v3 SP-M probe on hosted macos (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { os: macos-15, other: "26" }
-          - { os: macos-26, other: "15" }
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: 2898f0a6aeea6efa78904b3e3f30ac79b78ab255
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.4.4"
-
-      - name: Measure SP-M at the spike head (read-only)
-        shell: bash
-        run: |
-          out="$RUNNER_TEMP/sp-m"
-          mkdir -p "$out"
-          probe=crates/omo-computer-backend-macos/probes/probe-sp-m.ts
-          git rev-parse HEAD | tee "$out/head.txt"
-          sudo sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" \
-            "SELECT service, client, client_type, auth_value FROM access WHERE auth_value = 2 ORDER BY service, client;" \
-            | tee "$out/tcc-granted.txt"
-          bun "$probe" --session 2>&1 | tee "$out/session.txt"
-          bun "$probe" --measure --out "$out/macos-spi.${{ matrix.os }}.tsv" \
-            --pending ${{ matrix.other }}="measured by the other image's job of the same run" 2>&1 | tee "$out/measure.txt"
-          bun "$probe" --verify "$out/macos-spi.${{ matrix.os }}.tsv" 2>&1 | tee "$out/verify.txt"
-
-      - name: Upload SP-M ledger
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: sp-m-${{ matrix.os }}
-          path: ${{ runner.temp }}/sp-m
-          if-no-files-found: error
-
-      - name: Write job summary
-        if: always()
-        shell: bash
-        env:
-          JOB_SUMMARY_TITLE: cu-v3 SP-M probe (${{ matrix.os }})
-          JOB_SUMMARY_STATUS: ${{ job.status }}
-          JOB_SUMMARY_DETAILS: |
-            - Runs the SP-M probe of the spike branch at its pinned head, unchanged, with --session, --measure and --verify.
-            - The artifact carries the ledger, the granted TCC rows read in the same run, and the probe's own output.
-          JOB_SUMMARY_NEXT: A failed step is the probe's own refusal or exit code; read measure.txt in the artifact first.
-        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
-
   ledger:
     name: hosted macos live ledger
     needs: probe
