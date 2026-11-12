@@ -39,11 +39,11 @@ export function disclaimedInvoke(binary: string, subject: string): Invoke {
   return (args, timeoutMs) => helper(binary, ["disclaim", subject, ...args], timeoutMs)
 }
 
-const confirms = (evidence: string): Answer => ({ verdict: "CONFIRMS", evidence })
-const contradicts = (evidence: string): Answer => ({ verdict: "CONTRADICTS", evidence })
-const unmeasured = (evidence: string): Answer => ({ verdict: "UNMEASURED", evidence })
+export const confirms = (evidence: string): Answer => ({ verdict: "CONFIRMS", evidence })
+export const contradicts = (evidence: string): Answer => ({ verdict: "CONTRADICTS", evidence })
+export const unmeasured = (evidence: string): Answer => ({ verdict: "UNMEASURED", evidence })
 
-function failed(read: Json): string | null {
+export function failed(read: Json): string | null {
   return typeof read.helperError === "string" ? `helper call failed: ${read.helperError}` : null
 }
 
@@ -81,114 +81,6 @@ export async function askAxTree(probe: Probe): Promise<Answer> {
   const windowListed = Array.isArray(control.windows) && control.windows.length > 0
   if (!windowListed) return unmeasured(`control failed: no TextEdit window in the window list ${short(control)}`)
   return contradicts(`TextEdit window is listed (${short(control)}) but the AX read gave ${short(tree)}`)
-}
-
-function stateLines(file: string): string[] {
-  return existsSync(file)
-    ? readFileSync(file, "utf8")
-        .split("\n")
-        .filter((line) => line !== "")
-    : []
-}
-
-async function nextState(file: string, before: number, settleMs: number): Promise<string | undefined> {
-  const lines = await until(
-    () => stateLines(file),
-    (read) => read.length > before,
-    settleMs,
-  )
-  return lines.length > before ? lines.at(-1) : undefined
-}
-
-const PID_ROUTES = [
-  ["cg", "CGEventPostToPid"],
-  ["sl", "SLEventPostToPid"],
-] as const
-
-function frameOf(read: Json): readonly number[] | null {
-  const frame = read.frame
-  if (!Array.isArray(frame) || frame.length !== 4) return null
-  const numbers = frame.filter((value): value is number => typeof value === "number")
-  return numbers.length === 4 ? numbers : null
-}
-
-type ClickResult = { readonly toggled: string | undefined; readonly note: string }
-
-async function clickAt(probe: Probe, aim: readonly string[], route: string): Promise<ClickResult | string> {
-  const { fixture } = probe
-  const before = stateLines(fixture.stateFile).length
-  const eventsBefore = stateLines(fixture.eventFile).length
-  const click = probe.invoke(["click", String(fixture.pid), String(fixture.windowNumber), ...aim, route])
-  const error = failed(click)
-  if (error !== null) return error
-  const toggled = await nextState(fixture.stateFile, before, probe.settleMs)
-  const delivered = stateLines(fixture.eventFile).slice(eventsBefore)
-  const arrival =
-    delivered.length === 0
-      ? "the fixture window received no mouse event"
-      : `the fixture window received ${short(delivered)}`
-  return {
-    toggled,
-    note: `${route}: ${toggled === undefined ? "no toggle" : `toggled ${toggled}`} after ${short(click)}; ${arrival}`,
-  }
-}
-
-async function frontmost(probe: Probe, pid: string): Promise<string | null> {
-  if (probe.control(["frontmost", pid]).frontmost === true) return null
-  const activated = probe.control(["activate", pid])
-  const again = probe.control(["frontmost", pid])
-  return again.frontmost === true ? null : `fixture is not frontmost after activate ${short(activated)}`
-}
-
-function provenAim(probe: Probe, frame: readonly number[]): readonly string[] | string {
-  const [left = 0, top = 0, width = 0, height = 0] = frame
-  const middle = top + height / 2
-  const candidates = [
-    [left + width / 2, middle],
-    [left + Math.min(height / 2, 10), middle],
-  ]
-  const misses: string[] = []
-  for (const [x = 0, y = 0] of candidates) {
-    const hit = probe.control(["ax-hit", String(x), String(y)])
-    if (hit.role === "AXCheckBox" && hit.pid === probe.fixture.pid) return [String(x), String(y)]
-    misses.push(`(${x},${y}) hit ${short(hit)}`)
-  }
-  return `no candidate point inside the AX frame ${short(frame)} hit-tests to the fixture checkbox: ${misses.join("; ")}`
-}
-
-export async function askPidClick(probe: Probe): Promise<Answer> {
-  const pid = String(probe.fixture.pid)
-  const target = probe.control(["ax-checkbox", pid])
-  const frame = frameOf(target)
-  if (frame === null) return unmeasured(`control failed: no AX frame for the fixture checkbox ${short(target)}`)
-  const aimed = provenAim(probe, frame)
-  if (typeof aimed === "string") return unmeasured(`aim not proven: ${aimed}`)
-  const aim = aimed
-  const notFront = await frontmost(probe, pid)
-  if (notFront !== null) return unmeasured(`control not run: ${notFront}`)
-  const global = await clickAt(probe, aim, "hid")
-  if (typeof global === "string") return unmeasured(`control failed: global HID click ${global}`)
-  const where = `aim ${short(aim)} proven by AX hit-test inside frame ${short(frame)}, fixture frontmost`
-  if (global.toggled === undefined)
-    return unmeasured(
-      `global=not pid=untried: the global click at the same point did not toggle (${global.note}); ${where}`,
-    )
-  const notes = [global.note]
-  for (const [route, name] of PID_ROUTES) {
-    const pidClick = await clickAt(probe, aim, route)
-    if (typeof pidClick === "string") {
-      notes.push(`${name}: ${pidClick}`)
-      continue
-    }
-    notes.push(`${name} ${pidClick.note}`)
-    if (pidClick.toggled === undefined) continue
-    const ax = probe.control(["ax-checkbox", pid])
-    const evidence = `global=toggled pid=toggled (${name}); ${where}; ${notes.join("; ")}; AX read-back ${short(ax.value)}`
-    return ax.value === (pidClick.toggled === "on" ? 1 : 0)
-      ? confirms(evidence)
-      : contradicts(`AX disagrees: ${evidence}`)
-  }
-  return contradicts(`global=toggled pid=not: ${where}; ${notes.join("; ")}`)
 }
 
 export function askCapture(probe: Probe): Answer {

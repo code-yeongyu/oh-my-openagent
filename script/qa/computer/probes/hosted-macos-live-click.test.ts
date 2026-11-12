@@ -3,7 +3,8 @@ import { appendFileSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { Json } from "./hosted-macos-live-host.ts"
-import { askPidClick, type Probe } from "./hosted-macos-live-questions.ts"
+import { askPidClick } from "./hosted-macos-live-click-question.ts"
+import { type Probe } from "./hosted-macos-live-questions.ts"
 
 // The q3 decision rule, asserted as behaviour: CONFIRMS only when a pid-routed click toggles the DEFAULT checkbox
 // (with the precondition that delivery needed), a first-mouse-only toggle is its own finding and never a pass, and

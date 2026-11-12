@@ -38,11 +38,11 @@ import {
   rerunCommand,
   unsupportedHostReason,
 } from "./hosted-macos-live-ledger.ts"
+import { askPidClick } from "./hosted-macos-live-click-question.ts"
 import {
   type Answer,
   askAxTree,
   askCapture,
-  askPidClick,
   askSyntheticUser,
   askTap,
   askTrusted,
