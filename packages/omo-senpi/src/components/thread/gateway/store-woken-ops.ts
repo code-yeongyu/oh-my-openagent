@@ -228,6 +228,15 @@ export async function retryWakeLater(ctx: StoreContext, request: Timed<WokenSess
   })
 }
 
+export async function clearWaiting(
+  ctx: StoreContext,
+  request: Timed<WokenSessionFence>,
+): Promise<{ readonly kind: "ok" } | LostLease> {
+  return await transaction(ctx, "woken_clear_waiting", () =>
+    fenced(ctx, request, "first_waiting_at = NULL", []) ? { kind: "ok" as const } : LOST,
+  )
+}
+
 export async function endWake(
   ctx: StoreContext,
   request: Timed<WokenSessionFence>,
