@@ -9,7 +9,7 @@ use omo_computer_core::capabilities::RouteRung;
 use omo_computer_core::error::{EngineCode, Reason};
 use omo_computer_core::requests::SessionOpenRequest;
 use omo_computer_core::routes::{RouteOs, RouteTable, RouteTableInvalid};
-use serde_json::{json, Value};
+use serde_json::json;
 
 /// The refusal of a table that failed its load test.
 pub const ROUTE_TABLE_INVALID: Refusal =
@@ -40,9 +40,9 @@ pub fn route_ladder(os: RouteOs, drop_predicted: bool) -> Vec<RouteRung> {
 /// The table a session opens with: the seed, extended by the user's exact keys.
 ///
 /// # Errors
-/// [`ROUTE_TABLE_INVALID`] with the `{pointer}` member, the session left unopened.
-pub fn open_routes(request: &SessionOpenRequest, os: RouteOs) -> Result<RouteTable, (Refusal, Value)> {
-    let refuse = |invalid: RouteTableInvalid| (ROUTE_TABLE_INVALID, json!({ "pointer": invalid.pointer }));
+/// [`ROUTE_TABLE_INVALID`] carrying `data.pointer` (R28, R52); the session stays unopened.
+pub fn open_routes(request: &SessionOpenRequest, os: RouteOs) -> Result<RouteTable, Refusal> {
+    let refuse = |invalid: RouteTableInvalid| ROUTE_TABLE_INVALID.with_data(json!({ "pointer": invalid.pointer }));
     let mut table = RouteTable::seed().map_err(refuse)?;
     if let Some(user) = request.config.as_ref().and_then(|config| config.consent.toolkit_routes.as_ref()) {
         table.extend(os, user).map_err(refuse)?;
@@ -69,9 +69,9 @@ mod tests {
         let mut request = omo_computer_core::requests::read_session_open(serde_json::from_value(json!({})).expect("params"));
         let config = request.config.get_or_insert_with(Default::default);
         config.consent.toolkit_routes = Some([("Blend*".to_owned(), ToolkitClass::CanvasGl)].into());
-        let (refusal, detail) = open_routes(&request, RouteOs::X11).expect_err("a pattern key");
+        let refusal = open_routes(&request, RouteOs::X11).expect_err("a pattern key");
         assert_eq!((refusal.code, refusal.reason), (EngineCode::Internal, Some("route_table_invalid")));
-        assert_eq!(detail, json!({ "pointer": "/toolkit_routes/Blend*" }));
+        assert_eq!(refusal.wire_data()["pointer"], json!("/toolkit_routes/Blend*"));
         assert_eq!(refusal.computer_code().map(|c| c.wire()), Ok("COMPUTER_UNAVAILABLE"));
     }
 }
