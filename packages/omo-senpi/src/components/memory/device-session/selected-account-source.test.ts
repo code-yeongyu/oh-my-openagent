@@ -145,6 +145,90 @@ describe("the account source built from the engine's one selection", () => {
     expect((await source())?.kind).toBe("desktop")
   })
 
+  test("#given no account is current #when two resolves overlap #then they share one open and get the same account", async () => {
+    // given
+    let opened = 0
+    let release: () => void = () => {}
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const source = accountSourceFromSelection({
+      selection: desktop(wire()),
+      cli: cliCanary,
+      openAccount: async () => {
+        opened += 1
+        await gate
+        return desktopAccount(`generation-${opened}`, () => true)
+      },
+    })
+
+    // when
+    const first = source()
+    const second = source()
+    release()
+
+    // then
+    const [a, b] = await Promise.all([first, second])
+    expect(opened).toBe(1)
+    expect(b).toBe(a)
+  })
+
+  test("#given a shared open that main refuses #when it settles #then both resolves are signed out and the next resolve opens again", async () => {
+    // given
+    let opened = 0
+    const source = accountSourceFromSelection({
+      selection: desktop(wire()),
+      cli: cliCanary,
+      openAccount: async () => {
+        opened += 1
+        if (opened === 1) throw new DesktopSyncRefused()
+        return desktopAccount("generation-2", () => true)
+      },
+    })
+
+    // when
+    const both = await Promise.all([source(), source()])
+    const next = await source()
+
+    // then
+    expect(both).toEqual([null, null])
+    expect(next?.kind).toBe("desktop")
+    expect(opened).toBe(2)
+  })
+
+  test("#given another resolve reopened the account while a stale check was held #when the late resolve resumes #then it keeps that account and opens nothing", async () => {
+    // given: the first account goes stale; its first isCurrent() is held, every later one answers false at once
+    const channel = wire()
+    const held = Promise.withResolvers<boolean>()
+    let checks = 0
+    const stale = {
+      kind: "desktop",
+      descriptor: { generation: "stale" },
+      isCurrent: () => (checks++ === 0 ? held.promise : Promise.resolve(false)),
+    } as unknown as DesktopSyncAccount
+    const fresh = desktopAccount("reopened", () => true)
+    let opened = 0
+    const source = accountSourceFromSelection({
+      selection: desktop(channel),
+      cli: cliCanary,
+      openAccount: async () => (++opened === 1 ? stale : fresh),
+    })
+    expect(await source()).toBe(stale)
+
+    // when: a late resolve blocks on the held check, a third resolve reopens, then the held check answers false
+    const late = source()
+    // Bounded, so a regression that never reaches the held check fails at the assertion instead of hanging.
+    for (let spins = 0; checks < 1 && spins < 50; spins++) await Promise.resolve()
+    expect(checks).toBe(1)
+    const reopened = await source()
+    held.resolve(false)
+
+    // then
+    expect(reopened).not.toBe(stale)
+    expect(await late).toBe(reopened)
+    expect(opened).toBe(2)
+  })
+
   test("a closed channel stays unavailable and the resolver reports why without loading the sync runtime", async () => {
     const channel = wire()
     const source = accountSourceFromSelection({

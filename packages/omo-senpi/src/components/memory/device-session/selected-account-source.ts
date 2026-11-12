@@ -32,14 +32,24 @@ export function accountSourceFromSelection(options: {
     if (selection.kind === "unavailable") return unavailable(selection.reason)
     const channel = selection.channel
     if (channel.signal.aborted) return unavailable("private_channel_unavailable")
-    if (current !== undefined && (await current.isCurrent())) return current
+    // Drop only the account this resolve checked: another resolve may have reopened while the check was awaited, and
+    // its account is the current one (#12803 review).
+    const checked = current
+    if (checked !== undefined && (await checked.isCurrent())) return checked
+    if (current !== undefined && current !== checked) return current
     current = undefined
     try {
-      opening ??= open(channel).finally(() => {
-        opening = undefined
-      })
-      current = await opening
-      return current
+      // `current` is set inside the shared open, before it stops being shared, so a resolve that resumes after the open
+      // settles finds the account rather than an empty source and a cleared `opening` (#12803 review).
+      opening ??= open(channel)
+        .then((account) => {
+          current = account
+          return account
+        })
+        .finally(() => {
+          opening = undefined
+        })
+      return await opening
     } catch (error) {
       if (channel.signal.aborted) return unavailable("private_channel_unavailable")
       // Main has no account to describe (signed out, or retired mid-capture): signed out until the next resolve.
