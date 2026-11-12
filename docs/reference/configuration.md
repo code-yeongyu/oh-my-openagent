@@ -482,6 +482,7 @@ Control parallel agent execution and concurrency limits. `background_task` (came
 | `sessionGoneTimeoutMs`      | `60000`   | Timeout when a task session disappears (min: 10000)                   |
 | `taskCleanupDelayMs`        | `600000`  | Delay before terminal tasks and completed sync subagent sessions are removed (min: 60000) |
 | `syncPollTimeoutMs`         | -         | Synchronous polling timeout in milliseconds (min: 60000)             |
+| `busyParentWakeDelayMs`     | `60000`   | How long a notice for a parent whose turn is still running waits before OMO stores it in that session anyway; opencode reads it at the turn's next tool step, so the running turn sees it without a new turn (`0`: at once). Covers background task and monitor notices |
 | `maxToolCalls`              | `4000`    | Maximum tool calls per subagent task (min: 10)                        |
 | `circuitBreaker`            | -         | Circuit-breaker object: `enabled` (default `true`), `maxToolCalls`, `consecutiveThreshold` |
 

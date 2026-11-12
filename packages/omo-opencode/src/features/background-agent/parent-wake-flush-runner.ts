@@ -16,6 +16,7 @@ type ParentWakeFlushRunnerDeps = {
   readonly pendingQueue: ParentWakePendingQueue
   readonly dispatchedTracker: ParentWakeDispatchedTracker
   readonly sessionInspector: ParentWakeSessionInspector
+  readonly busyParentWakeDelayMs?: number
 }
 
 const PENDING_PARENT_WAKE_MAX_ACTIVE_DEFER_MS = 60_000
@@ -51,7 +52,12 @@ export class ParentWakeFlushRunner {
       return
     }
     const emptyAssistantTurnRetry = latestWake.allowEmptyAssistantTurnRetry === true
-    const forceDispatchAfterActiveDefer = sessionActive && this.shouldForceDispatchAfterActiveDefer(latestWake)
+    // A kept reply's notice already sits in the running turn, which reads it at its next step; the reply is owed only
+    // if that turn ends without reading it, so it waits for idle instead of being forced into the busy turn.
+    const forceDispatchAfterActiveDefer =
+      sessionActive &&
+      latestWake.noReplyAdmittedAt === undefined &&
+      this.shouldForceDispatchAfterActiveDefer(latestWake)
     if (sessionActive && !forceDispatchAfterActiveDefer) {
       this.schedulePendingParentWakeFlush(sessionID)
       log("[background-agent] Deferred parent wake because parent session is active:", {
@@ -259,8 +265,11 @@ export class ParentWakeFlushRunner {
     return isOpenCodeSessionActive(this.deps.notifierDeps.client, sessionID)
   }
 
+  // Past this delay a wake stops waiting for the parent's turn to end: opencode reads a prompt stored during a turn at
+  // that turn's next tool step, so the running turn sees it. The history checks still decide between a reply and a
+  // noReply deposit whose reply is retained until the parent's output shows it read it.
   private shouldForceDispatchAfterActiveDefer(wake: PendingParentWake): boolean {
-    return wake.shouldReply && this.getQueuedAgeMs(wake) >= PENDING_PARENT_WAKE_MAX_ACTIVE_DEFER_MS
+    return this.getQueuedAgeMs(wake) >= (this.deps.busyParentWakeDelayMs ?? PENDING_PARENT_WAKE_MAX_ACTIVE_DEFER_MS)
   }
 
   private getQueuedAgeMs(wake: PendingParentWake): number {
