@@ -8,9 +8,9 @@
 //! (c) a number never moves away from an object present in the read;
 //! (d) a diff never marks as changed (`~`) a number whose baseline object is still present
 //!     under another number (a false relabel);
-//! (e) a drill never gives an element a number that any valid generation of the window holds
-//!     for another live element: under another native object still present, or (without one)
-//!     outside the drilled element's subtree in that generation.
+//! (e) a drill never gives an element a number another element holds live in a valid
+//!     generation: another native object still holding it after the number's last full-read
+//!     hand-over, or (without objects) a latest holder outside the drilled element's subtree.
 //! The seeds are fixed and the run is bounded.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -126,28 +126,39 @@ fn under(generation: &crate::refs::Generation, mut at: usize, root: u64) -> bool
 fn drill_breaches(refs: &RefRegistry, sub: u64) -> Vec<String> {
     let drilled = refs.generation("w", sub).expect("sub-generation");
     let root = drilled.entries[0].n;
-    // Live: present in the newest full read or in the drill's own read. A recreated element that
-    // inherited a number in a full read (A1 rule 2) left its old object dead, not foreign.
-    let live: BTreeSet<u64> = refs.latest("w").into_iter().chain([drilled]).flat_map(|g| g.entries.iter().filter_map(|e| e.object.map(|o| o.0))).collect();
     let others: Vec<&crate::refs::Generation> = refs.windows["w"].generations.values().filter(|g| g.number != sub).collect();
+    let holder = |g: &crate::refs::Generation, n: u64| g.position(n).map(|at| g.entries[at].object.map(|o| o.0));
+    // Only a FULL read the old holder is ABSENT from may hand its number on (A1 rule 2: presence
+    // in the read); a drill never may (ruling R18). An object holds a number LIVE while some valid
+    // generation newer than the number's last such hand-over shows it with that number. A recreated element's old object, or an element that came back under a fresh
+    // number after a full read handed its number on, no longer holds it.
+    let holds_live = |object: u64, n: u64| {
+        let handed_on = others
+            .iter()
+            .filter(|g| g.parent.is_none() && holder(g, n).is_some_and(|h| h != Some(object)))
+            .filter(|g| !g.entries.iter().any(|e| e.object.map(|o| o.0) == Some(object)))
+            .map(|g| g.number)
+            .max()
+            .unwrap_or(0);
+        others.iter().any(|g| g.number > handed_on && holder(g, n) == Some(Some(object)))
+    };
     let mut out = Vec::new();
     for entry in &drilled.entries {
-        // Continuity: the same native object already held this number in a valid generation, so
-        // the drill decided nothing (a number a full read handed on is checked by (a)-(d)).
-        let kept = entry.object.is_some_and(|o| others.iter().any(|g| g.position(entry.n).is_some_and(|at| g.entries[at].object == Some(o))));
-        if kept {
-            continue;
-        }
-        let foreign = refs.windows["w"].generations.values().filter(|g| g.number != sub).find_map(|other| {
-            let at = other.position(entry.n)?;
-            let held = &other.entries[at];
-            let foreign = match held.object {
-                Some(object) => entry.object != Some(object) && live.contains(&object.0),
-                None => !under(other, at, root),
-            };
-            foreign.then(|| format!("(e) drill s{sub} gave {:?} e{} that s{} holds for {:?}", entry.read.title, entry.n, other.number, held.read.title))
+        let by_object = others.iter().find_map(|g| {
+            let at = g.position(entry.n)?;
+            let held = g.entries[at].object?;
+            (entry.object != Some(held) && holds_live(held.0, entry.n))
+                .then(|| format!("(e) drill s{sub} gave {:?} e{} that object {} ({:?}) holds live in s{}", entry.read.title, entry.n, held.0, g.entries[at].read.title, g.number))
         });
-        out.extend(foreign);
+        // Without native objects nothing tells two elements apart: the number's latest holder
+        // (its entry in the newest valid generation holding it) outside the drilled element's
+        // subtree is another element.
+        let by_place = || {
+            let (g, at) = others.iter().rev().find_map(|g| g.position(entry.n).map(|at| (*g, at)))?;
+            (g.entries[at].object.is_none() && !under(g, at, root))
+                .then(|| format!("(e) drill s{sub} gave {:?} e{} whose latest holder {:?} in s{} lies outside the subtree", entry.read.title, entry.n, g.entries[at].read.title, g.number))
+        };
+        out.extend(by_object.or_else(by_place));
     }
     out
 }

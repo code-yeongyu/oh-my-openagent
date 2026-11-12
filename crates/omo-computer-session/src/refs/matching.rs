@@ -9,6 +9,11 @@
 //! window. A drill reads a sub-generation whose parent stays valid (line 58), so every number a
 //! valid generation holds outside the drilled subtree is reserved (ruling R18). Anything else is
 //! not a match: the element gets the next counter number.
+//!
+//! A full read cut short (`complete:false`: the 2,000-node budget or the 3,000 ms deadline)
+//! treats the elements past the cut as absent - literally "unused in this capture" - so a
+//! lookalike read before the cut may inherit the number of an element past it. Diffs already
+//! refuse incomplete reads (`baseline_incomplete` / `current_incomplete`).
 
 use std::collections::{BTreeMap, HashSet};
 
