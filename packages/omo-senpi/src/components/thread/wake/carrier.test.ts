@@ -428,31 +428,50 @@ const UNCLASSIFIABLE = [
     (file: string) =>
       writeFileSync(
         file,
-        JSON.stringify({ type: "session", version: 3, id: "s1", timestamp: "2026-11-12T00:00:00.000Z", cwd: "/work/project" }),
+        JSON.stringify({
+          type: "session",
+          version: 3,
+          id: "s1",
+          timestamp: "2026-11-12T00:00:00.000Z",
+          cwd: "/work/project",
+        }),
       ),
   ],
-  ["an unrecognised kind", (file: string) => writeFileSync(file, `${JSON.stringify({ type: "session", version: 3, id: "s1", timestamp: "2026-11-12T00:00:00.000Z", cwd: "/work/project", kind: "robot" })}\n`)],
+  [
+    "an unrecognised kind",
+    (file: string) =>
+      writeFileSync(
+        file,
+        `${JSON.stringify({ type: "session", version: 3, id: "s1", timestamp: "2026-11-12T00:00:00.000Z", cwd: "/work/project", kind: "robot" })}\n`,
+      ),
+  ],
 ] as const
 
 describe("the session-kind classifier is closed", () => {
-  test.each(UNCLASSIFIABLE)("#given %s #when the session is woken #then it is refused not_wakeable as unknown and nothing opens", async (_case, rewrite) => {
-    const { fake, carrier, path } = await setup()
-    rewrite(path("s1"))
-    expect(await carrier.wake("s1")).toEqual({ kind: "not_wakeable", session_kind: "unknown" })
-    expect(sent(fake, "open_session")).toEqual([])
-  })
+  test.each(UNCLASSIFIABLE)(
+    "#given %s #when the session is woken #then it is refused not_wakeable as unknown and nothing opens",
+    async (_case, rewrite) => {
+      const { fake, carrier, path } = await setup()
+      rewrite(path("s1"))
+      expect(await carrier.wake("s1")).toEqual({ kind: "not_wakeable", session_kind: "unknown" })
+      expect(sent(fake, "open_session")).toEqual([])
+    },
+  )
 
-  test.each(UNCLASSIFIABLE)("#given a carrier that died after the open #when the session file now carries %s at the takeover #then the row ends and nothing is opened", async (_case, rewrite) => {
-    const { h, fake, store, carrier, path } = await setup()
-    const file = path("s1")
-    await carrier.wake("s1")
-    await carrier.stop()
-    rewrite(file)
-    h.clock.now += WAKE_LEASE_MS + 1
-    await successorOf(h, fake).sweep()
-    expect(await store.woken.list()).toEqual([])
-    expect(sent(fake, "open_session")).toHaveLength(1)
-  })
+  test.each(UNCLASSIFIABLE)(
+    "#given a carrier that died after the open #when the session file now carries %s at the takeover #then the row ends and nothing is opened",
+    async (_case, rewrite) => {
+      const { h, fake, store, carrier, path } = await setup()
+      const file = path("s1")
+      await carrier.wake("s1")
+      await carrier.stop()
+      rewrite(file)
+      h.clock.now += WAKE_LEASE_MS + 1
+      await successorOf(h, fake).sweep()
+      expect(await store.woken.list()).toEqual([])
+      expect(sent(fake, "open_session")).toHaveLength(1)
+    },
+  )
 })
 
 // Delta review of #13220 at da331c654d, LOW 3: a takeover reopens only a session a wake would open. A header that now
