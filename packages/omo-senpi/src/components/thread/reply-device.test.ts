@@ -220,7 +220,10 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
   )
 
   test("unchanged: #given a delivery relayed from b #when the run replies by the sender's id and by its stated name #then both reach b's listed row", async () => {
-    const { reply, admittedOn } = await consumed([{ id: "device:b/d-1", session_id: "dur-on-b", name: "on b" }], [B_ROW])
+    const { reply, admittedOn } = await consumed(
+      [{ id: "device:b/d-1", session_id: "dur-on-b", name: "on b" }],
+      [B_ROW],
+    )
     expect(await reply("dur-on-b")).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
     expect(await reply("on b")).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
     expect(admittedOn()).toEqual(["b", "b"])

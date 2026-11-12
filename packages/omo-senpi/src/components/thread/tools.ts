@@ -3,12 +3,7 @@ import { threadToolFailure } from "./errors"
 import type { ThreadToolFailure } from "./errors"
 import { type Static } from "typebox"
 import { toThreadAddressEntries } from "./address-book"
-import {
-  checkNameConflict,
-  normalizeThreadName,
-  type ThreadAddressEntry,
-  type ThreadResolveResult,
-} from "./addressing"
+import { checkNameConflict, normalizeThreadName, type ThreadAddressEntry, type ThreadResolveResult } from "./addressing"
 import { createLocalSessionHost } from "./control/local-session-host"
 import { checkInitialSkills } from "./initial-skills"
 import {
@@ -585,14 +580,19 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
     }
     if (current === PUBLISHED_SEND_VIEW) {
       // A reply approved by the sender's stated name must still land on that sender, not on a published thread that happens to carry the same spelling as its id.
-      const mismatch = replyTargetMismatch(options, address, {
-        thread_id: address,
-        name: address,
-        status: "live",
-        cwd: "",
-        created_at: "",
-        updated_at: null,
-      }, here)
+      const mismatch = replyTargetMismatch(
+        options,
+        address,
+        {
+          thread_id: address,
+          name: address,
+          status: "live",
+          cwd: "",
+          created_at: "",
+          updated_at: null,
+        },
+        here,
+      )
       if (mismatch !== undefined)
         return { kind: "error", result: { kind: "error", error: mismatch } as ThreadToolResult }
       return { kind: "local", thread_id: address, all_scope: scope }
@@ -823,9 +823,7 @@ function replyTargetMismatch(
   if (senders.length === 0) return undefined
   const entryDevice = otherDevice(entry.device, here)
   if (
-    senders.some(
-      (sender) => sender.session_id === entry.thread_id && otherDevice(sender.device, here) === entryDevice,
-    )
+    senders.some((sender) => sender.session_id === entry.thread_id && otherDevice(sender.device, here) === entryDevice)
   )
     return undefined
   return threadToolFailure(

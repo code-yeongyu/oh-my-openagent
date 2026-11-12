@@ -301,7 +301,9 @@ export async function replyOnDevice(
       ),
     } as ThreadResolveResult
   }
-  const row = rows.find((candidate) => candidate.device === sender.device && rowThreadId(candidate) === sender.session_id)
+  const row = rows.find(
+    (candidate) => candidate.device === sender.device && rowThreadId(candidate) === sender.session_id,
+  )
   return row === undefined ? missing() : { kind: "ok", entry: relayAddressEntry(row), resolution: "id" }
 }
 
