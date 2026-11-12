@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { join, resolve } from "node:path"
 
 import { observerCheck } from "./observer.ts"
 
@@ -19,6 +19,14 @@ describe("desktop observer at preflight (P-17)", () => {
     const { check } = await observerCheck(join(dir, "absent.ts"), "x11")
     expect(check.ok).toBe(false)
     expect(check.detail).toContain("is not on this checkout")
+  })
+
+  test("a missing sentinel is named by its repo-relative path with forward slashes, the same text on every OS", async () => {
+    const repo = resolve(import.meta.dir, "../../../..")
+    const { check, status } = await observerCheck(join(repo, "script", "qa", "computer", "sentinel", "absent.ts"), "x11")
+    const detail = "script/qa/computer/sentinel/absent.ts (row 3) is not on this checkout"
+    expect(check).toEqual({ name: "desktop-observer", ok: false, detail })
+    expect(status).toEqual({ kind: "unavailable", reason: detail })
   })
 
   test("a sentinel that cannot say which OSes it records is an environment fault", async () => {
