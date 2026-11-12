@@ -34,3 +34,19 @@ pub(crate) fn with_display_awake(mut session: crate::Session) -> crate::Session 
     session.set_lease_hook(Box::new(DisplayAwakeLeaseHook(hold)));
     session
 }
+
+impl crate::Session {
+    /// Every session is built here, so the lease hooks are installed on its own funnel.
+    pub(crate) fn build(backend: Box<dyn Backend>, guard: omo_computer_safety::Guard, funnel: crate::mutate::Funnel) -> Self {
+        crate::holds::with_holds(with_display_awake(Self {
+            backend,
+            guard,
+            opened: None,
+            funnel,
+            refs: crate::refs::RefRegistry::default(),
+            frames: crate::frames::FrameStore::default(),
+            trace: crate::trace::Trace::default(),
+            display_awake: crate::intervention::SharedHold::default(),
+        }))
+    }
+}
