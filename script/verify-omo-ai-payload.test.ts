@@ -54,6 +54,14 @@ const PACKED_SKILL_COUNT = 23
 
 const KEYCHAIN_HELPER = "bin/darwin/omo-keychain"
 
+// Build outputs that are not tracked in git: publish-main must generate them before it packs (#13192).
+const RELEASE_GENERATED_ARTIFACTS = [
+  "bin/lib/service-auth.generated.js",
+  "bin/lib/reflection-lock.generated.js",
+  "bin/lib/brand-logo.generated.js",
+  "plugin/scripts/install.mjs",
+] as const
+
 interface VerifierRun {
   readonly exitCode: number
   readonly output: string
@@ -154,7 +162,7 @@ describe("omo-ai payload verifier", () => {
 
     test.skipIf(process.platform === "win32")("#when the helper is packed with mode 0755 #then it passes", () => {
       const run = runVerifierOnPayload(
-        [...complete, KEYCHAIN_HELPER],
+        [...complete, ...RELEASE_GENERATED_ARTIFACTS, KEYCHAIN_HELPER],
         {},
         { args: ["--release"], modes: { [KEYCHAIN_HELPER]: 0o755 } },
       )
@@ -165,6 +173,26 @@ describe("omo-ai payload verifier", () => {
     test("#when the PR lane verifies without --release #then the helper is not required", () => {
       const run = runVerifierOnPayload(complete)
       expect(run.output).not.toContain(KEYCHAIN_HELPER)
+      expect(run.exitCode).toBe(0)
+    })
+  })
+
+  describe("#given the release payload gate (--release) for untracked build outputs", () => {
+    const complete = [...PACKED_ARTIFACTS, ...skillPaths(PACKED_SKILL_COUNT), KEYCHAIN_HELPER]
+
+    test.each(RELEASE_GENERATED_ARTIFACTS)("#when %s was not built #then it fails naming it", (artifact) => {
+      const run = runVerifierOnPayload(
+        [...complete, ...RELEASE_GENERATED_ARTIFACTS.filter((path) => path !== artifact)],
+        {},
+        { args: ["--release"], modes: { [KEYCHAIN_HELPER]: 0o755 } },
+      )
+      expect(run.output).toContain(`missing artifact: ${artifact}`)
+      expect(run.exitCode).toBe(1)
+    })
+
+    test("#when the PR lane verifies without --release #then they are not required", () => {
+      const run = runVerifierOnPayload([...PACKED_ARTIFACTS, ...skillPaths(PACKED_SKILL_COUNT)])
+      expect(run.output).not.toContain("missing artifact:")
       expect(run.exitCode).toBe(0)
     })
   })

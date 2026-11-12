@@ -47,6 +47,16 @@ const REQUIRED_ARTIFACTS = [
 const RELEASE_EXECUTABLE_ARTIFACTS = ["bin/darwin/omo-keychain"]
 const releaseMode = process.argv.slice(2).includes("--release")
 
+// Build outputs git does not track (#13192): only a build writes them, so a release that skipped a
+// generator would publish without them. bin/omo.js imports service-auth.generated.js for sync,
+// account and remote; the plugin installer is built by build-install.mjs.
+const RELEASE_GENERATED_ARTIFACTS = [
+  "bin/lib/service-auth.generated.js",
+  "bin/lib/reflection-lock.generated.js",
+  "bin/lib/brand-logo.generated.js",
+  "plugin/scripts/install.mjs",
+]
+
 // A bundle that reads `join(dirname(fileURLToPath(import.meta.url)), "<file>")` needs <file> packed
 // next to it; minified bundles keep this shape with renamed helpers, so the helper names are not matched.
 const SIBLING_ASSET_READ_RE = /import\.meta\.url\s*\)\s*\)\s*,\s*["']([\w.-]+\.[A-Za-z]\w*)["']/g
@@ -101,6 +111,12 @@ try {
 const pathSet = new Set(paths)
 
 for (const artifact of REQUIRED_ARTIFACTS) {
+  if (!pathSet.has(artifact)) {
+    errors.push(`missing artifact: ${artifact}`)
+  }
+}
+
+for (const artifact of releaseMode ? RELEASE_GENERATED_ARTIFACTS : []) {
   if (!pathSet.has(artifact)) {
     errors.push(`missing artifact: ${artifact}`)
   }
