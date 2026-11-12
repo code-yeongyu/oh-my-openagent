@@ -382,12 +382,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
         const local = { alias_scope: "local", alias_unavailable: claimed.local } as const
         if (value.name !== undefined) return { ...recorded, ...local } as ThreadToolResult
         const localName = value.alias.trim()
-        const named = await nameCreatedThread(
-          recorded.thread.thread_id,
-          localName,
-          await plan.host.visible(),
-          callerId,
-        )
+        const named = await nameCreatedThread(recorded.thread.thread_id, localName, await plan.host.visible(), callerId)
         return (
           named === undefined
             ? {
