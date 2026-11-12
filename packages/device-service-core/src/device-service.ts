@@ -21,6 +21,7 @@ import { newestRowsListing } from "./listing-rows.ts"
 import type { CommandRpc } from "./local-api/protocol.ts"
 import type { SessionCandidate } from "./local-api/protocol-delegated.ts"
 import { randomBytes } from "node:crypto"
+import { minimumInEffect, type MinimumsOption } from "./minimum-in-effect.ts"
 import { compareVersions } from "./release/version.ts"
 
 // A host sends no command state at all for a route it does not list toward a sender it does not grant (docs/local-api.md
@@ -273,7 +274,7 @@ export type ConnectDeviceServiceOptions = {
   /** Test seam: the local API connection (the vendored v1 client by default). */
   readonly connect?: (options: ConnectOptions) => Promise<LocalApiClient>
   /** Test seam: the two omo#13037 minimum versions (WAKE_MARK_MIN_SERVICE_VERSION, LOCATE_SINGLE_MIN_SERVICE_VERSION). */
-  readonly minimums?: { readonly wakeMark: string | null; readonly singleLocate: string | null }
+  readonly minimums?: MinimumsOption
 }
 
 /** Opens a proven connection to this device's service (mutual proof before any request) and returns the typed SDK. */
@@ -284,11 +285,11 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
     client: { name: "omo", version: options.version },
     ...(options.background === true ? { transport: () => connectLocal(stateDir, { background: true }) } : {}),
   })
-  const wakeMarkMinimum = options.minimums === undefined ? WAKE_MARK_MIN_SERVICE_VERSION : options.minimums.wakeMark
+  const wakeMarkMinimum = minimumInEffect(options.minimums, "wakeMark", WAKE_MARK_MIN_SERVICE_VERSION)
   const carriesWakeMark = serviceAtLeast(client.welcome.service_version, wakeMarkMinimum)
   const takesSingleLocate = serviceAtLeast(
     client.welcome.service_version,
-    options.minimums?.singleLocate ?? LOCATE_SINGLE_MIN_SERVICE_VERSION,
+    minimumInEffect(options.minimums, "singleLocate", LOCATE_SINGLE_MIN_SERVICE_VERSION),
   )
   return {
     serviceVersion: client.welcome.service_version,

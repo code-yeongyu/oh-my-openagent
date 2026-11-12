@@ -109,16 +109,25 @@ function engineStateOf(reply: JsonObject): EngineState {
 
 const WAITS: ReadonlySet<string> = new Set(["wake", "hold", "approval"])
 
-// A reason the receiving side wrote: one line, no control or format characters, at most REASON_SHOWN_MAX characters.
+// A reason the receiving side wrote, as it is shown to a person: one line of plain text, at most REASON_SHOWN_MAX
+// characters (code points, so a cut never splits a surrogate pair). The rule keeps letters, digits, punctuation,
+// symbols and single spaces. Line breaks and control characters become a space; format characters (bidi overrides,
+// zero-width marks) and combining marks (an overlay stroke over the letter before it) are dropped, as are the letters
+// that render as blank space; anything else (private use, unassigned) is dropped too.
 const REASON_SHOWN_MAX = 120
+const BLANK_LETTERS = /[\u115F\u1160\u3164\uFFA0\u2800]/gu
 const shownReason = (reason: string): string =>
-  reason
-    .replace(/[\u0000-\u001f\u007f-\u009f]+/g, " ")
-    // Format characters (bidi overrides and isolates, zero-width marks) would reorder how the line reads.
-    .replace(/\p{Cf}+/gu, "")
-    .replace(/\s+/g, " ")
-    .trim()
+  Array.from(
+    reason
+      .replace(/[\p{Cc}\p{Zl}\p{Zp}]+/gu, " ")
+      .replace(/[\p{Cf}\p{M}]+/gu, "")
+      .replace(BLANK_LETTERS, "")
+      .replace(/[^\p{L}\p{N}\p{P}\p{S}\p{Zs}]/gu, "")
+      .replace(/\s+/g, " ")
+      .trim(),
+  )
     .slice(0, REASON_SHOWN_MAX)
+    .join("")
 
 /**
  * omo#13037 section 5.1: what a session that is not running answers, from the receiving consumer (`data.kind` "refused")
