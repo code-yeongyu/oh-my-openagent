@@ -416,15 +416,18 @@ describe("#13037 the sender half reaches a session on another device that is not
     // Today's answer comes from an account whose sessions port has no lookup at all; the text is compared, not only the code.
     const today = async (rows: readonly RemoteSessionRow[], extra: Parameters<Fixture["account"]>[0] = {}) => {
       const before = fixture.account({ rows, ...extra, withoutLookup: true })
-      return await fixture.surface(before.remote).run("thread_send", { thread: GONE, message: "hi" })
+      const result = await fixture.surface(before.remote).run("thread_send", { thread: GONE, message: "hi" })
+      return { result, reads: before.deviceReads }
     }
     const messageOf = (result: ThreadToolResult) => (result as { error?: { code?: string; message?: string } }).error
 
     test("#given no other device online #then the not_found text is today's and no device is read for a lookup", async () => {
       const a = fixture.account({ rows: [B_ROW], online: false })
       const result = await fixture.surface(a.remote).run("thread_send", { thread: GONE, message: "hi" })
-      expect(messageOf(result)).toEqual(messageOf(await today([B_ROW], { online: false })))
-      expect(a.deviceReads).toEqual({ thisDevice: 0, devices: 0 })
+      const baseline = await today([B_ROW], { online: false })
+      expect(messageOf(result)).toEqual(messageOf(baseline.result))
+      // The lookup reads no device of its own: the reads are exactly the ones the send made before the lookup existed.
+      expect(a.deviceReads).toEqual(baseline.reads)
     })
 
     test.each([
@@ -433,7 +436,7 @@ describe("#13037 the sender half reaches a session on another device that is not
     ] as const)("#given %s and the device list failing #then it is today's not_found, not internal_error", async (_case, wakeFeature) => {
       const a = fixture.account({ rows: [B_ROW, C_ROW], devicesFail: true, wakeFeature })
       const result = await fixture.surface(a.remote).run("thread_send", { thread: GONE, message: "hi" })
-      expect(messageOf(result)).toEqual(messageOf(await today([B_ROW, C_ROW], { devicesFail: true })))
+      expect(messageOf(result)).toEqual(messageOf((await today([B_ROW, C_ROW], { devicesFail: true })).result))
       expect(messageOf(result)?.code).toBe("not_found")
     })
   })
