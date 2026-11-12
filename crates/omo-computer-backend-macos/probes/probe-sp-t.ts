@@ -913,40 +913,50 @@ function untagged(route: "hypervisor-vkbd" | "vhid") {
 }
 
 interface TapEvent {
+  tapReady?: boolean
+  tapDone?: boolean
+  tapDisabled?: number
   type?: number
   sourcePid?: number
   sourceStateId?: number
   error?: string
 }
 
-// pure: the untagged-route verdict from the tap file text. null = the file could not be read: NO_LAUNCH after a failed
-// launch, otherwise UNMEASURED; NO_EVENT only from a file that was read and holds no keyDown
+// pure: the untagged-route verdict from the tap file text. A tap file is evidence only when it is COMPLETE: every
+// line parses, it holds {"tapReady":true} and {"tapDone":true}, and no tapDisabled. Every other state (missing, empty,
+// tapReady only, no tapDone because the wait timed out, tapDisabled, an unparseable line, a failed tap creation) is
+// UNMEASURED with the reason, or NO_LAUNCH after a non-zero launch exit. NO_EVENT and ROUTE come only from a complete file.
 function tapOutcome(tapText: string | null, launchCode: number): Measured {
-  if (tapText === null)
-    return launchCode !== 0
+  const incomplete = (reason: string): Measured =>
+    launchCode !== 0
       ? {
           verdict: "NO_LAUNCH",
           measured: { launchExit: launchCode },
-          note: `the tap launch exited ${launchCode} and wrote no readable tap file`,
+          note: `the tap launch exited ${launchCode}; ${reason}`,
         }
-      : {
-          verdict: "UNMEASURED",
-          measured: { launchExit: launchCode },
-          note: "the tap file could not be read (never written, or unreadable as the QA account); no keyDown count is claimed",
-        }
-  const events = (tapText ?? "")
-    .split("\n")
-    .filter(Boolean)
-    .map((l) => JSON.parse(l) as TapEvent)
-  const keys = events.filter((e) => e.type === 10)
-  if (events.some((e) => e.error))
-    return {
-      verdict: "UNMEASURED",
-      measured: { launchExit: launchCode },
-      note: "the session tap could not be created inside the helper bundle launched by path (its own responsible process): Input Monitoring is not granted to the helper bundle",
+      : { verdict: "UNMEASURED", measured: { launchExit: launchCode }, note: `${reason}; no keyDown count is claimed` }
+  if (tapText === null)
+    return incomplete("the tap file could not be read (never written, or unreadable as the QA account)")
+  const events: TapEvent[] = []
+  for (const line of tapText.split("\n").filter((l) => l.trim())) {
+    try {
+      events.push(JSON.parse(line) as TapEvent)
+    } catch {
+      return incomplete(`the tap file holds an unparseable line (${line.slice(0, 40)})`)
     }
+  }
+  if (events.some((e) => e.error))
+    return incomplete(
+      "the session tap could not be created inside the helper bundle launched by path (its own responsible process): Input Monitoring is not granted to the helper bundle",
+    )
+  if (events.some((e) => e.tapDisabled !== undefined)) return incomplete("the session tap was disabled while it ran")
+  if (!events.some((e) => e.tapReady === true))
+    return incomplete("the tap file has no tapReady line (the tap never started)")
+  if (!events.some((e) => e.tapDone === true))
+    return incomplete("the tap file has no tapDone line (the tap did not finish before the wait ended)")
+  const keys = events.filter((e) => e.type === 10)
   if (keys.length === 0)
-    return { verdict: "NO_EVENT", measured: { events: events.length }, note: "no keyDown reached the session tap" }
+    return { verdict: "NO_EVENT", measured: { events: events.length }, note: "a complete tap file with no keyDown" }
   return {
     verdict: `ROUTE=${classifyTap(keys)}`,
     measured: {
@@ -1202,9 +1212,9 @@ async function measureRow(
 
 type CleanupStep = [label: string, step: () => Promise<string>]
 
-// pure: the --cleanup exit code from its receipts (RED stub: keeps the old behaviour)
-function cleanupExitCode(_receipts: string[]): number {
-  return 0
+// pure: --cleanup exits 1 when any receipt reports a failure (every step has already run by then), else 0
+function cleanupExitCode(receipts: string[]): number {
+  return receipts.some((r) => r.includes(" FAILED: ") || r.includes("STILL PRESENT")) ? 1 : 0
 }
 
 // runs every diagnostic step, then every teardown step. A failing step is recorded as a receipt line and never stops
