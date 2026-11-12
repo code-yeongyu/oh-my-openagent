@@ -1,0 +1,83 @@
+name: Computer sentinel (macOS)
+
+# The disturbance sentinel's own self-test on hosted macOS runners: the eight-signal recorder must catch each planted
+# disturbance alone, read none on a null run and see a 50 px warp-and-return; the sabotage leg must fail. The macOS
+# live tier folds this job in once it exists.
+
+on:
+  pull_request:
+    branches: [master, dev]
+    paths:
+      - "script/qa/computer/sentinel/**"
+      - ".github/workflows/computer-sentinel-macos.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  sentinel-selftest:
+    name: computer sentinel self-test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-26]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    env:
+      OMO_COMPUTER_QA_SESSION: "1"
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Host facts
+        shell: bash
+        run: |
+          OUT="$RUNNER_TEMP/sentinel-evidence"
+          mkdir -p "$OUT"
+          {
+            sw_vers
+            swiftc --version 2>&1 | head -1
+            echo "runner user: $(id -un)"
+            for db in "/Library/Application Support/com.apple.TCC/TCC.db" "$HOME/Library/Application Support/com.apple.TCC/TCC.db"; do
+              echo "granted rows in $db:"
+              sudo sqlite3 "$db" "select service, client from access where auth_value=2 and service in ('kTCCServiceAccessibility','kTCCServicePostEvent','kTCCServiceListenEvent','kTCCServiceScreenCapture') order by service, client" 2>&1 || true
+            done
+          } | tee "$OUT/host-facts.txt"
+
+      - name: Self-test (every detector must catch its planted disturbance)
+        shell: bash
+        run: |
+          set +e
+          OUT="$RUNNER_TEMP/sentinel-evidence" LATENCY_FILE="$RUNNER_TEMP/sentinel-latency-macos.json"
+          bun script/qa/computer/sentinel/sentinel.ts --self-test --os macos --latency-file "$LATENCY_FILE" 2>&1 | tee "$OUT/qa-happy.txt"
+          code=${PIPESTATUS[0]}
+          echo "EXIT $code" | tee -a "$OUT/qa-happy.txt"
+          grep -qx 'SENTINEL_SELFTEST signals=8 detected=8 null_false_positives=0' "$OUT/qa-happy.txt" && [ "$code" = 0 ]
+
+      - name: Sabotage (a dead window_raised detector must fail the self-test)
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          OUT="$RUNNER_TEMP/sentinel-evidence" LATENCY_FILE="$RUNNER_TEMP/sentinel-latency-macos.json"
+          bun script/qa/computer/sentinel/sentinel.ts --self-test --os macos --latency-file "$LATENCY_FILE" \
+            --sabotage drop-detector=window_raised 2>&1 | tee "$OUT/qa-failure.txt"
+          code=${PIPESTATUS[0]}
+          echo "EXIT $code" | tee -a "$OUT/qa-failure.txt"
+          grep -qx 'detector window_raised missed the planted raise' "$OUT/qa-failure.txt" && [ "$code" = 1 ]
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: sentinel-${{ matrix.os }}
+          path: ${{ runner.temp }}/sentinel-evidence
+          if-no-files-found: error

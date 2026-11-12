@@ -11,9 +11,9 @@ export type DesktopSnapshot = {
   readonly pointer: { readonly x: number; readonly y: number }
 }
 
-export type JournalEntry = { readonly t: number; readonly what: string; readonly value: string }
+type JournalEntry = { readonly t: number; readonly what: string; readonly value: string }
 
-export type Observed = {
+type Observed = {
   readonly foregroundChanged: boolean
   readonly stackingChanged: boolean
   readonly pointerMoved: boolean

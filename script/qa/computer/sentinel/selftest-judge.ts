@@ -18,7 +18,7 @@ export type Trial =
   | { readonly plant: Signal | null; readonly summary: SentinelSummary }
   | { readonly plant: Signal; readonly failed: string }
 
-export type SelfTestResult = { readonly lines: readonly string[]; readonly exitCode: 0 | 1 }
+type SelfTestResult = { readonly lines: readonly string[]; readonly exitCode: 0 | 1 }
 
 const happenedOn = (summary: SentinelSummary): Signal[] =>
   SIGNALS.filter((signal) => summary.signals[signal].signal === "happened")

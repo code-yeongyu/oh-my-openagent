@@ -1,7 +1,7 @@
 // Negative windows are pinned to measured latency: a "nothing happened" read is only trusted when the run waited at
 // least 1.5 times the host's recorded p99 for the slowest planted action to show up in the recording.
 
-export const WINDOW_RATIO = 1.5
+const WINDOW_RATIO = 1.5
 
 export type LatencyRecord = {
   readonly host: string
@@ -10,7 +10,7 @@ export type LatencyRecord = {
   readonly p99Ms: Readonly<Record<string, number>>
 }
 
-export type Admission = { readonly ok: true } | { readonly ok: false; readonly reason: string }
+type Admission = { readonly ok: true } | { readonly ok: false; readonly reason: string }
 
 export function p99(samples: readonly number[]): number {
   const sorted = [...samples].sort((a, b) => a - b)
