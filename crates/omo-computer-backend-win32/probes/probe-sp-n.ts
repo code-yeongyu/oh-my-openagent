@@ -2217,6 +2217,63 @@ const LOGIC_CHECKS: readonly Check[] = [
     },
   },
   {
+    finding: "SETUP error-to-nothing (hosted run 43220783638)",
+    async run() {
+      const bad: string[] = []
+      // the helper: every setup step (fragments, start marker, argument file, native type) runs in the handled path
+      const code = psCode(source("sp-n.ps1"))
+      const top = code.filter((l) => /^(Compile\b|\$a = |foreach \(\$f in .*\{ \. )/.test(l))
+      if (top.length) bad.push(`setup runs outside the handled path: ${top.join(" | ")}`)
+      const handled = /\ntry \{\n(?:[ \t][^\n]*\n|\n)*?[ \t]+Compile\b[^\n]*\n(?:[ \t][^\n]*\n|\n)*?\} catch \{ Emit @\{ legError = "setup failed: /
+      if (!handled.test(code.join("\n"))) bad.push('a failing setup does not report legError "setup failed: ..."')
+      const emit = code.slice(code.findIndex((l) => l.startsWith("function Emit"))).join("\n")
+      if (!/^function Emit[\s\S]*?'SpN' -as \[type\][\s\S]*?\n\}/.test(emit))
+        bad.push("Emit needs the native type for sessionId, so a setup error cannot be reported")
+      if (!code.some((l) => /^\s+if \(\$Out\) \{ \[IO\.File\]::WriteAllText\("\$Out\.started"/.test(l)))
+        bad.push("the helper writes no start marker beside -Out")
+      if (!/waitFile\(out, 60_000, \{ started: `\$\{out\}\.started`, alive: pidAlive \}\)/.test(source("probe-sp-n.ts")))
+        bad.push("the medium leg does not watch the helper's start marker")
+      // the probe: a helper that never started, exited silently, or still runs is named, never a plain timeout
+      const dir = join(tmpdir(), `omo-sp-n-setup-${process.pid}`)
+      mkdirSync(dir, { recursive: true })
+      try {
+        const out = join(dir, "uipi.medium.json")
+        const watch = (alive: boolean) => ({ started: `${out}.started`, alive: async () => alive })
+        const why = (alive: boolean) =>
+          waitFile(out, 300, watch(alive)).then(
+            (v: unknown) => `resolved ${JSON.stringify(v)}`,
+            (e: Error) => e.message,
+          )
+        const absent = await why(false)
+        if (!/not written within 0\.3 s; the helper never started/.test(absent))
+          bad.push(`a helper that never started reads: ${absent}`)
+        writeFileSync(`${out}.started`, JSON.stringify({ pid: 4242 }))
+        const silent = await why(false)
+        if (!/the helper \(pid 4242\) exited without writing a result \(silent exit\)/.test(silent))
+          bad.push(`a silent exit reads: ${silent}`)
+        const running = await why(true)
+        if (!/the helper \(pid 4242\) is still running/.test(running)) bad.push(`a running helper reads: ${running}`)
+        // a setup error the helper reported: the row is UNMEASURED with its text, never a timeout
+        const text = "setup failed: A required privilege is not held by the client (line 128)"
+        writeFileSync(out, JSON.stringify({ legError: text, leg: "uipi" }))
+        const g: Group = {
+          budgetS: 5,
+          ids: ["n-uipi-postmessage"],
+          async run() {
+            await waitFile(out, 300, watch(false))
+            return {}
+          },
+        }
+        const r = (await runGroup(g, testCtx()))["n-uipi-postmessage"]
+        if (r?.verdict !== "UNMEASURED" || !r.measured.includes(text) || /timeout|not written/.test(r.measured))
+          bad.push(`a reported setup error reads: ${JSON.stringify(r)}`)
+      } finally {
+        rmSync(dir, { recursive: true, force: true })
+      }
+      return bad.length ? bad.join("; ") : undefined
+    },
+  },
+  {
     finding: "SWALLOW read-state",
     async run() {
       const all = [...LEG_FILES, "sp-n.ps1", "sp-n-target.ps1"].map((f) => [f, source(f)] as const)
