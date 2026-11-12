@@ -57,15 +57,19 @@ describe("R57 replay-all classification", () => {
     expect(verdict("ported.json")).toStartWith(`FAIL ${DIR}/ported.json `)
   })
 
-  test("(b) an imported case with a delta or leg due at or before N fails, a passed leg fails", () => {
-    expect(verdict("delta-due.json")).toStartWith("FAIL ")
+  test("(b) an ORACLE-DELTAS row records a delta, it neither makes a case due nor owns it", () => {
+    expect(verdict("delta-due.json", 17)).toBe(`FAIL ${DIR}/delta-due.json unowned`)
+    expect(verdict("delta-due.json", 17)).not.toContain("due at row 12")
+    expect(verdict("delta-later.json")).toBe(`FAIL ${DIR}/delta-later.json unowned`)
+  })
+
+  test("(b) an imported case with a leg due at or before N fails, a passed leg fails", () => {
     expect(verdict("leg-due.json")).toStartWith("FAIL ")
     expect(verdict("leg-due.json", 19)).toBe(`owed ${DIR}/leg-due.json row 20`)
     expect(verdict("leg-passed.json")).toStartWith("FAIL ")
   })
 
   test("(c) an imported case owed only to later rows is owed to the row the ledgers name", () => {
-    expect(verdict("delta-later.json")).toBe(`owed ${DIR}/delta-later.json row 31`)
     expect(verdict("leg-owed.json")).toBe(`owed ${DIR}/leg-owed.json row 27`)
   })
 
@@ -79,12 +83,12 @@ describe("R57 replay-all classification", () => {
     const outcomes: Outcome[] = [
       { name: `${DIR}/hello.json`, status: "ok" },
       { name: "v3-old.json", status: "skipped" },
-      failed("delta-later.json"),
+      failed("leg-owed.json"),
       failed("orphan.json"),
     ]
     const result = classify(20, outcomes, LEDGERS)
     expect(result.lines).toEqual([
-      `owed ${DIR}/delta-later.json row 31`,
+      `owed ${DIR}/leg-owed.json row 27`,
       `FAIL ${DIR}/orphan.json unowned`,
       "replay-all R57 row=20: ok=1 skipped=1 failing=1 owed=1",
     ])

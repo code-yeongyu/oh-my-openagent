@@ -42,3 +42,6 @@ T1	replay of the imported case `error-codes-amend-1.json` against the v3 engine 
 T1	replay of the imported case `error-codes-amend-2.json` against the v3 engine exits 0 (plan L1200: row 28 replays error-codes-amend-2.json with the imported corpus)	20	28	owed
 T1	replay of the imported case `rejections.json` against the v3 engine exits 0 (plan L1200: row 28 replays rejections.json with the imported corpus)	20	28	owed
 T1	replay of the imported case `session-options-additive.json` against the v3 engine exits 0 (plan L1200: row 28 replays session-options-additive.json with the imported corpus)	20	28	owed
+T1	replay of the imported case `hello.json` against the v3 engine exits 0 (plan L831: `hello` with `protocolVersion`, `abi`, `generation`, `limits`; L1200: row 28 replays hello.json with the imported corpus)	20	28	owed
+T1	replay of the imported case `action-report-legacy.json` against the v3 engine exits 0 (plan L857: `ActionReport{disposition, delivered, effect, route, hit, focusRestoration, ...}`; L1200: row 28 replays action-report-legacy.json with the imported corpus)	20	28	owed
+T1	replay of the imported case `action-report-object.json` against the v3 engine exits 0 (plan L857: `ActionReport{disposition, delivered, effect, route, hit, focusRestoration, ...}`; L1200: row 28 replays action-report-object.json with the imported corpus)	20	28	owed

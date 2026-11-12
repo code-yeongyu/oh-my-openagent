@@ -7,8 +7,9 @@
 //   (b) an imported case FAILs when a ledger marks it passed or due at a row <= N:
 //       test-parity-manifest.tsv (its `fixture` row, keyed by the old path ORACLE-PROVENANCE.tsv
 //       maps the case to, or a `ported:<case>` status) with any status but `pending` is passed;
-//       an ORACLE-DELTAS.tsv line on the case is due at its `row`; a DEFERRED-LEGS.tsv leg that
-//       names the case's file is passed (`passed:*`) or due at its `owed to row`.
+//       a DEFERRED-LEGS.tsv leg that names the case's file is passed (`passed:*`) or due at its
+//       `owed to row`. An ORACLE-DELTAS.tsv `row` is the row that recorded a delta, not a row the
+//       case is due at, so ORACLE-DELTAS neither makes a case due nor owns it (ruling R57c).
 //   (c) otherwise, with every owner due after N, it is `owed <case> row <M>`, M the latest of them;
 //   (d) a case no ledger owns with a row (a `pending` manifest row carries none) FAILs `unowned`.
 import { readFile } from "node:fs/promises"
@@ -57,10 +58,6 @@ function ownersOf(name: string, ledgers: Ledgers): Owner[] {
     const status = line.status ?? ""
     const mine = (line.kind === "fixture" && old.has(line["test id"])) || status === `ported:${name}`
     if (mine && status !== "pending") owners.push({ source: `test-parity-manifest ${status}`, row: "passed" })
-  }
-  for (const line of table(ledgers.deltas)) {
-    const row = rowOf(line.row)
-    if (line.file === name && row !== undefined) owners.push({ source: `ORACLE-DELTAS ${line.pointer}`, row })
   }
   for (const line of table(ledgers.deferred)) {
     if (!names(line.leg ?? "", file)) continue
