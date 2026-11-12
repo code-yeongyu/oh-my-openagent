@@ -113,7 +113,9 @@ export function summarize(events: readonly SentinelEvent[]): SentinelSummary {
         order = event.windows
         break
       case "typed":
-        if (event.index !== sent.length) faults.push(`typing: typist sent index ${event.index} after ${sent.length}`)
+        if (event.index === 0) sent = ""
+        else if (event.index !== sent.length)
+          faults.push(`typing: typist sent index ${event.index} after ${sent.length}`)
         sent += event.char
         lastTypedAt = event.t
         break
