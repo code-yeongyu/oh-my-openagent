@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { appendFileSync } from "node:fs"
+import { appendFileSync, rmSync } from "node:fs"
 import { join } from "node:path"
 
 import { WAKE_LEASE_MS } from "../gateway/constants"
@@ -48,7 +48,9 @@ type Setup = {
   readonly path: (id: string) => string
 }
 
-async function setup(options: FakeEngineOptions & { readonly wakeLimit?: number } = {}): Promise<Setup> {
+async function setup(
+  options: FakeEngineOptions & { readonly wakeLimit?: number; readonly sameDevice?: () => boolean } = {},
+): Promise<Setup> {
   const h = (harness = createGatewayHarness())
   const fake = (host = await startFakeEngineHost(options))
   const store = h.store()
@@ -75,6 +77,7 @@ async function setup(options: FakeEngineOptions & { readonly wakeLimit?: number 
     ensureHost: async () => undefined,
     connect: () => connectCarrierHost({ socket: fake.socketPath, keyRoot: () => h.agentDir }),
     wakeLimit: () => options.wakeLimit ?? 0,
+    ...(options.sameDevice === undefined ? {} : { sameDevice: options.sameDevice }),
     schedule: () => () => undefined,
     onEvent: (event) => {
       events.push(event)
@@ -324,7 +327,78 @@ describe("the lease (A3.1.3)", () => {
     expect(await store.woken.list()).toEqual([])
     expect(sent(fake, "release_session")).toHaveLength(1)
   })
+
+  // Review of #13220 (MEDIUM): a successor must reopen the session in the session's own directory, never its own, or an
+  // unattended woken turn runs its tools outside the project.
+  test("#given a carrier that died after the open #when its successor takes the row over #then the successor opens the session in the session's own working directory", async () => {
+    const { h, fake, carrier, path } = await setup()
+    path("s1")
+    await carrier.wake("s1")
+    await carrier.stop()
+    h.clock.now += WAKE_LEASE_MS + 1
+    await successorOf(h, fake).sweep()
+    expect(sent(fake, "open_session").map((frame) => frame.cwd)).toEqual(["/work/project", "/work/project"])
+  })
+
+  test.each([
+    ["gone", (sessions: string, file: string) => rmSync(file)],
+    ["ambiguous", (sessions: string) => writeSessionFile(sessions, "s1", {}, "--other-project--")],
+  ] as const)(
+    "#given a carrier that died after the open #when the session is %s at the takeover #then the row ends and nothing is opened",
+    async (_case, change) => {
+      const { h, fake, store, sessions, carrier, path } = await setup()
+      const file = path("s1")
+      await carrier.wake("s1")
+      await carrier.stop()
+      change(sessions, file)
+      h.clock.now += WAKE_LEASE_MS + 1
+      await successorOf(h, fake).sweep()
+      expect(await store.woken.list()).toEqual([])
+      expect(sent(fake, "open_session")).toHaveLength(1)
+    },
+  )
 })
+
+// Review of #13220 (LOW): a same-device wake is opened only while its own switch allows it. A wake requested while the
+// switch was on and then deferred stays queued once the switch is turned off, and opens when it is turned on again.
+describe("the same-device switch at the sweep", () => {
+  test("#given a same-device wake requested while the switch was on and deferred #when the switch is off at the sweep #then nothing opens, and with the switch on again it opens", async () => {
+    let on = true
+    let refuse = true
+    const { h, fake, store, carrier, path } = await setup({
+      sameDevice: () => on,
+      openRefusal: () => (refuse ? { success: false, error: "host_stopping", errorCode: "host_stopping" } : undefined),
+    })
+    path("t")
+    h.phantom("t")
+    const sent0 = await h.session("a").engine.deliver({ sender: { kind: "session", durable_id: "a" }, target: "t", text: "hi" })
+    expect(sent0).toMatchObject({ kind: "ok", delivery: { kind: "queued_offline" } })
+    expect(await carrier.wake("t")).toMatchObject({ kind: "deferred" })
+    refuse = false
+    on = false
+    const [row] = await store.woken.list()
+    h.clock.now = (row?.next_attempt_at ?? h.clock.now) + 1
+    await carrier.sweep()
+    expect(sent(fake, "open_session")).toHaveLength(1)
+    expect(await store.woken.list()).toMatchObject([{ durable_id: "t", state: "requested" }])
+    on = true
+    await carrier.sweep()
+    expect(sent(fake, "open_session")).toHaveLength(2)
+    expect(sent(fake, "wake")).toHaveLength(1)
+  })
+})
+
+function successorOf(h: GatewayHarness, fake: FakeEngineHost): Carrier {
+  const successor = createCarrier({
+    store: h.store(),
+    sessionsDirectory: join(h.agentDir, "sessions"),
+    ensureHost: async () => undefined,
+    connect: () => connectCarrierHost({ socket: fake.socketPath, keyRoot: () => h.agentDir }),
+    schedule: () => () => undefined,
+  })
+  carriers.push(successor)
+  return successor
+}
 
 describe("the bound on woken turns (A3.5.3)", () => {
   test("#given the default setting #when a session is woken many times #then nothing is refused", async () => {
