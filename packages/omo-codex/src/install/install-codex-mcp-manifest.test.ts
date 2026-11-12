@@ -6,7 +6,7 @@ import { mkdtemp, readFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { runCodexInstaller } from "./install-codex"
-import { createCodexInstallSandbox, disposeCodexInstallSandboxes } from "../../scripts/install-test-fixtures.mjs"
+import { createCodexInstallSandbox, disposeCodexInstallSandboxes } from "../../scripts/codex-install-sandbox"
 
 const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = 30_000
 

@@ -5,8 +5,7 @@ import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import type { CodexInstallSandbox } from "../../scripts/install-test-fixtures.d.mts"
-import { createCodexInstallSandbox, disposeCodexInstallSandboxes } from "../../scripts/install-test-fixtures.mjs"
+import { createCodexInstallSandbox, disposeCodexInstallSandboxes } from "../../scripts/codex-install-sandbox"
 import * as codexPostHog from "../telemetry/posthog"
 import { trackCodexInstallTelemetry } from "./codex-install-telemetry"
 
@@ -38,7 +37,7 @@ afterEach(() => {
 describe("install telemetry follows the env it is given", () => {
   test("#given an env without an opt-out #when install telemetry runs #then its state lands in that env's data home, not the process's", async () => {
     // given: the bun preload opts this process out (OMO_DISABLE_POSTHOG) and points its data home elsewhere
-    const sandbox: CodexInstallSandbox = createCodexInstallSandbox("telemetry")
+    const sandbox = createCodexInstallSandbox("telemetry")
     const { DO_NOT_TRACK: _optOut, ...env } = sandbox.env
     process.env.XDG_DATA_HOME = processDataHome
     const captures = recordCaptures()
@@ -53,7 +52,7 @@ describe("install telemetry follows the env it is given", () => {
   })
 
   test("#given the sandbox env #when install telemetry runs #then nothing is captured and nothing is written", async () => {
-    const sandbox: CodexInstallSandbox = createCodexInstallSandbox("telemetry")
+    const sandbox = createCodexInstallSandbox("telemetry")
     process.env.XDG_DATA_HOME = processDataHome
     const captures = recordCaptures()
 

@@ -6,7 +6,7 @@ import { mkdir, mkdtemp, readFile, readlink, stat, writeFile } from "node:fs/pro
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { runCodexInstaller } from "./install-codex"
-import { createCodexInstallSandbox, disposeCodexInstallSandboxes } from "../../scripts/install-test-fixtures.mjs"
+import { createCodexInstallSandbox, disposeCodexInstallSandboxes } from "../../scripts/codex-install-sandbox"
 
 const skipAstGrepInstall = async () => ({ kind: "skipped" as const, reason: "test" })
 

@@ -11,7 +11,7 @@ import {
   EXPECTED_OMO_COMPONENT_BINS,
   expectedBinName,
 } from "./install-codex-test-fixtures"
-import { createCodexInstallSandbox, disposeCodexInstallSandboxes } from "../../scripts/install-test-fixtures.mjs"
+import { createCodexInstallSandbox, disposeCodexInstallSandboxes } from "../../scripts/codex-install-sandbox"
 
 const STALE_CODEX_COMPONENT_BINS = [
   "codex-comment-checker",

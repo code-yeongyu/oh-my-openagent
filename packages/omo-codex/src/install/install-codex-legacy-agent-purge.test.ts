@@ -6,7 +6,7 @@ import { lstat, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { runCodexInstaller } from "./install-codex"
-import { createCodexInstallSandbox, disposeCodexInstallSandboxes } from "../../scripts/install-test-fixtures.mjs"
+import { createCodexInstallSandbox, disposeCodexInstallSandboxes } from "../../scripts/codex-install-sandbox"
 
 const INSTALL_CODEX_LEGACY_AGENT_PURGE_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000
 

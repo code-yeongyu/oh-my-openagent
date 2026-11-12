@@ -15,7 +15,7 @@ import {
   waitForChildReady,
   writeLegacyVersionState,
 } from "./lsp-daemon-reaper.test-support"
-import { createCodexInstallSandbox, disposeCodexInstallSandboxes } from "../../scripts/install-test-fixtures.mjs"
+import { createCodexInstallSandbox, disposeCodexInstallSandboxes } from "../../scripts/codex-install-sandbox"
 
 const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = process.platform === "win32" ? 120_000 : 20_000
 

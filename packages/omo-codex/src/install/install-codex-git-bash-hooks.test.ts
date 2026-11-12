@@ -7,7 +7,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { runCodexInstaller } from "./install-codex"
 import { createRepoWithGitBashHooksFixture, EXPECTED_GIT_BASH_HOOKS } from "./install-codex-test-fixtures"
-import { createCodexInstallSandbox, disposeCodexInstallSandboxes } from "../../scripts/install-test-fixtures.mjs"
+import { createCodexInstallSandbox, disposeCodexInstallSandboxes } from "../../scripts/codex-install-sandbox"
 
 const [GIT_BASH_PRE_TOOL_USE_HOOK, GIT_BASH_POST_COMPACT_HOOK] = EXPECTED_GIT_BASH_HOOKS
 
