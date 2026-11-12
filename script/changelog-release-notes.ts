@@ -89,9 +89,12 @@ const NON_REPO_TOKENS = new Set(["pr", "gh", "issue", "issues"])
 const NEUTRALIZED = "tracked internally"
 
 // One pass, so the inside of a kept public URL is never rewritten again. Alternatives, in order: a markdown
-// link to a GitHub issue/pull/commit/compare URL, a bare such URL, an (optionally owner-qualified) repo#N.
+// link to a GitHub URL, an autolink <GitHub URL>, a bare GitHub URL, an (optionally owner-qualified) repo#N.
+// A GitHub URL is ANY URL to a repository: optional scheme, optional www., case-insensitive host, then
+// owner/repo and optionally any path, query or fragment (so bare repo URLs, /blob/, /tree/, /discussions/,
+// /releases/ and scheme-less URLs are all covered).
 const CROSS_REPO_PATTERN =
-  /\[([^\]]*)\]\((https?:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/(?:issues|pull|commit|compare)\/[^\s)]*)\)|https?:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/(?:issues|pull|commit|compare)\/[^\s)\]>]*[^\s)\]>.,;:!?]|\b(?:([\w.-]+)\/)?([A-Za-z][\w.-]*)#\d+\b/g
+  /\[([^\]]*)\]\(((?:https?:\/\/)?(?:www\.)?github\.com\/([\w.-]+)\/([\w.-]*[\w-])[^\s)]*)\)|<(?:https?:\/\/)?(?:www\.)?github\.com\/([\w.-]+)\/([\w.-]*[\w-])[^\s>]*>|(?<![\w./-])(?:https?:\/\/)?(?:www\.)?github\.com\/([\w.-]+)\/([\w.-]*[\w-])(?:[/?#](?:[^\s)\]>]*[^\s)\]>.,;:!?])?)?|\b(?:([\w.-]+)\/)?([A-Za-z][\w.-]*)#\d+\b/gi
 
 function isPublicPair(owner: string, repo: string): boolean {
   return PUBLIC_QUALIFIED_REPOS.has((owner + "/" + repo).toLowerCase())
@@ -106,6 +109,8 @@ export function neutralizeCrossRepoReferences(text: string): string {
       linkUrl: string | undefined,
       linkOwner: string | undefined,
       linkRepo: string | undefined,
+      autoOwner: string | undefined,
+      autoRepo: string | undefined,
       urlOwner: string | undefined,
       urlRepo: string | undefined,
       refOwner: string | undefined,
@@ -115,6 +120,9 @@ export function neutralizeCrossRepoReferences(text: string): string {
         if (!isPublicPair(linkOwner, linkRepo)) return NEUTRALIZED
         return "[" + neutralizeCrossRepoReferences(linkText ?? "") + "](" + linkUrl + ")"
       }
+      // The whole autolink goes, angle brackets included: a bare <tracked internally> would render as an HTML tag.
+      if (autoOwner !== undefined && autoRepo !== undefined)
+        return isPublicPair(autoOwner, autoRepo) ? match : NEUTRALIZED
       if (urlOwner !== undefined && urlRepo !== undefined) return isPublicPair(urlOwner, urlRepo) ? match : NEUTRALIZED
       if (refRepo === undefined || /[-.]$/.test(refRepo) || NON_REPO_TOKENS.has(refRepo.toLowerCase())) return match
       const isPublic =

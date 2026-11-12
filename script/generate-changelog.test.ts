@@ -171,7 +171,64 @@ describe("neutralizeCrossRepoReferences", () => {
       login: "minpeter",
       message: "fix: [a](https://github.com/acme-org/acme-svc/issues/1)",
     })
-    expect(formatContributorNotes(compare).join("\n")).not.toContain("acme-")
+    expect(formatContributorNotes(compare)).toStrictEqual([
+      "",
+      "**Thank you to 1 community contributor:**",
+      "- @minpeter:",
+      "  - fix: tracked internally",
+    ])
+  })
+
+  test("#given any GitHub URL form to a non-allowlisted repo #when neutralized #then it is replaced", () => {
+    for (const url of [
+      "https://github.com/acme-org/acme-svc",
+      "https://github.com/acme-org/acme-svc/",
+      "https://github.com/acme-org/acme-svc/blob/main/README.md#L3",
+      "https://github.com/acme-org/acme-svc/tree/main/src",
+      "https://github.com/acme-org/acme-svc/discussions/4",
+      "https://github.com/acme-org/acme-svc/releases/tag/v1.0.0",
+      "https://github.com/acme-org/acme-svc?tab=readme",
+      "https://www.github.com/acme-org/acme-svc/pull/9",
+      "https://GitHub.com/acme-org/acme-svc/pull/9",
+      "http://GITHUB.COM/Acme-Org/Acme-Svc",
+      "github.com/acme-org/acme-svc",
+      "www.github.com/acme-org/acme-svc/pull/9",
+    ]) {
+      expect(neutralizeCrossRepoReferences("see " + url + " now")).toBe("see tracked internally now")
+      expect(neutralizeCrossRepoReferences("see " + url + ".")).toBe("see tracked internally.")
+      expect(neutralizeCrossRepoReferences("[x](" + url + ")")).toBe("tracked internally")
+    }
+  })
+
+  test("#given any GitHub URL form to an allowlisted repo #when neutralized #then it is byte-identical", () => {
+    for (const url of [
+      "https://github.com/code-yeongyu/senpi",
+      "https://github.com/code-yeongyu/senpi/",
+      "https://github.com/code-yeongyu/senpi/blob/main/README.md#L3",
+      "https://github.com/code-yeongyu/senpi/tree/main/src",
+      "https://github.com/code-yeongyu/senpi/discussions/4",
+      "https://github.com/code-yeongyu/senpi/releases/tag/v1.0.0",
+      "https://www.github.com/code-yeongyu/senpi/pull/9",
+      "https://GitHub.com/Code-Yeongyu/Senpi/pull/9",
+      "github.com/code-yeongyu/senpi",
+      "www.github.com/sisyphuslabs/doriterm/pull/9",
+      "<https://github.com/code-yeongyu/senpi/pull/9>",
+    ]) {
+      expect(neutralizeCrossRepoReferences("see " + url + " now")).toBe("see " + url + " now")
+    }
+  })
+
+  test("#given a private autolink #when neutralized #then the angle brackets go too", () => {
+    expect(neutralizeCrossRepoReferences("fix <https://github.com/acme-org/acme-svc/pull/9> done")).toBe(
+      "fix tracked internally done",
+    )
+    expect(neutralizeCrossRepoReferences("<https://github.com/acme-org/acme-svc>")).toBe("tracked internally")
+  })
+
+  test("#given a host that only ends in github.com #when neutralized #then it is untouched", () => {
+    expect(neutralizeCrossRepoReferences("https://notgithub.com/acme-org/acme-svc")).toBe(
+      "https://notgithub.com/acme-org/acme-svc",
+    )
   })
 })
 
