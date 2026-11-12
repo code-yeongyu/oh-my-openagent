@@ -9,11 +9,11 @@ import {
   short,
   until,
 } from "./hosted-macos-live-host.ts"
+import { askPidClick } from "./hosted-macos-live-click-question.ts"
 import {
   type Answer,
   askAxTree,
   askCapture,
-  askPidClick,
   askTap,
   askTrusted,
   disclaimedInvoke,
