@@ -56,7 +56,7 @@ pub fn render(generation: &Generation, style: Style, nodes_observed: u32) -> (Ou
     for (index, entry) in generation.entries.iter().enumerate() {
         let above = entry.parent.and_then(|parent| nearest[parent]);
         let root = index == 0;
-        let shown = root || (entry.logical <= MAX_LOGICAL_DEPTH && (worth_a_line(&entry.read) || is_wrapper(&entry.read)));
+        let shown = root || (!is_wrapper(&entry.read) && entry.logical <= shown_depth && worth_a_line(&entry.read));
         if !shown {
             nearest.push(above);
             continue;
@@ -64,7 +64,7 @@ pub fn render(generation: &Generation, style: Style, nodes_observed: u32) -> (Ou
         let indent = above.map_or(0, |(_, indent)| indent + 1);
         let clamped = entry.logical >= shown_depth && entry.read.child_count > 0;
         let more = if clamped { Some(entry.read.child_count) } else { entry.left_out };
-        let line_style = LineStyle { actions: true, value: true };
+        let line_style = LineStyle { actions: style.actions, value: !(style.skeleton && more.is_some()) };
         let mut read = entry.read.clone();
         let extra = if root && window_root {
             read.focused = Some(generation.window_focused);

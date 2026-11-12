@@ -91,19 +91,63 @@ impl RefRegistry {
 
     /// The element number of every node of `walk`, by rules (1), (2), then the counter.
     fn number(&mut self, window_id: &str, walk: &Walk) -> Vec<u64> {
-        let _ = (window_id, HashSet::<u64>::new(), &self.next_n);
-        (1..=walk.nodes.len()).map(|n| u64::try_from(n).unwrap_or(0)).collect()
+        let window = self.windows.entry(window_id.to_owned()).or_default();
+        let mut used: HashSet<u64> = HashSet::new();
+        let mut numbers = Vec::with_capacity(walk.nodes.len());
+        for node in &walk.nodes {
+            let by_object = node.read.object.and_then(|object| window.by_object.get(&object).copied());
+            let by_native_id = node
+                .read
+                .native_id
+                .as_ref()
+                .and_then(|id| window.by_native_id.get(&(node.read.role.clone(), id.clone())).copied());
+            let kept = [by_object, by_native_id].into_iter().flatten().find(|n| !used.contains(n));
+            let n = kept.unwrap_or_else(|| {
+                let n = self.next_n;
+                self.next_n += 1;
+                n
+            });
+            used.insert(n);
+            numbers.push(n);
+        }
+        for (node, n) in walk.nodes.iter().zip(&numbers) {
+            if let Some(object) = node.read.object {
+                window.by_object.insert(object, *n);
+            }
+            if let Some(id) = &node.read.native_id {
+                window.by_native_id.insert((node.read.role.clone(), id.clone()), *n);
+            }
+        }
+        numbers
     }
 
     /// Keeps the newest eight full observations of the window and their drills.
     fn age_out(&mut self, window_id: &str) {
-        let _ = (window_id, GENERATIONS_PER_WINDOW);
+        let Some(window) = self.windows.get_mut(window_id) else { return };
+        let tops: Vec<u64> = window.generations.values().filter(|g| g.parent.is_none()).map(|g| g.number).collect();
+        let keep_from = tops.len().saturating_sub(GENERATIONS_PER_WINDOW);
+        for old in tops.into_iter().take(keep_from) {
+            self.retained -= remove_with_drills(window, old);
+        }
     }
 
     /// Drops least-recently-used full observations and their drills (never `fresh`, the one
     /// just minted or the parent of the drill just minted) until the store fits its cap.
     fn prune(&mut self, fresh_window: &str, fresh: u64) {
-        let _ = (fresh_window, fresh, remove_with_drills);
+        while self.retained > self.cap {
+            let oldest = self
+                .windows
+                .iter()
+                .flat_map(|(id, window)| window.generations.values().map(move |g| (g.last_used, id.clone(), g.number, g.parent)))
+                .filter(|(_, id, number, parent)| {
+                    parent.is_none() && !(id == fresh_window && (*number == fresh))
+                })
+                .min();
+            let Some((_, id, number, _)) = oldest else { break };
+            if let Some(window) = self.windows.get_mut(&id) {
+                self.retained -= remove_with_drills(window, number);
+            }
+        }
     }
 }
 

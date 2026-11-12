@@ -144,23 +144,23 @@ pub fn walk(reader: &mut dyn AxReader, root: NodeRead, limits: &Limits) -> Walk 
             hung: false,
         };
         let mut children = Vec::new();
-        if node.read.child_count > 0 {
+        if node.read.child_count > 0 && child_logical <= limits.max_logical_depth {
             let handle = node.read.handle;
             while let Some(handle) = handle {
                 let read = node.children_read;
                 let remaining = deadline.saturating_sub(reader.now_ms());
-                if read >= node.read.child_count {
+                if read >= node.read.child_count || remaining == 0 || observed >= limits.node_budget {
                     break;
                 }
-                let _ = remaining;
-                match reader.children(handle, read, limits.deadline_ms) {
+                match reader.children(handle, read, limits.slice_ms.min(remaining)) {
                     Slice::Hung => {
                         node.hung = true;
                         break;
                     }
                     Slice::Read(batch) if batch.is_empty() => break,
                     Slice::Read(batch) => {
-                        for child in batch {
+                        let room = limits.node_budget - observed;
+                        for child in batch.into_iter().take(usize::try_from(room).unwrap_or(usize::MAX)) {
                             children.push(child);
                             node.children_read += 1;
                             observed += 1;

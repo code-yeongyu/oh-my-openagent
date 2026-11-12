@@ -87,7 +87,7 @@ pub fn find(generation: &Generation, criteria: &Criteria) -> Vec<ElementInfo> {
             let entry = &generation.entries[*index];
             let role_ok = criteria.role.as_deref().is_none_or(|role| entry.read.role.eq_ignore_ascii_case(role));
             let text_ok = text.as_deref().is_none_or(|text| searchable(entry).contains(text));
-            role_ok && text_ok && entry.logical <= 3
+            role_ok && text_ok
         })
         .map(|index| generation.element_info(index))
         .collect()
