@@ -33,10 +33,12 @@ const stores: GatewayStore[] = []
 const sessions: Session[] = []
 afterEach(async () => {
   // senpi's fallback logger finishes its first-start removal asynchronously; removing the agent dir before it settles leaks it (#9766).
-  await Promise.all(sessions.splice(0).map((session) => {
-    session.dispose()
-    return session.whenToolChildClosed()
-  }))
+  await Promise.all(
+    sessions.splice(0).map((session) => {
+      session.dispose()
+      return session.whenToolChildClosed()
+    }),
+  )
   await Promise.all(stores.splice(0).map((store) => store.dispose()))
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
