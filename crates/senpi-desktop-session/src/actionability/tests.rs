@@ -4,7 +4,7 @@
 #[path = "lock_tests.rs"]
 mod lock_tests;
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use senpi_desktop_backend_fake::SinkOp;
 use senpi_desktop_core::error::{DesktopError, ErrorCode, ErrorReport};
@@ -70,41 +70,48 @@ fn action(response: Response) -> ActionReport {
 /// any bound a wall clock could set on "at once".
 const REFUSAL_STALL: Duration = Duration::from_millis(1_100);
 
-fn refused_fast(error: &DesktopError, started: Instant, reason: &str) {
+/// A harness whose battery waits on the fake's clock, which nothing else moves.
+fn opened_on_fake_time(overlay: &Value) -> Harness {
+    let mut harness = opened(overlay, ReportMode::Object);
+    harness.worker.battery_clock = Box::new(FakeTime(harness.ax_clock.clone()));
+    harness
+}
+
+/// Refused with `reason`, nothing sent, and at once: no fake time passed.
+fn refused_fast(harness: &Harness, error: &DesktopError, reason: &str) {
     assert_eq!(error.code, ErrorCode::AxUnsupported, "{error}");
     let report = report(error);
     assert_eq!(report.reason.as_deref(), Some(reason));
     assert_eq!(report.disposition, Some(Disposition::NOT_DELIVERED_SAFE));
-    assert!(started.elapsed() < Duration::from_secs(1), "refused after {:?}", started.elapsed());
+    let waited = harness.ax_clock.now_ms();
+    assert_eq!(waited, 0, "refused after {waited} ms of fake time");
 }
 
 #[test]
 fn the_battery_refuses_a_disabled_element_at_once_and_sends_nothing() {
     // Given: a visible, still, disabled button.
-    let mut harness = opened(&scene(button(&json!({"enabled": false})), &[]), ReportMode::Object);
+    let mut harness = opened_on_fake_time(&scene(button(&json!({"enabled": false})), &[]));
     let reference = harness.focused_ref();
     // When: a loaded host deschedules this thread around the press.
-    let started = Instant::now();
     std::thread::sleep(REFUSAL_STALL);
     let error = press(&mut harness, reference).expect_err("refused");
     // Then: no auto-wait for a terminal state.
-    refused_fast(&error, started, "disabled");
+    refused_fast(&harness, &error, "disabled");
     assert_eq!(pressed(&harness), 0);
 }
 
 #[test]
 fn the_battery_refuses_an_action_the_element_does_not_offer_at_once() {
     // Given: a button that offers only `click`.
-    let mut harness = opened(&scene(button(&json!({"actions": ["click"]})), &[]), ReportMode::Object);
+    let mut harness = opened_on_fake_time(&scene(button(&json!({"actions": ["click"]})), &[]));
     let reference = harness.focused_ref();
     // When: a loaded host deschedules this thread around the request.
-    let started = Instant::now();
     std::thread::sleep(REFUSAL_STALL);
     let error = harness
         .process(Op::AxPerform(AxPerformParams { ref_: reference, action: "increment".to_owned() }))
         .expect_err("refused");
     // Then
-    refused_fast(&error, started, "action_unsupported");
+    refused_fast(&harness, &error, "action_unsupported");
     assert_eq!(pressed(&harness), 0);
 }
 
