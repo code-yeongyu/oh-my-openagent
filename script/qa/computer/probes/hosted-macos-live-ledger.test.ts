@@ -62,15 +62,23 @@ describe("HOSTED_MACOS_LIVE decision", () => {
     )
   })
 
-  test("one live-tier question that does not confirm on one image makes it no", () => {
+  test("one live-tier question that is refused on one image makes it no", () => {
     const rows = fullLedger((question, image) =>
-      question === "q6" && image === "macos-26" ? "UNMEASURED" : "CONFIRMS",
+      question === "q6" && image === "macos-26" ? "CONTRADICTS" : "CONFIRMS",
     )
     expect(decideHostedMacosLive(rows)).toBe("no")
   })
 
-  test("a missing image counts as no", () => {
-    expect(decideHostedMacosLive(fullLedger(() => "CONFIRMS").filter((row) => row.image === "macos-15"))).toBe("no")
+  test("a missing image is unmeasured, never a clean no", () => {
+    const rows = fullLedger(() => "CONTRADICTS").filter((row) => row.image === "macos-15")
+    expect(decideHostedMacosLive(rows)).toBe("unmeasured")
+  })
+
+  test("an UNMEASURED live-tier row is unmeasured even beside a measured refusal", () => {
+    const rows = fullLedger((question, image) =>
+      question === "q4" && image === "macos-26" ? "UNMEASURED" : question === "q3" ? "CONTRADICTS" : "CONFIRMS",
+    )
+    expect(decideHostedMacosLive(rows)).toBe("unmeasured")
   })
 })
 
