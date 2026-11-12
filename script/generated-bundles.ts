@@ -23,6 +23,37 @@ export function loadGeneratedBundlePatterns(): readonly RegExp[] {
   })
 }
 
+// The generators whose outputs the list names: the ones the release job runs. script/build-generated.ts runs exactly
+// these, and the list test builds through them. `fixedOutputs` names the files of a generator that has no output
+// override, so the list test can account for them without writing into the tree.
+export const RELEASE_GENERATORS: readonly {
+  readonly script: string
+  readonly runtime: "node" | "bun"
+  readonly fixedOutputs?: readonly string[]
+}[] = [
+  // Inputs first: build-install.mjs bundles the local launcher, which imports the brand logo module.
+  {
+    script: "script/build-brand-logo.ts",
+    runtime: "bun",
+    fixedOutputs: ["packages/omo-native/bin/lib/brand-logo.generated.js"],
+  },
+  {
+    script: "script/build-reflection-lock.ts",
+    runtime: "bun",
+    fixedOutputs: ["packages/omo-native/bin/lib/reflection-lock.generated.js"],
+  },
+  {
+    script: "script/build-service-auth.ts",
+    runtime: "bun",
+    fixedOutputs: ["packages/omo-native/bin/lib/service-auth.generated.js"],
+  },
+  { script: "script/build-codex-install.ts", runtime: "bun" },
+  { script: "packages/omo-senpi/plugin/scripts/build-extension.mjs", runtime: "node" },
+  // Writes the tracked daemon launch spec, which the tree check that follows covers.
+  { script: "packages/omo-senpi/plugin/scripts/build-daemon-launch-spec.mjs", runtime: "node" },
+  { script: "packages/omo-senpi/plugin/scripts/build-install.mjs", runtime: "node" },
+]
+
 export function isGeneratedBundlePath(path: string, patterns: readonly RegExp[]): boolean {
   return patterns.some((pattern) => pattern.test(path))
 }

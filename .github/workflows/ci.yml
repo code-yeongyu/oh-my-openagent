@@ -859,6 +859,7 @@ jobs:
           # --check, runs build-daemon-launch-spec.mjs --check first, which guards the tracked daemon-launch-spec.json.
           bun run bundle-inputs:check
 
+      # Includes generated-bundles-list.test.mjs, which builds the plugin a second time into a temporary root (about 80 s).
       - name: Run Senpi compatibility tests
         id: senpi-tests-posix
         if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
@@ -889,6 +890,7 @@ jobs:
 
       - name: Run Senpi compatibility tests with Windows telemetry
         id: senpi-tests-windows
+        # Includes generated-bundles-list.test.mjs, which builds the plugin a second time (about 80 s on Linux).
         # #11815: this step has hung and stayed in_progress for hours under GitHub's 360-minute default job limit.
         # Healthy runs take 31-52 minutes (21 runs, 2026-10); 75 minutes fails a hang on its own and lets the telemetry
         # upload and the summary below still run.
@@ -1135,6 +1137,12 @@ jobs:
       - name: Install dependencies
         if: needs.ci-mode.outputs.run_heavy == 'true'
         run: bun install --frozen-lockfile
+
+      # omo-native ships bin/, including the generated bin/lib/service-auth.generated.js that bin/omo.js imports; feature
+      # PRs do not commit generated outputs (#9903), so build them before packing.
+      - name: Build generated outputs
+        if: needs.ci-mode.outputs.run_heavy == 'true'
+        run: bun script/build-generated.ts
 
       - name: Build omo-native
         if: needs.ci-mode.outputs.run_heavy == 'true'
