@@ -1,5 +1,5 @@
 {
-  // The Sisyphus Labs account (moved 2026-10-09, sisyphuslabs/common-infra docs/cutover-workers.md).
+  // The Sisyphus Labs account (moved 2026-10-09, see the shared infrastructure runbook for Workers).
   // get.omo.dev is a CUSTOM DOMAIN on the Sisyphus Labs omo.dev zone: oh-my-openagent-web fetches
   // get.omo.dev/stats/downloads, and a Worker can reach another Worker on the same zone through a custom
   // domain but not through a route. /stable/* and /beta/* are omo-desktop-releases' zone routes.

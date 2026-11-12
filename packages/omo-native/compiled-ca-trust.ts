@@ -4,7 +4,7 @@ import { X509Certificate } from "node:crypto"
  * Validation of `OMO_EXTRA_CA_CERTIFICATES` for the compiled engine (#10215, #10762).
  *
  * The value is PEM text (never a path) that the desktop validated and its server set for the engine
- * (sisyphuslabs/omo-desktop-app#2760). The engine entry and the launcher trust stage re-validate it
+ * (the desktop's extra-CA validation). The engine entry and the launcher trust stage re-validate it
  * here with the same rules, within the size limit below, and a bad value fails closed: the engine
  * refuses to start rather than run with a trust set the caller did not intend. Installing the trust
  * set is the launcher trust stage's job (`runTrustStage`), not this module's.

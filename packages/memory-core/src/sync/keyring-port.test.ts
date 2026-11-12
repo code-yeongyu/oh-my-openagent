@@ -294,10 +294,9 @@ describe("DeviceKeyring", () => {
   })
 
   // Golden vectors from omo-service fixtures/sync-v1/wraps.json, vendored into this test at
-  // sisyphuslabs/omo-service commit aaf7bb79540953bf9e0502d4a7b898438e22ae2d (branch
-  // memsync/sync-contract-format, PR #428, which regenerated the file with the RFC 9180 §4
-  // LabeledExpand layout; the pre-#428 fixture could not be opened by an RFC-correct
-  // construction). Copied here so the test never reads outside this repo. The pre-#428
+  // the OmO service's sync-contract change (commit aaf7bb79540953bf9e0502d4a7b898438e22ae2d, which regenerated the file with the RFC 9180 §4
+  // LabeledExpand layout; the earlier fixture could not be opened by an RFC-correct
+  // construction). Copied here so the test never reads outside this repo. The earlier
   // fixture was proven not to open (the previous revision of this leg failed under it), and
   // this regenerated fixture must open under the same port.
   const fixtureKeyrings = {
