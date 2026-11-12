@@ -190,6 +190,12 @@ impl Guard {
         self.supervisor.heartbeat(now);
     }
 
+    /// Why the stop latch is set, or `None` while it is clear.
+    #[must_use]
+    pub const fn latch(&self) -> Option<crate::SuspendReason> {
+        self.supervisor.latch()
+    }
+
     #[must_use]
     pub fn status(&self) -> StopPathStatus {
         self.supervisor.status(self.now_ms())
