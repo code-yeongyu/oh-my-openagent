@@ -24,7 +24,7 @@ impl Backend for ProbeOnly {
 
     fn probe_permissions(&self) -> PermissionProbe {
         self.probes.set(self.probes.get() + 1);
-        self.probe.clone()
+        self.probe
     }
 
     fn capture(&mut self, _target: &Target, _options: &CaptureOptions) -> BackendResult<FrameBytes> {
