@@ -344,14 +344,16 @@ describe("the bound on woken turns (A3.5.3)", () => {
     expect(sent(fake, "open_session")).toHaveLength(opens)
   })
 
-  test("#given the setting at 2 #when a person's input moved the session's input revision #then the count starts again", async () => {
+  test("#given the setting at 2 #when a person's input moved the session's input revision between wakes #then the count starts again", async () => {
     const { fake, carrier, path } = await setup({ wakeLimit: 2 })
     path("s1")
-    for (let round = 0; round < 2; round++) {
-      await carrier.wake("s1")
-      await carrier.evaluate("s1")
-    }
+    await carrier.wake("s1")
+    await carrier.evaluate("s1")
     fake.setSnapshot(path("s1"), { ...FINISHED, lifecycle: { ...FINISHED.lifecycle, humanInputRevision: 7 } })
+    await carrier.wake("s1")
+    await carrier.evaluate("s1")
     expect(await carrier.wake("s1")).toMatchObject({ kind: "open" })
+    await carrier.evaluate("s1")
+    expect(await carrier.wake("s1")).toEqual({ kind: "wake_limit_reached" })
   })
 })
