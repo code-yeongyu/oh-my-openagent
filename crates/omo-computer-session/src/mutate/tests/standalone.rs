@@ -44,6 +44,14 @@ fn set_mode(_path: &Path, _mode: u32) {}
 /// included), so the tempdir can always be removed.
 struct Restore(Vec<PathBuf>);
 
+impl Drop for Restore {
+    fn drop(&mut self) {
+        for dir in &self.0 {
+            set_mode(dir, 0o700);
+        }
+    }
+}
+
 #[cfg(unix)]
 #[test]
 fn restore_resets_narrowed_modes_when_the_replay_panics() {
@@ -176,7 +184,7 @@ fn v3_r17_marker_cases_replay_standalone_in_a_fresh_runtime_root() {
             "{name} names no fixed runtime dir"
         );
         let root = tempfile::tempdir().expect("tempdir");
-        let narrowed = plant(root.path(), &case);
+        let _restore = Restore(plant(root.path(), &case));
         replay(name, &case, root.path());
         if name == "v3-r17-marker-written-before-input.json" {
             let marker = fs::read_to_string(root.path().join("markers/local/default.json"))
@@ -185,9 +193,6 @@ fn v3_r17_marker_cases_replay_standalone_in_a_fresh_runtime_root() {
                 marker.contains("\"callId\":\"qa-marker-happy\""),
                 "{marker}"
             );
-        }
-        for dir in narrowed {
-            set_mode(&dir, 0o700);
         }
     }
 }
