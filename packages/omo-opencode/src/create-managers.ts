@@ -186,6 +186,13 @@ export function createManagers(args: {
           error: String(error),
         })
       })
+      // A finished background task's monitors end with it.
+      await monitorManager?.stopSessionMonitors(event.sessionID).catch((error) => {
+        log("[create-managers] stopping a finished child's monitors failed:", {
+          sessionID: event.sessionID,
+          error: String(error),
+        })
+      })
 
       log("[create-managers] onSubagentSessionDeleted callback completed")
     },

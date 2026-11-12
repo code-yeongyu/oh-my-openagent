@@ -120,6 +120,23 @@ afterEach(() => {
 })
 
 describe("spawnMonitoredProcess", () => {
+  describe("#given an unlimited runtime", () => {
+    test("#when spawned with an infinite maxRuntimeMs #then no watchdog is armed", () => {
+      // given
+      const subprocess = createFakeSubprocess({ exited: new Promise<number>(() => {}) })
+      const clock = createFakeClock()
+
+      // when
+      spawnMonitoredProcess(
+        { command: "tail -f app.log", maxRuntimeMs: Number.POSITIVE_INFINITY },
+        { ...clock.deps, spawn: unsafeTestValue(createFakeSpawn([subprocess], [])) },
+      )
+
+      // then
+      expect(clock.calls).toHaveLength(0)
+    })
+  })
+
   describe("#given a running subprocess", () => {
     test("#when kill runs #then it kills the process group and escalates after grace", () => {
       // given

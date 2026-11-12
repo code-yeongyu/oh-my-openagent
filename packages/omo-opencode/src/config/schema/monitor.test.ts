@@ -20,7 +20,7 @@ describe("MonitorConfigSchema", () => {
         max_runtime_ms: 1800000,
         batch_max_lines: 50,
         batch_max_bytes: 16384,
-        flush_interval_ms: 1000,
+        flush_interval_ms: 200,
         ring_max_lines: 1000,
         line_max_bytes: 8192,
         pattern_max_length: 512,

@@ -29616,9 +29616,17 @@
             },
             "max_runtime_ms": {
               "default": 1800000,
-              "type": "integer",
-              "minimum": 1000,
-              "maximum": 9007199254740991
+              "anyOf": [
+                {
+                  "type": "number",
+                  "const": 0
+                },
+                {
+                  "type": "integer",
+                  "minimum": 1000,
+                  "maximum": 9007199254740991
+                }
+              ]
             },
             "batch_max_lines": {
               "default": 50,
@@ -29633,9 +29641,9 @@
               "maximum": 9007199254740991
             },
             "flush_interval_ms": {
-              "default": 1000,
+              "default": 200,
               "type": "integer",
-              "minimum": 250,
+              "minimum": 50,
               "maximum": 9007199254740991
             },
             "ring_max_lines": {

@@ -837,7 +837,7 @@ interactive_bash(tmux_command="capture-pane -p -t dev-app")
 
 - Commands are tmux subcommands (no `tmux` prefix)
 - Use for interactive apps that need persistent sessions
-- Use the managed background-session or Monitor mechanism (`monitor_start`) for one-shot commands that must continue in the background; do not rely on shell `&` as the managed contract
+- Use the managed background-session or Monitor mechanism (`monitor`) for one-shot commands that must continue in the background; do not rely on shell `&` as the managed contract
 
 ## Hooks
 
