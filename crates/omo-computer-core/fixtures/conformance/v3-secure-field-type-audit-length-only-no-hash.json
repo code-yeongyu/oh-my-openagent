@@ -19,7 +19,29 @@
             "jsonrpc": "2.0",
             "id": 1,
             "result": {
-              "capabilities": {},
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "cursorOverlay": false,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "granted",
+                "axPermission": "granted",
+                "displayCount": 2,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": null,
+                "integrityLevel": null,
+                "screenLocked": false,
+                "displayAsleep": false
+              },
               "resumeToken": "per-process-random"
             }
           },
@@ -43,10 +65,20 @@
           "message": {
             "jsonrpc": "2.0",
             "id": 2,
-            "result": {}
+            "result": {
+              "suspended": false,
+              "globalLive": true,
+              "hostRelayLive": false,
+              "heartbeatFresh": true,
+              "stopPath": "global",
+              "reason": null
+            }
           },
           "variable": [
-            "/result"
+            "/result/globalLive",
+            "/result/heartbeatFresh",
+            "/result/stopPath",
+            "/result/hostRelayLive"
           ]
         }
       ],
