@@ -8,6 +8,13 @@ const DRIVER = join(ROOT, "script/qa/computer/replay.ts")
 const ENGINE = join(ROOT, "target/debug/omo-computer-engine")
 const CASE_01 = join(ROOT, "crates/omo-computer-engine/tests/fixtures/v1-consumers/01-stdio-session-open-no-options.json")
 const DELTAS_HEADER = "file\tpointer\tkind\tsource\trow\timported value\tv3 value"
+const PROVENANCE = join(ROOT, "crates/omo-computer-core/parity/ORACLE-PROVENANCE.tsv")
+
+// A probe engine: records the arguments it was spawned with, then exits without replying.
+const PROBE_ENGINE = `#!/usr/bin/env bun
+import { appendFileSync } from "node:fs"
+appendFileSync(process.env.PROBE_ARGV_LOG, JSON.stringify(process.argv.slice(2)) + "\\n")
+`
 
 // A scripted stand-in for the engine: for the n-th request line it appends `sink` lines to
 // its sink file under the runtime directory, then writes the n-th reply list.
@@ -29,6 +36,7 @@ type Run = { code: number; stdout: string; stderr: string }
 
 let dir = ""
 let scripted = ""
+let probeEngine = ""
 
 async function replay(args: string[], env: Record<string, string> = {}): Promise<Run> {
   const proc = Bun.spawn(["bun", DRIVER, ...args], {
@@ -73,11 +81,43 @@ const request = (id: number, method = "capabilities") => ({ jsonrpc: "2.0", id, 
 const reply = (id: number, result: unknown) => ({ jsonrpc: "2.0", id, result })
 const expectation = (message: unknown, variable: string[] = []) => ({ message, variable })
 
+type CaseFile = { readonly path: string; readonly transport: unknown }
+async function caseFile(path: string): Promise<CaseFile | undefined> {
+  const raw: unknown = JSON.parse(await readFile(path, "utf8"))
+  if (typeof raw !== "object" || raw === null || !("steps" in raw)) return undefined
+  return { path, transport: "transport" in raw ? raw.transport : undefined }
+}
+
+// The imported oracle cases: every replay case the provenance manifest lists.
+async function importedCases(): Promise<CaseFile[]> {
+  const listed = (await readFile(PROVENANCE, "utf8")).trim().split("\n").slice(1).map((row) => join(ROOT, row.split("\t")[0] ?? ""))
+  const cases = await Promise.all(listed.map(caseFile))
+  return cases.filter((item): item is CaseFile => item !== undefined)
+}
+
+async function v3Cases(): Promise<CaseFile[]> {
+  const paths = await Array.fromAsync(new Bun.Glob("crates/**/fixtures/**/v3-*.json").scan({ cwd: ROOT, absolute: true }))
+  const cases = await Promise.all(paths.map(caseFile))
+  return cases.filter((item): item is CaseFile => item !== undefined)
+}
+
+// Replays `casePath` against the probe engine: the run, and each spawn's arguments.
+async function probe(casePath: string): Promise<{ run: Run; argv: unknown[] }> {
+  counter += 1
+  const log = join(dir, `argv-${counter}.log`)
+  const run = await replay(["--engine", probeEngine, "--case", casePath], { PROBE_ARGV_LOG: log })
+  const text = (await Bun.file(log).exists()) ? await readFile(log, "utf8") : ""
+  return { run, argv: text.trim().split("\n").filter((line) => line !== "").map((line) => JSON.parse(line)) }
+}
+
 beforeAll(async () => {
   dir = await mkdtemp(join(tmpdir(), "omo-replay-test-"))
   scripted = join(dir, "scripted-engine.ts")
   await writeFile(scripted, SCRIPTED_ENGINE)
   await chmod(scripted, 0o755)
+  probeEngine = join(dir, "probe-engine.ts")
+  await writeFile(probeEngine, PROBE_ENGINE)
+  await chmod(probeEngine, 0o755)
   const build = Bun.spawn(["cargo", "build", "-p", "omo-computer-engine", "--locked"], {
     cwd: ROOT,
     stdout: "inherit",
@@ -201,6 +241,38 @@ describe("replay driver", () => {
       expect({ what, code: run.code, error: run.stdout.includes("REPLAY_ERROR") }).toEqual({ what, code: 2, error: true })
     }
   }, 60_000)
+
+  test("every imported oracle case without a transport replays as stdio", async () => {
+    const cases = (await importedCases()).filter((item) => item.transport === undefined)
+    expect(cases.length).toBeGreaterThan(0)
+    for (const item of cases) {
+      const { run, argv } = await probe(item.path)
+      expect({ case: item.path, code: run.code, first: argv[0] }).toEqual({ case: item.path, code: 1, first: ["--stdio"] })
+    }
+  }, 120_000)
+
+  test("every v3- case without a transport is refused with transport_missing and spawns nothing", async () => {
+    const synthetic = join(dir, "v3-no-transport.json")
+    await writeFile(synthetic, JSON.stringify({ steps: [{ send: request(1), expect: [] }] }))
+    const cases = [...(await v3Cases()).filter((item) => item.transport === undefined).map((item) => item.path), synthetic]
+    for (const path of cases) {
+      const { run, argv } = await probe(path)
+      const typed = run.stdout.includes("REPLAY_ERROR transport_missing")
+      expect({ path, code: run.code, typed, spawned: argv.length }).toEqual({ path, code: 2, typed: true, spawned: 0 })
+    }
+  }, 60_000)
+
+  test("a case with an explicit transport is replayed over that transport", async () => {
+    const synthetic = join(dir, "v3-explicit-mcp.json")
+    await writeFile(synthetic, JSON.stringify({ transport: "mcp", steps: [{ send: request(1), expect: [] }] }))
+    const cases = [...(await importedCases()), ...(await v3Cases()), { path: synthetic, transport: "mcp" }]
+    const explicit = cases.filter((item) => item.transport !== undefined)
+    expect(explicit.length).toBeGreaterThan(1)
+    for (const item of explicit) {
+      const { argv } = await probe(item.path)
+      expect({ case: item.path, first: argv[0] }).toEqual({ case: item.path, first: [`--${String(item.transport)}`] })
+    }
+  }, 120_000)
 
   test("--assert-sink-empty fails when the sink holds an entry", async () => {
     const steps = [{ send: request(1, "click"), expect: [expectation(reply(1, null))] }]
