@@ -17,8 +17,9 @@
 // path-derived auto identity for an auto agent value.
 
 import { createHash } from "node:crypto"
-import { basename, join, resolve as resolvePath } from "node:path"
-import { existsSync } from "../fs/resilient"
+import { homedir } from "node:os"
+import { basename, dirname, join, resolve as resolvePath, sep } from "node:path"
+import { existsSync, realpathSync, statSync } from "../fs/resilient"
 import { resolveLinkedWorktreeSource, type GitLayoutProbe } from "./git-layout"
 import { AGENTS_DIRNAME, buildIdentityPaths, resolveMemoryRoot, type MemoryIdentityPaths } from "./layout"
 
@@ -97,13 +98,70 @@ function derive(hashSource: string, slugSource: string): DerivedIdentity {
   }
 }
 
-function deriveAutoId(cwd: string, mode: AutoIdentityMode, gitLayout: GitLayoutProbe | undefined): DerivedIdentity {
-  if (mode === "git") {
-    const linked = resolveLinkedWorktreeSource(cwd, gitLayout)
-    if (linked !== undefined) return derive(linked.hashSource, linked.slugSource)
-  }
+function deriveAutoId(
+  cwd: string,
+  env: Record<string, string | undefined>,
+  mode: AutoIdentityMode,
+  gitLayout: GitLayoutProbe | undefined,
+): DerivedIdentity {
+  if (mode === "git") return deriveRepositoryId(cwd, env, gitLayout)
   const normalizedRoot = resolvePath(cwd)
   return derive(normalizedRoot, basename(normalizedRoot))
+}
+
+// `git` mode (#10070): the real path first, then the nearest repository root. A linked worktree keys to
+// its main working tree; a main checkout, `--separate-git-dir` checkout or submodule keys to its own root.
+// A repository rooted at or above `$HOME` is not a project, and a directory in no repository keys to its
+// real path, so every spelling of one place shares one id.
+function deriveRepositoryId(
+  cwd: string,
+  env: Record<string, string | undefined>,
+  gitLayout: GitLayoutProbe | undefined,
+): DerivedIdentity {
+  const real = realPathOr(resolvePath(cwd))
+  const root = nearestRepositoryRoot(real, gitLayout)
+  if (root === undefined || coversHome(root, env)) return derive(real, basename(real))
+  const linked = resolveLinkedWorktreeSource(root, gitLayout)
+  if (linked !== undefined) return derive(linked.hashSource, linked.slugSource)
+  return derive(root, basename(root))
+}
+
+function nearestRepositoryRoot(start: string, gitLayout: GitLayoutProbe | undefined): string | undefined {
+  for (let dir = start; ; dir = dirname(dir)) {
+    if (repositoryMarker(join(dir, ".git"), gitLayout)) return dir
+    if (dirname(dir) === dir) return undefined
+  }
+}
+
+function repositoryMarker(marker: string, gitLayout: GitLayoutProbe | undefined): boolean {
+  if (gitLayout !== undefined) return gitLayout.entryKind(marker) !== undefined
+  try {
+    const stats = statSync(marker)
+    return stats.isDirectory() || stats.isFile()
+  } catch {
+    // No readable marker here; the walk moves up a level.
+    return false
+  }
+}
+
+function coversHome(root: string, env: Record<string, string | undefined>): boolean {
+  const home = env.HOME ?? homedir()
+  if (home === "") return false
+  const realHome = realPathOr(resolvePath(home))
+  if (realHome === root) return true
+  // A filesystem root already ends in the separator; appending another makes "/" into "//" and the
+  // prefix check misses every home under it (#10070).
+  const prefix = root.endsWith(sep) ? root : `${root}${sep}`
+  return realHome.startsWith(prefix)
+}
+
+function realPathOr(path: string): string {
+  try {
+    return realpathSync.native(path)
+  } catch {
+    // A path that does not exist (yet) keeps its lexical spelling.
+    return path
+  }
 }
 
 function deriveExplicitId(trimmedValue: string): DerivedIdentity {
@@ -142,7 +200,7 @@ export function resolveAutoIdentity(
   probe: DirectoryProbe = defaultDirectoryProbe,
 ): MemoryIdentity {
   assertCwd(cwd, "resolveAutoIdentity")
-  return toIdentity(deriveAutoId(cwd, mode, probe.gitLayout), cwd, env, probe)
+  return toIdentity(deriveAutoId(cwd, env, mode, probe.gitLayout), cwd, env, probe)
 }
 
 export function resolveMemoryIdentity(

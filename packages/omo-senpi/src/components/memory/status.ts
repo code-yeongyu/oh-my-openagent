@@ -1,7 +1,14 @@
 import { readFile } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
-import { GitMemoryRepo, readReflectionParkFile } from "@oh-my-opencode/memory-core"
+import {
+  factsNotesOverBudget,
+  GitMemoryRepo,
+  isFactsNotePath,
+  measureFactsNote,
+  readReflectionParkFile,
+  type FactsNoteSize,
+} from "@oh-my-opencode/memory-core"
 
 import type { MemoryIdentityContext } from "./context"
 import { shownSyncFailure, type SyncStatusReader } from "./sync-status-surface"
@@ -57,12 +64,14 @@ export interface RefreshMemoryStatusInput {
   readonly context: MemoryIdentityContext
   readonly ui: MemoryStatusUi
   readonly compileWarnTokens: number
+  /** `memory.facts_note_max_bytes`: a committed facts note over it also requests the pressure dream (#10884). */
+  readonly factsNoteMaxBytes?: number
   readonly alreadyNotified: boolean
   readonly gitRepo?: GitRepoForStatus
   readonly now?: () => number
   readonly showFooter?: boolean
   readonly checkAdvisory?: boolean
-  /** Starts a spacing-gated background dream when the committed system tree reaches soft pressure. */
+  /** Starts a spacing-gated background dream when the committed system tree reaches soft pressure or a facts note is over budget. */
   readonly requestPressureDream?: () => void
   /** Bound session whose reflection backlog feeds the ` (+N)` segment; omitted means no backlog. */
   readonly sessionId?: string
@@ -89,7 +98,13 @@ export async function refreshMemoryStatus(input: RefreshMemoryStatusInput): Prom
   if (input.checkAdvisory === false || input.alreadyNotified) return { notified: false, footerShown }
 
   const estimate = await estimateSystemTokens(repo, head)
-  if (estimate >= Math.floor(MEMORY_PRESSURE_SOFT_RATIO * input.compileWarnTokens)) {
+  const systemPressure = estimate >= Math.floor(MEMORY_PRESSURE_SOFT_RATIO * input.compileWarnTokens)
+  const factsPressure =
+    !systemPressure &&
+    input.factsNoteMaxBytes !== undefined &&
+    input.factsNoteMaxBytes > 0 &&
+    factsNotesOverBudget(await measureFactsNotes(repo, head), input.factsNoteMaxBytes).length > 0
+  if (systemPressure || factsPressure) {
     try {
       input.requestPressureDream?.()
     } catch {
@@ -236,6 +251,11 @@ export async function estimateSystemTokens(repo: GitRepoForStatus, head: string)
   const contents = await Promise.all(systemMarkdownPaths.map((path) => repo.show(head, path)))
   const totalBytes = contents.reduce((sum, content) => sum + Buffer.byteLength(content, "utf8"), 0)
   return Math.floor(totalBytes / 4)
+}
+
+async function measureFactsNotes(repo: GitRepoForStatus, head: string): Promise<FactsNoteSize[]> {
+  const paths = (await repo.lsTree(head)).filter(isFactsNotePath)
+  return Promise.all(paths.map(async (path) => measureFactsNote(path, await repo.show(head, path))))
 }
 
 function isSystemMarkdown(path: string): boolean {

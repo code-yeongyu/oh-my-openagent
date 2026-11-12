@@ -9,6 +9,7 @@ import { registerFactsCommand } from "./facts"
 import { registerInitCommand } from "./init"
 import type { LazyMemoryCommandName, MemoryCommandPort } from "./metadata"
 import { registerMemoryCommand } from "./memory"
+import { registerMemoryMergeCommand } from "./memory-merge"
 import { registerMemoryRepositoryCommand } from "./memory-repository"
 import { registerRecompileCommand } from "./recompile"
 import { registerReflectCommand } from "./reflect"
@@ -37,6 +38,7 @@ const REGISTRARS: Readonly<Record<LazyMemoryCommandName, CommandRegistrar>> = {
   init: registerInitCommand,
   recompile: registerRecompileCommand,
   "memory-repository": registerMemoryRepositoryCommand,
+  "memory-merge": registerMemoryMergeCommand,
   sleeptime: registerSleeptimeCommand,
   reflect: registerReflectCommand,
   dream: registerDreamCommand,

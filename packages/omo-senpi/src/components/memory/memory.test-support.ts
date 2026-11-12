@@ -30,7 +30,7 @@ export function memorySettings(overrides: Partial<OmoMemorySettings> = {}): OmoM
   return {
     enabled: true,
     agent: "auto",
-    auto_identity: "path",
+    auto_identity: "git",
     reflection: {
       enabled: true,
       trigger: { step_count: 25, on_compaction: true },
@@ -77,6 +77,7 @@ export function memorySettings(overrides: Partial<OmoMemorySettings> = {}): OmoM
       max_bytes: 2 * 1024 * 1024 * 1024,
     },
     compile_warn_tokens: 30000,
+    facts_note_max_bytes: 49152,
     agents: {},
     ...overrides,
   }

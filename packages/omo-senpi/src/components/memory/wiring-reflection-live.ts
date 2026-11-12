@@ -247,6 +247,7 @@ function refreshInitialStatus(
     context: identity,
     ui,
     compileWarnTokens: settings.compile_warn_tokens,
+    factsNoteMaxBytes: settings.facts_note_max_bytes,
     alreadyNotified: false,
     requestPressureDream,
     sessionId,

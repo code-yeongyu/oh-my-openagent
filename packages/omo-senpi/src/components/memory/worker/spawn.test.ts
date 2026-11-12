@@ -109,6 +109,51 @@ describe("dream token budget launch contract", () => {
     })
   })
 
+  test("#given a facts note over budget #when a dream spawn is prepared #then the facts budget inputs name it largest first and a reflection gets none (#10884)", async () => {
+    const base = await root()
+    await mkdir(join(base, "notes", "facts"), { recursive: true })
+    await Promise.all([
+      writeFile(join(base, "notes", "facts", "2026-10.md"), "a\nb\n"),
+      writeFile(join(base, "notes", "facts", "2026-11.md"), "F".repeat(30)),
+    ])
+    const input = {
+      worktree: { dir: base, commonConfigPath: join(base, "config") } as unknown as ReflectionWorktree,
+      reflectionSessionsDir: join(base, "sessions"),
+      category: "quick",
+      model: "provider/model",
+      env: {},
+      mergePolicy: "auto" as const,
+      skillsUsageSource: join(base, "skills.json"),
+      memoryUsageSource: join(base, "memory-usage.json"),
+      dreamStateSource: join(base, "dream.json"),
+      peoplePolicy: { enabled: true, max_entries: 40, max_entry_chars: 200 },
+      systemTokenBudget: 100,
+      systemTokenTarget: 80,
+      factsNoteMaxBytes: 20,
+    }
+
+    const dream = await prepareReflectionSpawn({
+      ...input,
+      run: {
+        runId: "dream-facts-1",
+        request: { trigger: "dream", origin: "pressure", conversationIds: [], snapshots: [] },
+      },
+    })
+    const reflection = await prepareReflectionSpawn({ ...input, run })
+
+    expect(dream.env.FACTS_NOTES_PATH).toBe(dream.paths.factsNotes)
+    expect(dream.env.FACTS_NOTE_MAX_BYTES).toBe("20")
+    expect(JSON.parse(await readFile(dream.env.FACTS_NOTES_PATH ?? "", "utf8"))).toEqual({
+      maxBytes: 20,
+      overBudget: [{ path: "notes/facts/2026-11.md", bytes: 30, lines: 1 }],
+      notes: [
+        { path: "notes/facts/2026-10.md", bytes: 4, lines: 2 },
+        { path: "notes/facts/2026-11.md", bytes: 30, lines: 1 },
+      ],
+    })
+    expect(reflection.env.FACTS_NOTES_PATH).toBeUndefined()
+  })
+
   test("#given configured compile pressure #when the production candidate assembly prepares a dream #then budget and target reuse the shared soft ratio", async () => {
     const base = await root()
     await mkdir(join(base, "system"), { recursive: true })
@@ -138,6 +183,7 @@ describe("dream token budget launch contract", () => {
 
     expect(prepared.env.SYSTEM_TOKEN_BUDGET).toBe("101")
     expect(prepared.env.SYSTEM_TOKEN_TARGET).toBe("80")
+    expect(prepared.env.FACTS_NOTE_MAX_BYTES).toBe("49152")
     expect(JSON.parse(await readFile(prepared.env.SYSTEM_TOKENS_PATH!, "utf8"))).toMatchObject({ totalTokens: 4 })
   })
 })

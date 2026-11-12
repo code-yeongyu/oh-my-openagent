@@ -188,6 +188,9 @@ export class GitMemoryRepo {
   readBlobs(oids: readonly string[]): Promise<ReadonlyMap<string, string>> {
     return this.reads.readBlobs(oids)
   }
+  readBlobBytes(oids: readonly string[]): Promise<ReadonlyMap<string, Buffer>> {
+    return this.reads.readBlobBytes(oids)
+  }
   log(options: GitLogOptions = {}): Promise<readonly MemoryCommit[]> {
     return this.reads.log(options)
   }

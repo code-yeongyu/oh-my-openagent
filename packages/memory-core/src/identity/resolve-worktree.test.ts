@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test"
 import { execFileSync } from "node:child_process"
-import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs"
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { disableFixtureAutoMaintenance } from "../git/test-repo-config.test-support"
@@ -55,13 +55,67 @@ describe("resolveAutoIdentity with real git layouts", () => {
     expect(gitModeWorktree.paths.repo).toBe(pathModeMain.paths.repo)
   })
 
-  it("#given git mode #when a worktree subdirectory resolves #then it shares the same subdirectory of the main checkout", () => {
+  it("#given git mode #when a subdirectory of the main checkout or of a worktree resolves #then it keys to the main checkout's root id (#10070)", () => {
     // given
-    const pathModeMainSubdir = resolveAutoIdentity(join(main, "packages", "api"), env)
+    const pathModeMain = resolveAutoIdentity(main, env)
     // when
-    const gitModeWorktreeSubdir = resolveAutoIdentity(join(worktree, "packages", "api"), env, "git")
+    const mainSubdir = resolveAutoIdentity(join(main, "packages", "api"), env, "git")
+    const worktreeSubdir = resolveAutoIdentity(join(worktree, "packages", "api"), env, "git")
     // then
-    expect(gitModeWorktreeSubdir.id).toBe(pathModeMainSubdir.id)
+    expect(mainSubdir.id).toBe(pathModeMain.id)
+    expect(worktreeSubdir.id).toBe(pathModeMain.id)
+  })
+
+  it("#given path mode #when a subdirectory resolves #then it keeps its own path-derived id, byte-identical to before (#10070)", () => {
+    // given
+    const subdir = join(main, "packages", "api")
+    // when
+    const pathMode = resolveAutoIdentity(subdir, env, "path")
+    // then
+    expect(pathMode.id).not.toBe(resolveAutoIdentity(main, env).id)
+    expect(pathMode.id.startsWith("api-")).toBe(true)
+  })
+
+  it("#given git mode #when the checkout is reached through a symlinked parent #then the symlinked spelling keys to the same id (#10070)", () => {
+    // given
+    const alias = join(parent, "alias-parent")
+    symlinkSync(parent, alias)
+    // when
+    const viaAlias = resolveAutoIdentity(join(alias, "project", "packages", "api"), env, "git")
+    // then
+    expect(viaAlias.id).toBe(resolveAutoIdentity(main, env).id)
+  })
+
+  it("#given git mode #when the only repository marker is the filesystem root #then it counts as no repository and the path id is kept (#10070)", () => {
+    // given
+    const cwd = join(parent, "under-filesystem-root")
+    mkdirSync(cwd)
+    const filesystemRootGit = join("/", ".git")
+    const probe = {
+      exists: () => false,
+      gitLayout: {
+        entryKind: (marker: string) => (marker === filesystemRootGit ? ("directory" as const) : undefined),
+        readText: () => undefined,
+        realPath: (path: string) => path,
+      },
+    }
+    // when
+    const gitMode = resolveAutoIdentity(cwd, env, "git", probe)
+    // then
+    expect(gitMode.id).toBe(resolveAutoIdentity(cwd, env, "path").id)
+  })
+
+  it("#given git mode #when the nearest repository is rooted at the home directory #then it is treated as no repository and the path id is kept (#10070)", () => {
+    // given
+    const home = join(parent, "home-repo")
+    const inside = join(home, "notes", "today")
+    mkdirSync(inside, { recursive: true })
+    git(home, ["init", "--quiet", "--initial-branch=main"])
+    disableFixtureAutoMaintenance(home)
+    // when
+    const gitMode = resolveAutoIdentity(inside, { ...env, HOME: home }, "git")
+    // then
+    expect(gitMode.id).toBe(resolveAutoIdentity(inside, env).id)
   })
 
   it("#given path mode or an auto agent value #when the worktree resolves #then it keeps its own path-derived id", () => {
@@ -134,5 +188,7 @@ describe("resolveAutoIdentity with real git layouts", () => {
     const gitMode = resolveAutoIdentity(submodule, env, "git")
     // then
     expect(gitMode.id).toBe(resolveAutoIdentity(submodule, env).id)
+    mkdirSync(join(submodule, "src"), { recursive: true })
+    expect(resolveAutoIdentity(join(submodule, "src"), env, "git").id).toBe(gitMode.id)
   })
 })

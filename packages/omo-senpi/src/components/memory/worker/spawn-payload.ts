@@ -5,6 +5,9 @@ import {
   loadDreamPersona,
   loadReflectionPersona,
   auditMemoryRepo,
+  DEFAULT_FACTS_NOTE_MAX_BYTES,
+  factsNotesOverBudget,
+  measureFactsNotesInDir,
   redactSecretLikeMaterial,
   type ReservedRun,
 } from "@oh-my-opencode/memory-core"
@@ -31,9 +34,11 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
         dreamState: join(sessionDir, "dream-state.json"),
         dreamPolicy: join(sessionDir, "dream-policy.json"),
         systemTokens: join(sessionDir, "system-tokens.json"),
+        factsNotes: join(sessionDir, "facts-notes.json"),
         audit: join(sessionDir, "audit.json"),
       }
     : undefined
+  const factsNoteMaxBytes = input.factsNoteMaxBytes ?? DEFAULT_FACTS_NOTE_MAX_BYTES
   const payloadPaths = [transcript, persona, prompt, ...(dreamPaths === undefined ? [] : Object.values(dreamPaths))]
   // Payload files are chmod 0400 after writing, so a reused run directory (retry with the same
   // runId) must relax the mode before rewriting or the open() fails with EACCES.
@@ -67,6 +72,7 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
             "utf8",
           ),
           writeSystemTokenEstimate(input.worktree.dir, dreamPaths.systemTokens),
+          writeFactsNoteSizes(input.worktree.dir, dreamPaths.factsNotes, factsNoteMaxBytes),
           (async () => {
             const systemTokens = await estimateSystemTokens(input.worktree.dir)
             const audit = await auditMemoryRepo(input.worktree.dir, {
@@ -117,6 +123,8 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
           AUDIT_PATH: dreamPaths.audit,
           SYSTEM_TOKEN_BUDGET: String(input.systemTokenBudget),
           SYSTEM_TOKEN_TARGET: String(input.systemTokenTarget),
+          FACTS_NOTES_PATH: dreamPaths.factsNotes,
+          FACTS_NOTE_MAX_BYTES: String(factsNoteMaxBytes),
           ...(dreamTarget === undefined ? {} : { DREAM_TARGET_PATH: dreamTarget }),
         }),
     SENPI_MEMORY_REFLECTION: "1",
@@ -260,6 +268,12 @@ async function writeSystemTokenEstimate(repoDir: string, destination: string): P
     `${JSON.stringify({ totalTokens: estimate.totalTokens, files: estimate.files }, null, 2)}\n`,
     "utf8",
   )
+}
+
+async function writeFactsNoteSizes(repoDir: string, destination: string, maxBytes: number): Promise<void> {
+  const notes = await measureFactsNotesInDir(repoDir)
+  const overBudget = factsNotesOverBudget(notes, maxBytes)
+  await writeFile(destination, `${JSON.stringify({ maxBytes, overBudget, notes }, null, 2)}\n`, "utf8")
 }
 
 async function copyJsonOrEmpty(source: string, destination: string): Promise<void> {

@@ -1672,7 +1672,7 @@
           "minLength": 1
         },
         "auto_identity": {
-          "default": "path",
+          "default": "git",
           "type": "string",
           "enum": [
             "path",
@@ -2141,6 +2141,12 @@
           "default": 30000,
           "type": "integer",
           "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "facts_note_max_bytes": {
+          "default": 49152,
+          "type": "integer",
+          "minimum": 0,
           "maximum": 9007199254740991
         },
         "agents": {
@@ -4642,6 +4648,11 @@
               "exclusiveMinimum": 0,
               "maximum": 9007199254740991
             },
+            "facts_note_max_bytes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
             "agents": {
               "type": "object",
               "propertyNames": {
@@ -7115,6 +7126,11 @@
               "exclusiveMinimum": 0,
               "maximum": 9007199254740991
             },
+            "facts_note_max_bytes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
             "agents": {
               "type": "object",
               "propertyNames": {
@@ -9586,6 +9602,11 @@
             "compile_warn_tokens": {
               "type": "integer",
               "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "facts_note_max_bytes": {
+              "type": "integer",
+              "minimum": 0,
               "maximum": 9007199254740991
             },
             "agents": {
@@ -12067,6 +12088,11 @@
                 "exclusiveMinimum": 0,
                 "maximum": 9007199254740991
               },
+              "facts_note_max_bytes": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
               "agents": {
                 "type": "object",
                 "propertyNames": {
@@ -14538,6 +14564,11 @@
                   "compile_warn_tokens": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "facts_note_max_bytes": {
+                    "type": "integer",
+                    "minimum": 0,
                     "maximum": 9007199254740991
                   },
                   "agents": {
@@ -17013,6 +17044,11 @@
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
                   },
+                  "facts_note_max_bytes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
                   "agents": {
                     "type": "object",
                     "propertyNames": {
@@ -19484,6 +19520,11 @@
                   "compile_warn_tokens": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "facts_note_max_bytes": {
+                    "type": "integer",
+                    "minimum": 0,
                     "maximum": 9007199254740991
                   },
                   "agents": {

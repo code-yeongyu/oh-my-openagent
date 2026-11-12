@@ -628,6 +628,77 @@ describe("refreshMemoryStatus", () => {
     expect(pressureRequests).toEqual([])
   })
 
+  test("#given a facts note over its byte budget and a small system tree #when refresh runs #then one pressure dream request fires (#10884)", async () => {
+    const pressureRequests: number[] = []
+    const fakeRepo: GitRepoForStatus = {
+      head: async () => "abcdef1234567890",
+      headCommitTimestamp: async () => null,
+      lsTree: async () => ["system/persona.md", "notes/facts/2026-10.md", "notes/facts/2026-11.md"],
+      show: async (_revision, path) => (path === "notes/facts/2026-11.md" ? "F".repeat(201) : "x".repeat(10)),
+      status: async () => "",
+    }
+    const context = createMemoryIdentityContext({
+      identity: "pressure-agent",
+      identityPaths: buildIdentityPaths("/tmp/nonexistent", "pressure-agent"),
+      binding: { identity: "pressure-agent", repoPathHash: "hash", boundAt: 1 },
+    })
+    const recorder = recordingUi()
+
+    await refreshMemoryStatus({
+      context,
+      ui: recorder.ui,
+      compileWarnTokens: 100,
+      factsNoteMaxBytes: 200,
+      alreadyNotified: false,
+      gitRepo: fakeRepo,
+      requestPressureDream: async () => {
+        pressureRequests.push(1)
+      },
+    })
+
+    expect(pressureRequests).toHaveLength(1)
+    expect(recorder.notifications).toEqual([])
+  })
+
+  test("#given facts notes at the budget or with the budget disabled #when refresh runs #then no pressure dream request fires (#10884)", async () => {
+    const pressureRequests: number[] = []
+    const fakeRepo: GitRepoForStatus = {
+      head: async () => "abcdef1234567890",
+      headCommitTimestamp: async () => null,
+      lsTree: async () => ["system/persona.md", "notes/facts/2026-11.md"],
+      show: async (_revision, path) => (path === "notes/facts/2026-11.md" ? "F".repeat(200) : "x".repeat(10)),
+      status: async () => "",
+    }
+    const context = createMemoryIdentityContext({
+      identity: "pressure-agent",
+      identityPaths: buildIdentityPaths("/tmp/nonexistent", "pressure-agent"),
+      binding: { identity: "pressure-agent", repoPathHash: "hash", boundAt: 1 },
+    })
+
+    const oversizedFacts: GitRepoForStatus = {
+      ...fakeRepo,
+      show: async (_revision, path) => (path === "notes/facts/2026-11.md" ? "F".repeat(10_000) : "x".repeat(10)),
+    }
+    for (const [factsNoteMaxBytes, gitRepo] of [
+      [200, fakeRepo],
+      [0, oversizedFacts],
+    ] as const) {
+      await refreshMemoryStatus({
+        context,
+        ui: recordingUi().ui,
+        compileWarnTokens: 100,
+        factsNoteMaxBytes,
+        alreadyNotified: false,
+        gitRepo,
+        requestPressureDream: async () => {
+          pressureRequests.push(1)
+        },
+      })
+    }
+
+    expect(pressureRequests).toEqual([])
+  })
+
   test("#given pressure advisory work is already deduped #when refresh runs over threshold #then neither estimate-driven path fires again", async () => {
     const calls = { tree: 0, pressure: 0 }
     const fakeRepo: GitRepoForStatus = {

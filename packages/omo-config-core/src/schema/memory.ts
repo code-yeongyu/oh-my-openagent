@@ -363,7 +363,7 @@ export const OmoMemorySettingsSchema = z
   .object({
     enabled: z.boolean().default(true),
     agent: z.string().min(1).default("auto"),
-    auto_identity: OmoMemoryAutoIdentitySchema.default("path"),
+    auto_identity: OmoMemoryAutoIdentitySchema.default("git"),
     // "direct" registers the memory tools as always-on ToolDefinitions; "search" opts in to the
     // extension-declared MCP server surfaced through senpi's tool_search catalog.
     reflection: OmoMemoryReflectionSchema.default({
@@ -412,6 +412,11 @@ export const OmoMemorySettingsSchema = z
       max_bytes: 2 * 1024 * 1024 * 1024,
     }),
     compile_warn_tokens: z.number().int().positive().default(30000),
+    facts_note_max_bytes: z
+      .number()
+      .int()
+      .nonnegative()
+      .default(48 * 1024),
     agents: z.record(z.string(), OmoMemoryAgentOverridesSchema).default({}),
   })
   .strict()
@@ -436,6 +441,7 @@ export const OmoMemorySettingsLayerSchema = z
     projection: OmoMemoryProjectionLayerSchema.optional(),
     runtime: OmoMemoryRuntimeLayerSchema.optional(),
     compile_warn_tokens: z.number().int().positive().optional(),
+    facts_note_max_bytes: z.number().int().nonnegative().optional(),
     agents: z.record(z.string(), OmoMemoryAgentOverridesSchema).optional(),
   })
   .strict()
