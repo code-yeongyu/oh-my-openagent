@@ -348,7 +348,9 @@ export function createCarrier(options: CarrierOptions): Carrier {
     const opened = await open(taken.row.session_file, ".")
     if (opened.kind !== "opened") return
     carry(durableId, opened.connection, opened.sessionId, taken.row.generation)
-    await evaluate(durableId)
+    // Already inside this session's serial chain: evaluate directly, never through `evaluate`, which would wait on itself.
+    const outcome = await evaluateNow(durableId)
+    emit({ kind: "evaluated", durable_id: durableId, outcome })
   }
 
   const sweep = async (): Promise<void> => {

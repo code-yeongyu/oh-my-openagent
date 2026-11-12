@@ -774,7 +774,7 @@ async function openIntakeSessions(ctx: ops.StoreContext): Promise<OpenIntakeSess
     `SELECT target_durable_id, ${MARK_DEVICE} AS device, state, admitted_by FROM deliveries
      WHERE ledger_id IS NOT NULL AND state IN ${ops.OPEN_STATES}`,
     [],
-    "target_durable_id, seq",
+    "target_durable_id",
   )
   const sessions = new Map<string, Set<string>>()
   for (const row of rows) {
