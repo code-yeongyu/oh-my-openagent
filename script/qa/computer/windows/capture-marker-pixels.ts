@@ -4,6 +4,7 @@
 // and no overlay is involved.
 import type { Engine } from "./engine.ts"
 import { openMarker } from "./marker.ts"
+import { sessionId } from "./host.ts"
 import { readPng } from "./png.ts"
 import { register, type Outcome } from "./scenario.ts"
 
@@ -68,4 +69,9 @@ async function run(engine: Engine): Promise<Outcome> {
   }
 }
 
-register({ name: "capture-marker-pixels", admit: "none", run })
+/** Session 0 has no interactive desktop to put the marker window on. */
+async function precondition(): Promise<string | undefined> {
+  return (await sessionId()) === 0 ? "session 0 has no interactive desktop" : undefined
+}
+
+register({ name: "capture-marker-pixels", admit: "none", precondition, run })

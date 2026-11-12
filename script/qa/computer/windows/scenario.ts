@@ -15,17 +15,24 @@ export type Outcome = {
 export type Scenario = {
   readonly name: string
   readonly admit: Admission
+  /** A reason this host cannot run the scenario (--all counts it BLOCKED), or undefined. */
+  readonly precondition: () => Promise<string | undefined>
   readonly run: (engine: Engine) => Promise<Outcome>
 }
 
-let registered: Scenario | undefined
+const registered: Scenario[] = []
 
-/** Called at the bottom of every scenario file; the driver reads the last registration. */
+/** Called at the bottom of every scenario file. */
 export function register(scenario: Scenario): void {
-  registered = scenario
+  registered.push(scenario)
 }
 
-/** The scenario the imported file registered, or `undefined` when it registered none. */
+/** The scenario the most recently imported file registered, or `undefined` when it registered none. */
 export function lastRegistered(): Scenario | undefined {
+  return registered.at(-1)
+}
+
+/** Every scenario registered so far, in import order. */
+export function allRegistered(): readonly Scenario[] {
   return registered
 }

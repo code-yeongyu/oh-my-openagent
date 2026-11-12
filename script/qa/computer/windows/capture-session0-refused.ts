@@ -2,13 +2,13 @@
 // PermissionDenied naming the session (reason not_interactive) and no frame is produced. The
 // session id is read by the driver's own process, and the job fails unless it is 0.
 import type { Engine } from "./engine.ts"
+import { sessionId } from "./host.ts"
 import { register, type Outcome } from "./scenario.ts"
 
-async function sessionId(): Promise<number> {
-  const child = Bun.spawn(["powershell", "-NoProfile", "-Command", `(Get-Process -Id ${process.pid}).SessionId`], {
-    stdout: "pipe",
-  })
-  return Number((await new Response(child.stdout).text()).trim())
+/** Only Session 0 can prove the refusal; anywhere else --all counts this scenario BLOCKED. */
+async function precondition(): Promise<string | undefined> {
+  const session = await sessionId()
+  return session === 0 ? undefined : `session ${session} is not session 0`
 }
 
 async function run(engine: Engine): Promise<Outcome> {
@@ -23,4 +23,4 @@ async function run(engine: Engine): Promise<Outcome> {
   }
 }
 
-register({ name: "capture-session0-refused", admit: "none", run })
+register({ name: "capture-session0-refused", admit: "none", precondition, run })
