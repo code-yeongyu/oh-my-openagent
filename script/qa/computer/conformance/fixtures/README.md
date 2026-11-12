@@ -55,4 +55,5 @@ GUI code runs only on hosted runners or owned guests, never in a person's sessio
 
 The hosted `macos-15` job is the build and self-test proof: the fixture posts no events, so it needs no grant there. The
 live cells, which drive the app through the engine, run on the owned macOS 15 and macOS 26 guests, because a pid-routed
-click does nothing on hosted macOS runners.
+click does nothing on hosted macOS runners. No such guest exists yet, so until one does the macOS live cells are recorded
+as drops, not as passes or failures.
