@@ -11,6 +11,7 @@ import {
   type ThreadSurface,
 } from "../address-book"
 import {
+  fuzzyContenders,
   fuzzyMatch,
   resolveTarget,
   workspaceDirectories,
@@ -265,7 +266,9 @@ export function targetSession(view: ThreadHostView, durableId: string): ThreadHo
 
 /**
  * Decision 0027: ONE resolver over this device's entries and the relay transport's address book. A local hit never needs
- * the relay. Absent remote setup leaves a local miss unchanged; a configured relay's failed lookup, failing
+ * the relay. A fuzzy handoff first tries the exact ladder (id, alias, name) over every row, ended remote rows included, so
+ * it never lands on a different session than the exact path would; otherwise local, live remote and the ended remote rows
+ * that can contend are ranked in ONE comparison, so the runner-up rule covers every candidate. Absent remote setup leaves a local miss unchanged; a configured relay's failed lookup, failing
  * transport state (anything but connected once set up), plan refusal or alias holder's typed failure answers before not_found. An alias or entry on another
  * device is account-wide: the local scope no longer applies to it.
  */
@@ -286,17 +289,24 @@ export async function resolveAcross(
         "Set all_scope to search every workspace, or hand off from a session that knows its workspace.",
       ),
     }
-  const resolve = (entries: readonly ThreadAddressEntry[]): ThreadResolveResult => {
-    if (match === "exact") return resolution(options, entries, address, callerId, allScope)
+  const resolve = (
+    entries: readonly ThreadAddressEntry[],
+    ranked: readonly ThreadAddressEntry[] = entries,
+  ): ThreadResolveResult => {
+    const exact = resolution(options, entries, address, callerId, allScope)
+    if (match === "exact") return exact
+    // Exact first (#13141): an id, alias or name the exact path resolves is the answer, so fuzzy only ranks what exact
+    // cannot reach. The caller stays excluded, as the fuzzy scan excludes it: a handoff never targets its own sender.
+    if (exact.kind === "ok" && exact.entry.thread_id !== callerId) return exact
     const visible =
       allScope === true
-        ? entries
+        ? ranked
         : [
             ...workspaceEntries(
-              entries.filter((entry) => entry.transport === undefined),
+              ranked.filter((entry) => entry.transport === undefined),
               options.callerWorkspaceRoot(),
             ),
-            ...entries.filter((entry) => entry.transport !== undefined),
+            ...ranked.filter((entry) => entry.transport !== undefined),
           ]
     const found = fuzzyMatch(
       visible.filter((entry) => entry.thread_id !== callerId),
@@ -316,7 +326,22 @@ export async function resolveAcross(
     ),
   }))
   if (book.entries.length === 0 && here.kind === "ok") return here
-  const across = resolve([...local, ...book.entries])
+  // An ended session on another device is resumable: the exact ladder sees every row, and fuzzy ranks it in the same
+  // comparison as local and live candidates. Only the ended rows that can contend join that comparison (`fuzzyContenders`):
+  // the rest can change no outcome, so a large account's history cannot push a unique match over the 500-candidate cap.
+  const all = [...local, ...book.entries]
+  const ranked =
+    match === "fuzzy"
+      ? [
+          ...local,
+          ...book.entries.filter((entry) => entry.status === "live"),
+          ...fuzzyContenders(
+            book.entries.filter((entry) => entry.status !== "live"),
+            address,
+          ),
+        ]
+      : all
+  const across = resolve(all, ranked)
   if (across.kind === "ok")
     return {
       ...across,
