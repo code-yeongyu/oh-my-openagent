@@ -16,12 +16,18 @@ const LINUX_APPS: Apps = {
   webview: ["python3", join(FIXTURES, "webview/fixture.py")],
 }
 
-// The Windows app is compiled on the runner (fixtures/native-windows/build.ps1); the workflow names the built exe.
+// The workflow fetches the pinned Electron release and builds the Windows app on the runner, then names them here.
+function electronApp(env: Readonly<Record<string, string | undefined>>): Apps {
+  const binary = env.OMO_CONFORMANCE_ELECTRON?.trim()
+  return binary ? { electron: [binary, join(FIXTURES, "electron/main.cjs")] } : {}
+}
+
 function appsFor(platform: string, env: Readonly<Record<string, string | undefined>>): Apps | string {
-  if (platform === "linux") return LINUX_APPS
+  if (platform === "linux") return { ...LINUX_APPS, ...electronApp(env) }
   if (platform !== "win32") return `no fixture apps of row 4 are ready on ${platform} yet`
   const exe = env.OMO_CONFORMANCE_FIXTURE_EXE?.trim()
-  return exe ? { native: [exe] } : "OMO_CONFORMANCE_FIXTURE_EXE does not name the built Windows fixture app"
+  if (!exe) return "OMO_CONFORMANCE_FIXTURE_EXE does not name the built Windows fixture app"
+  return { native: [exe], ...electronApp(env) }
 }
 
 // The fixture's accessible names are unique in its window, so elements are found by name alone: a guessed role

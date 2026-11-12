@@ -95,6 +95,28 @@ jobs:
           DISPLAY=:99 xdpyinfo | grep -m1 dimensions
           echo "DISPLAY=:99" >> "$GITHUB_ENV"
 
+      # No package in the repository carries Electron; the fixture app runs one pinned release (row 4).
+      - name: Fetch Electron 45.3.1
+        shell: bash
+        run: |
+          set -uo pipefail
+          dir="$RUNNER_TEMP/electron"
+          for attempt in 1 2 3; do
+            if npm install --no-save --prefix "$dir" electron@45.3.1 > "$RUNNER_TEMP/electron.log" 2>&1 \
+              && node "$dir/node_modules/electron/install.js" >> "$RUNNER_TEMP/electron.log" 2>&1 \
+              && binary=$(node -p "require(process.argv[1])" "$dir/node_modules/electron") && test -x "$binary"; then
+              sandbox="$(dirname "$binary")/chrome-sandbox"
+              sudo chown root:root "$sandbox" && sudo chmod 4755 "$sandbox"
+              echo "OMO_CONFORMANCE_ELECTRON=$binary" >> "$GITHUB_ENV"
+              echo "electron 45.3.1 fetched on attempt ${attempt}: $binary"
+              exit 0
+            fi
+            tail -n 5 "$RUNNER_TEMP/electron.log"
+            [ "$attempt" -lt 3 ] && sleep 20
+          done
+          echo "::error::ENVIRONMENT failure, the runner could not fetch Electron (not a baseline finding)"
+          exit 1
+
       - name: Install the released omo-ai
         shell: bash
         run: |
@@ -128,12 +150,12 @@ jobs:
           set -uo pipefail
           left=0
           sudo pkill -x Xorg 2>/dev/null || true
-          pkill -f 'conformance/fixtures/.*/fixture.py' 2>/dev/null || true
+          pkill -f 'conformance/fixtures/' 2>/dev/null || true
           for name in senpi-desktop-engine Xorg; do
             for _ in $(seq 1 25); do pgrep -x "$name" >/dev/null || break; sleep 0.2; done
             if pgrep -x "$name" >/dev/null; then echo "${name} LEFT $(pgrep -x "$name" | tr '\n' ' ')"; left=1; else echo "${name} procs 0"; fi
           done
-          if pgrep -f 'conformance/fixtures/.*/fixture.py' >/dev/null; then echo "fixture LEFT"; left=1; else echo "fixture procs 0"; fi
+          if pgrep -f 'conformance/fixtures/' >/dev/null; then echo "fixture LEFT"; left=1; else echo "fixture procs 0"; fi
           exit "$left"
 
       - name: Upload evidence
@@ -152,7 +174,7 @@ jobs:
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
             - Installs the released omo-ai and takes its default computer settings from the release tag's own resolver.
-            - Drives the Linux native and web-view fixture apps; a cell without its fixture or observer is recorded not_run.
+            - Drives the Linux native, web-view and Electron fixture apps; a cell without its fixture or observer is recorded not_run.
             - Smoke: the release's computer tool reaches its own engine with no model and no credential.
             - Runs the conformance catalog and the task set through run.ts --driver legacy on real Xorg.
             - Teardown: the engine, fixture and Xorg processes are gone.
@@ -201,6 +223,26 @@ jobs:
           "OMO_CONFORMANCE_FIXTURE_EXE=$exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "fixture built $exe"
 
+      # No package in the repository carries Electron; the fixture app runs one pinned release (row 4).
+      - name: Fetch Electron 45.3.1
+        shell: bash
+        run: |
+          set -uo pipefail
+          dir="$RUNNER_TEMP/electron"
+          for attempt in 1 2 3; do
+            if npm install --no-save --prefix "$dir" electron@45.3.1 > "$RUNNER_TEMP/electron.log" 2>&1 \
+              && node "$dir/node_modules/electron/install.js" >> "$RUNNER_TEMP/electron.log" 2>&1 \
+              && binary=$(node -p "require(process.argv[1])" "$dir/node_modules/electron") && test -x "$binary"; then
+              echo "OMO_CONFORMANCE_ELECTRON=$binary" >> "$GITHUB_ENV"
+              echo "electron 45.3.1 fetched on attempt ${attempt}: $binary"
+              exit 0
+            fi
+            tail -n 5 "$RUNNER_TEMP/electron.log"
+            [ "$attempt" -lt 3 ] && sleep 20
+          done
+          echo "::error::ENVIRONMENT failure, the runner could not fetch Electron (not a baseline finding)"
+          exit 1
+
       - name: Install the released omo-ai
         shell: bash
         run: |
@@ -232,8 +274,8 @@ jobs:
         shell: powershell
         run: |
           $left = 0
-          Get-Process -Name conformance-fixture -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-          foreach ($name in @("senpi-desktop-engine*", "conformance-fixture")) {
+          Get-Process -Name conformance-fixture, electron -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          foreach ($name in @("senpi-desktop-engine*", "conformance-fixture", "electron")) {
             $procs = Get-Process -Name $name -ErrorAction SilentlyContinue
             if ($procs) { "$name LEFT $($procs.Id -join ' ')"; $left = 1 } else { "$name procs 0" }
           }
@@ -255,9 +297,9 @@ jobs:
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
             - Installs the released omo-ai and takes its default computer settings from the release tag's own resolver.
-            - Builds and drives the Windows native fixture app; a cell without its fixture or observer is recorded not_run.
+            - Builds and drives the Windows native and Electron fixture apps; a cell without its fixture or observer is recorded not_run.
             - Smoke: the release's computer tool reaches its own engine with no model and no credential.
             - Runs the conformance catalog and the task set through run.ts --driver legacy in the interactive session.
-            - Teardown: no engine or fixture process is left.
+            - Teardown: no engine, fixture or Electron process is left.
           JOB_SUMMARY_NEXT: Open the computer-baseline-legacy-windows artifact for run.json, environment.json and the logs.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
