@@ -171,8 +171,6 @@ describe("live thread surface endpoint cache", () => {
           host.surface.listTarget("durable-13009", {
             kind,
             socket: "/tmp/omo-enum-cache-owner.sock",
-            routing_id: null,
-            durable_session_id: "durable-13009",
           }),
           "listTarget behind a running enumeration",
         )
