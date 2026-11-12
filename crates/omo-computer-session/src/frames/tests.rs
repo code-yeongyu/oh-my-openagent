@@ -498,13 +498,15 @@ fn crosshair_lands_on_requested_point() {
 
 #[test]
 fn default_frame_carries_pointer() {
+    // The fixture's own pointer (960,540) is right of window 101 (x 100..900), so the window's
+    // frame rightly carries no pointer; this test puts the pointer over the window.
     for persona in [Persona::Macos, Persona::X11, Persona::Win32] {
-        let (backend, sink) = fake(&json!({}));
+        let (backend, sink) = fake(&json!({"cursor": {"x": 500, "y": 400}}));
         let mut session = opened(Box::new(backend.with_persona(persona)));
         let shown = frame(&mut session, "101");
         let (x, y) = shown
             .geometry
-            .unmap_point(960.0, 540.0, Some(&WINDOW))
+            .unmap_point(500.0, 400.0, Some(&WINDOW))
             .expect("the pointer is over 101");
         assert_eq!(shown.cursor, CursorMode::Os, "{persona:?}");
         assert_eq!(pixel(&shown, x, y), POINTER_GRAY, "{persona:?}");
@@ -525,7 +527,7 @@ fn default_frame_carries_pointer() {
         );
         click(&mut session, json!({"target": "101", "x": x, "y": y})).expect("delivered");
         assert_eq!(
-            moves_to(&sink, 960.0, 540.0),
+            moves_to(&sink, 500.0, 400.0),
             2,
             "{persona:?}: {:?}",
             sink.lines()
