@@ -66,6 +66,11 @@ per review finding it guards, for example:
 - the workflow budget fits its timeout;
 - the committed ledger keeps both wheel rows INVALID.
 
+The checks that scan the `.ps1` sources read them through `psCode`. It normalises CRLF, LF and lone-CR line
+endings, since a Windows checkout gives the `.ps1` files CRLF. It blanks `<# ... #>` blocks, here-strings, and
+`#` comments outside quotes, whether on their own line or trailing a statement. One check proves every source
+check gives the same result on LF and CRLF copies.
+
 `--measure` and `--verify` run the same logic checks first and refuse to measure when one fails.
 
 ## End of a run

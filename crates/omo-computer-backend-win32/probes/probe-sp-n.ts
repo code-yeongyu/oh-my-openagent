@@ -1253,7 +1253,64 @@ const testCtx = (): Ctx => ({
   cleanups: [],
   pending: new Map(),
 })
-const source = (file: string) => readFileSync(join(HERE, file), "utf8")
+// The text of a probe file. The line-ending check swaps it for a re-encoded copy to prove every source check reads
+// LF, CRLF and mixed checkouts alike (Windows checks the .ps1 files out with CRLF).
+let sourceAs: ((text: string) => string) | undefined
+const source = (file: string) => {
+  const text = readFileSync(join(HERE, file), "utf8")
+  return sourceAs ? sourceAs(text) : text
+}
+
+// PowerShell text reduced to its code, one entry per line, for the source scans. Line endings of any kind
+// (CRLF, LF, lone CR) are normalised; <# ... #> blocks, here-strings (@' '@, @" "@) and # comments outside
+// quotes, whole-line or trailing, become blank. Line numbers are kept.
+export function psCode(text: string): string[] {
+  const lines = text.replace(/\r\n?/g, "\n").split("\n")
+  const out: string[] = []
+  let block = false
+  let here: string | undefined
+  for (const line of lines) {
+    if (here) {
+      if (line.startsWith(here)) here = undefined
+      out.push("")
+      continue
+    }
+    let code = ""
+    let quote: string | undefined
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i] ?? ""
+      if (block) {
+        if (c === "#" && line[i + 1] === ">") {
+          block = false
+          i++
+        }
+        continue
+      }
+      if (quote) {
+        code += c
+        if (c === "`") {
+          code += line[i + 1] ?? ""
+          i++
+        } else if (c === quote) quote = undefined
+        continue
+      }
+      if (c === "<" && line[i + 1] === "#") {
+        block = true
+        i++
+        continue
+      }
+      if (c === "@" && (line[i + 1] === "'" || line[i + 1] === '"') && line.slice(i + 2).trim() === "") {
+        here = `${line[i + 1]}@`
+        break
+      }
+      if (c === "#") break
+      if (c === "'" || c === '"') quote = c
+      code += c
+    }
+    out.push(code)
+  }
+  return out
+}
 const LEG_FILES = ["sp-n-legs-delivery.ps1", "sp-n-legs-capture.ps1", "sp-n-legs-session.ps1"]
 const legsSource = () => LEG_FILES.map(source).join("\n")
 const WORKFLOW = join(HERE, "..", "..", "..", ".github", "workflows", "computer-spike-windows.yml")
@@ -1261,8 +1318,8 @@ const WORKFLOW = join(HERE, "..", "..", "..", ".github", "workflows", "computer-
 // Lines of PowerShell loops (for / foreach / while / do) whose body holds a return: in a loop, return leaves the
 // whole leg function and skips its Emit.
 export function returnsInLoops(source: string): string[] {
-  // line comments are blanked (same length, so line numbers hold): a comment may say "return"
-  const ps = source.replace(/(^|\s)#[^\n]*/g, (m) => m.replace(/[^\n]/g, " "))
+  // comments, comment blocks and here-strings are blanked by psCode (line numbers hold): a comment may say "return"
+  const ps = psCode(source).join("\n")
   const hits: string[] = []
   const loop = /\b(?:for|foreach|while)\s*\(|\bdo\s*\{/gi
   for (let m = loop.exec(ps); m; m = loop.exec(ps)) {
@@ -1816,16 +1873,11 @@ const LOGIC_CHECKS: readonly Check[] = [
       // ScheduledTasks, CimCmdlets, NetSecurity, Archive, ...); the probe reads these facts in its compiled C# instead
       const moduleCmdlet =
         /\b(?:Get|Set)-(?:Acl|AuthenticodeSignature|ExecutionPolicy|CmsMessage|PfxCertificate|LocalUser|LocalGroup|LocalGroupMember|ScheduledTask|CimInstance|NetFirewallRule)\b|\b(?:ConvertTo|ConvertFrom)-SecureString\b|\bRegister-ScheduledTask\b|\bExpand-Archive\b|\bCompress-Archive\b|\bImport-Module\b/i
-      if (
-        !moduleCmdlet.test("$x = Get-Acl -LiteralPath $p") ||
-        moduleCmdlet.test("# Get-Acl in a comment".replace(/(^|\s)#.*$/, ""))
-      )
-        return "the cmdlet scan misses a known case"
+      if (!moduleCmdlet.test("$x = Get-Acl -LiteralPath $p")) return "the cmdlet scan misses a known case"
       const files = ["sp-n.ps1", "sp-n-target.ps1", ...LEG_FILES]
       const hits = files.flatMap((f) =>
-        source(f)
-          .split("\n")
-          .map((l, i) => [l.replace(/(^|\s)#.*$/, ""), i + 1] as const)
+        psCode(source(f))
+          .map((l, i) => [l, i + 1] as const)
           .filter(([l]) => moduleCmdlet.test(l))
           .map(([l, n]) => `${f}:${n} ${l.trim().slice(0, 60)}`),
       )
@@ -1834,6 +1886,76 @@ const LOGIC_CHECKS: readonly Check[] = [
         /DirectorySecurity/.test(source("sp-n-native-input.ps1"))
         ? undefined
         : "the ACL read is not the compiled DirectorySecurity read"
+    },
+  },
+  {
+    finding: "ENDINGS ps-code (hosted run 43134728411)",
+    async run() {
+      const flagged = (text: string) =>
+        psCode(text)
+          .map((l, i) => [l, i + 1] as const)
+          .filter(([l]) => /\bGet-Acl\b/i.test(l))
+          .map(([, n]) => n)
+      // calls that must be flagged in every form, comments that must not be
+      const sample = [
+        "$a = Get-Acl -LiteralPath $p", // 1 call
+        "# Get-Acl in a line comment", // 2
+        "    # Get-Acl indented comment", // 3
+        "$b = 1 # Get-Acl trailing comment", // 4
+        "$c = 2; # Get-Acl after a statement", // 5
+        "<# Get-Acl in a one-line block #>", // 6
+        "<#", // 7
+        "  Get-Acl inside a block", // 8
+        "#>", // 9
+        "<# block #> $d = Get-Acl $p", // 10 call after a block
+        "$e = '# not a comment'; Get-Acl $p", // 11 call after a quoted #
+        "$f = @'", // 12
+        "Get-Acl inside a here-string", // 13
+        "'@", // 14
+        "Get-Acl $p # and a trailing comment", // 15 call
+      ]
+      const want = "1,10,11,15"
+      const endings: Array<[string, (ls: string[]) => string]> = [
+        ["LF", (ls) => ls.join("\n")],
+        ["CRLF", (ls) => ls.join("\r\n")],
+        ["mixed", (ls) => ls.map((l, i) => l + (i % 3 === 0 ? "\r\n" : i % 3 === 1 ? "\n" : "\r")).join("")],
+        ["CRLF with final newline", (ls) => `${ls.join("\r\n")}\r\n`],
+      ]
+      const bad = endings
+        .map(([name, join]) => [name, flagged(join(sample)).join(",")] as const)
+        .filter(([, got]) => got !== want)
+        .map(([name, got]) => `${name}: flagged lines ${got}, want ${want}`)
+      const loop = ["while ($x) {", "  # return here is a comment", "  break", "}"]
+      if (returnsInLoops(loop.join("\r\n")).length) bad.push("returnsInLoops counts a CRLF comment")
+      if (returnsInLoops(["while ($x) {", "  return", "}"].join("\r\n")).length !== 1)
+        bad.push("returnsInLoops misses a CRLF return")
+      return bad.length ? bad.join("; ") : undefined
+    },
+  },
+  {
+    finding: "ENDINGS self-test-identical",
+    async run() {
+      // every other source check must give the same result on the files as checked out with LF and with CRLF
+      const others = LOGIC_CHECKS.filter(
+        (c) => !c.finding.startsWith("ENDINGS") && c.finding.startsWith("PSMODULE"),
+      ).concat(
+        LOGIC_CHECKS.filter((c) =>
+          /return-in-loop|positive-control|foreground|last-error|webview2|OWNER|SWALLOW/.test(c.finding),
+        ),
+      )
+      const runAll = async (as: ((t: string) => string) | undefined) => {
+        sourceAs = as
+        try {
+          return (await runChecks(others)).join("\n")
+        } finally {
+          sourceAs = undefined
+        }
+      }
+      const lf = await runAll((t) => t.replace(/\r\n?/g, "\n"))
+      const crlf = await runAll((t) => t.replace(/\r\n?/g, "\n").replace(/\n/g, "\r\n"))
+      if (lf !== crlf)
+        return `source checks differ between LF and CRLF copies: LF [${lf || "pass"}] CRLF [${crlf || "pass"}]`
+      return others.length >= 8 ? undefined : `only ${others.length} source checks compared`
     },
   },
   {
