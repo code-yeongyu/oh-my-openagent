@@ -137,7 +137,7 @@ describe("omo login reuses this machine's device instead of registering another"
       ),
     ).rejects.toMatchObject({
       constructor: MachineCredentialUnreadable,
-      message: `omo could not read this computer's stored OmO sign-in, so it did not register another device. This computer's OmO device service holds its device, OmO Desktop on Studio. These steps end that device's sign-in on this computer too, so the OmO desktop app is signed out here and needs a sign-in afterwards. ${steps}`,
+      message: `omo could not read this computer's stored OmO sign-in, so it did not register another device. ${steps} This computer's OmO device service holds that device, OmO Desktop on Studio, so these steps also sign out the device service, and the OmO desktop app if it is installed, on this computer.`,
     })
     const unknownRefusal = refuseSecondMachineDevice(session, service({ kind: "unknown", reason: "timed_out" }))
     await expect(unknownRefusal).rejects.toBeInstanceOf(MachineAlreadySignedIn)

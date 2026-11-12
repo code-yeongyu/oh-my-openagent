@@ -20,9 +20,9 @@ function unreadableRefusal(heldDeviceName: string | undefined): MachineCredentia
   const cost =
     heldDeviceName === undefined
       ? ""
-      : ` This computer's OmO device service holds its device, ${terminalText(heldDeviceName)}. These steps end that device's sign-in on this computer too, so the OmO desktop app is signed out here and needs a sign-in afterwards.`
+      : ` This computer's OmO device service holds that device, ${terminalText(heldDeviceName)}, so these steps also sign out the device service, and the OmO desktop app if it is installed, on this computer.`
   return new MachineCredentialUnreadable(
-    `omo could not read this computer's stored OmO sign-in, so it did not register another device.${cost} To start over, remove this computer's device on the Devices page if it is still listed, then run omo account forget, then sign in again. omo account forget ends this computer's local sign-in and has its device service forget the device, without signing the device out on the OmO service.`,
+    `omo could not read this computer's stored OmO sign-in, so it did not register another device. To start over, remove this computer's device on the Devices page if it is still listed, then run omo account forget, then sign in again. omo account forget ends this computer's local sign-in and has its device service forget the device, without signing the device out on the OmO service.${cost}`,
   )
 }
 
