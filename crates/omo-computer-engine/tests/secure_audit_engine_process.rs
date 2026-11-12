@@ -63,15 +63,11 @@ fn secret(case: &Value) -> String {
 }
 
 /// What one engine process left behind.
-/// The fake's sink file under the runtime root (`route.rs` `SINK_FILE_PREFIX`).
-fn is_sink(path: &Path) -> bool {
-    path.file_name()
-        .and_then(|name| name.to_str())
-        .is_some_and(|name| name.starts_with("fake-sink-") && name.ends_with(".log"))
-}
-
 struct Left {
     root: tempfile::TempDir,
+    /// `<root>/fake-sink-<engine pid>.log`: the one file the engine's fake backend records
+    /// its delivered input to (engine `route.rs`, `SINK_FILE_PREFIX` + the process id).
+    sink_path: PathBuf,
     typed_reply: Value,
 }
 
@@ -88,26 +84,18 @@ impl Left {
         self.read("markers/local/default.json")
     }
 
-    /// Every ENGINE-written file under the root but the audit and the marker: the trace and
-    /// any other state. Excluded by name: the fake backend's `fake-sink-<pid>.log`
-    /// (`route.rs` `SINK_FILE_PREFIX`), the SIMULATED KEYBOARD, which records each delivered
-    /// event (`text "<typed>"`, fake `desktop.rs`) and so must hold the typed text: typing a
-    /// secret into a secure field still delivers it. `sink()` reads it, so a test asserts the
-    /// delivery the exclusion would otherwise hide.
+    /// Every file under the root but the audit and the marker (read on their own): the trace,
+    /// any other engine state, and anything new that appears. Exactly ONE file is excluded, by
+    /// its exact path: `sink_path`, the fake backend's SIMULATED KEYBOARD, which records each
+    /// delivered event (`text "<typed>"`, fake `desktop.rs`) and so must hold the typed text:
+    /// typing a secret into a secure field still delivers it. `sink()` reads it, and each test
+    /// asserts the delivery there, so the exclusion cannot hide a missing one.
     fn rest(&self) -> String {
         let skip = [
             self.root.path().join("audit/computer/local/audit.jsonl"),
             self.root.path().join("markers/local/default.json"),
+            self.sink_path.clone(),
         ];
-        self.files(|path| !skip.iter().any(|kept| kept == path) && !is_sink(path))
-    }
-
-    /// The fake backend's recording sink: what the simulated keyboard received.
-    fn sink(&self) -> String {
-        self.files(is_sink)
-    }
-
-    fn files(&self, keep: impl Fn(&Path) -> bool) -> String {
         let mut text = String::new();
         let mut stack = vec![self.root.path().to_owned()];
         while let Some(dir) = stack.pop() {
@@ -115,7 +103,7 @@ impl Left {
                 let path = entry.path();
                 if path.is_dir() {
                     stack.push(path);
-                } else if keep(&path) {
+                } else if !skip.contains(&path) {
                     text.push_str(&String::from_utf8_lossy(
                         &fs::read(&path).unwrap_or_default(),
                     ));
@@ -123,6 +111,11 @@ impl Left {
             }
         }
         text
+    }
+
+    /// The fake backend's recording sink: what the simulated keyboard received.
+    fn sink(&self) -> String {
+        fs::read_to_string(&self.sink_path).expect("the engine's fake sink file")
     }
 
     fn typed_line(&self) -> Value {
@@ -156,6 +149,7 @@ fn run_engine(case: &Value, scenario: &str) -> Left {
         command.env(name, value.as_str().expect("an env string"));
     }
     let mut child = command.spawn().expect("the engine spawns");
+    let sink_path = root.path().join(format!("fake-sink-{}.log", child.id()));
     let mut stdin = child.stdin.take().expect("stdin");
     let stdout = child.stdout.take().expect("stdout");
     let (lines, replies) = mpsc::channel();
@@ -185,7 +179,11 @@ fn run_engine(case: &Value, scenario: &str) -> Left {
         status.success(),
         "the engine exits 0 at stdin close: {status}"
     );
-    Left { root, typed_reply }
+    Left {
+        root,
+        sink_path,
+        typed_reply,
+    }
 }
 
 fn delivered(left: &Left) {
