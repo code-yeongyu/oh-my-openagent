@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 
@@ -316,6 +316,66 @@ describe("replay driver", () => {
       expect({ case: item.path, first: argv[0] }).toEqual({ case: item.path, first: [`--${String(item.transport)}`] })
     }
   }, 120_000)
+
+  test("replay_skips_an_old_case_its_superseding_case_names_in_a_list_or_directory", async () => {
+    counter += 1
+    const cases = join(dir, `supersedes-${counter}`)
+    await mkdir(cases)
+    const steps = [{ send: request(1), expect: [expectation(reply(1, { a: 1 }))] }]
+    const plan = join(dir, `supersedes-plan-${counter}.json`)
+    await writeFile(plan, JSON.stringify([{ replies: [reply(1, { a: 1 })] }]))
+    const failing = [{ send: request(1), expect: [expectation(reply(1, { a: 2 }))] }]
+    await writeFile(join(cases, "old.json"), JSON.stringify({ transport: "stdio", steps: failing }))
+    await writeFile(join(cases, "new.json"), JSON.stringify({ transport: "stdio", supersedes: ["old.json"], steps }))
+    const env = { SCRIPTED_ENGINE_PLAN: plan }
+    const listed = await replay(
+      ["--engine", scripted, "--case", join(cases, "new.json"), "--case", join(cases, "old.json")],
+      env,
+    )
+    const whole = await replay(["--engine", scripted, "--dir", cases], env)
+    for (const run of [listed, whole]) {
+      expect(run.stdout).toContain("SKIPPED old.json superseded by new.json")
+      expect(run.stdout).toContain("steps=1")
+      expect(run.stdout).not.toContain("MISMATCH")
+      expect(run.code).toBe(0)
+    }
+  }, 60_000)
+
+  test("replay_fails_when_a_superseding_case_names_a_missing_old_case", async () => {
+    counter += 1
+    const cases = join(dir, `supersedes-missing-${counter}`)
+    await mkdir(cases)
+    const steps = [{ send: request(1), expect: [] }]
+    await writeFile(join(cases, "new.json"), JSON.stringify({ transport: "stdio", supersedes: ["absent.json"], steps }))
+    const log = join(dir, `argv-supersedes-missing-${counter}.log`)
+    const run = await replay(["--engine", probeEngine, "--case", join(cases, "new.json")], { PROBE_ARGV_LOG: log })
+    expect(run.stdout).toContain("REPLAY_ERROR supersedes_missing")
+    expect(run.stdout).toContain("absent.json")
+    expect(run.code).toBe(2)
+    expect(await Bun.file(log).exists()).toBe(false)
+  }, 60_000)
+
+  test("replay_fails_the_list_when_the_superseding_case_fails", async () => {
+    counter += 1
+    const cases = join(dir, `supersedes-failing-${counter}`)
+    await mkdir(cases)
+    const plan = join(dir, `supersedes-failing-plan-${counter}.json`)
+    await writeFile(plan, JSON.stringify([{ replies: [reply(1, { a: 1 })] }]))
+    const steps = [{ send: request(1), expect: [expectation(reply(1, { a: 1 }))] }]
+    const failing = [{ send: request(1), expect: [expectation(reply(1, { a: 2 }))] }]
+    await writeFile(join(cases, "old.json"), JSON.stringify({ transport: "stdio", steps }))
+    await writeFile(
+      join(cases, "new.json"),
+      JSON.stringify({ transport: "stdio", supersedes: ["old.json"], steps: failing }),
+    )
+    const run = await replay(
+      ["--engine", scripted, "--case", join(cases, "new.json"), "--case", join(cases, "old.json")],
+      { SCRIPTED_ENGINE_PLAN: plan },
+    )
+    expect(run.stdout).toContain("SKIPPED old.json superseded by new.json")
+    expect(run.stdout).toContain("MISMATCH")
+    expect(run.code).toBe(1)
+  }, 60_000)
 
   test("--assert-sink-empty fails when the sink holds an entry", async () => {
     const steps = [{ send: request(1, "click"), expect: [expectation(reply(1, null))] }]
