@@ -1207,11 +1207,18 @@ export function verifyJob(
   want: (id: string) => boolean,
 ) {
   const merged = mergePasses(pass1, pass2, host)
+  // the wheel-control ruling: a gated row UNMEASURED because ITS control failed in a pass is not a difference
+  const gated = gatedVerify(pass1, pass2, host)
   const lines: string[] = []
   let diff = 0
   for (const [id, m] of Object.entries(merged).filter(([k]) => want(k))) {
     const c = committed.find((x) => x.id === id && x.host === host)
+    const g = gated.get(id)
     if (m.skip) lines.push(`SKIP ${id}: not re-measured by this pass: ${m.skip}`)
+    else if (g && m.verdict === "UNMEASURED" && c)
+      lines.push(
+        `SAME ${id} committed=${c.verdict} merged=UNMEASURED, not compared: ${/control failed in a pass: [^)]*/.exec(g.text)?.[0] ?? "control failed in a pass"}; ${clean(m.measured)}`,
+      )
     else if (!c || c.verdict !== m.verdict) {
       diff++
       lines.push(`DIFF ${id} committed=${c?.verdict ?? "missing"} merged=${m.verdict} ${clean(m.measured)}`)
@@ -3358,6 +3365,61 @@ const LOGIC_CHECKS: readonly Check[] = [
       ])
         if (!/d-windows\.md:245/.test(cite(id))) bad.push(`${id} does not cite the session-state line`)
       return bad.length ? bad.slice(0, 6).join("; ") : undefined
+    },
+  },
+  {
+    finding: "JOB control-failed gated rows read SAME (the wheel-control ruling, restored)",
+    async run() {
+      const bad: string[] = []
+      const t = (d: number, n = 6): Tally => ({ delivered: d, runs: n, acquire: "plain", notFg: 0 })
+      const pass = (control: number) =>
+        Object.fromEntries(
+          Object.entries(wheelResults(t(control), t(9, 18), t(3))).map(([id, r]) => [id, finalRow(id, r)]),
+        )
+      const row = (id: string, r: Result, verdict = r.verdict): LedgerRow =>
+        Object.fromEntries(
+          HEADER.map((h) => [
+            h,
+            h === "id" ? id : h === "host" ? "h" : h === "verdict" ? verdict : h === "measured" ? r.measured : "x",
+          ]),
+        ) as LedgerRow
+      const gated = CONTROL_GATES["n-wheel-control-settled"] ?? []
+      for (const [c1, c2] of [
+        [0, 6],
+        [6, 0],
+        [0, 0],
+        [6, 6],
+      ] as const)
+        for (const committedVerdict of ["CONFIRMS", "CONTRADICTS"] as const) {
+          const p1 = pass(c1)
+          const p2 = pass(c2)
+          const pass1 = Object.entries(p1).map(([id, r]) => row(id, r))
+          const committed = Object.entries(p1).map(([id, r]) =>
+            row(id, r, gated.includes(id) ? committedVerdict : r.verdict),
+          )
+          const job = verifyJob(pass1, p2, committed, "h", (id) => gated.includes(id))
+          const failed = c1 !== 6 || c2 !== 6
+          // control fine in both passes: both gated rows read CONTRADICTS (9/18 delivered, 3/6 lost)
+          const want = failed ? 0 : committedVerdict === "CONTRADICTS" ? 0 : gated.length
+          const shows = job.lines.every((l) => !failed || l.includes(`control failed in a pass: ${c1}/6 vs ${c2}/6`))
+          if (job.diff !== want || !shows)
+            bad.push(
+              `control ${c1}/${c2} committed ${committedVerdict}: diff ${job.diff}, want ${want}: ${job.lines[0]?.slice(0, 120)}`,
+            )
+        }
+      // any other UNMEASURED-vs-committed change still DIFFs: a gated row that failed itself, and an ungated row
+      // committed CONFIRMS (both wheel rows held), this pass's own leg failed: UNMEASURED outranks CONFIRMS
+      const ok = Object.fromEntries(
+        Object.entries(wheelResults(t(6), t(18, 18), t(0))).map(([id, r]) => [id, finalRow(id, r)]),
+      )
+      const own: Record<string, Result> = { ...ok, "n-wheel-after-raise-5ms": UN("errored: leg failed: x") }
+      const c = Object.entries(ok).map(([id, r]) => row(id, r))
+      if (verifyJob(c, own, c, "h", (id) => id === "n-wheel-after-raise-5ms").diff !== 1)
+        bad.push("a gated row's own failure is hidden")
+      const u = row("n-uipi-sendinput", { measured: "m; per design/d-windows.md:151 (x)", verdict: "CONFIRMS" })
+      if (verifyJob([u], { "n-uipi-sendinput": UN("errored: leg failed: y") }, [u], "h", () => true).diff !== 1)
+        bad.push("an ungated UNMEASURED change is hidden")
+      return bad.length ? bad.slice(0, 5).join("; ") : undefined
     },
   },
   {
