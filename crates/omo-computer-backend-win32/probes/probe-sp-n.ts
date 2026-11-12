@@ -521,7 +521,7 @@ export function wheelResults(control: Tally, flush: Tally, delay: Tally): Record
     ),
     "n-wheel-after-raise-dwmflush": proven
       ? {
-          measured: `delivered ${flush.delivered}/${flush.runs}; ${c}; foreground by ${flush.acquire ?? "-"}`,
+          measured: `delivered ${flush.delivered}/${flush.runs}; ${c}; foreground by ${flush.acquire ?? "-"} not foreground at the wheel ${flush.notFg ?? "-"}/${flush.runs}`,
           verdict: pick(
             flush.runs > 0 && flush.delivered / flush.runs >= BOUNDS.wheelAfterRaise.value,
             "CONFIRMS",
@@ -531,7 +531,7 @@ export function wheelResults(control: Tally, flush: Tally, delay: Tally): Record
       : UN(`${why}; delivered ${flush.delivered}/${flush.runs}`),
     "n-wheel-after-raise-5ms": proven
       ? {
-          measured: `lost ${delay.runs - delay.delivered}/${delay.runs}; ${c}; foreground by ${delay.acquire ?? "-"}`,
+          measured: `lost ${delay.runs - delay.delivered}/${delay.runs}; ${c}; foreground by ${delay.acquire ?? "-"} not foreground at the wheel ${delay.notFg ?? "-"}/${delay.runs}`,
           verdict: pick(
             delay.runs > 0 && (delay.runs - delay.delivered) / delay.runs >= BOUNDS.wheelAfterRaise.value,
             "CONFIRMS",
@@ -1005,7 +1005,7 @@ export function worstOfPasses(
 
 // Count rows ("-proves-") across two passes: the WORSE pass decides (CONFIRMS < NEW-EDGE < CONTRADICTS; on a tie,
 // the pass with fewer hits), and every count that differs is recorded "k/n vs k2/n".
-export const isCountRow = (id: string) => /-proves-|^n-wheel-control-/.test(id)
+export const isCountRow = (id: string) => /-proves-|^n-wheel-/.test(id)
 const countRank = (v: Verdict) => (v === "CONFIRMS" ? 0 : v === "CONTRADICTS" ? 2 : 1)
 const hits = (m: string) => [...m.matchAll(/(\d+)\/(\d+)/g)].reduce((t, x) => t + Number(x[1]), 0)
 export function worstOfCountPasses(
@@ -2547,6 +2547,92 @@ const LOGIC_CHECKS: readonly Check[] = [
         bad.push("a gated change under a passing control does not DIFF")
       if (!/"n-wheel-control-settled": propertyVerdict\(\s*"wheelSettled"/.test(source("probe-sp-n.ts")))
         bad.push("the control verdict is not from the citation lookup")
+      return bad.length ? bad.join("; ") : undefined
+    },
+  },
+  {
+    finding: "COUNT worst-of on every bounded count row (hosted run 43146515418)",
+    async run() {
+      const t = (d: number, n = 6): Tally => ({ delivered: d, runs: n, acquire: "plain", notFg: 0 })
+      const row = (r: Result, id: string): LedgerRow =>
+        Object.fromEntries(
+          HEADER.map((h) => [
+            h,
+            h === "id" ? id : h === "host" ? "h" : h === "verdict" ? r.verdict : h === "measured" ? r.measured : "x",
+          ]),
+        ) as LedgerRow
+      // every design-bounded count row, one pass inside its bound and one outside it
+      const recv = (k: number) => `sent 31/31 routed ${k}/31 consumed 31/31`
+      const pairs: Array<[string, Result, Result]> = [
+        [
+          "n-wheel-after-raise-dwmflush",
+          wheelResults(t(6), t(18, 18), t(6))["n-wheel-after-raise-dwmflush"] as Result,
+          wheelResults(t(6), t(9, 18), t(6))["n-wheel-after-raise-dwmflush"] as Result,
+        ],
+        [
+          "n-wheel-after-raise-5ms",
+          wheelResults(t(6), t(18, 18), t(0))["n-wheel-after-raise-5ms"] as Result,
+          wheelResults(t(6), t(18, 18), t(3))["n-wheel-after-raise-5ms"] as Result,
+        ],
+        ...FAMILIES.flatMap(([key]): Array<[string, Result, Result]> => [
+          [
+            `n-barrier-fg-proves-${key}`,
+            propertyVerdict("barrierReceipt", true, recv(31)),
+            propertyVerdict("barrierReceipt", false, recv(30)),
+          ],
+          [
+            `n-barrier-posted-proves-${key}`,
+            propertyVerdict("postedLandsClassic", true, "posted 31/31 consumed 31/31"),
+            propertyVerdict("postedLandsClassic", false, "posted 31/31 consumed 30/31"),
+          ],
+        ]),
+      ]
+      const bad: string[] = []
+      for (const [id, pass, miss] of pairs) {
+        if (pass.verdict !== "CONFIRMS" || miss.verdict !== "CONTRADICTS") {
+          bad.push(`${id}: fixture ${pass.verdict}/${miss.verdict}`)
+          continue
+        }
+        for (const [a, b] of [
+          [miss, pass],
+          [pass, miss],
+        ]) {
+          const w = a && b ? worstOfCountPasses(id, a, b) : undefined
+          if (w?.result.verdict !== "CONTRADICTS" || !/ vs /.test(w.result.measured))
+            bad.push(`${id}: worst-of ${JSON.stringify(w)}`)
+        }
+        const keep = verifyLine(row(miss, id), pass, "h")
+        if (keep.kind !== "SAME" || !/ vs /.test(keep.text))
+          bad.push(`${id}: a passing pass flips a CONTRADICTS: ${keep.text}`)
+        if (verifyLine(row(pass, id), miss, "h").kind !== "DIFF") bad.push(`${id}: a failing pass is hidden`)
+      }
+      // static: every committed row judged on counts is aggregated worst-of, and verify reaches the plain
+      // comparison only after the gate, the count and the timing paths
+      const counted = readLedger(join(HERE, "win32-delivery.tsv")).filter(
+        (r) =>
+          /^(CONFIRMS|CONTRADICTS)$/.test(r.verdict) &&
+          /\d+\/\d+/.test(r.measured) &&
+          !isCountRow(r.id) &&
+          !isTimingRow(r.id),
+      )
+      if (counted.length) bad.push(`count rows outside worst-of: ${[...new Set(counted.map((r) => r.id))].join(",")}`)
+      const self = source("probe-sp-n.ts")
+      const vl = self.slice(
+        self.indexOf("export function verifyLine("),
+        self.indexOf("\n}\n", self.indexOf("export function verifyLine(")),
+      )
+      const [ci, ti, di] = [
+        vl.indexOf("worstOfCountPasses("),
+        vl.indexOf("worstOfPasses("),
+        vl.lastIndexOf('kind: "DIFF"'),
+      ]
+      if (!(ci > 0 && ti > ci && di > ti)) bad.push("verifyLine compares before the worst-of paths")
+      if (
+        !/gatedRows\.get\(l\.id\) \?\? verifyLine\(/.test(self) ||
+        (self.match(/verifyLine\(l, results\[/g) ?? []).length !== 1 ||
+        /\.verdict !== l\.verdict/.test(self)
+      )
+        bad.push("a verify path bypasses verifyLine")
       return bad.length ? bad.join("; ") : undefined
     },
   },
