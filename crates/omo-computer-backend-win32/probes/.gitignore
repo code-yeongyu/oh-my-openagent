@@ -1,2 +1,0 @@
-# built per run by `sp-n.ps1 -Leg build-native` (the workflow's precompile step); never committed
-sp-n-native.dll*

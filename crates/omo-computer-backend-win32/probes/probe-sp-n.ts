@@ -668,7 +668,8 @@ export function secondaryResults(
   const where = `monitor ${i + 1} of ${monitors.length} ${monitorText(second)}`
   if (!control || !ex) return { [id]: UN(`skipped: the second-monitor capture did not run; ${where}`) }
   const m = (j: Json) => num(at(j, "wgcMonitor", "magenta"))
-  const text = `${where}; magenta=${m(ex)} control=${m(control)} setAffinity=${str(ex.setAffinityOk)} affinityRead=0x${num(ex.affinityRead).toString(16)} ${str(at(ex, "wgcMonitor", "info", "error"))}`.trim()
+  const text =
+    `${where}; magenta=${m(ex)} control=${m(control)} setAffinity=${str(ex.setAffinityOk)} affinityRead=0x${num(ex.affinityRead).toString(16)} ${str(at(ex, "wgcMonitor", "info", "error"))}`.trim()
   if (!(m(control) >= BOUNDS.coverWindowControl.value))
     return { [id]: UN(`the no-affinity control did not show the overlay; ${text}`) }
   if (!(m(ex) >= 0)) return { [id]: UN(`errored: no frame of the second monitor; ${text}`) }
@@ -2300,14 +2301,17 @@ const LOGIC_CHECKS: readonly Check[] = [
       const code = psCode(source("sp-n.ps1"))
       const top = code.filter((l) => /^(Compile\b|\$a = |foreach \(\$f in .*\{ \. )/.test(l))
       if (top.length) bad.push(`setup runs outside the handled path: ${top.join(" | ")}`)
-      const handled = /\ntry \{\n(?:[ \t][^\n]*\n|\n)*?[ \t]+Compile\b[^\n]*\n(?:[ \t][^\n]*\n|\n)*?\} catch \{ Emit @\{ legError = "setup failed: /
+      const handled =
+        /\ntry \{\n(?:[ \t][^\n]*\n|\n)*?[ \t]+Compile\b[^\n]*\n(?:[ \t][^\n]*\n|\n)*?\} catch \{ Emit @\{ legError = "setup failed: /
       if (!handled.test(code.join("\n"))) bad.push('a failing setup does not report legError "setup failed: ..."')
       const emit = code.slice(code.findIndex((l) => l.startsWith("function Emit"))).join("\n")
       if (!/^function Emit[\s\S]*?'SpN' -as \[type\][\s\S]*?\n\}/.test(emit))
         bad.push("Emit needs the native type for sessionId, so a setup error cannot be reported")
       if (!code.some((l) => /^\s+if \(\$Out\) \{ \[IO\.File\]::WriteAllText\("\$Out\.started"/.test(l)))
         bad.push("the helper writes no start marker beside -Out")
-      if (!/waitFile\(out, 60_000, \{ started: `\$\{out\}\.started`, alive: pidAlive \}\)/.test(source("probe-sp-n.ts")))
+      if (
+        !/waitFile\(out, 60_000, \{ started: `\$\{out\}\.started`, alive: pidAlive \}\)/.test(source("probe-sp-n.ts"))
+      )
         bad.push("the medium leg does not watch the helper's start marker")
       // the probe: a helper that never started, exited silently, or still runs is named, never a plain timeout
       const dir = join(tmpdir(), `omo-sp-n-setup-${process.pid}`)
@@ -2375,10 +2379,12 @@ const LOGIC_CHECKS: readonly Check[] = [
       if (!/if \(\$Leg -eq 'build-native'\) \{ BuildNative; exit 0 \}\n\s+Compile/.test(helper))
         bad.push("no build-native leg ahead of Compile in the handled path")
       if (!/-OutputAssembly \$NativeDll -OutputType Library/.test(helper)) bad.push("BuildNative writes no library")
-      if (!/\$r\['native'\] = \$script:NativeFrom/.test(helper)) bad.push("Emit does not report which native type it used")
+      if (!/\$r\['native'\] = \$script:NativeFrom/.test(helper))
+        bad.push("Emit does not report which native type it used")
       const yml = existsSync(WORKFLOW) ? readFileSync(WORKFLOW, "utf8") : ""
       const build = yml.indexOf("sp-n.ps1 -Leg build-native")
-      if (build < 0 || build > yml.indexOf("-Leg precondition")) bad.push("the workflow does not precompile before the legs run")
+      if (build < 0 || build > yml.indexOf("-Leg precondition"))
+        bad.push("the workflow does not precompile before the legs run")
       if (!/^sp-n-native\.dll\*?$/m.test(existsSync(join(HERE, ".gitignore")) ? source(".gitignore") : ""))
         bad.push("the built assembly is not ignored by git")
       // packaging only: nothing in the helpers changes a token, an integrity level or a privilege
@@ -2393,12 +2399,20 @@ const LOGIC_CHECKS: readonly Check[] = [
       const note = (n: string, native: unknown) => nativeNote(n, native)
       const cases: Array<[string, unknown, string]> = [
         ["-", "precompiled sha256=ab12", "native assembly: precompiled sha256=ab12"],
-        ["x; native assembly: precompiled sha256=00", "precompiled sha256=ab12", "x; native assembly: precompiled sha256=ab12"],
+        [
+          "x; native assembly: precompiled sha256=00",
+          "precompiled sha256=ab12",
+          "x; native assembly: precompiled sha256=ab12",
+        ],
         ["design-adopted (y)", undefined, "design-adopted (y)"],
       ]
       for (const [n, v, want] of cases)
         if (note(n, v) !== want) bad.push(`nativeNote(${n}, ${String(v)}) = ${note(n, v)}, want ${want}`)
-      if (!/nativeNote\(carriedNote\(notes\.get\(id\)\), elevated\.ids\.includes\(id\) \? ctx\.facts\.native : undefined\)/.test(source("probe-sp-n.ts")))
+      if (
+        !/nativeNote\(carriedNote\(notes\.get\(id\)\), elevated\.ids\.includes\(id\) \? ctx\.facts\.native : undefined\)/.test(
+          source("probe-sp-n.ts"),
+        )
+      )
         bad.push("the measure pass does not record the native assembly in the elevated rows' notes")
       return bad.length ? bad.join("; ") : undefined
     },
@@ -2416,7 +2430,8 @@ const LOGIC_CHECKS: readonly Check[] = [
       const one: Json = { monitors: [{ primary: true, w: 1024, h: 768, x: 0, y: 0, dpi: "96" }] }
       const ids = ["n-host-second-monitor", "n-affinity-wgc-monitor-secondary"]
       const has = (host: string, facts: Json) => ids.filter((id) => rowsForHost(host, facts).includes(id))
-      if (has(HOSTED, two).length !== 2) bad.push(`two monitors on ${HOSTED}: rows ${has(HOSTED, two).join(",") || "none"}`)
+      if (has(HOSTED, two).length !== 2)
+        bad.push(`two monitors on ${HOSTED}: rows ${has(HOSTED, two).join(",") || "none"}`)
       if (has(HOSTED, one).length) bad.push(`one monitor on ${HOSTED}: rows ${has(HOSTED, one).join(",")}`)
       if (has(H6, one).length !== 2) bad.push("H6 with one monitor lost its second-monitor rows")
       if (rowsForHost(HOSTED, two).includes("n-host-admin")) bad.push("n-host-admin selected off H6")
@@ -2430,7 +2445,11 @@ const LOGIC_CHECKS: readonly Check[] = [
       if (hostFacts.ids.includes("n-affinity-wgc-monitor-secondary"))
         bad.push("the secondary capture row is still a host fact, not a capture leg")
       // the capture leg on the second monitor, judged like the primary-monitor affinity row
-      const leg = (magenta: number): Json => ({ wgcMonitor: { magenta, info: {} }, setAffinityOk: true, affinityRead: 17 })
+      const leg = (magenta: number): Json => ({
+        wgcMonitor: { magenta, info: {} },
+        setAffinityOk: true,
+        affinityRead: 17,
+      })
       const r1 = secondaryResults(arr(one.monitors), undefined, undefined)["n-affinity-wgc-monitor-secondary"]
       if (r1?.verdict !== "UNMEASURED" || !/^UNMEASURED: skipped: one present monitor/.test(r1.measured))
         bad.push(`one monitor: ${JSON.stringify(r1)}`)
@@ -2447,7 +2466,11 @@ const LOGIC_CHECKS: readonly Check[] = [
       if (!GROUPS.some((g) => g.ids.includes("n-affinity-wgc-monitor-secondary")))
         bad.push("no group measures n-affinity-wgc-monitor-secondary")
       const capture = psCode(source("sp-n-legs-capture.ps1")).join("\n")
-      if (!/function Leg-affinity-monitor\(\$a\) \{[\s\S]*?\[SpN\]::Overlay\([\s\S]*?\[SpN\]::Wgc\(\[IntPtr\]::Zero, \$hmon/.test(capture))
+      if (
+        !/function Leg-affinity-monitor\(\$a\) \{[\s\S]*?\[SpN\]::Overlay\([\s\S]*?\[SpN\]::Wgc\(\[IntPtr\]::Zero, \$hmon/.test(
+          capture,
+        )
+      )
         bad.push("sp-n-legs-capture.ps1 has no WGC monitor leg for a given monitor rectangle")
       if (!/dpi = \[SpN\]::MonitorDpi\(/.test(source("sp-n.ps1"))) bad.push("HostFacts reads no monitor DPI")
       return bad.length ? bad.join("; ") : undefined
@@ -3867,13 +3890,7 @@ export async function prepare(opt: ReturnType<typeof args>, io: Io) {
   const ledger = opt.mode === "verify" ? readLedger(opt.file) : []
   if (opt.mode === "verify" && ledger.length === 0) fail(`LEDGER ${opt.file}: no rows to verify`)
   const fromLedger = ledger.filter((r) => r.host === host).map((r) => r.id)
-  const want = new Set(
-    opt.rows.length
-      ? opt.rows
-      : opt.mode === "verify"
-        ? fromLedger
-        : rowsForHost(host, ctx.facts),
-  )
+  const want = new Set(opt.rows.length ? opt.rows : opt.mode === "verify" ? fromLedger : rowsForHost(host, ctx.facts))
   if (want.size === 0) fail(`LEDGER ${opt.file}: no row for host "${host}"`)
   return { ctx, host, build, ledger, want }
 }
