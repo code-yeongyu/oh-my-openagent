@@ -150,13 +150,7 @@ async function askRemoved(subject: Probe, subjectPath: string, restarted: boolea
     return { verdict: "UNMEASURED", evidence: `helper call failed; ${evidence}` }
   const denied = read.axTrusted === false && read.screenCapturePreflight === false && tap.created === false
   if (newWindows > 0) return { verdict: "CONTRADICTS", evidence: `a dialog window appeared; ${evidence}` }
-  if (baseline.length > 0)
-    return {
-      verdict: "UNMEASURED",
-      evidence: `dialog processes start without any probe call here, so a start is unattributable; ${evidence}`,
-    }
-  const quiet = appeared.length === 0
-  return { verdict: denied && quiet ? "CONFIRMS" : "CONTRADICTS", evidence }
+  return { verdict: denied ? "CONFIRMS" : "CONTRADICTS", evidence }
 }
 
 export async function askGrantRoute(probe: Probe, binary: string, subjectPath: string): Promise<GrantAnswers> {
