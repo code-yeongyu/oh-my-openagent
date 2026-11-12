@@ -1134,6 +1134,8 @@ jobs:
       - name: Verify the release notes exist on the prepared source
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
+          RELEASE_NOTES_PRIVATE_NAMES: ${{ secrets.RELEASE_NOTES_PRIVATE_NAMES }}
+          CI_RELEASE_NOTES_REQUIRE_DENY: "1"
         run: bun run script/print-release-notes.ts "$VERSION" > /dev/null
 
       - name: Write job summary
@@ -1204,6 +1206,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.release-metadata.outputs.version }}
+          RELEASE_NOTES_PRIVATE_NAMES: ${{ secrets.RELEASE_NOTES_PRIVATE_NAMES }}
+          CI_RELEASE_NOTES_REQUIRE_DENY: "1"
         run: |
           # The release body comes from the CHANGELOG section stamped into the released commit,
           # so the notes are reviewed in the release PR rather than written after publication.

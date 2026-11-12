@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { $ } from "bun"
-import { neutralizeCrossRepoReferences } from "./changelog-release-notes"
+import { assertDenyListConfigured, neutralizeCrossRepoReferences } from "./changelog-release-notes"
 import { RELEASE_VERSION_PATTERN } from "./release-latest-flag"
 
 export { neutralizeCrossRepoReferences }
@@ -129,6 +129,7 @@ async function getContributors(previousTag: string): Promise<string[]> {
 }
 
 async function main() {
+  assertDenyListConfigured()
   const packageJson: unknown = await Bun.file(new URL("../package.json", import.meta.url)).json()
   if (
     typeof packageJson !== "object" ||
