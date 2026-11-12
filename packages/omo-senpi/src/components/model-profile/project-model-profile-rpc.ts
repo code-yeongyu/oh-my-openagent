@@ -1,6 +1,7 @@
-import { existsSync, readdirSync, realpathSync, rmSync, statSync } from "node:fs"
+import { randomUUID } from "node:crypto"
+import { existsSync, realpathSync, rmSync, statSync } from "node:fs"
 import { userInfo } from "node:os"
-import { basename, dirname, join, resolve } from "node:path"
+import { dirname, join, resolve } from "node:path"
 
 import {
   loadOmoConfig,
@@ -12,6 +13,9 @@ import {
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { BUILTIN_MODEL_PROFILES } from "./builtin-profiles"
+import { lookupHomeOfUid } from "./owner-home-lookup"
+
+export { homeFromPasswdEntry, lookupHomeOfUid, OWNER_LOOKUP_TTL_MS, runPasswdLookup } from "./owner-home-lookup"
 
 /**
  * Read and set a folder's `model_profile` (its `.omo/omo.jsonc`) over RPC (#13188), so a client that reaches a
@@ -47,10 +51,16 @@ export type ProjectModelProfileReply =
   | ({ readonly kind: "ok" } & ProjectModelProfileState)
   | { readonly kind: "refused"; readonly code: ProjectModelProfileRefusalCode; readonly message: string }
 
-/** Seams for tests: the writer's file system, where accounts' home folders live, and how a backup copy is removed. */
+/**
+ * Seams for tests: the writer's file system, the home of the account with a uid, where accounts' homes live, and how a
+ * backup copy is removed.
+ */
 export interface ProjectModelProfileDeps {
   readonly fileSystem?: OmoConfigWriteFileSystem
-  readonly accountsRoot?: string
+  /** The home folder of the account with this uid, null when there is no such account, undefined when the lookup failed. */
+  readonly homeOfUid?: (uid: number) => string | null | undefined
+  /** The folder accounts' homes sit in, used only where there is no uid to look up (win32); defaults to this account home's parent. */
+  readonly accountsRoot?: string | null
   readonly removeFile?: (path: string) => void
 }
 
@@ -63,6 +73,15 @@ const MAX_PROFILE_LENGTH = 200
 
 const INVISIBLE_OR_CONTROL = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Cs}\p{Default_Ignorable_Code_Point}\p{M}]/u
 
+// A home folder's `.omo` is a user layer (omo-config-core loader/paths.ts), never a project layer: this account's
+// HOME, the home the user database records for this account's uid, and the one it records for the folder's owner.
+// This account's record is looked up for every folder, whoever owns its home (a UID-mapped container hands this uid a
+// home another uid owns), because under Bun `userInfo().homedir` is `$HOME` too, so an overridden HOME would otherwise
+// hide this account's real home. When that lookup fails (no lookup binary, a down user database), every folder at or
+// above a HOME this process sees is refused, since the real home cannot be ruled out there; when the owner's lookup
+// fails, a folder another account owns is refused. win32 has no uid to look up, so a folder beside this account's home
+// is refused there instead.
+
 const realOrSelf = (path: string): string => {
   try {
     return realpathSync(path)
@@ -71,47 +90,64 @@ const realOrSelf = (path: string): string => {
   }
 }
 
-// A home folder's `.omo` is a user layer (omo-config-core loader/paths.ts), never a project layer: this account's
-// HOME and account home, and any other account's home directory.
-// Same directory by identity, not by spelling: a case-insensitive volume names one folder two ways.
-function sameDirectory(a: string, b: string): boolean {
-  try {
-    const left = statSync(a)
-    const right = statSync(b)
-    return left.dev === right.dev && left.ino === right.ino
-  } catch {
-    return realOrSelf(a) === realOrSelf(b)
-  }
-}
-
-/**
- * Where accounts' home folders live, taken from this account's home: its parent, but only when the home exists and that
- * parent is not the file system root (an account whose home is `/root` or `/nonexistent` names no accounts root).
- */
-export function accountsRootFor(home: string): string | null {
+// This account home's parent, unless the home is missing or sits at the file system root (`/root`, `/nonexistent`).
+function defaultAccountsRoot(): string | null {
+  const home = userInfo().homedir
   if (!existsSync(home)) return null
   const parent = dirname(realOrSelf(home))
   return parent === dirname(parent) ? null : parent
 }
 
+function sameDirectory(path: string, folder: { readonly dev: number; readonly ino: number }): boolean {
+  try {
+    const candidate = statSync(path)
+    return candidate.dev === folder.dev && candidate.ino === folder.ino
+  } catch {
+    return false
+  }
+}
+
+function atOrAbove(home: string, folder: { readonly dev: number; readonly ino: number }): boolean {
+  for (let path = realOrSelf(home); ; path = dirname(path)) {
+    if (sameDirectory(path, folder)) return true
+    if (path === dirname(path)) return false
+  }
+}
+
+// Same directory by identity, not by spelling: a symlink, a bind mount or a case-insensitive volume names one folder
+// several ways.
 function isHomeFolder(cwd: string, deps: ProjectModelProfileDeps): boolean {
-  if ([resolveHomeDir(), userInfo().homedir].some((home) => sameDirectory(home, cwd))) return true
-  const accountsRoot = deps.accountsRoot ?? accountsRootFor(userInfo().homedir)
-  if (accountsRoot === null) return false
-  return sameDirectory(dirname(realOrSelf(cwd)), accountsRoot) && basename(realOrSelf(cwd)).length > 0
+  let folder: { readonly dev: number; readonly ino: number; readonly uid: number }
+  const ownHomes = [resolveHomeDir(), userInfo().homedir]
+  try {
+    folder = statSync(cwd)
+  } catch {
+    // A folder that is gone is compared by spelling, so a missing HOME is still refused before the writer's mkdir.
+    return ownHomes.some((home) => realOrSelf(home) === realOrSelf(cwd))
+  }
+  if (ownHomes.some((home) => sameDirectory(home, folder))) return true
+  const ownUid = process.getuid?.()
+  if (ownUid !== undefined) {
+    const homeOfUid = deps.homeOfUid ?? lookupHomeOfUid
+    const ownPasswdHome = homeOfUid(ownUid)
+    if (typeof ownPasswdHome === "string" && sameDirectory(ownPasswdHome, folder)) return true
+    if (ownPasswdHome === undefined && ownHomes.some((home) => atOrAbove(home, folder))) return true
+    if (folder.uid === ownUid) return false
+    const ownerHome = homeOfUid(folder.uid)
+    return ownerHome === undefined || (ownerHome !== null && sameDirectory(ownerHome, folder))
+  }
+  const accountsRoot = deps.accountsRoot === undefined ? defaultAccountsRoot() : deps.accountsRoot
+  return accountsRoot !== null && sameDirectory(accountsRoot, statSync(dirname(realOrSelf(cwd))))
 }
 
-// The writer's pre-write copies of this folder's omo config (`<file>.bak.<stamp>`). Only copies that did not exist before
-// this write are ours to remove; a copy someone else made stays.
-function backupNames(path: string): ReadonlySet<string> {
-  const prefix = `${basename(path)}.bak.`
-  if (!existsSync(dirname(path))) return new Set()
-  return new Set(readdirSync(dirname(path)).filter((name) => name.startsWith(prefix)))
+// The writer's pre-write copy goes to a name only this write uses, so cleanup removes exactly that copy and never a
+// backup another writer made in the meantime.
+function plannedBackupPath(path: string): string {
+  return `${path}.bak.${new Date().toISOString().replace(/[:.]/g, "-")}-${randomUUID()}`
 }
 
-function removeNewBackups(path: string, before: ReadonlySet<string>, deps: ProjectModelProfileDeps): void {
-  const remove = deps.removeFile ?? ((file: string) => rmSync(file, { force: true }))
-  for (const name of backupNames(path)) if (!before.has(name)) remove(join(dirname(path), name))
+function removeBackup(path: string, deps: ProjectModelProfileDeps): void {
+  ;(deps.removeFile ?? ((file: string) => rmSync(file, { force: true })))(path)
 }
 
 function projectConfigPath(cwd: string): string {
@@ -121,10 +157,14 @@ function projectConfigPath(cwd: string): string {
   return existsSync(json) ? json : jsonc
 }
 
-export function readProjectModelProfile(cwd: string): ProjectModelProfileState & { readonly profileIds: ReadonlySet<string> } {
+export function readProjectModelProfile(
+  cwd: string,
+): ProjectModelProfileState & { readonly profileIds: ReadonlySet<string> } {
   const path = projectConfigPath(cwd)
   const loaded = loadOmoConfig({ cwd })
-  const layer = loaded.layers.find((candidate) => candidate.source.scope === "project" && candidate.source.path === path)
+  const layer = loaded.layers.find(
+    (candidate) => candidate.source.scope === "project" && candidate.source.path === path,
+  )
   const parseError =
     loaded.diagnostics.find((diagnostic) => diagnostic.path === path && diagnostic.kind === "parse")?.message ?? null
   const value = layer?.config["model_profile"]
@@ -185,17 +225,18 @@ export function setProjectModelProfile(
     return refused("project_config_parse_error", `${current.path} does not parse: ${current.parseError}`)
   if (value !== null && !validProfile(value, current.profileIds))
     return refused("invalid_model_profile", `${JSON.stringify(value)} is not a profile id or a provider/model pin.`)
-  const target = current.path
-  const backupsBefore = backupNames(target)
+  const backupPath = plannedBackupPath(current.path)
+  let written: { readonly backupPath?: string }
   try {
-    updateOmoConfig({
+    written = updateOmoConfig({
       scope: "project",
       projectDir: session.cwd,
       edits: [{ path: ["model_profile"], value: value ?? undefined }],
+      backupPath,
       ...(deps.fileSystem === undefined ? {} : { fileSystem: deps.fileSystem }),
     })
   } catch (error) {
-    removeNewBackups(target, backupsBefore, deps)
+    if (existsSync(backupPath)) removeBackup(backupPath, deps)
     if (error instanceof OmoConfigWriteError && error.operation === "parse")
       return refused("project_config_parse_error", error.message)
     return refused("project_config_write_failed", error instanceof Error ? error.message : String(error))
@@ -204,7 +245,7 @@ export function setProjectModelProfile(
   // copy that cannot be removed is reported with the read-back, never as a failed write.
   let leftover: string | null = null
   try {
-    removeNewBackups(target, backupsBefore, deps)
+    if (written.backupPath !== undefined) removeBackup(written.backupPath, deps)
   } catch (error) {
     leftover = error instanceof Error ? error.message : String(error)
   }
