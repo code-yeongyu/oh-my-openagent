@@ -2,7 +2,12 @@
 // window was stamped when the enumeration started, so its answer arrived already expired: the next view enumerated
 // again, and a caller arriving while it ran started a second one. A send paid one enumeration per view.
 import { describe, expect, test } from "bun:test"
-import { createLiveThreadSurface, HOST_ENDPOINTS_CACHE_TTL_MS, type HostEndpointReport } from "./live-surface"
+import {
+  createLiveThreadSurface,
+  HOST_ENDPOINTS_CACHE_TTL_MS,
+  HOST_ENDPOINTS_ENUMERATION_DEADLINE_MS,
+  type HostEndpointReport,
+} from "./live-surface"
 
 const SLOW_ENUMERATION_MS = HOST_ENDPOINTS_CACHE_TTL_MS + 1_000
 
@@ -126,6 +131,31 @@ describe("live thread surface endpoint cache", () => {
     const after = await host.surface.listView({ offline: true })
     expect(host.calls()).toBe(2)
     expect(after.hosts.map((entry) => entry.socket)).toEqual(["/tmp/omo-enum-cache-missing.sock"])
+  })
+
+  test("#given an enumeration that has not answered #when a caller arrives just before and then at its deadline #then the first shares it and the second starts a fresh one", async () => {
+    // given (#13009 item 1, the bound itself)
+    const host = slowHost()
+    const stuck = host.surface.listView({ offline: true })
+    await untilEnumerating(host)
+    try {
+      // when
+      host.advance(HOST_ENDPOINTS_ENUMERATION_DEADLINE_MS - 1)
+      const sharing = host.surface.listView({ offline: true })
+      for (let turn = 0; turn < 20; turn++) await Promise.resolve()
+      const sharedCalls = host.calls()
+      host.advance(1)
+      await within(host.surface.listView({ offline: true }), "a view at the enumeration deadline")
+
+      // then
+      expect(sharedCalls).toBe(1)
+      expect(host.calls()).toBe(2)
+      host.finishEnumeration()
+      await sharing
+    } finally {
+      host.finishEnumeration()
+      await stuck
+    }
   })
 
   test.each(["rpc_host", "tui"] as const)(
