@@ -37,7 +37,9 @@ function createPluginInput(promptCalls: unknown[]): RuntimeFallbackPluginInput {
     client: {
       tui: { showToast: async () => ({}) },
       session: {
-        messages: async () => ({ data: [{ info: { role: "user", id: "msg_original" }, parts: [{ type: "text", text: "do the work" }] }] }),
+        messages: async () => ({
+          data: [{ info: { role: "user", id: "msg_original" }, parts: [{ type: "text", text: "do the work" }] }],
+        }),
         promptAsync: async (args: unknown) => {
           promptCalls.push(args)
           return {}
@@ -95,7 +97,12 @@ function createGatedPluginInput(promptCalls: unknown[]) {
       },
     },
   })
-  return { input, started: started.promise, release: () => gate.resolve(), refuse: (error: Error) => gate.reject(error) }
+  return {
+    input,
+    started: started.promise,
+    release: () => gate.resolve(),
+    refuse: (error: Error) => gate.reject(error),
+  }
 }
 
 function sessionStatusRetry(sessionID: string): SessionErrorEvent {
@@ -137,10 +144,7 @@ describe("runtime-fallback recovery claim", () => {
     await hook.event({ event: { type: "session.created", properties: { info: { id: sessionID, model } } } })
   }
 
-  async function deliver(
-    hook: ReturnType<typeof createRuntimeFallbackHook>,
-    event: SessionErrorEvent,
-  ) {
+  async function deliver(hook: ReturnType<typeof createRuntimeFallbackHook>, event: SessionErrorEvent) {
     openRuntimeFallbackRecoveryClaim(event, String(event.properties.sessionID))
     const decision = awaitRuntimeFallbackRecoveryDecision(event)
     await hook.event({ event })
@@ -287,7 +291,8 @@ describe("runtime-fallback recovery claim", () => {
 
     test("declines the error when that dispatch is refused, so it is not dropped", async () => {
       // given
-      const { hook, gated, promptCalls, statusHandled, decision } = await errorDuringStatusDispatch("ses_claim_inflight_refused")
+      const { hook, gated, promptCalls, statusHandled, decision } =
+        await errorDuringStatusDispatch("ses_claim_inflight_refused")
 
       // when
       gated.refuse(new Error("upstream unavailable"))
@@ -313,7 +318,6 @@ describe("runtime-fallback recovery claim", () => {
       expect(afterDispose).toBe("declined")
     })
   })
-
 
   describe("when a compaction is running", () => {
     test("#given a status dispatch in flight #when an error arrives and that dispatch is refused #then the error's claim is declined, never left waiting", async () => {

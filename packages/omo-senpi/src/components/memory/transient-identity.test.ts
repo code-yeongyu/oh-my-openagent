@@ -17,7 +17,8 @@ import {
 const roots: string[] = []
 
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0))
+    rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
 const IDENTITY = "project-deadbeef"

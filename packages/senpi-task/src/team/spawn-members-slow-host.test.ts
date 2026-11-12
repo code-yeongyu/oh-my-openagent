@@ -11,13 +11,27 @@ import { spawnTeamMembers } from "./spawn-members"
 function slowHostManager(outcome: "admitted" | "refused"): TeamRuntimeManagerPort {
   let launched = false
   return {
-    start: async (spec: ManagerStartSpec): Promise<StartResult> =>
-      ({ kind: "started", task_id: "st_00000001", status: "running", starting: true, name: spec.name ?? "member" }),
-    whenLaunched: async () => { launched = true },
-    cancelTask: async () => { throw new Error("cancelTask not configured") },
-    get: () => (launched
-      ? ({ status: outcome === "admitted" ? "running" : "error", child_session_id: "child-session", error_message: "the task host refused the child session (open_failed)" } as unknown as TaskRecord)
-      : ({ status: "running" } as unknown as TaskRecord)),
+    start: async (spec: ManagerStartSpec): Promise<StartResult> => ({
+      kind: "started",
+      task_id: "st_00000001",
+      status: "running",
+      starting: true,
+      name: spec.name ?? "member",
+    }),
+    whenLaunched: async () => {
+      launched = true
+    },
+    cancelTask: async () => {
+      throw new Error("cancelTask not configured")
+    },
+    get: () =>
+      launched
+        ? ({
+            status: outcome === "admitted" ? "running" : "error",
+            child_session_id: "child-session",
+            error_message: "the task host refused the child session (open_failed)",
+          } as unknown as TaskRecord)
+        : ({ status: "running" } as unknown as TaskRecord),
     getResidentHandle: () => undefined,
   }
 }

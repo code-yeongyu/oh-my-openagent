@@ -3,7 +3,12 @@
 import { describe, expect, it } from "bun:test"
 import { Buffer } from "node:buffer"
 import { createConnection } from "node:net"
-import { startCallbackServer, type CallbackServer, type CallbackServerTimer, type CallbackServerTimerHandle } from "./callback-server"
+import {
+  startCallbackServer,
+  type CallbackServer,
+  type CallbackServerTimer,
+  type CallbackServerTimerHandle,
+} from "./callback-server"
 
 const HOSTNAME = "127.0.0.1"
 const CALLBACK_SERVER_TEST_TIMEOUT_MS = process.platform === "win32" ? 15_000 : 5_000
@@ -132,68 +137,78 @@ describe("startCallbackServer", () => {
     await server.close()
   }
 
-  it("starts server and returns port", async () => {
-    const server = await startCallbackServer(0)
+  it(
+    "starts server and returns port",
+    async () => {
+      const server = await startCallbackServer(0)
 
-    try {
-      expect(server.port).toBeGreaterThan(0)
-      expect(typeof server.waitForCallback).toBe("function")
-      expect(typeof server.close).toBe("function")
-    } finally {
-      await close(server)
-    }
-  }, CALLBACK_SERVER_TEST_TIMEOUT_MS)
+      try {
+        expect(server.port).toBeGreaterThan(0)
+        expect(typeof server.waitForCallback).toBe("function")
+        expect(typeof server.close).toBe("function")
+      } finally {
+        await close(server)
+      }
+    },
+    CALLBACK_SERVER_TEST_TIMEOUT_MS,
+  )
 
-  it("resolves callback with code and state from query params", async () => {
-    const server = await startCallbackServer(0)
+  it(
+    "resolves callback with code and state from query params",
+    async () => {
+      const server = await startCallbackServer(0)
 
-    try {
-      const callbackUrl = `http://${HOSTNAME}:${server.port}/oauth/callback?code=test-code&state=test-state`
-      const [result, response] = await Promise.all([
-        server.waitForCallback(),
-        request(callbackUrl),
-      ])
+      try {
+        const callbackUrl = `http://${HOSTNAME}:${server.port}/oauth/callback?code=test-code&state=test-state`
+        const [result, response] = await Promise.all([server.waitForCallback(), request(callbackUrl)])
 
-      expect(result).toEqual({ code: "test-code", state: "test-state" })
-      expect(response.status).toBe(200)
-      const html = await response.text()
-      expect(html).toContain("Authorization successful")
-    } finally {
-      await close(server)
-    }
-  }, CALLBACK_SERVER_TEST_TIMEOUT_MS)
+        expect(result).toEqual({ code: "test-code", state: "test-state" })
+        expect(response.status).toBe(200)
+        const html = await response.text()
+        expect(html).toContain("Authorization successful")
+      } finally {
+        await close(server)
+      }
+    },
+    CALLBACK_SERVER_TEST_TIMEOUT_MS,
+  )
 
-  it("returns 404 for non-callback routes", async () => {
-    const server = await startCallbackServer(0)
+  it(
+    "returns 404 for non-callback routes",
+    async () => {
+      const server = await startCallbackServer(0)
 
-    try {
-      const response = await request(`http://${HOSTNAME}:${server.port}/other`)
+      try {
+        const response = await request(`http://${HOSTNAME}:${server.port}/other`)
 
-      expect(response.status).toBe(404)
-    } finally {
-      await close(server)
-    }
-  }, CALLBACK_SERVER_TEST_TIMEOUT_MS)
+        expect(response.status).toBe(404)
+      } finally {
+        await close(server)
+      }
+    },
+    CALLBACK_SERVER_TEST_TIMEOUT_MS,
+  )
 
-  it("keeps non-callback routes separate from OAuth callbacks", async () => {
-    const server = await startCallbackServer(0)
+  it(
+    "keeps non-callback routes separate from OAuth callbacks",
+    async () => {
+      const server = await startCallbackServer(0)
 
-    try {
-      const readyResponse = await request(`http://${HOSTNAME}:${server.port}/__omo_oauth_startup_probe__`)
-      expect(readyResponse.status).toBe(404)
+      try {
+        const readyResponse = await request(`http://${HOSTNAME}:${server.port}/__omo_oauth_startup_probe__`)
+        expect(readyResponse.status).toBe(404)
 
-      const callbackUrl = `http://${HOSTNAME}:${server.port}/oauth/callback?code=after-ready&state=still-waiting`
-      const [result, response] = await Promise.all([
-        server.waitForCallback(),
-        request(callbackUrl),
-      ])
+        const callbackUrl = `http://${HOSTNAME}:${server.port}/oauth/callback?code=after-ready&state=still-waiting`
+        const [result, response] = await Promise.all([server.waitForCallback(), request(callbackUrl)])
 
-      expect(result).toEqual({ code: "after-ready", state: "still-waiting" })
-      expect(response.status).toBe(200)
-    } finally {
-      await close(server)
-    }
-  }, CALLBACK_SERVER_TEST_TIMEOUT_MS)
+        expect(result).toEqual({ code: "after-ready", state: "still-waiting" })
+        expect(response.status).toBe(200)
+      } finally {
+        await close(server)
+      }
+    },
+    CALLBACK_SERVER_TEST_TIMEOUT_MS,
+  )
 
   it("#given injected callback timer #when OAuth lifetime expires #then callback rejects without global timer patches", async () => {
     const { runTimersAtOrAfter, timer } = createControllableTimer()
@@ -215,93 +230,113 @@ describe("startCallbackServer", () => {
     }
   })
 
-  it("returns 400 and rejects when code is missing", async () => {
-    const server = await startCallbackServer(0)
+  it(
+    "returns 400 and rejects when code is missing",
+    async () => {
+      const server = await startCallbackServer(0)
 
-    try {
-      const callbackRejection = server.waitForCallback().catch((error: Error) => error)
-      const response = await request(`http://${HOSTNAME}:${server.port}/oauth/callback?state=s`)
-
-      expect(response.status).toBe(400)
-      const error = await callbackRejection
-      expect(error).toBeInstanceOf(Error)
-      if (!(error instanceof Error)) {
-        throw new Error("Expected callback rejection to be an Error")
-      }
-      expect(error.message).toContain("missing code or state")
-    } finally {
-      await close(server)
-    }
-  }, CALLBACK_SERVER_TEST_TIMEOUT_MS)
-
-  it("returns 400 and rejects when state is missing", async () => {
-    const server = await startCallbackServer(0)
-
-    try {
-      const callbackRejection = server.waitForCallback().catch((error: Error) => error)
-      const response = await request(`http://${HOSTNAME}:${server.port}/oauth/callback?code=c`)
-
-      expect(response.status).toBe(400)
-      const error = await callbackRejection
-      expect(error).toBeInstanceOf(Error)
-      if (!(error instanceof Error)) {
-        throw new Error("Expected callback rejection to be an Error")
-      }
-      expect(error.message).toContain("missing code or state")
-    } finally {
-      await close(server)
-    }
-  }, CALLBACK_SERVER_TEST_TIMEOUT_MS)
-
-  it("close stops the server immediately", async () => {
-    const server = await startCallbackServer(0)
-    const port = server.port
-
-    await server.close()
-
-    try {
-      await request(`http://${HOSTNAME}:${port}/oauth/callback?code=c&state=s`)
-      expect.unreachable("request should fail after close")
-    } catch (error) {
-      expect(error).toBeInstanceOf(Error)
-      if (!(error instanceof Error)) {
-        throw new Error("Expected request after close to fail with an Error")
-      }
-    }
-  }, CALLBACK_SERVER_TEST_TIMEOUT_MS)
-
-  it("close resolves after the underlying server releases its port", async () => {
-    const firstServer = await startCallbackServer(0)
-    const port = firstServer.port
-
-    const closeResult = firstServer.close()
-    expect(closeResult).toBeInstanceOf(Promise)
-    await closeResult
-
-    const secondServer = await startCallbackServer(port)
-    try {
-      expect(secondServer.port).toBe(port)
-      const response = await request(`http://${HOSTNAME}:${port}/other`)
-      expect(response.status).toBe(404)
-    } finally {
-      await close(secondServer)
-    }
-  }, CALLBACK_SERVER_TEST_TIMEOUT_MS)
-
-  it("#given default callback port is occupied #when starting callback server #then it binds a fallback port", async () => {
-    const occupiedDefaultPort = await startCallbackServer(19877)
-
-    try {
-      const fallbackServer = await startCallbackServer()
       try {
-        expect(fallbackServer.port).toBeGreaterThan(19877)
-        const response = await request(`http://${HOSTNAME}:${fallbackServer.port}/other`)
+        const callbackRejection = server.waitForCallback().catch((error: Error) => error)
+        const response = await request(`http://${HOSTNAME}:${server.port}/oauth/callback?state=s`)
+
+        expect(response.status).toBe(400)
+        const error = await callbackRejection
+        expect(error).toBeInstanceOf(Error)
+        if (!(error instanceof Error)) {
+          throw new Error("Expected callback rejection to be an Error")
+        }
+        expect(error.message).toContain("missing code or state")
+      } finally {
+        await close(server)
+      }
+    },
+    CALLBACK_SERVER_TEST_TIMEOUT_MS,
+  )
+
+  it(
+    "returns 400 and rejects when state is missing",
+    async () => {
+      const server = await startCallbackServer(0)
+
+      try {
+        const callbackRejection = server.waitForCallback().catch((error: Error) => error)
+        const response = await request(`http://${HOSTNAME}:${server.port}/oauth/callback?code=c`)
+
+        expect(response.status).toBe(400)
+        const error = await callbackRejection
+        expect(error).toBeInstanceOf(Error)
+        if (!(error instanceof Error)) {
+          throw new Error("Expected callback rejection to be an Error")
+        }
+        expect(error.message).toContain("missing code or state")
+      } finally {
+        await close(server)
+      }
+    },
+    CALLBACK_SERVER_TEST_TIMEOUT_MS,
+  )
+
+  it(
+    "close stops the server immediately",
+    async () => {
+      const server = await startCallbackServer(0)
+      const port = server.port
+
+      await server.close()
+
+      try {
+        await request(`http://${HOSTNAME}:${port}/oauth/callback?code=c&state=s`)
+        expect.unreachable("request should fail after close")
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error)
+        if (!(error instanceof Error)) {
+          throw new Error("Expected request after close to fail with an Error")
+        }
+      }
+    },
+    CALLBACK_SERVER_TEST_TIMEOUT_MS,
+  )
+
+  it(
+    "close resolves after the underlying server releases its port",
+    async () => {
+      const firstServer = await startCallbackServer(0)
+      const port = firstServer.port
+
+      const closeResult = firstServer.close()
+      expect(closeResult).toBeInstanceOf(Promise)
+      await closeResult
+
+      const secondServer = await startCallbackServer(port)
+      try {
+        expect(secondServer.port).toBe(port)
+        const response = await request(`http://${HOSTNAME}:${port}/other`)
         expect(response.status).toBe(404)
       } finally {
-        await close(fallbackServer)
+        await close(secondServer)
       }
-    } finally {
-      await close(occupiedDefaultPort)
-    }
-  }, CALLBACK_SERVER_TEST_TIMEOUT_MS)
+    },
+    CALLBACK_SERVER_TEST_TIMEOUT_MS,
+  )
+
+  it(
+    "#given default callback port is occupied #when starting callback server #then it binds a fallback port",
+    async () => {
+      const occupiedDefaultPort = await startCallbackServer(19877)
+
+      try {
+        const fallbackServer = await startCallbackServer()
+        try {
+          expect(fallbackServer.port).toBeGreaterThan(19877)
+          const response = await request(`http://${HOSTNAME}:${fallbackServer.port}/other`)
+          expect(response.status).toBe(404)
+        } finally {
+          await close(fallbackServer)
+        }
+      } finally {
+        await close(occupiedDefaultPort)
+      }
+    },
+    CALLBACK_SERVER_TEST_TIMEOUT_MS,
+  )
 })

@@ -24,9 +24,7 @@ function normalizeSkillAliasName(name: string): string {
   return name.toLowerCase()
 }
 
-function collectDisabledSkillNames(
-  normalizedConfig: ReturnType<typeof normalizeSkillsConfig>,
-): Set<string> {
+function collectDisabledSkillNames(normalizedConfig: ReturnType<typeof normalizeSkillsConfig>): Set<string> {
   const disabledSkillNames = new Set(normalizedConfig.disable.map(normalizeSkillAliasName))
   for (const [name, entry] of Object.entries(normalizedConfig.entries)) {
     if (isDisabledConfigEntry(entry)) {
@@ -44,7 +42,7 @@ export function mergeSkills(
   userOpencodeSkills: LoadedSkill[],
   projectClaudeSkills: LoadedSkill[],
   projectOpencodeSkills: LoadedSkill[],
-  options: MergeSkillsOptions = {}
+  options: MergeSkillsOptions = {},
 ): LoadedSkill[] {
   const skillMap = new Map<string, LoadedSkill>()
 

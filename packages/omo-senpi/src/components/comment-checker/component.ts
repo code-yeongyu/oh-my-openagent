@@ -39,9 +39,19 @@ export function createCommentCheckerComponent(options: CommentCheckerComponentOp
         const rawPath = getString(event.input.path)
         const patchInputs = event.toolName === "apply_patch" ? toApplyPatchHookInputs(event, toolContext) : []
         if (rawPath === undefined && patchInputs.length === 0) return undefined
-        const absolutePath = rawPath === undefined ? undefined : (isAbsolute(rawPath) ? rawPath : resolve(toolContext.cwd, rawPath))
-        const paths = patchInputs.length > 0 ? patchInputs.map((input) => input.tool_input.file_path).filter((path): path is string => typeof path === "string") : absolutePath ? [absolutePath] : []
-        const uniquePaths = paths.filter((path, index) => paths.indexOf(path) === index).filter((path) => !reportedFilesThisTurn.has(path))
+        const absolutePath =
+          rawPath === undefined ? undefined : isAbsolute(rawPath) ? rawPath : resolve(toolContext.cwd, rawPath)
+        const paths =
+          patchInputs.length > 0
+            ? patchInputs
+                .map((input) => input.tool_input.file_path)
+                .filter((path): path is string => typeof path === "string")
+            : absolutePath
+              ? [absolutePath]
+              : []
+        const uniquePaths = paths
+          .filter((path, index) => paths.indexOf(path) === index)
+          .filter((path) => !reportedFilesThisTurn.has(path))
         if (uniquePaths.length === 0) return undefined
 
         ensuring ??= ensureBinaryPath(resolveBinary, downloadBinary, {
@@ -71,7 +81,8 @@ export function createCommentCheckerComponent(options: CommentCheckerComponentOp
         }
 
         reportToolHookStatus(eventContext, "(OmO) Checking Comments")
-        const inputs = event.toolName === "apply_patch" ? patchInputs : [toHookInput(event, toolContext, uniquePaths[0])]
+        const inputs =
+          event.toolName === "apply_patch" ? patchInputs : [toHookInput(event, toolContext, uniquePaths[0])]
         const feedback: string[] = []
         for (const hookInput of inputs) {
           const path = hookInput.tool_input.file_path
@@ -115,7 +126,9 @@ async function ensureBinaryPath(
     if (!(error instanceof Error)) {
       throw error
     }
-    state.logger.warn("omo-senpi comment-checker binary resolution failed; component disabled for this session", { error })
+    state.logger.warn("omo-senpi comment-checker binary resolution failed; component disabled for this session", {
+      error,
+    })
     nextBinaryPath = null
   }
 

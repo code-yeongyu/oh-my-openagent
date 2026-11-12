@@ -22,7 +22,9 @@ fn key_down() -> TaggedInput {
 fn recording_sink_is_empty_after_refusal() {
     let mut backend = FakeBackend::from_json(ONE_WINDOW).expect("the scenario loads");
     let sink = backend.sink();
-    backend.inject(FakeMethod::Key, Fault::fail(EngineCode::InputFailed));
+    backend
+        .inject(FakeMethod::Key, Fault::fail(EngineCode::InputFailed))
+        .expect("InputFailed has a bare row");
 
     let refused = backend.post_input(&key_down(), Route::BackgroundWindow);
     assert_eq!(

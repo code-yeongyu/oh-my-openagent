@@ -6,24 +6,22 @@ const ToolActionSchema = z.enum(["allow", "deny", "ask"])
 
 export const ToolRuleEntrySchema = z.union([
   z.string(),
-  z.object({
-    pattern: z.string().optional(),
-    name: z.string().optional(),
-    tool: z.string().optional(),
-    allow: z.boolean().optional(),
-    deny: z.boolean().optional(),
-    action: ToolActionSchema.optional(),
-  }).passthrough(),
+  z
+    .object({
+      pattern: z.string().optional(),
+      name: z.string().optional(),
+      tool: z.string().optional(),
+      allow: z.boolean().optional(),
+      deny: z.boolean().optional(),
+      action: ToolActionSchema.optional(),
+    })
+    .passthrough(),
 ])
 
 // pi-task's documented `tools:` frontmatter contract (README.md:24-55, parsed by
 // its readPermissionConfig): a record whose values are booleans, "allow"/"deny"/"ask"
 // string actions, or nested command-pattern maps of those actions.
-const ToolPermissionValueSchema = z.union([
-  z.boolean(),
-  ToolActionSchema,
-  z.record(z.string(), ToolActionSchema),
-])
+const ToolPermissionValueSchema = z.union([z.boolean(), ToolActionSchema, z.record(z.string(), ToolActionSchema)])
 
 export const ToolsInputSchema = z.union([
   z.record(z.string(), z.boolean()),

@@ -1,10 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-  factsSelectionKey,
-  selectLaunchable,
-  type FactsLaunchSelection,
-} from "./failures-selection"
+import { factsSelectionKey, selectLaunchable, type FactsLaunchSelection } from "./failures-selection"
 import type { FactsFailureRecord, FactsFailuresFile } from "./failures-schema"
 import { FACTS_QUEUE_VERSION, type FactsQueueEntry } from "./schema"
 
@@ -86,11 +82,7 @@ describe("facts launch selection", () => {
 
   test("#given a parked endpoint #when selecting #then it is skipped and its later same-conversation entries still launch (#10918)", () => {
     // given
-    const entries = [
-      entry("alpha", "m1", 1),
-      entry("alpha", "m2", 4),
-      entry("beta", "m9", 2),
-    ]
+    const entries = [entry("alpha", "m1", 1), entry("alpha", "m2", 4), entry("beta", "m9", 2)]
 
     // when
     const selection = selectLaunchable(entries, failures([parked("alpha", "m1", 1)]), T0)

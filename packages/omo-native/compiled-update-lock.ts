@@ -1,7 +1,12 @@
 import { open, rm } from "node:fs/promises"
 import {
-  buildLockRecord, forgetLockRecord, isLockRecordStale, markLockRecordHeld, markLockRecordReleased,
-  readLockRecord, type ObservedLockRecord,
+  buildLockRecord,
+  forgetLockRecord,
+  isLockRecordStale,
+  markLockRecordHeld,
+  markLockRecordReleased,
+  readLockRecord,
+  type ObservedLockRecord,
 } from "../team-core/src/team-state-store/lock-record"
 import { withRecordGuard } from "../team-core/src/team-state-store/lock-reclaim"
 
@@ -39,19 +44,24 @@ export async function acquireBinaryUpdateLock(lockPath: string) {
       return true
     } finally {
       if (!complete) {
-        try { await file.close() } finally { await rm(lockPath, { force: true }) }
+        try {
+          await file.close()
+        } finally {
+          await rm(lockPath, { force: true })
+        }
       }
     }
   }
-  const stale = async (value: ObservedLockRecord) => expired(value) || await isLockRecordStale(value, BINARY_UPDATE_TIMEOUT_MS)
-  if (!await publish()) {
+  const stale = async (value: ObservedLockRecord) =>
+    expired(value) || (await isLockRecordStale(value, BINARY_UPDATE_TIMEOUT_MS))
+  if (!(await publish())) {
     const observed = await readLockRecord(lockPath)
-    if (observed === null || !await stale(observed)) return
+    if (observed === null || !(await stale(observed))) return
     // Reapers and releasers of one record share this guard. Re-read inside it: a fresh
     // successor must never be removed on the strength of an earlier stale observation.
     const acquired = await guard(observed.content, async () => {
       const current = await readLockRecord(lockPath)
-      if (current === null || current.content !== observed.content || !await stale(current)) return false
+      if (current === null || current.content !== observed.content || !(await stale(current))) return false
       await rm(lockPath)
       return await publish()
     })

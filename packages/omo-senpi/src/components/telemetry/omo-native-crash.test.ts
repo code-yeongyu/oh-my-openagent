@@ -60,7 +60,8 @@ async function startProcess(agentDir: string, messages: TelemetryCaptureMessage[
   )
 }
 
-const crashes = (messages: readonly TelemetryCaptureMessage[]) => messages.filter(({ event }) => event === "process_crashed")
+const crashes = (messages: readonly TelemetryCaptureMessage[]) =>
+  messages.filter(({ event }) => event === "process_crashed")
 
 describe("retired automatic crash reporting", () => {
   it("does not harvest operational crashes without separate crash consent", async () => {
@@ -73,7 +74,9 @@ describe("retired automatic crash reporting", () => {
       expect(crashes(messages)).toEqual([])
       expect(existsSync(join(getOmoNativeStateDir(createEnabledEnv(agentDir)), "crash-reports"))).toBe(false)
       expect(readFileSync(join(agentDir, "process-crashes", "crashes.jsonl"), "utf8")).toBe(TUI_RECORD + "\n")
-      expect(readFileSync(join(agentDir, "rpc-host-daemon", HOST_ENDPOINT, "crashes.jsonl"), "utf8")).toBe(LEGACY_HOST_RECORD + "\n")
+      expect(readFileSync(join(agentDir, "rpc-host-daemon", HOST_ENDPOINT, "crashes.jsonl"), "utf8")).toBe(
+        LEGACY_HOST_RECORD + "\n",
+      )
     })
   })
 

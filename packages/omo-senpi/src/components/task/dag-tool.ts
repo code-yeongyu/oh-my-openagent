@@ -76,7 +76,10 @@ function requireRunId(params: DagToolInput): string | undefined {
 async function startAction(deps: DagToolDeps, params: DagToolInput): Promise<DagToolResult> {
   const input = params.definition
   if (input === undefined) {
-    return failure("invalid_definition", "action=start requires a definition. Provide definition.key, definition.name, and definition.nodes.")
+    return failure(
+      "invalid_definition",
+      "action=start requires a definition. Provide definition.key, definition.name, and definition.nodes.",
+    )
   }
   const nodeErrors = validateNodeTargets(input.nodes)
   if (nodeErrors.length > 0) return invalidNodeTargets(nodeErrors)
@@ -174,11 +177,14 @@ export async function runDagTool(deps: DagToolDeps, params: DagToolInput): Promi
       }
       case "snapshot": {
         const snapshot = deps.manager.snapshot(runId as DagRunId, deps.parentSessionId())
-        return toolResult(`Dag run ${runId} is ${snapshot.status} (${snapshot.counts.completed}/${snapshot.counts.total} nodes complete).${quietNodesNotice(snapshot.nodes, Date.now())}`, {
-          kind: "snapshot",
-          run_id: runId,
-          snapshot,
-        })
+        return toolResult(
+          `Dag run ${runId} is ${snapshot.status} (${snapshot.counts.completed}/${snapshot.counts.total} nodes complete).${quietNodesNotice(snapshot.nodes, Date.now())}`,
+          {
+            kind: "snapshot",
+            run_id: runId,
+            snapshot,
+          },
+        )
       }
       case "wait":
         return await waitAction(deps, params, runId)
@@ -186,12 +192,17 @@ export async function runDagTool(deps: DagToolDeps, params: DagToolInput): Promi
         return await cancelAction(deps, runId, params.reason)
       case "cancel_node": {
         deps.manager.snapshot(runId as DagRunId, deps.parentSessionId())
-        if (params.node_id === undefined || params.node_id.trim().length === 0) return failure("invalid_arguments", "cancel_node requires node_id.")
-        if (deps.cancelNode === undefined) return failure("node_not_continuable", "Paused child cancellation is not available in this session.")
+        if (params.node_id === undefined || params.node_id.trim().length === 0)
+          return failure("invalid_arguments", "cancel_node requires node_id.")
+        if (deps.cancelNode === undefined)
+          return failure("node_not_continuable", "Paused child cancellation is not available in this session.")
         const nodeId = params.node_id.trim()
         await deps.cancelNode(runId as DagRunId, nodeId)
         return toolResult(`Cancelled dag node ${nodeId}.`, {
-          kind: "node_cancelled", run_id: runId, node_id: nodeId, snapshot: deps.manager.snapshot(runId as DagRunId, deps.parentSessionId()),
+          kind: "node_cancelled",
+          run_id: runId,
+          node_id: nodeId,
+          snapshot: deps.manager.snapshot(runId as DagRunId, deps.parentSessionId()),
         })
       }
       case "retry":

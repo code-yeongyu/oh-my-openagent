@@ -19,11 +19,7 @@ describe("team e2e injection evidence", () => {
     seedInjectionEvidence(fixture)
 
     // when
-    const checks = analyzeMain(
-      { events: fixture.events, status: 0 },
-      fixture.sandbox,
-      fixture.obsDir,
-    )
+    const checks = analyzeMain({ events: fixture.events, status: 0 }, fixture.sandbox, fixture.obsDir)
 
     // then
     expect(checks.memberEnvelopeEchoed).toBe(true)
@@ -40,11 +36,7 @@ describe("team e2e injection evidence", () => {
     mkdirSync(fixture.obsDir, { recursive: true })
 
     // when
-    analyzeMain(
-      { events: fixture.events, status: 0 },
-      fixture.sandbox,
-      fixture.obsDir,
-    )
+    analyzeMain({ events: fixture.events, status: 0 }, fixture.sandbox, fixture.obsDir)
 
     // then
     expect(existsSync(join(fixture.obsDir, "team-injection-evidence.json"))).toBe(true)
@@ -57,10 +49,12 @@ describe("team e2e injection evidence", () => {
       type: "message",
       message: {
         role: "user",
-        content: [{
-          type: "text",
-          text: `<peer_message from="lead" messageId="${fixture.leadMessageId}">\nCRASH-ONCE\n</peer_message>`,
-        }],
+        content: [
+          {
+            type: "text",
+            text: `<peer_message from="lead" messageId="${fixture.leadMessageId}">\nCRASH-ONCE\n</peer_message>`,
+          },
+        ],
       },
     })
 
@@ -105,7 +99,11 @@ function createFixture() {
     taskId,
     leadMessageId,
     events: [
-      toolEvent("team_create", { kind: "created", team_run_id: runId, members: [{ name: "quick" }, { name: "fixture" }] }),
+      toolEvent("team_create", {
+        kind: "created",
+        team_run_id: runId,
+        members: [{ name: "quick" }, { name: "fixture" }],
+      }),
       toolEvent("task_send", {
         kind: "team_message",
         team: { kind: "to_members", message_id: leadMessageId, recipients: ["quick"] },
@@ -126,10 +124,18 @@ function seedInjectionEvidence(fixture: Fixture): void {
     type: "message",
     message: {
       role: "user",
-      content: [{ type: "text", text: `<peer_message from="lead" messageId="${fixture.leadMessageId}">\nLEAD2QUICK\n</peer_message>` }],
+      content: [
+        {
+          type: "text",
+          text: `<peer_message from="lead" messageId="${fixture.leadMessageId}">\nLEAD2QUICK\n</peer_message>`,
+        },
+      ],
     },
   })
-  writeFileSync(join(fixture.obsDir, "lead-received.txt"), "custom-message\nQUICK2LEAD member report delivered by injection\n")
+  writeFileSync(
+    join(fixture.obsDir, "lead-received.txt"),
+    "custom-message\nQUICK2LEAD member report delivered by injection\n",
+  )
 }
 
 function writeSessionLine(fixture: Fixture, event: object): void {

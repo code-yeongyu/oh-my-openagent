@@ -114,7 +114,7 @@ export function messageHasInternalInitiatorMarker(message: unknown): boolean {
     return false
   }
   return (initiatorMessage.parts ?? []).some(
-    (part) => part.type === "text" && typeof part.text === "string" && hasInternalInitiatorMarker(part.text)
+    (part) => part.type === "text" && typeof part.text === "string" && hasInternalInitiatorMarker(part.text),
   )
 }
 
@@ -132,10 +132,7 @@ function partToolName(part: Record<string, unknown>): string | undefined {
 
 function partIsToolCall(part: Record<string, unknown>): boolean {
   return (
-    part.type === "tool"
-    || part.type === "tool_use"
-    || part.type === "tool-call"
-    || part.type === "tool-invocation"
+    part.type === "tool" || part.type === "tool_use" || part.type === "tool-call" || part.type === "tool-invocation"
   )
 }
 

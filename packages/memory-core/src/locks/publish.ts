@@ -34,7 +34,9 @@ let candidateFs: LockCandidateFs = {}
 export function setLockCandidateFsForTests(next: LockCandidateFs | undefined): () => void {
   const previous = candidateFs
   candidateFs = next ?? {}
-  return () => { candidateFs = previous }
+  return () => {
+    candidateFs = previous
+  }
 }
 
 /** The candidate-filesystem overrides currently installed (empty in production). */

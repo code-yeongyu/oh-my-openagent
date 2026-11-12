@@ -185,3 +185,18 @@ fn imported_error_code_faults_keep_their_exact_code_and_row() {
         assert!(fake.sink().is_empty());
     }
 }
+
+#[test]
+fn focus_record_sink_keeps_the_window_id_case() {
+    // given a window whose id is not already lowercase
+    let json = r#"{"windows":[{"id":"Main","title":"wMain","app":"a","pid":1,"x":0,"y":0,"width":10,"height":10,"focused":true,"elevated":null}]}"#;
+    let mut fake = FakeBackend::from_json(json).expect("the scenario loads");
+    // when the focus record is written
+    fake.focus_record(FocusRecordKind::Short, "Main")
+        .expect("recorded");
+    // then the sink line keeps the id and still folds the enum names
+    assert_eq!(
+        fake.sink().lines(),
+        ["focus_record kind=short window=Main outcome=tookeffect"]
+    );
+}
