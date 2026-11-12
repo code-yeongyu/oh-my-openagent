@@ -83,6 +83,30 @@ function argsHash(value: unknown): string {
  * 5.5). Every refusal here happens before the commit; an accepted record is the enqueue transaction's row, receipt, budgets
  * and inbox marker in one commit, its receipt completed with the answer so a repeat from the same device replays it.
  */
+/** A row already taken in under this ledger id, answered as the first answer was, with `deduplicated` set. */
+function answerFromLedgerRow(
+  ctx: ops.StoreContext,
+  ledgerId: string,
+  record: IntakeRequest["record"],
+): IntakeOutcome | undefined {
+  const found = ctx.sql.one(["delivery_id"], "SELECT delivery_id FROM deliveries WHERE ledger_id = ?", [ledgerId])
+  if (found === undefined) return undefined
+  const view = ops.deliveryView(ctx, String(found.delivery_id))
+  if (view === null) return undefined
+  if (view.row.target_durable_id !== record.sessionId)
+    return refusal("idempotency_conflict", "This delivery id was already taken in for another session.", {
+      ledger_id: ledgerId,
+    })
+  return {
+    kind: "queued",
+    delivery_id: record.deliveryId,
+    row_id: view.row.delivery_id,
+    ledger_id: ledgerId,
+    queue_position: view.queue_position,
+    deduplicated: true,
+  }
+}
+
 async function intake(ctx: ops.StoreContext, request: IntakeRequest): Promise<IntakeOutcome> {
   const record = request.record
   const device = request.attested_device
@@ -125,51 +149,62 @@ async function intake(ctx: ops.StoreContext, request: IntakeRequest): Promise<In
   // repeated delivery id into a second delivery.
   const principal = `device:${device}`
   const name = record.sender.name?.trim()
-  const outcome = await ops.enqueue(
-    ctx,
-    {
-      provenance: { ...request.provenance, device },
-      now: request.now,
-      delivery_id: randomUUID(),
-      target_durable_id: record.sessionId,
-      sender_principal: principal,
-      rate_principal: `device:${device}`,
-      sender_node: `${principal}#session:${senderSession}`,
-      sender_turn: null,
-      cause_delivery_id: null,
-      inbound_hop: record.chainCount - 1,
-      claimed_root_id: null,
-      origin: { session: senderSession },
-      actor: name === undefined || name === "" ? senderSession : name,
-      body: record.text,
-      mode: "follow_up",
-      expected_turn_id: null,
-      binding: null,
-      receipt: {
-        idempotency_key: record.deliveryId,
-        args_hash: argsHash({
-          target: record.sessionId,
-          text: record.text,
-          display_text: record.displayText,
-          deliver_as: record.deliverAs,
-          chain_count: record.chainCount,
+  let outcome: Awaited<ReturnType<typeof ops.enqueue>>
+  try {
+    outcome = await ops.enqueue(
+      ctx,
+      {
+        provenance: { ...request.provenance, device },
+        now: request.now,
+        delivery_id: randomUUID(),
+        target_durable_id: record.sessionId,
+        sender_principal: principal,
+        rate_principal: `device:${device}`,
+        sender_node: `${principal}#session:${senderSession}`,
+        sender_turn: null,
+        cause_delivery_id: null,
+        inbound_hop: record.chainCount - 1,
+        claimed_root_id: null,
+        origin: { session: senderSession },
+        actor: name === undefined || name === "" ? senderSession : name,
+        body: record.text,
+        mode: "follow_up",
+        expected_turn_id: null,
+        binding: null,
+        receipt: {
+          idempotency_key: record.deliveryId,
+          args_hash: argsHash({
+            target: record.sessionId,
+            text: record.text,
+            display_text: record.displayText,
+            deliver_as: record.deliverAs,
+            chain_count: record.chainCount,
+          }),
+        },
+        endpoint_kind: null,
+      },
+      {
+        ledger_id: ledgerId,
+        verbatim_text: record.text,
+        verbatim_display_text: record.displayText,
+        answer: (row, position) => ({
+          kind: "queued",
+          delivery_id: record.deliveryId,
+          row_id: row.delivery_id,
+          ledger_id: ledgerId,
+          queue_position: position,
         }),
       },
-      endpoint_kind: null,
-    },
-    {
-      ledger_id: ledgerId,
-      verbatim_text: record.text,
-      verbatim_display_text: record.displayText,
-      answer: (row, position) => ({
-        kind: "queued",
-        delivery_id: record.deliveryId,
-        row_id: row.delivery_id,
-        ledger_id: ledgerId,
-        queue_position: position,
-      }),
-    },
-  )
+    )
+  } catch (error) {
+    // The receipt is only the fast path: once it expired (30 days) the row can still be here, and two consumers can race
+    // past the receipt check. Either way the insert meets the unique index on ledger_id; the repeat is answered from the
+    // row that holds it, never with the raw constraint error (the base's review LOW).
+    if (!(error instanceof Error && /UNIQUE constraint failed: deliveries\.ledger_id/.test(error.message))) throw error
+    const raced = answerFromLedgerRow(ctx, ledgerId, record)
+    if (raced === undefined) throw error
+    return raced
+  }
   if (outcome.kind === "inserted") {
     return {
       kind: "queued",
