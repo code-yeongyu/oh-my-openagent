@@ -419,6 +419,46 @@ describe("the lease (A3.1.3)", () => {
   )
 })
 
+// Delta review of #13220 at da331c654d, LOW 3: a takeover reopens only a session a wake would open. A header that now
+// names a child or a worker is refused there as `not_wakeable`, so the takeover ends the row and opens nothing.
+describe("the takeover refuses a session a wake would refuse", () => {
+  test.each([
+    ["child", { spawnedBy: { session_id: "parent-s" } }],
+    ["worker", { kind: "worker" }],
+  ] as const)(
+    "#given a carrier that died after the open #when the session file now names a %s at the takeover #then the row ends and nothing is opened",
+    async (_kind, header) => {
+      const { h, fake, store, sessions, carrier, path } = await setup()
+      path("s1")
+      await carrier.wake("s1")
+      await carrier.stop()
+      writeSessionFile(sessions, "s1", header)
+      h.clock.now += WAKE_LEASE_MS + 1
+      await successorOf(h, fake).sweep()
+      expect(await store.woken.list()).toEqual([])
+      expect(sent(fake, "open_session")).toHaveLength(1)
+    },
+  )
+})
+
+// Delta review of #13220 at da331c654d, LOW 2: a wake that finds nothing queued ends only a record that is still
+// `requested`. Another carrier's record that is being opened or is open is left alone and the wake answers busy, so
+// that carrier keeps its lease and still closes the session it carries.
+describe("a wake with nothing queued and another carrier's live record", () => {
+  test("#given carrier A carrying an open session whose last row was settled #when carrier B is asked to wake it #then B answers busy, A's record and lease are untouched, and A still closes the session", async () => {
+    const { h, fake, store, carrier, path } = await setup()
+    path("s1")
+    expect(await carrier.wake("s1")).toMatchObject({ kind: "open" })
+    const before = await store.woken.list()
+    for (const row of await store.list({ target_durable_id: "s1" }))
+      await store.refuseQueued({ now: store.now(), delivery_id: row.delivery_id, reason: "sender_not_admitted" })
+    expect(await successorOf(h, fake).wake("s1")).toEqual({ kind: "busy", code: "wake_in_progress" })
+    expect(await store.woken.list()).toEqual(before)
+    expect(await carrier.evaluate("s1")).toEqual({ kind: "released" })
+    expect(sent(fake, "release_session")).toHaveLength(1)
+  })
+})
+
 // Review of #13220 (LOW) and A7.2.3 (A7R-10), one rule: a carrier opens a session only when the session holds a
 // queued row whose own switch allows the open. A same-device row reads `session_wake.same_device` at the open; a row
 // from another device reads the wake the consumer was told on its own connection.

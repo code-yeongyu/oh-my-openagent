@@ -136,6 +136,28 @@ describe("the wake the consumer is told (A7.2.3)", () => {
   })
 })
 
+// Delta review of #13220 at da331c654d, LOW 1: a restart that does not get a fresh acknowledgement reads off at once,
+// with no stop() in between, so the old `true` is never kept by a start that throws or serves nothing.
+describe("a restart that is not acknowledged reads the wake off", () => {
+  test.each([
+    ["throws", (service: FakeDeliveryService) => service.refuseServe("internal_error"), "throws"],
+    ["is refused as unknown", (service: FakeDeliveryService) => service.refuseServe("unknown_type"), "unsupported"],
+    ["gets an acknowledgement it cannot decode", (service: FakeDeliveryService) => service.ackServe({ wake: true, surprise: 1 }), "unsupported"],
+  ] as const)(
+    "#given a consumer told on #when a second start %s, with no stop() before it #then the wake reads off",
+    async (_case, fail, answer) => {
+      const { service, consumer } = setup()
+      service.ackServe({ wake: true })
+      await consumer.start()
+      expect(consumer.wakeAllowed()).toBe(true)
+      fail(service)
+      if (answer === "throws") await expect(consumer.start()).rejects.toThrow()
+      else expect(await consumer.start()).toBe(answer)
+      expect(consumer.wakeAllowed()).toBe(false)
+    },
+  )
+})
+
 describe("a handed delivery", () => {
   test("#given a session that is not running #when a record is handed in #then the row is committed before the answer, the answer is queued, and the session is woken after the sender is admitted", async () => {
     const { h, service, sessions, woken, consumer } = setup()
