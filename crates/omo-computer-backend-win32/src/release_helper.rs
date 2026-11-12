@@ -93,8 +93,9 @@ mod os {
     use std::os::windows::ffi::OsStrExt;
     use std::path::Path;
 
+    use windows::core::BOOL;
     use windows::core::{PCWSTR, PWSTR};
-    use windows::Win32::Foundation::{CloseHandle, BOOL, HANDLE};
+    use windows::Win32::Foundation::{CloseHandle, HANDLE};
     use windows::Win32::System::JobObjects::IsProcessInJob;
     use windows::Win32::System::Threading::{
         CreateProcessW, CREATE_BREAKAWAY_FROM_JOB, CREATE_NO_WINDOW, PROCESS_INFORMATION,

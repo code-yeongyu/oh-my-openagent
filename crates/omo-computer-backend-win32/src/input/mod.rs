@@ -9,6 +9,7 @@ pub mod partial;
 pub mod text;
 
 #[cfg(windows)]
+#[allow(dead_code, reason = "post_input calls these once row 23's verbs carry the target window and row 57's lease exists")]
 pub(crate) mod os;
 
 #[cfg(test)]
