@@ -188,7 +188,7 @@ describe("#13006: a send answers the same shape and the same refusals whichever 
   test.each(LEGS)(
     "#13037: #given a thread on the %s leg that no process runs #when it is sent to #then it is queued (offline here, waiting on the wake there) with the same result keys",
     async (leg) => {
-      const a = fixture.account({ rows: [B_ROW], ended: { b: { [NOT_RUNNING]: "rk-not-running" } } })
+      const a = fixture.account({ rows: [B_ROW], ended: { b: { [NOT_RUNNING]: "rk-not-running" } }, wakeFeature: true })
       const { run } = fixture.surface(a.remote, leg === "local" ? { diskSessions: [NOT_RUNNING] } : {})
       const result = await run("thread_send", { thread: NOT_RUNNING, message: "while you were away" })
       expect(result).toMatchObject(
@@ -201,7 +201,7 @@ describe("#13006: a send answers the same shape and the same refusals whichever 
   )
 
   test("#13037 5.8: #given the same message relayed to a live session and woken to one that is not running #when the two records are compared #then they differ only in the recorded fields", async () => {
-    const a = fixture.account({ rows: [B_ROW], ended: { b: { [NOT_RUNNING]: "rk-not-running" } } })
+    const a = fixture.account({ rows: [B_ROW], ended: { b: { [NOT_RUNNING]: "rk-not-running" } }, wakeFeature: true })
     const { run } = fixture.surface(a.remote)
     await run("thread_send", { thread: "dur-on-b", message: "same text", delivery: "follow_up" })
     await run("thread_send", { thread: NOT_RUNNING, message: "same text", delivery: "follow_up" })

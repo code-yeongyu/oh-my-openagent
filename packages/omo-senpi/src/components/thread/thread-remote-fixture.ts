@@ -107,6 +107,8 @@ export function createRemoteThreadFixture() {
       ended?: Readonly<Record<string, Readonly<Record<string, string>>>>
       /** omo#13037: devices whose single-probe lookup gets no answer within the bound. */
       silent?: readonly string[]
+      /** omo#13037: this device's service carries the wake mark and the single probe (both gates open). Off by default, as shipped. */
+      wakeFeature?: boolean
       /** omo#13037: this device's service makes no single probe (the lookup is never made). */
       noLookup?: boolean
       /** omo#13037: this device's service cannot carry the wake target (no wake is sent; today's path). */
@@ -352,15 +354,15 @@ export function createRemoteThreadFixture() {
           }
         },
         lookup: async (device, durableId) => {
-          if (options.noLookup === true) return { kind: "unavailable" }
+          if (options.noLookup === true || options.wakeFeature !== true) return { kind: "unavailable" }
           lookups.push({ device, durable_id: durableId })
           if (options.silent?.includes(device) === true) return { kind: "silent", reason: "host_not_answering" }
           const key = options.ended?.[device]?.[durableId]
           return key === undefined ? { kind: "none" } : { kind: "found", key }
         },
-        canWake: async () => options.noWake !== true,
+        canWake: async () => options.wakeFeature === true && options.noWake !== true,
         wake: async (device, durableId, rpc) => {
-          if (options.noWake === true) return { kind: "unavailable" }
+          if (options.noWake === true || options.wakeFeature !== true) return { kind: "unavailable" }
           sent.push({ via: "wake", device, session: durableId, rpc })
           return (
             options.wakeOutcome ?? {

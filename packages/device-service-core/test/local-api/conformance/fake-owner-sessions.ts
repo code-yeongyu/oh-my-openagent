@@ -153,6 +153,8 @@ const endpointCommand = (
 
 const command = (state: OwnerState, conn: Conn, request: SessionCommand): Outcome => {
   if ("device" in request) return endpointCommand(state, conn, request)
+  // This fake stands in for a service before omo#13037: it takes no wake target.
+  if ("wake" in request) return refuse("unsupported", "this service takes no wake target")
   const session = state.attaches.get(request.attach)
   if (session === undefined || !conn.attaches.has(request.attach)) return refuse("not_attached", "attach first")
   const resolved = commandOf(state, request)

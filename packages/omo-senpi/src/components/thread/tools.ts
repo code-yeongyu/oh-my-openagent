@@ -344,9 +344,14 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
             const found = await resolveAcross(options, entries, address, callerId, true)
             if (found.kind === "error")
               return { kind: "error", result: { kind: "error", error: found } as ThreadToolResult }
-            // A session its device holds but runs nowhere is no existing thread to open (omo#13037 A4.4): today's answer
-            // for a holder that cannot be reached, and no open is sent.
-            if (found.entry.transport?.kind === "relay" && found.entry.transport.row.state === "ended")
+            // A session found only by a probe (no file path: its device holds it but runs it nowhere) is no existing thread to
+            // open (omo#13037 A4.4): today's answer for a holder that cannot be reached, and no open is sent. A listed ended
+            // thread still opens from its file, as before.
+            if (
+              found.entry.transport?.kind === "relay" &&
+              found.entry.transport.row.state === "ended" &&
+              found.entry.transport.row.path === ""
+            )
               return {
                 kind: "error",
                 result: failure(

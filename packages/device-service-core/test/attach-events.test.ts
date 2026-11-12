@@ -38,6 +38,7 @@ function scriptedClient(onCommand: (commandId: string) => void = () => {}) {
       return commandId ?? "c"
     },
     endpointCommand: async () => "c",
+    wakeCommand: async () => "c",
     list: async () => ({ query_id: "q", revision: 0, rows: [], incomplete: [], devices: {} }),
     read: async () => ({ entries: [], next_before: null }),
     oversizedLines: () => 0,
