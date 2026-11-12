@@ -15,6 +15,8 @@ interface Report {
   readonly unobserved: number
   /** Cells the hand reported delivered, whatever the verdict: `delivered` counts only those that also passed. */
   readonly observedDelivered: number
+  /** Failed cells no observer watched: a missed oracle is a failure either way, but nothing saw the session. */
+  readonly failedUnwatched: number
   readonly problems: readonly string[]
   /** The run's shape faults: a missing, duplicate, undeclared or contradictory cell, or an empty catalog. */
   readonly structural: readonly string[]
@@ -36,6 +38,11 @@ function oracleProblem(cell: Cell, result: CellResult): string | undefined {
 
 function unobservedSignals(result: CellResult): SignalId[] {
   return SIGNAL_IDS.filter((id) => result.journal[id].signal === "not_observed")
+}
+
+/** A cell is watched when an observer read every one of its signals. */
+function isWatched(result: CellResult): boolean {
+  return unobservedSignals(result).length === 0
 }
 
 function inconsistentSignals(result: CellResult): SignalId[] {
@@ -77,7 +84,10 @@ function judge(cell: Cell, id: string, result: CellResult): Judgement {
     return { outcome: "skipped", problem: `skipped cell ${id}: ${result.observed.reason}` }
   }
   const problem = cellProblem(cell, result)
-  if (problem !== undefined) return { outcome: "failed", problem: `cell ${id}: ${problem}` }
+  if (problem !== undefined) {
+    const mark = isWatched(result) ? "" : " [unwatched]"
+    return { outcome: "failed", problem: `cell ${id}${mark}: ${problem}` }
+  }
   const unread = unobservedSignals(result)
   if (unread.length > 0) {
     const why = result.observerUnavailable === undefined ? "" : ` (${result.observerUnavailable})`
@@ -98,6 +108,7 @@ export function buildReport(catalog: readonly Cell[], results: readonly CellResu
   const structural: string[] = []
   const counts = { delivered: 0, refused: 0, failed: 0, skipped: 0, disturbed: 0, unobserved: 0 }
   const observedDelivered = results.filter((result) => result.observed.kind === "delivered").length
+  let failedUnwatched = 0
   const declared = groupBy(catalog, cellId)
   const observed = groupBy(results, (result) => result.id)
   if (catalog.length === 0) structural.push("empty catalog")
@@ -122,6 +133,7 @@ export function buildReport(catalog: readonly Cell[], results: readonly CellResu
     const judgement = judge(cell, id, row)
     if ("problem" in judgement) problems.push(judgement.problem)
     counts[judgement.outcome] += 1
+    if (judgement.outcome === "failed" && !isWatched(row)) failedUnwatched += 1
   }
   for (const id of observed.keys()) {
     if (declared.has(id)) continue
@@ -135,6 +147,7 @@ export function buildReport(catalog: readonly Cell[], results: readonly CellResu
     cells: declared.size,
     ...counts,
     observedDelivered,
+    failedUnwatched,
     problems: [...structural, ...problems],
     structural,
   }
@@ -172,10 +185,10 @@ function main(argv: readonly string[]): number {
   const report = buildReport(catalogFor(run.os, run.session), run.results)
   if (argv.includes("--check-schema") || argv.includes("--summary")) {
     for (const fault of report.structural) console.log(fault)
-    const { cells, delivered, refused, failed, disturbed, unobserved, observedDelivered } = report
+    const { cells, delivered, refused, failed, disturbed, unobserved, observedDelivered, failedUnwatched } = report
     if (argv.includes("--summary")) {
       console.log(
-        `cells=${cells} delivered=${delivered} refused=${refused} failed=${failed} disturbed=${disturbed} unobserved=${unobserved} observed_delivered=${observedDelivered}`,
+        `cells=${cells} delivered=${delivered} refused=${refused} failed=${failed} disturbed=${disturbed} unobserved=${unobserved} observed_delivered=${observedDelivered} failed_unwatched=${failedUnwatched}`,
       )
     } else if (report.structural.length === 0) console.log(`SCHEMA ok ${run.os}/${run.session} cells=${cells}`)
     return report.structural.length === 0 ? 0 : 1
