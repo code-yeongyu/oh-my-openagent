@@ -1,4 +1,128 @@
-//! The Windows stop path (row 57).
+//! The Windows stop path's view of input (d-windows.md '## Capture guard and input lock'). The
+//! `WH_KEYBOARD_LL` procedure classifies each event - physical (`!LLKHF_INJECTED`), ours (injected
+//! with [`crate::input::ENGINE_TAG`]) or another injector's - and only physical events move the
+//! [`PhysicalChord`] tracker, so an injected stop chord never stops and the release paths can skip
+//! a key the user holds. The `RegisterHotKey` backstop is judged against the hook's sightings.
+
+use crate::input::{ENGINE_TAG, VK_CONTROL, VK_MENU, VK_SHIFT};
 
 #[cfg(test)]
 mod tests;
+
+/// `VK_ESCAPE`.
+pub const VK_ESCAPE: u16 = 0x1B;
+/// A `WM_HOTKEY` within this window of a hook sighting is that sighting's (d-windows.md, 250 ms).
+pub const HOTKEY_DEDUPE_MS: u64 = 250;
+/// The stop chord's modifiers; the chord is these plus Escape (`ctrl+alt+shift+escape`).
+const STOP_MODIFIERS: [u16; 3] = [VK_CONTROL, VK_MENU, VK_SHIFT];
+
+/// One `KBDLLHOOKSTRUCT` as the procedure reads it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HookEvent {
+    pub vk: u16,
+    pub down: bool,
+    /// `LLKHF_INJECTED`.
+    pub injected: bool,
+    pub extra_info: usize,
+    /// The event's own `time`.
+    pub time: u64,
+}
+
+/// Who produced an event.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Origin {
+    Physical,
+    Ours,
+    Foreign,
+}
+
+impl HookEvent {
+    #[must_use]
+    pub const fn origin(&self) -> Origin {
+        match (self.injected, self.extra_info == ENGINE_TAG) {
+            (false, _) => Origin::Physical,
+            (true, true) => Origin::Ours,
+            (true, false) => Origin::Foreign,
+        }
+    }
+}
+
+/// The keys the user holds physically, and the stop-chord sighting of each event.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PhysicalChord {
+    held: Vec<u16>,
+    injected_down: Vec<u16>,
+}
+
+impl PhysicalChord {
+    /// Folds one event in; `Some(origin)` when it completes the stop chord (only a physical
+    /// sighting stops; an injected one is recorded for the hotkey dedupe).
+    pub fn on_key(&mut self, event: &HookEvent) -> Option<Origin> {
+        let origin = event.origin();
+        let keys = if origin == Origin::Physical {
+            &mut self.held
+        } else {
+            &mut self.injected_down
+        };
+        if event.down {
+            if !keys.contains(&event.vk) {
+                keys.push(event.vk);
+            }
+        } else {
+            keys.retain(|vk| *vk != event.vk);
+        }
+        let complete = event.down
+            && event.vk == VK_ESCAPE
+            && STOP_MODIFIERS.iter().all(|vk| keys.contains(vk));
+        complete.then_some(origin)
+    }
+
+    /// The virtual keys seen physically down and not yet up.
+    #[must_use]
+    pub fn held(&self) -> Vec<u16> {
+        self.held.clone()
+    }
+}
+
+/// What a `WM_HOTKEY` for the stop chord means.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HotkeyVerdict {
+    /// The hook saw an injected chord: never a stop.
+    Discard,
+    /// The hook already stopped on the physical chord.
+    Dedupe,
+    /// The hook saw nothing (blind behind an elevated window): stop, audited `hotkey_backstop`.
+    BackstopStop,
+}
+
+/// The hook's most recent stop-chord sighting.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Sightings {
+    last: Option<(Origin, u64)>,
+}
+
+impl Sightings {
+    pub fn record(&mut self, origin: Origin, time: u64) {
+        self.last = Some((origin, time));
+    }
+
+    #[must_use]
+    pub fn on_hotkey(&self, now: u64) -> HotkeyVerdict {
+        match self.last {
+            Some((origin, at)) if now.saturating_sub(at) <= HOTKEY_DEDUPE_MS => {
+                if origin == Origin::Physical {
+                    HotkeyVerdict::Dedupe
+                } else {
+                    HotkeyVerdict::Discard
+                }
+            }
+            _ => HotkeyVerdict::BackstopStop,
+        }
+    }
+}
+
+/// Whether `vk` is one of the stop chord's keys.
+#[must_use]
+pub fn is_stop_chord_key(vk: u16) -> bool {
+    vk == VK_ESCAPE || STOP_MODIFIERS.contains(&vk)
+}
