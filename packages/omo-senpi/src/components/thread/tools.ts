@@ -72,6 +72,8 @@ import {
 export const RECEIPT_RECOVERY_MAX_KEYS = 4_096
 /** A registered exact id needs no pre-engine view; the engine validates its one endpoint. */
 const PUBLISHED_SEND_VIEW: ThreadHostView = { sessions: [], hosts: [], disk: [] }
+/** A reply to a sender on another device resolves on that device alone and reads no view of this one. */
+const NO_LOCAL_VIEW: ThreadHostView = { sessions: [], hosts: [], disk: [] }
 /** A control tool's answer for a thread no engine holds live, on this device or another. */
 const NOT_LIVE: ThreadToolResult = failure(
   "not_resumable",
@@ -290,14 +292,14 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
     if (receipted) running.add(receiptKey(scope))
     try {
       // A send takes nothing live as the offline case: its view never raises host_unavailable.
+      // A reply whose sender is on another device resolves there alone (A4.3.1), so it takes no local listing.
+      const sendTo = name === "thread_send" && "thread" in value && typeof value.thread === "string" ? value.thread : ""
       const current =
-        name === "thread_send" &&
-        "thread" in value &&
-        typeof value.thread === "string" &&
-        value.thread !== "self" &&
-        (await store.sessionOwner(value.thread)) !== null
+        sendTo !== "" && sendTo !== "self" && (await store.sessionOwner(sendTo)) !== null
           ? PUBLISHED_SEND_VIEW
-          : await view(receipted ? undefined : { offline: true })
+          : sendTo !== "" && (await replyLeavesThisDevice(options, sendTo))
+            ? NO_LOCAL_VIEW
+            : await view(receipted ? undefined : { offline: true })
       result = await sideEffect(current, value, scope.idempotency_key, callerId)
     } catch (error) {
       // A control's typed refusal is the call's answer, recorded like one: a retry under the same key replays it.
@@ -779,6 +781,14 @@ async function thisDeviceOf(
 ): Promise<string | undefined> {
   if (options.remote === undefined || !senders.some((sender) => sender.device !== undefined)) return undefined
   return (await options.remote.sessions.thisDevice().catch(() => undefined)) ?? undefined
+}
+
+/** True when `address` is an approved reply to a consumed sender on another device, or names such senders ambiguously. */
+async function replyLeavesThisDevice(options: ThreadToolSurfaceOptions, address: string): Promise<boolean> {
+  const senders = consumedSendersOf(options, address)
+  if (!senders.some((sender) => sender.device !== undefined)) return false
+  const replyTo = replySender(address, senders, await thisDeviceOf(options, senders))
+  return replyTo !== undefined && ("code" in replyTo || replyTo.device !== undefined)
 }
 
 const otherDevice = (device: string | undefined, here: string | undefined): string | undefined =>
