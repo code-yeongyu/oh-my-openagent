@@ -189,8 +189,11 @@ jobs:
           echo "::error::ENVIRONMENT failure, the runner could not install the AT-SPI stack (not a fixture failure)"
           exit 1
 
+      # Chromium registers with AT-SPI only when ACCESSIBILITY_ENABLED=1 is set at startup.
       - name: Self-test
         shell: bash
+        env:
+          ACCESSIBILITY_ENABLED: "1"
         run: |
           dbus-run-session -- xvfb-run -a bun script/qa/computer/conformance/fixtures/self-test.ts \
             --fixture electron-linux --app-key dev.omo.conformance-fixture.electron \

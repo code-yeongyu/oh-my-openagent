@@ -13,7 +13,7 @@ import Foundation
 let waitSeconds = 20.0
 
 func trusted() -> Bool {
-    let options = [kAXTrustedCheckOptionPrompt: false] as CFDictionary
+    let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: false] as CFDictionary
     return AXIsProcessTrustedWithOptions(options)
 }
 

@@ -22,6 +22,10 @@ app.setName(APP)
 // "Chrome Legacy Window"). Force the accessibility tree on so every control of the shared page is visible to
 // AT-SPI/UIA/AX before the self-test's a11y leg probes it. Must run before the app is ready.
 app.commandLine.appendSwitch("force-renderer-accessibility")
+// On Linux Chromium registers with AT-SPI only when ACCESSIBILITY_ENABLED=1 (or the desktop's screen-reader
+// setting) is present at startup; the switch above alone leaves the AT-SPI desktop empty. Drivers should
+// launch the fixture with it set; this is the fixture's own best effort for a launcher that did not.
+if (process.platform === "linux") process.env.ACCESSIBILITY_ENABLED = "1"
 if (process.platform === "linux") app.commandLine.appendSwitch("class", APP_KEY)
 if (process.platform === "win32") app.setAppUserModelId(APP_KEY)
 
