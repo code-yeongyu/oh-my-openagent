@@ -74,7 +74,7 @@ const delegateTaskArgsSchema = {
     .boolean()
     .optional()
     .describe(
-      "true is the standard spawn: returns a background task ID `bg_...` at once; a notification with the child's final answer arrives when it finishes (background_output reads it again). false blocks this response until the child finishes; use it only for a short child whose result gates your very next call. Omitted counts as false.",
+      "Default true: returns a background task ID `bg_...` at once; a notification with the child's final answer arrives when it finishes (background_output reads it again). false blocks this response until the child finishes; use it only for a short child whose result gates your very next call.",
     ),
   wake: tool.schema
     .enum(["each", "none"])
