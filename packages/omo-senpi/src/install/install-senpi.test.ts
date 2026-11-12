@@ -210,6 +210,23 @@ describe("runSenpiInstaller", () => {
     expect(await backupFiles(agentDir)).toHaveLength(0)
   })
 
+  test("#given a plugin that was never built #when installing #then it names the build command before settings change", async () => {
+    // given
+    const agentDir = await makeAgentDir()
+    const pluginPath = await makePluginFixture()
+    await rm(join(pluginPath, "extensions", "omo.js"))
+    await mkdir(agentDir, { recursive: true })
+    await writeFile(join(agentDir, "settings.json"), JSON.stringify({ packages: ["keep-me"] }), "utf8")
+
+    // when
+    const install = runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+
+    // then
+    await expect(install).rejects.toThrow("run `bun run build:senpi-plugin`")
+    expect(await readSettings(agentDir)).toEqual({ packages: ["keep-me"] })
+    expect(await backupFiles(agentDir)).toHaveLength(0)
+  })
+
   test("#given a packed plugin missing the dream persona #when installing #then artifact validation fails before settings change", async () => {
     // given
     const agentDir = await makeAgentDir()

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { spawnSync } from "node:child_process"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
@@ -108,6 +109,29 @@ describe("local omo launcher", () => {
         expect(readFileSync(path, "utf8")).toContain("echo mine")
 
         rmSync(home, { recursive: true, force: true })
+      })
+    })
+
+    describe("#when the checkout's plugin is not built", () => {
+      test("#then the launcher exits 1 naming the build command instead of starting the engine", () => {
+        const home = makeHome()
+        const pluginPath = join(home, "plugin")
+        const engine = join(home, "engine.mjs")
+        mkdirSync(join(pluginPath, "extensions"), { recursive: true })
+        writeFileSync(engine, "process.stdout.write('ENGINE STARTED')\n")
+        const launcher = join(home, "omo.mjs")
+        writeFileSync(launcher, renderLocalLauncher({ ...BASE, pluginPath, senpiCliPath: engine }))
+
+        const unbuilt = spawnSync(process.execPath, [launcher, "--version"], { encoding: "utf8" })
+        writeFileSync(join(pluginPath, "extensions", "omo.js"), "")
+        const built = spawnSync(process.execPath, [launcher, "--version"], { encoding: "utf8" })
+        rmSync(home, { recursive: true, force: true })
+
+        expect(unbuilt.status).toBe(1)
+        expect(unbuilt.stdout).not.toContain("ENGINE STARTED")
+        expect(unbuilt.stderr).toContain("bun run build:senpi-plugin")
+        expect(built.status).toBe(0)
+        expect(built.stdout).toContain("ENGINE STARTED")
       })
     })
 
