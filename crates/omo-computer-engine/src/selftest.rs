@@ -13,15 +13,22 @@ const CHECKS: &[(&str, &str)] = &[
     ("session.open", r#"{"jsonrpc":"2.0","id":1,"method":"session.open","params":{}}"#),
     ("capabilities", r#"{"jsonrpc":"2.0","id":2,"method":"capabilities","params":{}}"#),
     ("stopPath.start", r#"{"jsonrpc":"2.0","id":3,"method":"stopPath.start","params":{}}"#),
+    ("capture", r#"{"jsonrpc":"2.0","id":4,"method":"capture","params":{"target":"desktop"}}"#),
     // Row 21: a click with no target lands on the user's pointer, which needs the human grant.
-    ("control.grant", r#"{"jsonrpc":"2.0","id":6,"method":"control.grant","params":{"reason":"selftest"}}"#),
-    ("click", r#"{"jsonrpc":"2.0","id":4,"method":"click","params":{"x":1,"y":1}}"#),
-    ("session.close", r#"{"jsonrpc":"2.0","id":5,"method":"session.close","params":{}}"#),
+    ("control.grant", r#"{"jsonrpc":"2.0","id":7,"method":"control.grant","params":{"reason":"selftest"}}"#),
+    ("click", r#"{"jsonrpc":"2.0","id":5,"method":"click","params":{"x":1,"y":1}}"#),
+    ("session.close", r#"{"jsonrpc":"2.0","id":6,"method":"session.close","params":{}}"#),
 ];
+
+/// One display, so the click has a frame to map through.
+const SCENARIO: &str = r#"{"displays":[{"id":"1","name":"Display","x":0,"y":0,"width":64,"height":48,"scale":1.0,"pixelX":0,"pixelY":0,"pixelWidth":64,"pixelHeight":48,"isPrimary":true}]}"#;
 
 fn checks() -> Vec<(String, bool)> {
     let sink = RecordingSink::default();
-    let backend = FakeBackend::with_parts(FakeScenario::default(), FakeClock::default(), sink.clone())
+    let Ok(scenario) = FakeScenario::from_json(SCENARIO) else {
+        return vec![("scenario".to_owned(), false)];
+    };
+    let backend = FakeBackend::with_parts(scenario, FakeClock::default(), sink.clone())
         .with_stop_path(StopPathScript::Live);
     let mut session = Session::new(Box::new(backend));
     let mut results: Vec<(String, bool)> = CHECKS

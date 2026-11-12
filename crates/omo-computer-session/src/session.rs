@@ -13,7 +13,9 @@ use omo_computer_core::params::{
 };
 use omo_computer_core::params::{StopPathStartParams, StopPathStopParams};
 use omo_computer_core::paths::Roots;
-use omo_computer_core::requests::{read_click, read_session_open, read_type_text, V1Request, Verb};
+use omo_computer_core::requests::{
+    read_click, read_session_open, read_type_text, TraceMode, V1Request, Verb,
+};
 use omo_computer_core::methods::Method;
 use omo_computer_core::results::{
     CapabilitiesReply, ExecReply, PermissionState, SessionOpened, StopPathStatus,
@@ -22,7 +24,9 @@ use omo_computer_core::session_state::Tristate;
 use omo_computer_safety::{Call, Guard, HostAdditions, StopPolicy, TargetRef, Transport, VerbKind};
 
 use crate::audit::gc::SweepTrigger;
+use crate::frames::admit::frame_key;
 use crate::mutate::{Funnel, Mutation, Refused};
+use crate::trace::Trace;
 
 /// `stopReason` while no stop path is armed: `session.open` arms none (`stopPath.start` does).
 pub const NO_GLOBAL_LISTENER: &str = "no-global-listener";
@@ -46,6 +50,9 @@ pub struct Session {
     pub(crate) opened: Option<Opened>,
     pub(crate) funnel: Funnel,
     pub(crate) refs: crate::refs::RefRegistry,
+    pub(crate) frames: crate::frames::FrameStore,
+    pub(crate) epoch_events: Vec<crate::epoch::EpochChanged>,
+    pub(crate) trace: Trace,
 }
 
 impl Session {
@@ -72,6 +79,9 @@ impl Session {
             opened: None,
             funnel: Funnel::in_memory(),
             refs: crate::refs::RefRegistry::default(),
+            frames: crate::frames::FrameStore::default(),
+            epoch_events: Vec::new(),
+            trace: Trace::default(),
         }
     }
 
@@ -92,6 +102,13 @@ impl Session {
         let resume_token = format!("{:016x}{:016x}", random_u64(), random_u64());
         self.open_control(&resume_token[..16])?;
         self.funnel.sweep(SweepTrigger::Open);
+        let trace_dir = self.artifacts().map(|store| store.dir().to_owned());
+        self.trace = Trace::open(
+            request.trace.unwrap_or(TraceMode::Off),
+            trace_dir,
+            &resume_token[..16],
+            crate::audit::now_ms(),
+        );
         Ok(SessionOpened {
             capabilities: self.capabilities(),
             resume_token,
@@ -134,48 +151,75 @@ impl Session {
     }
 
     pub fn close(&mut self) {
-        self.close_session();
+        self.close_control();
+        if self.opened.take().is_some() {
+            self.funnel.sweep(SweepTrigger::IdleExit);
+            if let Err(error) = self.trace.close(crate::audit::now_ms()) {
+                eprintln!("omo-computer-engine: warn trace manifest not finalised: {error}");
+            }
+        }
     }
 
+    /// The point is in the coordinate space of the frame the call names (or the target's
+    /// latest); the frame check runs in the funnel, and the point sent is the one the frame
+    /// record maps it to.
+    ///
     /// # Errors
     /// [`NOT_OPEN`], [`POINT_REQUIRED`], or the funnel's refusal.
     pub fn click(&mut self, params: ClickParams) -> Result<ExecReply, Refused> {
+        let dispatched = serde_json::to_value(&params).unwrap_or_default();
         let request = read_click(params);
         let Verb::Click {
             at,
             button,
             count,
             modifiers,
-            consume: _,
+            consume,
         } = request.verb
         else {
             unreachable!("read_click always reads a click");
         };
         let at = at.ok_or(POINT_REQUIRED)?;
+        let key = frame_key(request.target.as_deref());
+        let (point, frame_refusal, consumes) =
+            match self.admit_frame(&key, request.frame_id.as_deref(), at.x, at.y) {
+                Ok(admitted) => (
+                    admitted.point,
+                    None,
+                    consume.then(|| (key.clone(), admitted.frame_id)),
+                ),
+                Err(refusal) => (Point { x: at.x, y: at.y }, Some(refusal), None),
+            };
         let call = Call {
             verb: VerbKind::Pointer,
             target: TargetRef::read(request.target.as_deref()),
-            points: vec![Point { x: at.x, y: at.y }],
+            points: vec![point],
             chord: None,
             force: false,
         };
         let route = route_for(request.target.as_deref(), request.policy.delivery);
         let button = button.unwrap_or(Button::Left);
-        let mut events = vec![InputEvent::PointerMove(Point { x: at.x, y: at.y })];
+        let mut events = vec![InputEvent::PointerMove(point)];
         events.extend(modifiers.iter().map(|key| key_event(key, true)));
         for _ in 0..count.unwrap_or(1) {
             events.push(InputEvent::Button { button, down: true });
             events.push(InputEvent::Button { button, down: false });
         }
         events.extend(modifiers.iter().rev().map(|key| key_event(key, false)));
-        self.mutate(Mutation::exec(Method::Click, call, events, route, &request.authority)
-            .with_frame(request.frame_id.clone())
-            .with_keys(modifiers))
+        let result = self.mutate(
+            Mutation::exec(Method::Click, call, events, route, &request.authority)
+                .with_frame(request.frame_id.clone())
+                .with_frame_check(frame_refusal, consumes)
+                .with_keys(modifiers),
+        );
+        self.trace_turn(Method::Click, dispatched, &key, &result);
+        result
     }
 
     /// # Errors
     /// [`NOT_OPEN`] or the funnel's refusal.
     pub fn type_text(&mut self, params: TypeTextParams) -> Result<ExecReply, Refused> {
+        let dispatched = serde_json::to_value(&params).unwrap_or_default();
         let V1Request::TypeText { target, text } = read_type_text(params) else {
             unreachable!("read_type_text always reads a typeText");
         };
@@ -187,7 +231,9 @@ impl Session {
             force: false,
         };
         let route = route_for(Some(target.as_str()), None);
-        self.mutate(Mutation::typed(Method::TypeText, call, route, text))
+        let result = self.mutate(Mutation::typed(Method::TypeText, call, route, text));
+        self.trace_turn(Method::TypeText, dispatched, &target, &result);
+        result
     }
 }
 
@@ -290,6 +336,7 @@ mod tests {
         let mut session = session(&sink);
         session.open(params(json!({}))).expect("open");
         start(&mut session);
+        session.capture_frame("1", true, None).expect("a frame of 1");
         let reply = session.click(params(json!({"target": "1", "x": 3, "y": 4})));
         assert_eq!(reply, Ok(ExecReply(None)));
         assert_eq!(sink.len(), 3, "move, down, up: {:?}", sink.lines());

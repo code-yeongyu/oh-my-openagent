@@ -1,6 +1,7 @@
 //! One mutating call as the funnel takes it, and its builders.
 
 use omo_computer_core::backend::{InputEvent, Route};
+use omo_computer_core::frame::FrameRefusal;
 use omo_computer_core::methods::Method;
 use omo_computer_core::requests::CallAuthority;
 use omo_computer_safety::Call;
@@ -19,6 +20,11 @@ pub struct Mutation<'a> {
     pub keys: Vec<String>,
     /// Row 25: the call's targets resolved from the app's identity, not from a window.
     pub targets: Option<Vec<omo_computer_safety::gate::PointTarget>>,
+    /// The frame check's verdict on the call's coordinates: refused after the safety gate,
+    /// before anything is sent.
+    pub frame_refusal: Option<FrameRefusal>,
+    /// `consume:true`: the `(target, frameId)` a delivery consumes.
+    pub consume: Option<(String, String)>,
 }
 
 impl<'a> Mutation<'a> {
@@ -42,6 +48,8 @@ impl<'a> Mutation<'a> {
             text: None,
             keys: Vec::new(),
             targets: None,
+            frame_refusal: None,
+            consume: None,
         }
     }
 
@@ -59,6 +67,8 @@ impl<'a> Mutation<'a> {
             text: Some(text),
             keys: Vec::new(),
             targets: None,
+            frame_refusal: None,
+            consume: None,
         }
     }
 
@@ -71,6 +81,17 @@ impl<'a> Mutation<'a> {
     #[must_use]
     pub fn with_targets(mut self, targets: Vec<omo_computer_safety::gate::PointTarget>) -> Self {
         self.targets = Some(targets);
+        self
+    }
+
+    #[must_use]
+    pub fn with_frame_check(
+        mut self,
+        refusal: Option<FrameRefusal>,
+        consume: Option<(String, String)>,
+    ) -> Self {
+        self.frame_refusal = refusal;
+        self.consume = consume;
         self
     }
 

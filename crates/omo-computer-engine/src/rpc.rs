@@ -91,6 +91,11 @@ fn dispatch(session: &mut Session, name: &str, params: Value) -> Result<Value, F
             parse::<omo_computer_core::params::EmptyParams>(params)?;
             json!(session.capabilities())
         }
+        Method::Displays => {
+            parse::<omo_computer_core::params::EmptyParams>(params)?;
+            json!(session.displays().map_err(|r| refused(&r))?)
+        }
+        Method::Capture => json!(session.capture(parse(params)?).map_err(|r| refused(&r))?),
         Method::Click => json!(session.click(parse(params)?).map_err(|r| refused_call(&r))?),
         Method::TypeText => json!(session.type_text(parse(params)?).map_err(|r| refused_call(&r))?),
         Method::Observe => json!(session.observe(parse(params)?).map_err(|u| unresolved(&u))?),

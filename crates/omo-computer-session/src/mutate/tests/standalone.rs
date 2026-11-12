@@ -1,6 +1,7 @@
 //! The v3-r17 replacements of the three marker cases replay standalone: each runs in a fresh
 //! runtime root holding only the state the case plants (`runtime.plant`), the way the replay
-//! driver runs it, so no case depends on what an earlier run left behind.
+//! driver runs it, so no case depends on what an earlier run left behind. A case a later row
+//! superseded replays through its newest replacement.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -23,6 +24,34 @@ const CASES: [&str; 3] = [
 
 fn repo() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+}
+
+fn conformance() -> PathBuf {
+    repo().join("crates/omo-computer-core/fixtures/conformance")
+}
+
+/// The newest case of `name`'s supersedes chain: the case that names it in `supersedes`, followed
+/// to the end (a later row's replacement replays in its place).
+fn newest(name: &str) -> String {
+    let superseder = fs::read_dir(conformance())
+        .expect("the conformance dir")
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "json"))
+        .find(|path| {
+            fs::read_to_string(path)
+                .ok()
+                .and_then(|text| serde_json::from_str::<Value>(&text).ok())
+                .is_some_and(|case| {
+                    case["supersedes"]
+                        .as_array()
+                        .is_some_and(|names| names.contains(&json!(name)))
+                })
+        });
+    superseder.map_or_else(
+        || name.to_owned(),
+        |path| newest(&path.file_name().expect("a file name").to_string_lossy()),
+    )
 }
 
 fn mode(item: &Value) -> Option<u32> {
@@ -134,6 +163,9 @@ fn replay(name: &str, case: &Value, root: &Path) {
             "stopPath.start" => {
                 session.stop_path_start(params(send["params"].clone()));
             }
+            "capture" => {
+                session.capture(params(send["params"].clone())).expect(&at);
+            }
             "click" => check(session.click(params(send["params"].clone())), expected, &at),
             other => panic!("{at}: this replay does not drive {other}"),
         }
@@ -143,10 +175,9 @@ fn replay(name: &str, case: &Value, root: &Path) {
 #[test]
 fn v3_r17_marker_cases_replay_standalone_in_a_fresh_runtime_root() {
     for name in CASES {
-        let path = repo()
-            .join("crates/omo-computer-core/fixtures/conformance")
-            .join(name);
-        assert!(path.exists(), "{name} is missing");
+        assert!(conformance().join(name).exists(), "{name} is missing");
+        let replayed = newest(name);
+        let path = conformance().join(&replayed);
         let case: Value = serde_json::from_str(&fs::read_to_string(&path).expect("case text"))
             .expect("case JSON");
         assert_eq!(
@@ -156,7 +187,7 @@ fn v3_r17_marker_cases_replay_standalone_in_a_fresh_runtime_root() {
         );
         let root = tempfile::tempdir().expect("tempdir");
         let narrowed = plant(root.path(), &case);
-        replay(name, &case, root.path());
+        replay(&replayed, &case, root.path());
         if name == "v3-r17-marker-written-before-input.json" {
             let marker = fs::read_to_string(root.path().join("markers/local/default.json"))
                 .expect("the marker");
