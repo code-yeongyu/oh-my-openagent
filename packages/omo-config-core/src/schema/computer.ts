@@ -33,7 +33,9 @@ export const OmoComputerSettingsLayerSchema = z
     cua_adapter: z.boolean(),
     run_sandbox: z
       .enum(["vm", "quickjs"])
-      .describe("Where model-written `run` code executes: `vm` (default) or `quickjs`, the QuickJS cell; host-origin runs always use `vm`"),
+      .describe(
+        "Where model-written `run` code executes: `vm` (default) or `quickjs`, the QuickJS cell; host-origin runs always use `vm`",
+      ),
     intervention: z
       .enum(["continue", "pause"])
       .describe("What a background action does while the user uses the target app (default: continue)"),
