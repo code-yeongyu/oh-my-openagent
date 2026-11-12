@@ -10,6 +10,22 @@ type Field = Oracle["field"]
 const MAIN_WINDOW = "Conformance Document"
 type Leg = { readonly name: string; readonly fields: readonly string[]; readonly run: (dir: string) => Promise<string> }
 
+async function runA11yProbe(probe: string, pid: number): Promise<void> {
+  const child = Bun.spawn(["bash", "-c", probe.replaceAll("{pid}", String(pid))], {
+    stdout: "pipe",
+    stderr: "inherit",
+  })
+  const [code, output] = await Promise.all([child.exited, new Response(child.stdout).text()])
+  const last = output.trim().split("\n").at(-1) ?? ""
+  if (code !== 0) {
+    throw new Error(
+      code === 3
+        ? `ENVIRONMENT: the a11y probe could not reach the accessibility tree: ${last}`
+        : `the accessibility tree hides the page's controls (probe exit ${code}): ${last}`,
+    )
+  }
+}
+
 function catalogOracles(): { effect: ReadonlyMap<Action, Oracle>; initial: ReadonlyMap<Field, Oracle["equals"]> } {
   const effect = new Map<Action, Oracle>()
   const initial = new Map<Field, Oracle["equals"]>()
@@ -47,7 +63,7 @@ async function withFixture(
   }
 }
 
-function legs(command: readonly string[], sabotage: string, appKey: string): Leg[] {
+function legs(command: readonly string[], sabotage: string, appKey: string, a11yProbe: string | undefined): Leg[] {
   const { effect, initial } = catalogOracles()
   const untouched: Record<string, unknown> = Object.fromEntries(initial)
   const actionLegs = [...effect].map(([action, oracle]): Leg => ({
@@ -84,8 +100,24 @@ function legs(command: readonly string[], sabotage: string, appKey: string): Leg
       }),
   }
   const savedFields = ["title", "savedDocuments"]
+  // The a11y leg proves the page's controls are visible to the OS accessibility tree; it pins no report
+  // field, so it cannot be a sabotage target and is skipped in sabotage runs (which stay field-scoped).
+  const a11y: Leg[] =
+    a11yProbe === undefined || sabotage !== ""
+      ? []
+      : [
+          {
+            name: "a11y:controls-visible",
+            fields: [],
+            run: (dir) =>
+              withFixture(command, sabotage, dir, async (fixture) => {
+                await runA11yProbe(a11yProbe, fixture.pid)
+              }),
+          },
+        ]
   return [
     ...actionLegs,
+    ...a11y,
     windowTitles,
     { name: "document:save", fields: savedFields, run: saveDocument },
     {
@@ -104,20 +136,28 @@ function legs(command: readonly string[], sabotage: string, appKey: string): Leg
 async function main(): Promise<number> {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
-    options: { fixture: { type: "string" }, "app-key": { type: "string" }, sabotage: { type: "string", default: "" } },
+    options: {
+      fixture: { type: "string" },
+      "app-key": { type: "string" },
+      sabotage: { type: "string", default: "" },
+      a11y: { type: "string" },
+    },
   })
   const name = values.fixture
   const appKey = values["app-key"]
   if (name === undefined || appKey === undefined || positionals.length === 0) {
-    console.error("usage: self-test.ts --fixture <name> --app-key <key> [--sabotage <field>] -- <fixture command...>")
+    console.error(
+      "usage: self-test.ts --fixture <name> --app-key <key> [--sabotage <field>] [--a11y <probe command with {pid}>] -- <fixture command...>",
+    )
     return 2
   }
   const sabotage = values.sabotage
+  const a11yProbe = values.a11y
   const root = mkdtempSync(join(tmpdir(), `fixture-self-test-${name}-`))
   const failed: Leg[] = []
   let passed = 0
   try {
-    for (const leg of legs(positionals, sabotage, appKey)) {
+    for (const leg of legs(positionals, sabotage, appKey, a11yProbe)) {
       const dir = join(root, leg.name.replace(/[^a-zA-Z0-9.-]/g, "_"))
       try {
         for (const sub of ["first", "second"]) mkdirSync(join(dir, sub), { recursive: true })

@@ -17,6 +17,11 @@ const states = new Map()
 let initial = null
 
 app.setName(APP)
+// The baseline run (43237342972) found the page's controls absent from the accessibility tree: with no
+// assistive client detected, Chromium ships no renderer accessibility (Windows exposed only the frame plus
+// "Chrome Legacy Window"). Force the accessibility tree on so every control of the shared page is visible to
+// AT-SPI/UIA/AX before the self-test's a11y leg probes it. Must run before the app is ready.
+app.commandLine.appendSwitch("force-renderer-accessibility")
 if (process.platform === "linux") app.commandLine.appendSwitch("class", APP_KEY)
 if (process.platform === "win32") app.setAppUserModelId(APP_KEY)
 
@@ -148,6 +153,7 @@ app.whenReady().then(() => {
     return
   }
   buildMenu()
+  app.setAccessibilitySupportEnabled(true)
   const main = openWindow()
   main.webContents.once("did-finish-load", () => {
     void inPage(main, "conformance.state()").then(() => {

@@ -53,6 +53,10 @@ class Host:
         content.register_script_message_handler("report")
         content.connect("script-message-received::report", self.on_post, window)
         view = WebKit2.WebView.new_with_user_content_manager(content)
+        # Touch the ATK accessible now: the baseline run (43237342972) found only the menu bar in the tree,
+        # and forcing the accessible early makes WebKit build the web-content subtree as soon as the
+        # AT-SPI bridge (started by the workflow's dbus session) is reachable.
+        view.get_accessible()
         window.view = view
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         box.pack_start(self.menu_bar(window), False, False, 0)
@@ -149,6 +153,8 @@ def main():
     if len(sys.argv) != 3 or sys.argv[1] != "--report":
         print("usage: fixture.py --report <path>", file=sys.stderr)
         return 2
+    # Never inherit an atk-bridge disable; the a11y leg of the self-test needs the ATK tree.
+    os.environ.pop("NO_AT_BRIDGE", None)
     GLib.set_prgname(APP_KEY)
     Gdk.set_program_class(APP_KEY)
     host = Host(sys.argv[2])

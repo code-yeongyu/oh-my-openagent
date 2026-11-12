@@ -32,6 +32,10 @@ export class FixtureProcess {
     return readFixtureReport(this.reportPath)
   }
 
+  get pid(): number {
+    return this.child.pid
+  }
+
   reportText(): string {
     return readFileSync(this.reportPath, "utf8")
   }

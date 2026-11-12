@@ -46,7 +46,11 @@ namespace ConformanceFixtureWeb
             Views.Add(view);
             form.Show();
             string data = Path.Combine(Path.GetTempPath(), "conformance-fixture-web-" + Process.GetCurrentProcess().Id);
-            var environment = await CoreWebView2Environment.CreateAsync(null, data);
+            // The baseline run (43237342972) found the page absent from the UIA tree: with no assistive client
+            // detected, the WebView2 renderer ships no accessibility tree. Force it on so the UIA probe sees
+            // the page's controls.
+            var options = new CoreWebView2EnvironmentOptions { AdditionalBrowserArguments = "--force-renderer-accessibility" };
+            var environment = await CoreWebView2Environment.CreateAsync(null, data, options);
             await view.EnsureCoreWebView2Async(environment);
             await view.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(Bridge);
             view.CoreWebView2.WebMessageReceived += (sender, args) => Remember(view, args.TryGetWebMessageAsString());
