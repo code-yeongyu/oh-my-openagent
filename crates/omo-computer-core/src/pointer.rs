@@ -7,7 +7,7 @@ use crate::backend::InputEvent;
 use crate::params::ScrollDirection;
 
 /// The most wheel steps one `scroll` sends (R48 item 3, re-pin item 42: the old tree's X11
-/// `MAX_SCROLL_CLICKS`, `crates/senpi-desktop-backend-x11/src/input/xtest.rs:21` at d79bc6cc9a).
+/// backend capped wheel clicks at 1,000 per call, input/xtest.rs line 21 at d79bc6cc9a).
 pub const MAX_SCROLL_STEPS: u32 = 1_000;
 
 /// A scroll asking for more steps than [`MAX_SCROLL_STEPS`], refused before any input is sent.
