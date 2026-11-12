@@ -57,7 +57,7 @@ jobs:
 
       - name: Self-test
         run: |
-          xvfb-run -a bun script/qa/computer/conformance/fixtures/self-test.ts --fixture native-linux --app-key dev.omo.conformance-fixture.native -- \
+          xvfb-run -a bun script/qa/computer/conformance/fixtures/self-test.ts --fixture native-linux --app-key dev.omo.conformance-fixture.native --geometry -- \
             /usr/bin/python3 script/qa/computer/conformance/fixtures/native-linux/fixture.py
 
       - name: Sabotage legs (each must turn the self-test red)
@@ -77,7 +77,7 @@ jobs:
           JOB_SUMMARY_DETAILS: |
             - GTK install: ${{ steps.install.outputs.result || 'not reached' }}
             ${{ steps.install.outputs.versions }}
-            - GTK 3 fixture under Xvfb: each catalog action applied through GTK must change exactly its report field.
+            - GTK 3 fixture under Xvfb: each catalog action applied through GTK must change exactly its report field, and the report must carry a screen rect (name + role, no captions) for every widget a pixel driver aims at.
             - Sabotage legs: a pinned report field must turn the self-test red, on that field's legs only.
           JOB_SUMMARY_NEXT: An ENVIRONMENT failure on the GTK install is the runner, not the fixture; rerun the job. Otherwise start with the first CHECK ... FAIL or SABOTAGE ... line; a STAYED GREEN line means the self-test cannot see that field.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
@@ -102,7 +102,7 @@ jobs:
 
       - name: Self-test
         shell: bash
-        run: bun script/qa/computer/conformance/fixtures/self-test.ts --fixture native-windows --app-key dev.omo.conformance-fixture.native -- "$RUNNER_TEMP/ConformanceFixture.exe"
+        run: bun script/qa/computer/conformance/fixtures/self-test.ts --fixture native-windows --app-key dev.omo.conformance-fixture.native --geometry -- "$RUNNER_TEMP/ConformanceFixture.exe"
 
       - name: Sabotage legs (each must turn the self-test red)
         shell: bash
@@ -121,7 +121,7 @@ jobs:
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
             - WinForms fixture built by the in-box .NET Framework C# compiler, no package install.
-            - Each catalog action applied through WinForms must change exactly its report field.
+            - Each catalog action applied through WinForms must change exactly its report field, and the report must carry a screen rect (name + role, no captions) for every widget a pixel driver aims at.
             - Sabotage legs: a pinned report field must turn the self-test red, on that field's legs only.
           JOB_SUMMARY_NEXT: A build failure names the csc error; otherwise start with the first CHECK ... FAIL or SABOTAGE ... line.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

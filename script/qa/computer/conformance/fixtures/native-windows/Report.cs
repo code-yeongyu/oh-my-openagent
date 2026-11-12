@@ -23,7 +23,7 @@ namespace ConformanceFixture
             };
             var saved = new SortedDictionary<string, object>(main.Saved, StringComparer.Ordinal);
             saved["savedDocuments"] = windows.FindAll(window => window.SavedOnce).Count;
-            return new SortedDictionary<string, object>(StringComparer.Ordinal)
+            var report = new SortedDictionary<string, object>(StringComparer.Ordinal)
             {
                 { "schema", Schema },
                 { "app", DocumentForm.App },
@@ -33,6 +33,9 @@ namespace ConformanceFixture
                 { "fields", fields },
                 { "saved", saved },
             };
+            SortedDictionary<string, object> geometry = Geometry.Snapshot(main);
+            if (geometry != null) report["geometry"] = geometry;
+            return report;
         }
 
         public static void Pin(SortedDictionary<string, object> report, SortedDictionary<string, object> initial, string field)
@@ -86,6 +89,7 @@ namespace ConformanceFixture
             }
             else if (value is bool) text.Append((bool)value ? "true" : "false");
             else if (value is int) text.Append(((int)value).ToString(System.Globalization.CultureInfo.InvariantCulture));
+            else if (value is double) text.Append(((double)value).ToString("R", System.Globalization.CultureInfo.InvariantCulture));
             else throw new ArgumentException("cannot write " + value.GetType().Name + " to the report");
         }
 

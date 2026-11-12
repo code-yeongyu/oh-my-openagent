@@ -12,6 +12,7 @@ namespace ConformanceFixture
         private readonly Fixture fixture;
         private readonly FlowLayoutPanel body = new FlowLayoutPanel();
         public readonly Dictionary<string, ToolStripMenuItem> MenuItems = new Dictionary<string, ToolStripMenuItem>();
+        public readonly Dictionary<string, Button> Buttons = new Dictionary<string, Button>();
         public readonly List<string> Chords = new List<string>();
         public readonly List<string> Items = new List<string>();
         public readonly TextFields Fields;
@@ -36,6 +37,9 @@ namespace ConformanceFixture
             ClientSize = new Size(640, 720);
             KeyPreview = true;
             KeyDown += OnChord;
+            Shown += delegate { fixture.Changed(); };
+            Move += delegate { fixture.Changed(); };
+            Resize += delegate { fixture.Changed(); };
             MainMenuStrip = BuildMenu();
             body.Dock = DockStyle.Fill;
             body.FlowDirection = FlowDirection.TopDown;
@@ -94,6 +98,7 @@ namespace ConformanceFixture
             var button = new Button { Text = label, AccessibleName = label, AutoSize = true };
             button.Click += delegate { handler(); };
             body.Controls.Add(button);
+            Buttons[label] = button;
             return button;
         }
 
