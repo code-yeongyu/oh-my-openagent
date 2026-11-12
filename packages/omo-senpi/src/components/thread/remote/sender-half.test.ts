@@ -115,8 +115,10 @@ describe("#13037 the sender half reaches a session on another device that is not
     })
   })
 
+  // A7.2.6: "online device" in these rows reads "online device that lists the feature"; the sender's own service answers
+  // the empty page for any other device, which lookup-answers.test.ts pins as "answered, none".
   describe("A4.3.3 a bare session id that no listing holds", () => {
-    test("#given exactly one other device holds it #when it is sent to #then one single-probe query per online device finds it and the record goes to that device", async () => {
+    test("#given exactly one other device holds it #when it is sent to #then one single-probe query per online device that lists the feature finds it and the record goes to that device", async () => {
       const a = account({ rows: [B_ROW, C_ROW], ended: { c: { [GONE]: "rk-c-gone" } } })
       const { run } = fixture.surface(a.remote)
       expect(await run("thread_send", { thread: GONE, message: "hi" })).toMatchObject({
@@ -150,7 +152,7 @@ describe("#13037 the sender half reaches a session on another device that is not
       nothingSent(a)
     })
 
-    test("#given no device holds it and one online device did not answer #then it is host_unavailable naming that device", async () => {
+    test("#given no device holds it and one online device that lists the feature did not answer #then it is host_unavailable naming that device", async () => {
       const a = account({ rows: [B_ROW, C_ROW], silent: ["c"] })
       const { run } = fixture.surface(a.remote)
       expect(await run("thread_send", { thread: GONE, message: "hi" })).toMatchObject({
@@ -190,7 +192,7 @@ describe("#13037 the sender half reaches a session on another device that is not
       expect({ lookups: a.lookups, sent: a.sent }).toEqual({ lookups: [], sent: [] })
     })
 
-    test("#given the lookup runs #then it sends at most one query per online device", async () => {
+    test("#given the lookup runs #then it sends at most one query per online device that lists the feature", async () => {
       const a = account({ rows: [B_ROW, C_ROW, { ...C_ROW, session_id: "rk-c-2", durable_id: "dur-c-2" }] })
       const { run } = fixture.surface(a.remote)
       await run("thread_send", { thread: GONE, message: "hi" })
@@ -409,5 +411,53 @@ describe("#13037 the sender half reaches a session on another device that is not
         expect(count(a)).toEqual(expected)
       },
     )
+  })
+  describe("review: with the gates null, a send to an unlisted id answers as before the lookup existed", () => {
+    // Today's answer comes from an account whose sessions port has no lookup at all; the text is compared, not only the code.
+    const today = async (rows: readonly RemoteSessionRow[], extra: Parameters<Fixture["account"]>[0] = {}) => {
+      const before = fixture.account({ rows, ...extra, withoutLookup: true })
+      const result = await fixture.surface(before.remote).run("thread_send", { thread: GONE, message: "hi" })
+      return { result, reads: before.deviceReads }
+    }
+    const messageOf = (result: ThreadToolResult) => (result as { error?: { code?: string; message?: string } }).error
+
+    test("#given no other device online #then the not_found text is today's and no device is read for a lookup", async () => {
+      const a = fixture.account({ rows: [B_ROW], online: false })
+      const result = await fixture.surface(a.remote).run("thread_send", { thread: GONE, message: "hi" })
+      const baseline = await today([B_ROW], { online: false })
+      expect(messageOf(result)).toEqual(messageOf(baseline.result))
+      // The lookup reads no device of its own: the reads are exactly the ones the send made before the lookup existed.
+      expect(a.deviceReads).toEqual(baseline.reads)
+    })
+
+    test.each([
+      ["the gates null", false],
+      ["the gates set", true],
+    ] as const)(
+      "#given %s and the device list failing #then it is today's not_found, not internal_error",
+      async (_case, wakeFeature) => {
+        const a = fixture.account({ rows: [B_ROW, C_ROW], devicesFail: true, wakeFeature })
+        const result = await fixture.surface(a.remote).run("thread_send", { thread: GONE, message: "hi" })
+        expect(messageOf(result)).toEqual(messageOf((await today([B_ROW, C_ROW], { devicesFail: true })).result))
+        expect(messageOf(result)?.code).toBe("not_found")
+      },
+    )
+  })
+
+  describe("review: a receiving side's free-form refusal reason is bounded before it reaches the person", () => {
+    test("#given a long multi-line reason with control characters #then the message is one bounded line", async () => {
+      const reason = `${"x".repeat(600)}\nsecond line\u0007\u001b[31m`
+      const a = account({
+        rows: [B_ROW, C_ROW],
+        ended: { c: { [GONE]: "rk-c-gone" } },
+        wakeOutcome: queuedEnvelope({ kind: "refused", reason }),
+      })
+      const result = await fixture.surface(a.remote).run("thread_send", { thread: GONE, message: "hi" })
+      const error = (result as { error: { message: string; details?: { reason?: string } } }).error
+      for (const text of [error.message, error.details?.reason ?? ""]) {
+        expect(/[\u0000-\u001f\u007f]/.test(text)).toBe(false)
+        expect(text.length).toBeLessThanOrEqual(300)
+      }
+    })
   })
 })

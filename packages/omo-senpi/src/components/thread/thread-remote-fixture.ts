@@ -111,6 +111,10 @@ export function createRemoteThreadFixture() {
       wakeFeature?: boolean
       /** omo#13037: this device's service makes no single probe (the lookup is never made). */
       noLookup?: boolean
+      /** omo#13037 review: a sessions port as before the lookup existed (no lookup, no capability read). */
+      withoutLookup?: boolean
+      /** omo#13037 review: the account's device list cannot be read. */
+      devicesFail?: boolean
       /** omo#13037: this device's service cannot carry the wake target (no wake is sent; today's path). */
       noWake?: boolean
       /** omo#13037: the wake path's answer; default the consumer's queued envelope with `waiting_on: {kind: "wake"}`. */
@@ -133,6 +137,7 @@ export function createRemoteThreadFixture() {
       })
     const hops: number[] = []
     const lookups: Array<{ readonly device: string; readonly durable_id: string }> = []
+    const deviceReads = { thisDevice: 0, devices: 0 }
     // Account listing reads: `all` asks every device (one round across the account), `device` asks one device.
     const listings = { all: 0, device: 0 }
     const aliases = options.aliases ?? new Map<string, AliasHolder>()
@@ -313,8 +318,15 @@ export function createRemoteThreadFixture() {
     const remote: RemoteThreadSurface = {
       sessions: {
         status: async () => ({ state: options.plan ?? "connected" }),
-        thisDevice: async () => "here",
-        devices: async () => devices,
+        thisDevice: async () => {
+          deviceReads.thisDevice += 1
+          return "here"
+        },
+        devices: async () => {
+          deviceReads.devices += 1
+          if (options.devicesFail === true) throw new Error("closed")
+          return devices
+        },
         sessions: async (filter) => {
           if (filter?.device === undefined) listings.all += 1
           else listings.device += 1
@@ -353,6 +365,7 @@ export function createRemoteThreadFixture() {
             },
           }
         },
+        canLookup: async () => options.wakeFeature === true && options.noLookup !== true,
         lookup: async (device, durableId) => {
           if (options.noLookup === true || options.wakeFeature !== true) return { kind: "unavailable" }
           lookups.push({ device, durable_id: durableId })
@@ -402,7 +415,11 @@ export function createRemoteThreadFixture() {
         },
       },
     }
-    return { remote, sent, hops, aliases, live, registryCalls, lookups, listings }
+    if (options.withoutLookup === true) {
+      const { lookup: _lookup, canLookup: _canLookup, ...plain } = remote.sessions
+      ;(remote as { sessions: typeof plain }).sessions = plain
+    }
+    return { remote, sent, hops, aliases, live, registryCalls, lookups, listings, deviceReads }
   }
 
   function surface(

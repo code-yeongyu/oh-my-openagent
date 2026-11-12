@@ -13,6 +13,8 @@ export type DeviceServiceSessionsOptions = {
   readonly version: string
   /** Test seam: the proven local API connection (the device service SDK by default). */
   readonly connect?: () => Promise<DeviceService>
+  /** Test seam: the client's own cap on one single-probe locate (LOOKUP_CAP_MS). */
+  readonly lookupCapMs?: number
   /** Test seam: the wait between attaches of a just-created session while its device's listing catches up. */
   readonly retryDelay?: (ms: number) => Promise<void>
 }
@@ -136,6 +138,10 @@ function durableIdOf(row: object): { readonly durable_id?: string } {
   const value = Reflect.get(row, "durable_id")
   return typeof value === "string" && value !== "" ? { durable_id: value } : {}
 }
+
+// omo#13037 A4.3.3: the service bounds a single-probe locate at 3 s; the client holds its own cap so a send's bound does
+// not rest on the service honouring it. A device past the cap counts as silent.
+const LOOKUP_CAP_MS = 3_500
 
 export function createDeviceServiceSessions(options: DeviceServiceSessionsOptions): RemoteSessionsPort {
   let service: Promise<DeviceService> | undefined
@@ -302,14 +308,24 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         return { kind: "silent", reason: notSentReason(error) }
       }
       if (!connected.takesSingleLocate) return { kind: "unavailable" }
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const capped = new Promise<"timeout">((resolve) => {
+        timer = setTimeout(() => resolve("timeout"), options.lookupCapMs ?? LOOKUP_CAP_MS)
+        timer.unref?.()
+      })
       try {
-        return { kind: "found", key: (await connected.locate(device, durableId, { single: true })).key }
+        const answer = await Promise.race([connected.locate(device, durableId, { single: true }), capped])
+        if (answer === "timeout") return { kind: "silent", reason: "lookup_timeout" }
+        return { kind: "found", key: answer.key }
       } catch (error) {
         const code = error instanceof LocalApiError ? error.code : "locate_failed"
         return LOOKUP_NONE.has(code) ? { kind: "none" } : { kind: "silent", reason: code }
+      } finally {
+        clearTimeout(timer)
       }
     },
     canWake: async () => (await svc().catch(() => undefined))?.carriesWakeMark === true,
+    canLookup: async () => (await svc().catch(() => undefined))?.takesSingleLocate === true,
     wake: async (device, durableId, rpc) => {
       let record: WireRpc
       try {

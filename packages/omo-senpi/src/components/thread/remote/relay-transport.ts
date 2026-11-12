@@ -113,7 +113,17 @@ const WAITS: ReadonlySet<string> = new Set(["wake", "hold", "approval"])
  * omo#13037 section 5.1: what a session that is not running answers, from the receiving consumer (`data.kind` "refused")
  * or from the receiving device service itself (the command's receipt). One mapping for both.
  */
-function wakeRefusal(reason: string, device: string, data: JsonObject = {}): Failure {
+// A reason the receiving side wrote: one line, no control characters, at most REASON_SHOWN_MAX characters.
+const REASON_SHOWN_MAX = 120
+const shownReason = (reason: string): string =>
+  reason
+    .replace(/[\u0000-\u001f\u007f-\u009f]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, REASON_SHOWN_MAX)
+
+function wakeRefusal(received: string, device: string, data: JsonObject = {}): Failure {
+  const reason = shownReason(received)
   const details = { device, reason }
   switch (reason) {
     case "session_gone":

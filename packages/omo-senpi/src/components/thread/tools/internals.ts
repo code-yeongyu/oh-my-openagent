@@ -411,10 +411,17 @@ async function lookupAcross(
   remote: NonNullable<ThreadToolSurfaceOptions["remote"]>,
   address: string,
 ): Promise<ThreadResolveResult | undefined> {
+  // The capability first, from this device's own connection: with the probe off nothing is read for a lookup and the
+  // answer stays today's. A device round that fails leaves today's answer too.
   const probe = remote.sessions.lookup
-  if (probe === undefined) return undefined
-  const here = await remote.sessions.thisDevice()
-  const online = (await remote.sessions.devices()).filter((device) => device.online && device.device !== here)
+  if (probe === undefined || (await remote.sessions.canLookup?.().catch(() => false)) !== true) return undefined
+  let online: readonly { readonly device: string; readonly online: boolean }[]
+  try {
+    const here = await remote.sessions.thisDevice()
+    online = (await remote.sessions.devices()).filter((device) => device.online && device.device !== here)
+  } catch {
+    return undefined
+  }
   const answers = await Promise.all(
     online.map(async (device) => ({ device: device.device, answer: await probe(device.device, address) })),
   )
