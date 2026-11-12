@@ -279,6 +279,22 @@ export async function withAlias(
   result: ThreadToolResult,
   device?: string,
 ): Promise<ThreadToolResult> {
+  const claimed = await claimCreatedAlias(remote, alias, result, device, false)
+  return "local" in claimed ? result : claimed
+}
+
+/**
+ * withAlias for a thread this call just created: an account gone by the claim (`sign_in`, e.g. a token that expired
+ * after the resolve) answers `{ local: "sign_in" }` instead of a failure, so the caller names the thread by the alias
+ * on its device, exactly as when no account was there to begin with (#13104).
+ */
+export async function claimCreatedAlias(
+  remote: RemoteThreadSurface | undefined,
+  alias: string | undefined,
+  result: ThreadToolResult,
+  device?: string,
+  localWhenSignedOut = true,
+): Promise<ThreadToolResult | { readonly local: "sign_in" }> {
   if (remote?.aliases === undefined || alias === undefined || result.kind !== "ok" || !("thread" in result))
     return result
   let claimed: Awaited<ReturnType<AliasRegistry["claim"]>>
@@ -300,6 +316,7 @@ export async function withAlias(
     }
   }
   if (claimed.kind === "error") {
+    if (localWhenSignedOut && signedOut(claimed.error)) return { local: "sign_in" }
     const failed = aliasFailure(claimed.error)
     return {
       kind: "error",
@@ -334,7 +351,9 @@ export async function renameAlias(
           idempotency_key: key,
         })
       : await remote.aliases.rename({ session_id: threadId, from, to: alias, idempotency_key: key })
-  return changed.kind === "error" ? aliasFailure(changed.error) : undefined
+  if (changed.kind !== "error") return undefined
+  // The account can be gone by the claim or rename even when aliasesOf answered (a token that expired in between).
+  return signedOut(changed.error) ? { local: "sign_in" } : aliasFailure(changed.error)
 }
 
 /** thread_list with all_scope: this device's threads plus the account's other devices' (each with its device), with aliases. */

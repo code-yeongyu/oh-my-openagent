@@ -1,6 +1,6 @@
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import { threadToolFailure } from "./errors"
-import type { ThreadToolFailure } from "./errors"
+import type { ThreadErrorCode, ThreadToolFailure } from "./errors"
 import { type Static } from "typebox"
 import { toThreadAddressEntries } from "./address-book"
 import { checkNameConflict, normalizeThreadName, type ThreadAddressEntry } from "./addressing"
@@ -19,6 +19,7 @@ import {
   type ThreadSendInput,
   type ThreadSetModelInput,
   type ThreadSetReasoningInput,
+  type ThreadSummary,
   type ThreadToolName,
   type ThreadToolResult,
 } from "./contracts"
@@ -34,7 +35,7 @@ import { createGatewayServices } from "./tools/gateway-services"
 import { listThreads, readThread } from "./tools/read-ops"
 import { createRelayTools } from "./tools/relay-tools"
 import { isReplyToConsumedSender, threadSendPermission } from "./tools/reply-permission"
-import { listAcross, planCreate, renameAlias, withAlias } from "./remote/lazy-ops"
+import { claimCreatedAlias, listAcross, planCreate, renameAlias, withAlias } from "./remote/lazy-ops"
 import { locateControl } from "./control/locate"
 import { closeThread, interruptThread, setModelOn, setThinkingLevelOn } from "./control/operations"
 import { controlIdentity, controlRefusalOf } from "./control/port"
@@ -351,7 +352,8 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
         })
         if (plan.kind === "done") return await withAlias(options.remote, value.alias, plan.result, plan.device)
         // An alias no account holds names the thread on its device instead (#13104); a given name wins.
-        const name = plan.localAlias === undefined ? value.name : (value.name ?? value.alias)
+        // Trimmed like thread_rename's alias-as-name, so " x " and "x" name the thread the same way.
+        const name = plan.localAlias === undefined ? value.name : (value.name ?? value.alias?.trim())
         if (name !== undefined) {
           const conflict = checkNameConflict(await plan.host.visible(), name)
           if (conflict.kind === "error") return { kind: "error", error: conflict } as ThreadToolResult
@@ -374,8 +376,58 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
           return recorded.kind === "ok"
             ? ({ ...recorded, alias_scope: "local", alias_unavailable: plan.localAlias } as ThreadToolResult)
             : recorded
-        return await withAlias(options.remote, value.alias, recorded, plan.host.device)
+        if (!plan.creates) return await withAlias(options.remote, value.alias, recorded, plan.host.device)
+        const claimed = await claimCreatedAlias(options.remote, value.alias, recorded, plan.host.device)
+        if (!("local" in claimed)) return claimed
+        // The account was gone by the claim, after the create: the alias names the new thread here, as with no account.
+        if (recorded.kind !== "ok" || !("thread" in recorded) || value.alias === undefined) return recorded
+        const local = { alias_scope: "local", alias_unavailable: claimed.local } as const
+        if (value.name !== undefined) return { ...recorded, ...local } as ThreadToolResult
+        const localName = value.alias.trim()
+        const named = await nameCreatedThread(recorded.thread.thread_id, localName, await plan.host.visible(), callerId)
+        return (
+          named === undefined
+            ? {
+                ...recorded,
+                thread: {
+                  ...recorded.thread,
+                  name: localName,
+                  link: threadLink(recorded.thread.thread_id, localName),
+                },
+                ...local,
+              }
+            : { ...recorded, ...local, local_name_unavailable: named }
+        ) as ThreadToolResult
       }),
+  }
+  /**
+   * Names a thread thread_create already made, through the same path thread_rename takes (the create's name check against
+   * the device's threads, then the located control's setName). Answers the refusing code instead of failing, because the
+   * thread exists either way.
+   */
+  async function nameCreatedThread(
+    threadId: string,
+    name: string,
+    visible: readonly ThreadSummary[],
+    callerId: string,
+  ): Promise<ThreadErrorCode | undefined> {
+    const conflict = checkNameConflict(
+      visible.filter((thread) => thread.thread_id !== threadId),
+      name,
+    )
+    if (conflict.kind === "error") return conflict.code
+    const located = await locateControl(options, await view(), threadId, true, callerId)
+    if (located.kind === "not_live") return "not_resumable"
+    if (located.kind === "error")
+      return located.result.kind === "error" ? located.result.error.code : "host_unavailable"
+    try {
+      await located.control.setName(name)
+    } catch (error) {
+      const refusal = controlRefusalOf(error)
+      if (refusal === undefined) throw error
+      return refusal.code
+    }
+    return undefined
   }
   const list: AnyTool = {
     ...metadata("thread_list"),
