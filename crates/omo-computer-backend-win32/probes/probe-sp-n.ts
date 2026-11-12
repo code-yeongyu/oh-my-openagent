@@ -48,6 +48,22 @@ export const BOUNDS = {
 } as const
 type Bound = { readonly value: number; readonly cite: string }
 
+// Every count-row property a verdict judges, keyed to its pinned-design line. A property without a citation is not
+// a design claim: it is recorded as data and reads NEW-EDGE. Give it a citation here to make it a verdict.
+export const PROPERTIES: Readonly<Record<string, string | undefined>> = {
+  // '## Input', Barrier: what the barrier proves is routed + consumed, not the effect at return
+  barrierReceipt: "design/d-windows.md:130 (## Input, Barrier: routed hop + consumed hop)",
+  effectAtReturn: undefined, // the design lane: the barrier does not claim the effect is visible at return
+  postedLandsClassic: "design/d-windows.md:97 (background_window: PostMessageW, consumed hop, read-back)",
+  dropMatrixWebView2: "design/d-windows.md:146 (Chromium / CEF / WebView2 background refused)",
+  dropMatrixWpf: "design/d-windows.md:147 (WPF pointer and text refused in the background)",
+}
+export function propertyVerdict(property: string, held: boolean, numbers: string): Result {
+  const cite = PROPERTIES[property]
+  if (cite === undefined) return { measured: `${numbers}; no design claim (${property})`, verdict: "NEW-EDGE" }
+  return { measured: `${numbers}; per ${cite}`, verdict: pick(held, "CONFIRMS", "CONTRADICTS") }
+}
+
 // INVALID: a row measured by a probe with a known defect; kept with the reading, superseded by the next run.
 export type Verdict = "CONFIRMS" | "CONTRADICTS" | "NEW-EDGE" | "UNMEASURED" | "INVALID"
 // skip: this pass did not re-measure the row, and why (--verify reports it and does not compare it)
@@ -658,12 +674,12 @@ const barriers: Group = {
           Object.assign(out, all(ids.slice(0, 2), UN("the probe could not take the foreground for the target")))
         else {
           const measured = `sent ${sentRuns(fg.runs)}/${RUNS} routed ${count(fg.runs, "routed")}/${RUNS} consumed ${count(fg.runs, "consumed")}/${RUNS} effect at barrier return ${count(fg.runs, "atReturn")}/${RUNS} within 2 s ${count(fg.runs, "within2s")}/${RUNS} paint probe ${str(fg.probeClass)} foreground by ${str(fg.acquire)}`
-          out[`n-barrier-fg-proves-${key}`] = {
-            measured,
-            verdict: !oracleSeen
-              ? "UNMEASURED"
-              : pick(fgDone && count(fg.runs, "atReturn") === RUNS, "CONFIRMS", "CONTRADICTS"),
-          }
+          // the verdict is the barrier's claim, routed + consumed; the effect counts in measured are data only
+          out[`n-barrier-fg-proves-${key}`] = propertyVerdict(
+            "barrierReceipt",
+            fgDone,
+            `${measured}; effect at return is data, not a design claim`,
+          )
           const fgMs = `${ms(obj(fg.stats))} hang-guard expiries ${RUNS - Math.min(count(fg.runs, "routed"), count(fg.runs, "consumed"))} not foreground ${count(fg.runs, "notForeground")}/${RUNS}`
           out[`n-barrier-fg-ms-${key}`] = fgDone
             ? timingVerdict(num(at(fg, "stats", "p95")), undefined, fgMs)
@@ -676,7 +692,11 @@ const barriers: Group = {
         const landed =
           key === "notepad" ? poDone && count(po.runs, "atReturn") === RUNS : count(po.runs, "within2s") === 0
         out[`n-barrier-posted-proves-${key}`] = oracleSeen
-          ? { measured, verdict: pick(landed, "CONFIRMS", "CONTRADICTS") }
+          ? propertyVerdict(
+              key === "notepad" ? "postedLandsClassic" : key === "wpf" ? "dropMatrixWpf" : "dropMatrixWebView2",
+              landed,
+              measured,
+            )
           : UN(`the effect oracle never saw a foreground char; ${measured}`)
         const poMs = `${ms(obj(po.stats))} hang-guard expiries ${RUNS - count(po.runs, "consumed")}`
         out[`n-barrier-posted-ms-${key}`] = poDone
@@ -976,6 +996,32 @@ export function worstOfPasses(
   }
 }
 
+// Count rows ("-proves-") across two passes: the WORSE pass decides (CONFIRMS < NEW-EDGE < CONTRADICTS; on a tie,
+// the pass with fewer hits), and every count that differs is recorded "k/n vs k2/n".
+export const isCountRow = (id: string) => /-proves-/.test(id)
+const countRank = (v: Verdict) => (v === "CONFIRMS" ? 0 : v === "CONTRADICTS" ? 2 : 1)
+const hits = (m: string) => [...m.matchAll(/(\d+)\/(\d+)/g)].reduce((t, x) => t + Number(x[1]), 0)
+export function worstOfCountPasses(
+  id: string,
+  a: Result,
+  b: Result,
+): { readonly result: Result; readonly differ: boolean } | undefined {
+  if (!isCountRow(id)) return undefined
+  const [ra, rb] = [countRank(a.verdict), countRank(b.verdict)]
+  const [worse, other] =
+    ra !== rb ? (ra > rb ? [a, b] : [b, a]) : hits(a.measured) <= hits(b.measured) ? [a, b] : [b, a]
+  const others = [...other.measured.matchAll(/(\d+)\/(\d+)/g)].map((x) => x[0])
+  let i = 0
+  let differ = false
+  const measured = worse.measured.replace(/(\d+)\/(\d+)/g, (m) => {
+    const o = others[i++]
+    if (o === undefined || o === m) return m
+    differ = true
+    return `${m} vs ${o}`
+  })
+  return { result: { measured, verdict: worse.verdict }, differ }
+}
+
 // One --verify comparison: rows of other hosts and rows this pass did not re-measure are skipped with the reason;
 // timing rows compare worst-of-passes, so jitter across a bound reads UNSTABLE, never DIFF.
 export function verifyLine(
@@ -985,9 +1031,17 @@ export function verifyLine(
 ): { readonly kind: "SAME" | "DIFF" | "SKIP" | "UNSTABLE"; readonly text: string } {
   if (row.host !== host) return { kind: "SKIP", text: `SKIP ${row.id} host=${row.host}` }
   if (result?.skip) return { kind: "SKIP", text: `SKIP ${row.id}: not re-measured by this pass: ${result.skip}` }
-  const w = result
-    ? worstOfPasses(row.id, { measured: row.measured, verdict: row.verdict as Verdict }, result)
-    : undefined
+  const ledgerResult: Result = { measured: row.measured, verdict: row.verdict as Verdict }
+  const c = result ? worstOfCountPasses(row.id, ledgerResult, result) : undefined
+  // count rows: a re-confirm never DIFFs, a worse pass always does, and both passes' counts are shown either way
+  if (c && result)
+    return countRank(result.verdict) > countRank(ledgerResult.verdict)
+      ? {
+          kind: "DIFF",
+          text: `DIFF ${row.id} ledger=${row.verdict} now=${result.verdict} worst of passes: ${clean(c.result.measured)}`,
+        }
+      : { kind: "SAME", text: `SAME ${row.id} ${row.verdict} worst of passes: ${clean(c.result.measured)}` }
+  const w = result ? worstOfPasses(row.id, ledgerResult, result) : undefined
   if (w?.unstable && w.result.verdict !== row.verdict)
     return {
       kind: "UNSTABLE",
@@ -1220,7 +1274,7 @@ export function mergeLedger(before: readonly LedgerRow[], host: string, fresh: R
 }
 // A note survives a re-measure, except a probe-defect or SUSPECT note: the re-measure is what supersedes it.
 export const carriedNote = (n: string | undefined) =>
-  n && n !== "-" && !/^(probe defect|SUSPECT|lock state unproven)/.test(n) ? n : "-"
+  n && n !== "-" && !/^(probe defect|SUSPECT|lock state unproven|NEW-EDGE \(not a design claim\))/.test(n) ? n : "-"
 export const rerun = (id: string) => `bun ${SELF} --verify ${LEDGER} --row ${id}`
 export const ledgerLine = (id: string, r: Result, host: string, build: string, notes = "-") => {
   const spec = SPEC[id] ?? { question: "unknown row", condition: "-" }
@@ -2361,6 +2415,48 @@ const LOGIC_CHECKS: readonly Check[] = [
     },
   },
   {
+    finding: "COUNT worst-of and property lookup (hosted run 43142136804)",
+    async run() {
+      const bad: string[] = []
+      const id = "n-barrier-fg-proves-webview2"
+      const pass = (eff: number, routed = 31) =>
+        propertyVerdict(
+          "barrierReceipt",
+          routed === 31,
+          `routed ${routed}/31 consumed 31/31 effect at barrier return ${eff}/31 within 2 s 31/31`,
+        )
+      if (pass(30).verdict !== "CONFIRMS" || !pass(30).measured.includes("d-windows.md:"))
+        bad.push("the receipt is not judged on routed + consumed with its line")
+      if (pass(31, 30).verdict !== "CONTRADICTS") bad.push("a missed routed hop does not CONTRADICT")
+      if (propertyVerdict("effectAtReturn", false, "effect 30/31").verdict !== "NEW-EDGE")
+        bad.push("an uncited property is not NEW-EDGE")
+      const w = worstOfCountPasses(id, pass(31), pass(30))
+      if (!w?.result.measured.includes("30/31 vs 31/31") || !w.differ)
+        bad.push(`worst-of hides the miss: ${w?.result.measured}`)
+      const row = (r: Result): LedgerRow =>
+        Object.fromEntries(
+          HEADER.map((h) => [
+            h,
+            h === "id" ? id : h === "host" ? "h" : h === "verdict" ? r.verdict : h === "measured" ? r.measured : "x",
+          ]),
+        ) as LedgerRow
+      const v1 = verifyLine(row(pass(31)), pass(30), "h")
+      if (v1.kind === "DIFF" || !v1.text.includes("30/31 vs 31/31"))
+        bad.push(`an effect miss DIFFs or is hidden: ${v1.text}`)
+      if (verifyLine(row(pass(31, 30)), pass(31), "h").kind !== "SAME") bad.push("a re-confirm DIFFs")
+      if (verifyLine(row(pass(31)), pass(31, 30), "h").kind !== "DIFF") bad.push("a receipt miss does not DIFF")
+      const self = source("probe-sp-n.ts")
+      const grp = self.slice(self.indexOf("const barriers: Group = {"), self.indexOf("const chords: Group = {"))
+      const assigns = [
+        ...grp.matchAll(/out\[`n-barrier-(?:fg|posted)-proves-\$\{key\}`\] =\s*([^\n]+)\n\s*([^\n]*)/g),
+      ].map((m) => `${m[1]} ${m[2]}`)
+      if (assigns.length !== 2 || assigns.some((a) => !/propertyVerdict\(/.test(a)))
+        bad.push(`count-row verdicts not from the lookup: ${JSON.stringify(assigns)}`)
+      if (/pick\(landed|pick\(fgDone/.test(grp)) bad.push("a count row still decides with its own pick")
+      return bad.length ? bad.join("; ") : undefined
+    },
+  },
+  {
     finding: "LOW timing-flap",
     async run() {
       const cases: Array<[number, Bound | undefined, Verdict]> = [
@@ -2442,12 +2538,12 @@ const LEDGER_CHECKS: readonly Check[] = [
         (r) =>
           (r.verdict === "CONTRADICTS" || r.verdict === "CONFIRMS") && !/design\/d-windows\.md:\d+/.test(r.measured),
       )
-      const wpf = rows.find((r) => r.id === "n-barrier-fg-ms-wpf")
-      if (
-        !wpf?.measured.startsWith("first recorded: p95 14.531 / 23.079; unstable on this host") ||
-        wpf.verdict !== "NEW-EDGE"
+      const free = rows.filter(
+        (r) => !r.id.startsWith("n-poll-") && /p95=/.test(r.measured) && !/hang guard \(/.test(r.measured),
       )
-        return `n-barrier-fg-ms-wpf is not the unbounded two-pass reading: ${wpf?.verdict} ${wpf?.measured.slice(0, 80)}`
+      const notEdge = free.filter((r) => r.verdict !== "NEW-EDGE" || !r.measured.startsWith("first recorded: p95"))
+      if (notEdge.length)
+        return `unbounded timing rows not NEW-EDGE "first recorded": ${notEdge.map((r) => r.id).join(",")}`
       return bad.length ? `timing verdicts without a design bound: ${bad.map((r) => r.id).join(",")}` : undefined
     },
   },
