@@ -15,6 +15,9 @@ fn jpeg(width: u32, height: u32, len: usize) -> FrameBytes {
         height,
         mime: ImageMime::Jpeg,
         bytes: vec![0; len],
+        route: None,
+        occluders_visible: None,
+        cursor: None,
     }
 }
 
