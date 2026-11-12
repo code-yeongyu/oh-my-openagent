@@ -703,6 +703,19 @@ jobs:
           bun build packages/omo-opencode/src/cli/index.ts --outdir "$RUNNER_TEMP/preflight-cli" --target bun --format esm
           bun run build:cli-node
 
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Release build preflight (${{ matrix.os }})
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds every generated output from the prepared release commit on this runner OS.
+            - On Linux, builds the omo-ai payload and checks it carries every generated module.
+            - On Linux, builds the CLI bundles the release job builds after npm is published.
+          JOB_SUMMARY_NEXT: Fix the first failing build step; no platform or main package is published while this job is red.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
   dispatch-provenance-safe-publish:
     # Pin until this release/deploy path is proven on Ubuntu 26.04: #9936.
     runs-on: ubuntu-24.04
