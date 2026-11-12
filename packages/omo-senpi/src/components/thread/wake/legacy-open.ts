@@ -31,7 +31,7 @@ function refusalOf(frame: RpcFrame): WakeOpenReply {
   return { kind: "refused", code, ...(typeof hint === "number" ? { retry_after_ms: hint } : {}) }
 }
 
-export function classifyOpenFrame(frame: RpcFrame): WakeOpenReply {
+function classifyOpenFrame(frame: RpcFrame): WakeOpenReply {
   if (frame.success === true && record(frame.data) && typeof frame.data.sessionId === "string")
     return {
       kind: "opened",

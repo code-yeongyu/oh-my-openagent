@@ -73,7 +73,7 @@ describe("intake", () => {
       state: "queued",
       mode_requested: "follow_up",
       hop: 3,
-      sender: "device:dev-a#session:sender-s",
+      sender: "device:dev-a",
     })
     expect(row.envelope.origin).toEqual({ session: "sender-s" })
     expect(row.envelope.provenance?.device).toBe("dev-a")
@@ -110,6 +110,16 @@ describe("intake", () => {
     })
     const rows = await target.store.list({ target_durable_id: "target" })
     expect(rows.map((row) => row.ledger_id).sort()).toEqual(["device:dev-a/d-1", "device:dev-b/d-1"])
+  })
+
+  test("#given a taken-in record #when the same device repeats its delivery id under another claimed sender #then the first answer replays and no second row exists", async () => {
+    const h = (harness = createGatewayHarness())
+    const target = h.session("target")
+    const first = await target.store.intake(request(h))
+    const again = await target.store.intake(request(h, {}, { sender: { kind: "agent", session_id: "someone-else" } }))
+    expect(again).toEqual({ ...first, deduplicated: true } as typeof again)
+    const rows = await target.store.list({ target_durable_id: "target" })
+    expect(rows.map((row) => row.ledger_id)).toEqual(["device:dev-a/d-1"])
   })
 
   test("#given one device #when it claims a different session id on every record #then the rate bucket still counts that device alone", async () => {

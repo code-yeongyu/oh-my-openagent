@@ -47,8 +47,6 @@ import type {
   EnqueueOutcome,
   EnqueueRequest,
   GatewayStoreConfig,
-  IntakeOutcome,
-  IntakeRequest,
   GatewayStoreEvent,
   GatewayStoreStats,
   LegacyMailboxSkip,
@@ -629,7 +627,7 @@ function checkBinding(
 }
 
 /** What only the intake adds to an enqueue: the row's ledger fields, and the answer its receipt completes with in the same commit. */
-type IntakeFields = {
+export type IntakeFields = {
   readonly ledger_id: string
   readonly verbatim_text: string
   readonly verbatim_display_text: string
@@ -773,112 +771,6 @@ export async function enqueue(
     }
     throw error
   }
-}
-
-/**
- * Takes in a record another device's service attested, for a session on this device that is not running (#13037, design
- * 5.5). Every refusal here happens before the commit; an accepted record is the enqueue transaction's row, receipt, budgets
- * and inbox marker in one commit, its receipt completed with the answer so a repeat from the same device replays it.
- */
-export async function intake(ctx: StoreContext, request: IntakeRequest): Promise<IntakeOutcome> {
-  const record = request.record
-  const device = request.attested_device
-  if (
-    !DURABLE_ID_PATTERN.test(device) ||
-    !DURABLE_ID_PATTERN.test(record.deliveryId) ||
-    !DURABLE_ID_PATTERN.test(record.sessionId) ||
-    typeof record.text !== "string" ||
-    typeof record.displayText !== "string" ||
-    !Number.isSafeInteger(record.chainCount) ||
-    record.chainCount < 1
-  ) {
-    return refused("invalid_arguments", "The intake record is malformed.")
-  }
-  const senderSession = record.sender.kind === "agent" ? record.sender.session_id : undefined
-  if (senderSession === undefined || !DURABLE_ID_PATTERN.test(senderSession)) {
-    return refused("unsupported", "Only an agent sender can reach a session that is not running.", {
-      reason: "sender_not_allowed",
-    })
-  }
-  if (record.deliverAs !== "followUp") {
-    return refused("turn_conflict", "A session that is not running has no turn to steer.", {
-      target: record.sessionId,
-    })
-  }
-  if (request.target_session_kind !== "interactive") {
-    return refused("not_resumable", "A child or worker session is not started for a delivery.", {
-      reason: "not_wakeable",
-    })
-  }
-  if (request.chain_count_limit !== undefined && record.chainCount > request.chain_count_limit) {
-    return refused("unsupported", "The delivery's chain is over this machine's chain limit.", {
-      reason: "chain_count_limit",
-      chain_count: record.chainCount,
-      limit: request.chain_count_limit,
-    })
-  }
-  const ledgerId = `device:${device}/${record.deliveryId}`
-  const principal = `device:${device}#session:${senderSession}`
-  const name = record.sender.name?.trim()
-  const outcome = await enqueue(
-    ctx,
-    {
-      provenance: { ...request.provenance, device },
-      now: request.now,
-      delivery_id: randomUUID(),
-      target_durable_id: record.sessionId,
-      sender_principal: principal,
-      rate_principal: `device:${device}`,
-      sender_node: principal,
-      sender_turn: null,
-      cause_delivery_id: null,
-      inbound_hop: record.chainCount - 1,
-      claimed_root_id: null,
-      origin: { session: senderSession },
-      actor: name === undefined || name === "" ? senderSession : name,
-      body: record.text,
-      mode: "follow_up",
-      expected_turn_id: null,
-      binding: null,
-      receipt: {
-        idempotency_key: record.deliveryId,
-        args_hash: argsHash({
-          target: record.sessionId,
-          text: record.text,
-          display_text: record.displayText,
-          sender: record.sender,
-          deliver_as: record.deliverAs,
-          chain_count: record.chainCount,
-        }),
-      },
-      endpoint_kind: null,
-    },
-    {
-      ledger_id: ledgerId,
-      verbatim_text: record.text,
-      verbatim_display_text: record.displayText,
-      answer: (row, position) => ({
-        kind: "queued",
-        delivery_id: record.deliveryId,
-        row_id: row.delivery_id,
-        ledger_id: ledgerId,
-        queue_position: position,
-      }),
-    },
-  )
-  if (outcome.kind === "inserted") {
-    return {
-      kind: "queued",
-      delivery_id: record.deliveryId,
-      row_id: outcome.row.delivery_id,
-      ledger_id: ledgerId,
-      queue_position: outcome.queue_position,
-      deduplicated: false,
-    }
-  }
-  if (outcome.kind === "replay")
-    return { ...(outcome.result as Extract<IntakeOutcome, { kind: "queued" }>), deduplicated: true }
-  return outcome
 }
 
 function transcriptText(sessionPath: string | null, cache: Map<string, string>): string {

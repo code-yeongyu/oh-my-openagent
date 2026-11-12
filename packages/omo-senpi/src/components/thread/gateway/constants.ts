@@ -30,12 +30,8 @@ export const MAX_FANOUT_PER_TURN = 16
 
 /** At most this many woken sessions past `requested` per store (one store per agent directory, #13037 A3.1.2). */
 export const WOKEN_SESSION_CAP = 4
-/** How long a carrier's lease on a woken session lasts, and how often it renews it (#13037 A3.1.3). */
+/** How long a carrier's lease on a woken session lasts (#13037 A3.1.3). */
 export const WAKE_LEASE_MS = 60_000
-export const WAKE_LEASE_RENEW_MS = 20_000
-/** A wake whose open failed for a transient reason is tried again this long after, and is given up after this many attempts (A3.1.5). */
-export const WAKE_RETRY_DELAY_MS = 10_000
-export const WAKE_MAX_ATTEMPTS = 3
 
 export const QUEUED_TTL_MS = 24 * 60 * 60 * 1000
 
