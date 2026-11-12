@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { catalogFor } from "../catalog.ts"
+import { buildReport } from "../report.ts"
 import { isDriver } from "../driver.ts"
 import type { Cell, CellResult } from "../vocabulary.ts"
 import { createLegacyDriver, driver, type Fixtures, type Observer, readOutcome, type ShippedTool } from "./legacy.ts"
@@ -169,7 +170,7 @@ describe("legacy driver against the shipped run facade", () => {
     })
   })
 
-  test("a missing fixture or observer records not_run and sends nothing", async () => {
+  test("a missing fixture records not_run and sends nothing", async () => {
     const [cell] = cells
     if (cell === undefined) throw new Error("empty catalog")
     const tool = fakeTool([])
@@ -179,12 +180,6 @@ describe("legacy driver against the shipped run facade", () => {
       fixtures: { unavailable: "no fixture" },
       observer: { ready: observer },
     }).runCell(cell)
-    const noObserver = await createLegacyDriver({
-      session,
-      tool: { ready: tool },
-      fixtures: { ready: fixtures(1) },
-      observer: { unavailable: "no observer" },
-    }).runCell(cell)
     const noToolkit = await createLegacyDriver({
       session,
       tool: { ready: tool },
@@ -193,8 +188,25 @@ describe("legacy driver against the shipped run facade", () => {
     }).runCell(cell)
     expect(noFixture.observed).toEqual({ kind: "not_run", reason: "fixture_unavailable: no fixture" })
     expect(noToolkit.observed).toEqual({ kind: "not_run", reason: "fixture_unavailable: no electron app" })
-    expect(noObserver.observed).toEqual({ kind: "not_run", reason: "observer_unavailable: no observer" })
     expect(tool.calls).toBe(0)
+  })
+
+  test("without an observer the cell still runs, every signal reads not_observed, and the report never passes it", async () => {
+    const cell = cells.find((entry) => "deliver" in entry.expect && entry.mode === "background")
+    if (cell === undefined) throw new Error("catalog has no background deliver cell")
+    const sent: Sent[] = []
+    const result = await createLegacyDriver({
+      session,
+      tool: { ready: fakeTool(sent) },
+      fixtures: { ready: fixtures(cell.oracle.equals) },
+      observer: { unavailable: "no recorder for this OS" },
+    }).runCell(cell)
+    expect(result.observed).toEqual({ kind: "delivered" })
+    expect(sent.length).toBeGreaterThan(0)
+    expect(result.observerUnavailable).toBe("no recorder for this OS")
+    expect(new Set(Object.values(result.journal).map((summary) => summary.signal))).toEqual(new Set(["not_observed"]))
+    const report = buildReport([cell], [result])
+    expect([report.delivered, report.unobserved]).toEqual([0, 1])
   })
 
   // run.ts loads drivers/<name>.ts by path and accepts only a module whose `driver` passes isDriver.

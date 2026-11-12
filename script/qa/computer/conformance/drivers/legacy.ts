@@ -62,6 +62,23 @@ const EMPTY_JOURNAL: Journal = {
   dialog: NONE,
   activation: NONE,
 }
+const UNREAD = { signal: "not_observed", firstAt: null, count: 0 } as const
+const UNREAD_JOURNAL: Journal = {
+  key_focus: UNREAD,
+  window_raised: UNREAD,
+  typing: UNREAD,
+  pointer: UNREAD,
+  clipboard: UNREAD,
+  space: UNREAD,
+  dialog: UNREAD,
+  activation: UNREAD,
+}
+
+// With no observer for this OS the cell still runs and its outcome and fixture value are recorded, but every signal
+// reads not_observed and the reason travels with it: the report counts the cell unobserved, never clean (P-17).
+function unobserved(reason: string): Observer & { readonly reason: string } {
+  return { reason, observe: async (act) => ({ value: await act(), journal: UNREAD_JOURNAL }) }
+}
 
 /**
  * The shipped runtime's engine errors carry `code`, `hint`, `permission` and `reason`, and never say whether input
@@ -99,13 +116,17 @@ const notRun = (cell: Cell, reason: string): CellResult => ({
   journal: EMPTY_JOURNAL,
 })
 
-type Ready = { readonly tool: ShippedTool; readonly fixtures: Fixtures; readonly observer: Observer }
+type Ready = {
+  readonly tool: ShippedTool
+  readonly fixtures: Fixtures
+  readonly observer: Observer & { readonly reason?: string }
+}
 
 function ready(parts: LegacyDriverParts): Ready | string {
   if ("unavailable" in parts.tool) return `shipped_runtime_unavailable: ${parts.tool.unavailable}`
   if ("unavailable" in parts.fixtures) return `fixture_unavailable: ${parts.fixtures.unavailable}`
-  if ("unavailable" in parts.observer) return `observer_unavailable: ${parts.observer.unavailable}`
-  return { tool: parts.tool.ready, fixtures: parts.fixtures.ready, observer: parts.observer.ready }
+  const observer = "unavailable" in parts.observer ? unobserved(parts.observer.unavailable) : parts.observer.ready
+  return { tool: parts.tool.ready, fixtures: parts.fixtures.ready, observer }
 }
 
 export function createLegacyDriver(parts: LegacyDriverParts): Driver {
@@ -130,7 +151,8 @@ export function createLegacyDriver(parts: LegacyDriverParts): Driver {
         const { value, journal } = await observer.observe(() => run(tool, code))
         const durationMs = performance.now() - started
         const observed = await fixtures.read(cell)
-        return { id: cellId(cell), observed: readOutcome(value), oracle: { observed }, durationMs, journal }
+        const result = { id: cellId(cell), observed: readOutcome(value), oracle: { observed }, durationMs, journal }
+        return observer.reason === undefined ? result : { ...result, observerUnavailable: observer.reason }
       } finally {
         await fixtures.stop()
       }
