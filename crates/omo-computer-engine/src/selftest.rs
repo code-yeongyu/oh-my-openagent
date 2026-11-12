@@ -14,6 +14,8 @@ const CHECKS: &[(&str, &str)] = &[
     ("capabilities", r#"{"jsonrpc":"2.0","id":2,"method":"capabilities","params":{}}"#),
     ("stopPath.start", r#"{"jsonrpc":"2.0","id":3,"method":"stopPath.start","params":{}}"#),
     ("capture", r#"{"jsonrpc":"2.0","id":4,"method":"capture","params":{"target":"desktop"}}"#),
+    // Row 21: a click with no target lands on the user's pointer, which needs the human grant.
+    ("control.grant", r#"{"jsonrpc":"2.0","id":7,"method":"control.grant","params":{"reason":"selftest"}}"#),
     ("click", r#"{"jsonrpc":"2.0","id":5,"method":"click","params":{"x":1,"y":1}}"#),
     ("session.close", r#"{"jsonrpc":"2.0","id":6,"method":"session.close","params":{}}"#),
 ];
@@ -38,7 +40,10 @@ fn checks() -> Vec<(String, bool)> {
             ((*name).to_owned(), ok)
         })
         .collect();
-    results.push(("sink".to_owned(), sink.len() == 3));
+    let sent = sink.lines().iter().filter(|line| !line.starts_with("presence ")).count();
+    results.push(("sink".to_owned(), sent == 3));
+    let shown = sink.lines().iter().any(|line| line.starts_with("presence show"));
+    results.push(("presence".to_owned(), shown));
     results
 }
 
