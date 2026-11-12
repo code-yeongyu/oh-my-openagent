@@ -121,6 +121,22 @@ describe("identity record (#10070)", () => {
     expect(record).toMatchObject({ mergedInto: "project-target", mergedHead: "abc123" })
   })
 
+  test("#given a merge mark with paths still pending #when a later bind arrives #then the pending paths are kept with the merge marker (#13203 security review)", async () => {
+    const root = await identityRoot()
+    const bind = { id: "project-1234abcd", kind: "auto", mode: "path", source: "/work/project" } as const
+    await recordIdentityBind(root, { ...bind, spelling: "/work/project" })
+    await markIdentityMerged(root, "project-1234abcd", "project-target", "abc123", ["skills/.git/config"])
+
+    await recordIdentityBind(root, { ...bind, spelling: "/work/project-wt" })
+
+    expect(await readIdentityRecord(root)).toMatchObject({
+      mergedInto: "project-target",
+      mergedHead: "abc123",
+      pendingPaths: ["skills/.git/config"],
+      spellings: ["/work/project", "/work/project-wt"],
+    })
+  })
+
   test("#given an identity whose store does not exist yet #when a bind is recorded #then nothing is written and no directory is created (bind stays write-free, #12974 train-3)", async () => {
     const parent = await mkdtemp(join(tmpdir(), "omo-identity-record-"))
     roots.push(parent)

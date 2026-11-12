@@ -69,12 +69,13 @@ async function runMemoryMerge(deps: MemoryCommandDeps, args: string, ctx: Memory
 
   if (!apply) {
     const lines = await Promise.all(
-      // One store whose plan is refused (a tree entry that is not a plain path) must not hide the others.
+      // One store whose plan is refused (its repository cannot be read) must not hide the others.
       found.predecessors.map((predecessor) =>
         planIdentityMerge(
           predecessor.paths,
           identity.identityPaths,
           predecessor.mergedInto === identity.identity ? predecessor.mergedHead : undefined,
+          predecessor.mergedInto === identity.identity ? (predecessor.pendingPaths ?? []) : [],
         ).then(
           describePlan,
           (error: unknown) =>
@@ -112,18 +113,30 @@ async function runMemoryMerge(deps: MemoryCommandDeps, args: string, ctx: Memory
             },
           }),
       })
+      const leftover =
+        result.leftoverDirs === undefined
+          ? ""
+          : `; could not remove directories it created: ${result.leftoverDirs.join(", ")}`
       if (result.status === "merged") {
         merged = true
-        results.push(`merged ${predecessor.id} (${result.sha.slice(0, 7)}): ${counts(result.plan)}`)
+        results.push(`merged ${predecessor.id} (${result.sha.slice(0, 7)}): ${counts(result.plan)}${leftover}`)
       } else {
-        results.push(`${predecessor.id}: ${result.status === "already-merged" ? "already merged" : "nothing to merge"}`)
+        results.push(
+          `${predecessor.id}: ${result.status === "already-merged" ? "already merged" : "nothing to merge"}${leftOut(result.plan)}${asideCopies(result.plan)}${leftover}`,
+        )
       }
     } catch (error) {
-      results.push(`${predecessor.id}: skipped (${error instanceof Error ? error.message : String(error)})`)
+      results.push(`${predecessor.id}: skipped (${describeError(error)})`)
     }
   }
   if (merged) deps.bustPromptCache()
   return respond(ctx, [...results, ...unmapped].join("\n"))
+}
+
+/** The message plus its cause: a refused merge records there the directories its rollback could not remove. */
+function describeError(error: unknown): string {
+  if (!(error instanceof Error)) return String(error)
+  return error.cause instanceof Error ? `${error.message}; ${error.cause.message}` : error.message
 }
 
 function describePlan(plan: MergePlan): string {
@@ -131,9 +144,26 @@ function describePlan(plan: MergePlan): string {
 }
 
 function counts(plan: MergePlan): string {
-  const tally = { add: 0, "keep-aside": 0, skip: 0 }
-  for (const action of plan.actions) tally[action.action] += 1
-  return `${tally.add} to add, ${tally["keep-aside"]} kept aside under reference/merged/${plan.sourceId}/, ${tally.skip} identical`
+  const tally = { add: 0, "keep-aside": 0, skip: 0, unplaceable: 0 }
+  for (const action of plan.actions)
+    if (action.action !== "skip" || action.reason === undefined) tally[action.action] += 1
+  return `${tally.add} to add, ${tally["keep-aside"]} kept aside under reference/merged/${plan.sourceId}/, ${tally.skip} identical${leftOut(plan)}${asideCopies(plan)}`
+}
+
+/** Aside copies the store kept from an earlier merge into it: named, but never merged again. */
+function asideCopies(plan: MergePlan): string {
+  const entries = plan.actions.flatMap((action) =>
+    action.action === "skip" && action.reason !== undefined ? [`${action.path} (${action.reason})`] : [],
+  )
+  return entries.length === 0 ? "" : `; ${entries.length} not merged again: ${entries.join(", ")}`
+}
+
+/** The entries a merge leaves out, each with its reason, so the user can fix or remove them in the source store. */
+function leftOut(plan: MergePlan): string {
+  const entries = plan.actions.flatMap((action) =>
+    action.action === "unplaceable" ? [`${action.path} (${action.reason})`] : [],
+  )
+  return entries.length === 0 ? "" : `; ${entries.length} left out and still pending: ${entries.join(", ")}`
 }
 
 function writerLock(identity: MemoryCommandIdentity): MemoryWriteLock {

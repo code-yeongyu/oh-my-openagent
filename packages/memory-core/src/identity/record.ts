@@ -25,6 +25,11 @@ export interface IdentityRecord {
   /** Set by `/memory-merge --apply`: the identity this one was merged into, and its head at that merge. */
   readonly mergedInto?: string
   readonly mergedHead?: string
+  /**
+   * Source paths that merge left out (they could not be placed). A rerun plans the commits after `mergedHead`
+   * plus these paths only, so what was already placed is never added or set aside again; absent when none.
+   */
+  readonly pendingPaths?: readonly string[]
 }
 
 export interface IdentityBind {
@@ -96,6 +101,7 @@ async function writeIdentityBind(identityRoot: string, bind: IdentityBind): Prom
         : [...kept.spellings, bind.spelling],
     ...(kept?.mergedInto === undefined ? {} : { mergedInto: kept.mergedInto }),
     ...(kept?.mergedHead === undefined ? {} : { mergedHead: kept.mergedHead }),
+    ...(kept?.pendingPaths === undefined ? {} : { pendingPaths: kept.pendingPaths }),
   }
   await writeJsonAtomic(join(identityRoot, IDENTITY_RECORD_FILENAME), record)
   return record
@@ -106,20 +112,32 @@ export function markIdentityMerged(
   id: string,
   mergedInto: string,
   mergedHead: string,
+  pendingPaths: readonly string[] = [],
 ): Promise<IdentityRecord> {
-  return withRecordLock(identityRoot, () => writeIdentityMerged(identityRoot, id, mergedInto, mergedHead))
+  return withRecordLock(identityRoot, () =>
+    writeIdentityMerged(identityRoot, id, { mergedInto, mergedHead, pendingPaths }),
+  )
 }
 
 async function writeIdentityMerged(
   identityRoot: string,
   id: string,
-  mergedInto: string,
-  mergedHead: string,
+  mark: { readonly mergedInto: string; readonly mergedHead: string; readonly pendingPaths: readonly string[] },
 ): Promise<IdentityRecord> {
   const previous = await readIdentityRecord(identityRoot).catch(() => undefined)
   const base: IdentityRecord =
     previous?.id === id ? previous : { version: 1, id, kind: "auto", mode: "path", source: "", spellings: [] }
-  const record: IdentityRecord = { ...base, mergedInto, mergedHead }
+  const record: IdentityRecord = {
+    version: 1,
+    id: base.id,
+    kind: base.kind,
+    mode: base.mode,
+    source: base.source,
+    spellings: base.spellings,
+    mergedInto: mark.mergedInto,
+    mergedHead: mark.mergedHead,
+    ...(mark.pendingPaths.length === 0 ? {} : { pendingPaths: [...mark.pendingPaths] }),
+  }
   await writeJsonAtomic(join(identityRoot, IDENTITY_RECORD_FILENAME), record)
   return record
 }
@@ -141,5 +159,12 @@ function parseIdentityRecord(value: unknown): IdentityRecord | undefined {
     spellings,
     ...(typeof record.mergedInto === "string" ? { mergedInto: record.mergedInto } : {}),
     ...(typeof record.mergedHead === "string" ? { mergedHead: record.mergedHead } : {}),
+    ...(isStringArray(record.pendingPaths) && record.pendingPaths.length > 0
+      ? { pendingPaths: record.pendingPaths }
+      : {}),
   }
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string")
 }

@@ -79,6 +79,32 @@ describe("doctor memory fragmentation (#10070)", () => {
     expect(check.detail).toContain("thread-1-bbbb2222")
   })
 
+  test("#given a store merged at its current head with entries still pending #when checked #then it is still pending (#13203 security review)", async () => {
+    const root = await mkdtemp(join(tmpdir(), "omo-doctor-frag-"))
+    roots.push(root)
+    const thread = buildIdentityPaths(root, "thread-1-bbbb2222")
+    const repo = new GitMemoryRepo({ dir: thread.repo, agentId: "thread-1-bbbb2222" })
+    await repo.init({ authorName: "qa" })
+    await mkdir(join(thread.repo, "notes"), { recursive: true })
+    await writeFile(join(thread.repo, "notes/a.md"), "---\ndescription: a\n---\n\na\n")
+    await repo.commitWrite(["notes/a.md"], "a", { agentId: "thread-1-bbbb2222", authorName: "qa" })
+    await recordIdentityBind(thread.root, {
+      id: "thread-1-bbbb2222",
+      kind: "auto",
+      mode: "path",
+      source: "/w/thread-1",
+      spelling: "/w/thread-1",
+    })
+    await markIdentityMerged(thread.root, "thread-1-bbbb2222", "project-aaaa1111", (await repo.head()) ?? "", [
+      "skills/.git/config",
+    ])
+
+    const check = await checkMemoryFragmentation(buildIdentityPaths(root, "project-aaaa1111"), () => "project-aaaa1111")
+
+    expect(check.level).toBe("warn")
+    expect(check.detail).toContain("thread-1-bbbb2222")
+  })
+
   test("#given no other store maps here #when checked #then it is ok", async () => {
     const root = await mkdtemp(join(tmpdir(), "omo-doctor-frag-"))
     roots.push(root)
