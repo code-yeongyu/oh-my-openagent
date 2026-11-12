@@ -15,8 +15,16 @@ const record = (pair: Pair): TaskRecord => {
   return loaded
 }
 const participant = (pair: Pair) => pair.runPause.registry.load("parent-1")?.participants[T1]
-const plant = (pair: Pair) => pair.channel.assertDesired({ taskId: T1, runEpoch: 1, parentSessionId: "parent-1", pauseSeq: 2, runRef: RUN,
-  phase: "paused", guidance: planted })
+const plant = (pair: Pair) =>
+  pair.channel.assertDesired({
+    taskId: T1,
+    runEpoch: 1,
+    parentSessionId: "parent-1",
+    pauseSeq: 2,
+    runRef: RUN,
+    phase: "paused",
+    guidance: planted,
+  })
 
 describe("messages held for a remote child while the run is stopped (review of #12373, HIGH)", () => {
   test("#given each message is answered by the owner #when a ninth is sent and the run Resumes #then all nine are delivered and the child resumes", async () => {
@@ -51,8 +59,18 @@ describe("messages held for a remote child while the run is stopped (review of #
   test("#given ledger guidance that no longer fits the register #when the run Resumes #then the Resume is written without it and the child resumes", async () => {
     const pair = controlPair({ ownerTicks: false })
     await pair.advertise()
-    pair.runPause.registry.begin("parent-1", 2, [{ key: T1, taskId: T1, kind: "task", runRef: RUN, runEpoch: 1, state: "owned_elsewhere",
-      guidance: [{ inputId: "send-late", revision: 0, text: "late" }], at: new Date(0).toISOString() }])
+    pair.runPause.registry.begin("parent-1", 2, [
+      {
+        key: T1,
+        taskId: T1,
+        kind: "task",
+        runRef: RUN,
+        runEpoch: 1,
+        state: "owned_elsewhere",
+        guidance: [{ inputId: "send-late", revision: 0, text: "late" }],
+        at: new Date(0).toISOString(),
+      },
+    ])
     pair.runPause.registry.phase("parent-1", 2, "applied")
     plant(pair)
     pair.ownerTicks.enabled = true

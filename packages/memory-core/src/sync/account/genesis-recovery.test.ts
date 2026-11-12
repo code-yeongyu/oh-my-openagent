@@ -15,8 +15,14 @@ import { createPairingHttp } from "./pairing-http.ts"
 import { ACCOUNT, fixture } from "./testing/genesis-enable.test-support.ts"
 
 const cleanup: (() => void | Promise<void>)[] = []
-afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close() })
-const setup = async () => { const f = await fixture(); cleanup.push(f.close); return f }
+afterEach(async () => {
+  for (const close of cleanup.splice(0).reverse()) await close()
+})
+const setup = async () => {
+  const f = await fixture()
+  cleanup.push(f.close)
+  return f
+}
 
 test("pin write failure resumes accepted genesis without another credential", async () => {
   const f = await setup()
@@ -31,9 +37,17 @@ test("pin write failure resumes accepted genesis without another credential", as
 
 test("corrupt intent is preserved and refused before switches or another ceremony", async () => {
   const f = await setup()
-  await expect(enableSync({ ...f.input, chain: {
-    ...f.input.chain, appendKeys: async () => { throw new TypeError("synthetic network failure") },
-  } })).rejects.toThrow()
+  await expect(
+    enableSync({
+      ...f.input,
+      chain: {
+        ...f.input.chain,
+        appendKeys: async () => {
+          throw new TypeError("synthetic network failure")
+        },
+      },
+    }),
+  ).rejects.toThrow()
   const root = join(f.input.pinDir, "genesis-intent")
   const dir = (await readdir(root)).find((name) => /^[a-f0-9]{64}$/.test(name))
   if (!dir) throw new Error("intent missing")
@@ -66,11 +80,17 @@ test("different winner after CAS refusal requires pairing and never pins the win
 
 test("another genuinely signed genesis naming this device fails the exact-intent check", async () => {
   const f = await setup()
-  const prepared = await prepareGenesis({ ...f.bootstrap, custody_nonce: Buffer.alloc(16, 91).toString("base64url") }, f.capabilities)
+  const prepared = await prepareGenesis(
+    { ...f.bootstrap, custody_nonce: Buffer.alloc(16, 91).toString("base64url") },
+    f.capabilities,
+  )
   const different = await buildGenesis(ACCOUNT, f.keyring, prepared)
   const chain = {
     ...f.input.chain,
-    appendKeys: async () => { f.entries.push(await entryOf(different.request, f.keyring)); return { ok: true as const, seq: 1 } },
+    appendKeys: async () => {
+      f.entries.push(await entryOf(different.request, f.keyring))
+      return { ok: true as const, seq: 1 }
+    },
   }
   await expect(enableSync({ ...f.input, chain })).rejects.toMatchObject({ reason: "intent_mismatch" })
   expect((await pins.loadTrustAnchor(f.input.pinDir, ACCOUNT)).ok).toBe(false)
@@ -94,10 +114,17 @@ test("same principal cannot start a second native ceremony while the first owns 
   const f = await setup()
   const entered = Promise.withResolvers<void>()
   const release = Promise.withResolvers<void>()
-  const pending = enableSync({ ...f.input, genesis: {
-    prfSupported: true,
-    createGenesis: async () => { entered.resolve(); await release.promise; return { ok: true as const, prepared: f.prepared } },
-  } })
+  const pending = enableSync({
+    ...f.input,
+    genesis: {
+      prfSupported: true,
+      createGenesis: async () => {
+        entered.resolve()
+        await release.promise
+        return { ok: true as const, prepared: f.prepared }
+      },
+    },
+  })
   await entered.promise
   try {
     await expect(enableSync(f.input)).rejects.toMatchObject({ name: "LockContentionError" })
@@ -114,31 +141,61 @@ test("two concurrent creators select one root and the loser must pair", async ()
   const prepared = await prepareGenesis({ ...f.bootstrap, first_device: principalOf(second) }, f.capabilities)
   const both = Promise.withResolvers<void>()
   let entered = 0
-  const meet = async () => { if (++entered === 2) both.resolve(); await both.promise }
+  const meet = async () => {
+    if (++entered === 2) both.resolve()
+    await both.promise
+  }
   const options = { baseUrl: f.server.url, token: () => f.server.tokenFor(principalOf(second), "second") }
   const other = {
-    ...f.input, keyring: second, pinDir: join(f.input.pinDir, "other"), serviceDeviceId: "second",
-    chain: createAccountHttp(options), pairing: createPairingHttp(options),
-    genesis: { prfSupported: true, createGenesis: async () => { await meet(); return { ok: true as const, prepared } } },
+    ...f.input,
+    keyring: second,
+    pinDir: join(f.input.pinDir, "other"),
+    serviceDeviceId: "second",
+    chain: createAccountHttp(options),
+    pairing: createPairingHttp(options),
+    genesis: {
+      prfSupported: true,
+      createGenesis: async () => {
+        await meet()
+        return { ok: true as const, prepared }
+      },
+    },
   }
   const results = await Promise.all([
-    enableSync({ ...f.input, genesis: {
-      prfSupported: true, createGenesis: async () => { await meet(); return { ok: true as const, prepared: f.prepared } },
-    } }),
+    enableSync({
+      ...f.input,
+      genesis: {
+        prfSupported: true,
+        createGenesis: async () => {
+          await meet()
+          return { ok: true as const, prepared: f.prepared }
+        },
+      },
+    }),
     enableSync(other),
   ])
   expect(results.filter((r) => r.kind === "joined")).toHaveLength(1)
   expect(results.filter((r) => r.kind === "join_required")).toHaveLength(1)
   expect(f.entries).toHaveLength(1)
-  const pinned = await Promise.all([pins.loadTrustAnchor(f.input.pinDir, ACCOUNT), pins.loadTrustAnchor(other.pinDir, ACCOUNT)])
+  const pinned = await Promise.all([
+    pins.loadTrustAnchor(f.input.pinDir, ACCOUNT),
+    pins.loadTrustAnchor(other.pinDir, ACCOUNT),
+  ])
   expect(pinned.filter((p) => p.ok)).toHaveLength(1)
 })
 
 test("conflicting and corrupt pins cannot be replaced by an enable attempt", async () => {
   const f = await setup()
-  const prepared = await prepareGenesis({ ...f.bootstrap, custody_nonce: Buffer.alloc(16, 81).toString("base64url") }, f.capabilities)
+  const prepared = await prepareGenesis(
+    { ...f.bootstrap, custody_nonce: Buffer.alloc(16, 81).toString("base64url") },
+    f.capabilities,
+  )
   const other = await buildGenesis(ACCOUNT, f.keyring, prepared)
-  const walked = await appendEntries(emptyChain(ACCOUNT, creatorAnchor(ACCOUNT, f.keyring)), [await entryOf(other.request, f.keyring)], createRejectionCounter())
+  const walked = await appendEntries(
+    emptyChain(ACCOUNT, creatorAnchor(ACCOUNT, f.keyring)),
+    [await entryOf(other.request, f.keyring)],
+    createRejectionCounter(),
+  )
   if (!walked.ok || !walked.state.pin) throw new Error("fixture pin")
   await pins.pinTrustAnchor(f.input.pinDir, ACCOUNT, walked.state.pin)
   f.entries.push(await entryOf(f.built.request, f.keyring))

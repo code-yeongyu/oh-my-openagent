@@ -22,20 +22,33 @@ export function composeControlRequester(input: {
   readonly hostPid?: number
 }) {
   const { manager } = input
-  const channel = createRequesterChannel({ stateDir: input.stateDir, store: input.store, hostPid: input.hostPid ?? process.pid,
-    managerInstance: manager.managerInstance ?? "unknown", channel: input.channel, isProcessAlive: input.isProcessAlive })
+  const channel = createRequesterChannel({
+    stateDir: input.stateDir,
+    store: input.store,
+    hostPid: input.hostPid ?? process.pid,
+    managerInstance: manager.managerInstance ?? "unknown",
+    channel: input.channel,
+    isProcessAlive: input.isProcessAlive,
+  })
   let runPause: ReturnType<typeof createEngineRunPause> | undefined
   let carry: GuidanceCarry | undefined
   const remoteCancel = createRemoteCancel({
-    channel, store: input.store,
-    finish: record => input.lifecycle.finishPendingCancel?.(record) ?? Promise.resolve(),
-    holds: taskId => manager.holdsLiveHandle?.(taskId) === true,
-    pauseSeq: parent => runPause?.registry.load(parent)?.pauseSeq ?? 0,
+    channel,
+    store: input.store,
+    finish: (record) => input.lifecycle.finishPendingCancel?.(record) ?? Promise.resolve(),
+    holds: (taskId) => manager.holdsLiveHandle?.(taskId) === true,
+    pauseSeq: (parent) => runPause?.registry.load(parent)?.pauseSeq ?? 0,
   })
   let timer: ReturnType<typeof setInterval> | undefined
   return {
-    channel, remoteCancel,
-    remote: { channel, store: input.store, isProcessAlive: input.isProcessAlive, armCancelWatcher: (taskId: string) => remoteCancel.arm(taskId) },
+    channel,
+    remoteCancel,
+    remote: {
+      channel,
+      store: input.store,
+      isProcessAlive: input.isProcessAlive,
+      armCancelWatcher: (taskId: string) => remoteCancel.arm(taskId),
+    },
     bind(bound: ReturnType<typeof createEngineRunPause>): void {
       runPause = bound
       carry = createGuidanceCarry({ channel, registry: bound.registry })
@@ -44,18 +57,28 @@ export function composeControlRequester(input: {
     cancel: (record: TaskRecord, reason: string | undefined) => remoteCancel.cancel(record, reason),
     // Re-arm at session start, independent of any pause ledger (design 3.7; notes nit 4).
     rearm(sessionId: string): void {
-      remoteCancel.rearm(ownedSubtree(manager.list({ scope: "all" }).map(entry => entry.record), sessionId))
+      remoteCancel.rearm(
+        ownedSubtree(
+          manager.list({ scope: "all" }).map((entry) => entry.record),
+          sessionId,
+        ),
+      )
     },
     start(sessionId: () => string | undefined): void {
       if (timer !== undefined) return
       timer = setInterval(() => {
         const session = sessionId()
-        void remoteCancel.tick().then(() => session === undefined ? undefined : runPause?.bridge.tickRemote(session))
+        void remoteCancel
+          .tick()
+          .then(() => (session === undefined ? undefined : runPause?.bridge.tickRemote(session)))
           .catch((error: unknown) => log("[omo-senpi] control requester tick failed", { error: String(error) }))
       }, WATCH_MS)
       timer.unref?.()
     },
-    stop(): void { if (timer !== undefined) clearInterval(timer); timer = undefined },
+    stop(): void {
+      if (timer !== undefined) clearInterval(timer)
+      timer = undefined
+    },
   }
 }
 

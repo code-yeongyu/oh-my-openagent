@@ -2666,6 +2666,34 @@
         },
         "cua_adapter": {
           "type": "boolean"
+        },
+        "run_sandbox": {
+          "type": "string",
+          "enum": [
+            "vm",
+            "quickjs"
+          ],
+          "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
+        },
+        "intervention": {
+          "type": "string",
+          "enum": [
+            "continue",
+            "pause"
+          ],
+          "description": "What a background action does while the user uses the target app (default: continue)"
+        },
+        "macos_key_priming": {
+          "type": "string",
+          "enum": [
+            "on",
+            "off"
+          ],
+          "description": "macOS background keys first make the target window key (default: off)"
+        },
+        "trace": {
+          "type": "boolean",
+          "description": "Per-request timing traces (default: false)"
         }
       },
       "additionalProperties": false,
@@ -5114,6 +5142,34 @@
             },
             "cua_adapter": {
               "type": "boolean"
+            },
+            "run_sandbox": {
+              "type": "string",
+              "enum": [
+                "vm",
+                "quickjs"
+              ],
+              "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
+            },
+            "intervention": {
+              "type": "string",
+              "enum": [
+                "continue",
+                "pause"
+              ],
+              "description": "What a background action does while the user uses the target app (default: continue)"
+            },
+            "macos_key_priming": {
+              "type": "string",
+              "enum": [
+                "on",
+                "off"
+              ],
+              "description": "macOS background keys first make the target window key (default: off)"
+            },
+            "trace": {
+              "type": "boolean",
+              "description": "Per-request timing traces (default: false)"
             }
           },
           "additionalProperties": false,
@@ -7562,6 +7618,34 @@
             },
             "cua_adapter": {
               "type": "boolean"
+            },
+            "run_sandbox": {
+              "type": "string",
+              "enum": [
+                "vm",
+                "quickjs"
+              ],
+              "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
+            },
+            "intervention": {
+              "type": "string",
+              "enum": [
+                "continue",
+                "pause"
+              ],
+              "description": "What a background action does while the user uses the target app (default: continue)"
+            },
+            "macos_key_priming": {
+              "type": "string",
+              "enum": [
+                "on",
+                "off"
+              ],
+              "description": "macOS background keys first make the target window key (default: off)"
+            },
+            "trace": {
+              "type": "boolean",
+              "description": "Per-request timing traces (default: false)"
             }
           },
           "additionalProperties": false,
@@ -10010,6 +10094,34 @@
             },
             "cua_adapter": {
               "type": "boolean"
+            },
+            "run_sandbox": {
+              "type": "string",
+              "enum": [
+                "vm",
+                "quickjs"
+              ],
+              "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
+            },
+            "intervention": {
+              "type": "string",
+              "enum": [
+                "continue",
+                "pause"
+              ],
+              "description": "What a background action does while the user uses the target app (default: continue)"
+            },
+            "macos_key_priming": {
+              "type": "string",
+              "enum": [
+                "on",
+                "off"
+              ],
+              "description": "macOS background keys first make the target window key (default: off)"
+            },
+            "trace": {
+              "type": "boolean",
+              "description": "Per-request timing traces (default: false)"
             }
           },
           "additionalProperties": false,
@@ -12464,6 +12576,34 @@
               },
               "cua_adapter": {
                 "type": "boolean"
+              },
+              "run_sandbox": {
+                "type": "string",
+                "enum": [
+                  "vm",
+                  "quickjs"
+                ],
+                "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
+              },
+              "intervention": {
+                "type": "string",
+                "enum": [
+                  "continue",
+                  "pause"
+                ],
+                "description": "What a background action does while the user uses the target app (default: continue)"
+              },
+              "macos_key_priming": {
+                "type": "string",
+                "enum": [
+                  "on",
+                  "off"
+                ],
+                "description": "macOS background keys first make the target window key (default: off)"
+              },
+              "trace": {
+                "type": "boolean",
+                "description": "Per-request timing traces (default: false)"
               }
             },
             "additionalProperties": false,
@@ -14912,6 +15052,34 @@
                   },
                   "cua_adapter": {
                     "type": "boolean"
+                  },
+                  "run_sandbox": {
+                    "type": "string",
+                    "enum": [
+                      "vm",
+                      "quickjs"
+                    ],
+                    "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
+                  },
+                  "intervention": {
+                    "type": "string",
+                    "enum": [
+                      "continue",
+                      "pause"
+                    ],
+                    "description": "What a background action does while the user uses the target app (default: continue)"
+                  },
+                  "macos_key_priming": {
+                    "type": "string",
+                    "enum": [
+                      "on",
+                      "off"
+                    ],
+                    "description": "macOS background keys first make the target window key (default: off)"
+                  },
+                  "trace": {
+                    "type": "boolean",
+                    "description": "Per-request timing traces (default: false)"
                   }
                 },
                 "additionalProperties": false,
@@ -17360,6 +17528,34 @@
                   },
                   "cua_adapter": {
                     "type": "boolean"
+                  },
+                  "run_sandbox": {
+                    "type": "string",
+                    "enum": [
+                      "vm",
+                      "quickjs"
+                    ],
+                    "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
+                  },
+                  "intervention": {
+                    "type": "string",
+                    "enum": [
+                      "continue",
+                      "pause"
+                    ],
+                    "description": "What a background action does while the user uses the target app (default: continue)"
+                  },
+                  "macos_key_priming": {
+                    "type": "string",
+                    "enum": [
+                      "on",
+                      "off"
+                    ],
+                    "description": "macOS background keys first make the target window key (default: off)"
+                  },
+                  "trace": {
+                    "type": "boolean",
+                    "description": "Per-request timing traces (default: false)"
                   }
                 },
                 "additionalProperties": false,
@@ -19808,6 +20004,34 @@
                   },
                   "cua_adapter": {
                     "type": "boolean"
+                  },
+                  "run_sandbox": {
+                    "type": "string",
+                    "enum": [
+                      "vm",
+                      "quickjs"
+                    ],
+                    "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
+                  },
+                  "intervention": {
+                    "type": "string",
+                    "enum": [
+                      "continue",
+                      "pause"
+                    ],
+                    "description": "What a background action does while the user uses the target app (default: continue)"
+                  },
+                  "macos_key_priming": {
+                    "type": "string",
+                    "enum": [
+                      "on",
+                      "off"
+                    ],
+                    "description": "macOS background keys first make the target window key (default: off)"
+                  },
+                  "trace": {
+                    "type": "boolean",
+                    "description": "Per-request timing traces (default: false)"
                   }
                 },
                 "additionalProperties": false,

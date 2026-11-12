@@ -4,7 +4,14 @@ import type { TaskRecordStore } from "../store"
 import { ControlInbox } from "./control-inbox"
 import { defaultControlFsEnv, listControlFiles, readControlFile, type ControlFsEnv } from "./control-fs"
 import { advertisementName, ownersDir } from "./control-paths"
-import { parseAdvertisement, type ControlAck, type ControlGuidance, type ControlPhase, type ControlRegister, type OwnerAdvertisement } from "./control-schema"
+import {
+  parseAdvertisement,
+  type ControlAck,
+  type ControlGuidance,
+  type ControlPhase,
+  type ControlRegister,
+  type OwnerAdvertisement,
+} from "./control-schema"
 import { readAckFile, writeRegister, type ControlStore, type RegisterWrite } from "./control-store"
 
 const ADVERTISEMENT_LIVE_MS = 15_000
@@ -55,16 +62,22 @@ export function createRequesterChannel(options: RequesterChannelOptions) {
   function live(advertisement: OwnerAdvertisement | undefined): boolean {
     if (advertisement === undefined) return false
     const renewed = Date.parse(advertisement.renewedAt)
-    return Number.isFinite(renewed) && now() - renewed <= ADVERTISEMENT_LIVE_MS && options.isProcessAlive(advertisement.pid)
+    return (
+      Number.isFinite(renewed) && now() - renewed <= ADVERTISEMENT_LIVE_MS && options.isProcessAlive(advertisement.pid)
+    )
   }
 
   function advertised(record: TaskRecord): boolean {
     const pid = record.host_pid
     if (pid === undefined) return false
     const dir = ownersDir(options.stateDir)
-    const names = record.host_manager_instance !== undefined ? [advertisementName(pid, record.host_manager_instance)]
-      : listControlFiles(dir, control.env).map(file => file.name).filter(name => name.startsWith(`${pid}-`))
-    return names.some(name => {
+    const names =
+      record.host_manager_instance !== undefined
+        ? [advertisementName(pid, record.host_manager_instance)]
+        : listControlFiles(dir, control.env)
+            .map((file) => file.name)
+            .filter((name) => name.startsWith(`${pid}-`))
+    return names.some((name) => {
       const read = readControlFile(dir, name, control.env)
       const advertisement = read.kind === "ok" ? parseAdvertisement(read.text) : undefined
       return advertisement?.pid === pid && live(advertisement)
@@ -80,9 +93,11 @@ export function createRequesterChannel(options: RequesterChannelOptions) {
 
   function register(desired: DesiredState): ControlRegister {
     return {
-      version: 1, ...desired,
+      version: 1,
+      ...desired,
       ...(desired.guidance === undefined || desired.guidance.length === 0 ? {} : { guidance: desired.guidance }),
-      requester, writtenAt: new Date(now()).toISOString(),
+      requester,
+      writtenAt: new Date(now()).toISOString(),
     }
   }
 
@@ -94,7 +109,8 @@ export function createRequesterChannel(options: RequesterChannelOptions) {
   // phase, and the same resumeId for a Resume. A cancelled/settled ack on a flagged record always counts.
   function acceptedAck(desired: DesiredState, flagged: boolean): ControlAck | undefined {
     const ack = readAckFile(control, desired.taskId, desired.parentSessionId)
-    if (ack === undefined || ack.taskId !== desired.taskId || ack.parentSessionId !== desired.parentSessionId) return undefined
+    if (ack === undefined || ack.taskId !== desired.taskId || ack.parentSessionId !== desired.parentSessionId)
+      return undefined
     if (flagged && (ack.state === "cancelled" || ack.state === "settled")) return ack
     if (ack.runEpoch !== desired.runEpoch || ack.phase !== desired.phase) return undefined
     if (desired.phase !== "cancelled" && ack.pauseSeq !== desired.pauseSeq) return undefined
@@ -116,5 +132,15 @@ export function createRequesterChannel(options: RequesterChannelOptions) {
     return `running in another omo process (pid ${pid}); this run's Stop/Resume is carried there; its completion is reported to that process's session`
   }
 
-  return { ownedElsewhere, ownerStatus, cannotApply, assertDesired, acceptedAck, lastAck, channel: options.channel, control, requester }
+  return {
+    ownedElsewhere,
+    ownerStatus,
+    cannotApply,
+    assertDesired,
+    acceptedAck,
+    lastAck,
+    channel: options.channel,
+    control,
+    requester,
+  }
 }

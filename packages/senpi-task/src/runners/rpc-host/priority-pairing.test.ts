@@ -14,8 +14,13 @@ function world(started: typeof base, serviceTier: string | undefined, catalog: r
   const client = {
     open: async () => ({ sessionId: "session", attached: false, instanceId: "host", engineVersion: "v" }),
     getState: async () => ({ sessionId: "session", model: started, serviceTier }),
-    getAvailableModels: async () => { counts.catalog++; return catalog },
-    close: async () => { counts.close++ },
+    getAvailableModels: async () => {
+      counts.catalog++
+      return catalog
+    },
+    close: async () => {
+      counts.close++
+    },
   }
   return { client, counts }
 }
@@ -31,7 +36,9 @@ describe("host registry pairing (#9812)", () => {
     const { client, counts } = world(started, "standard", [base, alias])
     // when
     const result = await openTaskHostSession({
-      client, spec: { ...spec, model: `${provider}/${base.id}` }, sessionPath: "/tmp/pair.jsonl",
+      client,
+      spec: { ...spec, model: `${provider}/${base.id}` },
+      sessionPath: "/tmp/pair.jsonl",
     }).catch((error: unknown) => error)
     // then
     expect(RunnerError.is(result)).toBe(!accepted)
@@ -39,27 +46,45 @@ describe("host registry pairing (#9812)", () => {
     expect(counts.close).toBe(accepted ? 0 : 1)
   })
 
-  test.each(["priority", "standard", undefined])("forward alias accepts effective tier %s using host catalog", async (tier) => {
-    // given
-    const { client, counts } = world(base, tier, [alias])
-    // when
-    const opened = await openTaskHostSession({ client, spec: { ...spec, model: `${provider}/${alias.id}` }, sessionPath: "/tmp/pair.jsonl" })
-    const record = stampSpawnEffectiveModel(createTaskRecord({
-      parent_session_id: "parent", root_session_id: "parent", depth: 1,
-      execution_mode: "process", model: `${provider}/${alias.id}`, notify_on_terminal: false,
-    }), opened.reportedModel)
-    // then
-    expect(counts.catalog).toBe(1)
-    expect(counts.close).toBe(0)
-    expect(record.effective_model).toMatchObject({ provider, model_id: base.id })
-    expect(Reflect.get(record.effective_model ?? {}, "service_tier")).toBe(tier)
-  })
+  test.each(["priority", "standard", undefined])(
+    "forward alias accepts effective tier %s using host catalog",
+    async (tier) => {
+      // given
+      const { client, counts } = world(base, tier, [alias])
+      // when
+      const opened = await openTaskHostSession({
+        client,
+        spec: { ...spec, model: `${provider}/${alias.id}` },
+        sessionPath: "/tmp/pair.jsonl",
+      })
+      const record = stampSpawnEffectiveModel(
+        createTaskRecord({
+          parent_session_id: "parent",
+          root_session_id: "parent",
+          depth: 1,
+          execution_mode: "process",
+          model: `${provider}/${alias.id}`,
+          notify_on_terminal: false,
+        }),
+        opened.reportedModel,
+      )
+      // then
+      expect(counts.catalog).toBe(1)
+      expect(counts.close).toBe(0)
+      expect(record.effective_model).toMatchObject({ provider, model_id: base.id })
+      expect(Reflect.get(record.effective_model ?? {}, "service_tier")).toBe(tier)
+    },
+  )
 
   test("reverse alias accepts the started catalog entry and reports priority", async () => {
     // given
     const { client, counts } = world(alias, "priority", [base])
     // when
-    const opened = await openTaskHostSession({ client, spec: { ...spec, model: `${provider}/${base.id}` }, sessionPath: "/tmp/pair.jsonl" })
+    const opened = await openTaskHostSession({
+      client,
+      spec: { ...spec, model: `${provider}/${base.id}` },
+      sessionPath: "/tmp/pair.jsonl",
+    })
     // then
     expect(opened.reportedModel).toMatchObject({ provider, id: alias.id, serviceTier: "priority" })
     expect(counts.catalog).toBe(1)
@@ -75,13 +100,18 @@ describe("host registry pairing (#9812)", () => {
   ])("%s is refused and closed", async (label, reverse, catalog) => {
     // given
     const started = reverse
-      ? { ...alias, ...(label.includes("non-priority") ? { serviceTier: undefined } : {}),
-          ...(label.includes("different upstream") ? { upstreamModelId: "other" } : {}) }
+      ? {
+          ...alias,
+          ...(label.includes("non-priority") ? { serviceTier: undefined } : {}),
+          ...(label.includes("different upstream") ? { upstreamModelId: "other" } : {}),
+        }
       : base
     const { client, counts } = world(started, "priority", catalog)
     // when
     const failure = await openTaskHostSession({
-      client, spec: { ...spec, model: `${provider}/${reverse ? base.id : alias.id}` }, sessionPath: "/tmp/pair.jsonl",
+      client,
+      spec: { ...spec, model: `${provider}/${reverse ? base.id : alias.id}` },
+      sessionPath: "/tmp/pair.jsonl",
     }).catch((error: unknown) => error)
     // then
     expect(RunnerError.is(failure) ? failure.failure.kind : undefined).toBe("model_unavailable")
@@ -91,10 +121,14 @@ describe("host registry pairing (#9812)", () => {
   test("a catalog read failure refuses the unchecked pair", async () => {
     // given
     const { client, counts } = world(base, "standard", [])
-    client.getAvailableModels = async () => { throw new Error("catalog unavailable") }
+    client.getAvailableModels = async () => {
+      throw new Error("catalog unavailable")
+    }
     // when
     const failure = await openTaskHostSession({
-      client, spec: { ...spec, model: `${provider}/${alias.id}` }, sessionPath: "/tmp/pair.jsonl",
+      client,
+      spec: { ...spec, model: `${provider}/${alias.id}` },
+      sessionPath: "/tmp/pair.jsonl",
     }).catch((error: unknown) => error)
     // then
     expect(RunnerError.is(failure) ? failure.failure.kind : undefined).toBe("model_unavailable")

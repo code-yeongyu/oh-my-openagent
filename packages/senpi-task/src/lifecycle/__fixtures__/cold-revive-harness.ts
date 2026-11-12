@@ -12,23 +12,42 @@ import { createManagerResidencyRegistry } from "../../../../omo-senpi/src/compon
 import { createConfigGenerationStampingStore } from "../../../../omo-senpi/src/components/task/config-generation-store"
 import { NO_HOST_ENDPOINT } from "../host-session"
 
-export function coldReviveHarness(options: {
-  readonly policy?: ReviveDriftPolicy
-  readonly generation?: number
-  readonly cap?: number
-  readonly idleTimeoutMs?: number
-  readonly ttlMs?: number
-  readonly now?: () => number
-  readonly storeWrapper?: (store: TaskRecordStore) => TaskRecordStore
-  readonly resume?: (spec: ManagedStartSpec, path: string, handle: ManagedChildHandle) => Promise<ManagedChildHandle>
-} = {}) {
+export function coldReviveHarness(
+  options: {
+    readonly policy?: ReviveDriftPolicy
+    readonly generation?: number
+    readonly cap?: number
+    readonly idleTimeoutMs?: number
+    readonly ttlMs?: number
+    readonly now?: () => number
+    readonly storeWrapper?: (store: TaskRecordStore) => TaskRecordStore
+    readonly resume?: (spec: ManagedStartSpec, path: string, handle: ManagedChildHandle) => Promise<ManagedChildHandle>
+  } = {},
+) {
   const project = tempProject()
   const backing = createTaskRecordStore({ project_dir: project })
   const record: TaskRecord = {
-    ...createTaskRecord({ parent_session_id: "parent", root_session_id: "parent", depth: 1, execution_mode: "in-process", model: "fixture/model", notify_on_terminal: false }),
-    status: "completed", residency_state: "persisted_only", final_response: "TRANSCRIPT_SENTINEL",
-    spawn_spec: { version: 1, cwd: project, prompt: "RECORDED_PROMPT", instructions: "RECORDED_INSTRUCTIONS", member_scoped_tool_names: ["fixture_read"] },
-    tool_allow: ["read", "fixture_read"], tool_deny: ["write"], agent_type: "custom-worker",
+    ...createTaskRecord({
+      parent_session_id: "parent",
+      root_session_id: "parent",
+      depth: 1,
+      execution_mode: "in-process",
+      model: "fixture/model",
+      notify_on_terminal: false,
+    }),
+    status: "completed",
+    residency_state: "persisted_only",
+    final_response: "TRANSCRIPT_SENTINEL",
+    spawn_spec: {
+      version: 1,
+      cwd: project,
+      prompt: "RECORDED_PROMPT",
+      instructions: "RECORDED_INSTRUCTIONS",
+      member_scoped_tool_names: ["fixture_read"],
+    },
+    tool_allow: ["read", "fixture_read"],
+    tool_deny: ["write"],
+    agent_type: "custom-worker",
     ...(options.generation === undefined ? {} : { config_generation: options.generation }),
   }
   backing.save(record)
@@ -41,25 +60,64 @@ export function coldReviveHarness(options: {
   const fake = makeHandle(record.task_id)
   const resumed: Array<{ spec: ManagedStartSpec; path: string }> = []
   const warnings: ReviveGenerationWarning[] = []
-  const config = settings({ default_concurrency: 1, global_concurrency: 1, residency_max_children: options.cap ?? 4, ...(options.idleTimeoutMs === undefined ? {} : { resident_idle_timeout_ms: options.idleTimeoutMs }), ...(options.ttlMs === undefined ? {} : { ttl_ms: options.ttlMs }) })
-  const manager = createTaskManager({ store, cwd: project, config, now: options.now,
+  const config = settings({
+    default_concurrency: 1,
+    global_concurrency: 1,
+    residency_max_children: options.cap ?? 4,
+    ...(options.idleTimeoutMs === undefined ? {} : { resident_idle_timeout_ms: options.idleTimeoutMs }),
+    ...(options.ttlMs === undefined ? {} : { ttl_ms: options.ttlMs }),
+  })
+  const manager = createTaskManager({
+    store,
+    cwd: project,
+    config,
+    now: options.now,
     planner: () => ({ kind: "resolved", plan: { model: "fixture/model" } }),
-    runners: { "in-process": { start: (spec) => new FakeRunner().start(spec), resume: async (spec, path) => {
-      resumed.push({ spec, path })
-      return options.resume === undefined ? fake.handle : options.resume(spec, path, fake.handle)
-    } }, process: new FakeRunner() },
+    runners: {
+      "in-process": {
+        start: (spec) => new FakeRunner().start(spec),
+        resume: async (spec, path) => {
+          resumed.push({ spec, path })
+          return options.resume === undefined ? fake.handle : options.resume(spec, path, fake.handle)
+        },
+      },
+      process: new FakeRunner(),
+    },
     destruction: {
       destroyResidentTask: (id, cause) => lifecycle.destroyResidentTask(id, cause),
-      parkTerminalResident: id => lifecycle.parkTerminalResident(id),
+      parkTerminalResident: (id) => lifecycle.parkTerminalResident(id),
     },
   })
   const registry = createManagerResidencyRegistry(() => manager)
-  const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config, now: options.now,
-    revivePolicy: { currentGeneration: () => 2, warn: (warning) => warnings.push(warning), ...(options.policy === undefined ? {} : { policy: options.policy }) },
+  const lifecycle = createTaskLifecycle({
+    hostEndpoint: NO_HOST_ENDPOINT,
+    store,
+    registry,
+    config,
+    now: options.now,
+    revivePolicy: {
+      currentGeneration: () => 2,
+      warn: (warning) => warnings.push(warning),
+      ...(options.policy === undefined ? {} : { policy: options.policy }),
+    },
     idleReclaimerScheduler: { setInterval: () => ({}), clearInterval: () => undefined },
   })
-  return { project, store, record, fake, manager, lifecycle, registry, resumed, warnings, sessionPath,
-    send: (message = "CONTINUE_SENTINEL") => manager.sendToTask({ idOrName: record.task_id, callerSessionId: "parent", message }),
-    dispose: async () => { lifecycle.dispose?.(); await lifecycle.destroyResidentTask(record.task_id, "cancel") },
+  return {
+    project,
+    store,
+    record,
+    fake,
+    manager,
+    lifecycle,
+    registry,
+    resumed,
+    warnings,
+    sessionPath,
+    send: (message = "CONTINUE_SENTINEL") =>
+      manager.sendToTask({ idOrName: record.task_id, callerSessionId: "parent", message }),
+    dispose: async () => {
+      lifecycle.dispose?.()
+      await lifecycle.destroyResidentTask(record.task_id, "cancel")
+    },
   }
 }

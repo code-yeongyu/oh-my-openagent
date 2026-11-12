@@ -14,10 +14,24 @@ afterEach(cleanupPair)
 type Pair = ReturnType<typeof controlPair>
 const RUN = { kind: "task" as const, id: T1 }
 const OWNER = { parentSessionId: "parent-1", parentPauseSeq: 2, runRef: RUN }
-const pausedUnderA = { status: "paused" as const, run_pause: { parent_session_id: "parent-1", parent_pause_seq: 2, run_ref: RUN } }
+const pausedUnderA = {
+  status: "paused" as const,
+  run_pause: { parent_session_id: "parent-1", parent_pause_seq: 2, run_ref: RUN },
+}
 
 function seed(pair: Pair, state: PauseParticipant["state"], extra: Partial<PauseParticipant> = {}, key = T1): void {
-  pair.runPause.registry.begin("parent-1", 2, [{ key, taskId: key, kind: "task", runRef: { kind: "task", id: key }, runEpoch: 1, state, at: new Date(0).toISOString(), ...extra }])
+  pair.runPause.registry.begin("parent-1", 2, [
+    {
+      key,
+      taskId: key,
+      kind: "task",
+      runRef: { kind: "task", id: key },
+      runEpoch: 1,
+      state,
+      at: new Date(0).toISOString(),
+      ...extra,
+    },
+  ])
   pair.runPause.registry.phase("parent-1", 2, "applied")
 }
 const participant = (pair: Pair, key = T1) => pair.runPause.registry.load("parent-1")?.participants[key]
@@ -76,7 +90,9 @@ describe("#12349 part 2 requester cases (design section 7)", () => {
   })
 
   test("#given the owner already resumed and a register with guidance arrives #when answered #then each entry is undelivered and removed, no second resume (test 11d requester half)", async () => {
-    const pair = controlPair({ record: { run_pause_resumed: { resume_id: "r-1", parent_session_id: "parent-1", parent_pause_seq: 2 } } })
+    const pair = controlPair({
+      record: { run_pause_resumed: { resume_id: "r-1", parent_session_id: "parent-1", parent_pause_seq: 2 } },
+    })
     await pair.advertise()
     seed(pair, "held_remote", { remoteAckSeq: 2, guidance: [{ inputId: "send-1", revision: 0, text: "late" }] })
     await pair.runPause.controller.resume("parent-1", 2, "r-1")
@@ -96,7 +112,9 @@ describe("#12349 part 2 requester cases (design section 7)", () => {
   })
 
   test("#given the owner died after resuming but before acking #when A Resumes #then nothing resumes twice (test 17, F3)", async () => {
-    const pair = controlPair({ record: { run_pause_resumed: { resume_id: "r-1", parent_session_id: "parent-1", parent_pause_seq: 2 } } })
+    const pair = controlPair({
+      record: { run_pause_resumed: { resume_id: "r-1", parent_session_id: "parent-1", parent_pause_seq: 2 } },
+    })
     seed(pair, "held_remote", { remoteAckSeq: 2 })
     pair.alive.delete(B_PID)
     await pair.runPause.controller.resume("parent-1", 2, "r-1")
@@ -130,8 +148,16 @@ describe("#12349 part 2 requester cases (design section 7)", () => {
     const T2 = "st_00000002"
     seedRecord(pair.store, { task_id: T2, status: "running", run_epoch: 1, host_pid: B_PID })
     await pair.advertise()
-    const lost = (key: string): PauseParticipant => ({ key, taskId: key, kind: "task", runRef: { kind: "task", id: key }, runEpoch: 1,
-      state: "lost", lostReason: "resume failed: stale", at: new Date(0).toISOString() })
+    const lost = (key: string): PauseParticipant => ({
+      key,
+      taskId: key,
+      kind: "task",
+      runRef: { kind: "task", id: key },
+      runEpoch: 1,
+      state: "lost",
+      lostReason: "resume failed: stale",
+      at: new Date(0).toISOString(),
+    })
     pair.runPause.registry.begin("parent-1", 2, [lost(T1), lost(T2)])
     pair.runPause.registry.phase("parent-1", 2, "resumed")
     pair.barrier.release("parent-1", pair.barrier.resume("parent-1", 2, "r-0"))
@@ -149,7 +175,9 @@ describe("#12349 part 2 requester cases (design section 7)", () => {
   })
 
   test("#given a child paused at S-1 under the run and a dead owner #when A Resumes at S #then the record is aligned to S before the resume (test 17g, F7)", async () => {
-    const pair = controlPair({ record: { ...pausedUnderA, run_pause: { ...pausedUnderA.run_pause, parent_pause_seq: 1 } } })
+    const pair = controlPair({
+      record: { ...pausedUnderA, run_pause: { ...pausedUnderA.run_pause, parent_pause_seq: 1 } },
+    })
     seed(pair, "owned_elsewhere")
     pair.alive.delete(B_PID)
     await pair.runPause.controller.resume("parent-1", 2, "r-1")
@@ -185,8 +213,12 @@ describe("#12349 part 2 requester cases (design section 7)", () => {
     await pair.advertise()
     seed(pair, "held_remote", { remoteAckSeq: 2 })
     const order: string[] = []
-    const resumed = pair.runPause.bridge.changed("parent-1", { change: "resumed", pauseSeq: 2, holds: [] }).then(() => { order.push("resume") })
-    const ticked = pair.runPause.bridge.tickRemote("parent-1").then(() => { order.push("tick") })
+    const resumed = pair.runPause.bridge.changed("parent-1", { change: "resumed", pauseSeq: 2, holds: [] }).then(() => {
+      order.push("resume")
+    })
+    const ticked = pair.runPause.bridge.tickRemote("parent-1").then(() => {
+      order.push("tick")
+    })
     await Promise.all([resumed, ticked])
     expect(order).toEqual(["resume", "tick"])
     expect(pair.runPause.registry.load("parent-1")?.phase).toBe("resumed")
@@ -201,8 +233,19 @@ describe("#12349 part 2 requester cases (design section 7)", () => {
       pair.owner.live.add(key)
     }
     await pair.advertise()
-    pair.runPause.registry.begin("parent-1", 2, [T1, ...keys].map(key => ({ key, taskId: key, kind: "task" as const,
-      runRef: { kind: "task" as const, id: key }, runEpoch: 1, state: "owned_elsewhere" as const, at: new Date(0).toISOString() })))
+    pair.runPause.registry.begin(
+      "parent-1",
+      2,
+      [T1, ...keys].map((key) => ({
+        key,
+        taskId: key,
+        kind: "task" as const,
+        runRef: { kind: "task" as const, id: key },
+        runEpoch: 1,
+        state: "owned_elsewhere" as const,
+        at: new Date(0).toISOString(),
+      })),
+    )
     pair.runPause.registry.phase("parent-1", 2, "applied")
     const started = pair.clock()
     await pair.runPause.controller.resume("parent-1", 2, "r-1")
@@ -211,12 +254,19 @@ describe("#12349 part 2 requester cases (design section 7)", () => {
 
   test("#given a child another live process runs #when task_output reads it #then the status line says where it runs, or why it cannot be reached", async () => {
     const pair = controlPair()
-    const deps = { stateDir: pair.store.stateDir, ownerStatus: (entry: TaskRecord) => pair.channel.ownerStatus(entry),
-      manager: { list: () => [{ record: record(pair) }] } } as unknown as Parameters<typeof runTaskOutput>[0]
+    const deps = {
+      stateDir: pair.store.stateDir,
+      ownerStatus: (entry: TaskRecord) => pair.channel.ownerStatus(entry),
+      manager: { list: () => [{ record: record(pair) }] },
+    } as unknown as Parameters<typeof runTaskOutput>[0]
     const unreachable = await runTaskOutput(deps, { task_id: T1 }, "parent-1")
-    expect(unreachable.details).toMatchObject({ snapshot: { owner: `owner cannot apply: owner_unsupported (pid ${B_PID})` } })
+    expect(unreachable.details).toMatchObject({
+      snapshot: { owner: `owner cannot apply: owner_unsupported (pid ${B_PID})` },
+    })
     await pair.advertise()
     const carried = await runTaskOutput(deps, { task_id: T1 }, "parent-1")
-    expect(carried.details).toMatchObject({ snapshot: { owner: expect.stringContaining(`running in another omo process (pid ${B_PID})`) } })
+    expect(carried.details).toMatchObject({
+      snapshot: { owner: expect.stringContaining(`running in another omo process (pid ${B_PID})`) },
+    })
   })
 })

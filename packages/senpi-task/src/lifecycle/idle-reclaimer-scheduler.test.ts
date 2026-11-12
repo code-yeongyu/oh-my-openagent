@@ -11,13 +11,21 @@ describe("idle reclaimer long durations", () => {
     let sweeps = 0
     const scheduler = context.createIdleReclaimerScheduler({
       setTimeout: (callback, delay) => {
-        const timer = { unref: () => { unrefs += 1 } }
+        const timer = {
+          unref: () => {
+            unrefs += 1
+          },
+        }
         scheduled.push({ callback, delay, timer })
         return timer
       },
-      clearTimeout: (timer) => { cleared.push(timer) },
+      clearTimeout: (timer) => {
+        cleared.push(timer)
+      },
     })
-    const interval = scheduler.setInterval(() => { sweeps += 1 }, 2_147_483_647 + 37)
+    const interval = scheduler.setInterval(() => {
+      sweeps += 1
+    }, 2_147_483_647 + 37)
     interval.unref?.()
     expect(scheduled.map((entry) => entry.delay)).toEqual([2_147_483_647])
     scheduled[0]?.callback()

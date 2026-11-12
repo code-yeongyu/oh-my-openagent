@@ -15,8 +15,9 @@ type HandoffPorts = {
 }
 
 const namesRun = (record: TaskRecord, owner: RunPauseOwner): boolean =>
-  record.run_pause?.parent_session_id === owner.parentSessionId
-  && record.run_pause.run_ref.kind === owner.runRef.kind && record.run_pause.run_ref.id === owner.runRef.id
+  record.run_pause?.parent_session_id === owner.parentSessionId &&
+  record.run_pause.run_ref.kind === owner.runRef.kind &&
+  record.run_pause.run_ref.id === owner.runRef.id
 
 // The dead-owner handoff (design 3.2): a formerly remote child whose owner died or let it go is
 // handed to the local path, decided per FRESH record. It never restores or resumes a flagged record.
@@ -26,8 +27,11 @@ export function createOwnerHandoff(ports: HandoffPorts) {
   function align(record: TaskRecord, owner: RunPauseOwner): boolean {
     if (record.run_pause?.parent_pause_seq === owner.parentPauseSeq || ports.store === undefined) return true
     let aligned = false
-    ports.store.mutate(record.task_id, fresh => {
-      const owned = fresh.host_pid !== undefined && fresh.host_pid !== record.host_pid && ports.isProcessAlive?.(fresh.host_pid) === true
+    ports.store.mutate(record.task_id, (fresh) => {
+      const owned =
+        fresh.host_pid !== undefined &&
+        fresh.host_pid !== record.host_pid &&
+        ports.isProcessAlive?.(fresh.host_pid) === true
       if (owned || fresh.run_pause === undefined) return fresh
       aligned = true
       return { ...fresh, run_pause: { ...fresh.run_pause, parent_pause_seq: owner.parentPauseSeq } }
@@ -43,17 +47,27 @@ export function createOwnerHandoff(ports: HandoffPorts) {
 
   async function hold(_participant: PauseParticipant, record: TaskRecord, owner: RunPauseOwner) {
     if (flagged(record)) return { kind: "settled" as const }
-    if (record.status === "paused" && namesRun(record, owner)) return align(record, owner) ? { kind: "held" as const, childSeq: 0 } : undefined
+    if (record.status === "paused" && namesRun(record, owner))
+      return align(record, owner) ? { kind: "held" as const, childSeq: 0 } : undefined
     if (record.status !== "running") return { kind: "settled" as const }
     const ack = await ports.manager.pauseTask(record.task_id, owner)
     return "refused" in ack ? { kind: "settled" as const } : { kind: "held" as const, childSeq: ack.childSeq }
   }
 
-  async function resume(participant: PauseParticipant, record: TaskRecord, request: ResumeParticipantRequest, credential: ResumeCredential | undefined) {
+  async function resume(
+    participant: PauseParticipant,
+    record: TaskRecord,
+    request: ResumeParticipantRequest,
+    credential: ResumeCredential | undefined,
+  ) {
     if (flagged(record)) return { kind: "settled" as const }
-    if (record.status !== "paused" || !namesRun(record, request) || !align(record, request)) return { kind: "settled" as const }
+    if (record.status !== "paused" || !namesRun(record, request) || !align(record, request))
+      return { kind: "settled" as const }
     for (const entry of participant.guidance ?? []) await ports.manager.holdTaskInput(record.task_id, entry)
-    const resumed = await ports.manager.resumeLostTask(record.task_id, { ...request, ...(credential === undefined ? {} : { resumeCredential: credential }) })
+    const resumed = await ports.manager.resumeLostTask(record.task_id, {
+      ...request,
+      ...(credential === undefined ? {} : { resumeCredential: credential }),
+    })
     if ("notHeld" in resumed) return { kind: "settled" as const }
     if ("otherHoldLive" in resumed) return { kind: "held_by_user" as const, childSeq: resumed.childSeq ?? 0 }
     return { kind: "resumed" as const, turnId: resumed.turnId }

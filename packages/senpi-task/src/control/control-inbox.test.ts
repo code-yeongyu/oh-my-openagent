@@ -16,15 +16,34 @@ afterEach(async () => {
 
 const HOST = 7001
 
-function setup(input: { readonly status?: "running" | "paused"; readonly hostPid?: number; readonly ancestors?: readonly string[] } = {}) {
+function setup(
+  input: {
+    readonly status?: "running" | "paused"
+    readonly hostPid?: number
+    readonly ancestors?: readonly string[]
+  } = {},
+) {
   const store = tempStore()
-  seedRecord(store, { task_id: "st_00000001", status: input.status ?? "running", run_epoch: 1, host_pid: input.hostPid ?? HOST })
+  seedRecord(store, {
+    task_id: "st_00000001",
+    status: input.status ?? "running",
+    run_epoch: 1,
+    host_pid: input.hostPid ?? HOST,
+  })
   const owner = fakeOwner(store, HOST, input.ancestors === undefined ? {} : { ancestors: input.ancestors })
   owner.live.add("st_00000001")
   let now = 1_000_000
   const inbox = ControlInbox.for({ stateDir: store.stateDir, hostPid: HOST, store, autoStart: false, now: () => now })
   unregisters.push(inbox.register(owner, { channel: true, liveTasks: () => owner.live.size }))
-  return { store, owner, inbox, control: controlFor(store), advance: (ms: number) => { now += ms } }
+  return {
+    store,
+    owner,
+    inbox,
+    control: controlFor(store),
+    advance: (ms: number) => {
+      now += ms
+    },
+  }
 }
 
 const send = (store: TaskRecordStore, register: ControlRegister) => writeRegister(store, controlFor(store), register)
@@ -39,7 +58,10 @@ describe("owner inbox reconcile (design 3.3)", () => {
     send(store, want({ phase: "resumed", resumeId: "r-1" }))
     await inbox.tick()
     expect(ack(store)).toMatchObject({ state: "resumed", resumeId: "r-1" })
-    send(store, want({ phase: "resumed", resumeId: "r-1", guidance: [{ inputId: "send-1", revision: 0, text: "late" }] }))
+    send(
+      store,
+      want({ phase: "resumed", resumeId: "r-1", guidance: [{ inputId: "send-1", revision: 0, text: "late" }] }),
+    )
     await inbox.tick()
     expect(owner.calls).toMatchObject({ pause: 1, resume: 1 })
     expect(ack(store)).toMatchObject({ state: "resumed", guidance: [{ inputId: "send-1", outcome: "undelivered" }] })
@@ -58,8 +80,12 @@ describe("owner inbox reconcile (design 3.3)", () => {
     const { store, owner, inbox } = setup()
     send(store, want({ pauseSeq: 5 }))
     await inbox.tick()
-    writeControlFile(controlDir(store.stateDir), registerName("st_00000001", "parent-1"),
-      JSON.stringify(want({ pauseSeq: 3, phase: "resumed", resumeId: "r-old" })), controlFor(store).env)
+    writeControlFile(
+      controlDir(store.stateDir),
+      registerName("st_00000001", "parent-1"),
+      JSON.stringify(want({ pauseSeq: 3, phase: "resumed", resumeId: "r-old" })),
+      controlFor(store).env,
+    )
     await inbox.tick()
     expect(ack(store)).toMatchObject({ state: "refused", reason: "stale", pauseSeq: 3 })
     expect(owner.calls.resume).toBe(0)
@@ -69,13 +95,16 @@ describe("owner inbox reconcile (design 3.3)", () => {
     const { store, owner, inbox } = setup()
     send(store, want({ parentSessionId: "intruder" }))
     await inbox.tick()
-    expect(readAckFile(controlFor(store), "st_00000001", "intruder")).toMatchObject({ state: "refused", reason: "not_in_ancestry" })
+    expect(readAckFile(controlFor(store), "st_00000001", "intruder")).toMatchObject({
+      state: "refused",
+      reason: "not_in_ancestry",
+    })
     expect(owner.calls.pause).toBe(0)
   })
 
   test("#given a flag-less cancelled register at an older epoch #when reconciled #then epoch_moved, register deleted, child untouched (test 11b)", async () => {
     const { store, owner, inbox, control } = setup()
-    store.mutate("st_00000001", fresh => ({ ...fresh, notification: { ...fresh.notification, run_epoch: 2 } }))
+    store.mutate("st_00000001", (fresh) => ({ ...fresh, notification: { ...fresh.notification, run_epoch: 2 } }))
     send(store, want({ phase: "cancelled", cancel: { requestedAt: new Date(0).toISOString() } }))
     await inbox.tick()
     expect(ack(store)).toMatchObject({ state: "refused", reason: "epoch_moved" })
@@ -86,8 +115,11 @@ describe("owner inbox reconcile (design 3.3)", () => {
   test("#given a cancel-final record whose epoch moved #when any register reaches it #then the owner cancels unfenced once (test 20c)", async () => {
     const { store, owner, inbox } = setup()
     send(store, want())
-    store.mutate("st_00000001", fresh => ({ ...fresh, notification: { ...fresh.notification, run_epoch: 3 },
-      cancel_requested: { requested_at: new Date(0).toISOString(), reason: "user" } }))
+    store.mutate("st_00000001", (fresh) => ({
+      ...fresh,
+      notification: { ...fresh.notification, run_epoch: 3 },
+      cancel_requested: { requested_at: new Date(0).toISOString(), reason: "user" },
+    }))
     await inbox.tick()
     expect(owner.calls.cancel).toHaveLength(1)
     expect(ack(store)).toMatchObject({ state: "cancelled" })
@@ -95,10 +127,21 @@ describe("owner inbox reconcile (design 3.3)", () => {
 
   test("#given the owner's cancel answers cancel_pending #when ticked #then no ack, no owner_failed, then cancelled once terminal (test 20c)", async () => {
     const { store, owner, inbox, advance } = setup()
-    store.mutate("st_00000001", fresh => ({ ...fresh, cancel_requested: { requested_at: new Date(0).toISOString() } }))
-    owner.cancelAnswer = taskId => ({ kind: "cancel_pending", task_id: taskId, previous_status: "running", reason: "recovering" })
+    store.mutate("st_00000001", (fresh) => ({
+      ...fresh,
+      cancel_requested: { requested_at: new Date(0).toISOString() },
+    }))
+    owner.cancelAnswer = (taskId) => ({
+      kind: "cancel_pending",
+      task_id: taskId,
+      previous_status: "running",
+      reason: "recovering",
+    })
     send(store, want({ phase: "cancelled", cancel: { requestedAt: new Date(0).toISOString() } }))
-    for (let attempt = 0; attempt < 12; attempt += 1) { await inbox.tick(); advance(61_000) }
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      await inbox.tick()
+      advance(61_000)
+    }
     expect(ack(store)).toBeUndefined()
     owner.cancelAnswer = undefined
     await inbox.tick()
@@ -107,7 +150,7 @@ describe("owner inbox reconcile (design 3.3)", () => {
 
   test("#given the child settled before the cancel tick #when reconciled #then ack settled (test 20i)", async () => {
     const { store, inbox } = setup()
-    store.mutate("st_00000001", fresh => ({ ...fresh, status: "completed" }))
+    store.mutate("st_00000001", (fresh) => ({ ...fresh, status: "completed" }))
     send(store, want({ phase: "cancelled", cancel: { requestedAt: new Date(0).toISOString() } }))
     await inbox.tick()
     expect(ack(store)).toMatchObject({ state: "settled" })
@@ -135,7 +178,10 @@ describe("owner inbox reconcile (design 3.3)", () => {
     const { store, owner, inbox, advance } = setup()
     owner.pauseError = new Error("transport down")
     send(store, want())
-    for (let attempt = 0; attempt < 9; attempt += 1) { await inbox.tick(); advance(61_000) }
+    for (let attempt = 0; attempt < 9; attempt += 1) {
+      await inbox.tick()
+      advance(61_000)
+    }
     expect(ack(store)).toBeUndefined()
     await inbox.tick()
     expect(ack(store)).toMatchObject({ state: "refused", reason: "owner_failed" })
@@ -151,7 +197,11 @@ describe("owner inbox reconcile (design 3.3)", () => {
 
   test("#given the owner's own Stop at S' <= S #when the requester's resumed@S lands #then the barrier opens and the child resumes once (F12)", async () => {
     const { store, owner, inbox } = setup()
-    await owner.pauseTask("st_00000001", { parentSessionId: "parent-1", parentPauseSeq: 2, runRef: { kind: "task", id: "st_00000001" } })
+    await owner.pauseTask("st_00000001", {
+      parentSessionId: "parent-1",
+      parentPauseSeq: 2,
+      runRef: { kind: "task", id: "st_00000001" },
+    })
     owner.barrier?.close("parent-1", 2)
     send(store, want({ phase: "resumed", resumeId: "r-1" }))
     await inbox.tick()

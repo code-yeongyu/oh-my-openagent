@@ -20,13 +20,27 @@ const roots: string[] = []
 afterEach(async () => Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 }))))
 
 const T0 = Date.parse("2026-09-15T06:00:00.000Z")
-const deterministic: ReflectionFailureSignal = { fingerprint: "spawn_failed:Model not found", retryable: false, reason: "spawn_failed", detail: "Model not found" }
-const transient: ReflectionFailureSignal = { fingerprint: "child_exit:OpenAI API error (429)", retryable: true, reason: "child_exit", detail: "OpenAI API error (429)" }
+const deterministic: ReflectionFailureSignal = {
+  fingerprint: "spawn_failed:Model not found",
+  retryable: false,
+  reason: "spawn_failed",
+  detail: "Model not found",
+}
+const transient: ReflectionFailureSignal = {
+  fingerprint: "child_exit:OpenAI API error (429)",
+  retryable: true,
+  reason: "child_exit",
+  detail: "OpenAI API error (429)",
+}
 
 async function fixture() {
   const root = realpathSync.native(await mkdtemp(join(tmpdir(), "reflection-park-")))
   roots.push(root)
-  const identity: MemoryIdentity = { id: "agent-test", safeSlug: "agent-test", paths: buildIdentityPaths(root, "agent-test") }
+  const identity: MemoryIdentity = {
+    id: "agent-test",
+    safeSlug: "agent-test",
+    paths: buildIdentityPaths(root, "agent-test"),
+  }
   let nowMs = T0
   const now = () => new Date(nowMs)
   const journal = new TranscriptJournal({ journalDir: join(identity.paths.transcripts, "conversation-a"), now })
@@ -43,17 +57,30 @@ async function fixture() {
     getJournal: async () => journal,
     createRunId: () => `run-${++nextId}`,
   })
-  const advance = (ms: number) => { nowMs += ms }
+  const advance = (ms: number) => {
+    nowMs += ms
+  }
   const parkPath = join(identity.paths.reflection, "park.json")
   return { identity, journal, store, advance, parkPath }
 }
 
-async function automaticRequest(journal: TranscriptJournal, trigger: "step-count" | "compaction" = "step-count"): Promise<ReflectionRequest> {
+async function automaticRequest(
+  journal: TranscriptJournal,
+  trigger: "step-count" | "compaction" = "step-count",
+): Promise<ReflectionRequest> {
   const snapshot = await journal.captureReflectionSnapshot()
-  return { trigger, conversationIds: ["conversation-a"], snapshots: snapshot === null ? [] : [{ conversationId: "conversation-a", snapshot }] }
+  return {
+    trigger,
+    conversationIds: ["conversation-a"],
+    snapshots: snapshot === null ? [] : [{ conversationId: "conversation-a", snapshot }],
+  }
 }
 
-async function failAutomaticRuns(item: Awaited<ReturnType<typeof fixture>>, count: number, failure: ReflectionFailureSignal) {
+async function failAutomaticRuns(
+  item: Awaited<ReturnType<typeof fixture>>,
+  count: number,
+  failure: ReflectionFailureSignal,
+) {
   for (let index = 0; index < count; index += 1) {
     const reserved = await item.store.tryReserve(await automaticRequest(item.journal))
     if (reserved.status !== "active") throw new Error(`expected an active reservation, got ${reserved.status}`)
@@ -88,7 +115,11 @@ describe("reflection reservation park", () => {
     await failAutomaticRuns(item, REFLECTION_PARK_NON_RETRYABLE_STREAK, deterministic)
 
     // when
-    const manual = await item.store.tryReserve({ trigger: "manual", conversationIds: ["conversation-a"], snapshots: [] })
+    const manual = await item.store.tryReserve({
+      trigger: "manual",
+      conversationIds: ["conversation-a"],
+      snapshots: [],
+    })
     expect(manual.status).toBe("active")
     if (manual.status !== "active") throw new Error("unreachable")
     const completion = await item.store.complete(manual.run.runId, "merged")
@@ -175,7 +206,11 @@ describe("reflection reservation park", () => {
     const before = await item.store.readPark()
 
     // when
-    const manual = await item.store.tryReserve({ trigger: "manual", conversationIds: ["conversation-a"], snapshots: [] })
+    const manual = await item.store.tryReserve({
+      trigger: "manual",
+      conversationIds: ["conversation-a"],
+      snapshots: [],
+    })
     if (manual.status !== "active") throw new Error("expected an active reservation")
     await item.store.complete(manual.run.runId, "failed", { failure: deterministic })
 
@@ -203,24 +238,31 @@ describe("reflection reservation park", () => {
   it.each([
     ["truncated json", "{not json"],
     ["an unsupported shape", JSON.stringify({ version: 2, streak: "many" })],
-  ])("#given %s in park.json #when manual and automatic reflections are requested #then both reserve and the next automatic failure rewrites the file", async (_label, corrupt) => {
-    // given
-    const item = await fixture()
-    await mkdir(dirname(item.parkPath), { recursive: true })
-    await writeFile(item.parkPath, corrupt)
+  ])(
+    "#given %s in park.json #when manual and automatic reflections are requested #then both reserve and the next automatic failure rewrites the file",
+    async (_label, corrupt) => {
+      // given
+      const item = await fixture()
+      await mkdir(dirname(item.parkPath), { recursive: true })
+      await writeFile(item.parkPath, corrupt)
 
-    // when
-    const manual = await item.store.tryReserve({ trigger: "manual", conversationIds: ["conversation-a"], snapshots: [] })
-    expect(manual.status).toBe("active")
-    if (manual.status !== "active") throw new Error("unreachable")
-    await item.store.complete(manual.run.runId, "failed", { failure: deterministic })
-    item.advance(60_000)
-    const automatic = await item.store.tryReserve(await automaticRequest(item.journal))
-    expect(automatic.status).toBe("active")
-    if (automatic.status !== "active") throw new Error("unreachable")
-    await item.store.complete(automatic.run.runId, "failed", { failure: deterministic })
+      // when
+      const manual = await item.store.tryReserve({
+        trigger: "manual",
+        conversationIds: ["conversation-a"],
+        snapshots: [],
+      })
+      expect(manual.status).toBe("active")
+      if (manual.status !== "active") throw new Error("unreachable")
+      await item.store.complete(manual.run.runId, "failed", { failure: deterministic })
+      item.advance(60_000)
+      const automatic = await item.store.tryReserve(await automaticRequest(item.journal))
+      expect(automatic.status).toBe("active")
+      if (automatic.status !== "active") throw new Error("unreachable")
+      await item.store.complete(automatic.run.runId, "failed", { failure: deterministic })
 
-    // then
-    expect(await item.store.readPark()).toMatchObject({ version: 1, streak: 1 })
-  })
+      // then
+      expect(await item.store.readPark()).toMatchObject({ version: 1, streak: 1 })
+    },
+  )
 })

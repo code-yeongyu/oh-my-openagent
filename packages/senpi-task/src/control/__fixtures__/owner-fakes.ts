@@ -19,28 +19,45 @@ export type FakeOwner = ControlOwnerPort & {
   pauseError?: Error
 }
 
-export function fakeOwner(store: TaskRecordStore, hostPid: number, input: { readonly ancestors?: readonly string[] } = {}): FakeOwner {
+export function fakeOwner(
+  store: TaskRecordStore,
+  hostPid: number,
+  input: { readonly ancestors?: readonly string[] } = {},
+): FakeOwner {
   const engines = new Map<string, FakeEngine>()
-  const engine = (taskId: string): FakeEngine => engines.get(taskId) ?? engines.set(taskId, { highWater: 0, childSeq: 0 }).get(taskId) as FakeEngine
+  const engine = (taskId: string): FakeEngine =>
+    engines.get(taskId) ?? (engines.set(taskId, { highWater: 0, childSeq: 0 }).get(taskId) as FakeEngine)
   const load = (taskId: string): TaskRecord | undefined => store.load(taskId) ?? undefined
   const owner: FakeOwner = {
-    managerInstance: "owner-b", hostPid, calls: { pause: 0, resume: 0, hold: [], cancel: [] }, engines, live: new Set(),
+    managerInstance: "owner-b",
+    hostPid,
+    calls: { pause: 0, resume: 0, hold: [], cancel: [] },
+    engines,
+    live: new Set(),
     barrier: new AdmissionBarrier(),
     sessionId: () => "parent-1",
-    holds: taskId => owner.live.has(taskId),
+    holds: (taskId) => owner.live.has(taskId),
     load,
-    ownsRecord: record => record.parent_session_id === "parent-1",
+    ownsRecord: (record) => record.parent_session_id === "parent-1",
     inAncestry: (record, parent) => record.parent_session_id === parent || (input.ancestors ?? []).includes(parent),
     async pauseTask(taskId: string, run: RunPauseOwner) {
       if (owner.pauseError !== undefined) throw owner.pauseError
       const child = engine(taskId)
-      if (child.holder !== undefined && child.holder !== run.parentSessionId) return { refused: "wrong_parent" as const }
+      if (child.holder !== undefined && child.holder !== run.parentSessionId)
+        return { refused: "wrong_parent" as const }
       owner.calls.pause += 1
       child.holder = run.parentSessionId
       child.highWater = Math.max(child.highWater, run.parentPauseSeq)
       child.childSeq += 1
-      store.mutate(taskId, ({ run_pause_resumed: _gone, ...fresh }) => ({ ...fresh, status: "paused", run_pause: {
-        parent_session_id: run.parentSessionId, parent_pause_seq: run.parentPauseSeq, run_ref: run.runRef } }))
+      store.mutate(taskId, ({ run_pause_resumed: _gone, ...fresh }) => ({
+        ...fresh,
+        status: "paused",
+        run_pause: {
+          parent_session_id: run.parentSessionId,
+          parent_pause_seq: run.parentPauseSeq,
+          run_ref: run.runRef,
+        },
+      }))
       return { childSeq: child.childSeq }
     },
     async holdTaskInput(taskId, input) {
@@ -55,20 +72,36 @@ export function fakeOwner(store: TaskRecordStore, hostPid: number, input: { read
       const child = engine(taskId)
       if (child.holder !== request.parentSessionId) throw new Error("child refused the run Resume: wrong_parent")
       if (request.parentPauseSeq !== child.highWater) throw new Error("child refused the run Resume: stale")
-      if (request.resumeCredential === undefined && owner.barrier?.state("parent-1").kind !== "open") throw new Error("admission held")
+      if (request.resumeCredential === undefined && owner.barrier?.state("parent-1").kind !== "open")
+        throw new Error("admission held")
       owner.calls.resume += 1
       child.holder = undefined
-      store.mutate(taskId, ({ run_pause: _released, ...fresh }) => ({ ...fresh, status: "running", run_pause_resumed: {
-        resume_id: request.resumeId, parent_session_id: request.parentSessionId, parent_pause_seq: request.parentPauseSeq } }))
+      store.mutate(taskId, ({ run_pause: _released, ...fresh }) => ({
+        ...fresh,
+        status: "running",
+        run_pause_resumed: {
+          resume_id: request.resumeId,
+          parent_session_id: request.parentSessionId,
+          parent_pause_seq: request.parentPauseSeq,
+        },
+      }))
       return { turnId: `turn-${owner.calls.resume}` }
     },
     async cancelTask(taskId, _reason, options) {
       const scripted = owner.cancelAnswer?.(taskId)
       const record = load(taskId)
-      const outcome: CancelOutcome = scripted ?? (options?.expectedRunEpoch !== undefined && record?.notification.run_epoch !== options.expectedRunEpoch
-        ? { kind: "stale", task_id: taskId, status: record?.status ?? "running", run_epoch: record?.notification.run_epoch ?? 0, reason: "moved" }
-        : { kind: "cancelled", task_id: taskId, previous_status: record?.status ?? "running" })
-      if (outcome.kind === "cancelled") store.mutate(taskId, fresh => ({ ...fresh, status: "cancelled" }))
+      const outcome: CancelOutcome =
+        scripted ??
+        (options?.expectedRunEpoch !== undefined && record?.notification.run_epoch !== options.expectedRunEpoch
+          ? {
+              kind: "stale",
+              task_id: taskId,
+              status: record?.status ?? "running",
+              run_epoch: record?.notification.run_epoch ?? 0,
+              reason: "moved",
+            }
+          : { kind: "cancelled", task_id: taskId, previous_status: record?.status ?? "running" })
+      if (outcome.kind === "cancelled") store.mutate(taskId, (fresh) => ({ ...fresh, status: "cancelled" }))
       owner.calls.cancel.push(outcome)
       return outcome
     },
@@ -82,8 +115,15 @@ export function controlFor(store: TaskRecordStore) {
 
 export function want(overrides: Partial<ControlRegister> = {}): ControlRegister {
   return {
-    version: 1, taskId: "st_00000001", runEpoch: 1, parentSessionId: "parent-1", pauseSeq: 2,
-    runRef: { kind: "task", id: "st_00000001" }, phase: "paused",
-    requester: { pid: 4242, managerInstance: "requester-a" }, writtenAt: new Date(0).toISOString(), ...overrides,
+    version: 1,
+    taskId: "st_00000001",
+    runEpoch: 1,
+    parentSessionId: "parent-1",
+    pauseSeq: 2,
+    runRef: { kind: "task", id: "st_00000001" },
+    phase: "paused",
+    requester: { pid: 4242, managerInstance: "requester-a" },
+    writtenAt: new Date(0).toISOString(),
+    ...overrides,
   }
 }

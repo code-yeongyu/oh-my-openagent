@@ -6,7 +6,10 @@ import type { AckReason, AckState, GuidanceOutcome } from "./control-schema"
 
 // What the owner side needs from the task manager holding a live handle; nothing here restores,
 // respawns or cancels a record this manager does not hold (design 3.3).
-export type ControlOwnerPort = Pick<TaskPauseMethods, "pauseTask" | "holdTaskInput" | "observeTaskHold" | "resumePausedTask"> & {
+export type ControlOwnerPort = Pick<
+  TaskPauseMethods,
+  "pauseTask" | "holdTaskInput" | "observeTaskHold" | "resumePausedTask"
+> & {
   readonly managerInstance: string
   readonly hostPid: number
   sessionId(): string | undefined

@@ -33,10 +33,14 @@ export function registerControlOwner(input: {
     hostPid: input.hostPid ?? process.pid,
     sessionId: input.sessionId,
     holds,
-    load: taskId => manager.get(taskId),
+    load: (taskId) => manager.get(taskId),
     ownsRecord: input.ownsRecord,
-    inAncestry: (record, parentSessionId) => record.parent_session_id === parentSessionId
-      || ownedSubtree(manager.list({ scope: "all" }).map(entry => entry.record), parentSessionId).some(entry => entry.task_id === record.task_id),
+    inAncestry: (record, parentSessionId) =>
+      record.parent_session_id === parentSessionId ||
+      ownedSubtree(
+        manager.list({ scope: "all" }).map((entry) => entry.record),
+        parentSessionId,
+      ).some((entry) => entry.task_id === record.task_id),
     pauseTask: (taskId, owner) => manager.pauseTask(taskId, owner),
     holdTaskInput: (taskId, entry) => manager.holdTaskInput(taskId, entry),
     observeTaskHold: (taskId, parent) => manager.observeTaskHold(taskId, parent),
@@ -46,9 +50,17 @@ export function registerControlOwner(input: {
     async releaseRemoteStop({ parentSessionId, pauseSeq, resumeId, credential }) {
       const ledger = input.runPause.registry.load(parentSessionId)
       for (const participant of Object.values(ledger?.participants ?? {})) {
-        if (participant.kind !== "held_admission" || participant.runRef.kind !== "task" || manager.resumeHeldTask === undefined) continue
+        if (
+          participant.kind !== "held_admission" ||
+          participant.runRef.kind !== "task" ||
+          manager.resumeHeldTask === undefined
+        )
+          continue
         await manager.resumeHeldTask(participant, credential).catch((error: unknown) => {
-          log("[omo-senpi] remote Stop release could not re-admit a held admission", { key: participant.key, error: String(error) })
+          log("[omo-senpi] remote Stop release could not re-admit a held admission", {
+            key: participant.key,
+            error: String(error),
+          })
         })
       }
       input.runPause.controller.noteRemoteRelease(parentSessionId, pauseSeq, resumeId, credential)
@@ -57,5 +69,5 @@ export function registerControlOwner(input: {
   const inbox = ControlInbox.for({ stateDir: input.stateDir, hostPid: port.hostPid, store: input.store })
   const unregister = inbox.register(port, { channel: input.channel, liveTasks: () => manager.residentTaskIds().length })
   let released: Promise<void> | undefined
-  return { release: () => released ??= unregister() }
+  return { release: () => (released ??= unregister()) }
 }

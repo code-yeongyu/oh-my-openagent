@@ -15,7 +15,14 @@ export type RemoteResult = {
 export const REMOTE_DEADLINE_MS = 3_000
 
 const REMOTE_STATES: ReadonlySet<PauseParticipant["state"]> = new Set(["owned_elsewhere", "held_remote"])
-const NON_TERMINAL: ReadonlySet<PauseParticipant["state"]> = new Set(["pending", "held", "resuming", "lost", "owned_elsewhere", "held_remote"])
+const NON_TERMINAL: ReadonlySet<PauseParticipant["state"]> = new Set([
+  "pending",
+  "held",
+  "resuming",
+  "lost",
+  "owned_elsewhere",
+  "held_remote",
+])
 
 export function inRemoteClass(participant: PauseParticipant): boolean {
   return REMOTE_STATES.has(participant.state)
@@ -26,14 +33,28 @@ export function retriedAsRemote(participant: PauseParticipant, isRemote: boolean
 }
 
 // Writes a remote result over the participant, keeping any local cutoff it already had (finding r4-1b).
-export function writeRemote(registry: PauseRegistry, parentSessionId: string, pauseSeq: number, key: string, result: RemoteResult): void {
+export function writeRemote(
+  registry: PauseRegistry,
+  parentSessionId: string,
+  pauseSeq: number,
+  key: string,
+  result: RemoteResult,
+): void {
   registry.update(parentSessionId, pauseSeq, key, {
-    state: result.state, ownerPid: result.ownerPid, lostReason: undefined, reason: result.reason,
+    state: result.state,
+    ownerPid: result.ownerPid,
+    lostReason: undefined,
+    reason: result.reason,
     ...(result.ackSeq === undefined ? {} : { remoteAckSeq: result.ackSeq }),
     ...(result.childSeq === undefined ? {} : { remoteChildSeq: result.childSeq }),
   })
 }
 
-export function remoteFailure(key: string, result: RemoteResult): { readonly key: string; readonly reason: string } | undefined {
-  return result.reason === undefined ? undefined : { key, reason: `owner_cannot_apply: ${result.reason} (pid ${result.ownerPid})` }
+export function remoteFailure(
+  key: string,
+  result: RemoteResult,
+): { readonly key: string; readonly reason: string } | undefined {
+  return result.reason === undefined
+    ? undefined
+    : { key, reason: `owner_cannot_apply: ${result.reason} (pid ${result.ownerPid})` }
 }

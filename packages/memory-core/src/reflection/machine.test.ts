@@ -13,7 +13,8 @@ const REFLECTION_PENDING_MAX_BYTES = 4 * 1024 * 1024
 
 function pendingRequest(conversationId: string, bytes = 1): ReflectionRequest {
   return {
-    trigger: "manual", conversationIds: [conversationId],
+    trigger: "manual",
+    conversationIds: [conversationId],
     snapshots: [{ conversationId, snapshot: bulkySnapshot(bytes) }],
   }
 }
@@ -25,13 +26,15 @@ function bulkySnapshot(bytes: number): ReflectionSnapshot {
     end_message_id: "end",
     start_line: 0,
     end_snapshot_line: 1,
-    entries: [{
-      kind: "assistant",
-      text: "x".repeat(Math.max(1, bytes)),
-      captured_at: "2026-08-10T00:00:00.000Z",
-      source_line_id: "line",
-      source_message_id: "message",
-    }],
+    entries: [
+      {
+        kind: "assistant",
+        text: "x".repeat(Math.max(1, bytes)),
+        captured_at: "2026-08-10T00:00:00.000Z",
+        source_line_id: "line",
+        source_message_id: "message",
+      },
+    ],
   }
 }
 
@@ -129,7 +132,10 @@ describe("reflection trigger machine", () => {
     const first = evaluateTransitions(accepted, { kind: "settled", success: true })
     expect(first.action).toMatchObject({ kind: "reserve", request: { trigger: "compaction" } })
     const reserved = reserveTransition(first.state.reservation, request("compaction"), "run-active")
-    const second = evaluateTransitions({ ...first.state, reservation: reserved.state }, { kind: "settled", success: true })
+    const second = evaluateTransitions(
+      { ...first.state, reservation: reserved.state },
+      { kind: "settled", success: true },
+    )
     expect(second.action).toEqual({ kind: "none" })
   })
 
@@ -205,8 +211,10 @@ describe("reflection trigger machine", () => {
     const merged = state.pending?.request.snapshots.map((item) => item.conversationId) ?? []
     expect(merged).toHaveLength(REFLECTION_PENDING_MAX_CONVERSATIONS)
     expect(merged).toEqual(
-      Array.from({ length: REFLECTION_PENDING_MAX_CONVERSATIONS }, (_, index) =>
-        `conversation-${overflow - REFLECTION_PENDING_MAX_CONVERSATIONS + index}`),
+      Array.from(
+        { length: REFLECTION_PENDING_MAX_CONVERSATIONS },
+        (_, index) => `conversation-${overflow - REFLECTION_PENDING_MAX_CONVERSATIONS + index}`,
+      ),
     )
   })
 
@@ -228,7 +236,9 @@ describe("reflection trigger machine", () => {
     const snapshots = state.pending?.request.snapshots ?? []
     expect(snapshots.length).toBeGreaterThan(0)
     expect(snapshots.length).toBeLessThan(30)
-    expect(Buffer.byteLength(`${JSON.stringify(state.pending, null, 2)}\n`, "utf8")).toBeLessThanOrEqual(REFLECTION_PENDING_MAX_BYTES)
+    expect(Buffer.byteLength(`${JSON.stringify(state.pending, null, 2)}\n`, "utf8")).toBeLessThanOrEqual(
+      REFLECTION_PENDING_MAX_BYTES,
+    )
     expect(state.pending?.request.conversationIds).toEqual(snapshots.map((item) => item.conversationId))
     // eviction is oldest-first, so the newest request always survives.
     expect(snapshots.at(-1)?.conversationId).toBe("conversation-29")
@@ -250,19 +260,35 @@ describe("reflection trigger machine", () => {
 
   it("#given UTF-8 snapshots and JSON escaping #when the pending byte cap evicts #then the serialized payload fits and keeps the newest suffix", () => {
     const snapshot = bulkySnapshot(1)
-    const unicode: ReflectionSnapshot = { ...snapshot, entries: [{
-      kind: "assistant", text: '\u00e9\\n\\"'.repeat(200_000), captured_at: "2026-08-10T00:00:00.000Z",
-      source_line_id: "line", source_message_id: "message",
-    }] }
+    const unicode: ReflectionSnapshot = {
+      ...snapshot,
+      entries: [
+        {
+          kind: "assistant",
+          text: '\u00e9\\n\\"'.repeat(200_000),
+          captured_at: "2026-08-10T00:00:00.000Z",
+          source_line_id: "line",
+          source_message_id: "message",
+        },
+      ],
+    }
     let state = reserveTransition({}, pendingRequest("active"), "active").state
     for (let index = 0; index < 4; index += 1) {
       const conversationId = `conversation-${index}`
-      state = reserveTransition(state, {
-        trigger: "manual", conversationIds: [conversationId], snapshots: [{ conversationId, snapshot: unicode }],
-      }, `pending-${index}`).state
+      state = reserveTransition(
+        state,
+        {
+          trigger: "manual",
+          conversationIds: [conversationId],
+          snapshots: [{ conversationId, snapshot: unicode }],
+        },
+        `pending-${index}`,
+      ).state
     }
     expect(state.pending?.request.conversationIds).toEqual(["conversation-2", "conversation-3"])
-    expect(Buffer.byteLength(`${JSON.stringify(state.pending, null, 2)}\n`, "utf8")).toBeLessThanOrEqual(REFLECTION_PENDING_MAX_BYTES)
+    expect(Buffer.byteLength(`${JSON.stringify(state.pending, null, 2)}\n`, "utf8")).toBeLessThanOrEqual(
+      REFLECTION_PENDING_MAX_BYTES,
+    )
   })
 
   it("#given an initial pending request with only conversation ids #when it exceeds the count cap #then ids are bounded too", () => {
@@ -280,22 +306,36 @@ describe("reflection trigger machine", () => {
     state = reserveTransition(state, pendingRequest("conversation-0", 20), "ignored").state
     state = reserveTransition(state, pendingRequest("conversation-32"), "ignored").state
     expect(state.pending?.runId).toBe("pending-0")
-    expect(state.pending?.request.conversationIds).toEqual(Array.from({ length: 32 }, (_, index) => `conversation-${index + 1}`))
+    expect(state.pending?.request.conversationIds).toEqual(
+      Array.from({ length: 32 }, (_, index) => `conversation-${index + 1}`),
+    )
   })
 
   it("#given legacy oversized pending state #when the dead active run completes #then promotion applies the same bounds", () => {
     const requests = Array.from({ length: 40 }, (_, index) => pendingRequest(`conversation-${index}`))
-    const pending = { runId: "legacy-pending", request: {
-      trigger: "manual" as const,
-      conversationIds: requests.flatMap((item) => item.conversationIds),
-      snapshots: requests.flatMap((item) => item.snapshots),
-    } }
-    const result = completeTransition({
-      active: { runId: "active", request: pendingRequest("active") }, pending,
-    }, "active", "failed", new Map(), {})
+    const pending = {
+      runId: "legacy-pending",
+      request: {
+        trigger: "manual" as const,
+        conversationIds: requests.flatMap((item) => item.conversationIds),
+        snapshots: requests.flatMap((item) => item.snapshots),
+      },
+    }
+    const result = completeTransition(
+      {
+        active: { runId: "active", request: pendingRequest("active") },
+        pending,
+      },
+      "active",
+      "failed",
+      new Map(),
+      {},
+    )
 
     expect(result.launch?.request.conversationIds).toEqual(pending.request.conversationIds.slice(8))
-    expect(result.launch?.request.snapshots.map((item) => item.conversationId)).toEqual(pending.request.conversationIds.slice(8))
+    expect(result.launch?.request.snapshots.map((item) => item.conversationId)).toEqual(
+      pending.request.conversationIds.slice(8),
+    )
     expect(result.finalize).toEqual([])
   })
 
@@ -323,10 +363,21 @@ describe("reflection trigger machine", () => {
   })
 
   it("#given every completion outcome #when the active run completes #then only merged and no_changes advance its captured cursor", () => {
-    const outcomes = ["merged", "no_changes", "parent_dirty", "merge_conflict", "dirty_uncommitted", "failed", "timed_out"] as const
+    const outcomes = [
+      "merged",
+      "no_changes",
+      "parent_dirty",
+      "merge_conflict",
+      "dirty_uncommitted",
+      "failed",
+      "timed_out",
+    ] as const
     for (const outcome of outcomes) {
       const active = reserveTransition({}, request("step-count"), "run")
-      const result = completeTransition(active.state, "run", outcome, new Map([["conversation-a", journal(6)]]), { stepCount: 5, onCompaction: true })
+      const result = completeTransition(active.state, "run", outcome, new Map([["conversation-a", journal(6)]]), {
+        stepCount: 5,
+        onCompaction: true,
+      })
       expect(result.finalize).toHaveLength(outcome === "merged" || outcome === "no_changes" ? 1 : 0)
       expect(result.state.active).toBeUndefined()
     }
@@ -335,7 +386,9 @@ describe("reflection trigger machine", () => {
   it("#given a failed active run and a queued request #when completed #then the cursor stays unmoved and pending is promoted", () => {
     const active = reserveTransition({}, request("manual"), "active")
     const queued = reserveTransition(active.state, request("step-count"), "pending")
-    const result = completeTransition(queued.state, "active", "failed", new Map([["conversation-a", journal(6)]]), { stepCount: 5 })
+    const result = completeTransition(queued.state, "active", "failed", new Map([["conversation-a", journal(6)]]), {
+      stepCount: 5,
+    })
     expect(result.finalize).toEqual([])
     expect(result.launch?.runId).toBe("pending")
   })
@@ -343,12 +396,20 @@ describe("reflection trigger machine", () => {
   it("#given pending automatic work became stale #when dequeued #then it is dropped, while manual work survives", () => {
     const active = reserveTransition({}, request("manual"), "active")
     const stale = reserveTransition(active.state, request("step-count"), "stale")
-    const staleResult = completeTransition(stale.state, "active", "failed", new Map([["conversation-a", journal(1)]]), { stepCount: 5 })
+    const staleResult = completeTransition(stale.state, "active", "failed", new Map([["conversation-a", journal(1)]]), {
+      stepCount: 5,
+    })
     expect(staleResult.launch).toBeUndefined()
 
     const automatic = reserveTransition({}, request("step-count"), "active")
     const manual = reserveTransition(automatic.state, request("manual"), "manual")
-    const manualResult = completeTransition(manual.state, "active", "failed", new Map([["conversation-a", journal(0)]]), { stepCount: 5 })
+    const manualResult = completeTransition(
+      manual.state,
+      "active",
+      "failed",
+      new Map([["conversation-a", journal(0)]]),
+      { stepCount: 5 },
+    )
     expect(manualResult.launch?.request.trigger).toBe("manual")
   })
 })

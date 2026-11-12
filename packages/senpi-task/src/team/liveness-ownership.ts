@@ -15,7 +15,10 @@ export type TeamMemberTaskIdentity = {
 export type TeamMemberOwnershipDeps = {
   readonly stateDir: StateDirConfig
   readonly taskSettings: OmoTaskSettings
-  readonly loadRuntimeState?: (teamRunId: string, config: Parameters<typeof loadRuntimeState>[1]) => Promise<RuntimeState>
+  readonly loadRuntimeState?: (
+    teamRunId: string,
+    config: Parameters<typeof loadRuntimeState>[1],
+  ) => Promise<RuntimeState>
 }
 
 const TEAM_MEMBER_NAME_PATTERN = /^team:([0-9a-f-]{36}):([a-z0-9-]+)$/i
@@ -39,8 +42,10 @@ export async function isOwnedTeamMemberTask(
   try {
     const loader = deps.loadRuntimeState ?? loadRuntimeState
     const runtimeState = await loader(identity.teamRunId, config)
-    return runtimeState.leadSessionId === currentSessionId
-      && runtimeState.members.some((member) => member.name === identity.memberName)
+    return (
+      runtimeState.leadSessionId === currentSessionId &&
+      runtimeState.members.some((member) => member.name === identity.memberName)
+    )
   } catch {
     return false
   }

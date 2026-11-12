@@ -4,10 +4,19 @@ import { B_PID, cleanupPair, controlPair, T1 } from "./__fixtures__/control-pair
 afterEach(cleanupPair)
 
 const RUN = { kind: "task" as const, id: T1 }
-const pausedUnderA = { status: "paused" as const, run_pause: { parent_session_id: "parent-1", parent_pause_seq: 2, run_ref: RUN } }
+const pausedUnderA = {
+  status: "paused" as const,
+  run_pause: { parent_session_id: "parent-1", parent_pause_seq: 2, run_ref: RUN },
+}
 
-function seedLedger(pair: ReturnType<typeof controlPair>, state: "held" | "owned_elsewhere" | "held_remote" | "lost", extra: Record<string, unknown> = {}) {
-  pair.runPause.registry.begin("parent-1", 2, [{ key: T1, taskId: T1, kind: "task", runRef: RUN, runEpoch: 1, state, at: new Date(0).toISOString(), ...extra }])
+function seedLedger(
+  pair: ReturnType<typeof controlPair>,
+  state: "held" | "owned_elsewhere" | "held_remote" | "lost",
+  extra: Record<string, unknown> = {},
+) {
+  pair.runPause.registry.begin("parent-1", 2, [
+    { key: T1, taskId: T1, kind: "task", runRef: RUN, runEpoch: 1, state, at: new Date(0).toISOString(), ...extra },
+  ])
   pair.runPause.registry.phase("parent-1", 2, "applied")
 }
 
@@ -64,7 +73,11 @@ describe("a run's Stop and Resume carried to the live owner (#12349 part 2)", ()
     await pair.runPause.controller.pause("parent-1", 2)
     const record = pair.store.load(T1)
     if (record === null || record === undefined) throw new Error("record missing")
-    const sent = await pair.carry.carry(record, { parentSessionId: "parent-1", parentPauseSeq: 2, runRef: RUN }, "please also check the tests")
+    const sent = await pair.carry.carry(
+      record,
+      { parentSessionId: "parent-1", parentPauseSeq: 2, runRef: RUN },
+      "please also check the tests",
+    )
     expect(sent).toMatchObject({ kind: "held", pause_seq: 2 })
     await pair.runPause.controller.resume("parent-1", 2, "r-1")
     expect(pair.owner.calls.hold).toHaveLength(1)

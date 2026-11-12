@@ -25,8 +25,14 @@ function sameProcess(input: { readonly siblingHolds: boolean; readonly unsafeDir
     mkdirSync(controlDir(store.stateDir), { mode: 0o700 })
     chmodSync(controlDir(store.stateDir), 0o777)
   }
-  const channel = createRequesterChannel({ stateDir: store.stateDir, store, hostPid: PID, managerInstance: "requester-a",
-    channel: true, isProcessAlive: () => true })
+  const channel = createRequesterChannel({
+    stateDir: store.stateDir,
+    store,
+    hostPid: PID,
+    managerInstance: "requester-a",
+    channel: true,
+    isProcessAlive: () => true,
+  })
   return { channel, record }
 }
 
@@ -41,9 +47,12 @@ describe("ownership predicate, same process (design 3.2 case b)", () => {
     expect(channel.ownedElsewhere(record)).toBe(false)
   })
 
-  test.if(process.platform !== "win32")("#given the control dir is unsafe #when a sibling holds the handle #then it is still owned elsewhere: the answer never reads a file (test 20e)", () => {
-    const { channel, record } = sameProcess({ siblingHolds: true, unsafeDir: true })
-    expect(channel.ownedElsewhere(record)).toBe(true)
-    expect(channel.cannotApply(record)).toBe("owner_unsupported")
-  })
+  test.if(process.platform !== "win32")(
+    "#given the control dir is unsafe #when a sibling holds the handle #then it is still owned elsewhere: the answer never reads a file (test 20e)",
+    () => {
+      const { channel, record } = sameProcess({ siblingHolds: true, unsafeDir: true })
+      expect(channel.ownedElsewhere(record)).toBe(true)
+      expect(channel.cannotApply(record)).toBe("owner_unsupported")
+    },
+  )
 })

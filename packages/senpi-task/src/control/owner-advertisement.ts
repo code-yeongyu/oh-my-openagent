@@ -16,16 +16,28 @@ export function readProcessStartTime(pid: number, platform: NodeJS.Platform = pr
     const fields = stat.slice(stat.lastIndexOf(")") + 2).split(" ")
     const start = Number(fields[19])
     return Number.isSafeInteger(start) ? start : undefined
-  } catch { return undefined }
+  } catch {
+    return undefined
+  }
 }
 
-export function renewAdvertisement(control: ControlStore, input: {
-  readonly pid: number; readonly managerInstance: string; readonly sessionId: string; readonly now: number
-  readonly processStartTime: number | undefined
-}): boolean {
+export function renewAdvertisement(
+  control: ControlStore,
+  input: {
+    readonly pid: number
+    readonly managerInstance: string
+    readonly sessionId: string
+    readonly now: number
+    readonly processStartTime: number | undefined
+  },
+): boolean {
   return writeAdvertisement(control, {
-    version: 1, pid: input.pid, managerInstance: input.managerInstance, sessionId: input.sessionId,
-    renewedAt: new Date(input.now).toISOString(), ...(input.processStartTime === undefined ? {} : { processStartTime: input.processStartTime }),
+    version: 1,
+    pid: input.pid,
+    managerInstance: input.managerInstance,
+    sessionId: input.sessionId,
+    renewedAt: new Date(input.now).toISOString(),
+    ...(input.processStartTime === undefined ? {} : { processStartTime: input.processStartTime }),
   })
 }
 

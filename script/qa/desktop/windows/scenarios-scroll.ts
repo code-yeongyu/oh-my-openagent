@@ -32,7 +32,12 @@ const DISTANCE_BOUNDS = { min: SCROLL_DELTA / 2, max: SCROLL_DELTA * 2 } as cons
 
 type DeliveryMode = "background" | "foreground"
 
-async function scrollBy(engine: Engine, at: Record<string, string | number | null>, dy: number, mode: DeliveryMode): Promise<Reply> {
+async function scrollBy(
+  engine: Engine,
+  at: Record<string, string | number | null>,
+  dy: number,
+  mode: DeliveryMode,
+): Promise<Reply> {
   return engine.exec("scroll", { ...at, dx: 0, dy, opts: { deliveryMode: mode } })
 }
 
@@ -119,7 +124,10 @@ function scrollDirection(mode: DeliveryMode): Scenario {
             ["positive-dy-succeeded", down.error === undefined],
             ["positive-dy-moves-toward-end", afterPositive > start],
             ["line-height-measured", linePixels > 0],
-            ["positive-dy-distance-within-bounds", pixelsMoved >= DISTANCE_BOUNDS.min && pixelsMoved <= DISTANCE_BOUNDS.max],
+            [
+              "positive-dy-distance-within-bounds",
+              pixelsMoved >= DISTANCE_BOUNDS.min && pixelsMoved <= DISTANCE_BOUNDS.max,
+            ],
             ["negative-dy-succeeded", up.error === undefined],
             ["negative-dy-moves-toward-start", afterNegative >= 0 && afterNegative < afterPositive],
             ["negative-dy-returns-to-start", afterNegative === start],
@@ -141,7 +149,10 @@ function scrollDirection(mode: DeliveryMode): Scenario {
             distanceBounds: DISTANCE_BOUNDS,
             point: { x: at.x, y: at.y },
             firstVisibleLine: { before: start, afterPositiveDy: afterPositive, afterNegativeDy: afterNegative },
-            frontFirstVisibleLine: { before: firstVisibleLine(before, front.id), after: firstVisibleLine(after, front.id) },
+            frontFirstVisibleLine: {
+              before: firstVisibleLine(before, front.id),
+              after: firstVisibleLine(after, front.id),
+            },
             targetEvents: hostEvents(document),
             frontEvents,
             cursorAfterPositiveDy: middle.cursor,

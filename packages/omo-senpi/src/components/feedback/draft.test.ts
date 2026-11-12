@@ -43,7 +43,9 @@ describe("buildDraft", () => {
     const sent = draft.sections.map((section) => section.text).join("\n")
     expect(sent).not.toContain("ghp_")
     expect(draft.redactedCount).toBe(3)
-    expect(draft.totalBytes).toBe(draft.sections.reduce((sum, section) => sum + new TextEncoder().encode(section.text).byteLength, 0))
+    expect(draft.totalBytes).toBe(
+      draft.sections.reduce((sum, section) => sum + new TextEncoder().encode(section.text).byteLength, 0),
+    )
   })
 
   test("#given the identity block #when the draft is built #then its values are kept because collecting them is the point", () => {

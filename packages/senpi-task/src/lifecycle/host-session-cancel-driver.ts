@@ -13,7 +13,11 @@ import { endHostSessionChild, inFlightHostSessionEnd } from "./host-session-end"
  * in-flight close, so a close that never settles cannot hold the loop. Every exit but an engine dispose
  * settles the stop exactly once; a close confirmed after the loop gave up still finishes the cancel here.
  */
-export function driveHostSessionCancel(context: LifecycleContext, record: TaskRecord, sink: HostSessionCancelSink): void {
+export function driveHostSessionCancel(
+  context: LifecycleContext,
+  record: TaskRecord,
+  sink: HostSessionCancelSink,
+): void {
   void runDriver(context, record, sink).catch((error: unknown) => {
     log("senpi-task host session cancel driver failed", { taskId: record.task_id, error: String(error) })
   })
@@ -26,7 +30,8 @@ async function runDriver(context: LifecycleContext, record: TaskRecord, sink: Ho
     let end = (await inFlightHostSessionEnd(context, record)?.catch(() => NOT_STARTED)) ?? NOT_STARTED
     for (const backoffMs of context.hostRetry.deferredRetryBackoffMs) {
       if (end.kind === "ended") return await sink.ended()
-      if (end.kind === "pending" && (await settledFirst(end.settled, context.hostRetry.wait(backoffMs)))) return await sink.ended()
+      if (end.kind === "pending" && (await settledFirst(end.settled, context.hostRetry.wait(backoffMs))))
+        return await sink.ended()
       if (end.kind !== "pending") await context.hostRetry.wait(backoffMs)
       if (retriesDisposed(context)) {
         settleOnExit = false
@@ -60,16 +65,26 @@ function settledFirst(settled: Promise<boolean>, waited: Promise<void>): Promise
 function stillOurs(context: LifecycleContext, record: TaskRecord): boolean {
   const fresh = context.store.load(record.task_id)
   if (fresh === null || TERMINAL_STATUSES.has(fresh.status) || fresh.killed === true) return false
-  return fresh.notification.run_epoch === record.notification.run_epoch && fresh.residency_claim === record.residency_claim
+  return (
+    fresh.notification.run_epoch === record.notification.run_epoch && fresh.residency_claim === record.residency_claim
+  )
 }
 
-function finishOnLateClose(context: LifecycleContext, record: TaskRecord, settled: Promise<boolean>, sink: HostSessionCancelSink): void {
+function finishOnLateClose(
+  context: LifecycleContext,
+  record: TaskRecord,
+  settled: Promise<boolean>,
+  sink: HostSessionCancelSink,
+): void {
   void settled
     .then(async (closed) => {
       if (!closed || retriesDisposed(context) || !stillOurs(context, record)) return
       await sink.ended()
     })
     .catch((error: unknown) => {
-      log("senpi-task late host session close could not finish its cancel", { taskId: record.task_id, error: String(error) })
+      log("senpi-task late host session close could not finish its cancel", {
+        taskId: record.task_id,
+        error: String(error),
+      })
     })
 }

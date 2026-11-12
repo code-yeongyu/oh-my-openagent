@@ -88,9 +88,9 @@ describe("ParentWakeNotifier assistant error history", () => {
 
       // then
       expect(requeued).toBe(true)
-      expect(
-        notifier.getPendingParentWakes().get("parent-assistant-error-history")?.notifications,
-      ).toEqual([FINAL_WAKE])
+      expect(notifier.getPendingParentWakes().get("parent-assistant-error-history")?.notifications).toEqual([
+        FINAL_WAKE,
+      ])
       expect(notifier.getDispatchedParentWakes().has("parent-assistant-error-history")).toBe(false)
     } finally {
       notifier.shutdown()
