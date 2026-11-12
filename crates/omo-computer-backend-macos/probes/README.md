@@ -38,7 +38,15 @@ or `--verify` file that is not an SP-M ledger is refused with one line and exit 
 A negative verdict is proven only by a returned value: a symbol is `no` (and its row `CONTRADICTS`) only when its
 image loaded and `dlsym` answered null. An image that failed to load reads `load-error` and its row is `UNMEASURED`
 with the `dlerror()` text. A window-list entry whose id, owner pid, layer or bounds cannot be read is dropped, never
-defaulted to 0, and a display Space that reads as 0 leaves the copy-spaces row `UNMEASURED`.
+defaulted to 0. The copy-spaces row is `UNMEASURED` when the display Space reads as 0, when the window's Space
+list cannot be built or comes back empty, or when an entry cannot be read and no readable entry matches. The
+`hwcapture` row is `UNMEASURED` when a frame comes back but its pixel data cannot be read; it is never recorded as
+fully transparent.
+
+One exception is fail-closed by design: in `auth-offsets`, a candidate pointer (24 / 32 / 16) that cannot be read
+counts as a failed candidate, because the engine's self-check degrades to `pointer_only` in the same case. Such a row
+can read `CONTRADICTS`; its `measured` column names the unreadable candidates as `unreadable=<count>[<offsets>]`, so
+it is never confused with a clean read that found no sentinel (`unreadable=0[]`).
 
 By default the probe raises no dialog, posts no input, moves no window and adds no Space. A question that needs one of
 those, a grant the host does not have, or a fixture a later row builds is recorded `UNMEASURED` with the reason. The

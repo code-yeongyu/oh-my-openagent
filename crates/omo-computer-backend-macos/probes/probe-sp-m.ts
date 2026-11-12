@@ -476,33 +476,44 @@ function qHwCapture(host: Host): Outcome {
   const arr = capture(Number(mainCid()), new Uint32Array([win.id]), 1, (1 << 11) | (1 << 8)) as Pointer | null
   const images = arrayItems(arr)
   const img = images[0]
-  let behaves = "no image"
-  let ok = false
+  let decision: { verdict: Verdict; behaves: string } = { verdict: "CONTRADICTS", behaves: "no image" }
   if (img) {
     const w = Number(n.cg.CGImageGetWidth(img))
     const h = Number(n.cg.CGImageGetHeight(img))
-    const data = n.cg.CGDataProviderCopyData(n.cg.CGImageGetDataProvider(img)) as Pointer | null
-    let opaque = false
+    const provider = n.cg.CGImageGetDataProvider(img) as Pointer | null
+    const data = provider ? (n.cg.CGDataProviderCopyData(provider) as Pointer | null) : null
+    let alpha: "opaque" | "transparent" | "unread" = "unread"
     if (data) {
       const len = Number(n.cf.CFDataGetLength(data))
-      const bytes = new Uint8Array(toArrayBuffer(n.cf.CFDataGetBytePtr(data) as number, 0, len))
-      for (let i = 0; i < bytes.length; i += 4) {
-        if (bytes[i + 3] !== 0) {
-          opaque = true
-          break
+      const bytePtr = n.cf.CFDataGetBytePtr(data) as Pointer | null
+      if (bytePtr && len > 0) {
+        const bytes = new Uint8Array(toArrayBuffer(bytePtr, 0, len))
+        alpha = "transparent"
+        for (let i = 0; i < bytes.length; i += 4) {
+          if (bytes[i + 3] !== 0) {
+            alpha = "opaque"
+            break
+          }
         }
       }
       n.cf.CFRelease(data)
     }
-    behaves = `image ${bucket8(w)}x${bucket8(h)} ${opaque ? "non-transparent" : "fully transparent"}`
-    ok = w > 0 && h > 0 && opaque
+    decision = frameDecision(w, h, alpha)
   }
   if (arr) n.cf.CFRelease(arr)
+  const measured = `${r.detail};owner=${win.owner}`
+  if (decision.verdict === "UNMEASURED")
+    return unmeasured(
+      `a frame came back but its pixel data could not be read (${decision.behaves}); transparency is not decided`,
+      "yes",
+      measured,
+    )
+  const ok = decision.verdict === "CONFIRMS"
   return {
-    verdict: ok ? "CONFIRMS" : "CONTRADICTS",
+    verdict: decision.verdict,
     resolves: "yes",
-    behaves,
-    measured: `${r.detail};owner=${win.owner}`,
+    behaves: decision.behaves,
+    measured,
     reason: ok ? "-" : "resolves but returns no usable frame: SCK is the only capture path on this version",
   }
 }
@@ -637,13 +648,13 @@ function qRemoteToken(host: Host): Outcome {
   }
 }
 
-// An on-screen window is on its display's current Space: the Space list SLSCopySpacesForWindows returns for it must
-// contain that id. A zero id (no current Space read) never matches.
-// The copy-spaces decision: `unread` when the display's current Space could not be read (id 0), which is never a
-// negative verdict.
+// The copy-spaces decision. An on-screen window is on its display's current Space, so the list
+// SLSCopySpacesForWindows returns for it must contain that id. `unread` (never a negative verdict) when the current
+// Space reads 0, the list is empty, or an entry could not be read and no readable entry matches.
 function spaceDecision(spaces: ReadonlyArray<number | undefined>, currentSpace: number): "on" | "off" | "unread" {
-  if (currentSpace === 0) return "unread"
-  return spaces.includes(currentSpace) ? "on" : "off"
+  if (currentSpace === 0 || spaces.length === 0) return "unread"
+  if (spaces.includes(currentSpace)) return "on"
+  return spaces.includes(undefined) ? "unread" : "off"
 }
 
 // The hwcapture verdict for one returned frame. `alpha` is `unread` when the image's data provider or its bytes
@@ -653,6 +664,8 @@ function frameDecision(
   h: number,
   alpha: "opaque" | "transparent" | "unread",
 ): { verdict: Verdict; behaves: string } {
+  if (alpha === "unread")
+    return { verdict: "UNMEASURED", behaves: `image ${bucket8(w)}x${bucket8(h)}, pixel data unreadable` }
   const opaque = alpha === "opaque"
   const ok = w > 0 && h > 0 && opaque
   return {
@@ -664,8 +677,7 @@ function frameDecision(
 // The auth-offsets verdict. An unreadable candidate pointer is a failed candidate (the design's fail-closed
 // exception: the runtime degrades to pointer_only), and the ledger names it in `measured`.
 function authOffsetsOutcome(hits: number[], positions: number[], unreadable: number[]): Outcome {
-  void unreadable
-  const measured = `hits=[${hits.join(",")}];sentinelAt=[${positions.join(",")}]`
+  const measured = `hits=[${hits.join(",")}];sentinelAt=[${positions.join(",")}];unreadable=${unreadable.length}[${unreadable.join(",")}]`
   if (hits.length === 1)
     return {
       verdict: "CONFIRMS",
@@ -679,7 +691,10 @@ function authOffsetsOutcome(hits: number[], positions: number[], unreadable: num
     resolves: "-",
     behaves: hits.length === 0 ? "no candidate carries the sentinel" : `${hits.length} candidates carry the sentinel`,
     measured,
-    reason: "this version's fleet reads pointer_only",
+    reason:
+      unreadable.length > 0
+        ? "this version's fleet reads pointer_only (fail-closed: an unreadable candidate counts as a failed candidate)"
+        : "this version's fleet reads pointer_only",
   }
 }
 
@@ -711,10 +726,14 @@ function qCopySpaces(): Outcome {
   const num = cfNumber32(win.id)
   if (!num) return unmeasured("CFNumberCreate returned null", "yes", r.detail)
   const ids = cfArray([num])
+  if (!ids) {
+    n.cf.CFRelease(num)
+    return unmeasured("CFArrayCreate returned null; the window's Spaces were not read", "yes", r.detail)
+  }
   const spaces = copy(cid, 7, ids) as Pointer | null
   const list = arrayItems(spaces).map((v) => fromCfNumber(v))
   if (spaces) n.cf.CFRelease(spaces)
-  if (ids) n.cf.CFRelease(ids)
+  n.cf.CFRelease(ids)
   n.cf.CFRelease(num)
   // Compare with the current Space of the window's OWN display, not the focused display's active Space: on a
   // multi-display host a foreign window on the other display is on that display's current Space.
@@ -726,7 +745,7 @@ function qCopySpaces(): Outcome {
   const decision = spaceDecision(list, currentId)
   if (decision === "unread")
     return unmeasured(
-      "the display's current Space read as 0 (unread); membership is not decided",
+      "the display's current Space read as 0, or the window's Space list was empty or had an unreadable entry; membership is not decided",
       "yes",
       `${r.detail};spaces_for_window=${list.length};owner=${win.owner}`,
     )
@@ -874,13 +893,20 @@ function qAuthOffsets(): Outcome {
   n.cg.CGEventSetIntegerValueField(event, 9, 0x2e)
   const hits: number[] = []
   const positions: number[] = []
+  const unreadable: number[] = []
   for (const offset of [24, 32, 16]) {
     const slot = safeRead(Number(event) + offset, 8)
-    if (!slot) continue
+    if (!slot) {
+      unreadable.push(offset)
+      continue
+    }
     const candidate = Number(new DataView(slot.buffer).getBigUint64(0, true))
     if (!candidate) continue
     const record = safeRead(candidate, 512)
-    if (!record) continue
+    if (!record) {
+      unreadable.push(offset)
+      continue
+    }
     const view = new DataView(record.buffer)
     for (let at = 0; at + 8 <= 512; at += 8) {
       if (view.getBigUint64(at, true) === sentinel) {
@@ -894,22 +920,7 @@ function qAuthOffsets(): Outcome {
   if (source) n.cf.CFRelease(source)
   // Only the sentinel decides. A keycode byte is not recorded: one 0x2e byte somewhere in 512 bytes of
   // pointer-filled memory proves nothing about where the keycode field sits.
-  const measured = `hits=[${hits.join(",")}];sentinelAt=[${positions.join(",")}]`
-  if (hits.length === 1)
-    return {
-      verdict: "CONFIRMS",
-      resolves: "-",
-      behaves: `exactly one candidate (${hits[0]}) carries the sentinel`,
-      measured,
-      reason: "-",
-    }
-  return {
-    verdict: "CONTRADICTS",
-    resolves: "-",
-    behaves: hits.length === 0 ? "no candidate carries the sentinel" : `${hits.length} candidates carry the sentinel`,
-    measured,
-    reason: "this version's fleet reads pointer_only",
-  }
+  return authOffsetsOutcome(hits, positions, unreadable)
 }
 
 function appPresent(names: string[]): string | undefined {
@@ -1304,13 +1315,12 @@ function pendingRow(q: Question, major: number, reason: string): LedgerRow {
 
 // Command-line options that change what a measuring run does.
 function hostOptions(args: string[]): { withCapture: boolean } {
-  void args
-  return { withCapture: false }
+  return { withCapture: args.includes("--with-capture") }
 }
 
 function buildHost(args: string[]): Host {
   const { major, build } = precondition()
-  return { major, build, session: sessionFacts(), withCapture: args.includes("--with-capture") }
+  return { major, build, session: sessionFacts(), ...hostOptions(args) }
 }
 
 // Reads an existing ledger. A file that is not an SP-M ledger is an error value, never a thrown stack trace.
