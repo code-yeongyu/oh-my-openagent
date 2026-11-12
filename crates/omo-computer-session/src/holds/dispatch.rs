@@ -37,7 +37,7 @@ impl Session {
             Method::Pointer => serde_json::from_value::<EmptyParams>(params)
                 .map_err(HostCallError::Params)
                 .and_then(|_| self.pointer().map(|p| json!(p)).map_err(|r| HostCallError::Refused(Refused::from(r)))),
-            _ => return None,
+            _ => return self.row24_call(method, params),
         })
     }
 }
