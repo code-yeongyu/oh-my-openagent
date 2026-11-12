@@ -25,6 +25,10 @@ export type CarrierWakeOutcome =
   | { readonly kind: "busy"; readonly code: string }
   | { readonly kind: "deferred"; readonly attempts: number }
   | { readonly kind: "failed"; readonly attempts: number }
+  /** No queued row of this session may be opened under the switches as they read now (A7.2.3); the row waits. */
+  | { readonly kind: "switched_off" }
+  /** The session holds no queued row at all, so there is nothing to open for; the record is ended (A3.1.6). */
+  | { readonly kind: "nothing_queued" }
 
 export type CarrierEvaluation =
   | { readonly kind: "released" }
@@ -50,8 +54,13 @@ export type CarrierOptions = {
   readonly connect: () => Promise<CarrierHostConnection>
   /** `session_wake.wake_limit`; 0 means no bound (A3.5.3). */
   readonly wakeLimit?: () => number
-  /** `session_wake.same_device`, read when the sweep would open; off unless the machine's configuration turns it on. */
+  /** `session_wake.same_device`, read at the moment of the open; off unless the machine's configuration turns it on. */
   readonly sameDevice?: () => boolean
+  /**
+   * The receiving device's wake switch as the consumer was told it on its own serving connection (A7.2.3): the gate
+   * for a row from another device. Off unless a consumer is serving and was told on.
+   */
+  readonly remoteWake?: () => boolean
   readonly schedule: (run: () => void, ms: number) => () => void
   readonly onEvent?: (event: CarrierEvent) => void
 }
@@ -311,6 +320,16 @@ export function createCarrier(options: CarrierOptions): Carrier {
     if (target.session_kind !== "interactive") return { kind: "not_wakeable", session_kind: target.session_kind }
     const wait = await store.sessionWait.read({ durable_id: durableId })
     if (wait?.wait === "held" && wait.file_size === fileSize(target.session_path)) return { kind: "held" }
+    const allowance = await openAllowance(durableId)
+    if (allowance !== "open") {
+      if (allowance === "nothing_queued") {
+        const record = (await store.woken.list()).find((row) => row.durable_id === durableId)
+        if (record !== undefined) await store.woken.end({ durable_id: durableId, generation: record.generation })
+        return { kind: "nothing_queued" }
+      }
+      await store.woken.request({ durable_id: durableId, session_file: target.session_path })
+      return { kind: "switched_off" }
+    }
     const limit = options.wakeLimit?.() ?? 0
     if (limit > 0 && (await store.woken.wakeCount({ durable_id: durableId })) >= limit)
       return { kind: "wake_limit_reached" }
@@ -381,12 +400,22 @@ export function createCarrier(options: CarrierOptions): Carrier {
     emit({ kind: "evaluated", durable_id: durableId, outcome })
   }
 
-  /** A carrier opens a session only when the session holds a queued row whose own switch allows the open. */
-  const queuedRowAllowsOpen = async (durableId: string): Promise<boolean> => {
+  /**
+   * The one rule of A7.2.3 (A7R-10), the reviewer's LOW and A7's row-from-another-device rule in one place: a carrier
+   * opens a session only when the session holds a queued row whose own switch allows the open. A row from another
+   * device (it carries the intake's ledger id) reads the wake the consumer was told; a same-device row reads
+   * `session_wake.same_device`. Both are read here, at the moment of the open.
+   */
+  const openAllowance = async (durableId: string): Promise<"open" | "switched_off" | "nothing_queued"> => {
     const sameDevice = options.sameDevice?.() ?? false
-    for (const row of await store.list({ target_durable_id: durableId }))
-      if (row.state === "queued" && (typeof row.ledger_id === "string" || sameDevice)) return true
-    return false
+    const remoteWake = options.remoteWake?.() ?? false
+    let queued = false
+    for (const row of await store.list({ target_durable_id: durableId })) {
+      if (row.state !== "queued") continue
+      queued = true
+      if (typeof row.ledger_id === "string" ? remoteWake : sameDevice) return "open"
+    }
+    return queued ? "switched_off" : "nothing_queued"
   }
 
   const sweep = async (): Promise<void> => {
@@ -398,7 +427,7 @@ export function createCarrier(options: CarrierOptions): Carrier {
         continue
       }
       if (row.state === "requested") {
-        if ((row.next_attempt_at === null || row.next_attempt_at <= now) && (await queuedRowAllowsOpen(row.durable_id)))
+        if (row.next_attempt_at === null || row.next_attempt_at <= now)
           await serial(row.durable_id, () => wakeNow(row.durable_id)).catch(() => undefined)
         continue
       }

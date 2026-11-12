@@ -3,7 +3,7 @@ import type { GatewayStore } from "../gateway/store"
 import type { IntakeRecord } from "../gateway/types"
 import { findDiskSessions } from "../address-book"
 import { resolveWakeTarget } from "../wake/session-target"
-import { refusalCode, type DeliveryInboundEvent, type DeliveryServicePort } from "./port"
+import { decodeServeAck, refusalCode, type DeliveryInboundEvent, type DeliveryServicePort } from "./port"
 
 const DELIVERY_PROTOCOL_VERSION = 1
 
@@ -20,6 +20,12 @@ export type DeliveryConsumerOptions = {
 
 export type DeliveryConsumer = {
   readonly start: () => Promise<ConsumerStart>
+  /**
+   * The receiving device's wake switch as this consumer was told it on its own connection (A7.2.3): off until an
+   * acknowledgement names it, off again when the connection is dropped, and the carrier's gate for a row from
+   * another device.
+   */
+  readonly wakeAllowed: () => boolean
   /** One `delivery.drained` report per marked pair whose intake rows are all applied (the newest answered command id). */
   readonly reportDrained: () => Promise<void>
   readonly idle: () => Promise<void>
@@ -63,6 +69,7 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
   const { store, port } = options
   const follow = new Set<Promise<void>>()
   let marksKept = true
+  let wakeAllowed = false
   let unsubscribe: (() => void)[] = []
 
   const track = (work: Promise<void>): void => {
@@ -157,6 +164,7 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
   }
 
   return {
+    wakeAllowed: () => wakeAllowed,
     start: async () => {
       try {
         await store.identity()
@@ -164,13 +172,20 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
         if (error instanceof GatewayMigrationError || /schema/i.test(String(error))) return "schema_too_new"
         throw error
       }
+      let ack: unknown
       try {
-        await port.serve({ agent_dir: options.agentDir, v: DELIVERY_PROTOCOL_VERSION })
+        ack = await port.serve({ agent_dir: options.agentDir, v: DELIVERY_PROTOCOL_VERSION })
       } catch (error) {
         if (UNKNOWN_SHAPE.has(refusalCode(error) ?? "")) return "unsupported"
         throw error
       }
+      const decoded = decodeServeAck(ack)
+      if (decoded === undefined) return "unsupported"
+      wakeAllowed = decoded.wake ?? false
       unsubscribe = [
+        port.onWake((enabled) => {
+          wakeAllowed = enabled === true
+        }),
         port.onInbound((event) => track(onInbound(event))),
         port.onHolds((event) => {
           const holds = findDiskSessions(options.sessionsDirectory, event.durable_id, { id_only: true }).length > 0
@@ -209,6 +224,7 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
     stop: () => {
       for (const off of unsubscribe) off()
       unsubscribe = []
+      wakeAllowed = false
     },
   }
 }

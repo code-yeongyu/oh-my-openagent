@@ -19,8 +19,14 @@ export type DeliveryPendingPair = {
   readonly last_command_id: string
 }
 
+/**
+ * The acknowledgement of `deliveries.serve` (A7.2.3): `wake` is the receiving device's effective wake switch at that
+ * moment. An acknowledgement WITHOUT the field reads off, and the decoder stays closed for every other field.
+ */
+export type DeliveryServeAck = { readonly wake?: boolean }
+
 export type DeliveryServicePort = {
-  readonly serve: (request: { readonly agent_dir: string; readonly v: number }) => Promise<void>
+  readonly serve: (request: { readonly agent_dir: string; readonly v: number }) => Promise<unknown>
   /** Echoes the inbound's own pair: the service keys a waiting hand-off by (sender device, command id) (A5.1). */
   readonly answer: (
     delivery: { readonly sender_device: string; readonly command_id: string },
@@ -35,6 +41,20 @@ export type DeliveryServicePort = {
   ) => Promise<{ readonly kept: false } | { readonly kept: true; readonly expecting: string }>
   readonly onInbound: (listener: (event: DeliveryInboundEvent) => void) => () => void
   readonly onHolds: (listener: (event: DeliveryHoldsEvent) => void) => () => void
+  /** `delivery.wake { enabled }` on this serving connection: the device's wake switch changed (A7.2.3). */
+  readonly onWake: (listener: (enabled: unknown) => void) => () => void
+}
+
+/**
+ * The closed decoder of the serve acknowledgement: only the absent case and a boolean `wake` are accepted, and any
+ * other field makes it undefined, so the consumer serves nothing rather than guessing (A7.2.3).
+ */
+export function decodeServeAck(ack: unknown): DeliveryServeAck | undefined {
+  if (typeof ack !== "object" || ack === null) return undefined
+  for (const key of Object.keys(ack)) if (key !== "wake") return undefined
+  const wake = (ack as { readonly wake?: unknown }).wake
+  if (wake === undefined) return {}
+  return typeof wake === "boolean" ? { wake } : undefined
 }
 
 export function refusalCode(error: unknown): string | undefined {
