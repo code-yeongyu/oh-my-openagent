@@ -21,12 +21,12 @@ type SelfTestOptions = {
 async function trial(
   session: MacSession,
   which: Signal | null,
-  windowMs: number,
+  options: SelfTestOptions,
 ): Promise<Trial & { latency?: number }> {
   const run = await withSentinel(
     `selftest-${which ?? "null"}`,
-    async () => (which === null ? undefined : plant(session, which)),
-    { session, windowMs },
+    async () => (which === null ? undefined : plant(session, options.helpers, which)),
+    { session, windowMs: options.windowMs },
   )
   const { result: outcome, summary } = run
   if (which === null) return { plant: null, summary }
@@ -41,7 +41,7 @@ async function calibrate(session: MacSession, options: SelfTestOptions): Promise
   for (const signal of SIGNALS) {
     const latencies: number[] = []
     for (let index = 0; index < options.calibrationTrials; index++) {
-      const result = await trial(session, signal, options.windowMs)
+      const result = await trial(session, signal, options)
       if (result.latency !== undefined) latencies.push(result.latency)
     }
     const noun = PLANT_NOUN[signal]
@@ -89,9 +89,9 @@ export async function runSelfTest(options: SelfTestOptions): Promise<{ exitCode:
       console.log(`sentinel: refusing to judge negatives: ${admission.reason}`)
       return { exitCode: 2, receipts: await session.close() }
     }
-    const trials: Trial[] = [await trial(session, null, options.windowMs)]
-    for (const signal of SIGNALS) trials.push(await trial(session, signal, options.windowMs))
-    const control = await observeCell(session, () => plant(session, "warp"), options.windowMs)
+    const trials: Trial[] = [await trial(session, null, options)]
+    for (const signal of SIGNALS) trials.push(await trial(session, signal, options))
+    const control = await observeCell(session, () => plant(session, options.helpers, "warp"), options.windowMs)
     const status = "failed" in control.status ? `failed: ${control.status.failed}` : "planted"
     console.log(`SENTINEL_OBSERVER negative_control=${status} pointer_moved=${control.observed.pointerMoved}`)
     const result = judgeSelfTest(trials, control.observed.signals)

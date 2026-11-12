@@ -51,7 +51,10 @@ final class Planter: NSObject {
         self.restored("window_raised")
       }
     case "hover-top":
-      if let screen = NSScreen.screens.first { CGWarpMouseCursorPosition(CGPoint(x: screen.frame.midX, y: 1)) }
+      if let screen = NSScreen.screens.first {
+        postMove(to: CGPoint(x: screen.frame.midX, y: 40))
+        postMove(to: CGPoint(x: screen.frame.midX, y: 1))
+      }
       emit(["ctl": "hovered"])
     case "pointer", "warp":
       let plant = words.first == "warp" ? "warp" : "pointer"
@@ -116,21 +119,30 @@ final class Planter: NSObject {
   }
 }
 
-// macOS 14+ activation is cooperative: the frontmost typist has already yielded to this app, which now activates,
-// holds the front for a moment, and yields back so the typist can take it again.
-func activateThenYield(to typistPid: pid_t?) {
-  guard #available(macOS 14.0, *), let typistPid, let typist = NSRunningApplication(processIdentifier: typistPid) else {
-    return emit(["ctl": "plant_failed", "plant": "activation", "detail": "needs macOS 14 cooperative activation and a typist pid"])
-  }
-  let at = uptimeMs()
-  NSApp.activate()
-  after(0.15) {
-    guard NSWorkspace.shared.frontmostApplication?.processIdentifier == getpid() else {
-      return emit(["ctl": "plant_failed", "plant": "activation", "detail": "the idle app did not become frontmost"])
+// The idle app reports the moment it becomes active, whoever activated it (the self-test activates it through
+// LaunchServices, as a person's click would), then yields the front back to the typist.
+final class IdleApp: NSObject {
+  var typistPid: pid_t?
+
+  func command(_ words: [String]) {
+    switch words.first {
+    case "arm":
+      typistPid = words.dropFirst().first.flatMap { pid_t($0) }
+      emit(["ctl": "armed", "role": "idle"])
+    case "quit":
+      exit(0)
+    default:
+      emit(["ctl": "error", "detail": "idle: unknown command \(words.joined(separator: " "))"])
     }
-    emit(["ctl": "planted", "plant": "activation", "t": at])
+  }
+
+  @objc func becameActive() {
+    guard let typistPid else { return }
+    emit(["ctl": "planted", "plant": "activation"])
     after(0.3) {
-      NSApp.yieldActivation(to: typist)
+      if #available(macOS 14.0, *), let typist = NSRunningApplication(processIdentifier: typistPid) {
+        NSApp.yieldActivation(to: typist)
+      }
       emit(["ctl": "restoring", "plant": "activation"])
     }
   }
@@ -142,16 +154,10 @@ enum PlanterMain {
     let app = NSApplication.shared
     if CommandLine.arguments.contains("--idle") {
       app.setActivationPolicy(.regular)
-      readCommands { words in
-        switch words.first {
-        case "activate":
-          activateThenYield(to: words.dropFirst().first.flatMap { pid_t($0) })
-        case "quit":
-          exit(0)
-        default:
-          emit(["ctl": "error", "detail": "idle: unknown command \(words.joined(separator: " "))"])
-        }
-      }
+      let idle = IdleApp()
+      NotificationCenter.default.addObserver(
+        idle, selector: #selector(IdleApp.becameActive), name: NSApplication.didBecomeActiveNotification, object: nil)
+      readCommands { idle.command($0) }
       DispatchQueue.main.async { emit(["ctl": "hello", "role": "idle", "pid": Int(getpid())]) }
     } else {
       app.setActivationPolicy(.accessory)

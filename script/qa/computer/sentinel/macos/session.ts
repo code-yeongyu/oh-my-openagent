@@ -5,7 +5,14 @@ import { type ControlLine, Helper } from "./helper.ts"
 // A recording session on a macOS QA desktop: the typist (the synthetic user), the recorder watching it, and for the
 // self-test the planter plus an idle app to activate. `segment` cuts one judged trial out of the continuous recording.
 
-export type HelperPaths = { readonly recorder: string; readonly typist: string; readonly planter: string }
+export type HelperPaths = {
+  readonly recorder: string
+  readonly planter: string
+  readonly typist: string
+  readonly typistApp: string
+  readonly idle: string
+  readonly idleApp: string
+}
 
 type SessionOptions = {
   readonly helpers: HelperPaths
@@ -62,7 +69,7 @@ export class MacSession {
       if (options.withPlanter) {
         const [planter] = await session.start("planter", [options.helpers.planter])
         session.planter = planter
-        const [idle, idleHello] = await session.start("idle", [options.helpers.planter, "--idle"])
+        const [idle, idleHello] = await session.start("idle", [options.helpers.idle, "--idle"])
         session.idle = idle
         session.idlePid = numberField(idleHello, "pid")
       }
