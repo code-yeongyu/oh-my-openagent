@@ -594,6 +594,12 @@ jobs:
           cp ".omo/desktop-engine-assets/$ENGINE_ASSET" "$ENGINE_SOURCE"
           chmod +x "$ENGINE_SOURCE"
 
+      # Generated bundles are not tracked (#13192). The compiled entry imports bin/lib/*.generated.js,
+      # so every generator runs before the binary is built.
+      - name: Build generated files
+        if: steps.release-assets.outputs.binary_exists != 'true'
+        run: bun script/build-generated.ts
+
       - name: Download keychain helper
         if: startsWith(matrix.platform, 'darwin-') && (steps.release-assets.outputs.binary_exists != 'true' || steps.check.outputs.skip != 'true')
         uses: actions/download-artifact@v8
@@ -618,12 +624,6 @@ jobs:
             mkdir -p "packages/oh-my-opencode-${PLATFORM}/bin"
             install -m 0755 packages/omo-native/bin/darwin/omo-keychain "packages/oh-my-opencode-${PLATFORM}/bin/omo-keychain"
           fi
-
-      # Generated bundles are not tracked (#13192). The compiled entry imports bin/lib/*.generated.js,
-      # so every generator runs before the binary is built.
-      - name: Build generated files
-        if: steps.release-assets.outputs.binary_exists != 'true'
-        run: bun script/build-generated.ts
 
       - name: Build release binary
         if: steps.release-assets.outputs.binary_exists != 'true'
