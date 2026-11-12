@@ -619,6 +619,19 @@ jobs:
             install -m 0755 packages/omo-native/bin/darwin/omo-keychain "packages/oh-my-opencode-${PLATFORM}/bin/omo-keychain"
           fi
 
+      # Generated bundles are not tracked (#13192). The compiled entry imports bin/lib/*.generated.js,
+      # so every generator runs before the binary is built.
+      - name: Build generated files
+        if: steps.release-assets.outputs.binary_exists != 'true'
+        run: |
+          set -euo pipefail
+          bun script/build-brand-logo.ts
+          bun script/build-reflection-lock.ts
+          bun script/build-service-auth.ts
+          bun run build:codex-install
+          node packages/omo-senpi/plugin/scripts/build-extension.mjs
+          node packages/omo-senpi/plugin/scripts/build-install.mjs
+
       - name: Build release binary
         if: steps.release-assets.outputs.binary_exists != 'true'
         env:

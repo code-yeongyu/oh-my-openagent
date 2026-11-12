@@ -502,28 +502,11 @@ jobs:
           npm --prefix packages/omo-codex/plugin install --package-lock-only --ignore-scripts --no-audit --fund=false
           bun install --lockfile-only
 
-          # The version bump restamps OMO_SENPI_PACKAGE_VERSION inside the committed Senpi
-          # bundles; rebuild them so the release commit passes bundle-freshness CI.
-          node packages/omo-senpi/plugin/scripts/build-extension.mjs
-          # The committed Codex installer bundle embeds packages/omo-codex/package.json, and its
-          # freshness marker digests that file; rebuild it too or codex-install-bundle-freshness
-          # rejects the release commit as stale (v5.0.0-beta.83 release-state PR).
-          bun run build:codex-install
-          # The committed service-auth bundle inlines packages/omo-native/package.json's version;
-          # rebuild it too or script/build-service-auth.test.ts rejects the release commit as stale (#12046).
-          bun script/build-service-auth.ts
-
+          # The release commit carries sources only. Generated bundles are not tracked (#13192):
+          # publish-main and publish-platform build them from this commit before they pack.
           git config --global user.email "code.yeon.gyu@gmail.com"
           git config --global user.name "YeonGyu-Kim"
           git add CHANGELOG.md package.json packages/omo-native/package.json packages/oh-my-opencode-*/package.json packages/omo-senpi/package.json packages/omo-senpi/plugin/package.json packages/omo-codex/package.json packages/omo-codex/plugin/package.json packages/omo-codex/plugin/package-lock.json packages/omo-codex/plugin/.codex-plugin/plugin.json packages/omo-codex/plugin/components/*/package.json packages/omo-codex/plugin/hooks/*.json packages/omo-codex/plugin/components/*/hooks/hooks.json bun.lock
-          # build-extension.mjs also rewrites the committed bundles under plugin/runtime (the
-          # agent-toolkit SDK, the rollback migrator); commit every tracked one it touched or the
-          # freshness check rejects the release commit as stale-output (#8329, v5.1.1). `-u` stages
-          # only tracked files, so gitignored staged runtimes (lsp-daemon, ast-grep-mcp) stay out.
-          git add -f packages/omo-senpi/plugin/extensions
-          git add -u packages/omo-senpi/plugin/runtime
-          git add packages/omo-codex/scripts/install-dist/install-local.mjs
-          git add -u packages/omo-native/bin/lib
           git diff --cached --quiet || git commit -m "release: v${VERSION}"
 
           echo "needs_push=true" >> "$GITHUB_OUTPUT"
@@ -948,6 +931,20 @@ jobs:
           steps.check-openagent.outputs.skip != 'true' ||
           (inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true')
         run: node script/verify-npm-payload.mjs
+
+      # Generated bundles are not tracked (#13192), so the release commit has none. omo-ai ships
+      # bin/lib/*.generated.js as they are, so every generator runs here, after "Update version"
+      # stamps the versions they inline. verify-omo-ai-payload.mjs --release fails the job if one is missing.
+      - name: Build generated files
+        if: needs.release-metadata.outputs.already_published != 'true' && inputs.lazycodex_only != true
+        run: |
+          set -euo pipefail
+          bun script/build-brand-logo.ts
+          bun script/build-reflection-lock.ts
+          bun script/build-service-auth.ts
+          bun run build:codex-install
+          node packages/omo-senpi/plugin/scripts/build-extension.mjs
+          node packages/omo-senpi/plugin/scripts/build-install.mjs
 
       - name: Build omo-ai payload
         if: needs.release-metadata.outputs.already_published != 'true' && inputs.lazycodex_only != true
