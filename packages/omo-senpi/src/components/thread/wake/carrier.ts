@@ -50,6 +50,8 @@ export type CarrierOptions = {
   readonly connect: () => Promise<CarrierHostConnection>
   /** `session_wake.wake_limit`; 0 means no bound (A3.5.3). */
   readonly wakeLimit?: () => number
+  /** `session_wake.same_device`, read when the sweep would open; off unless the machine's configuration turns it on. */
+  readonly sameDevice?: () => boolean
   readonly schedule: (run: () => void, ms: number) => () => void
   readonly onEvent?: (event: CarrierEvent) => void
 }
@@ -366,12 +368,25 @@ export function createCarrier(options: CarrierOptions): Carrier {
   const takeOver = async (durableId: string): Promise<void> => {
     const taken = await store.woken.takeOver({ durable_id: durableId })
     if (taken.kind !== "taken_over") return
-    const opened = await open(taken.row.session_file, ".")
+    const target = resolveWakeTarget(options.sessionsDirectory, durableId)
+    if (target.kind !== "found") {
+      await store.woken.end({ durable_id: durableId, generation: taken.row.generation })
+      return
+    }
+    const opened = await open(target.session_path, target.cwd)
     if (opened.kind !== "opened") return
     carry(durableId, opened.connection, opened.sessionId, taken.row.generation)
     // Already inside this session's serial chain: evaluate directly, never through `evaluate`, which would wait on itself.
     const outcome = await evaluateNow(durableId)
     emit({ kind: "evaluated", durable_id: durableId, outcome })
+  }
+
+  /** A carrier opens a session only when the session holds a queued row whose own switch allows the open. */
+  const queuedRowAllowsOpen = async (durableId: string): Promise<boolean> => {
+    const sameDevice = options.sameDevice?.() ?? false
+    for (const row of await store.list({ target_durable_id: durableId }))
+      if (row.state === "queued" && (typeof row.ledger_id === "string" || sameDevice)) return true
+    return false
   }
 
   const sweep = async (): Promise<void> => {
@@ -383,7 +398,7 @@ export function createCarrier(options: CarrierOptions): Carrier {
         continue
       }
       if (row.state === "requested") {
-        if (row.next_attempt_at === null || row.next_attempt_at <= now)
+        if ((row.next_attempt_at === null || row.next_attempt_at <= now) && (await queuedRowAllowsOpen(row.durable_id)))
           await serial(row.durable_id, () => wakeNow(row.durable_id)).catch(() => undefined)
         continue
       }
