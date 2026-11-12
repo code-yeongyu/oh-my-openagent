@@ -20,12 +20,7 @@ import {
 import { RUNTIME_FALLBACK_RETRYABLE_ERROR_PATTERNS } from "./runtime-fallback-retryable-patterns"
 
 export type RuntimeFallbackErrorType =
-  | "missing_api_key"
-  | "invalid_api_key"
-  | "model_not_found"
-  | "quota_exceeded"
-  | "context_overflow"
-  | "abort"
+  "missing_api_key" | "invalid_api_key" | "model_not_found" | "quota_exceeded" | "context_overflow" | "abort"
 
 export interface RuntimeFallbackRetryOptions {
   onUnsafeRetryableSignalRejected?: (details: {
@@ -73,10 +68,7 @@ function getDetailErrorType(error: unknown): string | undefined {
 }
 
 function isTerminalQuotaMessage(message: string): boolean {
-  if (
-    /\bnon[-\s]+terminal\s+quota\b/i.test(message) ||
-    /\bnon[-\s]+terminal\s+billing\s+limit\b/i.test(message)
-  ) {
+  if (/\bnon[-\s]+terminal\s+quota\b/i.test(message) || /\bnon[-\s]+terminal\s+billing\s+limit\b/i.test(message)) {
     return false
   }
   return (
@@ -88,7 +80,10 @@ function isTerminalQuotaMessage(message: string): boolean {
 
 /** A quota the provider marks as permanent: no reset, so no fallback retry either. */
 export function isTerminalQuotaError(error: unknown): boolean {
-  return getDetailErrorType(error) === "terminal_quota_exhausted" || isTerminalQuotaMessage(getRuntimeFallbackErrorMessage(error))
+  return (
+    getDetailErrorType(error) === "terminal_quota_exhausted" ||
+    isTerminalQuotaMessage(getRuntimeFallbackErrorMessage(error))
+  )
 }
 
 export function classifyRuntimeFallbackError(error: unknown): RuntimeFallbackErrorType | undefined {
@@ -185,11 +180,7 @@ export function isRuntimeFallbackRetryableError(
     return true
   }
 
-  if (
-    errorType === "missing_api_key" ||
-    errorType === "model_not_found" ||
-    errorType === "quota_exceeded"
-  ) {
+  if (errorType === "missing_api_key" || errorType === "model_not_found" || errorType === "quota_exceeded") {
     return true
   }
 

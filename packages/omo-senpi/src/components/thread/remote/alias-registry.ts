@@ -15,7 +15,13 @@ const SCHEME = "plain-v1"
 const LOOKUP_MAX = 500
 // The service-auth protocol's bound on one account-service request: a stalled connection never holds a tool call.
 const REQUEST_TIMEOUT_MS = 30_000
-const ROUTES = { claim: "/v1/session-aliases", rename: "/v1/session-aliases/rename", release: "/v1/session-aliases/release", resolve: "/v1/session-aliases/resolve", of: "/v1/session-aliases/of" } as const
+const ROUTES = {
+  claim: "/v1/session-aliases",
+  rename: "/v1/session-aliases/rename",
+  release: "/v1/session-aliases/release",
+  resolve: "/v1/session-aliases/resolve",
+  of: "/v1/session-aliases/of",
+} as const
 
 // The service's alias rules, checked before anything is sent: an alias it would refuse never leaves this device.
 const SESSION_ID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
@@ -28,10 +34,15 @@ function brokenRule(normalized: string): string | undefined {
   return undefined
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value)
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
 const text = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined)
-const failed = <T>(code: AliasError["code"], message: string, details?: AliasError["details"]): AliasResult<T> => ({ kind: "error", error: { code, message, ...(details === undefined ? {} : { details }) } })
-const unavailable = <T>(reason: string): AliasResult<T> => failed("alias_registry_unavailable", `The account's alias registry could not be used (${reason}).`, { reason })
+const failed = <T>(code: AliasError["code"], message: string, details?: AliasError["details"]): AliasResult<T> => ({
+  kind: "error",
+  error: { code, message, ...(details === undefined ? {} : { details }) },
+})
+const unavailable = <T>(reason: string): AliasResult<T> =>
+  failed("alias_registry_unavailable", `The account's alias registry could not be used (${reason}).`, { reason })
 const notFound = <T>(): AliasResult<T> => failed("alias_not_found", "No thread of this account holds that alias.")
 
 function holderOf(value: unknown): AliasHolder | undefined {
@@ -69,12 +80,18 @@ export function createServiceAliasRegistry(access: ServiceAccess): AliasRegistry
     }
     let response: Response
     try {
-      response = await (access.fetch ?? fetch)(new Request(new URL(ROUTES[route], access.origin).href, {
-        method: "POST",
-        headers: { authorization: `Bearer ${token}`, "content-type": "application/json", "omo-contract-version": CONTRACT_VERSION },
-        body: JSON.stringify({ scheme: SCHEME, ...body }),
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      }))
+      response = await (access.fetch ?? fetch)(
+        new Request(new URL(ROUTES[route], access.origin).href, {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${token}`,
+            "content-type": "application/json",
+            "omo-contract-version": CONTRACT_VERSION,
+          },
+          body: JSON.stringify({ scheme: SCHEME, ...body }),
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        }),
+      )
     } catch (error) {
       return unavailable(error instanceof Error && error.name === "TimeoutError" ? "timeout" : "network")
     }
@@ -87,18 +104,31 @@ export function createServiceAliasRegistry(access: ServiceAccess): AliasRegistry
     }
     return response.ok ? { kind: "ok", value: json } : refusal(json, response.status)
   }
-  const holding = (result: AliasResult<unknown>): AliasResult<{ readonly alias: string; readonly holder: AliasHolder }> => {
+  const holding = (
+    result: AliasResult<unknown>,
+  ): AliasResult<{ readonly alias: string; readonly holder: AliasHolder }> => {
     if (result.kind === "error") return result
     const holder = holderOf(result.value)
     const alias = isRecord(result.value) ? text(result.value["alias_value"]) : undefined
-    return holder === undefined || alias === undefined ? unavailable("unreadable_response") : { kind: "ok", value: { alias, holder } }
+    return holder === undefined || alias === undefined
+      ? unavailable("unreadable_response")
+      : { kind: "ok", value: { alias, holder } }
   }
   return {
     claim: async ({ alias, holder, idempotency_key }) => {
       const key = normalizeThreadName(alias)
       const rule = brokenRule(key)
       if (rule !== undefined) return failed("alias_invalid", "That alias breaks an alias rule.", { reason: rule })
-      return holding(await send("claim", { alias_key: key, alias_value: key, session_key: holder.session_id, session_value: holder.session_id, device: holder.device, idempotency_key }))
+      return holding(
+        await send("claim", {
+          alias_key: key,
+          alias_value: key,
+          session_key: holder.session_id,
+          session_value: holder.session_id,
+          device: holder.device,
+          idempotency_key,
+        }),
+      )
     },
     rename: async ({ session_id, from, to, idempotency_key }) => {
       const toKey = normalizeThreadName(to)
@@ -106,14 +136,24 @@ export function createServiceAliasRegistry(access: ServiceAccess): AliasRegistry
       if (rule !== undefined) return failed("alias_invalid", "That alias breaks an alias rule.", { reason: rule })
       const fromKey = normalizeThreadName(from)
       if (brokenRule(fromKey) !== undefined) return notFound()
-      return holding(await send("rename", { session_key: session_id, from_key: fromKey, to_key: toKey, to_value: toKey, idempotency_key }))
+      return holding(
+        await send("rename", {
+          session_key: session_id,
+          from_key: fromKey,
+          to_key: toKey,
+          to_value: toKey,
+          idempotency_key,
+        }),
+      )
     },
     release: async ({ session_id, alias }) => {
       const key = normalizeThreadName(alias)
       if (brokenRule(key) !== undefined) return { kind: "ok", value: { released: false } }
       const result = await send("release", { session_key: session_id, alias_key: key })
       if (result.kind === "error") return result
-      return isRecord(result.value) && typeof result.value["released"] === "boolean" ? { kind: "ok", value: { released: result.value["released"] } } : unavailable("unreadable_response")
+      return isRecord(result.value) && typeof result.value["released"] === "boolean"
+        ? { kind: "ok", value: { released: result.value["released"] } }
+        : unavailable("unreadable_response")
     },
     resolve: async (alias) => {
       const key = normalizeThreadName(alias)

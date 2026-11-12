@@ -119,18 +119,37 @@ fn press_is_supported_by_any_listed_action_and_other_actions_need_their_name() {
     }
 }
 
+/// Wall time a busy host takes from the test between two of its steps.
+const HOST_STALL: Duration = Duration::from_millis(200);
+
+/// The battery waits on the fake's clock: each poll moves it, nothing else.
+struct FakeTime(senpi_desktop_backend_fake::FakeClock);
+
+impl super::BatteryClock for FakeTime {
+    fn now(&self) -> Duration {
+        Duration::from_millis(self.0.now_ms())
+    }
+
+    fn sleep(&self, pause: Duration) {
+        self.0.advance(u64::try_from(pause.as_millis()).unwrap_or(u64::MAX));
+    }
+}
+
 #[test]
 fn the_battery_waits_for_an_element_that_appears_enabled_after_500_ms() {
     // Given: hidden and disabled until 500 ms after its first read.
     let mut harness = opened(&scene(button(&json!({"ready_after_ms": 500})), &[]), ReportMode::Object);
+    harness.worker.battery_clock = Box::new(FakeTime(harness.ax_clock.clone()));
     let reference = harness.focused_ref();
+    // A loaded host deschedules this thread between the snapshot and the press:
+    // host time passes, the fake's does not.
+    std::thread::sleep(HOST_STALL);
     // When
-    let started = Instant::now();
     let report = action(press(&mut harness, reference).expect("delivered after the wait"));
-    // Then: the wait shows in the axResolve stage.
-    assert!(started.elapsed() >= Duration::from_millis(400), "{:?}", started.elapsed());
-    let waited = report.timings.and_then(|timings| timings.ax_resolve).expect("axResolve timed");
-    assert!((400_000..5_000_000).contains(&waited), "axResolve {waited} us");
+    // Then: the press waited the full 500 ms of fake time, and not until AUTO_WAIT.
+    let waited = harness.ax_clock.now_ms();
+    assert!((500..5_000).contains(&waited), "waited {waited} ms of fake time");
+    assert!(report.timings.and_then(|timings| timings.ax_resolve).is_some(), "axResolve timed");
     assert_eq!(report.disposition, Disposition::DELIVERED_UNVERIFIED);
     assert_eq!(pressed(&harness), 1);
 }

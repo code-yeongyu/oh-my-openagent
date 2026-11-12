@@ -30,7 +30,10 @@ export type ModelChainWorld = {
   /** How many times a child started by `runner()` was aborted before `dispose()`. */
   aborts(): number
   runner(): ManagedRunner
-  engineRunner(kind: EngineRunnerKind, options?: { readonly hiddenCapabilities?: readonly string[] }): Promise<ManagedRunner>
+  engineRunner(
+    kind: EngineRunnerKind,
+    options?: { readonly hiddenCapabilities?: readonly string[] },
+  ): Promise<ManagedRunner>
   /** The settings file an engine runner reads, copied byte for byte from `settingsPath` when it starts. */
   engineSettingsPath(kind: EngineRunnerKind): string
   dispose(): Promise<void>
@@ -55,8 +58,12 @@ export async function createModelChainWorld(
   const agentDir = join(root, "agent")
   mkdirSync(agentDir, { recursive: true })
   const settingsPath = join(agentDir, "settings.json")
-  const retry = options.userFallbackChains === undefined ? {} : { retry: { fallbackChains: options.userFallbackChains } }
-  writeFileSync(settingsPath, `${JSON.stringify({ defaultProvider: CLAUDE, defaultModel: "primary", ...retry }, null, 2)}\n`)
+  const retry =
+    options.userFallbackChains === undefined ? {} : { retry: { fallbackChains: options.userFallbackChains } }
+  writeFileSync(
+    settingsPath,
+    `${JSON.stringify({ defaultProvider: CLAUDE, defaultModel: "primary", ...retry }, null, 2)}\n`,
+  )
   const engines: EngineRunner[] = []
   const modelRuntime = ModelRuntime.createSync({ agentDir })
   const modelRegistry = new ModelRegistry(modelRuntime)
@@ -67,25 +74,31 @@ export async function createModelChainWorld(
   let aborts = 0
 
   for (const [provider, ids] of Object.entries(MODELS)) {
-    Reflect.apply(modelRegistry.registerProvider, modelRegistry, [provider, {
-      api: "openai-completions",
-      baseUrl: `file://${provider}`,
-      apiKey: "test-key",
-      models: ids.map(testModel),
-      async streamSimple(
-        model: { readonly id: string },
-        context: { readonly messages: readonly { readonly role: string }[] },
-        options: { readonly onPayload?: (payload: unknown) => unknown },
-      ) {
-        // Real providers call this hook immediately before sending their request. The synthetic
-        // provider has no HTTP payload, but must preserve that boundary for request-time budgets.
-        await options.onPayload?.({ model: model.id })
-        const key = `${provider}/${model.id}`
-        calls.push({ model: key, toolResults: context.messages.filter((message) => message.role === "toolResult").length })
-        const step = remaining.get(key)?.shift() ?? "complete"
-        return answer(provider, model.id, step)
+    Reflect.apply(modelRegistry.registerProvider, modelRegistry, [
+      provider,
+      {
+        api: "openai-completions",
+        baseUrl: `file://${provider}`,
+        apiKey: "test-key",
+        models: ids.map(testModel),
+        async streamSimple(
+          model: { readonly id: string },
+          context: { readonly messages: readonly { readonly role: string }[] },
+          options: { readonly onPayload?: (payload: unknown) => unknown },
+        ) {
+          // Real providers call this hook immediately before sending their request. The synthetic
+          // provider has no HTTP payload, but must preserve that boundary for request-time budgets.
+          await options.onPayload?.({ model: model.id })
+          const key = `${provider}/${model.id}`
+          calls.push({
+            model: key,
+            toolResults: context.messages.filter((message) => message.role === "toolResult").length,
+          })
+          const step = remaining.get(key)?.shift() ?? "complete"
+          return answer(provider, model.id, step)
+        },
       },
-    }])
+    ])
   }
 
   const countTool: ToolDefinition = {
@@ -109,17 +122,38 @@ export async function createModelChainWorld(
     // live asks before running the shared tool (it would be refused with no UI), so the count tool would never run.
     aborts: () => aborts,
     runner: () => {
-      const runner = createInProcessManagedRunner(new InProcessRunner({ sharedParentTools: [countTool], dialogs: { forward: async () => ({ kind: "value", value: "Allow once" }) } }), (spec) => {
-        const [provider, id] = (spec.model ?? "").split("/")
-        const model = provider === undefined || id === undefined ? undefined : modelRegistry.find(provider, id)
-        return { agentDir, projectTrusted: false, modelRegistry, modelRuntime, ...(model === undefined ? {} : { model }) }
-      })
-      return { ...runner, start: async spec => {
-        const started = await runner.start(spec)
-        const handle: ManagedChildHandle = { ...started, abort: async () => { aborts += 1; await started.abort() } }
-        handles.add(handle)
-        return handle
-      } }
+      const runner = createInProcessManagedRunner(
+        new InProcessRunner({
+          sharedParentTools: [countTool],
+          dialogs: { forward: async () => ({ kind: "value", value: "Allow once" }) },
+        }),
+        (spec) => {
+          const [provider, id] = (spec.model ?? "").split("/")
+          const model = provider === undefined || id === undefined ? undefined : modelRegistry.find(provider, id)
+          return {
+            agentDir,
+            projectTrusted: false,
+            modelRegistry,
+            modelRuntime,
+            ...(model === undefined ? {} : { model }),
+          }
+        },
+      )
+      return {
+        ...runner,
+        start: async (spec) => {
+          const started = await runner.start(spec)
+          const handle: ManagedChildHandle = {
+            ...started,
+            abort: async () => {
+              aborts += 1
+              await started.abort()
+            },
+          }
+          handles.add(handle)
+          return handle
+        },
+      }
     },
     engineRunner: async (kind, engineOptions = {}) => {
       const engine = await startEngineRunner(kind, { root, settingsPath, scripts, ...engineOptions })
@@ -129,7 +163,12 @@ export async function createModelChainWorld(
     engineSettingsPath: (kind) => join(engineAgentDir(root, kind), "settings.json"),
     dispose: async () => {
       try {
-        await Promise.all([...handles].map(async handle => { await handle.abort(); await handle.dispose() }))
+        await Promise.all(
+          [...handles].map(async (handle) => {
+            await handle.abort()
+            await handle.dispose()
+          }),
+        )
         for (const engine of engines.splice(0)) await engine.stop()
       } finally {
         rmSync(root, { recursive: true, force: true })

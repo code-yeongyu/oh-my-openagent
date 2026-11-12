@@ -23,10 +23,7 @@ function backupRoot(identity: MemoryCommandIdentity): string {
 }
 
 /** Copies the repository to a fresh sibling directory; never clobbers an existing backup. */
-export async function createRepoBackup(
-  deps: MemoryCommandDeps,
-  identity: MemoryCommandIdentity,
-): Promise<string> {
+export async function createRepoBackup(deps: MemoryCommandDeps, identity: MemoryCommandIdentity): Promise<string> {
   const stamp = backupTimestamp((deps.now ?? Date.now)())
   const root = backupRoot(identity)
   let candidate = join(root, `${BACKUP_PREFIX}${stamp}`)

@@ -22,7 +22,7 @@ function createMockCtx(agents: Array<{ name: string; mode?: string }> = []): Plu
       },
     } as unknown as OpencodeClient,
     directory: "/test",
-    }
+  }
 }
 
 const DEFAULT_AGENTS = [
@@ -32,12 +32,14 @@ const DEFAULT_AGENTS = [
 
 const reserveCommitMock = mock(() => 1)
 const reserveRollbackMock = mock(() => {})
-const reserveSubagentSpawnMock = mock(() => Promise.resolve({
-  spawnContext: { rootSessionID: "root-session", parentDepth: 0, childDepth: 1 },
-  descendantCount: 1,
-  commit: reserveCommitMock,
-  rollback: reserveRollbackMock,
-}))
+const reserveSubagentSpawnMock = mock(() =>
+  Promise.resolve({
+    spawnContext: { rootSessionID: "root-session", parentDepth: 0, childDepth: 1 },
+    descendantCount: 1,
+    commit: reserveCommitMock,
+    rollback: reserveRollbackMock,
+  }),
+)
 
 const toolCtx = {
   sessionID: "test",
@@ -89,21 +91,20 @@ describe("createCallOmoAgent edge cases", () => {
 
   describe("#given a non-allowed agent appears in runtime agent results", () => {
     test("#then the runtime agent is still rejected", async () => {
-      const agents = [
-        ...DEFAULT_AGENTS,
-        { name: "  bug-fixer  ", mode: "subagent" },
-      ]
+      const agents = [...DEFAULT_AGENTS, { name: "  bug-fixer  ", mode: "subagent" }]
       const mockCtx = createMockCtx(agents)
       const mockManager = {
         assertCanSpawn: mock(() => Promise.resolve(undefined)),
         reserveSubagentSpawn: reserveSubagentSpawnMock,
-        launch: mock(() => Promise.resolve({
-          id: "task-id",
-          sessionId: "ses-1",
-          description: "Test",
-          agent: "bug-fixer",
-          status: "pending",
-        })),
+        launch: mock(() =>
+          Promise.resolve({
+            id: "task-id",
+            sessionId: "ses-1",
+            description: "Test",
+            agent: "bug-fixer",
+            status: "pending",
+          }),
+        ),
         getTask: mock(() => ({ status: "pending", sessionId: "ses-1" })),
       }
       const toolDef = createCallOmoAgent(mockCtx, mockManager, [])
@@ -126,21 +127,20 @@ describe("createCallOmoAgent edge cases", () => {
 
   describe("#given an agent exists in both ALLOWED_AGENTS and runtime results", () => {
     test("#then the agent is callable without conflict", async () => {
-      const agents = [
-        ...DEFAULT_AGENTS,
-        { name: "explore", mode: "subagent" },
-      ]
+      const agents = [...DEFAULT_AGENTS, { name: "explore", mode: "subagent" }]
       const mockCtx = createMockCtx(agents)
       const mockManager = {
         assertCanSpawn: mock(() => Promise.resolve(undefined)),
         reserveSubagentSpawn: reserveSubagentSpawnMock,
-        launch: mock(() => Promise.resolve({
-          id: "task-id",
-          sessionId: "ses-1",
-          description: "Test",
-          agent: "explore",
-          status: "pending",
-        })),
+        launch: mock(() =>
+          Promise.resolve({
+            id: "task-id",
+            sessionId: "ses-1",
+            description: "Test",
+            agent: "explore",
+            status: "pending",
+          }),
+        ),
         getTask: mock(() => ({ status: "pending", sessionId: "ses-1" })),
       }
       const toolDef = createCallOmoAgent(mockCtx, mockManager, [])
@@ -162,10 +162,7 @@ describe("createCallOmoAgent edge cases", () => {
 
   describe("#given a disabled custom agent appears in runtime results", () => {
     test("#then restricted agent validation takes precedence over dynamic availability", async () => {
-      const agents = [
-        ...DEFAULT_AGENTS,
-        { name: "bug-fixer", mode: "subagent" },
-      ]
+      const agents = [...DEFAULT_AGENTS, { name: "bug-fixer", mode: "subagent" }]
       const mockCtx = createMockCtx(agents)
       const mockManager = {
         assertCanSpawn: mock(() => Promise.resolve(undefined)),

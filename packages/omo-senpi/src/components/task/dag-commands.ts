@@ -118,7 +118,10 @@ async function runDagCommand(manager: DagCommandManager, args: string, ctx: DagC
     ui.notify(EMPTY_STATE, "info")
     return
   }
-  const runId = args.trim().split(/\s+/).filter((token) => token.length > 0)[0]
+  const runId = args
+    .trim()
+    .split(/\s+/)
+    .filter((token) => token.length > 0)[0]
   if (runId === undefined) {
     renderList(manager, sessionId, ui)
     return
@@ -207,8 +210,17 @@ function dependentsByNode(snapshot: DagCommandRunSnapshot): Map<string, string[]
   return dependents
 }
 
-function nodeRow(node: DagCommandNode, manager: DagCommandManager, isCritical: boolean, dependsOn: readonly string[]): string {
-  const parts = [normalizeRendererText(node.label ?? node.id), normalizeRendererText(node.state), routeLabel(node.route)]
+function nodeRow(
+  node: DagCommandNode,
+  manager: DagCommandManager,
+  isCritical: boolean,
+  dependsOn: readonly string[],
+): string {
+  const parts = [
+    normalizeRendererText(node.label ?? node.id),
+    normalizeRendererText(node.state),
+    routeLabel(node.route),
+  ]
   const model = resolvedModel(node, manager)
   if (model !== undefined) parts.push(`model:${model}`)
   if (node.attempt > 1) parts.push(`x${node.attempt}`)
@@ -231,7 +243,11 @@ function routeLabel(route: DagCommandRoute): string {
 // effective model after a fallback or switch), so the attached record wins whenever the node reached one.
 function resolvedModel(node: DagCommandNode, manager: DagCommandManager): string | undefined {
   const record = node.taskId === undefined ? undefined : manager.taskRecord(node.taskId)
-  const resolved = record?.effective_model?.display ?? record?.resolved_model?.display ?? record?.model ?? (node.route.kind === "agent" ? node.route.model : undefined)
+  const resolved =
+    record?.effective_model?.display ??
+    record?.resolved_model?.display ??
+    record?.model ??
+    (node.route.kind === "agent" ? node.route.model : undefined)
   return resolved === undefined ? undefined : normalizeRendererText(resolved)
 }
 

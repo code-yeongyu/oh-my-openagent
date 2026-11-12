@@ -20,12 +20,28 @@ function write(path: string, content: string): void {
 
 beforeAll(async () => {
   write(join(runtimeRoot, "package.json"), JSON.stringify({ version: "0.0.0-fixture" }))
-  write(join(runtimeRoot, "plugin", "skills", "ultrawork", "SKILL.md"), "---\nname: ultrawork\ndescription: bundled\n---\n")
-  write(join(home, ".config", "opencode", "opencode.json"), JSON.stringify({ $schema: "https://opencode.ai/config.json", model: "openai/gpt-5.5" }))
-  write(join(home, ".config", "opencode", "skills", "ultrawork", "SKILL.md"), "---\nname: ultrawork\ndescription: user copy\n---\n")
+  write(
+    join(runtimeRoot, "plugin", "skills", "ultrawork", "SKILL.md"),
+    "---\nname: ultrawork\ndescription: bundled\n---\n",
+  )
+  write(
+    join(home, ".config", "opencode", "opencode.json"),
+    JSON.stringify({ $schema: "https://opencode.ai/config.json", model: "openai/gpt-5.5" }),
+  )
+  write(
+    join(home, ".config", "opencode", "skills", "ultrawork", "SKILL.md"),
+    "---\nname: ultrawork\ndescription: user copy\n---\n",
+  )
   const entry = join(import.meta.dir, "fixtures", "compiled-setup", "entry.ts")
-  const build = Bun.spawn([process.execPath, "build", "--compile", entry, "--outfile", binary], { stdout: "pipe", stderr: "pipe" })
-  const [stdout, stderr, code] = await Promise.all([new Response(build.stdout).text(), new Response(build.stderr).text(), build.exited])
+  const build = Bun.spawn([process.execPath, "build", "--compile", entry, "--outfile", binary], {
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  const [stdout, stderr, code] = await Promise.all([
+    new Response(build.stdout).text(),
+    new Response(build.stderr).text(),
+    build.exited,
+  ])
   if (code !== 0) throw new Error(`bun build --compile failed:\n${stdout}\n${stderr}`)
 }, 300_000)
 
@@ -47,8 +63,18 @@ describe("compiled omo setup --dry-run", () => {
     }
 
     // when
-    const child = Bun.spawn([binary, "setup", "--dry-run"], { cwd: home, env, stdin: "ignore", stdout: "pipe", stderr: "pipe" })
-    const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+    const child = Bun.spawn([binary, "setup", "--dry-run"], {
+      cwd: home,
+      env,
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+    const [stdout, stderr, code] = await Promise.all([
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+      child.exited,
+    ])
     const output = `${stdout}\n${stderr}`
 
     // then

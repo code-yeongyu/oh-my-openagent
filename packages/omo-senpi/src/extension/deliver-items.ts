@@ -23,12 +23,19 @@ type NativeSender = (
 // and answers nothing, which keeps its synchronous delivered-on-return contract.
 export async function deliverItems(
   send: NativeSender,
-  options: { readonly message: IdleInjectionMessage; readonly items: readonly AdmissionItem[]; readonly deliverAs: "steer" | "followUp" },
+  options: {
+    readonly message: IdleInjectionMessage
+    readonly items: readonly AdmissionItem[]
+    readonly deliverAs: "steer" | "followUp"
+  },
 ): Promise<readonly ItemReceipt[] | undefined> {
   const result = await send(options.message, {
-    triggerTurn: true, deliverAs: options.deliverAs,
-    items: options.items.map(item => ({
-      itemId: item.itemId, producer: item.producer, contentRange: item.contentRange,
+    triggerTurn: true,
+    deliverAs: options.deliverAs,
+    items: options.items.map((item) => ({
+      itemId: item.itemId,
+      producer: item.producer,
+      contentRange: item.contentRange,
       ...(item.runRef === undefined ? {} : { runRef: item.runRef }),
     })),
   })

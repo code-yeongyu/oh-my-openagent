@@ -43,7 +43,12 @@ function withoutDanglingSurrogate(text: string): string {
 }
 
 /** One folded event as it appears in the digest: kind (and tool), error flag, clipped body. */
-export function fragmentOf(event: { readonly kind: string; readonly tool?: string; readonly isError?: boolean; readonly body: string }): string {
+export function fragmentOf(event: {
+  readonly kind: string
+  readonly tool?: string
+  readonly isError?: boolean
+  readonly body: string
+}): string {
   const label = event.tool === undefined ? event.kind : `${event.kind}(${event.tool})`
   const status = event.isError === true ? " error" : ""
   const body = event.body.replace(/\s+/g, " ").trim()

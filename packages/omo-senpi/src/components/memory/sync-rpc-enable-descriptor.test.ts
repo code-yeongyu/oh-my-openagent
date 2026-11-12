@@ -21,16 +21,28 @@ async function fixture(genesis: "supported" | "unsupported") {
   const supported = genesis === "supported"
   const base = f.account.forOperation
   Object.assign(f.account, {
-    descriptor: { ...f.account.descriptor, genesis, rpId: supported ? "sync.example" : null, userName: supported ? "person" : null },
-    forOperation: async (authority: Parameters<typeof base>[0]) => ({ ...await base(authority), genesis: bridge }),
+    descriptor: {
+      ...f.account.descriptor,
+      genesis,
+      rpId: supported ? "sync.example" : null,
+      userName: supported ? "person" : null,
+    },
+    forOperation: async (authority: Parameters<typeof base>[0]) => ({ ...(await base(authority)), genesis: bridge }),
   })
   const seen: EnableInput[] = []
   const called = Promise.withResolvers<void>()
-  f.runtime.enableSync = async (input) => { seen.push(input); called.resolve(); return { kind: "needs_first_device" } }
-  const enabled = () => Promise.race([
-    called.promise,
-    Bun.sleep(remainingTestTime()).then(() => { throw new Error("waited out the test budget for enableSync, never called") }),
-  ])
+  f.runtime.enableSync = async (input) => {
+    seen.push(input)
+    called.resolve()
+    return { kind: "needs_first_device" }
+  }
+  const enabled = () =>
+    Promise.race([
+      called.promise,
+      Bun.sleep(remainingTestTime()).then(() => {
+        throw new Error("waited out the test budget for enableSync, never called")
+      }),
+    ])
   return { f, bridge, seen, enabled }
 }
 

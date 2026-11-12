@@ -7,7 +7,14 @@ import type { Theme, ThemeColor, ToolDefinition } from "@code-yeongyu/senpi"
 import { Box, Container, Text } from "@earendil-works/pi-tui"
 
 import { createMemoryWriteRenderResult, renderMemoryWriteNotice } from "./memory-write-render"
-import { createMemoryTools, MEMORY_TOOL_NAME, type MemoryToolExecutionResult, type MemoryToolParams, type MemoryToolResultDetails, type MemoryWriteNotice } from "./tools"
+import {
+  createMemoryTools,
+  MEMORY_TOOL_NAME,
+  type MemoryToolExecutionResult,
+  type MemoryToolParams,
+  type MemoryToolResultDetails,
+  type MemoryWriteNotice,
+} from "./tools"
 
 const BOLD = "\u001b[1m"
 const BOLD_OFF = "\u001b[22m"
@@ -55,7 +62,7 @@ function render(
   const component = renderResult(
     { content: [{ type: "text", text: details?.message ?? MESSAGE }], details } as never,
     { expanded: options.expanded ?? false, isPartial: false },
-    { bold, ...(options.theme ?? PLAIN_THEME) as object } as Theme,
+    { bold, ...((options.theme ?? PLAIN_THEME) as object) } as Theme,
     { ...callContext(), isError: options.isError ?? false, hasResult: true },
   )
   const lines = (component as { render(width: number): string[] }).render(WIDE)
@@ -70,13 +77,22 @@ const FRAME_THEME = {
   bg: (color: string, text: string) => `<${color}>${text}</${color}>`,
 } as Theme
 
-function callContext(): Parameters<NonNullable<ToolDefinition<
-  typeof MemoryToolParams, MemoryToolResultDetails, { callComponent?: Box }
->["renderCall"]>>[2] {
+function callContext(): Parameters<
+  NonNullable<ToolDefinition<typeof MemoryToolParams, MemoryToolResultDetails, { callComponent?: Box }>["renderCall"]>
+>[2] {
   return {
-    args: CALL_ARGS, toolCallId: "memory-frame", state: {}, lastComponent: undefined,
-    cwd: "/tmp", executionStarted: true, argsComplete: true, isPartial: false,
-    expanded: false, showImages: false, isError: false, hasResult: false,
+    args: CALL_ARGS,
+    toolCallId: "memory-frame",
+    state: {},
+    lastComponent: undefined,
+    cwd: "/tmp",
+    executionStarted: true,
+    argsComplete: true,
+    isPartial: false,
+    expanded: false,
+    showImages: false,
+    isError: false,
+    hasResult: false,
     invalidate() {},
   }
 }
@@ -136,20 +152,23 @@ describe("memory tool row framing", () => {
     expect(lines.join("\n")).not.toContain("memory: create:")
   })
 
-  test.each([false, true])("#when a notice is enabled (expanded=%s) #then the settled row is exactly the notice", (expanded) => {
-    const { renderCall } = framedTool()
-    const renderResult = createMemoryWriteRenderResult({ enabled: () => true, now: () => NOW })
-    const context = callContext()
-    const call = renderCall(CALL_ARGS, FRAME_THEME, context)
-    context.hasResult = true
-    const payload = notice()
-    const component = renderResult(frameResult(payload), { expanded, isPartial: false }, FRAME_THEME, context)
-    expect(component).toBe(call)
-    const lines = component.render(WIDE)
-    assertBackground(lines, "customMessageBg")
-    expect(lines).toEqual(renderMemoryWriteNotice(payload, { expanded }, FRAME_THEME, NOW).render(WIDE))
-    expect((component as Box).children.every((child) => child instanceof Text)).toBe(true)
-  })
+  test.each([false, true])(
+    "#when a notice is enabled (expanded=%s) #then the settled row is exactly the notice",
+    (expanded) => {
+      const { renderCall } = framedTool()
+      const renderResult = createMemoryWriteRenderResult({ enabled: () => true, now: () => NOW })
+      const context = callContext()
+      const call = renderCall(CALL_ARGS, FRAME_THEME, context)
+      context.hasResult = true
+      const payload = notice()
+      const component = renderResult(frameResult(payload), { expanded, isPartial: false }, FRAME_THEME, context)
+      expect(component).toBe(call)
+      const lines = component.render(WIDE)
+      assertBackground(lines, "customMessageBg")
+      expect(lines).toEqual(renderMemoryWriteNotice(payload, { expanded }, FRAME_THEME, NOW).render(WIDE))
+      expect((component as Box).children.every((child) => child instanceof Text)).toBe(true)
+    },
+  )
 
   test("#when a write committed but its facts could not be gathered #then the row is a statless remembered notice", () => {
     const { renderCall, renderResult } = framedTool()
@@ -213,7 +232,11 @@ describe("memory tool row framing", () => {
 
   test("#when a rename streams multiline arguments #then its old path stays on one pending line", () => {
     const { renderCall } = framedTool()
-    const component = renderCall({ command: "rename", reason: "rename", old_path: "knowledge/old\nname.md" }, FRAME_THEME, callContext())
+    const component = renderCall(
+      { command: "rename", reason: "rename", old_path: "knowledge/old\nname.md" },
+      FRAME_THEME,
+      callContext(),
+    )
     expect(component.render(WIDE)).toHaveLength(3)
     expect(component.render(WIDE)[1]).toContain("◌ Moving · knowledge/old name.md")
   })
@@ -222,11 +245,16 @@ describe("memory tool row framing", () => {
 describe("memory tool result rendering", () => {
   test("#when rendered with a background theme #then every padded line carries customMessageBg", () => {
     const renderResult = createMemoryWriteRenderResult({ enabled: () => true, now: () => NOW })
-    const component = renderResult(frameResult(notice()), { expanded: false, isPartial: false }, {
-      bold,
-      fg: (_color: ThemeColor, text: string) => text,
-      bg: (_color: "customMessageBg", text: string) => `<notice-bg>${text}</notice-bg>`,
-    } as unknown as Theme, { isError: false })
+    const component = renderResult(
+      frameResult(notice()),
+      { expanded: false, isPartial: false },
+      {
+        bold,
+        fg: (_color: ThemeColor, text: string) => text,
+        bg: (_color: "customMessageBg", text: string) => `<notice-bg>${text}</notice-bg>`,
+      } as unknown as Theme,
+      { isError: false },
+    )
     for (const line of component.render(WIDE)) expect(line).toMatch(/^<notice-bg>.*<\/notice-bg>$/u)
   })
 
@@ -246,8 +274,9 @@ describe("memory tool result rendering", () => {
   })
 
   test("#when it renders expanded #then the detail row carries sha7, identity and subject", () => {
-    expect(render({ message: MESSAGE, writeNotice: notice() }, { expanded: true })[4])
-      .toBe("a1b2c3d · project-a1b2c3d4 · Track the deploy runbook")
+    expect(render({ message: MESSAGE, writeNotice: notice() }, { expanded: true })[4]).toBe(
+      "a1b2c3d · project-a1b2c3d4 · Track the deploy runbook",
+    )
   })
 
   test("#when the gate is off #then the plain call line and tool message are rendered verbatim", () => {
@@ -268,7 +297,12 @@ describe("memory tool result rendering", () => {
 
   test("#when a result-only consumer renders with the gate off #then the tool text content is rendered", () => {
     const renderResult = createMemoryWriteRenderResult({ enabled: () => false })
-    const component = renderResult({ content: [{ type: "text", text: MESSAGE }] } as never, { expanded: false, isPartial: false }, { bold, ...PLAIN_THEME } as unknown as Theme, { isError: false })
+    const component = renderResult(
+      { content: [{ type: "text", text: MESSAGE }] } as never,
+      { expanded: false, isPartial: false },
+      { bold, ...PLAIN_THEME } as unknown as Theme,
+      { isError: false },
+    )
     expect(component.render(WIDE)).toEqual([MESSAGE])
   })
 })

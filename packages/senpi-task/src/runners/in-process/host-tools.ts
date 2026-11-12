@@ -37,9 +37,9 @@ export const CHILD_HOST_TOOLS: readonly ChildHostTool[] = [
 
 const WRITE_CAPABLE = new Map(CHILD_HOST_TOOLS.map((tool) => [tool.name, tool.writeCapable]))
 
-export const SENPI_SESSION_BUILTIN_NAMES: readonly string[] = CHILD_HOST_TOOLS.filter((tool) => tool.sessionBuiltin).map(
-  (tool) => tool.name,
-)
+export const SENPI_SESSION_BUILTIN_NAMES: readonly string[] = CHILD_HOST_TOOLS.filter(
+  (tool) => tool.sessionBuiltin,
+).map((tool) => tool.name)
 
 export function isWriteCapableHostTool(name: string): boolean {
   return WRITE_CAPABLE.get(name) !== false

@@ -22,7 +22,9 @@ export function backend(overrides: Partial<IsolationBackend> = {}): IsolationBac
     kind: "rcopy",
     clonesTree: false,
     probe: async () => ({ available: true }),
-    start: async (_lower, merged) => { await mkdir(merged) },
+    start: async (_lower, merged) => {
+      await mkdir(merged)
+    },
     stop: async () => {},
     ...overrides,
   }

@@ -43,7 +43,9 @@ export async function publishRunOutcome(
       await updateRunLedger(join(runDir, "ledger.json"), {
         attempt: manifest.nextAttempt.attempt,
         model: manifest.nextAttempt.model,
-        ...(manifest.nextAttempt.thinking === undefined ? { thinking: undefined } : { thinking: manifest.nextAttempt.thinking }),
+        ...(manifest.nextAttempt.thinking === undefined
+          ? { thinking: undefined }
+          : { thinking: manifest.nextAttempt.thinking }),
         launching: true,
         pid: undefined,
         processStart: undefined,

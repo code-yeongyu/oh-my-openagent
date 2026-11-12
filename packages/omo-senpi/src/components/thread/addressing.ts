@@ -81,7 +81,12 @@ export type ThreadResolveResult =
   | ThreadAddressError
 
 export type ThreadFuzzyResult =
-  | { readonly kind: "ok"; readonly entry: ThreadAddressEntry; readonly score: number; readonly basis: ThreadFuzzyBasis }
+  | {
+      readonly kind: "ok"
+      readonly entry: ThreadAddressEntry
+      readonly score: number
+      readonly basis: ThreadFuzzyBasis
+    }
   | ThreadAddressError
 
 export type ThreadNameConflictResult = { readonly kind: "ok" } | ThreadAddressError
@@ -105,25 +110,43 @@ const UNFOLDABLE_CONTROLS = /[\u0000-\u0008\u000e-\u001f\u007f]/
  * composed and a decomposed spelling of the same name are one name.
  */
 export function normalizeThreadName(value: string): string {
-  return value
-    .normalize("NFKC")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ")
+  return value.normalize("NFKC").trim().toLowerCase().replace(/\s+/g, " ")
 }
 
-type Guarded = { readonly ok: true; readonly normalized: string } | { readonly ok: false; readonly error: ThreadAddressError }
+type Guarded =
+  { readonly ok: true; readonly normalized: string } | { readonly ok: false; readonly error: ThreadAddressError }
 
 function guardInput(value: string, what: string): Guarded {
   if (typeof value !== "string") {
-    return { ok: false, error: addressError("invalid_arguments", `The ${what} must be a string.`, `Pass a thread_id or a unique name from thread_list as the ${what}.`) }
+    return {
+      ok: false,
+      error: addressError(
+        "invalid_arguments",
+        `The ${what} must be a string.`,
+        `Pass a thread_id or a unique name from thread_list as the ${what}.`,
+      ),
+    }
   }
   if (UNFOLDABLE_CONTROLS.test(value)) {
-    return { ok: false, error: addressError("invalid_arguments", `The ${what} contains control characters.`, `Remove the control characters and retry, or pass an address from thread_list.`) }
+    return {
+      ok: false,
+      error: addressError(
+        "invalid_arguments",
+        `The ${what} contains control characters.`,
+        `Remove the control characters and retry, or pass an address from thread_list.`,
+      ),
+    }
   }
   const normalized = normalizeThreadName(value)
   if (normalized.length === 0) {
-    return { ok: false, error: addressError("invalid_arguments", `The ${what} is empty.`, `Pass a thread_id or a unique name from thread_list as the ${what}.`) }
+    return {
+      ok: false,
+      error: addressError(
+        "invalid_arguments",
+        `The ${what} is empty.`,
+        `Pass a thread_id or a unique name from thread_list as the ${what}.`,
+      ),
+    }
   }
   return { ok: true, normalized }
 }
@@ -158,10 +181,26 @@ function toCandidate(entry: ThreadAddressEntry): ThreadCandidate {
 function toCandidates(matches: readonly ThreadAddressEntry[]): readonly ThreadCandidate[] {
   // When the candidates span devices, this device's threads say so too, so the caller can tell them apart.
   const spans = matches.some((entry) => entry.device !== undefined)
-  return [...matches].map((entry) => (spans && entry.device === undefined && entry.transport === undefined ? { ...entry, device: "here" } : entry))
+  return [...matches]
+    .map((entry) =>
+      spans && entry.device === undefined && entry.transport === undefined ? { ...entry, device: "here" } : entry,
+    )
     .sort((a, b) =>
-      (a.transport === undefined) !== (b.transport === undefined) ? (a.transport === undefined ? -1 : 1)
-        : a.updated_at === b.updated_at ? (a.thread_id < b.thread_id ? -1 : 1) : a.updated_at === null ? 1 : b.updated_at === null ? -1 : a.updated_at < b.updated_at ? 1 : -1,
+      (a.transport === undefined) !== (b.transport === undefined)
+        ? a.transport === undefined
+          ? -1
+          : 1
+        : a.updated_at === b.updated_at
+          ? a.thread_id < b.thread_id
+            ? -1
+            : 1
+          : a.updated_at === null
+            ? 1
+            : b.updated_at === null
+              ? -1
+              : a.updated_at < b.updated_at
+                ? 1
+                : -1,
     )
     .slice(0, AMBIGUOUS_CANDIDATE_LIMIT)
     .map(toCandidate)
@@ -282,7 +321,10 @@ export function resolveTarget(
 
   // Ladder step 1c (decision 0027): an account alias names one thread account-wide, on any device, never workspace-scoped.
   const wantedAlias = normalizeThreadName(target)
-  const aliasHit = wantedAlias === "" ? undefined : entries.find((entry) => entry.aliases?.some((alias) => normalizeThreadName(alias) === wantedAlias))
+  const aliasHit =
+    wantedAlias === ""
+      ? undefined
+      : entries.find((entry) => entry.aliases?.some((alias) => normalizeThreadName(alias) === wantedAlias))
   if (aliasHit !== undefined) return { kind: "ok", entry: aliasHit, resolution: "alias" }
 
   // Ladder step 2: normalized name match over the visible entries only.
@@ -298,12 +340,12 @@ export function resolveTarget(
       )
     }
     // A thread on another device belongs to the account, not to a workspace of this device: it stays visible (decision 0027).
-    visible = entries.filter((entry) => entry.transport !== undefined || sameWorkspace(entry.cwd, callerRoot, rootResolver))
+    visible = entries.filter(
+      (entry) => entry.transport !== undefined || sameWorkspace(entry.cwd, callerRoot, rootResolver),
+    )
   }
 
-  // An ended session on another device is reachable by id only, never by its title (it is not a live peer to talk to).
-  // A local resumable thread stays name-addressable (its contract today); making that one rule is #13012.
-  const matches = visible.filter((entry) => normalizeThreadName(entry.name) === guard.normalized && !(entry.transport !== undefined && entry.status === "resumable"))
+  const matches = visible.filter((entry) => normalizeThreadName(entry.name) === guard.normalized)
   if (matches.length === 1) return { kind: "ok", entry: matches[0], resolution: "name" }
   if (matches.length >= 2) {
     return addressError(
@@ -419,6 +461,19 @@ export function fuzzyMatch(entries: readonly ThreadAddressEntry[], query: string
     )
   }
   return { kind: "ok", entry: leader.entry, score: leader.score, basis: leader.basis }
+}
+
+/**
+ * The entries that can still change a `fuzzyMatch` outcome for `query`. An entry scoring below the accept floor minus the
+ * margin can neither lead nor sit within the margin of an accepted leader, so dropping it changes no accepted match and
+ * no ambiguity verdict. Callers use it to bound a large set (an account's ended history) before the candidate cap
+ * applies. An invalid or too-short query keeps nothing: `fuzzyMatch` reports that query on the rest of the set.
+ */
+export function fuzzyContenders(entries: readonly ThreadAddressEntry[], query: string): ThreadAddressEntry[] {
+  const guard = guardInput(query, "fuzzy query")
+  if (!guard.ok || guard.normalized.length < FUZZY_MIN_QUERY_LENGTH) return []
+  const queryGrams = trigrams(guard.normalized)
+  return entries.filter((entry) => scoreEntry(entry, queryGrams).score >= FUZZY_ACCEPT_SCORE - FUZZY_ACCEPT_MARGIN)
 }
 
 /**

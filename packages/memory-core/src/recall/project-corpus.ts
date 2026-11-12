@@ -8,10 +8,15 @@ import type { RecallDocument } from "./provider"
 export const PROJECT_MEMORY_PATH_PREFIX = "@project/"
 
 export function qualifyProjectDocuments(identityId: string, documents: readonly RecallDocument[]): RecallDocument[] {
-  return documents.map((document) => ({ ...document, path: `${PROJECT_MEMORY_PATH_PREFIX}${identityId}/${document.path}` }))
+  return documents.map((document) => ({
+    ...document,
+    path: `${PROJECT_MEMORY_PATH_PREFIX}${identityId}/${document.path}`,
+  }))
 }
 
-export function parseProjectMemoryPath(path: string): { readonly identityId: string; readonly path: string } | undefined {
+export function parseProjectMemoryPath(
+  path: string,
+): { readonly identityId: string; readonly path: string } | undefined {
   if (!path.startsWith(PROJECT_MEMORY_PATH_PREFIX)) return undefined
   const rest = path.slice(PROJECT_MEMORY_PATH_PREFIX.length)
   const slash = rest.indexOf("/")
