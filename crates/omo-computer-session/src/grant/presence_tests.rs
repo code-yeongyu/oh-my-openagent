@@ -136,3 +136,42 @@ fn every_lease_end_goes_through_one_funnel() {
     assert_eq!(serde_json::to_value(&after).expect("report")["focusRestoration"], json!("user_moved_on"),
         "a user-side end still reports");
 }
+
+#[derive(Clone, Default)]
+struct Recorded(std::sync::Arc<std::sync::Mutex<Vec<String>>>);
+
+impl super::LeaseHook for Recorded {
+    fn lease_ended(&mut self, _backend: &mut dyn omo_computer_core::backend::Backend, why: crate::presence::LeaseEnd) {
+        self.0.lock().expect("lock").push(format!("ended {why:?}"));
+    }
+
+    fn display_resumed(&mut self, _backend: &mut dyn omo_computer_core::backend::Backend) {
+        self.0.lock().expect("lock").push("resumed".to_owned());
+    }
+}
+
+#[test]
+fn every_lease_end_path_calls_the_hook_once_with_its_cause() {
+    let sink = RecordingSink::default();
+    let mut s = session(&json!({ "object": true }), &sink, None);
+    let calls = Recorded::default();
+    s.set_lease_hook(Box::new(calls.clone()));
+    let taken = || std::mem::take(&mut *calls.0.lock().expect("lock"));
+
+    s.control_grant(params(json!({ "reason": "r" })));
+    capture(&mut s, "1");
+    s.control_acquire().expect("lease");
+    s.control_release();
+    assert_eq!(taken(), ["ended Release"], "control.release, through the funnel");
+
+    s.control_acquire().expect("lease again");
+    s.display_release();
+    assert_eq!(taken(), ["ended DisplayRelease"], "display.release, through the funnel");
+
+    s.display_resume();
+    assert_eq!(taken(), ["resumed"], "display.resume");
+
+    s.control_acquire().expect("lease a third time");
+    s.end_lease(crate::presence::LeaseEnd::DisplayRelease);
+    assert_eq!(taken(), ["ended DisplayRelease"], "a direct end_lease");
+}
