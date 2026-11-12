@@ -71,9 +71,9 @@ describe("omo login reuses this machine's device instead of registering another"
     await expect(refused).rejects.toBeInstanceOf(MachineAlreadySignedIn)
   })
 
-  // The real refresh path throws refresh_recovery_expired for a stored refreshState "uncertain". omo can never use that
-  // sign-in again, but forget would also end a device the device service holds, so the recovery follows that state.
-  test("an uncertain refresh gives the destructive steps only when no device service holds the device", async () => {
+  // The real refresh path throws refresh_recovery_expired for a stored refreshState "uncertain". Forget would also end a
+  // device the device service holds, so the recovery follows that state: the desktop share leads when one is held.
+  test("an uncertain refresh leads with the desktop share when the device service holds the device", async () => {
     const session = await sessionWith({ ...stored, refreshState: "uncertain" })
     const absentRefusal = refuseSecondMachineDevice(session, service(absent))
     await expect(absentRefusal).rejects.toMatchObject({
