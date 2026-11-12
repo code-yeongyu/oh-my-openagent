@@ -70,6 +70,7 @@ import { spawn } from "node:child_process"
 import { existsSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
+import { pathToFileURL } from "node:url"
 
 const brand = ${JSON.stringify(brand)}
 const cli = process.env.OMO_SENPI_CLI_PATH ?? ${JSON.stringify(options.senpiCliPath)}
@@ -78,6 +79,17 @@ const plugin = process.env.OMO_PLUGIN_ROOT ?? ${JSON.stringify(options.pluginPat
 if (!existsSync(join(plugin, "extensions", "omo.js"))) {
   console.error("omo: the plugin at " + plugin + " is not built; run \`bun run build:senpi-plugin\` in that checkout")
   process.exit(1)
+}
+// A build older than the checkout's plugin sources still starts, with one line naming the rebuild (#13232). The check
+// lives in the checkout, which this launcher outlives: a checkout without it, or a check that throws, starts as before.
+try {
+  const stampModule = join(plugin, "scripts", "build-stamp.mjs")
+  if (existsSync(stampModule)) {
+    const warning = (await import(pathToFileURL(stampModule).href)).staleBuildWarning(plugin)
+    if (warning) console.error(warning)
+  }
+} catch {
+  // The warning is advice only; the engine starts whatever the check did.
 }
 // The same directory the published launcher pins, so a local install shares one state location
 // with the published one and with anything either of them spawns.

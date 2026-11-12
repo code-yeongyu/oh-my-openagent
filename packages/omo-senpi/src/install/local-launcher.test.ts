@@ -135,6 +135,77 @@ describe("local omo launcher", () => {
       })
     })
 
+    // #13232: the checkout moved past a plugin input since the last build. The launcher says so once and still starts.
+    describe("#when the checkout's plugin build is older than its plugin sources", () => {
+      const STAMP_MODULE = fileURLToPath(new URL("../../plugin/scripts/build-stamp.mjs", import.meta.url))
+
+      function git(cwd: string, ...args: string[]): string {
+        const result = spawnSync("git", args, { cwd, encoding: "utf8" })
+        if (result.status !== 0) throw new Error(`git ${args.join(" ")} failed: ${result.stderr}`)
+        return result.stdout.trim()
+      }
+
+      function commitAll(root: string, message: string): void {
+        git(root, "add", "-A")
+        git(root, "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "-m", message)
+      }
+
+      // A built checkout stamped at its first commit, then a commit that changes a plugin input.
+      function staleCheckout(withStampModule: boolean): { home: string; launcher: string } {
+        const home = makeHome()
+        const pluginPath = join(home, "packages", "omo-senpi", "plugin")
+        const source = join(home, "packages", "omo-senpi", "src", "index.ts")
+        mkdirSync(join(pluginPath, "extensions"), { recursive: true })
+        mkdirSync(join(pluginPath, "scripts"), { recursive: true })
+        mkdirSync(dirname(source), { recursive: true })
+        writeFileSync(join(home, ".gitignore"), "/packages/omo-senpi/plugin/extensions/\n/packages/omo-senpi/plugin/.build-stamp\n")
+        writeFileSync(source, "export const a = 1\n")
+        writeFileSync(
+          join(home, "packages", "omo-senpi", "bundle-inputs.json"),
+          `${JSON.stringify({ version: 1, files: ["packages/omo-senpi/src/index.ts"], directories: [] })}\n`,
+        )
+        if (withStampModule) writeFileSync(join(pluginPath, "scripts", "build-stamp.mjs"), readFileSync(STAMP_MODULE))
+        git(home, "init", "-q", "-b", "dev")
+        commitAll(home, "base")
+        writeFileSync(join(pluginPath, "extensions", "omo.js"), "")
+        writeFileSync(
+          join(pluginPath, ".build-stamp"),
+          `${JSON.stringify({ version: 1, commit: git(home, "rev-parse", "HEAD") })}\n`,
+        )
+        writeFileSync(source, "export const a = 2\n")
+        commitAll(home, "change a plugin input")
+        const engine = join(home, "engine.mjs")
+        writeFileSync(engine, "process.stdout.write('ENGINE STARTED')\n")
+        const launcher = join(home, "omo.mjs")
+        writeFileSync(launcher, renderLocalLauncher({ ...BASE, pluginPath, senpiCliPath: engine }))
+        return { home, launcher }
+      }
+
+      test("#then it warns once naming the build command and still starts the engine", () => {
+        const { home, launcher } = staleCheckout(true)
+
+        const run = spawnSync(process.execPath, [launcher, "--version"], { encoding: "utf8" })
+        rmSync(home, { recursive: true, force: true })
+
+        expect(run.status).toBe(0)
+        expect(run.stdout).toContain("ENGINE STARTED")
+        expect(run.stderr.match(/bun run build:senpi-plugin/g)?.length).toBe(1)
+      })
+
+      // The launcher is installed once and outlives the checkout's version: a checkout switched to a commit before
+      // #13232 has no stamp module, and the launcher must start exactly as it did before.
+      test("#then a checkout without the stamp module starts as before, with no warning", () => {
+        const { home, launcher } = staleCheckout(false)
+
+        const run = spawnSync(process.execPath, [launcher, "--version"], { encoding: "utf8" })
+        rmSync(home, { recursive: true, force: true })
+
+        expect(run.status).toBe(0)
+        expect(run.stdout).toContain("ENGINE STARTED")
+        expect(run.stderr).toBe("")
+      })
+    })
+
     describe("#when it is uninstalled", () => {
       test("#then only a generated launcher is removed", () => {
         const home = makeHome()

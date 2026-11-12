@@ -9,6 +9,7 @@
     "^packages/omo-native/bin/lib/service-auth\\.generated\\.js$",
     "^packages/omo-senpi/plugin/scripts/install\\.mjs$",
     "^packages/omo-native/bin/lib/reflection-lock\\.generated\\.js$",
-    "^packages/omo-native/bin/lib/brand-logo\\.generated\\.js$"
+    "^packages/omo-native/bin/lib/brand-logo\\.generated\\.js$",
+    "^packages/omo-senpi/plugin/\\.build-stamp$"
   ]
 }

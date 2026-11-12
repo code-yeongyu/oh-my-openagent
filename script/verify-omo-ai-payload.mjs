@@ -73,6 +73,8 @@ const FORBIDDEN_RULES = [
   { name: "source directory", matches: (path) => path.startsWith("src/") },
   { name: "test directory", matches: (path) => path.startsWith("test/") },
   { name: "test file", matches: (path) => path.includes(".test.") },
+  // The commit a checkout build was made from (#13232): a published package has no checkout to compare it with.
+  { name: "checkout build stamp", matches: (path) => path === "plugin/.build-stamp" },
 ]
 
 const MAX_UNPACKED_SIZE = 30 * 1024 * 1024

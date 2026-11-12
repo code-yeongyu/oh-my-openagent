@@ -315,4 +315,20 @@ describe("omo-ai payload verifier", () => {
       })
     })
   })
+
+  // #13232: the stamp records the commit a checkout build was made from; a published package has no checkout.
+  describe("#given a packed payload that carries a checkout build stamp", () => {
+    test("#then it fails naming plugin/.build-stamp as a forbidden path", () => {
+      // given
+      const payload = [...PACKED_ARTIFACTS, ...skillPaths(PACKED_SKILL_COUNT), "plugin/.build-stamp"]
+
+      // when
+      const run = runVerifierOnPayload(payload)
+
+      // then
+      expect(run.output).toContain("forbidden paths")
+      expect(run.output).toContain("plugin/.build-stamp")
+      expect(run.exitCode).toBe(1)
+    })
+  })
 })
