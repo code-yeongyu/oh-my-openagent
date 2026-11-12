@@ -2151,6 +2151,7 @@
         "script/patch-node-require-shim.ts",
         "script/print-release-notes.ts",
         "script/qa/computer/pool/windows-full.ts",
+        "script/qa/computer/pool/xorg-uinput-probe.ts",
         "script/qa/desktop/hyprland.ts",
         "script/qa/desktop/kwin.ts",
         // run by path as the live GNOME Wayland window-input QA (docs/guide/computer-use.md)
