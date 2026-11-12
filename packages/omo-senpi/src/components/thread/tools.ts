@@ -70,6 +70,8 @@ import {
 
 /** How many keys a tool surface keeps for recovering receipts whose admission reply was lost. */
 export const RECEIPT_RECOVERY_MAX_KEYS = 4_096
+/** The longest untyped rename error kept as `local_name_unavailable_reason`, in code points; longer ones end in an ellipsis. */
+const RENAME_REASON_MAX_CHARS = 300
 /** A registered exact id needs no pre-engine view; the engine validates its one endpoint. */
 const PUBLISHED_SEND_VIEW: ThreadHostView = { sessions: [], hosts: [], disk: [] }
 /** A control tool's answer for a thread no engine holds live, on this device or another. */
@@ -432,7 +434,13 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
     } catch (error) {
       const refusal = controlRefusalOf(error)
       if (refusal !== undefined) return { code: refusal.code }
-      return { code: "host_unavailable", reason: error instanceof Error ? error.message : String(error) }
+      const message = [...(error instanceof Error ? error.message : String(error))]
+      // A failed RPC can carry a whole host reply frame (live-surface.ts), and the result is kept in the call's receipt.
+      const reason =
+        message.length > RENAME_REASON_MAX_CHARS
+          ? `${message.slice(0, RENAME_REASON_MAX_CHARS).join("")}…`
+          : message.join("")
+      return { code: "host_unavailable", reason }
     }
     return undefined
   }

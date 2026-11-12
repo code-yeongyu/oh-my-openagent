@@ -131,8 +131,9 @@ describe("an alias whose claim asks for a sign-in", () => {
   test("#given claim answers sign_in and the rename throws an untyped error #when thread_create sets an alias #then it answers ok naming the created thread with local_name_unavailable host_unavailable", async () => {
     const a = account({ claimDown: "signed_out" })
     const { run, setSessionName } = surface(a.remote)
+    // #13283 review LOW: the message the real rpc-host socket client throws (senpi-task socket-client.ts).
     setSessionName.mockImplementation(async () => {
-      throw new Error("endpoint socket reset")
+      throw new Error("thread RPC connection closed before the response arrived")
     })
     const result = await run("thread_create", { alias: "about-me" })
     expect(result).toMatchObject({
@@ -142,9 +143,59 @@ describe("an alias whose claim asks for a sign-in", () => {
       alias_unavailable: "sign_in",
       local_name_unavailable: "host_unavailable",
       // #13185 review LOW: the untyped error's message is kept, so a rename-path bug is traceable.
-      local_name_unavailable_reason: "endpoint socket reset",
+      local_name_unavailable_reason: "thread RPC connection closed before the response arrived",
     })
     expect(result.kind === "ok" && "thread" in result ? result.thread.name : "no thread").not.toBe("about-me")
     expect(setSessionName.mock.calls.map((call) => [call[0], call[1]])).toStrictEqual([["route-created", "about-me"]])
+  })
+
+  // #13283 review LOW: a thrown non-Error value is kept as its string form.
+  test("#given claim answers sign_in and the rename throws a non-Error value #when thread_create sets an alias #then the reason is its string form", async () => {
+    const a = account({ claimDown: "signed_out" })
+    const { run, setSessionName } = surface(a.remote)
+    setSessionName.mockImplementation(async () => {
+      throw "socket gone"
+    })
+    const result = await run("thread_create", { alias: "about-me" })
+    expect(result).toMatchObject({
+      kind: "ok",
+      local_name_unavailable: "host_unavailable",
+      local_name_unavailable_reason: "socket gone",
+    })
+  })
+
+  // #13283 review LOW: a failed RPC can carry a whole host reply frame (live-surface.ts); the reason is capped.
+  test("#given the rename fails with a message carrying a large host reply frame #when thread_create sets an alias #then the reason is capped with an ellipsis", async () => {
+    const a = account({ claimDown: "signed_out" })
+    const { run, setSessionName } = surface(a.remote)
+    const frame = `thread RPC request failed: ${JSON.stringify({ success: false, data: "x".repeat(5000) })}`
+    setSessionName.mockImplementation(async () => {
+      throw new Error(frame)
+    })
+    const result = await run("thread_create", { alias: "about-me" })
+    const reason =
+      result.kind === "ok" && "local_name_unavailable_reason" in result
+        ? result.local_name_unavailable_reason
+        : undefined
+    expect(typeof reason).toBe("string")
+    expect([...(reason ?? "")].length).toBe(301)
+    expect(reason?.startsWith("thread RPC request failed: ")).toBe(true)
+    expect(reason?.endsWith("…")).toBe(true)
+  })
+
+  // #13284 review LOW: the cap cuts on code points, so an astral character at the cut is kept whole, never split.
+  test("#given the rename error has an astral character across the cap #when thread_create sets an alias #then the cut keeps it whole", async () => {
+    const a = account({ claimDown: "signed_out" })
+    const { run, setSessionName } = surface(a.remote)
+    setSessionName.mockImplementation(async () => {
+      throw new Error(`${"a".repeat(299)}\u{1F600}${"b".repeat(100)}`)
+    })
+    const result = await run("thread_create", { alias: "about-me" })
+    const reason =
+      result.kind === "ok" && "local_name_unavailable_reason" in result
+        ? result.local_name_unavailable_reason
+        : undefined
+    expect(reason).toBe(`${"a".repeat(299)}\u{1F600}…`)
+    expect(reason?.isWellFormed()).toBe(true)
   })
 })
