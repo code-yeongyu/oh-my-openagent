@@ -127,6 +127,40 @@ describe("createEngineUsageSource", () => {
     expect(source.snapshot().claude?.windows?.[0]?.percent).toBe(55)
   })
 
+  test("#given an env pin beside claude CLI accounts #when a stored account reported later #then the env record is drawn", () => {
+    // given the pin names no stored account, and the CLI account's report is the newer one
+    const limits = engine([
+      record("my", 90, { reportedAt: "2026-10-19T03:59:00.000Z" }),
+      record("env", 10, { reportedAt: "2026-10-19T03:00:00.000Z" }),
+    ])
+    const source = createEngineUsageSource({
+      limits,
+      readCredentials: () => ({
+        auth: {
+          "anthropic-subscription": {
+            type: "oauth",
+            access: "claude-sdk-oauth-managed",
+            pinned: "env",
+            accounts: [
+              { name: "my", store: "claude-cli", dirId: "my" },
+              { name: "work", store: "claude-cli", dirId: "work" },
+            ],
+          },
+        },
+        pool: undefined,
+      }),
+      now: () => NOW,
+      onChange: () => {},
+    })
+
+    // then the newest stored account's quota stays off the panel
+    expect(source.snapshot().claude).toMatchObject({
+      account: "env",
+      accountState: "ok",
+      windows: [{ percent: 10 }, { percent: 3 }],
+    })
+  })
+
   test("#given a stored login with its own record and an env record #when the panel reads #then the stored login's record wins", () => {
     const limits = engine([record("env", 55), record("work", 41)])
     const source = createEngineUsageSource({
