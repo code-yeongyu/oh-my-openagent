@@ -20,6 +20,7 @@ function slowHost(firstAnswer: readonly HostEndpointReport[] = []) {
     exists: () => false,
     registry: async () => [],
     now: () => clock,
+    monotonic: () => clock,
     statusAll: async (): Promise<readonly HostEndpointReport[]> => {
       calls += 1
       // Only the first enumeration is slow; any later one answers at once, so a duplicate is counted, not hung on.
@@ -199,6 +200,7 @@ describe("live thread surface endpoint cache", () => {
           exists: () => false,
           registry: async () => [],
           now: () => clock,
+          monotonic: () => clock,
           enumerations,
           statusAll: async (): Promise<readonly HostEndpointReport[]> => {
             counter.calls += 1
@@ -267,6 +269,159 @@ describe("live thread surface endpoint cache", () => {
         release()
         await pending
       }
+    })
+  })
+
+  describe("review follow-ups of #13231 and #13236", () => {
+    test("#given an enumeration still running #when only the wall clock jumps forward past the deadline #then the next caller shares it instead of starting a second one", async () => {
+      // given (L1: the deadline is timed on the monotonic clock, so a wall-clock jump is not elapsed time)
+      let wall = 1_000
+      let calls = 0
+      const pending: Array<() => void> = []
+      const surface = createLiveThreadSurface(
+        {} as never,
+        {
+          env: { SENPI_RPC_SOCKET: "/tmp/omo-enum-cache-missing.sock" },
+          exists: () => false,
+          registry: async () => [],
+          now: () => wall,
+          monotonic: () => 1_000,
+          statusAll: async (): Promise<readonly HostEndpointReport[]> => {
+            calls += 1
+            if (calls === 1) await new Promise<void>((done) => pending.push(done))
+            return []
+          },
+        } as never,
+      )
+      const first = surface.listView({ offline: true })
+      for (let turn = 0; turn < 100 && pending.length === 0; turn++) await Promise.resolve()
+      expect(pending).toHaveLength(1)
+
+      // when
+      wall += 10 * 60_000
+      const second = surface.listView({ offline: true })
+      for (let turn = 0; turn < 20; turn++) await Promise.resolve()
+      const callsAfterJump = calls
+      for (const done of pending.splice(0)) done()
+      await Promise.all([first, second])
+
+      // then
+      expect(callsAfterJump).toBe(1)
+    })
+
+    test("#given an abandoned enumeration that answers after a newer one #when its late answer names a socket the newer one recorded as another kind #then the newer kind stays and the old caller still gets its list", async () => {
+      // given (L2)
+      const socket = "/tmp/omo-enum-kind-owner.sock"
+      let clock = 1_000
+      let calls = 0
+      const secretReads: string[] = []
+      let releaseOld: () => void = () => {}
+      const surface = createLiveThreadSurface(
+        {} as never,
+        {
+          env: { SENPI_RPC_SOCKET: "/tmp/omo-enum-cache-missing.sock" },
+          exists: (path: string) => path === socket,
+          registry: async () => [],
+          now: () => clock,
+          monotonic: () => clock,
+          readSecret: (path: string) => {
+            secretReads.push(path)
+            throw new Error("no secret in this test")
+          },
+          statusAll: async (): Promise<readonly HostEndpointReport[]> => {
+            calls += 1
+            if (calls === 1) {
+              await new Promise<void>((done) => {
+                releaseOld = done
+              })
+              return [{ socket, reachable: false, session_paths: [], endpoint_kind: "rpc_host" }]
+            }
+            return [{ socket, reachable: false, session_paths: [], endpoint_kind: "tui" }]
+          },
+        } as never,
+      )
+      const old = surface.listView({ offline: true })
+      for (let turn = 0; turn < 100 && calls === 0; turn++) await Promise.resolve()
+      clock += HOST_ENDPOINTS_ENUMERATION_DEADLINE_MS
+      await within(surface.listView({ offline: true }), "the view that replaced the abandoned enumeration")
+
+      // when
+      releaseOld()
+      const late = await old
+      secretReads.length = 0
+      await surface
+        .endpoint(socket)
+        .getState("probe")
+        .catch(() => undefined)
+
+      // then
+      expect(late.hosts.map((host) => [host.socket, host.endpoint_kind])).toContainEqual([socket, "rpc_host"])
+      expect(secretReads).toEqual([socket])
+    })
+
+    test("#given a surface whose env moves to another agent dir between calls #when it lists again #then the new agent dir is enumerated under its own key and the old entry keeps the old answer", async () => {
+      // given (L3)
+      const enumerations = new Map<string, never>()
+      const env: Record<string, string> = {
+        SENPI_RPC_SOCKET: "/tmp/omo-enum-cache-missing.sock",
+        OMO_CODING_AGENT_DIR: "/tmp/omo-enum-env-a",
+      }
+      let calls = 0
+      const surface = createLiveThreadSurface(
+        {} as never,
+        {
+          env,
+          exists: () => false,
+          registry: async () => [],
+          now: () => 1_000,
+          monotonic: () => 1_000,
+          enumerations,
+          statusAll: async (): Promise<readonly HostEndpointReport[]> => {
+            calls += 1
+            return []
+          },
+        } as never,
+      )
+      await surface.listView({ offline: true })
+
+      // when
+      env.OMO_CODING_AGENT_DIR = "/tmp/omo-enum-env-b"
+      await surface.listView({ offline: true })
+
+      // then
+      expect(calls).toBe(2)
+      const keys = [...enumerations.keys()]
+      expect(keys).toHaveLength(2)
+      expect(keys.filter((key) => key.includes("/tmp/omo-enum-env-a"))).toHaveLength(1)
+      expect(keys.filter((key) => key.includes("/tmp/omo-enum-env-b"))).toHaveLength(1)
+    })
+
+    test("#given two surfaces with the real engine runner whose envs launch different engines #when both list over one shared map #then each engine gets its own entry", async () => {
+      // given (L4: no statusAll, so the key carries the engine launch; SENPI_BIN names it without any engine installed)
+      const enumerations = new Map<string, never>()
+      const surfaceFor = (engine: string) =>
+        createLiveThreadSurface(
+          {} as never,
+          {
+            env: {
+              SENPI_RPC_SOCKET: "/tmp/omo-enum-cache-missing.sock",
+              OMO_CODING_AGENT_DIR: "/tmp/omo-enum-engine",
+              SENPI_BIN: engine,
+            },
+            exists: () => false,
+            registry: async () => [],
+            now: () => 1_000,
+            monotonic: () => 1_000,
+            enumerations,
+          } as never,
+        )
+
+      // when
+      await within(surfaceFor("/bin/true").listView({ offline: true }), "a view enumerated by /bin/true")
+      await within(surfaceFor("/bin/false").listView({ offline: true }), "a view enumerated by /bin/false")
+
+      // then
+      expect(enumerations.size).toBe(2)
     })
   })
 })
