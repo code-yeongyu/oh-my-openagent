@@ -643,9 +643,14 @@ function charged(context: Context, path: "open" | "disclaim" | "plain") {
   }
 }
 
-async function grantPresent(env: HostEnv, log: EvidenceLog): Promise<boolean> {
-  const result = await runLeg(env, log, "gui", "open-path", currentApp(env))
-  return result.report?.preflight.accessibility === 1
+// the grant-check leg: null when the helper bundle holds Accessibility, else the row's outcome
+async function grantCheck(env: HostEnv, log: EvidenceLog): Promise<Measured | null> {
+  return grantGate(await runLeg(env, log, "gui", "open-path", currentApp(env)))
+}
+
+// pure (RED stub: keeps the old behaviour)
+function grantGate(result: LegResult): Measured | null {
+  return result.report?.preflight.accessibility === 1 ? null : AWAITING_H3
 }
 
 const AWAITING_H3: Measured = {
@@ -656,7 +661,8 @@ const AWAITING_H3: Measured = {
 
 function clientType(path: "open" | "disclaim") {
   return async (env: HostEnv, log: EvidenceLog): Promise<Measured> => {
-    if (!(await grantPresent(env, log))) return AWAITING_H3
+    const grant = await grantCheck(env, log)
+    if (grant) return grant
     const result = await runLeg(env, log, "gui", actionFor(path), currentApp(env))
     if (!result.report) return noReport(result, "client_type")
     const rows = await tccDb(env, log, "omo-computer-helper")
@@ -680,7 +686,8 @@ function clientType(path: "open" | "disclaim") {
 
 function swapSurvives(path: "open" | "disclaim") {
   return async (env: HostEnv, log: EvidenceLog): Promise<Measured> => {
-    if (!(await grantPresent(env, log))) return AWAITING_H3
+    const grant = await grantCheck(env, log)
+    if (grant) return grant
     const before = currentApp(env)
     const gen = await swapGeneration(env, `swap-${path}-${Date.now()}`)
     log.add("generation swap", { before, after: gen.app, cdhash: gen.cdhash, requirement: gen.requirement })
@@ -731,7 +738,8 @@ async function byNameOpen(env: HostEnv, log: EvidenceLog): Promise<Measured> {
 }
 
 async function rebuildSurvives(env: HostEnv, log: EvidenceLog): Promise<Measured> {
-  if (!(await grantPresent(env, log))) return AWAITING_H3
+  const grant = await grantCheck(env, log)
+  if (grant) return grant
   const p = paths(env)
   const readings: string[] = []
   const requirements: string[] = []
@@ -898,29 +906,8 @@ function untagged(route: "hypervisor-vkbd" | "vhid") {
     // bundle is its own responsible process and TCC checks Input Monitoring for the helper bundle's identity
     const leg = await runLeg(env, log, "gui", "open-path", currentApp(env), "", seconds)
     const tapText = leg.tapFile ? await qaRead(env, leg.tapFile) : null
-    const events = (tapText ?? "")
-      .split("\n")
-      .filter(Boolean)
-      .map((l) => JSON.parse(l) as TapEvent)
-    log.add("tap events", events)
-    const keys = events.filter((e) => e.type === 10)
-    if (events.some((e) => e.error))
-      return {
-        verdict: "UNMEASURED",
-        measured: { launchExit: leg.launch.code },
-        note: "the session tap could not be created inside the helper bundle launched by path (its own responsible process): Input Monitoring is not granted to the helper bundle",
-      }
-    if (keys.length === 0)
-      return { verdict: "NO_EVENT", measured: { events: events.length }, note: "no keyDown reached the session tap" }
-    return {
-      verdict: `ROUTE=${classifyTap(keys)}`,
-      measured: {
-        keyDowns: keys.length,
-        sourcePids: [...new Set(keys.map((e) => e.sourcePid))].join(","),
-        stateIds: [...new Set(keys.map((e) => e.sourceStateId))].join(","),
-      },
-      note: "listen-only kCGSessionEventTap inside the helper bundle launched by path (open <bundle> --args tap; the bundle is its own responsible process); untagged = kCGEventSourceUnixProcessID 0 on every keyDown",
-    }
+    log.add("tap file", tapText === null ? "(not read)" : tapText)
+    return tapOutcome(tapText, leg.launch.code)
   }
 }
 
@@ -929,6 +916,32 @@ interface TapEvent {
   sourcePid?: number
   sourceStateId?: number
   error?: string
+}
+
+// pure: the untagged-route verdict from the tap file text (null = the file could not be read) (RED stub: old behaviour)
+function tapOutcome(tapText: string | null, launchCode: number): Measured {
+  const events = (tapText ?? "")
+    .split("\n")
+    .filter(Boolean)
+    .map((l) => JSON.parse(l) as TapEvent)
+  const keys = events.filter((e) => e.type === 10)
+  if (events.some((e) => e.error))
+    return {
+      verdict: "UNMEASURED",
+      measured: { launchExit: launchCode },
+      note: "the session tap could not be created inside the helper bundle launched by path (its own responsible process): Input Monitoring is not granted to the helper bundle",
+    }
+  if (keys.length === 0)
+    return { verdict: "NO_EVENT", measured: { events: events.length }, note: "no keyDown reached the session tap" }
+  return {
+    verdict: `ROUTE=${classifyTap(keys)}`,
+    measured: {
+      keyDowns: keys.length,
+      sourcePids: [...new Set(keys.map((e) => e.sourcePid))].join(","),
+      stateIds: [...new Set(keys.map((e) => e.sourceStateId))].join(","),
+    },
+    note: "listen-only kCGSessionEventTap inside the helper bundle launched by path (open <bundle> --args tap; the bundle is its own responsible process); untagged = kCGEventSourceUnixProcessID 0 on every keyDown",
+  }
 }
 
 // pure: untagged = every keyDown carries kCGEventSourceUnixProcessID 0
@@ -1173,29 +1186,63 @@ async function measureRow(
 
 // ---------------------------------------------------------------------------------------------- cleanup
 
+type CleanupStep = [label: string, step: () => Promise<string>]
+
+// runs every diagnostic step, then every teardown step (RED stub: a throwing step stops the rest)
+async function runCleanupSteps(diagnostics: CleanupStep[], teardown: CleanupStep[]): Promise<string[]> {
+  const receipts: string[] = []
+  for (const [, step] of [...diagnostics, ...teardown]) receipts.push(await step())
+  return receipts
+}
+
 async function cleanup(env: HostEnv) {
   const p = paths(env)
-  const receipts: string[] = []
+  const diagnostics: CleanupStep[] = []
   for (const dir of [p.generations, join(env.work, "rebuild"), join(env.work, "prompt-probe")]) {
     if (!existsSync(dir)) continue
     const apps = dir === p.generations ? readdirSync(dir).map((g) => join(dir, g, APP_NAME)) : [join(dir, APP_NAME)]
     for (const app of apps) {
-      const out = await run(asQa(env, [LSREGISTER, "-u", app]))
-      receipts.push(`lsregister -u ${basename(join(app, "..", ".."))}/${basename(join(app, ".."))}: exit ${out.code}`)
+      const name = `lsregister -u ${basename(join(app, "..", ".."))}/${basename(join(app, ".."))}`
+      diagnostics.push([name, async () => `${name}: exit ${(await run(asQa(env, [LSREGISTER, "-u", app]))).code}`])
     }
   }
-  const reset = await run(asQa(env, ["tccutil", "reset", "Accessibility", PROMPT_BUNDLE_ID]))
-  receipts.push(`tccutil reset Accessibility ${PROMPT_BUNDLE_ID}: exit ${reset.code}`)
-  const jobs = must(await run(asQa(env, ["launchctl", "list"])), "launchctl list")
-  const left = jobs.stdout.split("\n").filter((l) => l.includes("ai.sisyphuslabs.sp-t."))
-  receipts.push(`leftover sp-t launchd jobs: ${left.length}`)
-  const procs = await run(["pgrep", "-f", "omo-computer-helper.app/Contents/MacOS/omo-computer-engine"])
-  receipts.push(`procs ${pgrepFound(procs) ? procs.stdout.split("\n").length : 0}`)
-  // the results directory belongs to the QA account (0700), so it is removed as that account first
-  const results = env.sameUser ? { code: 0 } : await run(asQa(env, ["rm", "-rf", p.results]))
-  receipts.push(`results dir removed as the QA account: exit ${results.code}`)
-  rmSync(env.work, { recursive: true, force: true })
-  receipts.push(existsSync(env.work) ? `dir STILL PRESENT ${env.work}` : `dir REMOVED ${env.work}`)
+  diagnostics.push(
+    [
+      "tccutil reset",
+      async () =>
+        `tccutil reset Accessibility ${PROMPT_BUNDLE_ID}: exit ${(await run(asQa(env, ["tccutil", "reset", "Accessibility", PROMPT_BUNDLE_ID]))).code}`,
+    ],
+    [
+      "launchctl list",
+      async () => {
+        const jobs = must(await run(asQa(env, ["launchctl", "list"])), "launchctl list")
+        return `leftover sp-t launchd jobs: ${jobs.stdout.split("\n").filter((l) => l.includes("ai.sisyphuslabs.sp-t.")).length}`
+      },
+    ],
+    [
+      "pgrep",
+      async () => {
+        const procs = await run(["pgrep", "-f", "omo-computer-helper.app/Contents/MacOS/omo-computer-engine"])
+        return `procs ${pgrepFound(procs) ? procs.stdout.split("\n").length : 0}`
+      },
+    ],
+  )
+  const teardown: CleanupStep[] = [
+    [
+      // the results directory belongs to the QA account (0700), so it is removed as that account first
+      "results dir",
+      async () =>
+        `results dir removed as the QA account: exit ${env.sameUser ? 0 : (await run(asQa(env, ["rm", "-rf", p.results]))).code}`,
+    ],
+    [
+      "work dir",
+      async () => {
+        rmSync(env.work, { recursive: true, force: true })
+        return existsSync(env.work) ? `dir STILL PRESENT ${env.work}` : `dir REMOVED ${env.work}`
+      },
+    ],
+  ]
+  const receipts = await runCleanupSteps(diagnostics, teardown)
   receipts.push(
     "kept: the T3 identity and the H3 grants to the helper bundle (later rows need them; the final teardown removes them)",
   )
@@ -1206,7 +1253,7 @@ async function cleanup(env: HostEnv) {
 
 // --self-test: the pure classification logic and the row table against fixed inputs; runs on any host, exits 1 on a
 // mismatch. It is the probe's unit coverage (the row's write scope allows no separate test file).
-function selfTest(): number {
+async function selfTest(): Promise<number> {
   const report = (over: Partial<ProbeReport>): ProbeReport => ({
     marker: "m",
     pid: 500,
@@ -1373,6 +1420,69 @@ function selfTest(): number {
       true,
     ],
   )
+  const legWith = (report: ProbeReport | null, code: number): LegResult => ({
+    ...leg,
+    report,
+    launch: { ...leg.launch, code },
+  })
+  const verdictOf = (m: Measured | null) => (m ? m.verdict : "granted")
+  const order: string[] = []
+  const cleanupReceipts = await runCleanupSteps(
+    [
+      ["diag ok", async () => (order.push("diag ok"), "diag ok")],
+      [
+        "launchctl list",
+        async () => {
+          order.push("diag fails")
+          throw new Error("launchctl list exited 5: boom")
+        },
+      ],
+    ],
+    [["results dir", async () => (order.push("teardown"), "results dir removed")]],
+  ).catch((error: unknown) => [`threw: ${error instanceof Error ? error.message : String(error)}`])
+  cases.push(
+    ["tap: unreadable file after a failed launch is NO_LAUNCH", tapOutcome(null, 1).verdict, "NO_LAUNCH"],
+    ["tap: unreadable file after a launch is UNMEASURED, never NO_EVENT", tapOutcome(null, 0).verdict, "UNMEASURED"],
+    [
+      "tap: file read with no keyDown is NO_EVENT",
+      tapOutcome('{"tapReady":true}\n{"tapDone":true}', 0).verdict,
+      "NO_EVENT",
+    ],
+    [
+      "tap: tap creation failed is UNMEASURED",
+      tapOutcome('{"error":"tap_create_failed"}\n{"tapDone":true}', 0).verdict,
+      "UNMEASURED",
+    ],
+    ["tap: untagged keyDowns", tapOutcome('{"type":10,"sourcePid":0}\n{"tapDone":true}', 0).verdict, "ROUTE=untagged"],
+    [
+      "grant: report with Accessibility",
+      verdictOf(
+        grantGate(legWith(report({ preflight: { accessibility: 1, screenRecording: 0, inputMonitoring: 0 } }), 0)),
+      ),
+      "granted",
+    ],
+    [
+      "grant: report without Accessibility is WAITING-PERSON",
+      verdictOf(grantGate(legWith(report({}), 0))),
+      "WAITING-PERSON",
+    ],
+    [
+      "grant: no report after a failed launch is NO_LAUNCH, never not-granted",
+      verdictOf(grantGate(legWith(null, 1))),
+      "NO_LAUNCH",
+    ],
+    [
+      "grant: no report after a timeout is NO_LAUNCH, never not-granted",
+      verdictOf(grantGate(legWith(null, 0))),
+      "NO_LAUNCH",
+    ],
+    [
+      "cleanup: a failed diagnostic is a receipt and teardown still runs",
+      cleanupReceipts,
+      ["diag ok", "launchctl list FAILED: launchctl list exited 5: boom", "results dir removed"],
+    ],
+    ["cleanup: steps ran in order, teardown last", order, ["diag ok", "diag fails", "teardown"]],
+  )
   let failed = 0
   for (const [name, got, want] of cases) {
     const ok = JSON.stringify(got) === JSON.stringify(want)
@@ -1395,7 +1505,7 @@ async function main(argv: string[]): Promise<number> {
   }
 
   if (flag("--leg")) return leg(value("--leg") ?? "")
-  if (flag("--self-test")) return selfTest()
+  if (flag("--self-test")) return await selfTest()
   if (flag("--print-skeleton")) {
     process.stdout.write(ledgerText(ROWS.map(skeletonLine)))
     return 0
