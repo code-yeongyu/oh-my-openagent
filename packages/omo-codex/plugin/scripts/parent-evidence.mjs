@@ -3,6 +3,8 @@ import crypto from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
 
+export { sourceReadPresent } from "./source-read-output.mjs"
+
 export {
   nativeReviewEvidence,
   nativeToolOutputEvidence,

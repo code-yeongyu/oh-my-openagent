@@ -105,6 +105,12 @@ owns those artifacts. Request a JSON object with a nonempty string `status` and
 arrays `findings` and `gaps` in commentary and final output. Required bootstrap
 messages may precede the first valid commentary.
 
+For a tool-backed review, require the first valid structured commentary and the
+first authorized source-read tool call in the same assistant response. Progress
+alone is not the final deliverable. Put mandatory skipped-work/risk statements
+inside final JSON string fields where the role permits; do not suppress required
+reporting, strip suffixes from captured output or waive a capture failure.
+
 The optional parent API also exports:
 
 - `nativeReviewEvidence(lines, agentId, turnId, phase)` captures the first valid
@@ -124,8 +130,26 @@ The optional parent API also exports:
   the command was read-only or that its output satisfies the task. The parent
   must inspect the actual tool operation and independently check the source/read
   result, allowed scope, modality and permissions.
+- `sourceReadPresent(output, source)` checks source text only after that native
+  call/output binding. It accepts plain native text or complete `input_text`
+  blocks containing a CLI envelope with string `chunk_id`, numeric zero
+  `exit_code` and string `output`. It checks that successful output contains the
+  exact source text (ignoring only trailing source whitespace), without mining
+  nested JSON or combining text across blocks. This is a source-read check, not
+  proof that a command was authorized or that a review is correct; keep the
+  original output bytes and independent source/hash checks.
 
 These are observations, not admission, a watchdog, a scheduler or acceptance.
+Native transcript retention does not prove model-visible delivery: the client
+may truncate a tool result again when projecting it into the next request.
+Larger inner/outer tool-output limits do not override that later context policy.
+Compare the actor/call-bound continuation input when available. For long sources,
+prepare contiguous byte-preserving chunks before dispatch and read each in a
+separate bounded tool response. Pin the source and ordered chunk hashes; the
+checker must bind every call/output pair, verify each complete output against
+its chunk and reassemble the exact source hash. Reserve enough response/tool
+allowance for every part before dispatch. A completed capture or source-read
+check never changes an explicitly incomplete review into a completed assessment.
 The parent must read real native transcript bytes; do not reconstruct events,
 forge actor/turn bindings or replace a transcript with parsed/pretty text.
 Malformed or unsupported structured output fails closed. Preserve mandatory
@@ -142,7 +166,7 @@ executable there and pass its absolute path as data/argv; do not evaluate
 The import-only parent API is separate from the CLI entrypoint.
 
 Before dispatch, copy `native-review-capture.mjs`, `native-review-evidence.mjs`,
-`parent-evidence.mjs` and `entry-guard.mjs` from the resolved plugin's `scripts/`
+`parent-evidence.mjs`, `source-read-output.mjs` and `entry-guard.mjs` from the resolved plugin's `scripts/`
 into the task-owned evidence directory. Copy the external adapter's watcher
 there too, pin all approved hashes and bind the copies as task inputs. Run the
 local watcher, and use the same local helper in the independent parent checker.
@@ -170,7 +194,9 @@ Test the **complete** capture-to-checker CLI/argv/artifact pipeline offline befo
 spending a native setup attempt, using retained copies and positive/rejection
 cases. Include both native output families, actor/turn/phase/call-ID mismatches,
 altered proofs/text/hashes and event/observation budget failures. A syntax check
-or isolated parser test is insufficient. Bind the exact tested checker bytes.
+alone is insufficient. Include plain and CLI-wrapped reads, nonzero exits,
+malformed envelopes, wrong-source and nested/prose-wrapped JSON rejection cases.
+An isolated parser test is insufficient. Bind the exact tested checker bytes.
 Require successful preparation and valid descriptor/inputs before dependent
 ledger initialization or collection. Offline replay is not new native proof and
 does not authorize retrying or accepting a historical failed run.

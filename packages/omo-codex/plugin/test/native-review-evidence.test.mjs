@@ -60,6 +60,30 @@ function fixture(kind = "custom_tool_call") {
 const lines = (events) => events.map((value) => JSON.stringify(value))
 const capture = (events, phase = "commentary") => evidence.nativeReviewEvidence(lines(events), actor, turn, phase)
 
+test("#given a bound native CLI envelope #when checking a read #then only successful complete text is evidence", () => {
+  const source = "D1: preserve schema.\nD2: add locale.\n"
+  const envelope = (extra = {}) => JSON.stringify({ chunk_id: "read", exit_code: 0, output: source, ...extra })
+  for (const kind of ["function_call", "custom_tool_call"]) {
+    const events = fixture(kind)
+    events[6].payload.output = [{ type: "input_text", text: "native tool metadata" }, { type: "input_text", text: envelope() }]
+    const bound = evidence.nativeToolOutputEvidence(lines(events), actor, turn, callId)
+    assert.equal(evidence.sourceReadPresent(bound.output, source), true)
+  }
+  assert.equal(evidence.sourceReadPresent(source, source), true)
+  assert.equal(evidence.sourceReadPresent('{"value":1}\n', '{"value":1}\n'), true)
+  assert.equal(evidence.sourceReadPresent('{"nested":"one-line source"}', 'one-line source'), false)
+  assert.equal(evidence.sourceReadPresent("anything", "\n"), false)
+  assert.equal(evidence.sourceReadPresent([{ type: "input_text", text: source }], source), true)
+  for (const output of [
+    envelope({ exit_code: 1 }),
+    envelope({ output: "different source" }),
+    JSON.stringify({ nested: JSON.parse(envelope()) }),
+    "prefix " + envelope(),
+    JSON.stringify({ ...JSON.parse(envelope()), exit_code: "0" }),
+    [{ type: "image", text: source }],
+  ]) assert.equal(evidence.sourceReadPresent(output, source), false)
+})
+
 test("#given bootstrap and structured native commentary #when captured #then exact first-valid bytes and hashes survive", () => {
   const events = fixture(),
     raw = lines(events),
@@ -173,6 +197,7 @@ function cliFixture(t) {
   for (const name of [
     "native-review-capture.mjs",
     "native-review-evidence.mjs",
+    "source-read-output.mjs",
     "parent-evidence.mjs",
     "entry-guard.mjs",
   ])
@@ -224,6 +249,13 @@ test("#given the normal CLI #when capture and independent verification run #then
   const output = f.run("tool-output", f.file, actor, turn, callId)
   assert.equal(output.status, 0, output.stderr)
   assert.deepEqual(JSON.parse(output.stdout).output, [{ type: "input_text", text: "opaque-marker\n" }])
+  const source = "first source line\nsecond source line\n"
+  const events = fixture()
+  events[6].payload.output = [{ type: "input_text", text: JSON.stringify({ chunk_id: "read", exit_code: 0, output: source }) }]
+  fs.writeFileSync(f.file, lines(events).join("\n") + "\n")
+  const wrapped = f.run("tool-output", f.file, actor, turn, callId)
+  assert.equal(wrapped.status, 0, wrapped.stderr)
+  assert.equal(evidence.sourceReadPresent(JSON.parse(wrapped.stdout).output, source), true)
 })
 test("#given an invalid CLI request or native file #when executed #then exit is nonzero without false proof", (t) => {
   const f = cliFixture(t)
