@@ -25,7 +25,10 @@ const lookup = (name: string, element: FixtureElement): string[] => {
   const missing = `fixture element "${element.title}" not found`
   return [
     `const ${name} = (await win.find(${JSON.stringify(query)}))[0]`,
-    `if (${name} === undefined) return { kind: "error", message: ${JSON.stringify(missing)} }`,
+    `if (${name} === undefined) {`,
+    `  const seen = (await win.find({ limit: 40 })).map((entry) => \`${"${entry.role}"}:${'${entry.title ?? ""}'}\`)`,
+    `  return { kind: "error", message: ${JSON.stringify(missing + "; the window exposes ")} + JSON.stringify(seen) }`,
+    "}",
   ]
 }
 

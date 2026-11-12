@@ -33,3 +33,10 @@ Until an OS has an observer, every disturbance signal of its cells reads `not_ob
 ## Findings so far
 
 - The shipped runtime never reports whether input was sent with a refusal, so every refusal is recorded with `nothingSent: false`.
+- Windows, native toolkit, the release's own answers (hosted run at `5eb8f0afcb`):
+  - Every foreground cell except the accessibility press is refused with `ControlRequired` (9 cells). The shipped default refuses foreground control when no person is there to approve it.
+  - Background typing into a text field through accessibility is refused with `AxUnsupported`.
+  - Setting a text field's value through accessibility is refused with `AxFailed`, in background and foreground.
+  - A background pixel drag in the list is refused with `InputFailed`.
+
+Only the release's own answers about actions it attempted are recorded here. Failures caused by the test harness are not, nor are results that are still being checked.

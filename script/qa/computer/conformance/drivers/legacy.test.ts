@@ -114,6 +114,7 @@ describe("legacy driver against the shipped run facade", () => {
       const sent: Sent[] = []
       const result = await createLegacyDriver({
         session,
+        settleMs: 0,
         tool: { ready: fakeTool(sent) },
         fixtures: { ready: fixtures(1) },
         observer: { ready: observer },
@@ -129,6 +130,7 @@ describe("legacy driver against the shipped run facade", () => {
       const sent: Sent[] = []
       await createLegacyDriver({
         session,
+        settleMs: 0,
         tool: { ready: fakeTool(sent) },
         fixtures: { ready: fixtures(1) },
         observer: { ready: observer },
@@ -154,6 +156,7 @@ describe("legacy driver against the shipped run facade", () => {
     const sent: Sent[] = []
     await createLegacyDriver({
       session,
+      settleMs: 0,
       tool: { ready: fakeTool(sent) },
       fixtures: { ready: fixtures(1) },
       observer: { ready: observer },
@@ -166,6 +169,7 @@ describe("legacy driver against the shipped run facade", () => {
     if (cell === undefined) throw new Error("empty catalog")
     const result = await createLegacyDriver({
       session,
+      settleMs: 0,
       tool: { ready: fakeTool([], "BackgroundUnavailable") },
       fixtures: { ready: fixtures(0) },
       observer: { ready: observer },
@@ -184,12 +188,14 @@ describe("legacy driver against the shipped run facade", () => {
     const tool = fakeTool([])
     const noFixture = await createLegacyDriver({
       session,
+      settleMs: 0,
       tool: { ready: tool },
       fixtures: { unavailable: "no fixture" },
       observer: { ready: observer },
     }).runCell(cell)
     const noToolkit = await createLegacyDriver({
       session,
+      settleMs: 0,
       tool: { ready: tool },
       fixtures: { ready: { ...fixtures(1), target: () => ({ unavailable: "no electron app" }) } },
       observer: { ready: observer },
@@ -205,6 +211,7 @@ describe("legacy driver against the shipped run facade", () => {
     const sent: Sent[] = []
     const result = await createLegacyDriver({
       session,
+      settleMs: 0,
       tool: { ready: fakeTool(sent) },
       fixtures: { ready: fixtures(cell.oracle.equals) },
       observer: { unavailable: "no recorder for this OS" },
@@ -223,6 +230,7 @@ describe("legacy driver against the shipped run facade", () => {
     const sent: Sent[] = []
     const result = await createLegacyDriver({
       session,
+      settleMs: 0,
       tool: { ready: fakeTool(sent) },
       fixtures: { ready: { ...fixtures(0), target: () => ({ ...TARGET, title: "Missing" }) } },
       observer: { ready: observer },

@@ -74,7 +74,7 @@ jobs:
           apt() { sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get "$@"; }
           for attempt in 1 2 3; do
             if apt update && apt install -y --no-install-recommends xserver-xorg-core xserver-xorg-video-dummy \
-              x11-utils dbus-x11 at-spi2-core python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1; then
+              x11-utils dbus-x11 at-spi2-core python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1 openbox; then
               echo "apt attempt ${attempt} ok"; exit 0
             fi
             echo "apt attempt ${attempt} failed"; sleep $((attempt * 15))
@@ -93,6 +93,10 @@ jobs:
           sudo Xorg :99 -noreset -nolisten tcp -config "$qa/xorg.conf" -logfile "$qa/xorg.log" &
           for _ in $(seq 1 50); do DISPLAY=:99 xdpyinfo >/dev/null 2>&1 && break; sleep 0.2; done
           DISPLAY=:99 xdpyinfo | grep -m1 dimensions
+          # A desktop has a window manager; without one the engine lists no client windows at all.
+          DISPLAY=:99 openbox --sm-disable > "$qa/openbox.log" 2>&1 &
+          for _ in $(seq 1 50); do DISPLAY=:99 xprop -root _NET_SUPPORTING_WM_CHECK 2>/dev/null | grep -q 'window id' && break; sleep 0.2; done
+          DISPLAY=:99 xprop -root _NET_SUPPORTING_WM_CHECK
           echo "DISPLAY=:99" >> "$GITHUB_ENV"
 
       # No package in the repository carries Electron; the fixture app runs one pinned release (row 4).
@@ -151,7 +155,8 @@ jobs:
           left=0
           sudo pkill -x Xorg 2>/dev/null || true
           pkill -f 'conformance/fixtures/' 2>/dev/null || true
-          for name in senpi-desktop-engine Xorg; do
+          pkill -x openbox 2>/dev/null || true
+          for name in senpi-desktop-engine openbox Xorg; do
             for _ in $(seq 1 25); do pgrep -x "$name" >/dev/null || break; sleep 0.2; done
             if pgrep -x "$name" >/dev/null; then echo "${name} LEFT $(pgrep -x "$name" | tr '\n' ' ')"; left=1; else echo "${name} procs 0"; fi
           done

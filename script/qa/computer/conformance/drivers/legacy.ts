@@ -46,6 +46,8 @@ type HostContext = Readonly<Record<string, unknown>>
 interface LegacyDriverParts {
   /** The host session directory the shipped tool writes its audit log into. */
   readonly session: () => string
+  /** How long a cell waits for the fixture to show its declared value; tests pass 0. */
+  readonly settleMs?: number
   readonly tool: Slot<ShippedTool>
   readonly fixtures: Slot<Fixtures>
   readonly observer: Slot<Observer>
@@ -116,6 +118,21 @@ const notRun = (cell: Cell, reason: string): CellResult => ({
   journal: EMPTY_JOURNAL,
 })
 
+// The fixture applies posted input on its own event loop, after the tool has returned; read its report until it
+// shows the declared value or a bounded wait ends, so a slow-but-delivered action is not recorded as no effect.
+const SETTLE_MS = 3_000
+const SETTLE_STEP_MS = 100
+
+async function settled(read: () => Promise<unknown>, expected: unknown, budgetMs: number): Promise<unknown> {
+  const deadline = performance.now() + budgetMs
+  let value = await read()
+  while (value !== expected && performance.now() < deadline) {
+    await Bun.sleep(SETTLE_STEP_MS)
+    value = await read()
+  }
+  return value
+}
+
 type Ready = {
   readonly tool: ShippedTool
   readonly fixtures: Fixtures
@@ -150,7 +167,7 @@ export function createLegacyDriver(parts: LegacyDriverParts): Driver {
         const started = performance.now()
         const { value, journal } = await observer.observe(() => run(tool, code))
         const durationMs = performance.now() - started
-        const observed = await fixtures.read(cell)
+        const observed = await settled(() => fixtures.read(cell), cell.oracle.equals, parts.settleMs ?? SETTLE_MS)
         const result = { id: cellId(cell), observed: readOutcome(value), oracle: { observed }, durationMs, journal }
         return observer.reason === undefined ? result : { ...result, observerUnavailable: observer.reason }
       } finally {
