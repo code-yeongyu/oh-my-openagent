@@ -517,11 +517,19 @@ export function stageBuiltPluginTree(pluginStage: string, stageDir: string, stag
   assertBuiltPluginStaged(staged)
 }
 
-function stagePluginPayload(stageDir: string, staged: Set<string>): void {
+export function stagePluginPayload(
+  stageDir: string,
+  staged: Set<string>,
+  dependencies: { readonly runCommand?: typeof runCommand } = {},
+): void {
   const pluginStageRoot = mkdtempSync(join(tmpdir(), "omo-plugin-stage-"))
   try {
     const pluginStage = join(pluginStageRoot, "plugin")
-    runCommand("bun", ["run", "script/build-omo-native.ts", "--output", pluginStage], repoRoot)
+    ;(dependencies.runCommand ?? runCommand)(
+      "bun",
+      ["run", "script/build-omo-native.ts", "--output", pluginStage],
+      repoRoot,
+    )
     stageBuiltPluginTree(pluginStage, stageDir, staged)
   } finally {
     rmSync(pluginStageRoot, { recursive: true, force: true })

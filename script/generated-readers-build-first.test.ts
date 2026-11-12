@@ -119,6 +119,8 @@ const READS_NOTHING: Readonly<Record<string, string>> = {
   "compiled-worker.yml relocated-worker": "copies three source files into a scratch directory and tests only those",
   "desktop-engine.yml native-contract":
     "reaches plugin/scripts/install.mjs only as a path string; passes on an unbuilt tree",
+  "computer-live-linux.yml xorg-uinput":
+    "runs script/qa/computer/pool/xorg-uinput-probe.ts, whose import closure (6 pool files) reaches only node builtins and bun:ffi",
   "get-worker-ci.yml worker":
     "packages/get-worker is its own project (own bun.lock, not a root workspace) and imports no output",
   "bot-merge.yml merge": NO_READER,

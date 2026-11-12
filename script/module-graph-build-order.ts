@@ -37,7 +37,7 @@ const MODULE_GRAPH_COMMANDS: readonly RegExp[] = [
 const UNBUILT_BY_DESIGN =
   "runs unbuilt by design on every pull request: no typechecked project includes a file that imports a generated output and knip ignores untracked outputs, so a new such import fails this job on the pull request that adds it"
 
-export const MODULE_GRAPH_EXCEPTIONS: ReadonlyArray<{
+const MODULE_GRAPH_EXCEPTIONS: ReadonlyArray<{
   readonly job: string
   readonly command: RegExp
   readonly reason: string

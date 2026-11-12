@@ -19,7 +19,7 @@ import { fileURLToPath } from "node:url"
 const verifierSource = fileURLToPath(new URL("./verify-omo-ai-payload.mjs", import.meta.url))
 const npmInvocationSource = fileURLToPath(new URL("./npm-invocation.mjs", import.meta.url))
 const generatedListSource = fileURLToPath(new URL("./generated-bundles.json", import.meta.url))
-const requiredOutputsSource = fileURLToPath(new URL("./plugin-required-outputs.mjs", import.meta.url))
+const requiredOutputsSource = fileURLToPath(new URL("./plugin-required-outputs.ts", import.meta.url))
 const guardTimeoutMs = 120_000
 
 setDefaultTimeout(guardTimeoutMs)
@@ -109,7 +109,7 @@ function runVerifierOnPayload(
     copyFileSync(verifierSource, join(fakeRepoRoot, "script", "verify-omo-ai-payload.mjs"))
     copyFileSync(npmInvocationSource, join(fakeRepoRoot, "script", "npm-invocation.mjs"))
     copyFileSync(generatedListSource, join(fakeRepoRoot, "script", "generated-bundles.json"))
-    copyFileSync(requiredOutputsSource, join(fakeRepoRoot, "script", "plugin-required-outputs.mjs"))
+    copyFileSync(requiredOutputsSource, join(fakeRepoRoot, "script", "plugin-required-outputs.ts"))
     // The installer's contract, read by the verifier through bun from the repository it runs in.
     const installDir = join(fakeRepoRoot, "packages", "omo-senpi", "src", "install")
     mkdirSync(installDir, { recursive: true })

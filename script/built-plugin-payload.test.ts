@@ -6,7 +6,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { stageBuiltPluginTree } from "./build-omo-binary"
+import { stageBuiltPluginTree, stagePluginPayload } from "./build-omo-binary"
 import { assertBuiltPluginStaged, BUILT_PLUGIN_PAYLOAD } from "./built-plugin-payload"
 
 // Release contract (#13192): stageSidecarPayload ends with this check, so a release binary staged from a tree where the
@@ -47,6 +47,44 @@ describe("release staging of the plugin tree", () => {
     try {
       const staged = new Set<string>()
       stageBuiltPluginTree(plugin, join(root, "stage"), staged)
+      for (const file of BUILT_PLUGIN_PAYLOAD) expect(staged.has(file)).toBe(true)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe("release staging through stagePluginPayload, the real caller", () => {
+  // build-omo-native is replaced by a writer of the plugin tree it would produce; the check must be reached from here.
+  const fakeBuild =
+    (files: readonly string[]) =>
+    (_command: string, args: readonly string[]): void => {
+      const output = args[args.indexOf("--output") + 1]
+      if (output === undefined) throw new Error("no --output")
+      for (const file of ["package.json", ...files]) {
+        mkdirSync(join(output, file, ".."), { recursive: true })
+        writeFileSync(join(output, file), "x")
+      }
+    }
+
+  test("#given build-omo-native wrote a plugin without the generated files #when the payload is staged #then staging fails", () => {
+    const root = mkdtempSync(join(tmpdir(), "omo-plugin-payload-test-"))
+    try {
+      expect(() =>
+        stagePluginPayload(join(root, "stage"), new Set(), { runCommand: fakeBuild(["skills/fixture/SKILL.md"]) }),
+      ).toThrow("plugin/extensions/omo.js")
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  test("#given build-omo-native wrote a built plugin #when the payload is staged #then both generated files are staged", () => {
+    const root = mkdtempSync(join(tmpdir(), "omo-plugin-payload-test-"))
+    try {
+      const staged = new Set<string>()
+      stagePluginPayload(join(root, "stage"), staged, {
+        runCommand: fakeBuild(["extensions/omo.js", "scripts/install.mjs"]),
+      })
       for (const file of BUILT_PLUGIN_PAYLOAD) expect(staged.has(file)).toBe(true)
     } finally {
       rmSync(root, { recursive: true, force: true })

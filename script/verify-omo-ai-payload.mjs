@@ -6,14 +6,7 @@ import { dirname, posix, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { npmSpawnOptions } from "./npm-invocation.mjs"
-import {
-  generatedOutputRequirements,
-  importMapTargets,
-  listPatterns,
-  loadRequiredPluginArtifacts,
-  PLUGIN_SOURCE_ROOT,
-  pluginRequiredOutputs,
-} from "./plugin-required-outputs.mjs"
+import { spawnSync } from "node:child_process"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(scriptDir, "..")
@@ -62,9 +55,10 @@ const releaseMode = process.argv.slice(2).includes("--release")
 const preflightMode = process.argv.slice(2).includes("--release-preflight")
 
 // Build outputs git does not track (#13192): only a build writes them, so a release that skipped one would publish
-// without it. "Every output the plugin needs" is defined once, in plugin-required-outputs.mjs: the installer's
+// without it. "Every output the plugin needs" is defined once, in plugin-required-outputs.ts: the installer's
 // REQUIRED_PLUGIN_ARTIFACTS plus the packed plugin's import-map targets, and every output script/generated-bundles.json
 // lists under a directory this package ships, per output (a pattern is never met by any one matching file).
+const PLUGIN_SOURCE_ROOT = "packages/omo-senpi/plugin/"
 const SHIPPED_ROOTS = [
   ["packages/omo-native/", ""],
   [PLUGIN_SOURCE_ROOT, "plugin/"],
@@ -76,21 +70,36 @@ const toPackedPath = (repoPath) => {
   return root === undefined ? undefined : root[1] + repoPath.slice(root[0].length)
 }
 
+// The list lives in TypeScript behind a workspace alias, so this node process reads it through one call of the job's
+// pinned bun (setup-bun in every job that runs this gate); a missing bun is an error line, not a stack trace.
+function readPluginRequirements() {
+  const result = spawnSync(
+    "bun",
+    [resolve(scriptDir, "plugin-required-outputs.ts"), resolve(pkgDir, "plugin", "package.json")],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+    },
+  )
+  if (result.error !== undefined)
+    throw new Error(`reading REQUIRED_PLUGIN_ARTIFACTS needs bun: ${result.error.message}`)
+  if (result.status !== 0) throw new Error(`reading REQUIRED_PLUGIN_ARTIFACTS failed: ${result.stderr.trim()}`)
+  return JSON.parse(result.stdout)
+}
+
 function releaseRequirements() {
-  let importTargets
-  try {
-    importTargets = importMapTargets(resolve(pkgDir, "plugin", "package.json"))
-  } catch (error) {
-    // An absent manifest is already a missing artifact of REQUIRED_ARTIFACTS; an unparsable one is reported here.
-    // Neither ends in a stack trace.
-    return [{ label: `plugin/package.json (unreadable: ${error.message})`, met: () => false }]
+  const read = readPluginRequirements()
+  // An absent manifest is already a missing artifact of REQUIRED_ARTIFACTS; an unparsable one is reported here.
+  if (read.manifestError !== undefined) {
+    return [{ label: `plugin/package.json (unreadable: ${read.manifestError})`, met: () => false }]
   }
-  const pluginOutputs = pluginRequiredOutputs(loadRequiredPluginArtifacts(repoRoot), importTargets)
+  const pluginOutputs = read.pluginOutputs
   const requirements = pluginOutputs.map((path) => {
     const packed = `plugin/${path}`
     return { label: packed, met: (paths) => paths.includes(packed) }
   })
-  for (const { label, regex } of generatedOutputRequirements(listPatterns(repoRoot), pluginOutputs)) {
+  for (const { label, source } of read.generated) {
+    const regex = new RegExp(source)
     const packedLabel = label.startsWith("a path matching") ? label : toPackedPath(label)
     if (
       packedLabel === undefined ||

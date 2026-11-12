@@ -1,6 +1,5 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs"
-import { REQUIRED_PLUGIN_ARTIFACTS } from "../packages/omo-senpi/src/install/plugin-artifacts"
-import { generatedOutputRequirements, importMapTargets, pluginRequiredOutputs } from "./plugin-required-outputs.mjs"
+import { generatedOutputRequirements, importMapTargets, pluginRequiredOutputs } from "./plugin-required-outputs"
 import { execFileSync } from "node:child_process"
 import path from "node:path"
 import { findRawTlsClients, normalizeCallText } from "./no-raw-tls-client"
@@ -168,12 +167,11 @@ export function discoverGeneratedOutputs(): string[] {
   return [...found].sort()
 }
 
-// Every output the plugin needs (plugin-required-outputs.mjs, the same definition the omo-ai payload gate uses), per
+// Every output the plugin needs (plugin-required-outputs.ts, the same definition the omo-ai payload gate uses), per
 // output: a list pattern is never met by any one built file. Outputs that are not scannable source (wasm, text,
 // personas) are the payload gate's to require, not this scan's.
 export function generatedOutputScanRequirements(
   pluginOutputs: readonly string[] = pluginRequiredOutputs(
-    REQUIRED_PLUGIN_ARTIFACTS.map((artifact) => artifact.split("\\").join("/")),
     importMapTargets(path.join(WORKSPACE_ROOT, "packages", "omo-senpi", "plugin", "package.json")),
   ),
 ): { label: string; regex: RegExp }[] {
