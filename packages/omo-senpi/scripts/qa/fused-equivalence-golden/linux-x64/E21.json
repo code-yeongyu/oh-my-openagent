@@ -3816,10 +3816,10 @@
    ],
    "tree": {
     ".omo/omo.json": {
-     "text": "{\n  \"computer\": {\n    \"engine_path\": \"/home/yeongyu/omo-runs/a2a-unify-train1-seoul-regen-1794326027/repo/target/release/senpi-desktop-engine\",\n    \"allow_host_relay_only_stop\": true\n  },\n  \"_migrations\": [\n    \"2026-08-reasoning-unification\"\n  ]\n}\n"
+     "text": "{\n  \"computer\": {\n    \"engine_path\": \"<omo-repo>/target/release/senpi-desktop-engine\",\n    \"allow_host_relay_only_stop\": true\n  },\n  \"_migrations\": [\n    \"2026-08-reasoning-unification\"\n  ]\n}\n"
     },
     ".omo/omo.json.bak.<ts:text:1>": {
-     "text": "{\n  \"computer\": {\n    \"engine_path\": \"/home/yeongyu/omo-runs/a2a-unify-train1-seoul-regen-1794326027/repo/target/release/senpi-desktop-engine\",\n    \"allow_host_relay_only_stop\": true\n  }\n}\n"
+     "text": "{\n  \"computer\": {\n    \"engine_path\": \"<omo-repo>/target/release/senpi-desktop-engine\",\n    \"allow_host_relay_only_stop\": true\n  }\n}\n"
     }
    },
    "extra": [],
