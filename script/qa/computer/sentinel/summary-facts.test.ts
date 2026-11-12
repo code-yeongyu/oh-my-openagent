@@ -178,19 +178,26 @@ describe("the final field read is judged against the keystrokes that had landed"
   })
 })
 
-describe("AX observer registration", () => {
-  const failed = (fields: { readonly pid?: number; readonly regular?: boolean; readonly t?: number } = {}) =>
+// A window observer that is not registered yet cannot see a sheet, which the window list cannot see either. Every
+// registration gap is reported with the moment the app launched (\`since\`) and judged on whether it overlaps the
+// recording, not on when the recorder got round to reporting it.
+describe("AX observer registration gaps", () => {
+  type Gap = { readonly pid?: number; readonly regular?: boolean; readonly since?: number; readonly t?: number }
+  const failed = (fields: Gap = {}) =>
     ({
-      t: 500,
+      t: 3_500,
       kind: "observer_failed",
       pid: 300,
       axError: "cannotComplete",
       attempts: 10,
       regular: true,
+      since: 1_500,
       ...fields,
     }) as const
+  const late = (fields: Gap = {}) =>
+    ({ t: 2_100, kind: "observer_late", pid: 300, attempts: 4, regular: true, since: 1_500, ...fields }) as const
 
-  test("a regular app outside the target that never registered is a dialog fault", () => {
+  test("an app launched inside the recording that never registered is a fault, even when it was reported after stop", () => {
     const summary = summarize(cleanRun([failed()]))
     expect(summary.faults).toEqual([
       "dialog: window observer for pid 300 did not register after 10 attempts (AX cannotComplete)",
@@ -198,9 +205,22 @@ describe("AX observer registration", () => {
     expect(verdict(summary)).toBe("invalid")
   })
 
-  test("a target app, an app without a user interface, or a failure after stop is not judged", () => {
-    expect(summarize(cleanRun([failed({ pid: TARGET_PID })])).faults).toEqual([])
-    expect(summarize(cleanRun([failed({ regular: false })])).faults).toEqual([])
-    expect(summarize(cleanRun([failed({ t: 3_500 })])).faults).toEqual([])
+  test("an app whose registration came late inside the recording leaves a gap, which is a fault", () => {
+    expect(summarize(cleanRun([late()])).faults).toEqual([
+      "dialog: window observer for pid 300 registered only after 4 attempts (600 ms without one inside the recording)",
+    ])
+  })
+
+  test("a gap that closed before start, an app launched after stop, a target app or an app without a UI is not judged", () => {
+    expect(summarize(cleanRun([late({ since: 200, t: 800 })])).faults).toEqual([])
+    expect(summarize(cleanRun([failed({ since: 3_200 })])).faults).toEqual([])
+    expect(summarize(cleanRun([failed({ pid: TARGET_PID }), late({ pid: TARGET_PID })])).faults).toEqual([])
+    expect(summarize(cleanRun([failed({ regular: false }), late({ regular: false })])).faults).toEqual([])
+  })
+
+  test("a gap that started before the recording counts only for the part inside it", () => {
+    expect(summarize(cleanRun([late({ since: 400, t: 1_300 })])).faults).toEqual([
+      "dialog: window observer for pid 300 registered only after 4 attempts (300 ms without one inside the recording)",
+    ])
   })
 })
