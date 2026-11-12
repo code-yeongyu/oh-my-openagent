@@ -207,7 +207,7 @@
                 "of": 3
               },
               "effect": "unverifiable",
-              "route": "",
+              "route": "background_window",
               "auditIds": [],
               "timings": {
                 "settleMs": 500
@@ -225,7 +225,6 @@
             }
           },
           "variable": [
-            "/result/route",
             "/result/auditIds"
           ]
         }
