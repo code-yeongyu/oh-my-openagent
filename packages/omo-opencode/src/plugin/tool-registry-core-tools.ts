@@ -37,6 +37,8 @@ export function createCoreTools(args: {
     pluginConfig.agents,
     pluginConfig.categories,
     managers.modelFallbackControllerAccessor,
+    pluginConfig.background_task?.syncPollTimeoutMs,
+    pluginConfig.background_task?.foregroundHandoffMs,
   )
   const isMultimodalLookerEnabled = !(pluginConfig.disabled_agents ?? []).some(
     (agent) => agent.toLowerCase() === "multimodal-looker",
