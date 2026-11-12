@@ -9,6 +9,7 @@ type Scene = {
   readonly togglingRoutes: readonly string[]
   readonly frontmost: boolean
   readonly axPressToggles: boolean
+  readonly hitRole?: string
 }
 
 const dirs: string[] = []
@@ -30,6 +31,7 @@ function fakeProbe(scene: Scene): { probe: Probe; clicks: string[] } {
   const answer = (args: readonly string[]): Json => {
     const [command, , , , , route = "cg"] = args
     if (command === "ax-checkbox") return { found: true, value: on ? 1 : 0, frame: [100, 200, 40, 20] }
+    if (command === "ax-hit") return { axError: 0, pid: 4242, role: scene.hitRole ?? "AXCheckBox" }
     if (command === "frontmost") return { frontmost: scene.frontmost }
     if (command === "activate") return { activated: scene.frontmost }
     if (command === "ax-press") {
@@ -75,6 +77,19 @@ describe("q3 pid-routed click, judged against a global click at the same point",
     const { probe, clicks } = fakeProbe({ togglingRoutes: ["hid"], frontmost: false, axPressToggles: true })
     const answer = await askPidClick(probe)
     expect(answer.verdict).toBe("UNMEASURED")
+    expect(clicks).toEqual([])
+  }, 30_000)
+
+  test("an aim the hit-test does not place on the checkbox is never clicked and stays unmeasured", async () => {
+    const { probe, clicks } = fakeProbe({
+      togglingRoutes: ["hid"],
+      frontmost: true,
+      axPressToggles: true,
+      hitRole: "AXWindow",
+    })
+    const answer = await askPidClick(probe)
+    expect(answer.verdict).toBe("UNMEASURED")
+    expect(answer.evidence).toContain("aim not proven")
     expect(clicks).toEqual([])
   }, 30_000)
 })
