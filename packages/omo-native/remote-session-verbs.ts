@@ -240,17 +240,34 @@ async function sendTo(
       const sent = await deliver()
       return nothingToSteer(sent) ?? show(sent, label)
     }
-    // Followed before the send, so no delta of the turn it starts can arrive unseen, and aimed once the send's own
-    // reply names its lane: the answer is read from the transcript anchored on this send's user entry, so only that
-    // turn's text prints and only its settle ends the wait (#13267).
+    // Delivered before the follow is awaited (#13269): the follow starts in parallel, the attach's pre-aim replay
+    // is dropped, and the transcript anchoring recovers the send's own turn, so a slower attach handshake never
+    // delays the hand-off.
     let reply = ""
-    follow = await followRemote(remote, row, (text) => {
+    const deliverNow = deliver()
+    const following = followRemote(remote, row, (text) => {
       reply += text
       if (!json) dependencies.write(text)
     }, { text: args.text })
-    if ("kind" in follow) return show(follow, label)
-    const sent = await deliver()
-    if (sent.kind === "error") return nothingToSteer(sent) ?? show(sent, label)
+    void following.catch(() => undefined)
+    const sent = await deliverNow
+    if (sent.kind === "error") {
+      const opened = await following
+      if (!("kind" in opened)) opened.stop()
+      return nothingToSteer(sent) ?? show(sent, label)
+    }
+    follow = await following
+    if ("kind" in follow) {
+      // The message is out; only its answer could not be followed. Reporting the delivery, never the follow's refusal
+      // as a failure, keeps a retry from sending a duplicate.
+      if (json) dependencies.output(JSON.stringify(sent))
+      else {
+        for (const line of sessionVerbLines("send", label, sent)) dependencies.output(line)
+        dependencies.error(`omo remote: the answer could not be followed: ${follow.error.message}`)
+        dependencies.error(follow.error.next_action)
+      }
+      return REMOTE_EXIT.ok
+    }
     // The ok send always carries its delivery; without one the attach's own end still settles the follow below.
     if ("delivery" in sent)
       follow.aim(
