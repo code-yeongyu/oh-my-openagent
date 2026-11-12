@@ -141,6 +141,8 @@ describe("an alias whose claim asks for a sign-in", () => {
       alias_scope: "local",
       alias_unavailable: "sign_in",
       local_name_unavailable: "host_unavailable",
+      // #13185 review LOW: the untyped error's message is kept, so a rename-path bug is traceable.
+      local_name_unavailable_reason: "endpoint socket reset",
     })
     expect(result.kind === "ok" && "thread" in result ? result.thread.name : "no thread").not.toBe("about-me")
     expect(setSessionName.mock.calls.map((call) => [call[0], call[1]])).toStrictEqual([["route-created", "about-me"]])

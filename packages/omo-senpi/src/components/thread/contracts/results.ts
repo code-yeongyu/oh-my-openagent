@@ -89,6 +89,11 @@ export type ThreadLocalAliasNote = {
    * `host_unavailable` when the rename failed with no typed refusal), so the thread keeps the name it was created with.
    */
   readonly local_name_unavailable?: ThreadErrorCode
+  /**
+   * Set only with `local_name_unavailable: "host_unavailable"` from a rename that failed with no typed refusal: the
+   * error's message, so a failure in the rename path is traceable instead of a bare code.
+   */
+  readonly local_name_unavailable_reason?: string
 }
 
 export type ThreadCreateResult =
