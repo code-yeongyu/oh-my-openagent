@@ -47,6 +47,33 @@ pub struct FrameBytes {
     pub bytes: Vec<u8>,
 }
 
+#[cfg(test)]
+mod frame_bytes_tests {
+    use super::*;
+
+    #[test]
+    fn frame_bytes_carry_root_crop_and_cursor_annotations() {
+        let annotated = FrameBytes {
+            width: 1,
+            height: 1,
+            mime: ImageMime::Png,
+            bytes: Vec::new(),
+            route: Some(CaptureRoute::RootCrop),
+            occluders_visible: Some(true),
+            cursor: Some(CursorMode::Engine),
+        };
+        let bare = FrameBytes {
+            route: None,
+            occluders_visible: None,
+            cursor: None,
+            ..annotated.clone()
+        };
+        assert_eq!(annotated.route, Some(CaptureRoute::RootCrop));
+        assert_eq!(annotated.occluders_visible, Some(true));
+        assert_ne!(annotated, bare);
+    }
+}
+
 /// One OS-level input event.
 #[derive(Debug, Clone, PartialEq)]
 pub enum InputEvent {

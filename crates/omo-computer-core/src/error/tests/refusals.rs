@@ -13,6 +13,22 @@ impl Backend for Bare {}
 impl AxBackend for Bare {}
 
 #[test]
+fn no_display_server_is_unavailable_after_user_with_diagnose_next() {
+    use super::super::{DispositionRule, NextCall, Reason, Recovery};
+    use crate::report::Disposition;
+    let refusal = Refusal::new(EngineCode::Internal, Reason::NoDisplayServer.wire());
+    let row = refusal.row().expect("no_display_server has a row");
+    assert_eq!(row.computer.wire(), "COMPUTER_UNAVAILABLE");
+    assert_eq!(
+        row.disposition,
+        DispositionRule::Fixed(Disposition::NOT_DELIVERED_AFTER_USER)
+    );
+    assert_eq!(row.nothing_sent, NothingSent::Yes);
+    assert_eq!(row.recovery, Some(Recovery::AskUser));
+    assert_eq!(row.next_call, NextCall::Call("computer.diagnose({ hand })"));
+}
+
+#[test]
 fn backend_refusals_map_through_the_table() {
     let mut bare = Bare;
     let input = TaggedInput {

@@ -86,4 +86,18 @@ mod tests {
             Err(RouteError::Fake(_))
         ));
     }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn x11_is_selected_on_linux_and_unset_stays_no_backend() {
+        let mut x11 = backend(&vars(&[(BACKEND_SEAM, "x11")])).expect("x11 backend");
+        assert_eq!(
+            x11.displays().unwrap_err(),
+            omo_computer_core::backend::Refusal::new(
+                omo_computer_core::error::EngineCode::Internal,
+                "no_display_server"
+            )
+        );
+        assert!(matches!(backend(&vars(&[])), Err(RouteError::NoBackend(None))));
+    }
 }
