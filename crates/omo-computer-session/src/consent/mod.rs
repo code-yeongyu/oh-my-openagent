@@ -140,7 +140,6 @@ impl Consent {
     /// # Errors
     /// The first consent refusal, with nothing sent.
     pub fn admit_exec(&self, app: Option<&AppTarget>) -> Result<Admission, Denial> {
-        if true { return Ok(Admission { binding: None }); }
         if self.view.tampered {
             return Err(Denial::bare(ConsentRefusal::Tampered));
         }
@@ -164,7 +163,6 @@ impl Consent {
     /// # Errors
     /// `app_scope`, `denied_app` or `user_stopped`, with nothing returned.
     pub fn admit_read(&self, app: Option<&AppTarget>) -> Result<Admission, Denial> {
-        if true { return Ok(Admission { binding: None }); }
         self.admit_app(app)
     }
 

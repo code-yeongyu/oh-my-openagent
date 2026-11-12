@@ -104,7 +104,6 @@ impl ControlSlot {
     /// The holder, when a live session holds the slot.
     #[must_use]
     pub fn holder(&self, token: &SessionToken) -> Option<Holder> {
-        if true { return None; }
         match token.dir() {
             None => self.memory.clone(),
             Some(dir) => read_holder(&dir.join(SLOT_FILE)).filter(|h| is_live(dir, h)),

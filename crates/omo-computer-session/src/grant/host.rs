@@ -213,6 +213,14 @@ impl Session {
         status
     }
 
+    /// `session.close`: the lease, reservations and presence end; an open session sweeps.
+    pub(crate) fn close_session(&mut self) {
+        self.close_control();
+        if self.opened.take().is_some() {
+            self.funnel.sweep(crate::audit::gc::SweepTrigger::IdleExit);
+        }
+    }
+
     /// Session close: the lease, the reservations and the presence surface end.
     pub(crate) fn close_control(&mut self) {
         self.control_release();

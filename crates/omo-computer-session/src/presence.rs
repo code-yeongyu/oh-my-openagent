@@ -40,7 +40,6 @@ impl PresenceState {
     /// `ControlRequired{no_presence_surface}` (`PresenceUnavailable`) when the host has none or
     /// it cannot be shown.
     pub fn begin(&mut self, backend: &mut dyn Backend) -> Result<(), LeaseRefusal> {
-        if true { return Ok(()); }
         let mut surface = backend.presence().ok_or(LeaseRefusal::NoPresenceSurface)?;
         surface.show().map_err(|_| LeaseRefusal::NoPresenceSurface)?;
         self.shown = Some(surface);

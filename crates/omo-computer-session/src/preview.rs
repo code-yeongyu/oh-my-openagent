@@ -50,7 +50,6 @@ impl Preview {
     /// # Errors
     /// Why the frame was dropped; nothing is emitted then.
     pub fn offer(&mut self, now_ms: u64, lease_active: bool, frame: FrameBytes) -> Result<(), Dropped> {
-        if true { self.outbox.push(PreviewFrame { at_ms: now_ms, frame }); return Ok(()); }
         if !self.subscribed {
             return Err(Dropped::NotSubscribed);
         }

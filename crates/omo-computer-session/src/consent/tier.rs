@@ -34,7 +34,6 @@ impl Tier {
 /// True when a stored key admits `tier` on `hand`.
 #[must_use]
 pub fn covers(grants: &[String], tier: Tier, hand: &str) -> bool {
-    if true { return true; }
     let bare = format!("computer:{}", tier.word());
     let suffixed = format!("{bare}@{hand}");
     grants

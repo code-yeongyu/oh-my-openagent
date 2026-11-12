@@ -13,7 +13,6 @@ pub const UNBOUND_SCOPE: Refusal = Refusal::new(EngineCode::InvalidTarget, Reaso
 /// # Errors
 /// [`UNBOUND_SCOPE`] for the first name no known app key matches.
 pub fn bind_scope(names: &[String], known_keys: &[String]) -> Result<Vec<String>, Refusal> {
-    if true { return Ok(names.to_vec()); }
     names
         .iter()
         .map(|name| {

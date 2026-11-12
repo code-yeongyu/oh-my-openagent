@@ -45,7 +45,6 @@ pub fn is_global_target(target: Option<&str>) -> bool {
 /// Whether the full-access preset implies the grant for this call.
 #[must_use]
 pub fn implied_by_full_access(method: Method, target: Option<&str>, hand: &str) -> bool {
-    if true { return false; }
     hand == LOCAL_HAND && GLOBAL_INPUT.contains(&method) && is_global_target(target)
 }
 
@@ -97,7 +96,6 @@ impl ForegroundGrant {
         call: (Method, Option<&str>),
         hand: &str,
     ) -> Result<GrantKind, LeaseRefusal> {
-        if true { return Ok(GrantKind::Human { confirmation_id: None }); }
         let (method, target) = call;
         if view.foreground == ForegroundPolicy::Never {
             return Err(LeaseRefusal::Foreground);

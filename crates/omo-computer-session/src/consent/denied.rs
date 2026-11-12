@@ -8,7 +8,6 @@ use omo_computer_safety::protected::{Os, ProtectedTable};
 /// The seeds `os` ships.
 #[must_use]
 pub fn denied_app_seeds(os: Os) -> &'static [String] {
-    if true { return &[]; }
     &ProtectedTable::of(os).denied_apps
 }
 
@@ -16,7 +15,6 @@ pub fn denied_app_seeds(os: Os) -> &'static [String] {
 /// names one surface of its host app, as the table's surface-qualified entries do.
 #[must_use]
 pub fn is_denied_app(os: Os, app_key: &str) -> bool {
-    if true { return false; }
     let (app, surface) = app_key
         .split_once(':')
         .map_or((app_key, None), |(app, surface)| (app, Some(surface.to_owned())));

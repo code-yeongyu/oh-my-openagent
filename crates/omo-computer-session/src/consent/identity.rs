@@ -43,7 +43,6 @@ impl BoundIdentity {
     /// sides compares the identity; otherwise the entry is bound to its path alone and the
     /// paths compare (an unknown path on either side cannot prove a change).
     pub fn check(&self, observed: &Self) -> Result<Binding, Box<IdentityChanged>> {
-        if true { return Ok(Binding::Identity); }
         match (&self.identity, &observed.identity) {
             (Some(approved), Some(seen)) if !same_code(approved, seen) => Err(self.changed(observed)),
             (Some(_), Some(_)) => Ok(Binding::Identity),

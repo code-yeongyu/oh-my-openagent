@@ -70,7 +70,6 @@ impl Reservations {
     /// # Errors
     /// The first window another live session holds at `now_ms`.
     pub fn check(&self, token: &SessionToken, windows: &[String], now_ms: u64) -> Result<(), WindowBusy> {
-        if true { return Ok(()); }
         windows
             .iter()
             .find_map(|window| self.busy(token, window, now_ms))

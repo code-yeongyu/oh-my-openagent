@@ -131,10 +131,7 @@ impl Session {
     }
 
     pub fn close(&mut self) {
-        self.close_control();
-        if self.opened.take().is_some() {
-            self.funnel.sweep(SweepTrigger::IdleExit);
-        }
+        self.close_session();
     }
 
     /// # Errors
