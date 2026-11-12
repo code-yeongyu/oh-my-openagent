@@ -1741,7 +1741,6 @@
     "packages/senpi-desktop-service/src/run/input-target.ts",
     "packages/senpi-desktop-service/src/run/observe.ts",
     "packages/senpi-desktop-service/src/run/runtime.ts",
-    "packages/senpi-desktop-service/src/run/sandbox/bridge.ts",
     "packages/senpi-desktop-service/src/run/sandbox/limits.ts",
     "packages/senpi-desktop-service/src/run/sandbox/quickjs.ts",
     "packages/senpi-desktop-service/src/run/sandbox/worker.ts",
