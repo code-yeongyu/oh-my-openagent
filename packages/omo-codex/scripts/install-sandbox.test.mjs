@@ -115,7 +115,7 @@ function balancedCall(text, openParen) {
   return text.slice(openParen)
 }
 
-export function installerCallsOutsideSandbox(file, text) {
+function installerCallsOutsideSandbox(file, text) {
   const lineOf = (index) => text.slice(0, index).split("\n").length
   const found = []
   for (const name of INSTALLER_CALLS)

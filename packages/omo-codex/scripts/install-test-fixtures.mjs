@@ -89,7 +89,7 @@ function assertSandboxEnv(root, env) {
   for (const key of SANDBOX_PATH_ENV) requireInside(root, `env.${key}`, env[key])
 }
 
-export function assertInsideCodexSandbox(root, options, { withoutBinDir = false } = {}) {
+function assertInsideCodexSandbox(root, options, { withoutBinDir = false } = {}) {
   requireInside(root, "options.codexHome", options.codexHome)
   requireInside(root, "options.projectDirectory", options.projectDirectory)
   if (options.env === undefined)

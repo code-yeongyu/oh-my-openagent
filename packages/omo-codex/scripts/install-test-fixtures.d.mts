@@ -34,11 +34,6 @@ export interface CodexInstallSandbox {
 
 export function createCodexInstallSandbox(name?: string): CodexInstallSandbox
 export function disposeCodexInstallSandboxes(): void
-export function assertInsideCodexSandbox(
-  root: string,
-  options: Record<string, unknown>,
-  flags?: { readonly withoutBinDir?: boolean },
-): void
 export function makeTempDir(): Promise<string>
 export function writeJson(path: string, value: unknown): Promise<void>
 export function writePlugin(root: string, name: string, version: string): Promise<void>
