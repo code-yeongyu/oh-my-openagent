@@ -175,3 +175,47 @@ fn url_policy_empty_table_skips_the_read() {
     assert!(report.get("urlPolicy").is_none());
     assert_eq!(sent(&sink).len(), 3);
 }
+
+fn apps_scenario(extra_app: Value) -> Value {
+    let mut scenario = fixture("v3-apps.json");
+    scenario["apps"].as_array_mut().expect("apps").push(extra_app);
+    scenario
+}
+
+#[test]
+fn apps_quit_protected_process() {
+    let sink = RecordingSink::default();
+    let shell = json!({ "app_key": "gnome-shell", "name": "GNOME Shell", "pid": 4444, "running": true, "source": "running" });
+    let (mut s, _) = session(apps_scenario(shell), json!({}), &sink);
+    for force in [false, true] {
+        let refused = s
+            .apps_quit(params(json!({ "target": "gnome-shell", "force": force })))
+            .expect_err("a protected process is never quit");
+        assert_eq!(refused.refusal.code.wire(), "ProtectedProcess", "force={force}");
+        assert!(sent(&sink).is_empty(), "nothing sent: {:?}", sent(&sink));
+    }
+}
+
+#[test]
+fn apps_quit_unprotected_delivered_verified() {
+    let sink = RecordingSink::default();
+    let (mut s, _) = session(fixture("v3-apps.json"), json!({ "reportMode": "object" }), &sink);
+    let reply = s.apps_quit(params(json!({ "target": "com.example.notes" }))).expect("quit");
+    let report = serde_json::to_value(&reply).expect("report");
+    assert_eq!(report["delivered"], json!({ "count": 1, "of": 1 }));
+    assert_eq!(sent(&sink).len(), 1);
+    assert!(sent(&sink)[0].ends_with(r#"app_quit "com.example.notes" force=false"#), "{:?}", sent(&sink));
+}
+
+#[test]
+fn apps_list_returns_every_running_app_with_its_identity_key() {
+    let sink = RecordingSink::default();
+    let (mut s, _) = session(fixture("v3-apps.json"), json!({}), &sink);
+    let apps = s.apps_list().expect("apps");
+    let running: Vec<&str> = apps.iter().filter(|a| a.running).map(|a| a.app_key.as_str()).collect();
+    assert_eq!(running, ["com.example.notes"], "every running app is listed");
+    let notes = apps.iter().find(|a| a.running).expect("the running app");
+    assert_eq!(notes.identity.as_ref().and_then(|id| id.cdhash.as_deref()), Some("0123456789abcdef0123456789abcdef01234567"));
+    assert!(apps.iter().any(|a| !a.running), "installed-but-not-running apps are listed too");
+    assert!(sink.lines().is_empty(), "a listing sends nothing");
+}
