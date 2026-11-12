@@ -164,7 +164,12 @@ export async function planMemoryCleanup(
     repoDir,
     generatedAt: new Date(resolved.now).toISOString(),
     options: resolved,
-    scanned: { notes: corpus.notes.size, byHome: countByHome(corpus), skipped: corpus.skipped },
+    scanned: {
+      notes: corpus.notes.size,
+      byHome: countByHome(corpus),
+      skipped: corpus.skipped,
+      legacy: corpus.legacy.length,
+    },
     findings,
     held,
     kept,

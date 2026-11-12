@@ -24,6 +24,10 @@ export function renderMemoryCleanupReport(
     `# Memory cleanup (${mode}) - ${plan.repoDir}`,
     `scanned ${plan.scanned.notes} note(s) (${homes || "none"}); ARCHIVE.md and notes/ are never candidates`,
   ]
+  if (plan.scanned.legacy > 0)
+    lines.push(
+      `not scanned: ${plan.scanned.legacy} note(s) in the legacy memory/ layout; cleanup reads only system/, reference/, people/ and skills/ at the repository root`,
+    )
   if (plan.scanned.skipped.length > 0) {
     lines.push(`skipped ${plan.scanned.skipped.length} unreadable file(s), never touched:`)
     for (const file of plan.scanned.skipped) lines.push(`  - ${file.path}: ${file.reason}`)
@@ -96,7 +100,10 @@ function renderBudget(plan: MemoryCleanupPlan): string {
 
 function renderSummary(plan: MemoryCleanupPlan): string {
   const { archive, merge, mark, repoint } = plan.summary
-  if (archive + merge + mark === 0) return "nothing; the repository is already clean under these rules"
+  if (archive + merge + mark === 0)
+    return plan.scanned.legacy > 0
+      ? `nothing in the scanned notes; ${plan.scanned.legacy} note(s) in the legacy memory/ layout were not scanned`
+      : "nothing; the repository is already clean under these rules"
   return `archive ${archive} note(s) into ARCHIVE.md, merge ${merge}, mark ${mark} conflict side(s), repoint links in ${repoint} other note(s); one commit, nothing deleted`
 }
 

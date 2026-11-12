@@ -1,6 +1,6 @@
 // The live corpus the cleanup planner reads: every memory content note that parses, with its paragraphs and the
-// repository paths its wikilinks and markdown links resolve to. ARCHIVE.md, notes/ and unparsable files are never
-// candidates, but every markdown file's links are read so that apply can repoint (or hold for) each one.
+// repository paths its wikilinks and markdown links resolve to. ARCHIVE.md, notes/, the legacy memory/ layout and
+// unparsable files are never candidates, but every markdown file's links are read so that apply can repoint (or hold for) each one.
 
 import { readFile, readdir } from "../fs/resilient"
 import { join, posix } from "node:path"
@@ -55,6 +55,8 @@ export interface CleanupCorpus {
   /** Files linking to each note. */
   readonly inbound: ReadonlyMap<string, ReadonlySet<string>>
   readonly skipped: readonly SkippedFile[]
+  /** Content notes in the legacy `memory/` layout, which are never candidates. */
+  readonly legacy: readonly string[]
 }
 
 export async function scanCleanupCorpus(repoDir: string): Promise<CleanupCorpus> {
@@ -63,8 +65,10 @@ export async function scanCleanupCorpus(repoDir: string): Promise<CleanupCorpus>
   const notes = new Map<string, CleanupNote>()
   const linking = new Map<string, LinkingFile>()
   const skipped: SkippedFile[] = []
+  const legacy: string[] = []
   for (const path of files) {
     if (!path.endsWith(".md") || path === ARCHIVE_PATH) continue
+    if (isMemoryContentPath(path) && path.startsWith("memory/")) legacy.push(path)
     const candidate = isMemoryContentPath(path) && !path.startsWith("memory/")
     let content: string
     try {
@@ -109,7 +113,7 @@ export async function scanCleanupCorpus(repoDir: string): Promise<CleanupCorpus>
       inbound.set(link.target, sources)
     }
   }
-  return { notes, linking, files: existing, inbound, skipped }
+  return { notes, linking, files: existing, inbound, skipped, legacy }
 }
 
 /** The audit's wikilink resolution: an existing file, the implied `.md`, never a directory or an escaping path. */

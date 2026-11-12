@@ -86,6 +86,8 @@ export interface MemoryCleanupPlan {
     readonly notes: number
     readonly byHome: Readonly<Record<string, number>>
     readonly skipped: readonly SkippedFile[]
+    /** Content notes in the legacy `memory/` layout, counted but not scanned. */
+    readonly legacy: number
   }
   readonly findings: readonly MemoryCleanupFinding[]
   readonly held: readonly HeldFinding[]
