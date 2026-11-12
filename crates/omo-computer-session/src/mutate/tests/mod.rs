@@ -1,6 +1,7 @@
 //! The funnel's tests: a fake backend over a temp RUNTIME/STATE root, as the engine runs it.
 
 mod batch;
+mod engine_process;
 mod marker;
 mod poison;
 mod recovery;
