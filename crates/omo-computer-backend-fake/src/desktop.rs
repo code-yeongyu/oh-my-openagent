@@ -143,12 +143,17 @@ impl Backend for FakeBackend {
         let state = self.lock();
         let mut capabilities =
             fake_capabilities(self.persona, state.displays.len(), self.stop_path);
-        // A scripted secure focus is Secure Input while its window is the focused one.
-        if let Some(secure) = &state.scenario.secure_focus {
-            let focused = state.windows.iter().any(|window| {
+        // Secure Input: scripted on (`secure_input_on`), or a scripted secure focus while its
+        // window is the focused, live one. Neither declared keeps today's value.
+        let input_on = state.scenario.secure_input_on;
+        let focused = state.scenario.secure_focus.as_ref().map(|secure| {
+            state.windows.iter().any(|window| {
                 window.focused && window.id == secure.window && !state.exited.contains(&window.id)
-            });
-            capabilities.session.secure_input_active = Tristate::Known(focused);
+            })
+        });
+        if input_on || focused.is_some() {
+            capabilities.session.secure_input_active =
+                Tristate::Known(input_on || focused == Some(true));
         }
         capabilities
     }
