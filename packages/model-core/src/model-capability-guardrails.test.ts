@@ -7,6 +7,7 @@ import { collectModelCapabilityGuardrailIssues, getBuiltInRequirementModelIDs } 
 
 describe("model-capability-guardrails", () => {
   test.each([
+    "deepseek-v4.1-flash-maas",
     "gpt-5.6-luna-fast",
     "gpt-6-luna-fast",
     "gpt-6-sol-fast",
@@ -22,6 +23,20 @@ describe("model-capability-guardrails", () => {
       expect.objectContaining({
         kind: "built-in-model-missing-from-snapshot",
         modelID,
+      }),
+    )
+  })
+
+  test("keeps the Garden DeepSeek MaaS id canonical instead of alias-backed", () => {
+    const issues = collectModelCapabilityGuardrailIssues({
+      snapshot: getBundledModelCapabilitiesSnapshot(bundledModelCapabilitiesSnapshotJson),
+      requirementModelIDs: ["deepseek-v4.1-flash-maas"],
+    })
+
+    expect(issues).not.toContainEqual(
+      expect.objectContaining({
+        kind: "built-in-model-relies-on-alias",
+        modelID: "deepseek-v4.1-flash-maas",
       }),
     )
   })

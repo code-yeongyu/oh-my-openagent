@@ -85,3 +85,21 @@ test("registers Claude Fable 5.2 with its launch limits and modalities", () => {
     limit: { context: 1_000_000, output: 128_000 },
   })
 })
+
+test("registers the Vertex Garden DeepSeek MaaS id with the Flash entry's limits", () => {
+  // given
+  const snapshot = getBundledModelCapabilitiesSnapshot({ generatedAt: "", sourceUrl: "", models: {} })
+
+  // when
+  const entry = snapshot.models["deepseek-v4.1-flash-maas"]
+
+  // then
+  expect(entry).toMatchObject({
+    family: "deepseek-flash",
+    reasoning: true,
+    temperature: true,
+    toolCall: true,
+    modalities: { input: ["text", "image"], output: ["text"] },
+    limit: { context: 1_000_000, output: 384_000 },
+  })
+})

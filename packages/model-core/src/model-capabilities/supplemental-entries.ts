@@ -270,6 +270,24 @@ export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSn
       output: 384000,
     },
   },
+  // Vertex Model Garden MaaS serving of the same DeepSeek V4.1 Flash, under its publisher-namespaced
+  // catalog id (ADC lane). The bare MaaS id stays canonical here instead of alias-mapped onto
+  // deepseek-flash, so built-in chains naming it do not rely on an alias rule.
+  "deepseek-v4.1-flash-maas": {
+    id: "deepseek-v4.1-flash-maas",
+    family: "deepseek-flash",
+    reasoning: true,
+    temperature: true,
+    toolCall: true,
+    modalities: {
+      input: ["text", "image"],
+      output: ["text"],
+    },
+    limit: {
+      context: 1000000,
+      output: 384000,
+    },
+  },
   "gpt-6-luna-fast": {
     id: "gpt-6-luna-fast",
     family: "gpt-nano",

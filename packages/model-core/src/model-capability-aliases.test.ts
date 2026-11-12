@@ -183,15 +183,14 @@ describe("model-capability-aliases", () => {
   })
 })
 
-describe("vertex-garden deepseek alias", () => {
-  test("maps the publisher-namespaced MaaS id onto the canonical Flash snapshot entry", () => {
+describe("vertex-garden deepseek id", () => {
+  test("keeps the publisher-namespaced MaaS id canonical now that the snapshot carries it", () => {
     const result = resolveModelIDAlias("deepseek-v4.1-flash-maas")
 
     expect(result).toEqual({
       requestedModelID: "deepseek-v4.1-flash-maas",
-      canonicalModelID: "deepseek-flash",
-      source: "exact-alias",
-      ruleID: "vertex-garden-deepseek-maas-alias",
+      canonicalModelID: "deepseek-v4.1-flash-maas",
+      source: "canonical",
     })
   })
 })
