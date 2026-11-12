@@ -4,6 +4,7 @@ pub mod ax;
 pub mod backend;
 pub mod capabilities;
 pub mod doc;
+pub mod diagnose;
 pub mod env;
 pub mod error;
 pub mod frame;
