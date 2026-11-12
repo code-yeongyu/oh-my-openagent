@@ -3,24 +3,22 @@ import { join } from "node:path"
 import { loadSenpiBarrel } from "../../../lazy/senpi-barrel"
 
 import { createTaskManager } from "../../../manager/manager"
-import { settledWithin } from "../../../manager/settled-within"
 import { adaptInProcessHandle } from "../../../manager/child-handle"
 import type { ManagedChildHandle, ManagedRunner } from "../../../manager"
-import { settings, tempProject } from "../../../manager/__fixtures__/manager-fakes"
+import { launchSettled, settings, tempProject } from "../../../manager/__fixtures__/manager-fakes"
 import { InProcessRunner } from "../../../runners/in-process"
 import { createTaskRecordStore } from "../../../store"
 import { buildTaskExecute } from "../execute"
 import { makeDeps } from "./task-tool-fakes"
-
-// Below bun's 5 s default test timeout, so a runner that never registers fails with the fixture's own message.
-const HANDLE_WAIT_MS = 4_000
 
 // Restored real sessions are deterministic: no prompt, provider, or model network call is made.
 //
 // The task tool reports a start that is still admitting once START_REPORT_WINDOW_MS has passed, so it can
 // return before this runner has registered its handle. `registerAfterReport` makes that order certain
 // instead of a matter of host speed: the runner holds its handle back until the tool has returned.
-// Either way the fixture waits for the start it triggered before it reads from the handle or cleans it up.
+// Either way the fixture waits for the launch it triggered to settle (launchSettled, bounded by the test's
+// own deadline) before it reads from the handle, and again before it tears down: by then the handle exists
+// and none of the launch's writes lands after the test's cleanup.
 //
 // `failAfterReport` fails the fixture right after the tool returned, while that start is still in flight;
 // `retired` receives the task id of every child the teardown retires.
@@ -38,10 +36,9 @@ export async function realSessionHandle(
   const store = createTaskRecordStore({ project_dir: project })
   const handles: ManagedChildHandle[] = []
   const transcripts: Array<{ path: string; before: string }> = []
+  const started: string[] = []
   const reported = Promise.withResolvers<void>()
-  const registered = Promise.withResolvers<ManagedChildHandle>()
-  // A start that throws is the task tool's to report; the wait below sees the same rejection when it is reached.
-  registered.promise.catch(() => undefined)
+  let tornDown = false
   const runner = new InProcessRunner({
     createSession: async (options) => {
       const { session } = await createAgentSession({
@@ -53,6 +50,7 @@ export async function realSessionHandle(
   })
   const restoredRunner: ManagedRunner = {
     start: async (spec) => {
+      started.push(spec.taskId)
       const sessionDir = join(store.stateDir, "children", spec.taskId, "sessions")
       const sessionManager = SessionManager.create(project, sessionDir)
       sessionManager.appendMessage({ role: "user", content: "fixture", timestamp: 1000 })
@@ -83,24 +81,28 @@ export async function realSessionHandle(
         await runner.resume({ ...spec, sessionDir, agentDir, model: undefined }, path),
       )
       if (options.registerAfterReport === true) await reported.promise
+      if (tornDown) {
+        // The teardown gave up on this launch (the test's deadline ran out): nothing else will retire this child.
+        await retire(handle)
+        throw new Error("the fixture was torn down before this start finished")
+      }
       handles.push(handle)
       return handle
     },
   }
-  const observedRunner: ManagedRunner = {
-    start: (spec) => {
-      const starting = restoredRunner.start(spec)
-      starting.then(registered.resolve, registered.reject)
-      return starting
-    },
-  }
   const manager = createTaskManager({
     store,
-    runners: { "in-process": observedRunner, process: observedRunner },
+    runners: { "in-process": restoredRunner, process: restoredRunner },
     cwd: project,
     config: settings(),
     planner: () => ({ kind: "resolved", plan: { model: "fixture/model" } }),
   })
+  const retire = async (handle: ManagedChildHandle): Promise<void> => {
+    manager.forget(handle.task_id, { path: "end" })
+    await handle.abort()
+    await handle.dispose()
+    options.retired?.push(handle.task_id)
+  }
   try {
     const response = await buildTaskExecute(makeDeps(manager))(
       "real-session",
@@ -116,13 +118,14 @@ export async function realSessionHandle(
     const registeredWhenReported = handles.length > 0
     if (options.failAfterReport === true) throw new Error("the fixture failed after the task tool reported")
     reported.resolve()
-    const waited = await settledWithin(registered.promise, HANDLE_WAIT_MS)
-    if (!waited.settled) throw new Error(`the restored runner registered no handle within ${HANDLE_WAIT_MS} ms`)
+    await launchSettled(manager, response.details.task_id)
+    const handle = handles[0]
+    if (handle === undefined) throw new Error("the launch settled without a restored child handle")
     return {
       response,
       registeredWhenReported,
       record: store.load(response.details.task_id),
-      sessionText: waited.value.lastAssistantText(),
+      sessionText: handle.lastAssistantText(),
       transcriptMessages: transcripts.map(({ path, before }) => ({
         before,
         after: JSON.stringify(
@@ -139,11 +142,10 @@ export async function realSessionHandle(
     }
   } finally {
     reported.resolve()
-    for (const handle of handles) {
-      manager.forget(handle.task_id, { path: "end" })
-      await handle.abort()
-      await handle.dispose()
-      options.retired?.push(handle.task_id)
-    }
+    // A start still in flight finishes first. A wait that runs out of the test's deadline is not an error of
+    // its own here: the failure that brought the fixture down is the one to report.
+    for (const taskId of started) await launchSettled(manager, taskId).catch(() => undefined)
+    tornDown = true
+    for (const handle of handles.splice(0)) await retire(handle)
   }
 }
