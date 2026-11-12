@@ -5,16 +5,26 @@ import { GitMemoryRepo, NoEffectiveChangesError, type GitCommitAuthor } from "..
 import { readdir, writeFile } from "../fs/resilient"
 import type { MemoryWriteLock } from "../tools/commit-write"
 import type { MemoryIdentityPaths } from "./layout"
-import { assertMergePathConfined, createInTarget, removeCreatedDirs } from "./merge-paths"
+import { assertMergePathConfined, attachLeftoverDirs, createInTarget, removeCreatedDirs } from "./merge-paths"
 import { identityIdOf, planIdentityMerge, type MergeAction, type MergePlan } from "./merge-plan"
 import { markIdentityMerged, readIdentityRecord } from "./record"
 
 const MERGED_FROM_TRAILER = "Omo-Merged-From"
 const MERGED_HEAD_TRAILER = "Omo-Merged-Head"
 
-export type MergeResult =
+export type MergeResult = (
   | { readonly status: "merged"; readonly sha: string; readonly plan: MergePlan }
   | { readonly status: "already-merged" | "nothing-to-merge"; readonly plan: MergePlan }
+) & {
+  /** Directories this merge created and could not remove while rolling a write back (a link put in place of one). */
+  readonly leftoverDirs?: readonly string[]
+}
+
+interface LockedOutcome {
+  readonly plan: MergePlan
+  readonly sha?: string
+  readonly leftoverDirs?: readonly string[]
+}
 
 export interface ApplyIdentityMergeOptions {
   readonly source: MemoryIdentityPaths
@@ -41,7 +51,7 @@ export async function applyIdentityMerge(options: ApplyIdentityMergeOptions): Pr
   const targetRepo = new GitMemoryRepo({ dir: target.repo, agentId: targetId })
   // The plan that is written is made inside the lock: another writer may have created a path in the
   // target after the preview, and an `add` must never replace it.
-  const outcome = await lock("memory-write", async (): Promise<{ readonly plan: MergePlan; readonly sha?: string }> => {
+  const outcome = await lock("memory-write", async (): Promise<LockedOutcome> => {
     // A repository-root identity that is new under the `git` default has no repository yet: the merge is
     // its first write, so it creates it here instead of failing every source.
     if (
@@ -107,21 +117,19 @@ export async function applyIdentityMerge(options: ApplyIdentityMergeOptions): Pr
       await markIdentityMerged(source.root, plan.sourceId, targetId, plan.sourceHead)
       return { plan, sha }
     } catch (error) {
-      if (error instanceof NoEffectiveChangesError) {
-        await targetRepo.restorePaths(written)
-        await removeCreatedDirs(createdDirs)
-        return { plan }
-      }
       await targetRepo.restorePaths(written)
-      await removeCreatedDirs(createdDirs)
+      const leftover = await removeCreatedDirs(target.repo, createdDirs)
+      if (error instanceof NoEffectiveChangesError) return { plan, leftoverDirs: leftover.map((dir) => dir.path) }
+      attachLeftoverDirs(error, leftover)
       throw error
     }
   })
   if (outcome.sha === undefined && outcome.plan.sourceHead !== null)
     await markIdentityMerged(source.root, outcome.plan.sourceId, targetId, outcome.plan.sourceHead)
+  const leftover = outcome.leftoverDirs?.length ? { leftoverDirs: outcome.leftoverDirs } : {}
   return outcome.sha === undefined
-    ? { status: "nothing-to-merge", plan: outcome.plan }
-    : { status: "merged", sha: outcome.sha, plan: outcome.plan }
+    ? { status: "nothing-to-merge", plan: outcome.plan, ...leftover }
+    : { status: "merged", sha: outcome.sha, plan: outcome.plan, ...leftover }
 }
 
 function requiredOid(oids: ReadonlyMap<string, string>, path: string): string {

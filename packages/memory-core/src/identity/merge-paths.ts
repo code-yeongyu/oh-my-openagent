@@ -1,7 +1,7 @@
 // Path confinement for `/memory-merge` (#12974 security): which source tree names may become target paths,
 // and how a target path is created without following a link or replacing bytes already on disk.
 
-import { join } from "node:path"
+import { join, relative, sep } from "node:path"
 
 import { lstat, mkdir, open, rmdir, type FileHandle } from "../fs/resilient"
 import { fsErrorCode } from "../fs/retry"
@@ -76,12 +76,33 @@ export function assertMergePathConfined(path: string): void {
   }
 }
 
-/** Removes, deepest first, the directories createInTarget made, only while they are empty, so a refused merge leaves no trace. */
-export async function removeCreatedDirs(created: readonly string[]): Promise<void> {
+export interface LeftoverDir {
+  /** Relative to the repository, `/`-separated. */
+  readonly path: string
+  readonly code: string
+}
+
+/**
+ * Removes, deepest first, the directories createInTarget made, only while they are empty, so a refused merge
+ * leaves no trace. Best effort: a directory it cannot remove (a link put in its place, a busy directory on
+ * Windows) is returned instead of thrown, so cleanup never replaces the outcome of the merge it cleans up.
+ */
+export async function removeCreatedDirs(repo: string, created: readonly string[]): Promise<readonly LeftoverDir[]> {
+  const leftover: LeftoverDir[] = []
   for (const dir of [...created].reverse()) {
     await rmdir(dir).catch((error: unknown) => {
       const code = fsErrorCode(error)
-      if (code !== "ENOENT" && code !== "ENOTEMPTY" && code !== "EEXIST") throw error
+      if (code === "ENOENT" || code === "ENOTEMPTY" || code === "EEXIST") return
+      leftover.push({ path: relative(repo, dir).split(sep).join("/"), code: code ?? String(error) })
     })
   }
+  return leftover
+}
+
+/** Records on the error a rollback is rethrowing the directories it could not remove, keeping any cause it had. */
+export function attachLeftoverDirs(error: unknown, leftover: readonly LeftoverDir[]): void {
+  if (leftover.length === 0 || !(error instanceof Error)) return
+  const listed = leftover.map((dir) => `${dir.path} (${dir.code})`).join(", ")
+  const failure = new Error(`memory merge: could not remove directories it created: ${listed}`)
+  error.cause = error.cause === undefined ? failure : new AggregateError([error.cause, failure], failure.message)
 }

@@ -112,11 +112,17 @@ async function runMemoryMerge(deps: MemoryCommandDeps, args: string, ctx: Memory
             },
           }),
       })
+      const leftover =
+        result.leftoverDirs === undefined
+          ? ""
+          : `; could not remove directories it created: ${result.leftoverDirs.join(", ")}`
       if (result.status === "merged") {
         merged = true
-        results.push(`merged ${predecessor.id} (${result.sha.slice(0, 7)}): ${counts(result.plan)}`)
+        results.push(`merged ${predecessor.id} (${result.sha.slice(0, 7)}): ${counts(result.plan)}${leftover}`)
       } else {
-        results.push(`${predecessor.id}: ${result.status === "already-merged" ? "already merged" : "nothing to merge"}`)
+        results.push(
+          `${predecessor.id}: ${result.status === "already-merged" ? "already merged" : "nothing to merge"}${leftover}`,
+        )
       }
     } catch (error) {
       results.push(`${predecessor.id}: skipped (${error instanceof Error ? error.message : String(error)})`)
