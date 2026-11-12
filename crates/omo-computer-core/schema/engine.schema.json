@@ -2186,7 +2186,10 @@
         "root_crop",
         "screencast",
         "screencast_crop",
-        "screenshot_portal"
+        "screenshot_portal",
+        "wgc",
+        "printwindow",
+        "bitblt"
       ],
       "description": "How a frame was produced."
     },

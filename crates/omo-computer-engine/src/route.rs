@@ -10,6 +10,10 @@ use omo_computer_core::env::{check_launch_env, SeamRefusal, FAKE_BACKEND};
 
 pub const BACKEND_SEAM: &str = "OMO_COMPUTER_BACKEND";
 pub const RUNTIME_DIR_SEAM: &str = "OMO_COMPUTER_RUNTIME_DIR";
+// Row 55 (R35): the value that selects the Windows backend; unset stays NoBackend (row 28).
+// Off Windows only the tests read it; the cfg(windows) arm is its one non-test reader.
+#[cfg_attr(not(windows), allow(dead_code))]
+pub const WIN32_BACKEND: &str = "win32";
 
 /// The fake's recording sink file under the runtime directory: `fake-sink-<pid>.log`, one
 /// per engine process, so a restarted engine never truncates the lines of the one before.
@@ -69,6 +73,9 @@ pub fn backend(vars: &[(String, String)]) -> Result<Box<dyn Backend>, RouteError
                 lookup("GDK_SCALE").as_deref(),
             ),
         )),
+        // Row 55 (R35): the Windows backend, on Windows only.
+        #[cfg(windows)]
+        Some(value) if value == WIN32_BACKEND => Ok(Box::new(omo_computer_backend_win32::Win32Backend::new())),
         other => Err(RouteError::NoBackend(other)),
     }
 }
@@ -106,6 +113,19 @@ mod tests {
                 omo_computer_core::error::Reason::NoDisplayServer,
             )
         );
+        assert!(matches!(backend(&vars(&[])), Err(RouteError::NoBackend(None))));
+    }
+
+    // Row 55 (R35): OMO_COMPUTER_BACKEND=win32 selects the Windows backend on Windows and
+    // nothing elsewhere; unset still selects nothing.
+    #[test]
+    fn win32_is_selected_only_on_windows() {
+        let selected = backend(&vars(&[(BACKEND_SEAM, WIN32_BACKEND)]));
+        if cfg!(windows) {
+            assert_eq!(selected.map(|backend| backend.capabilities().backend).ok().as_deref(), Some("win32"));
+        } else {
+            assert!(matches!(selected, Err(RouteError::NoBackend(Some(value))) if value == WIN32_BACKEND));
+        }
         assert!(matches!(backend(&vars(&[])), Err(RouteError::NoBackend(None))));
     }
 }
