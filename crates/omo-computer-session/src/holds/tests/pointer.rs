@@ -43,7 +43,7 @@ fn drag_drop_onto_a_denied_app_is_refused_with_nothing_pressed() {
     assert_eq!(reason(&refused), ("InvalidTarget", Some("drag_destination")));
     let detail = refused.detail.as_deref().cloned().expect("the refused point (R54)");
     assert_eq!(detail["point"], json!({"x": 900.0, "y": 100.0}), "{detail}");
-    assert_eq!(detail["stageCode"], json!("ControlRequired"), "the scope stage refuses a denied app: {detail}");
+    assert_eq!((&detail["stageCode"], &detail["stageReason"]), (&json!("ControlRequired"), &json!("denied_app")), "the denied-app stage's pair (R60b): {detail}");
     assert!(f.inputs().is_empty(), "nothing pressed: {:?}", f.inputs());
 }
 
