@@ -51,6 +51,7 @@ const HEADER = ["id", "question", "condition", "host", "verdict", "rerun", "host
 const LEG_TIMEOUT_MS = 20_000
 // the probe's exit codes; README.md documents each one and --self-test checks that the two agree
 const EXIT = { ok: 0, failed: 1, precondition: 2 } as const
+type ExitCode = (typeof EXIT)[keyof typeof EXIT]
 
 type Os = 15 | 26
 type HostRole = "h1" | "h2" | "h4"
@@ -369,7 +370,7 @@ async function setup(env: HostEnv) {
 
 // ---------------------------------------------------------------------------------------------- legs
 
-async function leg(specPath: string): Promise<number> {
+async function leg(specPath: string): Promise<ExitCode> {
   const spec = JSON.parse(readFileSync(specPath, "utf8")) as LegSpec
   const startedAt = Date.now()
   const reportArgs = [
@@ -413,7 +414,7 @@ async function leg(specPath: string): Promise<number> {
   }
   writeFileSync(`${spec.done}.tmp`, JSON.stringify(result))
   must(await run(["mv", `${spec.done}.tmp`, spec.done]), "mv of the leg result")
-  return report || tapping ? 0 : 1
+  return report || tapping ? EXIT.ok : EXIT.failed
 }
 
 let legCounter = 0
@@ -1158,10 +1159,10 @@ async function measureRow(
   def: RowDef,
   env: HostEnv,
   mode: "measure" | "verify" = "measure",
-): Promise<{ line: string[]; exit: number }> {
+): Promise<{ line: string[]; exit: ExitCode }> {
   const log = new EvidenceLog()
   let measured: Measured
-  let exit = 0
+  let exit: ExitCode = EXIT.ok
   try {
     const gate = routeGate(def, process.env.SPT_HW_ROUTE)
     if (!appliesHere(def, env))
@@ -1185,7 +1186,7 @@ async function measureRow(
         measured: {},
         note: String(error instanceof Error ? error.message : error).slice(0, 300),
       }
-      exit = 1
+      exit = EXIT.failed
     }
   }
   const line = [
@@ -1220,7 +1221,7 @@ async function measureRow(
 type CleanupStep = [label: string, step: () => Promise<string>]
 
 // pure: --cleanup exits 1 when any receipt reports a failure (every step has already run by then), else 0
-function cleanupExitCode(receipts: string[]): number {
+function cleanupExitCode(receipts: string[]): ExitCode {
   return receipts.some((r) => r.includes(" FAILED: ") || r.includes("STILL PRESENT")) ? EXIT.failed : EXIT.ok
 }
 
@@ -1368,15 +1369,109 @@ function functionText(source: string, header: string): string {
   return source.slice(start + 1, end < 0 ? undefined : end + 2)
 }
 
-// structural check (RED stub: the old narrow scan of main's bare returns)
+// The functions whose result is the process exit code. Each must be declared ExitCode (or Promise<ExitCode>).
+const EXIT_FUNCTIONS = ["main", "leg", "selfTest", "cleanupExitCode"]
+
+// Structural check: every value that can become the process exit code must come from EXIT. The positions are every
+// `return` inside an ExitCode function, every declaration or assignment of an exit variable (`exit`, `rowExit`, or
+// any `let/const x: ExitCode`), and every `process.exit(...)` argument. In each position, after splitting ternaries
+// into their branches, a value must be EXIT.<name>, a call of an ExitCode function, or an exit variable; a numeric
+// literal or anything else is flagged with the statement text.
 function exitCodeSourceProblems(source: string): string[] {
   const problems: string[] = []
-  const mainStart = /^async function main\(/m.exec(source)?.index
-  if (mainStart === undefined) problems.push("the source has no top-level main()")
-  const mainText = mainStart === undefined ? "" : source.slice(mainStart)
-  const bare = mainText.split("\n").filter((l) => /\breturn\s+\d+\b|\?\s*\d+\s*:\s*\d+/.test(l))
-  for (const line of bare) problems.push(`main returns a bare exit code: ${line.trim()}`)
+  const exitVars = new Set(["exit", "rowExit"])
+  for (const m of source.matchAll(/\b(?:let|const)\s+(\w+)\s*:\s*ExitCode\b/g)) if (m[1]) exitVars.add(m[1])
+  const isExitValue = (raw: string): boolean => {
+    const v = stripParens(raw.trim())
+    const name = /^EXIT\.(\w+)$/.exec(v)?.[1]
+    if (name) return name in EXIT
+    const call = /^(?:await\s+)?(\w+)\(/.exec(v)?.[1]
+    if (call) return EXIT_FUNCTIONS.includes(call)
+    return exitVars.has(v)
+  }
+  const checkValue = (expr: string, where: string, stmt: string) => {
+    for (const v of ternaryBranches(expr))
+      if (!isExitValue(v)) problems.push(`${where}: \`${stmt}\` uses a non-EXIT exit value \`${v.trim()}\``)
+  }
+  const lines = source.split("\n")
+  const statementAt = (i: number): string => {
+    let stmt = (lines[i] ?? "").trim()
+    for (let j = i + 1; j < lines.length && /^\s*(\?|:|\|\||&&|\?\?)/.test(lines[j] ?? ""); j++)
+      stmt += ` ${(lines[j] ?? "").trim()}`
+    return stmt
+  }
+  // returns inside every ExitCode function
+  for (const fn of EXIT_FUNCTIONS) {
+    const header = new RegExp(
+      `^(?:async )?function ${fn}\\(([^{}]*?)\\)\\s*:\\s*(?:Promise<ExitCode>|ExitCode)\\s*\\{`,
+      "m",
+    )
+    const m = header.exec(source)
+    if (!m) {
+      problems.push(`${fn} is not declared to return ExitCode`)
+      continue
+    }
+    const start = source.slice(0, m.index).split("\n").length - 1
+    for (let i = start + 1; i < lines.length && lines[i] !== "}"; i++) {
+      const r = /^\s*(?:if \(.*\) )?return\b\s*(.*)$/.exec(lines[i] ?? "")
+      if (r) checkValue(statementAt(i).replace(/^(?:if \(.*\) )?return\s*/, ""), `${fn} return`, statementAt(i))
+    }
+  }
+  // exit variables: declarations must be typed ExitCode; every declaration and assignment must take an EXIT value
+  lines.forEach((line, i) => {
+    const decl = /^\s*(?:let|const)\s+(exit|\w+Exit)\b(\s*:\s*\w+)?\s*=\s*(.+)$/.exec(line)
+    if (decl) {
+      if (!/:\s*ExitCode/.test(decl[2] ?? "")) problems.push(`exit variable not typed ExitCode: \`${line.trim()}\``)
+      checkValue(decl[3] ?? "", "exit variable", statementAt(i))
+      return
+    }
+    const assign = /^\s*(\w+)\s*(\|\|=|\?\?=|&&=|=)(?!=)\s*(.+)$/.exec(line)
+    if (assign?.[1] && exitVars.has(assign[1])) checkValue(assign[3] ?? "", "exit assignment", statementAt(i))
+    const exitCall = /^\s*process\.exit\((.*)\)\s*$/.exec(line)
+    if (exitCall) checkValue(exitCall[1] ?? "", "process.exit", line.trim())
+  })
   return problems
+}
+
+function stripParens(v: string): string {
+  let s = v
+  while (s.startsWith("(") && s.endsWith(")") && balanced(s.slice(1, -1))) s = s.slice(1, -1).trim()
+  return s
+}
+
+function balanced(s: string): boolean {
+  let depth = 0
+  for (const c of s) {
+    if (c === "(") depth++
+    if (c === ")" && --depth < 0) return false
+  }
+  return depth === 0
+}
+
+// the value positions of an expression: the branches of a top-level `cond ? a : b` (recursively), else the expression
+function ternaryBranches(expr: string): string[] {
+  let depth = 0
+  let quote = ""
+  let q = -1
+  let nested = 0
+  for (let i = 0; i < expr.length; i++) {
+    const c = expr[i] ?? ""
+    if (quote) {
+      if (c === quote && expr[i - 1] !== "\\") quote = ""
+      continue
+    }
+    if (c === '"' || c === "'" || c === "`") quote = c
+    else if ("([{".includes(c)) depth++
+    else if (")]}".includes(c)) depth--
+    else if (depth === 0 && c === "?" && expr[i + 1] !== "." && expr[i + 1] !== "?" && expr[i - 1] !== "?") {
+      if (q < 0) q = i
+      else nested++
+    } else if (depth === 0 && c === ":" && q >= 0) {
+      if (nested > 0) nested--
+      else return [...ternaryBranches(expr.slice(q + 1, i)), ...ternaryBranches(expr.slice(i + 1))]
+    }
+  }
+  return [expr]
 }
 
 // class: each way a raw number can become an exit code, applied to the real source, must be flagged by the source check
@@ -1408,6 +1503,21 @@ function exitCodeMutantCases(source: string): Array<[string, unknown, unknown]> 
       "process.exit(await main(process.argv.slice(2)))",
       "process.exit(4)",
       "process.exit(4)",
+    ],
+    ["exit ??= n in main", "async function main(", "exit ||= rowExit", "exit ??= 1", "exit ??= 1"],
+    [
+      "nested ternary in main",
+      "async function main(",
+      "? EXIT.ok : EXIT.failed",
+      "? EXIT.ok : stale ? 1 : EXIT.failed",
+      "stale ? 1",
+    ],
+    [
+      "process.exit(ternary)",
+      "process.exit(",
+      "process.exit(await main(process.argv.slice(2)))",
+      "process.exit(ok ? 0 : EXIT.failed)",
+      "process.exit(ok ? 0",
     ],
     [
       "mixed ternary in leg",
@@ -1441,7 +1551,22 @@ function exitCodeMutantCases(source: string): Array<[string, unknown, unknown]> 
 
 // --self-test: the pure classification logic and the row table against fixed inputs; runs on any host, exits 1 on a
 // mismatch. It is the probe's unit coverage (the row's write scope allows no separate test file).
-async function selfTest(): Promise<number> {
+async function selfTest(): Promise<ExitCode> {
+  const cases = await selfTestCases()
+  let failed = 0
+  for (const [name, got, want] of cases) {
+    const ok = JSON.stringify(got) === JSON.stringify(want)
+    if (!ok) failed++
+    console.log(
+      `${ok ? "PASS" : "FAIL"} ${name}${ok ? "" : `: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`}`,
+    )
+  }
+  console.log(failed === 0 ? `SELF_TEST_OK ${cases.length}` : `SELF_TEST_FAILED ${failed}/${cases.length}`)
+  return failed === 0 ? EXIT.ok : EXIT.failed
+}
+
+// the self-test's cases: [name, got, want]
+async function selfTestCases(): Promise<Array<[string, unknown, unknown]>> {
   const report = (over: Partial<ProbeReport>): ProbeReport => ({
     marker: "m",
     pid: 500,
@@ -1765,26 +1890,24 @@ async function selfTest(): Promise<number> {
     ["cleanup exit: dir STILL PRESENT -> 1", cleanupExitCode(["procs 0", "dir STILL PRESENT /w"]), 1],
     ["cleanup exit: the receipts of a run whose diagnostic failed -> 1", cleanupExitCode(cleanupReceipts), 1],
   )
-  let failed = 0
-  for (const [name, got, want] of cases) {
-    const ok = JSON.stringify(got) === JSON.stringify(want)
-    if (!ok) failed++
-    console.log(
-      `${ok ? "PASS" : "FAIL"} ${name}${ok ? "" : `: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`}`,
-    )
-  }
-  console.log(failed === 0 ? `SELF_TEST_OK ${cases.length}` : `SELF_TEST_FAILED ${failed}/${cases.length}`)
-  return failed === 0 ? EXIT.ok : EXIT.failed
+  return cases
 }
 
 // ---------------------------------------------------------------------------------------------- main
 
-async function main(argv: string[]): Promise<number> {
-  const flag = (name: string) => argv.includes(name)
-  const value = (name: string) => {
-    const i = argv.indexOf(name)
-    return i >= 0 ? argv[i + 1] : undefined
-  }
+function argFlag(argv: string[], name: string): boolean {
+  return argv.includes(name)
+}
+
+function argValue(argv: string[], name: string): string | undefined {
+  const i = argv.indexOf(name)
+  return i >= 0 ? argv[i + 1] : undefined
+}
+
+// every value main returns is an ExitCode (exitCodeSourceProblems checks it); helpers live outside main for that reason
+async function main(argv: string[]): Promise<ExitCode> {
+  const flag = (name: string) => argFlag(argv, name)
+  const value = (name: string) => argValue(argv, name)
 
   if (flag("--leg")) return leg(value("--leg") ?? "")
   if (flag("--self-test")) return await selfTest()
@@ -1848,7 +1971,7 @@ async function main(argv: string[]): Promise<number> {
   if (flag("--measure")) {
     const out = value("--out") ?? join(PROBE_DIR, "macos-tcc.tsv")
     const existing = existsSync(out) ? parseLedger(readFileSync(out, "utf8")) : new Map<string, string[]>()
-    let exit = 0
+    let exit: ExitCode = EXIT.ok
     for (const def of ROWS) {
       if (!appliesHere(def, env)) continue
       const { line, exit: rowExit } = await measureRow(def, env)

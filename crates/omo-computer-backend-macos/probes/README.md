@@ -97,6 +97,8 @@ against fixed inputs on any host.
   `VERIFY_OK` and exit 0. The T3 identity and the H3 grant stay for the later macOS rows and are removed
 at the final teardown (`sp-t-identity.sh delete`, and `tccutil reset` of the helper bundle id).
 
+`--measure` and `--row` exit 0 when every measured row gets a verdict (`UNMEASURED` and `WAITING-PERSON` included) and 1 when any row ends in `ERROR` (an unexpected failure inside a measurement); `--measure` still writes the ledger. Every exit code comes from the probe's one `EXIT` table, and `--self-test` checks that this README and the code agree.
+
 `--cleanup` runs every step even when one fails, and prints one receipt per step. `--cleanup` exits 0 when every receipt is clean and 1 when any receipt contains `FAILED` or `STILL PRESENT`, after it has removed everything it can.
 
 Any single row re-measures with the command in its `rerun` column. On a host without the preconditions (for example
