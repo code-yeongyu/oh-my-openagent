@@ -450,7 +450,11 @@ describe("#13037 the sender half reaches a session on another device that is not
 
   describe("review: a receiving side's free-form refusal reason is bounded before it reaches the person", () => {
     const shownOf = async (reason: string) => {
-      const a = account({ rows: [B_ROW, C_ROW], ended: { c: { [GONE]: "rk-c-gone" } }, wakeOutcome: queuedEnvelope({ kind: "refused", reason }) })
+      const a = account({
+        rows: [B_ROW, C_ROW],
+        ended: { c: { [GONE]: "rk-c-gone" } },
+        wakeOutcome: queuedEnvelope({ kind: "refused", reason }),
+      })
       const result = await fixture.surface(a.remote).run("thread_send", { thread: GONE, message: "hi" })
       return (result as { error: { details?: { reason?: string } } }).error.details?.reason ?? ""
     }
