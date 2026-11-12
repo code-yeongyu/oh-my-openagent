@@ -1,9 +1,10 @@
 import { expect, test } from "bun:test"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
+import { createServer } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { commitPathProblem, prepareLanding } from "./landing"
+import { commitPathProblem, fsRefusal, prepareLanding, readWorking } from "./landing"
 
 const posix = process.platform === "win32" ? test.skip : test
 
@@ -90,6 +91,91 @@ posix(
   },
   10_000,
 )
+
+// #12575: the kind of leaf is judged on the opened descriptor, so a FIFO swapped in after prepareLanding's lstat (or a
+// known key's file replaced by one before capture) settles as a refusal instead of blocking the read.
+posix(
+  "reading a FIFO leaf settles at once with the non-regular-file refusal, with no writer on the other end",
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), "omo-sync-landing-"))
+    try {
+      // given
+      const key = "memory/note.md"
+      await mkdir(join(root, "memory"), { recursive: true })
+      const made = Bun.spawn(["mkfifo", join(root, key)])
+      expect(await made.exited).toBe(0)
+      let timeoutId: ReturnType<typeof setTimeout> | undefined
+      const timeout = new Promise<{ kind: "timed-out" }>((resolve) => {
+        timeoutId = setTimeout(() => resolve({ kind: "timed-out" }), 5_000)
+      })
+
+      // when
+      try {
+        const settled = await Promise.race([
+          readWorking(root, key).then(
+            (text) => ({ kind: "read" as const, text }),
+            (error: unknown) => ({ kind: "refused" as const, reason: fsRefusal(error)?.toLowerCase() }),
+          ),
+          timeout,
+        ])
+
+        // then
+        expect(settled).toEqual({ kind: "refused", reason: "non-regular-file" })
+      } finally {
+        if (timeoutId !== undefined) clearTimeout(timeoutId)
+      }
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  },
+  10_000,
+)
+
+posix("reading a leaf that is a symlink fails instead of following it", async () => {
+  const root = await mkdtemp(join(tmpdir(), "omo-sync-landing-"))
+  try {
+    // given
+    await mkdir(join(root, "memory"), { recursive: true })
+    await writeFile(join(root, "memory", "real.md"), "real\n")
+    await symlink("real.md", join(root, "memory", "note.md"))
+
+    // when
+    const reason = await readWorking(root, "memory/note.md").then(
+      () => undefined,
+      (error: unknown) => fsRefusal(error),
+    )
+
+    // then
+    expect(reason).toBe("ELOOP")
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+posix("reading a socket leaf is refused as a non-regular file instead of failing the cycle", async () => {
+  const root = await mkdtemp(join(tmpdir(), "omo-sync-landing-"))
+  const server = createServer()
+  try {
+    // given
+    const key = "memory/note.md"
+    await mkdir(join(root, "memory"), { recursive: true })
+    await new Promise<void>((resolve) => {
+      server.listen(join(root, key), () => resolve())
+    })
+
+    // when
+    const reason = await readWorking(root, key).then(
+      () => undefined,
+      (error: unknown) => fsRefusal(error)?.toLowerCase(),
+    )
+
+    // then
+    expect(reason).toBe("non-regular-file")
+  } finally {
+    server.close()
+    await rm(root, { recursive: true, force: true })
+  }
+})
 
 test("an existing directory at a received key's path is refused as a non-regular leaf", async () => {
   const root = await mkdtemp(join(tmpdir(), "omo-sync-landing-"))
