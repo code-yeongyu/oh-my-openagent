@@ -85,6 +85,8 @@ case "dialogs":
   let list = (CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]]) ?? []
   let found = list.compactMap { $0[kCGWindowOwnerName as String] as? String }.filter { owners.contains($0) }
   emit(["windows": found])
+case "symbols":
+  emit(symbolReport())
 case "disclaim":
   spawnDisclaimed(argument(2), Array(arguments.dropFirst(3)))
 default:

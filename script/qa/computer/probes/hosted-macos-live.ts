@@ -135,6 +135,9 @@ async function probeRunner(args: readonly string[], image: string): Promise<numb
     const invoke = directInvoke(binary)
     const probe: Probe = { invoke, control: invoke, fixture: started.fixture, textEditPid, scratch }
     const results = await answers(only, probe, binary, subject)
+    const symbols = `${JSON.stringify(invoke(["symbols"]))}\n`
+    writeFileSync(join(out, `cuv3-symbols.${image}.json`), symbols)
+    process.stdout.write(`private symbol resolve (runner shell, public controls included): ${symbols}`)
     const link = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}/attempts/${process.env.GITHUB_RUN_ATTEMPT}`
     const rows: LedgerRow[] = [...results].map(([question, result]) => ({
       question,
