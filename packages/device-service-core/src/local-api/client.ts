@@ -247,7 +247,8 @@ export const connectLocalApi = async (options: ConnectOptions): Promise<LocalApi
     },
     command: (attach, rpc, command_id, route = {}, options) =>
       sendCommand(connection, attach, rpc, command_id, route, options?.accepts),
-    wakeCommand: (device, durableId, rpc, command_id) => sendWakeCommand(connection, device, durableId, rpc, command_id),
+    wakeCommand: (device, durableId, rpc, command_id) =>
+      sendWakeCommand(connection, device, durableId, rpc, command_id),
     endpointCommand: (device, endpoint, rpc, command_id, options) =>
       sendEndpointCommand(connection, device, endpoint, rpc, command_id, options?.locate === true),
     list: (filter, onRevision, rows) =>

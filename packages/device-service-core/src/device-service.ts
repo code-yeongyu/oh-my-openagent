@@ -40,7 +40,9 @@ function sendToEndpoint(
     const send = (asked: boolean): Promise<unknown> =>
       client.endpointCommand(device, endpoint, rpc, commandId, { locate: asked })
     return send(locate).catch((error: unknown) =>
-      locate && error instanceof LocalApiError && error.code === "invalid_request" ? send(false) : Promise.reject(error),
+      locate && error instanceof LocalApiError && error.code === "invalid_request"
+        ? send(false)
+        : Promise.reject(error),
     )
   })
 }

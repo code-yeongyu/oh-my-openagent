@@ -23,7 +23,8 @@ describe("#13037 the sender half reaches a session on another device that is not
   const fixture = createRemoteThreadFixture()
   afterEach(fixture.cleanup)
   // Both device-service gates open on this device (they ship null): the sender half is on.
-  const account = (options: Parameters<Fixture["account"]>[0] = {}) => fixture.account({ wakeFeature: true, ...options })
+  const account = (options: Parameters<Fixture["account"]>[0] = {}) =>
+    fixture.account({ wakeFeature: true, ...options })
 
   const wakes = (account: Account) => account.sent.filter((entry) => entry.via === "wake")
   const nothingSent = (account: Account) => expect(account.sent).toEqual([])
@@ -231,7 +232,10 @@ describe("#13037 the sender half reaches a session on another device that is not
     })
 
     test("#given this device's service cannot carry the wake #when an ended row is sent to #then no wake is sent", async () => {
-      const a = account({ rows: [B_ROW, { ...C_ROW, session_id: "rk-ended", durable_id: GONE, state: "ended" }], noWake: true })
+      const a = account({
+        rows: [B_ROW, { ...C_ROW, session_id: "rk-ended", durable_id: GONE, state: "ended" }],
+        noWake: true,
+      })
       const { run } = fixture.surface(a.remote)
       await run("thread_send", { thread: GONE, message: "hi" })
       expect(wakes(a)).toEqual([])
@@ -259,7 +263,12 @@ describe("#13037 the sender half reaches a session on another device that is not
     test("#given the receiver answered an existing row #then the result is deduplicated", async () => {
       expect(
         await answered(
-          queuedEnvelope({ kind: "queued", stored_command_id: "s-1", deduplicated: true, waiting_on: { kind: "wake" } }),
+          queuedEnvelope({
+            kind: "queued",
+            stored_command_id: "s-1",
+            deduplicated: true,
+            waiting_on: { kind: "wake" },
+          }),
         ),
       ).toMatchObject({ kind: "ok", deduplicated: true })
     })
@@ -273,15 +282,12 @@ describe("#13037 the sender half reaches a session on another device that is not
       ["chain_count_limit", "unsupported", { reason: "chain_count_limit" }],
       ["queue_full", "queue_full", {}],
       ["wake_limit_reached", "overloaded", { reason: "wake_limit_reached" }],
-    ] as const)(
-      "#given the receiver refused it with %s #then the tool answers %s",
-      async (reason, code, details) => {
-        expect(await answered(queuedEnvelope({ kind: "refused", reason }))).toMatchObject({
-          kind: "error",
-          error: { code, details: { device: "c", ...details } },
-        })
-      },
-    )
+    ] as const)("#given the receiver refused it with %s #then the tool answers %s", async (reason, code, details) => {
+      expect(await answered(queuedEnvelope({ kind: "refused", reason }))).toMatchObject({
+        kind: "error",
+        error: { code, details: { device: "c", ...details } },
+      })
+    })
 
     test("#given the receiver refused it overloaded #then the tool answers overloaded with retry_after_ms", async () => {
       expect(
@@ -294,19 +300,18 @@ describe("#13037 the sender half reaches a session on another device that is not
       ["session_gone", "not_found"],
       ["ambiguous_session", "ambiguous_target"],
       ["overloaded", "overloaded"],
-    ] as const)(
-      "#given the receiving service itself answered %s #then the tool answers %s",
-      async (detail, code) => {
-        expect(
-          await answered({ kind: "refused", reason: "engine_capability_missing", detail }),
-        ).toMatchObject({ kind: "error", error: { code, details: { device: "c", reason: detail } } })
-      },
-    )
+    ] as const)("#given the receiving service itself answered %s #then the tool answers %s", async (detail, code) => {
+      expect(await answered({ kind: "refused", reason: "engine_capability_missing", detail })).toMatchObject({
+        kind: "error",
+        error: { code, details: { device: "c", reason: detail } },
+      })
+    })
 
     test("#given the receiving service refused the grant #then the tool answers scope_denied", async () => {
-      expect(
-        await answered({ kind: "refused", reason: "capability_missing", detail: "not_carried" }),
-      ).toMatchObject({ kind: "error", error: { code: "scope_denied" } })
+      expect(await answered({ kind: "refused", reason: "capability_missing", detail: "not_carried" })).toMatchObject({
+        kind: "error",
+        error: { code: "scope_denied" },
+      })
     })
 
     test("#given the receiving device lacks the wake feature #then the tool answers unsupported (wake_unsupported)", async () => {
@@ -373,7 +378,11 @@ describe("#13037 the sender half reaches a session on another device that is not
         { listings: { all: 1, device: 0 }, lookups: 0, commands: 1 },
       ],
       "alias, live": [
-        { rows: [B_ROW], options: { aliases: new Map([["bee", { session_id: "dur-on-b", device: "b" }]]) }, thread: "bee" },
+        {
+          rows: [B_ROW],
+          options: { aliases: new Map([["bee", { session_id: "dur-on-b", device: "b" }]]) },
+          thread: "bee",
+        },
         { listings: { all: 1, device: 0 }, lookups: 0, commands: 2 },
       ],
       "bare id, not running, held": [

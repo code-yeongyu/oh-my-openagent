@@ -40,7 +40,10 @@ describe("an omo through 5.1.66 talking to a device service at the wake gate's v
       ),
     ).toMatchObject({ ok: true, data: { key: "S0VZS0VZS0VZS0VZS0VZSw" } })
     expect(
-      validateResponse({ id: "4", type: "response", ok: true, data: { command_id: "Y29tbWFuZC1pZC0wMDAwMQ" } }, "session.command"),
+      validateResponse(
+        { id: "4", type: "response", ok: true, data: { command_id: "Y29tbWFuZC1pZC0wMDAwMQ" } },
+        "session.command",
+      ),
     ).toMatchObject({ ok: true, data: { command_id: "Y29tbWFuZC1pZC0wMDAwMQ" } })
     expect(
       validateEvent({

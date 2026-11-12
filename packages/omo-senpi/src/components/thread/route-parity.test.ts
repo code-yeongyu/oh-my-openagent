@@ -196,7 +196,13 @@ describe("#13006: a send answers the same shape and the same refusals whichever 
           ? { kind: "ok", delivery: { kind: "queued_offline" } }
           : { kind: "ok", device: "b", delivery: { kind: "queued", waiting_on: { kind: "wake", device: "b" } } },
       )
-      expect(sharedKeys(result as object)).toEqual(["deduplicated", "delivery", "delivery_id", "effective_mode", "kind"])
+      expect(sharedKeys(result as object)).toEqual([
+        "deduplicated",
+        "delivery",
+        "delivery_id",
+        "effective_mode",
+        "kind",
+      ])
     },
   )
 

@@ -1,7 +1,14 @@
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import type { CommandResult } from "@oh-my-opencode/device-service-core"
 import { outcomeFailure, READ_UNCERTAIN } from "./outcome"
-import { endedRow, type AliasError, type AliasHolder, type JsonObject, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
+import {
+  endedRow,
+  type AliasError,
+  type AliasHolder,
+  type JsonObject,
+  type RemoteSessionRow,
+  type RemoteThreadSurface,
+} from "./ports"
 
 type Failure = { readonly kind: "error"; readonly error: ThreadToolFailure }
 const fail = (

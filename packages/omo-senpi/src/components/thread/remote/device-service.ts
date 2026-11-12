@@ -183,16 +183,18 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     devices: async () =>
       (await (await svc()).devices()).map((row) => ({ device: row.device, label: row.label, online: row.online })),
     sessions: async (filter) =>
-      (await (await svc()).sessions(filter?.device === undefined ? undefined : { device: filter.device })).rows.map((row) => ({
-        device: row.device,
-        session_id: row.session_id,
-        ...durableIdOf(row),
-        title: row.title,
-        project: row.project,
-        path: row.path,
-        state: row.state,
-        updated_ms: row.updated_ms,
-      })),
+      (await (await svc()).sessions(filter?.device === undefined ? undefined : { device: filter.device })).rows.map(
+        (row) => ({
+          device: row.device,
+          session_id: row.session_id,
+          ...durableIdOf(row),
+          title: row.title,
+          project: row.project,
+          path: row.path,
+          state: row.state,
+          updated_ms: row.updated_ms,
+        }),
+      ),
     // create / open / fork on another device: relay daemon #393's attach-less `session.command {device, endpoint, rpc}`.
     // The endpoint lookup and every refusal answered before sending ran nothing; anything after sending may have.
     endpointCommand: async (device, rpc, endpointOptions) => {
@@ -244,7 +246,8 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       }
       const sentAt = catalog.snapshots()
       // The gate is this connection's: a reconnect to an older service stops the mark.
-      const carries = MARKED_RECORDS.has(String(rpc["type"])) && (await svc().catch(() => undefined))?.carriesWakeMark === true
+      const carries =
+        MARKED_RECORDS.has(String(rpc["type"])) && (await svc().catch(() => undefined))?.carriesWakeMark === true
       const marked = carries ? { accepts: WAKE_ACCEPTS } : undefined
       try {
         const outcome = outcomeOf(await attached.command(record, marked))

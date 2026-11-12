@@ -303,11 +303,17 @@ export async function replyOnDevice(
       ),
     } as ThreadResolveResult
   }
-  const row = rows.find((candidate) => candidate.device === sender.device && rowThreadId(candidate) === sender.session_id)
+  const row = rows.find(
+    (candidate) => candidate.device === sender.device && rowThreadId(candidate) === sender.session_id,
+  )
   if (row !== undefined) return { kind: "ok", entry: relayAddressEntry(row), resolution: "id" }
   const probed = await remote.sessions.lookup?.(sender.device, sender.session_id)
   if (probed?.kind === "found")
-    return { kind: "ok", entry: relayAddressEntry(endedRow(sender.device, probed.key, sender.session_id)), resolution: "id" }
+    return {
+      kind: "ok",
+      entry: relayAddressEntry(endedRow(sender.device, probed.key, sender.session_id)),
+      resolution: "id",
+    }
   if (probed?.kind === "silent")
     return {
       kind: "error",
@@ -413,7 +419,9 @@ async function lookupAcross(
     online.map(async (device) => ({ device: device.device, answer: await probe(device.device, address) })),
   )
   if (answers.some(({ answer }) => answer.kind === "unavailable")) return undefined
-  const holders = answers.flatMap(({ device, answer }) => (answer.kind === "found" ? [{ device, key: answer.key }] : []))
+  const holders = answers.flatMap(({ device, answer }) =>
+    answer.kind === "found" ? [{ device, key: answer.key }] : [],
+  )
   const [only] = holders
   if (holders.length === 1 && only !== undefined)
     return { kind: "ok", entry: relayAddressEntry(endedRow(only.device, only.key, address)), resolution: "id" }

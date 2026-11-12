@@ -117,7 +117,12 @@ function wakeRefusal(reason: string, device: string, data: JsonObject = {}): Fai
   const details = { device, reason }
   switch (reason) {
     case "session_gone":
-      return fail("not_found", `Device ${device} holds no session file for that id.`, "Call thread_list with all_scope.", details)
+      return fail(
+        "not_found",
+        `Device ${device} holds no session file for that id.`,
+        "Call thread_list with all_scope.",
+        details,
+      )
     case "ambiguous_session":
       return fail(
         "ambiguous_target",
@@ -127,7 +132,12 @@ function wakeRefusal(reason: string, device: string, data: JsonObject = {}): Fai
       )
     case "not_wakeable":
     case "sender_not_admitted":
-      return fail("not_resumable", `Device ${device} cannot wake that session (${reason}).`, "Address another thread.", details)
+      return fail(
+        "not_resumable",
+        `Device ${device} cannot wake that session (${reason}).`,
+        "Address another thread.",
+        details,
+      )
     case "queue_full":
       return fail("queue_full", `The session on device ${device} has a full backlog.`, "Retry later.", details)
     case "overloaded": {
@@ -159,7 +169,12 @@ function wakeRefusal(reason: string, device: string, data: JsonObject = {}): Fai
         details,
       )
     default:
-      return fail("unsupported", `Device ${device} refused the message (${reason}).`, "Address another thread.", details)
+      return fail(
+        "unsupported",
+        `Device ${device} refused the message (${reason}).`,
+        "Address another thread.",
+        details,
+      )
   }
 }
 
@@ -523,7 +538,10 @@ export function createRelayTransport(
         {
           kind: "queued",
           queue_position: 1,
-          waiting_on: { kind: typeof wait === "string" && WAITS.has(wait) ? (wait as DeliveryWait["kind"]) : "wake", device },
+          waiting_on: {
+            kind: typeof wait === "string" && WAITS.has(wait) ? (wait as DeliveryWait["kind"]) : "wake",
+            device,
+          },
         },
         data["deduplicated"] === true,
       )
