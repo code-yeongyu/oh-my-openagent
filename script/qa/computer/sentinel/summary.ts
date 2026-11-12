@@ -193,11 +193,19 @@ export function summarize(events: readonly SentinelEvent[], options: { readonly 
           faults.push(`dialog: new window ${event.id} of pid ${event.ownerPid} was unreadable (AX ${event.axError})`)
         break
       case "observer_failed":
-        if (event.t <= until && event.regular && !targetPids.has(event.pid))
+        if (event.since <= until && event.regular && !targetPids.has(event.pid))
           faults.push(
             `dialog: window observer for pid ${event.pid} did not register after ${event.attempts} attempts (AX ${event.axError})`,
           )
         break
+      case "observer_late": {
+        const blind = Math.min(event.t, until) - Math.max(event.since, from)
+        if (blind > 0 && event.regular && !targetPids.has(event.pid))
+          faults.push(
+            `dialog: window observer for pid ${event.pid} registered only after ${event.attempts} attempts (${blind} ms without one inside the recording)`,
+          )
+        break
+      }
       case "leak":
         if (inWindow(event.t)) mark(event.what === "key" ? "typing" : "pointer", event.t)
         break

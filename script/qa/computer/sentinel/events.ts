@@ -44,11 +44,21 @@ export type SentinelEvent = { readonly t: number } & (
       readonly axReads?: number
     }
   | {
+      // A window observer that was not registered from `since` (the app's launch or the first attempt) until `t`
+      // (observer_late) or ever (observer_failed): a sheet in that gap is invisible to every branch.
       readonly kind: "observer_failed"
       readonly pid: number
       readonly axError: string
       readonly attempts: number
       readonly regular: boolean
+      readonly since: number
+    }
+  | {
+      readonly kind: "observer_late"
+      readonly pid: number
+      readonly attempts: number
+      readonly regular: boolean
+      readonly since: number
     }
   | { readonly kind: "leak"; readonly what: "key" | "mouse" }
 )
@@ -98,7 +108,8 @@ const SHAPES: Readonly<Record<SentinelEvent["kind"], Readonly<Record<string, Che
     axError: optional(str),
     axReads: optional(num),
   },
-  observer_failed: { pid: num, axError: str, attempts: num, regular: bool },
+  observer_failed: { pid: num, axError: str, attempts: num, regular: bool, since: num },
+  observer_late: { pid: num, attempts: num, regular: bool, since: num },
   leak: { what: oneOf("key", "mouse") },
 }
 

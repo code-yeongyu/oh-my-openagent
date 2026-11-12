@@ -117,16 +117,25 @@ final class Recorder: NSObject {
     if windowsListed { armed("dialog", "notification+sample") } else { fault("dialog", "window list unreadable") }
   }
 
-  // A just-launched app often refuses registration until its AX server is up, so registration retries for up to
-  // 2 s. One that never registers is reported as a fact (with whether it has a user interface); the reducer decides,
-  // and does not judge the target's own apps or apps without a UI. An app that has quit is not reported.
-  func watchWindows(of pid: pid_t, attempt: Int = 1) {
+  // A just-launched app with a user interface often refuses registration until its AX server is up, so only such an
+  // app is retried, for up to 2 s; a background agent is tried once and never costs the main thread a retry round.
+  // Every gap is reported with the moment it began (`since`): a registration that came late as observer_late, one
+  // that never came as observer_failed. The reducer judges the gap's overlap with the recording, and does not judge
+  // the target's own apps or apps without a UI. An app that has quit is not reported.
+  func watchWindows(of pid: pid_t, attempt: Int = 1, since: Double = uptimeMs()) {
     let error = observe(pid, AXUIElementCreateApplication(pid), [kAXWindowCreatedNotification, kAXSheetCreatedNotification])
-    guard error != .success, let app = NSRunningApplication(processIdentifier: pid), !app.isTerminated else { return }
-    if attempt < 10 { return after(0.2) { self.watchWindows(of: pid, attempt: attempt + 1) } }
+    guard let app = NSRunningApplication(processIdentifier: pid), !app.isTerminated else { return }
+    let regular = app.activationPolicy == .regular
+    if error == .success {
+      if attempt > 1 {
+        emit(["kind": "observer_late", "pid": Int(pid), "attempts": attempt, "regular": regular, "since": since])
+      }
+      return
+    }
+    if regular && attempt < 10 { return after(0.2) { self.watchWindows(of: pid, attempt: attempt + 1, since: since) } }
     emit([
       "kind": "observer_failed", "pid": Int(pid), "axError": axErrorName(error), "attempts": attempt,
-      "regular": app.activationPolicy == .regular,
+      "regular": regular, "since": since,
     ])
   }
 

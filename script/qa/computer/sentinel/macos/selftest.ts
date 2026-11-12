@@ -113,8 +113,9 @@ export async function runSelfTest(options: SelfTestOptions): Promise<{ exitCode:
     const control = await observeCell(session, () => plant(session, options.helpers, "warp"), options.windowMs)
     const status = "failed" in control.status ? `failed: ${control.status.failed}` : "planted"
     console.log(`SENTINEL_OBSERVER negative_control=${status} pointer_moved=${control.observed.pointerMoved}`)
-    const unregistered = session.events.filter((event) => event.kind === "observer_failed")
-    console.log(`SENTINEL_OBSERVERS failed=${unregistered.length}`)
+    const unregistered = session.events.filter((event) => event.kind === "observer_failed").length
+    const lateRegistered = session.events.filter((event) => event.kind === "observer_late").length
+    console.log(`SENTINEL_OBSERVERS failed=${unregistered} late=${lateRegistered}`)
     const result = judgeSelfTest(trials, control.observed.signals)
     for (const line of result.lines) console.log(line)
     return { exitCode: result.exitCode, receipts: await session.close() }
