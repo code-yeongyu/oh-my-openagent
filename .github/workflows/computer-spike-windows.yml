@@ -27,6 +27,9 @@ jobs:
     runs-on: windows-latest
     # 2 passes x 895 s + overhead + reserve, 10 % kept free (the self-test checks it)
     timeout-minutes: 45
+    env:
+      # the precompiled native assembly lives here, outside the checkout (sp-n.ps1 -NativeDir; probe-sp-n.ts passes it)
+      SPN_NATIVE_DIR: ${{ runner.temp }}\spn-native
     steps:
       - uses: actions/checkout@v7
 
@@ -34,7 +37,7 @@ jobs:
         with:
           bun-version: "1.4.4"
 
-      # The helper's native type, compiled once here into probes/sp-n-native.dll (sha256 recorded beside it and
+      # The helper's native type, compiled once here into $SPN_NATIVE_DIR/sp-n-native.dll (sha256 recorded beside it and
       # checked by every leg before loading), so no leg compiles at run time.
       - name: Precompile the SP-N native assembly
         shell: pwsh

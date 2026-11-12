@@ -42,7 +42,8 @@ The legs that change the session (disconnect, lock, console display off) need a 
 On hosted CI the workflow `.github/workflows/computer-spike-windows.yml` runs
 the precondition, `--measure` and `--verify` on `windows-latest` and uploads the
 ledger as an artifact. Its first step, `sp-n.ps1 -Leg build-native`, compiles the
-helper's native type once into `sp-n-native.dll` (built per run in the runner's checkout, never committed) with its sha256 in
+helper's native type once into `sp-n-native.dll` in `SPN_NATIVE_DIR` (the workflow sets it under the
+runner temp dir; else `TEMP`; never inside the checkout, passed to every leg as `-NativeDir`) with its sha256 in
 `sp-n-native.dll.sha256`; every leg hashes the assembly, refuses a mismatch
 (`legError`) and loads it, and compiles with `Add-Type` only when no assembly is
 present. The elevated rows' notes record which one the run used. A setup failure

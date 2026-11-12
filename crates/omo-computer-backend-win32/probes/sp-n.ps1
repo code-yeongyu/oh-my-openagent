@@ -7,7 +7,9 @@
 param(
   [Parameter(Mandatory = $true)][string]$Leg,
   [string]$ArgFile = '',
-  [string]$Out = ''
+  [string]$Out = '',
+  # where -Leg build-native writes sp-n-native.dll and every leg reads it; outside the checkout
+  [string]$NativeDir = $(if ($env:SPN_NATIVE_DIR) { $env:SPN_NATIVE_DIR } else { $env:TEMP })
 )
 $ErrorActionPreference = 'Stop'
 
@@ -22,11 +24,11 @@ using System.Threading;
 
 '@
 
-# The native type comes from sp-n-native.dll beside this file when the workflow precompiled it (-Leg build-native;
+# The native type comes from sp-n-native.dll in -NativeDir when the workflow precompiled it (-Leg build-native;
 # its sha256 is recorded in sp-n-native.dll.sha256), so a leg needs no compiler at run time. The bytes are hashed
 # and loaded from one read; a missing record or a mismatch throws (legError). Without the assembly the fragments
 # are compiled here, as before.
-$NativeDll = Join-Path $PSScriptRoot 'sp-n-native.dll'
+$NativeDll = Join-Path $NativeDir 'sp-n-native.dll'
 $script:NativeFrom = 'not loaded'
 function HexSHA256([byte[]]$bytes) {
   $h = [Security.Cryptography.SHA256]::Create()
@@ -48,8 +50,9 @@ function Compile {
   }
   [void][SpN]::SetProcessDpiAwarenessContext([IntPtr](-4))
 }
-# -Leg build-native: compile the fragments once into sp-n-native.dll and record its sha256 beside it.
+# -Leg build-native: compile the fragments once into sp-n-native.dll in -NativeDir and record its sha256 beside it.
 function BuildNative {
+  [void][IO.Directory]::CreateDirectory($NativeDir)
   foreach ($p in $NativeDll, "$NativeDll.sha256") { if (Test-Path -LiteralPath $p) { Remove-Item -Force -LiteralPath $p } }
   Add-Type -TypeDefinition $SpNNative -Language CSharp -OutputAssembly $NativeDll -OutputType Library
   $sha = HexSHA256 ([IO.File]::ReadAllBytes($NativeDll))

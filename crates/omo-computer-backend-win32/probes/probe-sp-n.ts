@@ -14,10 +14,22 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync, readdirSync } from "node:fs"
 import { randomBytes } from "node:crypto"
 import { tmpdir } from "node:os"
-import { basename, join, relative, resolve } from "node:path"
+import { basename, isAbsolute, join, relative, resolve } from "node:path"
 
 const HERE = import.meta.dir
 const HELPER = join(HERE, "sp-n.ps1")
+const REPO = resolve(HERE, "..", "..", "..")
+// Where `sp-n.ps1 -Leg build-native` writes sp-n-native.dll (+ .sha256) and every leg reads it: SPN_NATIVE_DIR (the
+// workflow sets it under the runner temp dir), else TEMP. Never inside the checkout. Every helper spawn passes it
+// as -NativeDir, since a runas or SYSTEM child may not inherit the variable.
+export function nativeDir(env: Readonly<Record<string, string | undefined>> = process.env, repo = REPO): string {
+  const dir = resolve(env.SPN_NATIVE_DIR || env.TEMP || tmpdir())
+  const rel = relative(repo, dir)
+  if (rel === "" || (!rel.startsWith("..") && !isAbsolute(rel)))
+    throw new Error(`native dir ${dir} is inside the repository ${repo}`)
+  return dir
+}
+const nativeArgs = () => ["-NativeDir", nativeDir()]
 const TARGET = join(HERE, "sp-n-target.ps1")
 export const LEDGER = "crates/omo-computer-backend-win32/probes/win32-delivery.tsv"
 const SELF = "crates/omo-computer-backend-win32/probes/probe-sp-n.ts"
@@ -377,7 +389,19 @@ async function leg(ctx: Ctx, name: string, arg: Json = {}): Promise<Json> {
   const argFile = join(ctx.tmp, `${name}-${Date.now()}-${Math.random().toString(36).slice(2)}.json`)
   writeFileSync(argFile, JSON.stringify(arg))
   const r = await run(
-    ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", HELPER, "-Leg", name, "-ArgFile", argFile],
+    [
+      "powershell.exe",
+      "-NoProfile",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      HELPER,
+      ...nativeArgs(),
+      "-Leg",
+      name,
+      "-ArgFile",
+      argFile,
+    ],
     ctx.live,
   )
   const line = r.out
@@ -430,7 +454,7 @@ export async function waitFile(path: string, ms: number, helper?: HelperWatch): 
 export function psCommand(dir: string, name: string, arg: Json, out: string): string {
   const argFile = join(dir, `${name}.arg.json`)
   writeFileSync(argFile, JSON.stringify(arg))
-  return `powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "${HELPER}" -Leg ${name} -ArgFile "${argFile}" -Out "${out}"`
+  return `powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "${HELPER}" -NativeDir "${nativeDir()}" -Leg ${name} -ArgFile "${argFile}" -Out "${out}"`
 }
 
 // A leg as a medium-integrity process (basic-user trust level of this account). It cannot write the
@@ -1376,6 +1400,7 @@ async function sessionLeg(ctx: Ctx, t: Target, state: "disconnected" | "locked")
         "Bypass",
         "-File",
         HELPER,
+        ...nativeArgs(),
         "-Leg",
         "capture",
         "-ArgFile",
