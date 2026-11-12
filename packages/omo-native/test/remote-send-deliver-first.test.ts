@@ -34,6 +34,9 @@ describe("#13269: a waiting send hands its message to the session before the fol
     // The attach handshake modelled as a gate the test holds shut: over the relay it is slower than the delivery, so
     // the watch completes only once the prompt was handed over, and the reply lands only when the test releases it.
     const replyGate = Promise.withResolvers<void>()
+    const replyGateDone = (): boolean => replyDone
+    let replyDone = false
+    let recordsOut = false
     const firstDelta = Promise.withResolvers<void>()
     let records: ((record: JsonObject) => void) | undefined
     const surface = {
@@ -47,7 +50,22 @@ describe("#13269: a waiting send hands its message to the session before the fol
           calls.push("devices")
           return [{ device: "b", label: "b", online: true }]
         },
-        read: async () => ({ kind: "ok" as const, response: { entries: [] } }),
+        read: async () => {
+          calls.push("read")
+          // The turn's records leave when the follower first comes looking, as the wire streams them after the
+          // reply: the aim's probe read is that first look.
+          if (!recordsOut && replyGateDone()) {
+            recordsOut = true
+            if (records !== undefined)
+              for (const record of [
+                { type: "agent_start" },
+                { type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "hi there\n", contentIndex: 0 } },
+                { type: "agent_settled" },
+              ])
+                records(record as JsonObject)
+          }
+          return { kind: "ok" as const, response: { entries: [] } }
+        },
         watch: async (_device: string, _session: string, listener: (record: JsonObject) => void) => {
           calls.push("watch")
           records = listener
@@ -114,17 +132,11 @@ describe("#13269: a waiting send hands its message to the session before the fol
         8_000,
         "the message was never handed to the session: its delivery waits behind the follow's watch attach (#13269)",
       )
-      // The turn opens while the reply is still in flight, so its records can only be the follow's to hold until
-      // the reply marks them as this send's own; the settle is handed over only once the delta has actually printed.
-      if (records !== undefined)
-        for (const record of [
-          { type: "agent_start" },
-          { type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "hi there\n", contentIndex: 0 } },
-        ])
-          records(record as JsonObject)
+      // The reply lands and the follow aims (its attach may still be completing); the aim's probe read is the
+      // turn's first hop out, so the answer streams from there and settles at its run's settle.
+      replyDone = true
       replyGate.resolve()
       await withTimeout(firstDelta.promise, 8_000, "the turn's own deltas never printed after its reply")
-      records?.({ type: "agent_settled" })
       const exit = await withTimeout(run, 8_000, "the send never returned after its turn settled")
       expect(exit).toBe(0)
       expect(written).toEqual(["hi there\n"])

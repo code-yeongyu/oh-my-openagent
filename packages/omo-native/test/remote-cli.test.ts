@@ -731,14 +731,16 @@ describe("omo remote session verbs", () => {
     ])
   })
 
-  test("send to a session that cannot be followed is refused before the message is sent", async () => {
+  test("send to a session that cannot be followed is refused by the delivery itself", async () => {
     const a = fixture.account({ refuse: "host_not_answering" })
     const { code, err } = await run(["send", "b/dur-on-b", "hi"], undefined, SIGNED_IN, testBootstrap(), a.remote)
     expect([code, err[0]]).toEqual([
       REMOTE_EXIT.failed,
       "omo remote: Device b did not answer (host_not_answering); this call changed nothing there.",
     ])
-    expect(types(a.sent, "prompt")).toEqual([])
+    // Delivered first (#13269), the refusal surfaces from the delivery attempt itself: one prompt, refused by the
+    // engine, so nothing changed there.
+    expect(types(a.sent, "prompt")).toHaveLength(1)
   })
 
   test("send puts a line break between the text of two content blocks of one message", async () => {
