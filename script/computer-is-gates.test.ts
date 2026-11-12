@@ -62,12 +62,28 @@ describe("computer-is-gates --gate", () => {
       repo.write({ "followup.rs": "// row 15\n" })
       repo.commit("row 15 work")
       repo.git("checkout", "-q", "feat/cu-v3-row14-fake")
-      repo.git("merge", "-q", "--no-ff", "-m", "Merge pull request #201 from owner/feat/cu-v3-row15-followup", "feat/cu-v3-row15-followup")
+      repo.git(
+        "merge",
+        "-q",
+        "--no-ff",
+        "-m",
+        "Merge pull request #201 from owner/feat/cu-v3-row15-followup",
+        "feat/cu-v3-row15-followup",
+      )
       repo.git("checkout", "-q", "dev")
 
-      expect(runGates(["--gate", "spine", "--ref", "dev"], repo.options).lines).toEqual(["GATE spine FAIL missing=14,15"])
+      expect(runGates(["--gate", "spine", "--ref", "dev"], repo.options).lines).toEqual([
+        "GATE spine FAIL missing=14,15",
+      ])
 
-      repo.git("merge", "-q", "--no-ff", "-m", "Merge pull request #200 from owner/feat/cu-v3-row14-fake", "feat/cu-v3-row14-fake")
+      repo.git(
+        "merge",
+        "-q",
+        "--no-ff",
+        "-m",
+        "Merge pull request #200 from owner/feat/cu-v3-row14-fake",
+        "feat/cu-v3-row14-fake",
+      )
       const landed = runGates(["--gate", "spine", "--ref", "dev"], repo.options)
 
       // the row 15 merge now sits in dev's history, but only on the second-parent side: still missing

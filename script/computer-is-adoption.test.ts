@@ -47,7 +47,10 @@ describe("computer-is-gates --adoption", () => {
   test("an adopt, adapt or probe entry taken by no row fails and is named", () => {
     withFixtureRepo((repo) => {
       seed(repo, {
-        "script/computer-adoption.tsv": ledger(entry("ADP-1", "goat-cu", "adopt", "4"), entry("ADP-2", "goat", "adapt", "")),
+        "script/computer-adoption.tsv": ledger(
+          entry("ADP-1", "goat-cu", "adopt", "4"),
+          entry("ADP-2", "goat", "adapt", ""),
+        ),
         "THIRD-PARTY-NOTICES.md": notices(),
       })
 
@@ -61,7 +64,10 @@ describe("computer-is-gates --adoption", () => {
   test("a file that carries another project's code without that project's notice fails", () => {
     withFixtureRepo((repo) => {
       seed(repo, {
-        "script/computer-adoption.tsv": ledger(entry("ADP-1", "goat-cu", "adopt", "4"), entry("ADP-2", "goat", "adopt", "5")),
+        "script/computer-adoption.tsv": ledger(
+          entry("ADP-1", "goat-cu", "adopt", "4"),
+          entry("ADP-2", "goat", "adopt", "5"),
+        ),
         "THIRD-PARTY-NOTICES.md": notices("goat-cu"),
         "crates/x/src/seat.rs": `// ${portMarker("ADP-2")}\n`,
       })
@@ -79,7 +85,10 @@ describe("computer-is-gates --adoption", () => {
   test("a malformed ledger line is a finding, never a smaller passing ledger", () => {
     withFixtureRepo((repo) => {
       seed(repo, {
-        "script/computer-adoption.tsv": ledger(entry("ADP-1", "goat-cu", "adopt", "4"), entry("ADP-2", "goat", "borrow", "5")),
+        "script/computer-adoption.tsv": ledger(
+          entry("ADP-1", "goat-cu", "adopt", "4"),
+          entry("ADP-2", "goat", "borrow", "5"),
+        ),
         "THIRD-PARTY-NOTICES.md": notices(),
       })
 
@@ -106,7 +115,10 @@ describe("computer-is-gates --adoption --row", () => {
       })
 
       const partial = runGates(["--adoption", "--row", "3"], repo.options)
-      expect(partial.lines).toEqual(["ADOPTION row=3 entries=2 proven=1", "ADOPTION row=3 ADP-4 has no tagged test or scenario"])
+      expect(partial.lines).toEqual([
+        "ADOPTION row=3 entries=2 proven=1",
+        "ADOPTION row=3 ADP-4 has no tagged test or scenario",
+      ])
       expect(partial.exitCode).toBe(1)
 
       seed(repo, { "script/qa/computer/sentinel/scenarios/warp.ts": `export const warp = "${tag("ADP-4")}"\n` })

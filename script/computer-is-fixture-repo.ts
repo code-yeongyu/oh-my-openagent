@@ -29,7 +29,16 @@ export function withFixtureRepo(body: (repo: FixtureRepo) => void): void {
   const root = mkdtempSync(join(tmpdir(), "cu-is-gates-"))
   const git = (...args: string[]): string => {
     const result = Bun.spawnSync(
-      ["git", "-c", "user.name=gate-test", "-c", "user.email=gate-test@example.invalid", "-c", "commit.gpgsign=false", ...args],
+      [
+        "git",
+        "-c",
+        "user.name=gate-test",
+        "-c",
+        "user.email=gate-test@example.invalid",
+        "-c",
+        "commit.gpgsign=false",
+        ...args,
+      ],
       { cwd: root, env: isolatedEnv, stdout: "pipe", stderr: "pipe" },
     )
     if (result.exitCode !== 0) throw new Error(`git ${args.join(" ")} failed: ${result.stderr.toString()}`)
