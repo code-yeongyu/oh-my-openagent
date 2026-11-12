@@ -8,7 +8,7 @@ use omo_computer_core::capabilities::CaptureRoute;
 use omo_computer_core::error::{DispositionRule, EngineCode, NextCall, Reason};
 use omo_computer_core::report::Disposition;
 
-use super::kit::{rect, solid, window_os, window_target, ScriptedOs, HWND, OPTIONS};
+use super::kit::{rect, solid, window_os, window_target, ScriptedOs, OPTIONS};
 use crate::Win32Backend;
 
 fn elevated(wgc: bool) -> ScriptedOs {
@@ -97,15 +97,11 @@ fn elevated_target_refusal_is_after_user_with_no_next_call() {
 }
 
 #[test]
-fn window_capture_is_unavailable_per_elevated_window_and_the_route_stays() {
-    let mut backend = Win32Backend::with_os(elevated(true));
-    let window = backend.window_capture(HWND);
-    assert!(!window.available);
-    assert_eq!(window.reason.as_deref(), Some("elevated_target"));
-    assert_eq!(
-        backend.capabilities().capture.route,
-        Some(CaptureRoute::Wgc)
-    );
-    let mut backend = Win32Backend::with_os(window_os(true));
-    assert!(backend.window_capture(HWND).available);
+fn window_capture_and_route_stay_the_hands_values_with_an_elevated_window() {
+    // The pin has no per-window windowCapture: WindowInfo.elevated is the per-window datum, and
+    // the hand's windowCapture and capture_route do not change because one window is elevated.
+    let backend = Win32Backend::with_os(elevated(true));
+    let capabilities = backend.capabilities();
+    assert!(capabilities.window_capture.available);
+    assert_eq!(capabilities.capture.route, Some(CaptureRoute::Wgc));
 }
