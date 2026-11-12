@@ -1,11 +1,13 @@
 //! A worker over the fake backend with a live stop path, its op log, its
 //! failure and panic injection, its clock, and every audit event it emitted.
 
+mod fake_time;
 mod panicky;
 mod screen;
 
 use std::sync::Arc;
 
+pub(crate) use fake_time::harness_on_fake_time;
 pub(crate) use panicky::{AfterPointer, Panics, Watches};
 pub(crate) use screen::{AwakeHolds, FakeScreen};
 use parking_lot::Mutex;
@@ -41,8 +43,10 @@ pub(crate) struct Harness {
     pub(crate) awake: AwakeHolds,
     pub(crate) screen: FakeScreen,
     pub(crate) after_pointer: AfterPointer,
-    /// The fake's time for `ready_after_ms`, moved only by the test.
-    pub(crate) ax_clock: AxClock,
+    /// `Some` only in a [`harness_on_fake_time`] harness: the one clock the
+    /// fake measures `ready_after_ms` on and the battery waits on, moved only
+    /// by the battery's polls. `None`: both read host time.
+    pub(crate) ax_clock: Option<AxClock>,
     user_input: Arc<FakeUserInput>,
 }
 
@@ -112,11 +116,20 @@ pub(crate) fn harness_with_slot(overlay: &Value, slot: Arc<crate::grant::Control
     harness_opened(overlay, slot, DesktopSessionOptions::default())
 }
 
-/// A harness whose session was opened with `options`.
+/// A harness whose session was opened with `options`, on host time.
 pub(crate) fn harness_opened(
     overlay: &Value,
     slot: Arc<crate::grant::ControlSlot>,
     options: DesktopSessionOptions,
+) -> Harness {
+    open_with(overlay, slot, options, None)
+}
+
+fn open_with(
+    overlay: &Value,
+    slot: Arc<crate::grant::ControlSlot>,
+    options: DesktopSessionOptions,
+    ax_clock: Option<AxClock>,
 ) -> Harness {
     let scenario = scenario(overlay);
     let built = Built::default();
@@ -134,9 +147,8 @@ pub(crate) fn harness_opened(
     let (awake, screen) = (AwakeHolds::default(), FakeScreen::default());
     let watches = Watches::default();
     let after_pointer = AfterPointer::default();
-    let ax_clock = AxClock::new(0);
     let factory = Factory {
-        ax_clock: Some(ax_clock.clone()),
+        ax_clock: ax_clock.clone(),
         after_pointer: after_pointer.clone(),
         scenario,
         built: Arc::clone(&built),

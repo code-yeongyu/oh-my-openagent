@@ -15,7 +15,7 @@ use senpi_desktop_core::types::DesktopSessionOptions;
 use serde_json::{json, Value};
 
 use crate::request::{Op, Response};
-use crate::test_support::{harness_opened, Harness};
+use crate::test_support::{harness_on_fake_time, harness_opened, Harness};
 
 fn window(id: &str, title: &str) -> Value {
     json!({"id": id, "title": title, "app": "Notes", "pid": 4242, "x": 100, "y": 100,
@@ -70,11 +70,10 @@ fn action(response: Response) -> ActionReport {
 /// any bound a wall clock could set on "at once".
 const REFUSAL_STALL: Duration = Duration::from_millis(1_100);
 
-/// A harness whose battery waits on the fake's clock, which nothing else moves.
+/// An object-mode harness on fake time.
 fn opened_on_fake_time(overlay: &Value) -> Harness {
-    let mut harness = opened(overlay, ReportMode::Object);
-    harness.worker.battery_clock = Box::new(FakeTime(harness.ax_clock.clone()));
-    harness
+    let options = DesktopSessionOptions { report_mode: ReportMode::Object, trace: true, ..DesktopSessionOptions::default() };
+    harness_on_fake_time(overlay, crate::grant::ControlSlot::new(), options)
 }
 
 /// Refused with `reason`, nothing sent, and at once: no fake time passed.
@@ -83,7 +82,7 @@ fn refused_fast(harness: &Harness, error: &DesktopError, reason: &str) {
     let report = report(error);
     assert_eq!(report.reason.as_deref(), Some(reason));
     assert_eq!(report.disposition, Some(Disposition::NOT_DELIVERED_SAFE));
-    let waited = harness.ax_clock.now_ms();
+    let waited = harness.fake_ms();
     assert_eq!(waited, 0, "refused after {waited} ms of fake time");
 }
 
@@ -135,24 +134,10 @@ fn press_is_supported_by_any_listed_action_and_other_actions_need_their_name() {
 /// Wall time a busy host takes from the test between two of its steps.
 const HOST_STALL: Duration = Duration::from_millis(200);
 
-/// The battery waits on the fake's clock: each poll moves it, nothing else.
-struct FakeTime(senpi_desktop_backend_fake::FakeClock);
-
-impl super::BatteryClock for FakeTime {
-    fn now(&self) -> Duration {
-        Duration::from_millis(self.0.now_ms())
-    }
-
-    fn sleep(&self, pause: Duration) {
-        self.0.advance(u64::try_from(pause.as_millis()).unwrap_or(u64::MAX));
-    }
-}
-
 #[test]
 fn the_battery_waits_for_an_element_that_appears_enabled_after_500_ms() {
     // Given: hidden and disabled until 500 ms after its first read.
-    let mut harness = opened(&scene(button(&json!({"ready_after_ms": 500})), &[]), ReportMode::Object);
-    harness.worker.battery_clock = Box::new(FakeTime(harness.ax_clock.clone()));
+    let mut harness = opened_on_fake_time(&scene(button(&json!({"ready_after_ms": 500})), &[]));
     let reference = harness.focused_ref();
     // A loaded host deschedules this thread between the snapshot and the press:
     // host time passes, the fake's does not.
@@ -160,7 +145,7 @@ fn the_battery_waits_for_an_element_that_appears_enabled_after_500_ms() {
     // When
     let report = action(press(&mut harness, reference).expect("delivered after the wait"));
     // Then: the press waited the full 500 ms of fake time, and not until AUTO_WAIT.
-    let waited = harness.ax_clock.now_ms();
+    let waited = harness.fake_ms();
     assert!((500..5_000).contains(&waited), "waited {waited} ms of fake time");
     assert!(report.timings.and_then(|timings| timings.ax_resolve).is_some(), "axResolve timed");
     assert_eq!(report.disposition, Disposition::DELIVERED_UNVERIFIED);
