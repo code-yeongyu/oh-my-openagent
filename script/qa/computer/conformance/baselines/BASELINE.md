@@ -73,7 +73,7 @@ An earlier version of this baseline recorded three findings that were the harnes
 
 ### How a cell is aimed
 
-A cell finds its element in the tree the release itself returns, skipping captions, and logs the resolved role, bounds and candidates. The fixture apps do not report their widgets' screen geometry, so a pixel cell's point is the centre of that resolved element, and the cell is sent only when the point is inside the window and inside the element's bounds. The release's hit-test answer never stops a cell; it is recorded. A typing cell that resolves to a caption is refused by the driver and sends nothing.
+A cell finds its element in the tree the release itself returns, skipping captions, and logs the resolved role, bounds and candidates. The fixture apps do not report their widgets' screen geometry yet, so a pixel cell's point is the centre of that resolved element, and the cell is sent only when the point is inside the window and inside the element's bounds: the aim rests on the tree the release itself returns. On both OSes an independent input sent to such a point registered in the fixture (the controls below), so the aim was on the element. The release's hit-test answer never stops a cell; it is recorded. A typing cell that resolves to a caption is refused by the driver and sends nothing.
 
 ### The controls (rules fixed before their runs)
 
