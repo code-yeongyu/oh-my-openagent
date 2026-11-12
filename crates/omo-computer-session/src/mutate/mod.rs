@@ -18,11 +18,14 @@ mod tests;
 
 pub use binding::{Binding, SecureInputProbe, SecureProbe};
 pub use call::Mutation;
+pub(crate) use report::released_reply;
 pub(crate) use route::{key_event, route_for};
 
 use std::path::{Path, PathBuf};
 
-use omo_computer_core::backend::Refusal;
+use omo_computer_core::backend::{Delivered, Refusal};
+use omo_computer_core::intervention::{Pause, TargetLiveness};
+use omo_computer_core::session_state::SessionState;
 use omo_computer_core::error::{EngineCode, Reason};
 use omo_computer_core::paths::Roots;
 use omo_computer_core::report::Disposition;
@@ -62,6 +65,24 @@ pub struct Refused {
     pub call_id: Option<String>,
     pub receipt: Option<Box<Value>>,
     pub interrupted: Option<Disposition>,
+    /// The members a consent or lease refusal carries on the wire (`app`, `identity`,
+    /// `window`, `holder`, `retryAfterMs`).
+    pub detail: Option<Box<Value>>,
+    /// What row 22 stamps on a refusal, boxed so the error type stays small.
+    pub stamps: Box<Stamps>,
+}
+
+/// The members a refusal carries beside its code.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Stamps {
+    /// Object mode: the units sent before an interrupted send stopped.
+    pub delivered: Option<Delivered>,
+    /// What the admission waited for before it refused or the send stopped.
+    pub paused: Vec<Pause>,
+    /// Object mode: the session state sampled for the call.
+    pub session: Option<SessionState>,
+    /// The target that exited or stopped answering.
+    pub target: Option<TargetLiveness>,
 }
 
 impl From<Refusal> for Refused {
@@ -71,7 +92,17 @@ impl From<Refusal> for Refused {
             call_id: None,
             receipt: None,
             interrupted: None,
+            stamps: Box::default(),
+            detail: None,
         }
+    }
+}
+
+impl Refused {
+    #[must_use]
+    pub fn with_paused(mut self, paused: Vec<Pause>) -> Self {
+        self.stamps.paused = paused;
+        self
     }
 }
 
@@ -93,6 +124,7 @@ pub(crate) struct Funnel {
     permits: Permits,
     artifacts: Option<ArtifactStore>,
     secure: Box<dyn SecureProbe>,
+    pub(crate) control: crate::grant::Control,
 }
 
 impl Funnel {
@@ -109,7 +141,7 @@ impl Funnel {
     /// STATE root.
     pub(crate) fn for_roots(roots: &Roots) -> Self {
         let artifacts = ArtifactStore::new(roots.state.join("artifacts"), GcLimits::default());
-        Self::with(
+        let mut funnel = Self::with(
             (
                 Box::new(MarkerDir::under(&roots.runtime)),
                 Poisoned::under(&roots.runtime),
@@ -117,7 +149,9 @@ impl Funnel {
             AuditSpec::Dir(roots.state.join("audit")),
             Some(InteractionLock::under(&roots.runtime)),
             Some(artifacts),
-        )
+        );
+        funnel.control.runtime = Some(roots.runtime.clone());
+        funnel
     }
 
     fn with(
@@ -138,6 +172,7 @@ impl Funnel {
             permits: Permits::default(),
             artifacts,
             secure: Box::new(SecureInputProbe),
+            control: crate::grant::Control::default(),
         }
     }
 
@@ -196,6 +231,10 @@ impl Session {
     pub fn with_binding(mut self, binding: Binding) -> Self {
         self.funnel.binding = binding;
         self
+    }
+
+    pub(crate) fn funnel_issuer(&self) -> String {
+        self.funnel.binding.issuer.clone()
     }
 
     /// The per-hand audit file, once the first exec opened it.

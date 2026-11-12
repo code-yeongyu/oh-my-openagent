@@ -36,6 +36,11 @@ pub(super) struct Sent {
     pub(super) effect: Effect,
     pub(super) audit_id: Option<String>,
     pub(super) warning: Option<String>,
+    pub(super) paused: Vec<omo_computer_core::intervention::Pause>,
+    pub(super) session: Option<omo_computer_core::session_state::SessionState>,
+    pub(super) target: Option<omo_computer_core::intervention::TargetLiveness>,
+    /// The foreground lease ended under the user since the last report.
+    pub(super) user_moved_on: bool,
 }
 
 /// # Errors
@@ -58,7 +63,9 @@ pub(super) fn reply(
         effect: sent.effect,
         route: sent.route.into(),
         hit: None,
-        focus_restoration: None,
+        focus_restoration: sent
+            .user_moved_on
+            .then_some(omo_computer_core::report::FocusRestoration::UserMovedOn),
         opened_surfaces: Vec::new(),
         next_call: None,
         note: None,
@@ -67,6 +74,32 @@ pub(super) fn reply(
         timings: None,
         evidence: Vec::new(),
         observation: UntrustedText,
+        paused: sent.paused,
+        session: sent.session,
+        target: sent.target,
     };
     ActionReport::new(ReportContext::new(verb, None), parts).map(|report| ExecReply(Some(report)))
+}
+
+/// The reply of an `up` whose hold the ledger already released at the 100 s bound (row 23,
+/// R49): effect `partial`, `delivered{count: 0, of: 1}`, nothing sent.
+///
+/// # Errors
+/// `Internal` if the report breaks a wire rule (a defect of this module).
+pub(crate) fn released_reply(mode: ReportMode, method: Method) -> Result<ExecReply, super::Refused> {
+    let sent = Sent {
+        route: Route::ForegroundHid,
+        count: 0,
+        of: 1,
+        effect: Effect::Partial,
+        audit_id: None,
+        warning: None,
+        paused: Vec::new(),
+        session: None,
+        target: None,
+        user_moved_on: false,
+    };
+    reply(mode, method, sent).map_err(|_| {
+        super::Refused::from(omo_computer_core::backend::Refusal::bare(omo_computer_core::error::EngineCode::Internal))
+    })
 }

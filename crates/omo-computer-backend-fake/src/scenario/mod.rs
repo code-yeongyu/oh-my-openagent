@@ -7,6 +7,7 @@ mod events;
 mod invalid;
 mod records;
 mod references;
+mod session_timeline;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -22,6 +23,7 @@ pub use additions::{
 };
 pub use events::{DisplaysChange, EpochEvent, EpochReason, IdentityChange};
 pub use invalid::{field_names, InvalidKind, ScenarioInvalid};
+pub use session_timeline::{state_at, SessionMark};
 pub use records::{
     DelayMs, FakeAxNode, FakeDisplay, FakeMenuNode, FakeWindow, FocusRead, FocusRecordKind,
     FocusRecordOutcome, RemoteForwarding, ScriptedFailure, ScriptedHit, TimedUserInput,
@@ -85,6 +87,8 @@ pub struct FakeScenario {
     pub window_frame_policy: BTreeMap<String, FramePolicy>,
     /// Keys the user holds physically at start.
     pub held_keys: Vec<String>,
+    /// The route's wheel-step cap per scroll: steps past it deliver 0 of 1 (row 23, R48c).
+    pub scroll_cap: Option<u32>,
     pub full_access_preset: bool,
     pub target_exit: Vec<TargetExit>,
     /// Window id -> the session or hand that holds its reservation.
@@ -93,6 +97,12 @@ pub struct FakeScenario {
     pub code_identity: BTreeMap<u32, CodeIdentity>,
     /// The hand identity the fleet harness reads.
     pub hand: Option<HandIdentity>,
+    /// Session-state fields (lock, sleep, console, saver, Secure Input, suspend) by fake-clock time.
+    pub session_timeline: Vec<SessionMark>,
+    /// Fake-clock milliseconds between two typed Unicode scalars of one text.
+    pub typing_unit_ms: Option<u64>,
+    // --- Row 21: the fake host's consent view handed to the engine at `session.open`. ---
+    pub consent: Option<serde_json::Value>,
 }
 
 impl FakeScenario {

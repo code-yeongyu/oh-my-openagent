@@ -87,9 +87,71 @@ pub trait Backend: Send {
         None
     }
 
+    /// The backend's monotonic clock and its wait; `None` (the default) when it has none,
+    /// which makes an admission that would pause answer at once instead.
+    fn clock(&self) -> Option<&dyn crate::intervention::BackendClock> {
+        None
+    }
+
+    /// The reads the takeover gate, the mid-send watch and target liveness take; `None` (the
+    /// default) when the backend has no foreign-input filter or liveness probe.
+    fn intervention(&self) -> Option<&dyn crate::intervention::InterventionSource> {
+        None
+    }
+
+    /// The keys the user holds physically, which a release never lifts (row 23); empty (the
+    /// default) when the backend cannot tell them apart.
+    fn user_held_keys(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// The pointer's point, read without posting anything (`pointer()`, row 23); `None` (the
+    /// default) when the backend cannot read it.
+    fn pointer(&self) -> Option<crate::params::Point> {
+        None
+    }
+
+    /// Types `text` as one stroke that `interrupt` may end between Unicode scalars (asked
+    /// before every scalar after the first). The default cannot be interrupted: it sends the
+    /// whole text as one `post_input`, exactly as a Text event, and reports every scalar.
+    fn post_text(
+        &mut self,
+        text: &str,
+        route: Route,
+        tag: u64,
+        interrupt: &mut dyn FnMut(&dyn Backend) -> bool,
+    ) -> crate::intervention::TextDelivery {
+        let _ = interrupt;
+        let of = crate::intervention::scalars(text);
+        let input = TaggedInput {
+            event: InputEvent::Text(text.to_owned()),
+            tag,
+        };
+        match self.post_input(&input, route) {
+            Ok(_) => crate::intervention::TextDelivery { sent: of, of, refusal: None, interrupted: false },
+            Err(refusal) => crate::intervention::TextDelivery { sent: 0, of, refusal: Some(refusal), interrupted: false },
+        }
+    }
+
     /// The accessibility reads the observation model walks and re-identifies through; `None`
     /// reads `AxUnsupported{snapshot_unsupported}`.
     fn ax_reader(&mut self) -> Option<&mut dyn crate::ax::AxReader> {
+        None
+    }
+
+    // --- Row 21: consent bound to code identity, and the host's consent view. ---
+
+    /// The signed code identity of `pid`'s executable, read without prompting. `None` is
+    /// `identity_unavailable`: a consent entry then binds to the path alone.
+    fn code_identity(&self, pid: u32) -> Option<crate::listing::CodeIdentity> {
+        let _ = pid;
+        None
+    }
+
+    /// The consent view the hand tool host hands the engine at `session.open`, as the host
+    /// wrote it (`design/d-safety.md` '## Approval and consent'). `None`: no host view, and the
+    /// session keeps its default view.
+    fn host_consent(&self) -> Option<serde_json::Value> {
         None
     }
 }

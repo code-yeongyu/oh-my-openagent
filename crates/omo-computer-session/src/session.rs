@@ -16,7 +16,7 @@ use omo_computer_core::results::{
     CapabilitiesReply, ExecReply, PermissionState, SessionOpened, StopPathStatus,
 };
 use omo_computer_core::session_state::Tristate;
-use omo_computer_safety::{Call, Guard, HostAdditions, NoHolds, StopPolicy, TargetRef, Transport, VerbKind};
+use omo_computer_safety::{Call, Guard, HostAdditions, StopPolicy, TargetRef, Transport, VerbKind};
 
 use crate::audit::gc::SweepTrigger;
 use crate::frames::random_u64;
@@ -35,6 +35,7 @@ pub const POINT_REQUIRED: Refusal = Refusal::bare(EngineCode::InvalidTarget);
 pub(crate) struct Opened {
     pub(crate) report_mode: ReportMode,
     pub(crate) tag: u64,
+    pub(crate) settings: crate::intervention::OpenSettings,
 }
 
 /// The session state of one engine process.
@@ -46,6 +47,8 @@ pub struct Session {
     pub(crate) refs: crate::refs::RefRegistry,
     pub(crate) frames: crate::frames::FrameStore,
     pub(crate) trace: crate::trace::Trace,
+    /// The session-scoped display-awake hold (design row C22).
+    pub(crate) display_awake: crate::intervention::SharedHold,
 }
 
 impl Session {
@@ -66,7 +69,7 @@ impl Session {
 
     #[must_use]
     pub fn with_guard(backend: Box<dyn Backend>, guard: Guard) -> Self {
-        Self {
+        crate::holds::with_holds(crate::intervention::with_display_awake(Self {
             backend,
             guard,
             opened: None,
@@ -74,7 +77,8 @@ impl Session {
             refs: crate::refs::RefRegistry::default(),
             frames: crate::frames::FrameStore::default(),
             trace: crate::trace::Trace::default(),
-        }
+            display_awake: crate::intervention::SharedHold::default(),
+        }))
     }
 
     /// Opens (or re-opens) the session and answers its capabilities and a fresh resume token.
@@ -89,9 +93,10 @@ impl Session {
         self.opened = Some(Opened {
             report_mode: request.report_mode,
             tag: random_u64(),
+            settings: crate::intervention::OpenSettings::read(&request),
         });
         let resume_token = format!("{:016x}{:016x}", random_u64(), random_u64());
-        self.funnel.set_session_id(resume_token[..16].to_owned());
+        self.open_control(&resume_token[..16])?;
         self.funnel.sweep(SweepTrigger::Open);
         self.open_trace(request.trace, &resume_token[..16]);
         Ok(SessionOpened {
@@ -108,7 +113,7 @@ impl Session {
 
     /// `stopPath.stop{source}`: latches and commits the stop.
     pub fn stop_path_stop(&mut self, params: StopPathStopParams) -> StopPathStatus {
-        self.guard.stop(params.source.as_deref(), &mut NoHolds).1
+        self.stop_control(params.source.as_deref())
     }
 
     /// `stopPath.heartbeat` from the session's host.
@@ -124,8 +129,7 @@ impl Session {
     /// The capabilities in the open session's report mode; with no session, the v1 shape.
     #[must_use]
     pub fn capabilities(&self) -> CapabilitiesReply {
-        let mut capabilities = self.backend.capabilities();
-        self.guard.describe(&mut capabilities.stop_path);
+        let capabilities = self.sampled_capabilities();
         match self.opened.as_ref().map(|opened| opened.report_mode) {
             Some(ReportMode::Object) => CapabilitiesReply::Object(Box::new(capabilities)),
             Some(ReportMode::Null) | None => CapabilitiesReply::Legacy(Box::new(legacy_capabilities(
@@ -136,6 +140,7 @@ impl Session {
     }
 
     pub fn close(&mut self) {
+        self.close_control();
         if self.opened.take().is_some() {
             self.funnel.sweep(SweepTrigger::IdleExit);
             self.close_trace();

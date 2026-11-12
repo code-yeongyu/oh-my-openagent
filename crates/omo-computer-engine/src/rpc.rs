@@ -5,6 +5,7 @@
 
 use omo_computer_core::backend::Refusal;
 use omo_computer_core::methods::Method;
+use omo_computer_session::grant::HostCallError;
 use omo_computer_session::{Refused, Session, Unresolved};
 use serde::de::DeserializeOwned;
 use serde_json::{json, Map, Value};
@@ -101,9 +102,22 @@ fn dispatch(session: &mut Session, name: &str, params: Value) -> Result<Value, F
         Method::AxDrill => json!(session.drill(parse(params)?).map_err(|u| unresolved(&u))?),
         Method::AxNode => json!(session.ax_node(parse(params)?).map_err(|u| unresolved(&u))?),
         Method::AxChildren => json!(session.ax_children(parse(params)?).map_err(|u| unresolved(&u))?),
-        _ => return Err(not_found()),
+        _ => {
+            return session.host_call(method, params).map_or_else(|| Err(not_found()), |r| r.map_err(host_failure))
+        }
     };
     Ok(value)
+}
+
+// --- Rows 21-27: the session's host calls (R31); row 28 moves this into the engine router. ---
+
+fn host_failure(error: HostCallError) -> Failure {
+    match error {
+        HostCallError::Params(error) => {
+            failure(INVALID_PARAMS, "Invalid params", Some(json!({ "detail": error.to_string() })))
+        }
+        HostCallError::Refused(refused) => refused_call(&refused),
+    }
 }
 
 /// A refusal on the wire: the closed engine code's number and name, `data.code` as v1 wrote
@@ -136,6 +150,24 @@ fn refused_call(refused: &Refused) -> Failure {
         }
         if let Some(disposition) = refused.interrupted {
             data["disposition"] = json!(disposition);
+        }
+        let stamps = &refused.stamps;
+        if let Some(delivered) = stamps.delivered {
+            data["delivered"] = json!({ "count": delivered.count, "of": delivered.of });
+        }
+        if !stamps.paused.is_empty() {
+            data["paused"] = json!(stamps.paused);
+        }
+        if let Some(session) = &stamps.session {
+            data["session"] = json!(session);
+        }
+        if let Some(target) = stamps.target {
+            data["target"] = json!(target);
+        }
+        if let (Some(Value::Object(detail)), Some(data)) = (refused.detail.as_deref(), data.as_object_mut()) {
+            for (key, value) in detail {
+                data.entry(key.clone()).or_insert_with(|| value.clone());
+            }
         }
     }
     failure
@@ -224,10 +256,9 @@ mod tests {
     #[test]
     fn an_interrupted_call_carries_its_disposition_on_the_wire() {
         let interrupted = omo_computer_session::Refused {
-            refusal: Refusal::new(EngineCode::TransactionFailed, "recovery_required"),
             call_id: Some("k-1".to_owned()),
-            receipt: None,
             interrupted: Some(omo_computer_core::report::Disposition::UNCERTAIN_UNSAFE),
+            ..Refusal::new(EngineCode::TransactionFailed, "recovery_required").into()
         };
         let Failure { data, .. } = refused_call(&interrupted);
         let data = data.expect("data");
@@ -235,6 +266,49 @@ mod tests {
         assert_eq!(data["disposition"], json!({ "delivery": "delivery_uncertain", "retry": "unsafe" }));
         let plain = refused_call(&Refusal::new(EngineCode::TransactionFailed, "marker_unavailable").into());
         assert!(plain.data.expect("data").get("disposition").is_none(), "a refusal before any send carries none");
+    }
+
+    const NOTES: &str = r#""windows":[{"id":"101","title":"t","app":"Notes","pid":4242,"x":0,"y":0,"width":800,"height":600,"focused":true,"elevated":null}]"#;
+
+    fn opened(extra: &str, open: &str) -> Session {
+        let scenario = FakeScenario::from_json(&format!("{{{NOTES}{extra}}}")).expect("scenario");
+        let backend = FakeBackend::with_parts(scenario, FakeClock::default(), RecordingSink::default())
+            .with_stop_path(omo_computer_backend_fake::StopPathScript::Live);
+        let mut session = Session::new(Box::new(backend));
+        call(&mut session, &format!(r#"{{"jsonrpc":"2.0","id":1,"method":"session.open","params":{open}}}"#));
+        call(&mut session, r#"{"jsonrpc":"2.0","id":2,"method":"stopPath.start","params":{}}"#);
+        session
+    }
+
+    const LOCKED: &str = r#","session_timeline":[{"t_ms":0,"screen_locked":true}]"#;
+    const INTERRUPTED: &str = r#","typing_unit_ms":10,"user_input_timeline":[{"t_ms":25,"pid":4242,"kind":"key"}]"#;
+    const CLICK: &str = r#"{"jsonrpc":"2.0","id":3,"method":"click","params":{"target":"101","x":10,"y":10}}"#;
+    const TYPE: &str = r#"{"jsonrpc":"2.0","id":3,"method":"typeText","params":{"target":"101","text":"abcdefghij"}}"#;
+
+    #[test]
+    fn null_mode_refusals_keep_the_v1_bytes() {
+        let locked = call(&mut opened(LOCKED, "{}"), CLICK);
+        assert_eq!(
+            locked["error"]["data"],
+            json!({ "code": "ScreenLocked", "hint": null, "reason": "screen_locked" })
+        );
+        let interrupted = call(&mut opened(INTERRUPTED, "{}"), TYPE);
+        let mut data = interrupted["error"]["data"].clone();
+        assert!(data["callId"].is_string(), "{data}");
+        data.as_object_mut().expect("data").remove("callId");
+        assert_eq!(data, json!({ "code": "UserIntervened", "hint": null }));
+    }
+
+    #[test]
+    fn object_mode_refusals_carry_delivered_paused_and_session() {
+        let object = r#"{"reportMode":"object"}"#;
+        let locked = call(&mut opened(LOCKED, object), CLICK);
+        let data = &locked["error"]["data"];
+        assert_eq!(data["paused"], json!([{ "reason": "screen_locked", "ms": 120_001 }]));
+        assert_eq!(data["session"]["screenLocked"], json!(true));
+        assert!(data.get("delivered").is_none(), "nothing was sent: {data}");
+        let interrupted = call(&mut opened(INTERRUPTED, object), TYPE);
+        assert_eq!(interrupted["error"]["data"]["delivered"], json!({ "count": 3, "of": 10 }));
     }
 
     #[test]
