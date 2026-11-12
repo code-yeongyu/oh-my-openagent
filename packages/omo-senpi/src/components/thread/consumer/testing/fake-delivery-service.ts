@@ -26,6 +26,12 @@ export type FakeDeliveryService = {
   readonly calls: FakeServiceCall[]
   /** The next `deliveries.serve` is refused with this local-API error code. */
   readonly refuseServe: (code: string) => void
+  /** What the next `deliveries.serve` is acknowledged with; the default is `{}` (a service that names no wake). */
+  readonly ackServe: (ack: Record<string, unknown>) => void
+  /** The service's `delivery.wake` event on the serving connection (A7.2.3). */
+  readonly pushWake: (enabled: unknown) => void
+  /** The serving connection drops: every later event is delivered to nobody. */
+  readonly drop: () => void
   /** `delivery.pending` and `delivery.drained` are refused with this code from now on. */
   readonly refuseMarks: (code: string) => void
   readonly onAnswer: (listener: () => Promise<void>) => void
@@ -51,6 +57,8 @@ export function createFakeDeliveryService(options: { readonly admitted: boolean 
   let answerListener: (() => Promise<void>) | undefined
   let answersRefused = false
   let expecting: string | undefined
+  let ack: Record<string, unknown> = {}
+  let wakeListener: ((enabled: unknown) => void) | undefined
   let inboundListener: ((event: DeliveryInboundEvent) => void) | undefined
   let holdsListener: ((event: DeliveryHoldsEvent) => void) | undefined
   const answers = new Map<string, (reply: AnswerEnvelope) => void>()
@@ -60,6 +68,7 @@ export function createFakeDeliveryService(options: { readonly admitted: boolean 
     serve: async (request) => {
       calls.push({ type: "deliveries.serve", agent_dir: request.agent_dir, v: request.v })
       if (serveRefusal !== undefined) throw refusal(serveRefusal)
+      return ack
     },
     answer: async (delivery, reply) => {
       await answerListener?.()
@@ -105,6 +114,12 @@ export function createFakeDeliveryService(options: { readonly admitted: boolean 
         holdsListener = undefined
       }
     },
+    onWake: (listener) => {
+      wakeListener = listener
+      return () => {
+        wakeListener = undefined
+      }
+    },
   }
 
   return {
@@ -112,6 +127,17 @@ export function createFakeDeliveryService(options: { readonly admitted: boolean 
     calls,
     refuseServe: (code) => {
       serveRefusal = code
+    },
+    ackServe: (next) => {
+      ack = next
+    },
+    pushWake: (enabled) => {
+      wakeListener?.(enabled)
+    },
+    drop: () => {
+      inboundListener = undefined
+      holdsListener = undefined
+      wakeListener = undefined
     },
     refuseMarks: (code) => {
       marksRefusal = code

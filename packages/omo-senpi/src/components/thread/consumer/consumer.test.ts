@@ -84,6 +84,55 @@ describe("declaring", () => {
   })
 })
 
+// A7.2.3: the consumer is told the receiving device's wake switch on its own serving connection. An acknowledgement
+// without the field, no acknowledgement, and a dropped connection all read off, and only an explicit `true` reads on.
+describe("the wake the consumer is told (A7.2.3)", () => {
+  test.each([
+    [{}, false],
+    [{ wake: false }, false],
+    [{ wake: true }, true],
+  ])("#given the serve acknowledgement %j #when the consumer starts #then the wake it holds is %p", async (ack, held) => {
+    const { service, consumer } = setup()
+    service.ackServe(ack)
+    expect(await consumer.start()).toBe("serving")
+    expect(consumer.wakeAllowed()).toBe(held)
+  })
+
+  test("#given an acknowledgement carrying a field the decoder does not know #when the consumer starts #then it serves nothing and holds the wake off", async () => {
+    const { service, consumer } = setup()
+    service.ackServe({ wake: true, surprise: 1 })
+    expect(await consumer.start()).toBe("unsupported")
+    expect(consumer.wakeAllowed()).toBe(false)
+    expect(service.calls).toEqual([{ type: "deliveries.serve", agent_dir: expect.any(String), v: 1 }])
+  })
+
+  test("#given a serving consumer told on #when the service pushes the event in each direction #then the held value follows it, and a value that is not a boolean reads off", async () => {
+    const { service, consumer } = setup()
+    service.ackServe({ wake: true })
+    await consumer.start()
+    service.pushWake(false)
+    expect(consumer.wakeAllowed()).toBe(false)
+    service.pushWake(true)
+    expect(consumer.wakeAllowed()).toBe(true)
+    service.pushWake("yes")
+    expect(consumer.wakeAllowed()).toBe(false)
+  })
+
+  test("#given a consumer told on #when its connection drops #then the wake reads off until its own next acknowledgement, and an event in between changes nothing", async () => {
+    const { service, consumer } = setup()
+    service.ackServe({ wake: true })
+    await consumer.start()
+    expect(consumer.wakeAllowed()).toBe(true)
+    service.drop()
+    consumer.stop()
+    expect(consumer.wakeAllowed()).toBe(false)
+    service.pushWake(true)
+    expect(consumer.wakeAllowed()).toBe(false)
+    expect(await consumer.start()).toBe("serving")
+    expect(consumer.wakeAllowed()).toBe(true)
+  })
+})
+
 describe("a handed delivery", () => {
   test("#given a session that is not running #when a record is handed in #then the row is committed before the answer, the answer is queued, and the session is woken after the sender is admitted", async () => {
     const { h, service, sessions, woken, consumer } = setup()

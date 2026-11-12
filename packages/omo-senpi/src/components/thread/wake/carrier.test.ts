@@ -45,11 +45,20 @@ type Setup = {
   readonly events: CarrierEvent[]
   /** Resolves on the first event matching `match`, armed before the trigger; fails after 5 s. */
   readonly next: (match: (event: CarrierEvent) => boolean, what: string) => Promise<CarrierEvent>
+  /** Writes the session file and queues one same-device row for it: the queued row every open needs (A7.2.3). */
   readonly path: (id: string) => string
+  /** Writes the session file only, with no queued row. */
+  readonly file: (id: string) => string
+  /** Queues one row for the session from another device, through the intake. */
+  readonly intakeRow: (id: string, deliveryId: string) => Promise<void>
 }
 
 async function setup(
-  options: FakeEngineOptions & { readonly wakeLimit?: number; readonly sameDevice?: () => boolean } = {},
+  options: FakeEngineOptions & {
+    readonly wakeLimit?: number
+    readonly sameDevice?: () => boolean
+    readonly remoteWake?: () => boolean
+  } = {},
 ): Promise<Setup> {
   const h = (harness = createGatewayHarness())
   const fake = (host = await startFakeEngineHost(options))
@@ -77,7 +86,8 @@ async function setup(
     ensureHost: async () => undefined,
     connect: () => connectCarrierHost({ socket: fake.socketPath, keyRoot: () => h.agentDir }),
     wakeLimit: () => options.wakeLimit ?? 0,
-    ...(options.sameDevice === undefined ? {} : { sameDevice: options.sameDevice }),
+    sameDevice: options.sameDevice ?? (() => true),
+    ...(options.remoteWake === undefined ? {} : { remoteWake: options.remoteWake }),
     schedule: () => () => undefined,
     onEvent: (event) => {
       events.push(event)
@@ -89,21 +99,71 @@ async function setup(
   })
   carriers.push(carrier)
   const paths = new Map<string, string>()
+  // A row queued for the session is what every open needs (A7.2.3), so `path` queues one and the carrier the tests
+  // drive waits for those writes before it acts: the fixture's own ordering, never a timer.
+  const queueing: Promise<unknown>[] = []
+  let sender: ReturnType<GatewayHarness["session"]> | undefined
+  const file = (id: string): string => {
+    let found = paths.get(id)
+    if (found === undefined) {
+      found = writeSessionFile(sessions, id)
+      paths.set(id, found)
+    }
+    return found
+  }
+  const settled = async <T>(run: () => Promise<T>): Promise<T> => {
+    while (queueing.length > 0) await Promise.all(queueing.splice(0))
+    return await run()
+  }
+  const waited: Carrier = {
+    wake: (id) => settled(() => carrier.wake(id)),
+    evaluate: (id) => settled(() => carrier.evaluate(id)),
+    sweep: () => settled(() => carrier.sweep()),
+    stop: () => carrier.stop(),
+  }
   return {
     h,
     fake,
     store,
     sessions,
-    carrier,
+    carrier: waited,
     events,
     next,
     path: (id) => {
-      let found = paths.get(id)
-      if (found === undefined) {
-        found = writeSessionFile(sessions, id)
-        paths.set(id, found)
+      const known = paths.has(id)
+      const found = file(id)
+      if (!known) {
+        h.phantom(id)
+        const from = (sender ??= h.session("row-sender"))
+        queueing.push(
+          from.engine
+            .deliver({ sender: { kind: "session", durable_id: "row-sender" }, target: id, text: `to ${id}` })
+            .then((sent) => {
+              if (sent.kind !== "ok") throw new Error(`queueing a same-device row for ${id} answered ${sent.kind}`)
+            }),
+        )
       }
       return found
+    },
+    file,
+    intakeRow: async (id, deliveryId) => {
+      file(id)
+      const outcome = await store.intake({
+        now: h.clock.now,
+        attested_device: "dev-b",
+        record: {
+          sessionId: id,
+          deliveryId,
+          text: deliveryId,
+          displayText: deliveryId,
+          sender: { kind: "agent", session_id: "sender-s" },
+          deliverAs: "followUp",
+          chainCount: 1,
+        },
+        provenance: { workspace: "remote", project: "remote" },
+        target_session_kind: "interactive",
+      })
+      if (outcome.kind !== "queued") throw new Error(`the intake for ${id} answered ${outcome.kind}`)
     },
   }
 }
@@ -359,10 +419,11 @@ describe("the lease (A3.1.3)", () => {
   )
 })
 
-// Review of #13220 (LOW): a same-device wake is opened only while its own switch allows it. A wake requested while the
-// switch was on and then deferred stays queued once the switch is turned off, and opens when it is turned on again.
-describe("the same-device switch at the sweep", () => {
-  test("#given a same-device wake requested while the switch was on and deferred #when the switch is off at the sweep #then nothing opens, and with the switch on again it opens", async () => {
+// Review of #13220 (LOW) and A7.2.3 (A7R-10), one rule: a carrier opens a session only when the session holds a
+// queued row whose own switch allows the open. A same-device row reads `session_wake.same_device` at the open; a row
+// from another device reads the wake the consumer was told on its own connection.
+describe("the switches at the open (A7.2.3)", () => {
+  test("#given a same-device wake requested while the switch was on and then deferred #when the switch is off at the sweep #then nothing opens, and with the switch on again it opens", async () => {
     let on = true
     let refuse = true
     const { h, fake, store, carrier, path } = await setup({
@@ -370,9 +431,6 @@ describe("the same-device switch at the sweep", () => {
       openRefusal: () => (refuse ? { success: false, error: "host_stopping", errorCode: "host_stopping" } : undefined),
     })
     path("t")
-    h.phantom("t")
-    const sent0 = await h.session("a").engine.deliver({ sender: { kind: "session", durable_id: "a" }, target: "t", text: "hi" })
-    expect(sent0).toMatchObject({ kind: "ok", delivery: { kind: "queued_offline" } })
     expect(await carrier.wake("t")).toMatchObject({ kind: "deferred" })
     refuse = false
     on = false
@@ -385,6 +443,59 @@ describe("the same-device switch at the sweep", () => {
     await carrier.sweep()
     expect(sent(fake, "open_session")).toHaveLength(2)
     expect(sent(fake, "wake")).toHaveLength(1)
+  })
+
+  test.each([
+    [false, false, false],
+    [true, false, true],
+    [false, true, true],
+    [true, true, true],
+  ])(
+    "#given a session holding a row of each kind #when the wake is told %p and the same-device switch is %p #then an open happens: %p",
+    async (wake, same, opens) => {
+      const { fake, carrier, path, intakeRow } = await setup({ sameDevice: () => same, remoteWake: () => wake })
+      path("t")
+      await intakeRow("t", "d-remote")
+      expect(await carrier.wake("t")).toMatchObject(opens ? { kind: "open" } : { kind: "switched_off" })
+      expect(sent(fake, "open_session")).toHaveLength(opens ? 1 : 0)
+    },
+  )
+
+  test("#given a session whose only row is from another device #when the consumer was told off #then nothing opens, the row stays queued, and it opens when the consumer is told on", async () => {
+    let wake = false
+    const { fake, store, carrier, intakeRow } = await setup({ sameDevice: () => false, remoteWake: () => wake })
+    await intakeRow("t", "d-remote")
+    expect(await carrier.wake("t")).toEqual({ kind: "switched_off" })
+    expect(await store.list({ target_durable_id: "t" })).toMatchObject([{ state: "queued" }])
+    expect(await store.woken.list()).toMatchObject([{ durable_id: "t", state: "requested" }])
+    wake = true
+    await carrier.sweep()
+    expect(sent(fake, "open_session")).toHaveLength(1)
+  })
+
+  test("#given a wake that is told off while the session is being opened #when the open finishes #then the session is not killed and the row is carried", async () => {
+    let wake = true
+    const { fake, carrier, path, intakeRow } = await setup({
+      sameDevice: () => false,
+      remoteWake: () => wake,
+      openRefusal: () => {
+        wake = false
+        return undefined
+      },
+    })
+    path("t")
+    await intakeRow("t", "d-remote")
+    expect(await carrier.wake("t")).toMatchObject({ kind: "open" })
+    expect(sent(fake, "wake")).toHaveLength(1)
+  })
+
+  test("#given a session with no queued row #when the sweep finds its requested record #then nothing opens and the record ends", async () => {
+    const { fake, store, carrier, file } = await setup()
+    const session = file("t")
+    await store.woken.request({ durable_id: "t", session_file: session })
+    await carrier.sweep()
+    expect(sent(fake, "open_session")).toEqual([])
+    expect(await store.woken.list()).toEqual([])
   })
 })
 
