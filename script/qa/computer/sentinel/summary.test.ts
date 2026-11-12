@@ -224,6 +224,91 @@ describe("a failed read is never a negative", () => {
   })
 })
 
+describe("a new window whose attributes could not be read", () => {
+  test("a timed-out AX read of a non-target window is a dialog fault, never a negative", () => {
+    const summary = summarize(
+      cleanRun([
+        {
+          t: 1_500,
+          kind: "window_added",
+          id: "ax:300#0",
+          ownerPid: 300,
+          role: "",
+          subrole: "",
+          layer: 0,
+          axRead: "timeout",
+        },
+      ]),
+    )
+    expect(summary.faults).toContain("dialog: new window ax:300#0 of pid 300 was unreadable (AX timeout)")
+    expect(verdict(summary)).toBe("invalid")
+  })
+
+  test("a timed-out read of the target's own window is no fault, and a clean read is judged as before", () => {
+    const own = {
+      t: 1_500,
+      kind: "window_added",
+      id: "ax:200#0",
+      ownerPid: TARGET_PID,
+      role: "",
+      subrole: "",
+      layer: 0,
+      axRead: "timeout",
+    } as const
+    const plain = {
+      ...own,
+      id: "ax:300#5",
+      ownerPid: 300,
+      role: "AXWindow",
+      subrole: "AXStandardWindow",
+      axRead: "ok",
+    } as const
+    const summary = summarize(cleanRun([own, plain]))
+    expect(summary.faults).toEqual([])
+    expect(verdict(summary)).toBe("clean")
+  })
+})
+
+describe("sabotage: every detector can be made to miss", () => {
+  const plants: Readonly<Record<Signal, SentinelEvent>> = {
+    key_focus: { t: 1_500, kind: "focus", via: "notification", value: "typist/other" },
+    window_raised: { t: 1_500, kind: "order", windows: ["other#3", "typist#1", "target#2"] },
+    typing: { t: 1_700, kind: "field", text: "abX", final: false },
+    pointer: { t: 1_500, kind: "pointer", via: "tap", x: 400, y: 300 },
+    clipboard: { t: 1_500, kind: "clipboard", changeCount: 8 },
+    space: { t: 1_500, kind: "space", via: "notification", value: "space-2" },
+    dialog: {
+      t: 1_500,
+      kind: "window_added",
+      id: "a#1",
+      ownerPid: 300,
+      role: "AXWindow",
+      subrole: "AXDialog",
+      layer: 0,
+    },
+    activation: { t: 1_500, kind: "activation", via: "notification", pid: 300 },
+  }
+
+  for (const signal of SIGNALS) {
+    test(`dropping ${signal} turns its own planted disturbance into a miss and leaves the run valid`, () => {
+      const events = cleanRun([plants[signal]])
+      expect(summarize(events).signals[signal].signal).toBe("happened")
+      const dropped = summarize(events, { drop: signal })
+      expect(dropped.signals[signal].signal).toBe("none")
+      expect(dropped.faults).toEqual([])
+    })
+  }
+
+  test("dropping typing also silences the final field read and its missing-read fault", () => {
+    const lostLast = cleanRun().map((event) =>
+      event.kind === "field" && event.final ? { ...event, text: "abc" } : event,
+    )
+    expect(summarize(lostLast, { drop: "typing" }).signals.typing.signal).toBe("none")
+    const noFinal = cleanRun().filter((event) => !(event.kind === "field" && event.final))
+    expect(summarize(noFinal, { drop: "typing" }).faults).toEqual([])
+  })
+})
+
 describe("event stream parsing", () => {
   test("parses JSON lines and reports a malformed line as a fault, never as an absence", () => {
     const { events, faults } = parseEvents(
