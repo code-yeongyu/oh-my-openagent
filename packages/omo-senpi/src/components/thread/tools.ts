@@ -396,35 +396,43 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
                 },
                 ...local,
               }
-            : { ...recorded, ...local, local_name_unavailable: named }
+            : {
+                ...recorded,
+                ...local,
+                local_name_unavailable: named.code,
+                ...(named.reason === undefined ? {} : { local_name_unavailable_reason: named.reason }),
+              }
         ) as ThreadToolResult
       }),
   }
   /**
    * Names a thread thread_create already made, through the same path thread_rename takes (the create's name check against
    * the device's threads, then the located control's setName). Answers the refusing code instead of failing, because the
-   * thread exists either way: a rename that fails with no typed refusal answers `host_unavailable`, so the result still
-   * names the created thread (withAlias's rule for every failure after the create).
+   * thread exists either way: a rename that fails with no typed refusal answers `host_unavailable` with the error's
+   * message as `reason`, so the result still names the created thread (withAlias's rule for every failure after the
+   * create) and a failure in the rename path stays traceable.
    */
   async function nameCreatedThread(
     threadId: string,
     name: string,
     visible: readonly ThreadSummary[],
     callerId: string,
-  ): Promise<ThreadErrorCode | undefined> {
+  ): Promise<{ readonly code: ThreadErrorCode; readonly reason?: string } | undefined> {
     const conflict = checkNameConflict(
       visible.filter((thread) => thread.thread_id !== threadId),
       name,
     )
-    if (conflict.kind === "error") return conflict.code
+    if (conflict.kind === "error") return { code: conflict.code }
     const located = await locateControl(options, await view(), threadId, true, callerId)
-    if (located.kind === "not_live") return "not_resumable"
+    if (located.kind === "not_live") return { code: "not_resumable" }
     if (located.kind === "error")
-      return located.result.kind === "error" ? located.result.error.code : "host_unavailable"
+      return { code: located.result.kind === "error" ? located.result.error.code : "host_unavailable" }
     try {
       await located.control.setName(name)
     } catch (error) {
-      return controlRefusalOf(error)?.code ?? "host_unavailable"
+      const refusal = controlRefusalOf(error)
+      if (refusal !== undefined) return { code: refusal.code }
+      return { code: "host_unavailable", reason: error instanceof Error ? error.message : String(error) }
     }
     return undefined
   }
