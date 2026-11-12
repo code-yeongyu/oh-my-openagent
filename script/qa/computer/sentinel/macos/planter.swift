@@ -119,6 +119,19 @@ final class Planter: NSObject {
         self.alert = nil
         self.restored("dialog")
       }
+    case "sheet":
+      // AX-only dialog: a sheet on this app's own background window sits at window layer 0, so only the recorder's
+      // AX sheet-created path can see it as a dialog. The main thread then blocks 200 ms so the recorder's first AX
+      // reads of the new sheet time out and must retry.
+      let sheet = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 240, height: 90), styleMask: [.titled], backing: .buffered, defer: false)
+      background.beginSheet(sheet)
+      planted("sheet")
+      usleep(200_000)
+      after(0.3) {
+        self.background.endSheet(sheet)
+        sheet.orderOut(nil)
+        self.restored("sheet")
+      }
     case "focus":
       guard let typist = numbers.first else { return failed("key_focus", "usage: focus <typist pid>") }
       guard setFocus(pid: typist, identifier: "sentinel.other") else { return failed("key_focus", "could not focus sentinel.other") }

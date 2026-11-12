@@ -3,7 +3,12 @@ import { formatSignals, type SentinelSummary, type Signal, summarize, type Verdi
 
 type Recording = { segment(act: () => Promise<void>, windowMs: number): Promise<SentinelEvent[]> }
 
-type SentinelRun<T> = { readonly result: T; readonly summary: SentinelSummary; readonly verdict: Verdict }
+type SentinelRun<T> = {
+  readonly result: T
+  readonly summary: SentinelSummary
+  readonly verdict: Verdict
+  readonly events: readonly SentinelEvent[]
+}
 
 // Runs one scenario under the sentinel: the synthetic user keeps typing, the recorder watches all eight signals, and
 // the run passes only when the scenario's own oracle holds and every signal reads none. The caller has already
@@ -21,5 +26,5 @@ export async function withSentinel<T>(
   const summary = summarize(events, options.drop === undefined ? {} : { drop: options.drop })
   const judged = verdict(summary)
   console.log(`SENTINEL ${scenario} verdict=${judged} ${formatSignals(summary)}`)
-  return { result: result.value, summary, verdict: judged }
+  return { result: result.value, summary, verdict: judged, events }
 }

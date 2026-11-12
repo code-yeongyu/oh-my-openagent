@@ -4,7 +4,7 @@ import { hostname } from "node:os"
 import { admitWindow, type LatencyRecord, p99 } from "../latency.ts"
 import { observeCell } from "../observe-cell.ts"
 import { judgeSelfTest, PLANT_NOUN, type Trial } from "../selftest-judge.ts"
-import { SIGNALS, type Signal } from "../summary.ts"
+import { dialogHits, SIGNALS, type Signal } from "../summary.ts"
 import { withSentinel } from "../with-sentinel.ts"
 import { plant } from "./plants.ts"
 import { type HelperPaths, MacSession } from "./session.ts"
@@ -71,6 +71,27 @@ function recordedLatency(file: string): LatencyRecord | undefined {
   return { host, os: "macos", trials: 0, p99Ms: Object.fromEntries(entries) }
 }
 
+// The dialog detector has two branches: a modal-panel window layer (the alert plant) and the AX role/subrole of a new
+// window. This trial plants a layer-0 sheet, which only the AX branch can see, and counts as a dialog detection only
+// when its hit came through that branch alone - so a dead AX path fails the self-test instead of hiding behind the
+// layer branch.
+async function axOnlyDialogTrial(session: MacSession, options: SelfTestOptions): Promise<Trial> {
+  const run = await withSentinel("selftest-dialog-ax", () => plant(session, options.helpers, "sheet"), {
+    session,
+    windowMs: options.windowMs,
+    ...(options.drop === undefined ? {} : { drop: options.drop }),
+  })
+  if ("failed" in run.result) return { plant: "dialog", failed: `AX-only sheet: ${run.result.failed}` }
+  const hits = dialogHits(run.events)
+  if (options.drop !== "dialog" && (!hits.includes("role") || hits.includes("layer")))
+    return {
+      plant: "dialog",
+      failed: `AX-only sheet was seen through [${hits.join(",")}], not the AX role branch alone`,
+    }
+  console.log(`SENTINEL_DIALOG_BRANCH sheet hits=${hits.join(",") || "none"}`)
+  return { plant: "dialog", summary: run.summary }
+}
+
 export async function runSelfTest(options: SelfTestOptions): Promise<{ exitCode: number; receipts: string[] }> {
   const session = await MacSession.open({
     helpers: options.helpers,
@@ -90,6 +111,7 @@ export async function runSelfTest(options: SelfTestOptions): Promise<{ exitCode:
     }
     const trials: Trial[] = [await trial(session, null, options)]
     for (const signal of SIGNALS) trials.push(await trial(session, signal, options))
+    trials.push(await axOnlyDialogTrial(session, options))
     const control = await observeCell(session, () => plant(session, options.helpers, "warp"), options.windowMs)
     const status = "failed" in control.status ? `failed: ${control.status.failed}` : "planted"
     console.log(`SENTINEL_OBSERVER negative_control=${status} pointer_moved=${control.observed.pointerMoved}`)

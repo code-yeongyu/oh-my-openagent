@@ -79,6 +79,20 @@ func axFind(_ root: AXUIElement, identifier: String, depth: Int = 10) -> AXUIEle
   return nil
 }
 
+func axErrorName(_ error: AXError) -> String {
+  switch error {
+  case .success: return "success"
+  case .noValue: return "noValue"
+  case .attributeUnsupported: return "attributeUnsupported"
+  case .cannotComplete: return "cannotComplete"
+  case .invalidUIElement: return "invalidUIElement"
+  case .failure: return "failure"
+  case .apiDisabled: return "apiDisabled"
+  case .notImplemented: return "notImplemented"
+  default: return "ax\(error.rawValue)"
+  }
+}
+
 func axSetFrontmost(_ pid: pid_t) -> AXError {
   AXUIElementSetAttributeValue(AXUIElementCreateApplication(pid), kAXFrontmostAttribute as CFString, kCFBooleanTrue)
 }

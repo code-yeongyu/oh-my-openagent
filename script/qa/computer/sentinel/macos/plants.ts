@@ -2,7 +2,7 @@ import type { Signal } from "../summary.ts"
 import type { ControlLine } from "./helper.ts"
 import type { HelperPaths, MacSession } from "./session.ts"
 
-type Plant = Signal | "warp"
+type Plant = Signal | "warp" | "sheet"
 type PlantOutcome = { readonly plantedAt: number } | { readonly failed: string }
 
 const PLANT_MS = 4_000
@@ -18,6 +18,8 @@ function command(session: MacSession, plant: Exclude<Plant, "activation">): stri
       return "pointer"
     case "warp":
       return "warp"
+    case "sheet":
+      return "sheet"
     case "clipboard":
       return "pasteboard"
     case "space":

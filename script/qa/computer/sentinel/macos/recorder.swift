@@ -1,8 +1,9 @@
 // The eight-signal recorder. Event-driven where macOS offers a notification (AX focus and window creation, the
 // pointer event tap, workspace activation and Space changes, the typist field's value), with a 20 Hz sampler beside
 // it for what has no notification (window order, the pasteboard change count) and as a second read of the rest.
-// It never acts on the desktop. `--drop <signal>` is the self-test's sabotage: that detector stays armed but stops
-// reporting once recording starts, so the self-test can prove it notices a dead detector.
+// It never acts on the desktop and judges nothing: it reports facts (including the raw AXError of a new window's
+// reads and how many such reads were still running at stop), and the reducer in summary.ts judges them. The
+// self-test's sabotage lives in that reducer, not here.
 
 import AppKit
 import ApplicationServices
@@ -21,7 +22,6 @@ final class Recorder: NSObject {
   let userPid: pid_t
   let targetPids: [pid_t]
   let fieldIdentifier: String
-  let dropped: String?
   var recording = false
   var observers: [pid_t: AXObserver] = [:]
   var tap: CFMachPort?
@@ -29,18 +29,18 @@ final class Recorder: NSObject {
   var last: [String: String] = [:]
   var knownWindows: Set<UInt32> = []
   var windowsListed = false
+  var pendingReads = 0
+  var stopping = false
 
-  init(userPid: pid_t, targetPids: [pid_t], fieldIdentifier: String, dropped: String?) {
+  init(userPid: pid_t, targetPids: [pid_t], fieldIdentifier: String) {
     self.userPid = userPid
     self.targetPids = targetPids
     self.fieldIdentifier = fieldIdentifier
-    self.dropped = dropped
   }
 
   var refcon: UnsafeMutableRawPointer { Unmanaged.passUnretained(self).toOpaque() }
 
   func send(_ signal: String, _ fields: [String: Any]) {
-    if recording, dropped == signal { return }
     emit(fields)
   }
 
@@ -117,8 +117,12 @@ final class Recorder: NSObject {
     if windowsListed { armed("dialog", "notification+sample") } else { fault("dialog", "window list unreadable") }
   }
 
+  // An app with a user interface whose window observer cannot register is AX-blind for dialogs: that is a fault,
+  // never a silent gap. Background agents without a UI routinely refuse and are not judged.
   func watchWindows(of pid: pid_t) {
-    _ = observe(pid, AXUIElementCreateApplication(pid), [kAXWindowCreatedNotification, kAXSheetCreatedNotification])
+    let error = observe(pid, AXUIElementCreateApplication(pid), [kAXWindowCreatedNotification, kAXSheetCreatedNotification])
+    guard error != .success, NSRunningApplication(processIdentifier: pid)?.activationPolicy == .regular else { return }
+    fault("dialog", "window observer for pid \(pid) did not register (AX \(axErrorName(error)))")
   }
 
   @objc func spaceChanged() {
@@ -149,43 +153,50 @@ final class Recorder: NSObject {
     }
   }
 
-  // A window-created notification arrives while its owner is still building the window, so reads of it can each take
-  // the full AX timeout. They run on a background queue; the event keeps the notification's own time, and the result is
-  // recorded back on the main thread, so the 20 Hz sampler never waits on another app.
+  // A window-created notification arrives while its owner is still building the window, so its reads can time out.
+  // They run off the main thread with a bounded retry of a timed-out read; the raw AXError name goes into the event and
+  // the reducer judges it. `pendingReads` lets `stop` wait for reads still running instead of closing the window on
+  // them (the retry can take ~3 s: 20 x (2 x 50 ms timeouts + 50 ms)).
   func windowAdded(_ element: AXUIElement, sheet: Bool) {
     let at = uptimeMs()
+    pendingReads += 1
     DispatchQueue.global(qos: .userInitiated).async {
       AXUIElementSetMessagingTimeout(element, 0.05)
       var pid: pid_t = 0
       AXUIElementGetPid(element, &pid)
-      // The owner may still be building the window: retry a timed-out read for up to 1 s. A read that never completes
-      // is reported as axRead=timeout, which the reducer turns into a dialog fault - never into "not a dialog".
-      var role = "", subrole = "", completed = false
+      var role = "", subrole = "", lastError = AXError.success
       for _ in 0..<20 {
         let (roleError, roleValue) = axValue(element, kAXRoleAttribute)
         let (subroleError, subroleValue) = axValue(element, kAXSubroleAttribute)
-        if roleError == .cannotComplete || subroleError == .cannotComplete {
-          usleep(50_000)
-          continue
-        }
         role = roleValue as? String ?? ""
         subrole = subroleValue as? String ?? ""
-        completed = true
-        break
+        lastError = roleError != .success ? roleError : subroleError
+        if roleError != .cannotComplete && subroleError != .cannotComplete { break }
+        usleep(50_000)
       }
       if sheet && role.isEmpty { role = "AXSheet" }
       var number: CGWindowID = 0
       if let windowOfElement { _ = windowOfElement(element, &number) }
       let layer = listWindows()?.first { $0.number == number }?.layer ?? 0
       DispatchQueue.main.async {
+        self.pendingReads -= 1
         if number != 0 { self.knownWindows.insert(number) }
         self.send("dialog", [
           "t": at, "kind": "window_added", "id": "ax:\(pid)#\(number)", "ownerPid": Int(pid), "layer": layer,
-          "role": role, "subrole": subrole, "axRead": completed || sheet ? "ok" : "timeout",
+          "role": role, "subrole": subrole, "axError": axErrorName(lastError),
         ])
       }
     }
   }
+
+  // `stop` waits up to 4 s for new-window reads still running, then reports how many were left; `final` waits for it.
+  func drainThenStop(deadline: Double) {
+    if pendingReads > 0 && uptimeMs() < deadline { return after(0.05) { self.drainThenStop(deadline: deadline) } }
+    recording = false
+    emit(["kind": "stop", "pendingReads": pendingReads])
+    stopping = false
+  }
+
 
 
 
@@ -213,9 +224,10 @@ final class Recorder: NSObject {
       emit(["kind": "start"])
       recording = true
     case "stop":
-      recording = false
-      emit(["kind": "stop"])
+      stopping = true
+      drainThenStop(deadline: uptimeMs() + 4_000)
     case "final":
+      if stopping { return after(0.05) { self.command(words) } }
       finalRead(deadline: uptimeMs() + 1_000)
     case "snapshot":
       emitSnapshot()
@@ -231,15 +243,14 @@ final class Recorder: NSObject {
 enum RecorderMain {
   static func main() {
     guard let user = argument("--user-pid").flatMap({ pid_t($0) }) else {
-      FileHandle.standardError.write(Data("usage: recorder --user-pid <pid> [--target-pid <pid>,...] [--field <id>] [--drop <signal>]\n".utf8))
+      FileHandle.standardError.write(Data("usage: recorder --user-pid <pid> [--target-pid <pid>,...] [--field <id>]\n".utf8))
       exit(2)
     }
     let targets = (argument("--target-pid") ?? "").split(separator: ",").compactMap { pid_t($0) }
     let app = NSApplication.shared
     app.setActivationPolicy(.prohibited)
     let recorder = Recorder(
-      userPid: user, targetPids: targets, fieldIdentifier: argument("--field") ?? "sentinel.field",
-      dropped: argument("--drop"))
+      userPid: user, targetPids: targets, fieldIdentifier: argument("--field") ?? "sentinel.field")
     emit(["ctl": "hello", "role": "recorder", "pid": Int(getpid()), "trusted": AXIsProcessTrusted()])
     recorder.arm()
     recorder.startSampler()

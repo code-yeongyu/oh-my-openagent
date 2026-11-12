@@ -29,10 +29,40 @@ const DIALOG_ROLES = new Set(["AXSheet"])
 const DIALOG_SUBROLES = new Set(["AXDialog", "AXSystemDialog"])
 const SAMPLED: readonly Signal[] = ["key_focus", "window_raised", "pointer", "clipboard", "space", "activation"]
 
-const isDialog = (window: { readonly role: string; readonly subrole: string; readonly layer: number }): boolean =>
-  DIALOG_ROLES.has(window.role) ||
-  DIALOG_SUBROLES.has(window.subrole) ||
-  (window.layer >= MODAL_PANEL_LAYER && window.layer < MAIN_MENU_LAYER)
+type WindowFacts = { readonly role: string; readonly subrole: string; readonly layer: number }
+const roleHit = (window: WindowFacts): boolean => DIALOG_ROLES.has(window.role) || DIALOG_SUBROLES.has(window.subrole)
+const layerHit = (window: WindowFacts): boolean => window.layer >= MODAL_PANEL_LAYER && window.layer < MAIN_MENU_LAYER
+const isDialog = (window: WindowFacts): boolean => roleHit(window) || layerHit(window)
+
+// The recorder reports the raw AXError name of a new window's attribute reads; this table is the one judgement of
+// it. An attribute that is legitimately absent is "ok"; anything that means the read did not happen is a fault, and
+// an unknown name is a fault too, so a read failure can never become "not a dialog".
+export const AX_READ_ERRORS: Readonly<Record<string, "ok" | "fault">> = {
+  success: "ok",
+  noValue: "ok",
+  attributeUnsupported: "ok",
+  cannotComplete: "fault",
+  invalidUIElement: "fault",
+  failure: "fault",
+  apiDisabled: "fault",
+  notImplemented: "fault",
+}
+
+// Which branch of the dialog detector fired for each dialog seen during the recording, in event order. The self-test
+// uses it to prove the AX role/subrole branch on a live trial, where a layer-only hit would hide a dead AX path.
+export function dialogHits(events: readonly SentinelEvent[]): ("role" | "layer")[] {
+  const from = events.find((event) => event.kind === "start")?.t ?? Number.POSITIVE_INFINITY
+  const until = events.find((event) => event.kind === "stop")?.t ?? Number.NEGATIVE_INFINITY
+  const context = events.find((event) => event.kind === "context")
+  const targets = new Set(context?.kind === "context" ? context.targetPids : [])
+  const hits: ("role" | "layer")[] = []
+  for (const event of [...events].sort((a, b) => a.t - b.t)) {
+    if (event.kind !== "window_added" || event.t <= from || event.t > until || targets.has(event.ownerPid)) continue
+    if (roleHit(event)) hits.push("role")
+    else if (layerHit(event)) hits.push("layer")
+  }
+  return hits
+}
 
 // Only windows present in both reads are compared, so a window that opens or closes is not a raise.
 export function relativeOrderChanged(before: readonly string[], after: readonly string[]): boolean {
@@ -91,7 +121,10 @@ export function summarize(events: readonly SentinelEvent[], options: { readonly 
         if (event.t >= from && event.t <= until) ticks.push(event.t)
         break
       case "start":
+        break
       case "stop":
+        if ((event.pendingReads ?? 0) > 0)
+          faults.push(`dialog: ${event.pendingReads} new-window reads were still running at stop`)
         break
       case "focus":
         observe("key_focus", event.t, event.value, event.via === "notification")
@@ -130,9 +163,9 @@ export function summarize(events: readonly SentinelEvent[], options: { readonly 
         break
       case "window_added":
         if (!inWindow(event.t) || targetPids.has(event.ownerPid)) break
-        if (event.axRead === "timeout")
-          faults.push(`dialog: new window ${event.id} of pid ${event.ownerPid} was unreadable (AX timeout)`)
-        else if (isDialog(event)) mark("dialog", event.t)
+        if (isDialog(event)) mark("dialog", event.t)
+        else if (event.axError !== undefined && AX_READ_ERRORS[event.axError] !== "ok")
+          faults.push(`dialog: new window ${event.id} of pid ${event.ownerPid} was unreadable (AX ${event.axError})`)
         break
       case "leak":
         if (inWindow(event.t)) mark(event.what === "key" ? "typing" : "pointer", event.t)

@@ -18,7 +18,6 @@ type SessionOptions = {
   readonly helpers: HelperPaths
   readonly targetPids: readonly number[]
   readonly withPlanter: boolean
-  readonly drop?: string
   readonly beforeTypist?: (session: MacSession) => Promise<void>
 }
 
@@ -80,7 +79,6 @@ export class MacSession {
       session.typistPid = numberField(hello, "pid")
       session.typistWindow = numberField(hello, "window")
       const args = ["--user-pid", String(session.typistPid), "--target-pid", options.targetPids.join(",")]
-      if (options.drop !== undefined) args.push("--drop", options.drop)
       const [recorder] = await session.start("recorder", [options.helpers.recorder, ...args], "ready")
       session.recorder = recorder
       return session
