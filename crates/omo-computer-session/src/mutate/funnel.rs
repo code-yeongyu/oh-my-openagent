@@ -65,8 +65,14 @@ impl Session {
             .transpose()
         {
             Ok(lock) => lock,
-            Err(_) => {
-                return Err(self.refuse(record, Some("Lock".to_owned()), TRANSACTION_FAILED.into()))
+            Err(error) => {
+                self.funnel
+                    .warn(format!("interaction lock not taken: {error}"));
+                return Err(self.refuse(
+                    record,
+                    Some("Lock".to_owned()),
+                    TRANSACTION_FAILED.into(),
+                ));
             }
         };
         if self.funnel.markers.create(&record.marker).is_err() {
@@ -115,6 +121,9 @@ impl Session {
                     None,
                 );
                 let appended = self.funnel.audit().append(record.event.clone());
+                if let Err(error) = &appended {
+                    self.funnel.warn(format!("audit line not written: {error}"));
+                }
                 let sent = Sent {
                     route: mutation.route,
                     count,
