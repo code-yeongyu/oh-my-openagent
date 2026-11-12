@@ -82,9 +82,11 @@ fn every_refused_exec_leaves_the_recording_sink_empty() {
     let mut session = session(4242, StopPathScript::Live, &sink);
     session.open(params(json!({}))).expect("open");
     session.stop_path_start(params(json!({})));
-    session
-        .click(params(json!({ "target": "101", "x": 10, "y": 10 })))
-        .expect("admitted");
+    let frame = session
+        .capture_frame("101", true, None)
+        .expect("a frame of window 101");
+    let click = json!({ "target": "101", "x": 10, "y": 10, "frameId": frame.frame_id });
+    session.click(params(click)).expect("admitted");
     assert_eq!(
         sink.len(),
         3,

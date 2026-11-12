@@ -2,7 +2,7 @@
 // Do not edit by hand; run `bun run --cwd packages/omo-computer-protocol generate`.
 
 /** sha256 of the schema file this module was generated from; the schema-drift test compares it. */
-export const SCHEMA_SHA256 = "da974ea42139f11b748beee5d1c92057e224ba5d674d1c5c0406a79b368b3dde" as const
+export const SCHEMA_SHA256 = "e8d03727cce8c913a43f78402a91bc5e289fbcbf175940a460453a2860948f6e" as const
 
 /** The wire protocol version `engine.hello` reports. */
 export const PROTOCOL_VERSION = "1" as const
@@ -723,6 +723,8 @@ export type Diagnosis = {
 	observation: UntrustedText
 }
 
+export type DiffFallback = "baseline_incomplete" | "current_incomplete" | "since_expired" | "window_changed" | "menu_root" | "reordered" | "not_shorter" | "query_projection"
+
 export type DisplayAwake = {
 	state: DisplayAwakeState
 	graceMs: number
@@ -1113,6 +1115,8 @@ export type Observation = {
 	frame?: Frame | null
 	tree?: string | null
 	diff?: string | null
+	diffFallback?: DiffFallback | null
+	baseline?: number | null
 	focused?: ElementInfo | null
 	selectedText?: string | null
 	complete: boolean

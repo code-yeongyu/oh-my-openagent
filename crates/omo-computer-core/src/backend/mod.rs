@@ -120,6 +120,12 @@ pub trait Backend: Send {
             Err(refusal) => crate::intervention::TextDelivery { sent: 0, of, refusal: Some(refusal), interrupted: false },
         }
     }
+
+    /// The accessibility reads the observation model walks and re-identifies through; `None`
+    /// reads `AxUnsupported{snapshot_unsupported}`.
+    fn ax_reader(&mut self) -> Option<&mut dyn crate::ax::AxReader> {
+        None
+    }
 }
 
 /// The accessibility half of a backend.

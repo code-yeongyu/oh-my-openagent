@@ -44,6 +44,9 @@ impl Session {
                 return Err(self.refuse(record, Some(blocked.stage), refused));
             }
         };
+        if let Some(frame) = mutation.frame_refusal {
+            return Err(self.refuse(record, Some("Frame".to_owned()), frame.refusal().into()));
+        }
         let _permit = self.funnel.permits.try_take(PermitKind::Exec);
         match self.funnel.recover(&call_id) {
             Err(refused) => return Err(self.refuse(record, Some("Marker".to_owned()), refused)),
@@ -77,8 +80,11 @@ impl Session {
             .and_then(|pid| MidSend::start(self.backend.as_ref(), pid, policy));
         let outcome = self.send_watched(mutation.events, mutation.route, tag, watch, target);
         drop(lock);
-        let read_back = report::read_back(report::settle());
         let (count, of) = (outcome.count, outcome.of);
+        if let Some((target, frame_id)) = mutation.consume.as_ref().filter(|_| count > 0) {
+            self.frames.consume(target, frame_id);
+        }
+        let read_back = report::read_back(report::settle());
         let paused = if object { admission.paused } else { Vec::new() };
         let session = object.then(|| sample(self.backend.as_ref()));
         match outcome.stop {

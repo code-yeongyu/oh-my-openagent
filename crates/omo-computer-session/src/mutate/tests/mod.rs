@@ -114,9 +114,13 @@ impl Run {
     }
 }
 
+/// Opened, the stop path armed, and a frame of window 101 to click through.
 pub(super) fn open(mut session: Session) -> Session {
     session.open(params(json!({}))).expect("open");
     session.stop_path_start(params(json!({})));
+    session
+        .capture_frame("101", true, None)
+        .expect("a frame of window 101");
     session
 }
 

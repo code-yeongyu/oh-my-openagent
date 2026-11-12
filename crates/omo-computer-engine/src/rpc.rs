@@ -5,7 +5,7 @@
 
 use omo_computer_core::backend::Refusal;
 use omo_computer_core::methods::Method;
-use omo_computer_session::{Refused, Session};
+use omo_computer_session::{Refused, Session, Unresolved};
 use serde::de::DeserializeOwned;
 use serde_json::{json, Map, Value};
 
@@ -90,8 +90,17 @@ fn dispatch(session: &mut Session, name: &str, params: Value) -> Result<Value, F
             parse::<omo_computer_core::params::EmptyParams>(params)?;
             json!(session.capabilities())
         }
+        Method::Displays => {
+            parse::<omo_computer_core::params::EmptyParams>(params)?;
+            json!(session.displays().map_err(|r| refused(&r))?)
+        }
+        Method::Capture => json!(session.capture(parse(params)?).map_err(|r| refused(&r))?),
         Method::Click => json!(session.click(parse(params)?).map_err(|r| refused_call(&r))?),
         Method::TypeText => json!(session.type_text(parse(params)?).map_err(|r| refused_call(&r))?),
+        Method::Observe => json!(session.observe(parse(params)?).map_err(|u| unresolved(&u))?),
+        Method::AxDrill => json!(session.drill(parse(params)?).map_err(|u| unresolved(&u))?),
+        Method::AxNode => json!(session.ax_node(parse(params)?).map_err(|u| unresolved(&u))?),
+        Method::AxChildren => json!(session.ax_children(parse(params)?).map_err(|u| unresolved(&u))?),
         _ => return Err(not_found()),
     };
     Ok(value)
@@ -141,6 +150,15 @@ fn refused_call(refused: &Refused) -> Failure {
         if let Some(target) = stamps.target {
             data["target"] = json!(target);
         }
+    }
+    failure
+}
+
+/// A ref that did not resolve: the refusal, and on `AmbiguousTarget` the `candidates`.
+fn unresolved(unresolved: &Unresolved) -> Failure {
+    let mut failure = refused(&unresolved.refusal);
+    if let Some(data) = failure.data.as_mut().filter(|_| !unresolved.candidates.is_empty()) {
+        data["candidates"] = json!(unresolved.candidates);
     }
     failure
 }
