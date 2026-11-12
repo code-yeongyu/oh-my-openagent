@@ -332,6 +332,19 @@ describe("neutralizeCrossRepoReferences invariant", () => {
     "x_https://github.com/acme-org/acme-svc/pull/9",
     "[a](https://example.com/a_(b)?r=https://github.com/acme-org/acme-svc)",
     "see https://github.com/acme-org/acme-svc#readme, [x](https://github.com/code-yeongyu/senpi) ok",
+    "_github.com/acme-org/acme-svc_",
+    "*github.com/acme-org/acme-svc*",
+    "**github.com/acme-org/acme-svc**",
+    "_acme-svc#3_",
+    "https://github.com./acme-org/acme-svc",
+    "github.com./acme-org/acme-svc",
+    "https://example.com/?u=https%3A%2F%2Fgithub.com%2Facme-org%2Facme-svc",
+    "https://example.com/?u=https%253A%252F%252Fgithub.com%252Facme-org%252Facme-svc",
+    "https%3A%2F%2Fgithub.com%2Facme-org%2Facme-svc",
+    "https://github.com/code-yeongyu/senpi/compare/main...acme-org:acme-svc:feat",
+    "https://github.com/code-yeongyu/senpi/../../acme-org/acme-svc",
+    "[a](https://github.com/code-yeongyu/senpi/compare/main...acme-org:acme-svc:feat)",
+    "<https://github.com/code-yeongyu/senpi/../../acme-org/acme-svc>",
   ]
 
   test.each(PRIVATE_INPUTS)(
@@ -366,6 +379,12 @@ describe("neutralizeCrossRepoReferences invariant", () => {
     "https://notgithub.com/acme-org/acme-svc",
     "fixed senpi#6412 and omo#12 and code-yeongyu/senpi#7 (PR#3, GH#4)",
     "plain text with no references at all.",
+    "_github.com/code-yeongyu/senpi_",
+    "**github.com/code-yeongyu/senpi**",
+    "https://github.com./code-yeongyu/senpi",
+    "https://example.com/?u=https%3A%2F%2Fgithub.com%2Fcode-yeongyu%2Fsenpi",
+    "https://github.com/code-yeongyu/senpi/compare/main...code-yeongyu:senpi:feat",
+    "see _senpi#3_ now",
   ]
 
   test.each(PUBLIC_INPUTS)("#given public-only input %p #when neutralized #then it is byte-identical", (text) => {
@@ -379,5 +398,55 @@ describe("neutralizeCrossRepoReferences invariant", () => {
         "a senpi#1 b acme-svc#2 c https://github.com/code-yeongyu/senpi d <https://github.com/acme-org/acme-svc> e",
       ),
     ).toBe("a senpi#1 b tracked internally c https://github.com/code-yeongyu/senpi d tracked internally e")
+  })
+})
+
+describe("neutralizeCrossRepoReferences emphasis, encoding and following pairs", () => {
+  test.each([
+    ["_github.com/acme-org/acme-svc_", "_tracked internally_"],
+    ["*github.com/acme-org/acme-svc*", "*tracked internally*"],
+    ["**github.com/acme-org/acme-svc**", "**tracked internally**"],
+    ["~~https://github.com/acme-org/acme-svc/pull/9~~", "~~tracked internally~~"],
+    ["see _acme-svc#3_ now", "see _tracked internally_ now"],
+    ["https://github.com./acme-org/acme-svc", "tracked internally"],
+    ["github.com./acme-org/acme-svc", "tracked internally"],
+    ["https://example.com/?u=https%3A%2F%2Fgithub.com%2Facme-org%2Facme-svc", "tracked internally"],
+    ["https://example.com/?u=https%253A%252F%252Fgithub.com%252Facme-org%252Facme-svc", "tracked internally"],
+    ["https%3A%2F%2Fgithub.com%2Facme-org%2Facme-svc", "tracked internally"],
+    ["https://github.com/code-yeongyu/senpi/compare/main...acme-org:acme-svc:feat", "tracked internally"],
+    ["see https://github.com/code-yeongyu/senpi/../../acme-org/acme-svc now", "see tracked internally now"],
+    ["https://github.com/code-yeongyu/senpi/%2e%2e/%2e%2e/acme-org/acme-svc", "tracked internally"],
+  ])("#given %p #when neutralized #then it becomes %p", (text, expected) => {
+    expect(neutralizeCrossRepoReferences(text)).toStrictEqual(expected)
+  })
+
+  test.each([
+    "_github.com/code-yeongyu/senpi_",
+    "**github.com/code-yeongyu/senpi**",
+    "https://github.com./code-yeongyu/senpi",
+    "https://example.com/?u=https%3A%2F%2Fgithub.com%2Fcode-yeongyu%2Fsenpi",
+    "https://github.com/code-yeongyu/senpi/compare/main...code-yeongyu:senpi:feat",
+    "https://github.com/code-yeongyu/senpi/blob/main/a.ts#L1",
+    "see _senpi#3_ now",
+  ])("#given public variant %p #when neutralized #then it is byte-identical", (text) => {
+    expect(findPrivateReferences(text)).toBe(false)
+    expect(neutralizeCrossRepoReferences(text)).toBe(text)
+  })
+})
+
+describe("neutralizeCrossRepoReferences performance", () => {
+  test("#given 100k characters of a. #when neutralized #then it completes under one second", () => {
+    const text = "a.".repeat(50_000)
+    const started = performance.now()
+    expect(neutralizeCrossRepoReferences(text)).toBe(text)
+    expect(findPrivateReferences(text)).toBe(false)
+    expect(performance.now() - started).toBeLessThan(1000)
+  })
+
+  test("#given a GitHub host followed by 100k characters of a. #when neutralized #then it completes under one second", () => {
+    const text = "https://github.com/code-yeongyu/senpi/" + "a.".repeat(50_000)
+    const started = performance.now()
+    neutralizeCrossRepoReferences(text)
+    expect(performance.now() - started).toBeLessThan(1000)
   })
 })
