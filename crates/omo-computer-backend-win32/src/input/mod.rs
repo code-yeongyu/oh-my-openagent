@@ -4,6 +4,7 @@
 //! `SendInput` site and the one `PostMessageW` site in [`os`].
 
 pub mod chords;
+pub mod focus_child;
 pub mod ledger;
 pub mod partial;
 pub mod text;
