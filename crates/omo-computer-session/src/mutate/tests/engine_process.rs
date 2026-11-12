@@ -24,6 +24,8 @@ use sha2::{Digest, Sha256};
 const CASE: &str = "crates/omo-computer-core/fixtures/conformance/v3-secure-field-type-audit-length-only-no-hash.json";
 const PLAIN_SCENARIO: &str =
     "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json";
+const SECURE_INPUT_SCENARIO: &str =
+    "crates/omo-computer-backend-fake/fixtures/v3-secure-input-on.json";
 const REPLY_TIMEOUT: Duration = Duration::from_secs(10);
 
 fn repo() -> PathBuf {
@@ -190,15 +192,11 @@ fn delivered(left: &Left) {
     );
 }
 
-#[test]
-fn engine_process_secure_type_leaves_no_digest_in_audit_marker_or_trace() {
-    let case = case();
-    let secret = secret(&case);
+/// The case's type into a secure context on `scenario`: length only, no digest, anywhere.
+fn assert_length_only(case: &Value, scenario: &str) {
+    let secret = secret(case);
     let needle = sha256_16(&secret);
-    let scenario = case["scenario"]
-        .as_str()
-        .expect("the case's secure scenario");
-    let left = run_engine(&case, scenario);
+    let left = run_engine(case, scenario);
     delivered(&left);
     let typed = left.typed_line();
     let counts = [
@@ -223,6 +221,22 @@ fn engine_process_secure_type_leaves_no_digest_in_audit_marker_or_trace() {
         "{typed}"
     );
     assert_eq!(typed["warnings"], json!(["redacted_secure"]), "{typed}");
+}
+
+#[test]
+fn engine_process_secure_type_leaves_no_digest_in_audit_marker_or_trace() {
+    let case = case();
+    let scenario = case["scenario"]
+        .as_str()
+        .expect("the case's secure scenario")
+        .to_owned();
+    assert_length_only(&case, &scenario);
+}
+
+/// The same type under OS-wide Secure Input (`secure_input_on`), no secure field focused.
+#[test]
+fn engine_process_secure_input_type_leaves_no_digest_in_audit_marker_or_trace() {
+    assert_length_only(&case(), SECURE_INPUT_SCENARIO);
 }
 
 #[test]
