@@ -1340,12 +1340,103 @@ function exitCodeDocProblems(readme: string, source: string): string[] {
   )
   expect(failedCode, cleanupExitCode(["launchctl list FAILED: x"]), "--cleanup with a FAILED receipt")
   expect(failedCode, cleanupExitCode(["dir STILL PRESENT /w"]), "--cleanup with a STILL PRESENT receipt")
+  const measureOk = documented(
+    /`--measure` and `--row` exit (\d+) when every measured row gets a verdict/,
+    "--measure/--row with every row measured",
+  )
+  expect(measureOk, EXIT.ok, "--measure/--row with every row measured")
+  const measureError = documented(
+    /`--measure` and `--row` exit \d+ when every measured row gets a verdict .*? and (\d+) when any row ends in `ERROR`/,
+    "--measure/--row with an ERROR row",
+  )
+  expect(measureError, EXIT.failed, "--measure/--row with an ERROR row")
+  // the code side of that sentence: measureRow starts at EXIT.ok and sets EXIT.failed only on the ERROR verdict
+  const measureRowText = functionText(source, "async function measureRow(")
+  if (!/let exit: ExitCode = EXIT\.ok/.test(measureRowText))
+    problems.push("measureRow does not start its exit at EXIT.ok")
+  if (!/verdict: "ERROR"[\s\S]*?exit = EXIT\.failed/.test(measureRowText))
+    problems.push("measureRow does not set EXIT.failed on the ERROR verdict")
+  problems.push(...exitCodeSourceProblems(source))
+  return problems
+}
+
+// the text of a top-level function, from its header to the first closing brace at column 0
+function functionText(source: string, header: string): string {
+  const start = source.indexOf(`\n${header}`)
+  if (start < 0) return ""
+  const end = source.indexOf("\n}\n", start + 1)
+  return source.slice(start + 1, end < 0 ? undefined : end + 2)
+}
+
+// structural check (RED stub: the old narrow scan of main's bare returns)
+function exitCodeSourceProblems(source: string): string[] {
+  const problems: string[] = []
   const mainStart = /^async function main\(/m.exec(source)?.index
   if (mainStart === undefined) problems.push("the source has no top-level main()")
   const mainText = mainStart === undefined ? "" : source.slice(mainStart)
   const bare = mainText.split("\n").filter((l) => /\breturn\s+\d+\b|\?\s*\d+\s*:\s*\d+/.test(l))
   for (const line of bare) problems.push(`main returns a bare exit code: ${line.trim()}`)
   return problems
+}
+
+// class: each way a raw number can become an exit code, applied to the real source, must be flagged by the source check
+// with the mutated line named. A mutant that is not applied (its anchor is gone) fails too, so the list stays honest.
+function exitCodeMutantCases(source: string): Array<[string, unknown, unknown]> {
+  // [form, function header the mutant is applied inside, anchor, replacement, text the problem must name]
+  const mutants: Array<[string, string, string, string, string]> = [
+    ["return n in main", "async function main(", "  return EXIT.precondition\n}", "  return 2\n}", "return 2"],
+    [
+      "mixed ternary in main",
+      "async function main(",
+      "? EXIT.ok : EXIT.failed",
+      "? 0 : EXIT.failed",
+      "? 0 : EXIT.failed",
+    ],
+    ["let exit = n in main", "async function main(", "let exit: ExitCode = EXIT.ok", "let exit = 0", "let exit = 0"],
+    ["exit ||= n in main", "async function main(", "exit ||= rowExit", "exit ||= 1", "exit ||= 1"],
+    [
+      "let exit = n in measureRow",
+      "async function measureRow(",
+      "let exit: ExitCode = EXIT.ok",
+      "let exit = 0",
+      "let exit = 0",
+    ],
+    ["exit = n in measureRow", "async function measureRow(", "exit = EXIT.failed", "exit = 1", "exit = 1"],
+    [
+      "process.exit(n)",
+      "process.exit(",
+      "process.exit(await main(process.argv.slice(2)))",
+      "process.exit(4)",
+      "process.exit(4)",
+    ],
+    [
+      "mixed ternary in leg",
+      "async function leg(",
+      "? EXIT.ok : EXIT.failed",
+      "? 0 : EXIT.failed",
+      "? 0 : EXIT.failed",
+    ],
+    [
+      "mixed ternary in selfTest",
+      "async function selfTest(",
+      "? EXIT.ok : EXIT.failed",
+      "? 0 : EXIT.failed",
+      "? 0 : EXIT.failed",
+    ],
+    [
+      "ternary in cleanupExitCode",
+      "function cleanupExitCode(",
+      "? EXIT.failed : EXIT.ok",
+      "? 1 : EXIT.ok",
+      "? 1 : EXIT.ok",
+    ],
+  ]
+  return mutants.map(([form, header, anchor, replacement, named]): [string, unknown, unknown] => {
+    const body = functionText(source, header)
+    if (!body.includes(anchor)) return [`exit-code mutant ${form}: anchor present in ${header}`, false, true]
+    const mutated = source.replace(body, body.replace(anchor, replacement))
+    return [`exit-code mutant ${form}: flagged`, exitCodeSourceProblems(mutated).some((p) => p.includes(named)), true]
+  })
 }
 
 // --self-test: the pure classification logic and the row table against fixed inputs; runs on any host, exits 1 on a
@@ -1665,11 +1756,7 @@ async function selfTest(): Promise<number> {
       exitCodeDocProblems(readme.replace(/`--cleanup` exits/g, "cleanup prints"), source).length > 0,
       true,
     ],
-    [
-      "exit codes: a bare numeric return in main is caught",
-      exitCodeDocProblems(readme, `${source}\n    return 3\n`).some((p) => p.includes("bare exit code")),
-      true,
-    ],
+    ...exitCodeMutantCases(source),
   )
   // class: --cleanup exits non-zero when any receipt reports a failure, after every step has run
   cases.push(
