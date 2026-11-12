@@ -36,7 +36,8 @@ func pixelStats(_ image: CGImage) -> [String: Any] {
 
 func capture(_ pid: pid_t) -> [String: Any] {
   _ = NSApplication.shared
-  var result: [String: Any] = ["preflight": CGPreflightScreenCaptureAccess()]
+  let scale = Double(NSScreen.main?.backingScaleFactor ?? 1)
+  var result: [String: Any] = ["preflight": CGPreflightScreenCaptureAccess(), "backingScale": scale]
   let done = DispatchSemaphore(value: 0)
   SCShareableContent.getExcludingDesktopWindows(false, onScreenWindowsOnly: true) { content, error in
     guard let content else {
@@ -50,8 +51,8 @@ func capture(_ pid: pid_t) -> [String: Any] {
       return
     }
     let configuration = SCStreamConfiguration()
-    configuration.width = max(Int(window.frame.width) * 2, 2)
-    configuration.height = max(Int(window.frame.height) * 2, 2)
+    configuration.width = max(Int(window.frame.width * scale), 2)
+    configuration.height = max(Int(window.frame.height * scale), 2)
     configuration.showsCursor = false
     SCScreenshotManager.captureImage(
       contentFilter: SCContentFilter(desktopIndependentWindow: window), configuration: configuration
