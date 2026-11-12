@@ -63,6 +63,13 @@ fn secret(case: &Value) -> String {
 }
 
 /// What one engine process left behind.
+/// The fake's sink file under the runtime root (`route.rs` `SINK_FILE_PREFIX`).
+fn is_sink(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.starts_with("fake-sink-") && name.ends_with(".log"))
+}
+
 struct Left {
     root: tempfile::TempDir,
     typed_reply: Value,
@@ -81,12 +88,26 @@ impl Left {
         self.read("markers/local/default.json")
     }
 
-    /// Every file under the root but the audit and the marker: the trace and anything else.
+    /// Every ENGINE-written file under the root but the audit and the marker: the trace and
+    /// any other state. Excluded by name: the fake backend's `fake-sink-<pid>.log`
+    /// (`route.rs` `SINK_FILE_PREFIX`), the SIMULATED KEYBOARD, which records each delivered
+    /// event (`text "<typed>"`, fake `desktop.rs`) and so must hold the typed text: typing a
+    /// secret into a secure field still delivers it. `sink()` reads it, so a test asserts the
+    /// delivery the exclusion would otherwise hide.
     fn rest(&self) -> String {
         let skip = [
             self.root.path().join("audit/computer/local/audit.jsonl"),
             self.root.path().join("markers/local/default.json"),
         ];
+        self.files(|path| !skip.iter().any(|kept| kept == path) && !is_sink(path))
+    }
+
+    /// The fake backend's recording sink: what the simulated keyboard received.
+    fn sink(&self) -> String {
+        self.files(is_sink)
+    }
+
+    fn files(&self, keep: impl Fn(&Path) -> bool) -> String {
         let mut text = String::new();
         let mut stack = vec![self.root.path().to_owned()];
         while let Some(dir) = stack.pop() {
@@ -94,7 +115,7 @@ impl Left {
                 let path = entry.path();
                 if path.is_dir() {
                     stack.push(path);
-                } else if !skip.contains(&path) {
+                } else if keep(&path) {
                     text.push_str(&String::from_utf8_lossy(
                         &fs::read(&path).unwrap_or_default(),
                     ));
@@ -204,6 +225,10 @@ fn assert_length_only(case: &Value, scenario: &str) {
         0,
         "the secret is on disk"
     );
+    assert!(
+        left.sink().contains(&secret),
+        "the simulated keyboard received the secret: the exclusion hides no missing delivery"
+    );
     assert_eq!(
         typed["text"],
         json!({ "length": secret.chars().count() }),
@@ -248,5 +273,9 @@ fn engine_process_plain_type_keeps_the_digest_the_grep_looks_for() {
             .count(),
         0,
         "the plain text itself is never on disk"
+    );
+    assert!(
+        left.sink().contains(&secret),
+        "the simulated keyboard received the text"
     );
 }
