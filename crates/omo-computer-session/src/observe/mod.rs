@@ -23,7 +23,7 @@ use omo_computer_core::requests::{read_observe, ReadRequest};
 use omo_computer_core::untrusted::UntrustedText;
 
 use crate::diff::{decide, Decision, Outline, Side};
-use crate::refs::{Generation, RefRegistry, Unresolved};
+use crate::refs::{Drilled, Generation, RefRegistry, Unresolved};
 
 /// What one observe asks for, with the defaults applied: skeleton on, actions off.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -149,7 +149,8 @@ pub fn drill(refs: &mut RefRegistry, reader: &mut dyn AxReader, token: &str, dep
     }
     let read = walk(reader, resolved.live, &limits);
     let nodes = u32::try_from(read.nodes.len()).unwrap_or(u32::MAX);
-    let number = refs.mint(&root, &read, Some((top, &identity))).generation;
+    let drilled = Drilled { top, from: resolved.generation, index: resolved.index, identity: &identity };
+    let number = refs.mint(&root, &read, Some(drilled)).generation;
     let generation = minted(refs, &resolved.window, number)?;
     let style = Style { skeleton: false, depth, actions: false };
     let (outline, cuts) = project::render(generation, style, nodes);

@@ -66,6 +66,7 @@ impl RefRegistry {
         refs.generations.clear();
         refs.by_object.clear();
         refs.by_native_id.clear();
+        refs.last_entry.clear();
         refs.needs_observe = false;
         refs.wiped = Some((refs.next_generation + 1, why.reason()));
         self.retained -= released;

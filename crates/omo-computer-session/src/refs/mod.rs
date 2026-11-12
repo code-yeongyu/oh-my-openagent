@@ -4,6 +4,7 @@
 
 mod entry;
 mod invalidate;
+mod matching;
 mod mint;
 mod resolve;
 
@@ -14,6 +15,7 @@ mod tests;
 
 pub use entry::{identities, Generation, Identity, RefEntry};
 pub use invalidate::Expiry;
+pub use matching::Drilled;
 pub use resolve::{Resolved, Unresolved};
 
 use std::collections::{BTreeMap, HashMap};
@@ -31,6 +33,9 @@ pub(crate) struct WindowRefs {
     pub(crate) by_object: HashMap<NativeObject, u64>,
     /// Role + native id -> the numbers that key carried in its latest read, in document order.
     pub(crate) by_native_id: HashMap<(String, String), Vec<u64>>,
+    /// Number -> the native object and role + native id of its latest entry: the old entry a
+    /// match is verified against.
+    pub(crate) last_entry: HashMap<u64, (Option<NativeObject>, Option<matching::Tuple>)>,
     pub(crate) needs_observe: bool,
     /// Generations below the first number expired at once for the reason.
     pub(crate) wiped: Option<(u64, Reason)>,

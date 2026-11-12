@@ -1,13 +1,10 @@
-//! Minting a generation from a walk. Amendment A1: an element keeps its number across
-//! observations when (1) the backend reports the same native object, else (2) role and native
-//! id match and the number is unused in this capture; otherwise it gets the next number of the
-//! session-wide counter, which is never reused.
-
-use std::collections::{HashMap, HashSet};
+//! Minting a generation from a walk: the numbers come from the identity verdict of
+//! `matching`, then the generation is stored, aged out and pruned.
 
 use omo_computer_core::ax::{RootRead, Walk, GENERATIONS_PER_WINDOW};
 
-use super::entry::{identities, Generation, Identity, RefEntry};
+use super::entry::{identities, Generation, RefEntry};
+use super::matching::Drilled;
 use super::{RefRegistry, WindowRefs};
 use crate::refs::invalidate::Expiry;
 
@@ -21,10 +18,10 @@ pub struct Minted {
 }
 
 impl RefRegistry {
-    /// Mints the generation `walk` read under `root`'s window. `drilled` names the generation
-    /// and identity of the element a drill walked from: the new generation is its
-    /// sub-generation and leaves every other generation valid.
-    pub fn mint(&mut self, root: &RootRead, walk: &Walk, drilled: Option<(u64, &Identity)>) -> Minted {
+    /// Mints the generation `walk` read under `root`'s window. `drilled` names the element a
+    /// drill walked from: the new generation is a sub-generation of its full observation and
+    /// leaves every other generation valid.
+    pub fn mint(&mut self, root: &RootRead, walk: &Walk, drilled: Option<Drilled<'_>>) -> Minted {
         let window_id = root.window.id.clone();
         let mut identity_changed = false;
         if drilled.is_none() {
@@ -34,8 +31,9 @@ impl RefRegistry {
                 identity_changed = true;
             }
         }
-        let identities = identities(walk, drilled.map(|(_, identity)| identity));
-        let numbers = self.number(&window_id, walk);
+        let identities = identities(walk, drilled.map(|d| d.identity));
+        let reserved = self.reserved(&window_id, drilled.as_ref());
+        let numbers = self.number(&window_id, walk, &reserved, drilled.is_some());
         let window = self.windows.entry(window_id.clone()).or_default();
         window.key = Some(root.window.clone());
         window.next_generation += 1;
@@ -68,7 +66,7 @@ impl RefRegistry {
             number,
             Generation {
                 number,
-                parent: drilled.map(|(parent, _)| parent),
+                parent: drilled.map(|d| d.top),
                 window: root.window.clone(),
                 app: root.app.clone(),
                 window_focused: root.focused,
@@ -85,57 +83,8 @@ impl RefRegistry {
             window.needs_observe = false;
             self.age_out(&window_id);
         }
-        self.prune(&window_id, drilled.map_or(number, |(parent, _)| parent));
+        self.prune(&window_id, drilled.map_or(number, |d| d.top));
         Minted { generation: number, identity_changed }
-    }
-
-    /// The element number of every node of `walk`. Pass 1 settles every same-native-object
-    /// match across the whole read; pass 2 gives a role + native id match only a number pass 1
-    /// left unclaimed (with duplicate ids, the old numbers of that key in their old order);
-    /// every other node then gets the next number of the counter.
-    fn number(&mut self, window_id: &str, walk: &Walk) -> Vec<u64> {
-        let window = self.windows.entry(window_id.to_owned()).or_default();
-        let key = |read: &omo_computer_core::ax::NodeRead| read.native_id.clone().map(|id| (read.role.clone(), id));
-        let mut claimed: HashSet<u64> = HashSet::new();
-        let mut numbers: Vec<Option<u64>> = walk
-            .nodes
-            .iter()
-            .map(|node| {
-                let n = node.read.object.and_then(|object| window.by_object.get(&object).copied())?;
-                claimed.insert(n).then_some(n)
-            })
-            .collect();
-        for (slot, node) in numbers.iter_mut().zip(&walk.nodes) {
-            if slot.is_some() {
-                continue;
-            }
-            let candidates = key(&node.read).and_then(|key| window.by_native_id.get(&key));
-            if let Some(n) = candidates.and_then(|old| old.iter().copied().find(|n| !claimed.contains(n))) {
-                claimed.insert(n);
-                *slot = Some(n);
-            }
-        }
-        let numbers: Vec<u64> = numbers
-            .into_iter()
-            .map(|slot| {
-                slot.unwrap_or_else(|| {
-                    let n = self.next_n;
-                    self.next_n += 1;
-                    n
-                })
-            })
-            .collect();
-        let mut by_key: HashMap<(String, String), Vec<u64>> = HashMap::new();
-        for (node, n) in walk.nodes.iter().zip(&numbers) {
-            if let Some(object) = node.read.object {
-                window.by_object.insert(object, *n);
-            }
-            if let Some(key) = key(&node.read) {
-                by_key.entry(key).or_default().push(*n);
-            }
-        }
-        window.by_native_id.extend(by_key);
-        numbers
     }
 
     /// Keeps the newest eight full observations of the window and their drills.
