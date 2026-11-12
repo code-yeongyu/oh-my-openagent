@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs"
+import { mkdtempSync } from "node:fs"
 import { join } from "node:path"
 import { loadSenpiBarrel } from "../../../lazy/senpi-barrel"
 
@@ -27,22 +27,26 @@ export async function realSessionHandle(
     readonly registerAfterReport?: boolean
     readonly failAfterReport?: boolean
     readonly retired?: string[]
+    readonly holdUntilTornDown?: boolean
+    readonly teardownWaitMs?: number
   } = {},
 ) {
   const { ModelRuntime, SessionManager, createAgentSession } = await loadSenpiBarrel()
   const project = tempProject()
-  const agentDir = join(project, "isolated-agent")
-  mkdirSync(agentDir)
-  // The engine's fallback logger retires older generations from an async step that writes this marker, and that
-  // step can land after the test's cleanup removed the project, which leaves the directory behind (#9766).
-  // Writing the marker here makes the step return without creating anything.
-  mkdirSync(join(agentDir, "logs"), { recursive: true })
-  writeFileSync(join(agentDir, "logs", ".fallback-log-v2"), "")
+  // The engine writes into its agent dir on its own schedule: its fallback logger checks and creates a file there
+  // from an async step nothing here can await. An agent dir inside the per-test project is therefore re-created
+  // after the test's cleanup removed it and reported as a temp leak (#9766). No test can own this directory, so it
+  // lives in the suite's process-scoped temp dir and leaves with the run root.
+  const processTemp = process.env["OMO_TEST_PROCESS_TMPDIR"]
+  if (processTemp === undefined)
+    throw new Error("the typed-handle fixture needs the test preload's OMO_TEST_PROCESS_TMPDIR")
+  const agentDir = mkdtempSync(join(processTemp, "typed-handle-agent-"))
   const store = createTaskRecordStore({ project_dir: project })
   const handles: ManagedChildHandle[] = []
   const transcripts: Array<{ path: string; before: string }> = []
   const started: string[] = []
   const reported = Promise.withResolvers<void>()
+  const tornDownSignal = Promise.withResolvers<void>()
   let tornDown = false
   const runner = new InProcessRunner({
     createSession: async (options) => {
@@ -86,6 +90,9 @@ export async function realSessionHandle(
         await runner.resume({ ...spec, sessionDir, agentDir, model: undefined }, path),
       )
       if (options.registerAfterReport === true) await reported.promise
+      // `holdUntilTornDown` makes a start outlive the teardown's wait by cause rather than by timing: the handle
+      // cannot arrive until the teardown has given up and released this.
+      if (options.holdUntilTornDown === true) await tornDownSignal.promise
       if (tornDown) {
         // The teardown gave up on this launch (the test's deadline ran out): nothing else will retire this child.
         await retire(handle)
@@ -149,8 +156,11 @@ export async function realSessionHandle(
     reported.resolve()
     // A start still in flight finishes first. A wait that runs out of the test's deadline is not an error of
     // its own here: the failure that brought the fixture down is the one to report.
-    for (const taskId of started) await launchSettled(manager, taskId).catch(() => undefined)
+    for (const taskId of started) await launchSettled(manager, taskId, options.teardownWaitMs).catch(() => undefined)
     tornDown = true
+    tornDownSignal.resolve()
+    // A start released just now retires its own child. Waiting for its launch means the caller sees that done.
+    for (const taskId of started) await launchSettled(manager, taskId).catch(() => undefined)
     for (const handle of handles.splice(0)) await retire(handle)
   }
 }
