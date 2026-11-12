@@ -8,6 +8,7 @@ mod binding;
 mod call;
 mod diagnostics;
 mod funnel;
+mod memory_markers;
 mod poison;
 mod record;
 mod recovery;
@@ -18,6 +19,7 @@ mod tests;
 
 pub use binding::{Binding, SecureInputProbe, SecureProbe};
 pub use call::Mutation;
+pub use memory_markers::MemoryMarkers;
 
 use std::path::{Path, PathBuf};
 
@@ -31,7 +33,7 @@ use crate::audit::gc::{ArtifactStore, GcLimits};
 use crate::audit::{AuditLimits, AuditSink, AuditWriter, MemoryAudit, UnavailableAudit, WriterId};
 use crate::budget::Permits;
 use crate::lock::InteractionLock;
-use crate::marker::{MarkerDir, MarkerStore, MemoryMarkers};
+use crate::marker::{MarkerDir, MarkerStore};
 use crate::Session;
 use poison::Poisoned;
 

@@ -4,7 +4,6 @@
 //! every transport; the reply is stored in it as the receipt once the call completes. A file
 //! that is there and cannot be read as a marker reads `Unreadable`, never absent.
 
-use std::collections::BTreeMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
@@ -13,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::audit::TextRecord;
+pub use crate::mutate::MemoryMarkers;
 
 /// The markers directory under the RUNTIME root.
 pub const MARKERS_DIR: &str = "markers";
@@ -171,42 +171,6 @@ impl MarkerStore for MarkerDir {
             Err(error) => Err(error),
             Ok(()) => File::open(parent(&path)?)?.sync_all(),
         }
-    }
-}
-
-/// Markers of a session with no RUNTIME root (the self-test and in-process tests).
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct MemoryMarkers {
-    markers: BTreeMap<(String, String), PreInputMarker>,
-}
-
-impl MarkerStore for MemoryMarkers {
-    fn read(&self, issuer: &str, scope: &str) -> MarkerRead {
-        self.markers
-            .get(&(issuer.to_owned(), scope.to_owned()))
-            .map_or(MarkerRead::Absent, |marker| {
-                MarkerRead::Found(Box::new(marker.clone()))
-            })
-    }
-
-    fn create(&mut self, marker: &PreInputMarker) -> io::Result<()> {
-        let key = (marker.binding.issuer.clone(), marker.binding.scope.clone());
-        if self.markers.contains_key(&key) {
-            return Err(io::Error::from(io::ErrorKind::AlreadyExists));
-        }
-        self.markers.insert(key, marker.clone());
-        Ok(())
-    }
-
-    fn record_receipt(&mut self, marker: &PreInputMarker) -> io::Result<()> {
-        let key = (marker.binding.issuer.clone(), marker.binding.scope.clone());
-        self.markers.insert(key, marker.clone());
-        Ok(())
-    }
-
-    fn clear(&mut self, issuer: &str, scope: &str) -> io::Result<()> {
-        self.markers.remove(&(issuer.to_owned(), scope.to_owned()));
-        Ok(())
     }
 }
 
