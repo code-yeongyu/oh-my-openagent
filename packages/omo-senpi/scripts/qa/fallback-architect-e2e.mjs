@@ -49,6 +49,11 @@ function seedScenario(scenario) {
   mkdirSync(home, { recursive: true })
 
   const settings = JSON.parse(readFileSync(join(sandbox.agentDir, "settings.json"), "utf8"))
+  // The primary is the session's default, not a `--model` choice: a model named at launch is pinned and never
+  // falls back (omo#13243), so these fallback scenarios start on the default model.
+  const primaryRef = scenario.primary ?? PRIMARY
+  settings.defaultProvider = primaryRef.slice(0, primaryRef.indexOf("/"))
+  settings.defaultModel = primaryRef.slice(primaryRef.indexOf("/") + 1)
   settings.retry = {
     enabled: true,
     maxRetries: 1,
@@ -74,7 +79,7 @@ function seedScenario(scenario) {
   )
 
   const primary = scenario.primary ?? PRIMARY
-  return { sandbox, sessionDir, home, primary, modelId: primary.slice(primary.indexOf("/") + 1) }
+  return { sandbox, sessionDir, home, primary }
 }
 
 function driveSenpi(senpiBin, scenario) {
@@ -84,10 +89,6 @@ function driveSenpi(senpiBin, scenario) {
       "-e",
       mockProvider,
       "-p",
-      "--provider",
-      "omo-mock",
-      "--model",
-      scenario.modelId,
       "--session-dir",
       scenario.sessionDir,
       "design a caching layer for the fixture service",
