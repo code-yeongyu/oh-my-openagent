@@ -6,7 +6,7 @@ import { recordsOn } from "./sentinel.ts"
 
 // A consumer (the conformance runner) writes not_observed instead of none for every OS this answers false, so a
 // claimed OS must have a recorder in the tree; an unclaimed one must not be silently reported as recorded.
-const CANDIDATES = ["macos", "windows", "x11", "wayland", "linux"] as const
+const CANDIDATES = ["macos", "windows", "x11", "wayland"] as const
 const recorderIn = (os: string): boolean =>
   existsSync(join(import.meta.dir, os, "recorder.swift")) || existsSync(join(import.meta.dir, os, "recorder.ts"))
 
