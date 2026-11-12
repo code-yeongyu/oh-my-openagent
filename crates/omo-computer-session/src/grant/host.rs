@@ -121,6 +121,12 @@ impl Session {
         self.funnel.control.presence.end(why);
         self.funnel.control.slot.release(&self.funnel.control.token);
         self.funnel.control.lease_epoch = None;
+        self.funnel.control.lease_hook.lease_ended(self.backend.as_mut(), why);
+    }
+
+    /// Installs the lease-end hook a later row's state lives in (R45).
+    pub fn set_lease_hook(&mut self, hook: Box<dyn super::LeaseHook>) {
+        self.funnel.control.lease_hook = hook;
     }
 
     /// `display.release`: ends the lease and lets the display sleep; the run continues.
@@ -134,6 +140,7 @@ impl Session {
         // Row 22 (R26): display.resume re-arms the hold row 22 owns.
         self.display_awake = self.display_awake.resume();
         self.funnel.control.display_released = false;
+        self.funnel.control.lease_hook.display_resumed(self.backend.as_mut());
     }
 
     #[must_use]
