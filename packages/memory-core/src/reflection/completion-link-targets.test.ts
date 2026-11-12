@@ -54,6 +54,24 @@ describe("link repair keeps each link's original target (#12642)", () => {
     expect(result.status).toBe("valid")
   })
 
+  it("#given a note renamed into the folder its relative links point at #when validated #then they become '.', never an empty destination", async () => {
+    // given
+    const worktree = await fixture({
+      "a/b/x.md": note("X", "Go [up](..) or [up](../).\n"),
+      "a/other.md": note("Other", "o\n"),
+    })
+    await git(worktree.dir, "mv", "a/b/x.md", "a/x.md")
+    await commitAll(worktree.dir, "chore(dream): move x up")
+
+    // when
+    const result = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
+
+    // then
+    const moved = await read(worktree.dir, "a/x.md")
+    expect([...moved.matchAll(/\[up\]\(([^)]*)\)/g)].map((found) => found[1])).toStrictEqual([".", "."])
+    expect(result.status).toBe("valid")
+  })
+
   it("#given an archive entry that names only the ledger's file name #when validated #then links to it point at the archive", async () => {
     // given
     const worktree = await fixture({

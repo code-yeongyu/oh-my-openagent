@@ -107,6 +107,35 @@ describe("memory cleanup link integrity", () => {
     },
   )
 
+  it("#given an archived note whose relative links point at its parent folder #when applied #then they become '.' at the root, never an empty destination", async () => {
+    // given
+    const { dir, repo } = await repoWith([
+      {
+        relativePath: "reference/up-LIFTED.md",
+        content: memory("Up", "The hold was lifted; go [up](..) or [up](../)."),
+      },
+      SIBLING,
+    ])
+    const before = await danglingLinks(dir)
+
+    // when
+    const { applied } = await run(repo)
+
+    // then
+    const archive = await read(dir, "ARCHIVE.md")
+    expect([...archive.matchAll(/\[up\]\(([^)]*)\)/g)].map((found) => found[1])).toStrictEqual([".", "."])
+    expect(applied.applied).toBe(true)
+    // The audit never resolves a link to the root folder, so the same two links stay counted, now from the archive.
+    expect(before).toStrictEqual([
+      ["reference/up-LIFTED.md", ".."],
+      ["reference/up-LIFTED.md", "../"],
+    ])
+    expect(await danglingLinks(dir)).toStrictEqual([
+      ["ARCHIVE.md", "."],
+      ["ARCHIVE.md", "."],
+    ])
+  })
+
   it("#given an archived note in a subfolder whose relative link already dangled and a root file of that name #when applied #then the archived link keeps its old folder and gains no target", async () => {
     // given
     const { dir, repo } = await repoWith([
