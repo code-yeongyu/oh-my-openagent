@@ -1,5 +1,5 @@
 import { setTimeout } from "node:timers/promises"
-import { type MachineSignIn, prepareMachineSignIn } from "./machine-binding"
+import { generateDeviceKeys } from "./device-keys"
 import {
   ApiRefusal,
   type ChooseDevice,
@@ -12,9 +12,6 @@ import {
 } from "./protocol"
 import type { Session } from "./session"
 
-const unbound = async (): Promise<MachineSignIn> =>
-  prepareMachineSignIn({ stored: null, local: undefined, deviceService: undefined })
-
 export type DisplayCode = { readonly verificationUri: string; readonly userCode: string; readonly matchingCode: string }
 export async function loginDevice(
   session: Session,
@@ -23,22 +20,19 @@ export async function loginDevice(
     readonly platform: Platform
     readonly show: (code: DisplayCode) => void
     readonly chooseDevice: ChooseDevice
-    /** The machine binding (omo-service#1016); absent, the sign-in registers unbound as before. */
-    readonly machine?: (session: Session) => Promise<MachineSignIn>
+    /** This machine's hardware digest (#6503), sent only when the service advertises machine identity. */
+    readonly machineDigest?: string
     readonly now?: () => number
     readonly sleep?: (ms: number) => Promise<void>
   },
 ): Promise<void> {
   await session.ready()
-  const machine = await (options.machine ?? unbound)(session)
-  const keys = machine.keys
+  const keys = generateDeviceKeys()
   const minted = parseReply(
     deviceCodeSchema,
     await session.request(
       "/v1/device/code",
-      jsonRequest({
-        client: { name: options.name, platform: options.platform, ...(machine.advertise ? { machineBinding: 1 } : {}) },
-      }),
+      jsonRequest({ client: { name: options.name, platform: options.platform } }),
     ),
   )
   const uri = new URL(minted.verificationUri)
@@ -66,15 +60,16 @@ export async function loginDevice(
           jsonRequest({
             deviceCode: minted.deviceCode,
             ...keys.public,
-            ...machine.fields(),
+            ...(options.machineDigest === undefined ? {} : { machineDigest: options.machineDigest }),
           }),
         ),
       )
-      await session.save({ ...grant, ...keys.private }, { adopt: machine.adopt() })
+      await session.save({ ...grant, ...keys.private })
       return
     } catch (error) {
       if (!(error instanceof ApiRefusal)) throw error
-      if (await machine.retry(error)) continue
+      // #6503: this machine already has its device. Terminal: never retried, never a reason to remove or inherit that device.
+      if (error.code === "machine_exists") throw error
       if (error.status === 400 && error.code === "authorization_pending") continue
       if (error.status === 400 && error.code === "slow_down") {
         interval += 5000
