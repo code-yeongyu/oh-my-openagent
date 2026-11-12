@@ -34,8 +34,19 @@ pub struct Attribution {
 /// Where `event` falls against a send at `send_ms`.
 #[must_use]
 pub const fn place(event: InputSeen, send_ms: u64) -> Placement {
-    let _ = (event, send_ms, SETTLE_PROFILE.attribution_before_ms);
-    Placement::Outside
+    if event.own {
+        Placement::Outside
+    } else if event.at_ms < send_ms {
+        if send_ms - event.at_ms <= SETTLE_PROFILE.attribution_before_ms {
+            Placement::BeforeSend
+        } else {
+            Placement::Outside
+        }
+    } else if event.at_ms - send_ms < SETTLE_PROFILE.attribution_after_ms {
+        Placement::AfterSend
+    } else {
+        Placement::Outside
+    }
 }
 
 /// Whether a foreign event inside the window before `send_ms` holds the send.
@@ -49,6 +60,13 @@ pub fn holds_send(events: &[InputSeen], send_ms: u64) -> bool {
 /// The foreign events inside the window after `send_ms`.
 #[must_use]
 pub fn after_send(events: &[InputSeen], send_ms: u64) -> Attribution {
-    let _ = (events, send_ms);
-    Attribution::default()
+    let after: Vec<u64> = events
+        .iter()
+        .filter(|event| place(**event, send_ms) == Placement::AfterSend)
+        .map(|event| event.at_ms - send_ms)
+        .collect();
+    Attribution {
+        foreign_events: u32::try_from(after.len()).unwrap_or(u32::MAX),
+        first_foreign_at_ms: after.iter().copied().min(),
+    }
 }
