@@ -14,6 +14,7 @@ export type Fixture = {
   readonly x: number
   readonly y: number
   readonly stateFile: string
+  readonly eventFile: string
 }
 
 export type Invoke = (args: readonly string[], timeoutMs?: number) => Json
@@ -116,13 +117,19 @@ type ClickResult = { readonly toggled: string | undefined; readonly note: string
 async function clickAt(probe: Probe, aim: readonly string[], route: string): Promise<ClickResult | string> {
   const { fixture } = probe
   const before = stateLines(fixture.stateFile).length
+  const eventsBefore = stateLines(fixture.eventFile).length
   const click = probe.invoke(["click", String(fixture.pid), String(fixture.windowNumber), ...aim, route])
   const error = failed(click)
   if (error !== null) return error
   const toggled = await nextState(fixture.stateFile, before, probe.settleMs)
+  const delivered = stateLines(fixture.eventFile).slice(eventsBefore)
+  const arrival =
+    delivered.length === 0
+      ? "the fixture window received no mouse event"
+      : `the fixture window received ${short(delivered)}`
   return {
     toggled,
-    note: `${route}: ${toggled === undefined ? "no toggle" : `toggled ${toggled}`} after ${short(click)}`,
+    note: `${route}: ${toggled === undefined ? "no toggle" : `toggled ${toggled}`} after ${short(click)}; ${arrival}`,
   }
 }
 

@@ -38,7 +38,7 @@ case "ax-press":
   guard let box = firstElement(app, role: kAXCheckBoxRole) else { emit(["found": false]) }
   emit(["found": true, "axError": Int(AXUIElementPerformAction(box, kAXPressAction as CFString).rawValue)])
 case "fixture":
-  let delegate = Fixture(stateFile: argument(2), readyFile: argument(3))
+  let delegate = Fixture(stateFile: argument(2), readyFile: argument(3), eventFile: argument(4))
   let app = NSApplication.shared
   app.setActivationPolicy(.regular)
   app.delegate = delegate

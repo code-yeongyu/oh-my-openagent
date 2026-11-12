@@ -89,7 +89,8 @@ function recordFacts(out: string): void {
 async function startFixture(binary: string, scratch: string): Promise<{ fixture: Fixture; kill: () => void }> {
   const stateFile = join(scratch, "fixture.state")
   const readyFile = join(scratch, "fixture.ready")
-  const child = Bun.spawn([binary, "fixture", stateFile, readyFile], { stdout: "ignore", stderr: "ignore" })
+  const eventFile = join(scratch, "fixture.events")
+  const child = Bun.spawn([binary, "fixture", stateFile, readyFile, eventFile], { stdout: "ignore", stderr: "ignore" })
   const ready = await until(
     () => run("/bin/cat", [readyFile]).stdout,
     (text) => text !== "",
@@ -98,7 +99,14 @@ async function startFixture(binary: string, scratch: string): Promise<{ fixture:
   if (ready === "") throw new Error("the fixture app wrote no ready file within 15 s")
   const parsed: unknown = JSON.parse(ready)
   const field = (key: string) => Number(typeof parsed === "object" && parsed !== null ? Reflect.get(parsed, key) : NaN)
-  const fixture = { pid: field("pid"), windowNumber: field("windowNumber"), x: field("x"), y: field("y"), stateFile }
+  const fixture = {
+    pid: field("pid"),
+    windowNumber: field("windowNumber"),
+    x: field("x"),
+    y: field("y"),
+    stateFile,
+    eventFile,
+  }
   return { fixture, kill: () => child.kill() }
 }
 

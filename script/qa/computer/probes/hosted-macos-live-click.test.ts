@@ -40,12 +40,14 @@ function fakeProbe(scene: Scene): { probe: Probe; clicks: string[] } {
     }
     if (command === "click") {
       clicks.push(`${route}@${args[3]},${args[4]}`)
+      appendFileSync(eventFile, `1 ${args[3]} ${args[4]}\n`)
       if (scene.togglingRoutes.includes(route)) toggle()
       return { posted: true, route }
     }
     return { helperError: `unexpected ${command}` }
   }
-  const fixture = { pid: 4242, windowNumber: 7, x: 0, y: 0, stateFile }
+  const eventFile = join(scratch, "fixture.events")
+  const fixture = { pid: 4242, windowNumber: 7, x: 0, y: 0, stateFile, eventFile }
   const probe: Probe = { invoke: answer, control: answer, fixture, textEditPid: null, scratch, settleMs: 50 }
   return { probe, clicks }
 }
