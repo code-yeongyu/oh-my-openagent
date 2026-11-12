@@ -1,10 +1,18 @@
 import assert from "node:assert/strict"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import test from "node:test"
+import test, { afterEach } from "node:test"
 
 import { installMarketplaceLocally } from "./install-local.mjs"
-import { createCodexInstallSandbox, makeTempDir, writeJson, writePluginAt } from "./install-test-fixtures.mjs"
+import {
+  createCodexInstallSandbox,
+  disposeCodexInstallSandboxes,
+  makeTempDir,
+  writeJson,
+  writePluginAt,
+} from "./install-test-fixtures.mjs"
+
+afterEach(disposeCodexInstallSandboxes)
 
 test("#given sisyphuslabs lazycodex install #when installing locally #then stamps the distribution version", async () => {
   const repoRoot = await makeTempDir()

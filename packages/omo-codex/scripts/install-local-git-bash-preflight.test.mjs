@@ -2,10 +2,12 @@ import assert from "node:assert/strict"
 import { mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import test from "node:test"
+import test, { afterEach } from "node:test"
 
 import { installMarketplaceLocally } from "./install-local.mjs"
-import { createCodexInstallSandbox } from "./install-test-fixtures.mjs"
+import { createCodexInstallSandbox, disposeCodexInstallSandboxes } from "./install-test-fixtures.mjs"
+
+afterEach(disposeCodexInstallSandboxes)
 
 const windowsGitBashPath = "C:\\Program Files\\Git\\bin\\bash.exe"
 const lspCliPath = join(process.cwd(), "packages", "lsp-tools-mcp", "dist", "cli.js")

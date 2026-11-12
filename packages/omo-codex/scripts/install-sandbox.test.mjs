@@ -2,10 +2,12 @@ import assert from "node:assert/strict"
 import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { dirname, join } from "node:path"
-import test from "node:test"
+import test, { afterEach } from "node:test"
 import { fileURLToPath } from "node:url"
 
-import { createCodexInstallSandbox } from "./install-test-fixtures.mjs"
+import { createCodexInstallSandbox, disposeCodexInstallSandboxes } from "./install-test-fixtures.mjs"
+
+afterEach(disposeCodexInstallSandboxes)
 
 // #13253: the Codex installer and cleanup resolve codexHome, the bin dir and the project directory from the real home
 // when a caller leaves one out, so a test that forgets one writes or deletes outside its scratch directory. The

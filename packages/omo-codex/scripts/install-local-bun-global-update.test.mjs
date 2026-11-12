@@ -3,10 +3,12 @@ import { execFileSync } from "node:child_process"
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
-import test from "node:test"
+import test, { afterEach } from "node:test"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
-import { createCodexInstallSandbox } from "./install-test-fixtures.mjs"
+import { createCodexInstallSandbox, disposeCodexInstallSandboxes } from "./install-test-fixtures.mjs"
+
+afterEach(disposeCodexInstallSandboxes)
 
 test(
   "#given direct bun global lazycodex bin #when running update dry-run #then prints bun global update command",

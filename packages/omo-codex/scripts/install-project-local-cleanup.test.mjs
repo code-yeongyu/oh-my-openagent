@@ -1,11 +1,19 @@
 import assert from "node:assert/strict"
 import { lstat, mkdir, readFile, symlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import test from "node:test"
+import test, { afterEach } from "node:test"
 
 import { installMarketplaceLocally } from "./install-local.mjs"
 import { repairNearestProjectLocalCodexArtifacts } from "./install-dist/install-local.mjs"
-import { createCodexInstallSandbox, makeTempDir, writeJson, writePluginAt } from "./install-test-fixtures.mjs"
+import {
+  createCodexInstallSandbox,
+  disposeCodexInstallSandboxes,
+  makeTempDir,
+  writeJson,
+  writePluginAt,
+} from "./install-test-fixtures.mjs"
+
+afterEach(disposeCodexInstallSandboxes)
 
 test("#given stale project-local Codex config #when Node installer runs #then repairs the local conflict", async () => {
   const repoRoot = await makeTempDir()

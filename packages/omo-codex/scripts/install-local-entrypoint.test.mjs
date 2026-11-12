@@ -3,11 +3,13 @@ import { execFileSync } from "node:child_process"
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
-import test from "node:test"
+import test, { afterEach } from "node:test"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { resolveDefaultRepoRoot } from "./install-local.mjs"
-import { createCodexInstallSandbox } from "./install-test-fixtures.mjs"
+import { createCodexInstallSandbox, disposeCodexInstallSandboxes } from "./install-test-fixtures.mjs"
+
+afterEach(disposeCodexInstallSandboxes)
 
 test("#given published lazycodex bin runs outside the package #when resolving default repo root #then uses installer location", () => {
   // given
