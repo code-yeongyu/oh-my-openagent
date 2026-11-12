@@ -48,6 +48,11 @@ helper's native type once into `sp-n-native.dll` (git-ignored) with its sha256 i
 present. The elevated rows' notes record which one the run used. A setup failure
 in the helper is a `legError` ("setup failed: ..."), never a silent exit.
 
+The second-monitor rows (`n-host-second-monitor`, `n-affinity-wgc-monitor-secondary`)
+are measured on H6 and on any host whose facts report two or more monitors (each
+monitor's resolution, position and DPI go into the row); with fewer they are not
+selected off H6, and on H6 the capture row reads `skipped: one present monitor`.
+
 ## Time budget
 
 Every group of legs has its own budget (`budgetS` in `probe-sp-n.ts`), plus the time its cleanups may take

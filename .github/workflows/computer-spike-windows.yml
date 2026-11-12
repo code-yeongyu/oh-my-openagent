@@ -25,7 +25,8 @@ jobs:
   sp-n:
     name: computer spike SP-N (windows-latest)
     runs-on: windows-latest
-    timeout-minutes: 40
+    # 2 passes x 895 s + overhead + reserve, 10 % kept free (the self-test checks it)
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
 

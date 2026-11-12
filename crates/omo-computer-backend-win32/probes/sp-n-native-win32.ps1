@@ -52,6 +52,15 @@ public static partial class SpN {
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
   [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
   [DllImport("user32.dll")] public static extern IntPtr MonitorFromWindow(IntPtr h, uint flags);
+  [DllImport("user32.dll")] static extern IntPtr MonitorFromPoint(POINT pt, uint flags);
+  [DllImport("shcore.dll")] static extern int GetDpiForMonitor(IntPtr hmon, int type, out uint dpiX, out uint dpiY);
+  // Effective DPI of the monitor holding (x, y) as text, or the failing HRESULT; never a sentinel number.
+  public static string MonitorDpi(int x, int y) {
+    POINT p; p.X = x; p.Y = y;
+    uint dx, dy;
+    int hr = GetDpiForMonitor(MonitorFromPoint(p, 2), 0, out dx, out dy);
+    return hr == 0 ? dx.ToString() : "hr=0x" + hr.ToString("X8");
+  }
   [DllImport("user32.dll")] public static extern IntPtr GetDC(IntPtr h);
   [DllImport("user32.dll")] public static extern int ReleaseDC(IntPtr h, IntPtr dc);
   [DllImport("user32.dll", SetLastError = true)] public static extern bool PrintWindow(IntPtr h, IntPtr dc, uint flags);

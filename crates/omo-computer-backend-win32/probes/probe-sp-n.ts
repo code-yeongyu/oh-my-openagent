@@ -99,7 +99,13 @@ type Ctx = {
   session: { unusable?: string }
 }
 type Cleanup = { readonly name: string; run(ctx: Ctx): Promise<string> }
-type Spec = { readonly question: string; readonly condition: string; readonly h6Only?: true }
+// h6Only: measured on H6 only. multiMonitor: measured on H6 and on any host that reports two or more monitors.
+type Spec = {
+  readonly question: string
+  readonly condition: string
+  readonly h6Only?: true
+  readonly multiMonitor?: true
+}
 
 // ------------------------------------------------------------------ the questions
 
@@ -137,9 +143,9 @@ export const SPEC: Readonly<Record<string, Spec>> = {
     h6Only: true,
   },
   "n-host-second-monitor": {
-    question: "does the Windows desktop of host prerequisite H6 have a second monitor",
+    question: "does the measuring host's Windows desktop have a second monitor (host prerequisite H6)",
     condition: "monitors attached to the interactive session",
-    h6Only: true,
+    multiMonitor: true,
   },
   "n-wgc-issupported-session0": {
     question: "is GraphicsCaptureSession::IsSupported false in Session 0",
@@ -238,7 +244,7 @@ export const SPEC: Readonly<Record<string, Spec>> = {
   "n-affinity-wgc-monitor-secondary": {
     question: AFFINITY_Q,
     condition: "overlay on the second monitor, WGC monitor capture of that monitor",
-    h6Only: true,
+    multiMonitor: true,
   },
   "n-uipi-sendinput": {
     question: "does SendInput under UIPI drop with last error 0",
@@ -619,9 +625,17 @@ type Group = {
   run(ctx: Ctx): Promise<Record<string, Result>>
 }
 
+// The rows a --measure of this host writes: H6 rows only on H6, second-monitor rows wherever two monitors are seen.
+export const rowsForHost = (host: string, facts: Json): string[] =>
+  Object.keys(SPEC).filter((id) =>
+    SPEC[id]?.multiMonitor ? host === H6 || arr(facts.monitors).length >= 2 : host === H6 || !SPEC[id]?.h6Only,
+  )
+const monitorText = (m: Json) => `${num(m.w)}x${num(m.h)}@${num(m.x)},${num(m.y)} dpi=${str(m.dpi) || "unread"}`
+const presentMonitors = (n: number) => (n === 1 ? "one present monitor" : `${n} present monitors`)
+
 const hostFacts: Group = {
   budgetS: 15,
-  ids: ["n-host-admin", "n-host-second-monitor", "n-affinity-wgc-monitor-secondary"],
+  ids: ["n-host-admin", "n-host-second-monitor"],
   async run(ctx) {
     const f = ctx.facts
     const monitors = arr(f.monitors)
@@ -633,15 +647,45 @@ const hostFacts: Group = {
         verdict: pick(admin, "CONFIRMS", "CONTRADICTS"),
       },
       "n-host-second-monitor": {
-        measured: `monitors=${monitors.length} ${monitors.map((m) => `${num(m.w)}x${num(m.h)}@${num(m.x)},${num(m.y)}`).join(" ")}`,
+        measured: `monitors=${monitors.length} ${monitors.map(monitorText).join(" ")}`,
         verdict: pick(monitors.length >= 2, "CONFIRMS", "CONTRADICTS"),
       },
-      "n-affinity-wgc-monitor-secondary": UN(
-        monitors.length >= 2
-          ? "the second-monitor capture leg is not implemented in this probe"
-          : `no second monitor on this host (monitors=${monitors.length})`,
-      ),
     }
+  },
+}
+
+// The affinity overlay on the second monitor, judged like n-affinity-wgc-monitor: the no-affinity control must
+// show the overlay, then the flagged overlay must read no magenta. Fewer than two monitors: skipped, with the count.
+export function secondaryResults(
+  monitors: readonly Json[],
+  control: Json | undefined,
+  ex: Json | undefined,
+): Record<string, Result> {
+  const id = "n-affinity-wgc-monitor-secondary"
+  const i = monitors.findIndex((m) => m.primary !== true)
+  const second = monitors[i]
+  if (monitors.length < 2 || !second) return { [id]: UN(`skipped: ${presentMonitors(monitors.length)}`) }
+  const where = `monitor ${i + 1} of ${monitors.length} ${monitorText(second)}`
+  if (!control || !ex) return { [id]: UN(`skipped: the second-monitor capture did not run; ${where}`) }
+  const m = (j: Json) => num(at(j, "wgcMonitor", "magenta"))
+  const text = `${where}; magenta=${m(ex)} control=${m(control)} setAffinity=${str(ex.setAffinityOk)} affinityRead=0x${num(ex.affinityRead).toString(16)} ${str(at(ex, "wgcMonitor", "info", "error"))}`.trim()
+  if (!(m(control) >= BOUNDS.coverWindowControl.value))
+    return { [id]: UN(`the no-affinity control did not show the overlay; ${text}`) }
+  if (!(m(ex) >= 0)) return { [id]: UN(`errored: no frame of the second monitor; ${text}`) }
+  return { [id]: { measured: text, verdict: pick(m(ex) <= BOUNDS.coverWindow.value, "CONFIRMS", "CONTRADICTS") } }
+}
+
+const secondMonitor: Group = {
+  budgetS: 30,
+  ids: ["n-affinity-wgc-monitor-secondary"],
+  async run(ctx) {
+    const monitors = arr(ctx.facts.monitors)
+    const second = monitors.find((m) => m.primary !== true)
+    if (monitors.length < 2 || !second) return secondaryResults(monitors, undefined, undefined)
+    const rect = { x: num(second.x), y: num(second.y), w: num(second.w), h: num(second.h) }
+    const control = await leg(ctx, "affinity-monitor", { ...rect, exclude: false })
+    const ex = await leg(ctx, "affinity-monitor", { ...rect, exclude: true })
+    return secondaryResults(monitors, control, ex)
   },
 }
 
@@ -1491,7 +1535,18 @@ export function toObs(r: Result): Obs {
 export const finalRow = (id: string, r: Result, cites: Readonly<Record<string, Cite>> = ROW_CITES): Result =>
   r.verdict === "INVALID" ? r : { ...rowVerdict(id, toObs(r), cites), ...(r.skip ? { skip: r.skip } : {}) }
 
-const GROUPS: readonly Group[] = [hostFacts, isSupported, timers, barriers, chords, wheel, affinity, elevated, capture]
+const GROUPS: readonly Group[] = [
+  hostFacts,
+  isSupported,
+  timers,
+  barriers,
+  chords,
+  wheel,
+  affinity,
+  secondMonitor,
+  elevated,
+  capture,
+]
 
 // Budget of one probe pass (--measure or --verify): starting the targets, then every group with the time its
 // cleanups may take after a timeout. The self-test checks the hosted workflow's passes fit its job timeout.
@@ -3817,7 +3872,7 @@ export async function prepare(opt: ReturnType<typeof args>, io: Io) {
       ? opt.rows
       : opt.mode === "verify"
         ? fromLedger
-        : Object.keys(SPEC).filter((id) => host === H6 || !SPEC[id]?.h6Only),
+        : rowsForHost(host, ctx.facts),
   )
   if (want.size === 0) fail(`LEDGER ${opt.file}: no row for host "${host}"`)
   return { ctx, host, build, ledger, want }

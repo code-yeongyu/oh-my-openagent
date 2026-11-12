@@ -82,7 +82,7 @@ function HostFacts {
   $groups = whoami /groups /fo csv | ConvertFrom-Csv
   $adminGroup = $groups | Where-Object { $_.SID -eq 'S-1-5-32-544' } | Select-Object -First 1
   $principal = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
-  $screens = @([System.Windows.Forms.Screen]::AllScreens | ForEach-Object { @{ primary = $_.Primary; w = $_.Bounds.Width; h = $_.Bounds.Height; x = $_.Bounds.X; y = $_.Bounds.Y } })
+  $screens = @([System.Windows.Forms.Screen]::AllScreens | ForEach-Object { @{ primary = $_.Primary; w = $_.Bounds.Width; h = $_.Bounds.Height; x = $_.Bounds.X; y = $_.Bounds.Y; dpi = [SpN]::MonitorDpi($_.Bounds.X, $_.Bounds.Y) } })
   $sid = [SpN]::OwnSession()
   return @{
     build = "$($cv.CurrentMajorVersionNumber).$($cv.CurrentMinorVersionNumber).$($cv.CurrentBuild).$($cv.UBR)"

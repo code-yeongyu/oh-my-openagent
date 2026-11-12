@@ -73,6 +73,26 @@ function Leg-affinity($a) {
   Emit $r
 }
 
+# Leg-affinity's WGC monitor oracle on a given monitor rectangle (the second monitor): the overlay is placed inside
+# it, the monitor holding the overlay is captured, magenta is read inside the overlay rect. An overlay that lands on
+# another monitor throws (legError), so the row is UNMEASURED, never read as a capture of the wrong monitor.
+function Leg-affinity-monitor($a) {
+  $ox = [int]$a.x + 60; $oy = [int]$a.y + 80; $ow = 160; $oh = 120
+  $affOk = $false; [uint32]$affRead = 0
+  $ov = [SpN]::Overlay($ox, $oy, $ow, $oh, [bool]$a.exclude, [ref]$affOk, [ref]$affRead)
+  try {
+    $r = @{ exclude = [bool]$a.exclude; setAffinityOk = $affOk; affinityRead = $affRead }
+    Add-Type -AssemblyName System.Windows.Forms
+    $scr = [System.Windows.Forms.Screen]::FromHandle($ov).Bounds
+    if ($scr.X -ne [int]$a.x -or $scr.Y -ne [int]$a.y) { throw "overlay is on the monitor at $($scr.X),$($scr.Y), not $($a.x),$($a.y)" }
+    $r['monitor'] = @{ x = $scr.X; y = $scr.Y; w = $scr.Width; h = $scr.Height }
+    $hmon = [SpN]::MonitorFromWindow($ov, 2)
+    $mi = @{}; $mf = [SpN]::Wgc([IntPtr]::Zero, $hmon, 2000, $mi)
+    $r['wgcMonitor'] = @{ magenta = [SpN]::Magenta($mf, $ox - $scr.X + 8, $oy - $scr.Y + 8, $ox - $scr.X + $ow - 8, $oy - $scr.Y + $oh - 8); info = $mi }
+  } finally { [void][SpN]::DestroyWindow($ov) }
+  Emit $r
+}
+
 function Leg-issupported($a) {
   $r = [SpN]::IsSupported(); $r['integrity'] = Integrity; Emit $r
 }
