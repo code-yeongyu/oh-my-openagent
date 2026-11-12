@@ -77,24 +77,14 @@ export async function spawnHerdrSubagentTab(
   try {
     await deps.ensureServer()
 
-    let workspaceId = args.workspaceId ?? await findHerdrWorkspaceByLabel(args.workspaceLabel, deps)
+    let workspaceId = args.workspaceId ?? (await findHerdrWorkspaceByLabel(args.workspaceLabel, deps))
     if (!workspaceId) {
       const workspace = await herdrCreateWorkspace(args.cwd, args.workspaceLabel, deps)
       workspaceId = workspace.workspaceId
     }
 
-    const tab = await herdrCreateTab(
-      workspaceId,
-      args.cwd,
-      args.description,
-      buildHerdrPaneAuthEnv(),
-      deps,
-    )
-    await herdrRunPaneCommand(
-      tab.paneId,
-      buildTmuxAttachCommand(args.serverUrl, args.sessionId, args.cwd),
-      deps,
-    )
+    const tab = await herdrCreateTab(workspaceId, args.cwd, args.description, buildHerdrPaneAuthEnv(), deps)
+    await herdrRunPaneCommand(tab.paneId, buildTmuxAttachCommand(args.serverUrl, args.sessionId, args.cwd), deps)
     return { success: true, paneId: tab.paneId, workspaceId }
   } catch (error) {
     return {

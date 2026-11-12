@@ -1,6 +1,8 @@
 //! The session thread's state and request dispatch.
 
+use std::cell::Cell;
 use std::path::PathBuf;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use parking_lot::Mutex;
@@ -8,9 +10,12 @@ use senpi_desktop_core::ax::{AxBackend, AxRegistry};
 use senpi_desktop_core::backend::Backend;
 use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode};
 use senpi_desktop_core::protocol_results::AuditEvent;
+use senpi_desktop_core::report::{Disposition, ReportMode};
 use senpi_desktop_core::types::{DesktopCapabilities, DesktopSessionOptions, DesktopWindow, Target};
 
 use crate::audit::ArtifactGc;
+use crate::display_awake::DisplayAwake;
+use crate::screen_notes::ScreenNotes;
 use crate::mutate::SessionSafety;
 use crate::pointer::FrameCache;
 use crate::request::{Op, Response};
@@ -31,6 +36,8 @@ pub(crate) struct Worker {
     pub(crate) registry: AxRegistry,
     pub(crate) frames: FrameCache,
     capabilities: Arc<Mutex<DesktopCapabilities>>,
+    /// Published copy of the applied `reportMode`, read by the session handle.
+    report_mode: Arc<Mutex<ReportMode>>,
     pub(crate) safety: SessionSafety,
     pub(crate) session_id: String,
     pub(crate) run_id: String,
@@ -39,10 +46,19 @@ pub(crate) struct Worker {
     pub(crate) instance: u64,
     /// This session's live foreground control grant, when it holds the slot.
     pub(crate) control: Option<crate::grant::ControlGrant>,
+    pub(crate) awake: Arc<DisplayAwake>,
+    pub(crate) notes: ScreenNotes,
     /// Whether this backend's watch of the user's own input was started.
     pub(crate) watching_user_input: bool,
     /// The user's input into the apps this session works in (#11459).
     pub(crate) intervention: crate::intervention::Intervention,
+    /// The route and hit of the mutating request being served, for its
+    /// object-mode report.
+    pub(crate) report_extras: Rc<Cell<Option<crate::report::ReportExtras>>>,
+    /// The coordinate epoch; moves supersede frames and expire refs.
+    pub(crate) epochs: crate::epoch::Epochs,
+    /// The time the actionability battery waits on.
+    pub(crate) battery_clock: Box<dyn crate::actionability::BatteryClock>,
 }
 
 /// A mutating request's reply and the audit event it emitted.
@@ -54,7 +70,9 @@ impl Worker {
     pub(crate) fn new(
         factory: Box<dyn BackendFactory>,
         capabilities: Arc<Mutex<DesktopCapabilities>>,
+        report_mode: Arc<Mutex<ReportMode>>,
         safety: SessionSafety,
+        (awake, notes): (Arc<DisplayAwake>, ScreenNotes),
     ) -> Self {
         let backend = factory.create(&DesktopSessionOptions {
             show_cursor: false,
@@ -69,17 +87,34 @@ impl Worker {
             registry: AxRegistry::default(),
             frames: FrameCache::default(),
             capabilities,
+            report_mode,
             safety,
             session_id: String::new(),
             run_id: String::new(),
             gc: ArtifactGc::default(),
             instance: crate::grant::next_instance(),
             control: None,
+            awake,
+            notes,
             watching_user_input: false,
             intervention: crate::intervention::Intervention::new(),
+            report_extras: Rc::default(),
+            epochs: crate::epoch::Epochs::default(),
+            battery_clock: Box::new(crate::actionability::HostClock::new()),
         };
+        worker.install_screen_probe();
         worker.refresh_capabilities();
         worker
+    }
+
+    /// Takes the display-awake hold for an activity request.
+    pub(crate) fn begin_activity(&mut self) {
+        let backend = self.backend.as_mut().ok();
+        self.awake.begin(|| backend.and_then(|backend| backend.hold_display_awake()));
+    }
+
+    fn install_screen_probe(&self) {
+        self.notes.install(self.backend.as_ref().ok().and_then(|backend| backend.screen_probe()));
     }
 
     /// Applies cursor-only display changes in place; every other change
@@ -98,6 +133,7 @@ impl Worker {
                 backend.set_show_cursor(options.show_cursor);
             }
             self.options = Some(options);
+            self.publish_report_mode();
             return self.refresh_capabilities();
         }
         self.backend = self.factory.create(&options);
@@ -109,14 +145,28 @@ impl Worker {
                 self.backend = Err(error);
             }
         }
-        self.registry = AxRegistry::default();
-        self.frames = FrameCache::default();
+        self.install_screen_probe();
+        let (source, screen) = self
+            .backend
+            .as_ref()
+            .ok()
+            .map_or((None, None), |backend| (backend.epoch_source(), backend.screen_probe()));
+        self.epochs.arm(options.report_mode == ReportMode::Object, source, screen);
+        self.registry = AxRegistry::with_report_mode(options.report_mode);
+        self.frames = FrameCache::with_report_mode(options.report_mode);
         self.options = Some(options);
         self.session_id = ulid::Ulid::generate().to_string();
         self.run_id = ulid::Ulid::generate().to_string();
         self.gc = ArtifactGc::default();
         self.maybe_gc();
+        self.publish_report_mode();
         self.refresh_capabilities()
+    }
+
+    /// Publishes the mode the registry now serves under; only an open that
+    /// ran to here changes what the session handle reports.
+    fn publish_report_mode(&self) {
+        *self.report_mode.lock() = self.registry.report_mode();
     }
 
     pub(crate) fn artifact_dir(&self) -> PathBuf {
@@ -124,6 +174,11 @@ impl Worker {
             .as_ref()
             .and_then(|options| options.artifact_dir.clone())
             .unwrap_or_else(|| std::env::temp_dir().join(DEFAULT_ARTIFACT_DIR))
+    }
+
+    /// The `backend` name of the capabilities read last.
+    pub(crate) fn backend_name(&self) -> String {
+        self.capabilities.lock().backend.clone()
     }
 
     pub(crate) fn refresh_capabilities(&mut self) -> DesktopCapabilities {
@@ -151,15 +206,42 @@ impl Worker {
             self.attach_user_input_feed();
             self.drain_user_input();
         }
-        self.serve(op, cancelled)
+        self.apply_epoch();
+        let result = self.serve(op, cancelled);
+        if matches!(&result, Err(error) if error.code == ErrorCode::SpaceUnsupported) {
+            self.epochs.record(senpi_desktop_core::protocol_results::EpochReason::Space);
+        }
+        self.apply_epoch();
+        result
     }
 
     fn serve(&mut self, op: Op, cancelled: &dyn Fn() -> bool) -> CoreResult<Response> {
-        let served = |audited: CoreResult<Audited>| audited.map(|(response, _audit)| response);
+        let mode = self.registry.report_mode();
+        let extras = Rc::clone(&self.report_extras);
+        let served = |audited: CoreResult<Audited>| {
+            let extras = extras.take().unwrap_or_default();
+            match audited {
+                Ok((response, audit)) => {
+                    Ok(crate::report::respond(mode, response, &audit, extras))
+                }
+                // `mutate` reports every error it returns in object mode, so an
+                // unreported one was refused before it (bad params): nothing was sent.
+                Err(error) if mode == ReportMode::Object => {
+                    Err(error.with_fallback_disposition(Disposition::NOT_DELIVERED_SAFE))
+                }
+                Err(error) => Err(error),
+            }
+        };
         // Every mutating request goes through `mutate`; reads bypass it.
         match op {
             Op::Displays => Ok(Response::Displays(self.backend()?.displays()?)),
-            Op::Windows => Ok(Response::Windows(self.backend()?.windows()?)),
+            Op::Windows => {
+                let mut windows = self.backend()?.windows()?;
+                if mode == ReportMode::Null {
+                    windows.iter_mut().for_each(|window| window.identity = None);
+                }
+                Ok(Response::Windows(windows))
+            }
             Op::Capture(params) => self.capture(&params),
             Op::Observe(params) => self.observe(&params, cancelled),
             Op::CaptureRegion(params) => self.capture_region(&params, cancelled),

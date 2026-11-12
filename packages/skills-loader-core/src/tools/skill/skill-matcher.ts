@@ -23,7 +23,10 @@ export function matchSkillByName(skills: LoadedSkill[], requestedName: string): 
   return undefined
 }
 
-export function matchCommandByName<TCommand extends CommandInfoLike>(commands: TCommand[], requestedName: string): TCommand | undefined {
+export function matchCommandByName<TCommand extends CommandInfoLike>(
+  commands: TCommand[],
+  requestedName: string,
+): TCommand | undefined {
   const normalizedName = requestedName.toLowerCase()
   return sortByScopePriority(commands).find((command) => command.name.toLowerCase() === normalizedName)
 }
@@ -31,11 +34,10 @@ export function matchCommandByName<TCommand extends CommandInfoLike>(commands: T
 export function findPartialMatches(
   skills: LoadedSkill[],
   commands: CommandInfoLike[],
-  requestedName: string
+  requestedName: string,
 ): string[] {
   const normalizedName = requestedName.toLowerCase()
-  return [
-    ...skills.map((skill) => skill.name),
-    ...commands.map((command) => `/${command.name}`),
-  ].filter((name) => name.toLowerCase().includes(normalizedName))
+  return [...skills.map((skill) => skill.name), ...commands.map((command) => `/${command.name}`)].filter((name) =>
+    name.toLowerCase().includes(normalizedName),
+  )
 }

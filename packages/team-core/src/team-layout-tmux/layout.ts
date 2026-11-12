@@ -1,10 +1,22 @@
 import {
-  buildPaneAuthEnvironmentArgs, withPaneAuth, escapeTmuxFormat, isServerRunning, runTmuxCommand,
-  herdrCreateWorkspace, herdrCreateTab, herdrRunPaneCommand, herdrCloseWorkspace, herdrClosePane,
+  buildPaneAuthEnvironmentArgs,
+  withPaneAuth,
+  escapeTmuxFormat,
+  isServerRunning,
+  runTmuxCommand,
+  herdrCreateWorkspace,
+  herdrCreateTab,
+  herdrRunPaneCommand,
+  herdrCloseWorkspace,
+  herdrClosePane,
   herdrListAgents,
-  isHerdrPaneId, HERDR_TEAM_WORKSPACE_LABEL_PREFIX, buildHerdrPaneAuthEnv,
+  isHerdrPaneId,
+  HERDR_TEAM_WORKSPACE_LABEL_PREFIX,
+  buildHerdrPaneAuthEnv,
   defaultHerdrOpsDeps,
-  type MultiplexerBackend, type TmuxCommandResult, type HerdrOpsDeps,
+  type MultiplexerBackend,
+  type TmuxCommandResult,
+  type HerdrOpsDeps,
 } from "@oh-my-opencode/tmux-core"
 import { log } from "../logger"
 import { shellSingleQuote } from "../shell-quote"
@@ -20,7 +32,11 @@ const OMO_ATTACH_SERVER_URL_OPTION = "@omo_attach_server_url"
 const OMO_ATTACH_SESSION_ID_OPTION = "@omo_attach_session_id"
 
 export type TeamLayoutDeps = {
-  runTmuxCommand: (tmuxPath: string, args: Array<string>, options?: { retry?: number; timeoutMs?: number }) => Promise<TmuxCommandResult>
+  runTmuxCommand: (
+    tmuxPath: string,
+    args: Array<string>,
+    options?: { retry?: number; timeoutMs?: number },
+  ) => Promise<TmuxCommandResult>
   isServerRunning: typeof isServerRunning
   getTmuxPath: () => Promise<string | null | undefined>
   resolveCallerTmuxSession: typeof resolveCallerTmuxSession
@@ -54,14 +70,18 @@ export type TeamLayoutCleanupTarget = {
   paneIds?: Array<string>
 }
 
-export function canVisualize(): boolean { return process.env.TMUX !== undefined }
+export function canVisualize(): boolean {
+  return process.env.TMUX !== undefined
+}
 
 function getPaneWorkingDirectory(member: TeamLayoutMember): string {
   return member.worktreePath ?? process.cwd()
 }
 
 function buildAttachCommand(member: TeamLayoutMember, serverUrl: string): string {
-  return withPaneAuth(`opencode attach ${shellSingleQuote(serverUrl)} --session ${shellSingleQuote(member.sessionId)} --dir ${shellSingleQuote(getPaneWorkingDirectory(member))}`)
+  return withPaneAuth(
+    `opencode attach ${shellSingleQuote(serverUrl)} --session ${shellSingleQuote(member.sessionId)} --dir ${shellSingleQuote(getPaneWorkingDirectory(member))}`,
+  )
 }
 
 async function listPanesInWindow(tmuxPath: string, windowTarget: string, deps: TeamLayoutDeps): Promise<Array<string>> {
@@ -77,7 +97,21 @@ function selectExistingTeammatePane(teammatePanes: Array<string>, callerPaneId: 
 function buildSplitArgs(callerPaneId: string, teammatePanes: Array<string>, member: TeamLayoutMember): Array<string> {
   const environmentArgs = buildPaneAuthEnvironmentArgs()
   if (teammatePanes.length === 0) {
-    return ["split-window", ...environmentArgs, "-t", callerPaneId, "-h", "-d", "-l", "70%", "-P", "-F", "#{pane_id}", "-c", escapeTmuxFormat(getPaneWorkingDirectory(member))]
+    return [
+      "split-window",
+      ...environmentArgs,
+      "-t",
+      callerPaneId,
+      "-h",
+      "-d",
+      "-l",
+      "70%",
+      "-P",
+      "-F",
+      "#{pane_id}",
+      "-c",
+      escapeTmuxFormat(getPaneWorkingDirectory(member)),
+    ]
   }
 
   return [
@@ -116,7 +150,14 @@ async function createTeamLayoutInCallerWindow(
     panesByMember[member.name] = paneId
     await deps.runTmuxCommand(tmuxPath, ["select-pane", "-t", paneId, "-T", `${TEAM_PANE_TITLE_PREFIX}${member.name}`])
     await deps.runTmuxCommand(tmuxPath, ["set-option", "-p", "-t", paneId, OMO_ATTACH_SERVER_URL_OPTION, serverUrl])
-    await deps.runTmuxCommand(tmuxPath, ["set-option", "-p", "-t", paneId, OMO_ATTACH_SESSION_ID_OPTION, member.sessionId])
+    await deps.runTmuxCommand(tmuxPath, [
+      "set-option",
+      "-p",
+      "-t",
+      paneId,
+      OMO_ATTACH_SESSION_ID_OPTION,
+      member.sessionId,
+    ])
     await deps.runTmuxCommand(tmuxPath, ["send-keys", "-t", paneId, buildAttachCommand(member, serverUrl), "Enter"])
   }
 
@@ -176,7 +217,14 @@ export async function createTeamLayout(
       return null
     }
 
-    const focus = await createTeamLayoutInCallerWindow(tmuxPath, callerSession.paneId, callerSession.windowTarget, members, serverUrl, deps)
+    const focus = await createTeamLayoutInCallerWindow(
+      tmuxPath,
+      callerSession.paneId,
+      callerSession.windowTarget,
+      members,
+      serverUrl,
+      deps,
+    )
     if (!focus) return null
 
     return {
@@ -201,9 +249,7 @@ export async function removeTeamLayout(
   deps: TeamLayoutDeps = defaultDeps,
 ): Promise<void> {
   const resolvedDeps = isTeamLayoutDeps(tmuxMgrOrDeps) ? tmuxMgrOrDeps : deps
-  const cleanupTarget = isTeamLayoutCleanupTarget(tmuxMgrOrCleanupTarget)
-    ? tmuxMgrOrCleanupTarget
-    : undefined
+  const cleanupTarget = isTeamLayoutCleanupTarget(tmuxMgrOrCleanupTarget) ? tmuxMgrOrCleanupTarget : undefined
 
   if (cleanupTargetUsesHerdr(cleanupTarget)) {
     await removeTeamLayoutHerdr(teamRunId, cleanupTarget, resolvedDeps)
@@ -215,8 +261,14 @@ export async function removeTeamLayout(
     const tmuxPath = await resolvedDeps.getTmuxPath()
     if (!tmuxPath) return
 
+    const cleanupTarget = isTeamLayoutCleanupTarget(tmuxMgrOrCleanupTarget) ? tmuxMgrOrCleanupTarget : undefined
+
     if (cleanupTarget?.ownedSession !== false) {
-      await resolvedDeps.runTmuxCommand(tmuxPath, ["kill-session", "-t", cleanupTarget?.targetSessionId ?? `omo-team-${teamRunId}`])
+      await resolvedDeps.runTmuxCommand(tmuxPath, [
+        "kill-session",
+        "-t",
+        cleanupTarget?.targetSessionId ?? `omo-team-${teamRunId}`,
+      ])
       return
     }
 
@@ -254,10 +306,11 @@ function isTeamLayoutDeps(value: TmuxSessionManager | TeamLayoutDeps | undefined
   return value !== undefined && "runTmuxCommand" in value && "getTmuxPath" in value
 }
 
-function isTeamLayoutCleanupTarget(value: TmuxSessionManager | TeamLayoutCleanupTarget | undefined): value is TeamLayoutCleanupTarget {
+function isTeamLayoutCleanupTarget(
+  value: TmuxSessionManager | TeamLayoutCleanupTarget | undefined,
+): value is TeamLayoutCleanupTarget {
   return value !== undefined && "ownedSession" in value && "targetSessionId" in value
 }
-
 
 // ---------------------------------------------------------------------------
 // Herdr backend
@@ -376,10 +429,17 @@ async function removeTeamLayoutHerdr(
       try {
         await herdrClosePane(paneId, herdrOps)
       } catch (error) {
-        deps.log("herdr team pane cleanup failed", { teamRunId, paneId, error: error instanceof Error ? String(error) : String(error) })
+        deps.log("herdr team pane cleanup failed", {
+          teamRunId,
+          paneId,
+          error: error instanceof Error ? String(error) : String(error),
+        })
       }
     }
   } catch (error) {
-    deps.log("herdr team layout cleanup failed", { teamRunId, error: error instanceof Error ? String(error) : String(error) })
+    deps.log("herdr team layout cleanup failed", {
+      teamRunId,
+      error: error instanceof Error ? String(error) : String(error),
+    })
   }
 }

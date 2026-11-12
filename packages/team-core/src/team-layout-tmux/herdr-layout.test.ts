@@ -6,9 +6,10 @@ function envelope(result: unknown): string {
   return JSON.stringify({ id: "cli:test", result })
 }
 
-function fakeHerdrOps(
-  script: (args: ReadonlyArray<string>) => HerdrExecResult,
-): { ops: HerdrOpsDeps; calls: string[][] } {
+function fakeHerdrOps(script: (args: ReadonlyArray<string>) => HerdrExecResult): {
+  ops: HerdrOpsDeps
+  calls: string[][]
+} {
   const calls: string[][] = []
   const run: RunHerdrCommand = async (args) => {
     calls.push([...args])
@@ -41,17 +42,25 @@ describe("createTeamLayout on the herdr backend", () => {
     let tabIndex = 0
     const { ops, calls } = fakeHerdrOps((args) => {
       if (args[0] === "workspace" && args[1] === "create") {
-        return { success: true, output: envelope({ workspace: { workspace_id: "w9" }, root_pane: { pane_id: "w9:p1" } }) }
+        return {
+          success: true,
+          output: envelope({ workspace: { workspace_id: "w9" }, root_pane: { pane_id: "w9:p1" } }),
+        }
       }
       if (args[0] === "tab" && args[1] === "create") {
         tabIndex += 1
-        return { success: true, output: envelope({ tab: { tab_id: `w9:t${tabIndex + 1}` }, root_pane: { pane_id: `w9:p${tabIndex + 1}` } }) }
+        return {
+          success: true,
+          output: envelope({ tab: { tab_id: `w9:t${tabIndex + 1}` }, root_pane: { pane_id: `w9:p${tabIndex + 1}` } }),
+        }
       }
       return { success: true, output: "" }
     })
 
     // when
-    const layout = await createTeamLayout("11111111-2222-3333-4444-555555555555", members, tmuxMgr, baseDeps(ops), { multiplexer: "herdr" })
+    const layout = await createTeamLayout("11111111-2222-3333-4444-555555555555", members, tmuxMgr, baseDeps(ops), {
+      multiplexer: "herdr",
+    })
 
     // then
     expect(layout).not.toBeNull()
@@ -84,7 +93,13 @@ describe("createTeamLayout on the herdr backend", () => {
       const { ops, calls } = fakeHerdrOps(() => ({ success: true, output: "" }))
 
       // when
-      const layout = await createTeamLayout("11111111-2222-3333-4444-555555555555", members.slice(0, 1), tmuxMgr, baseDeps(ops), { multiplexer: "herdr" })
+      const layout = await createTeamLayout(
+        "11111111-2222-3333-4444-555555555555",
+        members.slice(0, 1),
+        tmuxMgr,
+        baseDeps(ops),
+        { multiplexer: "herdr" },
+      )
 
       // then
       // workspace create fails silently in the fake (no workspace_id) -> null,
@@ -101,7 +116,10 @@ describe("createTeamLayout on the herdr backend", () => {
     let tabIndex = 0
     const { ops, calls } = fakeHerdrOps((args) => {
       if (args[0] === "workspace" && args[1] === "create") {
-        return { success: true, output: envelope({ workspace: { workspace_id: "w9" }, root_pane: { pane_id: "w9:p1" } }) }
+        return {
+          success: true,
+          output: envelope({ workspace: { workspace_id: "w9" }, root_pane: { pane_id: "w9:p1" } }),
+        }
       }
       if (args[0] === "tab" && args[1] === "create") {
         tabIndex += 1
@@ -115,7 +133,9 @@ describe("createTeamLayout on the herdr backend", () => {
     })
 
     // when
-    const layout = await createTeamLayout("11111111-2222-3333-4444-555555555555", members, tmuxMgr, baseDeps(ops), { multiplexer: "herdr" })
+    const layout = await createTeamLayout("11111111-2222-3333-4444-555555555555", members, tmuxMgr, baseDeps(ops), {
+      multiplexer: "herdr",
+    })
 
     // then
     // member 2's tab create fails -> null layout, and the failure rollback
@@ -131,7 +151,10 @@ describe("createTeamLayout on the herdr backend", () => {
     let tabIndex = 0
     const { ops, calls } = fakeHerdrOps((args) => {
       if (args[0] === "workspace" && args[1] === "create") {
-        return { success: true, output: envelope({ workspace: { workspace_id: "w9" }, root_pane: { pane_id: "w9:p1" } }) }
+        return {
+          success: true,
+          output: envelope({ workspace: { workspace_id: "w9" }, root_pane: { pane_id: "w9:p1" } }),
+        }
       }
       if (args[0] === "tab" && args[1] === "create") {
         tabIndex += 1
@@ -146,7 +169,9 @@ describe("createTeamLayout on the herdr backend", () => {
     })
 
     // when
-    const layout = await createTeamLayout("11111111-2222-3333-4444-555555555555", members, tmuxMgr, baseDeps(ops), { multiplexer: "herdr" })
+    const layout = await createTeamLayout("11111111-2222-3333-4444-555555555555", members, tmuxMgr, baseDeps(ops), {
+      multiplexer: "herdr",
+    })
 
     // then
     expect(layout).toBeNull()
@@ -157,7 +182,10 @@ describe("createTeamLayout on the herdr backend", () => {
     // given
     const { ops, calls } = fakeHerdrOps((args) => {
       if (args[0] === "workspace" && args[1] === "create") {
-        return { success: true, output: envelope({ workspace: { workspace_id: "w9" }, root_pane: { pane_id: "w9:p1" } }) }
+        return {
+          success: true,
+          output: envelope({ workspace: { workspace_id: "w9" }, root_pane: { pane_id: "w9:p1" } }),
+        }
       }
       if (args[0] === "agent" && args[1] === "list") {
         return { success: false, output: "", error: "server went away", code: "server_not_running" }
@@ -166,7 +194,9 @@ describe("createTeamLayout on the herdr backend", () => {
     })
 
     // when
-    const layout = await createTeamLayout("11111111-2222-3333-4444-555555555555", members, tmuxMgr, baseDeps(ops), { multiplexer: "herdr" })
+    const layout = await createTeamLayout("11111111-2222-3333-4444-555555555555", members, tmuxMgr, baseDeps(ops), {
+      multiplexer: "herdr",
+    })
 
     // then
     // rollback is best-effort: probe failure means no close, no throw

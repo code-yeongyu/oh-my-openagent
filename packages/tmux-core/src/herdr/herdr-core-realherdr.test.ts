@@ -63,7 +63,6 @@ async function waitForServer(timeoutMs: number): Promise<boolean> {
   return false
 }
 
-
 async function stopOwnedServer(server: SpawnedProcess | null): Promise<void> {
   if (!server) return
   await runHerdrCommandDefault(["server", "stop"], { env: realEnv(), timeoutMs: 3_000 }).catch(() => undefined)
@@ -72,17 +71,14 @@ async function stopOwnedServer(server: SpawnedProcess | null): Promise<void> {
   } catch {
     // already gone
   }
-  await Promise.race([
-    server.exited.catch(() => undefined),
-    new Promise((resolve) => setTimeout(resolve, 3_000)),
-  ])
+  await Promise.race([server.exited.catch(() => undefined), new Promise((resolve) => setTimeout(resolve, 3_000))])
 }
 
 describe("herdr core (real herdr)", () => {
   test.skipIf(!LIVE)("workspace + tab + pane run + read + teardown round-trip", { timeout: 20000 }, async () => {
-
     const label = `${HERDR_TEAM_WORKSPACE_LABEL_PREFIX}itest${Date.now().toString(36)}`
-    const initiallyRunning = (await runHerdrCommandDefault(["agent", "list"], { env: realEnv(), timeoutMs: 2_000 })).success
+    const initiallyRunning = (await runHerdrCommandDefault(["agent", "list"], { env: realEnv(), timeoutMs: 2_000 }))
+      .success
     let server: SpawnedProcess | null = null
     if (!initiallyRunning) {
       server = spawn(["herdr", "server"], { stdout: "pipe", stderr: "pipe", env: realEnv() })

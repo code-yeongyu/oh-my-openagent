@@ -31,9 +31,7 @@ function envelope(result: unknown): string {
   return JSON.stringify({ id: "cli:test", result })
 }
 
-function fakeOps(
-  script: (args: ReadonlyArray<string>) => HerdrExecResult,
-): { deps: HerdrOpsDeps; calls: string[][] } {
+function fakeOps(script: (args: ReadonlyArray<string>) => HerdrExecResult): { deps: HerdrOpsDeps; calls: string[][] } {
   const calls: string[][] = []
   const run: RunHerdrCommand = async (args) => {
     calls.push([...args])
@@ -65,8 +63,11 @@ describe("herdr id grammar", () => {
 describe("parseHerdrEnvelope", () => {
   test("accepts success envelopes, error envelopes, and plain text", () => {
     expect(parseHerdrEnvelope(envelope({ agents: [] }))).toEqual({ kind: "ok", result: { agents: [] } })
-    expect(parseHerdrEnvelope('{"error":{"code":"server_not_running","message":"down"}}'))
-      .toEqual({ kind: "error", code: "server_not_running", message: "down" })
+    expect(parseHerdrEnvelope('{"error":{"code":"server_not_running","message":"down"}}')).toEqual({
+      kind: "error",
+      code: "server_not_running",
+      message: "down",
+    })
     // pane read/run output is plain text - never an envelope
     expect(parseHerdrEnvelope("plain pane text")).toEqual({ kind: "ok" })
     expect(parseHerdrEnvelope("")).toEqual({ kind: "ok" })
@@ -199,12 +200,15 @@ describe.skipIf(process.platform === "win32")("runHerdrCommandDefault", () => {
       // fix, ~timeoutMs of lingering without it.
       const probe = join(dir, "probe.ts")
       const herdrCore = JSON.stringify(join(import.meta.dir, "herdr-core.ts"))
-      writeFileSync(probe, [
-        `const { runHerdrCommandDefault } = await import(${herdrCore})`,
-        `const result = await runHerdrCommandDefault(["agent", "list"], { env: { PATH: ${JSON.stringify(dir)} }, timeoutMs: 10_000 })`,
-        `if (!result.success || result.output !== "hi\\n") { console.error("probe exec failed:", result); process.exit(2) }`,
-        `console.log("settled")`,
-      ].join("\n"))
+      writeFileSync(
+        probe,
+        [
+          `const { runHerdrCommandDefault } = await import(${herdrCore})`,
+          `const result = await runHerdrCommandDefault(["agent", "list"], { env: { PATH: ${JSON.stringify(dir)} }, timeoutMs: 10_000 })`,
+          `if (!result.success || result.output !== "hi\\n") { console.error("probe exec failed:", result); process.exit(2) }`,
+          `console.log("settled")`,
+        ].join("\n"),
+      )
       const startedAt = Date.now()
 
       // when
@@ -225,7 +229,9 @@ describe.skipIf(process.platform === "win32")("runHerdrCommandDefault", () => {
 describe("herdr ops", () => {
   test("workspace create pins cwd, label, and focus", async () => {
     // given
-    const { deps, calls } = fakeOps(() => ok(envelope({ workspace: { workspace_id: "w9" }, root_pane: { pane_id: "w9:p1" } })))
+    const { deps, calls } = fakeOps(() =>
+      ok(envelope({ workspace: { workspace_id: "w9" }, root_pane: { pane_id: "w9:p1" } })),
+    )
 
     // when
     const created = await herdrCreateWorkspace("/repo", "omo-team-x", deps)
@@ -278,12 +284,16 @@ describe("herdr ops", () => {
 
   test("team workspace listing filters by label prefix", async () => {
     // given
-    const { deps } = fakeOps(() => ok(envelope({
-      workspaces: [
-        { workspace_id: "w1", label: "user-own" },
-        { workspace_id: "w2", label: `${HERDR_TEAM_WORKSPACE_LABEL_PREFIX}abc` },
-      ],
-    })))
+    const { deps } = fakeOps(() =>
+      ok(
+        envelope({
+          workspaces: [
+            { workspace_id: "w1", label: "user-own" },
+            { workspace_id: "w2", label: `${HERDR_TEAM_WORKSPACE_LABEL_PREFIX}abc` },
+          ],
+        }),
+      ),
+    )
 
     // when
     const teams = await herdrListTeamWorkspaces(deps)
@@ -340,12 +350,19 @@ describe("ensureHerdrServer", () => {
   })
 
   test("does not restart on unrelated command failures", async () => {
-    await expect(ensureHerdrServer({
-      runHerdrCommand: async () => ({ success: false, output: "", error: "agent_name_taken", code: "agent_name_taken" }),
-      spawnDetached: () => {
-        throw new Error("must not spawn")
-      },
-      sleep: async () => {},
-    })).rejects.toThrow("agent_name_taken")
+    await expect(
+      ensureHerdrServer({
+        runHerdrCommand: async () => ({
+          success: false,
+          output: "",
+          error: "agent_name_taken",
+          code: "agent_name_taken",
+        }),
+        spawnDetached: () => {
+          throw new Error("must not spawn")
+        },
+        sleep: async () => {},
+      }),
+    ).rejects.toThrow("agent_name_taken")
   })
 })

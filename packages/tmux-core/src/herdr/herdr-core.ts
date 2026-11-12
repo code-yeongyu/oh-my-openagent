@@ -44,10 +44,7 @@ export type HerdrExecOptions = {
   readonly env?: Record<string, string | undefined>
 }
 
-export type RunHerdrCommand = (
-  args: ReadonlyArray<string>,
-  options?: HerdrExecOptions,
-) => Promise<HerdrExecResult>
+export type RunHerdrCommand = (args: ReadonlyArray<string>, options?: HerdrExecOptions) => Promise<HerdrExecResult>
 
 export type EnsureHerdrServerDeps = {
   readonly runHerdrCommand: RunHerdrCommand
@@ -73,9 +70,7 @@ export function herdrWorkspaceIdFromPaneId(paneId: string): string {
  * to an existing file (trust-pinning); otherwise the plain `herdr` name is
  * resolved by PATH, mirroring how tmux is invoked today.
  */
-export function resolveHerdrBinary(
-  env: Record<string, string | undefined> = process.env,
-): string | null {
+export function resolveHerdrBinary(env: Record<string, string | undefined> = process.env): string | null {
   const pinned = env["HERDR_BIN_PATH"]?.trim()
   if (pinned && pinned.startsWith("/") && exists(pinned)) return pinned
   return "herdr"
@@ -105,16 +100,20 @@ export function isHerdrBinaryCallable(env: Record<string, string | undefined> = 
   return false
 }
 
-export function parseHerdrEnvelope(stdout: string):
-  | { kind: "ok"; result?: unknown }
-  | { kind: "error"; code: string; message: string } {
+export function parseHerdrEnvelope(
+  stdout: string,
+): { kind: "ok"; result?: unknown } | { kind: "error"; code: string; message: string } {
   const trimmed = stdout.trim()
   if (trimmed.length === 0) return { kind: "ok" }
   try {
     const parsed = JSON.parse(trimmed) as { result?: unknown; error?: { code?: string; message?: string } }
     if (parsed && typeof parsed === "object") {
       if (parsed.error) {
-        return { kind: "error", code: parsed.error.code ?? "error", message: parsed.error.message ?? "herdr command failed" }
+        return {
+          kind: "error",
+          code: parsed.error.code ?? "error",
+          message: parsed.error.message ?? "herdr command failed",
+        }
       }
       return { kind: "ok", result: parsed.result }
     }
@@ -195,7 +194,12 @@ export const runHerdrCommandDefault: RunHerdrCommand = async (args, options = {}
     return { success: true, output: stdout }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    return { success: false, output: "", error: message, code: message.includes("ENOENT") ? "binary_missing" : "spawn_failed" }
+    return {
+      success: false,
+      output: "",
+      error: message,
+      code: message.includes("ENOENT") ? "binary_missing" : "spawn_failed",
+    }
   }
 }
 
@@ -278,10 +282,10 @@ export async function herdrCreateWorkspace(
   deps: HerdrOpsDeps = defaultHerdrOpsDeps,
 ): Promise<HerdrWorkspaceCreated> {
   await deps.ensureServer()
-  const result = await deps.runHerdrCommand([
-    "workspace", "create", "--cwd", cwd, "--label", label, "--no-focus",
-  ])
-  const created = parseEnvelopeResult<{ workspace?: { workspace_id?: string }; root_pane?: { pane_id?: string } }>(result)
+  const result = await deps.runHerdrCommand(["workspace", "create", "--cwd", cwd, "--label", label, "--no-focus"])
+  const created = parseEnvelopeResult<{ workspace?: { workspace_id?: string }; root_pane?: { pane_id?: string } }>(
+    result,
+  )
   const workspaceId = created?.workspace?.workspace_id
   const rootPaneId = created?.root_pane?.pane_id
   if (typeof workspaceId !== "string" || workspaceId.length === 0) {
@@ -332,7 +336,13 @@ export async function herdrReadPane(
   deps: HerdrOpsDeps = defaultHerdrOpsDeps,
 ): Promise<string> {
   const result = await deps.runHerdrCommand([
-    "pane", "read", paneId, "--source", "recent-unwrapped", "--lines", String(lines),
+    "pane",
+    "read",
+    paneId,
+    "--source",
+    "recent-unwrapped",
+    "--lines",
+    String(lines),
   ])
   if (!result.success) throw new Error(result.error ?? "herdr pane read failed")
   return result.output
@@ -348,16 +358,15 @@ export async function herdrListAgents(
   deps: HerdrOpsDeps = defaultHerdrOpsDeps,
 ): Promise<Array<{ paneId: string; name?: string; status?: string }>> {
   const result = await deps.runHerdrCommand(["agent", "list"])
-  const listed = parseEnvelopeResult<{ agents?: Array<{ pane_id?: string; name?: string; agent_status?: string }> }>(result)
+  const listed = parseEnvelopeResult<{ agents?: Array<{ pane_id?: string; name?: string; agent_status?: string }> }>(
+    result,
+  )
   return (listed?.agents ?? [])
     .filter((agent) => typeof agent.pane_id === "string")
     .map((agent) => ({ paneId: agent.pane_id as string, name: agent.name, status: agent.agent_status }))
 }
 
-export async function herdrClosePane(
-  paneId: string,
-  deps: HerdrOpsDeps = defaultHerdrOpsDeps,
-): Promise<void> {
+export async function herdrClosePane(paneId: string, deps: HerdrOpsDeps = defaultHerdrOpsDeps): Promise<void> {
   const result = await deps.runHerdrCommand(["pane", "close", paneId])
   if (!result.success) throw new Error(result.error ?? "herdr pane close failed")
 }

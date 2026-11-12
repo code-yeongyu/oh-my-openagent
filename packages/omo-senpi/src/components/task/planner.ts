@@ -1,7 +1,13 @@
-import { createModelDistributor, isExcludedModel, type ModelDistributor, type OmoConfig } from "@oh-my-opencode/omo-config-core"
+import {
+  createModelDistributor,
+  isExcludedModel,
+  type ModelDistributor,
+  type OmoConfig,
+} from "@oh-my-opencode/omo-config-core"
 
 import { inheritParentFastMode, type ResolveParentServiceTier } from "./fast-mode-inheritance"
 import { NO_REGISTRY_MESSAGE, resolveExplicitPin, type ResolveDefaultRoute } from "./planner-explicit-pin"
+import { agentModelFailureText, categoryModelFailureText } from "./model-error-text"
 import {
   resolveAgent,
   resolveCategory,
@@ -51,7 +57,15 @@ export function createTaskChildPlanner(
   const availableAgents = listAvailableAgents(agents)
   const planChild = (spec: Parameters<ChildPlanner>[0]): PlanResolution => {
     if (spec.subagent_type !== undefined) {
-      const agentResolution = resolveAgentTarget(spec.subagent_type, spec.model, agents, resolveRegistry, omoConfig, distributeModels, resolveDefaultRoute)
+      const agentResolution = resolveAgentTarget(
+        spec.subagent_type,
+        spec.model,
+        agents,
+        resolveRegistry,
+        omoConfig,
+        distributeModels,
+        resolveDefaultRoute,
+      )
       return agentResolution ?? unresolvableAgentTarget(spec.subagent_type, availableAgents, resolveRegistry, omoConfig)
     }
 
@@ -70,7 +84,10 @@ export function createTaskChildPlanner(
 
     const categoryName = spec.category
     if (categoryName === undefined) {
-      return { kind: "error", error: { code: "invalid_target", message: "A task requires a category, subagent_type, or model." } }
+      return {
+        kind: "error",
+        error: { code: "invalid_target", message: "A task requires a category, subagent_type, or model." },
+      }
     }
 
     const registry = resolveRegistry()
@@ -82,7 +99,18 @@ export function createTaskChildPlanner(
     }
 
     const resolution = resolveCategory(categoryName, omoConfig, registry, { distributeModels })
-    return toPlanResolution(categoryName, resolution, availableAgents)
+    const plan = toPlanResolution(categoryName, resolution, availableAgents)
+    // Q's standing model rule: a chain ends in a typed failure that names each model, so the parent
+    // reads the whole chain and the fix instead of retrying a dead binding. No substitution happens.
+    if (plan.kind === "error" && plan.error.code === "model_unavailable") {
+      const message = categoryModelFailureText(
+        plan.error,
+        omoConfig,
+        resolution.kind === "model_unavailable" ? resolution.category : undefined,
+      )
+      if (message !== undefined) return { kind: "error", error: { ...plan.error, message } }
+    }
+    return plan
   }
   return (spec): PlanResolution => {
     const resolution = planChild(spec)
@@ -126,8 +154,10 @@ function resolveAgentTarget(
       kind: "error",
       error: {
         code: "model_unavailable",
-        message: `No available model for agent "${agentName}" (attempted ${resolution.attemptedModel ?? "none"}).`,
+        message: agentModelFailureText(agentName, resolution, agents),
         availableAgents: resolution.availableAgents,
+        ...(resolution.attempted_chain !== undefined && { attempted_chain: resolution.attempted_chain }),
+        ...(resolution.missing_providers !== undefined && { missing_providers: resolution.missing_providers }),
       },
     }
   }
@@ -161,19 +191,19 @@ function unresolvableAgentTarget(
   }
 }
 
-function toAgentPlan(resolution: ResolvedAgentResult, explicitModel: ResolvedModelMetadata | undefined, canonicalModel?: string): ResolvedPlan {
+function toAgentPlan(
+  resolution: ResolvedAgentResult,
+  explicitModel: ResolvedModelMetadata | undefined,
+  canonicalModel?: string,
+): ResolvedPlan {
   const resolvedModel = resolution.resolved_model ?? explicitModel
   // Identical precedence to the category path below: reasoning outranks reasoningEffort outranks
   // variant, and whichever is chosen becomes the child's thinking level through asSenpiThinkingLevel.
   const appliedVariant = resolvedModel?.reasoning ?? resolvedModel?.reasoning_effort ?? resolvedModel?.variant
   return {
     model: canonicalModel ?? resolution.model,
-    ...(resolution.requested_model !== undefined
-      ? { requested_model: resolution.requested_model }
-      : {}),
-    ...(resolution.fallback_models !== undefined
-      ? { fallback_models: resolution.fallback_models }
-      : {}),
+    ...(resolution.requested_model !== undefined ? { requested_model: resolution.requested_model } : {}),
+    ...(resolution.fallback_models !== undefined ? { fallback_models: resolution.fallback_models } : {}),
     ...(resolvedModel !== undefined ? { resolved_model: resolvedModel } : {}),
     ...(appliedVariant !== undefined ? { variant: appliedVariant } : {}),
     agentType: resolution.agentType,
@@ -206,19 +236,17 @@ function toPlanResolution(
       kind: "resolved",
       plan: {
         model: `${resolution.spec.provider}/${resolution.spec.modelId}`,
-        ...(resolution.spec.requested_model !== undefined
-          ? { requested_model: resolution.spec.requested_model }
-          : {}),
-        ...(resolution.spec.fallback_models !== undefined
-          ? { fallback_models: resolution.spec.fallback_models }
-          : {}),
+        ...(resolution.spec.requested_model !== undefined ? { requested_model: resolution.spec.requested_model } : {}),
+        ...(resolution.spec.fallback_models !== undefined ? { fallback_models: resolution.spec.fallback_models } : {}),
         resolved_model: {
           source: "category",
           provider: resolution.spec.provider,
           model_id: resolution.spec.modelId,
           display: resolution.spec.displayName ?? `${resolution.spec.provider}/${resolution.spec.modelId}`,
           ...(resolution.spec.variant !== undefined ? { variant: resolution.spec.variant } : {}),
-          ...(resolution.spec.reasoningEffort !== undefined ? { reasoning_effort: resolution.spec.reasoningEffort } : {}),
+          ...(resolution.spec.reasoningEffort !== undefined
+            ? { reasoning_effort: resolution.spec.reasoningEffort }
+            : {}),
           ...(resolution.spec.reasoning !== undefined ? { reasoning: resolution.spec.reasoning } : {}),
         },
         ...(appliedVariant !== undefined ? { variant: appliedVariant } : {}),
@@ -230,7 +258,11 @@ function toPlanResolution(
   if (resolution.kind === "disabled") {
     return {
       kind: "error",
-      error: { code: "category_disabled", message: resolution.reason, availableCategories: resolution.availableCategories },
+      error: {
+        code: "category_disabled",
+        message: resolution.reason,
+        availableCategories: resolution.availableCategories,
+      },
     }
   }
   if (resolution.kind === "not_found") {
@@ -254,7 +286,9 @@ function toPlanResolution(
       category: categoryName,
       ...(resolution.attempted_chain !== undefined && { attempted_chain: resolution.attempted_chain }),
       ...(resolution.missing_providers !== undefined && { missing_providers: resolution.missing_providers }),
-      ...(resolution.unlisted_provider_model !== undefined && { unlisted_provider_model: resolution.unlisted_provider_model }),
+      ...(resolution.unlisted_provider_model !== undefined && {
+        unlisted_provider_model: resolution.unlisted_provider_model,
+      }),
     },
   }
 }

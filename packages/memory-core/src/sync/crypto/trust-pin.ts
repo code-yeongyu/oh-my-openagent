@@ -9,14 +9,15 @@
 // A missing, corrupt or mismatching pin, or an account directory without its pin file, is NO anchor: the caller refuses and tells the user to re-pair or recover, never trusting the
 // server or a fresh bootstrap walk on its own.
 
-import { createHash, randomBytes } from "node:crypto"
+import { randomBytes } from "node:crypto"
 import { join } from "node:path"
 
-import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "../../fs/resilient"
+import { mkdir, readdir, readFile, rm, stat, writeFile } from "../../fs/resilient"
 import { syncJournalDirectory, syncJournalFile } from "../../journal/fsync"
 import { ANCHOR_NEXT_STEP, isPinCandidate, mintTrustAnchor, type PinCandidate, type TrustAnchor } from "./anchor.ts"
 import { decodeB64 } from "./signatures.ts"
 import { checkSyncOperation, isSyncOperationCancelled, type SyncOperationOptions } from "../operation-authority.ts"
+import { retireSyncDevice, trustAnchorDir, trustAnchorKey, trustAnchorRoot } from "../device-retire"
 import { publishSyncRename } from "../publication.ts"
 
 export type PinLoad =
@@ -36,9 +37,9 @@ export class TrustPinError extends Error {
 const PIN_FILE = "pin.json"
 const SOURCES = new Set(["pairing", "recovery", "creator"])
 
-const accountKey = (account: string): string => createHash("sha256").update(account, "utf8").digest("base64url")
-const rootDir = (stateDir: string): string => join(stateDir, "trust-anchor")
-const pinDir = (stateDir: string, account: string): string => join(rootDir(stateDir), accountKey(account))
+const accountKey = trustAnchorKey
+const rootDir = trustAnchorRoot
+const pinDir = trustAnchorDir
 
 const isMissing = (error: unknown): boolean => error instanceof Error && "code" in error && error.code === "ENOENT"
 
@@ -71,7 +72,8 @@ const cleanStaleCandidates = async (stateDir: string, account: string): Promise<
 const hasExactly = (value: Record<string, unknown>, keys: ReadonlyArray<string>): boolean =>
   Object.keys(value).sort().join(",") === [...keys].sort().join(",")
 
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value)
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
 
 const parsePin = (raw: string, account: string): TrustAnchor | null => {
   let value: unknown
@@ -80,12 +82,25 @@ const parsePin = (raw: string, account: string): TrustAnchor | null => {
   } catch {
     return null
   }
-  if (!isRecord(value) || !hasExactly(value, ["version", "account", "genesis_digest", "pinned_by", "pinned_at"])) return null
+  if (!isRecord(value) || !hasExactly(value, ["version", "account", "genesis_digest", "pinned_by", "pinned_at"]))
+    return null
   const at = value["pinned_at"]
   const digest = value["genesis_digest"]
-  if (value["version"] !== 1 || value["account"] !== account || typeof digest !== "string" || decodeB64(digest, 32) === null) return null
+  if (
+    value["version"] !== 1 ||
+    value["account"] !== account ||
+    typeof digest !== "string" ||
+    decodeB64(digest, 32) === null
+  )
+    return null
   if (typeof value["pinned_by"] !== "string" || !SOURCES.has(value["pinned_by"])) return null
-  if (!isRecord(at) || !hasExactly(at, ["seq", "keyring_link"]) || !Number.isSafeInteger(at["seq"]) || Number(at["seq"]) < 1) return null
+  if (
+    !isRecord(at) ||
+    !hasExactly(at, ["seq", "keyring_link"]) ||
+    !Number.isSafeInteger(at["seq"]) ||
+    Number(at["seq"]) < 1
+  )
+    return null
   if (typeof at["keyring_link"] !== "string" || decodeB64(at["keyring_link"], 32) === null) return null
   return mintTrustAnchor(account, digest)
 }
@@ -115,7 +130,12 @@ export const loadTrustAnchor = async (stateDir: string, account: string): Promis
  * pin; a different root, or a pin file that does not parse, throws and changes nothing. Losing the
  * publishing rename to a concurrent writer is decided the same way, by the pin that writer published.
  */
-export const pinTrustAnchor = async (stateDir: string, account: string, candidate: PinCandidate, operation: SyncOperationOptions = {}): Promise<TrustAnchor> => {
+export const pinTrustAnchor = async (
+  stateDir: string,
+  account: string,
+  candidate: PinCandidate,
+  operation: SyncOperationOptions = {},
+): Promise<TrustAnchor> => {
   if (!isPinCandidate(candidate) || candidate.account !== account) throw new TrustPinError("not_verified")
   const existing = await loadTrustAnchor(stateDir, account)
   if (existing.ok) {
@@ -130,7 +150,13 @@ export const pinTrustAnchor = async (stateDir: string, account: string, candidat
   await mkdir(rootDir(stateDir), { recursive: true, mode: 0o700 })
   const staging = `${target}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`
   await mkdir(staging, { mode: 0o700 })
-  const pin = { version: 1, account, genesis_digest: candidate.genesisDigest, pinned_by: candidate.pinnedBy, pinned_at: { ...candidate.at } }
+  const pin = {
+    version: 1,
+    account,
+    genesis_digest: candidate.genesisDigest,
+    pinned_by: candidate.pinnedBy,
+    pinned_at: { ...candidate.at },
+  }
   try {
     await writeFile(join(staging, PIN_FILE), `${JSON.stringify(pin)}\n`, { flag: "wx", mode: 0o600 })
     await syncJournalFile(join(staging, PIN_FILE))
@@ -153,13 +179,45 @@ export const pinTrustAnchor = async (stateDir: string, account: string, candidat
 }
 
 /**
- * Retires the pin so a new pairing or recovery can set one. Only the user-driven re-pair and
- * recovery flows call this; it is not exported from the package, and no sync path reaches it.
+ * Retires the pin by rename, so a later ceremony can set one. Called only when this machine discards
+ * the private keys of the principal that earned the pin (#12280, through `device-retire.ts`); it is not
+ * exported from the crypto barrel, and no sync, session or ceremony path reaches it.
  */
-export const forgetTrustAnchor = async (stateDir: string, account: string): Promise<void> => {
+export const forgetTrustAnchor = (stateDir: string, account: string): Promise<void> =>
+  retireSyncDevice({ pinDir: stateDir, account })
+
+/** The genesis digest of the newest retired pin for `account`, or null when none parses. */
+const newestRetiredRoot = async (stateDir: string, account: string): Promise<string | null> => {
+  const prefix = `${accountKey(account)}.retired-`
+  let names: string[]
   try {
-    await rename(pinDir(stateDir, account), `${pinDir(stateDir, account)}.retired-${Date.now()}-${randomBytes(4).toString("hex")}`)
+    names = await readdir(rootDir(stateDir))
   } catch (error) {
-    if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error
+    if (isMissing(error)) return null
+    throw error
   }
+  const stamp = (name: string): number => Number(name.slice(prefix.length).split("-")[0])
+  const retired = names
+    .filter((name) => name.startsWith(prefix) && Number.isSafeInteger(stamp(name)))
+    .sort((a, b) => stamp(b) - stamp(a))
+  for (const name of retired) {
+    const raw = await readFile(join(rootDir(stateDir), name, PIN_FILE), "utf8").catch(() => null)
+    const anchor = raw === null ? null : parsePin(raw, account)
+    if (anchor !== null) return anchor.genesisDigest
+  }
+  return null
+}
+
+/**
+ * Whether a ceremony that just pinned `genesisDigest` moved the account to a different root than the
+ * one this device last held (#12280): a non-blocking notice, never a refusal. Only local retired pins
+ * are read; nothing a server says enters the comparison.
+ */
+export const rootChangedSinceRetired = async (
+  stateDir: string,
+  account: string,
+  genesisDigest: string,
+): Promise<boolean> => {
+  const retired = await newestRetiredRoot(stateDir, account)
+  return retired !== null && retired !== genesisDigest
 }

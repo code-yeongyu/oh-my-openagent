@@ -38,7 +38,7 @@ export function cacheToolInput(
   sessionId: string,
   toolName: string,
   invocationId: string,
-  toolInput: Record<string, unknown>
+  toolInput: Record<string, unknown>,
 ): void {
   ensureCleanupInterval()
   const key = `${sessionId}:${toolName}:${invocationId}`
@@ -48,7 +48,7 @@ export function cacheToolInput(
 export function getToolInput(
   sessionId: string,
   toolName: string,
-  invocationId: string
+  invocationId: string,
 ): Record<string, unknown> | null {
   const key = `${sessionId}:${toolName}:${invocationId}`
   const entry = cache.get(key)

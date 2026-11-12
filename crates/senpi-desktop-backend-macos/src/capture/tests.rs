@@ -18,6 +18,7 @@ const DEADLINE: Duration = Duration::from_secs(60);
 fn window_list_excludes_two_helpers_by_title_without_hiding_reused_pids() {
     // Given: two overlay windows and two real application windows.
     let window = |id: &str, title: &str, pid| senpi_desktop_core::types::DesktopWindow {
+        identity: None,
         id: id.to_owned(), title: title.to_owned(), app: "fixture".to_owned(), pid,
         x: 0, y: 0, width: 100, height: 100, focused: false, is_on_screen: None, elevated: None,
     };
@@ -38,6 +39,7 @@ fn window_list_excludes_two_helpers_by_title_without_hiding_reused_pids() {
 fn user_window_sharing_the_helper_title_stays_listed() {
     // Given: a user document titled like the helper, at a normal window level.
     let window = |id: &str| senpi_desktop_core::types::DesktopWindow {
+        identity: None,
         id: id.to_owned(), title: "senpi-desktop-cursor-overlay".to_owned(), app: "TextEdit".to_owned(),
         pid: Some(5), x: 0, y: 0, width: 100, height: 100, focused: false, is_on_screen: None, elevated: None,
     };
@@ -52,6 +54,7 @@ fn user_window_sharing_the_helper_title_stays_listed() {
 #[test]
 fn unknown_helper_list_hides_every_title_match() {
     let mut windows = vec![senpi_desktop_core::types::DesktopWindow {
+        identity: None,
         id: "303".to_owned(), title: "senpi-desktop-cursor-overlay".to_owned(), app: "x".to_owned(),
         pid: None, x: 0, y: 0, width: 100, height: 100, focused: false, is_on_screen: None, elevated: None,
     }];
@@ -208,6 +211,7 @@ fn active_display_composite_preserves_negative_origin_in_its_frame() {
     let primary = display("1", 0, 100, 50);
     let left = display("2", -100, 100, 50);
     let focused = senpi_desktop_core::types::DesktopWindow {
+        identity: None,
         id: "window".into(), title: String::new(), app: String::new(), pid: None,
         x: -90, y: 0, width: 50, height: 40, focused: true, elevated: None,
         is_on_screen: None,

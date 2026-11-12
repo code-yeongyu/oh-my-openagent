@@ -10,7 +10,9 @@ describe("built omowright runtime probe (CI)", () => {
       ci: "true",
     })
     expect(
-      verdict.failures.some((line) => line.includes("packages/omo-codex/plugin/skills/browser/runtime/omowright/index.js")),
+      verdict.failures.some((line) =>
+        line.includes("packages/omo-codex/plugin/skills/browser/runtime/omowright/index.js"),
+      ),
       JSON.stringify(verdict),
     ).toBe(true)
     expect(verdict.scanned).toEqual([])

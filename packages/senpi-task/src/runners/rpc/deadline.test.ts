@@ -16,15 +16,24 @@ test("#given a silent stdio child #when the prompt deadline expires #then start 
     modelAdmission: async () => {},
     buildSpawn: () => ({ command: "unused", args: [], cwd: process.cwd(), env: {} }),
   })
-  const result = runner.start({ task_id: "st_deadline", cwd: process.cwd(), state_dir: "/tmp/unused", prompt: "work" })
-    .then(() => undefined, (error: unknown) => error)
+  const result = runner
+    .start({ task_id: "st_deadline", cwd: process.cwd(), state_dir: "/tmp/unused", prompt: "work" })
+    .then(
+      () => undefined,
+      (error: unknown) => error,
+    )
   await clock.advance(0)
   expect(fake.commands.some((command) => command.type === "prompt")).toBe(true)
   await clock.advance(30_000)
   const error = await Promise.race([result, Promise.resolve("still pending")])
-  expect(error).toMatchObject({ failure: { kind: "child-prompt-failed", cause: { name: "RpcRequestTimeout", command: "prompt", deadlineMs: 30_000 } } })
+  expect(error).toMatchObject({
+    failure: {
+      kind: "child-prompt-failed",
+      cause: { name: "RpcRequestTimeout", command: "prompt", deadlineMs: 30_000 },
+    },
+  })
   expect(describeStartFailure(error).errorMessage).toMatch(/Action: /)
-  expect(clock.pending()).toBe(0)
+  clock.assertNoPendingTimers()
 })
 
 test("#given an input received acknowledgement #when preflight takes time #then it has five minutes without repeated extension", async () => {
@@ -32,7 +41,14 @@ test("#given an input received acknowledgement #when preflight takes time #then 
   const fake = silentChild()
   const client = new RpcProtocolClient({ child: fake.child })
   let result: unknown
-  const pending = client.send({ type: "prompt", message: "work" }).then((value) => { result = value }, (error) => { result = error })
+  const pending = client.send({ type: "prompt", message: "work" }).then(
+    (value) => {
+      result = value
+    },
+    (error) => {
+      result = error
+    },
+  )
   const command = fake.commands[0]!
   fake.emit({ type: "queued", for_request: command.id })
   await clock.advance(30_000)
@@ -43,7 +59,7 @@ test("#given an input received acknowledgement #when preflight takes time #then 
   await pending
   fake.respond(command)
   expect(result).toMatchObject({ name: "RpcRequestTimeout" })
-  expect(clock.pending()).toBe(0)
+  clock.assertNoPendingTimers()
 })
 
 test("#given explicit and default request budgets #when requests answer or exit #then every deadline is cleared", async () => {
@@ -63,5 +79,5 @@ test("#given explicit and default request budgets #when requests answer or exit 
   const exited = client.send({ type: "get_entries" }).catch((error: unknown) => error)
   fake.child.emit("close", 0, null)
   expect(await exited).toBeInstanceOf(Error)
-  expect(clock.pending()).toBe(0)
+  clock.assertNoPendingTimers()
 })

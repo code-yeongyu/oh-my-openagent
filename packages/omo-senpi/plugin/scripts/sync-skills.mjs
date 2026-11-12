@@ -6,13 +6,14 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 import { createSkillSourceCopyFilter } from "@oh-my-opencode/shared-skills/skill-source-filter"
 import { createNativeSkillSources } from "./native-skill-sources.mjs"
 import { insertSenpiCompatibilityGuidance } from "./senpi-compatibility-guidance.mjs"
-import { applySenpiSkillRosterOverlay } from "./senpi-skill-roster-overlay.mjs"
+import { applySenpiSkillRosterOverlay, assertSenpiSkillRosterOverlay } from "./senpi-skill-roster-overlay.mjs"
 
 const pluginRoot = dirname(dirname(fileURLToPath(import.meta.url)))
 const repoRoot = dirname(dirname(pluginRoot))
-const skillsRoot = process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined
-  ? join(pluginRoot, "skills")
-  : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "skills")
+const skillsRoot =
+  process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined
+    ? join(pluginRoot, "skills")
+    : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "skills")
 const sharedSkillsRoot = join(repoRoot, "shared-skills", "skills")
 
 const skillSources = [
@@ -35,7 +36,6 @@ const sectionHeadingsToStrip = new Set([
   "Senpi Harness Tool Compatibility",
 ])
 const forbiddenGuidancePattern = /\b(?:multi_agent|spawn_agent|update_plan)\b/i
-
 
 /** senpi additionally excludes the generated Codex agent manifest from packaged skills. */
 const senpiFilterOptions = { ignoredFileNames: ["openai.yaml"] }
@@ -188,7 +188,9 @@ async function overlaySharedAssets(name, nativeSource, destination, sharedAssets
     if (existsSync(nativePath)) {
       const collisions = (await stat(nativePath)).isDirectory() ? await listFiles(nativePath) : [nativePath]
       if (collisions.length > 0) {
-        throw new Error(`${name}: shared asset "${asset}" would overwrite native source file(s): ${collisions.join(", ")}`)
+        throw new Error(
+          `${name}: shared asset "${asset}" would overwrite native source file(s): ${collisions.join(", ")}`,
+        )
       }
     }
 
@@ -238,6 +240,10 @@ export async function syncSkills() {
     const destination = join(skillsRoot, skillName)
     await cp(source, destination, { filter: createSkillSourceCopyFilter(source, senpiFilterOptions), recursive: true })
     await adaptSkillTree(destination, (content) => applySharedTierAdaptation(skillName, content))
+    const texts = await Promise.all(
+      (await listFiles(destination)).filter(isTextFile).map((file) => readFile(file, "utf8")),
+    )
+    assertSenpiSkillRosterOverlay(skillName, texts)
   }
 
   console.log(`synced omo-senpi skills to ${skillsRoot}`)

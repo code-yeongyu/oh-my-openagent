@@ -29,9 +29,10 @@ export async function checkTeamModeDependencies(
   const multiplexer = deps.multiplexer ?? readMultiplexerEnv()
   const tmuxEnv = deps.tmuxEnv ?? process.env["TMUX"]
   const herdrEnv = deps.herdrEnv ?? process.env["HERDR_ENV"]
-  const tmuxAvailable = multiplexer === "herdr"
-    ? Boolean(herdrEnv) || (await probeBinary("herdr", ["--version"], spawnImpl))
-    : Boolean(tmuxEnv) || (await probeBinary("tmux", ["-V"], spawnImpl))
+  const tmuxAvailable =
+    multiplexer === "herdr"
+      ? Boolean(herdrEnv) || (await probeBinary("herdr", ["--version"], spawnImpl))
+      : Boolean(tmuxEnv) || (await probeBinary("tmux", ["-V"], spawnImpl))
   const gitAvailable = await probeBinary("git", ["--version"], spawnImpl)
   if (config.tmux_visualization && !tmuxAvailable) {
     console.warn(

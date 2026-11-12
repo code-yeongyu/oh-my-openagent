@@ -11,7 +11,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs"
-import { dirname, join, resolve } from "node:path"
+import { dirname, join, posix, resolve, win32 } from "node:path"
 
 export type EmbeddedFile = Blob & {
   name: string
@@ -20,14 +20,39 @@ export type EmbeddedFile = Blob & {
   text?: () => Promise<string>
 }
 export type EmbeddedManifestEntry = { relPath: string; sha256: string; mode: number; size: number }
-export type EmbeddedManifest = { omoAiVersion: string; enginePin: string; manifestSha: string; entries: EmbeddedManifestEntry[]; buildInfo?: unknown; engineBuild?: unknown; releaseTarget?: unknown }
+export type EmbeddedManifest = {
+  omoAiVersion: string
+  enginePin: string
+  manifestSha: string
+  entries: EmbeddedManifestEntry[]
+  buildInfo?: unknown
+  engineBuild?: unknown
+  releaseTarget?: unknown
+}
 
-export function isProvisionedExecutable(execPath: string, expectedPath: string): boolean {
+// One spelling per file. On Windows the JS realpath keeps 8.3 short names (RUNNER~1, which tmpdir()
+// and homedir() can return) while the running exe reports the long one, so only the native resolver
+// meets both; NTFS paths are case-insensitive and may carry the \\?\ prefix (#12769).
+function canonicalExecutablePath(path: string, platform: NodeJS.Platform, realpath: (path: string) => string): string {
+  let canonical: string
   try {
-    return realpathSync(execPath) === realpathSync(expectedPath)
+    canonical = realpath(path)
   } catch {
-    return resolve(execPath) === resolve(expectedPath)
+    canonical = (platform === "win32" ? win32 : posix).resolve(path)
   }
+  if (platform !== "win32") return canonical
+  return win32.resolve(canonical.replace(/^\\\\\?\\UNC\\/i, "\\\\").replace(/^\\\\\?\\/, "")).toLowerCase()
+}
+
+export function isProvisionedExecutable(
+  execPath: string,
+  expectedPath: string,
+  platform: NodeJS.Platform = process.platform,
+  realpath: (path: string) => string = realpathSync.native,
+): boolean {
+  return (
+    canonicalExecutablePath(execPath, platform, realpath) === canonicalExecutablePath(expectedPath, platform, realpath)
+  )
 }
 
 /**
@@ -113,14 +138,15 @@ export async function selectRuntimeManifest(embedded: EmbeddedFile[]): Promise<E
   return undefined
 }
 
-export async function provisionEmbeddedRuntime(manifest: EmbeddedManifest, embedded: EmbeddedFile[], runtimeDir: string): Promise<void> {
+export async function provisionEmbeddedRuntime(
+  manifest: EmbeddedManifest,
+  embedded: EmbeddedFile[],
+  runtimeDir: string,
+): Promise<void> {
   mkdirSync(runtimeDir, { recursive: true })
   const marker = join(runtimeDir, ".provisioned")
   if (readFileIfExists(marker)?.trim() === manifest.manifestSha) return
-  const byPath = new Map(embedded.map((file) => [
-    file.name.replace(/^\.\//, "").replace(/^omo-runtime\//, ""),
-    file,
-  ]))
+  const byPath = new Map(embedded.map((file) => [file.name.replace(/^\.\//, "").replace(/^omo-runtime\//, ""), file]))
   for (const entry of manifest.entries) {
     const file = byPath.get(entry.relPath.replace(/^\.\//, ""))
     if (!file) throw new Error(`embedded asset missing: ${entry.relPath}`)
@@ -137,5 +163,9 @@ export async function provisionEmbeddedRuntime(manifest: EmbeddedManifest, embed
 }
 
 function readFileIfExists(path: string): string | undefined {
-  try { return readFileSync(path, "utf8") } catch { return undefined }
+  try {
+    return readFileSync(path, "utf8")
+  } catch {
+    return undefined
+  }
 }

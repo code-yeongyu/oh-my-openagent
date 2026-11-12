@@ -10,10 +10,7 @@ import {
   createTeamModeStatusInjector,
   createToolPairValidatorHook,
 } from "../../hooks"
-import {
-  contextCollector,
-  createContextInjectorMessagesTransformHook,
-} from "../../features/context-injector"
+import { contextCollector, createContextInjectorMessagesTransformHook } from "../../features/context-injector"
 import { createBtwSideContextInjectorHook } from "../../features/btw-side"
 import { safeCreateHook } from "../../shared/safe-create-hook"
 
@@ -69,8 +66,7 @@ export function createTransformHooks(args: {
       )
     : null
 
-  const contextInjectorMessagesTransform =
-    createContextInjectorMessagesTransformHook(contextCollector)
+  const contextInjectorMessagesTransform = createContextInjectorMessagesTransformHook(contextCollector)
   const btwSideContextInjector = createBtwSideContextInjectorHook({
     client: ctx.client,
   })
@@ -86,29 +82,24 @@ export function createTransformHooks(args: {
     : null
 
   const teamMailboxInjector = teamModeConfig?.enabled
-    ? safeCreateHook(
-        "team-mailbox-injector",
-        () => createTeamMailboxInjector(ctx, teamModeConfig),
-        { enabled: safeHookEnabled },
-      )
+    ? safeCreateHook("team-mailbox-injector", () => createTeamMailboxInjector(ctx, teamModeConfig), {
+        enabled: safeHookEnabled,
+      })
     : null
 
   const toolPairValidator = isHookEnabled("tool-pair-validator")
-    ? safeCreateHook(
-        "tool-pair-validator",
-        () => createToolPairValidatorHook(),
-        { enabled: safeHookEnabled },
-      )
+    ? safeCreateHook("tool-pair-validator", () => createToolPairValidatorHook(), { enabled: safeHookEnabled })
     : null
 
   const monitorConfig = pluginConfig.monitor
-  const monitorStatusInjector = monitorConfig?.enabled && monitorManager && isHookEnabled("monitor-status-injector")
-    ? safeCreateHook(
-        "monitor-status-injector",
-        () => createMonitorStatusInjectorHook(monitorManager, { enabled: monitorConfig.enabled }),
-        { enabled: safeHookEnabled },
-      )
-    : null
+  const monitorStatusInjector =
+    monitorConfig?.enabled && monitorManager && isHookEnabled("monitor-status-injector")
+      ? safeCreateHook(
+          "monitor-status-injector",
+          () => createMonitorStatusInjectorHook(monitorManager, { enabled: monitorConfig.enabled }),
+          { enabled: safeHookEnabled },
+        )
+      : null
 
   return {
     claudeCodeHooks,

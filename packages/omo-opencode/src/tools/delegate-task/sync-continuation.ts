@@ -55,10 +55,7 @@ function shouldAttemptPollErrorRecovery(pollError: string): boolean {
   return false
 }
 
-async function resolveResumeContext(
-  client: ExecutorContext["client"],
-  continuationID: string
-): Promise<ResumeContext> {
+async function resolveResumeContext(client: ExecutorContext["client"], continuationID: string): Promise<ResumeContext> {
   try {
     const messagesResp = await client.session.messages({ path: { id: continuationID } })
     const messages = normalizeSDKResponse(messagesResp, [] as SessionMessage[])
@@ -68,9 +65,9 @@ async function resolveResumeContext(
       if (info?.agent || info?.model || (info?.modelID && info?.providerID)) {
         return {
           resumeAgent: info.agent,
-          resumeModel: info.model ?? (info.providerID && info.modelID
-            ? { providerID: info.providerID, modelID: info.modelID }
-            : undefined),
+          resumeModel:
+            info.model ??
+            (info.providerID && info.modelID ? { providerID: info.providerID, modelID: info.modelID } : undefined),
           resumeVariant: info.variant,
           anchorMessageCount: messages.length,
           anchorMessageID: messages.at(-1)?.info?.id,
@@ -87,9 +84,10 @@ async function resolveResumeContext(
 
     return {
       resumeAgent: prevMessage?.agent,
-      resumeModel: resumeMessageModel?.providerID && resumeMessageModel.modelID
-        ? { providerID: resumeMessageModel.providerID, modelID: resumeMessageModel.modelID }
-        : undefined,
+      resumeModel:
+        resumeMessageModel?.providerID && resumeMessageModel.modelID
+          ? { providerID: resumeMessageModel.providerID, modelID: resumeMessageModel.modelID }
+          : undefined,
       resumeVariant: resumeMessageModel?.variant,
     }
   }
@@ -101,7 +99,7 @@ export async function executeSyncContinuation(
   executorCtx: ExecutorContext,
   parentContext: ParentContext,
   deps: SyncContinuationDeps = syncContinuationDeps,
-  systemContent?: string
+  systemContent?: string,
 ): Promise<string> {
   const { client, syncPollTimeoutMs, taskCleanupDelayMs, sisyphusAgentConfig } = executorCtx
   const toastManager = getTaskToastManager()
@@ -142,9 +140,8 @@ export async function executeSyncContinuation(
     anchorMessageCount = resumeContext.anchorMessageCount
     anchorMessageID = resumeContext.anchorMessageID
 
-    const resumeModelForMetadata = resumeModel && resumeVariant !== undefined
-      ? { ...resumeModel, variant: resumeVariant }
-      : resumeModel
+    const resumeModelForMetadata =
+      resumeModel && resumeVariant !== undefined ? { ...resumeModel, variant: resumeVariant } : resumeModel
 
     const syncContMeta = {
       title: args.description,
@@ -152,7 +149,9 @@ export async function executeSyncContinuation(
         prompt: args.prompt,
         ...(resumeAgent !== undefined ? { agent: resumeAgent } : {}),
         ...(args.category !== undefined ? { category: args.category } : {}),
-        ...(args.requested_subagent_type !== undefined ? { requested_subagent_type: args.requested_subagent_type } : {}),
+        ...(args.requested_subagent_type !== undefined
+          ? { requested_subagent_type: args.requested_subagent_type }
+          : {}),
         load_skills: args.load_skills,
         description: args.description,
         run_in_background: args.run_in_background,
@@ -176,107 +175,116 @@ export async function executeSyncContinuation(
     }
     setSessionTools(continuationID, tools)
 
-    await promptWithModelSuggestionRetry(client, {
-      path: { id: continuationID },
-      body: {
-        ...(resumeAgent !== undefined ? { agent: resumeAgent } : {}),
-        ...(resumeModel !== undefined ? { model: resumeModel } : {}),
-        ...(resumeVariant !== undefined ? { variant: resumeVariant } : {}),
-        system: systemContent,
-        tools,
-        parts: [{ type: "text", text: effectivePrompt }],
+    await promptWithModelSuggestionRetry(
+      client,
+      {
+        path: { id: continuationID },
+        body: {
+          ...(resumeAgent !== undefined ? { agent: resumeAgent } : {}),
+          ...(resumeModel !== undefined ? { model: resumeModel } : {}),
+          ...(resumeVariant !== undefined ? { variant: resumeVariant } : {}),
+          system: systemContent,
+          tools,
+          parts: [{ type: "text", text: effectivePrompt }],
+        },
       },
-    }, {
-      queueBehavior: "defer",
-      checkToolState: false,
-    })
-   } catch (promptError) {
-     if (toastManager) {
-       toastManager.removeTask(taskId)
-     }
-     const errorMessage = promptError instanceof Error ? promptError.message : String(promptError)
-     detachFromManager?.()
-     scheduleSyncSessionDeletion(client, continuationID, taskCleanupDelayMs)
-     return `Failed to send continuation prompt: ${errorMessage}\n\nTask ID: ${continuationID}`
-   }
+      {
+        queueBehavior: "defer",
+        checkToolState: false,
+      },
+    )
+  } catch (promptError) {
+    if (toastManager) {
+      toastManager.removeTask(taskId)
+    }
+    const errorMessage = promptError instanceof Error ? promptError.message : String(promptError)
+    detachFromManager?.()
+    scheduleSyncSessionDeletion(client, continuationID, taskCleanupDelayMs)
+    return `Failed to send continuation prompt: ${errorMessage}\n\nTask ID: ${continuationID}`
+  }
 
-    try {
-      const pollError = await deps.pollSyncSession(ctx, client, {
+  try {
+    const pollError = await deps.pollSyncSession(
+      ctx,
+      client,
+      {
         sessionID: continuationID,
         agentToUse: resumeAgent ?? "continue",
         toastManager,
         taskId,
         anchorMessageCount,
         anchorMessageID,
-      }, syncPollTimeoutMs)
-      if (pollError && shouldAttemptPollErrorRecovery(pollError)) {
-        if (anchorMessageCount === undefined) {
-          return pollError
-        }
-        const recoveredResult = await deps.fetchSyncResult(client, continuationID, anchorMessageCount, {
-          strictAbortRecovery: true,
-          deliverableTag: getDeliverableTag(resumeAgent),
-        })
-        if (!recoveredResult.ok) {
-          return pollError
-        }
+      },
+      syncPollTimeoutMs,
+    )
+    if (pollError && shouldAttemptPollErrorRecovery(pollError)) {
+      if (anchorMessageCount === undefined) {
+        return pollError
+      }
+      const recoveredResult = await deps.fetchSyncResult(client, continuationID, anchorMessageCount, {
+        strictAbortRecovery: true,
+        deliverableTag: getDeliverableTag(resumeAgent),
+      })
+      if (!recoveredResult.ok) {
+        return pollError
+      }
 
-        const duration = formatDuration(startTime)
-        handedBackToParent = true
+      const duration = formatDuration(startTime)
+      handedBackToParent = true
 
-        return `Task continued and completed in ${duration}.
+      return `Task continued and completed in ${duration}.
 
 ---
 
 ${recoveredResult.textContent || "(No text output)"}
 
 ${buildTaskMetadataBlock({
-          sessionId: continuationID,
-          taskId: continuationID,
-          agent: resumeAgent,
-          category: args.category,
-        })}`
-      } else if (pollError) {
-        return pollError
-      }
+  sessionId: continuationID,
+  taskId: continuationID,
+  agent: resumeAgent,
+  category: args.category,
+})}`
+    } else if (pollError) {
+      return pollError
+    }
 
-      const result = await deps.fetchSyncResult(client, continuationID, anchorMessageCount, {
-        deliverableTag: getDeliverableTag(resumeAgent),
-      })
-      if (!result.ok) {
-        return result.error
-      }
+    const result = await deps.fetchSyncResult(client, continuationID, anchorMessageCount, {
+      deliverableTag: getDeliverableTag(resumeAgent),
+    })
+    if (!result.ok) {
+      return result.error
+    }
 
-     const duration = formatDuration(startTime)
-     handedBackToParent = true
+    const duration = formatDuration(startTime)
+    handedBackToParent = true
 
-     return `Task continued and completed in ${duration}.
+    return `Task continued and completed in ${duration}.
 
 ---
 
 ${result.textContent || "(No text output)"}
 
 ${buildTaskMetadataBlock({
-        sessionId: continuationID,
-        taskId: continuationID,
-        agent: resumeAgent,
-        category: args.category,
-      })}`
-   } finally {
-     if (toastManager) {
-       toastManager.removeTask(taskId)
-     }
-     if (handedBackToParent) {
-       handedBackSyncSessions.add(continuationID)
-       if (typeof client.session.abort === "function") {
-         void client.session.abort({ path: { id: continuationID } }).catch((error: unknown) => {
-           log(`[task] Failed to abort completed sync continuation session:`, error)
-         })
-       }
-     }
-     // Every terminal continuation path must restore the cleanup grace timer,
-     // including prompt/poll failures after revival cancelled the old timer.
-     detachFromManager?.()
-     scheduleSyncSessionDeletion(client, continuationID, taskCleanupDelayMs)
-   }
+  sessionId: continuationID,
+  taskId: continuationID,
+  agent: resumeAgent,
+  category: args.category,
+})}`
+  } finally {
+    if (toastManager) {
+      toastManager.removeTask(taskId)
+    }
+    if (handedBackToParent) {
+      handedBackSyncSessions.add(continuationID)
+      if (typeof client.session.abort === "function") {
+        void client.session.abort({ path: { id: continuationID } }).catch((error: unknown) => {
+          log(`[task] Failed to abort completed sync continuation session:`, error)
+        })
+      }
+    }
+    // Every terminal continuation path must restore the cleanup grace timer,
+    // including prompt/poll failures after revival cancelled the old timer.
+    detachFromManager?.()
+    scheduleSyncSessionDeletion(client, continuationID, taskCleanupDelayMs)
+  }
 }

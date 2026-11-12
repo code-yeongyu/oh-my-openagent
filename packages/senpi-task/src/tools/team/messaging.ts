@@ -29,7 +29,10 @@ export async function runTeamSend(
     })
     switch (result.kind) {
       case "to_lead":
-        return toolResult(`Message enqueued to lead (id: ${result.messageId}).`, { kind: "to_lead", message_id: result.messageId })
+        return toolResult(`Message enqueued to lead (id: ${result.messageId}).`, {
+          kind: "to_lead",
+          message_id: result.messageId,
+        })
       case "to_members":
         return toolResult(
           `Message enqueued to ${result.recipients.length} recipient(s): ${result.recipients.join(", ")} (id: ${result.messageId}).`,

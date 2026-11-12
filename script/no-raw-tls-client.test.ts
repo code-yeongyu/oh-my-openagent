@@ -28,53 +28,63 @@ import {
 // destructuring; variable/const-folded module specifiers; Reflect.get(Bun, "connect").
 // This is a regression guard, not a complete data-flow or evasion detector.
 const ALLOWLIST: AllowlistEntry[] = [
-  ...["omo-codex", "omo-senpi"].flatMap((edition) => ["https", "tls"].map((module) => ({
-    file: `packages/${edition}/plugin/skills/browser/runtime/omowright/index.js`,
-    call: `__require("${module}")`,
-    count: 1,
-    reason: "bundled ws@8.21.3 acquisition: request options and tls.connect(options) derive host/servername from new URL(address).hostname; the connector call remains independently pinned (omowright#40, senpi#3078).",
-  }))),
   {
-    file: "packages/omo-native/compiled-ca-trust.ts",
-    call: 'import * as nodeTls from "node:tls"',
+    file: "packages/omo-senpi/plugin/runtime/bunshin-ts/sdk.js",
+    call: "t.connect()",
     count: 1,
-    reason: "no connection and no host: the module reads getCACertificates and sets setDefaultCACertificates at engine startup (#10215); it never calls connect, createConnection, TLSSocket, createSecureContext or checkServerIdentity.",
+    reason:
+      'no TLS and no remote host: `t` is the SDK\'s relay transport, whose connect() opens the local device service through node:net createConnection({ path: <stateDir>/<socket> }) or, on Windows, { host: "127.0.0.1", port } (vendor/bunshin-ts-relay/index.js:766); the bundle imports no node:tls/https/http2 and has no wss URL (#12258, senpi#3078).',
   },
+  ...["omo-codex", "omo-senpi"].flatMap((edition) =>
+    ["https", "tls"].map((module) => ({
+      file: `packages/${edition}/plugin/skills/browser/runtime/omowright/index.js`,
+      call: `__require("${module}")`,
+      count: 1,
+      reason:
+        "bundled ws@8.21.3 acquisition: request options and tls.connect(options) derive host/servername from new URL(address).hostname; the connector call remains independently pinned (omowright#40, senpi#3078).",
+    })),
+  ),
   {
     file: "packages/omo-native/trust-acquisition.ts",
     call: 'import { getCACertificates} from "node:tls"',
     count: 1,
-    reason: "no connection and no host: the launcher trust importer reads getCACertificates(\"bundled\") only to pass Bun's compiled-in roots to the Windows trust helper on stdin (#10762, design 4.2); it never calls connect, createConnection, TLSSocket, createSecureContext or checkServerIdentity (senpi#3078).",
+    reason:
+      'no connection and no host: the launcher trust importer reads getCACertificates("bundled") only to pass Bun\'s compiled-in roots to the Windows trust helper on stdin (#10762, design 4.2); it never calls connect, createConnection, TLSSocket, createSecureContext or checkServerIdentity (senpi#3078).',
   },
   {
     file: "packages/omo-native/trust-stage.ts",
     call: 'import { getCACertificates} from "node:tls"',
     count: 1,
-    reason: "no connection and no host: the launcher trust stage reads getCACertificates(\"extra\"), Bun's own parse of the native NODE_EXTRA_CA_CERTS, to compare the loaded set at adoption and capture user extras (#10762, design 5.2, 5.9); it never calls connect, createConnection, TLSSocket, createSecureContext or checkServerIdentity (senpi#3078).",
+    reason:
+      'no connection and no host: the launcher trust stage reads getCACertificates("extra"), Bun\'s own parse of the native NODE_EXTRA_CA_CERTS, to compare the loaded set at adoption and capture user extras (#10762, design 5.2, 5.9); it never calls connect, createConnection, TLSSocket, createSecureContext or checkServerIdentity (senpi#3078).',
   },
   {
     file: "packages/omo-codex/plugin/scripts/auto-update-release-notes.mjs",
     call: 'import { get as httpsGet } from "node:https"',
     count: 1,
-    reason: "this acquisition supplies the single pinned httpsGet(url, ...) call below; https.get parses the literal api.github.com authority before TLS (senpi#3078).",
+    reason:
+      "this acquisition supplies the single pinned httpsGet(url, ...) call below; https.get parses the literal api.github.com authority before TLS (senpi#3078).",
   },
   {
     file: "packages/omo-codex/plugin/scripts/auto-update-release-notes.mjs",
-    call: "httpsGet(url, { headers: { Accept: \"application/vnd.github+json\", \"User-Agent\": \"lazycodex-auto-update\", }, }, (response) => { if (response.statusCode !== 200) { response.resume(); resolve(undefined); return; } let body = \"\"; response.setEncoding(\"utf8\"); response.on(\"data\", (chunk) => { body += chunk; if (body.length > 128_000) request.destroy(); }); response.on(\"end\", () => { try { const parsed = JSON.parse(body); resolve(typeof parsed.body === \"string\" && parsed.body.trim() ? truncateReleaseNotes(parsed.body) : undefined); } catch (error) { if (error instanceof Error) { resolve(undefined); return; } throw error; } }); })",
+    call: 'httpsGet(url, { headers: { Accept: "application/vnd.github+json", "User-Agent": "lazycodex-auto-update", }, }, (response) => { if (response.statusCode !== 200) { response.resume(); resolve(undefined); return; } let body = ""; response.setEncoding("utf8"); response.on("data", (chunk) => { body += chunk; if (body.length > 128_000) request.destroy(); }); response.on("end", () => { try { const parsed = JSON.parse(body); resolve(typeof parsed.body === "string" && parsed.body.trim() ? truncateReleaseNotes(parsed.body) : undefined); } catch (error) { if (error instanceof Error) { resolve(undefined); return; } throw error; } }); })',
     count: 1,
-    reason: "the only outbound call; the url argument is the api.github.com template prefix built in fetchGithubReleaseNotes (repo and version interpolate into the path, not the host) and https.get URL-parses it before TLS (senpi#3078).",
+    reason:
+      "the only outbound call; the url argument is the api.github.com template prefix built in fetchGithubReleaseNotes (repo and version interpolate into the path, not the host) and https.get URL-parses it before TLS (senpi#3078).",
   },
   {
     file: "packages/omo-codex/plugin/skills/browser/runtime/omowright/index.js",
     call: "tls.connect(options)",
     count: 1,
-    reason: "bundled ws@8.21.3 WebSocket client: host and servername come from new URL(address).hostname (ws/lib/websocket.js:703-758,1083-1090); verified on Bun 1.4.2 in omowright#40",
+    reason:
+      "bundled ws@8.21.3 WebSocket client: host and servername come from new URL(address).hostname (ws/lib/websocket.js:703-758,1083-1090); verified on Bun 1.4.2 in omowright#40",
   },
   {
     file: "packages/omo-senpi/plugin/skills/browser/runtime/omowright/index.js",
     call: "tls.connect(options)",
     count: 1,
-    reason: "bundled ws@8.21.3 WebSocket client: host and servername come from new URL(address).hostname (ws/lib/websocket.js:703-758,1083-1090); verified on Bun 1.4.2 in omowright#40",
+    reason:
+      "bundled ws@8.21.3 WebSocket client: host and servername come from new URL(address).hostname (ws/lib/websocket.js:703-758,1083-1090); verified on Bun 1.4.2 in omowright#40",
   },
 ]
 
@@ -91,7 +101,8 @@ const OFFENDER_GUIDANCE = [
   "Otherwise route the request through fetch(), which parses the URL.",
 ].join("\n")
 
-const STALE_GUIDANCE = "Every allowlist entry must match the shipped tree: file scanned, normalized call text found, occurrence count exact, reason present."
+const STALE_GUIDANCE =
+  "Every allowlist entry must match the shipped tree: file scanned, normalized call text found, occurrence count exact, reason present."
 
 describe("no raw TLS client calls in shipped source (CVE-2026-48618, Bun 1.4.2)", () => {
   test("#given raw client samples #when scanned #then sampled client patterns, module forms and bindings are caught with line numbers", () => {
@@ -99,11 +110,11 @@ describe("no raw TLS client calls in shipped source (CVE-2026-48618, Bun 1.4.2)"
       ['module access: import from "node:tls"', 'import { connect } from "node:tls";'],
       ['module access: import from "node:https"', 'import { createServer } from "node:https";'],
       ['module access: import from "node:http2"', 'import { createServer } from "node:http2"; createServer(h);'],
-      ["tls.connect(", 'await tls.connect({ host: hostname, port: 443 });'],
+      ["tls.connect(", "await tls.connect({ host: hostname, port: 443 });"],
       ["https.request(", "https.request(url, onResponse);"],
       ["https.get(", "https.get(url, onResponse);"],
       ["http2.connect(", 'http2.connect("https://example.com");'],
-      ["Bun.connect(", 'Bun.connect({ hostname: host, port: 1 });'],
+      ["Bun.connect(", "Bun.connect({ hostname: host, port: 1 });"],
       ["new https.Agent(", "new https.Agent({ keepAlive: true });"],
       ["new tls.TLSSocket(", "new tls.TLSSocket(socket, options);"],
       ["checkServerIdentity", "const options = { checkServerIdentity: () => undefined };"],
@@ -116,16 +127,25 @@ describe("no raw TLS client calls in shipped source (CVE-2026-48618, Bun 1.4.2)"
       ['re-export from "node:https"', 'export * from "node:https";'],
       ['module access: import from "node:http2"', 'import * as http2 from "node:http2";'],
       ['module access: import from "node:https"', 'import https from "node:https";'],
-      ['binding call: httpsGet (imported from "node:https")', 'import { get as httpsGet } from "node:https";\nhttpsGet(url);'],
+      [
+        'binding call: httpsGet (imported from "node:https")',
+        'import { get as httpsGet } from "node:https";\nhttpsGet(url);',
+      ],
       ['binding call: connect (imported from "node:http2")', 'import { connect } from "node:http2";\nconnect(host);'],
       ['binding call: h2c (imported from "node:http2")', 'import { connect as h2c } from "node:http2";\nh2c(host);'],
-      ['binding call: TLSSocket (imported from "node:tls")', 'import { TLSSocket } from "node:tls";\nnew TLSSocket(sock);'],
+      [
+        'binding call: TLSSocket (imported from "node:tls")',
+        'import { TLSSocket } from "node:tls";\nnew TLSSocket(sock);',
+      ],
       ['template import of "node:tls"', "const tls = await import(`node:tls`);"],
       ['template require of "node:https"', "const m = require(`node:https`);"],
     ]
     for (const [id, sample] of samples) {
       const hits = findRawTlsClients(sample)
-      expect(hits.some((hit) => hit.id === id), "sample not caught as " + id + ": " + sample).toBe(true)
+      expect(
+        hits.some((hit) => hit.id === id),
+        "sample not caught as " + id + ": " + sample,
+      ).toBe(true)
     }
     const positioned = findRawTlsClients('const a = 1;\n\nawait tls.connect({ host: "x", port: 1 });')
     expect(positioned).toEqual([{ line: 3, id: "tls.connect(", text: 'tls.connect({ host: "x", port: 1})' }])
@@ -251,21 +271,36 @@ describe("no raw TLS client calls in shipped source (CVE-2026-48618, Bun 1.4.2)"
 
     test("#given a named import and call pinned separately #when evaluated #then new calls still fail", () => {
       const entries: AllowlistEntry[] = [
-        { file: "pkg/b.mjs", call: 'import { get as httpsGet } from "node:https"', count: 1, reason: "supplies the pinned URL client" },
+        {
+          file: "pkg/b.mjs",
+          call: 'import { get as httpsGet } from "node:https"',
+          count: 1,
+          reason: "supplies the pinned URL client",
+        },
         { file: "pkg/b.mjs", call: 'httpsGet(url, { redaction: "none" })', count: 1, reason: "host is a literal" },
       ]
       const exact: ScanItem[] = [
-        { path: "pkg/b.mjs", content: 'import { get as httpsGet } from "node:https";\nhttpsGet(url, { redaction: "none" });\n' },
+        {
+          path: "pkg/b.mjs",
+          content: 'import { get as httpsGet } from "node:https";\nhttpsGet(url, { redaction: "none" });\n',
+        },
       ]
       expect(evaluateShippedSource(exact, entries)).toEqual({ offenders: [], stale: [] })
       const extra: ScanItem[] = [
-        { path: "pkg/b.mjs", content: 'import { get as httpsGet } from "node:https";\nhttpsGet(url, { redaction: "none" });\nhttpsGet({ host, servername: host });\n' },
+        {
+          path: "pkg/b.mjs",
+          content:
+            'import { get as httpsGet } from "node:https";\nhttpsGet(url, { redaction: "none" });\nhttpsGet({ host, servername: host });\n',
+        },
       ]
       expect(evaluateShippedSource(extra, entries).offenders.length > 0, "new binding call must fail").toBe(true)
       const importPinned: AllowlistEntry[] = [
         { file: "pkg/b.mjs", call: 'import { get as httpsGet } from "node:https"', count: 1, reason: "x" },
       ]
-      expect(evaluateShippedSource(exact, importPinned).offenders.length > 0, "pinning an acquisition does not exempt its calls").toBe(true)
+      expect(
+        evaluateShippedSource(exact, importPinned).offenders.length > 0,
+        "pinning an acquisition does not exempt its calls",
+      ).toBe(true)
     })
 
     test("#given reformatted calls #when evaluated #then they still match the pinned text", () => {
@@ -275,7 +310,6 @@ describe("no raw TLS client calls in shipped source (CVE-2026-48618, Bun 1.4.2)"
       expect(evaluateShippedSource(scan, [pinnedCallEntry()])).toEqual({ offenders: [], stale: [] })
     })
   })
-
 
   test("#given shipped production source #when scanned #then no raw TLS client call exists outside the reviewed allowlist", () => {
     const files = collectShippedSourceFiles()

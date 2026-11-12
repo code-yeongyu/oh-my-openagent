@@ -32,7 +32,12 @@ export function parseModelSuggestion(error: unknown): ModelSuggestionInfo | null
     if (readProperty(error, "name") === "ProviderModelNotFoundError") {
       const data = readProperty(error, "data")
       const suggestions = readProperty(data, "suggestions")
-      if (typeof data === "object" && data !== null && Array.isArray(suggestions) && typeof suggestions[0] === "string") {
+      if (
+        typeof data === "object" &&
+        data !== null &&
+        Array.isArray(suggestions) &&
+        typeof suggestions[0] === "string"
+      ) {
         return {
           providerID: String(readProperty(data, "providerID") ?? ""),
           modelID: String(readProperty(data, "modelID") ?? ""),

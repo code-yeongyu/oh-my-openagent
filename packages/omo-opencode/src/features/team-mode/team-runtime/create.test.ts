@@ -18,10 +18,7 @@ import * as sweepStaleSessionsModule from "../team-layout-tmux/sweep-stale-team-
 import { loadRuntimeState, transitionRuntimeState } from "../team-state-store/store"
 import { clearTeamSessionRegistry, lookupTeamSession } from "../team-session-registry"
 import type { TeamSpec } from "../types"
-import {
-  clearSessionTeamRunCleanupRegistry,
-  getSessionCreatedTeamRunIds,
-} from "./session-cleanup"
+import { clearSessionTeamRunCleanupRegistry, getSessionCreatedTeamRunIds } from "./session-cleanup"
 import { createLaunchConcurrencyProbe } from "../test-support/async-test-helpers"
 
 const resolveMemberMock = mock(async (member: TeamSpec["members"][number]) => ({
@@ -36,7 +33,11 @@ mock.module("./resolve-member", () => ({ resolveMember: resolveMemberMock }))
 const { createTeamRun, TeamRunCreateError } = await import("./create")
 
 function createConfig(baseDir: string, maxParallelMembers = 4) {
-  return TeamModeConfigSchema.parse({ base_dir: baseDir, max_parallel_members: maxParallelMembers, max_wall_clock_minutes: 1 })
+  return TeamModeConfigSchema.parse({
+    base_dir: baseDir,
+    max_parallel_members: maxParallelMembers,
+    max_wall_clock_minutes: 1,
+  })
 }
 
 function createSpec(memberCount: number, withWorktrees = false): TeamSpec {
@@ -58,9 +59,14 @@ function createSpec(memberCount: number, withWorktrees = false): TeamSpec {
   }
 }
 
-function createContext(baseDir: string, manager: BackgroundManager): ExecutorContext & { client: { session: { create: ReturnType<typeof mock> } } } {
+function createContext(
+  baseDir: string,
+  manager: BackgroundManager,
+): ExecutorContext & { client: { session: { create: ReturnType<typeof mock> } } } {
   return {
-    client: { session: { create: mock(async () => ({ data: { id: "forbidden" } })) } } as ExecutorContext["client"] & { session: { create: ReturnType<typeof mock> } },
+    client: { session: { create: mock(async () => ({ data: { id: "forbidden" } })) } } as ExecutorContext["client"] & {
+      session: { create: ReturnType<typeof mock> }
+    },
     manager,
     directory: baseDir,
   }
@@ -71,7 +77,9 @@ function createManager(
   launchImpl: (input: LaunchInput) => Promise<BackgroundTask>,
   getTaskImpl: (taskId: string) => BackgroundTask | undefined = () => undefined,
 ): { manager: BackgroundManager; launchMock: ReturnType<typeof mock>; cancelTaskMock: ReturnType<typeof mock> } {
-  const manager = new BackgroundManager({ pluginContext: { client: {} as ExecutorContext["client"], directory: baseDir } as PluginInput })
+  const manager = new BackgroundManager({
+    pluginContext: { client: {} as ExecutorContext["client"], directory: baseDir } as PluginInput,
+  })
   const launchMock = mock((input: LaunchInput) => launchImpl(input))
   const getTaskMock = mock((taskId: string) => getTaskImpl(taskId))
   const cancelTaskMock = mock(async () => true)
@@ -110,7 +118,9 @@ describe("createTeamRun", () => {
 
   afterAll(async () => {
     clearSessionTeamRunCleanupRegistry()
-    await Promise.all(temporaryDirectories.splice(0).map(async (directoryPath) => rm(directoryPath, { recursive: true, force: true })))
+    await Promise.all(
+      temporaryDirectories.splice(0).map(async (directoryPath) => rm(directoryPath, { recursive: true, force: true })),
+    )
   })
 
   test("spawns 3 members through BackgroundManager.launch without direct session creation", async () => {
@@ -118,7 +128,11 @@ describe("createTeamRun", () => {
     const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-create-"))
     temporaryDirectories.push(baseDir)
     let launchCount = 0
-    const { manager, launchMock } = createManager(baseDir, async () => ({ id: `task-${++launchCount}`, sessionId: `session-${launchCount}`, status: "running" } as BackgroundTask))
+    const { manager, launchMock } = createManager(
+      baseDir,
+      async () =>
+        ({ id: `task-${++launchCount}`, sessionId: `session-${launchCount}`, status: "running" }) as BackgroundTask,
+    )
     const context = createContext(baseDir, manager)
 
     // when
@@ -129,17 +143,28 @@ describe("createTeamRun", () => {
     expect(context.client.session.create).toHaveBeenCalledTimes(0)
     expect(runtimeState.status).toBe("active")
     expect(runtimeState.members.map((member) => member.sessionId)).toEqual(["session-1", "session-2", "session-3"])
-    expect((launchMock.mock.calls as Array<[LaunchInput]>).every(([input]) => input.suppressTmuxSpawn === true)).toBe(true)
+    expect((launchMock.mock.calls as Array<[LaunchInput]>).every(([input]) => input.suppressTmuxSpawn === true)).toBe(
+      true,
+    )
   })
 
   test("#given a new team runtime #when createTeamRun succeeds #then it registers the run for session cleanup", async () => {
     // given
     const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-session-cleanup-"))
     temporaryDirectories.push(baseDir)
-    const { manager } = createManager(baseDir, async () => ({ id: "task-1", sessionId: "session-1", status: "running" } as BackgroundTask))
+    const { manager } = createManager(
+      baseDir,
+      async () => ({ id: "task-1", sessionId: "session-1", status: "running" }) as BackgroundTask,
+    )
 
     // when
-    const runtimeState = await createTeamRun(createSpec(1), "lead-session", createContext(baseDir, manager), createConfig(baseDir), manager)
+    const runtimeState = await createTeamRun(
+      createSpec(1),
+      "lead-session",
+      createContext(baseDir, manager),
+      createConfig(baseDir),
+      manager,
+    )
 
     // then
     expect(getSessionCreatedTeamRunIds()).toEqual([runtimeState.teamRunId])
@@ -176,7 +201,13 @@ describe("createTeamRun", () => {
     )
 
     // when
-    const runtimeState = await createTeamRun(createSpec(1), "lead-session", createContext(baseDir, manager), createConfig(baseDir), manager)
+    const runtimeState = await createTeamRun(
+      createSpec(1),
+      "lead-session",
+      createContext(baseDir, manager),
+      createConfig(baseDir),
+      manager,
+    )
 
     // then
     expect(runtimeState.members[0]?.sessionId).toBe("session-lineage")
@@ -192,20 +223,44 @@ describe("createTeamRun", () => {
     const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-subagent-type-"))
     temporaryDirectories.push(baseDir)
     let launchCount = 0
-    const { manager } = createManager(baseDir, async () => ({ id: `task-${++launchCount}`, sessionId: `session-${launchCount}`, status: "running" } as BackgroundTask))
+    const { manager } = createManager(
+      baseDir,
+      async () =>
+        ({ id: `task-${++launchCount}`, sessionId: `session-${launchCount}`, status: "running" }) as BackgroundTask,
+    )
 
     // when
-    const runtimeState = await createTeamRun(createSpec(3), "lead-session", createContext(baseDir, manager), createConfig(baseDir), manager)
+    const runtimeState = await createTeamRun(
+      createSpec(3),
+      "lead-session",
+      createContext(baseDir, manager),
+      createConfig(baseDir),
+      manager,
+    )
 
     // then
-    expect(runtimeState.members.map((member) => ({
-      name: member.name,
-      subagent_type: member.subagent_type,
-      model: member.model,
-    }))).toEqual([
-      { name: "member-1", subagent_type: "member-1-agent", model: { providerID: "openai", modelID: "gpt-5.6-luna-fast" } },
-      { name: "member-2", subagent_type: "member-2-agent", model: { providerID: "openai", modelID: "gpt-5.6-luna-fast" } },
-      { name: "member-3", subagent_type: "member-3-agent", model: { providerID: "openai", modelID: "gpt-5.6-luna-fast" } },
+    expect(
+      runtimeState.members.map((member) => ({
+        name: member.name,
+        subagent_type: member.subagent_type,
+        model: member.model,
+      })),
+    ).toEqual([
+      {
+        name: "member-1",
+        subagent_type: "member-1-agent",
+        model: { providerID: "openai", modelID: "gpt-5.6-luna-fast" },
+      },
+      {
+        name: "member-2",
+        subagent_type: "member-2-agent",
+        model: { providerID: "openai", modelID: "gpt-5.6-luna-fast" },
+      },
+      {
+        name: "member-3",
+        subagent_type: "member-3-agent",
+        model: { providerID: "openai", modelID: "gpt-5.6-luna-fast" },
+      },
     ])
   })
 
@@ -213,11 +268,15 @@ describe("createTeamRun", () => {
     // given
     const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-member-prompt-"))
     temporaryDirectories.push(baseDir)
-    const { manager, launchMock } = createManager(baseDir, async () => ({
-      id: "task-1",
-      sessionId: "session-1",
-      status: "running",
-    } as BackgroundTask))
+    const { manager, launchMock } = createManager(
+      baseDir,
+      async () =>
+        ({
+          id: "task-1",
+          sessionId: "session-1",
+          status: "running",
+        }) as BackgroundTask,
+    )
 
     // when
     await createTeamRun(createSpec(1), "lead-session", createContext(baseDir, manager), createConfig(baseDir), manager)
@@ -239,7 +298,13 @@ describe("createTeamRun", () => {
     })
 
     // when
-    const result = createTeamRun(createSpec(4), "lead-session", createContext(baseDir, manager), createConfig(baseDir), manager)
+    const result = createTeamRun(
+      createSpec(4),
+      "lead-session",
+      createContext(baseDir, manager),
+      createConfig(baseDir),
+      manager,
+    )
 
     // then
     try {
@@ -249,7 +314,11 @@ describe("createTeamRun", () => {
       if (!(error instanceof TeamRunCreateError)) throw error
       expect(error).toBeInstanceOf(TeamRunCreateError)
     }
-    expect((cancelTaskMock.mock.calls as Array<[string]>).map(([taskId]) => taskId)).toEqual(["task-3", "task-2", "task-1"])
+    expect((cancelTaskMock.mock.calls as Array<[string]>).map(([taskId]) => taskId)).toEqual([
+      "task-3",
+      "task-2",
+      "task-1",
+    ])
     expect((await loadSingleRuntimeState(baseDir)).status).toBe("failed")
     expect(getSessionCreatedTeamRunIds()).toEqual([])
   })
@@ -261,7 +330,13 @@ describe("createTeamRun", () => {
     const { manager } = createManager(baseDir, async () => Promise.reject("launch failed as string"))
 
     // when
-    const result = createTeamRun(createSpec(1), "lead-session", createContext(baseDir, manager), createConfig(baseDir), manager)
+    const result = createTeamRun(
+      createSpec(1),
+      "lead-session",
+      createContext(baseDir, manager),
+      createConfig(baseDir),
+      manager,
+    )
 
     // then
     try {
@@ -305,7 +380,11 @@ describe("createTeamRun", () => {
     const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-worktree-cwd-"))
     temporaryDirectories.push(baseDir)
     let launchCount = 0
-    const { manager, launchMock } = createManager(baseDir, async () => ({ id: `task-${++launchCount}`, sessionId: `session-${launchCount}`, status: "running" } as BackgroundTask))
+    const { manager, launchMock } = createManager(
+      baseDir,
+      async () =>
+        ({ id: `task-${++launchCount}`, sessionId: `session-${launchCount}`, status: "running" }) as BackgroundTask,
+    )
     const spec = createSpec(2, true)
 
     // when
@@ -327,7 +406,11 @@ describe("createTeamRun", () => {
     const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-no-worktree-cwd-"))
     temporaryDirectories.push(baseDir)
     let launchCount = 0
-    const { manager, launchMock } = createManager(baseDir, async () => ({ id: `task-${++launchCount}`, sessionId: `session-${launchCount}`, status: "running" } as BackgroundTask))
+    const { manager, launchMock } = createManager(
+      baseDir,
+      async () =>
+        ({ id: `task-${++launchCount}`, sessionId: `session-${launchCount}`, status: "running" }) as BackgroundTask,
+    )
     const spec = createSpec(2, false)
 
     // when
@@ -346,7 +429,11 @@ describe("createTeamRun", () => {
     const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-idempotent-"))
     temporaryDirectories.push(baseDir)
     let launchCount = 0
-    const { manager, launchMock } = createManager(baseDir, async () => ({ id: `task-${++launchCount}`, sessionId: `session-${launchCount}`, status: "running" } as BackgroundTask))
+    const { manager, launchMock } = createManager(
+      baseDir,
+      async () =>
+        ({ id: `task-${++launchCount}`, sessionId: `session-${launchCount}`, status: "running" }) as BackgroundTask,
+    )
     const spec = createSpec(2)
     const context = createContext(baseDir, manager)
 
@@ -364,15 +451,23 @@ describe("createTeamRun", () => {
     const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-unresolved-existing-"))
     temporaryDirectories.push(baseDir)
     let launchCount = 0
-    const { manager, launchMock } = createManager(baseDir, async () => ({ id: `task-${++launchCount}`, sessionId: `session-${launchCount}`, status: "running" } as BackgroundTask))
+    const { manager, launchMock } = createManager(
+      baseDir,
+      async () =>
+        ({ id: `task-${++launchCount}`, sessionId: `session-${launchCount}`, status: "running" }) as BackgroundTask,
+    )
     const spec = createSpec(1)
     const context = createContext(baseDir, manager)
     const config = createConfig(baseDir)
     const firstRuntime = await createTeamRun(spec, "lead-session", context, config, manager)
-    await transitionRuntimeState(firstRuntime.teamRunId, (currentState) => ({
-      ...currentState,
-      members: currentState.members.map((member) => ({ ...member, sessionId: undefined, status: "pending" })),
-    }), config)
+    await transitionRuntimeState(
+      firstRuntime.teamRunId,
+      (currentState) => ({
+        ...currentState,
+        members: currentState.members.map((member) => ({ ...member, sessionId: undefined, status: "pending" })),
+      }),
+      config,
+    )
 
     // when
     const secondRuntime = await createTeamRun(spec, "lead-session", context, config, manager)
@@ -396,7 +491,13 @@ describe("createTeamRun", () => {
     const { manager } = createManager(baseDir, async (input) => launchProbe.launch(input))
 
     // when
-    const run = createTeamRun(createSpec(8), "lead-session", createContext(baseDir, manager), createConfig(baseDir, launchLimit), manager)
+    const run = createTeamRun(
+      createSpec(8),
+      "lead-session",
+      createContext(baseDir, manager),
+      createConfig(baseDir, launchLimit),
+      manager,
+    )
     try {
       const firstBatch = await launchProbe.waitForFirstBatch()
       await launchProbe.releaseAndWaitForCompletion(run)
@@ -419,11 +520,15 @@ describe("createTeamRun", () => {
     const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-caller-lead-"))
     temporaryDirectories.push(baseDir)
     let launchCount = 0
-    const { manager, launchMock } = createManager(baseDir, async (input) => ({
-      id: `task-${++launchCount}`,
-      sessionId: `${input.agent}-session-${launchCount}`,
-      status: "running",
-    } as BackgroundTask))
+    const { manager, launchMock } = createManager(
+      baseDir,
+      async (input) =>
+        ({
+          id: `task-${++launchCount}`,
+          sessionId: `${input.agent}-session-${launchCount}`,
+          status: "running",
+        }) as BackgroundTask,
+    )
     const spec: TeamSpec = {
       version: 1,
       name: "alpha-team",
@@ -431,7 +536,14 @@ describe("createTeamRun", () => {
       leadAgentId: "lead",
       members: [
         { kind: "subagent_type", name: "lead", subagent_type: "sisyphus", backendType: "in-process", isActive: true },
-        { kind: "category", name: "member-1", category: "quick", prompt: "prompt-1", backendType: "in-process", isActive: true },
+        {
+          kind: "category",
+          name: "member-1",
+          category: "quick",
+          prompt: "prompt-1",
+          backendType: "in-process",
+          isActive: true,
+        },
       ],
     }
 
@@ -461,11 +573,15 @@ describe("createTeamRun", () => {
     // given
     const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-caller-lead-pin-"))
     temporaryDirectories.push(baseDir)
-    const { manager } = createManager(baseDir, async (input) => ({
-      id: `task-${input.agent}`,
-      sessionId: `${input.agent}-session`,
-      status: "running",
-    } as BackgroundTask))
+    const { manager } = createManager(
+      baseDir,
+      async (input) =>
+        ({
+          id: `task-${input.agent}`,
+          sessionId: `${input.agent}-session`,
+          status: "running",
+        }) as BackgroundTask,
+    )
     const spec: TeamSpec = {
       version: 1,
       name: "alpha-team",
@@ -473,7 +589,14 @@ describe("createTeamRun", () => {
       leadAgentId: "lead",
       members: [
         { kind: "subagent_type", name: "lead", subagent_type: "sisyphus", backendType: "in-process", isActive: true },
-        { kind: "category", name: "worker", category: "quick", prompt: "work hard", backendType: "in-process", isActive: true },
+        {
+          kind: "category",
+          name: "worker",
+          category: "quick",
+          prompt: "work hard",
+          backendType: "in-process",
+          isActive: true,
+        },
       ],
     }
 
@@ -500,11 +623,15 @@ describe("createTeamRun", () => {
     const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-explicit-lead-"))
     temporaryDirectories.push(baseDir)
     let launchCount = 0
-    const { manager, launchMock } = createManager(baseDir, async (input) => ({
-      id: `task-${++launchCount}`,
-      sessionId: `${input.agent}-session-${launchCount}`,
-      status: "running",
-    } as BackgroundTask))
+    const { manager, launchMock } = createManager(
+      baseDir,
+      async (input) =>
+        ({
+          id: `task-${++launchCount}`,
+          sessionId: `${input.agent}-session-${launchCount}`,
+          status: "running",
+        }) as BackgroundTask,
+    )
     const spec: TeamSpec = {
       version: 1,
       name: "alpha-team",
@@ -512,7 +639,14 @@ describe("createTeamRun", () => {
       leadAgentId: "captain",
       members: [
         { kind: "subagent_type", name: "captain", subagent_type: "atlas", backendType: "in-process", isActive: true },
-        { kind: "category", name: "member-1", category: "quick", prompt: "prompt-1", backendType: "in-process", isActive: true },
+        {
+          kind: "category",
+          name: "member-1",
+          category: "quick",
+          prompt: "prompt-1",
+          backendType: "in-process",
+          isActive: true,
+        },
       ],
     }
 
@@ -543,16 +677,35 @@ describe("createTeamRun", () => {
     const defaultDir = await mkdtemp(path.join(tmpdir(), "team-runtime-sweep-default-"))
     const tmuxDir = await mkdtemp(path.join(tmpdir(), "team-runtime-sweep-tmux-"))
     temporaryDirectories.push(defaultDir, tmuxDir)
-    const { manager: defaultManager } = createManager(defaultDir, async () => ({ id: "task-1", sessionId: "session-1", status: "running" } as BackgroundTask))
-    const { manager: tmuxManager } = createManager(tmuxDir, async () => ({ id: "task-1", sessionId: "session-1", status: "running" } as BackgroundTask))
+    const { manager: defaultManager } = createManager(
+      defaultDir,
+      async () => ({ id: "task-1", sessionId: "session-1", status: "running" }) as BackgroundTask,
+    )
+    const { manager: tmuxManager } = createManager(
+      tmuxDir,
+      async () => ({ id: "task-1", sessionId: "session-1", status: "running" }) as BackgroundTask,
+    )
     const tmuxMgr = { getServerUrl: () => "http://127.0.0.1:1", multiplexer: "tmux" } as unknown as TmuxSessionManager
     const herdrSweepSpy = spyOn(sweepStaleSessionsModule, "sweepStaleHerdrTeamWorkspaces").mockResolvedValue([])
     const tmuxSweepSpy = spyOn(sweepStaleSessionsModule, "sweepStaleTeamSessions").mockResolvedValue([])
 
     try {
       // when
-      await createTeamRun(createSpec(1), "lead-session", createContext(defaultDir, defaultManager), createConfig(defaultDir), defaultManager)
-      await createTeamRun(createSpec(1), "lead-session", createContext(tmuxDir, tmuxManager), createConfig(tmuxDir), tmuxManager, tmuxMgr)
+      await createTeamRun(
+        createSpec(1),
+        "lead-session",
+        createContext(defaultDir, defaultManager),
+        createConfig(defaultDir),
+        defaultManager,
+      )
+      await createTeamRun(
+        createSpec(1),
+        "lead-session",
+        createContext(tmuxDir, tmuxManager),
+        createConfig(tmuxDir),
+        tmuxManager,
+        tmuxMgr,
+      )
 
       // then: the tmux sweep still runs, herdr is never spawned
       expect(tmuxSweepSpy).toHaveBeenCalledTimes(2)
@@ -567,14 +720,24 @@ describe("createTeamRun", () => {
     // given
     const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-sweep-herdr-"))
     temporaryDirectories.push(baseDir)
-    const { manager } = createManager(baseDir, async () => ({ id: "task-1", sessionId: "session-1", status: "running" } as BackgroundTask))
+    const { manager } = createManager(
+      baseDir,
+      async () => ({ id: "task-1", sessionId: "session-1", status: "running" }) as BackgroundTask,
+    )
     const tmuxMgr = { getServerUrl: () => "http://127.0.0.1:1", multiplexer: "herdr" } as unknown as TmuxSessionManager
     const herdrSweepSpy = spyOn(sweepStaleSessionsModule, "sweepStaleHerdrTeamWorkspaces").mockResolvedValue([])
     const tmuxSweepSpy = spyOn(sweepStaleSessionsModule, "sweepStaleTeamSessions").mockResolvedValue([])
 
     try {
       // when
-      await createTeamRun(createSpec(1), "lead-session", createContext(baseDir, manager), createConfig(baseDir), manager, tmuxMgr)
+      await createTeamRun(
+        createSpec(1),
+        "lead-session",
+        createContext(baseDir, manager),
+        createConfig(baseDir),
+        manager,
+        tmuxMgr,
+      )
 
       // then
       expect(herdrSweepSpy).toHaveBeenCalledTimes(1)

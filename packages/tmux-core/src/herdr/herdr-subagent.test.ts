@@ -30,9 +30,7 @@ function errorEnvelope(code: string, message: string): HerdrExecResult {
   return { success: false, output: JSON.stringify({ id: "cli:test", error: { code, message } }), error: message, code }
 }
 
-function fakeOps(
-  script: (args: ReadonlyArray<string>) => HerdrExecResult,
-): { deps: HerdrOpsDeps; calls: string[][] } {
+function fakeOps(script: (args: ReadonlyArray<string>) => HerdrExecResult): { deps: HerdrOpsDeps; calls: string[][] } {
   const calls: string[][] = []
   const run: RunHerdrCommand = async (args) => {
     calls.push([...args])
@@ -95,17 +93,20 @@ describe("spawnHerdrSubagentTab", () => {
 
       const commands = calls.map((call) => `${call[0]} ${call[1] ?? ""}`.trim())
       // discovery finds no omo-agents workspace, so it creates one
-      expect(commands).toEqual([
-        "workspace list",
-        "workspace create",
-        "tab create",
-        "pane run",
-      ])
+      expect(commands).toEqual(["workspace list", "workspace create", "tab create", "pane run"])
       const create = calls[1]
       expect(create).toEqual(["workspace", "create", "--cwd", "/repo", "--label", "omo-agents-4242", "--no-focus"])
       const tab = calls[2]
       expect(tab.slice(0, 9)).toEqual([
-        "tab", "create", "--workspace", "w9", "--cwd", "/repo", "--label", "research worker", "--env",
+        "tab",
+        "create",
+        "--workspace",
+        "w9",
+        "--cwd",
+        "/repo",
+        "--label",
+        "research worker",
+        "--env",
       ])
       // password auth travels as a single-use 0600 file path, never as the
       // password itself (--env argv is world-readable in the process list)
@@ -122,7 +123,9 @@ describe("spawnHerdrSubagentTab", () => {
       // the pane run payload is exactly the attach string activateTmuxPane
       // uses, and it sources the same file before attaching
       expect(calls[3]).toEqual([
-        "pane", "run", "w9:p2",
+        "pane",
+        "run",
+        "w9:p2",
         buildTmuxAttachCommand("http://127.0.0.1:4096", "sess-1", "/repo"),
       ])
       expect(calls[3][3]).toContain("opencode attach")
@@ -139,70 +142,77 @@ describe("spawnHerdrSubagentTab", () => {
     }
   })
 
-  test.skipIf(process.platform === "win32")("a pane shell consumes the handoff: password arrives via the 0600 file and the file is unlinked before attach", async () => {
-    // given
-    const authPassword = process.env["OPENCODE_SERVER_PASSWORD"]
-    process.env["OPENCODE_SERVER_PASSWORD"] = fixturePassword
-    const cleanupAuthDirectory = createPaneAuthDirectory()
-    const sandbox = mkdtempSync(join(tmpdir(), "omo-herdr-auth-"))
-    let passwordFile: string | undefined
-    try {
-      const { deps, calls } = fakeOps((args) => {
-        if (args[0] === "workspace" && args[1] === "list") return ok(envelope({ workspaces: [] }))
-        if (args[0] === "workspace" && args[1] === "create") {
-          return ok(envelope({ workspace: { workspace_id: "w9" }, root_pane: { pane_id: "w9:p1" } }))
-        }
-        if (args[0] === "tab" && args[1] === "create") {
-          return ok(envelope({ tab: { tab_id: "w9:t2" }, root_pane: { pane_id: "w9:p2" } }))
-        }
-        return ok("")
-      })
+  test.skipIf(process.platform === "win32")(
+    "a pane shell consumes the handoff: password arrives via the 0600 file and the file is unlinked before attach",
+    async () => {
+      // given
+      const authPassword = process.env["OPENCODE_SERVER_PASSWORD"]
+      process.env["OPENCODE_SERVER_PASSWORD"] = fixturePassword
+      const cleanupAuthDirectory = createPaneAuthDirectory()
+      const sandbox = mkdtempSync(join(tmpdir(), "omo-herdr-auth-"))
+      let passwordFile: string | undefined
+      try {
+        const { deps, calls } = fakeOps((args) => {
+          if (args[0] === "workspace" && args[1] === "list") return ok(envelope({ workspaces: [] }))
+          if (args[0] === "workspace" && args[1] === "create") {
+            return ok(envelope({ workspace: { workspace_id: "w9" }, root_pane: { pane_id: "w9:p1" } }))
+          }
+          if (args[0] === "tab" && args[1] === "create") {
+            return ok(envelope({ tab: { tab_id: "w9:t2" }, root_pane: { pane_id: "w9:p2" } }))
+          }
+          return ok("")
+        })
 
-      const result = await spawnHerdrSubagentTab(spawnArgs, deps)
-      expect(result.success).toBe(true)
-      const tab = calls.find((call) => call[0] === "tab" && call[1] === "create")
-      const fileArg = tab?.find((arg) => arg.startsWith("OPENCODE_SERVER_PASSWORD_FILE="))
-      passwordFile = fileArg?.slice("OPENCODE_SERVER_PASSWORD_FILE=".length)
-      if (!passwordFile) throw new Error("missing password file arg")
-      const paneRunCommand = calls.find((call) => call[0] === "pane" && call[1] === "run")?.[3]
-      if (!paneRunCommand) throw new Error("missing pane run command")
+        const result = await spawnHerdrSubagentTab(spawnArgs, deps)
+        expect(result.success).toBe(true)
+        const tab = calls.find((call) => call[0] === "tab" && call[1] === "create")
+        const fileArg = tab?.find((arg) => arg.startsWith("OPENCODE_SERVER_PASSWORD_FILE="))
+        passwordFile = fileArg?.slice("OPENCODE_SERVER_PASSWORD_FILE=".length)
+        if (!passwordFile) throw new Error("missing password file arg")
+        const paneRunCommand = calls.find((call) => call[0] === "pane" && call[1] === "run")?.[3]
+        if (!paneRunCommand) throw new Error("missing pane run command")
 
-      // a fake `opencode` proves the pane shell sees the password in its
-      // environment (not in argv) and that the one-use file is already gone
-      writeFileSync(join(sandbox, "opencode"), [
-        "#!/bin/sh",
-        `test "$OPENCODE_SERVER_PASSWORD" = "${fixturePassword}" || exit 2`,
-        'test ! -e "$OPENCODE_SERVER_PASSWORD_FILE" || exit 3',
-        `for arg in "$@"; do test "$arg" != "${fixturePassword}" || exit 4; done`,
-        "printf auth-ok",
-      ].join("\n"), { mode: 0o700 })
+        // a fake `opencode` proves the pane shell sees the password in its
+        // environment (not in argv) and that the one-use file is already gone
+        writeFileSync(
+          join(sandbox, "opencode"),
+          [
+            "#!/bin/sh",
+            `test "$OPENCODE_SERVER_PASSWORD" = "${fixturePassword}" || exit 2`,
+            'test ! -e "$OPENCODE_SERVER_PASSWORD_FILE" || exit 3',
+            `for arg in "$@"; do test "$arg" != "${fixturePassword}" || exit 4; done`,
+            "printf auth-ok",
+          ].join("\n"),
+          { mode: 0o700 },
+        )
 
-      // when
-      // simulate the pane shell: the --env vars are exported, the pane run
-      // payload is the command line the shell executes
-      const child = Bun.spawn(["/bin/sh", "-c", paneRunCommand], {
-        env: {
-          ...process.env,
-          PATH: `${sandbox}:${process.env.PATH ?? ""}`,
-          OPENCODE_SERVER_PASSWORD: "",
-          OPENCODE_SERVER_PASSWORD_FILE: passwordFile,
-        },
-        stdout: "pipe",
-        stderr: "pipe",
-      })
+        // when
+        // simulate the pane shell: the --env vars are exported, the pane run
+        // payload is the command line the shell executes
+        const child = Bun.spawn(["/bin/sh", "-c", paneRunCommand], {
+          env: {
+            ...process.env,
+            PATH: `${sandbox}:${process.env.PATH ?? ""}`,
+            OPENCODE_SERVER_PASSWORD: "",
+            OPENCODE_SERVER_PASSWORD_FILE: passwordFile,
+          },
+          stdout: "pipe",
+          stderr: "pipe",
+        })
 
-      // then
-      expect(await child.exited).toBe(0)
-      expect(await new Response(child.stdout).text()).toBe("auth-ok")
-      expect(existsSync(passwordFile)).toBe(false)
-    } finally {
-      cleanupAuthDirectory()
-      if (passwordFile) rmSync(passwordFile, { force: true })
-      rmSync(sandbox, { recursive: true, force: true })
-      if (authPassword === undefined) delete process.env["OPENCODE_SERVER_PASSWORD"]
-      else process.env["OPENCODE_SERVER_PASSWORD"] = authPassword
-    }
-  })
+        // then
+        expect(await child.exited).toBe(0)
+        expect(await new Response(child.stdout).text()).toBe("auth-ok")
+        expect(existsSync(passwordFile)).toBe(false)
+      } finally {
+        cleanupAuthDirectory()
+        if (passwordFile) rmSync(passwordFile, { force: true })
+        rmSync(sandbox, { recursive: true, force: true })
+        if (authPassword === undefined) delete process.env["OPENCODE_SERVER_PASSWORD"]
+        else process.env["OPENCODE_SERVER_PASSWORD"] = authPassword
+      }
+    },
+  )
 
   test("reuses a workspace discovered by exact label match without creating", async () => {
     // given
@@ -284,14 +294,18 @@ describe("herdrClosePaneIfExists", () => {
 describe("herdrListWorkspacesByLabelPrefix", () => {
   test("filters by the requested prefix only", async () => {
     // given
-    const { deps } = fakeOps(() => ok(envelope({
-      workspaces: [
-        { workspace_id: "w1", label: "wb-repricer" },
-        { workspace_id: "w2", label: "omo-team-abc" },
-        { workspace_id: "w3", label: "omo-agents-111" },
-        { workspace_id: "", label: "omo-agents-broken" },
-      ],
-    })))
+    const { deps } = fakeOps(() =>
+      ok(
+        envelope({
+          workspaces: [
+            { workspace_id: "w1", label: "wb-repricer" },
+            { workspace_id: "w2", label: "omo-team-abc" },
+            { workspace_id: "w3", label: "omo-agents-111" },
+            { workspace_id: "", label: "omo-agents-broken" },
+          ],
+        }),
+      ),
+    )
 
     // when
     const listed = await herdrListWorkspacesByLabelPrefix("omo-agents-", deps)
@@ -309,7 +323,9 @@ describe("isHerdrBinaryCallable", () => {
       writeFileSync(join(dir, "herdr"), "#!/bin/sh\n")
 
       // when / then
-      expect(isHerdrBinaryCallable({ HERDR_BIN_PATH: join(import.meta.dir, "herdr-subagent.test.ts"), PATH: "" })).toBe(true)
+      expect(isHerdrBinaryCallable({ HERDR_BIN_PATH: join(import.meta.dir, "herdr-subagent.test.ts"), PATH: "" })).toBe(
+        true,
+      )
       expect(isHerdrBinaryCallable({ PATH: dir })).toBe(true)
       expect(isHerdrBinaryCallable({ PATH: join(dir, "missing") })).toBe(false)
       expect(isHerdrBinaryCallable({ HERDR_BIN_PATH: "/nonexistent/herdr", PATH: "" })).toBe(false)
@@ -340,11 +356,13 @@ describe("sweepStaleHerdrAgentsWorkspacesWith", () => {
     const closed: string[] = []
 
     // when
-    const removed = await sweepStaleHerdrAgentsWorkspacesWith(baseDeps({
-      closeWorkspace: async (workspaceId) => {
-        closed.push(workspaceId)
-      },
-    }))
+    const removed = await sweepStaleHerdrAgentsWorkspacesWith(
+      baseDeps({
+        closeWorkspace: async (workspaceId) => {
+          closed.push(workspaceId)
+        },
+      }),
+    )
 
     // then
     // w1 (dead pid), w2 (dead pid with manager suffix), w3 (dead pid) close;

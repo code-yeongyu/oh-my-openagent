@@ -86,10 +86,7 @@ export function waitForState(root, readValue, accepted, timeoutMs, signal) {
     }
     signal.addEventListener("abort", abort, { once: true })
     watcher = watch(root, { recursive: true }, check)
-    timer = setTimeout(
-      () => finish(undefined, new Error(`state transition timed out after ${timeoutMs}ms`)),
-      timeoutMs,
-    )
+    timer = setTimeout(() => finish(undefined, new Error(`state transition timed out after ${timeoutMs}ms`)), timeoutMs)
     queueMicrotask(check)
   })
 }

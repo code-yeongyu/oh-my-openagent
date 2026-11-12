@@ -86,7 +86,9 @@ function createFakeManager(records: MonitorRecord[], lines: OutputLine[]): Monit
       const streamFilteredLines = stream === "all" ? lines : lines.filter((line) => line.text.startsWith(stream))
       const sinceSequence = opts.since_sequence
       const sinceFilteredLines =
-        sinceSequence === undefined ? streamFilteredLines : streamFilteredLines.filter((line) => line.seq > sinceSequence)
+        sinceSequence === undefined
+          ? streamFilteredLines
+          : streamFilteredLines.filter((line) => line.seq > sinceSequence)
       const limitedLines = opts.limit === undefined ? sinceFilteredLines : sinceFilteredLines.slice(-opts.limit)
 
       return {
@@ -103,17 +105,20 @@ function createFakeManager(records: MonitorRecord[], lines: OutputLine[]): Monit
 describe("monitor_output tool", () => {
   test("returns only unmatched lines when stream is unmatched", async () => {
     //#given
-    const manager = createFakeManager([createRecord("mon_1")], [
-      createLine(1, "matched: boot"),
-      createLine(2, "unmatched: warning"),
-      createLine(3, "matched: done"),
-      createLine(4, "unmatched: trace"),
-    ])
+    const manager = createFakeManager(
+      [createRecord("mon_1")],
+      [
+        createLine(1, "matched: boot"),
+        createLine(2, "unmatched: warning"),
+        createLine(3, "matched: done"),
+        createLine(4, "unmatched: trace"),
+      ],
+    )
     const monitorOutput = createMonitorOutput(manager)
 
     //#when
     const result = parseMonitorOutput(
-      await monitorOutput.execute({ monitor_id: "mon_1", stream: "unmatched" }, createToolContext())
+      await monitorOutput.execute({ monitor_id: "mon_1", stream: "unmatched" }, createToolContext()),
     )
 
     //#then
@@ -123,17 +128,20 @@ describe("monitor_output tool", () => {
 
   test("returns only lines newer than since_sequence", async () => {
     //#given
-    const manager = createFakeManager([createRecord("mon_2")], [
-      createLine(4, "unmatched: old"),
-      createLine(5, "matched: boundary"),
-      createLine(6, "unmatched: new"),
-      createLine(7, "matched: latest"),
-    ])
+    const manager = createFakeManager(
+      [createRecord("mon_2")],
+      [
+        createLine(4, "unmatched: old"),
+        createLine(5, "matched: boundary"),
+        createLine(6, "unmatched: new"),
+        createLine(7, "matched: latest"),
+      ],
+    )
     const monitorOutput = createMonitorOutput(manager)
 
     //#when
     const result = parseMonitorOutput(
-      await monitorOutput.execute({ monitor_id: "mon_2", since_sequence: 5 }, createToolContext())
+      await monitorOutput.execute({ monitor_id: "mon_2", since_sequence: 5 }, createToolContext()),
     )
 
     //#then
@@ -143,17 +151,22 @@ describe("monitor_output tool", () => {
 
   test("caps returned lines with limit", async () => {
     //#given
-    const manager = createFakeManager([createRecord("mon_3")], [
-      createLine(1, "unmatched: one"),
-      createLine(2, "unmatched: two"),
-      createLine(3, "unmatched: three"),
-      createLine(4, "unmatched: four"),
-      createLine(5, "unmatched: five"),
-    ])
+    const manager = createFakeManager(
+      [createRecord("mon_3")],
+      [
+        createLine(1, "unmatched: one"),
+        createLine(2, "unmatched: two"),
+        createLine(3, "unmatched: three"),
+        createLine(4, "unmatched: four"),
+        createLine(5, "unmatched: five"),
+      ],
+    )
     const monitorOutput = createMonitorOutput(manager)
 
     //#when
-    const result = parseMonitorOutput(await monitorOutput.execute({ monitor_id: "mon_3", limit: 3 }, createToolContext()))
+    const result = parseMonitorOutput(
+      await monitorOutput.execute({ monitor_id: "mon_3", limit: 3 }, createToolContext()),
+    )
 
     //#then
     expect(result.lines.map((line) => line.seq)).toEqual([3, 4, 5])
@@ -187,7 +200,9 @@ describe("monitor_output tool", () => {
     const monitorOutput = createMonitorOutput(manager)
 
     //#when
-    const result = parseMonitorOutput(await monitorOutput.execute({ monitor_id: "missing_monitor" }, createToolContext()))
+    const result = parseMonitorOutput(
+      await monitorOutput.execute({ monitor_id: "missing_monitor" }, createToolContext()),
+    )
 
     //#then
     expect(result).toEqual({
@@ -208,14 +223,15 @@ describe("monitor_output tool", () => {
 
   test("does not expose output from another session's monitor", async () => {
     //#given
-    const manager = createFakeManager([createRecord("foreign_monitor", OTHER_SESSION_ID)], [
-      createLine(1, "unmatched: secret"),
-    ])
+    const manager = createFakeManager(
+      [createRecord("foreign_monitor", OTHER_SESSION_ID)],
+      [createLine(1, "unmatched: secret")],
+    )
     const monitorOutput = createMonitorOutput(manager)
 
     //#when
     const result = parseMonitorOutput(
-      await monitorOutput.execute({ monitor_id: "foreign_monitor" }, createToolContext(CALLING_SESSION_ID))
+      await monitorOutput.execute({ monitor_id: "foreign_monitor" }, createToolContext(CALLING_SESSION_ID)),
     )
 
     //#then

@@ -18,7 +18,12 @@ export type ThreadSummary = {
   /** Present only on a thread listed from disk because its endpoint stopped answering. */
   readonly error_note?: string
   /** The endpoint serving the thread: a host (`rpc_host`, with the session's routing id) or a terminal (`tui`). */
-  readonly endpoint?: { readonly kind: "rpc_host" | "tui"; readonly socket: string; readonly routing_id: string | null; readonly durable_session_id: string } | null
+  readonly endpoint?: {
+    readonly kind: "rpc_host" | "tui"
+    readonly socket: string
+    readonly routing_id: string | null
+    readonly durable_session_id: string
+  } | null
   readonly surface?: "tui" | "desktop" | "child" | "daemon" | null
   /** `false` when the endpoint is not answering; the fields then come from the session file. */
   readonly alive?: boolean
@@ -26,6 +31,10 @@ export type ThreadSummary = {
   readonly controls?: readonly ("send" | "read" | "rename" | "set_model" | "set_reasoning" | "interrupt")[]
   /** `thread_create` only: the initial skills attached to the new thread (`initial-skills.ts`). */
   readonly skills?: readonly string[]
+  /** The account device that holds the thread, when it is not this device's (A3: resolved from the account's session list). */
+  readonly device?: string
+  /** The thread's account-wide alias, usable instead of its id in every thread tool. */
+  readonly alias?: string
 }
 
 /**
@@ -37,7 +46,12 @@ export type ThreadResultSummary = ThreadSummary & { readonly link: string }
 export type ThreadDelivery =
   | { readonly kind: "steered"; readonly turn_id: string }
   | { readonly kind: "started"; readonly turn_id: string }
-  | { readonly kind: "queued"; readonly queue_position: number }
+  /** `waiting_on`: the receiver is parked on an approval a human must answer on that device (`device`, absent when this install has no device identity); the message runs after it. */
+  | {
+      readonly kind: "queued"
+      readonly queue_position: number
+      readonly waiting_on?: { readonly kind: "approval"; readonly device?: string }
+    }
   /** Gateway only: the target has no answering endpoint; the message is durable and its drain takes it on the next start. */
   | { readonly kind: "queued_offline"; readonly queue_position: number }
 
@@ -62,12 +76,31 @@ export type ThreadTranscriptItem = {
   readonly content: string
 }
 
+/**
+ * `alias_scope: "local"` (#13104): no account could hold the alias (`alias_unavailable` says why), so it is only the
+ * thread's name on its device - addressable there like any name, never account-wide.
+ */
+export type ThreadLocalAliasNote = {
+  readonly alias_scope?: "local"
+  readonly alias_unavailable?: "sign_in" | "no_registry" | "no_remote"
+}
+
 export type ThreadCreateResult =
-  | { readonly kind: "ok"; readonly thread: ThreadResultSummary; readonly deduplicated: boolean }
+  | ({
+      readonly kind: "ok"
+      readonly thread: ThreadResultSummary
+      readonly deduplicated: boolean
+    } & ThreadLocalAliasNote)
   | ThreadDataError
 
 export type ThreadListResult =
-  | { readonly kind: "ok"; readonly threads: readonly ThreadResultSummary[]; readonly scope: "workspace" | "all" }
+  | {
+      readonly kind: "ok"
+      readonly threads: readonly ThreadResultSummary[]
+      readonly scope: "workspace" | "all"
+      /** Set when the account's other devices could not be listed (A5: `relay_requires_paid_plan`, or the device service is unreachable). */
+      readonly remote_unavailable?: string
+    }
   | ThreadDataError
 
 export type ThreadReadResult =
@@ -82,6 +115,7 @@ export type ThreadReadResult =
       /** Set on the JSONL fallback for a thread whose endpoint is dead: the file may lag the session. */
       readonly source_incomplete?: boolean
       readonly error_note?: string
+      readonly device?: string
     }
   | ThreadDataError
 
@@ -91,13 +125,26 @@ export type ThreadSendResult =
       readonly thread_id: string
       readonly link: string
       readonly delivery: ThreadDelivery
-      readonly message_seq: number
+      /** The gateway row's sequence; absent for a session on another device, which has no row here. */
+      readonly message_seq?: number
       readonly deduplicated: boolean
+      readonly device?: string
     } & ThreadGatewayDeliveryFacts)
   | ThreadDataError
 
 export type ThreadInterruptResult =
-  | { readonly kind: "ok"; readonly thread_id: string; readonly turn_id?: string; readonly interrupted: boolean }
+  | {
+      readonly kind: "ok"
+      readonly thread_id: string
+      readonly turn_id?: string
+      readonly interrupted: boolean
+      readonly device?: string
+    }
+  | ThreadDataError
+
+/** `closed` is false when no live owner held the thread, so there was nothing to close. */
+export type ThreadCloseResult =
+  | { readonly kind: "ok"; readonly thread_id: string; readonly closed: boolean; readonly device?: string }
   | ThreadDataError
 
 export type ThreadHandoffResult =
@@ -106,8 +153,10 @@ export type ThreadHandoffResult =
       readonly thread: ThreadResultSummary
       readonly resolved_by: ThreadAddressResolution
       readonly delivery: ThreadDelivery
-      readonly message_seq: number
+      /** The gateway row's sequence; absent for a session on another device, which has no row here. */
+      readonly message_seq?: number
       readonly deduplicated: boolean
+      readonly device?: string
     } & ThreadGatewayDeliveryFacts)
   | ThreadDataError
 
@@ -116,22 +165,40 @@ export type ThreadThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" 
 export type ThreadReasoningScope = "session" | "turn"
 
 export type ThreadRenameResult =
-  | { readonly kind: "ok"; readonly thread_id: string; readonly name: string }
+  | ({
+      readonly kind: "ok"
+      readonly thread_id: string
+      readonly name: string
+      readonly alias?: string
+      readonly device?: string
+    } & ThreadLocalAliasNote)
   | ThreadDataError
 
 export type ThreadSetModelResult =
-  | { readonly kind: "ok"; readonly thread_id: string; readonly model: { readonly provider: string; readonly id: string } }
+  | {
+      readonly kind: "ok"
+      readonly thread_id: string
+      readonly model: { readonly provider: string; readonly id: string }
+      readonly device?: string
+    }
   | ThreadDataError
 
 export type ThreadSetReasoningResult =
-  | { readonly kind: "ok"; readonly thread_id: string; readonly level: ThreadThinkingLevel; readonly scope: ThreadReasoningScope }
+  | {
+      readonly kind: "ok"
+      readonly thread_id: string
+      readonly level: ThreadThinkingLevel
+      readonly scope: ThreadReasoningScope
+      readonly device?: string
+    }
   | ThreadDataError
 
 export type ThreadBinding = BindingRecord
 
 export type ThreadOutboxRow = OutboxRow
 
-export type ThreadBindResult = { readonly kind: "ok"; readonly binding: ThreadBinding; readonly deduplicated: boolean } | ThreadDataError
+export type ThreadBindResult =
+  { readonly kind: "ok"; readonly binding: ThreadBinding; readonly deduplicated: boolean } | ThreadDataError
 
 export type ThreadUnbindResult =
   | {
@@ -155,7 +222,9 @@ export type ThreadRebindResult =
     }
   | ThreadDataError
 
-export type ThreadBindingsResult = { readonly kind: "ok"; readonly bindings: readonly ThreadBinding[]; readonly next_cursor: string | null } | ThreadDataError
+export type ThreadBindingsResult =
+  | { readonly kind: "ok"; readonly bindings: readonly ThreadBinding[]; readonly next_cursor: string | null }
+  | ThreadDataError
 
 export type ThreadReportResult =
   | {
@@ -183,9 +252,13 @@ export type ThreadOutboxResult =
     }
   | ThreadDataError
 
-export type ThreadOutboxAckResult = { readonly kind: "ok"; readonly binding_id: string; readonly acked_cursor: number; readonly changed: boolean } | ThreadDataError
+export type ThreadOutboxAckResult =
+  | { readonly kind: "ok"; readonly binding_id: string; readonly acked_cursor: number; readonly changed: boolean }
+  | ThreadDataError
 
-export type ThreadAnswerResult = { readonly kind: "ok"; readonly binding_id: string; readonly cursor: number; readonly session_durable_id: string } | ThreadDataError
+export type ThreadAnswerResult =
+  | { readonly kind: "ok"; readonly binding_id: string; readonly cursor: number; readonly session_durable_id: string }
+  | ThreadDataError
 
 export type ThreadToolResult =
   | ThreadBindResult
@@ -201,6 +274,7 @@ export type ThreadToolResult =
   | ThreadReadResult
   | ThreadSendResult
   | ThreadInterruptResult
+  | ThreadCloseResult
   | ThreadHandoffResult
   | ThreadRenameResult
   | ThreadSetModelResult

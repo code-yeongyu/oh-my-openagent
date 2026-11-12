@@ -1,22 +1,22 @@
 #!/usr/bin/env node
-import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
 
-import { resolveCanonicalUltraworkDirectivePath } from "./canonical-ultrawork-directive.mjs";
-import { isCliEntry } from "./entry-guard.mjs";
-import { sharedSkillsRootPath } from "@oh-my-opencode/shared-skills";
-import { createSkillSourceCopyFilter } from "@oh-my-opencode/shared-skills/skill-source-filter";
+import { resolveCanonicalUltraworkDirectivePath } from "./canonical-ultrawork-directive.mjs"
+import { isCliEntry } from "./entry-guard.mjs"
+import { sharedSkillsRootPath } from "@oh-my-opencode/shared-skills"
+import { createSkillSourceCopyFilter } from "@oh-my-opencode/shared-skills/skill-source-filter"
 
-const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const repoRoot = join(root, "..", "..", "..");
-const sharedSkillsRoot = sharedSkillsRootPath();
-const skillsRoot = join(root, "skills");
+const root = dirname(dirname(fileURLToPath(import.meta.url)))
+const repoRoot = join(root, "..", "..", "..")
+const sharedSkillsRoot = sharedSkillsRootPath()
+const skillsRoot = join(root, "skills")
 // The ultrawork skill body is the canonical prompts-core directive, read DIRECTLY here rather than
 // from a component-local copy: sync-skills runs before build-components (see plugin/package.json
 // build chain), so consuming components/ultrawork/scripts/sync-directive.mjs output would break a
 // clean checkout.
-const canonicalUltraworkDirectivePath = resolveCanonicalUltraworkDirectivePath(root, repoRoot);
+const canonicalUltraworkDirectivePath = resolveCanonicalUltraworkDirectivePath(root, repoRoot)
 const ultraworkSkillFrontmatter = `---
 name: ultrawork
 description: Binding ultrawork mode directive for omo on Codex. When a prompt contains ultrawork or ulw, the omo UserPromptSubmit hook injects a short bootstrap that points at this file. Read the whole file and follow every rule in it for the rest of the task.
@@ -24,22 +24,22 @@ metadata:
   short-description: Binding ultrawork mode directive
 ---
 
-`;
+`
 const skillSources = [
-	["comment-checker", "components/comment-checker/skills/comment-checker"],
-	["lcx-contribute-bug-fix", "components/lcx/skills/lcx-contribute-bug-fix"],
-	["lcx-doctor", "components/lcx/skills/lcx-doctor"],
-	["lcx-report-bug", "components/lcx/skills/lcx-report-bug"],
-	["lsp", "components/lsp/skills/lsp"],
-	["rules", "components/rules/skills/rules"],
-	["teammode", "components/teammode/skills/teammode"],
-	["ulw-loop", "components/ulw-loop/skills/ulw-loop"],
-	["ulw-plan", "components/ultrawork/skills/ulw-plan"],
-];
-const componentSkillNames = new Set([...skillSources.map(([name]) => name), "ultrawork"]);
-const skillDisplayPrefix = "(OmO) ";
+  ["comment-checker", "components/comment-checker/skills/comment-checker"],
+  ["lcx-contribute-bug-fix", "components/lcx/skills/lcx-contribute-bug-fix"],
+  ["lcx-doctor", "components/lcx/skills/lcx-doctor"],
+  ["lcx-report-bug", "components/lcx/skills/lcx-report-bug"],
+  ["lsp", "components/lsp/skills/lsp"],
+  ["rules", "components/rules/skills/rules"],
+  ["teammode", "components/teammode/skills/teammode"],
+  ["ulw-loop", "components/ulw-loop/skills/ulw-loop"],
+  ["ulw-plan", "components/ultrawork/skills/ulw-plan"],
+]
+const componentSkillNames = new Set([...skillSources.map(([name]) => name), "ultrawork"])
+const skillDisplayPrefix = "(OmO) "
 
-const opencodeOnlyOrchestrationPattern = /\b(?:call_omo_agent|background_output|team_[a-z_]+|task)\s*\(/;
+const opencodeOnlyOrchestrationPattern = /\b(?:call_omo_agent|background_output|team_[a-z_]+|task)\s*\(/
 
 export const codexHarnessToolCompatibility = `## Codex Harness Tool Compatibility
 
@@ -65,71 +65,72 @@ Omit optional keys you do not set. Never send \`items: []\`, \`message: ""\`, \`
 
 For work likely to exceed one wait cycle, require the child to send \`WORKING: <task> - <current phase>\` before long passes and \`BLOCKED: <reason>\` only when progress stops. A \`multi_agent_v1.wait_agent\` timeout only means no new mailbox update arrived; back off between waits (double the timeout up to ~5 minutes) instead of spinning short cycles. Treat a running child as alive. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly \`BLOCKED:\`, or no longer running.
 
-`;
+`
 
 const codexCompatibilityEndMarkers = [
-	"Omit optional keys you do not set. Never send `items: []`, `message: \"\"`, `model: \"\"`, `reasoning_effort: \"\"`, or `service_tier: \"\"`. Codex rejects them (`Items can't be empty`, `reasoning_effort must not be empty`).\n\nFor work likely to exceed one wait cycle, require the child to send `WORKING: <task> - <current phase>` before long passes and `BLOCKED: <reason>` only when progress stops. A `multi_agent_v1.wait_agent` timeout only means no new mailbox update arrived; back off between waits (double the timeout up to ~5 minutes) instead of spinning short cycles. Treat a running child as alive. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly `BLOCKED:`, or no longer running.\n\n",
-	"On the v2 surface `agent_type` may be ABSENT from the spawn schema (verified 2026-07-11: only `fork_turns`/`message`/`task_name`). When absent, omit it and describe the role inside `message`; installed role TOMLs cannot be selected on that surface. If a code block below conflicts with this section, this section wins. `fork_context` is rejected on `multi_agent_v2` (`fork_context is not supported in MultiAgentV2; use fork_turns instead`).\n\n",
-	"For work likely to exceed one wait cycle, require the child to send `WORKING: <task> - <current phase>` before long passes and `BLOCKED: <reason>` only when progress stops. A `multi_agent_v1.wait_agent` timeout only means no new mailbox update arrived. Treat a running child as alive. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly `BLOCKED:`, or no longer running.\n\n",
-	"On `multi_agent_v2` sessions the same `agent_type` applies (the OMO installer exposes it) with `fork_turns` instead of `fork_context`. If a code block below conflicts with this section, this section wins.\n\n",
-	"Role-specific behavior must be described in a self-contained `message`. Use `fork_context: false` to start the child with only the initial prompt (no parent history); use `fork_context: true` only when full parent history is truly required. Include any required conversation context, files, diffs, constraints, and requested skill names directly in the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
-	"When translating `load_skills=[...]`, include the requested skill names in the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
-	"When translating `load_skills=[...]`, name the skills inside the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
-];
+  'Omit optional keys you do not set. Never send `items: []`, `message: ""`, `model: ""`, `reasoning_effort: ""`, or `service_tier: ""`. Codex rejects them (`Items can\'t be empty`, `reasoning_effort must not be empty`).\n\nFor work likely to exceed one wait cycle, require the child to send `WORKING: <task> - <current phase>` before long passes and `BLOCKED: <reason>` only when progress stops. A `multi_agent_v1.wait_agent` timeout only means no new mailbox update arrived; back off between waits (double the timeout up to ~5 minutes) instead of spinning short cycles. Treat a running child as alive. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly `BLOCKED:`, or no longer running.\n\n',
+  "On the v2 surface `agent_type` may be ABSENT from the spawn schema (verified 2026-07-11: only `fork_turns`/`message`/`task_name`). When absent, omit it and describe the role inside `message`; installed role TOMLs cannot be selected on that surface. If a code block below conflicts with this section, this section wins. `fork_context` is rejected on `multi_agent_v2` (`fork_context is not supported in MultiAgentV2; use fork_turns instead`).\n\n",
+  "For work likely to exceed one wait cycle, require the child to send `WORKING: <task> - <current phase>` before long passes and `BLOCKED: <reason>` only when progress stops. A `multi_agent_v1.wait_agent` timeout only means no new mailbox update arrived. Treat a running child as alive. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly `BLOCKED:`, or no longer running.\n\n",
+  "On `multi_agent_v2` sessions the same `agent_type` applies (the OMO installer exposes it) with `fork_turns` instead of `fork_context`. If a code block below conflicts with this section, this section wins.\n\n",
+  "Role-specific behavior must be described in a self-contained `message`. Use `fork_context: false` to start the child with only the initial prompt (no parent history); use `fork_context: true` only when full parent history is truly required. Include any required conversation context, files, diffs, constraints, and requested skill names directly in the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
+  "When translating `load_skills=[...]`, include the requested skill names in the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
+  "When translating `load_skills=[...]`, name the skills inside the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
+]
 
 function findCodexCompatibilitySectionEnd(content, searchStart) {
-	const structuralEndPattern = /\n(?:---|export\s+const\s+|#{1,6}\s)/g;
-	structuralEndPattern.lastIndex = searchStart;
-	const structuralEnd = structuralEndPattern.exec(content);
-	if (structuralEnd) return structuralEnd.index + 1;
+  const structuralEndPattern = /\n(?:---|export\s+const\s+|#{1,6}\s)/g
+  structuralEndPattern.lastIndex = searchStart
+  const structuralEnd = structuralEndPattern.exec(content)
+  if (structuralEnd) return structuralEnd.index + 1
 
-	const knownEndMarker = codexCompatibilityEndMarkers.find((marker) => content.indexOf(marker, searchStart) !== -1);
-	if (knownEndMarker === undefined) return content.length;
+  const knownEndMarker = codexCompatibilityEndMarkers.find((marker) => content.indexOf(marker, searchStart) !== -1)
+  if (knownEndMarker === undefined) return content.length
 
-	return content.indexOf(knownEndMarker, searchStart) + knownEndMarker.length;
+  return content.indexOf(knownEndMarker, searchStart) + knownEndMarker.length
 }
 
 function removeCodexCompatibilityGuidance(content) {
-	const heading = "## Codex Harness Tool Compatibility";
-	let withoutGuidance = content;
+  const heading = "## Codex Harness Tool Compatibility"
+  let withoutGuidance = content
 
-	while (true) {
-		const start = withoutGuidance.indexOf(heading);
-		if (start === -1) return withoutGuidance;
+  while (true) {
+    const start = withoutGuidance.indexOf(heading)
+    if (start === -1) return withoutGuidance
 
-		const end = findCodexCompatibilitySectionEnd(withoutGuidance, start + heading.length);
+    const end = findCodexCompatibilitySectionEnd(withoutGuidance, start + heading.length)
 
-		withoutGuidance = `${withoutGuidance.slice(0, start)}${withoutGuidance.slice(end)}`;
-	}
+    withoutGuidance = `${withoutGuidance.slice(0, start)}${withoutGuidance.slice(end)}`
+  }
 }
 
 function hasKnownGeneratedCodexCompatibilityGuidance(content, compatibilityIndex) {
-	return codexCompatibilityEndMarkers.some((marker) => content.indexOf(marker, compatibilityIndex) !== -1);
+  return codexCompatibilityEndMarkers.some((marker) => content.indexOf(marker, compatibilityIndex) !== -1)
 }
 
 export function insertCodexCompatibilityGuidance(content, force = false) {
-	if (!force && !opencodeOnlyOrchestrationPattern.test(content)) return content;
-	const firstExampleIndex = content.search(opencodeOnlyOrchestrationPattern);
-	const compatibilityIndex = content.indexOf("## Codex Harness Tool Compatibility");
-	if (
-		compatibilityIndex !== -1 &&
-		compatibilityIndex < firstExampleIndex &&
-		!hasKnownGeneratedCodexCompatibilityGuidance(content, compatibilityIndex)
-	) {
-		return content;
-	}
+  if (!force && !opencodeOnlyOrchestrationPattern.test(content)) return content
+  const firstExampleIndex = content.search(opencodeOnlyOrchestrationPattern)
+  const compatibilityIndex = content.indexOf("## Codex Harness Tool Compatibility")
+  if (
+    compatibilityIndex !== -1 &&
+    compatibilityIndex < firstExampleIndex &&
+    !hasKnownGeneratedCodexCompatibilityGuidance(content, compatibilityIndex)
+  ) {
+    return content
+  }
 
-	const contentWithoutGuidance = removeCodexCompatibilityGuidance(content);
+  const contentWithoutGuidance = removeCodexCompatibilityGuidance(content)
 
-	const frontmatterMatch = contentWithoutGuidance.match(/^---\n[\s\S]*?\n---\n+/);
-	if (!frontmatterMatch) {
-		return `${codexHarnessToolCompatibility}${contentWithoutGuidance}`;
-	}
+  const frontmatterMatch = contentWithoutGuidance.match(/^---\n[\s\S]*?\n---\n+/)
+  if (!frontmatterMatch) {
+    return `${codexHarnessToolCompatibility}${contentWithoutGuidance}`
+  }
 
-	return `${frontmatterMatch[0]}${codexHarnessToolCompatibility}${contentWithoutGuidance.slice(frontmatterMatch[0].length)}`;
+  return `${frontmatterMatch[0]}${codexHarnessToolCompatibility}${contentWithoutGuidance.slice(frontmatterMatch[0].length)}`
 }
 
-export const reviewWorkAnchor = "Review completed implementation work through exactly two lanes: your own hands-on manual QA on the real surface, and ONE gate reviewer sub-agent that audits the whole change set against the goal, the constraints, and your QA evidence. The review passes only when the QA matrix has no failing row AND the gate reviewer returns APPROVE.\n";
+export const reviewWorkAnchor =
+  "Review completed implementation work through exactly two lanes: your own hands-on manual QA on the real surface, and ONE gate reviewer sub-agent that audits the whole change set against the goal, the constraints, and your QA evidence. The review passes only when the QA matrix has no failing row AND the gate reviewer returns APPROVE.\n"
 
 const reviewWorkCodexGate = `
 On Codex, use \`review-work\` only when the user asks for a review or demands
@@ -169,159 +170,170 @@ user data before including evidence in logs, PR bodies, or handoffs. Never
 include raw tokens, credentials, auth headers, cookies, API keys, env dumps,
 private logs, or PII; summarize with lengths, hashes, and short non-sensitive
 prefixes when identity is needed.
-`;
+`
 
 // Codex has no `task(category="writing")` worker, so its ulw-research edition drops the proofread gate
 // and keeps every tool-based delivery gate (static, fidelity, layout, visual QA). The item is matched by
 // its text right after the Visual QA sentence, not by its list numeral, so adding or removing an earlier
 // delivery gate does not unhook the overlay.
-const ulwResearchProofreadGate = "**Proofread gate: `task(category=\"writing\", ...)`.** Hand the final text to a dedicated `writing` worker whose only job is language: grammar, spelling, punctuation, terminology consistency, and whether the prose reads NATIVELY in the report's own language. It proofreads only and never composes, and it never edits the file: it returns `$SESSION_DIR/polish-edits.json`, an array of `{\"before\": ..., \"after\": ..., \"reason\": ...}` where `before` is the exact current text of one or more adjacent sentences. Edits change text only; an edit whose before/after would alter any tag, attribute, comment, or script/style content is rejected, and markup changes go through the full fidelity gates instead. Apply it with `node \"$SKILL_DIR/scripts/report-tools.mjs\" fact polish-apply \"$SESSION_DIR/report.html\" --edits \"$SESSION_DIR/polish-edits.json\" --out \"$SESSION_DIR/report.polished.html\" --session-dir \"$SESSION_DIR\"`: each edit is applied alone, and an edit that changes a fact span, a numeral, a link, or a claim id, or drops a hedge or qualifier the source carries, is `polish_edit_rejected` (a `before` not found exactly once is `polish_edit_unlocated`) and leaves its text unchanged. Send the rejected and unlocated edits back to the same worker with their reasons, plus `$SESSION_DIR/polish-defects.json` and the pre-polish `report.html` the backstop compared against, so the worker sees why each edit was refused; it returns either a rewritten sentence or a new edit list, and the repair round re-runs `fact polish-apply` with `\"$SESSION_DIR/report.polished.html\"` as both input and output, within the repair budget. Then run the backstop `fact polish-diff --before \"$SESSION_DIR/report.html\" --after \"$SESSION_DIR/report.polished.html\" --session-dir \"$SESSION_DIR\"` (exit `1` on `polish_diff_fail`), `fact verify` on `report.polished.html`, and `fact pairs \"$SESSION_DIR/report.polished.html\" --changed-since \"$SESSION_DIR/report.html.fill-map.json\" --session-dir \"$SESSION_DIR\"`, which keeps only the quote and claim pairs whose sentence text changed during polish; run the meaning readers above (cheap, then strong on the flagged pairs) on exactly those pairs and `fact meaning-check` before recording `outcome gate fidelity`. A rewording that keeps every number, hedge, qualifier, and link but swaps who did what to whom therefore still reaches a meaning reader on the delivered text. `report.polished.html` is the report that is delivered. Deliver only on a clean pass. This gate runs BEFORE the first delivery, not after the user finds the typo. Edits must not span entities (such as &amp; or &lt;) or markup; narrow the edit to the surrounding words instead, and a rejected edit comes back with the reason to act on.";
-const ulwResearchProofreadGateSource = ulwResearchProofreadGate.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const ulwResearchProofreadGatePattern = new RegExp(`(inspect the pixels\\.)\\n\\d+\\. ${ulwResearchProofreadGateSource}`);
+const ulwResearchProofreadGate =
+  '**Proofread gate: `task(category="writing", ...)`.** Hand the final text to a dedicated `writing` worker whose only job is language: grammar, spelling, punctuation, terminology consistency, and whether the prose reads NATIVELY in the report\'s own language. It proofreads only and never composes, and it never edits the file: it returns `$SESSION_DIR/polish-edits.json`, an array of `{"before": ..., "after": ..., "reason": ...}` where `before` is the exact current text of one or more adjacent sentences. Edits change text only; an edit whose before/after would alter any tag, attribute, comment, or script/style content is rejected, and markup changes go through the full fidelity gates instead. Apply it with `node "$SKILL_DIR/scripts/report-tools.mjs" fact polish-apply "$SESSION_DIR/report.html" --edits "$SESSION_DIR/polish-edits.json" --out "$SESSION_DIR/report.polished.html" --session-dir "$SESSION_DIR"`: each edit is applied alone, and an edit that changes a fact span, a numeral, a link, or a claim id, or drops a hedge or qualifier the source carries, is `polish_edit_rejected` (a `before` not found exactly once is `polish_edit_unlocated`) and leaves its text unchanged. Send the rejected and unlocated edits back to the same worker with their reasons, plus `$SESSION_DIR/polish-defects.json` and the pre-polish `report.html` the backstop compared against, so the worker sees why each edit was refused; it returns either a rewritten sentence or a new edit list, and the repair round re-runs `fact polish-apply` with `"$SESSION_DIR/report.polished.html"` as both input and output, within the repair budget. Then run the backstop `fact polish-diff --before "$SESSION_DIR/report.html" --after "$SESSION_DIR/report.polished.html" --session-dir "$SESSION_DIR"` (exit `1` on `polish_diff_fail`), `fact verify` on `report.polished.html`, and `fact pairs "$SESSION_DIR/report.polished.html" --changed-since "$SESSION_DIR/report.html.fill-map.json" --session-dir "$SESSION_DIR"`, which keeps only the quote and claim pairs whose sentence text changed during polish; run the meaning readers above (cheap, then strong on the flagged pairs) on exactly those pairs and `fact meaning-check` before recording `outcome gate fidelity`. A rewording that keeps every number, hedge, qualifier, and link but swaps who did what to whom therefore still reaches a meaning reader on the delivered text. `report.polished.html` is the report that is delivered; polish can change line wrapping, so re-run the layout gates and visual QA on `report.polished.html` and record `layout` and `visual` again. Deliver only on a clean pass. This gate runs BEFORE the first delivery, not after the user finds the typo. Edits must not span entities (such as &amp; or &lt;) or markup; narrow the edit to the surrounding words instead, and a rejected edit comes back with the reason to act on.'
+const ulwResearchProofreadGateSource = ulwResearchProofreadGate.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+const ulwResearchProofreadGatePattern = new RegExp(
+  `(inspect the pixels\\.)\\n\\d+\\. ${ulwResearchProofreadGateSource}`,
+)
 
 export const ulwExecuteOriginalCompletion = [
-	"When all top-level checkboxes in `## TODOs` and `## Final Verification Wave` are complete:",
-	"",
-	"1. Run the plan's final verification commands.",
-	"2. For PR/branch work, finish the lifecycle from the last phase's worktree: sync `.omo/` state back to the main repo, create or update the PR, wait for review/verification gates, merge by default unless explicitly opted out, and remove the worktree only after successful merge or explicit handoff. Finish directory teardown per Task resources and record its receipts.",
-	"3. Remove or mark the Boulder work as completed.",
-	"4. Print an `ORCHESTRATION COMPLETE` block with the plan path, verification commands, artifacts, and cleanup receipts.",
-].join("\n");
+  "When all top-level checkboxes in `## TODOs` and `## Final Verification Wave` are complete:",
+  "",
+  "1. Run the plan's final verification commands.",
+  "2. Under `--make-pr` or `--ship`, finish the lifecycle from the last phase's worktree: sync `.omo/` state back to the main repo, create or update the PR, and wait for review/verification gates. Then follow the delivery mode: `--ship` merges per the repository's merge policy; `--make-pr` hands off with the PR URL and merges only if the user asks. Remove the worktree only after a successful merge or that explicit handoff. Finish directory teardown per Task resources and record its receipts.",
+  "3. Remove or mark the Boulder work as completed.",
+  "4. Print an `ORCHESTRATION COMPLETE` block with the plan path, verification commands, artifacts, and cleanup receipts.",
+].join("\n")
+export const ulwExecuteOriginalRootScope =
+  "This rule binds the root of a ulw-execute run, including its Final Verification Wave and any `review-work` pass run inside it: a worker runs every QA scenario, and you judge the artifacts it captured. Outside a ulw-execute run (a bare ultrawork run, a ulw-loop final gate, a standalone `review-work`), the session that owns the run runs the final real-surface QA itself."
+const ulwExecuteCodexRootScope =
+  "This rule binds the root of a ulw-execute run: a worker runs every implementation and per-task QA scenario, and you judge the artifacts it captured. The Codex edition's one exception is the final verification in the Completion section below, where the root runs its own manual QA on the real surface and records a self-review. Outside a ulw-execute run (a bare ultrawork run, a ulw-loop final gate, a standalone `review-work`), the session that owns the run runs the final real-surface QA itself."
 export const ulwExecuteOriginalHardRule = [
-	"- No production change before the tests covering that behavior were read and a bug's reproduction captured; existing tests are green on the unchanged code first, and one that contradicts the intent is a FINDING, never edited green.",
-	"- No `--dry-run` as completion evidence.",
-	"- No tests-only completion claim. A Manual-QA artifact is required.",
-	"- **NO DIRECT IMPLEMENTATION BY THE ORCHESTRATOR.** Root NEVER edits product files, writes tests, or runs QA itself; a spawned worker does.",
-	"- No completion claim while an applicable ultraqa adversarial class was never probed. Each applicable class needs a captured observable result; each skipped class needs a one-line not-applicable reason in the ledger.",
-	"- No implementation, review, or merge in the main checkout; every phase works in its task-owned worktree.",
-	"- No unprefixed session ids in Boulder state. Sessions are always recorded as `codex:<session_id>`.",
-	"- No stale-memory execution. The plan and ledger are the durable source of truth.",
-].join("\n");
+  "- No production change before the tests covering that behavior were read and a bug's reproduction captured; existing tests are green on the unchanged code first, and one that contradicts the intent is a FINDING, never edited green.",
+  "- No `--dry-run` as completion evidence.",
+  "- No tests-only completion claim. A Manual-QA artifact is required.",
+  "- **NO DIRECT IMPLEMENTATION BY THE ORCHESTRATOR.** Root NEVER edits product files, writes tests, or runs QA itself; a spawned worker does.",
+  "- No completion claim while an applicable ultraqa adversarial class was never probed. Each applicable class needs a captured observable result; each skipped class needs a one-line not-applicable reason in the ledger.",
+  "- No implementation, review, or merge in the main checkout; every phase works in its task-owned worktree.",
+  "- No unprefixed session ids in Boulder state. Sessions are always recorded as `codex:<session_id>`.",
+  "- No stale-memory execution. The plan and ledger are the durable source of truth.",
+].join("\n")
 const ulwExecuteCodexCompletion = [
-	"When all top-level checkboxes in `## TODOs` and `## Final Verification Wave` are complete:",
-	"",
-	"1. Run the plan's final verification commands.",
-	"2. Record a self-review in the notepad: re-read the diff, run diagnostics, and capture evidence for every acceptance criterion. Run your own manual QA on the real surface.",
-	"3. Only when the user demanded strict, rigorous, or high-accuracy review, spawn ONE `lazycodex-gate-reviewer`; otherwise your self-review is the final verification.",
-	"4. Finish the PR/branch lifecycle from its task-owned worktree: sync `.omo/` state back to the main repo, create or update the PR, wait for review/verification gates, merge by default unless explicitly opted out, and remove the worktree only after successful merge or explicit handoff. Finish directory teardown per Task resources and record its receipts.",
-	"5. Remove or mark the Boulder work as completed.",
-	"6. Print an `ORCHESTRATION COMPLETE` block with the plan path, verification commands, artifacts, and cleanup receipts.",
-].join("\n");
+  "When all top-level checkboxes in `## TODOs` and `## Final Verification Wave` are complete:",
+  "",
+  "1. Run the plan's final verification commands.",
+  "2. Record a self-review in the notepad: re-read the diff, run diagnostics, and capture evidence for every acceptance criterion. Run your own manual QA on the real surface.",
+  "3. Only when the user demanded strict, rigorous, or high-accuracy review, spawn ONE `lazycodex-gate-reviewer`; otherwise your self-review is the final verification.",
+  "4. Finish the PR/branch lifecycle from its task-owned worktree: sync `.omo/` state back to the main repo, create or update the PR, wait for review/verification gates; `--ship` merges per the repository's merge policy, `--make-pr` hands off with the PR URL and merges only if the user asks; remove the worktree only after a successful merge or that explicit handoff. Finish directory teardown per Task resources and record its receipts.",
+  "5. Remove or mark the Boulder work as completed.",
+  "6. Print an `ORCHESTRATION COMPLETE` block with the plan path, verification commands, artifacts, and cleanup receipts.",
+].join("\n")
 const ulwExecuteCodexHardRule = [
-	"- No production change before the tests covering that behavior were read and a bug's reproduction captured; existing tests are green on the unchanged code first, and one that contradicts the intent is a FINDING, never edited green.",
-	"- No `--dry-run` as completion evidence.",
-	"- No tests-only completion claim. A Manual-QA artifact is required.",
-	"- **NO DIRECT IMPLEMENTATION BY THE ORCHESTRATOR.** Root NEVER edits product files, writes tests, or runs QA itself; a spawned worker does.",
-	"- No completion claim while an applicable ultraqa adversarial class was never probed. Each applicable class needs a captured observable result; each skipped class needs a one-line not-applicable reason in the ledger.",
-	"- No implementation, review, or merge in the main checkout; every phase works in a task-owned worktree.",
-	"- No unprefixed session ids in Boulder state. Sessions are always recorded as `codex:<session_id>`.",
-	"- No stale-memory execution. The plan and ledger are the durable source of truth.",
-	"- Codex final verification is the exception to the delegated-QA-only rule above: perform your own manual QA on the real surface and record a self-review before completion.",
-].join("\n");
+  "- No production change before the tests covering that behavior were read and a bug's reproduction captured; existing tests are green on the unchanged code first, and one that contradicts the intent is a FINDING, never edited green.",
+  "- No `--dry-run` as completion evidence.",
+  "- No tests-only completion claim. A Manual-QA artifact is required.",
+  "- **NO DIRECT IMPLEMENTATION BY THE ORCHESTRATOR.** Root NEVER edits product files, writes tests, or runs QA itself; a spawned worker does.",
+  "- No completion claim while an applicable ultraqa adversarial class was never probed. Each applicable class needs a captured observable result; each skipped class needs a one-line not-applicable reason in the ledger.",
+  "- No implementation, review, or merge in the main checkout; every phase works in a task-owned worktree.",
+  "- No unprefixed session ids in Boulder state. Sessions are always recorded as `codex:<session_id>`.",
+  "- No stale-memory execution. The plan and ledger are the durable source of truth.",
+  "- Codex final verification is the exception to the delegated-QA-only rule above: perform your own manual QA on the real surface and record a self-review before completion.",
+].join("\n")
 
 export function applyCodexSkillOverlays(skillName, content) {
-	if (skillName === "ulw-research") {
-		return content.replace(ulwResearchProofreadGatePattern, "$1");
-	}
-	if (skillName === "ulw-execute") {
-		return content
-			.replace(ulwExecuteOriginalCompletion, ulwExecuteCodexCompletion)
-			.replace(ulwExecuteOriginalHardRule, ulwExecuteCodexHardRule);
-	}
-	if (skillName === "review-work" && !content.includes("When `review-work` is used as a final implementation")) {
-		return content.replace(reviewWorkAnchor, `${reviewWorkAnchor}${reviewWorkCodexGate}`);
-	}
-	return content;
+  if (skillName === "ulw-research") {
+    return content.replace(ulwResearchProofreadGatePattern, "$1")
+  }
+  if (skillName === "ulw-execute") {
+    return content
+      .replace(ulwExecuteOriginalRootScope, ulwExecuteCodexRootScope)
+      .replace(ulwExecuteOriginalCompletion, ulwExecuteCodexCompletion)
+      .replace(ulwExecuteOriginalHardRule, ulwExecuteCodexHardRule)
+  }
+  if (skillName === "review-work" && !content.includes("When `review-work` is used as a final implementation")) {
+    return content.replace(reviewWorkAnchor, `${reviewWorkAnchor}${reviewWorkCodexGate}`)
+  }
+  return content
 }
 
 function readSkillFrontmatterName(content, fallbackName) {
-	const frontmatter = content.match(/^---\n(?<body>[\s\S]*?)\n---\n+/);
-	const rawName = frontmatter?.groups?.body.match(/^name:\s*"?([^"\n]+)"?\s*$/m)?.[1]?.trim();
-	return rawName && rawName.length > 0 ? rawName : fallbackName;
+  const frontmatter = content.match(/^---\n(?<body>[\s\S]*?)\n---\n+/)
+  const rawName = frontmatter?.groups?.body.match(/^name:\s*"?([^"\n]+)"?\s*$/m)?.[1]?.trim()
+  return rawName && rawName.length > 0 ? rawName : fallbackName
 }
 
 function upsertDisplayName(metadata, displayName) {
-	const content = metadata.endsWith("\n") ? metadata : `${metadata}\n`;
-	if (/^\s*display_name:/m.test(metadata)) {
-		return content.replace(/^(\s*display_name:\s*).+$/m, `$1"${displayName}"`);
-	}
-	if (/^interface:\s*$/m.test(metadata)) {
-		return content.replace(/^interface:\s*$/m, `interface:\n  display_name: "${displayName}"`);
-	}
-	return `interface:\n  display_name: "${displayName}"\n${content}`;
+  const content = metadata.endsWith("\n") ? metadata : `${metadata}\n`
+  if (/^\s*display_name:/m.test(metadata)) {
+    return content.replace(/^(\s*display_name:\s*).+$/m, `$1"${displayName}"`)
+  }
+  if (/^interface:\s*$/m.test(metadata)) {
+    return content.replace(/^interface:\s*$/m, `interface:\n  display_name: "${displayName}"`)
+  }
+  return `interface:\n  display_name: "${displayName}"\n${content}`
 }
 
 async function writeCodexSkillDisplayMetadata(skillName) {
-	const skillRoot = join(skillsRoot, skillName);
-	const skillPath = join(skillRoot, "SKILL.md");
-	const content = await readFile(skillPath, "utf8");
-	const frontmatterName = readSkillFrontmatterName(content, skillName);
-	const metadataDir = join(skillRoot, "agents");
-	const metadataPath = join(metadataDir, "openai.yaml");
-	await mkdir(metadataDir, { recursive: true });
-	let metadata = "interface:\n";
-	try {
-		metadata = await readFile(metadataPath, "utf8");
-	} catch (error) {
-		if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
-	}
-	await writeFile(metadataPath, upsertDisplayName(metadata, `${skillDisplayPrefix}${frontmatterName}`), "utf8");
+  const skillRoot = join(skillsRoot, skillName)
+  const skillPath = join(skillRoot, "SKILL.md")
+  const content = await readFile(skillPath, "utf8")
+  const frontmatterName = readSkillFrontmatterName(content, skillName)
+  const metadataDir = join(skillRoot, "agents")
+  const metadataPath = join(metadataDir, "openai.yaml")
+  await mkdir(metadataDir, { recursive: true })
+  let metadata = "interface:\n"
+  try {
+    metadata = await readFile(metadataPath, "utf8")
+  } catch (error) {
+    if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error
+  }
+  await writeFile(metadataPath, upsertDisplayName(metadata, `${skillDisplayPrefix}${frontmatterName}`), "utf8")
 }
 
 async function adaptSkillForCodex(skillName) {
-	const skillPath = join(skillsRoot, skillName, "SKILL.md");
-	const content = await readFile(skillPath, "utf8");
-	const needsSpawnPayloadGuidance = ["ulw-loop", "review-work", "ulw-execute"].includes(skillName);
-	const adapted = applyCodexSkillOverlays(skillName, insertCodexCompatibilityGuidance(content, needsSpawnPayloadGuidance));
-	if (adapted !== content) {
-		await writeFile(skillPath, adapted, "utf8");
-	}
-	await writeCodexSkillDisplayMetadata(skillName);
+  const skillPath = join(skillsRoot, skillName, "SKILL.md")
+  const content = await readFile(skillPath, "utf8")
+  const needsSpawnPayloadGuidance = ["ulw-loop", "review-work", "ulw-execute"].includes(skillName)
+  const adapted = applyCodexSkillOverlays(
+    skillName,
+    insertCodexCompatibilityGuidance(content, needsSpawnPayloadGuidance),
+  )
+  if (adapted !== content) {
+    await writeFile(skillPath, adapted, "utf8")
+  }
+  await writeCodexSkillDisplayMetadata(skillName)
 }
 
 // Read-only inventory shared by generation and shipped-payload validation.
 export async function getSkillOutputManifest() {
-	const sharedSkillEntries = await readdir(sharedSkillsRoot, { withFileTypes: true });
-	const sharedSkillNames = sharedSkillEntries
-		.filter((entry) => entry.isDirectory())
-		.map((entry) => entry.name)
-		.sort();
-	return {
-		root: skillsRoot,
-		names: [...new Set([...componentSkillNames, ...sharedSkillNames])],
-	};
+  const sharedSkillEntries = await readdir(sharedSkillsRoot, { withFileTypes: true })
+  const sharedSkillNames = sharedSkillEntries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort()
+  return {
+    root: skillsRoot,
+    names: [...new Set([...componentSkillNames, ...sharedSkillNames])],
+  }
 }
 
 async function syncSkills() {
-	await rm(skillsRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
-	await mkdir(skillsRoot, { recursive: true });
+  await rm(skillsRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
+  await mkdir(skillsRoot, { recursive: true })
 
-	for (const [name, source] of skillSources) {
-		await cp(join(root, source), join(skillsRoot, name), { recursive: true });
-		await adaptSkillForCodex(name);
-	}
+  for (const [name, source] of skillSources) {
+    await cp(join(root, source), join(skillsRoot, name), { recursive: true })
+    await adaptSkillForCodex(name)
+  }
 
-	await mkdir(join(skillsRoot, "ultrawork"), { recursive: true });
-	const canonicalUltraworkDirective = await readFile(canonicalUltraworkDirectivePath, "utf8");
-	await writeFile(
-		join(skillsRoot, "ultrawork", "SKILL.md"),
-		`${ultraworkSkillFrontmatter}${canonicalUltraworkDirective}`,
-		"utf8",
-	);
-	await adaptSkillForCodex("ultrawork");
+  await mkdir(join(skillsRoot, "ultrawork"), { recursive: true })
+  const canonicalUltraworkDirective = await readFile(canonicalUltraworkDirectivePath, "utf8")
+  await writeFile(
+    join(skillsRoot, "ultrawork", "SKILL.md"),
+    `${ultraworkSkillFrontmatter}${canonicalUltraworkDirective}`,
+    "utf8",
+  )
+  await adaptSkillForCodex("ultrawork")
 
-	const { names } = await getSkillOutputManifest();
-	for (const skillName of names) {
-		if (componentSkillNames.has(skillName)) continue;
-		const sharedSkillSource = join(sharedSkillsRoot, skillName);
-		await cp(sharedSkillSource, join(skillsRoot, skillName), {
-			filter: createSkillSourceCopyFilter(sharedSkillSource),
-			recursive: true,
-		});
-		await adaptSkillForCodex(skillName);
-	}
+  const { names } = await getSkillOutputManifest()
+  for (const skillName of names) {
+    if (componentSkillNames.has(skillName)) continue
+    const sharedSkillSource = join(sharedSkillsRoot, skillName)
+    await cp(sharedSkillSource, join(skillsRoot, skillName), {
+      filter: createSkillSourceCopyFilter(sharedSkillSource),
+      recursive: true,
+    })
+    await adaptSkillForCodex(skillName)
+  }
 }
 
 if (isCliEntry(import.meta.url)) {
-	await syncSkills();
+  await syncSkills()
 }

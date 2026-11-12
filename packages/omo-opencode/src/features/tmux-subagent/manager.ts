@@ -39,11 +39,7 @@ import { resolveServerUrl } from "./resolve-server-url"
 import { sweepStaleTmuxResources } from "./stale-tmux-resource-sweeper"
 type OpencodeClient = PluginInput["client"]
 
-type SpawnStage =
-  | "deferred.attach"
-  | "deferred.isolated-container"
-  | "session.created"
-  | "session.idle.retry"
+type SpawnStage = "deferred.attach" | "deferred.isolated-container" | "session.created" | "session.idle.retry"
 
 interface SessionCreatedEvent {
   type: string
@@ -225,13 +221,10 @@ export class TmuxSessionManager {
     return this.sourcePaneId
   }
 
-  private async spawnInIsolatedContainer(
-    sessionId: string,
-    title: string,
-  ): Promise<string | null> {
+  private async spawnInIsolatedContainer(sessionId: string, title: string): Promise<string | null> {
     if (!this.isIsolated()) return null
     if (this.isolatedWindowPaneId) {
-        const state = await this.deps.queryWindowState(this.isolatedWindowPaneId).catch((error) => {
+      const state = await this.deps.queryWindowState(this.isolatedWindowPaneId).catch((error) => {
         this.deps.log("[tmux-session-manager] failed to query isolated window state", {
           paneId: this.isolatedWindowPaneId,
           error: String(error),
@@ -259,18 +252,19 @@ export class TmuxSessionManager {
     const isolation = this.tmuxConfig.isolation
     this.deps.log("[tmux-session-manager] creating isolated tmux container", { isolation, sessionId, title })
 
-    const result = isolation === "session"
-      ? await spawnTmuxSession(
-        sessionId,
-        title,
-        this.tmuxConfig,
-        this.serverUrl,
-        this.projectDirectory,
-        this.sourcePaneId,
-        undefined,
-        this.isolatedSessionManagerId,
-      )
-      : await spawnTmuxWindow(sessionId, title, this.tmuxConfig, this.serverUrl, this.projectDirectory)
+    const result =
+      isolation === "session"
+        ? await spawnTmuxSession(
+            sessionId,
+            title,
+            this.tmuxConfig,
+            this.serverUrl,
+            this.projectDirectory,
+            this.sourcePaneId,
+            undefined,
+            this.isolatedSessionManagerId,
+          )
+        : await spawnTmuxWindow(sessionId, title, this.tmuxConfig, this.serverUrl, this.projectDirectory)
 
     if (result.success && result.paneId) {
       this.isolatedContainerPaneId = result.paneId
@@ -366,19 +360,19 @@ export class TmuxSessionManager {
    * liveness is unknown - arm the retry cooldown and let a later pass try
    * again, mirroring the tmux zombie-pane cooldown semantics.
    */
-  private async finalizeHerdrForceRemoveCandidate(
-    tracked: TrackedSession,
-    source: string,
-  ): Promise<boolean> {
+  private async finalizeHerdrForceRemoveCandidate(tracked: TrackedSession, source: string): Promise<boolean> {
     if (tracked.attachActivated) {
       try {
         const agents = await herdrListAgents(this.herdrOps)
         if (!agents.some((agent) => agent.paneId === tracked.paneId)) {
-          this.deps.log("[tmux-session-manager] herdr pane already gone after max close retries; finalizing tracked close", {
-            sessionId: tracked.sessionId,
-            paneId: tracked.paneId,
-            source,
-          })
+          this.deps.log(
+            "[tmux-session-manager] herdr pane already gone after max close retries; finalizing tracked close",
+            {
+              sessionId: tracked.sessionId,
+              paneId: tracked.paneId,
+              source,
+            },
+          )
           this.removeTrackedSession(tracked.sessionId)
           return true
         }
@@ -391,12 +385,15 @@ export class TmuxSessionManager {
       }
     }
 
-    this.deps.log("[tmux-session-manager] herdr pane still alive after max close retries; arming retry cooldown for next attempt", {
-      sessionId: tracked.sessionId,
-      paneId: tracked.paneId,
-      cooldownMs: CLOSE_RETRY_COOLDOWN_MS,
-      source,
-    })
+    this.deps.log(
+      "[tmux-session-manager] herdr pane still alive after max close retries; arming retry cooldown for next attempt",
+      {
+        sessionId: tracked.sessionId,
+        paneId: tracked.paneId,
+        cooldownMs: CLOSE_RETRY_COOLDOWN_MS,
+        source,
+      },
+    )
     const currentTracked = this.sessions.get(tracked.sessionId)
     if (currentTracked) {
       currentTracked.closeRetryCooldownUntil = new Date(Date.now() + CLOSE_RETRY_COOLDOWN_MS)
@@ -540,14 +537,10 @@ export class TmuxSessionManager {
   }
 
   private windowStateContainsPane(state: WindowState, paneId: string): boolean {
-    return state.mainPane?.paneId === paneId
-      || state.agentPanes.some((pane) => pane.paneId === paneId)
+    return state.mainPane?.paneId === paneId || state.agentPanes.some((pane) => pane.paneId === paneId)
   }
 
-  private async finalizeForceRemoveCandidate(
-    tracked: TrackedSession,
-    source: string,
-  ): Promise<boolean> {
+  private async finalizeForceRemoveCandidate(tracked: TrackedSession, source: string): Promise<boolean> {
     if (this.isHerdrBackend()) {
       return this.finalizeHerdrForceRemoveCandidate(tracked, source)
     }
@@ -578,13 +571,16 @@ export class TmuxSessionManager {
       // later eventually cleans up naturally; a permanently wedged pane
       // retries every CLOSE_RETRY_COOLDOWN_MS instead of leaking memory
       // for the rest of the parent session's lifetime.
-      this.deps.log("[tmux-session-manager] pane still exists after max close retries; arming retry cooldown for next attempt", {
-        sessionId: tracked.sessionId,
-        paneId: tracked.paneId,
-        closeRetryCount: tracked.closeRetryCount,
-        cooldownMs: CLOSE_RETRY_COOLDOWN_MS,
-        source,
-      })
+      this.deps.log(
+        "[tmux-session-manager] pane still exists after max close retries; arming retry cooldown for next attempt",
+        {
+          sessionId: tracked.sessionId,
+          paneId: tracked.paneId,
+          closeRetryCount: tracked.closeRetryCount,
+          cooldownMs: CLOSE_RETRY_COOLDOWN_MS,
+          source,
+        },
+      )
       const currentTracked = this.sessions.get(tracked.sessionId)
       if (currentTracked) {
         currentTracked.closeRetryCooldownUntil = new Date(Date.now() + CLOSE_RETRY_COOLDOWN_MS)
@@ -610,10 +606,7 @@ export class TmuxSessionManager {
     return state.windowActive === true && state.sessionAttached === true
   }
 
-  private async closeTrackedSessionPane(args: {
-    tracked: TrackedSession
-    state: WindowState
-  }): Promise<boolean> {
+  private async closeTrackedSessionPane(args: { tracked: TrackedSession; state: WindowState }): Promise<boolean> {
     const { tracked, state } = args
 
     try {
@@ -625,7 +618,7 @@ export class TmuxSessionManager {
           serverUrl: this.serverUrl,
           windowState: state,
           sourcePaneId: this.getEffectiveSourcePaneId(),
-        }
+        },
       )
 
       return result.success
@@ -646,11 +639,7 @@ export class TmuxSessionManager {
   }): Promise<void> {
     const { tracked, state, isolatedPaneAlreadyClosed } = args
     this.removeTrackedSession(tracked.sessionId)
-    await this.cleanupIsolatedContainerAfterSessionDeletion(
-      tracked,
-      isolatedPaneAlreadyClosed,
-      state,
-    )
+    await this.cleanupIsolatedContainerAfterSessionDeletion(tracked, isolatedPaneAlreadyClosed, state)
   }
 
   private async closeTrackedSession(tracked: TrackedSession): Promise<boolean> {
@@ -675,9 +664,7 @@ export class TmuxSessionManager {
   }
 
   private async retryPendingCloses(): Promise<void> {
-    const pendingSessions = Array.from(this.sessions.values()).filter(
-      (tracked) => tracked.closePending,
-    )
+    const pendingSessions = Array.from(this.sessions.values()).filter((tracked) => tracked.closePending)
 
     for (const tracked of pendingSessions) {
       if (!this.sessions.has(tracked.sessionId)) continue
@@ -685,10 +672,13 @@ export class TmuxSessionManager {
       if (tracked.closeRetryCount >= MAX_CLOSE_RETRY_COUNT) {
         if (tracked.closeRetryCooldownUntil) {
           if (Date.now() >= tracked.closeRetryCooldownUntil.getTime()) {
-            this.deps.log("[tmux-session-manager] close-retry cooldown elapsed; resetting retry state so polling can re-attempt", {
-              sessionId: tracked.sessionId,
-              paneId: tracked.paneId,
-            })
+            this.deps.log(
+              "[tmux-session-manager] close-retry cooldown elapsed; resetting retry state so polling can re-attempt",
+              {
+                sessionId: tracked.sessionId,
+                paneId: tracked.paneId,
+              },
+            )
             const fresh = this.sessions.get(tracked.sessionId)
             if (fresh) {
               fresh.closeRetryCount = 0
@@ -747,11 +737,7 @@ export class TmuxSessionManager {
     }
   }
 
-  private enqueueDeferredSession(
-    sessionId: string,
-    title: string,
-    retryIsolatedContainer = false,
-  ): void {
+  private enqueueDeferredSession(sessionId: string, title: string, retryIsolatedContainer = false): void {
     if (this.shouldSkipRespawnAfterPollingClose(sessionId, "deferred enqueue")) {
       this.failedReadinessCache.clear(sessionId)
       return
@@ -829,14 +815,11 @@ export class TmuxSessionManager {
     this.deps.log("[tmux-session-manager] deferred attach polling stopped")
   }
 
-  private beginPendingSession(
-    sessionId: string,
-    options?: { allowDeferredSession?: boolean },
-  ): boolean {
+  private beginPendingSession(sessionId: string, options?: { allowDeferredSession?: boolean }): boolean {
     if (
-      this.sessions.has(sessionId)
-      || this.pendingSessions.has(sessionId)
-      || (!options?.allowDeferredSession && this.deferredSessions.has(sessionId))
+      this.sessions.has(sessionId) ||
+      this.pendingSessions.has(sessionId) ||
+      (!options?.allowDeferredSession && this.deferredSessions.has(sessionId))
     ) {
       this.deps.log("[tmux-session-manager] session already tracked or pending", { sessionId })
       return false
@@ -846,10 +829,7 @@ export class TmuxSessionManager {
     return true
   }
 
-  private async ensureSessionReadyBeforeSpawn(
-    sessionId: string,
-    stage: SpawnStage,
-  ): Promise<boolean> {
+  private async ensureSessionReadyBeforeSpawn(sessionId: string, stage: SpawnStage): Promise<boolean> {
     try {
       const ready = await this.deps.waitForSessionReady({
         client: this.client,
@@ -973,13 +953,7 @@ export class TmuxSessionManager {
       agentPanes: state.agentPanes.map((pane) => pane.paneId),
     })
 
-    const decision = decideSpawnActions(
-      state,
-      sessionId,
-      title,
-      this.getCapacityConfig(),
-      this.getSessionMappings(),
-    )
+    const decision = decideSpawnActions(state, sessionId, title, this.getCapacityConfig(), this.getSessionMappings())
 
     this.deps.log("[tmux-session-manager] spawn decision", {
       canSpawn: decision.canSpawn,
@@ -1004,16 +978,13 @@ export class TmuxSessionManager {
       return
     }
 
-    const result = await this.deps.executeActions(
-      decision.actions,
-      {
-        config: this.tmuxConfig,
-        directory: this.projectDirectory,
-        serverUrl: this.serverUrl,
-        windowState: state,
-        sourcePaneId,
-      },
-    )
+    const result = await this.deps.executeActions(decision.actions, {
+      config: this.tmuxConfig,
+      directory: this.projectDirectory,
+      serverUrl: this.serverUrl,
+      windowState: state,
+      sourcePaneId,
+    })
 
     for (const { action, result: actionResult } of result.results) {
       if (action.type === "close" && actionResult.success) {
@@ -1077,10 +1048,7 @@ export class TmuxSessionManager {
     }
   }
 
-  private getEventSessionId(event: {
-    type: string
-    properties?: Record<string, unknown>
-  }): string | undefined {
+  private getEventSessionId(event: { type: string; properties?: Record<string, unknown> }): string | undefined {
     const sessionId = event.properties?.sessionID
     return typeof sessionId === "string" ? sessionId : undefined
   }
@@ -1165,10 +1133,7 @@ export class TmuxSessionManager {
       }
 
       if (this.isHerdrBackend()) {
-        const readyForHerdrAttach = await this.ensureSessionReadyBeforeSpawn(
-          sessionId,
-          "deferred.attach",
-        )
+        const readyForHerdrAttach = await this.ensureSessionReadyBeforeSpawn(sessionId, "deferred.attach")
         if (!readyForHerdrAttach) {
           this.removeDeferredSession(sessionId)
           return
@@ -1248,10 +1213,7 @@ export class TmuxSessionManager {
         return
       }
 
-      const readyForDeferredAttach = await this.ensureSessionReadyBeforeSpawn(
-        sessionId,
-        "deferred.attach",
-      )
+      const readyForDeferredAttach = await this.ensureSessionReadyBeforeSpawn(sessionId, "deferred.attach")
       if (!readyForDeferredAttach) {
         this.removeDeferredSession(sessionId)
         return
@@ -1418,8 +1380,7 @@ export class TmuxSessionManager {
       return
     }
 
-    const isolatedPaneAlreadyClosed =
-      closeAction.type === "close" && closeAction.paneId === tracked.paneId
+    const isolatedPaneAlreadyClosed = closeAction.type === "close" && closeAction.paneId === tracked.paneId
 
     try {
       const result = await this.deps.executeAction(closeAction, {
@@ -1449,7 +1410,6 @@ export class TmuxSessionManager {
       isolatedPaneAlreadyClosed,
     })
   }
-
 
   private async closeSessionById(sessionId: string): Promise<void> {
     const tracked = this.sessions.get(sessionId)

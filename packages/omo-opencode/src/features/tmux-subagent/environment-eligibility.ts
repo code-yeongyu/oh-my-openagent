@@ -11,9 +11,9 @@ import { isNativeTmux, isTmuxPaneCompatible } from "../../shared/tmux"
  * unchanged.
  */
 export function selectTmuxManagerEnvironmentPredicate(
-	isolation: TmuxConfig["isolation"],
-	multiplexer: MultiplexerBackend = "tmux",
+  isolation: TmuxConfig["isolation"],
+  multiplexer: MultiplexerBackend = "tmux",
 ): () => boolean {
-	if (multiplexer === "herdr") return () => isHerdrBinaryCallable()
-	return isolation === "inline" ? isTmuxPaneCompatible : isNativeTmux
+  if (multiplexer === "herdr") return () => isHerdrBinaryCallable()
+  return isolation === "inline" ? isTmuxPaneCompatible : isNativeTmux
 }
