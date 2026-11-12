@@ -50,6 +50,43 @@ describe("project model_profile view (#13188)", () => {
     expect(JSON.stringify(reply)).not.toContain("sk-should-not-leave")
   })
 
+  test("#given provider_options secrets in model_profiles entries the schema accepts #when viewed #then only the resolver's fields leave the machine", () => {
+    const homeDir = home()
+    const folder = join(homeDir, "work", "secret")
+    mkdirSync(folder, { recursive: true })
+    const secretEntry = (model: string) => ({
+      model,
+      reasoning: "high",
+      provider_options: {
+        apiKey: "sk-should-not-leave",
+        headers: { Authorization: "Bearer sk-should-not-leave" },
+        baseURL: "https://user:sk-should-not-leave@gateway.example/v1",
+      },
+    })
+    writeConfig(homeDir, JSON.stringify({
+      model_profiles: { mine: { display_name: "Mine", family: "daily", models: ["a/b", secretEntry("a/c")] } },
+      model_pad: { labels: { daily: "Day" } },
+      profiles: { opus: { "[native]": { model_profiles: { deep: { tier: "heavy", models: [secretEntry("a/d")] } } } } },
+    }))
+    writeConfig(folder, JSON.stringify({ "[senpi]": { model_profiles: { local: { models: [secretEntry("a/e")] } } } }))
+
+    const reply = viewProjectModelProfile({ cwd: folder }, { env: { HOME: homeDir, OMO_PROFILE: "opus" } })
+
+    expect(reply).toStrictEqual({
+      kind: "ok",
+      layers: {
+        user: {
+          model_profiles: { mine: { display_name: "Mine", family: "daily", models: ["a/b", { model: "a/c", reasoning: "high" }] } },
+          model_pad: { labels: { daily: "Day" } },
+          profiles: { opus: { "[senpi]": { model_profiles: { deep: { tier: "heavy", models: [{ model: "a/d", reasoning: "high" }] } } } } },
+        },
+        project: { "[senpi]": { model_profiles: { local: { models: [{ model: "a/e", reasoning: "high" }] } } } },
+        activeProfile: "opus",
+      },
+    })
+    expect(JSON.stringify(reply)).not.toContain("sk-should-not-leave")
+  })
+
   test("#given a folder with no omo config and no profile #when viewed #then only the user layer is sent", () => {
     const homeDir = home()
     const folder = join(homeDir, "work", "bare")
