@@ -1992,8 +1992,8 @@
       "packages/web/proxy.ts": ["config"],
       // pre-existing at origin dev 4686e425b5: unused export(s) AGENT_COMMAND_RE, HUMAN_COMMAND_RE, BARE_BIN_RE, ALLOWLIST_RELATIVE_PATH, AUDIT_TEST_RELATIVE_PATH, SCAN_MODULE_RELATIVE_PATH, SCAN_TEST_RELATIVE_PATH, trackedSourceFiles
       "script/agent-command-string-scan.ts": ["AGENT_COMMAND_RE", "HUMAN_COMMAND_RE", "BARE_BIN_RE", "ALLOWLIST_RELATIVE_PATH", "AUDIT_TEST_RELATIVE_PATH", "SCAN_MODULE_RELATIVE_PATH", "SCAN_TEST_RELATIVE_PATH", "trackedSourceFiles"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) generatedCodexInstallerPath, CODEX_INSTALL_BUILD_MARKER_PREFIX, buildCodexInstaller
-      "script/build-codex-install.ts": ["generatedCodexInstallerPath", "CODEX_INSTALL_BUILD_MARKER_PREFIX", "buildCodexInstaller"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) generatedCodexInstallerPath, CODEX_INSTALL_BUILD_MARKER_PREFIX
+      "script/build-codex-install.ts": ["generatedCodexInstallerPath", "CODEX_INSTALL_BUILD_MARKER_PREFIX"],
       // pre-existing at origin dev 4686e425b5: unused export(s) buildReleaseBinary
       "script/build-omo-binary.ts": ["buildReleaseBinary"],
       // pre-existing at origin dev 4686e425b5: unused export(s) CATEGORY_COVERAGE_ENTRY, CATEGORY_COVERAGE_ARTIFACT, CATEGORY_COVERAGE_PRELUDE_ASSET, TASK_CONFIG_ENTRY, TASK_CONFIG_ARTIFACT
