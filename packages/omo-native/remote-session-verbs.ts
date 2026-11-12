@@ -254,6 +254,9 @@ async function sendTo(
     if ("delivery" in sent)
       follow.aim(
         sent.delivery.kind === "started" ? "started" : sent.delivery.kind === "steered" ? "steered" : "queued",
+        sent.delivery.kind === "queued" || sent.delivery.kind === "queued_offline"
+          ? sent.delivery.queue_position
+          : undefined,
       )
     const end = await follow.settled
     if (!json && reply.length > 0 && !reply.endsWith("\n")) dependencies.write("\n")

@@ -40,6 +40,7 @@ const ROW: RemoteSessionRow = {
 }
 
 const agentStart = (): JsonObject => ({ type: "agent_start" })
+const agentEnd = (): JsonObject => ({ type: "agent_end" })
 const delta = (text: string, contentIndex = 0): JsonObject => ({
   type: "message_update",
   assistantMessageEvent: { type: "text_delta", delta: text, contentIndex },
@@ -73,11 +74,11 @@ describe("#13267: a follow prints only the turn its own send started", () => {
     const follow = await followRemote(remote, ROW, (text) => printed.push(text))
     if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
     // The attach's replay of the previous turn (turn 6) arrives after watch() returned, as it does over the relay.
-    deliver([agentStart(), delta("pong\n"), settled()])
+    deliver([agentStart(), delta("pong\n"), agentEnd(), settled()])
     await flush()
     expect(printed).toEqual([])
     follow.aim("started")
-    deliver([agentStart(), delta("ping answer\n"), settled()])
+    deliver([agentStart(), delta("ping answer\n"), agentEnd(), settled()])
     expect(await withTimeout(follow.settled, 5_000, "waited 5s for the send's own agent_settled, never fired")).toBe(
       "settled",
     )
@@ -90,7 +91,7 @@ describe("#13267: a follow prints only the turn its own send started", () => {
     const printed: string[] = []
     const follow = await followRemote(remote, ROW, (text) => printed.push(text))
     if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
-    deliver([agentStart(), delta("pong\n"), settled()])
+    deliver([agentStart(), delta("pong\n"), agentEnd(), settled()])
     await flush()
     // The send's own turn (turn 7) started before the send's reply came back to aim the follow.
     deliver([agentStart(), delta("ping")])
@@ -104,21 +105,48 @@ describe("#13267: a follow prints only the turn its own send started", () => {
     follow.stop()
   })
 
-  test("#given a send queued behind a running turn #when that turn settles and the send's own turn runs #then only the send's own turn is written", async () => {
+  test("#given a send queued behind a running turn #when that turn ends and the send's own turn runs #then the send completes and only its own answer is written (the engine runs a queued follow-up right after agent_end, with no agent_settled between turns)", async () => {
     const { remote, deliver } = asyncReplaySurface()
     const printed: string[] = []
     const follow = await followRemote(remote, ROW, (text) => printed.push(text))
     if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
-    // The blocker turn (turn 6) is running when the send is queued behind it; its start is in the replayed buffer.
-    deliver([agentStart(), delta("still running")])
+    deliver([agentStart(), delta("running turn ")])
     await flush()
-    follow.aim("queued")
-    deliver([delta(" some more")])
-    expect(printed).toEqual([])
-    deliver([settled()])
-    deliver([agentStart(), delta("bravo answer\n"), settled()])
-    await withTimeout(follow.settled, 5_000, "waited 5s for the send's own agent_settled, never fired")
-    expect(printed).toEqual(["bravo answer\n"])
+    follow.aim("queued", 1)
+    deliver([delta("rest of running\n"), agentEnd()])
+    deliver([agentStart(), delta("own answer\n"), agentEnd(), settled()])
+    await withTimeout(follow.settled, 5_000, "a send queued behind a running turn never completed")
+    expect(printed).toEqual(["own answer\n"])
+    follow.stop()
+  })
+
+  test("#given a send queued behind a running turn after an earlier settled run #when the aim sees the blocker's open turn in the replay #then the blocker's text is never written as the answer", async () => {
+    const { remote, deliver } = asyncReplaySurface()
+    const printed: string[] = []
+    const follow = await followRemote(remote, ROW, (text) => printed.push(text))
+    if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
+    deliver([agentStart(), delta("earlier\n"), agentEnd(), settled(), agentStart(), delta("running turn ")])
+    await flush()
+    follow.aim("queued", 1)
+    deliver([delta("rest of running\n"), agentEnd()])
+    deliver([agentStart(), delta("own answer\n"), agentEnd(), settled()])
+    await withTimeout(follow.settled, 5_000, "a send queued behind a running turn never completed")
+    expect(printed).toEqual(["own answer\n"])
+    follow.stop()
+  })
+
+  test("#given a send queued behind two turns #when both run first #then only the send's own answer is written", async () => {
+    const { remote, deliver } = asyncReplaySurface()
+    const printed: string[] = []
+    const follow = await followRemote(remote, ROW, (text) => printed.push(text))
+    if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
+    deliver([agentStart(), delta("running "), agentEnd()])
+    await flush()
+    follow.aim("queued", 2)
+    deliver([agentStart(), delta("first queued\n"), agentEnd()])
+    deliver([agentStart(), delta("own answer\n"), agentEnd(), settled()])
+    await withTimeout(follow.settled, 5_000, "a send queued behind two turns never completed")
+    expect(printed).toEqual(["own answer\n"])
     follow.stop()
   })
 
@@ -127,7 +155,7 @@ describe("#13267: a follow prints only the turn its own send started", () => {
     const printed: string[] = []
     const follow = await followRemote(remote, ROW, (text) => printed.push(text))
     if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
-    deliver([agentStart(), delta("before the steer\n"), settled()])
+    deliver([agentStart(), delta("before the steer\n"), agentEnd(), settled()])
     await flush()
     follow.aim("steered")
     deliver([delta("steered answer\n"), settled()])

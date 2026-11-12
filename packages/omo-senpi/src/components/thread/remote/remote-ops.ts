@@ -152,12 +152,13 @@ export type RemoteFollow = {
   readonly settled: Promise<string>
   readonly stop: () => void
   /**
-   * Names how the send's delivery answered, once its reply is known: `started` arms at the turn the send starts (its
-   * records may already sit in the buffer, having outrun the reply), `queued` first skips the running turn's settle,
-   * `steered` prints from the aim, because the steered turn started before this follow. Until the aim nothing is
-   * written and nothing settles: the attach's replayed history is never this send's answer (#13267).
+   * Names how the send's delivery answered, once its reply is known: `started` arms at the turn the send starts
+   * (its records may already sit in the buffer, having outrun the reply), `queued` waits out the running turn and
+   * `queuePosition - 1` further whole turns before arming at the send's own, `steered` prints from the aim, because
+   * the steered turn started before this follow. Until the aim nothing is written and nothing settles: the attach's
+   * replayed history is never this send's answer (#13267).
    */
-  readonly aim: (lane: RemoteFollowLane) => void
+  readonly aim: (lane: RemoteFollowLane, queuePosition?: number) => void
 }
 
 const isRecord = (value: unknown): value is JsonObject =>
@@ -182,18 +183,48 @@ export async function followRemote(
   let last: { readonly index: unknown; readonly endsLine: boolean } | undefined
   let newMessage = false
   // Which records reach onText (#13267): `unaimed` buffers everything (an attach's replayed history is never this
-  // send's answer), `await-turn` drops records until the send's own `agent_start` (the wire's turn-open record, the
-  // pair of the `agent_settled` that ends it), `queued-wait` additionally drops the running turn's settle first (the
-  // send waits behind it), and `following` is the send's own turn.
+  // send's answer); a send that started its turn arms at its own `agent_start` (`await-turn`); a send queued at a
+  // position drops the running turn's records to its `agent_end` (`skip-running`) and then `position - 1` whole
+  // turns (`skip-starts`) - a queued follow-up runs right after the previous turn's `agent_end`, with no
+  // `agent_settled` between turns, because `agent_settled` ends the run, not each turn; `following` prints the
+  // send's own turn and settles at its `agent_end`.
   type Gate =
     | { kind: "unaimed"; buffered: JsonObject[] }
     | { kind: "await-turn" }
-    | { kind: "queued-wait" }
+    | { kind: "skip-running"; readonly skip: number }
+    | { kind: "skip-starts"; left: number }
     | { kind: "following" }
   let gate: Gate = { kind: "unaimed", buffered: [] }
+  const arm = (): void => {
+    last = undefined
+    newMessage = false
+    gate = { kind: "following" }
+  }
+  const receive = (record: JsonObject): void => {
+    const type = record["type"]
+    switch (gate.kind) {
+      case "unaimed":
+        gate.buffered.push(record)
+        return
+      case "await-turn":
+        if (type === "agent_start") arm()
+        return
+      case "skip-running":
+        if (type === "agent_end") gate = { kind: "skip-starts", left: gate.skip }
+        return
+      case "skip-starts":
+        if (type !== "agent_start") return
+        if (gate.left > 0) gate = { kind: "skip-starts", left: gate.left - 1 }
+        else arm()
+        return
+      case "following":
+        followRecord(record)
+        return
+    }
+  }
   const followRecord = (record: JsonObject): void => {
-    // senpi settles a turn the session's close cut short with reason session_closed: that turn never finished.
-    if (record["type"] === "agent_settled")
+    // The send's own turn completed (senpi settles a turn the session's close cut short with reason session_closed).
+    if (record["type"] === "agent_end" || record["type"] === "agent_settled")
       return settle(record["reason"] === "session_closed" ? "session_closed" : "settled")
     if (record["type"] === "message_start" || record["type"] === "message_end") newMessage = true
     const event = record["assistantMessageEvent"]
@@ -211,47 +242,59 @@ export async function followRemote(
     last = { index: event["contentIndex"], endsLine: delta.endsWith("\n") }
     onText(delta)
   }
-  const aim: RemoteFollow["aim"] = (lane) => {
+  const aim: RemoteFollow["aim"] = (lane, queuePosition = 1) => {
     if (gate.kind !== "unaimed") return
     const buffered = gate.buffered
-    let lastSettled = -1
+    let lastEnd = -1
     let openTurn = -1
+    let lastSettled = -1
+    const startsOfRun: number[] = []
     for (const [index, record] of buffered.entries()) {
-      if (record["type"] === "agent_settled") lastSettled = index
-      else if (record["type"] === "agent_start") openTurn = index
-    }
-    // The buffered turn that never settled is the send's own when the send started it or it follows a settled turn;
-    // for a queued send it is the running turn the send waits behind, so its settle is skipped first.
-    const ownTurn = openTurn > lastSettled && (lane === "started" || lastSettled >= 0)
-    last = undefined
-    newMessage = false
-    if (lane === "steered" || ownTurn) {
-      gate = { kind: "following" }
-      if (ownTurn) for (const record of buffered.slice(openTurn + 1)) followRecord(record)
-      return
-    }
-    gate = lane === "queued" && lastSettled < 0 ? { kind: "queued-wait" } : { kind: "await-turn" }
-  }
-  const watched = await remote.sessions.watch(row.device, row.session_id, (record) => {
-    const type = record["type"]
-    if (gate.kind === "unaimed") {
-      gate.buffered.push(record)
-      return
-    }
-    if (gate.kind === "await-turn") {
-      if (type === "agent_start") {
-        last = undefined
-        newMessage = false
-        gate = { kind: "following" }
+      const type = record["type"]
+      if (type === "agent_end") lastEnd = index
+      else if (type === "agent_start") {
+        openTurn = index
+        if (index > lastSettled) startsOfRun.push(index)
+      } else if (type === "agent_settled") {
+        lastSettled = index
+        startsOfRun.length = 0
       }
+    }
+    if (openTurn <= lastEnd) openTurn = -1
+    if (lane === "queued") {
+      // The open buffered turn is the running turn the send waits behind; replaying from it through the same machine
+      // lands on the send's own turn wherever the stream already holds it.
+      if (openTurn >= 0) {
+        gate = { kind: "skip-running", skip: queuePosition - 1 }
+        for (const record of buffered.slice(openTurn)) receive(record)
+        return
+      }
+      // No turn is running: within the current run (after its last `agent_settled`) the turn order is the running
+      // turn, then the queued messages ahead of this one, then this one.
+      if (startsOfRun.length >= queuePosition + 1) {
+        const own = startsOfRun[queuePosition] ?? -1
+        arm()
+        if (own >= 0) for (const record of buffered.slice(own + 1)) followRecord(record)
+        return
+      }
+      const ahead = Math.max(0, startsOfRun.length - 1)
+      gate = { kind: "skip-starts", left: queuePosition - 1 - ahead }
       return
     }
-    if (gate.kind === "queued-wait") {
-      if (type === "agent_settled") gate = { kind: "await-turn" }
+    if (lane === "steered") {
+      arm()
       return
     }
-    followRecord(record)
-  })
+    // started: a buffered open turn (no agent_end after it) is this send's own turn outrunning its reply; its
+    // records may already sit in the buffer.
+    if (openTurn >= 0) {
+      arm()
+      for (const record of buffered.slice(openTurn + 1)) followRecord(record)
+      return
+    }
+    gate = { kind: "await-turn" }
+  }
+  const watched = await remote.sessions.watch(row.device, row.session_id, receive)
   if (watched.kind !== "ok") return outcomeFailure(watched, row.device)
   void watched.watch.ended.then(settle)
   return { settled, stop: watched.watch.stop, aim }
