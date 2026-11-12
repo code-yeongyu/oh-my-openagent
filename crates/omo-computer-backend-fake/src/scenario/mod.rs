@@ -17,8 +17,8 @@ use serde::Deserialize;
 use serde_json::Value;
 
 pub use additions::{
-    AxNotification, BusyMark, ClipboardScript, FrameAxis, FramePolicy, HandIdentity, SecureFocus,
-    TargetExit,
+    AxNotification, BusyMark, ClipboardScript, FrameAxis, FramePolicy, HandIdentity,
+    NotificationPost, SecureFocus, TargetExit,
 };
 pub use events::{DisplaysChange, EpochEvent, EpochReason, IdentityChange};
 pub use invalid::{field_names, InvalidKind, ScenarioInvalid};
@@ -73,6 +73,8 @@ pub struct FakeScenario {
     pub ax_notification_timeline: Vec<AxNotification>,
     /// Loading indicators by fake-clock time.
     pub busy_timeline: Vec<BusyMark>,
+    /// Notifications by fake-clock time; absent scripts a host with no notification surface.
+    pub notification_timeline: Option<Vec<NotificationPost>>,
     pub secure_focus: Option<SecureFocus>,
     pub secure_input_on: bool,
     pub clipboard: Option<ClipboardScript>,

@@ -9,6 +9,7 @@ use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
 
 use crate::listing::Surface;
+use crate::observation::ObservationSettle;
 use crate::untrusted::UntrustedText;
 
 use super::disposition::Disposition;
@@ -43,6 +44,9 @@ pub struct ReportParts {
     pub audit_ids: Vec<String>,
     #[serde(default)]
     pub timings: Option<Timings>,
+    /// The post-send settle: the regime picked and its outcome.
+    #[serde(default)]
+    pub settle: Option<ObservationSettle>,
     pub evidence: Vec<Evidence>,
     /// Required on the wire: a report without `{untrustedText: true}` does not parse.
     pub observation: UntrustedText,
@@ -72,6 +76,8 @@ pub struct ActionReport {
     audit_ids: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     timings: Option<Timings>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    settle: Option<ObservationSettle>,
     evidence: Vec<Evidence>,
     observation: UntrustedText,
 }
@@ -137,6 +143,11 @@ impl ActionReport {
         &self.audit_ids
     }
 
+    #[must_use]
+    pub const fn settle(&self) -> Option<&ObservationSettle> {
+        self.settle.as_ref()
+    }
+
     fn from_checked(parts: ReportParts) -> Self {
         Self {
             disposition: parts.disposition,
@@ -151,6 +162,7 @@ impl ActionReport {
             warning: parts.warning,
             audit_ids: parts.audit_ids,
             timings: parts.timings,
+            settle: parts.settle,
             evidence: parts.evidence,
             observation: parts.observation,
         }

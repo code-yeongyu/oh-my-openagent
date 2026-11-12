@@ -25,6 +25,16 @@ pub struct BusyMark {
     pub indicator: Option<String>,
 }
 
+/// One notification the notification surface lists from fake-clock time `t_ms` on.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NotificationPost {
+    pub t_ms: u64,
+    pub app: String,
+    pub title: String,
+    pub body: String,
+}
+
 /// The focused element of `window` is a secure field.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]

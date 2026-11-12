@@ -119,4 +119,7 @@ pub struct Timings {
     pub verify: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub restore: Option<u64>,
+    /// Milliseconds the post-send settle waited (its `settle.waitedMs`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settle_ms: Option<u64>,
 }

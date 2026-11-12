@@ -89,6 +89,9 @@ pub struct ObservationSettle {
     pub indicator: Option<BusyIndicator>,
     pub quiet_ms: u64,
     pub waited_ms: u64,
+    /// The regime of `settle_profile` the engine picked.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub regime: Option<crate::settle_profile::SettleRegime>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]

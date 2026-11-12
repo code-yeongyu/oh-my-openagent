@@ -261,6 +261,17 @@ impl Backend for FakeBackend {
     fn ax_reader(&mut self) -> Option<&mut dyn omo_computer_core::ax::AxReader> {
         Some(self)
     }
+
+    fn clock(&self) -> Option<&dyn omo_computer_core::backend::BackendClock> {
+        Some(&self.clock)
+    }
+
+    fn settle_source(&mut self) -> Option<Box<dyn omo_computer_core::backend::SettleSource>> {
+        Some(Box::new(crate::settle_source::FakeSettleSource::new(
+            self.shared.clone(),
+            self.clock.clone(),
+        )))
+    }
 }
 
 #[cfg(test)]

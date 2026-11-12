@@ -42,6 +42,9 @@ impl Session {
         if let Some(frame) = mutation.frame_refusal {
             return Err(self.refuse(record, Some("Frame".to_owned()), frame.refusal().into()));
         }
+        if let Err(busy) = self.busy_before_send(target) {
+            return Err(self.refuse(record, Some("Busy".to_owned()), busy.into()));
+        }
         let _permit = self.funnel.permits.try_take(PermitKind::Exec);
         match self.funnel.recover(&call_id) {
             Err(refused) => return Err(self.refuse(record, Some("Marker".to_owned()), refused)),
@@ -76,7 +79,10 @@ impl Session {
         if let Some((target, frame_id)) = mutation.consume.as_ref().filter(|_| count > 0) {
             self.frames.consume(target, frame_id);
         }
-        let read_back = report::read_back(report::settle());
+        let settled = (failure.is_none() && count > 0)
+            .then(|| self.settle_after_send(target))
+            .flatten();
+        let read_back = report::read_back(report::settle(settled.as_ref()));
         match failure {
             Some(refusal) if count == 0 => {
                 let issuer = record.marker.binding.issuer.clone();
@@ -117,6 +123,7 @@ impl Session {
                     count,
                     of,
                     effect: read_back.effect,
+                    settle: settled.as_ref().map(crate::settle::Settled::wire),
                     warning: appended.is_err().then(|| "write_failed".to_owned()),
                     audit_id: appended.ok(),
                 };
