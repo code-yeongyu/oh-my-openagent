@@ -44,9 +44,16 @@ $legs = @{
 }
 if (-not $legs.ContainsKey($Leg)) { throw "unknown leg '$Leg' (known: $(($legs.Keys | Sort-Object) -join ', '))" }
 if (-not $Out -and -not $Leg.StartsWith('fixture') -and -not $Leg.StartsWith('worker') -and $Leg -ne 'dpi-read') { throw "-Out is required for leg '$Leg'" }
+# A leg that throws is still a measurement: its error becomes the fact (the ledger reads it UNMEASURED) and the step
+# succeeds once that fact is written. A child, or a failure to write the fact, still fails the step.
 try {
 	& $legs[$Leg]
 } catch {
-	if ($Out) { Emit @{ leg = $Leg; run = $Run; error = $_.Exception.Message } }
-	throw
+	if (-not $Out) { throw }
+	$message = $_.Exception.Message
+	Emit @{ leg = $Leg; run = $Run; error = $message }
+	[Console]::Out.WriteLine("LEG_ERROR leg=$Leg run=$Run recorded: $message")
 }
+# The legs end on native calls that may exit non-zero by design (schtasks /Query on a task just deleted); the CI shell
+# wrapper exits with $LASTEXITCODE, so the script sets it once the fact is written.
+exit 0

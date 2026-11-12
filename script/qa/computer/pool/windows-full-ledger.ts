@@ -14,46 +14,38 @@ export type LegId = "elevated" | "lock" | "disconnect" | "mixed-dpi" | "secure-d
 type Leg = {
   readonly leg: LegId
   readonly question: string
-  readonly scenario: string
   readonly job: "host" | "session"
   readonly judge: (f: Facts) => Reading
 }
 
-// `scenario` is the name a later Windows backend row adds to script/qa/computer/windows.ts; until the driver quotes
-// it the leg is reported blocked with backend_not_built, never run and never counted as a pass.
 export const LEGS: readonly Leg[] = [
   {
     leg: "elevated",
     question: "q1 can the engine run at medium integrity beside an elevated fixture",
-    scenario: "elevated-target-refused",
     job: "host",
     judge: verdictElevated,
   },
   {
     leg: "lock",
     question: "q2 can the session be locked and unlocked from a scheduled task",
-    scenario: "screen-locked-last",
     job: "session",
     judge: verdictLock,
   },
   {
     leg: "disconnect",
     question: "q3 can the session be disconnected and reconnected",
-    scenario: "session-disconnected-capture",
     job: "session",
     judge: verdictDisconnect,
   },
   {
     leg: "mixed-dpi",
     question: "q4 can a second virtual monitor at 150 % scaling be added through an indirect display driver",
-    scenario: "mixed-dpi-capture",
     job: "host",
     judge: verdictMixedDpi,
   },
   {
     leg: "secure-desktop",
     question: "q5 is the elevation prompt's secure desktop reachable for the refusal leg",
-    scenario: "secure-desktop-refused",
     job: "host",
     judge: verdictSecureDesktop,
   },
@@ -177,40 +169,4 @@ export const planLine = (p: PlannedLeg): string =>
 export function decideTier(plan: readonly PlannedLeg[]): "hosted" | "guest" | "partial" {
   if (plan.every((p) => p.tier === "hosted")) return "hosted"
   return plan.some((p) => p.tier === "blocked") ? "partial" : "guest"
-}
-
-export function scenarioBuilt(driverSource: string | null, scenario: string): boolean {
-  return driverSource !== null && (driverSource.includes(`"${scenario}"`) || driverSource.includes(`'${scenario}'`))
-}
-
-export type SetCounts = {
-  readonly pass: number
-  readonly fail: number
-  readonly blocked: number
-  readonly notBuilt: number
-}
-
-export function setLine(tier: "hosted" | "guest", c: SetCounts): string {
-  const base = `SET windows-full tier=${tier} pass=${c.pass} fail=${c.fail} blocked=${c.blocked}`
-  return c.notBuilt > 0 && c.notBuilt === c.blocked ? `${base} reason=backend_not_built` : base
-}
-
-export type JobState = "started" | "queued" | "absent"
-
-export function guestJobState(
-  jobs: readonly { readonly name: string; readonly status: string }[],
-  name: string,
-): JobState {
-  const job = jobs.find((j) => j.name === name)
-  if (!job) return "absent"
-  return job.status === "queued" || job.status === "waiting" || job.status === "pending" ? "queued" : "started"
-}
-
-export function decideWatch(
-  state: JobState,
-  elapsedS: number,
-  deadlineS: number,
-): "ok" | "wait" | "runner_unavailable" {
-  if (state === "started") return "ok"
-  return elapsedS >= deadlineS ? "runner_unavailable" : "wait"
 }

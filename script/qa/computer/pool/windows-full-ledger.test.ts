@@ -1,18 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-  decideTier,
-  decideWatch,
-  guestJobState,
-  LEGS,
-  ledgerRows,
-  ledgerTsv,
-  parseFacts,
-  planLegs,
-  scenarioBuilt,
-  setLine,
-  validateLedger,
-} from "./windows-full-ledger.ts"
+import { decideTier, LEGS, ledgerRows, ledgerTsv, parseFacts, planLegs, validateLedger } from "./windows-full-ledger.ts"
 import { combineRuns, type Facts } from "./windows-full-verdicts.ts"
 
 const elevated = (run: number): Facts => ({
@@ -69,7 +57,7 @@ describe("[ADP-26] runs, ledger and validation", () => {
   })
 })
 
-describe("[ADP-26] tier plan, runs and the guest watchdog", () => {
+describe("[ADP-26] tier plan", () => {
   const verdicts = {
     elevated: "CONFIRMS",
     lock: "UNMEASURED",
@@ -96,39 +84,5 @@ describe("[ADP-26] tier plan, runs and the guest watchdog", () => {
       "secure-desktop": "CONFIRMS",
     } as const
     expect(decideTier(planLegs(all, false))).toBe("hosted")
-  })
-
-  test("a scenario is built only when the driver quotes its name", () => {
-    expect(scenarioBuilt(null, "screen-locked-last")).toBe(false)
-    expect(scenarioBuilt('const S = ["screen-locked-last-x"]', "screen-locked-last")).toBe(false)
-    expect(scenarioBuilt('const S = ["screen-locked-last"]', "screen-locked-last")).toBe(true)
-  })
-
-  test("the set line names backend_not_built only when it is the reason", () => {
-    expect(setLine("hosted", { pass: 0, fail: 0, blocked: 2, notBuilt: 2 })).toBe(
-      "SET windows-full tier=hosted pass=0 fail=0 blocked=2 reason=backend_not_built",
-    )
-    expect(setLine("guest", { pass: 1, fail: 0, blocked: 0, notBuilt: 0 })).toBe(
-      "SET windows-full tier=guest pass=1 fail=0 blocked=0",
-    )
-  })
-
-  test("the watchdog fails with runner_unavailable when the guest job has not started by the deadline", () => {
-    const jobs = [
-      { name: "computer live windows-full (guest)", status: "queued" },
-      { name: "computer live windows-full (host)", status: "completed" },
-    ]
-    expect(guestJobState(jobs, "computer live windows-full (guest)")).toBe("queued")
-    expect(guestJobState([], "computer live windows-full (guest)")).toBe("absent")
-    expect(
-      guestJobState(
-        [{ name: "computer live windows-full (guest)", status: "in_progress" }],
-        "computer live windows-full (guest)",
-      ),
-    ).toBe("started")
-    expect(decideWatch("queued", 100, 900)).toBe("wait")
-    expect(decideWatch("queued", 900, 900)).toBe("runner_unavailable")
-    expect(decideWatch("absent", 900, 900)).toBe("runner_unavailable")
-    expect(decideWatch("started", 10, 900)).toBe("ok")
   })
 })
