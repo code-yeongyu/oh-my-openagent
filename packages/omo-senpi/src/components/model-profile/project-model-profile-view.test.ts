@@ -5,7 +5,7 @@ import { mkdirSync, realpathSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { testTempDir } from "../../../test-support/temp-dir"
-import { viewProjectModelProfile } from "./project-model-profile-rpc"
+import { viewProjectModelProfile } from "./project-model-profile-view"
 
 function home(): string {
   return realpathSync(testTempDir("omo-model-profile-view-home-"))

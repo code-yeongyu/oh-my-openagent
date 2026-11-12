@@ -2,15 +2,12 @@ import { execFileSync } from "node:child_process"
 import { randomUUID } from "node:crypto"
 import { existsSync, rmSync, statSync } from "node:fs"
 import { userInfo } from "node:os"
-import { join } from "node:path"
 
 import {
   loadOmoConfig,
-  type OmoConfigEnv,
   OmoConfigWriteError,
   type OmoConfigWriteFileSystem,
   resolveHomeDir,
-  resolveOmoProfileName,
   updateOmoConfig,
 } from "@oh-my-opencode/omo-config-core"
 
@@ -18,6 +15,8 @@ import { log } from "@oh-my-opencode/utils"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { BUILTIN_MODEL_PROFILES } from "./builtin-profiles"
+import { projectConfigPath } from "./project-config-path"
+import { viewProjectModelProfile } from "./project-model-profile-view"
 
 /**
  * Read and set a folder's `model_profile` (its `.omo/omo.jsonc`) over RPC (#13188), so a client that reaches a
@@ -37,20 +36,6 @@ export const PROJECT_MODEL_PROFILE_SET = "omo.project.model_profile.set"
  * them, the same one it runs on a local folder, so local and remote show one structure.
  */
 export const PROJECT_MODEL_PROFILE_VIEW = "omo.project.model_profile.view"
-
-/** Only the keys a model-profile resolver reads leave the machine; the rest of a config file (servers, secrets) never does. */
-export type ModelProfileLayer = Readonly<Record<string, unknown>>
-
-export type ProjectModelProfileViewReply =
-  | {
-      readonly kind: "ok"
-      readonly layers: {
-        readonly user: ModelProfileLayer
-        readonly project?: ModelProfileLayer
-        readonly activeProfile?: string
-      }
-    }
-  | { readonly kind: "refused"; readonly code: "no_session"; readonly message: string }
 
 export interface ProjectModelProfileState {
   readonly path: string
@@ -163,13 +148,6 @@ function removeBackup(path: string, deps: ProjectModelProfileDeps): void {
   ;(deps.removeFile ?? ((file: string) => rmSync(file, { force: true })))(path)
 }
 
-function projectConfigPath(cwd: string): string {
-  const jsonc = join(cwd, ".omo", "omo.jsonc")
-  if (existsSync(jsonc)) return jsonc
-  const json = join(cwd, ".omo", "omo.json")
-  return existsSync(json) ? json : jsonc
-}
-
 export function readProjectModelProfile(cwd: string): ProjectModelProfileState & { readonly profileIds: ReadonlySet<string> } {
   const path = projectConfigPath(cwd)
   const loaded = loadOmoConfig({ cwd })
@@ -204,59 +182,6 @@ const refused = (code: ProjectModelProfileRefusalCode, message: string): Project
 const stateReply = (cwd: string): ProjectModelProfileReply => {
   const { profileIds: _ids, ...state } = readProjectModelProfile(cwd)
   return { kind: "ok", ...state }
-}
-
-const MODEL_PROFILE_KEYS = ["model_profile", "model_profiles", "model_pad"] as const
-// The loader folds a legacy `[senpi]` block into the canonical `[native]` one (`[native]` wins each key). A client's
-// resolver reads the harness block as `[senpi]`, the key users write, so the merged block is sent under that key.
-const LEGACY_HARNESS_BLOCK = "[senpi]"
-const HARNESS_BLOCK = "[native]"
-
-const asRecord = (value: unknown): Readonly<Record<string, unknown>> | null =>
-  typeof value === "object" && value !== null && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : null
-
-function modelProfileKeys(config: Readonly<Record<string, unknown>>, withProfiles: boolean): Record<string, unknown> {
-  const kept: Record<string, unknown> = {}
-  for (const key of MODEL_PROFILE_KEYS) if (config[key] !== undefined) kept[key] = config[key]
-  const harness = { ...(asRecord(config[LEGACY_HARNESS_BLOCK]) ?? {}), ...(asRecord(config[HARNESS_BLOCK]) ?? {}) }
-  const harnessKeys = modelProfileKeys(harness, false)
-  if (Object.keys(harnessKeys).length > 0) kept[LEGACY_HARNESS_BLOCK] = harnessKeys
-  const profiles = withProfiles ? asRecord(config["profiles"]) : null
-  if (profiles !== null) {
-    const keptProfiles: Record<string, unknown> = {}
-    for (const [name, value] of Object.entries(profiles)) {
-      const profile = asRecord(value)
-      if (profile === null) continue
-      const inner = modelProfileKeys(profile, false)
-      if (Object.keys(inner).length > 0) keptProfiles[name] = inner
-    }
-    if (Object.keys(keptProfiles).length > 0) kept["profiles"] = keptProfiles
-  }
-  return kept
-}
-
-export function viewProjectModelProfile(
-  session: Pick<ProjectModelProfileSession, "cwd"> | undefined,
-  deps: { readonly env?: OmoConfigEnv } = {},
-): ProjectModelProfileViewReply {
-  if (session === undefined) return { kind: "refused", code: "no_session", message: "No session is bound to answer for a folder." }
-  const env = deps.env ?? process.env
-  const loaded = loadOmoConfig({ cwd: session.cwd, env })
-  const userLayer = loaded.layers.find((layer) => layer.source.scope === "user")
-  const projectPath = projectConfigPath(session.cwd)
-  // A home folder's file is the user layer; the loader never also lists it as a project layer.
-  const projectLayer = loaded.layers.find(
-    (layer) => layer.source.scope === "project" && layer.source.path === projectPath && layer.source.path !== userLayer?.source.path,
-  )
-  const activeProfile = resolveOmoProfileName({ env })
-  return {
-    kind: "ok",
-    layers: {
-      user: modelProfileKeys(userLayer?.config ?? {}, true),
-      ...(projectLayer === undefined ? {} : { project: modelProfileKeys(projectLayer.config, true) }),
-      ...(activeProfile === undefined ? {} : { activeProfile }),
-    },
-  }
 }
 
 export function getProjectModelProfile(
