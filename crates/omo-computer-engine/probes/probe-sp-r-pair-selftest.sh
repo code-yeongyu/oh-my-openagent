@@ -33,6 +33,8 @@ check() { # name, condition result (0 = pass), detail
 }
 # A fake device service: a process whose command line holds "omo-device-service run", listening as asked.
 mkdir -p "$work/svc/bin/9.9.9"
+# The helper must read this fake, not a real device service that may run on the test host.
+export SP_R_PAIR_SERVICE_MATCH="$work/svc/bin/9.9.9/omo-device-service run"
 cat > "$work/svc/bin/9.9.9/omo-device-service" << 'EOF'
 const mode = process.argv[3] ?? "none"
 const s = { data() {} }
@@ -57,7 +59,7 @@ leftovers() { # processes or temp files the helper left behind
   f=$(ls -d "${TMPDIR:-/tmp}"/sp-r-state.* 2> /dev/null | wc -l | tr -d ' ')
   echo $((n + f))
 }
-field() { sed -n "s/.*\\b$1=\\([^ ]*\\).*/\\1/p" "$work/out" | head -1; }
+field() { tr ' ' '\n' < "$work/out" | sed -n "s/^$1=//p" | head -1; }
 
 # 1. lsof missing: a PATH that has every tool the helper uses except lsof.
 mkdir -p "$work/nolsof"
@@ -109,14 +111,15 @@ check "no device service -> device_service=absent" "$([ $rc -eq 0 ] && [ "$(fiel
 start_svc any
 mkdir -p "$work/slow"
 printf '#!/bin/sh\nsleep 30\n' > "$work/slow/lsof" && chmod +x "$work/slow/lsof"
+# Ctrl-C reaches the whole process group, so the helper runs as its own job and the group gets the signal.
+set -m
 SP_R_PAIR_MAX_LOAD=100000 PATH="$work/slow:$PATH" sh "$helper" state > "$work/out" 2>&1 &
 hp=$!
+set +m
 sleep 2
-kill -INT "$hp" 2> /dev/null
-kill -TERM "$hp" 2> /dev/null
+kill -INT -- "-$hp" 2> /dev/null
 wait "$hp" 2> /dev/null
 sleep 1
-pkill -f "$work/slow/lsof" 2> /dev/null
 check "interrupt mid-run -> nothing left behind" "$([ "$(leftovers)" = 0 ] && echo 0 || echo 1)" "$(leftovers) leftovers"
 
 # 10. the helper never writes a fixed temp name.

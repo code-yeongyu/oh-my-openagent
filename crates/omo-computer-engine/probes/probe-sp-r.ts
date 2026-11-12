@@ -9,12 +9,13 @@
 // here, signed by a key generated for the run and served by a loopback key server. No account, no hosted relay.
 // The relay's wire details stay in that private checkout: this file uses only its harness API, and reads the socket
 // route and the token claim shape from the checkout at run time.
-// Same-network (lan) rows stay UNMEASURED until a same-network pair of machines is measured.
+// Same-network rows read a same-network pair through SP_R_PAIR_A/B (probe-sp-r-pair.sh); --self-test checks every
+// verdict rule by class without a relay or a pair.
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 
 const HEADER = ["id", "pipe", "question", "measured", "verdict", "rerun", "host_build", "note"]
-const LAN_REASON: string = "disabled by the relay owner ruling of 2026-11-11 (#953)"
+const LAN_REASON = "disabled by the relay daemon owner's ruling of 2026-11-11"
 type Verdict = "CONFIRMS" | "CONTRADICTS" | "NEW-EDGE" | "UNMEASURED"
 type Row = Readonly<{
   id: string
@@ -28,17 +29,19 @@ type Row = Readonly<{
 // ---- pure decisions (no I/O): every row's verdict passes through these, and --self-test exercises them ---------------
 type Run = Readonly<{ measured: string; verdict: Verdict; note: string; errored?: true }>
 type PairOut = Readonly<{ ok: true; fields: Record<string, string> }> | Readonly<{ ok: false; why: string }>
-/** A row's outcome; a thrown probe error is turned into a verdict here. */
+/** A failed measurement: UNMEASURED with its reason, flagged so --verify can never count it as a match. */
+const failedRun = (why: string): Run => ({ measured: "-", verdict: "UNMEASURED", note: why, errored: true })
+/** A row's outcome; a thrown probe error becomes UNMEASURED with the error as its reason. */
 const settle = async (run: () => Promise<Run>): Promise<Run> => {
   try {
     return await run()
   } catch (e) {
-    return { measured: `probe error: ${e instanceof Error ? e.message : String(e)}`, verdict: "CONTRADICTS", note: "" }
+    return failedRun(`probe error: ${e instanceof Error ? e.message : String(e)}`)
   }
 }
-/** --verify: does a fresh outcome match the ledger's verdict? */
-const verdictMatches = (ledger: Verdict, r: Run): boolean => ledger === r.verdict
-/** The pair helper's exit code and stdout, as one host's result. */
+/** --verify: a fresh outcome matches the ledger only when it was measured (never when a failure produced it). */
+const verdictMatches = (ledger: Verdict, r: Run): boolean => r.errored !== true && ledger === r.verdict
+/** The pair helper's exit code and stdout, as one host's result: only exit 0 with the helper's own fields counts. */
 const parsePairOut = (side: "A" | "B", code: number, out: string): PairOut => {
   if (code === 75 || out.startsWith("busy"))
     return { ok: false, why: `host ${side} load at or above its core count, stopped` }
@@ -46,10 +49,12 @@ const parsePairOut = (side: "A" | "B", code: number, out: string): PairOut => {
     return { ok: false, why: `precondition missing on host ${side}: ${out.trim().split("\n").pop() ?? ""}` }
   if (code !== 0) return { ok: false, why: `host ${side} unreachable or dropped mid-run (exit ${code})` }
   const fields: Record<string, string> = {}
-  for (const m of out.matchAll(/([a-z_]+)=([^\s]*)/g)) if (m[1] !== undefined) fields[m[1]] = m[2] ?? ""
+  for (const m of out.matchAll(/(?:^|\s)([a-z_]+)=([^\s]*)/g)) if (m[1] !== undefined) fields[m[1]] = m[2] ?? ""
+  if (fields["load"] === undefined)
+    return { ok: false, why: `host ${side} returned no helper fields (exit 0): its exec prefix ran nothing` }
   return { ok: true, fields }
 }
-/** The shell command that runs the pair helper on one host through its exec prefix. */
+/** The shell command that runs the pair helper on one host through its exec prefix (the prefix must keep argv). */
 const pairCommand = (prefix: string, helperB64: string, helperArgs: string): string =>
   `${prefix} sh -c "echo ${helperB64} | base64 -d | sh -s -- ${helperArgs}"`
 type ReproveQa = Readonly<{
@@ -58,7 +63,7 @@ type ReproveQa = Readonly<{
 }>
 /** R-AUTH-4 (re-proof client) and R-AUTH-5 (client without re-proof) from the relay's own re-proof QA. */
 const reproveRun = (m: ReproveQa | null, client: "reprove" | "legacy", note: string): Run => {
-  if (m === null) return { measured: "relay re-proof QA did not report", verdict: "CONTRADICTS", note }
+  if (m === null) return failedRun("the relay checkout's re-proof QA reported nothing")
   if (client === "reprove")
     return {
       measured: `hub evicted ${m.after.hibernated}/1, reconnects per refresh ${m.after.reconnectsPerRefresh}, re-proof ${m.after.reproveMs.join("/")} ms`,
@@ -71,54 +76,85 @@ const reproveRun = (m: ReproveQa | null, client: "reprove" | "legacy", note: str
     note,
   }
 }
+/** The close code the relay sends when its dead window ends a silent channel. */
+const DEAD_WINDOW_CLOSE = 4000
 type Silent = Readonly<{ openAt150: boolean; closedAfterS: number | null; closeCode: number | null; evicted: boolean }>
-/** R-HIB-5 (how long a silent channel lives) and R-LIVE-120-2 (does it outlive 120 s). */
+/** R-HIB-5 (how long a silent channel lives) and R-LIVE-120-2 (does it outlive 120 s): only the dead-window close counts. */
 const silentRun = (m: Silent, row: "R-HIB-5" | "R-LIVE-120-2", note: string): Run => {
-  const short = m.closedAfterS !== null && m.closedAfterS < 120
+  if (m.openAt150) return { measured: "open at 150 s", verdict: row === "R-HIB-5" ? "CONTRADICTS" : "CONFIRMS", note }
+  if (m.closedAfterS === null || m.closeCode !== DEAD_WINDOW_CLOSE)
+    return failedRun(
+      `closed after ${m.closedAfterS ?? "?"} s with code ${m.closeCode ?? "none"}, not the relay's dead-window close (${DEAD_WINDOW_CLOSE})`,
+    )
+  const short = m.closedAfterS < 120
   if (row === "R-HIB-5")
     return {
-      measured: m.openAt150
-        ? "open at 150 s"
-        : `closed after ${m.closedAfterS} s, code ${m.closeCode}, hub evicted ${m.evicted}`,
+      measured: `closed after ${m.closedAfterS} s, code ${m.closeCode}, hub evicted ${m.evicted}`,
       verdict: short ? "NEW-EDGE" : "CONTRADICTS",
       note,
     }
   return {
-    measured: m.openAt150 ? "open at 150 s" : `closed after ${m.closedAfterS} s`,
+    measured: `closed after ${m.closedAfterS} s, code ${m.closeCode}`,
     verdict: short ? "CONTRADICTS" : "CONFIRMS",
     note,
   }
 }
-/** L-STATE-*: the pair helper's state fields for one host. */
+/** L-STATE-*: a zero is trusted only after the helper's positive lsof control passed and the target was visible. */
 const stateRun = (m: PairOut, note: string): Run => {
-  if (!m.ok) return { measured: "-", verdict: "UNMEASURED", note: m.why }
+  if (!m.ok) return failedRun(m.why)
   const f = m.fields
+  if (f["device_service"] !== "running") return failedRun("no device service running on the host")
+  if (f["control"] !== "ok" || f["target_visible"] !== "yes")
+    return failedRun(
+      `lsof positive control did not pass (control=${f["control"] ?? "none"}, target_visible=${f["target_visible"] ?? "none"})`,
+    )
   const off = f["listeners_off_loopback"] === "0" && f["udp_discovery_sockets"] === "0"
   return {
-    measured: `device service ${f["device_service"] ?? "?"} ${f["version"] ?? ""}; listeners ${f["listeners_total"] ?? "?"} (off loopback ${f["listeners_off_loopback"] ?? "?"}); discovery sockets ${f["udp_discovery_sockets"] ?? "?"}; load ${f["load"] ?? "?"}/${f["cores"] ?? "?"}`,
-    verdict: f["device_service"] === "running" && off ? "CONTRADICTS" : "NEW-EDGE",
+    measured: `lsof control ok (${f["control_listeners"] ?? "?"} listeners seen, ${f["control_off_loopback"] ?? "?"} off loopback); device service ${f["version"] ?? ""}; listeners ${f["listeners_total"] ?? "?"} (off loopback ${f["listeners_off_loopback"] ?? "?"}); unix sockets ${f["unix_sockets"] ?? "?"}; discovery sockets ${f["udp_discovery_sockets"] ?? "?"}; load ${f["load"] ?? "?"}/${f["cores"] ?? "?"}`,
+    verdict: off ? "CONTRADICTS" : "NEW-EDGE",
     note,
   }
 }
-/** Waits for a socket to open (bounded by ms). */
-const awaitOpen = (ws: WebSocket, _ms = 10_000): Promise<void> =>
-  new Promise<void>((ok) => {
-    ws.onopen = () => ok()
+/** Waits for a socket to open: an error, a close or ms without an open rejects (the caller's row is UNMEASURED). */
+const awaitOpen = (ws: WebSocket, ms = 10_000): Promise<void> =>
+  new Promise<void>((ok, no) => {
+    const timer = setTimeout(() => {
+      ws.close()
+      no(new Error(`socket did not open within ${ms} ms`))
+    }, ms)
+    ws.addEventListener("open", () => (clearTimeout(timer), ok()), { once: true })
+    ws.addEventListener("error", () => (clearTimeout(timer), no(new Error("socket failed to open"))), { once: true })
+    ws.addEventListener("close", (e) => (clearTimeout(timer), no(new Error(`socket closed before open (${e.code})`))), {
+      once: true,
+    })
   })
 /** Runs the pair helper on one host through its exec prefix and reads its result. */
 const runOnPair = async (prefix: string, helperB64: string, helperArgs: string, timeoutS: number): Promise<PairOut> => {
-  const proc = Bun.spawn(["sh", "-c", pairCommand(prefix, helperB64, helperArgs)], { stdout: "pipe", stderr: "ignore" })
-  const timer = setTimeout(() => proc.kill(), timeoutS * 1000)
-  const out = await new Response(proc.stdout).text()
-  const code = await proc.exited
-  clearTimeout(timer)
-  return parsePairOut("A", code, out)
+  const run = async (cmd: string): Promise<{ code: number; out: string }> => {
+    const proc = Bun.spawn(["sh", "-c", cmd], { stdout: "pipe", stderr: "ignore" })
+    const timer = setTimeout(() => proc.kill(), timeoutS * 1000)
+    const out = await new Response(proc.stdout).text()
+    const code = await proc.exited
+    clearTimeout(timer)
+    return { code, out }
+  }
+  // A prefix that joins its arguments into one string (ssh does) would run "sh -c echo" and return nothing; refuse it.
+  const canary = await run(`${prefix} sh -c 'echo sp-r-argv-$((6*7))'`)
+  if (!canary.out.includes("sp-r-argv-42"))
+    return { ok: false, why: `host A exec prefix does not keep its arguments (canary exit ${canary.code})` }
+  const r = await run(pairCommand(prefix, helperB64, helperArgs))
+  return parsePairOut("A", r.code, r.out)
 }
 /** R-HOSTED-1-*: the hosted silent unadmitted socket against the relay's hello deadline and the local close code. */
 const hostedRun = (m: PairOut, ref: { afterOpenMs: number; code: string }, deadlineMs: number, note: string): Run => {
-  if (!m.ok) return { measured: "-", verdict: "UNMEASURED", note: m.why }
-  const ms = Number(m.fields["closed_after_open_ms"] ?? "-1")
-  const code = m.fields["code"] ?? "?"
+  if (!m.ok) return failedRun(m.why)
+  const opened = Number(m.fields["opened_ms"] ?? "NaN")
+  const ms = Number(m.fields["closed_after_open_ms"] ?? "NaN")
+  const code = m.fields["code"] ?? ""
+  if (!(opened >= 0) || !(ms >= 0) || !/^\d+$/.test(code))
+    return failedRun(
+      `hosted socket gave no close result (opened_ms=${m.fields["opened_ms"] ?? "none"}, code=${code || "none"})`,
+    )
   const ok = ms >= deadlineMs - 500 && ms <= deadlineMs + 2_000 && code === ref.code
   return {
     measured: `hosted closed ${ms} ms after open, code ${code}; hello deadline ${deadlineMs} ms; local relay (this run, loaded build host) closed ${ref.afterOpenMs} ms after open, code ${ref.code}`,
@@ -128,9 +164,9 @@ const hostedRun = (m: PairOut, ref: { afterOpenMs: number; code: string }, deadl
 }
 /** Rows whose rerun needs the same-network pair and the hosted relay configured. */
 const PAIR_IDS = new Set(["L-STATE-A", "L-STATE-B", "R-HOSTED-1-A", "R-HOSTED-1-B"])
-/** The rerun command recorded for a ledger row. */
+/** The rerun command recorded for a ledger row (the environment it needs, and nothing more). */
 const rerunFor = (id: string): string =>
-  `CI=true SP_R_RELAY_CHECKOUT=<relay checkout> SP_R_PAIR_A=<exec on pair host A> SP_R_PAIR_B=<exec on pair host B> SP_R_HOSTED_RELAY=<wss://hosted relay> bun crates/omo-computer-engine/probes/probe-sp-r.ts --verify crates/omo-computer-engine/probes/relay-limits.tsv --only ${id}`
+  `CI=true SP_R_RELAY_CHECKOUT=<relay checkout> ${PAIR_IDS.has(id) ? "SP_R_PAIR_A=<exec on pair host A> SP_R_PAIR_B=<exec on pair host B> SP_R_HOSTED_RELAY=<wss://hosted relay> " : ""}bun crates/omo-computer-engine/probes/probe-sp-r.ts --verify crates/omo-computer-engine/probes/relay-limits.tsv --only ${id}`
 
 // ---- --self-test: class-level checks of every decision above, plus the pair helper's own checks ----------------------
 const selfTest = async (): Promise<number> => {
@@ -535,8 +571,8 @@ const pairOn = async (base: string): Promise<{ account: string; brain: PeerT; ha
   const account = uid("sp-r")
   const brain = new h.Peer(base, account, "brain")
   const hand = new h.Peer(base, account, "hand")
-  await brain.connect()
-  await hand.connect()
+  for (const peer of [brain, hand])
+    if ((await within(15_000, peer.connect())) === "timeout") throw new Error("relay peer did not connect within 15 s")
   // The hand answers every brain ping with its own stream envelope, as a hand link's heartbeat reply would.
   hand.onDeliver = (e) => {
     const body = new TextDecoder().decode(e.sealed)

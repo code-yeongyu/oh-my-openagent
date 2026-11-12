@@ -19,6 +19,8 @@ CI=true SP_R_RELAY_CHECKOUT=<relay checkout> bun crates/omo-computer-engine/prob
 ```
 
 - `--verify` measures every row again. It exits 0 only when every verdict matches the ledger, and it writes nothing. The measured numbers may differ between runs.
+- A measurement that fails (a probe error, a socket that never opens, a helper that returns nothing, a close the row did not expect) is recorded as `UNMEASURED` with its reason. `--verify` never counts such a result as a match, even against an `UNMEASURED` ledger row.
+- `bun crates/omo-computer-engine/probes/probe-sp-r.ts --self-test` checks every verdict rule by class, without a relay or a pair. It also runs `probe-sp-r-pair-selftest.sh` (Linux or macOS; needs `bun` and `lsof`).
 
 ### Preconditions
 
@@ -42,7 +44,13 @@ These rows measure a local relay, and the hibernation onset is the local runtime
 
 ### Same-network pair and the hosted relay
 
-`probe-sp-r-pair.sh` is a helper that the probe sends to each host of a same-network pair. `SP_R_PAIR_A` and `SP_R_PAIR_B` are each a command prefix that runs one shell command on one host. The helper is read-only: it reports the host's load, the device service's version, and whether that service listens off loopback or holds discovery sockets. It can also open one unauthenticated socket to the hosted relay named by `SP_R_HOSTED_RELAY` (`wss://<host>`). It sends nothing on that socket and records when and how the relay closes it. The helper refuses to run when the host's 1-minute load is at or above its core count. It removes its temp file on every exit path, and nothing stays resident.
+`probe-sp-r-pair.sh` is a helper that the probe sends to each host of a same-network pair. `SP_R_PAIR_A` and `SP_R_PAIR_B` are each a command prefix that runs one command on one host and keeps its arguments as given; the probe checks that first and refuses a prefix that joins them (as `ssh` does).
+
+The helper is read-only. In `state` mode it first starts a listener of its own on loopback and on all interfaces, and requires `lsof` to show both. Only then does it read the device service: its version, whether `lsof` can see it at all, and whether it listens off loopback or holds discovery sockets. If `lsof` is missing, silent, erroring or blind to the device service, the helper exits 2 and the row is `UNMEASURED`; it never reports a zero it could not see.
+
+In `silent` mode it opens one unauthenticated socket to the hosted relay named by `SP_R_HOSTED_RELAY` (`wss://<host>`), sends nothing, and records when and how the relay closes it.
+
+The helper refuses to run when the host's 1-minute load is at or above its core count. Its temp dir and its control listener are removed on every exit path, and nothing stays resident.
 
 - `L-STATE-A` and `L-STATE-B` record that the shipped device service has no same-network direct path.
 - `R-HOSTED-1-A` and `R-HOSTED-1-B` compare the hosted relay's deadline with the local one.
