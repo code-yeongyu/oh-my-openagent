@@ -54,8 +54,10 @@ async function setup(options: FakeEngineOptions & { readonly wakeLimit?: number 
   const store = h.store()
   const sessions = join(h.agentDir, "sessions")
   const events: CarrierEvent[] = []
-  const waiters: { readonly match: (event: CarrierEvent) => boolean; readonly resolve: (event: CarrierEvent) => void }[] =
-    []
+  const waiters: {
+    readonly match: (event: CarrierEvent) => boolean
+    readonly resolve: (event: CarrierEvent) => void
+  }[] = []
   const next = (match: (event: CarrierEvent) => boolean, what: string): Promise<CarrierEvent> =>
     new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error(`waited 5s for ${what}, never fired`)), 5_000)

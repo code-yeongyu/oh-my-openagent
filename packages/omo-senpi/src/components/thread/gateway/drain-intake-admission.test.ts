@@ -73,10 +73,12 @@ describe("admission at run", () => {
     })
     await drain.drain({ reason: "command" })
     expect(runtime.enqueueCalls.map((call) => call.delivery_id)).toEqual(["device:dev-ok/d-ok"])
-    expect((await store.list({ target_durable_id: "t" })).map((row) => [row.ledger_id, row.state, row.reason])).toEqual([
-      ["device:dev-ok/d-ok", "admitted", null],
-      ["device:dev-no/d-no", "refused", "sender_not_admitted"],
-    ])
+    expect((await store.list({ target_durable_id: "t" })).map((row) => [row.ledger_id, row.state, row.reason])).toEqual(
+      [
+        ["device:dev-ok/d-ok", "admitted", null],
+        ["device:dev-no/d-no", "refused", "sender_not_admitted"],
+      ],
+    )
   })
 
   test("#given the device service does not answer for one device #when the drain runs #then only that device's rows wait and a same-device row behind them is admitted without asking", async () => {
@@ -85,7 +87,11 @@ describe("admission at run", () => {
     const store = h.store()
     await store.intake(intake(h, "d-1", "dev-silent"))
     h.phantom("t")
-    const local = await sender.engine.deliver({ sender: { kind: "session", durable_id: "a" }, target: "t", text: "local" })
+    const local = await sender.engine.deliver({
+      sender: { kind: "session", durable_id: "a" },
+      target: "t",
+      text: "local",
+    })
     if (local.kind !== "ok") throw new Error("local send refused")
     const { runtime, drain, asked } = drainFor(h, store, { admit: async () => "unknown" })
     await drain.drain({ reason: "command" })

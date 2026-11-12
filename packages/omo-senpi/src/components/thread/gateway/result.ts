@@ -41,7 +41,10 @@ export function resultFromRow(
     deduplicated,
   }
   if (sessionWait !== undefined && (row.state === "queued" || row.state === "admitted"))
-    return { ...base, delivery: { kind: "queued", queue_position: Math.max(queuePosition, 1), waiting_on: sessionWait } }
+    return {
+      ...base,
+      delivery: { kind: "queued", queue_position: Math.max(queuePosition, 1), waiting_on: sessionWait },
+    }
   if (row.state === "admitted" || row.state === "applied") {
     if (row.admission_kind === "started" || row.admission_kind === "steered") {
       return { ...base, delivery: { kind: row.admission_kind, turn_id: String(row.turn_epoch ?? 0) } }

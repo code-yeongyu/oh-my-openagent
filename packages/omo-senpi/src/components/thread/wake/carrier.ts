@@ -142,8 +142,14 @@ export function createCarrier(options: CarrierOptions): Carrier {
   }
 
   /** The quiet hand-back (A3.2.4): a refusal naming a held delivery is retried once with interrupt, which drops it. */
-  const quietRelease = async (entry: Carried): Promise<{ readonly ok: true } | { readonly ok: false; readonly code: string }> => {
-    const first = await entry.connection.request({ type: "release_session", sessionId: entry.sessionId, reason: "takeover" })
+  const quietRelease = async (
+    entry: Carried,
+  ): Promise<{ readonly ok: true } | { readonly ok: false; readonly code: string }> => {
+    const first = await entry.connection.request({
+      type: "release_session",
+      sessionId: entry.sessionId,
+      reason: "takeover",
+    })
     if (first.success === true) return { ok: true }
     if (codeOf(first) === "turn_active" && busyList(first).includes("delivery")) {
       const second = await entry.connection.request({
@@ -199,7 +205,9 @@ export function createCarrier(options: CarrierOptions): Carrier {
       if (recorded.kind === "lost_lease") return { kind: "lost_lease" }
       const since = recorded.row.first_waiting_at ?? store.now()
       if (store.now() - since < PERSON_WAIT_CLOSE_MS) return { kind: "waiting", since }
-      const fresh = readEngineState(dataOf(await entry.connection.request({ type: "get_state", sessionId: entry.sessionId })))
+      const fresh = readEngineState(
+        dataOf(await entry.connection.request({ type: "get_state", sessionId: entry.sessionId })),
+      )
       if (!fresh.waitingForPerson) return { kind: "kept", reason: "working" }
       await entry.connection.request({ type: "close_session", sessionId: entry.sessionId })
       await store.woken.end(fence)
@@ -210,7 +218,8 @@ export function createCarrier(options: CarrierOptions): Carrier {
     if (!view.finished) return { kind: "kept", reason: "working" }
     const released = await quietRelease(entry)
     if (!released.ok) {
-      if (released.code === "turn_active" || released.code === "session_busy") return { kind: "kept", reason: "working" }
+      if (released.code === "turn_active" || released.code === "session_busy")
+        return { kind: "kept", reason: "working" }
       if (released.code === "attached") {
         await releaseOwn(entry)
         await store.woken.end(fence)
@@ -237,7 +246,8 @@ export function createCarrier(options: CarrierOptions): Carrier {
 
   const carry = (durableId: string, connection: CarrierHostConnection, sessionId: string, generation: number) => {
     const off = connection.onEvent((frame) => {
-      if (frame.type === "session_lifecycle" && frame.sessionId === sessionId) void evaluate(durableId).catch(() => undefined)
+      if (frame.type === "session_lifecycle" && frame.sessionId === sessionId)
+        void evaluate(durableId).catch(() => undefined)
     })
     const entry: Carried = { durableId, connection, sessionId, generation, off }
     carried.set(durableId, entry)
@@ -251,7 +261,13 @@ export function createCarrier(options: CarrierOptions): Carrier {
     path: string,
     cwd: string,
   ): Promise<
-    | { readonly kind: "opened"; readonly connection: CarrierHostConnection; readonly sessionId: string; readonly attached: boolean; readonly view: EngineView }
+    | {
+        readonly kind: "opened"
+        readonly connection: CarrierHostConnection
+        readonly sessionId: string
+        readonly attached: boolean
+        readonly view: EngineView
+      }
     | { readonly kind: "refused"; readonly code: string }
     | { readonly kind: "unreachable" }
   > => {
@@ -324,7 +340,12 @@ export function createCarrier(options: CarrierOptions): Carrier {
       return { kind: "held" }
     }
     if (opened.view.waitingForPerson) {
-      await store.sessionWait.write({ durable_id: durableId, wait: "waiting", hold_kinds: [], file_size: fileSize(target.session_path) })
+      await store.sessionWait.write({
+        durable_id: durableId,
+        wait: "waiting",
+        hold_kinds: [],
+        file_size: fileSize(target.session_path),
+      })
       await releaseOwn(entry)
       await store.woken.end(fence)
       forget(entry)
@@ -373,9 +394,12 @@ export function createCarrier(options: CarrierOptions): Carrier {
 
   const arm = (): void => {
     if (stopped) return
-    cancelTimer = options.schedule(() => {
-      void sweep().finally(arm)
-    }, Math.min(CARRIER_RENEW_MS, WAKE_LEASE_MS / 3))
+    cancelTimer = options.schedule(
+      () => {
+        void sweep().finally(arm)
+      },
+      Math.min(CARRIER_RENEW_MS, WAKE_LEASE_MS / 3),
+    )
   }
   arm()
 

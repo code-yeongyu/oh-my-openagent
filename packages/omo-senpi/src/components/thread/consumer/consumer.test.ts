@@ -93,8 +93,18 @@ describe("a handed delivery", () => {
     service.onAnswer(async () => {
       committedAtAnswer = (await h.store().list({ target_durable_id: "t" })).length
     })
-    const reply = await service.inbound({ command_id: "c-1", sender_device: "dev-a", durable_id: "t", record: record("d-1") })
-    expect(reply.data).toMatchObject({ kind: "queued", delivery_id: "d-1", deduplicated: false, waiting_on: { kind: "wake" } })
+    const reply = await service.inbound({
+      command_id: "c-1",
+      sender_device: "dev-a",
+      durable_id: "t",
+      record: record("d-1"),
+    })
+    expect(reply.data).toMatchObject({
+      kind: "queued",
+      delivery_id: "d-1",
+      deduplicated: false,
+      waiting_on: { kind: "wake" },
+    })
     expect(committedAtAnswer).toBe(1)
     await consumer.idle()
     expect(service.calls).toContainEqual({ type: "peer.admitted", device: "dev-a" })
@@ -105,7 +115,12 @@ describe("a handed delivery", () => {
     const { sessions, service, consumer } = setup()
     writeSessionFile(sessions, "t")
     await consumer.start()
-    const reply = await service.inbound({ command_id: "c-1", sender_device: "dev-a", durable_id: "t", record: record("d-1") })
+    const reply = await service.inbound({
+      command_id: "c-1",
+      sender_device: "dev-a",
+      durable_id: "t",
+      record: record("d-1"),
+    })
     expect(Object.keys(reply).sort()).toEqual(["data", "success", "type"])
     expect(reply).toMatchObject({ type: "response", success: true, data: { kind: "queued", deduplicated: false } })
     expect(typeof reply.data.stored_command_id).toBe("string")
@@ -121,7 +136,12 @@ describe("a handed delivery", () => {
       writeSessionFile(sessions, "t")
       await store.sessionWait.write({ durable_id: "t", ...wait, file_size: 1 })
       await consumer.start()
-      const reply = await service.inbound({ command_id: "c-1", sender_device: "dev-a", durable_id: "t", record: record("d-1") })
+      const reply = await service.inbound({
+        command_id: "c-1",
+        sender_device: "dev-a",
+        durable_id: "t",
+        record: record("d-1"),
+      })
       expect(reply.data.waiting_on).toEqual({ kind })
     },
   )
@@ -131,7 +151,12 @@ describe("a handed delivery", () => {
     writeSessionFile(sessions, "t")
     await consumer.start()
     await service.inbound({ command_id: "c-1", sender_device: "dev-a", durable_id: "t", record: record("d-1") })
-    const again = await service.inbound({ command_id: "c-2", sender_device: "dev-a", durable_id: "t", record: record("d-1") })
+    const again = await service.inbound({
+      command_id: "c-2",
+      sender_device: "dev-a",
+      durable_id: "t",
+      record: record("d-1"),
+    })
     expect(again.data).toMatchObject({ kind: "queued", delivery_id: "d-1", deduplicated: true })
     await consumer.idle()
     expect(woken).toEqual(["t", "t"])
@@ -160,7 +185,12 @@ describe("a handed delivery", () => {
       const { h, sessions, service, woken, consumer } = setup()
       arrange(sessions)
       await consumer.start()
-      const reply = await service.inbound({ command_id: "c-1", sender_device: "dev-a", durable_id: "t", record: record("d-1") })
+      const reply = await service.inbound({
+        command_id: "c-1",
+        sender_device: "dev-a",
+        durable_id: "t",
+        record: record("d-1"),
+      })
       expect(reply.data).toEqual({ kind: "refused", reason })
       await consumer.idle()
       expect(await h.store().list({ target_durable_id: "t" })).toEqual([])
@@ -207,7 +237,10 @@ describe("A5: the consumer's side of the local delivery messages", () => {
     writeSessionFile(sessions, "t")
     await consumer.start()
     service.refuseAnswers()
-    expect((await service.inbound({ command_id: "c-1", sender_device: "dev-a", durable_id: "t", record: record("d-1") })).data).toEqual({
+    expect(
+      (await service.inbound({ command_id: "c-1", sender_device: "dev-a", durable_id: "t", record: record("d-1") }))
+        .data,
+    ).toEqual({
       kind: "unknown_delivery",
     })
     await consumer.idle()
@@ -219,15 +252,23 @@ describe("A5: the consumer's side of the local delivery messages", () => {
     const { h, sessions, service, consumer } = setup()
     writeSessionFile(sessions, "t")
     await consumer.start()
-    expect((await service.inbound({ command_id: "c-1", sender_device: "dev-a", durable_id: "t", record: record("d-1") })).data).toMatchObject({
+    expect(
+      (await service.inbound({ command_id: "c-1", sender_device: "dev-a", durable_id: "t", record: record("d-1") }))
+        .data,
+    ).toMatchObject({
       deduplicated: false,
       stored_command_id: "c-1",
     })
-    expect((await service.inbound({ command_id: "c-2", sender_device: "dev-a", durable_id: "t", record: record("d-1") })).data).toMatchObject({
+    expect(
+      (await service.inbound({ command_id: "c-2", sender_device: "dev-a", durable_id: "t", record: record("d-1") }))
+        .data,
+    ).toMatchObject({
       deduplicated: true,
       stored_command_id: "c-1",
     })
-    expect(await h.store().intakeMarks.pending()).toEqual([{ sender_device: "dev-a", session_id: "t", last_command_id: "c-1" }])
+    expect(await h.store().intakeMarks.pending()).toEqual([
+      { sender_device: "dev-a", session_id: "t", last_command_id: "c-1" },
+    ])
   })
 
   test("#given the pair's only row was refused because the sender is no longer admitted #when the consumer reports #then drained is sent: no open row is left whatever the end state", async () => {
@@ -252,10 +293,9 @@ describe("A5: the consumer's side of the local delivery messages", () => {
     await h.quiesce()
     service.expectOnDrained("c-0")
     await consumer.reportDrained()
-    expect(service.calls.filter((call) => call.type === "delivery.drained").map((call) => call.last_command_id)).toEqual([
-      "c-1",
-      "c-0",
-    ])
+    expect(
+      service.calls.filter((call) => call.type === "delivery.drained").map((call) => call.last_command_id),
+    ).toEqual(["c-1", "c-0"])
   })
 })
 

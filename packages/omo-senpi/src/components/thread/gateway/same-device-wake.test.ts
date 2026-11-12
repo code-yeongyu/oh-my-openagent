@@ -28,7 +28,11 @@ function delivery(target: string): OutboundDelivery {
   }
 }
 
-function setup(options: { readonly enabled: boolean; readonly carrier: boolean; readonly header?: Record<string, unknown> }) {
+function setup(options: {
+  readonly enabled: boolean
+  readonly carrier: boolean
+  readonly header?: Record<string, unknown>
+}) {
   const h = (harness = createGatewayHarness())
   const sender = h.session("a")
   h.phantom("t")

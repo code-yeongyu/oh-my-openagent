@@ -138,7 +138,10 @@ export async function startFakeEngineHost(options: FakeEngineOptions = {}): Prom
     holders.set(socket, held)
     switch (frame.type) {
       case "get_protocol_info":
-        return { success: true, data: { capabilities: options.capabilities ?? ["detach_connection", "release_attachment"] } }
+        return {
+          success: true,
+          data: { capabilities: options.capabilities ?? ["detach_connection", "release_attachment"] },
+        }
       case "open_session": {
         const path = String(frame.sessionPath)
         const refusal = options.openRefusal?.(path)

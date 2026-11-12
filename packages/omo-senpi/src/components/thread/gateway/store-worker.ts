@@ -610,7 +610,10 @@ function readWait(ctx: ops.StoreContext, request: WaitKey): SessionWaitState | n
   return found === undefined ? null : waitStateFrom(found)
 }
 
-async function writeWait(ctx: ops.StoreContext, request: Omit<SessionWaitState, "written_at"> & WaitKey): Promise<void> {
+async function writeWait(
+  ctx: ops.StoreContext,
+  request: Omit<SessionWaitState, "written_at"> & WaitKey,
+): Promise<void> {
   await ops.transaction(ctx, "wait_write", () => {
     ops.write(
       ctx,
@@ -649,7 +652,8 @@ async function countWake(
       [request.durable_id],
     )
     const stored = found?.human_input_revision ?? null
-    const moved = found === undefined || (request.human_input_revision !== null && Number(stored) !== request.human_input_revision)
+    const moved =
+      found === undefined || (request.human_input_revision !== null && Number(stored) !== request.human_input_revision)
     const count = moved ? 1 : Number(found?.count ?? 0) + 1
     ops.write(
       ctx,
@@ -724,7 +728,12 @@ function openMarkRows(ctx: ops.StoreContext, pair: IntakePair): number {
 
 function markedPairs(ctx: ops.StoreContext): IntakePair[] {
   return ctx.sql
-    .all(["sender_device", "session_id"], "SELECT sender_device, session_id FROM intake_marks", [], "sender_device, session_id")
+    .all(
+      ["sender_device", "session_id"],
+      "SELECT sender_device, session_id FROM intake_marks",
+      [],
+      "sender_device, session_id",
+    )
     .map((row) => ({ sender_device: String(row.sender_device), session_id: String(row.session_id) }))
 }
 
@@ -788,7 +797,10 @@ async function openIntakeSessions(ctx: ops.StoreContext): Promise<OpenIntakeSess
   }
   const local = new Set(
     ctx.sql
-      .all(["target_durable_id"], "SELECT DISTINCT target_durable_id FROM deliveries WHERE ledger_id IS NULL AND state = 'queued'")
+      .all(
+        ["target_durable_id"],
+        "SELECT DISTINCT target_durable_id FROM deliveries WHERE ledger_id IS NULL AND state = 'queued'",
+      )
       .map((row) => String(row.target_durable_id)),
   )
   for (const id of local) if (!sessions.has(id)) sessions.set(id, new Set())
@@ -798,7 +810,9 @@ async function openIntakeSessions(ctx: ops.StoreContext): Promise<OpenIntakeSess
 }
 
 function commandForRow(ctx: ops.StoreContext, request: { readonly ledger_id: string }): string | null {
-  const found = ctx.sql.one(["command_id"], "SELECT command_id FROM intake_commands WHERE ledger_id = ?", [request.ledger_id])
+  const found = ctx.sql.one(["command_id"], "SELECT command_id FROM intake_commands WHERE ledger_id = ?", [
+    request.ledger_id,
+  ])
   return found === undefined ? null : String(found.command_id)
 }
 

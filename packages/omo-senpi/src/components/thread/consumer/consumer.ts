@@ -189,7 +189,10 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
           const reply = await port.drained({ ...pair, last_command_id: result.last_command_id })
           if (
             reply.kept &&
-            !(await store.intakeMarks.openForCommand({ sender_device: pair.sender_device, command_id: reply.expecting }))
+            !(await store.intakeMarks.openForCommand({
+              sender_device: pair.sender_device,
+              command_id: reply.expecting,
+            }))
           )
             await port.drained({ ...pair, last_command_id: reply.expecting })
         } catch (error) {

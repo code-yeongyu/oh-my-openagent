@@ -1,9 +1,4 @@
-import type {
-  DeliveryHoldsEvent,
-  DeliveryInboundEvent,
-  DeliveryPendingPair,
-  DeliveryServicePort,
-} from "../port"
+import type { DeliveryHoldsEvent, DeliveryInboundEvent, DeliveryPendingPair, DeliveryServicePort } from "../port"
 
 /** `delivery.answer`'s reply as the service reads it: the engine's RPC response envelope (A5 addendum 2). */
 export type AnswerEnvelope = {
