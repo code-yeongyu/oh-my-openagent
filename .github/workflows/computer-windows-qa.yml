@@ -1,8 +1,9 @@
 name: Computer Windows QA
 
 # Live Windows QA of the computer-use v3 engine on a hosted runner. The interactive job proves an
-# interactive desktop first (interactive-desktop-smoke.ps1), then runs the Windows backend's own
-# tests with the live ones included and the live driver's scenarios against the release engine;
+# interactive desktop first (interactive-desktop-smoke.ps1), then runs ONLY the Windows backend's
+# live (#[ignore]d) tests - computer-engine.yml already runs its other tests on Windows - and the
+# live driver's scenarios against the release engine;
 # every scenario's JSON line is kept as the run's evidence artifact. The session0 job runs the one
 # Session 0 scenario as SYSTEM from a one-shot scheduled task (Windows starts it in Session 0) and
 # fails unless the recorded session id is 0. The screen-locked scenario, when one exists, is the
@@ -12,20 +13,14 @@ on:
   pull_request:
     paths:
       - ".github/workflows/computer-windows-qa.yml"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - "rust-toolchain.toml"
-      - "crates/omo-computer-*/**"
+      - "crates/omo-computer-backend-win32/**"
       - "script/qa/computer/windows.ts"
       - "script/qa/computer/windows/**"
   push:
     branches: [dev]
     paths:
       - ".github/workflows/computer-windows-qa.yml"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - "rust-toolchain.toml"
-      - "crates/omo-computer-*/**"
+      - "crates/omo-computer-backend-win32/**"
       - "script/qa/computer/windows.ts"
       - "script/qa/computer/windows/**"
 
@@ -72,12 +67,12 @@ jobs:
         with:
           key: computer-windows-qa-${{ env.RUST_TARGET }}
 
-      - name: Windows backend tests, live ones included
+      - name: Windows backend live tests (the ignored ones only)
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p qa-evidence
-          cargo test -p omo-computer-backend-win32 --target "${RUST_TARGET}" --locked -- --include-ignored --test-threads=1 2>&1 | tee qa-evidence/backend-win32-tests.txt
+          cargo test -p omo-computer-backend-win32 --target "${RUST_TARGET}" --locked -- --ignored --test-threads=1 2>&1 | tee qa-evidence/backend-win32-live-tests.txt
 
       - name: Build engine (msvc x64, release)
         shell: bash
