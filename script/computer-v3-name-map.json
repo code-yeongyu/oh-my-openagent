@@ -192,7 +192,6 @@
     "generated": [
       "crates/omo-computer-core/schema/engine.schema.json",
       "crates/omo-computer-core/docs/",
-      "packages/omo-computer-protocol/src/generated/",
       "packages/omo-computer-protocol/src/engine-schema.generated.ts",
       "packages/omo-computer-sdk/facade-manifest.json",
       "packages/omo-computer-prelude/src/generated/",
