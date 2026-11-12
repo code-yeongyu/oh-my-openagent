@@ -5,7 +5,7 @@ export type BuildNode = {
   deps: string[]
 }
 
-const OPENTUI_EXTERNALS = ["@opentui/core", "@opentui/keymap", "@opentui/solid"]
+const OPENTUI_EXTERNALS = ["@opentui/core", "@opentui/keymap", "@opentui/solid", "solid-js"]
 
 export const BUILD_NODES: BuildNode[] = [
   { id: "service-auth", command: "bun", args: ["script/build-service-auth.ts"], deps: [] },
