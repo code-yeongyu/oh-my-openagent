@@ -1,6 +1,8 @@
 //! The actionability battery, opened surfaces, refusal hints and dangerous
 //! chords over scripted fake windows.
 
+#[path = "auto_wait_tests.rs"]
+mod auto_wait_tests;
 #[path = "lock_tests.rs"]
 mod lock_tests;
 #[path = "no_sleep_tests.rs"]
