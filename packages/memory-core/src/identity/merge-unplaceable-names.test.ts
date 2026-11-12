@@ -84,6 +84,36 @@ describe("identity merge around a source entry that is not a plain path (#10070)
     expect((await readIdentityRecord(merged.source.paths.root))?.mergedInto).toBeUndefined()
   }, 60_000)
 
+  it("#given a store holding only dot-named entries and an aside copy from an earlier merge #when it is merged #then each is named, nothing is written and the store is not marked merged (#13203 security review)", async () => {
+    const root = await memoryRoot()
+    const target = await identity(root, "project-aaaa1111", { "notes/base.md": note("base") }, ["/work/project"])
+    const source = await identity(
+      root,
+      "project-feature-bbbb2222",
+      { ".gitignore": "local/\n", "reference/merged/other-cccc3333/notes/a.md": note("aside") },
+      ["/work/project-feature"],
+    )
+    commitTreePath(source.paths.repo, "../x.md", note("climbs"))
+    const before = await fingerprint(target.paths.root, GIT_READ_STATE)
+    const headBefore = await target.repo.head()
+
+    const result = await applyIdentityMerge({ source: source.paths, target: target.paths, lock, author: AUTHOR })
+
+    expect(result.status).toBe("nothing-to-merge")
+    expect(Object.fromEntries(result.plan.actions.map((action) => [action.path, action]))).toStrictEqual({
+      "../x.md": { path: "../x.md", action: "unplaceable", reason: "not-a-plain-path" },
+      ".gitignore": { path: ".gitignore", action: "unplaceable", reason: "not-a-plain-path" },
+      "reference/merged/other-cccc3333/notes/a.md": {
+        path: "reference/merged/other-cccc3333/notes/a.md",
+        action: "skip",
+        reason: "earlier-aside-copy",
+      },
+    })
+    expect(changedEntries(before, await fingerprint(target.paths.root, GIT_READ_STATE))).toStrictEqual([])
+    expect(await target.repo.head()).toBe(headBefore)
+    expect((await readIdentityRecord(source.paths.root))?.mergedInto).toBeUndefined()
+  }, 30_000)
+
   it("#given a store whose every entry is not a plain path #when it is merged #then nothing is committed, the target is unchanged, every entry is named and the store is not marked merged", async () => {
     const root = await memoryRoot()
     const target = await identity(root, "project-aaaa1111", { "notes/base.md": note("base") }, ["/work/project"])

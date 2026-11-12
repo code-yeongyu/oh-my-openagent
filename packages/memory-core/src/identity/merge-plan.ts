@@ -7,7 +7,11 @@ import { foldTreeName, isMergePathConfined, isPlainTreePath, type UnplaceableRea
 
 export type MergeAction =
   | { readonly path: string; readonly action: "add"; readonly destination: string }
-  | { readonly path: string; readonly action: "skip" }
+  /**
+   * Nothing to write: the target already holds this content, or (with a reason) an aside copy this store kept
+   * from an earlier merge into it, which is never merged again so aside copies do not nest.
+   */
+  | { readonly path: string; readonly action: "skip"; readonly reason?: "earlier-aside-copy" }
   | { readonly path: string; readonly action: "keep-aside"; readonly destination: string }
   /** Left out of the merge: nothing is written for it anywhere, and the source is not marked merged. */
   | { readonly path: string; readonly action: "unplaceable"; readonly reason: UnplaceableReason }
@@ -49,13 +53,15 @@ export async function planIdentityMerge(
           ]),
         )
   const actions = [...sourceBlobs]
-    .filter((entry) => !entry.path.startsWith(".") && !entry.path.startsWith(`${MERGED_ASIDE_ROOT}/`))
     .filter((entry) => mergedBefore?.get(entry.path) !== entry.oid)
     .sort((left, right) => left.path.localeCompare(right.path))
     .map((entry): MergeAction => {
-      // A source tree is data: plumbing or another tool can name an entry `..`, `.git` or `a\b`, and such a
-      // name must never become a target path (#12974 security). It is left out and named; the rest still merges.
-      if (!isMergePathConfined(entry.path) || !isPlainTreePath(entry.path))
+      if (entry.path.startsWith(`${MERGED_ASIDE_ROOT}/`))
+        return { path: entry.path, action: "skip", reason: "earlier-aside-copy" }
+      // A source tree is data: plumbing or another tool can name an entry `..`, `.git` or `a\b`, and a name
+      // starting with `.` configures the repository (`.gitignore`, `.gitattributes`) or climbs out of it. None
+      // may become a target path (#12974 security): it is left out and named, and the rest still merges.
+      if (entry.path.startsWith(".") || !isMergePathConfined(entry.path) || !isPlainTreePath(entry.path))
         return { path: entry.path, action: "unplaceable", reason: "not-a-plain-path" }
       const existing = targetBlobs.get(entry.path)
       if (existing?.oid === entry.oid) return { path: entry.path, action: "skip" }
