@@ -401,7 +401,8 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
   /**
    * Names a thread thread_create already made, through the same path thread_rename takes (the create's name check against
    * the device's threads, then the located control's setName). Answers the refusing code instead of failing, because the
-   * thread exists either way.
+   * thread exists either way: a rename that fails with no typed refusal answers `host_unavailable`, so the result still
+   * names the created thread (withAlias's rule for every failure after the create).
    */
   async function nameCreatedThread(
     threadId: string,
@@ -421,9 +422,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
     try {
       await located.control.setName(name)
     } catch (error) {
-      const refusal = controlRefusalOf(error)
-      if (refusal === undefined) throw error
-      return refusal.code
+      return controlRefusalOf(error)?.code ?? "host_unavailable"
     }
     return undefined
   }
