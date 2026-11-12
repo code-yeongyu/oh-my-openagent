@@ -9,7 +9,9 @@ use std::sync::Arc;
 pub(crate) use panicky::{AfterPointer, Panics, Watches};
 pub(crate) use screen::{AwakeHolds, FakeScreen};
 use parking_lot::Mutex;
-use senpi_desktop_backend_fake::{FakeBackend, FakeScenario, FakeUserInput, Faults, RecordingSink, SinkOp};
+use senpi_desktop_backend_fake::{
+    FakeBackend, FakeClock as AxClock, FakeScenario, FakeUserInput, Faults, RecordingSink, SinkOp,
+};
 use senpi_desktop_core::backend::{Backend, DeliveryMode, Modifiers, MouseButton, PointerEvent};
 use senpi_desktop_core::error::CoreResult;
 use senpi_desktop_core::frame::FrameGeometry;
@@ -39,6 +41,8 @@ pub(crate) struct Harness {
     pub(crate) awake: AwakeHolds,
     pub(crate) screen: FakeScreen,
     pub(crate) after_pointer: AfterPointer,
+    /// The fake's time for `ready_after_ms`, moved only by the test.
+    pub(crate) ax_clock: AxClock,
     user_input: Arc<FakeUserInput>,
 }
 
@@ -52,11 +56,15 @@ struct Factory {
     screen: FakeScreen,
     watches: Watches,
     after_pointer: AfterPointer,
+    ax_clock: Option<AxClock>,
 }
 
 impl BackendFactory for Factory {
     fn create(&self, _options: &DesktopSessionOptions) -> CoreResult<Box<dyn Backend>> {
-        let backend = FakeBackend::new(self.scenario.clone());
+        let mut backend = FakeBackend::new(self.scenario.clone());
+        if let Some(clock) = &self.ax_clock {
+            backend.set_ax_clock(clock.clone());
+        }
         *self.built.lock() = Some((backend.sink(), backend.faults(), backend.user_input()));
         Ok(Box::new(panicky::PanickyFake {
             inner: backend,
@@ -88,6 +96,7 @@ pub(crate) fn session_factory(awake: &AwakeHolds, screen: &FakeScreen) -> impl B
         screen: screen.clone(),
         watches: Watches::default(),
         after_pointer: AfterPointer::default(),
+        ax_clock: None,
     }
 }
 
@@ -125,7 +134,9 @@ pub(crate) fn harness_opened(
     let (awake, screen) = (AwakeHolds::default(), FakeScreen::default());
     let watches = Watches::default();
     let after_pointer = AfterPointer::default();
+    let ax_clock = AxClock::new(0);
     let factory = Factory {
+        ax_clock: Some(ax_clock.clone()),
         after_pointer: after_pointer.clone(),
         scenario,
         built: Arc::clone(&built),
@@ -152,6 +163,7 @@ pub(crate) fn harness_opened(
         awake,
         screen,
         after_pointer,
+        ax_clock,
         user_input,
     }
 }
