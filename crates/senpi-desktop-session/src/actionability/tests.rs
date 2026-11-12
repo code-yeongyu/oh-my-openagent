@@ -119,11 +119,16 @@ fn press_is_supported_by_any_listed_action_and_other_actions_need_their_name() {
     }
 }
 
+/// Wall time a busy host takes from the test between two of its steps.
+const HOST_STALL: Duration = Duration::from_millis(200);
+
 #[test]
 fn the_battery_waits_for_an_element_that_appears_enabled_after_500_ms() {
     // Given: hidden and disabled until 500 ms after its first read.
     let mut harness = opened(&scene(button(&json!({"ready_after_ms": 500})), &[]), ReportMode::Object);
     let reference = harness.focused_ref();
+    // A loaded host deschedules this thread between the snapshot and the press.
+    std::thread::sleep(HOST_STALL);
     // When
     let started = Instant::now();
     let report = action(press(&mut harness, reference).expect("delivered after the wait"));
