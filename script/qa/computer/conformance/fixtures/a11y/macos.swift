@@ -13,13 +13,15 @@ import Foundation
 let waitSeconds = 20.0
 
 func trusted() -> Bool {
-    let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue as String: false] as CFDictionary
+    let options = [kAXTrustedCheckOptionPrompt: false] as CFDictionary
     return AXIsProcessTrustedWithOptions(options)
 }
 
 func children(_ element: AXUIElement) -> [AXUIElement] {
     var value: CFTypeRef?
-    guard AXUIElementCopyChildren(element, &value) == .success, let items = value as? [AXUIElement] else { return [] }
+    guard AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &value) == .success,
+          let items = value as? [AXUIElement]
+    else { return [] }
     return items
 }
 

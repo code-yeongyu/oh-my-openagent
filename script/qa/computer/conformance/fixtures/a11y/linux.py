@@ -66,6 +66,22 @@ def find_window(title):
     return None
 
 
+def visible_summary():
+    apps = []
+    desktop = Atspi.get_desktop(0)
+    for index in range(desktop.get_child_count()):
+        app = desktop.get_child_at_index(index)
+        if app is None:
+            continue
+        windows = []
+        for child in range(min(app.get_child_count(), 5)):
+            element = app.get_child_at_index(child)
+            if element is not None:
+                windows.append(f"{element.get_role()}={element.get_name()!r}")
+        apps.append(f"{app.get_name()!r}[{','.join(windows)}]")
+    return "; ".join(apps)
+
+
 def main():
     if len(sys.argv) != 3:
         print("usage: linux.py <pid> <window title>", file=sys.stderr)
@@ -80,7 +96,7 @@ def main():
             print(f"ENVIRONMENT: AT-SPI unreachable ({error})")
             return 3
         if window is None and time.monotonic() >= deadline:
-            print(f"ENVIRONMENT: no AT-SPI window titled {title!r} within {WAIT_SECONDS:.0f}s")
+            print(f"ENVIRONMENT: no AT-SPI window titled {title!r} within {WAIT_SECONDS:.0f}s; visible: {visible_summary()}")
             return 3
         if window is None:
             time.sleep(0.5)
