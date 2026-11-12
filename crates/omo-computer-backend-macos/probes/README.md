@@ -63,7 +63,7 @@ bun $P/probe-sp-t.ts --request-grant            # H3: the dialog for "OmO Comput
 bun $P/probe-sp-t.ts --check-grant              # expects accessibility 1
 bun $P/probe-sp-t.ts --measure --out $P/macos-tcc.tsv   # now also the grant and prompt rows
 bun $P/probe-sp-t.ts --verify $P/macos-tcc.tsv  # from a clean shell, in the same person slot; see below
-bun $P/probe-sp-t.ts --cleanup                  # receipts: procs 0, dir REMOVED; keeps the identity and the H3 grant
+bun $P/probe-sp-t.ts --cleanup                  # receipts: procs 0, dir REMOVED; keeps the identity and the H3 grant; exit 1 on a failed receipt
 ```
 
 No agent clicks a TCC grant or answers a permission prompt. The rows that need the H3 grant (`client-type.*`,
@@ -96,6 +96,8 @@ against fixed inputs on any host.
   `untagged.*` rows wait for the key press again: run it only in a person slot. Every verdict identical gives
   `VERIFY_OK` and exit 0. The T3 identity and the H3 grant stay for the later macOS rows and are removed
 at the final teardown (`sp-t-identity.sh delete`, and `tccutil reset` of the helper bundle id).
+
+`--cleanup` runs every step even when one fails, and prints one receipt per step. `--cleanup` exits 0 when every receipt is clean and 1 when any receipt contains `FAILED` or `STILL PRESENT`, after it has removed everything it can.
 
 Any single row re-measures with the command in its `rerun` column. On a host without the preconditions (for example
 a Linux compute host) every mode except `--print-skeleton` exits 2 with one line naming the first missing

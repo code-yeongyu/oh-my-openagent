@@ -941,11 +941,16 @@ function tapOutcome(tapText: string | null, launchCode: number): Measured {
     return incomplete("the tap file could not be read (never written, or unreadable as the QA account)")
   const events: TapEvent[] = []
   for (const line of tapText.split("\n").filter((l) => l.trim())) {
+    let value: unknown
     try {
-      events.push(JSON.parse(line) as TapEvent)
+      value = JSON.parse(line)
     } catch {
       return incomplete(`the tap file holds an unparseable line (${line.slice(0, 40)})`)
     }
+    // the helper writes one JSON object per line; null, a number, a string, an array or a boolean is not an event
+    if (value === null || typeof value !== "object" || Array.isArray(value))
+      return incomplete(`the tap file holds a line that is not a JSON object (${line.slice(0, 40)})`)
+    events.push(value as TapEvent)
   }
   if (events.some((e) => e.error))
     return incomplete(
@@ -1216,7 +1221,7 @@ type CleanupStep = [label: string, step: () => Promise<string>]
 
 // pure: --cleanup exits 1 when any receipt reports a failure (every step has already run by then), else 0
 function cleanupExitCode(receipts: string[]): number {
-  return receipts.some((r) => r.includes(" FAILED: ") || r.includes("STILL PRESENT")) ? 1 : 0
+  return receipts.some((r) => r.includes(" FAILED: ") || r.includes("STILL PRESENT")) ? EXIT.failed : EXIT.ok
 }
 
 // runs every diagnostic step, then every teardown step. A failing step is recorded as a receipt line and never stops
@@ -1682,7 +1687,7 @@ async function selfTest(): Promise<number> {
     )
   }
   console.log(failed === 0 ? `SELF_TEST_OK ${cases.length}` : `SELF_TEST_FAILED ${failed}/${cases.length}`)
-  return failed === 0 ? 0 : 1
+  return failed === 0 ? EXIT.ok : EXIT.failed
 }
 
 // ---------------------------------------------------------------------------------------------- main
@@ -1698,12 +1703,12 @@ async function main(argv: string[]): Promise<number> {
   if (flag("--self-test")) return await selfTest()
   if (flag("--print-skeleton")) {
     process.stdout.write(ledgerText(ROWS.map(skeletonLine)))
-    return 0
+    return EXIT.ok
   }
   const verifyPath = value("--verify")
   if (verifyPath && !existsSync(verifyPath)) {
     console.error(`SP-T precondition missing: the ledger ${verifyPath}`)
-    return 2
+    return EXIT.precondition
   }
 
   let env: HostEnv
@@ -1712,7 +1717,7 @@ async function main(argv: string[]): Promise<number> {
   } catch (error) {
     if (error instanceof Precondition) {
       console.error(`SP-T precondition missing: ${error.message}`)
-      return 2
+      return EXIT.precondition
     }
     throw error
   }
@@ -1725,11 +1730,11 @@ async function main(argv: string[]): Promise<number> {
 
   if (flag("--setup")) {
     console.log(`setup done: current=${currentApp(env)}`)
-    return 0
+    return EXIT.ok
   }
   if (flag("--request-grant") && !personPresent()) {
     console.error(`SP-T WAITING-PERSON: ${PERSON_REASON.grant}`)
-    return 2
+    return EXIT.precondition
   }
   if (flag("--request-grant") || flag("--check-grant")) {
     const log = new EvidenceLog()
@@ -1740,14 +1745,14 @@ async function main(argv: string[]): Promise<number> {
         responsibleIsSelf: result.report ? result.report.responsiblePid === result.report.pid : null,
       }),
     )
-    return result.report ? 0 : 1
+    return result.report ? EXIT.ok : EXIT.failed
   }
   const rowId = value("--row")
   if (rowId) {
     const def = ROWS.find((r) => r.id === rowId)
     if (!def) {
       console.error(`unknown row ${rowId}`)
-      return 2
+      return EXIT.precondition
     }
     const { line, exit } = await measureRow(def, env)
     console.log(line.join("\t"))
@@ -1787,12 +1792,12 @@ async function main(argv: string[]): Promise<number> {
       console.log(`${same ? "SAME" : "DIFF"} ${def.id} recorded=${recorded[4]} measured=${line[4]}`)
     }
     console.log(mismatches === 0 ? "VERIFY_OK" : `VERIFY_FAILED mismatches=${mismatches}`)
-    return mismatches === 0 ? 0 : 1
+    return mismatches === 0 ? EXIT.ok : EXIT.failed
   }
   console.error(
     "usage: probe-sp-t.ts --self-test | --print-skeleton | --setup | --request-grant | --check-grant | --row <id> | --measure --out <ledger> | --verify <ledger> | --cleanup",
   )
-  return 2
+  return EXIT.precondition
 }
 
 process.exit(await main(process.argv.slice(2)))
