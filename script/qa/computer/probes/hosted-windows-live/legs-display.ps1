@@ -14,10 +14,10 @@ function Child-DpiRead {
 }
 
 function Read-Dpi([string]$dir) {
-	$out = Join-Path $dir ('dpi-' + [guid]::NewGuid().ToString('N') + '.json')
-	$id = [OmoHwl.Token]::Start((Child-Command 'dpi-read' $out), $KeepLabel)
+	$dpiPath = Join-Path $dir ('dpi-' + [guid]::NewGuid().ToString('N') + '.json')
+	$id = [OmoHwl.Token]::Start((Child-Command 'dpi-read' $dpiPath), $KeepLabel)
 	[void](Wait-Exit $id 30000)
-	return ((Wait-File $out 5000 $out) | ConvertFrom-Json)
+	return ((Wait-File $dpiPath 5000 $dpiPath) | ConvertFrom-Json)
 }
 
 function Get-Sha256([string]$path) {

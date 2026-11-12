@@ -104,10 +104,10 @@ function Leg-Elevated {
 		foreach ($arm in @(@{ name = 'control'; label = $KeepLabel; chars = 'ps' }, @{ name = 'medium'; label = $MediumLabel; chars = 'qt' })) {
 			[void][OmoHwl.Input]::SetForegroundWindow($form)
 			$foreground = [OmoHwl.Input]::GetForegroundWindow() -eq $form
-			$out = "$dir\$($arm.name).json"
-			$workerPid = [OmoHwl.Token]::Start((Child-Command 'worker-input' $out "-Edit $($edit.ToInt64()) -Marker $($arm.chars)"), $arm.label)
+			$reportPath = "$dir\$($arm.name).json"
+			$workerPid = [OmoHwl.Token]::Start((Child-Command 'worker-input' $reportPath "-Edit $($edit.ToInt64()) -Marker $($arm.chars)"), $arm.label)
 			$exited = Wait-Exit $workerPid 60000
-			$report = (Wait-File $out 5000 $out) | ConvertFrom-Json
+			$report = (Wait-File $reportPath 5000 $reportPath) | ConvertFrom-Json
 			$window = if ($arm.name -eq 'control') { 3000 } else { [Math]::Max(2000, 10 * $controlMs) }
 			$landed = Watch-Text $edit $arm.chars $window
 			$post = $landed[[string]$arm.chars[0]]; $send = $landed[[string]$arm.chars[1]]
