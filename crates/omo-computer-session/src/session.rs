@@ -23,6 +23,7 @@ use omo_computer_safety::{Call, Guard, HostAdditions, NoHolds, StopPolicy, Targe
 
 use crate::audit::gc::SweepTrigger;
 use crate::mutate::{Funnel, Mutation, Refused};
+use crate::trace::Trace;
 
 /// `stopReason` while no stop path is armed: `session.open` arms none (`stopPath.start` does).
 pub const NO_GLOBAL_LISTENER: &str = "no-global-listener";
@@ -46,6 +47,9 @@ pub struct Session {
     pub(crate) opened: Option<Opened>,
     pub(crate) funnel: Funnel,
     pub(crate) refs: crate::refs::RefRegistry,
+    pub(crate) frames: crate::frames::FrameStore,
+    pub(crate) epoch_events: Vec<crate::epoch::EpochChanged>,
+    pub(crate) trace: Trace,
 }
 
 impl Session {
@@ -72,6 +76,9 @@ impl Session {
             opened: None,
             funnel: Funnel::in_memory(),
             refs: crate::refs::RefRegistry::default(),
+            frames: crate::frames::FrameStore::default(),
+            epoch_events: Vec::new(),
+            trace: Trace::default(),
         }
     }
 
@@ -291,6 +298,7 @@ mod tests {
         let mut session = session(&sink);
         session.open(params(json!({}))).expect("open");
         start(&mut session);
+        session.capture_frame("1", true, None).expect("a frame of 1");
         let reply = session.click(params(json!({"target": "1", "x": 3, "y": 4})));
         assert_eq!(reply, Ok(ExecReply(None)));
         assert_eq!(sink.len(), 3, "move, down, up: {:?}", sink.lines());

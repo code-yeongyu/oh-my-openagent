@@ -85,3 +85,8 @@ pub fn solid_png(width: u32, height: u32, gray: u8) -> Vec<u8> {
     chunk(&mut out, b"IEND", &[]);
     out
 }
+
+/// The gray level of the pointer glyph a default frame carries.
+pub const POINTER_GRAY: u8 = 0x00;
+/// The gray level of the crosshair a `crosshair` capture draws.
+pub const CROSSHAIR_GRAY: u8 = 0xFF;

@@ -1,0 +1,6 @@
+old case	replacement	reason
+crates/omo-computer-core/fixtures/conformance/v3-stop-live-click-then-suspended.json	crates/omo-computer-core/fixtures/conformance/v3-r20-stop-live-click-then-suspended.json	frame_required, row 20
+crates/omo-computer-core/fixtures/conformance/v3-marker-written-before-input.json	crates/omo-computer-core/fixtures/conformance/v3-r20-marker-written-before-input.json	frame_required, row 20
+crates/omo-computer-core/fixtures/conformance/v3-marker-replayed-local.json	crates/omo-computer-core/fixtures/conformance/v3-r20-marker-replayed-local.json	frame_required, row 20
+crates/omo-computer-core/fixtures/conformance/v3-marker-crash-redrive-uncertain.json	crates/omo-computer-core/fixtures/conformance/v3-r20-marker-crash-redrive-uncertain.json	frame_required, row 20
+crates/omo-computer-core/fixtures/conformance/v3-marker-unavailable.json	crates/omo-computer-core/fixtures/conformance/v3-r20-marker-unavailable.json	frame_required, row 20

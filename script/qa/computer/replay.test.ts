@@ -12,6 +12,14 @@ const CASE_01 = join(
 )
 const DELTAS_HEADER = "file\tpointer\tkind\tsource\trow\timported value\tv3 value"
 const PROVENANCE = join(ROOT, "crates/omo-computer-core/parity/ORACLE-PROVENANCE.tsv")
+const SUPERSEDED = join(ROOT, "crates/omo-computer-core/fixtures/conformance/SUPERSEDED.tsv")
+const SUPERSEDED_HEADER = "old case\treplacement\treason"
+
+// The old cases SUPERSEDED.tsv lists: the driver skips them, so they spawn nothing.
+async function supersededCases(): Promise<Set<string>> {
+  const rows = (await readFile(SUPERSEDED, "utf8")).trim().split("\n").slice(1)
+  return new Set(rows.map((row) => join(ROOT, row.split("\t")[0] ?? "")))
+}
 
 // A probe engine: records the arguments it was spawned with, then exits without replying.
 const PROBE_ENGINE = `#!/usr/bin/env bun
@@ -308,14 +316,60 @@ describe("replay driver", () => {
   test("a case with an explicit transport is replayed over that transport", async () => {
     const synthetic = join(dir, "v3-explicit-mcp.json")
     await writeFile(synthetic, JSON.stringify({ transport: "mcp", steps: [{ send: request(1), expect: [] }] }))
+    const skipped = await supersededCases()
     const cases = [...(await importedCases()), ...(await v3Cases()), { path: synthetic, transport: "mcp" }]
-    const explicit = cases.filter((item) => item.transport !== undefined)
+    const explicit = cases.filter((item) => item.transport !== undefined && !skipped.has(item.path))
     expect(explicit.length).toBeGreaterThan(1)
     for (const item of explicit) {
       const { argv } = await probe(item.path)
       expect({ case: item.path, first: argv[0] }).toEqual({ case: item.path, first: [`--${String(item.transport)}`] })
     }
   }, 120_000)
+
+  test("replay_skips_a_superseded_case_with_its_named_reason_and_spawns_nothing", async () => {
+    counter += 1
+    const old = join(dir, `superseded-old-${counter}.json`)
+    const replacement = join(dir, `superseded-new-${counter}.json`)
+    const list = join(dir, `superseded-${counter}.tsv`)
+    const body = JSON.stringify({ transport: "stdio", steps: [{ send: request(1), expect: [] }] })
+    await writeFile(old, body)
+    await writeFile(replacement, body)
+    await writeFile(list, `${SUPERSEDED_HEADER}\n${old}\t${replacement}\tframe_required, row 20\n`)
+    const log = join(dir, `argv-superseded-${counter}.log`)
+    const run = await replay(["--engine", probeEngine, "--case", old, "--superseded", list], { PROBE_ARGV_LOG: log })
+    expect(run.stdout).toContain(`REPLAY_SKIPPED ${old} superseded by ${replacement}: frame_required, row 20`)
+    expect(run.code).toBe(0)
+    expect(await Bun.file(log).exists()).toBe(false)
+
+    const listed = await supersededCases()
+    expect(listed.size).toBeGreaterThan(0)
+    for (const path of listed) {
+      const repo = await replay(["--engine", probeEngine, "--case", path], { PROBE_ARGV_LOG: log })
+      expect({ path, code: repo.code, skipped: repo.stdout.includes("REPLAY_SKIPPED") }).toEqual({
+        path,
+        code: 0,
+        skipped: true,
+      })
+    }
+  }, 60_000)
+
+  test("replay_fails_when_a_superseded_row_names_a_missing_replacement", async () => {
+    counter += 1
+    const old = join(dir, `superseded-orphan-${counter}.json`)
+    await writeFile(old, JSON.stringify({ transport: "stdio", steps: [{ send: request(1), expect: [] }] }))
+    const list = join(dir, `superseded-missing-${counter}.tsv`)
+    await writeFile(
+      list,
+      `${SUPERSEDED_HEADER}\n${old}\t${join(dir, "absent-replacement.json")}\tframe_required, row 20\n`,
+    )
+    const log = join(dir, `argv-missing-${counter}.log`)
+    const run = await replay(["--engine", probeEngine, "--case", CASE_01, "--superseded", list], {
+      PROBE_ARGV_LOG: log,
+    })
+    expect(run.stdout).toContain("REPLAY_ERROR superseded_replacement_missing")
+    expect(run.code).toBe(2)
+    expect(await Bun.file(log).exists()).toBe(false)
+  }, 60_000)
 
   test("--assert-sink-empty fails when the sink holds an entry", async () => {
     const steps = [{ send: request(1, "click"), expect: [expectation(reply(1, null))] }]

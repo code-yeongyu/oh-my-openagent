@@ -1,0 +1,445 @@
+{
+  "description": "Row 20 replacement of v3-marker-crash-redrive-uncertain.json (SUPERSEDED.tsv: frame_required, row 20): the same assertions with a capture of window 101 before the clicks of each engine process, since a click needs a frame. A call that crashed between its pre-input marker and its reply is never delivered again. The runtime root this case names must hold that crash state before the run: a click with callId k-crash delivered by this engine, whose marker then lost its receipt (the QA command produces it). Every re-drive of k-crash, in one engine and after a restart, answers TransactionFailed{recovery_required, callId} with disposition delivery_uncertain/unsafe and sends nothing; another callId in the scope is delivered; k-crash stays refused after it. The driver counts sinks in its own temp dir, so the QA command counts the sink under this root: 3 lines from the crashed delivery plus 3 from k-next.",
+  "transport": "stdio",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json",
+  "env": {
+    "OMO_COMPUTER_FAKE_STOP_PATH": "live",
+    "OMO_COMPUTER_RUNTIME_DIR": "target/qa-computer-v3/marker-crash-redrive"
+  },
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session.open",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "cursorOverlay": false,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "granted",
+                "axPermission": "granted",
+                "displayCount": 2,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": null,
+                "integrityLevel": null,
+                "screenLocked": false,
+                "displayAsleep": false
+              },
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "stopPath.start",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "suspended": false,
+              "globalLive": true,
+              "hostRelayLive": false,
+              "heartbeatFresh": true,
+              "stopPath": "global",
+              "reason": null
+            }
+          },
+          "variable": [
+            "/result/globalLive",
+            "/result/heartbeatFresh",
+            "/result/stopPath",
+            "/result/hostRelayLive"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 91,
+        "method": "capture",
+        "params": {
+          "target": "101"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 91,
+            "result": {
+              "mode": "inline-png",
+              "data": "png-base64",
+              "mimeType": "image/png",
+              "artifactPath": null,
+              "width": 800,
+              "height": 600,
+              "sourceWidth": 800,
+              "sourceHeight": 600,
+              "coordinateWidth": 800,
+              "coordinateHeight": 600,
+              "region": null,
+              "scale": 1.0,
+              "target": "101",
+              "frameId": "frame-1",
+              "note": null
+            }
+          },
+          "variable": [
+            "/result/data"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "click",
+        "params": {
+          "target": "101",
+          "x": 10,
+          "y": 10,
+          "callId": "k-crash"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "error": {
+              "code": -32020,
+              "message": "TransactionFailed",
+              "data": {
+                "code": "TransactionFailed",
+                "hint": null,
+                "reason": "recovery_required",
+                "callId": "k-crash",
+                "disposition": {
+                  "delivery": "delivery_uncertain",
+                  "retry": "unsafe"
+                }
+              }
+            }
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "click",
+        "params": {
+          "target": "101",
+          "x": 10,
+          "y": 10,
+          "callId": "k-crash"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "error": {
+              "code": -32020,
+              "message": "TransactionFailed",
+              "data": {
+                "code": "TransactionFailed",
+                "hint": null,
+                "reason": "recovery_required",
+                "callId": "k-crash",
+                "disposition": {
+                  "delivery": "delivery_uncertain",
+                  "retry": "unsafe"
+                }
+              }
+            }
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "restart": true
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "session.open",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "cursorOverlay": false,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "granted",
+                "axPermission": "granted",
+                "displayCount": 2,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": null,
+                "integrityLevel": null,
+                "screenLocked": false,
+                "displayAsleep": false
+              },
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "method": "stopPath.start",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 6,
+            "result": {
+              "suspended": false,
+              "globalLive": true,
+              "hostRelayLive": false,
+              "heartbeatFresh": true,
+              "stopPath": "global",
+              "reason": null
+            }
+          },
+          "variable": [
+            "/result/globalLive",
+            "/result/heartbeatFresh",
+            "/result/stopPath",
+            "/result/hostRelayLive"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 92,
+        "method": "capture",
+        "params": {
+          "target": "101"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 92,
+            "result": {
+              "mode": "inline-png",
+              "data": "png-base64",
+              "mimeType": "image/png",
+              "artifactPath": null,
+              "width": 800,
+              "height": 600,
+              "sourceWidth": 800,
+              "sourceHeight": 600,
+              "coordinateWidth": 800,
+              "coordinateHeight": 600,
+              "region": null,
+              "scale": 1.0,
+              "target": "101",
+              "frameId": "frame-1",
+              "note": null
+            }
+          },
+          "variable": [
+            "/result/data"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "method": "click",
+        "params": {
+          "target": "101",
+          "x": 10,
+          "y": 10,
+          "callId": "k-crash"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 7,
+            "error": {
+              "code": -32020,
+              "message": "TransactionFailed",
+              "data": {
+                "code": "TransactionFailed",
+                "hint": null,
+                "reason": "recovery_required",
+                "callId": "k-crash",
+                "disposition": {
+                  "delivery": "delivery_uncertain",
+                  "retry": "unsafe"
+                }
+              }
+            }
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 8,
+        "method": "click",
+        "params": {
+          "target": "101",
+          "x": 10,
+          "y": 10,
+          "callId": "k-next"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 8,
+            "result": null
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 9,
+        "method": "click",
+        "params": {
+          "target": "101",
+          "x": 10,
+          "y": 10,
+          "callId": "k-crash"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 9,
+            "error": {
+              "code": -32020,
+              "message": "TransactionFailed",
+              "data": {
+                "code": "TransactionFailed",
+                "hint": null,
+                "reason": "recovery_required",
+                "callId": "k-crash",
+                "disposition": {
+                  "delivery": "delivery_uncertain",
+                  "retry": "unsafe"
+                }
+              }
+            }
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 10,
+        "method": "click",
+        "params": {
+          "target": "101",
+          "x": 10,
+          "y": 10,
+          "callId": "k-crash"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 10,
+            "error": {
+              "code": -32020,
+              "message": "TransactionFailed",
+              "data": {
+                "code": "TransactionFailed",
+                "hint": null,
+                "reason": "recovery_required",
+                "callId": "k-crash",
+                "disposition": {
+                  "delivery": "delivery_uncertain",
+                  "retry": "unsafe"
+                }
+              }
+            }
+          },
+          "variable": []
+        }
+      ]
+    }
+  ]
+}
