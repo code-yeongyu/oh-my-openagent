@@ -1,0 +1,225 @@
+{
+  "description": "Row 25 (AC-86): menu.items lists the fixture's menu tree with label, enabled, checked, accelerator, submenu and path per item and the untrusted-text signal, sending nothing; menu.select of the exact label path File > Save is proven against a fresh listing and leaves through the one sink as one menu_select event.",
+  "transport": "stdio",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/menus.json",
+  "env": {
+    "OMO_COMPUTER_FAKE_STOP_PATH": "live"
+  },
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session.open",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "cursorOverlay": false,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "granted",
+                "axPermission": "granted",
+                "displayCount": 1,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": null,
+                "integrityLevel": null,
+                "screenLocked": false,
+                "displayAsleep": false
+              },
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "stopPath.start",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "suspended": false,
+              "globalLive": true,
+              "hostRelayLive": false,
+              "heartbeatFresh": true,
+              "stopPath": "global",
+              "reason": null
+            }
+          },
+          "variable": []
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "menu.items",
+        "params": {
+          "target": "101"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "result": {
+              "items": [
+                {
+                  "label": "File",
+                  "enabled": true,
+                  "checked": false,
+                  "submenu": true,
+                  "path": [
+                    "File"
+                  ],
+                  "observation": {
+                    "untrustedText": true
+                  }
+                },
+                {
+                  "label": "Save",
+                  "enabled": true,
+                  "checked": false,
+                  "accelerator": "Cmd+S",
+                  "submenu": false,
+                  "path": [
+                    "File",
+                    "Save"
+                  ],
+                  "observation": {
+                    "untrustedText": true
+                  }
+                },
+                {
+                  "label": "Export…",
+                  "enabled": true,
+                  "checked": false,
+                  "submenu": true,
+                  "path": [
+                    "File",
+                    "Export…"
+                  ],
+                  "observation": {
+                    "untrustedText": true
+                  }
+                },
+                {
+                  "label": "PDF",
+                  "enabled": true,
+                  "checked": false,
+                  "submenu": false,
+                  "path": [
+                    "File",
+                    "Export…",
+                    "PDF"
+                  ],
+                  "observation": {
+                    "untrustedText": true
+                  }
+                },
+                {
+                  "label": "Edit",
+                  "enabled": false,
+                  "checked": false,
+                  "submenu": true,
+                  "path": [
+                    "Edit"
+                  ],
+                  "observation": {
+                    "untrustedText": true
+                  }
+                },
+                {
+                  "label": "Undo",
+                  "enabled": true,
+                  "checked": false,
+                  "submenu": false,
+                  "path": [
+                    "Edit",
+                    "Undo"
+                  ],
+                  "observation": {
+                    "untrustedText": true
+                  }
+                },
+                {
+                  "label": "View",
+                  "enabled": true,
+                  "checked": true,
+                  "submenu": false,
+                  "path": [
+                    "View"
+                  ],
+                  "observation": {
+                    "untrustedText": true
+                  }
+                }
+              ],
+              "observation": {
+                "untrustedText": true
+              }
+            }
+          },
+          "variable": []
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "menu.select",
+        "params": {
+          "target": "101",
+          "path": [
+            "File",
+            "Save"
+          ]
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "result": null
+          },
+          "variable": []
+        }
+      ],
+      "sink": 1
+    }
+  ]
+}

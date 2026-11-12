@@ -35,14 +35,19 @@ impl Session {
         let record = Record::new(&self.funnel, &mutation, &call_id, secure);
         let epoch = self.guard.supervisor().stop_epoch();
         let call = (mutation.method, &mutation.call.target, mutation.route);
-        let plan = self.funnel.control.plan(self.backend.as_mut(), call, epoch);
+        let mut plan = self.funnel.control.plan(self.backend.as_mut(), call, epoch);
+        let url = super::url::check(&self.funnel.url_policy, self.backend.as_mut(), &mutation.call.target);
+        plan.stages.consequential = url.refusal;
+        plan.stages.targets = mutation.targets.clone();
+        self.funnel.url_unknown = url.unknown;
         if let Err(refused) =
             self.guard
-                .admit_on_with(self.backend.as_mut(), &mutation.call, plan.stages)
+                .admit_on_with(self.backend.as_mut(), &mutation.call, plan.stages.clone())
         {
             let detail = match refused.gate {
                 Gate::Consent => plan.consent_detail.clone(),
                 Gate::Lease => plan.lease_detail.clone(),
+                Gate::Consequential => url.detail.clone(),
                 _ => None,
             };
             let out = Refused {
@@ -144,6 +149,7 @@ impl Session {
                     of,
                     effect: read_back.effect,
                     user_moved_on: self.funnel.control.presence.take_ended().is_some(),
+                    url_unknown: std::mem::take(&mut self.funnel.url_unknown),
                     warning: appended.is_err().then(|| "write_failed".to_owned()),
                     audit_id: appended.ok(),
                 };

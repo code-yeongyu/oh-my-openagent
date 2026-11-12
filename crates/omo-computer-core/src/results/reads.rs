@@ -4,7 +4,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use super::v1::{LegacyFrame, LegacyObservation, LegacyWindow};
-use crate::listing::{ElementInfo, Rect, WindowInfo};
+use crate::listing::{Rect, WindowInfo};
 use crate::observation::{Frame, Observation};
 use crate::untrusted::UntrustedText;
 
@@ -82,7 +82,7 @@ pub struct ClipboardContent {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct MenuItems {
-    pub items: Vec<ElementInfo>,
+    pub items: Vec<crate::menus::MenuItem>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub truncated: Option<bool>,
     pub observation: UntrustedText,

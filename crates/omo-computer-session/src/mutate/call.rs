@@ -17,6 +17,8 @@ pub struct Mutation<'a> {
     /// Typed text: the marker and the audit keep its length (and digest outside a secure focus).
     pub text: Option<String>,
     pub keys: Vec<String>,
+    /// Row 25: the call's targets resolved from the app's identity, not from a window.
+    pub targets: Option<Vec<omo_computer_safety::gate::PointTarget>>,
 }
 
 impl<'a> Mutation<'a> {
@@ -39,6 +41,7 @@ impl<'a> Mutation<'a> {
             frame_id: None,
             text: None,
             keys: Vec::new(),
+            targets: None,
         }
     }
 
@@ -55,12 +58,19 @@ impl<'a> Mutation<'a> {
             frame_id: None,
             text: Some(text),
             keys: Vec::new(),
+            targets: None,
         }
     }
 
     #[must_use]
     pub fn with_frame(mut self, frame_id: Option<String>) -> Self {
         self.frame_id = frame_id;
+        self
+    }
+
+    #[must_use]
+    pub fn with_targets(mut self, targets: Vec<omo_computer_safety::gate::PointTarget>) -> Self {
+        self.targets = Some(targets);
         self
     }
 

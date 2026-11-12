@@ -38,6 +38,8 @@ pub(super) struct Sent {
     pub(super) warning: Option<String>,
     /// The foreground lease ended under the user since the last report.
     pub(super) user_moved_on: bool,
+    /// Row 25: the browser window's URL could not be read under a non-empty `url_policy`.
+    pub(super) url_unknown: bool,
 }
 
 /// # Errors
@@ -70,6 +72,9 @@ pub(super) fn reply(
         audit_ids: sent.audit_id.into_iter().collect(),
         timings: None,
         evidence: Vec::new(),
+        url_policy: sent
+            .url_unknown
+            .then_some(omo_computer_core::url_policy::UrlPolicyStamp::Unknown),
         observation: UntrustedText,
     };
     ActionReport::new(ReportContext::new(verb, None), parts).map(|report| ExecReply(Some(report)))
