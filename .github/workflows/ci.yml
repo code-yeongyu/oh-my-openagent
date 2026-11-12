@@ -344,7 +344,7 @@ jobs:
         env:
           WINDOWS_TEST_SHARD: ${{ matrix.shard }}
         run: |
-          # Feature PRs do not commit generated outputs (#9903), so these tests read a fresh build, as on POSIX.
+          # Generated outputs are not tracked (#13192): build them so these tests read the outputs of this commit, as on POSIX.
           bun script/build-generated.ts
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $telemetryDirectory = Join-Path $env:RUNNER_TEMP "windows-root-test-telemetry"
@@ -842,9 +842,9 @@ jobs:
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         run: bun run script/remove-stale-self-package-tests.ts
 
-      # Linux only: digestBuildSources hashes repo-relative paths (build-extension.mjs:140,143),
-      # which are backslash-separated on Windows, so the source digest is platform-dependent and
-      # a committed artifact can never match on every OS. One platform is enough to catch drift.
+      # Linux only: digestBuildSources hashes repo-relative paths (build-extension.mjs:140,143), which are
+      # backslash-separated on Windows, so the recorded source digest is platform-dependent and this step runs on
+      # one platform.
       # #13192: no build output on script/generated-bundles.json is tracked, so this step builds all of them (and the
       # tracked daemon launch spec) and checks the tree: the build modifies no tracked file and writes only ignored paths.
       - name: Verify generated outputs and committed Senpi files are current
