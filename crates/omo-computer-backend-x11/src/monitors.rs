@@ -65,7 +65,15 @@ fn physical_scale(monitor: &Monitor) -> Option<f64> {
 /// The scale of `monitor` and its source.
 #[must_use]
 pub fn scale_of(monitor: &Monitor, resources: Option<&str>, gdk: Option<&str>) -> (f64, ScaleSource) {
-    let _ = (monitor, resources, gdk);
+    if let Some(dpi) = resources.and_then(xft_dpi) {
+        return (dpi / BASE_DPI, ScaleSource::XftDpi);
+    }
+    if let Some(scale) = gdk_scale(gdk) {
+        return (scale, ScaleSource::GdkScale);
+    }
+    if let Some(scale) = physical_scale(monitor) {
+        return (scale, ScaleSource::RandrMm);
+    }
     (1.0, ScaleSource::Assumed)
 }
 

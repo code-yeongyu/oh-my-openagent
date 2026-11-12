@@ -205,6 +205,9 @@ impl Backend for FakeBackend {
                 height,
                 mime: ImageMime::Png,
                 bytes: raster.png(),
+                route: None,
+                occluders_visible: None,
+                cursor: None,
             })
         })
     }

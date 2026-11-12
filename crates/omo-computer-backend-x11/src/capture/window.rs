@@ -57,7 +57,11 @@ impl<S: XServer> X11Capture<S> {
         if !placement.viewable {
             return Err(Refusal::new(EngineCode::CaptureUnavailable, Reason::Unmapped.wire()));
         }
-        let read = PixmapRead::RedirectRefused;
+        let composited = self.server().compositor_present().map_err(|error| failed(&error))?;
+        let read = self
+            .server()
+            .window_pixmap(xid, &placement, !composited)
+            .map_err(|error| failed(&error))?;
         let (mut image, route, occluders_visible) = match read {
             PixmapRead::Image(raw) => (decode(&raw).map_err(|error| failed(&error))?, CaptureRoute::Composite, false),
             PixmapRead::RedirectRefused => (self.root_crop(&placement)?, CaptureRoute::RootCrop, true),
@@ -65,14 +69,15 @@ impl<S: XServer> X11Capture<S> {
                 return Err(Refusal::new(EngineCode::CaptureUnavailable, Reason::Unmapped.wire()));
             }
         };
-        let cursor = CursorMode::None;
+        let mut cursor = CursorMode::None;
         if options.cursor {
-            if let Some(glyph) = None::<super::server::CursorImage> {
+            if let Some(glyph) = self.server().cursor().map_err(|error| failed(&error))? {
                 let rect = placement.rect;
                 if rect.contains(glyph.x, glyph.y) {
                     let left = i64::from(glyph.x) - i64::from(rect.x) - i64::from(glyph.xhot);
                     let top = i64::from(glyph.y) - i64::from(rect.y) - i64::from(glyph.yhot);
                     blend_cursor(&mut image, &glyph, left, top);
+                    cursor = CursorMode::Engine;
                 }
             }
         }

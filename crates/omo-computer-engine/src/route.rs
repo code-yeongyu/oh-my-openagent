@@ -61,6 +61,14 @@ pub fn backend(vars: &[(String, String)]) -> Result<Box<dyn Backend>, RouteError
             let fake = FakeBackend::from_seams(lookup, sink).map_err(RouteError::Fake)?;
             Ok(Box::new(fake))
         }
+        // Row 47: the X11 backend on Linux, over the display `DISPLAY` names.
+        #[cfg(target_os = "linux")]
+        Some(value) if value == omo_computer_backend_x11::X11_BACKEND => Ok(Box::new(
+            omo_computer_backend_x11::X11Backend::from_env(
+                lookup("DISPLAY").as_deref(),
+                lookup("GDK_SCALE").as_deref(),
+            ),
+        )),
         other => Err(RouteError::NoBackend(other)),
     }
 }

@@ -113,6 +113,9 @@ impl<S: XServer> Backend for X11Backend<S> {
             height: frame.image.height(),
             mime: ImageMime::Png,
             bytes,
+            route: Some(frame.route),
+            occluders_visible: Some(frame.occluders_visible),
+            cursor: Some(frame.cursor),
         })
     }
 }
@@ -182,5 +185,8 @@ mod tests {
         assert_eq!((frame.width, frame.height), (50, 40));
         assert_eq!(frame.mime, ImageMime::Png);
         assert!(frame.bytes.starts_with(b"\x89PNG"));
+        assert_eq!(frame.route, Some(CaptureRoute::Composite));
+        assert_eq!(frame.occluders_visible, Some(false));
+        assert_eq!(frame.cursor, Some(CursorMode::None));
     }
 }

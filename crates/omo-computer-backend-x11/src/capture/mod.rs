@@ -134,14 +134,15 @@ impl<S: XServer> X11Capture<S> {
             imageops::replace(&mut canvas, &image, round_px(region.pixel.x), round_px(region.pixel.y));
             placed.push((reading.monitor.rect, *region));
         }
-        let cursor = CursorMode::None;
-        if false {
+        let mut cursor = CursorMode::None;
+        if options.cursor {
             if let Some(image) = self.server.cursor().map_err(|error| failed(&error))? {
                 if let Some((rect, region)) = placed.iter().find(|(rect, _)| rect.contains(image.x, image.y)) {
                     let ratio = region.pixel.width / f64::from(rect.width.max(1));
                     let x = round_px(region.pixel.x + f64::from(image.x - rect.x) * ratio);
                     let y = round_px(region.pixel.y + f64::from(image.y - rect.y) * ratio);
                     blend_cursor(&mut canvas, &image, x - i64::from(image.xhot), y - i64::from(image.yhot));
+                    cursor = CursorMode::Engine;
                 }
             }
         }

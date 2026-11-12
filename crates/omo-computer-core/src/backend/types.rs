@@ -1,8 +1,9 @@
 //! The argument and return types of the backend traits. They are in-process types, never
 //! on the wire.
 
+use crate::capabilities::CaptureRoute;
 use crate::listing::{ElementInfo, Rect, WindowInfo};
-use crate::observation::ImageMime;
+use crate::observation::{CursorMode, ImageMime};
 use crate::params::{Button, ObserveOptions, Point};
 use crate::results::PermissionState;
 
@@ -45,6 +46,12 @@ pub struct FrameBytes {
     pub height: u32,
     pub mime: ImageMime,
     pub bytes: Vec<u8>,
+    /// How the pixels were produced, when the backend reports it.
+    pub route: Option<CaptureRoute>,
+    /// `Some(true)` when windows covering the target may show (a root-crop tier).
+    pub occluders_visible: Option<bool>,
+    /// Whose pointer the pixels carry, when the backend reports it.
+    pub cursor: Option<CursorMode>,
 }
 
 #[cfg(test)]

@@ -10,7 +10,11 @@ use crate::monitors::MonitorReading;
 /// The id a monitor answers to: its RandR name, else its name atom.
 #[must_use]
 pub fn display_id(monitor: &Monitor) -> String {
-    monitor.atom.to_string()
+    if monitor.name.is_empty() {
+        monitor.atom.to_string()
+    } else {
+        monitor.name.clone()
+    }
 }
 
 /// The `DisplayInfo` of one monitor reading.
