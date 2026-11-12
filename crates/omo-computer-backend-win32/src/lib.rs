@@ -6,9 +6,15 @@
 pub mod backend;
 pub mod capture;
 pub mod displays;
+pub mod foreground;
 pub mod input;
+pub mod input_lock;
 pub mod ocr;
+pub mod overlay;
+pub mod protected;
 pub mod release_helper;
+pub mod self_set;
+pub mod stop_path;
 
 pub use backend::Win32Backend;
 
