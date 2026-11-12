@@ -66,6 +66,10 @@ fn action(response: Response) -> ActionReport {
     }
 }
 
+/// Wall time a busy host takes from the test around a refusal: longer than
+/// any bound a wall clock could set on "at once".
+const REFUSAL_STALL: Duration = Duration::from_millis(1_100);
+
 fn refused_fast(error: &DesktopError, started: Instant, reason: &str) {
     assert_eq!(error.code, ErrorCode::AxUnsupported, "{error}");
     let report = report(error);
@@ -79,8 +83,9 @@ fn the_battery_refuses_a_disabled_element_at_once_and_sends_nothing() {
     // Given: a visible, still, disabled button.
     let mut harness = opened(&scene(button(&json!({"enabled": false})), &[]), ReportMode::Object);
     let reference = harness.focused_ref();
-    // When
+    // When: a loaded host deschedules this thread around the press.
     let started = Instant::now();
+    std::thread::sleep(REFUSAL_STALL);
     let error = press(&mut harness, reference).expect_err("refused");
     // Then: no auto-wait for a terminal state.
     refused_fast(&error, started, "disabled");
@@ -92,8 +97,9 @@ fn the_battery_refuses_an_action_the_element_does_not_offer_at_once() {
     // Given: a button that offers only `click`.
     let mut harness = opened(&scene(button(&json!({"actions": ["click"]})), &[]), ReportMode::Object);
     let reference = harness.focused_ref();
-    // When
+    // When: a loaded host deschedules this thread around the request.
     let started = Instant::now();
+    std::thread::sleep(REFUSAL_STALL);
     let error = harness
         .process(Op::AxPerform(AxPerformParams { ref_: reference, action: "increment".to_owned() }))
         .expect_err("refused");
