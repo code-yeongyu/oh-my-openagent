@@ -50,6 +50,8 @@ export async function joinAccount(
     readonly clock: CeremonyClock
     readonly showCode: (code: string) => void | Promise<void>
     readonly onPending?: (pending: PendingApproval) => void
+    /** A best-effort step after the pin failed (#12382); stderr when absent. */
+    readonly onWarning?: (message: string) => void
   } & SyncOperationOptions,
 ): Promise<JoinOutcome> {
   const { account, keyring, clock } = input
@@ -110,7 +112,7 @@ export async function joinAccount(
       }
       await pinTrustAnchor(input.pinDir, account, pin, operation)
       checkSyncOperation(operation)
-      return (await rootChangedSinceRetired(input.pinDir, account, pin.genesisDigest))
+      return (await rootChangedSinceRetired(input.pinDir, account, pin.genesisDigest, input.onWarning))
         ? { kind: "joined", rootChanged: true }
         : { kind: "joined" }
     }
