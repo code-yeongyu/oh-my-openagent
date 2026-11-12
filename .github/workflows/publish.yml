@@ -695,6 +695,14 @@ jobs:
         if: runner.os == 'Linux'
         run: node script/verify-omo-ai-payload.mjs --release-preflight
 
+      # The release job bundles these two CLIs after npm is published; build them here so an import of an untracked
+      # generated module fails before anything is published.
+      - name: Build the release job's CLI bundles
+        if: runner.os == 'Linux'
+        run: |
+          bun build packages/omo-opencode/src/cli/index.ts --outdir "$RUNNER_TEMP/preflight-cli" --target bun --format esm
+          bun run build:cli-node
+
   dispatch-provenance-safe-publish:
     # Pin until this release/deploy path is proven on Ubuntu 26.04: #9936.
     runs-on: ubuntu-24.04
@@ -1270,6 +1278,11 @@ jobs:
           path: lazycodex-marketplace
           token: ${{ secrets.LAZYCODEX_SYNC_TOKEN }}
           fetch-depth: 0
+
+      # The marketplace sync bundles the CLI, which imports the generated brand logo module; it is not tracked (#13192).
+      - name: Build generated files
+        if: inputs.publish_lazycodex == true
+        run: bun script/build-generated.ts
 
       - name: Sync LazyCodex Codex marketplace
         if: inputs.publish_lazycodex == true

@@ -731,6 +731,11 @@ jobs:
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         run: bun install --frozen-lockfile --ignore-scripts
 
+      # The suites import the generated brand logo module through the local launcher; it is not tracked (#13192).
+      - name: Build generated files
+        if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+        run: bun script/build-generated.ts
+
       - name: Run full Codex compatibility suite
         id: codex-full-tests
         if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.suite == 'full' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
