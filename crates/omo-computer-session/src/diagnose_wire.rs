@@ -51,3 +51,26 @@ pub(crate) fn host_call(session: &mut Session, method: Method, params: Value) ->
         _ => None,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use omo_computer_backend_fake::{fixtures_dir, FakeBackend, FakeScenario};
+    use omo_computer_core::results::PermissionState::{Denied, Granted, Unknown};
+
+    use crate::Session;
+
+    fn states(session: &Session) -> [omo_computer_core::results::PermissionState; 3] {
+        let report = session.diagnose();
+        ["capture", "input", "accessibility"].map(|name| report.permissions[name].state)
+    }
+
+    #[test]
+    fn an_absent_permissions_block_grants_every_permission() {
+        let absent = Session::new(Box::new(FakeBackend::new(FakeScenario::default())));
+        assert_eq!(states(&absent), [Granted; 3], "absent: all granted (R51)");
+        let scripted = FakeScenario::load(&fixtures_dir().join("v3-diagnose-denied.json")).expect("fixture");
+        let denied = Session::new(Box::new(FakeBackend::new(scripted)));
+        assert_eq!(states(&denied), [Granted, Denied, Unknown]);
+        assert!(!denied.diagnose().ok, "a denial is not ready");
+    }
+}

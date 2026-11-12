@@ -201,11 +201,3 @@ fn focus_record_sink_keeps_the_window_id_case() {
     );
 }
 
-#[test]
-fn an_absent_permissions_block_grants_every_permission() {
-    use omo_computer_core::results::PermissionState::{Denied, Granted, Unknown};
-    let probe = FakeBackend::new(FakeScenario::default()).probe_permissions();
-    assert_eq!([probe.capture, probe.input, probe.accessibility], [Granted; 3], "absent: all granted");
-    let scripted = fixture("v3-diagnose-denied.json").probe_permissions();
-    assert_eq!([scripted.capture, scripted.input, scripted.accessibility], [Granted, Denied, Unknown]);
-}
