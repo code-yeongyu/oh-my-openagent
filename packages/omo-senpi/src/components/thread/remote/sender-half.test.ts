@@ -162,10 +162,14 @@ describe("#13037 the sender half reaches a session on another device that is not
       nothingSent(a)
     })
 
-    test("#given one device holds it and another did not answer #then the row is used", async () => {
+    // Found over silent, by choice: a device that does not answer within the bound (or hangs past the client's cap) must
+    // not block a send another device can take. The silent device is asked once and not again; this is not ambiguous.
+    test("#given one device holds it and another did not answer #then the row is used and the silent device is asked once", async () => {
       const a = account({ rows: [B_ROW, C_ROW], silent: ["b"], ended: { c: { [GONE]: "rk-c-gone" } } })
       const { run } = fixture.surface(a.remote)
       expect(await run("thread_send", { thread: GONE, message: "hi" })).toMatchObject({ kind: "ok", device: "c" })
+      expect(a.lookups.map((entry) => entry.device).sort()).toEqual(["b", "c"])
+      expect(wakes(a).map((entry) => entry.device)).toEqual(["c"])
     })
 
     test("#given a device that is offline #then it is not asked", async () => {
@@ -446,7 +450,8 @@ describe("#13037 the sender half reaches a session on another device that is not
 
   describe("review: a receiving side's free-form refusal reason is bounded before it reaches the person", () => {
     test("#given a long multi-line reason with control characters #then the message is one bounded line", async () => {
-      const reason = `${"x".repeat(600)}\nsecond line\u0007\u001b[31m`
+      // The format characters come first, inside the shown length, so the cut cannot hide them.
+      const reason = `\u202Eevil\u2066\u200B${"x".repeat(600)}\nsecond line\u0007\u001b[31m`
       const a = account({
         rows: [B_ROW, C_ROW],
         ended: { c: { [GONE]: "rk-c-gone" } },
@@ -456,6 +461,8 @@ describe("#13037 the sender half reaches a session on another device that is not
       const error = (result as { error: { message: string; details?: { reason?: string } } }).error
       for (const text of [error.message, error.details?.reason ?? ""]) {
         expect(/[\u0000-\u001f\u007f]/.test(text)).toBe(false)
+        // Format characters (bidi overrides and isolates, zero-width marks) would reorder how the reason reads.
+        expect(/\p{Cf}/u.test(text)).toBe(false)
         expect(text.length).toBeLessThanOrEqual(300)
       }
     })

@@ -114,4 +114,13 @@ describe("omo remote wake", () => {
     expect(bad.code).toBe(REMOTE_EXIT.usage)
     expect(sent(svc)).toBe(0)
   })
+
+  test("#given the gate constant unset, and separately a service older than the gate #then the two refusals name different causes", async () => {
+    const unset = await wake(["on"], (await owner()).stateDir, null)
+    const older = await wake(["on"], (await owner("1.3.9")).stateDir, GATE)
+    expect([unset.code, older.code]).toEqual([REMOTE_EXIT.unavailable, REMOTE_EXIT.unavailable])
+    expect(unset.err.length).toBeGreaterThan(0)
+    expect(older.err.length).toBeGreaterThan(0)
+    expect(unset.err).not.toEqual(older.err)
+  })
 })
