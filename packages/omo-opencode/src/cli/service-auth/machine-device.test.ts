@@ -134,7 +134,22 @@ describe("omo login reuses this machine's device instead of registering another"
       await expect(refused).rejects.toThrow(
         "Remove this computer's device on the Devices page if it is still listed, then run omo account forget, then run omo login.",
       )
+      await expect(refused).rejects.toThrow("has its device service forget the device, without signing the device out")
       await expect(refused).rejects.not.toThrow("--new-device")
+      // No device service at all is the same as one that holds nothing.
+      await expect(refuseSecondMachineDevice(session, undefined)).rejects.toThrow("then run omo account forget")
+      // #13265 design gate A2: a device service that holds the device makes the item a damaged copy; never offer forget.
+      const heldRefusal = refuseSecondMachineDevice(
+        session,
+        service({ kind: "held", device: { id: "dev-desktop", name: "OmO Desktop on Studio" } }),
+      )
+      await expect(heldRefusal).rejects.toBeInstanceOf(MachineCredentialUnreadable)
+      await expect(heldRefusal).rejects.toThrow("repair it from the OmO desktop app")
+      await expect(heldRefusal).rejects.not.toThrow("forget")
+      // A device service that does not answer keeps the did-not-answer refusal.
+      const unknownRefusal = refuseSecondMachineDevice(session, service({ kind: "unknown", reason: "timed_out" }))
+      await expect(unknownRefusal).rejects.toBeInstanceOf(MachineAlreadySignedIn)
+      await expect(unknownRefusal).rejects.toThrow("is installed but did not answer")
     })
   }
 
