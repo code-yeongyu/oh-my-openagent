@@ -7,6 +7,7 @@ import type { ListingResult, ListingRevision } from "./local-api/client-assembly
 import type {
   Capability,
   ControlAttachState,
+  ControlSessionWakeState,
   DeviceRef,
   DeviceRow,
   MachineBinding,
@@ -160,6 +161,9 @@ export type DeviceService = {
   readonly watchStatus: (listener: (status: Status) => void) => Promise<() => void>
   readonly setEnabled: (enabled: boolean) => Promise<boolean>
   /** Whether this account's other devices may view and command this device's sessions (the per-device opt-out). */
+  /** omo#13037 A7.2.5: the wake switch, read and set through the owner's own local API (never a capability word). */
+  readonly sessionWake: () => Promise<ControlSessionWakeState>
+  readonly setSessionWake: (enabled: boolean | null) => Promise<ControlSessionWakeState>
   readonly attachControl: () => Promise<ControlAttachState>
   readonly setAttachControl: (attached: boolean) => Promise<ControlAttachState>
   /** The binary the service runs to refresh its access token (absolute path) and that binary's version. */
@@ -305,6 +309,8 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
       return stop
     },
     setEnabled: async (enabled) => (await client.request("service.set_enabled", { enabled })).enabled,
+    sessionWake: () => client.request("control.session_wake.get", {}),
+    setSessionWake: (enabled) => client.request("control.session_wake.set", { enabled }),
     attachControl: () => client.request("control.attach.get", {}),
     setAttachControl: (attached) => client.request("control.attach.set", { attached }),
     registerRefresher: async (binaryPath, version) => {

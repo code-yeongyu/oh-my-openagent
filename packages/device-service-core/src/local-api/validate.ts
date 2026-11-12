@@ -142,6 +142,17 @@ const attachState = (v: unknown) => {
     changedAt: typeof changedAt === "string" ? changedAt : fail("changedAt"),
   }
 }
+const sessionWakeState = (v: unknown) => {
+  const m = known(v, ["enabled", "stored", "changedAt", "overridden"], [], "data")
+  const s = m["stored"]
+  const changedAt = m["changedAt"]
+  return {
+    enabled: bool(m["enabled"], "enabled"),
+    stored: s === null || typeof s === "boolean" || s === "unreadable" ? s : fail("stored"),
+    changedAt: typeof changedAt === "string" ? changedAt : fail("changedAt"),
+    overridden: bool(m["overridden"], "overridden"),
+  }
+}
 // Raw 32 bytes, unpadded base64url: a machine hash and both public keys share the service's encoding.
 const base64url32 = (v: unknown, what: string): string =>
   typeof v === "string" && /^[A-Za-z0-9_-]{43}$/.test(v) ? v : fail(what)
@@ -194,6 +205,8 @@ const DATA: { readonly [T in RequestType]: (v: unknown) => ResponseData[T] } = {
   "owner.shutdown_for_upgrade": empty,
   "session.endpoints": endpointsData,
   "session.locate": locateData,
+  "control.session_wake.get": sessionWakeState,
+  "control.session_wake.set": sessionWakeState,
   "control.attach.get": attachState,
   "control.attach.set": attachState,
 }
