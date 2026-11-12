@@ -333,8 +333,10 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
           )
         const loaded = skills?.kind === "ok" ? skills.names : undefined
         const entries = resolveEntries(options, current)
+        const callerCwd = options.callerWorkspaceRoot()
         const plan = await planCreate(options.remote, value, {
           host: createLocalSessionHost(options.host, entries),
+          ...(callerCwd.trim() === "" ? {} : { callerCwd }),
           resolve: (address) => resolution(options, entries, address, callerId, true),
           // Decision 0027: an existing thread or a fork source is found by the same resolver every send uses, not by a second ladder.
           locate: async (address) => {
