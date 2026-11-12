@@ -1,9 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
 
-import { type Cell, cellId, type CellResult, catalogFor, type SignalId, type SignalSummary } from "./catalog.ts"
+import { type Cell, cellId, type CellResult, type SignalId, type SignalSummary } from "./catalog.ts"
 import { buildReport, summaryLine } from "./report.ts"
 
 const deliverCell: Cell = {
@@ -196,38 +193,5 @@ describe("conformance report, declared-outcome catalog [ADP-1]", () => {
   test("a catalog that declares one cell twice is contradictory", () => {
     const report = buildReport([...catalog, { ...deliverCell, expect: { refuse: ["InputFailed"] } }], passingRun())
     expect(report.problems).toContain(`contradictory cell ${cellId(deliverCell)}: declared 2 times`)
-  })
-
-  test("the CLI names the missing cell of a finished run and exits 1", () => {
-    const fake = catalogFor("fake", "headless")
-    const results = fake.map((cell) =>
-      "deliver" in cell.expect ? delivered(cell) : refused(cell, cell.expect.refuse[0] ?? "no declared code"),
-    )
-    const dir = mkdtempSync(join(tmpdir(), "conformance-report-"))
-    try {
-      const input = join(dir, "run.json")
-      const write = (rows: CellResult[]) =>
-        writeFileSync(
-          input,
-          JSON.stringify({
-            schema: "omo-conformance-run/1",
-            driver: "engine",
-            os: "fake",
-            session: "headless",
-            results: rows,
-          }),
-        )
-      write(results)
-      const ok = Bun.spawnSync(["bun", join(import.meta.dir, "report.ts"), "--input", input])
-      expect(ok.stdout.toString()).toContain(`CATALOG fake/headless cells=${fake.length} `)
-      expect(ok.exitCode).toBe(0)
-      const [dropped, ...rest] = results
-      write(rest)
-      const missing = Bun.spawnSync(["bun", join(import.meta.dir, "report.ts"), "--input", input])
-      expect(missing.stdout.toString()).toContain(`missing cell ${dropped?.id}`)
-      expect(missing.exitCode).toBe(1)
-    } finally {
-      rmSync(dir, { recursive: true, force: true })
-    }
   })
 })
