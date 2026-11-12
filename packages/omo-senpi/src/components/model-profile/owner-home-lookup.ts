@@ -53,23 +53,26 @@ function isAtOrBelow(path: string, folder: string): boolean {
   return rest === "" || (rest !== ".." && !rest.startsWith(`..${sep}`) && !isAbsolute(rest))
 }
 
+const isInsideAny = (path: string, folders: readonly string[]): boolean =>
+  folders.some((folder) => isAtOrBelow(realOrResolved(path), folder))
+
 // PATH counts only through absolute entries outside every untrusted folder, compared by real path: a relative entry
 // resolves against the session folder, and an absolute one can still point into it (direnv `PATH_add bin`,
 // `<project>/node_modules/.bin`), so either could run a getent or id the folder ships before the folder is trusted.
-function trustedPath(path: string | undefined, untrustedFolders: readonly string[]): string {
-  const folders = [process.cwd(), ...untrustedFolders].map(realOrResolved)
-  return (path ?? "")
-    .split(delimiter)
-    .filter((entry) => !folders.some((folder) => isAtOrBelow(realOrResolved(entry), folder)))
-    .join(delimiter)
-}
-
+// The binary found is held to the same test, because a trusted directory can hold a file symlink into the folder.
 function findLookupBinary(command: string, deps: PasswdLookupDeps): string | null {
   const systemPath = (deps.systemBinDirs ?? SYSTEM_BIN_DIRS).join(delimiter)
   const fromSystem = findOnPath(command, { ...process.env, PATH: systemPath })
   if (fromSystem !== null) return fromSystem
-  const userPath = trustedPath(process.env.PATH, deps.untrustedFolders ?? [])
-  return findOnPath(command, { ...process.env, PATH: userPath }, process.platform, { absoluteOnly: true })
+  const folders = [process.cwd(), ...(deps.untrustedFolders ?? [])].map(realOrResolved)
+  const userPath = (process.env.PATH ?? "")
+    .split(delimiter)
+    .filter((entry) => !isInsideAny(entry, folders))
+    .join(delimiter)
+  return findOnPath(command, { ...process.env, PATH: userPath }, process.platform, {
+    absoluteOnly: true,
+    accept: (candidate) => !isInsideAny(candidate, folders),
+  })
 }
 
 function readOptionalFile(path: string): string | null {

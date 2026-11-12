@@ -4,6 +4,8 @@ import { delimiter, isAbsolute, join } from "node:path"
 export interface FindOnPathOptions {
   /** Skip relative PATH entries (`.`, `bin`), which resolve against the cwd and so can name a folder's own binaries. */
   readonly absoluteOnly?: boolean
+  /** Returns false to skip an executable candidate and keep searching the remaining PATH entries. */
+  readonly accept?: (candidate: string) => boolean
 }
 
 export function findOnPath(
@@ -22,10 +24,10 @@ export function findOnPath(
       const candidate = join(directory, name)
       try {
         accessSync(candidate, platform === "win32" ? constants.F_OK : constants.X_OK)
-        return candidate
       } catch {
         continue
       }
+      if (options.accept === undefined || options.accept(candidate)) return candidate
     }
   }
   return null
