@@ -13,6 +13,9 @@ const pkgDir = resolve(repoRoot, "packages", "omo-native")
 
 const REQUIRED_ARTIFACTS = [
   "bin/omo.js",
+  // bin/omo.js imports it for omo auth, sync, account and remote; it is a generated output (#9903), so a payload
+  // packed without the generated build lacks it.
+  "bin/lib/service-auth.generated.js",
   "plugin/package.json",
   "plugin/CHANGELOG.md",
   "plugin/extensions/omo.js",

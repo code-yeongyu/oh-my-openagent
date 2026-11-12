@@ -24,6 +24,7 @@ setDefaultTimeout(guardTimeoutMs)
 
 const PACKED_ARTIFACTS = [
   "bin/omo.js",
+  "bin/lib/service-auth.generated.js",
   "plugin/package.json",
   "plugin/CHANGELOG.md",
   "plugin/extensions/omo.js",
@@ -119,6 +120,17 @@ describe("omo-ai payload verifier", () => {
     ])
     expect(run.exitCode).toBe(1)
     expect(run.output).toContain("missing artifact: plugin/runtime/agent-toolkit-sdk/sdk.js")
+  })
+
+  // bin/omo.js imports it for omo auth, sync, account and remote; it is a generated output (#9903), so a payload
+  // packed from a checkout that skipped the build must fail here instead of shipping those commands broken.
+  test("#given a payload missing only the generated service-auth module #when verified #then it fails naming that artifact", () => {
+    const run = runVerifierOnPayload([
+      ...PACKED_ARTIFACTS.filter((path) => path !== "bin/lib/service-auth.generated.js"),
+      ...skillPaths(PACKED_SKILL_COUNT),
+    ])
+    expect(run.exitCode).toBe(1)
+    expect(run.output).toContain("missing artifact: bin/lib/service-auth.generated.js")
   })
 
   test("#given a payload missing only the device-account extension #when verified #then it fails naming that artifact", () => {
