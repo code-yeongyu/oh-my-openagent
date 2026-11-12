@@ -5,7 +5,7 @@
 // Measurements run only against a local bunshin binary under a fresh, empty HOME; they never
 // contact a running agent, a hub or another machine. Rows whose proof is bunshin source read a
 // local check file kept outside the repository (see README.md).
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import os from "node:os"
 import path from "node:path"
@@ -471,18 +471,25 @@ const rows: Row[] = [
 
 const hostBuild = () => `${os.type().toLowerCase()} ${os.release()} ${os.arch()}`
 
-const parseLedger = (text: string) => {
+type Ledger = Map<string, { verdict: string; line: string }>
+
+// Parses a ledger; returns the reason it is malformed instead of exiting, so a full --write can regenerate.
+const parseLedgerText = (text: string): Ledger | string => {
   const lines = text.split("\n").filter((l) => l.length > 0)
-  if (lines[0] !== LEDGER_HEADER.join("\t"))
-    fail(`SP-B ledger malformed: line 1 is not the header ${LEDGER_HEADER.join(",")}`, 1)
-  const map = new Map<string, { verdict: string; line: string }>()
-  lines.slice(1).forEach((line, i) => {
+  if (lines[0] !== LEDGER_HEADER.join("\t")) return `line 1 is not the header ${LEDGER_HEADER.join(",")}`
+  const map: Ledger = new Map()
+  for (const [i, line] of lines.slice(1).entries()) {
     const cols = line.split("\t")
     if (cols.length !== LEDGER_HEADER.length || !cols[4] || !cols[5])
-      fail(`SP-B ledger malformed: line ${i + 2} has ${cols.length} columns or an empty verdict/rerun`, 1)
+      return `line ${i + 2} has ${cols.length} columns or an empty verdict/rerun`
     map.set(cols[0] ?? "", { verdict: cols[4] ?? "", line })
-  })
+  }
   return map
+}
+
+const parseLedger = (text: string): Ledger => {
+  const parsed = parseLedgerText(text)
+  return typeof parsed === "string" ? fail(`SP-B ledger malformed: ${parsed}`, 1) : parsed
 }
 
 const ledgerLine = (r: Row & Measured) =>
@@ -500,15 +507,15 @@ const ledgerLine = (r: Row & Measured) =>
 
 // --write rewrites the whole ledger; --write with --row replaces (or adds) that one row, keeping the rest
 // and the row order of this script.
-// A row this run did not measure (the root leg without --allow-sudo) keeps its committed line.
-const writeLedger = async (
-  file: string,
-  results: Array<Row & Measured>,
-  existing: Map<string, { verdict: string; line: string }>,
-) => {
-  const kept = new Map(existing)
-  for (const r of results)
-    if (!(r.notRun && kept.has(r.id))) kept.set(r.id, { verdict: r.verdict, line: ledgerLine(r) })
+// The ledger is written from THIS run's measurements. From the existing ledger only the root-leg rows this
+// run did not measure (no --allow-sudo) are carried, byte for byte. With --row, the other rows of the
+// existing ledger are kept as well (base); a full --write starts from an empty base, so stale rows drop out.
+const writeLedger = async (file: string, results: Array<Row & Measured>, base: Ledger, committed: Ledger) => {
+  const kept: Ledger = new Map(base)
+  for (const r of results) {
+    const carried = r.notRun ? committed.get(r.id) : undefined
+    kept.set(r.id, carried ?? { verdict: r.verdict, line: ledgerLine(r) })
+  }
   const order = rows.map((r) => r.id)
   const ids = [...kept.keys()].sort((a, b) => order.indexOf(a) - order.indexOf(b))
   const body = ids.map((id) => kept.get(id)?.line ?? "")
@@ -579,6 +586,24 @@ const readLedger = async (file: string, purpose: string) => {
   }
 }
 
+// bunshinSrc must name an existing git checkout that is not this repository; anything else would let the
+// source rows read this repository's files and report verdicts about the wrong code.
+const checkBunshinSrc = async (src: unknown, specPath: string) => {
+  const why = (reason: string): never =>
+    fail(`SP-B precondition missing: bunshinSrc in the local source-check file ${reason} (${specPath})`)
+  if (typeof src !== "string" || src.trim() === "") return why("is empty")
+  const exists = await stat(src).then(
+    (st) => st.isDirectory(),
+    () => false,
+  )
+  if (!exists) return why(`is not an existing directory: ${src}`)
+  const top = await run(["git", "-C", src, "rev-parse", "--show-toplevel"])
+  if (top.code !== 0) return why(`is not a git checkout: ${src}`)
+  const self = await run(["git", "-C", import.meta.dir, "rev-parse", "--show-toplevel"])
+  const [theirs, ours] = await Promise.all([realpath(top.stdout.trim()), realpath(self.stdout.trim())])
+  if (self.code === 0 && theirs === ours) return why(`points into this repository: ${src}`)
+}
+
 // The root leg is opt-in: it needs Linux, passwordless sudo and python3 under sudo, each a precondition.
 const checkRootPreconditions = async () => {
   if (process.platform !== "linux") fail("SP-B precondition missing: --allow-sudo needs Linux")
@@ -614,8 +639,7 @@ const main = async () => {
     specPath,
     rows.filter((r) => r.source).map((r) => r.id),
   )
-  if ((await run(["git", "-C", spec.bunshinSrc, "rev-parse", "HEAD"])).code !== 0)
-    fail("SP-B precondition missing: the bunshin checkout named by the source-check file is not a git checkout")
+  await checkBunshinSrc(spec.bunshinSrc, specPath)
 
   const selected = only ? rows.filter((r) => r.id === only) : rows
   if (selected.length === 0) fail(`SP-B: unknown row ${only}`)
@@ -623,12 +647,19 @@ const main = async () => {
     fail(`SP-B: --verify --row ${only} would check nothing: it is a root-leg row, pass --allow-sudo`)
   if (allowSudo && selected.some((r) => r.rootLeg)) await checkRootPreconditions()
   const expected = verify ? await readLedger(verify, "--verify") : undefined
-  // --write --row merges into an existing ledger; a full --write keeps the committed rows it cannot measure.
-  const existing = writeTo
-    ? only
-      ? await readLedger(writeTo, "--write --row")
-      : await readFile(writeTo, "utf8").then(parseLedger, () => new Map<string, { verdict: string; line: string }>())
-    : new Map<string, { verdict: string; line: string }>()
+  // --write --row merges into an existing ledger that must parse. A full --write regenerates; it only
+  // carries the root rows it cannot measure, and a missing or corrupt ledger does not block it.
+  let committed: Ledger = new Map()
+  if (writeTo && only) committed = await readLedger(writeTo, "--write --row")
+  else if (writeTo) {
+    const text = await readFile(writeTo, "utf8").catch(() => undefined)
+    const parsed = text === undefined ? new Map() : parseLedgerText(text)
+    if (typeof parsed === "string") {
+      process.stderr.write(
+        `SP-B warning: existing ledger malformed (${parsed}); regenerating, root rows not measured this run cannot be carried (${writeTo})\n`,
+      )
+    } else committed = parsed
+  }
   const home = await mkdtemp(path.join(tmpdir(), "sp-b-"))
   const ctx: Ctx = { bin: bin ?? "", home, spec, specPath, allowSudo }
   const results: Array<Row & Measured> = []
@@ -680,7 +711,7 @@ const main = async () => {
         2,
       )}\n`,
     )
-  if (writeTo) await writeLedger(writeTo, results, existing)
+  if (writeTo) await writeLedger(writeTo, results, only ? committed : new Map(), committed)
   if (expected) {
     const tail = notRun ? ` not_run=${notRun} (root leg needs --allow-sudo)` : ""
     process.stdout.write(

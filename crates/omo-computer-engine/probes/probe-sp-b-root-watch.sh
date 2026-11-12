@@ -11,12 +11,14 @@
 #   none      - neither watch (negative control): the launcher must still be alive after 2 s.
 # Prints one JSON line. Exit 2: usage or not root. Exit 3: python3 missing. Exit 4: the stand-in never
 # reported ready (or the ready pipe closed empty). Exit 5: pidfd_open is unavailable to this script.
-# On exit 4 and 5 every stand-in process is killed and reaped first; stderr names the cause.
+# On exit 4 and 5 the cause goes to stderr first, then the whole stand-in process group (agent,
+# launcher, engine) is killed and reaped.
 # Optional 4th argument, a fault seam for the probe's own checks: empty-ready (the launcher closes the
-# ready pipe without writing) or pidfd-fail (this script treats pidfd_open as failed).
+# ready pipe without writing), hang-ready (the launcher never reports ready, so the 10 s timeout fires)
+# or pidfd-fail (this script treats pidfd_open as failed).
 set -eu
-[ $# -eq 3 ] || [ $# -eq 4 ] || { echo "usage: probe-sp-b-root-watch.sh <uid> <gid> <pidfd|pdeathsig|none> [empty-ready|pidfd-fail]" >&2; exit 2; }
-case "${4:-}" in ""|empty-ready|pidfd-fail) ;; *) echo "SP-B root-watch: unknown fault $4" >&2; exit 2 ;; esac
+[ $# -eq 3 ] || [ $# -eq 4 ] || { echo "usage: probe-sp-b-root-watch.sh <uid> <gid> <pidfd|pdeathsig|none> [empty-ready|hang-ready|pidfd-fail]" >&2; exit 2; }
+case "${4:-}" in ""|empty-ready|hang-ready|pidfd-fail) ;; *) echo "SP-B root-watch: unknown fault $4" >&2; exit 2 ;; esac
 case "$3" in pidfd|pdeathsig|none) ;; *) echo "SP-B root-watch: unknown mode $3" >&2; exit 2 ;; esac
 [ "$(id -u)" = 0 ] || { echo "SP-B root-watch: must run as root" >&2; exit 2; }
 command -v python3 >/dev/null 2>&1 || { echo "SP-B precondition missing: python3 not found" >&2; exit 3; }
@@ -30,7 +32,13 @@ WINDOW_MS = 2000
 uid, gid, mode, fault = int(sys.argv[1]), int(sys.argv[2]), sys.argv[3], sys.argv[4]
 
 def bail(code, why, pids):
-    # Kill and reap every stand-in this script knows about, then exit with a distinct code.
+    # The cause goes out first, so a hang while reaping can never lose it. Then the stand-ins' whole
+    # process group dies (the agent leads it; launcher and engine inherit it), plus any pid named here.
+    print(f"SP-B root-watch: {why}", file=sys.stderr, flush=True)
+    try:
+        os.killpg(agent, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
     for p in pids:
         try:
             os.kill(p, signal.SIGKILL)
@@ -43,7 +51,6 @@ def bail(code, why, pids):
     except ChildProcessError:
         pass
     signal.alarm(0)
-    print(f"SP-B root-watch: {why}", file=sys.stderr)
     sys.exit(code)
 
 def pidfd_open(pid):
@@ -58,6 +65,7 @@ libc.prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0)
 ready_r, ready_w = os.pipe()
 agent = os.fork()
 if agent == 0:
+    os.setpgid(0, 0)  # the stand-ins' own process group, so a bail can kill all of them at once
     os.close(ready_r)
     launcher = os.fork()
     if launcher == 0:
@@ -87,6 +95,8 @@ if agent == 0:
             signal.pause()
             os._exit(0)
         os.close(eng_w)
+        if fault == "hang-ready":
+            signal.pause()
         if fault == "empty-ready":
             os.kill(engine, signal.SIGKILL)
             os._exit(1)
@@ -108,6 +118,10 @@ if agent == 0:
     os._exit(0)
 
 os.close(ready_w)
+try:
+    os.setpgid(agent, agent)  # also from the parent, so the group exists before any bail
+except (PermissionError, ProcessLookupError):
+    pass
 readable, _, _ = select.select([ready_r], [], [], 10)
 if not readable:
     bail(4, "stand-in never became ready within 10 s", [agent])

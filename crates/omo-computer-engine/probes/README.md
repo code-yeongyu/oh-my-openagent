@@ -30,9 +30,12 @@ Modes and their combinations:
   are not checked. For a root-leg row without `--allow-sudo` it would check nothing, so it exits 2
   and says so.
 - `--row <id>` alone measures one row and prints it.
-- `--write <ledger>` measures every row and rewrites the whole ledger. A row this run did not measure
-  (the root leg without `--allow-sudo`) keeps its committed line; it is never overwritten with
-  `UNMEASURED`.
+- `--write <ledger>` measures every row and regenerates the ledger from this run's measurements,
+  so a row the probe no longer has is dropped. The only lines carried over from the existing ledger
+  are the root-leg rows this run did not measure (`B-05c` and `B-05e` without `--allow-sudo`),
+  byte for byte, and only if the existing ledger parses. A missing or malformed existing ledger
+  does not block the write: the ledger is regenerated, and a malformed one draws a warning that
+  its root rows could not be carried.
 - `--write <ledger> --row <id>` measures one row and replaces (or adds) only that row. Every other
   row of the existing ledger is kept as it is, so the ledger must already exist and parse.
 - `--verify` and `--write` cannot be combined.
@@ -57,7 +60,8 @@ Preconditions. Each one that is missing ends the run with exit 2 and a single li
 The source-check file is validated before anything is measured. It needs an entry for every
 `(source)` row. Each entry needs at least one check, and each check needs a `kind` of `present`
 or `absent`, a non-empty `pattern`, and a `paths` list (an empty list searches the whole
-checkout). A file that fails any of this exits 2 with one line naming the file and the rows.
+checkout). `bunshinSrc` must be a non-empty path to an existing git checkout that is not this
+repository. A file that fails any of this exits 2 with one line naming the file and the reason.
 
 The root leg (rows `B-05c` and `B-05e`) runs root code, so it runs only with `--allow-sudo`.
 Without the flag both rows read `UNMEASURED` with the reason. `--verify` reports them as
@@ -72,7 +76,9 @@ one host-death watch live, so the mechanism is measured, not inferred:
 - `B-05e`: the parent-death signal re-armed after the drop, with no pidfd poll. The launcher
   passes only if it ends by `signal 9`.
 
-The helper's engine reports ready only after it has armed its own parent-death signal and
+The stand-ins run in their own process group. Every failure exit of the helper prints its
+reason first and then kills that whole group, so a timeout or an early exit leaves no stand-in
+behind. The helper's engine reports ready only after it has armed its own parent-death signal and
 checked that the launcher is still its parent, so a launcher that dies early can't leak an
 engine. Running the helper directly with mode `none` gives the negative control: no watch, so
 the launcher is still alive after the 2 s window and the helper kills it. The live row with the
