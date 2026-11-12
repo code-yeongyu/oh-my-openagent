@@ -87,6 +87,12 @@ pub trait Backend: Send {
         None
     }
 
+    /// The accessibility reads the observation model walks and re-identifies through; `None`
+    /// reads `AxUnsupported{snapshot_unsupported}`.
+    fn ax_reader(&mut self) -> Option<&mut dyn crate::ax::AxReader> {
+        None
+    }
+
     // --- Row 21: consent bound to code identity, and the host's consent view. ---
 
     /// The signed code identity of `pid`'s executable, read without prompting. `None` is
