@@ -54,6 +54,18 @@ describe("selectBuildNodes", () => {
     expect(() => selectBuildNodes(BUILD_NODES, "broken", { broken: ["no-such-node"] })).toThrow(/unknown node/)
   })
 
+  // Generated modules are build outputs, not tracked (#13192): a bundle node that imports one must wait for its generator,
+  // or a fresh clone's `bun install` (prepare = build) fails to resolve it.
+  test("#given the bundles that import a generated bin/lib module #when the graph runs #then its generator runs first", () => {
+    const deps = (id: string) => BUILD_NODES.find((node) => node.id === id)?.deps ?? []
+    for (const id of ["cli", "cli-node"]) expect(deps(id)).toContain("brand-logo")
+  })
+
+  test("#given the omo-native profile #when selected #then every generated module the compiled entry imports is built", () => {
+    const selected = selectBuildNodes(BUILD_NODES, "omo-native").map((node) => node.id)
+    for (const id of ["service-auth", "reflection-lock", "brand-logo"]) expect(selected).toContain(id)
+  })
+
   test("#given the declared graph #when every dependency is resolved #then no node depends on a missing id", () => {
     const ids = new Set(BUILD_NODES.map((node) => node.id))
     for (const node of BUILD_NODES) {
