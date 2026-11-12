@@ -102,6 +102,9 @@ export function sessionLines(result: ListingResult, labels: ReadonlyMap<string, 
   return lines
 }
 
+/** The queued-fate line shared by the send verb's human forms (#13268). */
+const queuedLine = (label: string, position: number): string => `Queued on ${label} at position ${position}.`
+
 /** The human answer of a session verb that succeeded; `label` is the `<device>/<session>` it named. */
 export function sessionVerbLines(
   verb: "open" | "send" | "model" | "interrupt" | "close",
@@ -113,7 +116,7 @@ export function sessionVerbLines(
   if (verb === "send" && "delivery" in result) {
     const { delivery } = result
     if (delivery.kind === "queued" || delivery.kind === "queued_offline")
-      return [`Queued on ${label} at position ${delivery.queue_position}.`]
+      return [queuedLine(label, delivery.queue_position)]
     if (delivery.kind === "steered") return [`Steered turn ${delivery.turn_id} on ${label}.`]
     return [`Sent to ${label}: turn ${delivery.turn_id} started.`]
   }
@@ -122,6 +125,19 @@ export function sessionVerbLines(
     return [result.interrupted ? `Interrupted ${label}.` : `Nothing was running on ${label}.`]
   if (verb === "close" && "closed" in result) return [result.closed ? `Closed ${label}.` : `${label} was not open.`]
   return []
+}
+
+/**
+ * The wait-mode status line for a send that waits behind a running turn (#13268): stdout stays the streamed answer
+ * alone, so the CLI writes this to stderr the moment the send's own reply names its position. A send that started or
+ * steered a turn answers nothing here - its answer is already streaming.
+ */
+export function sendWaitNotice(label: string, result: ThreadToolResult): string | null {
+  if (result.kind !== "ok" || !("delivery" in result)) return null
+  const { delivery } = result
+  return delivery.kind === "queued" || delivery.kind === "queued_offline"
+    ? queuedLine(label, delivery.queue_position)
+    : null
 }
 
 export function controlLines(state: ControlAttachState, now: number): string[] {
