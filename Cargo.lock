@@ -2001,8 +2001,11 @@ dependencies = [
 name = "omo-computer-backend-win32"
 version = "0.0.0"
 dependencies = [
+ "image",
  "omo-computer-core",
  "omo-computer-safety",
+ "serde_json",
+ "windows 0.62.2",
 ]
 
 [[package]]

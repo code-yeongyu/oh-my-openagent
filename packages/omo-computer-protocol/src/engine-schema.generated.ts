@@ -2,7 +2,7 @@
 // Do not edit by hand; run `bun run --cwd packages/omo-computer-protocol generate`.
 
 /** sha256 of the schema file this module was generated from; the schema-drift test compares it. */
-export const SCHEMA_SHA256 = "b3b3d676b5c6bc93259885c279007402715c4a6eb57e68de457e1f9034c24f81" as const
+export const SCHEMA_SHA256 = "7a923554315400abb22677f71a5f54ad1d04e396a23fb3934c8c31df6c425155" as const
 
 /** The wire protocol version `engine.hello` reports. */
 export const PROTOCOL_VERSION = "1" as const
@@ -604,7 +604,7 @@ export type CapturePolicyRow = {
 
 export type CaptureReply = LegacyFrame | Frame
 
-export type CaptureRoute = "composite" | "root_crop" | "screencast" | "screencast_crop" | "screenshot_portal"
+export type CaptureRoute = "composite" | "root_crop" | "screencast" | "screencast_crop" | "screenshot_portal" | "wgc" | "printwindow" | "bitblt"
 
 export type ChainLink = {
 	role: ChainRole

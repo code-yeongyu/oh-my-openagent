@@ -2151,6 +2151,9 @@
         "script/print-release-notes.ts",
         // run by path as the computer-use v3 corpus replay driver
         "script/qa/computer/replay.ts",
+        "script/qa/computer/windows.ts",
+        "script/qa/computer/windows/capture-marker-pixels.ts",
+        "script/qa/computer/windows/capture-session0-refused.ts",
         "script/qa/desktop/hyprland.ts",
         "script/qa/desktop/kwin.ts",
         // run by path as the live GNOME Wayland window-input QA (docs/guide/computer-use.md)
