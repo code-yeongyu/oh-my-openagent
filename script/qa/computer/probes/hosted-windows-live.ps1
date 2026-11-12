@@ -32,7 +32,6 @@ if ($env:OMO_HWL_NATIVE_DLL -and [IO.File]::Exists($env:OMO_HWL_NATIVE_DLL)) {
 . (Join-Path $Here 'legs-session.ps1')
 . (Join-Path $Here 'legs-integrity.ps1')
 . (Join-Path $Here 'legs-display.ps1')
-. (Join-Path $Here 'legs-spn.ps1')
 
 function Emit($fields) {
 	$line = ($fields | ConvertTo-Json -Compress -Depth 8)
@@ -52,11 +51,9 @@ $legs = @{
 	'worker-input' = { Child-WorkerInput }
 	'worker-runas' = { Child-WorkerRunas }
 	'dpi-read' = { Child-DpiRead }
-	'sp-n-prepare' = { Leg-SpnPrepare }
-	'sp-n-cleanup' = { Leg-SpnCleanup }
 }
 if (-not $legs.ContainsKey($Leg)) { throw "unknown leg '$Leg' (known: $(($legs.Keys | Sort-Object) -join ', '))" }
-if (-not $Out -and -not $Leg.StartsWith('fixture') -and -not $Leg.StartsWith('worker') -and $Leg -ne 'dpi-read' -and -not $Leg.StartsWith('sp-n-')) { throw "-Out is required for leg '$Leg'" }
+if (-not $Out -and -not $Leg.StartsWith('fixture') -and -not $Leg.StartsWith('worker') -and $Leg -ne 'dpi-read') { throw "-Out is required for leg '$Leg'" }
 # A leg that throws is still a measurement: its error becomes the fact (the ledger reads it UNMEASURED) and the step
 # succeeds once that fact is written. A child, or a failure to write the fact, still fails the step.
 try {
