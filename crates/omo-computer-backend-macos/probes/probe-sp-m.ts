@@ -482,23 +482,15 @@ function qHwCapture(host: Host): Outcome {
     const h = Number(n.cg.CGImageGetHeight(img))
     const provider = n.cg.CGImageGetDataProvider(img) as Pointer | null
     const data = provider ? (n.cg.CGDataProviderCopyData(provider) as Pointer | null) : null
-    let alpha: "opaque" | "transparent" | "unread" = "unread"
+    let bytes: Uint8Array | null = null
     if (data) {
       const len = Number(n.cf.CFDataGetLength(data))
       const bytePtr = n.cf.CFDataGetBytePtr(data) as Pointer | null
-      if (bytePtr && len > 0) {
-        const bytes = new Uint8Array(toArrayBuffer(bytePtr, 0, len))
-        alpha = "transparent"
-        for (let i = 0; i < bytes.length; i += 4) {
-          if (bytes[i + 3] !== 0) {
-            alpha = "opaque"
-            break
-          }
-        }
-      }
+      // Copied out before the CFData is released.
+      if (bytePtr && len > 0) bytes = new Uint8Array(toArrayBuffer(bytePtr, 0, len)).slice()
       n.cf.CFRelease(data)
     }
-    decision = frameDecision(w, h, alpha)
+    decision = frameDecision(w, h, frameAlpha(bytes))
   }
   if (arr) n.cf.CFRelease(arr)
   const measured = `${r.detail};owner=${win.owner}`
@@ -701,8 +693,11 @@ function authOffsetsOutcome(hits: number[], positions: number[], unreadable: num
 // The alpha class of a frame's RGBA bytes: `unread` when no bytes could be read (null or empty), `opaque` when any
 // pixel has a non-zero alpha byte, else `transparent`.
 function frameAlpha(bytes: Uint8Array | null): "opaque" | "transparent" | "unread" {
-  void bytes
-  return "unread"
+  if (!bytes || bytes.length === 0) return "unread"
+  for (let i = 3; i < bytes.length; i += 4) {
+    if (bytes[i] !== 0) return "opaque"
+  }
+  return "transparent"
 }
 
 // The auth-offsets scan over the three candidate slots of an event record. `read` returns null for an unreadable
@@ -712,10 +707,32 @@ function scanCandidates(
   eventAddress: number,
   sentinel: bigint,
 ): { hits: number[]; positions: number[]; unreadable: number[] } {
-  void read
-  void eventAddress
-  void sentinel
-  return { hits: [], positions: [], unreadable: [] }
+  const hits: number[] = []
+  const positions: number[] = []
+  const unreadable: number[] = []
+  for (const offset of [24, 32, 16]) {
+    const slot = read(eventAddress + offset, 8)
+    if (!slot) {
+      unreadable.push(offset)
+      continue
+    }
+    const candidate = Number(new DataView(slot.buffer, slot.byteOffset, 8).getBigUint64(0, true))
+    if (!candidate) continue
+    const record = read(candidate, 512)
+    if (!record) {
+      unreadable.push(offset)
+      continue
+    }
+    const view = new DataView(record.buffer, record.byteOffset, record.byteLength)
+    for (let at = 0; at + 8 <= record.byteLength; at += 8) {
+      if (view.getBigUint64(at, true) === sentinel) {
+        hits.push(offset)
+        positions.push(at)
+        break
+      }
+    }
+  }
+  return { hits, positions, unreadable }
 }
 
 function qCopySpaces(): Outcome {
@@ -911,31 +928,7 @@ function qAuthOffsets(): Outcome {
   const sentinel = crypto.getRandomValues(new BigUint64Array(1))[0] ?? 0n
   n.cg.CGEventSetIntegerValueField(event, 42, BigInt.asIntN(64, sentinel))
   n.cg.CGEventSetIntegerValueField(event, 9, 0x2e)
-  const hits: number[] = []
-  const positions: number[] = []
-  const unreadable: number[] = []
-  for (const offset of [24, 32, 16]) {
-    const slot = safeRead(Number(event) + offset, 8)
-    if (!slot) {
-      unreadable.push(offset)
-      continue
-    }
-    const candidate = Number(new DataView(slot.buffer).getBigUint64(0, true))
-    if (!candidate) continue
-    const record = safeRead(candidate, 512)
-    if (!record) {
-      unreadable.push(offset)
-      continue
-    }
-    const view = new DataView(record.buffer)
-    for (let at = 0; at + 8 <= 512; at += 8) {
-      if (view.getBigUint64(at, true) === sentinel) {
-        hits.push(offset)
-        positions.push(at)
-        break
-      }
-    }
-  }
+  const { hits, positions, unreadable } = scanCandidates(safeRead, Number(event), sentinel)
   n.cf.CFRelease(event)
   if (source) n.cf.CFRelease(source)
   // Only the sentinel decides. A keycode byte is not recorded: one 0x2e byte somewhere in 512 bytes of
@@ -1344,13 +1337,11 @@ function hostFromParts(
   session: SessionFacts,
   options: { withCapture: boolean },
 ): Host {
-  void options
-  return { major: facts.major, build: facts.build, session, withCapture: false }
+  return { major: facts.major, build: facts.build, session, ...options }
 }
 
 function buildHost(args: string[]): Host {
-  const { major, build } = precondition()
-  return { major, build, session: sessionFacts(), ...hostOptions(args) }
+  return hostFromParts(precondition(), sessionFacts(), hostOptions(args))
 }
 
 // Reads an existing ledger. A file that is not an SP-M ledger is an error value, never a thrown stack trace.
