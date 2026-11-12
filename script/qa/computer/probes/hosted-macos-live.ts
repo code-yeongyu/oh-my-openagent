@@ -4,7 +4,7 @@
 //   bun script/qa/computer/probes/hosted-macos-live.ts --merge <ledger.tsv> <fragment.tsv>...
 //   bun script/qa/computer/probes/hosted-macos-live.ts --decide <ledger.tsv>
 
-import { appendFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { appendFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { askGrantRoute } from "./hosted-macos-live-grant.ts"
@@ -121,7 +121,7 @@ async function probeRunner(args: readonly string[], image: string): Promise<numb
   if (asked !== undefined && only === undefined) throw new Error(`unknown question ${asked}`)
   const out = argValue(args, "--out") ?? join(process.env.RUNNER_TEMP ?? tmpdir(), "hosted-macos-live")
   mkdirSync(out, { recursive: true })
-  const scratch = mkdtempSync(join(tmpdir(), "omo-hosted-macos-live-"))
+  const scratch = realpathSync(mkdtempSync(join(process.env.RUNNER_TEMP ?? tmpdir(), "omo-hosted-macos-live-")))
   const binary = join(scratch, "bin", "omo-probe")
   const subject = join(scratch, "subject", "omo-probe-subject")
   let killFixture: (() => void) | undefined

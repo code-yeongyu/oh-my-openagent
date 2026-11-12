@@ -10,7 +10,7 @@ export type Question = (typeof QUESTIONS)[number]
 
 export const IMAGES = ["macos-15", "macos-26"] as const
 
-export const VERDICTS = ["CONFIRMS", "CONTRADICTS", "UNMEASURED"] as const
+const VERDICTS = ["CONFIRMS", "CONTRADICTS", "UNMEASURED"] as const
 export type Verdict = (typeof VERDICTS)[number]
 
 export type LedgerRow = {
@@ -23,7 +23,7 @@ export type LedgerRow = {
 
 export const LEDGER_HEADER = "question\timage\tverdict\tevidence\trerun"
 
-export const LIVE_TIER_QUESTIONS: readonly Question[] = ["q2", "q3", "q4", "q6"]
+const LIVE_TIER_QUESTIONS: readonly Question[] = ["q2", "q3", "q4", "q6"]
 
 export function cell(text: string): string {
   return text.replace(/[\t\r\n]+/g, " ").trim()

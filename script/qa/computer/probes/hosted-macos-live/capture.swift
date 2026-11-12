@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 import Foundation
 import ScreenCaptureKit
@@ -34,6 +35,7 @@ func pixelStats(_ image: CGImage) -> [String: Any] {
 }
 
 func capture(_ pid: pid_t) -> [String: Any] {
+  _ = NSApplication.shared
   var result: [String: Any] = ["preflight": CGPreflightScreenCaptureAccess()]
   let done = DispatchSemaphore(value: 0)
   SCShareableContent.getExcludingDesktopWindows(false, onScreenWindowsOnly: true) { content, error in

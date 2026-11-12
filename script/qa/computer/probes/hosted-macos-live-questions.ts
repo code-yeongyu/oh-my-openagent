@@ -26,8 +26,8 @@ export type Probe = {
   readonly scratch: string
 }
 
-export const PROBE_KEYCODE = "80"
-export const PROBE_TAG = "7302511"
+const PROBE_KEYCODE = "80"
+const PROBE_TAG = "7302511"
 
 export function directInvoke(binary: string): Invoke {
   return (args, timeoutMs) => helper(binary, args, timeoutMs)
@@ -86,24 +86,52 @@ async function nextState(file: string, before: number): Promise<string | undefin
   return lines.length > before ? lines.at(-1) : undefined
 }
 
+const CLICK_ROUTES = [
+  ["cg", "CGEventPostToPid"],
+  ["sl", "SLEventPostToPid"],
+] as const
+
+function frameOf(read: Json): readonly number[] | null {
+  const frame = read.frame
+  if (!Array.isArray(frame) || frame.length !== 4) return null
+  const numbers = frame.filter((value): value is number => typeof value === "number")
+  return numbers.length === 4 ? numbers : null
+}
+
 export async function askPidClick(probe: Probe): Promise<Answer> {
   const { fixture } = probe
   const pid = String(fixture.pid)
-  const before = stateLines(fixture.stateFile).length
-  const click = probe.invoke(["click", pid, String(fixture.windowNumber), String(fixture.x), String(fixture.y)])
-  const error = failed(click)
-  if (error !== null) return unmeasured(error)
-  const state = await nextState(fixture.stateFile, before)
-  const ax = probe.control(["ax-checkbox", pid])
-  if (state !== undefined) {
-    const evidence = `click ${short(click)}; fixture report ${state}; AX read-back ${short(ax)}`
+  const target = probe.control(["ax-checkbox", pid])
+  const frame = frameOf(target)
+  if (frame === null) return unmeasured(`control failed: no AX frame for the fixture checkbox ${short(target)}`)
+  const [left = 0, top = 0, width = 0, height = 0] = frame
+  const aim = [String(left + width / 2), String(top + height / 2)]
+  const attempts: string[] = []
+  let posted = false
+  for (const [route, name] of CLICK_ROUTES) {
+    const before = stateLines(fixture.stateFile).length
+    const click = probe.invoke(["click", pid, String(fixture.windowNumber), ...aim, route])
+    const error = failed(click)
+    if (error !== null) {
+      attempts.push(`${name}: ${error}`)
+      continue
+    }
+    posted = true
+    const state = await nextState(fixture.stateFile, before)
+    if (state === undefined) {
+      attempts.push(`${name}: no toggle within 5 s of ${short(click)}`)
+      continue
+    }
+    const ax = probe.control(["ax-checkbox", pid])
+    const evidence = `${name} aimed at the AX frame ${short(frame)}; ${short(click)}; fixture report ${state}; AX read-back ${short(ax.value)}; earlier routes: ${attempts.join("; ") || "none"}`
     return ax.value === (state === "on" ? 1 : 0) ? confirms(evidence) : contradicts(`AX disagrees: ${evidence}`)
   }
+  if (!posted) return unmeasured(`no route posted: ${attempts.join("; ")}`)
   const controlBefore = stateLines(fixture.stateFile).length
   const press = probe.control(["ax-press", pid])
   const controlState = await nextState(fixture.stateFile, controlBefore)
   if (controlState === undefined) return unmeasured(`control failed: AX press ${short(press)} did not toggle the fixture`)
-  return contradicts(`no toggle within 5 s of ${short(click)}; control AX press toggled to ${controlState}`)
+  return contradicts(`aimed at the AX frame ${short(frame)}: ${attempts.join("; ")}; control AX press toggled to ${controlState}`)
 }
 
 export function askCapture(probe: Probe): Answer {

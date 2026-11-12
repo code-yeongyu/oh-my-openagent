@@ -57,3 +57,16 @@ func permissions() -> [String: Any] {
     "postEventPreflight": CGPreflightPostEventAccess(),
   ]
 }
+
+func axFrame(_ element: AXUIElement) -> [Double]? {
+  guard let position = axValue(element, kAXPositionAttribute), let size = axValue(element, kAXSizeAttribute) else {
+    return nil
+  }
+  var origin = CGPoint.zero
+  var extent = CGSize.zero
+  guard
+    AXValueGetValue(unsafeBitCast(position, to: AXValue.self), .cgPoint, &origin),
+    AXValueGetValue(unsafeBitCast(size, to: AXValue.self), .cgSize, &extent)
+  else { return nil }
+  return [Double(origin.x), Double(origin.y), Double(extent.width), Double(extent.height)]
+}

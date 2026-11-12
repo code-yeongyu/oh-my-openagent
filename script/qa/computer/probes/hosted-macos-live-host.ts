@@ -33,7 +33,7 @@ export function short(value: unknown): string {
 }
 
 export const SYSTEM_TCC_DB = "/Library/Application Support/com.apple.TCC/TCC.db"
-export const PROBE_SERVICES = [
+const PROBE_SERVICES = [
   "kTCCServiceAccessibility",
   "kTCCServicePostEvent",
   "kTCCServiceListenEvent",
@@ -94,7 +94,7 @@ export function designatedRequirementHex(binary: string, scratch: string): strin
   return readFileSync(blob).toString("hex")
 }
 
-export const DIALOG_PROCESSES = [
+const DIALOG_PROCESSES = [
   "UserNotificationCenter",
   "universalAccessAuthWarn",
   "SecurityAgent",

@@ -29,7 +29,10 @@ case "ax-tree":
 case "ax-checkbox":
   let app = AXUIElementCreateApplication(pidArgument(2))
   guard let box = firstElement(app, role: kAXCheckBoxRole) else { emit(["found": false]) }
-  emit(["found": true, "value": (axValue(box, kAXValueAttribute) as? NSNumber)?.intValue ?? -1])
+  emit([
+    "found": true, "value": (axValue(box, kAXValueAttribute) as? NSNumber)?.intValue ?? -1,
+    "frame": axFrame(box) ?? NSNull(),
+  ])
 case "ax-press":
   let app = AXUIElementCreateApplication(pidArgument(2))
   guard let box = firstElement(app, role: kAXCheckBoxRole) else { emit(["found": false]) }
@@ -43,10 +46,11 @@ case "fixture":
 case "click":
   let before = CGEvent(source: nil)?.location ?? .zero
   let point = CGPoint(x: Double(argument(4)) ?? 0, y: Double(argument(5)) ?? 0)
-  postMouse(pid: pidArgument(2), windowNumber: Int64(argument(3)) ?? 0, at: point)
+  let route = arguments.count > 6 ? argument(6) : "cg"
+  postMouse(pid: pidArgument(2), windowNumber: Int64(argument(3)) ?? 0, at: point, route: route)
   let after = CGEvent(source: nil)?.location ?? .zero
   emit([
-    "posted": true, "pointerBefore": [before.x, before.y], "pointerAfter": [after.x, after.y],
+    "posted": true, "route": route, "aim": [point.x, point.y], "pointerBefore": [before.x, before.y], "pointerAfter": [after.x, after.y],
     "postEventPreflight": CGPreflightPostEventAccess(), "axTrusted": AXIsProcessTrusted(),
   ])
 case "capture":
