@@ -12,6 +12,7 @@ use super::record::{target_id, Record};
 use super::recovery::Verdict;
 use super::report::{self, Sent};
 use super::{Mutation, Refused, MARKER_UNAVAILABLE, TRANSACTION_FAILED};
+use crate::audit::AuditEvent;
 use crate::budget::PermitKind;
 use crate::marker::Receipt;
 use crate::{Session, NOT_OPEN};
@@ -42,7 +43,11 @@ impl Session {
         if let Some(frame) = mutation.frame_refusal {
             return Err(self.refuse(record, Some("Frame".to_owned()), frame.refusal().into()));
         }
-        let _permit = self.funnel.permits.try_take(PermitKind::Exec);
+        // `&mut Session` serialises a session's calls, so no exec permit free means one leaked:
+        // refused with nothing sent, never sent without one.
+        let Some(_permit) = self.funnel.permits.try_take(PermitKind::Exec) else {
+            return Err(self.refuse(record, Some("Permit".to_owned()), TRANSACTION_FAILED.into()));
+        };
         match self.funnel.recover(&call_id) {
             Err(refused) => return Err(self.refuse(record, Some("Marker".to_owned()), refused)),
             Ok(Verdict::Refuse {
@@ -81,7 +86,10 @@ impl Session {
             Some(refusal) if count == 0 => {
                 let issuer = record.marker.binding.issuer.clone();
                 let scope = record.marker.binding.scope.clone();
-                let _ = self.funnel.markers.clear(&issuer, &scope);
+                if let Err(error) = self.funnel.markers.clear(&issuer, &scope) {
+                    self.funnel
+                        .warn(format!("marker not cleared after a refused send: {error}"));
+                }
                 Err(self.refuse(record, None, refusal.into()))
             }
             Some(refusal) => {
@@ -95,12 +103,13 @@ impl Session {
                 let stored =
                     json!({ "error": { "code": refusal.code.wire(), "reason": refusal.reason } });
                 self.store_receipt(&mut record, stored);
-                let _ = self.funnel.audit().append(record.event);
+                let warning = self.append_or_warn(record.event);
                 Err(Refused {
                     refusal,
                     call_id: Some(call_id),
                     receipt: None,
                     interrupted: Some(Disposition::UNCERTAIN_UNSAFE),
+                    warning,
                 })
             }
             None => {
@@ -125,10 +134,8 @@ impl Session {
                         eprintln!("omo-computer-engine: action report rejected: {rejection:?}");
                         ExecReply(None)
                     });
-                self.store_receipt(
-                    &mut record,
-                    serde_json::to_value(&reply).unwrap_or_default(),
-                );
+                let receipt = self.funnel.receipt_of(&reply);
+                self.store_receipt(&mut record, receipt);
                 Ok(reply)
             }
         }
@@ -154,7 +161,8 @@ impl Session {
     fn store_receipt(&mut self, record: &mut Record, reply: serde_json::Value) {
         record.marker.receipt = Some(Receipt { reply });
         if let Err(error) = self.funnel.markers.record_receipt(&record.marker) {
-            eprintln!("omo-computer-engine: warn marker receipt not stored: {error}");
+            self.funnel
+                .warn(format!("marker receipt not stored: {error}"));
         }
     }
 
@@ -162,8 +170,16 @@ impl Session {
     fn refuse(&mut self, record: Record, stage: Option<String>, refused: Refused) -> Refused {
         let mut record = record;
         record.refused(stage, &refused.refusal);
-        let _ = self.funnel.audit().append(record.event);
-        refused
+        let warning = self.append_or_warn(record.event);
+        Refused { warning, ..refused }
+    }
+
+    /// Appends one audit line. A failure degrades the sink (every later admission refuses);
+    /// it is logged and answers `write_failed`.
+    fn append_or_warn(&mut self, event: AuditEvent) -> Option<String> {
+        let error = self.funnel.audit().append(event).err()?;
+        self.funnel.warn(format!("audit line not written: {error}"));
+        Some("write_failed".to_owned())
     }
 
     /// A marker refusal: its audit line, then (on a re-drive) the marker cleared by it.
@@ -174,14 +190,15 @@ impl Session {
             record.sent(0, 0, interrupted, "unverifiable", None);
             record.event.delivered = None;
         }
-        let written = self.funnel.audit().append(record.event).is_ok();
-        if clear && written {
+        let warning = self.append_or_warn(record.event);
+        if clear && warning.is_none() {
             let binding = self.funnel.binding.clone();
             if let Err(error) = self.funnel.markers.clear(&binding.issuer, &binding.scope) {
-                eprintln!("omo-computer-engine: warn recovered marker not cleared: {error}");
+                self.funnel
+                    .warn(format!("recovered marker not cleared: {error}"));
             }
         }
-        refused
+        Refused { warning, ..refused }
     }
 }
 
