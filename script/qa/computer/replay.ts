@@ -30,38 +30,67 @@ type Transport = keyof typeof TRANSPORT_ARGS
 type Expectation = { readonly message: unknown; readonly variable: readonly string[] }
 type Step =
   | { readonly restart: true }
-  | { readonly restart: false; readonly send: unknown; readonly expect: readonly Expectation[]; readonly sink: number | undefined }
-type Case = { readonly transport: Transport; readonly scenario: string | undefined; readonly env: Readonly<Record<string, string>>; readonly steps: readonly Step[] }
-type Delta = { readonly kind: string; readonly pointer: string; readonly pattern: readonly string[]; readonly imported: unknown; readonly v3: unknown; matched: number }
+  | {
+      readonly restart: false
+      readonly send: unknown
+      readonly expect: readonly Expectation[]
+      readonly sink: number | undefined
+    }
+type Case = {
+  readonly transport: Transport
+  readonly scenario: string | undefined
+  readonly env: Readonly<Record<string, string>>
+  readonly steps: readonly Step[]
+}
+type Delta = {
+  readonly kind: string
+  readonly pointer: string
+  readonly pattern: readonly string[]
+  readonly imported: unknown
+  readonly v3: unknown
+  matched: number
+}
 
 class InputError extends Error {}
 class TransportMissing extends InputError {
   constructor(name: string) {
-    super(`transport_missing: ${name} names no transport and ORACLE-PROVENANCE.tsv does not list it as an imported oracle case`)
+    super(
+      `transport_missing: ${name} names no transport and ORACLE-PROVENANCE.tsv does not list it as an imported oracle case`,
+    )
   }
 }
 
 const describe = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
 async function readText(file: string, what: string): Promise<string> {
-  try { return await readFile(file, "utf8") } catch (error) { throw new InputError(`cannot read the ${what} ${file}: ${describe(error)}`) }
+  try {
+    return await readFile(file, "utf8")
+  } catch (error) {
+    throw new InputError(`cannot read the ${what} ${file}: ${describe(error)}`)
+  }
 }
 
 function parseJson(text: string, what: string): unknown {
-  try { return JSON.parse(text) } catch (error) { throw new InputError(`the ${what} is not JSON: ${describe(error)}`) }
+  try {
+    return JSON.parse(text)
+  } catch (error) {
+    throw new InputError(`the ${what} is not JSON: ${describe(error)}`)
+  }
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
 const isTransport = (value: unknown): value is Transport => typeof value === "string" && value in TRANSPORT_ARGS
-const isStrings = (value: unknown): value is string[] => Array.isArray(value) && value.every((item) => typeof item === "string")
+const isStrings = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((item) => typeof item === "string")
 
 function parseStep(raw: unknown, index: number): Step {
   if (!isRecord(raw)) throw new InputError(`step ${index + 1} is not an object`)
   if (raw.restart === true) return { restart: true }
   const { send, expect, sink } = raw
   if (!isRecord(send) || !Array.isArray(expect)) throw new InputError(`step ${index + 1} needs send and expect[]`)
-  if (sink !== undefined && !(Number.isInteger(sink) && typeof sink === "number" && sink >= 0)) throw new InputError(`step ${index + 1}: sink must be a count`)
+  if (sink !== undefined && !(Number.isInteger(sink) && typeof sink === "number" && sink >= 0))
+    throw new InputError(`step ${index + 1}: sink must be a count`)
   const expectations = expect.map((item: unknown): Expectation => {
     if (!isRecord(item) || !("message" in item)) throw new InputError(`step ${index + 1}: an expectation needs message`)
     const variable = item.variable ?? []
@@ -78,19 +107,30 @@ function parseCase(raw: unknown, name: string, imported: boolean): Case {
   const transport = raw.transport ?? "stdio"
   if (!isTransport(transport)) throw new InputError(`unknown transport ${JSON.stringify(transport)}`)
   if (scenario !== undefined && typeof scenario !== "string") throw new InputError("scenario must be a path")
-  if (!isRecord(env) || !Object.values(env).every((value) => typeof value === "string")) throw new InputError("env must map names to strings")
+  if (!isRecord(env) || !Object.values(env).every((value) => typeof value === "string"))
+    throw new InputError("env must map names to strings")
   if (!Array.isArray(steps)) throw new InputError("steps must be an array")
-  return { transport, scenario, env: Object.fromEntries(Object.entries(env).map(([k, v]) => [k, String(v)])), steps: steps.map(parseStep) }
+  return {
+    transport,
+    scenario,
+    env: Object.fromEntries(Object.entries(env).map(([k, v]) => [k, String(v)])),
+    steps: steps.map(parseStep),
+  }
 }
 
-const segments = (pointer: string): string[] => pointer.split("/").slice(1).map((s) => s.replaceAll("~1", "/").replaceAll("~0", "~"))
+const segments = (pointer: string): string[] =>
+  pointer
+    .split("/")
+    .slice(1)
+    .map((s) => s.replaceAll("~1", "/").replaceAll("~0", "~"))
 const child = (pointer: string, key: string) => `${pointer}/${key.replaceAll("~", "~0").replaceAll("/", "~1")}`
 
 function matches(pattern: readonly string[], pointer: string): boolean {
   const path = segments(pointer)
   const fits = (pat: readonly string[], segs: readonly string[]) =>
     pat.length === segs.length && pat.every((seg, i) => seg === "*" || seg === segs[i])
-  if (pattern[0] === "**") return path.length >= pattern.length - 1 && fits(pattern.slice(1), path.slice(path.length - pattern.length + 1))
+  if (pattern[0] === "**")
+    return path.length >= pattern.length - 1 && fits(pattern.slice(1), path.slice(path.length - pattern.length + 1))
   return fits(pattern, path)
 }
 
@@ -100,7 +140,10 @@ async function isImported(casePath: string): Promise<boolean> {
 }
 
 async function loadDeltas(file: string, casePath: string): Promise<Delta[]> {
-  const rows = (await readText(file, "delta file")).split("\n").slice(1).filter((line) => line.trim() !== "")
+  const rows = (await readText(file, "delta file"))
+    .split("\n")
+    .slice(1)
+    .filter((line) => line.trim() !== "")
   return rows.flatMap((line) => {
     const [target = "", pointer = "", kind = "", , , imported = "", v3 = ""] = line.split("\t")
     if (target !== "*" && resolve(ROOT, target) !== casePath) return []
@@ -111,12 +154,18 @@ async function loadDeltas(file: string, casePath: string): Promise<Delta[]> {
   })
 }
 
-type Context = { readonly variable: ReadonlySet<string>; readonly deltas: readonly Delta[]; readonly fail: (pointer: string, detail: string) => void }
+type Context = {
+  readonly variable: ReadonlySet<string>
+  readonly deltas: readonly Delta[]
+  readonly fail: (pointer: string, detail: string) => void
+}
 const show = (value: unknown) => JSON.stringify(value)
 
 function compare(expectedRaw: unknown, actual: unknown, pointer: string, ctx: Context): void {
   if (ctx.variable.has(pointer)) return
-  const replaced = ctx.deltas.find((d) => d.kind === "replaced" && matches(d.pattern, pointer) && Bun.deepEquals(d.imported, expectedRaw, true))
+  const replaced = ctx.deltas.find(
+    (d) => d.kind === "replaced" && matches(d.pattern, pointer) && Bun.deepEquals(d.imported, expectedRaw, true),
+  )
   if (replaced) replaced.matched += 1
   const expected = replaced ? replaced.v3 : expectedRaw
   if (actual === undefined) return ctx.fail(pointer, `missing, expected ${show(expected)}`)
@@ -132,7 +181,8 @@ function compare(expectedRaw: unknown, actual: unknown, pointer: string, ctx: Co
     return
   }
   if (Array.isArray(expected) && Array.isArray(actual)) {
-    if (expected.length !== actual.length) return ctx.fail(pointer, `expected ${expected.length} items, got ${actual.length}`)
+    if (expected.length !== actual.length)
+      return ctx.fail(pointer, `expected ${expected.length} items, got ${actual.length}`)
     expected.forEach((item, i) => compare(item, actual[i], child(pointer, String(i)), ctx))
     return
   }
@@ -173,7 +223,11 @@ class Peer {
   private push(line: string): void {
     if (line.trim() === "") return
     let message: unknown = line
-    try { message = JSON.parse(line) } catch { /* an unparsable line stays a string and mismatches */ }
+    try {
+      message = JSON.parse(line)
+    } catch {
+      /* an unparsable line stays a string and mismatches */
+    }
     const waiter = this.waiters.shift()
     if (waiter) waiter(message)
     else this.queue.push(message)
@@ -183,14 +237,22 @@ class Peer {
     try {
       this.proc.stdin.write(`${JSON.stringify(message)}\n`)
       this.proc.stdin.flush()
-    } catch { /* the engine is gone: its missing replies are reported as mismatches */ }
+    } catch {
+      /* the engine is gone: its missing replies are reported as mismatches */
+    }
   }
 
   next(): Promise<unknown> {
     if (this.queue.length > 0 || this.ended) return Promise.resolve(this.queue.shift())
     return new Promise((done) => {
-      const waiter = (message: unknown) => { clearTimeout(timer); done(message) }
-      const timer = setTimeout(() => { this.waiters.splice(this.waiters.indexOf(waiter), 1); done(undefined) }, MESSAGE_TIMEOUT_MS)
+      const waiter = (message: unknown) => {
+        clearTimeout(timer)
+        done(message)
+      }
+      const timer = setTimeout(() => {
+        this.waiters.splice(this.waiters.indexOf(waiter), 1)
+        done(undefined)
+      }, MESSAGE_TIMEOUT_MS)
       this.waiters.push(waiter)
     })
   }
@@ -198,7 +260,9 @@ class Peer {
   async close(): Promise<unknown[]> {
     this.proc.stdin.end()
     let timer: Timer | undefined
-    const deadline = new Promise<false>((done) => { timer = setTimeout(() => done(false), EXIT_TIMEOUT_MS) })
+    const deadline = new Promise<false>((done) => {
+      timer = setTimeout(() => done(false), EXIT_TIMEOUT_MS)
+    })
     const exited = await Promise.race([this.proc.exited.then(() => true), deadline])
     clearTimeout(timer)
     if (!exited) this.proc.kill("SIGKILL")
@@ -215,18 +279,31 @@ async function sinkCount(dir: string): Promise<number> {
 }
 
 function args(argv: readonly string[]) {
-  const value = (flag: string) => { const i = argv.indexOf(flag); return i >= 0 ? argv[i + 1] : undefined }
+  const value = (flag: string) => {
+    const i = argv.indexOf(flag)
+    return i >= 0 ? argv[i + 1] : undefined
+  }
   const engine = value("--engine")
   const file = value("--case")
-  if (!engine || !file) throw new InputError("usage: replay.ts --engine <binary> --case <file> [--assert-sink-empty] [--deltas <tsv>]")
-  return { engine: resolve(engine), casePath: resolve(file), deltas: resolve(value("--deltas") ?? DEFAULT_DELTAS), assertSinkEmpty: argv.includes("--assert-sink-empty") }
+  if (!engine || !file)
+    throw new InputError("usage: replay.ts --engine <binary> --case <file> [--assert-sink-empty] [--deltas <tsv>]")
+  return {
+    engine: resolve(engine),
+    casePath: resolve(file),
+    deltas: resolve(value("--deltas") ?? DEFAULT_DELTAS),
+    assertSinkEmpty: argv.includes("--assert-sink-empty"),
+  }
 }
 
 async function replay(argv: readonly string[]): Promise<number> {
   const opts = args(argv)
   const rel = relative(ROOT, opts.casePath)
   const name = rel.startsWith("..") ? opts.casePath : rel
-  const spec = parseCase(parseJson(await readText(opts.casePath, "case file"), "case file"), name, await isImported(opts.casePath))
+  const spec = parseCase(
+    parseJson(await readText(opts.casePath, "case file"), "case file"),
+    name,
+    await isImported(opts.casePath),
+  )
   await access(opts.engine, constants.X_OK).catch((error: unknown) => {
     throw new InputError(`the engine ${opts.engine} is not an executable file: ${describe(error)}`)
   })
@@ -234,11 +311,24 @@ async function replay(argv: readonly string[]): Promise<number> {
   const runtime = await mkdtemp(join(tmpdir(), "omo-replay-"))
   const failures: string[] = []
   const peers: Peer[] = []
-  const inherited = Object.entries(process.env).filter((e): e is [string, string] => !e[0].startsWith("OMO_COMPUTER_") && e[1] !== undefined)
-  const env: Record<string, string> = { ...Object.fromEntries(inherited), OMO_COMPUTER_BACKEND: "fake", OMO_COMPUTER_RUNTIME_DIR: runtime, ...spec.env }
+  const inherited = Object.entries(process.env).filter(
+    (e): e is [string, string] => !e[0].startsWith("OMO_COMPUTER_") && e[1] !== undefined,
+  )
+  const env: Record<string, string> = {
+    ...Object.fromEntries(inherited),
+    OMO_COMPUTER_BACKEND: "fake",
+    OMO_COMPUTER_RUNTIME_DIR: runtime,
+    ...spec.env,
+  }
   if (spec.scenario) env.OMO_COMPUTER_FAKE_SCENARIO = resolve(ROOT, spec.scenario)
-  const spawn = () => { const peer = new Peer([opts.engine, ...TRANSPORT_ARGS[spec.transport]], env); peers.push(peer); return peer }
-  const leftovers = (messages: unknown[]) => { for (const m of messages) failures.push(`LEFTOVER ${name} ${show(m)}`) }
+  const spawn = () => {
+    const peer = new Peer([opts.engine, ...TRANSPORT_ARGS[spec.transport]], env)
+    peers.push(peer)
+    return peer
+  }
+  const leftovers = (messages: unknown[]) => {
+    for (const m of messages) failures.push(`LEFTOVER ${name} ${show(m)}`)
+  }
   const persistent = spec.transport !== "oneshot"
   let completed = false
   try {
@@ -254,13 +344,18 @@ async function replay(argv: readonly string[]): Promise<number> {
       target.send(step.send)
       for (const [j, expectation] of step.expect.entries()) {
         const message = await target.next()
-        const fail = (pointer: string, detail: string) => failures.push(`MISMATCH ${name} ${label} message=${j + 1} ${pointer || "/"}: ${detail}`)
-        if (message === undefined) { fail("", `no message within ${MESSAGE_TIMEOUT_MS} ms`); break }
+        const fail = (pointer: string, detail: string) =>
+          failures.push(`MISMATCH ${name} ${label} message=${j + 1} ${pointer || "/"}: ${detail}`)
+        if (message === undefined) {
+          fail("", `no message within ${MESSAGE_TIMEOUT_MS} ms`)
+          break
+        }
         compare(expectation.message, message, "", { variable: new Set(expectation.variable), deltas, fail })
       }
       if (!peer) leftovers(await target.close())
       const found = step.sink === undefined ? undefined : await sinkCount(runtime)
-      if (found !== step.sink) failures.push(`MISMATCH ${name} ${label} sink: expected ${step.sink} entries, found ${found}`)
+      if (found !== step.sink)
+        failures.push(`MISMATCH ${name} ${label} sink: expected ${step.sink} entries, found ${found}`)
     }
     if (peer) leftovers(await peer.close())
     const found = opts.assertSinkEmpty ? await sinkCount(runtime) : 0
