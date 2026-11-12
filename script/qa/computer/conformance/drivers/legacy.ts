@@ -102,6 +102,12 @@ export function readOutcome(result: unknown): Observed {
   return { kind: "error", message: `the run returned no outcome: ${JSON.stringify(value)}` }
 }
 
+// The release's hit-test answer at a pointer cell's aim point, logged on its own fields so a mismatch reads as a finding.
+function hitTest(aim: unknown): string {
+  if (!isRecord(aim) || !("matchesTarget" in aim)) return ""
+  return ` hit_test=${JSON.stringify(`${String(aim.role)}:${String(aim.title)}`)} hit_test_matches_target=${aim.matchesTarget === true}`
+}
+
 function hostContext(dir: string): HostContext {
   return {
     cwd: dir,
@@ -174,7 +180,7 @@ export function createLegacyDriver(parts: LegacyDriverParts): Driver {
         const resolved = isRecord(returned) ? returned.resolved : undefined
         if (aim !== undefined || resolved !== undefined)
           console.log(
-            `CELL_EVIDENCE ${cellId(cell)} resolved=${JSON.stringify(resolved)} aim=${JSON.stringify(aim)} fixture=${JSON.stringify(observed)}`,
+            `CELL_EVIDENCE ${cellId(cell)} resolved=${JSON.stringify(resolved)} aim=${JSON.stringify(aim)}${hitTest(aim)} fixture=${JSON.stringify(observed)}`,
           )
         const result = { id: cellId(cell), observed: readOutcome(value), oracle: { observed }, durationMs, journal }
         return observer.reason === undefined ? result : { ...result, observerUnavailable: observer.reason }

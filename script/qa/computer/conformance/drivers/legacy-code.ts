@@ -61,9 +61,10 @@ const CENTRE = [
   "}",
 ]
 
-// A synthetic pointer event lands on whatever is under the pointer. Each pointer cell asks the engine what it reads at
-// the element's centre; a pixel cell whose point is not on its target sends nothing, and a delivered cell carries
-// the reading, so "delivered but not received" can only be claimed when the point was on the element.
+// A synthetic pointer event lands on whatever is under the pointer. Each pointer cell aims at the centre of the element
+// the driver resolved, and a pixel cell is decided by geometry alone: it sends only when that point is inside the
+// window and inside the element's bounds. The engine's hit-test answer at the point never decides anything; it is
+// recorded on the cell with whether it named the target, because a mismatch is a finding about the release.
 const AIM = [
   "let aimed = null",
   "const aim = async (element) => {",
@@ -71,7 +72,7 @@ const AIM = [
   '  if (box === null) throw new Error("fixture element has no bounds")',
   "  const point = { x: Math.round(box.x + box.width / 2), y: Math.round(box.y + box.height / 2) }",
   "  const at = await desktop.elementAt(point.x, point.y)",
-  "  aimed = { point, window: win.bounds, role: at?.role ?? null, title: at?.title ?? null }",
+  "  aimed = { point, window: win.bounds, bounds: box, role: at?.role ?? null, title: at?.title ?? null }",
   "  return aimed",
   "}",
 ]
@@ -81,11 +82,12 @@ const POINTER: ReadonlySet<Cell["action"]> = new Set(["click", "typeText", "scro
 function aimLines(cell: Cell, target: FixtureTarget): string[] {
   if (!POINTER.has(cell.action)) return []
   const title = JSON.stringify(target.element.title)
-  const check = ["const seen = await aim(el)"]
+  const check = ["const seen = await aim(el)", `seen.matchesTarget = seen.title === ${title}`]
   if (cell.targeting !== "px") return check
   return [
     ...check,
-    `if (seen.title !== ${title}) return { kind: "error", message: "aim point is not on the target; the engine reads " + JSON.stringify(seen), aim: seen }`,
+    "const within = (r, p) => p.x >= r.x && p.x < r.x + r.width && p.y >= r.y && p.y < r.y + r.height",
+    `if (!within(win.bounds, seen.point) || !within(seen.bounds, seen.point)) return { kind: "error", message: "aim point is outside the target's bounds or the window", aim: seen }`,
   ]
 }
 

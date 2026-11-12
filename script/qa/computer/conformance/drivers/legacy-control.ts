@@ -65,6 +65,12 @@ const xdotoolAt =
     )
   }
 
+const xdotoolChord: Independent = async (_point, target, say) => {
+  say(`raise ${await xdotool("search", "--name", `^${target.title}$`, "windowactivate", "--sync")}`)
+  say(`focus before chord ${await xdotool("getwindowfocus", "getwindowname")}`)
+  say(`chord ${await xdotool("key", "--clearmodifiers", "ctrl+k")}`)
+}
+
 const typeAtPoint: Independent = async (point, target, say) => {
   if (point === undefined) return say("independent skipped: the release reported no aim point")
   say(`raise ${await sendInput("-Do", "focus", "-Window", target.title)}`)
@@ -89,6 +95,7 @@ const LEGS: readonly Leg[] = [
     expected: 3,
     independent: xdotoolAt(["click", "--repeat", "3", "5"]),
   },
+  { os: "x11", action: "keyChord", targeting: "ax", expected: "ctrl+k", independent: xdotoolChord },
   { os: "windows", action: "typeText", targeting: "px", expected: "conformance", independent: typeAtPoint },
   { os: "windows", action: "keyChord", targeting: "ax", expected: "ctrl+k", independent: chordToElement },
 ]

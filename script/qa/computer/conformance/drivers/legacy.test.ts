@@ -8,7 +8,7 @@ import { buildReport } from "../report.ts"
 import { isDriver } from "../driver.ts"
 import type { Cell } from "../vocabulary.ts"
 import { createLegacyDriver, driver, readOutcome } from "./legacy.ts"
-import { fakeTool, fixtures, type Listing, observer, type Sent, TARGET } from "./legacy-facade.ts"
+import { fakeTool, fixtures, type HitTest, type Listing, observer, type Sent, TARGET } from "./legacy-facade.ts"
 
 const cells = catalogFor("x11", "xorg")
 const sessionDir = mkdtempSync(join(tmpdir(), "legacy-driver-test-"))
@@ -90,6 +90,46 @@ describe("legacy driver against the shipped run facade", () => {
       const sent: Sent[] = []
       const result = await run(cell, "caption-only", sent)
       expect([result.id, result.observed.kind, sent]).toEqual([result.id, "error", []])
+    }
+  })
+
+  test("a pixel cell is decided by geometry: the hit-test answer is recorded, and only a point off the target sends nothing", async () => {
+    const pixel = cells.filter((entry) => entry.targeting === "px")
+    const run = (cell: Cell, hit: HitTest, sent: Sent[]) =>
+      createLegacyDriver({
+        session,
+        settleMs: 0,
+        tool: { ready: fakeTool(sent, undefined, undefined, hit) },
+        fixtures: { ready: fixtures(1) },
+        observer: { ready: observer },
+      }).runCell(cell)
+    const logged: string[] = []
+    const log = console.log
+    console.log = (line: unknown) => void logged.push(String(line))
+    try {
+      for (const cell of pixel) {
+        for (const hit of ["root", "other"] as const) {
+          const sent: Sent[] = []
+          logged.length = 0
+          const result = await run(cell, hit, sent)
+          expect([cell.action, hit, result.observed.kind, sent.length > 0]).toEqual([
+            cell.action,
+            hit,
+            "delivered",
+            true,
+          ])
+          expect([cell.action, hit, logged.some((line) => line.includes("hit_test_matches_target=false"))]).toEqual([
+            cell.action,
+            hit,
+            true,
+          ])
+        }
+        const offscreen: Sent[] = []
+        const result = await run(cell, "offscreen", offscreen)
+        expect([cell.action, result.observed.kind, offscreen]).toEqual([cell.action, "error", []])
+      }
+    } finally {
+      console.log = log
     }
   })
 

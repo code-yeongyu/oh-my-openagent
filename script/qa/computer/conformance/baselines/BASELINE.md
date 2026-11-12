@@ -63,7 +63,8 @@ Task set, replayed with no model: windows 1 of 12 (choosing a menu item by title
 - **Foreground, both:** every foreground cell except the accessibility press is refused with `ControlRequired` (8 on x11, 9 on Windows), which is the shipped answer when no person can approve foreground control.
 - **Electron and web-view content is not reachable.** On x11 every Electron cell is refused `AxFailed`; on Windows the Electron window lists only its frame and a `Chrome Legacy Window`, and the x11 web-view window lists only its menu bar. The web content is absent from the accessibility tree in all three. Whether the fixture apps must turn renderer accessibility on, or the release cannot read it, is open and is being asked of the fixture apps' owner.
 
-- **x11, the release's own hit-test (labelled observation, from the aim check of the hosted run at `bfdec3c9a9`).** `elementAt` at the centre of the Press button, the Value field, the Scroll target and a list row returns the window's root `filler` with no title, before and after the window was raised. On X11 the release cannot resolve a point inside the GTK window to the element under it.
+- **x11, its own finding class: the release's hit-test returns the root filler everywhere.** `elementAt` at the centre of the Press button, the Value field, the Scroll target and a list row returns the window's root `filler` with no title, before and after the window was raised (aim check of the hosted run at `bfdec3c9a9`, and every x11 pointer cell since). On X11 the release cannot resolve a point inside the GTK window to the element under it. This is separate from the delivery finding above. Every pointer cell now logs the answer as `hit_test=` and `hit_test_matches_target=`.
+- **How a pixel cell is aimed.** The fixture apps do not report their widgets' screen geometry, so a pixel cell's point is the centre of the element the driver resolved from the tree the release itself returned, and the cell is sent only when that point is inside the window and inside the element's bounds. The release's hit-test answer never stops a cell; it is recorded.
 
 ### Control for the x11 "delivered but not received" class (rule fixed before its run)
 
@@ -81,6 +82,18 @@ Two legs, each on a fresh fixture: typing by pixel into the Value field, and the
 - The independent input registers in the fixture, `SendInput` reports every event sent, and the focus logged before it is the Value field in the fixture window: the input reached the control the release addressed, and the release's reported delivery was lost. The cell becomes **verified by control**.
 - `SendInput` reports every event sent, the focus is the Value field, and the fixture still records nothing: the fixture does not take this input, so the cell is a **harness** finding, not the release's.
 - `SendInput` sends fewer events than asked, or the focus is not the Value field: the control did not run as designed, and the cell stays **not controlled**.
+
+### Control for the x11 key chord (rule fixed before its run)
+
+One leg on a fresh fixture: the release focuses the Value field and sends its background chord `ctrl+k`. Then `xdotool`, outside the tool, raises the fixture window, logs the window that holds keyboard focus, and presses `ctrl+k`. The GTK fixture records chords at the window, so the input reaches the receiver the release addressed when the focused window is the fixture's.
+
+- The independent chord registers and the focused window is the fixture's: the release's reported delivery was lost. The cell becomes **verified by control**.
+- The focused window is the fixture's and the fixture still records nothing: the fixture does not take this input, a **harness** finding.
+- The focused window is not the fixture's, or `xdotool` fails: the cell stays **not controlled**.
+
+Result: not yet run.
+
+### Windows control result
 
 Result (hosted run at `2a52285478`): key chord **verified by control** (focus on the Value field, `SendInput` 4/4, independent `ctrl+k` recorded, release empty). Typing by pixel **not controlled**: the focus before the independent typing was the `Press` button, because the release's aim point is on the field's label.
 

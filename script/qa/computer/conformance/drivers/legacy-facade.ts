@@ -23,7 +23,13 @@ const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor
 // the caption is all it lists.
 export type Listing = "field" | "captioned" | "caption-only"
 
-function facade(sent: Sent[], refuse?: string, listing: Listing = "field") {
+// What the engine's hit-test answers at a point inside the element: the element itself, the window's untitled root
+// (the x11 release), or another titled element; "offscreen" puts the element outside the window.
+export type HitTest = "element" | "root" | "other" | "offscreen"
+
+const OFFSCREEN = { x: 900, y: 900, width: 20, height: 10 }
+
+function facade(sent: Sent[], refuse?: string, listing: Listing = "field", hit: HitTest = "element") {
   const record =
     (verb: string) =>
     async (...args: unknown[]) => {
@@ -31,7 +37,7 @@ function facade(sent: Sent[], refuse?: string, listing: Listing = "field") {
       sent.push({ verb, args })
     }
   const element = {
-    bounds: async () => ELEMENT,
+    bounds: async () => (hit === "offscreen" ? OFFSCREEN : ELEMENT),
     click: record("el.click"),
     type: record("el.type"),
     setValue: record("el.setValue"),
@@ -64,7 +70,11 @@ function facade(sent: Sent[], refuse?: string, listing: Listing = "field") {
   const inside = (x: number, y: number) =>
     x >= ELEMENT.x && x <= ELEMENT.x + ELEMENT.width && y >= ELEMENT.y && y <= ELEMENT.y + ELEMENT.height
   return {
-    elementAt: async (x: number, y: number) => (inside(x, y) ? { role: "button", title: TARGET.element.title } : null),
+    elementAt: async (x: number, y: number) => {
+      if (!inside(x, y)) return null
+      if (hit === "root") return { role: "filler", title: null }
+      return { role: "button", title: hit === "other" ? "Elsewhere" : TARGET.element.title }
+    },
     windows: async (filter?: { title?: string }) =>
       filter?.title === undefined ? listed : listed.filter((entry) => entry.title.includes(filter.title ?? "")),
     window: async (id: string) => {
@@ -74,12 +84,17 @@ function facade(sent: Sent[], refuse?: string, listing: Listing = "field") {
   }
 }
 
-export function fakeTool(sent: Sent[], refuse?: string, listing?: Listing): ShippedTool & { calls: number } {
+export function fakeTool(
+  sent: Sent[],
+  refuse?: string,
+  listing?: Listing,
+  hit?: HitTest,
+): ShippedTool & { calls: number } {
   const tool = {
     calls: 0,
     async execute(_id: string, input: Readonly<Record<string, unknown>>) {
       tool.calls += 1
-      const value: unknown = await new AsyncFunction("desktop", String(input.code))(facade(sent, refuse, listing))
+      const value: unknown = await new AsyncFunction("desktop", String(input.code))(facade(sent, refuse, listing, hit))
       return { details: { value } }
     },
   }
