@@ -109,7 +109,7 @@ test("#given a claim taken, extended and released #when the claims root is liste
   await claim?.expiresAt(Date.now() + 60_000)
   await claim?.release()
   expect(claim).not.toBeNull()
-  expect(await readdir(path)).toEqual([])
+  expect(await readdir(path)).toStrictEqual([])
 })
 
 // Windows can keep a just-unlinked lease, lock or guard listed, and Bun's recursive rm then reports success but
@@ -120,6 +120,7 @@ test.skipIf(process.platform !== "win32")(
     const path = await mkdtemp(join(tmpdir(), "g3-claims-win-"))
     try {
       const claim = await createSyncRpcClaims(path).acquire(identity, "enable", undefined, authority())
+      expect(claim).not.toBeNull()
       await claim?.expiresAt(Date.now() + 60_000)
       await claim?.release()
     } finally {
