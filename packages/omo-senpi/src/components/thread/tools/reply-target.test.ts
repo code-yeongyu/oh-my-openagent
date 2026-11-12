@@ -27,7 +27,9 @@ const entry = (device?: string): ThreadAddressEntry => ({
 
 describe("replyTargetMismatch compares the device as well as the session id", () => {
   test("#given the sender came from device b #when the resolved entry has its session id on device c #then it is reply_target_mismatch", () => {
-    expect(replyTargetMismatch(repliesTo([{ session_id: "dur-sender", device: "b" }]), "dur-sender", entry("c"), "here")).toMatchObject({
+    expect(
+      replyTargetMismatch(repliesTo([{ session_id: "dur-sender", device: "b" }]), "dur-sender", entry("c"), "here"),
+    ).toMatchObject({
       code: "reply_target_mismatch",
       details: { resolved_thread_id: "dur-sender", device: "c" },
     })
@@ -40,14 +42,18 @@ describe("replyTargetMismatch compares the device as well as the session id", ()
   })
 
   test("#given a sender on this device #when the resolved entry is its session here #then it passes, whether the device is absent or named as this one", () => {
-    expect(replyTargetMismatch(repliesTo([{ session_id: "dur-sender" }]), "dur-sender", entry(), "here")).toBeUndefined()
+    expect(
+      replyTargetMismatch(repliesTo([{ session_id: "dur-sender" }]), "dur-sender", entry(), "here"),
+    ).toBeUndefined()
     expect(
       replyTargetMismatch(repliesTo([{ session_id: "dur-sender", device: "here" }]), "dur-sender", entry(), "here"),
     ).toBeUndefined()
   })
 
   test("#given a sender on this device #when the resolved entry has its session id on another device #then it is reply_target_mismatch", () => {
-    expect(replyTargetMismatch(repliesTo([{ session_id: "dur-sender" }]), "dur-sender", entry("b"), "here")).toMatchObject({
+    expect(
+      replyTargetMismatch(repliesTo([{ session_id: "dur-sender" }]), "dur-sender", entry("b"), "here"),
+    ).toMatchObject({
       code: "reply_target_mismatch",
     })
   })
