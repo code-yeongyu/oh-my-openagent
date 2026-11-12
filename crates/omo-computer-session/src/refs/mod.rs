@@ -29,7 +29,8 @@ pub(crate) struct WindowRefs {
     pub(crate) next_generation: u64,
     pub(crate) generations: BTreeMap<u64, Generation>,
     pub(crate) by_object: HashMap<NativeObject, u64>,
-    pub(crate) by_native_id: HashMap<(String, String), u64>,
+    /// Role + native id -> the numbers that key carried in its latest read, in document order.
+    pub(crate) by_native_id: HashMap<(String, String), Vec<u64>>,
     pub(crate) needs_observe: bool,
     /// Generations below the first number expired at once for the reason.
     pub(crate) wiped: Option<(u64, Reason)>,
@@ -104,12 +105,12 @@ impl RefRegistry {
     pub fn locate(&mut self, token: &str, object_mode: bool) -> Result<Location, Refusal> {
         let stale = Refusal::bare(EngineCode::StaleRef);
         let parsed = RefToken::parse(token).ok_or(Refusal::bare(EngineCode::InvalidTarget))?;
+        if object_mode && matches!(parsed, RefToken::Bare { .. }) {
+            return Err(Refusal::new(EngineCode::InvalidTarget, Reason::RefUnqualified.wire()));
+        }
         let window_id = self.owner.get(&parsed.n()).ok_or_else(|| stale.clone())?.clone();
         let window = self.windows.get_mut(&window_id).ok_or_else(|| stale.clone())?;
         let number = match parsed {
-            RefToken::Bare { .. } if object_mode => {
-                return Err(Refusal::new(EngineCode::InvalidTarget, Reason::RefUnqualified.wire()))
-            }
             RefToken::Bare { n } => window
                 .generations
                 .values()

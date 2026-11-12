@@ -3,7 +3,7 @@
 //! id match and the number is unused in this capture; otherwise it gets the next number of the
 //! session-wide counter, which is never reused.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use omo_computer_core::ax::{RootRead, Walk, GENERATIONS_PER_WINDOW};
 
@@ -89,35 +89,52 @@ impl RefRegistry {
         Minted { generation: number, identity_changed }
     }
 
-    /// The element number of every node of `walk`, by rules (1), (2), then the counter.
+    /// The element number of every node of `walk`. Pass 1 settles every same-native-object
+    /// match across the whole read; pass 2 gives a role + native id match only a number pass 1
+    /// left unclaimed (with duplicate ids, the old numbers of that key in their old order);
+    /// every other node then gets the next number of the counter.
     fn number(&mut self, window_id: &str, walk: &Walk) -> Vec<u64> {
         let window = self.windows.entry(window_id.to_owned()).or_default();
-        let mut used: HashSet<u64> = HashSet::new();
-        let mut numbers = Vec::with_capacity(walk.nodes.len());
-        for node in &walk.nodes {
-            let by_object = node.read.object.and_then(|object| window.by_object.get(&object).copied());
-            let by_native_id = node
-                .read
-                .native_id
-                .as_ref()
-                .and_then(|id| window.by_native_id.get(&(node.read.role.clone(), id.clone())).copied());
-            let kept = [by_object, by_native_id].into_iter().flatten().find(|n| !used.contains(n));
-            let n = kept.unwrap_or_else(|| {
-                let n = self.next_n;
-                self.next_n += 1;
-                n
-            });
-            used.insert(n);
-            numbers.push(n);
+        let key = |read: &omo_computer_core::ax::NodeRead| read.native_id.clone().map(|id| (read.role.clone(), id));
+        let mut claimed: HashSet<u64> = HashSet::new();
+        let mut numbers: Vec<Option<u64>> = walk
+            .nodes
+            .iter()
+            .map(|node| {
+                let n = node.read.object.and_then(|object| window.by_object.get(&object).copied())?;
+                claimed.insert(n).then_some(n)
+            })
+            .collect();
+        for (slot, node) in numbers.iter_mut().zip(&walk.nodes) {
+            if slot.is_some() {
+                continue;
+            }
+            let candidates = key(&node.read).and_then(|key| window.by_native_id.get(&key));
+            if let Some(n) = candidates.and_then(|old| old.iter().copied().find(|n| !claimed.contains(n))) {
+                claimed.insert(n);
+                *slot = Some(n);
+            }
         }
+        let numbers: Vec<u64> = numbers
+            .into_iter()
+            .map(|slot| {
+                slot.unwrap_or_else(|| {
+                    let n = self.next_n;
+                    self.next_n += 1;
+                    n
+                })
+            })
+            .collect();
+        let mut by_key: HashMap<(String, String), Vec<u64>> = HashMap::new();
         for (node, n) in walk.nodes.iter().zip(&numbers) {
             if let Some(object) = node.read.object {
                 window.by_object.insert(object, *n);
             }
-            if let Some(id) = &node.read.native_id {
-                window.by_native_id.insert((node.read.role.clone(), id.clone()), *n);
+            if let Some(key) = key(&node.read) {
+                by_key.entry(key).or_default().push(*n);
             }
         }
+        window.by_native_id.extend(by_key);
         numbers
     }
 
