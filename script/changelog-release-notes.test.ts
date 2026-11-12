@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test"
-import { assertUtcDate, composeReleaseBody, extractReleaseNotes, stampUnreleased } from "./changelog-release-notes"
+import {
+  assertUtcDate,
+  composeReleaseBody,
+  extractReleaseNotes,
+  neutralizeCrossRepoReferences,
+  stampUnreleased,
+} from "./changelog-release-notes"
 
 const CHANGELOG = [
   "# Changelog",
@@ -118,5 +124,54 @@ describe("installFooter", () => {
   test("#given a prerelease version #then the footer installs the beta tag", async () => {
     const { installFooter } = await import("./print-release-notes")
     expect(installFooter("5.0.0-beta.91")).toContain("bun add -g omo-ai@beta")
+  })
+})
+
+describe("neutralizeCrossRepoReferences URL boundaries", () => {
+  const PRIVATE = "https://github.com/acme-org/acme-svc/pull/9"
+  test.each(["_", "-", ".", "/", "a"])(
+    "#given a private https URL right after %p #when neutralized #then it is replaced",
+    (lead) => {
+      expect(neutralizeCrossRepoReferences("x" + lead + PRIVATE)).toStrictEqual("x" + lead + "tracked internally")
+    },
+  )
+
+  test("#given a scheme-less private URL after a space #when neutralized #then it is replaced", () => {
+    expect(neutralizeCrossRepoReferences("see github.com/acme-org/acme-svc now")).toStrictEqual(
+      "see tracked internally now",
+    )
+  })
+
+  test("#given a scheme-less private URL inside another URL path #when neutralized #then it is untouched", () => {
+    const text = "https://example.com/github.com/acme-org/acme-svc"
+    expect(neutralizeCrossRepoReferences(text)).toStrictEqual(text)
+  })
+
+  test.each([
+    "https://github.com/settings/tokens",
+    "https://github.com/apps/renovate",
+    "https://github.com/sponsors/someone",
+    "https://github.com/orgs/acme-org",
+    "https://github.com/marketplace/actions",
+    "https://github.com/features/actions",
+    "https://github.com/topics/typescript",
+    "https://github.com/notifications/subscriptions",
+    "https://github.com/login/device",
+    "https://github.com/new/import",
+    "[tokens](https://github.com/settings/tokens)",
+    "<https://github.com/apps/renovate>",
+  ])("#given a reserved GitHub page %p #when neutralized #then it is unchanged", (text) => {
+    expect(neutralizeCrossRepoReferences(text)).toStrictEqual(text)
+  })
+
+  test("#given a public clone URL with .git #when neutralized #then it is unchanged", () => {
+    const text = "git clone https://github.com/code-yeongyu/oh-my-openagent.git"
+    expect(neutralizeCrossRepoReferences(text)).toStrictEqual(text)
+  })
+
+  test("#given a private clone URL with .git #when neutralized #then it is replaced", () => {
+    expect(neutralizeCrossRepoReferences("git clone https://github.com/acme-org/acme-svc.git")).toStrictEqual(
+      "git clone tracked internally",
+    )
   })
 })
