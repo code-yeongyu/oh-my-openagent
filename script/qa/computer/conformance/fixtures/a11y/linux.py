@@ -12,10 +12,14 @@ unreachable - no bus, no desktop or no window with that title within the wait.""
 import sys
 import time
 
-import gi
+try:
+    import gi
 
-gi.require_version("Atspi", "1.0")
-from gi.repository import Atspi  # noqa: E402
+    gi.require_version("Atspi", "2.0")
+    from gi.repository import Atspi  # noqa: E402
+except Exception as error:  # the Atspi typelib missing on the runner is the runner, not the fixture
+    print(f"ENVIRONMENT: the Atspi typelib is unavailable ({error})")
+    sys.exit(3)
 
 WAIT_SECONDS = 20.0
 MAX_DEPTH = 40
