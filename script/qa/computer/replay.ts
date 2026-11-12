@@ -2,6 +2,7 @@
 // Replays one corpus case against an engine binary the way a consumer drives it.
 //
 //   bun script/qa/computer/replay.ts --engine <binary> --case <file> [--assert-sink-empty] [--deltas <tsv>]
+//                                    [--superseded <tsv>]
 //
 // Every reply is deep-compared with the case's expected messages modulo the case's `variable`
 // JSON pointers and the lines of ORACLE-DELTAS.tsv (row 3's rule: an `additive` line accepts an
@@ -13,6 +14,9 @@
 // be spawned) prints `REPLAY_ERROR <why>` and exits 2. A case with no `transport` is replayed
 // over stdio only when ORACLE-PROVENANCE.tsv lists it as an imported oracle case (the v1 corpus
 // predates the field); any other case without one is refused `REPLAY_ERROR transport_missing`.
+// A case SUPERSEDED.tsv lists (old case, replacement, reason) is not replayed: the driver prints
+// `REPLAY_SKIPPED <case> superseded by <replacement>: <reason>`, spawns nothing and exits 0; a row
+// whose replacement file does not exist is `REPLAY_ERROR superseded_replacement_missing` (exit 2).
 import { constants } from "node:fs"
 import { access, mkdtemp, readdir, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -21,6 +25,7 @@ import { join, relative, resolve } from "node:path"
 const ROOT = resolve(import.meta.dir, "../../..")
 const DEFAULT_DELTAS = join(ROOT, "crates/omo-computer-core/parity/ORACLE-DELTAS.tsv")
 const PROVENANCE = join(ROOT, "crates/omo-computer-core/parity/ORACLE-PROVENANCE.tsv")
+const DEFAULT_SUPERSEDED = join(ROOT, "crates/omo-computer-core/fixtures/conformance/SUPERSEDED.tsv")
 const SINK_PREFIX = "fake-sink-" // the engine's per-process sink file under OMO_COMPUTER_RUNTIME_DIR
 const MESSAGE_TIMEOUT_MS = 10_000
 const EXIT_TIMEOUT_MS = 5_000
@@ -132,6 +137,30 @@ function matches(pattern: readonly string[], pointer: string): boolean {
   if (pattern[0] === "**")
     return path.length >= pattern.length - 1 && fits(pattern.slice(1), path.slice(path.length - pattern.length + 1))
   return fits(pattern, path)
+}
+
+type Superseded = { readonly replacement: string; readonly reason: string }
+
+// The SUPERSEDED.tsv row of `casePath`, after checking that every row's replacement exists.
+async function supersededBy(file: string, casePath: string): Promise<Superseded | undefined> {
+  const rows = (await readText(file, "superseded list"))
+    .split("\n")
+    .slice(1)
+    .filter((line) => line.trim() !== "")
+  let found: Superseded | undefined
+  for (const line of rows) {
+    const [old = "", replacement = "", reason = ""] = line.split("\t")
+    const target = resolve(ROOT, replacement)
+    const exists =
+      replacement !== "" &&
+      (await access(target, constants.R_OK).then(
+        () => true,
+        () => false,
+      ))
+    if (!exists) throw new InputError(`superseded_replacement_missing: ${old} names ${replacement || "no replacement"}`)
+    if (resolve(ROOT, old) === casePath) found = { replacement, reason }
+  }
+  return found
 }
 
 async function isImported(casePath: string): Promise<boolean> {
@@ -286,11 +315,14 @@ function args(argv: readonly string[]) {
   const engine = value("--engine")
   const file = value("--case")
   if (!engine || !file)
-    throw new InputError("usage: replay.ts --engine <binary> --case <file> [--assert-sink-empty] [--deltas <tsv>]")
+    throw new InputError(
+      "usage: replay.ts --engine <binary> --case <file> [--assert-sink-empty] [--deltas <tsv>] [--superseded <tsv>]",
+    )
   return {
     engine: resolve(engine),
     casePath: resolve(file),
     deltas: resolve(value("--deltas") ?? DEFAULT_DELTAS),
+    superseded: resolve(value("--superseded") ?? DEFAULT_SUPERSEDED),
     assertSinkEmpty: argv.includes("--assert-sink-empty"),
   }
 }
@@ -299,6 +331,11 @@ async function replay(argv: readonly string[]): Promise<number> {
   const opts = args(argv)
   const rel = relative(ROOT, opts.casePath)
   const name = rel.startsWith("..") ? opts.casePath : rel
+  const superseded = await supersededBy(opts.superseded, opts.casePath)
+  if (superseded) {
+    console.log(`REPLAY_SKIPPED ${name} superseded by ${superseded.replacement}: ${superseded.reason}`)
+    return 0
+  }
   const spec = parseCase(
     parseJson(await readText(opts.casePath, "case file"), "case file"),
     name,

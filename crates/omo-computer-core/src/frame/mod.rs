@@ -9,6 +9,9 @@ mod epoch;
 mod geometry;
 mod refusal;
 
+#[cfg(test)]
+mod tests;
+
 pub use budget::{ladder, Delivery, NoJpeg, Reencode, INLINE_BUDGET_BYTES, JPEG_QUALITY};
 pub use composite::{
     composite, Composite, DisplaySelector, MAX_COMPOSITE_DISPLAYS, MAX_COMPOSITE_PIXELS,

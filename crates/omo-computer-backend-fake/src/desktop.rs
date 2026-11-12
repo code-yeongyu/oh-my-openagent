@@ -14,7 +14,7 @@ use omo_computer_core::untrusted::UntrustedText;
 
 use crate::backend::{FakeBackend, StopPathScript};
 use crate::capabilities::fake_capabilities;
-use crate::frame::{pixels, solid_png};
+use crate::frame::{pixels, Raster};
 use crate::handles::{FakeEpochSource, FakePresence, FakeStopListener};
 use crate::method::FakeMethod;
 use crate::scenario::{FakeDisplay, FakeWindow};
@@ -191,11 +191,20 @@ impl Backend for FakeBackend {
             } else {
                 0xA0
             };
+            let mut raster = Raster::filled(width, height, gray);
+            // The pointer is in the frame by default (`cursor:false` leaves it out), drawn at
+            // the cursor's native pixel; the crosshair is drawn at the frame point it names.
+            if let Some(cursor) = state.cursor.filter(|_| options.cursor) {
+                raster.pointer((cursor.x - rect.x) * scale, (cursor.y - rect.y) * scale);
+            }
+            if let Some(at) = options.crosshair {
+                raster.crosshair(at.x, at.y);
+            }
             Ok(FrameBytes {
                 width,
                 height,
                 mime: ImageMime::Png,
-                bytes: solid_png(width, height, gray),
+                bytes: raster.png(),
             })
         })
     }

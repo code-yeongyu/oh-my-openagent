@@ -1,5 +1,6 @@
-//! A minimal, deterministic PNG writer for the fake's captures: one gray level, stored
-//! (uncompressed) deflate blocks, so a frame costs a copy and never depends on a codec.
+//! A minimal, deterministic PNG writer for the fake's captures: 8-bit gray, stored
+//! (uncompressed) deflate blocks, so a frame costs a copy and never depends on a codec. The
+//! frame carries the pointer glyph by default and the crosshair a `crosshair` capture asks for.
 
 const SIGNATURE: [u8; 8] = [0x89, b'P', b'N', b'G', b'\r', b'\n', 0x1A, b'\n'];
 const MAX_STORED: usize = 65_535;
@@ -65,28 +66,89 @@ fn zlib_stored(raw: &[u8]) -> Vec<u8> {
     out
 }
 
-/// An 8-bit grayscale PNG of one level.
-#[must_use]
-pub fn solid_png(width: u32, height: u32, gray: u8) -> Vec<u8> {
-    let row_len = usize::try_from(width).unwrap_or(0);
-    let rows = usize::try_from(height).unwrap_or(0);
-    let mut raw = Vec::with_capacity((row_len + 1) * rows);
-    for _ in 0..rows {
-        raw.push(0);
-        raw.resize(raw.len() + row_len, gray);
-    }
-    let mut header = Vec::with_capacity(13);
-    header.extend_from_slice(&width.to_be_bytes());
-    header.extend_from_slice(&height.to_be_bytes());
-    header.extend_from_slice(&[8, 0, 0, 0, 0]);
-    let mut out = SIGNATURE.to_vec();
-    chunk(&mut out, b"IHDR", &header);
-    chunk(&mut out, b"IDAT", &zlib_stored(&raw));
-    chunk(&mut out, b"IEND", &[]);
-    out
-}
-
 /// The gray level of the pointer glyph a default frame carries.
 pub const POINTER_GRAY: u8 = 0x00;
 /// The gray level of the crosshair a `crosshair` capture draws.
 pub const CROSSHAIR_GRAY: u8 = 0xFF;
+/// Half the side of the square pointer glyph centred on the hot spot.
+const POINTER_HALF: i64 = 1;
+/// The arm length of the crosshair either side of its centre.
+const CROSSHAIR_ARM: i64 = 4;
+
+/// The gray pixels of one frame, held as PNG scanlines (a filter byte, then the row).
+pub struct Raster {
+    width: u32,
+    height: u32,
+    rows: Vec<u8>,
+}
+
+impl Raster {
+    /// A frame of one gray level.
+    #[must_use]
+    pub fn filled(width: u32, height: u32, gray: u8) -> Self {
+        let row_len = usize::try_from(width).unwrap_or(0);
+        let count = usize::try_from(height).unwrap_or(0);
+        let mut rows = Vec::with_capacity((row_len + 1) * count);
+        for _ in 0..count {
+            rows.push(0);
+            rows.resize(rows.len() + row_len, gray);
+        }
+        Self {
+            width,
+            height,
+            rows,
+        }
+    }
+
+    fn set(&mut self, x: i64, y: i64, gray: u8) {
+        let (Ok(x), Ok(y)) = (u32::try_from(x), u32::try_from(y)) else {
+            return;
+        };
+        if x < self.width && y < self.height {
+            let row_len = usize::try_from(self.width).unwrap_or(0) + 1;
+            let index = usize::try_from(y).unwrap_or(0) * row_len + 1 + usize::try_from(x).unwrap_or(0);
+            if let Some(pixel) = self.rows.get_mut(index) {
+                *pixel = gray;
+            }
+        }
+    }
+
+    /// The pixel holding the frame point `(x, y)`.
+    fn cell(x: f64, y: f64) -> (i64, i64) {
+        // `floor` of a finite frame coordinate; a non-finite one lands outside the frame.
+        (x.floor() as i64, y.floor() as i64)
+    }
+
+    /// The pointer glyph, centred on the hot spot `(x, y)` in frame pixels.
+    pub fn pointer(&mut self, x: f64, y: f64) {
+        let (cx, cy) = Self::cell(x, y);
+        for dy in -POINTER_HALF..=POINTER_HALF {
+            for dx in -POINTER_HALF..=POINTER_HALF {
+                self.set(cx + dx, cy + dy, POINTER_GRAY);
+            }
+        }
+    }
+
+    /// The crosshair centred on `(x, y)` in frame pixels.
+    pub fn crosshair(&mut self, x: f64, y: f64) {
+        let (cx, cy) = Self::cell(x, y);
+        for d in -CROSSHAIR_ARM..=CROSSHAIR_ARM {
+            self.set(cx + d, cy, CROSSHAIR_GRAY);
+            self.set(cx, cy + d, CROSSHAIR_GRAY);
+        }
+    }
+
+    /// The 8-bit grayscale PNG of the frame.
+    #[must_use]
+    pub fn png(&self) -> Vec<u8> {
+        let mut header = Vec::with_capacity(13);
+        header.extend_from_slice(&self.width.to_be_bytes());
+        header.extend_from_slice(&self.height.to_be_bytes());
+        header.extend_from_slice(&[8, 0, 0, 0, 0]);
+        let mut out = SIGNATURE.to_vec();
+        chunk(&mut out, b"IHDR", &header);
+        chunk(&mut out, b"IDAT", &zlib_stored(&self.rows));
+        chunk(&mut out, b"IEND", &[]);
+        out
+    }
+}

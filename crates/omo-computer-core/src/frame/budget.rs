@@ -31,9 +31,18 @@ impl Reencode for NoJpeg {
     }
 }
 
-/// Signature only at the test-first commit.
+fn fits(bytes: &[u8], budget: u64) -> bool {
+    u64::try_from(bytes.len()).is_ok_and(|len| len <= budget)
+}
+
+/// The first ladder step that fits `budget`.
 #[must_use]
 pub fn ladder(png: Vec<u8>, budget: u64, encoder: &dyn Reencode) -> Delivery {
-    let _ = (budget, encoder);
-    Delivery::InlinePng(png)
+    if fits(&png, budget) {
+        return Delivery::InlinePng(png);
+    }
+    match encoder.jpeg(&png, JPEG_QUALITY) {
+        Some(jpeg) if fits(&jpeg, budget) => Delivery::InlineJpeg(jpeg),
+        _ => Delivery::Artifact(png),
+    }
 }

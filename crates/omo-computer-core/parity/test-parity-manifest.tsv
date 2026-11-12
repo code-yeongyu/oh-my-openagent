@@ -913,13 +913,13 @@ senpi-desktop-core	rust	senpi-desktop-core::clipboard::live_tests::a_written_tex
 senpi-desktop-core	rust	senpi-desktop-core::frame::geometry::zoom::tests::zoom_maps_fractional_regions_to_fresh_native_pixels	pending	crates/senpi-desktop-core/src/frame/geometry/zoom/tests.rs:24
 senpi-desktop-core	rust	senpi-desktop-core::frame::geometry::zoom::tests::zoom_refuses_incompatible_fresh_geometry_and_image_dimensions	pending	crates/senpi-desktop-core/src/frame/geometry/zoom/tests.rs:52
 senpi-desktop-core	rust	senpi-desktop-core::frame::geometry::zoom::tests::zoom_allows_window_movement_without_reanchoring_the_stored_frame	pending	crates/senpi-desktop-core/src/frame/geometry/zoom/tests.rs:77
-senpi-desktop-core	rust	senpi-desktop-core::frame::tests::pixel_to_logical_at_one_and_two_x	pending	crates/senpi-desktop-core/src/frame/tests.rs:44
-senpi-desktop-core	rust	senpi-desktop-core::frame::tests::moved_window_is_reanchored	pending	crates/senpi-desktop-core/src/frame/tests.rs:54
+senpi-desktop-core	rust	senpi-desktop-core::frame::tests::pixel_to_logical_at_one_and_two_x	ported:omo-computer-core::frame::tests::composite_draws_at_the_top_scale_and_refuses_points_between_regions	crates/senpi-desktop-core/src/frame/tests.rs:44
+senpi-desktop-core	rust	senpi-desktop-core::frame::tests::moved_window_is_reanchored	ported:omo-computer-core::frame::tests::window_frame_maps_through_the_current_origin_and_refuses_a_resize	crates/senpi-desktop-core/src/frame/tests.rs:54
 senpi-desktop-core	rust	senpi-desktop-core::frame::tests::cap_scaling_adjusts_geometry	pending	crates/senpi-desktop-core/src/frame/tests.rs:62
 senpi-desktop-core	rust	senpi-desktop-core::frame::tests::uncapped_composite_over_max_composite_pixels_is_capture_failed	pending	crates/senpi-desktop-core/src/frame/tests.rs:76
-senpi-desktop-core	rust	senpi-desktop-core::frame::tests::map_point_round_trips_map_to_pixel_within_half_pixel	pending	crates/senpi-desktop-core/src/frame/tests.rs:89
-senpi-desktop-core	rust	senpi-desktop-core::frame::tests::pixels_only_frame_refuses_coordinate_input_and_hit_tests	pending	crates/senpi-desktop-core/src/frame/tests.rs:108
-senpi-desktop-core	rust	senpi-desktop-core::frame::tests::a_window_frame_keeps_its_owner_follows_a_move_and_names_a_resize	pending	crates/senpi-desktop-core/src/frame/tests.rs:124
+senpi-desktop-core	rust	senpi-desktop-core::frame::tests::map_point_round_trips_map_to_pixel_within_half_pixel	ported:omo-computer-core::frame::tests::window_frame_maps_through_the_current_origin_and_refuses_a_resize	crates/senpi-desktop-core/src/frame/tests.rs:89
+senpi-desktop-core	rust	senpi-desktop-core::frame::tests::pixels_only_frame_refuses_coordinate_input_and_hit_tests	ported:omo-computer-session::frames::tests::frame_refused_pixels_only	crates/senpi-desktop-core/src/frame/tests.rs:108
+senpi-desktop-core	rust	senpi-desktop-core::frame::tests::a_window_frame_keeps_its_owner_follows_a_move_and_names_a_resize	ported:omo-computer-session::frames::tests::frame_refused_resized	crates/senpi-desktop-core/src/frame/tests.rs:124
 senpi-desktop-core	rust	senpi-desktop-core::holds::release_failure_tests::a_plain_cancel_is_not_a_release_failure	pending	crates/senpi-desktop-core/src/holds.rs:93
 senpi-desktop-core	rust	senpi-desktop-core::holds::release_failure_tests::a_cancel_whose_release_failed_is_a_release_failure	pending	crates/senpi-desktop-core/src/holds.rs:98
 senpi-desktop-core	rust	senpi-desktop-core::holds::release_failure_tests::a_release_failure_after_a_clean_hold_is_a_release_failure	pending	crates/senpi-desktop-core/src/holds.rs:105
@@ -1397,7 +1397,7 @@ senpi-desktop-session	rust	senpi-desktop-session::worker_ax::type_text_tests::te
 senpi-desktop-session	rust	senpi-desktop-session::worker_ax::type_text_tests::foreground_element_typing_needs_the_grant	pending	crates/senpi-desktop-session/src/worker_ax/type_text_tests.rs:112
 senpi-desktop-session	rust	senpi-desktop-session::worker_ax::type_text_tests::an_element_that_never_takes_focus_gets_no_keys_and_the_refusal_names_the_focus	pending	crates/senpi-desktop-session/src/worker_ax/type_text_tests.rs:144
 senpi-desktop-session	rust	senpi-desktop-session::worker_ax::type_text_tests::an_unanswered_insertion_is_unconfirmed_after_it_landed	pending	crates/senpi-desktop-session/src/worker_ax/type_text_tests.rs:172
-senpi-desktop-session	rust	senpi-desktop-session::worker_capture::tests::base64_matches_the_rfc_4648_vectors	pending	crates/senpi-desktop-session/src/worker_capture.rs:132
+senpi-desktop-session	rust	senpi-desktop-session::worker_capture::tests::base64_matches_the_rfc_4648_vectors	ported:omo-computer-session::frames::capture::base64_tests::base64_matches_rfc_4648	crates/senpi-desktop-session/src/worker_capture.rs:132
 senpi-desktop-session	rust	senpi-desktop-session::worker_capture::tests::base64_uses_the_standard_alphabet_for_high_bits	pending	crates/senpi-desktop-session/src/worker_capture.rs:148
 senpi-desktop-session	rust	senpi-desktop-session::worker_clipboard::tests::a_written_text_reads_back	pending	crates/senpi-desktop-session/src/worker_clipboard/tests.rs:20
 senpi-desktop-session	rust	senpi-desktop-session::worker_clipboard::tests::a_write_is_audited_by_length_and_digest_never_its_text	pending	crates/senpi-desktop-session/src/worker_clipboard/tests.rs:34
