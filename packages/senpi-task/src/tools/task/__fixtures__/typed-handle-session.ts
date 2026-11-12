@@ -12,7 +12,11 @@ import { buildTaskExecute } from "../execute"
 import { makeDeps } from "./task-tool-fakes"
 
 // Restored real sessions are deterministic: no prompt, provider, or model network call is made.
-export async function realSessionHandle() {
+//
+// The task tool reports a start that is still admitting once START_REPORT_WINDOW_MS has passed, so it can
+// return before this runner has registered its handle. `registerAfterReport` makes that order certain
+// instead of a matter of host speed: the runner holds its handle back until the tool has returned.
+export async function realSessionHandle(options: { readonly registerAfterReport?: boolean } = {}) {
   const { ModelRuntime, SessionManager, createAgentSession } = await loadSenpiBarrel()
   const project = tempProject()
   const agentDir = join(project, "isolated-agent")
@@ -20,6 +24,7 @@ export async function realSessionHandle() {
   const store = createTaskRecordStore({ project_dir: project })
   const handles: ManagedChildHandle[] = []
   const transcripts: Array<{ path: string; before: string }> = []
+  const reported = Promise.withResolvers<void>()
   const runner = new InProcessRunner({
     createSession: async (options) => {
       const { session } = await createAgentSession({
@@ -60,6 +65,7 @@ export async function realSessionHandle() {
       const handle = adaptInProcessHandle(
         await runner.resume({ ...spec, sessionDir, agentDir, model: undefined }, path),
       )
+      if (options.registerAfterReport === true) await reported.promise
       handles.push(handle)
       return handle
     },
@@ -83,8 +89,11 @@ export async function realSessionHandle() {
       undefined,
       { cwd: project, sessionManager: { getSessionId: () => "fixture-parent" } },
     )
+    const registeredWhenReported = handles.length > 0
+    reported.resolve()
     return {
       response,
+      registeredWhenReported,
       record: store.load(response.details.task_id),
       sessionText: handles[0]?.lastAssistantText(),
       transcriptMessages: transcripts.map(({ path, before }) => ({
@@ -102,6 +111,7 @@ export async function realSessionHandle() {
       providerCalls: 0,
     }
   } finally {
+    reported.resolve()
     for (const handle of handles) {
       manager.forget(handle.task_id, { path: "end" })
       await handle.abort()
