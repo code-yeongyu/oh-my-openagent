@@ -17,8 +17,16 @@ const USAGE =
 const DEFAULT_WINDOW_MS = 3_000
 const DEFAULT_CALIBRATION_TRIALS = 5
 
+const RECORDED_OSES: readonly string[] = ["macos"]
+
+// Whether this sentinel has a recorder for the OS. A consumer writes its eight signals as not_observed where this is
+// false, never none: an OS without a recorder observed nothing.
+export function recordsOn(os: string): boolean {
+  return RECORDED_OSES.includes(os)
+}
+
 function qaSessionRefusal(os: string): string | undefined {
-  if (os !== "macos") return `the ${os} sentinel is not part of this driver yet; only --os macos is built`
+  if (!recordsOn(os)) return `the ${os} sentinel has no recorder yet; it records on ${RECORDED_OSES.join(", ")}`
   if (process.platform !== "darwin") return `--os macos needs a macOS QA session; this host is ${process.platform}`
   if (process.env.OMO_COMPUTER_QA_SESSION !== "1")
     return "refusing to run outside a disposable QA desktop session (OMO_COMPUTER_QA_SESSION=1)"
