@@ -22,13 +22,44 @@ using System.Threading;
 
 '@
 
+# The native type comes from sp-n-native.dll beside this file when the workflow precompiled it (-Leg build-native;
+# its sha256 is recorded in sp-n-native.dll.sha256), so a leg needs no compiler at run time. The bytes are hashed
+# and loaded from one read; a missing record or a mismatch throws (legError). Without the assembly the fragments
+# are compiled here, as before.
+$NativeDll = Join-Path $PSScriptRoot 'sp-n-native.dll'
+$script:NativeFrom = 'not loaded'
+function HexSHA256([byte[]]$bytes) {
+  $h = [Security.Cryptography.SHA256]::Create()
+  try { return ([BitConverter]::ToString($h.ComputeHash($bytes)) -replace '-', '').ToLowerInvariant() } finally { $h.Dispose() }
+}
 function Compile {
-  if (-not ('SpN' -as [type])) { Add-Type -TypeDefinition $SpNNative -Language CSharp }
+  if (-not ('SpN' -as [type])) {
+    if (Test-Path -LiteralPath $NativeDll) {
+      $bytes = [IO.File]::ReadAllBytes($NativeDll)
+      $got = HexSHA256 $bytes
+      $want = ([IO.File]::ReadAllText("$NativeDll.sha256")).Trim().ToLowerInvariant()
+      if ($got -ne $want) { throw "native assembly sha256 mismatch: $NativeDll is $got, recorded $want" }
+      [void][Reflection.Assembly]::Load($bytes)
+      $script:NativeFrom = "precompiled sha256=$got"
+    } else {
+      Add-Type -TypeDefinition $SpNNative -Language CSharp
+      $script:NativeFrom = 'Add-Type at run time (no precompiled assembly)'
+    }
+  }
   [void][SpN]::SetProcessDpiAwarenessContext([IntPtr](-4))
+}
+# -Leg build-native: compile the fragments once into sp-n-native.dll and record its sha256 beside it.
+function BuildNative {
+  foreach ($p in $NativeDll, "$NativeDll.sha256") { if (Test-Path -LiteralPath $p) { Remove-Item -Force -LiteralPath $p } }
+  Add-Type -TypeDefinition $SpNNative -Language CSharp -OutputAssembly $NativeDll -OutputType Library
+  $sha = HexSHA256 ([IO.File]::ReadAllBytes($NativeDll))
+  [IO.File]::WriteAllText("$NativeDll.sha256", $sha)
+  Emit @{ built = $NativeDll; sha256 = $sha }
 }
 
 function Emit([hashtable]$r) {
   $r['leg'] = $Leg
+  $r['native'] = $script:NativeFrom
   # a setup error is emitted before the native type exists
   $r['sessionId'] = if ('SpN' -as [type]) { [SpN]::OwnSession() } else { $null }
   $json = $r | ConvertTo-Json -Depth 8 -Compress
@@ -139,6 +170,7 @@ try {
   foreach ($f in 'win32', 'input', 'capture') { . (Join-Path $PSScriptRoot "sp-n-native-$f.ps1") }
   foreach ($f in 'delivery', 'capture', 'session') { . (Join-Path $PSScriptRoot "sp-n-legs-$f.ps1") }
   $a = if ($ArgFile) { Get-Content -Raw $ArgFile | ConvertFrom-Json } else { [pscustomobject]@{} }
+  if ($Leg -eq 'build-native') { BuildNative; exit 0 }
   Compile
 } catch { Emit @{ legError = "setup failed: $($_.Exception.Message) (line $($_.InvocationInfo.ScriptLineNumber))" }; exit 1 }
 

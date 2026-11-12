@@ -1606,6 +1606,13 @@ export function mergeLedger(before: readonly LedgerRow[], host: string, fresh: R
 // A note survives a re-measure, except a probe-defect or SUSPECT note: the re-measure is what supersedes it.
 export const carriedNote = (n: string | undefined) =>
   n && n !== "-" && !/^(probe defect|SUSPECT|lock state unproven|NEW-EDGE \(not a design claim\))/.test(n) ? n : "-"
+// The native assembly the helpers used ("precompiled sha256=..." or the run-time Add-Type), one note segment,
+// replaced on every pass; recorded on the rows whose helper runs restricted (the elevated group).
+export function nativeNote(note: string, native: unknown): string {
+  if (typeof native !== "string" || !native) return note
+  const kept = note.split("; ").filter((s) => s !== "-" && !s.startsWith("native assembly: "))
+  return [...kept, `native assembly: ${native}`].join("; ")
+}
 export const rerun = (id: string) => `bun ${SELF} --verify ${LEDGER} --row ${id}`
 export const ledgerLine = (id: string, r: Result, host: string, build: string, notes = "-") => {
   const spec = SPEC[id] ?? { question: "unknown row", condition: "-" }
@@ -3782,6 +3789,8 @@ async function main(): Promise<number> {
   const groups = GROUPS.filter((g) => g.ids.some((id) => want.has(id)))
   const results: Record<string, Result> = {}
   const ids = Object.keys(SPEC).filter((id) => want.has(id))
+  const noteOf = (notes: ReadonlyMap<string, string>, id: string) =>
+    nativeNote(carriedNote(notes.get(id)), elevated.ids.includes(id) ? ctx.facts.native : undefined)
   const end = await runThenClean(
     async () => {
       const setupDone = await runSetup(ctx, SETUP_BUDGET_S, (own) =>
@@ -3801,10 +3810,7 @@ async function main(): Promise<number> {
         const before = readLedger(opt.file)
         const notes = new Map(before.filter((r) => r.host === host).map((r) => [r.id, r.notes]))
         const fresh = new Map(
-          ids.map((id) => [
-            id,
-            ledgerLine(id, finalRow(id, results[id] ?? missing), host, build, carriedNote(notes.get(id))),
-          ]),
+          ids.map((id) => [id, ledgerLine(id, finalRow(id, results[id] ?? missing), host, build, noteOf(notes, id))]),
         )
         writeFileSync(opt.file, `${mergeLedger(before, host, fresh).join("\n")}\n`)
         for (const id of ids)
@@ -3822,7 +3828,7 @@ async function main(): Promise<number> {
       if (resolve(opt.file) !== resolve(LEDGER)) {
         const notes = new Map(ledger.filter((r) => r.host === host).map((r) => [r.id, r.notes]))
         const fresh = new Map(
-          Object.entries(job.merged).map(([id, m]) => [id, ledgerLine(id, m, host, build, carriedNote(notes.get(id)))]),
+          Object.entries(job.merged).map(([id, m]) => [id, ledgerLine(id, m, host, build, noteOf(notes, id))]),
         )
         writeFileSync(opt.file, `${mergeLedger(ledger, host, fresh).join("\n")}\n`)
         console.log(`SP-N merged worst-of-both-passes ledger -> ${relative(process.cwd(), opt.file)}`)

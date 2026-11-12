@@ -33,6 +33,12 @@ jobs:
         with:
           bun-version: "1.4.4"
 
+      # The helper's native type, compiled once here into probes/sp-n-native.dll (sha256 recorded beside it and
+      # checked by every leg before loading), so no leg compiles at run time.
+      - name: Precompile the SP-N native assembly
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File crates/omo-computer-backend-win32/probes/sp-n.ps1 -Leg build-native
+
       - name: Interactive desktop precondition
         shell: pwsh
         run: powershell -NoProfile -ExecutionPolicy Bypass -File crates/omo-computer-backend-win32/probes/sp-n.ps1 -Leg precondition
