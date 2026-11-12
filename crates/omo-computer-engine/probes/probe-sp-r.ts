@@ -88,7 +88,8 @@ const fieldOk = (k: Kind, v: unknown): boolean => {
     case "bool":
       return typeof v === "boolean"
     case "text":
-      return typeof v === "string" && !PLACEHOLDERS.has(v.trim().toLowerCase())
+      // A bare negative number ("-1") is the usual "not measured" placeholder, never a measured text.
+      return typeof v === "string" && !PLACEHOLDERS.has(v.trim().toLowerCase()) && !/^\s*-\d/.test(v)
   }
 }
 /** The first field of a record that its rule's schema does not accept, or null. */
@@ -109,7 +110,14 @@ const overText = (o: string): string =>
       : o
 /** The relay's close code when its dead window ends a silent channel. */
 const DEAD_WINDOW_CLOSE = 4000
-const EXPIRY = { afterExpS: { opt: "ms" }, code: { opt: "code" }, evicted: "bool" } as const
+// afterExpS is the distance from token expiry to the close; closedEarly says the close came before the expiry.
+const EXPIRY = { afterExpS: { opt: "ms" }, closedEarly: "bool", code: { opt: "code" }, evicted: "bool" } as const
+const expiryText = (r: Rec): string => {
+  const after = optNum(r, "afterExpS")
+  const when =
+    after === null ? "never (60 s)" : flag(r, "closedEarly") ? `${after} s before exp` : `${after} s after exp`
+  return `closed ${when}, code ${optNum(r, "code") ?? "-"}, hub evicted ${flag(r, "evicted")}`
+}
 const WAKE = { warm: { opt: "ms" }, wake: { opt: "ms" }, open: "bool", dataDelivered: "bool", evicted: "bool" } as const
 const KEEPALIVE = { openAt150: "bool", delivered: "bool", evicted: "bool" } as const
 const SILENT = {
@@ -155,24 +163,25 @@ const sizeRule: Rule = {
 const RULES: Readonly<Record<string, Rule>> = {
   "R-AUTH-1": {
     schema: EXPIRY,
-    sample: { afterExpS: 0.1, code: 4003, evicted: false },
+    sample: { afterExpS: 0.1, closedEarly: false, code: 4003, evicted: false },
     decide: (r, note) => {
       const after = optNum(r, "afterExpS")
       return {
-        measured: `closed ${after ?? "never (60 s)"} s after exp, code ${optNum(r, "code") ?? "-"}, hub evicted ${flag(r, "evicted")}`,
-        verdict: after !== null && after <= 5 && !flag(r, "evicted") ? "CONFIRMS" : "CONTRADICTS",
+        measured: expiryText(r),
+        verdict:
+          after !== null && !flag(r, "closedEarly") && after <= 5 && !flag(r, "evicted") ? "CONFIRMS" : "CONTRADICTS",
         note,
       }
     },
   },
   "R-AUTH-2": {
     schema: EXPIRY,
-    sample: { afterExpS: 0.1, code: 4003, evicted: true },
+    sample: { afterExpS: 0.1, closedEarly: false, code: 4003, evicted: true },
     decide: (r, note) => {
       const after = optNum(r, "afterExpS")
       return {
-        measured: `closed ${after ?? "never (60 s)"} s after exp, code ${optNum(r, "code") ?? "-"}, hub evicted ${flag(r, "evicted")}`,
-        verdict: after !== null && after <= 5 ? "CONFIRMS" : "CONTRADICTS",
+        measured: expiryText(r),
+        verdict: after !== null && !flag(r, "closedEarly") && after <= 5 ? "CONFIRMS" : "CONTRADICTS",
         note,
       }
     },
@@ -391,6 +400,11 @@ const RULES: Readonly<Record<string, Rule>> = {
 const judge = (rule: string, r: Rec, note: string): Run => {
   const found = RULES[rule]
   if (found === undefined) return failedRun(`no verdict rule named ${rule}`)
+  const bad = invalidField(found, r)
+  if (bad !== null)
+    return failedRun(
+      `${rule}: measurement field ${bad} is missing or invalid (${bad in r ? String(JSON.stringify(r[bad])) : "missing"})`,
+    )
   return found.decide(r, note)
 }
 /** Helper output values are strings; a value that is wholly a number becomes one (anything else stays and fails). */
@@ -754,6 +768,14 @@ const selfTest = async (): Promise<number> => {
     }
   }
   check("R2 an unknown rule name is UNMEASURED", failed(judge("R-NOPE", {}, "n")))
+  for (const id of ["R-AUTH-1", "R-AUTH-2"]) {
+    const early = judge(id, { afterExpS: 3, closedEarly: true, code: 4003, evicted: id === "R-AUTH-2" }, "n")
+    check(
+      `R2 ${id} a close before token expiry stays a measured CONTRADICTS`,
+      early.verdict === "CONTRADICTS" && early.errored !== true && early.measured.includes("before exp"),
+      JSON.stringify(early),
+    )
+  }
   // Finding 1 through hostedRun itself: the local reference and the deadline are part of the record.
   const goodPair: PairOut = {
     ok: true,
@@ -1156,7 +1178,8 @@ const mSize = (cls: "stream" | "data") =>
     // "codec": the relay's shared codec (used by both ends) refused to encode the frame, so it never left the hand.
     const tryN = async (n: number): Promise<"ok" | "refused" | "closed" | "codec"> => {
       await sleep(cls === "data" ? 250 : 150)
-      if (p.brain.ws?.readyState !== WebSocket.OPEN) await p.brain.connect()
+      if (p.brain.ws?.readyState !== WebSocket.OPEN && (await within(15_000, p.brain.connect())) === "timeout")
+        throw new Error("relay peer did not reconnect within 15 s")
       let r: Reply
       try {
         r = await p.brain.send(p.brain.envelope("hand", cls, "x".repeat(n)))
@@ -1230,7 +1253,8 @@ const mExpiry = (hibernate: boolean) =>
     const evicted = (await instanceOf(base, account)) !== before
     if (end === "timeout") ws.close()
     return {
-      afterExpS: end === "timeout" ? null : Math.round((end.at - expS * 1000) / 100) / 10,
+      afterExpS: end === "timeout" ? null : Math.abs(Math.round((end.at - expS * 1000) / 100) / 10),
+      closedEarly: end !== "timeout" && end.at < expS * 1000 - 50,
       code: end === "timeout" ? null : end.code,
       evicted,
     }

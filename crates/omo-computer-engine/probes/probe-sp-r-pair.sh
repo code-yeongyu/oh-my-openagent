@@ -104,8 +104,9 @@ EOF
       echo "device_service=absent"
       exit 0
     fi
-    # The target must be visible to lsof (a root daemon or another user's process is not): any open file will do.
-    fds=$(lsof -nP -p "$svc" 2> /dev/null | awk 'NR>1' | wc -l | tr -d ' ')
+    # The target must be visible to lsof: at least one row with a numeric file descriptor. For a root daemon or another
+    # user's process lsof still prints cwd/rtd/txt rows marked "Permission denied" and a NOFD row; those do not count.
+    fds=$(lsof -nP -p "$svc" 2> /dev/null | awk 'NR>1 && $4 ~ /^[0-9]+/' | wc -l | tr -d ' ')
     [ "$fds" -gt 0 ] || missing "lsof cannot see the device service (pid $svc)"
     ver=$(ps -o command= -p "$svc" | sed -n 's#.*/bin/\([^/]*\)/omo-device-service.*#\1#p')
     echo "device_service=running version=$ver target_visible=yes target_fds=$fds"
