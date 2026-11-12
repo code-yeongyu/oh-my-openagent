@@ -3,7 +3,7 @@ import { threadToolFailure } from "./errors"
 import type { ThreadToolFailure } from "./errors"
 import { type Static } from "typebox"
 import { toThreadAddressEntries } from "./address-book"
-import { checkNameConflict, normalizeThreadName, type ThreadAddressEntry, type ThreadResolveResult } from "./addressing"
+import { checkNameConflict, normalizeThreadName, type ThreadResolveResult } from "./addressing"
 import { createLocalSessionHost } from "./control/local-session-host"
 import { checkInitialSkills } from "./initial-skills"
 import {
