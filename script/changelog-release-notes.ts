@@ -339,7 +339,7 @@ function splitTrailing(token: string): [string, string] {
  * private repo#N keeps the target and neutralizes only the text. Plain-text references are replaced one by one.
  * Public text comes out byte-identical.
  */
-export function neutralizeCrossRepoReferences(text: string): string {
+function neutralizeAllowlist(text: string): string {
   let result = ""
   let last = 0
   for (const found of text.matchAll(TOKEN_PATTERN)) {
@@ -349,7 +349,7 @@ export function neutralizeCrossRepoReferences(text: string): string {
     if (linkTarget !== undefined) {
       result += findPrivateReferences(linkTarget)
         ? NEUTRALIZED
-        : "[" + neutralizeCrossRepoReferences(linkText ?? "") + "](" + linkTarget + ")"
+        : "[" + neutralizeAllowlist(linkText ?? "") + "](" + linkTarget + ")"
     } else if (angleUrl !== undefined) {
       // The whole autolink goes, angle brackets included: a bare <tracked internally> would render as an HTML tag.
       result += findPrivateReferences(angleUrl) ? NEUTRALIZED : match
@@ -361,6 +361,198 @@ export function neutralizeCrossRepoReferences(text: string): string {
     }
   }
   return result + replacePlainReferences(text.slice(last))
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Name-based DENY pass. The allowlist above judges URL shapes; this second layer judges NAMES, so a new URL
+// spelling cannot leak a repository the deny list names. The list lives in RELEASE_NOTES_PRIVATE_NAMES
+// (newline or comma separated, each entry "owner/repo" or a bare repo name) and is never logged.
+// An "owner/repo" entry matches anywhere. A bare name is often an ordinary word (docs, api), so it matches only in
+// reference contexts: inside a link, autolink or URL token, as the repo part of name#N, or inside a GitHub-host or
+// relative-path word - never as a free-standing prose word.
+// ---------------------------------------------------------------------------------------------------------
+const DENY_ENV = "RELEASE_NOTES_PRIVATE_NAMES"
+const DENY_REQUIRE_ENV = "CI_RELEASE_NOTES_REQUIRE_DENY"
+const HTML_ENTITIES: Readonly<Record<string, string>> = {
+  sol: "/",
+  bsol: "\\",
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  num: "#",
+  colon: ":",
+  period: ".",
+  lowbar: "_",
+  hyphen: "-",
+  dash: "-",
+  ast: "*",
+  grave: "`",
+  tilde: "~",
+}
+const DENY_NAME_CHAR = /[a-z0-9._-]/
+const DENY_NORMALIZE_PASSES = 8
+const REFERENCE_CONTEXT = /github\.com|githubusercontent\.com|:\/\/|\.\.\/|^\/\//
+
+interface DenyEntry {
+  raw: string
+  normalized: string
+}
+
+interface DenyList {
+  qualified: DenyEntry[]
+  bare: DenyEntry[]
+}
+
+let cachedDenyRaw: string | undefined
+let cachedDenyList: DenyList = { qualified: [], bare: [] }
+
+function parseDenyList(raw: string): DenyList {
+  const list: DenyList = { qualified: [], bare: [] }
+  const seen = new Set<string>()
+  for (const part of raw.split(/[\n,]/)) {
+    const entry = part.trim().toLowerCase()
+    if (!entry || seen.has(entry)) continue
+    seen.add(entry)
+    const normalized = normalizeForDeny(entry)
+    if (!normalized) continue
+    ;(entry.includes("/") ? list.qualified : list.bare).push({ raw: entry, normalized })
+  }
+  return list
+}
+
+function denyList(): DenyList {
+  const raw = process.env[DENY_ENV] ?? ""
+  if (raw !== cachedDenyRaw) {
+    cachedDenyRaw = raw
+    cachedDenyList = parseDenyList(raw)
+  }
+  return cachedDenyList
+}
+
+/**
+ * Fail closed in the release job: with CI_RELEASE_NOTES_REQUIRE_DENY=1 an unset or empty deny list throws, so a
+ * release can never publish notes that only the allowlist protected. Call it from entry points, not libraries.
+ */
+export function assertDenyListConfigured(): void {
+  if (process.env[DENY_REQUIRE_ENV] !== "1") return
+  const list = parseDenyList(process.env[DENY_ENV] ?? "")
+  if (list.qualified.length + list.bare.length === 0) {
+    throw new Error(DENY_ENV + " is unset or empty, but " + DENY_REQUIRE_ENV + "=1 requires a deny list")
+  }
+}
+
+function decodeEntity(match: string, body: string): string {
+  if (body.startsWith("#")) {
+    const hex = body.charAt(1) === "x" || body.charAt(1) === "X"
+    const code = Number.parseInt(body.slice(hex ? 2 : 1), hex ? 16 : 10)
+    return Number.isInteger(code) && code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : match
+  }
+  return HTML_ENTITIES[body.toLowerCase()] ?? match
+}
+
+/**
+ * A normalized copy of text for NAME detection only: percent-decoded and HTML-entity-decoded until stable
+ * (bounded), markdown-unescaped, backslashes turned into slashes, repeated slashes collapsed, emphasis markers
+ * stripped, a root dot after a hostname collapsed, lowercased. Every step is linear.
+ */
+export function normalizeForDeny(text: string): string {
+  let current = text
+  for (let pass = 0; pass < DENY_NORMALIZE_PASSES; pass++) {
+    const next = current
+      .replace(/%([0-9a-f]{2})/gi, (_, hex: string) => String.fromCharCode(Number.parseInt(hex, 16)))
+      .replace(/&(#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|[a-zA-Z]{2,8});/g, decodeEntity)
+    if (next === current) break
+    current = next
+  }
+  return current
+    .replace(/\\([!-/:-@[-`{-~])/g, "$1")
+    .replace(/\\/g, "/")
+    .replace(/[_*~`]/g, "")
+    .replace(/\/{2,}/g, "/")
+    .replace(/(?<=[a-z0-9])\.+(?=[/:])/gi, "")
+    .toLowerCase()
+}
+
+/** True when the entry sits in the text between non-name characters (a trailing sentence dot counts as one). */
+function hasBoundedEntry(text: string, entry: string): boolean {
+  if (!entry) return false
+  for (let at = text.indexOf(entry); at >= 0; at = text.indexOf(entry, at + 1)) {
+    if (at > 0 && DENY_NAME_CHAR.test(text.charAt(at - 1))) continue
+    const end = at + entry.length
+    const after = text.charAt(end)
+    if (after === "" || !DENY_NAME_CHAR.test(after)) return true
+    if (after === "." && (end + 1 >= text.length || !DENY_NAME_CHAR.test(text.charAt(end + 1)))) return true
+  }
+  return false
+}
+
+function matchesAny(raw: string, normalized: string, entries: readonly DenyEntry[]): boolean {
+  return entries.some((entry) => hasBoundedEntry(raw, entry.raw) || hasBoundedEntry(normalized, entry.normalized))
+}
+
+/** True when a link, autolink or URL token (always a reference context) names a deny entry. */
+function tokenIsDenied(token: string, list: DenyList): boolean {
+  const raw = token.toLowerCase()
+  const normalized = normalizeForDeny(token)
+  return matchesAny(raw, normalized, list.qualified) || matchesAny(raw, normalized, list.bare)
+}
+
+/** True when a plain-text word names a deny entry: owner/repo anywhere, a bare name only in a reference context. */
+function wordIsDenied(word: string, list: DenyList): boolean {
+  const raw = word.toLowerCase()
+  const normalized = normalizeForDeny(word)
+  if (matchesAny(raw, normalized, list.qualified)) return true
+  if (list.bare.length === 0) return false
+  if (REFERENCE_CONTEXT.test(raw) || REFERENCE_CONTEXT.test(normalized)) return matchesAny(raw, normalized, list.bare)
+  return scanRepoReferences(normalized).some((reference) =>
+    list.bare.some((entry) => reference.repo === entry.normalized),
+  )
+}
+
+const WORD_WRAPPERS = EMPHASIS_CHARS + "([{<\"'"
+const WORD_TAIL_WRAPPERS = EMPHASIS_CHARS + TRAILING_CHARS + ")]}>\"'"
+
+function denyPlainText(text: string, list: DenyList): string {
+  return text.replace(/\S+/g, (word) => {
+    let start = 0
+    let end = word.length
+    while (start < end && WORD_WRAPPERS.includes(word.charAt(start))) start++
+    while (end > start && WORD_TAIL_WRAPPERS.includes(word.charAt(end - 1))) end--
+    const core = word.slice(start, end)
+    return core && wordIsDenied(core, list) ? word.slice(0, start) + NEUTRALIZED + word.slice(end) : word
+  })
+}
+
+/** Second layer: per token (same tokenizer as the allowlist pass), replace anything that names a deny entry. */
+function neutralizeDenied(text: string, list: DenyList): string {
+  let result = ""
+  let last = 0
+  for (const found of text.matchAll(TOKEN_PATTERN)) {
+    const [match, , linkTarget, angleUrl, urlToken] = found
+    result += denyPlainText(text.slice(last, found.index), list)
+    last = found.index + match.length
+    if (linkTarget !== undefined || angleUrl !== undefined) {
+      result += tokenIsDenied(match, list) ? NEUTRALIZED : match
+    } else if (urlToken !== undefined) {
+      const [url, tail] = splitTrailing(urlToken)
+      result += tokenIsDenied(url, list) ? NEUTRALIZED + tail : match
+    } else {
+      result += match
+    }
+  }
+  return result + denyPlainText(text.slice(last), list)
+}
+
+/**
+ * Replace private references in published release text: the allowlist pass first, then the name-based deny pass
+ * (a no-op when no deny list is configured).
+ */
+export function neutralizeCrossRepoReferences(text: string): string {
+  const allowed = neutralizeAllowlist(text)
+  const list = denyList()
+  return list.qualified.length + list.bare.length === 0 ? allowed : neutralizeDenied(allowed, list)
 }
 
 /** Release body = authored notes, then the contributor block, then the install footer. */
