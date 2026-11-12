@@ -1,11 +1,11 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join, relative, resolve } from "node:path"
+import { join, resolve } from "node:path"
 
 import { catalogFor, SESSIONS } from "./catalog.ts"
 import { type Driver, isDriver } from "./driver.ts"
 import { type ObserverStatus, observerCheck } from "./observer.ts"
-import { type Check, executable, fakeStdio, preflight, type Probe } from "./preflight.ts"
+import { type Check, executable, fakeStdio, preflight, type Probe, repoPath } from "./preflight.ts"
 import { buildReport, summaryLine } from "./report.ts"
 import { taskFailure } from "./taskset/judge.ts"
 import { MAX_REFERENCE_CELLS, TASKS } from "./taskset/tasks.ts"
@@ -25,7 +25,7 @@ const NOT_YET: Readonly<Record<DriverName, string>> = {
 
 async function loadDriver(name: DriverName): Promise<DriverSlot> {
   const file = join(import.meta.dir, "drivers", `${name}.ts`)
-  const shown = relative(REPO, file)
+  const shown = repoPath(REPO, file)
   if (!existsSync(file)) return { unavailable: `${shown} is not present: ${NOT_YET[name]}` }
   const loaded: unknown = await import(file)
   const driver = typeof loaded === "object" && loaded !== null && "driver" in loaded ? loaded.driver : undefined
