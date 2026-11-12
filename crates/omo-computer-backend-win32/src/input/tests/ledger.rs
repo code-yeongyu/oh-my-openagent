@@ -12,12 +12,20 @@ fn ledger_lines_round_trip() {
         Entry::KeyDown(KeyUnit::virtual_key(VK_SHIFT, true)),
         Entry::KeyUp(KeyUnit::virtual_key(VK_SHIFT, false)),
         Entry::KeyDown(KeyUnit::unicode(0xD55C, true)),
-        Entry::ButtonDown { button: 1, x: -20, y: 1080 },
+        Entry::ButtonDown {
+            button: 1,
+            x: -20,
+            y: 1080,
+        },
         Entry::ButtonUp { button: 1 },
     ] {
         assert_eq!(Entry::parse(&entry.line()), Some(entry), "{}", entry.line());
     }
-    assert_eq!(Entry::parse("K 1 nonsense"), None, "a malformed line is refused, never guessed");
+    assert_eq!(
+        Entry::parse("K 1 nonsense"),
+        None,
+        "a malformed line is refused, never guessed"
+    );
 }
 
 #[test]
@@ -30,7 +38,11 @@ fn release_helper_releases_after_engine_kill() {
     // button goes up at its press origin.
     assert_eq!(
         replay(&ledger, &[]),
-        vec![Step::Warp { x: 300, y: 200 }, Step::ButtonUp { button: 1 }, Step::KeyUp(KeyUnit::virtual_key(VK_SHIFT, false))]
+        vec![
+            Step::Warp { x: 300, y: 200 },
+            Step::ButtonUp { button: 1 },
+            Step::KeyUp(KeyUnit::virtual_key(VK_SHIFT, false))
+        ]
     );
 }
 
@@ -39,5 +51,8 @@ fn replay_skips_a_key_the_user_holds_physically() {
     let mut ledger = Ledger::default();
     ledger.apply(&Entry::KeyDown(KeyUnit::virtual_key(VK_SHIFT, true)));
     ledger.apply(&Entry::KeyDown(KeyUnit::virtual_key(VK_A, true)));
-    assert_eq!(replay(&ledger, &[VK_SHIFT]), vec![Step::KeyUp(KeyUnit::virtual_key(VK_A, false))]);
+    assert_eq!(
+        replay(&ledger, &[VK_SHIFT]),
+        vec![Step::KeyUp(KeyUnit::virtual_key(VK_A, false))]
+    );
 }

@@ -45,8 +45,13 @@ pub(crate) fn send(batch: &[KeyUnit]) -> usize {
     usize::try_from(sent).unwrap_or(0)
 }
 
-/// Posts one message to `window`; `false` when the queue refused it.
-pub(crate) fn post(window: isize, message: &Posted) -> bool {
+/// Posts one message to `window`. A refused post is an ERROR, never silence: posting to a window
+/// above the engine's integrity level answers access denied (error 5), unlike `SendInput`, whose
+/// UIPI drop is silent.
+///
+/// # Errors
+/// The Win32 error of the refused post.
+pub(crate) fn post(window: isize, message: &Posted) -> windows::core::Result<()> {
     let hwnd = HWND(window as *mut core::ffi::c_void);
     // SAFETY: a plain message post; an invalid window makes the call fail, never UB.
     unsafe {
