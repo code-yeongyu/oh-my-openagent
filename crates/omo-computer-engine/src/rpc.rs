@@ -135,6 +135,28 @@ fn refused(refusal: &Refusal) -> Failure {
     failure(refusal.code.number(), refusal.code.wire(), Some(data))
 }
 
+#[allow(dead_code)]
+/// R60c: a refusal whose row reads its disposition from the inner stage (a gated drag point)
+/// carries that stage pair's disposition and next call, looked up in the same table.
+fn inner_disposition(refusal: &Refusal, detail: Option<&Value>, data: &mut Value) {
+    let inner = refusal.row().is_ok_and(|row| row.disposition == omo_computer_core::error::DispositionRule::OfInnerCode);
+    let Some(stage) = detail.filter(|_| inner).and_then(|d| d.get("stageCode")).and_then(Value::as_str) else {
+        return;
+    };
+    let reason = detail.and_then(|d| d.get("stageReason")).and_then(Value::as_str);
+    let Ok(row) = omo_computer_core::error::inner_row(stage, reason) else {
+        return;
+    };
+    let disposition = match row.disposition {
+        omo_computer_core::error::DispositionRule::Fixed(d) | omo_computer_core::error::DispositionRule::BySent { nothing: d, .. } => d,
+        _ => return,
+    };
+    data["disposition"] = json!(disposition);
+    if let omo_computer_core::error::NextCall::Call(call) = row.next_call {
+        data["nextCall"] = json!(call);
+    }
+}
+
 /// A funnel refusal: the refusal's members plus the `callId` it concerns, for a replay the
 /// stored `receipt` (`TransactionFailed{reason:"replayed", callId, receipt}`), and for a call
 /// whose send was interrupted its `disposition` (`delivery_uncertain/unsafe`): without it
@@ -266,6 +288,52 @@ mod tests {
         assert_eq!(data["disposition"], json!({ "delivery": "delivery_uncertain", "retry": "unsafe" }));
         let plain = refused_call(&Refusal::new(EngineCode::TransactionFailed, "marker_unavailable").into());
         assert!(plain.data.expect("data").get("disposition").is_none(), "a refusal before any send carries none");
+    }
+
+    fn drag_refused(stage: Value) -> Value {
+        let refused = omo_computer_session::Refused {
+            detail: Some(Box::new(stage)),
+            ..Refusal::new(EngineCode::InvalidTarget, "drag_destination").into()
+        };
+        refused_call(&refused).data.expect("data")
+    }
+
+    fn own_row(code: EngineCode, reason: Option<&str>) -> Value {
+        let row = omo_computer_core::error::from_wire(code.number(), reason).expect("a row");
+        match row.disposition {
+            omo_computer_core::error::DispositionRule::Fixed(d)
+            | omo_computer_core::error::DispositionRule::BySent { nothing: d, .. } => json!(d),
+            _ => Value::Null,
+        }
+    }
+
+    #[test]
+    fn a_refused_drag_point_takes_its_stage_pairs_own_disposition() {
+        for (code, reason) in [
+            (EngineCode::ControlRequired, Some("denied_app")),
+            (EngineCode::ControlRequired, Some("app_scope")),
+            (EngineCode::ProtectedProcess, Some("self_target")),
+            (EngineCode::InvalidTarget, Some("protected_surface")),
+            (EngineCode::BackgroundUnavailable, Some("target_unknown")),
+            (EngineCode::ScreenLocked, None),
+        ] {
+            let mut stage = json!({"point": {"x": 1.0, "y": 2.0}, "stageCode": code.wire()});
+            if let Some(reason) = reason {
+                stage["stageReason"] = json!(reason);
+            }
+            let data = drag_refused(stage);
+            assert_eq!((&data["code"], &data["reason"]), (&json!("InvalidTarget"), &json!("drag_destination")));
+            assert_eq!(data["disposition"], own_row(code, reason), "{code:?} {reason:?}: {data}");
+        }
+    }
+
+    #[test]
+    fn every_other_refusal_keeps_its_wire_form() {
+        let before = json!({"code": "ControlRequired", "hint": null, "reason": "denied_app"});
+        let plain = refused_call(&Refusal::new(EngineCode::ControlRequired, "denied_app").into());
+        assert_eq!(plain.data.expect("data"), before, "no disposition or nextCall is added");
+        let drag_without_stage = drag_refused(json!({"point": {"x": 1.0, "y": 2.0}}));
+        assert!(drag_without_stage.get("disposition").is_none() && drag_without_stage.get("nextCall").is_none());
     }
 
     const NOTES: &str = r#""windows":[{"id":"101","title":"t","app":"Notes","pid":4242,"x":0,"y":0,"width":800,"height":600,"focused":true,"elevated":null}]"#;
