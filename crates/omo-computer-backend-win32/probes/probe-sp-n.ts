@@ -53,6 +53,7 @@ type Bound = { readonly value: number; readonly cite: string }
 export const PROPERTIES: Readonly<Record<string, string | undefined>> = {
   // '## Input', Barrier: what the barrier proves is routed + consumed, not the effect at return
   barrierReceipt: "design/d-windows.md:130 (## Input, Barrier: routed hop + consumed hop)",
+  wheelSettled: undefined, // no design line states that a settled foreground target receives the wheel
   effectAtReturn: undefined, // the design lane: the barrier does not claim the effect is visible at return
   postedLandsClassic: "design/d-windows.md:97 (background_window: PostMessageW, consumed hop, read-back)",
   dropMatrixWebView2: "design/d-windows.md:146 (Chromium / CEF / WebView2 background refused)",
@@ -507,16 +508,17 @@ export function timingVerdict(p95: number, bound: Bound | undefined, measured: s
 
 // The wheel rows count only when the settled-foreground control delivered every wheel: without that, a 0 could
 // be an oracle that cannot see a wheel.
-type Tally = { readonly delivered: number; readonly runs: number; readonly acquire?: string }
+type Tally = { readonly delivered: number; readonly runs: number; readonly acquire?: string; readonly notFg?: number }
 export function wheelResults(control: Tally, flush: Tally, delay: Tally): Record<string, Result> {
   const c = `control delivered ${control.delivered}/${control.runs}`
   const proven = control.runs > 0 && control.delivered === control.runs
   const why = `the settled-foreground ${c}, so the wheel oracle is not proven`
   return {
-    "n-wheel-control-settled": {
-      measured: `${c} foreground by ${control.acquire ?? "-"}`,
-      verdict: pick(proven, "CONFIRMS", "CONTRADICTS"),
-    },
+    "n-wheel-control-settled": propertyVerdict(
+      "wheelSettled",
+      proven,
+      `${c} foreground by ${control.acquire ?? "-"} not foreground at the wheel ${control.notFg ?? "-"}/${control.runs}`,
+    ),
     "n-wheel-after-raise-dwmflush": proven
       ? {
           measured: `delivered ${flush.delivered}/${flush.runs}; ${c}; foreground by ${flush.acquire ?? "-"}`,
@@ -777,7 +779,12 @@ const wheel: Group = {
     const cover = ctx.targets.get("SPN-COVER")
     if (!t || !cover) return all(this.ids, UN(notStarted(ctx, t ? "SPN-COVER" : "SPN-EDIT")))
     const base = { top: t.top, cover: cover.top, state: t.state }
-    const tally = (j: Json): Tally => ({ delivered: num(j.delivered), runs: num(j.runs), acquire: str(j.acquire) })
+    const tally = (j: Json): Tally => ({
+      delivered: num(j.delivered),
+      runs: num(j.runs),
+      acquire: str(j.acquire),
+      notFg: num(j.notForegroundAtWheel),
+    })
     const control = await leg(ctx, "wheel", { ...base, mode: "settled", n: 6 })
     const flush = await leg(ctx, "wheel", { ...base, mode: "dwmflush", n: 18 })
     const delay = await leg(ctx, "wheel", { ...base, mode: "delay", delayMs: 5, n: 6 })
@@ -998,7 +1005,7 @@ export function worstOfPasses(
 
 // Count rows ("-proves-") across two passes: the WORSE pass decides (CONFIRMS < NEW-EDGE < CONTRADICTS; on a tie,
 // the pass with fewer hits), and every count that differs is recorded "k/n vs k2/n".
-export const isCountRow = (id: string) => /-proves-/.test(id)
+export const isCountRow = (id: string) => /-proves-|^n-wheel-control-/.test(id)
 const countRank = (v: Verdict) => (v === "CONFIRMS" ? 0 : v === "CONTRADICTS" ? 2 : 1)
 const hits = (m: string) => [...m.matchAll(/(\d+)\/(\d+)/g)].reduce((t, x) => t + Number(x[1]), 0)
 export function worstOfCountPasses(
@@ -1020,6 +1027,36 @@ export function worstOfCountPasses(
     return `${m} vs ${o}`
   })
   return { result: { measured, verdict: worse.verdict }, differ }
+}
+
+// Rows gated on a positive control are compared together with it: if the control failed in either pass (the
+// ledger's or this one), the gated rows' combined verdict is UNMEASURED and verify reports SAME, naming both counts.
+export const CONTROL_GATES: Readonly<Record<string, readonly string[]>> = {
+  "n-wheel-control-settled": ["n-wheel-after-raise-dwmflush", "n-wheel-after-raise-5ms"],
+}
+const controlCount = (m: string | undefined) => /control delivered (\d+)\/(\d+)/.exec(m ?? "")
+const controlOk = (m: string | undefined) => {
+  const x = controlCount(m)
+  return !!x && x[1] === x[2] && x[2] !== "0" && !/ vs /.test(m ?? "")
+}
+export function gatedVerify(ledger: readonly LedgerRow[], results: Record<string, Result>, host: string) {
+  const out = new Map<string, { readonly kind: "SAME"; readonly text: string }>()
+  for (const [ctl, gated] of Object.entries(CONTROL_GATES)) {
+    const row = ledger.find((r) => r.id === ctl && r.host === host)
+    const now = results[ctl]
+    if (!row || !now || now.skip || (controlOk(row.measured) && controlOk(now.measured))) continue
+    const k = (m: string) => {
+      const x = controlCount(m)
+      return x ? `${x[1]}/${x[2]}` : "?"
+    }
+    const why = `control failed in a pass: ${k(row.measured)} vs ${k(now.measured)}`
+    for (const id of gated)
+      out.set(id, {
+        kind: "SAME",
+        text: `SAME ${id} UNMEASURED combined with its control (${why}); now: ${clean(results[id]?.measured ?? "missing")}`,
+      })
+  }
+  return out
 }
 
 // One --verify comparison: rows of other hosts and rows this pass did not re-measure are skipped with the reason;
@@ -2457,6 +2494,63 @@ const LOGIC_CHECKS: readonly Check[] = [
     },
   },
   {
+    finding: "WHEEL control-gated verify (hosted run 43144561350)",
+    async run() {
+      const t = (d: number, n = 6): Tally => ({ delivered: d, runs: n, acquire: "plain", notFg: 0 })
+      const row = (r: Result, id: string): LedgerRow =>
+        Object.fromEntries(
+          HEADER.map((h) => [
+            h,
+            h === "id" ? id : h === "host" ? "h" : h === "verdict" ? r.verdict : h === "measured" ? r.measured : "x",
+          ]),
+        ) as LedgerRow
+      const gatedIds = CONTROL_GATES["n-wheel-control-settled"] ?? []
+      const bad: string[] = []
+      for (const [c1, c2] of [
+        [0, 6],
+        [6, 0],
+        [0, 0],
+        [6, 6],
+      ] as const) {
+        const p1 = wheelResults(t(c1), t(c1 ? 15 : 0, 18), t(c1 ? 3 : 0))
+        const p2 = wheelResults(t(c2), t(c2 ? 15 : 0, 18), t(c2 ? 3 : 0))
+        const ledger = Object.entries(p1).map(([id, r]) => row(r, id))
+        const g = gatedVerify(ledger, p2, "h")
+        const failed = c1 !== 6 || c2 !== 6
+        for (const id of gatedIds) {
+          const l = ledger.find((r) => r.id === id)
+          const v = g.get(id) ?? (l ? verifyLine(l, p2[id], "h") : undefined)
+          if (
+            v?.kind !== "SAME" ||
+            failed !==
+              (v.text.includes(`control failed in a pass: ${c1}/6 vs ${c2}/6`) && v.text.includes("UNMEASURED"))
+          )
+            bad.push(`${c1}/${c2} ${id}: ${v?.text}`)
+        }
+        const ctl = verifyLine(
+          row(p1["n-wheel-control-settled"] as Result, "n-wheel-control-settled"),
+          p2["n-wheel-control-settled"],
+          "h",
+        )
+        if (
+          p1["n-wheel-control-settled"]?.verdict !== "NEW-EDGE" ||
+          ctl.kind !== "SAME" ||
+          (c1 !== c2 && !ctl.text.includes("0/6 vs 6/6"))
+        )
+          bad.push(`${c1}/${c2} control: ${p1["n-wheel-control-settled"]?.verdict} ${ctl.text}`)
+      }
+      // a passing control never hides a real change in a gated row
+      const a = wheelResults(t(6), t(18, 18), t(6))
+      const b = wheelResults(t(6), t(15, 18), t(3))
+      const l = row(a["n-wheel-after-raise-dwmflush"] as Result, "n-wheel-after-raise-dwmflush")
+      if ((gatedVerify([l], b, "h").get(l.id) ?? verifyLine(l, b[l.id], "h")).kind !== "DIFF")
+        bad.push("a gated change under a passing control does not DIFF")
+      if (!/"n-wheel-control-settled": propertyVerdict\(\s*"wheelSettled"/.test(source("probe-sp-n.ts")))
+        bad.push("the control verdict is not from the citation lookup")
+      return bad.length ? bad.join("; ") : undefined
+    },
+  },
+  {
     finding: "LOW timing-flap",
     async run() {
       const cases: Array<[number, Bound | undefined, Verdict]> = [
@@ -2492,6 +2586,11 @@ const LEDGER_CHECKS: readonly Check[] = [
         if (!r) bad.push(`${id}: no ${HOSTED} row`)
         else if (r.verdict === "INVALID") {
           if (r.notes !== INVALID_NOTE) bad.push(`${id}: INVALID without the defect note`)
+        } else if (
+          r.verdict === "UNMEASURED" &&
+          /^UNMEASURED: control failed in a pass: \d+\/\d+ vs \d+\/\d+/.test(r.measured)
+        ) {
+          // combined with a control that failed in a pass: recorded, not judged
         } else {
           // a measured wheel verdict stands only on a control that delivered every wheel
           const m = /control delivered (\d+)\/(\d+)/.exec(r.measured)
@@ -2695,8 +2794,9 @@ async function main() {
         return 0
       }
       let diff = 0
+      const gatedRows = gatedVerify(ledger, results, host)
       for (const l of ledger.filter((r) => want.has(r.id))) {
-        const v = verifyLine(l, results[l.id], host)
+        const v = gatedRows.get(l.id) ?? verifyLine(l, results[l.id], host)
         if (v.kind === "DIFF") diff++
         console.log(v.text)
       }
