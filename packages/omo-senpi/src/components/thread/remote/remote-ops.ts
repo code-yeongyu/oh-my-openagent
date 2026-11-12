@@ -53,7 +53,11 @@ export function aliasFailure(error: AliasError): Failure {
       reason: error.details?.reason,
     })
   if (error.code === "alias_not_found")
-    return fail("not_found", error.message, "Call thread_list to see the threads and their aliases.")
+    return fail(
+      "not_found",
+      error.message,
+      "Run tool.thread_list in an eval cell to see the threads and their aliases.",
+    )
   return fail("host_unavailable", error.message, "Retry when the account service is reachable.", {
     reason: error.details?.reason,
   })
@@ -105,7 +109,7 @@ export async function holderTarget(
   return fail(
     "not_found",
     `The alias names thread ${holder.session_id} on device ${holder.device}, which that device does not list.`,
-    "Call thread_list with all_scope to find the live thread, then claim the alias for it again with thread_rename.",
+    "Run tool.thread_list({ all_scope: true }) in an eval cell to find the live thread, then claim the alias for it again with tool.thread_rename.",
     {
       device: holder.device,
       thread_id: holder.session_id,
@@ -122,7 +126,7 @@ export async function deviceOnline(remote: RemoteThreadSurface, device: string):
     return fail(
       "not_found",
       `No device named ${device} is signed in to this account.`,
-      "Call thread_list with all_scope to see the account's devices and threads.",
+      "Run tool.thread_list in an eval cell with all_scope to see the account's devices and threads.",
       { device },
     )
   if (!row.online)

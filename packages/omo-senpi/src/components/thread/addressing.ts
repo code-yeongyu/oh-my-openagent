@@ -306,7 +306,7 @@ export function resolveTarget(
       return addressError(
         "caller_context_missing",
         "Scoping an id hit needs the caller's workspace root, which this call did not provide.",
-        "Set all_scope to address every workspace, or call thread_list from a session that knows its workspace.",
+        "Set all_scope to address every workspace, or run tool.thread_list() in an eval cell from a session that knows its workspace.",
       )
     }
     if (sameWorkspace(idHit.cwd, callerRoot, rootResolver)) {
@@ -315,7 +315,7 @@ export function resolveTarget(
     return addressError(
       "scope_denied",
       `Thread ${idHit.thread_id} exists outside this workspace.`,
-      "Call thread_list with all_scope to confirm the id, then retry with all_scope set, or target a thread in this workspace.",
+      "Run tool.thread_list in an eval cell with all_scope to confirm the id, then retry with all_scope set, or target a thread in this workspace.",
     )
   }
 
@@ -336,7 +336,7 @@ export function resolveTarget(
       return addressError(
         "caller_context_missing",
         "Scoped address resolution needs the caller's workspace root, which this call did not provide.",
-        "Set all_scope to address every workspace, or call thread_list from a session that knows its workspace.",
+        "Set all_scope to address every workspace, or run tool.thread_list() in an eval cell from a session that knows its workspace.",
       )
     }
     // A thread on another device belongs to the account, not to a workspace of this device: it stays visible (decision 0027).
@@ -351,14 +351,14 @@ export function resolveTarget(
     return addressError(
       "ambiguous_target",
       `${matches.length} visible threads share the name "${target}".`,
-      "Call thread_list and pass the exact thread_id of the intended thread.",
+      "Run tool.thread_list in an eval cell and pass the exact thread_id of the intended thread.",
       toCandidates(matches),
     )
   }
   return addressError(
     "not_found",
     `No visible thread matches "${target}" in ${opts.all_scope === true ? "the daemon-wide scope" : "this workspace"}.`,
-    "Call thread_list and pass the thread_id or a unique name it returned.",
+    "Run tool.thread_list in an eval cell and pass the thread_id or a unique name it returned.",
   )
 }
 
@@ -424,18 +424,22 @@ export function fuzzyMatch(entries: readonly ThreadAddressEntry[], query: string
     return addressError(
       "invalid_arguments",
       `A fuzzy query needs at least ${FUZZY_MIN_QUERY_LENGTH} characters; "${query}" is too short.`,
-      "Pass a longer query, or call thread_list and pass the thread_id or a unique name it returned.",
+      "Pass a longer query, or run tool.thread_list in an eval cell and pass the thread_id or a unique name it returned.",
     )
   }
   if (entries.length > FUZZY_MAX_CANDIDATES) {
     return addressError(
       "ambiguous_target",
       `${entries.length} threads are in scope; the fuzzy scan is capped at ${FUZZY_MAX_CANDIDATES}.`,
-      "Call thread_list, pick the intended thread, and pass its thread_id instead of a fuzzy query.",
+      "Run tool.thread_list() in an eval cell, pick the intended thread, and pass its thread_id instead of a fuzzy query.",
     )
   }
   if (entries.length === 0) {
-    return addressError("not_found", "There is no thread to match.", "Call thread_list to see the addressable threads.")
+    return addressError(
+      "not_found",
+      "There is no thread to match.",
+      "run tool.thread_list in an eval cell to see the addressable threads.",
+    )
   }
 
   const queryGrams = trigrams(guard.normalized)
@@ -449,14 +453,14 @@ export function fuzzyMatch(entries: readonly ThreadAddressEntry[], query: string
     return addressError(
       "not_found",
       `No thread scored close enough to "${query}" (best ${leader.score.toFixed(3)}).`,
-      "Call thread_list and pass the thread_id, or retry with a longer, more distinctive query.",
+      "Run tool.thread_list in an eval cell and pass the thread_id, or retry with a longer, more distinctive query.",
     )
   }
   if (leader.score - runnerUp < FUZZY_ACCEPT_MARGIN) {
     return addressError(
       "ambiguous_target",
       `Several threads match "${query}" about equally (best ${leader.score.toFixed(3)}, runner-up ${runnerUp.toFixed(3)}).`,
-      "Call thread_list and pass the exact thread_id of the intended thread.",
+      "Run tool.thread_list in an eval cell and pass the exact thread_id of the intended thread.",
       toCandidates(scored.slice(0, AMBIGUOUS_CANDIDATE_LIMIT).map((candidate) => candidate.entry)),
     )
   }
@@ -478,7 +482,7 @@ export function checkNameConflict(entries: readonly ThreadSummary[], name: strin
   return addressError(
     "name_conflict",
     `A thread named "${conflict.name}" (${conflict.thread_id}) already exists.`,
-    "Call thread_list to reuse that thread by id, or pass a different name for the new thread.",
+    "Run tool.thread_list in an eval cell to reuse that thread by id, or pass a different name for the new thread.",
     [toCandidate(conflict)],
   )
 }

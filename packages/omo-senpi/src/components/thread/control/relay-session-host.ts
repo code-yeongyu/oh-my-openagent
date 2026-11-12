@@ -94,7 +94,7 @@ export function createRelaySessionHost(
           return fail(
             "internal_error",
             `Device ${device} opened a session but did not name it.`,
-            "Call thread_list with all_scope to find the new thread.",
+            "Run tool.thread_list in an eval cell with all_scope to find the new thread.",
             { device },
           )
         const located = await remote.sessions.locate(device, engineId, outcome.located)
@@ -102,7 +102,7 @@ export function createRelaySessionHost(
           return fail(
             "unsupported",
             `Device ${device} created a session but its id there could not be found (${located.reason}).`,
-            "Call thread_list with all_scope to find the new thread, or update omo on that device.",
+            "Run tool.thread_list in an eval cell with all_scope to find the new thread, or update omo on that device.",
             { device, reason: located.reason },
           )
         threadId = located.sessionId

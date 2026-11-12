@@ -156,10 +156,10 @@ export type GatewayRelayOptions = {
 
 const NEXT_ACTION: Partial<Record<ThreadErrorCode, string>> = {
   binding_conflict:
-    "Call thread_bindings to find the binding that holds this thread, then thread_rebind it with its revision, or thread_unbind it first.",
+    "Run tool.thread_bindings in an eval cell to find the binding that holds this thread, then thread_rebind it with its revision, or thread_unbind it first.",
   binding_mismatch: "Answer through the binding that asked the question; the question stays pending.",
-  binding_inactive: "Bind the thread again with thread_bind.",
-  stale_revision: "Call thread_bindings for the current revision and retry with it.",
+  binding_inactive: "Bind the thread again with tool.thread_bind({ ... }) in an eval cell.",
+  stale_revision: "Run tool.thread_bindings in an eval cell for the current revision and retry with it.",
   stale_token:
     "The question was asked under an earlier binding revision or session runtime; wait for the session to ask again.",
   already_answered: "Nothing to do: the question has its answer.",
@@ -167,10 +167,10 @@ const NEXT_ACTION: Partial<Record<ThreadErrorCode, string>> = {
     "Retry after a moment: another answer is still being handed to the session, and the question goes back to pending if that fails.",
   idempotency_conflict: "Retry with a new idempotency_key.",
   idempotency_uncertain:
-    "Call thread_bindings or thread_outbox to see the current state before retrying with a new key.",
+    "Run tool.thread_bindings in an eval cell or thread_outbox to see the current state before retrying with a new key.",
   scope_denied: "Report through a binding attached to this session; thread_bindings lists them.",
   unsupported: "Report only the events the binding subscribes to, through a binding with an outbound direction.",
-  not_found: "Call thread_bindings for the binding ids that exist.",
+  not_found: "Run tool.thread_bindings in an eval cell for the binding ids that exist.",
   cursor_invalid: "Read thread_outbox again and ack a cursor it returned.",
   host_unavailable: "Retry when the session is running; the question stays pending.",
   invalid_arguments: "Fix the arguments and call again.",
@@ -194,7 +194,9 @@ function failure(
     error: threadToolFailure(
       code,
       message,
-      nextAction ?? NEXT_ACTION[code] ?? "Call thread_bindings and retry after checking the binding.",
+      nextAction ??
+        NEXT_ACTION[code] ??
+        "Run tool.thread_bindings in an eval cell and retry after checking the binding.",
       details,
     ),
   }

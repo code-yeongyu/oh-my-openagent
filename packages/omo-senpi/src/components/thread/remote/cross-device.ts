@@ -57,7 +57,11 @@ async function targetDevice(
     const missing = await deviceOnline(remote, device)
     return {
       result:
-        missing ?? invalid(`No device ${device}.`, "Call thread_list with all_scope to see the account's devices."),
+        missing ??
+        invalid(
+          `No device ${device}.`,
+          "Run tool.thread_list in an eval cell with all_scope to see the account's devices.",
+        ),
     }
   }
   return { id: row.device }

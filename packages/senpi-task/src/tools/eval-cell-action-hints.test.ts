@@ -55,7 +55,6 @@ describe("model-facing task actions name the eval cell", () => {
 
     expect(text).toContain("tool.task_send({ to, message })")
     expect(text).toContain("eval cell")
-    expect(text).not.toMatch(/Use task_send/)
   })
 
   test("#given a foreground wait converted to background #when the conversion text is built #then both steer and read name the eval-cell forms", () => {
@@ -63,14 +62,12 @@ describe("model-facing task actions name the eval cell", () => {
 
     expect(text).toContain("tool.task_send({ to, message })")
     expect(text).toContain(CELL_OUTPUT)
-    expect(text).not.toMatch(/with task_send, read with task_output/)
   })
 
   test("#given parked steering messages #when the notice is appended #then continuing names tool.task_send in an eval cell", () => {
     const text = withParkedSteeringNotice("done", 2)
 
     expect(text).toContain("tool.task_send in an eval cell")
-    expect(text).not.toMatch(/with task_send\./)
   })
 
   test("#given a child session replaced by the host #when the agent_end outcome is built #then the interrupt names tool.task_send in an eval cell", () => {

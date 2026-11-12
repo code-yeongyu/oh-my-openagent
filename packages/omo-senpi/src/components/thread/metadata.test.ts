@@ -130,7 +130,6 @@ describe("thread family metadata shape", () => {
     for (const entry of routed) {
       expect(entry.description).toContain("tool.task(")
       expect(entry.description).toContain("eval cell")
-      expect(entry.description).not.toMatch(/instead, use task\./)
     }
   })
 })

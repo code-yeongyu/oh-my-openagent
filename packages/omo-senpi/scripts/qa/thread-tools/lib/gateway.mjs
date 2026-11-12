@@ -29,6 +29,7 @@ import { EventEmitter } from "node:events"
 import {
   cpSync,
   existsSync,
+  chmodSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -457,6 +458,9 @@ export function makeScratch(label, fake) {
   const work = join(dir, "work")
   for (const path of [home, agentDir, work, join(agentDir, "omo-senpi", "omo-native")])
     mkdirSync(path, { recursive: true })
+  // senpi >= 2026.11.10-3 refuses an RPC key directory that is group- or world-writable (unsafe_key_record), and
+  // mkdir's mode is masked by the caller's umask (002 on the shared hosts), so the agent dir is tightened explicitly.
+  chmodSync(agentDir, 0o700)
   writeFileSync(join(agentDir, "models.json"), `${JSON.stringify(mockModels(fake.url), null, 2)}\n`)
   // The thread tools are eval-only while codemode's eval tool exists (#12903). These scenarios test the
   // gateway through the fake model's DIRECT `QA:CALL thread_*` calls, so they run the no-eval surface,

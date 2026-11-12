@@ -67,7 +67,7 @@ describe("dropEvalProgressSnapshots", () => {
     partialResult: { content: [{ type: "text", text }], details: { cells: [{ status }] } },
   })
 
-  test("#given a cell that streamed two mid-run snapshots #when dropped #then only the queued and complete transitions remain", () => {
+  test("#given a cell that streamed two mid-run snapshots #when dropped #then the queued, first running and complete transitions remain", () => {
     const client = {
       turn: [
         { type: "tool_execution_start", toolName: "eval" },
@@ -84,9 +84,11 @@ describe("dropEvalProgressSnapshots", () => {
     expect(kept.map((event) => event.partialResult?.details?.cells?.[0]?.status ?? event.type)).toEqual([
       "tool_execution_start",
       "queued",
+      "running",
       "complete",
       "tool_execution_end",
     ])
+    expect(kept[2].partialResult.content[0].text).toBe("1/1 cells running")
   })
 
   test("#given another tool's running update #when dropped #then it is untouched", () => {

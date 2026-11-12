@@ -57,14 +57,43 @@ const isEvalProgressSnapshot = (event) => {
  * The eval tool streams a progress snapshot of its running cells on a timer while a cell runs, so how many
  * `tool_execution_update` events a long cell emits, and what the cell had printed when each fired, is wall-clock sampling,
  * not session behavior (E22 drives a child through `tool.task` in a cell). The queued and complete transitions and the
- * tool_execution_end carry the cell's state and full output; the mid-run snapshots are dropped from the turn list.
+ * tool_execution_end carry the cell's state and full output; the first running snapshot per cell is kept with its
+ * output cut to the status line, and every later mid-run snapshot is dropped from the turn list.
  */
 export function dropEvalProgressSnapshots(client) {
   const listKey = Array.isArray(client.turn) ? "turn" : "events"
   const events = client[listKey]
   if (!Array.isArray(events)) throw new Error(`unexpected O6 shape from the harness: ${Object.keys(client).join(",")}`)
-  return { ...client, [listKey]: events.filter((event) => !isEvalProgressSnapshot(event)) }
+  const seen = new Set()
+  const kept = []
+  for (const event of events) {
+    if (!isEvalProgressSnapshot(event)) {
+      kept.push(event)
+      continue
+    }
+    // The first running snapshot per cell proves the tool streams progress; its content is whatever the cell had
+    // printed when the timer fired, so only the status line (the first line) is kept.
+    if (seen.has(event.toolCallId)) continue
+    seen.add(event.toolCallId)
+    kept.push(firstRunningSnapshot(event))
+  }
+  return { ...client, [listKey]: kept }
 }
+
+const firstLine = (text) => String(text ?? "").split("\n")[0]
+const firstRunningSnapshot = (event) => ({
+  ...event,
+  partialResult: {
+    ...event.partialResult,
+    content: (event.partialResult?.content ?? []).map((part) =>
+      part?.type === "text" ? { ...part, text: firstLine(part.text) } : part,
+    ),
+    details: {
+      ...event.partialResult?.details,
+      cells: (event.partialResult?.details?.cells ?? []).map((cell) => ({ ...cell, output: firstLine(cell.output) })),
+    },
+  },
+})
 
 /** Per O6 client, each status channel's snapshot count: written to the receipt next to the compare result. */
 export function statusCounts(observations) {

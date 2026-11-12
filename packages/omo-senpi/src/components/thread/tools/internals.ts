@@ -241,7 +241,7 @@ export function resolution(
         ...threadToolFailure(
           "caller_context_missing",
           "The caller's durable session id is not in the thread address book.",
-          "Call thread_list and pass an explicit thread_id, or retry from a session with caller context.",
+          "Run tool.thread_list in an eval cell and pass an explicit thread_id, or retry from a session with caller context.",
         ),
       }
     target = caller.thread_id

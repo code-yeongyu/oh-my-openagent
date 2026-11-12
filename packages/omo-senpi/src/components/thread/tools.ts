@@ -272,7 +272,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
           failure(
             "unsupported",
             `The target's endpoint does not accept ${message.slice("unsupported:".length)}: that terminal runs an engine from before terminal session controls.`,
-            "Update omo where that terminal runs and restart it, or use thread_send and thread_read; thread_list shows each thread's controls.",
+            "Update omo where that terminal runs and restart it, or run tool.thread_send in an eval cell and thread_read; thread_list shows each thread's controls.",
             { command: message.slice("unsupported:".length) },
           ),
         )
@@ -281,7 +281,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
         failure(
           "internal_error",
           `Thread operation failed: ${message}`,
-          "Call thread_list and retry after checking the target.",
+          "run tool.thread_list in an eval cell and retry after checking the target.",
         ),
       )
     }
@@ -464,7 +464,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
             : failure(
                 "name_conflict",
                 `A thread named "${existing.name}" already exists.`,
-                "Call thread_list and choose another name.",
+                "run tool.thread_list in an eval cell and choose another name.",
               )
         }
         let name = value.name?.trim()
@@ -530,7 +530,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
         result: failure(
           "not_resumable",
           "The thread has no session file on this device to open.",
-          "Call thread_list and pick a thread it lists.",
+          "run tool.thread_list in an eval cell and pick a thread it lists.",
         ),
       }
     return { kind: "file", sessionPath: entry.session_path }
@@ -712,7 +712,11 @@ async function deliverThrough(
   const thread =
     session !== undefined ? summary(session, entry) : entry !== undefined ? degradedSummary(entry) : undefined
   if (thread === undefined)
-    return failure("not_found", `Thread ${threadId} is not in the address book.`, "Call thread_list and retry.")
+    return failure(
+      "not_found",
+      `Thread ${threadId} is not in the address book.`,
+      "run tool.thread_list in an eval cell and retry.",
+    )
   return {
     kind: "ok",
     thread,
