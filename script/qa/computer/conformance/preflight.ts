@@ -1,4 +1,5 @@
 import { accessSync, constants } from "node:fs"
+import { relative } from "node:path"
 
 export interface Check {
   readonly name: string
@@ -22,6 +23,11 @@ export interface Environment {
 }
 
 export type Probe = () => Promise<Check>
+
+/** A repo-relative path with forward slashes: runs are compared across OSes, so the text must not depend on the host's separator. */
+export function repoPath(repo: string, file: string): string {
+  return relative(repo, file).replaceAll("\\", "/")
+}
 
 const HANG_GUARD_MS = 10_000
 
