@@ -227,18 +227,25 @@ async function sendTo(
       device: row.device,
     }
   }
-  const nothingToSteer = (result: ThreadToolResult): number | undefined => {
-    if (result.kind !== "error" || result.error.code !== "not_steerable" || json) return undefined
-    dependencies.error(`omo remote: nothing is running on ${label} to steer.`)
-    dependencies.error("Send without --steer to start a turn.")
-    return REMOTE_EXIT.failed
+  // The transport's not_steerable text is the thread tool's. A person at this terminal hears the CLI's own
+  // lines, and --json prints that same typed error (#12712).
+  const steerRefusal = (result: ThreadToolResult): ThreadToolResult => {
+    if (result.kind !== "error" || result.error.code !== "not_steerable") return result
+    return {
+      kind: "error",
+      error: {
+        ...result.error,
+        message: `nothing is running on ${label} to steer.`,
+        next_action: "Send without --steer to start a turn.",
+      },
+    }
   }
   let follow: Awaited<ReturnType<typeof followRemote>> | undefined
   try {
     // The person at this terminal sends their own input as a prompt; a peer session's message is a delivery (#12882).
     if (!args.wait) {
       const sent = await deliver()
-      return nothingToSteer(sent) ?? show(sent, label)
+      return show(steerRefusal(sent), label)
     }
     // Followed before the send, so no delta of the turn it starts can arrive unseen.
     let reply = ""
@@ -248,11 +255,16 @@ async function sendTo(
     })
     if ("kind" in follow) return show(follow, label)
     const sent = await deliver()
-    if (sent.kind === "error") return nothingToSteer(sent) ?? show(sent, label)
+    if (sent.kind === "error") return show(steerRefusal(sent), label)
     const end = await follow.settled
     if (!json && reply.length > 0 && !reply.endsWith("\n")) dependencies.write("\n")
-    // --json: the send's typed result, with the answer it streamed.
-    if (json && end === "settled") dependencies.output(JSON.stringify({ ...sent, reply }))
+    // --json: the send's typed result, with the answer it streamed. When the turn did not settle the send's fields are
+    // still printed, but under `kind: "unsettled"` with how the follow ended, so a consumer that reads only `kind`
+    // never takes the failed exit for success.
+    if (json)
+      dependencies.output(
+        JSON.stringify(end === "settled" ? { ...sent, reply } : { ...sent, kind: "unsettled", reply, ended: end }),
+      )
     if (end !== "settled") {
       dependencies.error(`omo remote: the session on ${row.device} ended before its turn settled (${end}).`)
       return REMOTE_EXIT.failed

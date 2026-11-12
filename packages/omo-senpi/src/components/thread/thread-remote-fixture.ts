@@ -103,6 +103,8 @@ export function createRemoteThreadFixture() {
       registryDown?: "refused" | "throws" | "signed_out"
       chainCountLimit?: number
       relayKeys?: ReadonlyMap<string, string>
+      // `watchEnds`: every open watch ends with that reason right after the prompt's records, as an attach the host drops.
+      watchEnds?: string
     } = {},
   ) {
     const engine = options.engine ?? ENGINE
@@ -113,9 +115,11 @@ export function createRemoteThreadFixture() {
     let heldDraft = options.heldDraft ?? 0
     // The session's records a prompt makes it write, delivered to every watch after the prompt is answered.
     const watchers = new Set<(record: JsonObject) => void>()
+    const watchEnders = new Set<(reason: string) => void>()
     const writeRecords = () =>
       queueMicrotask(() => {
         for (const record of options.records ?? []) for (const listener of [...watchers]) listener(record)
+        if (options.watchEnds !== undefined) for (const end of [...watchEnders]) end(options.watchEnds)
       })
     const hops: number[] = []
     const aliases = options.aliases ?? new Map<string, AliasHolder>()
@@ -319,10 +323,13 @@ export function createRemoteThreadFixture() {
           sent.push({ via: "watch", device, session })
           if (options.refuse !== undefined) return { kind: "refused", reason: options.refuse }
           watchers.add(listener)
+          const ended = new Promise<string>((resolve) => {
+            watchEnders.add(resolve)
+          })
           return {
             kind: "ok",
             watch: {
-              ended: new Promise<string>(() => {}),
+              ended,
               stop: () => {
                 watchers.delete(listener)
               },
