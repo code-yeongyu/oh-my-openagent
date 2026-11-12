@@ -97,6 +97,14 @@ impl Ended {
 }
 
 impl Session {
+    /// A stop is never held (R53): the listener is polled between units, and a set latch ends
+    /// the stroke there with the latch's own `Suspended{reason}`.
+    fn latched(&mut self) -> Option<Stop> {
+        let backend = &mut self.backend;
+        self.guard.observe(&mut || backend.stop_listener(), &mut omo_computer_safety::NoHolds);
+        self.guard.latch().map(|reason| Stop::Refused(reason.refusal()))
+    }
+
     pub(crate) fn send_watched(
         &mut self,
         events: Vec<InputEvent>,

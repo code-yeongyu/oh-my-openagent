@@ -80,4 +80,6 @@ impl crate::Session {
 #[cfg(test)]
 mod session_state_tests;
 #[cfg(test)]
+mod stop_tests;
+#[cfg(test)]
 mod tests;
