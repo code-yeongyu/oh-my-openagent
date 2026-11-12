@@ -16,7 +16,7 @@
 //   --stubs                            no unimplemented!, todo!(, .skip(, .only( or bare #[ignore] in new sources
 
 import { existsSync, lstatSync, readFileSync } from "node:fs"
-import { dirname, join, posix, resolve } from "node:path"
+import { dirname, isAbsolute, join, posix, resolve } from "node:path"
 
 import nameMap from "./computer-v3-name-map.json"
 
@@ -369,7 +369,8 @@ function blockerEdits(planFile: string, row: string): Set<string> {
 
 /**
  * SCOPE-ADDENDA.tsv beside the plan (the plan is never edited): `row<TAB>path<TAB>ruling` admits EXACTLY that path
- * for EXACTLY that row. A path with a glob character or a trailing `/`, or a line without three cells, is a finding.
+ * for EXACTLY that row. A path with a glob or brace character, a trailing `/`, a `..` segment or an absolute path,
+ * or a line without three cells, is a finding.
  */
 function addenda(planFile: string, row: string): { readonly admitted: Set<string>; readonly problems: string[] } {
   const name = nameMap.scope.addenda
@@ -381,7 +382,12 @@ function addenda(planFile: string, row: string): { readonly admitted: Set<string
     if (line.trim().length === 0 || line.startsWith("#")) return
     const cells = line.split("\t")
     const [lineRow = "", path = "", ruling = ""] = cells
-    const exact = path.length > 0 && !/[\s*?[]/.test(path) && !path.endsWith("/")
+    const exact =
+      path.length > 0 &&
+      !/[\s*?[{]/.test(path) &&
+      !path.endsWith("/") &&
+      !isAbsolute(path) &&
+      !path.split(/[\\/]/).includes("..")
     if (cells.length !== 3 || !/^\d+$/.test(lineRow) || !exact || ruling.trim().length === 0)
       problems.push(
         `scope: ${name} line ${index + 1} is malformed (expected <row><TAB><exact file path><TAB><ruling>; no glob, no directory)`,
