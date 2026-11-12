@@ -175,3 +175,63 @@ describe("neutralizeCrossRepoReferences URL boundaries", () => {
     )
   })
 })
+describe("neutralizeCrossRepoReferences API, raw and nested URLs", () => {
+  test.each([
+    ["https://api.github.com/repos/acme-org/acme-svc/pulls/1", "tracked internally"],
+    ["see https://api.github.com/repos/acme-org/acme-svc now", "see tracked internally now"],
+    ["https://raw.githubusercontent.com/acme-org/acme-svc/main/README.md", "tracked internally"],
+    ["[file](https://raw.githubusercontent.com/acme-org/acme-svc/main/a.md)", "tracked internally"],
+    ["<https://api.github.com/repos/acme-org/acme-svc/issues/2>", "tracked internally"],
+  ])("#given a private API or raw URL %p #when neutralized #then it is replaced", (text, expected) => {
+    expect(neutralizeCrossRepoReferences(text)).toStrictEqual(expected)
+  })
+
+  test.each([
+    "https://api.github.com/repos/code-yeongyu/oh-my-openagent/pulls/1",
+    "https://raw.githubusercontent.com/code-yeongyu/senpi/main/README.md",
+  ])("#given a public API or raw URL %p #when neutralized #then it is unchanged", (text) => {
+    expect(neutralizeCrossRepoReferences(text)).toStrictEqual(text)
+  })
+
+  test("#given an API URL whose owner is a reserved web path #when neutralized #then it is still replaced", () => {
+    expect(neutralizeCrossRepoReferences("https://api.github.com/repos/settings/acme-svc")).toStrictEqual(
+      "tracked internally",
+    )
+  })
+
+  test.each([
+    "https://github.com/codespaces/new",
+    "https://github.com/users/u/projects/3",
+    "https://github.com/enterprises/acme/settings",
+    "https://github.com/account/billing",
+    "https://github.com/dashboard/feed",
+    "https://github.com/pulls/assigned",
+    "https://github.com/issues/created",
+    "https://github.com/pulls",
+  ])("#given a non-owner GitHub page %p #when neutralized #then it is unchanged", (text) => {
+    expect(neutralizeCrossRepoReferences(text)).toStrictEqual(text)
+  })
+
+  test("#given a private URL nested in an archive URL #when neutralized #then the whole URL is replaced", () => {
+    expect(
+      neutralizeCrossRepoReferences("see https://web.archive.org/web/2024/https://github.com/acme-org/acme-svc now"),
+    ).toStrictEqual("see tracked internally now")
+  })
+
+  test("#given a private URL nested in a markdown link target #when neutralized #then the whole link is replaced", () => {
+    expect(
+      neutralizeCrossRepoReferences("a [old](https://web.archive.org/web/2024/https://github.com/acme-org/acme-svc) b"),
+    ).toStrictEqual("a tracked internally b")
+  })
+
+  test("#given a public URL nested in an archive URL #when neutralized #then it is unchanged", () => {
+    const text = "[old](https://web.archive.org/web/2024/https://github.com/code-yeongyu/senpi) x"
+    expect(neutralizeCrossRepoReferences(text)).toStrictEqual(text)
+  })
+
+  test("#given a non-GitHub markdown link with a private reference in its text #when neutralized #then the text is neutralized", () => {
+    expect(neutralizeCrossRepoReferences("[acme-org/acme-svc#3](https://example.com/x)")).toStrictEqual(
+      "[tracked internally](https://example.com/x)",
+    )
+  })
+})

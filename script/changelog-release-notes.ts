@@ -112,37 +112,60 @@ const RESERVED_GITHUB_PATHS = new Set([
   "trending",
   "new",
   "organizations",
+  "codespaces",
+  "users",
+  "enterprises",
+  "account",
+  "dashboard",
+  "pulls",
+  "issues",
 ])
 
-// A GitHub URL is ANY URL to a repository: optional www., case-insensitive host, owner/repo, then optionally any
-// path, query or fragment (bare repo URLs, /blob/, /tree/, /discussions/, /releases/ are all covered).
-const HOST = String.raw`(?:www\.)?github\.com\/`
+// A GitHub URL is ANY URL to a repository: github.com (optional www.), api.github.com/repos or
+// raw.githubusercontent.com (case-insensitive host), owner/repo, then optionally any path, query or fragment
+// (bare repo URLs, /blob/, /tree/, /discussions/, /releases/ are all covered).
+const HOST = String.raw`(?:(?:www\.)?github\.com\/|api\.github\.com\/repos\/|raw\.githubusercontent\.com\/)`
 const REPO = String.raw`([\w.-]+)\/([\w.-]*[\w-])`
 const URL_TAIL = String.raw`(?:[/?#](?:[^\s)\]>]*[^\s)\]>.,;:!?])?)?`
 
 // One pass, so the inside of a kept public URL is never rewritten again. Alternatives, in order (the capture
 // groups are consumed positionally by the replacer): 1-4 markdown link, 5-6 autolink, 7-8 URL with an explicit
 // http(s):// scheme (matched wherever it appears), 9-10 scheme-less URL (only when not glued to a URL or word),
-// 11-12 an (optionally owner-qualified) repo#N reference.
+// 11-12 an (optionally owner-qualified) repo#N reference, 13-14 a markdown link to any other URL and 15 any other
+// http(s):// URL token: those last three exist so a private GitHub URL nested inside a larger URL replaces the
+// whole enclosing link or URL instead of being spliced into it.
 const MARKDOWN_LINK = String.raw`\[([^\]]*)\]\(((?:https?:\/\/)?` + HOST + REPO + String.raw`[^\s)]*)\)`
 const AUTOLINK = String.raw`<(?:https?:\/\/)?` + HOST + REPO + String.raw`[^\s>]*>`
 const SCHEME_URL = String.raw`https?:\/\/` + HOST + REPO + URL_TAIL
 const SCHEMELESS_URL = String.raw`(?<![\w./-])` + HOST + REPO + URL_TAIL
 const REPO_REFERENCE = String.raw`\b(?:([\w.-]+)\/)?([A-Za-z][\w.-]*)#\d+\b`
+const OTHER_MARKDOWN_LINK = String.raw`\[([^\]]*)\]\((https?:\/\/[^\s)]*)\)`
+const OTHER_URL = String.raw`(https?:\/\/[^\s)\]>]*[^\s)\]>.,;:!?])`
 const CROSS_REPO_PATTERN = new RegExp(
-  [MARKDOWN_LINK, AUTOLINK, SCHEME_URL, SCHEMELESS_URL, REPO_REFERENCE].join("|"),
+  [MARKDOWN_LINK, AUTOLINK, SCHEME_URL, SCHEMELESS_URL, REPO_REFERENCE, OTHER_MARKDOWN_LINK, OTHER_URL].join("|"),
   "gi",
 )
+const NESTED_GITHUB_URL = new RegExp(String.raw`https?:\/\/` + HOST + REPO, "gi")
+const GITHUB_WEB_URL = /^[<(]?(?:https?:\/\/)?(?:www\.)?github\.com\//i
 
 // Keep (do not neutralize) a GitHub URL that is a public repo or not a repo at all. A trailing .git is the
-// clone-URL spelling of the same repo.
-function keepsGithubUrl(owner: string, repo: string): boolean {
-  if (RESERVED_GITHUB_PATHS.has(owner.toLowerCase())) return true
+// clone-URL spelling of the same repo. Reserved product-page paths exist only on the github.com web host:
+// api.github.com/repos/<owner>/<repo> and raw.githubusercontent.com/<owner>/<repo> always name a repository.
+function keepsGithubUrl(owner: string, repo: string, url: string): boolean {
+  if (GITHUB_WEB_URL.test(url) && RESERVED_GITHUB_PATHS.has(owner.toLowerCase())) return true
   return isPublicPair(owner, repo.replace(/\.git$/i, ""))
 }
 
 function isPublicPair(owner: string, repo: string): boolean {
   return PUBLIC_QUALIFIED_REPOS.has((owner + "/" + repo).toLowerCase())
+}
+
+function nestsPrivateGithubUrl(url: string): boolean {
+  for (const nested of url.matchAll(NESTED_GITHUB_URL)) {
+    const [text, owner, repo] = nested
+    if (owner !== undefined && repo !== undefined && !keepsGithubUrl(owner, repo, text)) return true
+  }
+  return false
 }
 
 export function neutralizeCrossRepoReferences(text: string): string {
@@ -162,18 +185,26 @@ export function neutralizeCrossRepoReferences(text: string): string {
       bareRepo: string | undefined,
       refOwner: string | undefined,
       refRepo: string | undefined,
+      otherLinkText: string | undefined,
+      otherLinkUrl: string | undefined,
+      otherUrl: string | undefined,
     ) => {
       if (linkOwner !== undefined && linkRepo !== undefined) {
-        if (!keepsGithubUrl(linkOwner, linkRepo)) return NEUTRALIZED
+        if (!keepsGithubUrl(linkOwner, linkRepo, linkUrl ?? "")) return NEUTRALIZED
         return "[" + neutralizeCrossRepoReferences(linkText ?? "") + "](" + linkUrl + ")"
       }
       // The whole autolink goes, angle brackets included: a bare <tracked internally> would render as an HTML tag.
       if (autoOwner !== undefined && autoRepo !== undefined)
-        return keepsGithubUrl(autoOwner, autoRepo) ? match : NEUTRALIZED
+        return keepsGithubUrl(autoOwner, autoRepo, match) ? match : NEUTRALIZED
       const urlOwner = schemeOwner ?? bareOwner
       const urlRepo = schemeRepo ?? bareRepo
       if (urlOwner !== undefined && urlRepo !== undefined)
-        return keepsGithubUrl(urlOwner, urlRepo) ? match : NEUTRALIZED
+        return keepsGithubUrl(urlOwner, urlRepo, match) ? match : NEUTRALIZED
+      if (otherLinkUrl !== undefined) {
+        if (nestsPrivateGithubUrl(otherLinkUrl)) return NEUTRALIZED
+        return "[" + neutralizeCrossRepoReferences(otherLinkText ?? "") + "](" + otherLinkUrl + ")"
+      }
+      if (otherUrl !== undefined) return nestsPrivateGithubUrl(otherUrl) ? NEUTRALIZED : match
       if (refRepo === undefined || /[-.]$/.test(refRepo) || NON_REPO_TOKENS.has(refRepo.toLowerCase())) return match
       const isPublic =
         refOwner === undefined ? PUBLIC_UNQUALIFIED_REPOS.has(refRepo.toLowerCase()) : isPublicPair(refOwner, refRepo)
