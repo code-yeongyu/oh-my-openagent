@@ -6,6 +6,7 @@ import { catalogFor, SESSIONS } from "./catalog.ts"
 import { type Driver, isDriver } from "./driver.ts"
 import { type Check, executable, fakeStdio, preflight, type Probe } from "./preflight.ts"
 import { buildReport, summaryLine } from "./report.ts"
+import { taskFailure } from "./taskset/judge.ts"
 import { MAX_REFERENCE_CELLS, TASKS } from "./taskset/tasks.ts"
 import { type CellResult, OS_NAMES, type OsName, RUN_SCHEMA } from "./vocabulary.ts"
 
@@ -89,13 +90,9 @@ async function runCatalog(options: Options, driver: Driver): Promise<number> {
 async function runTaskset(options: Options, driver: Driver): Promise<number> {
   let pass = 0
   for (const task of TASKS) {
-    const outcome = await driver.runTask(task)
-    const wrong = task.oracle.filter((expected) => outcome.saved[expected.field] !== expected.equals)
-    if (wrong.length === 0 && outcome.cells <= MAX_REFERENCE_CELLS) pass += 1
-    else
-      console.log(
-        `task ${task.id}: saved fields not as declared: ${wrong.map((w) => w.field).join(",") || "none"} cells=${outcome.cells}`,
-      )
+    const failure = taskFailure(task, await driver.runTask(task))
+    if (failure === undefined) pass += 1
+    else console.log(`task ${task.id}: ${failure}`)
   }
   const most = Math.max(...TASKS.map((task) => task.cells.length))
   console.log(`TASKSET ${options.os} tasks=${TASKS.length} pass=${pass} reference_max_cells=${most}`)
