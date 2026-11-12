@@ -1,8 +1,8 @@
 import { execFileSync } from "node:child_process"
 import { randomUUID } from "node:crypto"
-import { existsSync, rmSync, statSync } from "node:fs"
+import { existsSync, realpathSync, rmSync, statSync } from "node:fs"
 import { userInfo } from "node:os"
-import { join } from "node:path"
+import { dirname, join, resolve } from "node:path"
 
 import {
   loadOmoConfig,
@@ -51,11 +51,16 @@ export type ProjectModelProfileReply =
   | ({ readonly kind: "ok" } & ProjectModelProfileState)
   | { readonly kind: "refused"; readonly code: ProjectModelProfileRefusalCode; readonly message: string }
 
-/** Seams for tests: the writer's file system, the home of the account with a uid, and how a backup copy is removed. */
+/**
+ * Seams for tests: the writer's file system, the home of the account with a uid, where accounts' homes live, and how a
+ * backup copy is removed.
+ */
 export interface ProjectModelProfileDeps {
   readonly fileSystem?: OmoConfigWriteFileSystem
-  /** The home folder of the account with this uid, or null when the lookup failed or there is no such account. */
-  readonly homeOfUid?: (uid: number) => string | null
+  /** The home folder of the account with this uid, null when there is no such account, undefined when the lookup failed. */
+  readonly homeOfUid?: (uid: number) => string | null | undefined
+  /** The folder accounts' homes sit in, used only when the owner lookup failed; defaults to this account home's parent. */
+  readonly accountsRoot?: string | null
   readonly removeFile?: (path: string) => void
 }
 
@@ -69,8 +74,9 @@ const MAX_PROFILE_LENGTH = 200
 const INVISIBLE_OR_CONTROL = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Cs}\p{Default_Ignorable_Code_Point}\p{M}]/u
 
 // A home folder's `.omo` is a user layer (omo-config-core loader/paths.ts), never a project layer: this account's
-// HOME and account home, and the home of the account that owns the folder. Only that one account is looked up, so the
-// check costs one user-database lookup and one stat per call, and an account known only through NSS/LDAP is covered.
+// HOME and account home, and the home of the account that owns the folder. Only a folder another account owns is looked
+// up, once per owner for the process, so an account known only through NSS/LDAP is covered. When that lookup fails
+// (no lookup binary, a down user database, win32), any folder beside this account's home is refused instead.
 
 /** The home field of one passwd entry: `getent passwd <uid>` (7 fields) or macOS `id -P <uid>` (10 fields). */
 export function homeFromPasswdEntry(entry: string): string | null {
@@ -85,27 +91,53 @@ function runPasswdLookup(uid: number): string {
     process.platform === "darwin"
       ? (["/usr/bin/id", ["-P", String(uid)]] as const)
       : (["/usr/bin/getent", ["passwd", String(uid)]] as const)
-  return execFileSync(command, [...args], { encoding: "utf8", timeout: 2_000, stdio: ["ignore", "pipe", "ignore"] })
+  return execFileSync(command, [...args], {
+    encoding: "utf8",
+    timeout: 2_000,
+    stdio: ["ignore", "pipe", "ignore"],
+    windowsHide: true,
+  })
 }
 
-const homeByUid = new Map<number, string>()
+const homeByUid = new Map<number, string | null | undefined>()
 
-/** The home of the account with this uid. A found home is reused for the process; a failed lookup is logged and retried. */
-export function lookupHomeOfUid(uid: number, run: (uid: number) => string = runPasswdLookup): string | null {
-  const known = homeByUid.get(uid)
-  if (known !== undefined) return known
-  let home: string | null
+/**
+ * The home of the account with this uid: null when there is no such account, undefined when the lookup failed. Every
+ * answer, a failure included, is reused for the process, so a down user database blocks at most one call per owner.
+ */
+export function lookupHomeOfUid(
+  uid: number,
+  run: (uid: number) => string = runPasswdLookup,
+): string | null | undefined {
+  if (homeByUid.has(uid)) return homeByUid.get(uid)
+  let home: string | null | undefined
   try {
     home = homeFromPasswdEntry(run(uid))
   } catch (error) {
-    log("[model-profile] owner home lookup failed; only this account's homes are refused", {
+    log("[model-profile] owner home lookup failed; folders beside this account's home are refused instead", {
       uid,
       error: error instanceof Error ? error.message : String(error),
     })
-    return null
+    home = undefined
   }
-  if (home !== null) homeByUid.set(uid, home)
+  homeByUid.set(uid, home)
   return home
+}
+
+const realOrSelf = (path: string): string => {
+  try {
+    return realpathSync(path)
+  } catch {
+    return resolve(path)
+  }
+}
+
+// This account home's parent, unless the home is missing or sits at the file system root (`/root`, `/nonexistent`).
+function defaultAccountsRoot(): string | null {
+  const home = userInfo().homedir
+  if (!existsSync(home)) return null
+  const parent = dirname(realOrSelf(home))
+  return parent === dirname(parent) ? null : parent
 }
 
 function sameDirectory(path: string, folder: { readonly dev: number; readonly ino: number }): boolean {
@@ -121,14 +153,19 @@ function sameDirectory(path: string, folder: { readonly dev: number; readonly in
 // several ways.
 function isHomeFolder(cwd: string, deps: ProjectModelProfileDeps): boolean {
   let folder: { readonly dev: number; readonly ino: number; readonly uid: number }
+  const ownHomes = [resolveHomeDir(), userInfo().homedir]
   try {
     folder = statSync(cwd)
   } catch {
-    return false
+    // A folder that is gone is compared by spelling, so a missing HOME is still refused before the writer's mkdir.
+    return ownHomes.some((home) => realOrSelf(home) === realOrSelf(cwd))
   }
-  if ([resolveHomeDir(), userInfo().homedir].some((home) => sameDirectory(home, folder))) return true
+  if (ownHomes.some((home) => sameDirectory(home, folder))) return true
+  if (folder.uid === process.getuid?.()) return false
   const ownerHome = (deps.homeOfUid ?? lookupHomeOfUid)(folder.uid)
-  return ownerHome !== null && sameDirectory(ownerHome, folder)
+  if (ownerHome !== undefined) return ownerHome !== null && sameDirectory(ownerHome, folder)
+  const accountsRoot = deps.accountsRoot === undefined ? defaultAccountsRoot() : deps.accountsRoot
+  return accountsRoot !== null && sameDirectory(accountsRoot, statSync(dirname(realOrSelf(cwd))))
 }
 
 // The writer's pre-write copy goes to a name only this write uses, so cleanup removes exactly that copy and never a
@@ -148,10 +185,14 @@ function projectConfigPath(cwd: string): string {
   return existsSync(json) ? json : jsonc
 }
 
-export function readProjectModelProfile(cwd: string): ProjectModelProfileState & { readonly profileIds: ReadonlySet<string> } {
+export function readProjectModelProfile(
+  cwd: string,
+): ProjectModelProfileState & { readonly profileIds: ReadonlySet<string> } {
   const path = projectConfigPath(cwd)
   const loaded = loadOmoConfig({ cwd })
-  const layer = loaded.layers.find((candidate) => candidate.source.scope === "project" && candidate.source.path === path)
+  const layer = loaded.layers.find(
+    (candidate) => candidate.source.scope === "project" && candidate.source.path === path,
+  )
   const parseError =
     loaded.diagnostics.find((diagnostic) => diagnostic.path === path && diagnostic.kind === "parse")?.message ?? null
   const value = layer?.config["model_profile"]
