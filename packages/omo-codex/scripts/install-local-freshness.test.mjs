@@ -20,11 +20,17 @@ import { fileURLToPath } from "node:url"
 const root = join(dirname(fileURLToPath(import.meta.url)), "..")
 const source = join(root, "packages", "omo-codex", "src", "install", "install-local-cli.ts")
 export const generatedCodexInstallerPath = join(root, "packages", "omo-codex", "scripts", "install-dist", "install-local.mjs")
-export const bundledWorkspaceSources = () => []
-export const digestCodexInstallerSources = async () => createHash("sha256").update(readFileSync(source, "utf8")).digest("hex")
+// Like the real builder: the bundle body names the workspace sources it bundled, and the digest reads each of them.
+export const bundledWorkspaceSources = (body) => [...body.matchAll(/^\\/\\/ src:(\\S+)$/gm)].map((match) => match[1])
+export async function digestCodexInstallerSources(bundled = []) {
+  const hash = createHash("sha256").update(readFileSync(source, "utf8"))
+  for (const path of bundled) hash.update(readFileSync(join(root, path), "utf8"))
+  return hash.digest("hex")
+}
 export function parseCodexInstallerArtifact(text) {
-  const match = /^\\/\\/ omo-codex-install:([a-f0-9]{64}):([a-f0-9]{64})$/.exec(text.split("\\n")[1] ?? "")
-  return match ? { sourceDigest: match[1], bodyDigest: match[2], body: "" } : undefined
+  const lines = text.split("\\n")
+  const match = /^\\/\\/ omo-codex-install:([a-f0-9]{64}):([a-f0-9]{64})$/.exec(lines[1] ?? "")
+  return match ? { sourceDigest: match[1], bodyDigest: match[2], body: lines.slice(2).join("\\n") } : undefined
 }
 if (import.meta.main) {
   mkdirSync(dirname(generatedCodexInstallerPath), { recursive: true })
@@ -33,7 +39,7 @@ if (import.meta.main) {
 }
 `
 
-function checkout({ source, bundleBuiltFrom, published = false }) {
+function checkout({ source, bundleBuiltFrom, published = false, bannerSources = [] }) {
   const root = mkdtempSync(join(tmpdir(), "omo-codex-shim-"))
   const scripts = join(root, "packages", "omo-codex", "scripts")
   mkdirSync(join(scripts, "install-dist"), { recursive: true })
@@ -51,7 +57,7 @@ function checkout({ source, bundleBuiltFrom, published = false }) {
   if (bundleBuiltFrom !== undefined)
     writeFileSync(
       join(scripts, "install-dist", "install-local.mjs"),
-      `#!/usr/bin/env node\n// omo-codex-install:${sha(bundleBuiltFrom)}:${"0".repeat(64)}\nexport {}\n`,
+      `#!/usr/bin/env node\n// omo-codex-install:${sha(bundleBuiltFrom)}:${"0".repeat(64)}\n${bannerSources.map((path) => `// src:${path}\n`).join("")}export {}\n`,
     )
   return {
     root,
@@ -90,6 +96,21 @@ test("#given a published package without sources #when the shim loads #then it u
   try {
     await tree.load()
     assert.equal(tree.builds(), 0)
+  } finally {
+    rmSync(tree.root, { recursive: true, force: true })
+  }
+})
+
+test("#given a bundle that records a source since deleted #when the shim loads #then it rebuilds instead of failing", async () => {
+  const tree = checkout({
+    source: "export const v = 2\n",
+    bundleBuiltFrom: "export const v = 2\n",
+    bannerSources: ["packages/omo-codex/src/install/deleted-helper.ts"],
+  })
+  try {
+    const installer = await tree.load()
+    assert.equal(tree.builds(), 1)
+    assert.equal(typeof installer, "object")
   } finally {
     rmSync(tree.root, { recursive: true, force: true })
   }

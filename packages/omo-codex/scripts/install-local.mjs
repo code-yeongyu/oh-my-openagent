@@ -20,8 +20,14 @@ const FRESHNESS_CHECK = `
 import { readFileSync } from "node:fs"
 import { bundledWorkspaceSources, digestCodexInstallerSources, generatedCodexInstallerPath, parseCodexInstallerArtifact } from "./script/build-codex-install.ts"
 const artifact = parseCodexInstallerArtifact(readFileSync(generatedCodexInstallerPath, "utf8"))
-const current = artifact !== undefined && artifact.sourceDigest === (await digestCodexInstallerSources(bundledWorkspaceSources(artifact.body)))
-process.exit(current ? 0 : 3)
+let digest
+try {
+  digest = artifact === undefined ? undefined : await digestCodexInstallerSources(bundledWorkspaceSources(artifact.body))
+} catch (error) {
+  // A source the bundle recorded was renamed or deleted since it was built: the bundle is stale.
+  if (error?.code !== "ENOENT") throw error
+}
+process.exit(artifact !== undefined && digest === artifact.sourceDigest ? 0 : 3)
 `
 
 function generatedInstallerIsCurrent(repoRoot) {
