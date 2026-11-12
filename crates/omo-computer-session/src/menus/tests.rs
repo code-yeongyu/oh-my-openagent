@@ -138,7 +138,9 @@ fn bank(urls: Value, policy: Value) -> (Session, RecordingSink) {
     let mut scenario = fixture("v3-browser-urls.json");
     scenario["browser_urls"] = urls;
     let sink = RecordingSink::default();
-    let (s, _) = session(scenario, json!({ "reportMode": "object", "settings": { "url_policy": policy } }), &sink);
+    let (mut s, _) = session(scenario, json!({ "reportMode": "object", "settings": { "url_policy": policy } }), &sink);
+    // Row 20: a click maps through the target's newest captured frame.
+    s.capture(params(json!({ "target": "101" }))).expect("capture");
     (s, sink)
 }
 
