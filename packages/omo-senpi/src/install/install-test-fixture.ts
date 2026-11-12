@@ -36,6 +36,9 @@ export async function createPluginFixture(
     "export const createTaskComponent = () => ({})\n",
   )
   await writeFixtureFile(join(pluginPath, "extensions", "omo-computer-use.js"), "export {}\n")
+  for (const sidecar of ["omo-side-panel.js", "omo-onboarding-scan.js", "omo-init-deep-advisor.js"]) {
+    await writeFixtureFile(join(pluginPath, "extensions", sidecar), "export {}\n")
+  }
   await writeFixtureFile(join(pluginPath, "extensions", "omo-memory-doctor.js"), "export {}\n")
   await writeFixtureFile(join(pluginPath, "extensions", "omo-memory-memfs.js"), "export {}\n")
   await writeFixtureFile(join(pluginPath, "extensions", "omo-memory-palace.js"), "export {}\n")

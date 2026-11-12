@@ -6,6 +6,14 @@ import { dirname, posix, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { npmSpawnOptions } from "./npm-invocation.mjs"
+import {
+  generatedOutputRequirements,
+  importMapTargets,
+  listPatterns,
+  loadRequiredPluginArtifacts,
+  PLUGIN_SOURCE_ROOT,
+  pluginRequiredOutputs,
+} from "./plugin-required-outputs.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(scriptDir, "..")
@@ -53,55 +61,45 @@ const releaseMode = process.argv.slice(2).includes("--release")
 // modules below without the helper.
 const preflightMode = process.argv.slice(2).includes("--release-preflight")
 
-// Build outputs git does not track (#13192): only a build writes them, so a release that skipped a generator would
-// publish without them. The required set is derived from script/generated-bundles.json so a newly listed output can
-// never ship unpinned: every listed output under a directory this package ships is required, a literal path exactly,
-// a pattern (or each branch of its alternation) by at least one packed match.
+// Build outputs git does not track (#13192): only a build writes them, so a release that skipped one would publish
+// without it. "Every output the plugin needs" is defined once, in plugin-required-outputs.mjs: the installer's
+// REQUIRED_PLUGIN_ARTIFACTS plus the packed plugin's import-map targets, and every output script/generated-bundles.json
+// lists under a directory this package ships, per output (a pattern is never met by any one matching file).
 const SHIPPED_ROOTS = [
   ["packages/omo-native/", ""],
-  ["packages/omo-senpi/plugin/", "plugin/"],
+  [PLUGIN_SOURCE_ROOT, "plugin/"],
 ]
-
-// The plugin's import map is what the runtime resolves its lazy sidecars through (#omo-task-runtime ->
-// ./extensions/omo-task.js), so every target it names must be packed. A list pattern such as extensions/[^/]+ is met
-// by any one file; this requires each sidecar the packed plugin actually imports.
-function pluginImportMapRequirements() {
-  const manifestPath = resolve(pkgDir, "plugin", "package.json")
-  // An absent manifest is already a missing artifact of REQUIRED_ARTIFACTS; an unparsable one is reported here. Neither
-  // ends in a stack trace.
-  if (!existsSync(manifestPath)) return []
-  let manifest
-  try {
-    manifest = JSON.parse(readFileSync(manifestPath, "utf8"))
-  } catch (error) {
-    return [{ label: `plugin/package.json (unreadable: ${error.message})`, met: () => false }]
-  }
-  return [...new Set(Object.values(manifest.imports ?? {}).filter((target) => typeof target === "string"))].map(
-    (target) => {
-      const path = posix.join("plugin", target)
-      return { label: path, met: (paths) => paths.includes(path) }
-    },
-  )
+const toRepoPath = (packed) =>
+  packed.startsWith("plugin/") ? PLUGIN_SOURCE_ROOT + packed.slice(7) : `packages/omo-native/${packed}`
+const toPackedPath = (repoPath) => {
+  const root = SHIPPED_ROOTS.find(([source]) => repoPath.startsWith(source))
+  return root === undefined ? undefined : root[1] + repoPath.slice(root[0].length)
 }
 
-function releaseGeneratedRequirements() {
-  const { patterns } = JSON.parse(readFileSync(resolve(repoRoot, "script", "generated-bundles.json"), "utf8"))
-  const requirements = []
-  for (const pattern of patterns) {
-    const root = SHIPPED_ROOTS.find(([source]) => pattern.startsWith(`^${source}`))
-    if (root === undefined) continue
-    const rest = pattern.slice(1 + root[0].length)
-    const group = /^(.*)\(\?:([^()]+)\)(.*)$/.exec(rest)
-    const branches = group ? group[2].split("|").map((branch) => `${group[1]}${branch}${group[3]}`) : [rest]
-    for (const branch of branches) {
-      const literal = branch.replace(/\$$/, "").replaceAll("\\.", ".")
-      const regex = new RegExp(`^${root[1]}${branch}`)
-      requirements.push(
-        /[\\[\](){}*+?|^$]/.test(literal)
-          ? { label: `a path matching ${regex.source}`, met: (paths) => paths.some((path) => regex.test(path)) }
-          : { label: `${root[1]}${literal}`, met: (paths) => paths.includes(`${root[1]}${literal}`) },
-      )
-    }
+function releaseRequirements() {
+  let importTargets
+  try {
+    importTargets = importMapTargets(resolve(pkgDir, "plugin", "package.json"))
+  } catch (error) {
+    // An absent manifest is already a missing artifact of REQUIRED_ARTIFACTS; an unparsable one is reported here.
+    // Neither ends in a stack trace.
+    return [{ label: `plugin/package.json (unreadable: ${error.message})`, met: () => false }]
+  }
+  const pluginOutputs = pluginRequiredOutputs(loadRequiredPluginArtifacts(repoRoot), importTargets)
+  const requirements = pluginOutputs.map((path) => {
+    const packed = `plugin/${path}`
+    return { label: packed, met: (paths) => paths.includes(packed) }
+  })
+  for (const { label, regex } of generatedOutputRequirements(listPatterns(repoRoot), pluginOutputs)) {
+    const packedLabel = label.startsWith("a path matching") ? label : toPackedPath(label)
+    if (
+      packedLabel === undefined ||
+      (!label.startsWith("a path matching") && pluginOutputs.includes(packedLabel.slice(7)))
+    )
+      continue
+    if (label.startsWith("a path matching") && !SHIPPED_ROOTS.some(([source]) => regex.source.startsWith(`^${source}`)))
+      continue
+    requirements.push({ label: packedLabel, met: (paths) => paths.some((path) => regex.test(toRepoPath(path))) })
   }
   return requirements
 }
@@ -165,9 +163,16 @@ for (const artifact of REQUIRED_ARTIFACTS) {
   }
 }
 
-for (const requirement of releaseMode || preflightMode
-  ? [...releaseGeneratedRequirements(), ...pluginImportMapRequirements()]
-  : []) {
+let requirements = []
+if (releaseMode || preflightMode) {
+  try {
+    requirements = releaseRequirements()
+  } catch (error) {
+    // No stack trace: name the cause, e.g. bun missing from the job.
+    errors.push(error.message)
+  }
+}
+for (const requirement of requirements) {
   if (!requirement.met(paths)) {
     errors.push(`missing artifact: ${requirement.label}`)
   }

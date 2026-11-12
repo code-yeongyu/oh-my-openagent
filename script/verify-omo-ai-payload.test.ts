@@ -19,6 +19,7 @@ import { fileURLToPath } from "node:url"
 const verifierSource = fileURLToPath(new URL("./verify-omo-ai-payload.mjs", import.meta.url))
 const npmInvocationSource = fileURLToPath(new URL("./npm-invocation.mjs", import.meta.url))
 const generatedListSource = fileURLToPath(new URL("./generated-bundles.json", import.meta.url))
+const requiredOutputsSource = fileURLToPath(new URL("./plugin-required-outputs.mjs", import.meta.url))
 const guardTimeoutMs = 120_000
 
 setDefaultTimeout(guardTimeoutMs)
@@ -94,7 +95,13 @@ function writeFixtureFile(packageDir: string, relativePath: string, content: str
 function runVerifierOnPayload(
   payloadPaths: readonly string[],
   contents: Readonly<Record<string, string>> = {},
-  options: { readonly args?: readonly string[]; readonly modes?: Readonly<Record<string, number>> } = {},
+  options: {
+    readonly args?: readonly string[]
+    readonly modes?: Readonly<Record<string, number>>
+    readonly requiredPluginArtifacts?: readonly string[]
+    readonly runtime?: string
+    readonly env?: Readonly<Record<string, string | undefined>>
+  } = {},
 ): VerifierRun {
   const fakeRepoRoot = mkdtempSync(join(tmpdir(), "omo-ai-payload-guard-"))
   try {
@@ -102,6 +109,14 @@ function runVerifierOnPayload(
     copyFileSync(verifierSource, join(fakeRepoRoot, "script", "verify-omo-ai-payload.mjs"))
     copyFileSync(npmInvocationSource, join(fakeRepoRoot, "script", "npm-invocation.mjs"))
     copyFileSync(generatedListSource, join(fakeRepoRoot, "script", "generated-bundles.json"))
+    copyFileSync(requiredOutputsSource, join(fakeRepoRoot, "script", "plugin-required-outputs.mjs"))
+    // The installer's contract, read by the verifier through bun from the repository it runs in.
+    const installDir = join(fakeRepoRoot, "packages", "omo-senpi", "src", "install")
+    mkdirSync(installDir, { recursive: true })
+    writeFileSync(
+      join(installDir, "plugin-artifacts.ts"),
+      `export const REQUIRED_PLUGIN_ARTIFACTS: readonly string[] = ${JSON.stringify(options.requiredPluginArtifacts ?? [])}\n`,
+    )
 
     const packageDir = join(fakeRepoRoot, "packages", "omo-native")
     mkdirSync(packageDir, { recursive: true })
@@ -125,9 +140,9 @@ function runVerifierOnPayload(
     }
 
     const result = spawnSync(
-      process.execPath,
+      options.runtime ?? process.execPath,
       [join(fakeRepoRoot, "script", "verify-omo-ai-payload.mjs"), ...(options.args ?? [])],
-      { cwd: fakeRepoRoot, encoding: "utf8", timeout: guardTimeoutMs },
+      { cwd: fakeRepoRoot, encoding: "utf8", timeout: guardTimeoutMs, env: { ...process.env, ...options.env } },
     )
     return {
       exitCode: result.status ?? 1,
@@ -280,6 +295,65 @@ describe("omo-ai payload verifier", () => {
       )
       expect(run.output).not.toContain("missing artifact:")
       expect(run.exitCode).toBe(0)
+    })
+  })
+
+  describe("#given the installer's REQUIRED_PLUGIN_ARTIFACTS in a release payload", () => {
+    const payload = [
+      ...new Set([...PACKED_ARTIFACTS, ...RELEASE_GENERATED_ARTIFACTS, ...skillPaths(PACKED_SKILL_COUNT)]),
+    ]
+    const required = ["extensions/omo.js", "extensions/omo-side-panel.js"]
+
+    test("#when a sidecar loaded by path is not packed #then --release fails naming it", () => {
+      const run = runVerifierOnPayload(
+        [...payload, KEYCHAIN_HELPER],
+        {},
+        {
+          args: ["--release"],
+          modes: { [KEYCHAIN_HELPER]: 0o755 },
+          requiredPluginArtifacts: required,
+        },
+      )
+      expect(run.output).toContain("missing artifact: plugin/extensions/omo-side-panel.js")
+      expect(run.exitCode).toBe(1)
+    })
+
+    // The workflows run the verifier with node (ci.yml, publish.yml), and node reads the list through the job's bun.
+    test("#when started with node as the workflows do #then it reads the list through bun and passes a complete payload", () => {
+      const run = runVerifierOnPayload(
+        [...payload, "plugin/extensions/omo-side-panel.js"],
+        {},
+        {
+          args: ["--release-preflight"],
+          requiredPluginArtifacts: required,
+          runtime: "node",
+        },
+      )
+      expect(run.output).not.toContain("missing artifact:")
+      expect(run.exitCode).toBe(0)
+    })
+
+    test("#when bun is not on PATH #then it fails naming bun, not with a stack trace", () => {
+      const emptyPath = mkdtempSync(join(tmpdir(), "omo-no-bun-path-"))
+      try {
+        const node = Bun.which("node")
+        if (node === null) throw new Error("node is required for this test")
+        const run = runVerifierOnPayload(
+          payload,
+          {},
+          {
+            args: ["--release-preflight"],
+            requiredPluginArtifacts: required,
+            runtime: node,
+            env: { PATH: emptyPath, Path: emptyPath },
+          },
+        )
+        expect(run.output).toContain("needs bun")
+        expect(run.output).not.toContain("    at ")
+        expect(run.exitCode).toBe(1)
+      } finally {
+        rmSync(emptyPath, { recursive: true, force: true })
+      }
     })
   })
 

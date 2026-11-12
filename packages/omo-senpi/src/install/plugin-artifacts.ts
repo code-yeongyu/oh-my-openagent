@@ -10,6 +10,11 @@ import { isRecord } from "./senpi-settings"
 export const REQUIRED_PLUGIN_ARTIFACTS: readonly string[] = [
   join("extensions", "omo.js"),
   join("extensions", "omo-task.js"),
+  // Loaded by path at runtime, not through the import map (side-panel/constants.ts, onboarding/scan-component.ts,
+  // init-deep-advisor): a payload without them installs and then fails when the feature first runs.
+  join("extensions", "omo-side-panel.js"),
+  join("extensions", "omo-onboarding-scan.js"),
+  join("extensions", "omo-init-deep-advisor.js"),
   join("extensions", "omo-computer-use.js"),
   join("extensions", "omo-memory-doctor.js"),
   join("extensions", "omo-memory-memfs.js"),

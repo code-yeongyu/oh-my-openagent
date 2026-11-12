@@ -1,4 +1,6 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs"
+import { REQUIRED_PLUGIN_ARTIFACTS } from "../packages/omo-senpi/src/install/plugin-artifacts"
+import { generatedOutputRequirements, importMapTargets, pluginRequiredOutputs } from "./plugin-required-outputs.mjs"
 import { execFileSync } from "node:child_process"
 import path from "node:path"
 import { findRawTlsClients, normalizeCallText } from "./no-raw-tls-client"
@@ -139,11 +141,6 @@ function isGeneratedOutput(relativePath: string): boolean {
   return GENERATED_PATTERNS.some((pattern) => new RegExp(pattern).test(relativePath))
 }
 
-function patternLiteral(pattern: string): string | undefined {
-  const body = pattern.replace(/^\^/, "").replace(/\$/, "").replaceAll("\\.", ".")
-  return /[\\[\](){}*+?|^$]/.test(body) ? undefined : body
-}
-
 function patternDirectory(pattern: string): string {
   const body = pattern.replace(/^\^/, "")
   const meta = body.search(/[\\[\](){}*+?|$]/)
@@ -171,25 +168,34 @@ export function discoverGeneratedOutputs(): string[] {
   return [...found].sort()
 }
 
+// Every output the plugin needs (plugin-required-outputs.mjs, the same definition the omo-ai payload gate uses), per
+// output: a list pattern is never met by any one built file. Outputs that are not scannable source (wasm, text,
+// personas) are the payload gate's to require, not this scan's.
+export function generatedOutputScanRequirements(
+  pluginOutputs: readonly string[] = pluginRequiredOutputs(
+    REQUIRED_PLUGIN_ARTIFACTS.map((artifact) => artifact.split("\\").join("/")),
+    importMapTargets(path.join(WORKSPACE_ROOT, "packages", "omo-senpi", "plugin", "package.json")),
+  ),
+): { label: string; regex: RegExp }[] {
+  return generatedOutputRequirements(GENERATED_PATTERNS, pluginOutputs).filter(
+    (requirement) => requirement.label.startsWith("a path matching") || isScannedSourceFile(requirement.label),
+  )
+}
+
 export function evaluateGeneratedOutputProbe(input: {
-  patterns: readonly string[]
+  requirements: readonly { label: string; regex: RegExp }[]
   discovered: readonly string[]
   ci: string | undefined
 }): string[] {
   if (input.ci === undefined) return []
-  const failures: string[] = []
-  for (const pattern of input.patterns) {
-    const literal = patternLiteral(pattern)
-    if (literal !== undefined && !isScannedSourceFile(literal)) continue
-    const regex = new RegExp(pattern)
-    if (input.discovered.some((file) => regex.test(file))) continue
-    failures.push(
-      "CI: no built output matches " +
-        pattern +
+  return input.requirements
+    .filter((requirement) => !input.discovered.some((file) => requirement.regex.test(file)))
+    .map(
+      (requirement) =>
+        "CI: built output missing: " +
+        requirement.label +
         " (script/generated-bundles.json). The job must build the generated outputs before this scan so it reads what ships.",
     )
-  }
-  return failures
 }
 
 export type BuiltRuntimeProbeVerdict = { scanned: string[]; failures: string[] }
@@ -329,7 +335,11 @@ export function collectShippedSourceFiles(): string[] {
   const generated = discoverGeneratedOutputs()
   const failures = [
     ...probe.failures,
-    ...evaluateGeneratedOutputProbe({ patterns: GENERATED_PATTERNS, discovered: generated, ci: process.env.CI }),
+    ...evaluateGeneratedOutputProbe({
+      requirements: generatedOutputScanRequirements(),
+      discovered: generated,
+      ci: process.env.CI,
+    }),
   ]
   if (failures.length > 0) {
     throw new Error(failures.join("\n"))
