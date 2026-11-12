@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url"
 import type { Context } from "../lib/scenario.ts"
 import { type Raster, pixelAt } from "../lib/pixels.ts"
 
-export const FIXTURES = fileURLToPath(new URL("../fixtures", import.meta.url))
+const FIXTURES = fileURLToPath(new URL("../fixtures", import.meta.url))
 export const MARKER: readonly [number, number, number] = [255, 0, 0]
 
 /** The fixture window binary and its argv for one window. */

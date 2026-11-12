@@ -12,6 +12,7 @@ const GREEN: readonly [number, number, number] = [0, 128, 0]
 const MAGENTA: readonly [number, number, number] = [255, 0, 255]
 
 export const occluderOracle: Scenario = {
+  name: "occluder-oracle",
   admit: "os",
   sessions: ["xvfb"],
   async run(ctx: Context): Promise<Checked> {

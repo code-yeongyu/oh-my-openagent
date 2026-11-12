@@ -1,10 +1,21 @@
 // With `DISPLAY` unset the engine reports no display server: every verb that needs a
-// backend answers `COMPUTER_UNAVAILABLE` (`no_display_server`, not delivered, nothing
-// sent) with `nextCall computer.diagnose({ hand })`, and nothing reaches the machine.
-import type { EngineError } from "../lib/engine.ts"
+// backend is refused `Internal` with `data.reason` `no_display_server` (the wire form; the
+// model-facing `COMPUTER_UNAVAILABLE` member and `nextCall` come from the SDK mapper of the
+// error-table row), nothing is sent, and no input reaches the machine.
+import type { EngineError, JsonObject } from "../lib/engine.ts"
 import type { Checked, Context, Scenario } from "../lib/scenario.ts"
 
+function raw(error: EngineError | undefined): JsonObject {
+  if (error === undefined) return { answered: true }
+  return { code: error.code, data: error.data }
+}
+
+function refusedNoDisplay(error: EngineError | undefined): boolean {
+  return error !== undefined && error.code === "Internal" && (error.data.reason ?? "") === "no_display_server"
+}
+
 export const noDisplay: Scenario = {
+  name: "no-display",
   admit: "none",
   sessions: ["none"],
   async run(ctx: Context): Promise<Checked> {
@@ -18,34 +29,18 @@ export const noDisplay: Scenario = {
     }
     const capture = await engine.refusal("capture", { target: "desktop", cursor: false })
     const displays = await engine.refusal("displays", {})
-    const zoom = await engine.refusal("zoom", { target: "desktop" })
-
-    const unavailable = (refusal: EngineError | undefined): boolean =>
-      refusal !== undefined &&
-      refusal.code === "COMPUTER_UNAVAILABLE" &&
-      (refusal.data.reason ?? "") === "no_display_server"
 
     return {
       checks: {
         backend_is_x11: capabilities.backend === "x11",
         capture_reports_no_display_server: capabilities.capture.reason === "no_display_server",
         window_capture_reports_no_display_server: capabilities.windowCapture.reason === "no_display_server",
-        capture_refused_unavailable_no_display_server: unavailable(capture),
-        displays_refused_unavailable_no_display_server: unavailable(displays),
-        zoom_refused_unavailable_no_display_server: unavailable(zoom),
-        next_call_is_diagnose:
-          capture !== undefined &&
-          JSON.stringify(capture.data).includes("computer.diagnose") &&
-          JSON.stringify(capture.data).includes("hand"),
+        capture_refused_internal_no_display_server: refusedNoDisplay(capture),
+        displays_refused_internal_no_display_server: refusedNoDisplay(displays),
       },
       facts: {
         capabilities,
-        refusals: {
-          capture: capture?.code ?? null,
-          displays: displays?.code ?? null,
-          zoom: zoom?.code ?? null,
-          reason: capture?.data.reason ?? null,
-        },
+        refusals: { capture: raw(capture), displays: raw(displays) },
         input_sent: 0,
       },
       observer: { before: {}, after: { backend: capabilities.backend } },

@@ -22,10 +22,14 @@ export class EngineError extends Error {
   }
 }
 
+/** The engine process died before answering; its stderr tail says why. */
+export class EngineDied extends Error {}
+
 export class Engine {
-  private readonly proc: Subprocess<"pipe", "pipe", "inherit">
+  private readonly proc: Subprocess<"pipe", "pipe", "pipe">
   private readonly pending = new Map<number, (message: JsonObject) => void>()
   private readonly pumped: Promise<void>
+  private stderr = ""
   private heartbeat: ReturnType<typeof setInterval> | undefined
   private next = 1
 
@@ -35,9 +39,17 @@ export class Engine {
       env: clean as Record<string, string>,
       stdin: "pipe",
       stdout: "pipe",
-      stderr: "inherit",
+      stderr: "pipe",
     })
+    void this.drainStderr()
     this.pumped = this.pump()
+  }
+
+  private async drainStderr(): Promise<void> {
+    const decoder = new TextDecoder()
+    for await (const chunk of this.proc.stderr) {
+      this.stderr = (this.stderr + decoder.decode(chunk, { stream: true })).slice(-2000)
+    }
   }
 
   private async pump(): Promise<void> {
@@ -60,6 +72,10 @@ export class Engine {
     }
   }
 
+  private died(method: string): EngineDied {
+    return new EngineDied(`the engine died before ${method}: ${this.stderr.trim() || "no stderr"}`)
+  }
+
   async call(method: string, params: JsonObject = {}): Promise<Json> {
     const id = this.next++
     const settled = new Promise<JsonObject>((done, fail) => {
@@ -67,9 +83,18 @@ export class Engine {
       setTimeout(() => {
         if (this.pending.delete(id)) fail(new Error(`${method} did not answer within ${CALL_TIMEOUT_MS} ms`))
       }, CALL_TIMEOUT_MS)
+      void this.proc.exited.then((code) => {
+        if (this.pending.delete(id)) fail(this.died(method))
+        void code
+      })
     })
-    this.proc.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`)
-    this.proc.stdin.flush()
+    try {
+      this.proc.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`)
+      this.proc.stdin.flush()
+    } catch {
+      this.pending.delete(id)
+      throw this.died(method)
+    }
     const message = await settled
     const error = message.error
     if (error && typeof error === "object" && !Array.isArray(error)) {

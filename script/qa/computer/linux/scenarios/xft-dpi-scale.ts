@@ -12,6 +12,7 @@ const WINDOW_AT = { x: 40, y: 30 } as const
 const TITLE = "r47-scale-marker"
 
 export const xftDpiScale: Scenario = {
+  name: "xft-dpi-scale",
   admit: "os",
   sessions: ["xvfb"],
   async run(ctx: Context): Promise<Checked> {

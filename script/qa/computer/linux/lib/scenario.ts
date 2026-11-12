@@ -6,9 +6,9 @@ import type { Processes } from "./procs.ts"
 
 /** How a scenario's session is admitted (the plan's '### Real-surface QA drivers'). */
 export type Admit = "os" | "host-relay" | "none"
-export const ADMITS: readonly Admit[] = ["os", "host-relay", "none"]
+const ADMITS: readonly Admit[] = ["os", "host-relay", "none"]
 
-export const SESSIONS = ["xvfb", "xvfb-nobus", "none", "xorg", "sway", "weston", "gnome", "kde"] as const
+const SESSIONS = ["xvfb", "xvfb-nobus", "none", "xorg", "sway", "weston", "gnome", "kde"] as const
 export type SessionName = (typeof SESSIONS)[number]
 
 /** What a started session gives a scenario: the display and the environment its tools need. */
@@ -26,6 +26,7 @@ export interface Context {
 }
 
 export interface Scenario {
+  readonly name: string
   readonly admit: Admit
   /** The sessions this scenario runs under; the driver refuses any other. */
   readonly sessions: readonly SessionName[]
@@ -67,10 +68,6 @@ export function failed(scenario: string, session: SessionName, error: unknown): 
     facts: { error: error instanceof Error ? error.message : String(error) },
     observer: { before: {}, after: {} },
   }
-}
-
-export function isSession(name: string): name is SessionName {
-  return SESSIONS.some((known) => known === name)
 }
 
 export function isAdmit(value: unknown): value is Admit {

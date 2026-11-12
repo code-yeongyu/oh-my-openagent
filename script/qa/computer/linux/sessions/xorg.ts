@@ -29,8 +29,6 @@ Section "ServerLayout"
 EndSection
 `
 
-export const SESSION = "xorg" as const
-
 export async function start(procs: Processes, runDir: string): Promise<Stage> {
   if (existsSync("/.dockerenv")) {
     throw new Error("the xorg session runs directly on the host, never inside a container")

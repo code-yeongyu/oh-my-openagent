@@ -26,3 +26,4 @@ T3	the live Linux driver's scenario step joining the ideal-state computer-live-l
 T3	the sway and weston sessions of the live driver (wlroots headless, weston headless-backend)	47	52/53	owed
 T3	the fake xdg-desktop-portal and the fake EIS server under script/qa/computer/linux/	47	52/53	owed
 T3	windows() listing gaps: paging, identity reason "no_pid" and the per-window cursor field	47	49	owed
+C1	the zoom wire verb on a no-display host (the method table lists zoom; the session router of this base does not dispatch it yet) - asserted by the no-display scenario once routed	47	28	owed
