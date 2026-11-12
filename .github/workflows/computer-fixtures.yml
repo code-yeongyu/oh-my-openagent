@@ -365,3 +365,179 @@ jobs:
             - Sabotage legs: a pinned report field must turn the self-test red, on that field's legs only.
           JOB_SUMMARY_NEXT: A build failure names the swiftc error; otherwise start with the first CHECK ... FAIL or SABOTAGE ... line.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  electron-macos:
+    name: fixture electron (macos-15)
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # No package in the repository carries Electron; the fixture fetches one pinned release.
+      - name: Fetch Electron 45.3.1
+        id: electron
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            dir="$RUNNER_TEMP/electron"
+            if npm install --no-save --prefix "$dir" electron@45.3.1 > electron.log 2>&1 \
+              && node "$dir/node_modules/electron/install.js" >> electron.log 2>&1 \
+              && binary=$(node -p "require(process.argv[1])" "$dir/node_modules/electron") && test -x "$binary"; then
+              echo "result=Electron 45.3.1 fetched on attempt $attempt" >> "$GITHUB_OUTPUT"
+              echo "binary=$binary" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            tail -n 5 electron.log
+            [ "$attempt" -lt 3 ] && sleep 20
+          done
+          echo "result=ENVIRONMENT failure, the runner could not fetch Electron after 3 attempts: $(tail -n 1 electron.log)" >> "$GITHUB_OUTPUT"
+          echo "::error::ENVIRONMENT failure, the runner could not fetch Electron (not a fixture failure)"
+          exit 1
+
+      - name: Self-test
+        shell: bash
+        run: bun script/qa/computer/conformance/fixtures/self-test.ts --fixture electron-macos -- "${{ steps.electron.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs
+
+      - name: Sabotage legs (each must turn the self-test red)
+        shell: bash
+        run: |
+          for field in value receivedKeys pressCount scrollSteps dragOrder menuSelection title savedDocuments; do
+            bun script/qa/computer/conformance/fixtures/self-test.ts --fixture electron-macos --sabotage "$field" -- "${{ steps.electron.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs | tail -n 1
+            test "${PIPESTATUS[0]}" -eq 0
+          done
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Conformance fixture electron (macOS)
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Electron fetch: ${{ steps.electron.outputs.result || 'not reached' }}
+            - The shared page (web/) in Electron: each catalog action applied in the page must change exactly its report field.
+          JOB_SUMMARY_NEXT: An ENVIRONMENT failure on the Electron fetch is the runner, not the fixture; rerun. Otherwise start with the first CHECK ... FAIL or SABOTAGE ... line.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  webview-macos:
+    name: fixture webview (macos-15)
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build with the image's swiftc
+        id: build
+        run: echo "binary=$(bash script/qa/computer/conformance/fixtures/webview-macos/build.sh "$RUNNER_TEMP" | tail -n 1)" >> "$GITHUB_OUTPUT"
+
+      - name: Self-test
+        shell: bash
+        run: bun script/qa/computer/conformance/fixtures/self-test.ts --fixture webview-macos -- "${{ steps.build.outputs.binary }}"
+
+      - name: Sabotage legs (each must turn the self-test red)
+        shell: bash
+        run: |
+          for field in value receivedKeys pressCount scrollSteps dragOrder menuSelection title savedDocuments; do
+            bun script/qa/computer/conformance/fixtures/self-test.ts --fixture webview-macos --sabotage "$field" -- "${{ steps.build.outputs.binary }}" | tail -n 1
+            test "${PIPESTATUS[0]}" -eq 0
+          done
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Conformance fixture webview (macOS)
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - WKWebView host of the shared page, built by the image's swiftc, no package install.
+            - Each catalog action applied in the page must change exactly its report field.
+          JOB_SUMMARY_NEXT: A build failure names the swiftc error; otherwise start with the first CHECK ... FAIL or SABOTAGE ... line.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  webview-windows:
+    name: fixture webview (windows-latest)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # The WebView2 SDK ships only as a NuGet package; one pinned release is fetched and checked by digest.
+      - name: Fetch the WebView2 SDK 1.0.4314.35
+        id: sdk
+        shell: bash
+        run: |
+          url=https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/1.0.4314.35/microsoft.web.webview2.1.0.4314.35.nupkg
+          for attempt in 1 2 3; do
+            if curl -fsSL -o "$RUNNER_TEMP/webview2.zip" "$url" \
+              && echo "90778deb1b77e36292828b4b5833c9255c27533f40e0ddd55891ae718944edc4  $RUNNER_TEMP/webview2.zip" | sha256sum -c -; then
+              unzip -q -o "$RUNNER_TEMP/webview2.zip" -d "$RUNNER_TEMP/webview2"
+              echo "result=WebView2 SDK 1.0.4314.35 fetched and verified on attempt $attempt" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            [ "$attempt" -lt 3 ] && sleep 20
+          done
+          echo "result=ENVIRONMENT failure, the runner could not fetch the WebView2 SDK after 3 attempts" >> "$GITHUB_OUTPUT"
+          echo "::error::ENVIRONMENT failure, the runner could not fetch the WebView2 SDK (not a fixture failure)"
+          exit 1
+
+      - name: Check the WebView2 runtime
+        id: runtime
+        shell: pwsh
+        run: |
+          $key = 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+          $version = (Get-ItemProperty -Path $key -ErrorAction SilentlyContinue).pv
+          if (-not $version) {
+            "result=ENVIRONMENT failure, the image carries no WebView2 runtime" >> $env:GITHUB_OUTPUT
+            Write-Output "::error::ENVIRONMENT failure, the image carries no WebView2 runtime (not a fixture failure)"
+            exit 1
+          }
+          "result=WebView2 runtime $version" >> $env:GITHUB_OUTPUT
+
+      - name: Build with the in-box C# compiler
+        shell: pwsh
+        run: script/qa/computer/conformance/fixtures/webview-windows/build.ps1 -Out "$env:RUNNER_TEMP\webview\ConformanceFixtureWeb.exe" -Sdk "$env:RUNNER_TEMP\webview2"
+
+      - name: Self-test
+        shell: bash
+        run: bun script/qa/computer/conformance/fixtures/self-test.ts --fixture webview-windows -- "$RUNNER_TEMP/webview/ConformanceFixtureWeb.exe"
+
+      - name: Sabotage legs (each must turn the self-test red)
+        shell: bash
+        run: |
+          for field in value receivedKeys pressCount scrollSteps dragOrder menuSelection title savedDocuments; do
+            bun script/qa/computer/conformance/fixtures/self-test.ts --fixture webview-windows --sabotage "$field" -- "$RUNNER_TEMP/webview/ConformanceFixtureWeb.exe" | tail -n 1
+            test "${PIPESTATUS[0]}" -eq 0
+          done
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Conformance fixture webview (Windows)
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - WebView2 SDK: ${{ steps.sdk.outputs.result || 'not reached' }}
+            - Runtime: ${{ steps.runtime.outputs.result || 'not reached' }}
+            - WebView2 host of the shared page, built by the in-box C# compiler.
+          JOB_SUMMARY_NEXT: An ENVIRONMENT failure on the SDK fetch or the runtime check is the runner, not the fixture. Otherwise start with the build error or the first CHECK ... FAIL line.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

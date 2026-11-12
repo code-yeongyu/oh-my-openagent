@@ -1,7 +1,7 @@
 # Conformance fixture apps
 
 The apps the conformance catalog (`../catalog.ts`) and the model-free task set (`../taskset/tasks.ts`) run against: a
-native toolkit app per OS, an Electron app and a web-view app. Each holds the widgets every catalog action needs, in the window
+native toolkit app, an Electron app and a web-view app on each of Linux, Windows and macOS. Each holds the widgets every catalog action needs, in the window
 "Conformance Document"; File > New Window opens "Conformance Document 2". A window is selected by TITLE, never by the
 app display name, so the title carries the app's name and the display name does not matter.
 
@@ -10,8 +10,10 @@ app display name, so the title carries the app's name and the display name does 
 | `native-linux/` | GTK 3 through PyGObject, AT-SPI on | `apt-get install python3-gi gir1.2-gtk-3.0 at-spi2-core` | `fixture native-linux (ubuntu-26.04)` |
 | `native-windows/` | WinForms | the in-box .NET Framework C# compiler (`build.ps1`) | `fixture native-windows (windows-latest)` |
 | `native-macos/` | AppKit app bundle | the image's `swiftc` (`build.sh`) | `fixture native-macos (macos-15)` |
-| `electron/` | Electron 45.3.1 around `web/` | one pinned release fetched by the job | `fixture electron (ubuntu-26.04)`, `fixture electron (windows-latest)` |
+| `electron/` | Electron 45.3.1 around `web/` | one pinned release fetched by the job | `fixture electron (ubuntu-26.04)`, `fixture electron (windows-latest)`, `fixture electron (macos-15)` |
 | `webview/` | WebKitGTK 4.1 in a GTK 3 window around `web/` | `apt-get install gir1.2-webkit2-4.1` | `fixture webview (ubuntu-26.04)` |
+| `webview-macos/` | WKWebView around `web/`, app bundle | the image's `swiftc` (`build.sh`) | `fixture webview (macos-15)` |
+| `webview-windows/` | WebView2 around `web/` | the in-box C# compiler with the WebView2 SDK 1.0.4314.35 (NuGet, checked by digest; it ships only as a package) | `fixture webview (windows-latest)` |
 
 The Linux image carries Xvfb and Tk but no GTK bindings, and Tk exports no AT-SPI tree, so the accessibility cells
 could not be delivered on it; that is why the Linux apps install GTK. Every install retries three times and a failure is

@@ -87,7 +87,8 @@ function buildMenu() {
       click: (_item, focused) => void menu(focused ?? windows[0], `${title}/${label}`),
     })),
   }))
-  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+  const appMenu = process.platform === "darwin" ? [{ role: "appMenu" }] : []
+  Menu.setApplicationMenu(Menu.buildFromTemplate([...appMenu, ...template]))
 }
 
 async function control(line) {
