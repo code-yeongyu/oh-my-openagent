@@ -80,17 +80,19 @@ describe("project model_profile RPC owner home lookup (#13207, #13209)", () => {
   })
 
   // The default runner with its process spawn injected: the lookup binary comes from PATH, and an exit that means
-  // "no such account" is told apart from a failed lookup.
+  // "no such account" is told apart from a failed lookup. The passwd sources default to local files only.
   function lookupThroughRunner(
     uid: number,
     platform: NodeJS.Platform,
     exec: (file: string, args: readonly string[]) => string,
     which: (command: string) => string | null = (command) => `/opt/tools/bin/${command}`,
+    nsswitch: () => string | null = () => "passwd: files systemd\ngroup: files\n",
+    passwdFile: () => string | null = () => "root:x:0:0:root:/root:/bin/sh\n",
   ): string | null | undefined {
     const { lookupHomeOfUid, runPasswdLookup } = projectModelProfileRpc
     return lookupHomeOfUid(
       uid,
-      (asked) => runPasswdLookup(asked, { platform, exec, which }),
+      (asked) => runPasswdLookup(asked, { platform, exec, which, nsswitch, passwdFile }),
       () => 4_000_000 + uid,
     )
   }
@@ -110,17 +112,71 @@ describe("project model_profile RPC owner home lookup (#13207, #13209)", () => {
     expect(calls).toStrictEqual(["/opt/tools/bin/getent passwd 424250", "/opt/tools/bin/id -P 424251"])
   })
 
-  test("#given getent exits 2 or id -P reports no such user #when the default runner looks the uid up #then there is no such account", () => {
+  test("#given getent exits 2 and passwd entries come only from local files #when the default runner looks the uid up #then there is no such account", () => {
+    const notFound = () => {
+      throw exitError(2)
+    }
+
+    expect(lookupThroughRunner(424252, "linux", notFound)).toBeNull()
+    expect(lookupThroughRunner(424259, "linux", notFound, undefined, () => null)).toBeNull()
+  })
+
+  // getent exits 2 and id -P says "no such user" for any missing entry, also when the directory service that would
+  // hold it is down, so only a passwd database read from local files alone proves the account is missing.
+  test("#given getent exits 2 while passwd also comes from a directory service, or id -P reports no such user #when the default runner looks the uid up #then the lookup failed", () => {
+    const notFound = () => {
+      throw exitError(2)
+    }
+
     expect(
-      lookupThroughRunner(424252, "linux", () => {
-        throw exitError(2)
+      lookupThroughRunner(424260, "linux", notFound, undefined, () => "passwd:   files [NOTFOUND=return] sss\n"),
+    ).toBeUndefined()
+    expect(lookupThroughRunner(424261, "linux", notFound, undefined, () => "passwd: files ldap\n")).toBeUndefined()
+    expect(
+      lookupThroughRunner(424262, "linux", notFound, undefined, () => {
+        throw Object.assign(new Error("EACCES: permission denied"), { code: "EACCES" })
       }),
-    ).toBeNull()
+    ).toBeUndefined()
     expect(
       lookupThroughRunner(424253, "darwin", () => {
         throw exitError(1, "id: 424253: no such user\n")
       }),
-    ).toBeNull()
+    ).toBeUndefined()
+  })
+
+  // compat reads NIS through `+`/`-` lines in /etc/passwd, and older glibc uses it for passwd when nsswitch.conf is
+  // missing or has no passwd line, so a NIS outage there also ends in getent exit 2.
+  test("#given passwd uses compat, named in nsswitch.conf or as the default with +/- lines in /etc/passwd #when getent exits 2 #then the lookup failed", () => {
+    const notFound = () => {
+      throw exitError(2)
+    }
+    const nisLines = () => "root:x:0:0:root:/root:/bin/sh\n+@staff::::::\n"
+
+    expect(lookupThroughRunner(424263, "linux", notFound, undefined, () => "passwd: compat\n")).toBeUndefined()
+    expect(lookupThroughRunner(424264, "linux", notFound, undefined, () => null, nisLines)).toBeUndefined()
+    expect(
+      lookupThroughRunner(
+        424265,
+        "linux",
+        notFound,
+        undefined,
+        () => "group: files\n",
+        () => "-baduser::::::\n",
+      ),
+    ).toBeUndefined()
+    expect(
+      lookupThroughRunner(
+        424266,
+        "linux",
+        notFound,
+        undefined,
+        () => null,
+        () => {
+          throw Object.assign(new Error("EACCES: permission denied"), { code: "EACCES" })
+        },
+      ),
+    ).toBeUndefined()
+    expect(lookupThroughRunner(424267, "linux", notFound, undefined, () => null)).toBeNull()
   })
 
   test("#given the lookup binary is not on PATH, times out or fails otherwise #when the default runner looks the uid up #then the lookup failed", () => {

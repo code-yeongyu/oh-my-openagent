@@ -75,36 +75,45 @@ describe("project model_profile RPC refusal of this account's own home (#13209)"
     }
   })
 
-  test("#given the lookup of this account's own home fails and HOME points inside a folder this account owns #when a pin is set in that folder or its parent #then it is refused and nothing is written", () => {
-    const parent = folder()
-    const work = join(parent, "work")
-    mkdirSync(join(work, ".omo"), { recursive: true })
-    writeFileSync(join(work, ".omo", "omo.jsonc"), COMMENTED)
-    mkdirSync(join(work, "sandbox-home"))
-    const deps = { homeOfUid: () => undefined }
-    const previous = process.env.HOME
-    process.env.HOME = join(work, "sandbox-home")
-    try {
-      for (const cwd of [work, parent]) {
-        expect(setProjectModelProfile(trusted(cwd), { modelProfile: "a/b" }, deps)).toMatchObject({
-          kind: "refused",
-          code: "home_folder",
-        })
-        expect(getProjectModelProfile(trusted(cwd), deps)).toMatchObject({ kind: "refused", code: "home_folder" })
+  // A missing passwd entry for this account (a container started with a bare uid) is treated like a failed lookup:
+  // only folders at or above HOME are refused, so the bind-mounted project below it keeps working.
+  for (const [label, ownHome] of [
+    ["fails", undefined],
+    ["finds no passwd entry", null],
+  ] as const) {
+    test(`#given the lookup of this account's own home ${label} and HOME points inside a folder this account owns #when a pin is set in that folder or its parent #then it is refused and nothing is written`, () => {
+      const parent = folder()
+      const work = join(parent, "work")
+      mkdirSync(join(work, ".omo"), { recursive: true })
+      writeFileSync(join(work, ".omo", "omo.jsonc"), COMMENTED)
+      mkdirSync(join(work, "sandbox-home"))
+      const deps = { homeOfUid: () => ownHome }
+      const previous = process.env.HOME
+      process.env.HOME = join(work, "sandbox-home")
+      try {
+        for (const cwd of [work, parent]) {
+          expect(setProjectModelProfile(trusted(cwd), { modelProfile: "a/b" }, deps)).toMatchObject({
+            kind: "refused",
+            code: "home_folder",
+          })
+          expect(getProjectModelProfile(trusted(cwd), deps)).toMatchObject({ kind: "refused", code: "home_folder" })
+        }
+        expect(configText(work)).toBe(COMMENTED)
+        expect(existsSync(join(parent, ".omo"))).toBe(false)
+      } finally {
+        if (previous === undefined) delete process.env.HOME
+        else process.env.HOME = previous
       }
-      expect(configText(work)).toBe(COMMENTED)
-      expect(existsSync(join(parent, ".omo"))).toBe(false)
-    } finally {
-      if (previous === undefined) delete process.env.HOME
-      else process.env.HOME = previous
+    })
+  }
+
+  test("#given the lookup of this account's own home fails or finds no passwd entry #when a pin is set in a folder this account owns #then it is written", () => {
+    for (const ownHome of [undefined, null]) {
+      const work = folder()
+
+      const reply = setProjectModelProfile(trusted(work), { modelProfile: "a/b" }, { homeOfUid: () => ownHome })
+
+      expect(reply).toMatchObject({ kind: "ok", modelProfile: "a/b" })
     }
-  })
-
-  test("#given the lookup of this account's own home fails #when a pin is set in a folder this account owns #then it is written", () => {
-    const work = folder()
-
-    const reply = setProjectModelProfile(trusted(work), { modelProfile: "a/b" }, { homeOfUid: () => undefined })
-
-    expect(reply).toMatchObject({ kind: "ok", modelProfile: "a/b" })
   })
 })
