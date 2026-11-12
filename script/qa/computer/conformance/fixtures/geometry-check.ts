@@ -4,7 +4,7 @@ import type { FixtureGeometry } from "./fixture-report.ts"
 type Rect = FixtureGeometry["window"]["client"]
 
 /** Widgets a pixel driver aims at, by accessible name with the role it must carry. */
-export const REQUIRED_WIDGETS: Readonly<Record<string, string>> = {
+const REQUIRED_WIDGETS: Readonly<Record<string, string>> = {
   Press: "button",
   Value: "text",
   Title: "text",
