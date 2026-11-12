@@ -16,7 +16,9 @@
   // Extension class the shell loads); its pure window-rects.js stays checked through window-rects.test.mjs.
   // The omo 5.1.66 local API decoders, vendored byte for byte (git blob ids pinned in its PIN.json) so the old-client
   // tests read a newer service's frames with a released client's decoders; their unused exports are that release's.
-  "ignore": ["packages/shared-skills/upstreams/**", "packages/omo-senpi/vendor/**", "packages/gnome-window-rects-extension/extension.js", "packages/device-service-core/vendor/omo-5.1.66-decoder/**"],
+  // brand-logo.generated.d.ts declares an untracked build output (#13192): its importers resolve to it only while the
+  // .js is unbuilt, so knip's verdict on it would depend on whether the tree was built.
+  "ignore": ["packages/shared-skills/upstreams/**", "packages/omo-senpi/vendor/**", "packages/gnome-window-rects-extension/extension.js", "packages/device-service-core/vendor/omo-5.1.66-decoder/**", "packages/omo-native/bin/lib/brand-logo.generated.d.ts"],
   // Unused exports already present at origin dev 4686e425b5, named per symbol. knip has no per-symbol ignore and a file-wide
   // ignoreIssues "exports" entry would also hide a new unused export in that file, so script/knip-preexisting-exports.ts
   // (shared byte for byte with omo-relay-daemon, sha256-pinned by script/knip-coverage.test.ts) drops exactly these names, and
@@ -450,8 +452,6 @@
       "packages/omo-codex/plugin/test/aggregate-plugin-fixture.mjs": ["readRepoJson", "readPluginVersion", "hasSpawnIsolationArgument"],
       // pre-existing at origin dev 4686e425b5: unused export(s) CONTEXT_PRESSURE_SKILL_BUDGET_BYTES, assertPackagedContentMatches
       "packages/omo-codex/plugin/test/sync-skills-test-support.mjs": ["CONTEXT_PRESSURE_SKILL_BUDGET_BYTES", "assertPackagedContentMatches"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) PASSTHROUGH_COMMANDS, buildDelegatedOmoInvocation, formatLazyCodexInstallHelp, installMarketplaceLocally, parseLazyCodexInstallCliArgs, resolveCodexInstallerBinDir, resolveDefaultRepoRoot, resolveDefaultRepoRootForEntrypoint, runDelegatedOmoCommand, runLazyCodexInstallLocalCli
-      "packages/omo-codex/scripts/install-dist/install-local.mjs": ["PASSTHROUGH_COMMANDS", "buildDelegatedOmoInvocation", "formatLazyCodexInstallHelp", "installMarketplaceLocally", "parseLazyCodexInstallCliArgs", "resolveCodexInstallerBinDir", "resolveDefaultRepoRoot", "resolveDefaultRepoRootForEntrypoint", "runDelegatedOmoCommand", "runLazyCodexInstallLocalCli"],
       // pre-existing at origin dev 4686e425b5: unused export(s) writePlugin
       "packages/omo-codex/scripts/install-test-fixtures.mjs": ["writePlugin"],
       // pre-existing at origin dev 4686e425b5: unused export(s) installedMarketplaceRoot
@@ -509,8 +509,6 @@
       "packages/omo-config-core/src/schema/team.ts": ["OmoTeamCategoryMemberSchema", "OmoTeamSubagentMemberSchema", "OmoTeamMemberSchema", "OmoTeamSpecSchema", "OmoTeamSpecLayerSchema"],
       // pre-existing at origin dev 4686e425b5: unused export(s) AGENT_DIR_ENV_NAMES, ADOPTED_STATE_FILES, defaultAgentDir
       "packages/omo-native/bin/lib/agent-dir.js": ["AGENT_DIR_ENV_NAMES", "ADOPTED_STATE_FILES", "defaultAgentDir"],
-      // added on dev by #11445 after the baseline: the declaration of the sibling generated .js, which every importer resolves to
-      "packages/omo-native/bin/lib/brand-logo.generated.d.ts": ["OMO_BRAND_LOGO"],
       // pre-existing at origin dev 4686e425b5: unused export(s) BUN_MIN_VERSION, resolveBunGuard, findNodeBinary
       "packages/omo-native/bin/lib/bun-runtime.js": ["BUN_MIN_VERSION", "resolveBunGuard", "findNodeBinary"],
       // pre-existing at origin dev 4686e425b5: unused export(s) COMPUTER_USE_RUNTIME
@@ -529,8 +527,6 @@
       "packages/omo-native/bin/lib/model-chains.js": ["formatModelChainLines"],
       // pre-existing at origin dev 4686e425b5: unused export(s) readInstalledVersion
       "packages/omo-native/bin/lib/self-update.js": ["readInstalledVersion"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) default
-      "packages/omo-native/bin/lib/service-auth.generated.js": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) API_KEY_TYPE_ACCEPTLIST
       "packages/omo-native/bin/lib/setup-credentials.js": ["API_KEY_TYPE_ACCEPTLIST"],
       // pre-existing at origin dev 4686e425b5: unused export(s) KNOWN_AUTH_SCHEMA_VERSIONS
@@ -2926,7 +2922,6 @@
         "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "scripts/install-local.mjs",
-        "scripts/install-dist/install-local.mjs",
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
       ],
@@ -4351,49 +4346,16 @@
         "scripts/sync-version.mjs",
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
-        "extensions/omo-claim-receipt.js",
-        "extensions/omo-computer-use.js",
-        "extensions/omo-desktop-toolkit.js",
-        "extensions/omo-device-account.js",
-        "extensions/omo-feedback.js",
-        "extensions/omo-memory-commands.js",
-        "extensions/omo-memory-doctor.js",
-        "extensions/omo-memory-memfs.js",
-        "extensions/omo-memory-palace.js",
-        "extensions/omo-memory-sync.js",
-        "extensions/omo-recall-store.js",
-        "extensions/omo-device-service.js",
-        "extensions/omo-session-history.js",
-        "extensions/omo-task.js",
-        "extensions/omo-telemetry-otlp.js",
-        "extensions/omo-telemetry-posthog.js",
-        "extensions/omo-telemetry-recovery.js",
-        "extensions/omo-thread-client.js",
-        "runtime/agent-toolkit-sdk/sdk.js",
       ],
       "ignoreFiles": [
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "extensions/gateway-store-worker.mjs",
-        // the bundled computer.run QuickJS sandbox Worker, loaded by path by senpi-desktop-service src/run/sandbox/quickjs.ts
-        "extensions/omo-computer-run-worker.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "extensions/omo-init-deep-advisor.js",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "extensions/omo-member.js",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "runtime/dag/library.js",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "runtime/dag/sdk.js",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "runtime/rollback-migrate.js",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "runtime/thread-sdk/sdk.js",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/build-extension.d.mts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/bundle-inputs-trace.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/install.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/native-skill-sources.d.mts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
