@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { existsSync } from "node:fs"
+import { gatewayInboxDirectory } from "./gateway/paths"
 import type { RemoteSessionRow } from "./remote/ports"
 import type { ThreadHostSession } from "./tools"
 import { B_ROW, createRemoteThreadFixture } from "./thread-remote-fixture"
@@ -70,12 +72,14 @@ describe("#13006: a send answers the same shape and the same refusals whichever 
     const a = fixture.account({ rows, live: rows.map((row) => row.session_id) })
     const extra =
       sender === undefined ? {} : { callerReplyTargets: () => [sender.session_id], callerReplySenders: () => [sender] }
-    const { run, permission } = fixture.surface(a.remote, {
+    const { run, permission, prompts, agentDir } = fixture.surface(a.remote, {
       sessions: twinsOn === "local" ? [LOCAL, ...TWINS] : [LOCAL],
       ...extra,
     })
     const admits = () => a.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message")
-    return { run, permission, admits }
+    // A delivery to a session on this device leaves a marker in its gateway inbox: none means nothing reached it.
+    const reachedLocally = (durableId: string) => existsSync(gatewayInboxDirectory(agentDir, durableId))
+    return { run, permission, admits, prompts, reachedLocally }
   }
 
   /**
@@ -139,7 +143,7 @@ describe("#13006: a send answers the same shape and the same refusals whichever 
     "#given a run woken by a sender that stated the %s thread's name but is another session #when it replies by that name #then the ask is approved from the delivery, and the send never reaches the thread carrying that name",
     async (leg) => {
       const other = TARGET[leg].other
-      const { run, permission, admits } = legs({
+      const { run, permission, admits, prompts, reachedLocally } = legs({
         sender: { session_id: other.id, name: TARGET[leg].name, ...(other.id === "dur-on-b" ? { device: "b" } : {}) },
       })
       expect(permission({ thread: TARGET[leg].name, message: "reply" })).toEqual(approved(TARGET[leg].name))
@@ -147,6 +151,8 @@ describe("#13006: a send answers the same shape and the same refusals whichever 
       if (leg === "local") {
         expect(result).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
         expect(admits()).toHaveLength(1)
+        // The local namesake ("local peer", dur-local) received nothing: no prompt and no gateway delivery.
+        expect({ prompts: prompts(), reached: reachedLocally("dur-local") }).toEqual({ prompts: 0, reached: false })
       } else {
         expect(result).toMatchObject({ kind: "error", error: { code: "not_found" } })
         expect(admits()).toHaveLength(0)

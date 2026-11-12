@@ -34,6 +34,7 @@ import { createGatewayServices } from "./tools/gateway-services"
 import { listThreads, readThread } from "./tools/read-ops"
 import { createRelayTools } from "./tools/relay-tools"
 import { consumedSendersOf, threadSendPermission } from "./tools/reply-permission"
+import { otherDevice, replyTargetMismatch } from "./tools/reply-target"
 import { listAcross, planCreate, renameAlias, withAlias } from "./remote/lazy-ops"
 import { locateControl } from "./control/locate"
 import { closeThread, interruptThread, setModelOn, setThinkingLevelOn } from "./control/operations"
@@ -808,9 +809,6 @@ async function replyLeavesThisDevice(options: ThreadToolSurfaceOptions, address:
   return replyTo !== undefined && ("code" in replyTo || replyTo.device !== undefined)
 }
 
-const otherDevice = (device: string | undefined, here: string | undefined): string | undefined =>
-  device === here ? undefined : device
-
 /**
  * The one consumed sender a reply addresses, its device absent for this device; undefined when the send is no reply. One
  * session id stated from two devices, or one name stated by two senders, is ambiguous_target: none is picked.
@@ -837,26 +835,5 @@ function replySender(
         ...(sender.device === undefined ? {} : { device: sender.device }),
       })),
     },
-  )
-}
-
-function replyTargetMismatch(
-  options: ThreadToolSurfaceOptions,
-  address: string,
-  entry: ThreadAddressEntry,
-  here: string | undefined,
-): ThreadToolFailure | undefined {
-  const senders = consumedSendersOf(options, address)
-  if (senders.length === 0) return undefined
-  const entryDevice = otherDevice(entry.device, here)
-  if (
-    senders.some((sender) => sender.session_id === entry.thread_id && otherDevice(sender.device, here) === entryDevice)
-  )
-    return undefined
-  return threadToolFailure(
-    "reply_target_mismatch",
-    `"${address}" was approved as a reply to a sender of this run's deliveries, but it resolves to ${entry.name} (${entry.thread_id}${entry.device === undefined ? "" : " on " + entry.device}), which is not that sender.`,
-    "Reply with the sender's durable id from the delivery header, or send to the other thread by its id as a normal send.",
-    { resolved_thread_id: entry.thread_id, ...(entry.device === undefined ? {} : { device: entry.device }) },
   )
 }
