@@ -207,7 +207,10 @@ const stateReply = (cwd: string): ProjectModelProfileReply => {
 }
 
 const MODEL_PROFILE_KEYS = ["model_profile", "model_profiles", "model_pad"] as const
-const HARNESS_BLOCKS = ["[senpi]", "[native]"] as const
+// The loader folds a legacy `[senpi]` block into the canonical `[native]` one (`[native]` wins each key). A client's
+// resolver reads the harness block as `[senpi]`, the key users write, so the merged block is sent under that key.
+const LEGACY_HARNESS_BLOCK = "[senpi]"
+const HARNESS_BLOCK = "[native]"
 
 const asRecord = (value: unknown): Readonly<Record<string, unknown>> | null =>
   typeof value === "object" && value !== null && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : null
@@ -215,12 +218,9 @@ const asRecord = (value: unknown): Readonly<Record<string, unknown>> | null =>
 function modelProfileKeys(config: Readonly<Record<string, unknown>>, withProfiles: boolean): Record<string, unknown> {
   const kept: Record<string, unknown> = {}
   for (const key of MODEL_PROFILE_KEYS) if (config[key] !== undefined) kept[key] = config[key]
-  for (const block of HARNESS_BLOCKS) {
-    const harness = asRecord(config[block])
-    if (harness === null) continue
-    const inner = modelProfileKeys(harness, false)
-    if (Object.keys(inner).length > 0) kept[block] = inner
-  }
+  const harness = { ...(asRecord(config[LEGACY_HARNESS_BLOCK]) ?? {}), ...(asRecord(config[HARNESS_BLOCK]) ?? {}) }
+  const harnessKeys = modelProfileKeys(harness, false)
+  if (Object.keys(harnessKeys).length > 0) kept[LEGACY_HARNESS_BLOCK] = harnessKeys
   const profiles = withProfiles ? asRecord(config["profiles"]) : null
   if (profiles !== null) {
     const keptProfiles: Record<string, unknown> = {}
