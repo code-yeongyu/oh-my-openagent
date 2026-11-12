@@ -41,12 +41,21 @@ function Leg-find($a) {
   Emit $r
 }
 
-# The shared directory's ACL as SIDs, read in this leg so no PowerShell code travels on a command line.
+# The shared directory's owner and access entries as SIDs, read in this leg so no PowerShell code travels on a
+# command line. Only SIDs are emitted (never a name, an SDDL alias or icacls text); a read that fails keeps its
+# own error text.
 function Leg-acl($a) {
-  $acl = (Get-Item -LiteralPath $a.path -Force).GetAccessControl('Owner, Access')
-  $sids = @($acl.Access | ForEach-Object { $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value } | Sort-Object -Unique)
-  $owner = $acl.GetOwner([Security.Principal.SecurityIdentifier])
-  Emit @{ owner = $(if ($owner) { $owner.Value } else { '' }); sids = ($sids -join ','); sddl = $acl.Sddl }
+  $acl = Get-Acl -LiteralPath $a.path
+  $r = @{ sids = @(); sidErrors = @() }
+  try {
+    $o = $acl.GetOwner([System.Security.Principal.SecurityIdentifier])
+    if ($null -eq $o) { $r['ownerError'] = 'GetOwner returned null' } else { $r['owner'] = $o.Value }
+  } catch { $r['ownerError'] = $_.Exception.Message }
+  foreach ($e in $acl.Access) {
+    try { $r['sids'] += $e.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+    catch { $r['sidErrors'] += @{ entry = [string]$e.IdentityReference; error = $_.Exception.Message } }
+  }
+  Emit $r
 }
 
 function Leg-close($a) {

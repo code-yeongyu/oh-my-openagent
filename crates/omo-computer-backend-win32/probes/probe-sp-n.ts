@@ -42,7 +42,8 @@ type Target = {
   readonly state: string | undefined
   readonly title: string
 }
-type Killable = { kill(): void }
+// pid and exited are present on real child processes; cleanup waits for exited, never only for kill()
+type Killable = { kill(): void; readonly pid?: number; readonly exited?: Promise<unknown> }
 type Ctx = {
   tmp: string
   shared: string
@@ -560,7 +561,7 @@ const isSupported: Group = {
 }
 
 const timers: Group = {
-  budgetS: 30,
+  budgetS: 15,
   ids: ["n-dwmflush-ms", "n-poll-sleep1-ms", "n-poll-hrtimer1-ms"],
   async run(ctx) {
     const d = obj((await leg(ctx, "dwmflush", { warm: WARM, n: RUNS })).stats)
@@ -650,7 +651,7 @@ const barriers: Group = {
 }
 
 const chords: Group = {
-  budgetS: 60,
+  budgetS: 45,
   ids: [
     "n-fg-chord-ctrl-a-notepad-control",
     "n-posted-chord-ctrl-a-notepad",
@@ -947,7 +948,10 @@ const GROUPS: readonly Group[] = [hostFacts, isSupported, timers, barriers, chor
 // Budget of one probe pass (--measure or --verify): starting the targets, then every group with the time its
 // cleanups may take after a timeout. The self-test checks the hosted workflow's passes fit its job timeout.
 export const SETUP_BUDGET_S = 120
-export const TOTAL_BUDGET_S = SETUP_BUDGET_S + GROUPS.reduce((s, g) => s + g.budgetS + (g.cleanupS ?? 0), 0)
+// ending children (bounded wait for their exit) and removing the run's directories (bounded retries), after the ledger
+export const CLEANUP_BUDGET_S = 30
+export const TOTAL_BUDGET_S =
+  SETUP_BUDGET_S + GROUPS.reduce((s, g) => s + g.budgetS + (g.cleanupS ?? 0), 0) + CLEANUP_BUDGET_S
 // job steps outside the probe (checkout, bun, precondition, upload: about 30 s observed) and the margin kept free
 export const JOB_OVERHEAD_S = 120
 export const JOB_RESERVE_S = 300
@@ -1093,16 +1097,25 @@ export async function freshDir(path: string, lockDown: (p: string) => Promise<st
   return path
 }
 
-const OWNER_SDDL: Readonly<Record<string, string>> = { BA: "S-1-5-32-544", SY: "S-1-5-18" }
 // What is wrong with an ACL read of the shared directory, or undefined. A failed read reports its own error.
+const SID = /^S-1-(?:\d+-)*\d+$/
+export const ADMINISTRATORS_SID = "S-1-5-32-544"
+export const SYSTEM_SID = "S-1-5-18"
 export function aclProblem(j: Json): string | undefined {
   if (typeof j.legError === "string") return `ACL read failed: ${j.legError}`
-  const sddlOwner = /^O:([A-Z]{2}|S-[0-9-]+)/.exec(str(j.sddl))?.[1]
-  const owner = str(j.owner) || (sddlOwner ? (OWNER_SDDL[sddlOwner] ?? sddlOwner) : "")
-  if (!owner) return `ACL read returned no owner (owner=${JSON.stringify(j.owner)} sddl=${JSON.stringify(j.sddl)})`
-  if (owner !== "S-1-5-32-544") return `owner is ${owner}, not Administrators`
-  const sids = str(j.sids)
-  return sids === "S-1-5-18,S-1-5-32-544" ? undefined : `access list is ${sids}, not SYSTEM and Administrators only`
+  if (typeof j.ownerError === "string") return `owner read failed: ${j.ownerError}`
+  const owner = str(j.owner)
+  // compared by SID only: a name, an SDDL alias or icacls text is never trusted, even when it looks right
+  if (!SID.test(owner)) return `owner read returned ${owner ? `"${owner}", not a SID` : "nothing"}`
+  if (owner !== ADMINISTRATORS_SID) return `owner is ${owner}, not Administrators (${ADMINISTRATORS_SID})`
+  const sidErrors = arr(j.sidErrors).map((e) => str(e.error))
+  if (sidErrors.length) return `access entries not translated to SIDs: ${sidErrors.join("; ")}`
+  const sids = (Array.isArray(j.sids) ? j.sids.map(str) : str(j.sids).split(",")).filter(Boolean)
+  const notSid = sids.filter((x) => !SID.test(x))
+  if (notSid.length) return `access entries are not SIDs: ${notSid.join(",")}`
+  const got = [...new Set(sids)].sort().join(",")
+  const want = [SYSTEM_SID, ADMINISTRATORS_SID].sort().join(",")
+  return got === want ? undefined : `access list is ${got || "empty"}, not SYSTEM and Administrators only`
 }
 
 // The ACL is read back by a leg (no PowerShell code on a command line), which emits the ACL or its error.
@@ -1131,6 +1144,87 @@ async function setup(ctx: Ctx, ids: readonly string[]) {
   if (needs(/-wpf$/)) await startTarget(ctx, "wpf", "SPN-WPF", 80, 460)
   if (needs(/-webview2$/)) await startTarget(ctx, "webview2", "SPN-WV2", 640, 460)
   if (needs(/uipi|elevated/)) await startTarget(ctx, "edit", "SPN-ELEV", 360, 260)
+}
+
+// ------------------------------------------------------------------ run end: ledger first, then cleanup
+
+// Ends every child and waits up to ms for each to EXIT. killTree (taskkill /T /F on Windows) also ends
+// grandchildren, such as WebView2's msedgewebview2 processes that keep files open in the shared directory.
+// Returns the pids still running at the deadline.
+export async function endChildren(
+  procs: readonly Killable[],
+  ms: number,
+  killTree?: (pid: number) => Promise<unknown>,
+): Promise<number[]> {
+  for (const p of procs) {
+    if (killTree && p.pid !== undefined) await killTree(p.pid).catch(() => p.kill())
+    else p.kill()
+  }
+  const left = await Promise.all(
+    procs.map(async (p) =>
+      (await bounded(p.exited ?? Promise.resolve(), ms / 1000)) === "timeout" ? (p.pid ?? -1) : undefined,
+    ),
+  )
+  return left.filter((pid): pid is number => pid !== undefined)
+}
+
+// Removes a directory, retrying a busy one (EBUSY, EPERM, ENOTEMPTY) with a growing delay: tries attempts spread
+// over about totalMs. A final failure is returned as a warning, never thrown.
+export async function removeDir(
+  path: string,
+  rm: (p: string) => void = (p) => rmSync(p, { recursive: true, force: true }),
+  tries = 10,
+  totalMs = 5000,
+): Promise<string | undefined> {
+  const unit = totalMs / ((tries * (tries - 1)) / 2 || 1)
+  let last = ""
+  for (let i = 0; i < tries; i++) {
+    try {
+      rm(path)
+      return undefined
+    } catch (e) {
+      last = (e as Error).message
+      // already gone: nothing left to remove
+      if ((e as { code?: string }).code === "ENOENT" || /^ENOENT\b/.test(last)) return undefined
+      if (i < tries - 1) await Bun.sleep(Math.round(unit * (i + 1)))
+    }
+  }
+  return `could not remove ${path} after ${tries} tries over about ${totalMs / 1000} s: ${clean(last)}`
+}
+
+// The end of a run. The measurement runs, then its output is written (the ledger, or the verify comparison),
+// even when the measurement threw, and only then the cleanup runs. A cleanup failure is a warning line: it never
+// discards the written output and never changes the exit code. Errors are reported in order: the
+// measurement's first, the cleanup's second.
+export async function runThenClean(
+  measure: () => Promise<void>,
+  write: (measureError: Error | undefined) => number,
+  cleanup: () => Promise<string[]>,
+  cleanupBudgetS = CLEANUP_BUDGET_S,
+): Promise<{ readonly exitCode: number; readonly lines: readonly string[] }> {
+  const lines: string[] = []
+  let measureError: Error | undefined
+  try {
+    await measure()
+  } catch (e) {
+    measureError = e as Error
+    lines.push(`SP-N ERROR (measurement): ${clean(measureError.message)}`)
+  }
+  let exitCode: number
+  try {
+    exitCode = write(measureError)
+  } catch (e) {
+    lines.push(`SP-N ERROR (writing the result): ${clean((e as Error).message)}`)
+    exitCode = 1
+  }
+  if (measureError) exitCode = exitCode || 1
+  const warnings = await bounded(
+    cleanup().catch((e: Error) => [`cleanup threw: ${clean(e.message)}`]),
+    cleanupBudgetS,
+  )
+  for (const w of warnings === "timeout" ? [`cleanup ran past ${cleanupBudgetS} s`] : warnings)
+    lines.push(`SP-N WARNING (cleanup): ${w}`)
+  return { exitCode, lines }
 }
 
 // ------------------------------------------------------------------ self-test
@@ -1281,7 +1375,7 @@ const LOGIC_CHECKS: readonly Check[] = [
       const yml = readFileSync(WORKFLOW, "utf8")
       const passes = (yml.match(/probe-sp-n\.ts --(?:measure|verify)\b/g) ?? []).length
       const timeoutS = Number(/timeout-minutes:\s*(\d+)/.exec(yml)?.[1] ?? 0) * 60
-      const sum = SETUP_BUDGET_S + GROUPS.reduce((s, g) => s + g.budgetS + (g.cleanupS ?? 0), 0)
+      const sum = SETUP_BUDGET_S + GROUPS.reduce((s, g) => s + g.budgetS + (g.cleanupS ?? 0), 0) + CLEANUP_BUDGET_S
       if (TOTAL_BUDGET_S !== sum) return `TOTAL_BUDGET_S ${TOTAL_BUDGET_S} != setup + group budgets ${sum}`
       const spent = passes * TOTAL_BUDGET_S + JOB_OVERHEAD_S + JOB_RESERVE_S
       const allowed = Math.floor(timeoutS * (1 - JOB_MIN_MARGIN))
@@ -1387,20 +1481,59 @@ const LOGIC_CHECKS: readonly Check[] = [
     },
   },
   {
-    finding: "RUN acl-read (hosted run 43085201882)",
+    finding: "OWNER by-SID (hosted run 43085201882)",
     async run() {
-      const denied = aclProblem({ legError: "Access to the path is denied" })
-      if (!denied?.includes("Access to the path is denied")) return `a failed ACL read hides its error: ${denied}`
-      const fromSddl = aclProblem({
-        owner: "",
-        sddl: "O:BAG:SYD:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)",
-        sids: "S-1-5-18,S-1-5-32-544",
+      const A = ADMINISTRATORS_SID
+      const S = SYSTEM_SID
+      const ok = { owner: A, sids: [S, A] }
+      // every representation of the owner and the entries: only the exact SIDs pass, every other one is refused
+      // with a reason, and a failed read keeps its own error text
+      const cases: Array<[string, Json, RegExp | undefined]> = [
+        ["owner SID", ok, undefined],
+        ["entries in any order, repeated", { owner: A, sids: [A, S, A] }, undefined],
+        ["entries as one comma string", { owner: A, sids: `${A},${S}` }, undefined],
+        ["owner by name", { owner: "BUILTIN\\Administrators", sids: [S, A] }, /not a SID/],
+        ["owner as SDDL alias", { owner: "BA", sids: [S, A] }, /not a SID/],
+        [
+          "owner only in the SDDL",
+          { owner: "", sddl: "O:BAG:SYD:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)", sids: [S, A] },
+          /returned nothing/,
+        ],
+        [
+          "owner read error",
+          { ownerError: "GetOwner returned null", sids: [S, A] },
+          /owner read failed: GetOwner returned null/,
+        ],
+        [
+          "whole read error",
+          { legError: "Access to the path is denied" },
+          /ACL read failed: Access to the path is denied/,
+        ],
+        ["owner SYSTEM", { owner: S, sids: [S, A] }, /not Administrators/],
+        ["owner another SID", { owner: "S-1-5-21-1-2-3-500", sids: [S, A] }, /not Administrators/],
+        ["entry by name", { owner: A, sids: [S, "BUILTIN\\Users"] }, /not SIDs/],
+        [
+          "entry not translated",
+          { owner: A, sids: [S, A], sidErrors: [{ error: "IdentityNotMappedException" }] },
+          /IdentityNotMappedException/,
+        ],
+        ["extra entry", { owner: A, sids: [S, A, "S-1-5-32-545"] }, /not SYSTEM and Administrators only/],
+        ["missing entry", { owner: A, sids: [A] }, /not SYSTEM and Administrators only/],
+        ["no entries", { owner: A, sids: [] }, /access list is empty/],
+      ]
+      const bad = cases.flatMap(([name, j, want]) => {
+        const got = aclProblem(j)
+        return (want ? got !== undefined && want.test(got) : got === undefined) ? [] : [`${name}: ${got ?? "accepted"}`]
       })
-      if (fromSddl) return `an owner present in the SDDL is not read: ${fromSddl}`
+      if (bad.length) return bad.join("; ")
+      const leg = source("sp-n-legs-session.ps1")
+      const acl = leg.slice(leg.indexOf("function Leg-acl("), leg.indexOf("function Leg-close("))
+      if (!/GetOwner\(\[System\.Security\.Principal\.SecurityIdentifier\]\)/.test(acl))
+        return "Leg-acl does not read the owner as a SecurityIdentifier"
+      if (/Sddl|\.Owner\b|icacls/i.test(acl)) return "Leg-acl still emits or reads a name, SDDL or icacls text"
       const self = source("probe-sp-n.ts")
       const lock = self.slice(self.indexOf("async function lockDownWindows("), self.indexOf("async function setup("))
-      if (/"-Command"/.test(lock)) return "the ACL read is still PowerShell code on a command line"
-      return /leg\(ctx, "acl"/.test(lock) ? undefined : "the ACL read is not a leg"
+      return /"-Command"/.test(lock) ? "the ACL read is PowerShell code on a command line" : undefined
     },
   },
   {
@@ -1496,6 +1629,146 @@ const LOGIC_CHECKS: readonly Check[] = [
     },
   },
   {
+    finding: "CLEANUP keeps-ledger (hosted run 43124914270)",
+    async run() {
+      const dir = join(tmpdir(), `omo-sp-n-end-${process.pid}`)
+      mkdirSync(dir, { recursive: true })
+      try {
+        const out = join(dir, "ledger.tsv")
+        const fsError = (code: string) =>
+          Object.assign(new Error(`${code}: rm 'C:\\ProgramData\\omo-sp-n-x'`), { code })
+        // every way the cleanup can fail: it throws (EBUSY, EPERM, ENOENT), it reports a child still alive or a
+        // directory it could not remove, it never returns
+        const modes: Array<[string, () => Promise<string[]>, RegExp]> = [
+          ["EBUSY", () => Promise.reject(fsError("EBUSY")), /EBUSY/],
+          ["EPERM", () => Promise.reject(fsError("EPERM")), /EPERM/],
+          ["ENOENT", () => Promise.reject(fsError("ENOENT")), /ENOENT/],
+          ["child alive", async () => ["children still running after 10 s: 4242"], /4242/],
+          ["dir kept", async () => ["could not remove x after 10 tries over about 5 s: EBUSY"], /could not remove/],
+          ["hangs", () => never(), /ran past 1 s/],
+        ]
+        // and every body result: written with 0, written with a verify difference (1), measurement threw
+        const bodies: Array<[string, () => Promise<void>, number]> = [
+          ["ok", async () => undefined, 0],
+          ["verify differs", async () => undefined, 1],
+          ["threw", () => Promise.reject(new Error("group exploded")), 1],
+        ]
+        const bad: string[] = []
+        for (const [mode, cleanup, mark] of modes)
+          for (const [body, measure, code] of bodies) {
+            rmSync(out, { force: true })
+            const r = await bounded(
+              runThenClean(
+                measure,
+                (e) => {
+                  writeFileSync(out, `ledger ${e ? "partial" : "full"}\n`)
+                  return body === "verify differs" ? 1 : 0
+                },
+                cleanup,
+                1,
+              ),
+              5,
+            ).catch((e: Error) => e)
+            const tag = `${mode}/${body}`
+            if (r === "timeout") bad.push(`${tag}: did not return within 5 s`)
+            else if (r instanceof Error) bad.push(`${tag}: threw ${r.message}`)
+            else {
+              if (!existsSync(out)) bad.push(`${tag}: ledger not written`)
+              if (r.exitCode !== code) bad.push(`${tag}: exit ${r.exitCode}, want the body's ${code}`)
+              const warn = r.lines.findIndex((l) => l.startsWith("SP-N WARNING (cleanup)") && mark.test(l))
+              if (warn < 0) bad.push(`${tag}: cleanup failure not reported as a warning`)
+              if (body === "threw" && !(r.lines[0]?.includes("group exploded") && warn > 0))
+                bad.push(`${tag}: body error not reported first: ${JSON.stringify(r.lines)}`)
+            }
+          }
+        if (bad.length) return bad.slice(0, 6).join("; ") + (bad.length > 6 ? ` (+${bad.length - 6} more)` : "")
+        const self = source("probe-sp-n.ts")
+        const main = self.slice(self.search(/^async function main\(\) \{$/m))
+        if (/rmSync\(ctx\.(shared|tmp)/.test(main))
+          return "main still removes the run directories with a throwing rmSync"
+        return /await runThenClean\(/.test(main) ? undefined : "main does not end the run through runThenClean"
+      } finally {
+        rmSync(dir, { recursive: true, force: true })
+      }
+    },
+  },
+  {
+    finding: "CLEANUP rm-retry",
+    async run() {
+      const bad: string[] = []
+      for (const code of ["EBUSY", "EPERM", "ENOTEMPTY"]) {
+        let calls = 0
+        const t0 = Date.now()
+        const w = await removeDir(
+          "x",
+          () => {
+            calls++
+            throw Object.assign(new Error(`${code}: rm 'x'`), { code })
+          },
+          10,
+          200,
+        ).catch((e: Error) => e)
+        if (w instanceof Error) bad.push(`${code}: thrown (${w.message})`)
+        else if (calls !== 10 || !w?.includes(code) || !w.includes("10 tries"))
+          bad.push(`${code}: ${calls} tries, warning ${w}`)
+        else if (Date.now() - t0 < 150) bad.push(`${code}: no backoff`)
+      }
+      let calls = 0
+      const gone = await removeDir(
+        "x",
+        () => {
+          calls++
+          throw Object.assign(new Error("ENOENT: no such file"), { code: "ENOENT" })
+        },
+        10,
+        200,
+      )
+      if (gone !== undefined || calls !== 1)
+        bad.push(`ENOENT: ${calls} tries, ${gone} (already gone counts as removed)`)
+      let n = 0
+      const third = await removeDir(
+        "x",
+        () => {
+          if (++n < 3) throw Object.assign(new Error("EBUSY"), { code: "EBUSY" })
+        },
+        10,
+        100,
+      )
+      if (third !== undefined || n !== 3) bad.push(`freed on the third try: ${n} tries, ${third}`)
+      return bad.length ? bad.join("; ") : undefined
+    },
+  },
+  {
+    finding: "CLEANUP children-exit",
+    async run() {
+      const killed: number[] = []
+      let release = () => {}
+      const exits = new Promise<void>((r) => {
+        release = r
+      })
+      const quick = { pid: 11, kill: () => release(), exited: exits }
+      const stuck = { pid: 22, kill: () => undefined, exited: never() }
+      let plainKilled = false
+      let treeFailKilled = false
+      const plain = { kill: () => (plainKilled = true) }
+      const treeFails = { pid: 33, kill: () => (treeFailKilled = true), exited: Promise.resolve() }
+      const left = await endChildren([quick, stuck, plain, treeFails], 300, async (pid) => {
+        killed.push(pid)
+        if (pid === 11) release()
+        if (pid === 33) throw new Error("taskkill failed")
+      })
+      if (killed.join(",") !== "11,22,33") return `not every child's tree was ended: ${killed.join(",")}`
+      if (!plainKilled) return "a child without a pid was not killed"
+      if (!treeFailKilled) return "a child whose tree kill failed was not killed directly"
+      if (left.join(",") !== "22") return `children not waited for exit, or a stuck one not reported: ${left.join(",")}`
+      const self = source("probe-sp-n.ts")
+      const main = self.slice(self.search(/^async function main\(\) \{$/m))
+      return /endChildren\(/.test(main) && /taskkill\.exe/.test(main)
+        ? undefined
+        : "main does not wait for the children's trees to exit"
+    },
+  },
+  {
     finding: "LOW timing-flap",
     async run() {
       const cases: Array<[number, number, Verdict]> = [
@@ -1585,12 +1858,13 @@ async function selfTest(): Promise<never> {
     process.argv.includes("--only") && only ? cs.filter((c) => c.finding.includes(only)) : cs
   if (process.argv.includes("--only") && pick([...LOGIC_CHECKS, ...LEDGER_CHECKS]).length === 0)
     fail(`SELF-TEST no check matches --only ${only}`)
+  const ran = [...pick(LOGIC_CHECKS), ...pick(LEDGER_CHECKS)].length
   const failures = [...(await runChecks(pick(LOGIC_CHECKS))), ...(await runChecks(pick(LEDGER_CHECKS)))]
   for (const f of failures) console.log(`SELF-TEST FAIL ${f}`)
   console.log(
     failures.length
       ? `SELF-TEST FAIL ${failures.length} checks`
-      : `SELF-TEST PASS ${LOGIC_CHECKS.length + LEDGER_CHECKS.length} checks, pass budget ${TOTAL_BUDGET_S} s`,
+      : `SELF-TEST PASS ${ran} checks, pass budget ${TOTAL_BUDGET_S} s`,
   )
   process.exit(failures.length ? 1 : 0)
 }
@@ -1650,51 +1924,70 @@ async function main() {
   if (want.size === 0) fail(`LEDGER ${opt.file}: no row for host "${host}"`)
   const groups = GROUPS.filter((g) => g.ids.some((id) => want.has(id)))
   const results: Record<string, Result> = {}
-  try {
-    const setupDone = await runSetup(ctx, SETUP_BUDGET_S, (own) =>
-      setup(
-        own,
-        groups.flatMap((g) => g.ids),
-      ),
-    )
-    if (!setupDone) console.log(`SP-N setup ran past ${SETUP_BUDGET_S} s; targets not started yet are UNMEASURED`)
-    for (const g of groups) Object.assign(results, await runGroup(g, ctx))
-  } finally {
-    const notepad = ctx.targets.get("Notepad")
-    if (notepad) await leg(ctx, "close", { top: notepad.top }).catch(() => undefined)
-    for (const p of [...ctx.spawned, ...ctx.pending.values()]) p.kill()
-    rmSync(ctx.tmp, { recursive: true, force: true })
-    rmSync(ctx.shared, { recursive: true, force: true })
-  }
   const ids = Object.keys(SPEC).filter((id) => want.has(id))
-  if (opt.mode === "measure") {
-    const before = readLedger(opt.file)
-    const notes = new Map(before.filter((r) => r.host === host).map((r) => [r.id, r.notes]))
-    const fresh = new Map(
-      ids.map((id) => [
-        id,
-        ledgerLine(id, results[id] ?? UN("no leg produced this row"), host, build, carriedNote(notes.get(id))),
-      ]),
-    )
-    const lines = mergeLedger(before, host, fresh)
-    writeFileSync(opt.file, `${lines.join("\n")}\n`)
-    for (const id of ids)
-      console.log(`${(results[id]?.verdict ?? "UNMEASURED").padEnd(11)} ${id}  ${clean(results[id]?.measured ?? "")}`)
-    console.log(`SP-N measured ${ids.length} rows on ${host} (${build}) -> ${relative(process.cwd(), opt.file)}`)
-    // Explicit: a child the probe could not end must not keep the run alive (the hosted job hung here).
-    process.exit(0)
-  }
-  let diff = 0
-  for (const l of ledger.filter((r) => want.has(r.id))) {
-    const m = results[l.id]
-    if (l.host !== host) console.log(`SKIP ${l.id} host=${l.host}`)
-    else if (!m || m.verdict !== l.verdict) {
-      diff++
-      console.log(`DIFF ${l.id} ledger=${l.verdict} now=${m?.verdict ?? "missing"} ${clean(m?.measured ?? "")}`)
-    } else console.log(`SAME ${l.id} ${m.verdict} ${clean(m.measured)}`)
-  }
-  console.log(`SP-N verify on ${host} (${build}): ${Object.keys(results).length} measured, ${diff} differing`)
-  process.exit(diff === 0 ? 0 : 1)
+  const end = await runThenClean(
+    async () => {
+      const setupDone = await runSetup(ctx, SETUP_BUDGET_S, (own) =>
+        setup(
+          own,
+          groups.flatMap((g) => g.ids),
+        ),
+      )
+      if (!setupDone) console.log(`SP-N setup ran past ${SETUP_BUDGET_S} s; targets not started yet are UNMEASURED`)
+      for (const g of groups) Object.assign(results, await runGroup(g, ctx))
+    },
+    (measureError) => {
+      const missing = UN(
+        `no leg produced this row${measureError ? `: the measurement failed: ${clean(measureError.message)}` : ""}`,
+      )
+      if (opt.mode === "measure") {
+        const before = readLedger(opt.file)
+        const notes = new Map(before.filter((r) => r.host === host).map((r) => [r.id, r.notes]))
+        const fresh = new Map(
+          ids.map((id) => [id, ledgerLine(id, results[id] ?? missing, host, build, carriedNote(notes.get(id)))]),
+        )
+        writeFileSync(opt.file, `${mergeLedger(before, host, fresh).join("\n")}\n`)
+        for (const id of ids)
+          console.log(
+            `${(results[id] ?? missing).verdict.padEnd(11)} ${id}  ${clean((results[id] ?? missing).measured)}`,
+          )
+        console.log(`SP-N measured ${ids.length} rows on ${host} (${build}) -> ${relative(process.cwd(), opt.file)}`)
+        return 0
+      }
+      let diff = 0
+      for (const l of ledger.filter((r) => want.has(r.id))) {
+        const m = results[l.id]
+        if (l.host !== host) console.log(`SKIP ${l.id} host=${l.host}`)
+        else if (!m || m.verdict !== l.verdict) {
+          diff++
+          console.log(`DIFF ${l.id} ledger=${l.verdict} now=${m?.verdict ?? "missing"} ${clean(m?.measured ?? "")}`)
+        } else console.log(`SAME ${l.id} ${m.verdict} ${clean(m.measured)}`)
+      }
+      console.log(`SP-N verify on ${host} (${build}): ${Object.keys(results).length} measured, ${diff} differing`)
+      return diff === 0 ? 0 : 1
+    },
+    async () => {
+      const warnings: string[] = []
+      const notepad = ctx.targets.get("Notepad")
+      if (notepad)
+        await leg(ctx, "close", { top: notepad.top }).catch((e: Error) =>
+          warnings.push(`closing Notepad: ${clean(e.message)}`),
+        )
+      // whole trees, then a bounded wait for every child to exit: files in the shared dir are closed before rm
+      const left = await endChildren([...ctx.spawned, ...ctx.pending.values()], 10_000, (pid) =>
+        run(["taskkill.exe", "/PID", String(pid), "/T", "/F"]),
+      )
+      if (left.length) warnings.push(`children still running after 10 s: ${left.join(",")}`)
+      for (const d of [ctx.tmp, ctx.shared]) {
+        const w = await removeDir(d)
+        if (w) warnings.push(w)
+      }
+      return warnings
+    },
+  )
+  for (const l of end.lines) console.log(l)
+  // Explicit: a child the probe could not end must not keep the run alive (the hosted job hung here once).
+  process.exit(end.exitCode)
 }
 
 if (import.meta.main) await main()

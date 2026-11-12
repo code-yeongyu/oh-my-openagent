@@ -68,11 +68,24 @@ per review finding it guards, for example:
 
 `--measure` and `--verify` run the same logic checks first and refuse to measure when one fails.
 
+## End of a run
+
+The probe writes its output (the ledger, or the verify comparison) before any cleanup, even when the measurement
+threw. The cleanup then:
+- ends every child's process tree (`taskkill /T /F`) and waits, bounded, for each to exit;
+- removes the run's directories, retrying a busy one 10 times over about 5 s.
+
+A cleanup that fails, hangs or leaves a child running prints `SP-N WARNING (cleanup)` and never changes the
+written output or the exit code. A measurement error prints `SP-N ERROR (measurement)` before the cleanup
+warnings.
+
 ## Shared directory
 
 SYSTEM tasks and the elevated helpers exchange files through a fresh directory under `%ProgramData%`:
 - Its name is `omo-sp-n-<pid>-<random>`. A directory that already exists is refused, never reused.
-- Only SYSTEM and Administrators may access it, and Administrators own it; this is checked after it is created.
+- Only SYSTEM and Administrators may access it, and Administrators own it. This is checked after creation by SID
+  only (`S-1-5-18`, `S-1-5-32-544`): never by a name, an SDDL alias or icacls text. A failed read reports its own
+  error.
 - Every path on a command line is quoted.
 
 The medium-integrity helper cannot write there, so it uses the run's own temp directory.
