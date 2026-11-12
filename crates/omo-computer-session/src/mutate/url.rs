@@ -18,7 +18,6 @@ pub(crate) struct UrlStage {
 }
 
 pub(crate) fn check(policy: &UrlPolicy, backend: &mut dyn Backend, target: &TargetRef<'_>) -> UrlStage {
-    if true { return UrlStage { unknown: true, ..UrlStage::default() }; }
     let TargetRef::Window(window) = target else {
         return UrlStage::default();
     };

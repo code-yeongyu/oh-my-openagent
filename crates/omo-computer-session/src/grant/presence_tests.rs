@@ -102,7 +102,7 @@ fn host_call_serves_only_its_own_table_methods_with_typed_params() {
     use omo_computer_core::methods::Method;
     let mut s = session(&json!({}), &RecordingSink::default(), None);
     assert!(s.host_call(Method::Click, json!({})).is_none(), "not a host call");
-    assert!(s.host_call(Method::MenuItems, json!({})).is_none(), "a later row's method answers None here");
+    assert!(s.host_call(Method::Capabilities, json!({})).is_none(), "the engine's own method is never a host call");
     let granted = s.host_call(Method::ControlGrant, json!({ "reason": "r" })).expect("served").expect("granted");
     assert_eq!(granted["active"], json!(true));
     assert!(matches!(

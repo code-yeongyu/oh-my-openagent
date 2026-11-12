@@ -38,7 +38,6 @@ impl Session {
     /// [`NOT_OPEN`], a consent refusal for the window's app, `StaleRef` / `AmbiguousTarget` for
     /// a `path` that names no single submenu, or the backend's refusal.
     pub fn menu_items(&mut self, params: MenuItemsParams) -> Result<MenuItems, Refused> {
-        if true { return Ok(MenuItems { items: Vec::new(), truncated: None, observation: UntrustedText }); }
         self.opened.as_ref().ok_or(NOT_OPEN)?;
         let ReadRequest::MenuItems { target, path } = read_menu_items(params) else {
             unreachable!("read_menu_items always reads a menu.items");

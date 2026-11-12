@@ -54,7 +54,6 @@ impl Session {
     /// # Errors
     /// [`NOT_OPEN`] or the backend's refusal.
     pub fn apps_list(&mut self) -> Result<Vec<AppInfo>, Refusal> {
-        if true { return Ok(Vec::new()); }
         self.opened.as_ref().ok_or(NOT_OPEN)?;
         let mut apps = shell(self)?.apps()?;
         for app in &mut apps {

@@ -47,7 +47,6 @@ impl Session {
     /// # Errors
     /// As [`Session::surface`], or the backend's refusal.
     pub fn surface_observe(&mut self, kind: SurfaceKind) -> Result<Vec<ElementInfo>, Refused> {
-        if true { return Ok(Vec::new()); }
         self.surface(kind)?;
         Ok(crate::apps::shell(self)?.surface_tree(kind)?)
     }

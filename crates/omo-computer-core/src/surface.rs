@@ -55,7 +55,6 @@ pub fn kind_name(kind: SurfaceKind) -> String {
 /// # Errors
 /// [`SURFACE_UNSUPPORTED`] with the `{surface}` member the refusal carries on the wire.
 pub fn admit(kind: SurfaceKind, served: &[SurfaceKind]) -> Result<(), (Refusal, Value)> {
-    if true { return Ok(()); }
     if served.contains(&kind) {
         Ok(())
     } else {

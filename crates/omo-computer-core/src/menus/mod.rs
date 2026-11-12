@@ -56,7 +56,6 @@ impl MenuBounds {
 /// The listing of `nodes` under `path`, and whether a bound cut it.
 #[must_use]
 pub fn list(nodes: &[MenuNode], under: &[String], bounds: MenuBounds) -> (Vec<MenuItem>, bool) {
-    if true { return (Vec::new(), false); }
     let mut items = Vec::new();
     let mut truncated = false;
     walk(nodes, under, 1, bounds, &mut items, &mut truncated);
@@ -97,7 +96,6 @@ fn walk(
 /// `StaleRef` when a step names no item (the menu changed since the listing), `AmbiguousTarget`
 /// when a step names more than one.
 pub fn find_exact<'a>(nodes: &'a [MenuNode], path: &[String]) -> Result<&'a MenuNode, Refusal> {
-    if true { return Err(Refusal::bare(EngineCode::StaleRef)); }
     let (first, rest) = path.split_first().ok_or(Refusal::bare(EngineCode::StaleRef))?;
     let mut matches = nodes.iter().filter(|node| node.title == *first);
     let found = matches.next().ok_or(Refusal::bare(EngineCode::StaleRef))?;
@@ -117,7 +115,6 @@ pub fn find_exact<'a>(nodes: &'a [MenuNode], path: &[String]) -> Result<&'a Menu
 /// # Errors
 /// [`find_exact`]'s refusals; a disabled item is `StaleRef` too.
 pub fn prove(nodes: &[MenuNode], path: &[String]) -> Result<(), Refusal> {
-    if true { return Ok(()); }
     let node = find_exact(nodes, path)?;
     if node.enabled {
         Ok(())
