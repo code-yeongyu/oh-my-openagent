@@ -20,15 +20,19 @@ export class MachineCredentialUnreadable extends SignInError {}
 export async function refuseSecondMachineDevice(
   session: Pick<Session, "accessSnapshot">,
   deviceService: DeviceServiceHandoff | undefined,
-  options: { readonly newDevice?: boolean } = {},
 ): Promise<void> {
   const stored = await session.accessSnapshot().catch((error: unknown) => {
-    // A locked or unreadable store is not "nothing stored": its item may be this machine's device. Only the person's
-    // explicit --new-device registers another one; it never skips a device the service holds (checked below).
-    if (error instanceof CredentialStoreError || error instanceof InvalidCredentialState) {
-      if (options.newDevice === true) return null
+    // A locked or unreadable store is not "nothing stored": its item may be this machine's device, and the service keeps
+    // one device per machine (a second registration over it is refused, or leaves two live devices for a row enrolled
+    // before machine binding), so neither case registers another device.
+    if (error instanceof CredentialStoreError) {
       throw new MachineCredentialUnreadable(
-        `omo could not read this computer's OmO sign-in (${terminalText(error.message)}), so it did not register another device. Unlock or repair the credential store and run omo login again, or run omo login --new-device to register a new device anyway.`,
+        `omo could not read this computer's OmO sign-in (${terminalText(error.message)}), so it did not register another device. Unlock the credential store, then run omo login again.`,
+      )
+    }
+    if (error instanceof InvalidCredentialState) {
+      throw new MachineCredentialUnreadable(
+        `omo could not read this computer's OmO sign-in (${terminalText(error.message)}), so it did not register another device. Remove this computer's device on the Devices page if it is still listed, then run omo account forget, then run omo login.`,
       )
     }
     if (!(error instanceof SessionEnded)) throw error
@@ -53,7 +57,7 @@ export async function refuseSecondMachineDevice(
   }
   if (held.kind === "unknown") {
     throw new MachineAlreadySignedIn(
-      `This computer's OmO device service is installed but did not answer (${terminalText(held.reason)}), so omo did not register another device. Start the device service, then run omo login again.`,
+      `This computer's OmO device service is installed but did not answer (${terminalText(held.reason)}), so omo did not register another device. Start the device service (opening the OmO desktop app starts it), then run omo login again.${held.endpoint === undefined ? "" : ` If the device service was removed, delete its leftover file ${terminalText(held.endpoint)} first.`}`,
     )
   }
 }

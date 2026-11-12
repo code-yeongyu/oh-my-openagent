@@ -76,10 +76,39 @@ describe("omo login reuses this machine's device instead of registering another"
     await expect(refuseSecondMachineDevice(session, service(absent))).rejects.toBeInstanceOf(MachineAlreadySignedIn)
   })
 
-  // A locked or unreadable credential store is not "nothing stored": its item may be this machine's device. Same ruling as
-  // the desktop: block, and register another device only on the person's explicit --new-device.
-  for (const failure of [new KeychainLockedError("locked"), new InvalidCredentialState("unreadable")]) {
-    test(`a ${failure.constructor.name} blocks a new device and names the explicit path`, async () => {
+  // A locked or unreadable credential store is not "nothing stored": its item may be this machine's device, so neither
+  // registers another one (#13265 design gate: the service refuses a second device per machine, or keeps two live ones
+  // for a row enrolled before machine binding). There is no --new-device escape.
+  test("a locked store blocks a new device and names the unlock", async () => {
+    const locked = new KeychainLockedError("locked")
+    const store: CredentialStore = {
+      read: async () => {
+        throw locked
+      },
+      readAuthoritative: async () => {
+        throw locked
+      },
+      write: async () => {
+        throw new Error("nothing may be written")
+      },
+      clear: async () => {
+        throw new Error("nothing may be cleared")
+      },
+    }
+    const session = createSession({
+      api: fakeApi(() => new Response(null, { status: 204 })),
+      store,
+      home: await temporaryHome(),
+      beforeKeysDiscarded: async () => undefined,
+    })
+    const refused = refuseSecondMachineDevice(session, service(absent))
+    await expect(refused).rejects.toBeInstanceOf(MachineCredentialUnreadable)
+    await expect(refused).rejects.toThrow("Unlock the credential store, then run omo login again.")
+    await expect(refused).rejects.not.toThrow("--new-device")
+  })
+
+  for (const failure of [new InvalidCredentialState("unreadable")]) {
+    test(`a ${failure.constructor.name} blocks a new device and names the path the service accepts`, async () => {
       const store: CredentialStore = {
         read: async () => {
           throw failure
@@ -102,14 +131,10 @@ describe("omo login reuses this machine's device instead of registering another"
       })
       const refused = refuseSecondMachineDevice(session, service(absent))
       await expect(refused).rejects.toBeInstanceOf(MachineCredentialUnreadable)
-      await expect(refused).rejects.toThrow("--new-device")
-      await expect(refuseSecondMachineDevice(session, service(absent), { newDevice: true })).resolves.toBeUndefined()
-      // The explicit path skips only the unreadable store, never a device the service holds.
-      await expect(
-        refuseSecondMachineDevice(session, service({ kind: "held", device: { id: "dev-x", name: "X" } }), {
-          newDevice: true,
-        }),
-      ).rejects.toBeInstanceOf(MachineAlreadySignedIn)
+      await expect(refused).rejects.toThrow(
+        "Remove this computer's device on the Devices page if it is still listed, then run omo account forget, then run omo login.",
+      )
+      await expect(refused).rejects.not.toThrow("--new-device")
     })
   }
 
