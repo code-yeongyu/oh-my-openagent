@@ -38,7 +38,7 @@ import { listAcross, planCreate, renameAlias, withAlias } from "./remote/lazy-op
 import { locateControl } from "./control/locate"
 import { closeThread, interruptThread, setModelOn, setThinkingLevelOn } from "./control/operations"
 import { controlIdentity, controlRefusalOf } from "./control/port"
-import type { LocalExisting } from "./remote/cross-device"
+import type { LocalAliasReason, LocalExisting } from "./remote/cross-device"
 import { recordThreadCreator, registerExtensionTools, type ExtensionToolHost } from "./tools/extension-tools"
 export type { ThreadHost, ThreadHostSession, ThreadToolSurfaceOptions } from "./tools/ports"
 export { UNKNOWN_CALLER } from "./tools/ports"
@@ -348,14 +348,16 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
           existing: (address) => existingHere(current, address, callerId),
         })
         if (plan.kind === "done") return await withAlias(options.remote, value.alias, plan.result, plan.device)
-        if (value.name !== undefined) {
-          const conflict = checkNameConflict(await plan.host.visible(), value.name)
+        // An alias no account holds names the thread on its device instead (#13104); a given name wins.
+        const name = plan.localAlias === undefined ? value.name : (value.name ?? value.alias)
+        if (name !== undefined) {
+          const conflict = checkNameConflict(await plan.host.visible(), name)
           if (conflict.kind === "error") return { kind: "error", error: conflict } as ThreadToolResult
         }
         const preset = plan.creates ? options.remote?.permissionPreset?.() : undefined
         const opened = await plan.host.open({
           ...plan.request,
-          ...(plan.creates && value.name !== undefined ? { name: value.name } : {}),
+          ...(plan.creates && name !== undefined ? { name } : {}),
           ...(plan.creates && loaded !== undefined ? { initialSkills: loaded } : {}),
           ...(preset === undefined ? {} : { permissionPreset: preset }),
         })
@@ -365,12 +367,12 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
           thread: { ...opened.thread, ...(plan.creates && loaded !== undefined ? { requested_skills: loaded } : {}) },
           deduplicated: false,
         }
-        return await withAlias(
-          options.remote,
-          value.alias,
-          plan.creates ? await recordThreadCreator(options, current, callerId, created) : created,
-          plan.host.device,
-        )
+        const recorded = plan.creates ? await recordThreadCreator(options, current, callerId, created) : created
+        if (plan.localAlias !== undefined)
+          return recorded.kind === "ok"
+            ? ({ ...recorded, alias_scope: "local", alias_unavailable: plan.localAlias } as ThreadToolResult)
+            : recorded
+        return await withAlias(options.remote, value.alias, recorded, plan.host.device)
       }),
   }
   const list: AnyTool = {
@@ -445,10 +447,11 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
         // a thread with no live owner, a device that is offline), then the name checks.
         const located = await locateControl(options, current, value.thread, value.all_scope, callerId)
         if (located.kind === "error") return located.result
-        const name = value.name?.trim()
-        if (name !== undefined && located.kind === "not_live") return NOT_LIVE
         const thread = located.kind === "control" ? located.control : located
-        if (name !== undefined && located.kind === "control") {
+        // #13066: the name is checked on the target device's own listing, and only when a live owner holds the thread.
+        const nameRefusal = async (name: string): Promise<ThreadToolResult | undefined> => {
+          if (located.kind === "not_live") return NOT_LIVE
+          if (located.kind !== "control") return undefined
           if (name.length === 0)
             return failure("invalid_arguments", "The new thread name is empty.", "Pass a non-empty name.")
           const visible = await located.control.visible()
@@ -456,24 +459,38 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
             (entry) =>
               entry.thread_id !== thread.thread_id && normalizeThreadName(entry.name) === normalizeThreadName(name),
           )
-          if (existing !== undefined)
-            return failure(
-              "name_conflict",
-              `A thread named "${existing.name}" already exists.`,
-              "Call thread_list and choose another name.",
-            )
+          return existing === undefined
+            ? undefined
+            : failure(
+                "name_conflict",
+                `A thread named "${existing.name}" already exists.`,
+                "Call thread_list and choose another name.",
+              )
         }
+        let name = value.name?.trim()
+        const refusedName = name === undefined ? undefined : await nameRefusal(name)
+        if (refusedName !== undefined) return refusedName
+        let localAlias: LocalAliasReason | undefined
         if (value.alias !== undefined) {
           const refused = await renameAlias(options.remote, thread.thread_id, thread.device, value.alias, operationId)
-          if (refused !== undefined) return refused
+          if (refused !== undefined && "local" in refused) {
+            // No account holds the alias and nothing changed (#13104): it becomes the thread's name unless one was given.
+            localAlias = refused.local
+            if (name === undefined) {
+              name = value.alias.trim()
+              const refusedAlias = await nameRefusal(name)
+              if (refusedAlias !== undefined) return refusedAlias
+            }
+          } else if (refused !== undefined) return refused
         }
         if (name !== undefined && located.kind === "control") await located.control.setName(name)
-        return {
-          kind: "ok",
-          ...controlIdentity(thread),
-          name: name ?? thread.title,
-          ...(value.alias === undefined ? {} : { alias: value.alias }),
-        }
+        const aliasFields =
+          value.alias === undefined
+            ? {}
+            : localAlias === undefined
+              ? { alias: value.alias }
+              : { alias_scope: "local" as const, alias_unavailable: localAlias }
+        return { kind: "ok", ...controlIdentity(thread), name: name ?? thread.title, ...aliasFields }
       }),
   }
   const setModel: AnyTool = {
