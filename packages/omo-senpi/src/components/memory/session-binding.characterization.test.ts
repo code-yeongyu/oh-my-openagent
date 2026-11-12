@@ -7,9 +7,15 @@ import { mkdirSync, mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { readIdentityRecord, recordIdentityBind, resolveMemoryIdentity } from "@oh-my-opencode/memory-core"
+import {
+  InFlightReads,
+  readIdentityRecord,
+  recordIdentityBind,
+  resolveMemoryIdentity,
+  type AutoIdentityMode,
+} from "@oh-my-opencode/memory-core"
 import { createMemoryBinding } from "./binding"
-import { MEMORY_BINDING_CUSTOM_TYPE, createMemoryComponent, memoryModuleSupervisor } from "./index"
+import { MEMORY_BINDING_CUSTOM_TYPE, createMemoryComponent, memoryModuleSupervisor, resolveMemoryConfig } from "./index"
 import {
   componentContext,
   loadedMemoryConfig,
@@ -18,6 +24,7 @@ import {
   sessionContext,
   type SessionEntryFixture,
 } from "./memory.test-support"
+import { createSessionBinder, releaseSession, type SessionState } from "./session-binding"
 import type { SyncRunner } from "./sync-runner"
 import { rmSyncEfaultTolerant } from "./teardown.test-support"
 
@@ -105,6 +112,36 @@ function harness(options: { readonly agent?: string; readonly now?: number } = {
   const identityFor = (cwd: string) => resolveMemoryIdentity(settings.agent, cwd, env)
   const workspace = (): string => join(tempDir("omo-x8c-ws-"), "project")
   return { pi, ctx, hostCwd, syncCalls, identityFor, workspace }
+}
+
+// Binds one fresh session under memory.auto_identity = autoIdentity and returns the project scope the bind recorded.
+async function boundProjectScope(autoIdentity: AutoIdentityMode) {
+  const sessionId = `session-${autoIdentity}`
+  const sessions = new Map<string, SessionState>()
+  const work = new InFlightReads()
+  createSessionBinder({
+    pi: new MemoryFakeExtensionAPI(),
+    ctx: componentContext(),
+    env: { OMO_MEMORY_HOME: join(tempDir("omo-x8c-home-"), "memory") },
+    now: () => 1243,
+    cwd: join(tempDir("omo-x8c-host-"), "host"),
+    loadConfig: () => loadedMemoryConfig(memorySettings({ auto_identity: autoIdentity })),
+    sessions,
+    wiring: { afterBind: () => Promise.resolve() },
+    syncRunner: recordingSyncRunner([]),
+    work,
+    isEnabled: () => true,
+    resolveConfig: resolveMemoryConfig,
+  })(
+    { readEntries: () => [], id: sessionId, cwd: join(tempDir("omo-x8c-ws-"), "project") },
+    {},
+    { existing: undefined, verifyRepository: false },
+  )
+  const state = sessions.get(sessionId)
+  const projectScope = state?.context?.projectScope
+  await work.settled()
+  releaseSession(state)
+  return projectScope
 }
 
 function supervisorDelta(before: number): number {
@@ -628,5 +665,16 @@ describe("X8c memory binding at session_start (characterization)", () => {
     ])
     expect(h.syncCalls).toEqual([])
     expect(supervisorDelta(before)).toBe(1)
+  })
+
+  test("#given memory.auto_identity set to path and to git #when a session binds under each #then the bound project scope carries the configured auto identity", async () => {
+    // given
+    const configured: readonly AutoIdentityMode[] = ["path", "git"]
+
+    // when
+    const scoped = await Promise.all(configured.map(async (mode) => (await boundProjectScope(mode))?.autoIdentity))
+
+    // then
+    expect(scoped).toEqual(["path", "git"])
   })
 })
