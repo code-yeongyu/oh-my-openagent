@@ -42,7 +42,8 @@ pub struct DesktopSessionOptions {
     /// `engine.hello` lists `action-report`.
     pub report_mode: ReportMode,
     /// Whether `session.open` named `reportMode` at all (set by the engine, never on the
-    /// wire). A protocol-1 caller that did not keeps byte-equal null-mode replies, where
+    /// wire). A protocol-1 caller that did not keeps byte-equal null-mode replies (except for
+    /// `since`, which no read implements and which fails in every mode), where
     /// ax snapshots ignore `root` and `skeleton`; a caller that chose a mode gets a typed
     /// error for an option its mode cannot honour instead (#13170).
     #[serde(skip)]

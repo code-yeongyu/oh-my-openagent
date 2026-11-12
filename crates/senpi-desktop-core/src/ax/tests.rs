@@ -524,8 +524,11 @@ fn since_is_refused_in_every_report_mode_because_no_read_honours_it() {
     let since = AxSnapshotOptions { since: Some(1), ..AxSnapshotOptions::default() };
     for mut registry in [AxRegistry::default(), object_registry()] {
         // When
+        let object = registry.report_mode() == crate::report::ReportMode::Object;
         let error = snapshot(&mut titled_levels(), &mut registry, &window(), &since).unwrap_err();
-        // Then
+        // Then: object mode also says why, machine-readably (#13175 review).
         assert_eq!(error.code, crate::error::ErrorCode::AxUnsupported);
+        let reason = error.report.as_ref().and_then(|report| report.reason.as_deref());
+        assert_eq!(reason, object.then_some("unsupported_option"));
     }
 }

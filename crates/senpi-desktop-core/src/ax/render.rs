@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 
 use super::walk::{filter_node, label, walk_observed, walk_raw, WalkNode, WalkState};
 use super::{AxBackend, AxRegistry, DEFAULT_DEADLINE_MS};
-use crate::error::{CoreResult, DesktopError, ErrorCode};
+use crate::error::{CoreResult, DesktopError, ErrorCode, ErrorReport};
 use crate::report::ReportMode;
 use crate::types::{AxCut, AxSnapshot, AxSnapshotOptions, DesktopWindow};
 
@@ -83,6 +83,14 @@ impl TreeWriter<'_> {
     }
 }
 
+/// The object-mode report of an ax snapshot option the read cannot honour.
+fn unsupported_option() -> ErrorReport {
+    ErrorReport {
+        reason: Some("unsupported_option".into()),
+        ..ErrorReport::default()
+    }
+}
+
 pub fn snapshot(
     backend: &mut dyn AxBackend,
     registry: &mut AxRegistry,
@@ -95,10 +103,13 @@ pub fn snapshot(
     // `skeleton` need an object-mode session. A protocol-1 session that never named
     // `reportMode` keeps its byte-equal replies (fixture ax-drill-v1-control).
     if options.since.is_some() {
-        return Err(DesktopError::new(
+        let error = DesktopError::new(
             ErrorCode::AxUnsupported,
             "ax snapshot option `since` is not supported; read the window again",
-        ));
+        );
+        // Object mode carries a machine-readable reason, so a client can tell an unsupported option
+        // from a backend with no accessibility at all (same code).
+        return Err(if object { error.with_report(unsupported_option()) } else { error });
     }
     if !object && registry.report_mode_explicit() && (options.root.is_some() || options.skeleton == Some(true)) {
         return Err(DesktopError::new(
