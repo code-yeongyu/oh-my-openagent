@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs"
+import { mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { loadSenpiBarrel } from "../../../lazy/senpi-barrel"
 
@@ -33,6 +33,11 @@ export async function realSessionHandle(
   const project = tempProject()
   const agentDir = join(project, "isolated-agent")
   mkdirSync(agentDir)
+  // The engine's fallback logger retires older generations from an async step that writes this marker, and that
+  // step can land after the test's cleanup removed the project, which leaves the directory behind (#9766).
+  // Writing the marker here makes the step return without creating anything.
+  mkdirSync(join(agentDir, "logs"), { recursive: true })
+  writeFileSync(join(agentDir, "logs", ".fallback-log-v2"), "")
   const store = createTaskRecordStore({ project_dir: project })
   const handles: ManagedChildHandle[] = []
   const transcripts: Array<{ path: string; before: string }> = []
