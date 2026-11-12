@@ -1,6 +1,7 @@
-//! Read 4 / exec 1 permits per session. Same-session calls queue behind a held permit with
-//! the run's deadline; a session is never answered "busy" for its own calls, so a call that
-//! finds no permit free waits, and this type only counts.
+//! Read 4 / exec 1 permits per session. A session's own calls are serialised by `&mut Session`
+//! (they queue in the transport, never answered "busy"), so the funnel never waits here: an
+//! exec call that finds no exec permit free means one leaked, and the funnel refuses it
+//! `TransactionFailed` with nothing sent. This type only counts.
 
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
