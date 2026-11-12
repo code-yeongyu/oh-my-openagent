@@ -2360,8 +2360,8 @@ const LOGIC_CHECKS: readonly Check[] = [
       const helper = psCode(source("sp-n.ps1")).join("\n")
       const compile = helper.slice(helper.indexOf("function Compile {"), helper.indexOf("function Emit("))
       // load the precompiled assembly from the very bytes whose sha256 matched its recorded value
-      if (!/\$NativeDll = Join-Path \$PSScriptRoot 'sp-n-native\.dll'/.test(helper))
-        bad.push("the helper does not look for sp-n-native.dll beside itself")
+      if (!/\$NativeDll = Join-Path \$NativeDir 'sp-n-native\.dll'/.test(helper))
+        bad.push("the helper does not look for sp-n-native.dll in -NativeDir")
       const order = [
         /Test-Path -LiteralPath \$NativeDll/,
         /\[IO\.File\]::ReadAllBytes\(\$NativeDll\)/,
@@ -2385,8 +2385,35 @@ const LOGIC_CHECKS: readonly Check[] = [
       const build = yml.indexOf("sp-n.ps1 -Leg build-native")
       if (build < 0 || build > yml.indexOf("-Leg precondition"))
         bad.push("the workflow does not precompile before the legs run")
-      if (!/^sp-n-native\.dll\*?$/m.test(existsSync(join(HERE, ".gitignore")) ? source(".gitignore") : ""))
-        bad.push("the built assembly is not ignored by git")
+      // the build output lives outside the checkout: the runner temp dir the workflow names, else TEMP
+      const repo = resolve(HERE, "..", "..", "..")
+      const inside = await Promise.resolve()
+        .then(() => nativeDir({ SPN_NATIVE_DIR: join(repo, "target", "spn") }, repo))
+        .then(
+          (d) => `a native dir inside the repository was accepted: ${d}`,
+          (e: Error) => (/inside the repository/.test(e.message) ? undefined : `wrong error: ${e.message}`),
+        )
+      if (inside) bad.push(inside)
+      const outside = join(tmpdir(), "spn-native")
+      if (nativeDir({ SPN_NATIVE_DIR: outside, TEMP: "/t" }, repo) !== outside)
+        bad.push("SPN_NATIVE_DIR is not the native dir")
+      if (nativeDir({ TEMP: outside }, repo) !== outside) bad.push("the native dir does not fall back to TEMP")
+      if (!/^\s+SPN_NATIVE_DIR: \$\{\{ runner\.temp \}\}[\\/]/m.test(yml))
+        bad.push("the workflow does not set SPN_NATIVE_DIR under the runner temp dir")
+      if (
+        !/\[string\]\$NativeDir = \$\(if \(\$env:SPN_NATIVE_DIR\) \{ \$env:SPN_NATIVE_DIR \} else \{ \$env:TEMP \}\)/.test(
+          helper,
+        )
+      )
+        bad.push("sp-n.ps1 has no -NativeDir defaulting to SPN_NATIVE_DIR, then TEMP")
+      if (/sp-n-native\.dll[^\n]*\$PSScriptRoot|\$PSScriptRoot[^\n]*sp-n-native\.dll/.test(helper))
+        bad.push("the helper still reads or writes the assembly beside itself")
+      // every helper spawn names the native dir (a runas or SYSTEM child may not inherit the variable)
+      const self = source("probe-sp-n.ts")
+      const spawns = (self.match(/"-File",\s*HELPER,/g) ?? []).length
+      const named = (self.match(/"-File",\s*HELPER,\s*\.\.\.nativeArgs\(\),/g) ?? []).length
+      if (spawns === 0 || named !== spawns) bad.push(`${spawns - named} of ${spawns} helper spawns lack -NativeDir`)
+      if (!/ -NativeDir "\$\{nativeDir\(\)\}"/.test(self)) bad.push("psCommand does not pass -NativeDir")
       // packaging only: nothing in the helpers changes a token, an integrity level or a privilege
       const files = [...LEG_FILES, "sp-n.ps1", "sp-n-target.ps1", "sp-n-native-win32.ps1", "sp-n-native-input.ps1"]
       const tok = files.filter((f) =>
