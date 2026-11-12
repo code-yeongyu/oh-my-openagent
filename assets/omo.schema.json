@@ -2670,7 +2670,7 @@
             "vm",
             "quickjs"
           ],
-          "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
+          "description": "Where model-written `run` code executes: `vm` (default) or `quickjs`, the QuickJS cell; host-origin runs always use `vm`"
         },
         "intervention": {
           "type": "string",
@@ -5143,7 +5143,7 @@
                 "vm",
                 "quickjs"
               ],
-              "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
+              "description": "Where model-written `run` code executes: `vm` (default) or `quickjs`, the QuickJS cell; host-origin runs always use `vm`"
             },
             "intervention": {
               "type": "string",
@@ -7616,7 +7616,7 @@
                 "vm",
                 "quickjs"
               ],
-              "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
+              "description": "Where model-written `run` code executes: `vm` (default) or `quickjs`, the QuickJS cell; host-origin runs always use `vm`"
             },
             "intervention": {
               "type": "string",
@@ -10089,7 +10089,7 @@
                 "vm",
                 "quickjs"
               ],
-              "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
+              "description": "Where model-written `run` code executes: `vm` (default) or `quickjs`, the QuickJS cell; host-origin runs always use `vm`"
             },
             "intervention": {
               "type": "string",
@@ -12568,7 +12568,7 @@
                   "vm",
                   "quickjs"
                 ],
-                "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
+                "description": "Where model-written `run` code executes: `vm` (default) or `quickjs`, the QuickJS cell; host-origin runs always use `vm`"
               },
               "intervention": {
                 "type": "string",
@@ -15041,7 +15041,7 @@
                       "vm",
                       "quickjs"
                     ],
-                    "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
+                    "description": "Where model-written `run` code executes: `vm` (default) or `quickjs`, the QuickJS cell; host-origin runs always use `vm`"
                   },
                   "intervention": {
                     "type": "string",
@@ -17514,7 +17514,7 @@
                       "vm",
                       "quickjs"
                     ],
-                    "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
+                    "description": "Where model-written `run` code executes: `vm` (default) or `quickjs`, the QuickJS cell; host-origin runs always use `vm`"
                   },
                   "intervention": {
                     "type": "string",
@@ -19987,7 +19987,7 @@
                       "vm",
                       "quickjs"
                     ],
-                    "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
+                    "description": "Where model-written `run` code executes: `vm` (default) or `quickjs`, the QuickJS cell; host-origin runs always use `vm`"
                   },
                   "intervention": {
                     "type": "string",

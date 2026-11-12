@@ -124,12 +124,53 @@ Put the `computer` block in `~/.omo/omo.jsonc` (or `~/.omo/omo.json`) for your a
 | `screenshot_gc.scan_interval_ms` | `1800000` (30 minutes) | How often stale screenshots are swept |
 | `engine_path` | unset | Use this engine binary instead of locating or downloading one |
 | `cua_adapter` | `false` | Also register `computer_actions`, OpenAI computer-use actions over the same permissions, audit and stop path |
+| `run_sandbox` | `"vm"` | Where the agent's `run` code executes; `"quickjs"` runs it in an isolated QuickJS cell (see [Run code in the QuickJS sandbox](#run-code-in-the-quickjs-sandbox)) |
+| `intervention` | `"continue"` | What background input does while you use the target app: `"continue"` keeps going past your input, `"pause"` waits for you to stop (see [When you use the same app](#when-you-use-the-same-app)) |
+| `macos_key_priming` | `"off"` | `"on"` lets background typing reach one window of a macOS app that has several (see [Type into an app with several windows](#type-into-an-app-with-several-windows)) |
+| `trace` | `false` | Write a redacted per-request timing trace beside the audit log, for diagnosing slow actions |
 
 The schema is `packages/omo-config-core/src/schema/computer.ts`; the defaults are resolved in `packages/senpi-desktop-tool/src/settings.ts`. An invalid block is reported in the log and the component stays unregistered for that session. Start a new session after changing the file.
 
 `await computer.display(id)` returns a screenshot/input handle for one display; `"active"` follows focus and `"all"` composites every display. For example, `await (await computer.display("all")).screenshot()` observes every monitor without reopening or changing the session default. Each target has its own screenshot frame. `computer.displays()` lists all known monitors; its pixel rectangles describe the `"all"` composite, not the default active capture. Active chooses the monitor with the largest focused-window intersection; ties or missing focus use the primary display.
 
 Wayland has no focused-window geometry and uses the first display the portal reports, not a known compositor primary. The explicit id `"wayland-portal-0"` still means the whole Screenshot-portal image, even when libei proves a multi-monitor layout; other `"wayland-portal-N"` ids select a region through the Screenshot portal. Without a proven layout, only the whole-desktop image is available and coordinate input is refused. Explicit `"wayland-screencast-N"` ids now fail `InvalidTarget` if ScreenCast is unavailable instead of silently returning an unrelated Screenshot image; use `"all"` or `"wayland-portal-0"` for that fallback.
+
+## Act, then check
+
+Each input action now reports what happened. The `computer` tool's result carries `details.report` (and `details.reports` when a call sent several actions) with a `disposition` such as `{ "delivery": "not_delivered", "retry": "safe" }`: whether the input reached the app, and whether sending it again could duplicate it. A failed action carries the same pair in its error. The agent is told to resend only when `retry` is `safe`, to wait for you on `after_user`, and to read the screen again on anything else. The full table is in [Dispositions](../reference/computer.md#dispositions).
+
+### Check the result with verify
+
+In an eval kernel, `computer.verify(expectation, { timeoutMs })` re-reads the desktop until a state holds or the deadline passes (default 2 seconds), instead of a fixed sleep. Expectations are `elementExists`, `elementValue`, `elementEnabled`, `elementSelected` (each with an element `ref`), and `windowExists`, `windowGone`, `windowBounds` (each with a window selector). The answer is `satisfied`, `unsatisfied` (the state still did not hold at the deadline) or `unknown` (a read failed), with the number of reads:
+
+```js
+const verdict = await computer.verify({ kind: "windowExists", window: { app: "TextEdit", title: "Untitled" } }, { timeoutMs: 3000 })
+if (verdict.status !== "satisfied") throw new Error(`window did not open: ${verdict.status}`)
+```
+
+`verify` only reads; it never sends input, and it never runs past its deadline.
+
+### Use a screenshot only once
+
+Coordinates belong to the latest full screenshot of the same window. If the window changes size after the capture, a click against that frame is refused (`InvalidCoordinateFrame`, reason `resized`) with nothing sent; a zoomed crop is never an input frame (reason `zoom`). For a click that must not happen twice, such as paying or deleting, a program using the SDK (`@oh-my-opencode/senpi-desktop-sdk`) passes `consume: true` in the pointer options: after that action the frame is spent, and any further input against it is refused with reason `consumed` until a new screenshot is taken. The `computer` tool's `run` facade does not forward `consume` in this release.
+
+### Type into an app with several windows
+
+On macOS, background typing goes to the app, which routes keys to its own key window. When the target app has only one window that is enough; when it has several, OmO refuses the keys with `BackgroundUnavailable` rather than risk typing into the wrong window. Three ways through:
+
+- Prefer accessibility: an element's `setValue` or `type` writes into that exact field without keyboard focus.
+- Set `computer.macos_key_priming` to `"on"`. Before typing, OmO makes the target window the app's key window, confirms that with two reads, sends the keys only on that proof, then hands key focus inside the app back. The app is not brought to the front. If the target cannot be made key, nothing is sent and the refusal can be retried.
+- Use `delivery: "foreground"`, which needs your foreground-control approval.
+
+If you pressed a key or clicked in that app within the last 1.5 seconds while it is frontmost, background keys into it are refused (`BackgroundUnavailable`, reason `user_active_in_target`) so the agent never types over you; it retries once you pause.
+
+### When you use the same app
+
+By default (`computer.intervention: "continue"`), the agent's input in an app you are typing or clicking in keeps going: your keys and clicks there are recorded, but nothing waits for you and input already in progress is not stopped. The 1.5-second rule above still applies, so background keys into the frontmost app you just used are refused until you pause. With `"pause"`, its input there waits for you to pause and then stops with `UserIntervened`, nothing sent, and input already in progress stops at your first key or click and reports how much was delivered, so the agent reads the window again and sends only what is left. Using apps the agent is not working in does not stop it. OmO sends the setting only to an engine that advertises `intervention-policy`; an older engine is not sent it and always pauses.
+
+### Run code in the QuickJS sandbox
+
+By default the agent's `run` code executes in a `node:vm` context of the OmO process with `desktop`, `wait`, `assert` and `tool` as globals; that context scopes the globals and bounds synchronous work but is not a security boundary. With `computer.run_sandbox: "quickjs"`, model-written `run` code executes in a QuickJS WebAssembly cell instead, whose only globals are `computer` (alias `desktop`), `assert` and `console`; `wait` and `tool` are not available there. Each run is limited to 64 MiB of memory, 1,000 desktop calls and 1 MiB of output and of return value, and the result's `details.sandbox` says where it ran. Code OmO builds itself, such as a `call` chain, always runs in `vm`. The sandbox narrows what model-written code can reach; the permission tiers and stop path still apply to every desktop call.
 
 ## Safety model
 
@@ -149,7 +190,7 @@ Plain Esc is not a stop key: the app you are working in needs it for its own dia
 
 **What the agent is told.** The computer-use skill instructs the model to treat screen text, notifications and documents as untrusted data that can never authorize an action, and to confirm immediately before consequential actions (sending or publishing, purchases and transfers, deletion, account, security and permission changes, disclosing private data, accepting terms) unless your own message authorized that exact action. A `Suspended` or `StopPathUnavailable` error means stop and report; the model is told never to work around it. These are model instructions, not a sandbox: `computer.run` code runs with full host access, so keep permission rules strict for untrusted work and use a separate account or VM for risky automation.
 
-**Focus.** Input defaults to background delivery. On macOS it leaves your frontmost app, visible front window, keyboard focus, cursor and next-keystroke destination unchanged, although a clicked target may rise directly beneath your front window. Background typing into an app with multiple windows can report `BackgroundUnavailable`; use accessibility actions or foreground delivery instead. Foreground delivery briefly activates the target and then restores the previous window and cursor; a failed restore is reported, not hidden.
+**Focus.** Input defaults to background delivery. On macOS it leaves your frontmost app, visible front window, keyboard focus, cursor and next-keystroke destination unchanged, although a clicked target may rise directly beneath your front window. Background typing into an app with multiple windows can report `BackgroundUnavailable`; use accessibility actions, `macos_key_priming`, or foreground delivery instead (see [Type into an app with several windows](#type-into-an-app-with-several-windows)). Foreground delivery briefly activates the target and then restores the previous window and cursor; a failed restore is reported, not hidden.
 
 **Audit.** Every mutating action is appended to `.computer-audit.jsonl` in the session directory. Typed text is recorded by length and digest, never content, and an interrupted `type` also records how many characters were delivered. Set `audit_log.enabled: false` to turn it off.
 
