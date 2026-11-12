@@ -168,9 +168,9 @@ function assertClickAudited(run) {
 function assertChildRanFromCell(run) {
   const end = run.client.events.find((event) => event.type === "tool_execution_end" && event.toolName === "eval")
   if (!end) throw new Error("E22: the eval cell never finished")
-  const text = JSON.stringify(end.result ?? "")
-  if (end.isError || !text.includes("E22-CHILD false") || !text.includes("CHILD-DONE"))
-    throw new Error(`E22: the cell's tool.task did not run a child to completion: ${text.slice(0, 400)}`)
+  const printed = (end.result?.content ?? []).map((part) => part?.text ?? "").join("\n")
+  if (end.isError || !printed.includes("E22-CHILD false CHILD-DONE"))
+    throw new Error(`E22: the cell's tool.task did not run a child to completion: ${printed.slice(0, 400)}`)
 }
 
 /** The fake provider's model, as a category model reference. */
