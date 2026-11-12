@@ -109,19 +109,21 @@ function engineStateOf(reply: JsonObject): EngineState {
 
 const WAITS: ReadonlySet<string> = new Set(["wake", "hold", "approval"])
 
-/**
- * omo#13037 section 5.1: what a session that is not running answers, from the receiving consumer (`data.kind` "refused")
- * or from the receiving device service itself (the command's receipt). One mapping for both.
- */
-// A reason the receiving side wrote: one line, no control characters, at most REASON_SHOWN_MAX characters.
+// A reason the receiving side wrote: one line, no control or format characters, at most REASON_SHOWN_MAX characters.
 const REASON_SHOWN_MAX = 120
 const shownReason = (reason: string): string =>
   reason
     .replace(/[\u0000-\u001f\u007f-\u009f]+/g, " ")
+    // Format characters (bidi overrides and isolates, zero-width marks) would reorder how the line reads.
+    .replace(/\p{Cf}+/gu, "")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, REASON_SHOWN_MAX)
 
+/**
+ * omo#13037 section 5.1: what a session that is not running answers, from the receiving consumer (`data.kind` "refused")
+ * or from the receiving device service itself (the command's receipt). One mapping for both.
+ */
 function wakeRefusal(received: string, device: string, data: JsonObject = {}): Failure {
   const reason = shownReason(received)
   const details = { device, reason }

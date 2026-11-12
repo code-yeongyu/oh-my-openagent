@@ -426,6 +426,9 @@ async function lookupAcross(
     online.map(async (device) => ({ device: device.device, answer: await probe(device.device, address) })),
   )
   if (answers.some(({ answer }) => answer.kind === "unavailable")) return undefined
+  // Found over silent, by choice: one device holding the id is used even when another did not answer within the bound or
+  // the client's cap. A device that hangs must not block a send another device can take; the silent one is not asked
+  // again, and two copies of one id behind a silent device is the residual A4.3.5 names, never ambiguous_target.
   const holders = answers.flatMap(({ device, answer }) =>
     answer.kind === "found" ? [{ device, key: answer.key }] : [],
   )

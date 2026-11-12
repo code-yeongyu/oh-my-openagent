@@ -182,8 +182,12 @@ async function runOn(service: DeviceService, parsed: Parsed, dependencies: Remot
     case "wake": {
       // The gate is this connection's own welcome.service_version (A7R-11), never a capability word.
       if (!service.carriesWakeMark) {
+        // Two causes, two answers: this build carries no wake switch yet (no update of the service enables it), or the
+        // device service is older than the release that carries it (updating does).
         dependencies.error(
-          "The OmO device service on this device cannot wake sessions for other devices yet. Update OmO, then try again.",
+          service.wakeMarkMinimum === null
+            ? "This build of OmO does not carry the wake switch yet."
+            : "The OmO device service on this device cannot wake sessions for other devices yet. Update OmO, then try again.",
         )
         return REMOTE_EXIT.unavailable
       }
