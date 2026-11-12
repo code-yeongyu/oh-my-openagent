@@ -15,6 +15,7 @@ import {
   ensureIsolation,
   mergeIsolatedChanges,
   retainIsolation,
+  isolatedWorkIsOnRemote,
   runGit,
   sweepStaleIsolations,
   writeOwnerMarker,
@@ -53,6 +54,8 @@ export type IsolationRuntime = {
   merge(options: IsolationMergeOptions): Promise<CoreMergeResult>
   cleanup(handle: IsolationHandle): Promise<void>
   retain(handle: IsolationHandle, reason: string): Promise<string>
+  /** Whether a settled clone holds nothing a remote lacks, so it need not be retained. */
+  workIsOnRemote(mergedDir: string, baseline: WorktreeBaseline): Promise<boolean>
   /** Re-stamp ownership once the child's identity (pid or host session) is known. */
   writeOwner(baseDir: string, id: string, owner: IsolationOwner): Promise<void>
   sweep(roots: readonly string[], probe: OwnerProbe): Promise<SweepResult>
@@ -100,6 +103,7 @@ export function createIsolationRuntime(options: { readonly homeDir?: string } = 
     merge: (mergeOptions) => mergeIsolatedChanges(mergeOptions),
     cleanup: (handle) => cleanupIsolation(handle),
     retain: (handle, reason) => retainIsolation(handle, reason),
+    workIsOnRemote: (mergedDir, baseline) => isolatedWorkIsOnRemote(mergedDir, baseline),
     writeOwner: (baseDir, id, owner) => writeOwnerMarker(baseDir, id, owner),
     sweep: (roots, probe) => sweepStaleIsolations(roots, { backends, probe }),
     sweepRoots: [join(homeDir, ".omo", "wt")],

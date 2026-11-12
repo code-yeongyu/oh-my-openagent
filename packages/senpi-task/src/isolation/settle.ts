@@ -53,7 +53,7 @@ export async function settleIsolation(input: SettleIsolationInput): Promise<Isol
   }
 
   const result = project(core, Date.now() - started, input.reason)
-  await disposeWorkspace(input, result)
+  await disposeWorkspace(input, result, baseline)
   return result
 }
 
@@ -76,14 +76,20 @@ function project(core: CoreMergeResult, durationMs: number, reason: string | und
 }
 
 /**
- * A clone whose changes could not land is the user's only copy of that work, so it is renamed aside
- * instead of deleted. Without a handle (a crash salvaged by a later process) nothing is touched: the
+ * A clone whose changes could not land is renamed aside instead of deleted when it is the user's only
+ * copy of that work. When the child already pushed everything (no other edits, HEAD on a remote) the
+ * clone holds nothing to recover and is cleaned up like any other; the patch and summary stay in the
+ * artifacts either way. Without a handle (a crash salvaged by a later process) nothing is touched: the
  * startup sweep owns reclamation once the dead owner is proven.
  */
-async function disposeWorkspace(input: SettleIsolationInput, result: IsolationMergeResult): Promise<void> {
+async function disposeWorkspace(
+  input: SettleIsolationInput,
+  result: IsolationMergeResult,
+  baseline: WorktreeBaseline,
+): Promise<void> {
   const handle = input.handle
   if (handle === undefined) return
-  if (RETAINING_KINDS.has(result.kind)) {
+  if (RETAINING_KINDS.has(result.kind) && !(await input.runtime.workIsOnRemote(input.isolation.merged_dir, baseline))) {
     await input.runtime.retain(handle, result.kind)
     return
   }
