@@ -254,8 +254,17 @@ function fail(line: string): never {
   process.exit(2)
 }
 
+// The environment of every child: this process's, without PSModulePath (any casing). A Windows PowerShell 5.1
+// child that inherits pwsh 7's PSModulePath cannot load its own modules (hosted run 43133245569: Get-Acl's
+// Microsoft.PowerShell.Security "could not be loaded"); without the variable it uses its own defaults.
+export function childEnv(env: Readonly<Record<string, string | undefined>> = process.env): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const [k, v] of Object.entries(env)) if (v !== undefined && k.toLowerCase() !== "psmodulepath") out[k] = v
+  return out
+}
+
 async function run(cmd: string[], live?: Set<Killable>): Promise<{ code: number; out: string }> {
-  const p = Bun.spawn(cmd, { stdout: "pipe", stderr: "pipe" })
+  const p = Bun.spawn(cmd, { stdout: "pipe", stderr: "pipe", env: childEnv() })
   live?.add(p)
   try {
     const [out, err, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited])
@@ -386,7 +395,7 @@ async function startTarget(ctx: Ctx, kind: "edit" | "wpf" | "webview2", title: s
     ...(kind === "webview2" ? ["-Work", join(ctx.shared, `wv2-${title}`)] : []),
   ]
   const errFile = join(ctx.tmp, `${title}.stderr.txt`)
-  const proc = Bun.spawn(cmd, { stdout: "ignore", stderr: Bun.file(errFile) })
+  const proc = Bun.spawn(cmd, { stdout: "ignore", stderr: Bun.file(errFile), env: childEnv() })
   ctx.spawned.push(proc)
   ctx.pending.set(title, proc)
   const ready = await Promise.race([
@@ -415,7 +424,7 @@ async function startNotepad(ctx: Ctx) {
   if (ctx.token.aborted) return
   const before = await leg(ctx, "find", { cls: "Notepad" })
   // Tracked so it is ended with the run: an untracked live child kept the hosted --measure from exiting.
-  ctx.spawned.push(Bun.spawn(["notepad.exe"], { stdout: "ignore", stderr: "ignore" }))
+  ctx.spawned.push(Bun.spawn(["notepad.exe"], { stdout: "ignore", stderr: "ignore", env: childEnv() }))
   const exclude = arr(before.all).length ? before.all : []
   for (let i = 0; i < 60; i++) {
     await Bun.sleep(250)
@@ -893,7 +902,7 @@ async function sessionLeg(ctx: Ctx, t: Target, state: "disconnected" | "locked")
         "-Out",
         out,
       ],
-      { stdout: "ignore", stderr: "ignore" },
+      { stdout: "ignore", stderr: "ignore", env: childEnv() },
     ),
   )
   await Bun.sleep(1500)
@@ -1528,9 +1537,20 @@ const LOGIC_CHECKS: readonly Check[] = [
       if (bad.length) return bad.join("; ")
       const leg = source("sp-n-legs-session.ps1")
       const acl = leg.slice(leg.indexOf("function Leg-acl("), leg.indexOf("function Leg-close("))
-      if (!/GetOwner\(\[System\.Security\.Principal\.SecurityIdentifier\]\)/.test(acl))
-        return "Leg-acl does not read the owner as a SecurityIdentifier"
-      if (/Sddl|\.Owner\b|icacls/i.test(acl)) return "Leg-acl still emits or reads a name, SDDL or icacls text"
+      const native = source("sp-n-native-input.ps1")
+      const read = native.slice(
+        native.indexOf("public static Hashtable AclSids("),
+        native.indexOf("public static string InputDesktop("),
+      )
+      if (!/GetOwner\(typeof\(System\.Security\.Principal\.SecurityIdentifier\)\)/.test(read))
+        return "the ACL read does not take the owner as a SecurityIdentifier"
+      if (!/GetAccessRules\(true, true, typeof\(System\.Security\.Principal\.SecurityIdentifier\)\)/.test(read))
+        return "the ACL read does not take the entries as SecurityIdentifiers"
+      // names travel as an SDDL string, an NTAccount, the .Owner name property or icacls text (a section flag is fine)
+      const names = /\.Sddl\b|SddlForm|NTAccount|\$\w+\.Owner\b|icacls/i
+      if (!names.test("$acl.Owner") || names.test("AccessControlSections.Owner"))
+        return "the name scan misreads a known case"
+      if (names.test(acl + read)) return "the ACL read still emits or reads a name, SDDL or icacls text"
       const self = source("probe-sp-n.ts")
       const lock = self.slice(self.indexOf("async function lockDownWindows("), self.indexOf("async function setup("))
       return /"-Command"/.test(lock) ? "the ACL read is PowerShell code on a command line" : undefined
@@ -1766,6 +1786,54 @@ const LOGIC_CHECKS: readonly Check[] = [
       return /endChildren\(/.test(main) && /taskkill\.exe/.test(main)
         ? undefined
         : "main does not wait for the children's trees to exit"
+    },
+  },
+  {
+    finding: "PSMODULEPATH child-env (hosted run 43133245569)",
+    async run() {
+      const env = childEnv({
+        PSModulePath: "C:\\pwsh7\\Modules",
+        psmodulepath: "x",
+        PSMODULEPATH: "y",
+        Path: "C:\\bin",
+        HOME: "h",
+        EMPTY: undefined,
+      })
+      const left = Object.keys(env).filter((k) => k.toLowerCase() === "psmodulepath")
+      if (left.length) return `PSModulePath reaches the child: ${left.join(",")}`
+      if (env.Path !== "C:\\bin" || env.HOME !== "h") return "childEnv drops variables other than PSModulePath"
+      const self = source("probe-sp-n.ts")
+      const spawns = self.match(/Bun\.spawn\([\s\S]*?\{ stdout:[^}]*\}/g) ?? []
+      const bare = spawns.filter((x) => !/env: childEnv\(\)/.test(x))
+      if (spawns.length < 4) return `the spawn scan found only ${spawns.length} spawns`
+      return bare.length ? `${bare.length} of ${spawns.length} spawns do not pass env: childEnv()` : undefined
+    },
+  },
+  {
+    finding: "PSMODULEPATH no-module-cmdlets",
+    async run() {
+      // cmdlets of modules that a Windows PowerShell 5.1 child loads through PSModulePath (Security, LocalAccounts,
+      // ScheduledTasks, CimCmdlets, NetSecurity, Archive, ...); the probe reads these facts in its compiled C# instead
+      const moduleCmdlet =
+        /\b(?:Get|Set)-(?:Acl|AuthenticodeSignature|ExecutionPolicy|CmsMessage|PfxCertificate|LocalUser|LocalGroup|LocalGroupMember|ScheduledTask|CimInstance|NetFirewallRule)\b|\b(?:ConvertTo|ConvertFrom)-SecureString\b|\bRegister-ScheduledTask\b|\bExpand-Archive\b|\bCompress-Archive\b|\bImport-Module\b/i
+      if (
+        !moduleCmdlet.test("$x = Get-Acl -LiteralPath $p") ||
+        moduleCmdlet.test("# Get-Acl in a comment".replace(/(^|\s)#.*$/, ""))
+      )
+        return "the cmdlet scan misses a known case"
+      const files = ["sp-n.ps1", "sp-n-target.ps1", ...LEG_FILES]
+      const hits = files.flatMap((f) =>
+        source(f)
+          .split("\n")
+          .map((l, i) => [l.replace(/(^|\s)#.*$/, ""), i + 1] as const)
+          .filter(([l]) => moduleCmdlet.test(l))
+          .map(([l, n]) => `${f}:${n} ${l.trim().slice(0, 60)}`),
+      )
+      if (hits.length) return `module cmdlets in probe legs: ${hits.join("; ")}`
+      return /AclSids/.test(source("sp-n-legs-session.ps1")) &&
+        /DirectorySecurity/.test(source("sp-n-native-input.ps1"))
+        ? undefined
+        : "the ACL read is not the compiled DirectorySecurity read"
     },
   },
   {

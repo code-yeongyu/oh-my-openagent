@@ -53,6 +53,24 @@ public static partial class SpN {
     int v = Marshal.ReadInt32(buf); WTSFreeMemory(buf); return v;
   }
 
+  // The owner and access entries of a directory as SIDs, read in .NET (no Get-Acl, so no PowerShell module and
+  // no PSModulePath). Each failed part keeps its own error text; a failed read of the whole descriptor throws.
+  public static Hashtable AclSids(string path) {
+    var h = H(); var sids = new ArrayList(); var errs = new ArrayList();
+    var ds = new System.Security.AccessControl.DirectorySecurity(path,
+      System.Security.AccessControl.AccessControlSections.Owner | System.Security.AccessControl.AccessControlSections.Access);
+    try {
+      var o = ds.GetOwner(typeof(System.Security.Principal.SecurityIdentifier));
+      if (o == null) h["ownerError"] = "GetOwner returned null"; else h["owner"] = o.Value;
+    } catch (Exception e) { h["ownerError"] = e.Message; }
+    try {
+      foreach (System.Security.AccessControl.AuthorizationRule r in ds.GetAccessRules(true, true, typeof(System.Security.Principal.SecurityIdentifier)))
+        sids.Add(r.IdentityReference.Value);
+    } catch (Exception e) { var x = H(); x["error"] = e.Message; errs.Add(x); }
+    h["sids"] = sids; h["sidErrors"] = errs;
+    return h;
+  }
+
   public static string InputDesktop() {
     IntPtr d = OpenInputDesktop(0, false, 0x0001);
     if (d == IntPtr.Zero) return null;

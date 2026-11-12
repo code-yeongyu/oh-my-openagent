@@ -41,21 +41,11 @@ function Leg-find($a) {
   Emit $r
 }
 
-# The shared directory's owner and access entries as SIDs, read in this leg so no PowerShell code travels on a
-# command line. Only SIDs are emitted (never a name, an SDDL alias or icacls text); a read that fails keeps its
-# own error text.
+# The shared directory's owner and access entries as SIDs. The read is the compiled [SpN]::AclSids (.NET
+# DirectorySecurity), not Get-Acl: a module cmdlet fails to load when this Windows PowerShell 5.1 child inherits
+# pwsh 7's PSModulePath (hosted run 43133245569).
 function Leg-acl($a) {
-  $acl = Get-Acl -LiteralPath $a.path
-  $r = @{ sids = @(); sidErrors = @() }
-  try {
-    $o = $acl.GetOwner([System.Security.Principal.SecurityIdentifier])
-    if ($null -eq $o) { $r['ownerError'] = 'GetOwner returned null' } else { $r['owner'] = $o.Value }
-  } catch { $r['ownerError'] = $_.Exception.Message }
-  foreach ($e in $acl.Access) {
-    try { $r['sids'] += $e.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value }
-    catch { $r['sidErrors'] += @{ entry = [string]$e.IdentityReference; error = $_.Exception.Message } }
-  }
-  Emit $r
+  Emit ([SpN]::AclSids([string]$a.path))
 }
 
 function Leg-close($a) {

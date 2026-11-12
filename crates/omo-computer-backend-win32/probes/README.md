@@ -88,6 +88,10 @@ SYSTEM tasks and the elevated helpers exchange files through a fresh directory u
   error.
 - Every path on a command line is quoted.
 
+The ACL is read in the compiled C# (.NET `DirectorySecurity`), not with `Get-Acl`. No leg uses a PowerShell
+module cmdlet, and every child the probe spawns gets its environment without `PSModulePath`: a Windows
+PowerShell 5.1 child that inherits pwsh 7's module path cannot load its own modules.
+
 The medium-integrity helper cannot write there, so it uses the run's own temp directory.
 
 The WebView2 target extracts the SDK from the pinned, hash-checked package into a fresh subdirectory of this
