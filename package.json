@@ -194,7 +194,7 @@
   "dependencies": {
     "@opentui/solid": "^0.5.11",
     "detect-libc": "^2.1.2",
-    "zod": "^4.6.5"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@clack/prompts": "^1.8.1",
