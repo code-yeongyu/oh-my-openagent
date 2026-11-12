@@ -448,78 +448,61 @@ describe("#13037 the sender half reaches a session on another device that is not
     )
   })
 
-  describe("review: a receiving side's free-form refusal reason is bounded before it reaches the person", () => {
-    const shownOf = async (reason: string) => {
+  describe("review: a receiving side's refusal reason is shown only when it is a machine code", () => {
+    const refusalOf = async (reason: string) => {
       const a = account({
         rows: [B_ROW, C_ROW],
         ended: { c: { [GONE]: "rk-c-gone" } },
         wakeOutcome: queuedEnvelope({ kind: "refused", reason }),
       })
       const result = await fixture.surface(a.remote).run("thread_send", { thread: GONE, message: "hi" })
-      return (result as { error: { details?: { reason?: string } } }).error.details?.reason ?? ""
+      return (result as { error: { code: string; message: string; details?: { reason?: string } } }).error
     }
 
-    test("#given combining marks and letters that render blank #then only what reads as text is shown", async () => {
-      expect(await shownOf("a\u0336b\u3164c\u2800d")).toBe("abcd")
+    test.each([
+      "session_gone",
+      "ambiguous_session",
+      "not_wakeable",
+      "sender_not_admitted",
+      "queue_full",
+      "overloaded",
+      "wake_limit_reached",
+      "wake_unavailable",
+      "wake_unsupported",
+    ])("#given the known code %s #then its reason is the code itself", async (code) => {
+      expect((await refusalOf(code)).details?.reason).toBe(code)
     })
+
+    test.each(["some_new_code", "v2.busy-now"])(
+      "#given an unknown code of the machine shape %s #then it is shown verbatim",
+      async (code) => {
+        const error = await refusalOf(code)
+        expect(error.code).toBe("unsupported")
+        expect(error.details?.reason).toBe(code)
+        expect(error.message.includes(code)).toBe(true)
+      },
+    )
 
     test.each([
-      ["Hindi", "नहीं, यह सत्र बंद है"],
-      ["Thai", "ไม่ได้รับอนุญาต"],
-      ["Tamil", "தமிழ் மறுப்பு"],
-      ["Vietnamese, decomposed", "Vi\u0065\u0323\u0302t"],
-      ["Persian with a zero-width non-joiner", "می\u200Cخواهم"],
-      ["a family emoji", "\u{1F468}\u200D\u{1F469}\u200D\u{1F467}"],
-      ["a red heart with its selector", "\u2764\uFE0F"],
-      ["Korean", "세션을 깨울 수 없습니다"],
-      ["Korean in decomposed jamo", "\u1112\u1161\u11AB\u1100\u1173\u11AF"],
-    ] as const)("#given a reason in %s #then it is shown as written (after NFC)", async (_script, text) => {
-      expect(await shownOf(text)).toBe(text.normalize("NFC"))
-    })
-
-    test("#given everything that can deface or disguise a line #then none of it is shown", async () => {
-      const bidi = "\u061C\u200E\u200F\u202A\u202B\u202C\u202D\u202E\u2066\u2067\u2068\u2069"
-      const reason = `${bidi}o\uFEFF\u{E0041}\u{E007F}k\u0336\u20DD\u3164\u2800\u115F\u1160\uFFA0\u0007`
-      expect(await shownOf(reason)).toBe("ok")
-    })
-
-    test("#given a stack of 40 marks on one letter #then at most MARKS_PER_BASE_MAX of them are kept", async () => {
-      const shown = await shownOf(`a${"\u0346".repeat(40)}b`)
-      expect(shown.startsWith("a") && shown.endsWith("b")).toBe(true)
-      expect((shown.match(/\p{M}/gu) ?? []).length).toBe(6)
-    })
-
-    test.each([
-      [119, "whole"],
-      [120, "absent"],
-    ] as const)("#given %d characters then a flag #then the flag is %s, never half", async (count, expected) => {
-      const shown = await shownOf(`${"x".repeat(count)}\u{1F1EF}\u{1F1F5}tail`)
-      const indicators = (shown.match(/[\u{1F1E6}-\u{1F1FF}]/gu) ?? []).length
-      expect(indicators).toBe(expected === "whole" ? 2 : 0)
-    })
-
-    test("#given a cut that would fall inside a surrogate pair #then it is cut by grapheme and leaves no half pair", async () => {
-      const shown = await shownOf(`${"x".repeat(119)}\u{1F600}tail`)
-      expect(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(shown)).toBe(false)
-      expect(Array.from(shown)).toHaveLength(120)
-    })
-
-    test("#given a long multi-line reason with control characters #then the message is one bounded line", async () => {
-      // The format characters come first, inside the shown length, so the cut cannot hide them.
-      const reason = `\u202Eevil\u2066\u200B${"x".repeat(600)}\nsecond line\u0007\u001b[31m`
-      const a = account({
-        rows: [B_ROW, C_ROW],
-        ended: { c: { [GONE]: "rk-c-gone" } },
-        wakeOutcome: queuedEnvelope({ kind: "refused", reason }),
-      })
-      const result = await fixture.surface(a.remote).run("thread_send", { thread: GONE, message: "hi" })
-      const error = (result as { error: { message: string; details?: { reason?: string } } }).error
-      for (const text of [error.message, error.details?.reason ?? ""]) {
-        expect(/[\u0000-\u001f\u007f]/.test(text)).toBe(false)
-        // Format characters (bidi overrides and isolates, zero-width marks) would reorder how the reason reads.
-        expect(/\p{Cf}/u.test(text)).toBe(false)
-        expect(text.length).toBeLessThanOrEqual(300)
-      }
+      ["a joiner after a run of marks", `a${"\u0300\u0301\u0302\u0303\u0304\u0305\u200D".repeat(40)}`],
+      ["a joiner between two invisibles", "a\u034F\u200D\uFE0Fb"],
+      ["a bidi override", "\u202Eesrever"],
+      ["tag characters", "\u{E0041}\u{E0042}\u{E007F}"],
+      ["a combining grapheme joiner", "busy\u034F"],
+      ["a variation selector", "busy\uFE0F"],
+      ["Hindi prose", "नहीं, यह सत्र बंद है"],
+      ["Arabic prose", "الجلسة مغلقة"],
+      ["Korean prose", "세션을 깨울 수 없습니다"],
+      ["an emoji", "\u{1F600}"],
+      ["a string with a space", "turn active"],
+      ["an upper-case word", "Busy"],
+      ["an empty string", ""],
+      ["65 characters", "a".repeat(65)],
+      ["a string with a newline", "busy\nnow"],
+    ] as const)("#given %s #then the reason is the constant and the text is not shown", async (_label, reason) => {
+      const error = await refusalOf(reason)
+      expect(error.details?.reason).toBe("unrecognised")
+      expect(error.message).toBe("Device c refused the message (unrecognised reason).")
     })
   })
 })
