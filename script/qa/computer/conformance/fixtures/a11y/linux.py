@@ -16,7 +16,7 @@ try:
     import gi
 
     gi.require_version("Atspi", "2.0")
-    from gi.repository import Atspi  # noqa: E402
+    from gi.repository import Atspi, GLib  # noqa: E402
 except Exception as error:  # the Atspi typelib missing on the runner is the runner, not the fixture
     print(f"ENVIRONMENT: the Atspi typelib is unavailable ({error})")
     sys.exit(3)
@@ -50,7 +50,7 @@ def count_controls(root):
 
 
 def find_window(title):
-    desktop = Atspi.get_desktop()
+    desktop = Atspi.get_desktop(0)
     if desktop is None:
         return None
     for index in range(desktop.get_child_count()):
@@ -76,7 +76,7 @@ def main():
     while window is None:
         try:
             window = find_window(title)
-        except Exception as error:  # no AT-SPI bus on this runner
+        except GLib.Error as error:  # no AT-SPI bus on this runner; anything else is a probe bug and crashes
             print(f"ENVIRONMENT: AT-SPI unreachable ({error})")
             return 3
         if window is None and time.monotonic() >= deadline:
