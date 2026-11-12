@@ -3153,6 +3153,34 @@ const LOGIC_CHECKS: readonly Check[] = [
     },
   },
   {
+    finding: "COUNT predicate rows are not hit tallies (hosted run 43236534776)",
+    async run() {
+      const bad: string[] = []
+      const row = (id: string, verdict: Verdict, measured: string) => ({ id, verdict, measured })
+      const fg = "targetForeground=true foreground by plain"
+      // n-uipi-sendinput: "returned k/n" is one SendInput call's return against the events of that call, judged
+      // all-or-nothing with lastError and the arrived chars; it is not a hit tally over runs
+      if (outsideWorstOf(row("n-uipi-sendinput", "CONFIRMS", `returned 6/6 lastError=0 chars arrived=0 ${fg}`)))
+        bad.push("n-uipi-sendinput is read as a count row")
+      if (outsideWorstOf(row("n-barrier-fg-proves-notepad", "CONFIRMS", "sent 31/31 routed 31/31")))
+        bad.push("a -proves- count row is outside worst-of")
+      if (!outsideWorstOf(row("n-some-new-row", "CONFIRMS", "delivered 3/4")))
+        bad.push("an unclassified row with a k/n count is not flagged")
+      // across passes the predicate row merges by verdict, worst first, and keeps both passes' texts
+      const ok: Result = { measured: `returned 6/6 lastError=0 chars arrived=0 ${fg}`, verdict: "CONFIRMS" }
+      const no: Result = { measured: `returned 6/6 lastError=0 chars arrived=1 ${fg}`, verdict: "CONTRADICTS" }
+      for (const [a, b] of [
+        [ok, no],
+        [no, ok],
+      ] as const) {
+        const m = mergeTwo("n-uipi-sendinput", a, b)
+        if (m.verdict !== "CONTRADICTS" || !m.measured.includes("arrived=0") || !m.measured.includes("arrived=1"))
+          bad.push(`a failing pass is hidden: ${JSON.stringify(m)}`)
+      }
+      return bad.length ? bad.join("; ") : undefined
+    },
+  },
+  {
     finding: "COUNT worst-of on every bounded count row (hosted run 43146515418)",
     async run() {
       const t = (d: number, n = 6): Tally => ({ delivered: d, runs: n, acquire: "plain", notFg: 0 })
