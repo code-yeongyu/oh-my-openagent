@@ -11,11 +11,16 @@ interface Report {
   readonly refused: number
   readonly failed: number
   readonly skipped: number
+  readonly disturbed: number
+  readonly unobserved: number
   readonly problems: readonly string[]
+  /** The run's shape faults: a missing, duplicate, undeclared or contradictory cell, or an empty catalog. */
+  readonly structural: readonly string[]
 }
 
 type Judgement =
-  { readonly outcome: "delivered" | "refused" } | { readonly outcome: "failed" | "skipped"; readonly problem: string }
+  | { readonly outcome: "delivered" | "refused" }
+  | { readonly outcome: "failed" | "skipped" | "unobserved"; readonly problem: string }
 
 function changedSignals(result: CellResult, allowed: readonly SignalId[]): SignalId[] {
   return SIGNAL_IDS.filter((id) => result.journal[id].signal === "happened" && !allowed.includes(id))
@@ -27,10 +32,15 @@ function oracleProblem(cell: Cell, result: CellResult): string | undefined {
   return `oracle ${field} == ${JSON.stringify(equals)} does not hold (fixture reads ${JSON.stringify(result.oracle.observed)})`
 }
 
+function unobservedSignals(result: CellResult): SignalId[] {
+  return SIGNAL_IDS.filter((id) => result.journal[id].signal === "not_observed")
+}
+
 function inconsistentSignals(result: CellResult): SignalId[] {
   return SIGNAL_IDS.filter((id) => {
     const { signal, count, firstAt } = result.journal[id]
-    return signal === "happened" ? count === 0 || firstAt === null : count !== 0 || firstAt !== null
+    if (signal === "happened") return count === 0 || firstAt === null
+    return count !== 0 || firstAt !== null
   })
 }
 
@@ -66,6 +76,11 @@ function judge(cell: Cell, id: string, result: CellResult): Judgement {
   }
   const problem = cellProblem(cell, result)
   if (problem !== undefined) return { outcome: "failed", problem: `cell ${id}: ${problem}` }
+  const unread = unobservedSignals(result)
+  if (unread.length > 0) {
+    const why = result.observerUnavailable === undefined ? "" : ` (${result.observerUnavailable})`
+    return { outcome: "unobserved", problem: `cell ${id}: observer did not read ${unread.join(",")}${why}` }
+  }
   return { outcome: "deliver" in cell.expect ? "delivered" : "refused" }
 }
 
@@ -78,10 +93,11 @@ function groupBy<T>(items: readonly T[], key: (item: T) => string): Map<string, 
 /** Judges one finished run against the catalog: every declared cell exactly once, each with its declared outcome. */
 export function buildReport(catalog: readonly Cell[], results: readonly CellResult[]): Report {
   const problems: string[] = []
-  const counts = { delivered: 0, refused: 0, failed: 0, skipped: 0 }
+  const structural: string[] = []
+  const counts = { delivered: 0, refused: 0, failed: 0, skipped: 0, disturbed: 0, unobserved: 0 }
   const declared = groupBy(catalog, cellId)
   const observed = groupBy(results, (result) => result.id)
-  if (catalog.length === 0) problems.push("empty catalog")
+  if (catalog.length === 0) structural.push("empty catalog")
   for (const [id, cells] of declared) {
     const [cell] = cells
     const rows = observed.get(id) ?? []
@@ -95,37 +111,71 @@ export function buildReport(catalog: readonly Cell[], results: readonly CellResu
             ? `duplicate cell ${id}`
             : undefined
     if (fault !== undefined || cell === undefined || row === undefined) {
-      problems.push(fault ?? `missing cell ${id}`)
+      structural.push(fault ?? `missing cell ${id}`)
       counts.failed += 1
       continue
     }
+    if (changedSignals(row, "deliver" in cell.expect ? cell.declares : []).length > 0) counts.disturbed += 1
     const judgement = judge(cell, id, row)
     if ("problem" in judgement) problems.push(judgement.problem)
     counts[judgement.outcome] += 1
   }
   for (const id of observed.keys()) {
     if (declared.has(id)) continue
-    problems.push(`undeclared cell ${id}`)
+    structural.push(`undeclared cell ${id}`)
     counts.failed += 1
   }
   const [first] = catalog
-  return { os: first?.os ?? "unknown", session: first?.session ?? "unknown", cells: declared.size, ...counts, problems }
+  return {
+    os: first?.os ?? "unknown",
+    session: first?.session ?? "unknown",
+    cells: declared.size,
+    ...counts,
+    problems: [...structural, ...problems],
+    structural,
+  }
 }
 
 export function summaryLine(report: Report): string {
-  const { os, session, cells, delivered, refused, failed, skipped } = report
-  return `CATALOG ${os}/${session} cells=${cells} delivered=${delivered} refused=${refused} failed=${failed} skipped=${skipped}`
+  const { os, session, cells, delivered, refused, failed, skipped, unobserved } = report
+  const tail = unobserved > 0 ? ` unobserved=${unobserved}` : ""
+  return `CATALOG ${os}/${session} cells=${cells} delivered=${delivered} refused=${refused} failed=${failed} skipped=${skipped}${tail}`
+}
+
+function readRun(input: string) {
+  try {
+    const parsed = runFileSchema.safeParse(JSON.parse(readFileSync(input, "utf8")))
+    return parsed.success
+      ? parsed.data
+      : `invalid run file ${input}: ${parsed.error.issues[0]?.message ?? "schema mismatch"}`
+  } catch (error) {
+    return `unreadable run file ${input}: ${error instanceof Error ? error.message : String(error)}`
+  }
 }
 
 function main(argv: readonly string[]): number {
   const at = argv.indexOf("--input")
   const input = at >= 0 ? argv[at + 1] : undefined
   if (input === undefined) {
-    console.error("usage: report.ts --input <run.json>")
+    console.error("usage: report.ts --input <run.json> [--check-schema | --summary]")
     return 2
   }
-  const run = runFileSchema.parse(JSON.parse(readFileSync(input, "utf8")))
+  const run = readRun(input)
+  if (typeof run === "string") {
+    console.log(run)
+    return 1
+  }
   const report = buildReport(catalogFor(run.os, run.session), run.results)
+  if (argv.includes("--check-schema") || argv.includes("--summary")) {
+    for (const fault of report.structural) console.log(fault)
+    const { cells, delivered, refused, failed, disturbed, unobserved } = report
+    if (argv.includes("--summary")) {
+      console.log(
+        `cells=${cells} delivered=${delivered} refused=${refused} failed=${failed} disturbed=${disturbed} unobserved=${unobserved}`,
+      )
+    } else if (report.structural.length === 0) console.log(`SCHEMA ok ${run.os}/${run.session} cells=${cells}`)
+    return report.structural.length === 0 ? 0 : 1
+  }
   for (const problem of report.problems) console.log(problem)
   console.log(summaryLine(report))
   return report.problems.length === 0 ? 0 : 1
