@@ -62,6 +62,19 @@ const SHIPPED_ROOTS = [
   ["packages/omo-senpi/plugin/", "plugin/"],
 ]
 
+// The plugin's import map is what the runtime resolves its lazy sidecars through (#omo-task-runtime ->
+// ./extensions/omo-task.js), so every target it names must be packed. A list pattern such as extensions/[^/]+ is met
+// by any one file; this requires each sidecar the packed plugin actually imports.
+function pluginImportMapRequirements() {
+  const manifest = JSON.parse(readFileSync(resolve(pkgDir, "plugin", "package.json"), "utf8"))
+  return [...new Set(Object.values(manifest.imports ?? {}).filter((target) => typeof target === "string"))].map(
+    (target) => {
+      const path = posix.join("plugin", target)
+      return { label: path, met: (paths) => paths.includes(path) }
+    },
+  )
+}
+
 function releaseGeneratedRequirements() {
   const { patterns } = JSON.parse(readFileSync(resolve(repoRoot, "script", "generated-bundles.json"), "utf8"))
   const requirements = []
@@ -143,7 +156,9 @@ for (const artifact of REQUIRED_ARTIFACTS) {
   }
 }
 
-for (const requirement of releaseMode || preflightMode ? releaseGeneratedRequirements() : []) {
+for (const requirement of releaseMode || preflightMode
+  ? [...releaseGeneratedRequirements(), ...pluginImportMapRequirements()]
+  : []) {
   if (!requirement.met(paths)) {
     errors.push(`missing artifact: ${requirement.label}`)
   }

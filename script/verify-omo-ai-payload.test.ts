@@ -115,7 +115,11 @@ function runVerifierOnPayload(
       "utf8",
     )
     for (const relativePath of payloadPaths) {
-      writeFixtureFile(packageDir, relativePath, contents[relativePath] ?? "// fixture\n")
+      writeFixtureFile(
+        packageDir,
+        relativePath,
+        contents[relativePath] ?? (relativePath === "plugin/package.json" ? '{"imports":{}}\n' : "// fixture\n"),
+      )
       const mode = options.modes?.[relativePath]
       if (mode !== undefined) chmodSync(join(packageDir, relativePath), mode)
     }
@@ -242,6 +246,31 @@ describe("omo-ai payload verifier", () => {
       expect(run.output).toContain(`missing artifact: ${missing}`)
     },
   )
+
+  describe("#given the plugin import map in a release payload", () => {
+    const manifest = JSON.stringify({ imports: { "#omo-task-runtime": "./extensions/omo-task.js" } })
+    const payload = [
+      ...new Set([...PACKED_ARTIFACTS, ...RELEASE_GENERATED_ARTIFACTS, ...skillPaths(PACKED_SKILL_COUNT)]),
+    ]
+
+    test("#when a sidecar it maps is not packed #then --release-preflight fails naming it", () => {
+      const run = runVerifierOnPayload(payload, { "plugin/package.json": manifest }, { args: ["--release-preflight"] })
+      expect(run.output).toContain("missing artifact: plugin/extensions/omo-task.js")
+      expect(run.exitCode).toBe(1)
+    })
+
+    test("#when every sidecar it maps is packed #then --release-preflight passes", () => {
+      const run = runVerifierOnPayload(
+        [...payload, "plugin/extensions/omo-task.js"],
+        { "plugin/package.json": manifest },
+        {
+          args: ["--release-preflight"],
+        },
+      )
+      expect(run.output).not.toContain("missing artifact:")
+      expect(run.exitCode).toBe(0)
+    })
+  })
 
   describe("#given the release preflight gate (--release-preflight)", () => {
     const complete = [...PACKED_ARTIFACTS, ...skillPaths(PACKED_SKILL_COUNT), ...RELEASE_GENERATED_ARTIFACTS]
