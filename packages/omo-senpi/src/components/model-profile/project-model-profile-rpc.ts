@@ -13,7 +13,7 @@ import {
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { BUILTIN_MODEL_PROFILES } from "./builtin-profiles"
-import { lookupHomeOfUid } from "./owner-home-lookup"
+import { lookupHomeOfUid, runPasswdLookup } from "./owner-home-lookup"
 
 export { homeFromPasswdEntry, lookupHomeOfUid, OWNER_LOOKUP_TTL_MS, runPasswdLookup } from "./owner-home-lookup"
 
@@ -128,7 +128,10 @@ function isHomeFolder(cwd: string, deps: ProjectModelProfileDeps): boolean {
   if (ownHomes.some((home) => sameDirectory(home, folder))) return true
   const ownUid = process.getuid?.()
   if (ownUid !== undefined) {
-    const homeOfUid = deps.homeOfUid ?? lookupHomeOfUid
+    // The lookup never runs a getent or id from a PATH entry inside the folder being checked.
+    const homeOfUid =
+      deps.homeOfUid ??
+      ((uid: number) => lookupHomeOfUid(uid, (asked) => runPasswdLookup(asked, { untrustedFolders: [cwd] })))
     const ownPasswdHome = homeOfUid(ownUid)
     if (typeof ownPasswdHome === "string" && sameDirectory(ownPasswdHome, folder)) return true
     // No passwd home for this account (a failed lookup, or a container started with a bare uid): refuse only folders at
