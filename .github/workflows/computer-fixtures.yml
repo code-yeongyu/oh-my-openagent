@@ -178,7 +178,7 @@ jobs:
         id: atspi
         shell: bash
         run: |
-          packages=(gir1.2-atspi-2.0 dbus)
+          packages=(at-spi2-core gir1.2-atspi-2.0 dbus)
           for attempt in 1 2 3; do
             if sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get update > apt-atspi.log 2>&1 \
               && sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y --no-install-recommends \
