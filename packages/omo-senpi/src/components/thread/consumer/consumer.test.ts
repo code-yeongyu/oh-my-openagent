@@ -91,12 +91,15 @@ describe("the wake the consumer is told (A7.2.3)", () => {
     [{}, false],
     [{ wake: false }, false],
     [{ wake: true }, true],
-  ])("#given the serve acknowledgement %j #when the consumer starts #then the wake it holds is %p", async (ack, held) => {
-    const { service, consumer } = setup()
-    service.ackServe(ack)
-    expect(await consumer.start()).toBe("serving")
-    expect(consumer.wakeAllowed()).toBe(held)
-  })
+  ])(
+    "#given the serve acknowledgement %j #when the consumer starts #then the wake it holds is %p",
+    async (ack, held) => {
+      const { service, consumer } = setup()
+      service.ackServe(ack)
+      expect(await consumer.start()).toBe("serving")
+      expect(consumer.wakeAllowed()).toBe(held)
+    },
+  )
 
   test("#given an acknowledgement carrying a field the decoder does not know #when the consumer starts #then it serves nothing and holds the wake off", async () => {
     const { service, consumer } = setup()
