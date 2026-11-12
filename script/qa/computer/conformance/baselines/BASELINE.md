@@ -62,4 +62,15 @@ Task set, replayed with no model: windows 1 of 12 (choosing a menu item by title
 - **Foreground, both:** every foreground cell except the accessibility press is refused with `ControlRequired` (8 on x11, 9 on Windows), which is the shipped answer when no person can approve foreground control.
 - **Electron and web-view content is not reachable.** On x11 every Electron cell is refused `AxFailed`; on Windows the Electron window lists only its frame and a `Chrome Legacy Window`, and the x11 web-view window lists only its menu bar. The web content is absent from the accessibility tree in all three. Whether the fixture apps must turn renderer accessibility on, or the release cannot read it, is open and is being asked of the fixture apps' owner.
 
+- **x11, the release's own hit-test (labelled observation, from the aim check of the hosted run at `bfdec3c9a9`).** `elementAt` at the centre of the Press button, the Value field, the Scroll target and a list row returns the window's root `filler` with no title, before and after the window was raised. On X11 the release cannot resolve a point inside the GTK window to the element under it.
+
+### Control for the x11 "delivered but not received" class (rule fixed before its run)
+
+Two elements of different kinds, each on a fresh fixture: the Press button (a click) and the Scroll target (a scroll). The release sends its element-routed background action; then `xdotool`, outside the tool, raises the window and acts at the same global point the element's bounds give; the bounds the release reported are logged beside the window geometry `xdotool` reads.
+
+- `xdotool`'s action registers in the fixture: the point is right and the release's reported delivery was lost. The class becomes **verified by control**.
+- `xdotool`'s action does not register: the bounds are off. The class stays **unclassified**.
+
+Until that control has run, nothing about this class is a fact about the release.
+
 Only the release's own answers about actions it attempted are recorded here. Failures caused by the test harness are not, nor are results that are still being checked.
