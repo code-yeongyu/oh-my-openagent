@@ -1,0 +1,270 @@
+{
+  "description": "Row 23: a window-target drag whose destination leaves the window's frame resolves that point as a desktop verb does (here onto a denied app), so the whole drag is refused InvalidTarget{drag_destination} with the point, nothing sent.",
+  "transport": "stdio",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/v3-drag-destinations.json",
+  "env": {
+    "OMO_COMPUTER_FAKE_STOP_PATH": "live"
+  },
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session.open",
+        "params": {
+          "reportMode": "object"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayCount": 1,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capture": {
+                  "available": true,
+                  "route": "composite"
+                },
+                "windowCapture": {
+                  "available": true
+                },
+                "windowInput": {
+                  "available": true
+                },
+                "observe": true,
+                "settle": true,
+                "ocr": false,
+                "background_window_input": true,
+                "background_window_input_basis": "route_available",
+                "inputModes": [
+                  "pointer",
+                  "keyboard",
+                  "ax"
+                ],
+                "backgroundReach": "full",
+                "toolkitRoutes": {
+                  "seeded": [],
+                  "learned": []
+                },
+                "session": {
+                  "screenLocked": "unknown",
+                  "displayAsleep": "unknown",
+                  "userActive": {
+                    "active": "unknown",
+                    "lastInputAgeMs": null
+                  },
+                  "secureInputActive": "unknown",
+                  "sessionActive": "unknown",
+                  "screensaverActive": "unknown",
+                  "pauseReasons": [],
+                  "sampledAt": 0
+                },
+                "sessionProbes": {
+                  "screenLocked": "none",
+                  "displayAsleep": "none",
+                  "userActive": "none",
+                  "secureInputActive": "none",
+                  "sessionActive": "none",
+                  "screensaverActive": "none",
+                  "sessionActiveDeliveryVerified": false
+                },
+                "displayAwake": {
+                  "state": "idle",
+                  "graceMs": 0,
+                  "capMs": 0,
+                  "heldSinceMs": null,
+                  "mechanism": "unavailable"
+                },
+                "surfaces": [],
+                "routeLadder": [],
+                "sendOnEnter": {
+                  "keys": 0
+                },
+                "stopPath": {
+                  "kind": "global",
+                  "hostRelayLive": false,
+                  "allowHostRelayOnly": false,
+                  "listener": "xi2-raw",
+                  "deaf": false,
+                  "stale": false
+                }
+              },
+              "resumeToken": "d57d495a75aebfa33d4604268f102b5b"
+            }
+          },
+          "variable": [
+            "/result"
+          ]
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "stopPath.start",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "suspended": false,
+              "globalLive": true,
+              "hostRelayLive": false,
+              "heartbeatFresh": true,
+              "stopPath": "global",
+              "reason": null
+            }
+          },
+          "variable": [
+            "/result"
+          ]
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "control.grant",
+        "params": {
+          "reason": "fixture"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "result": {
+              "active": true,
+              "reason": "fixture",
+              "grantedAt": null
+            }
+          },
+          "variable": [
+            "/result"
+          ]
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "capture",
+        "params": {
+          "target": "101"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "result": {
+              "frameId": "frame-f7552e1219c0db2a-1",
+              "target": "101",
+              "width": 800,
+              "height": 600,
+              "coordinateWidth": 800,
+              "coordinateHeight": 600,
+              "scale": 1,
+              "cursor": "os",
+              "session": {
+                "screenLocked": "unknown",
+                "displayAsleep": "unknown",
+                "userActive": {
+                  "active": "unknown",
+                  "lastInputAgeMs": null
+                },
+                "secureInputActive": "unknown",
+                "sessionActive": "unknown",
+                "screensaverActive": "unknown",
+                "pauseReasons": [],
+                "sampledAt": 0
+              },
+              "observation": {
+                "untrustedText": true
+              }
+            }
+          },
+          "variable": [
+            "/result"
+          ]
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "drag",
+        "params": {
+          "target": "101",
+          "from": {
+            "x": 50,
+            "y": 50
+          },
+          "to": {
+            "x": 1000,
+            "y": 80
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "error": {
+              "code": -32005,
+              "message": "InvalidTarget",
+              "data": {
+                "code": "InvalidTarget",
+                "hint": null,
+                "reason": "drag_destination",
+                "session": {
+                  "screenLocked": "unknown",
+                  "displayAsleep": "unknown",
+                  "userActive": {
+                    "active": "unknown",
+                    "lastInputAgeMs": null
+                  },
+                  "secureInputActive": "unknown",
+                  "sessionActive": "unknown",
+                  "screensaverActive": "unknown",
+                  "pauseReasons": [],
+                  "sampledAt": 0
+                },
+                "point": {
+                  "x": 1000,
+                  "y": 80
+                },
+                "stageCode": "ControlRequired"
+              }
+            }
+          },
+          "variable": [
+            "/error/data/session"
+          ]
+        }
+      ],
+      "sink": 0
+    }
+  ]
+}
