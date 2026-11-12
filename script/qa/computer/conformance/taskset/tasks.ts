@@ -14,10 +14,10 @@ export interface Task {
   readonly oracle: readonly SavedStateOracle[]
 }
 
-const FIXTURE_APP = "Conformance Fixture"
+const DOCUMENT_TITLE = "Conformance Document"
 export const MAX_REFERENCE_CELLS = 6
 
-const open = `const win = await desktop.window({ app: "${FIXTURE_APP}", title: "Document" })`
+const open = `const win = await desktop.window({ title: "${DOCUMENT_TITLE}" })`
 const field = (label: string) => `win.ref((await win.find({ role: "textfield", title: "${label}", limit: 1 }))[0].ref)`
 const button = (label: string) => `win.ref((await win.find({ role: "button", title: "${label}", limit: 1 }))[0].ref)`
 const save = `${open}\nawait win.menu.select(["File", "Save"])\nawait wait({ settle: {} })`
@@ -159,10 +159,10 @@ export const TASKS: readonly Task[] = [
       run(
         open,
         `await win.menu.select(["File", "New Window"])`,
-        `await wait({ window: { app: "${FIXTURE_APP}", title: "Document 2", state: "appeared" } })`,
+        `await wait({ window: { title: "${DOCUMENT_TITLE} 2", state: "appeared" } })`,
       ),
       run(
-        `const second = await desktop.window({ app: "${FIXTURE_APP}", title: "Document 2" })`,
+        `const second = await desktop.window({ title: "${DOCUMENT_TITLE} 2" })`,
         `await second.ref((await second.find({ role: "textfield", title: "Title", limit: 1 }))[0].ref).type("Second")`,
         `await second.menu.select(["File", "Save"])`,
       ),
