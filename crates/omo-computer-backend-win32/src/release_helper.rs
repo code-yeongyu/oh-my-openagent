@@ -82,3 +82,86 @@ pub const fn admit(state: HelperState, verb: VerbKind) -> Result<(), Refusal> {
         _ => Ok(()),
     }
 }
+
+#[cfg(windows)]
+pub use os::{spawn_outside_jobs, HelperProcess};
+
+/// The Windows half the engine's `--release-helper` mode (row 28) calls: the spawn that leaves every
+/// job and the read-back that decides [`HelperState`].
+#[cfg(windows)]
+mod os {
+    use std::os::windows::ffi::OsStrExt;
+    use std::path::Path;
+
+    use windows::core::{PCWSTR, PWSTR};
+    use windows::Win32::Foundation::{CloseHandle, BOOL, HANDLE};
+    use windows::Win32::System::JobObjects::IsProcessInJob;
+    use windows::Win32::System::Threading::{
+        CreateProcessW, CREATE_BREAKAWAY_FROM_JOB, CREATE_NO_WINDOW, PROCESS_INFORMATION,
+        STARTUPINFOW,
+    };
+
+    use super::HelperState;
+
+    /// A started helper; its handle is closed on drop.
+    pub struct HelperProcess {
+        pub pid: u32,
+        process: HANDLE,
+    }
+
+    impl HelperProcess {
+        /// `IsProcessInJob(helper, NULL)`: the read-back that decides the state, whatever
+        /// `CreateProcess` answered.
+        #[must_use]
+        pub fn state(&self) -> HelperState {
+            let mut in_job = BOOL(0);
+            // SAFETY: a live process handle and a plain out-parameter.
+            let read = unsafe { IsProcessInJob(self.process, None, &mut in_job) };
+            HelperState::from_read_back(read.ok().map(|()| in_job.as_bool()))
+        }
+    }
+
+    impl Drop for HelperProcess {
+        fn drop(&mut self) {
+            // SAFETY: the handle CreateProcessW returned, closed once.
+            let _ = unsafe { CloseHandle(self.process) };
+        }
+    }
+
+    /// Starts `exe args` with `CREATE_BREAKAWAY_FROM_JOB`, inheriting no handle.
+    ///
+    /// # Errors
+    /// The Win32 error of `CreateProcessW` (`ERROR_ACCESS_DENIED` when a job forbids breakaway).
+    pub fn spawn_outside_jobs(exe: &Path, args: &str) -> windows::core::Result<HelperProcess> {
+        let app: Vec<u16> = exe.as_os_str().encode_wide().chain(Some(0)).collect();
+        let mut line: Vec<u16> = format!("\"{}\" {args}", exe.display())
+            .encode_utf16()
+            .chain(Some(0))
+            .collect();
+        let startup = STARTUPINFOW {
+            cb: u32::try_from(std::mem::size_of::<STARTUPINFOW>()).unwrap_or(0),
+            ..Default::default()
+        };
+        let mut info = PROCESS_INFORMATION::default();
+        // SAFETY: NUL-terminated buffers that outlive the call; no handle is inherited.
+        unsafe {
+            CreateProcessW(
+                PCWSTR(app.as_ptr()),
+                Some(PWSTR(line.as_mut_ptr())),
+                None,
+                None,
+                false,
+                CREATE_BREAKAWAY_FROM_JOB | CREATE_NO_WINDOW,
+                None,
+                PCWSTR::null(),
+                &startup,
+                &mut info,
+            )?;
+            let _ = CloseHandle(info.hThread);
+        }
+        Ok(HelperProcess {
+            pid: info.dwProcessId,
+            process: info.hProcess,
+        })
+    }
+}
