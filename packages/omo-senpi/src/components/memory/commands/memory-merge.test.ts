@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
 import { execFileSync } from "node:child_process"
 import { existsSync, mkdirSync, mkdtempSync, realpathSync } from "node:fs"
 import { readFile, writeFile, mkdir } from "node:fs/promises"
@@ -11,6 +11,7 @@ import {
   resolveAutoIdentity,
   type MemoryIdentity,
 } from "@oh-my-opencode/memory-core"
+import * as resilient from "@oh-my-opencode/memory-core/fs"
 import { MemoryFakeExtensionAPI, memorySettings } from "../memory.test-support"
 import { fakeCommandContext, fakeDeps, invoke } from "./commands.test-support"
 import { registerMemoryMergeCommand } from "./memory-merge"
@@ -20,6 +21,7 @@ const GIT = ["-c", "user.name=qa", "-c", "user.email=qa@example.invalid", "-c", 
 const roots: string[] = []
 
 afterEach(async () => {
+  mock.restore()
   await Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 })))
 })
 
@@ -62,6 +64,28 @@ async function desktopLayout() {
 }
 
 describe("/memory-merge (#10070)", () => {
+  test("#given a merge refused at commit whose created directories cannot be removed #when /memory-merge --apply reports it #then the report names the directories left behind (#13203 security review)", async () => {
+    const { pi, target, old } = await desktopLayout()
+    const rmdir = resilient.rmdir
+    spyOn(resilient, "rmdir").mockImplementation(async (...args: Parameters<typeof resilient.rmdir>) => {
+      if (!String(args[0]).startsWith(target.paths.repo)) return rmdir(...args)
+      throw Object.assign(new Error(`ENOTDIR: not a directory, rmdir '${String(args[0])}'`), { code: "ENOTDIR" })
+    })
+    const commitWrite = GitMemoryRepo.prototype.commitWrite
+    spyOn(GitMemoryRepo.prototype, "commitWrite").mockImplementation(async function (
+      this: GitMemoryRepo,
+      ...args: Parameters<GitMemoryRepo["commitWrite"]>
+    ) {
+      if (this.dir !== target.paths.repo) return commitWrite.apply(this, args)
+      throw new Error("commit refused")
+    })
+
+    const text = await invoke(pi, "memory-merge", "--apply", fakeCommandContext())
+
+    expect(text).toContain(`${old.id}: skipped (commit refused`)
+    expect(text).toContain(`reference/merged/${old.id}/system (ENOTDIR)`)
+  }, 60_000)
+
   test("#given a Desktop thread worktree that wrote its own store #when /memory-merge runs without --apply #then it lists the store and its actions and changes nothing", async () => {
     const { pi, old, targetRepo } = await desktopLayout()
     const headBefore = await targetRepo.head()

@@ -125,11 +125,17 @@ async function runMemoryMerge(deps: MemoryCommandDeps, args: string, ctx: Memory
         )
       }
     } catch (error) {
-      results.push(`${predecessor.id}: skipped (${error instanceof Error ? error.message : String(error)})`)
+      results.push(`${predecessor.id}: skipped (${describeError(error)})`)
     }
   }
   if (merged) deps.bustPromptCache()
   return respond(ctx, [...results, ...unmapped].join("\n"))
+}
+
+/** The message plus its cause: a refused merge records there the directories its rollback could not remove. */
+function describeError(error: unknown): string {
+  if (!(error instanceof Error)) return String(error)
+  return error.cause instanceof Error ? `${error.message}; ${error.cause.message}` : error.message
 }
 
 function describePlan(plan: MergePlan): string {
