@@ -425,6 +425,14 @@ Never edit `CHANGELOG.md`, the root `changes.md` or any `packages/<name>/changes
 
 No bundle or copy built from source is tracked (#9903, #13192). The paths matched by `script/generated-bundles.json` (the Senpi plugin `extensions/`, the generated `plugin/runtime` bundles, the plugin installer `plugin/scripts/install.mjs`, the Codex installer bundle `install-dist/install-local.mjs`, and `packages/omo-native/bin/lib/{service-auth,reflection-lock,brand-logo}.generated.js`) are build outputs that git ignores; `script/generated-bundles.test.ts` fails when one is tracked. Build them with `bun script/build-generated.ts` (the root build, and so `bun install`, builds them too); CI and the release jobs build before anything reads them, and an unbuilt checkout's local install stops with `run bun run build:senpi-plugin`. Two derived files stay tracked, each with a CI check: `packages/omo-senpi/bundle-inputs.json` (`bun run bundle-inputs:check`) and `packages/omo-senpi/plugin/daemon-launch-spec.json` (`build-daemon-launch-spec.mjs --check`, reached through that same check), as do the hand-written `brand-logo.generated.d.ts` and `plugin/runtime/dag/{sdk,library}.js` source.
 
+A `git pull` does not refresh these outputs. The Codex installer shim rebuilds its bundle when the bundle's recorded source digest no longer matches the sources, and the Senpi installer rebuilds the plugin on every install. The locally installed `omo` launcher and the QA drivers run the plugin the checkout last built: after a pull, rerun `bun run build:senpi-plugin` (or the installer). That is safe because they run exactly the build the developer last made, never a mix, and packed or published installs are unaffected (tracked: #13232).
+
+A branch opened before #13192 that changed one of these outputs conflicts with it as modify/delete. Run this once on that branch, from the repository root, then merge `dev` as usual; it removes the outputs from the branch's index only, so the files stay on disk and the branch's source changes are untouched:
+
+```sh
+git rm -r -q --cached --ignore-unmatch -- packages/omo-senpi/plugin/extensions packages/omo-senpi/plugin/runtime/agent-toolkit-sdk packages/omo-senpi/plugin/runtime/bunshin-ts packages/omo-senpi/plugin/runtime/thread-sdk packages/omo-senpi/plugin/runtime/rollback-migrate.js packages/omo-senpi/plugin/scripts/install.mjs packages/omo-codex/scripts/install-dist/install-local.mjs packages/omo-native/bin/lib/service-auth.generated.js packages/omo-native/bin/lib/reflection-lock.generated.js packages/omo-native/bin/lib/brand-logo.generated.js && git commit -q -m "chore: stop tracking generated bundles (#13192)"
+```
+
 ## PR MERGE POLICY
 
 - **PRs into `dev` MUST use merge commits.**
