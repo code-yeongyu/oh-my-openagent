@@ -84,6 +84,12 @@ describe("sentinel self-test judge", () => {
     expect(result.exitCode).toBe(1)
   })
 
+  test("an invalid negative-control recording is reported as invalid with its faults, never as missed", () => {
+    const result = judgeSelfTest(perfect, summaryWith(["pointer"], ["typing: final field read failed"]))
+    expect(result.lines).toContain("SENTINEL_NEGATIVE_CONTROL pointer_warp_50px=invalid: typing: final field read failed")
+    expect(result.exitCode).toBe(1)
+  })
+
   test("a missing plant, a missing null run or a missed negative control fails", () => {
     expect(judgeSelfTest(perfect.slice(0, -1), control).exitCode).toBe(1)
     expect(judgeSelfTest(perfect.slice(1), control).exitCode).toBe(1)
