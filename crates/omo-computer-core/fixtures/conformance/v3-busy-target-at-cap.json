@@ -147,10 +147,35 @@
           "message": {
             "jsonrpc": "2.0",
             "id": 3,
-            "result": {}
+            "result": {
+              "frameId": "frame-01m6fpgstw33ky1ae8azckv6j9-1",
+              "target": "101",
+              "width": 800,
+              "height": 600,
+              "coordinateWidth": 800,
+              "coordinateHeight": 600,
+              "scale": 1,
+              "cursor": "os",
+              "session": {
+                "screenLocked": "unknown",
+                "displayAsleep": "unknown",
+                "userActive": {
+                  "active": "unknown",
+                  "lastInputAgeMs": null
+                },
+                "secureInputActive": "unknown",
+                "sessionActive": "unknown",
+                "screensaverActive": "unknown",
+                "pauseReasons": [],
+                "sampledAt": 0
+              },
+              "observation": {
+                "untrustedText": true
+              }
+            }
           },
           "variable": [
-            "/result"
+            "/result/frameId"
           ]
         }
       ],
@@ -173,7 +198,10 @@
             "jsonrpc": "2.0",
             "id": 4,
             "result": {
-              "disposition": {},
+              "disposition": {
+                "delivery": "delivered_unverified",
+                "retry": "unsafe"
+              },
               "delivered": {
                 "count": 3,
                 "of": 3
@@ -197,7 +225,6 @@
             }
           },
           "variable": [
-            "/result/disposition",
             "/result/route",
             "/result/auditIds"
           ]
