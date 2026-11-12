@@ -27,7 +27,7 @@ function recording(extra: readonly SentinelEvent[] = []): SentinelEvent[] {
   for (let t = 0; t <= 2_000; t += 50) events.push({ t, kind: "tick" })
   events.push(
     { t: 100, kind: "start" },
-    { t: 1_500, kind: "stop" },
+    { t: 1_500, kind: "stop", pendingReads: 0 },
     { t: 1_600, kind: "field", text: "a", final: true },
   )
   return [...events, ...extra].sort((a, b) => a.t - b.t)

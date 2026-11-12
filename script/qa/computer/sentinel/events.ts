@@ -31,12 +31,24 @@ export type SentinelEvent = { readonly t: number } & (
   | { readonly kind: "activation"; readonly via: Via; readonly pid: number }
   | {
       readonly kind: "window_added"
+      // "ax": a window/sheet-created notification and the recorder's own attribute reads of it, which must carry
+      // their facts (which notification, how many read attempts, the last AXError). "sample": the window list.
+      readonly source: "ax" | "sample"
       readonly id: string
       readonly ownerPid: number
       readonly role: string
       readonly subrole: string
       readonly layer: number
+      readonly notification?: "window" | "sheet"
       readonly axError?: string
+      readonly axReads?: number
+    }
+  | {
+      readonly kind: "observer_failed"
+      readonly pid: number
+      readonly axError: string
+      readonly attempts: number
+      readonly regular: boolean
     }
   | { readonly kind: "leak"; readonly what: "key" | "mouse" }
 )
@@ -76,13 +88,17 @@ const SHAPES: Readonly<Record<SentinelEvent["kind"], Readonly<Record<string, Che
   clipboard: { changeCount: num },
   activation: { via, pid: num },
   window_added: {
+    source: oneOf("ax", "sample"),
     id: str,
     ownerPid: num,
     role: str,
     subrole: str,
     layer: num,
+    notification: optional(oneOf("window", "sheet")),
     axError: optional(str),
+    axReads: optional(num),
   },
+  observer_failed: { pid: num, axError: str, attempts: num, regular: bool },
   leak: { what: oneOf("key", "mouse") },
 }
 

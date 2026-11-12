@@ -1,4 +1,4 @@
-import { type SentinelSummary, SIGNALS, type Signal, verdict } from "./summary.ts"
+import { type DialogHit, type SentinelSummary, SIGNALS, type Signal, verdict } from "./summary.ts"
 
 // The self-test is the proof that every detector can fail: each planted disturbance must read `happened` on exactly
 // its own signal, a null run must read `none` on all eight, and the 50 px warp-and-return must be seen.
@@ -31,6 +31,19 @@ function plantProblem(trial: Trial & { readonly plant: Signal }): string | undef
   if (!hits.includes(trial.plant)) return `detector ${trial.plant} missed the planted ${noun}`
   const others = hits.filter((signal) => signal !== trial.plant)
   if (others.length > 0) return `plant ${trial.plant} also read happened on ${others.join(",")}`
+  return undefined
+}
+
+// The AX-only sheet trial must prove the AX attribute read and its retry: exactly one dialog hit, through the role
+// branch, after at least one retried read. The answer names why the AX path is unproven, or is undefined when proven.
+export function judgeAxSheetTrial(hits: readonly DialogHit[]): string | undefined {
+  const [hit, ...more] = hits
+  if (hit === undefined) return "the AX-only sheet was not seen as a dialog"
+  if (more.length > 0) return `the AX-only sheet was seen ${hits.length} times (${hits.map((h) => h.branch).join(",")})`
+  if (hit.branch !== "role")
+    return `the AX-only sheet was seen only through the ${hit.branch} branch: its role read never succeeded`
+  if (hit.axReads === null || hit.axReads < 2)
+    return `the sheet's role read succeeded on attempt ${hit.axReads ?? "unknown"}: its retry was never exercised`
   return undefined
 }
 

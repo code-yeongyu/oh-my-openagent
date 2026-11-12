@@ -29,10 +29,18 @@ const DIALOG_ROLES = new Set(["AXSheet"])
 const DIALOG_SUBROLES = new Set(["AXDialog", "AXSystemDialog"])
 const SAMPLED: readonly Signal[] = ["key_focus", "window_raised", "pointer", "clipboard", "space", "activation"]
 
-type WindowFacts = { readonly role: string; readonly subrole: string; readonly layer: number }
-const roleHit = (window: WindowFacts): boolean => DIALOG_ROLES.has(window.role) || DIALOG_SUBROLES.has(window.subrole)
-const layerHit = (window: WindowFacts): boolean => window.layer >= MODAL_PANEL_LAYER && window.layer < MAIN_MENU_LAYER
-const isDialog = (window: WindowFacts): boolean => roleHit(window) || layerHit(window)
+type WindowAdded = Extract<SentinelEvent, { readonly kind: "window_added" }>
+type DialogBranch = "role" | "notification" | "layer"
+const roleHit = (window: WindowAdded): boolean => DIALOG_ROLES.has(window.role) || DIALOG_SUBROLES.has(window.subrole)
+const layerHit = (window: WindowAdded): boolean => window.layer >= MODAL_PANEL_LAYER && window.layer < MAIN_MENU_LAYER
+// The branch a dialog was seen through: its AX role/subrole read, the sheet-created notification alone (the read never
+// gave a role), or the window layer. A window that is none of them is not a dialog.
+function dialogBranch(window: WindowAdded): DialogBranch | undefined {
+  if (roleHit(window)) return "role"
+  if (window.notification === "sheet") return "notification"
+  if (layerHit(window)) return "layer"
+  return undefined
+}
 
 // The recorder reports the raw AXError name of a new window's attribute reads; this table is the one judgement of
 // it. An attribute that is legitimately absent is "ok"; anything that means the read did not happen is a fault, and
@@ -48,18 +56,24 @@ export const AX_READ_ERRORS: Readonly<Record<string, "ok" | "fault">> = {
   notImplemented: "fault",
 }
 
-// Which branch of the dialog detector fired for each dialog seen during the recording, in event order. The self-test
-// uses it to prove the AX role/subrole branch on a live trial, where a layer-only hit would hide a dead AX path.
-export function dialogHits(events: readonly SentinelEvent[]): ("role" | "layer")[] {
+// After a keystroke is posted it needs this long to reach the typist's field; a final field read is judged only
+// against the keystrokes this old, so a read that lands just after the next keystroke can never fake a disturbance.
+export const LANDING_MS = 400
+
+export type DialogHit = { readonly branch: DialogBranch; readonly axReads: number | null }
+
+// Which branch of the dialog detector fired for each dialog seen during the recording, in event order, with how many
+// AX read attempts it took. The self-test uses it to prove the AX read path and its retry on a live trial.
+export function dialogHits(events: readonly SentinelEvent[]): DialogHit[] {
   const from = events.find((event) => event.kind === "start")?.t ?? Number.POSITIVE_INFINITY
   const until = events.find((event) => event.kind === "stop")?.t ?? Number.NEGATIVE_INFINITY
   const context = events.find((event) => event.kind === "context")
   const targets = new Set(context?.kind === "context" ? context.targetPids : [])
-  const hits: ("role" | "layer")[] = []
+  const hits: DialogHit[] = []
   for (const event of [...events].sort((a, b) => a.t - b.t)) {
     if (event.kind !== "window_added" || event.t <= from || event.t > until || targets.has(event.ownerPid)) continue
-    if (roleHit(event)) hits.push("role")
-    else if (layerHit(event)) hits.push("layer")
+    const branch = dialogBranch(event)
+    if (branch !== undefined) hits.push({ branch, axReads: event.axReads ?? null })
   }
   return hits
 }
@@ -103,6 +117,7 @@ export function summarize(events: readonly SentinelEvent[], options: { readonly 
   let order: readonly string[] | undefined
   let sent = ""
   let lastTypedAt = Number.NEGATIVE_INFINITY
+  const typedAt: number[] = []
   let finalRead = false
   const ticks: number[] = []
 
@@ -123,7 +138,8 @@ export function summarize(events: readonly SentinelEvent[], options: { readonly 
       case "start":
         break
       case "stop":
-        if ((event.pendingReads ?? 0) > 0)
+        if (event.pendingReads === undefined) faults.push("dialog: stop marker did not report pending new-window reads")
+        else if (event.pendingReads > 0)
           faults.push(`dialog: ${event.pendingReads} new-window reads were still running at stop`)
         break
       case "focus":
@@ -148,24 +164,39 @@ export function summarize(events: readonly SentinelEvent[], options: { readonly 
         order = event.windows
         break
       case "typed":
-        if (event.index === 0) sent = ""
-        else if (event.index !== sent.length)
+        if (event.index === 0) {
+          sent = ""
+          typedAt.length = 0
+        } else if (event.index !== sent.length)
           faults.push(`typing: typist sent index ${event.index} after ${sent.length}`)
         sent += event.char
+        typedAt.push(event.t)
         lastTypedAt = event.t
         break
       case "field":
         if (event.final) {
           if (event.t < lastTypedAt) break
           finalRead = true
-          if (event.text !== sent) mark("typing", event.t)
+          const landed = sent.slice(0, typedAt.filter((t) => t <= event.t - LANDING_MS).length)
+          if (!sent.startsWith(event.text) || !event.text.startsWith(landed)) mark("typing", event.t)
         } else if (inWindow(event.t) && !sent.startsWith(event.text)) mark("typing", event.t)
         break
       case "window_added":
         if (!inWindow(event.t) || targetPids.has(event.ownerPid)) break
-        if (isDialog(event)) mark("dialog", event.t)
+        if (
+          event.source === "ax" &&
+          (event.notification === undefined || event.axError === undefined || event.axReads === undefined)
+        )
+          faults.push(`dialog: AX window event ${event.id} of pid ${event.ownerPid} did not report its read result`)
+        else if (dialogBranch(event) !== undefined) mark("dialog", event.t)
         else if (event.axError !== undefined && AX_READ_ERRORS[event.axError] !== "ok")
           faults.push(`dialog: new window ${event.id} of pid ${event.ownerPid} was unreadable (AX ${event.axError})`)
+        break
+      case "observer_failed":
+        if (event.t <= until && event.regular && !targetPids.has(event.pid))
+          faults.push(
+            `dialog: window observer for pid ${event.pid} did not register after ${event.attempts} attempts (AX ${event.axError})`,
+          )
         break
       case "leak":
         if (inWindow(event.t)) mark(event.what === "key" ? "typing" : "pointer", event.t)

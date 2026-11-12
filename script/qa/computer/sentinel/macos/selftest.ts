@@ -3,7 +3,7 @@ import { hostname } from "node:os"
 
 import { admitWindow, type LatencyRecord, p99 } from "../latency.ts"
 import { observeCell } from "../observe-cell.ts"
-import { judgeSelfTest, PLANT_NOUN, type Trial } from "../selftest-judge.ts"
+import { judgeAxSheetTrial, judgeSelfTest, PLANT_NOUN, type Trial } from "../selftest-judge.ts"
 import { dialogHits, SIGNALS, type Signal } from "../summary.ts"
 import { withSentinel } from "../with-sentinel.ts"
 import { plant } from "./plants.ts"
@@ -71,10 +71,10 @@ function recordedLatency(file: string): LatencyRecord | undefined {
   return { host, os: "macos", trials: 0, p99Ms: Object.fromEntries(entries) }
 }
 
-// The dialog detector has two branches: a modal-panel window layer (the alert plant) and the AX role/subrole of a new
-// window. This trial plants a layer-0 sheet, which only the AX branch can see, and counts as a dialog detection only
-// when its hit came through that branch alone - so a dead AX path fails the self-test instead of hiding behind the
-// layer branch.
+// The dialog detector has three branches: a modal-panel window layer (the alert plant), a sheet-created notification,
+// and the AX role/subrole read of a new window. This trial plants a layer-0 sheet while the planter blocks, and counts
+// as a dialog detection only when the role read saw it after at least one retried read - so a dead AX read or retry
+// path fails the self-test instead of hiding behind the layer or notification branch.
 async function axOnlyDialogTrial(session: MacSession, options: SelfTestOptions): Promise<Trial> {
   const run = await withSentinel("selftest-dialog-ax", () => plant(session, options.helpers, "sheet"), {
     session,
@@ -83,12 +83,10 @@ async function axOnlyDialogTrial(session: MacSession, options: SelfTestOptions):
   })
   if ("failed" in run.result) return { plant: "dialog", failed: `AX-only sheet: ${run.result.failed}` }
   const hits = dialogHits(run.events)
-  if (options.drop !== "dialog" && (!hits.includes("role") || hits.includes("layer")))
-    return {
-      plant: "dialog",
-      failed: `AX-only sheet was seen through [${hits.join(",")}], not the AX role branch alone`,
-    }
-  console.log(`SENTINEL_DIALOG_BRANCH sheet hits=${hits.join(",") || "none"}`)
+  const shown = hits.map((hit) => `${hit.branch}:${hit.axReads ?? "-"}`).join(",") || "none"
+  console.log(`SENTINEL_DIALOG_BRANCH sheet hits=${shown}`)
+  const unproven = options.drop === "dialog" ? undefined : judgeAxSheetTrial(hits)
+  if (unproven !== undefined) return { plant: "dialog", failed: unproven }
   return { plant: "dialog", summary: run.summary }
 }
 
@@ -115,6 +113,8 @@ export async function runSelfTest(options: SelfTestOptions): Promise<{ exitCode:
     const control = await observeCell(session, () => plant(session, options.helpers, "warp"), options.windowMs)
     const status = "failed" in control.status ? `failed: ${control.status.failed}` : "planted"
     console.log(`SENTINEL_OBSERVER negative_control=${status} pointer_moved=${control.observed.pointerMoved}`)
+    const unregistered = session.events.filter((event) => event.kind === "observer_failed")
+    console.log(`SENTINEL_OBSERVERS failed=${unregistered.length}`)
     const result = judgeSelfTest(trials, control.observed.signals)
     for (const line of result.lines) console.log(line)
     return { exitCode: result.exitCode, receipts: await session.close() }

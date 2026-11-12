@@ -54,7 +54,7 @@ extension Recorder {
       for window in windows where !knownWindows.contains(window.number) {
         knownWindows.insert(window.number)
         send("dialog", [
-          "kind": "window_added", "id": window.id, "ownerPid": Int(window.ownerPid), "layer": window.layer,
+          "kind": "window_added", "source": "sample", "id": window.id, "ownerPid": Int(window.ownerPid), "layer": window.layer,
           "role": "", "subrole": "",
         ])
       }

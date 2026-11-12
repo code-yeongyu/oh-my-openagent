@@ -1,5 +1,5 @@
 import type { DesktopSnapshot } from "../observation.ts"
-import { parseEvents, type SentinelEvent } from "../summary.ts"
+import { LANDING_MS, parseEvents, type SentinelEvent } from "../summary.ts"
 import { type ControlLine, Helper } from "./helper.ts"
 
 // A recording session on a macOS QA desktop: the typist (the synthetic user), the recorder watching it, and for the
@@ -23,9 +23,12 @@ type SessionOptions = {
 
 const HELLO_MS = 15_000
 const MARKER_MS = 3_000
+// The recorder's stop waits up to RECORDER_DRAIN_MS for new-window reads still running and its final field read
+// retries for up to RECORDER_FINAL_MS; both budgets are sent with the command, and the harness waits for each marker
+// at least that long plus its own marker allowance, so a slow drain ends in the recorder's pendingReads fact.
+const RECORDER_DRAIN_MS = 4_000
+const RECORDER_FINAL_MS = 1_000
 const KEYSTROKE_MS = 2_500
-// After a keystroke is posted, the final field read waits this long so the keystroke has landed.
-const LANDING_MS = 400
 
 const numberField = (line: ControlLine, field: string): number => {
   const value = line[field]
@@ -132,10 +135,12 @@ export class MacSession {
 
     await this.nextEvent((event) => event.kind === "typed", KEYSTROKE_MS, "a keystroke after the window")
     await Bun.sleep(LANDING_MS)
-    const stopped = this.nextEvent((event) => event.kind === "stop", MARKER_MS, "recorder stop marker")
-    const finalRead = this.nextEvent((event) => event.kind === "field" && event.final, MARKER_MS, "final field read")
-    recorder.send("stop")
-    recorder.send("final")
+    const stopWait = RECORDER_DRAIN_MS + MARKER_MS
+    const stopped = this.nextEvent((event) => event.kind === "stop", stopWait, "recorder stop marker")
+    const finalWait = RECORDER_DRAIN_MS + RECORDER_FINAL_MS + MARKER_MS
+    const finalRead = this.nextEvent((event) => event.kind === "field" && event.final, finalWait, "final field read")
+    recorder.send(`stop ${RECORDER_DRAIN_MS}`)
+    recorder.send(`final ${RECORDER_FINAL_MS}`)
     const [stop, final] = await Promise.all([stopped, finalRead])
 
     if (this.protocolFaults.length > 0) throw new Error(`helper protocol broken: ${this.protocolFaults.join("; ")}`)
