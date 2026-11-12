@@ -6,8 +6,8 @@ import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
 
 import { resolveAgentHome } from "../components/agent-home/resolve-agent-home"
-import { launcherOwnership } from "./launcher-ownership"
-import { installLocalLauncher, localLauncherPath, uninstallLocalLauncher } from "./local-launcher"
+import { launcherCmdOwnership, launcherOwnership } from "./launcher-ownership"
+import { installLocalLauncher, localLauncherCmdPath, localLauncherPath, uninstallLocalLauncher } from "./local-launcher"
 import { ensurePluginArtifacts } from "./plugin-artifacts"
 import {
   dedupePackages,
@@ -40,8 +40,13 @@ export interface SenpiInstallResult {
   readonly settingsPath: string
   readonly pluginPath: string
   readonly launcherPath?: string | undefined
-  /** The launcher path holds a file this installer did not write (a compiled omo, another install's launcher, a symlink): it was neither replaced nor removed. */
-  readonly launcherLeftAlone?: { readonly path: string; readonly reason: string } | undefined
+  /**
+   * Every launcher file this run left alone because the installer did not write it (a compiled omo, another install's
+   * launcher, a symlink, a directory). Each file is judged on its own: on Windows the command omo runs omo.cmd, so a
+   * foreign omo.cmd beside an owned omo is reported even though omo itself was written.
+   */
+  readonly launchersLeftAlone?:
+    readonly { readonly file: "omo" | "omo.cmd"; readonly path: string; readonly reason: string }[] | undefined
   readonly changed: boolean
   readonly backupPath: string
   readonly removed?: boolean
@@ -69,12 +74,13 @@ export async function runSenpiInstaller(options: SenpiInstallOptions = {}): Prom
     pluginPath: context.pluginPath,
     senpiCliPath: join(context.repoRoot, "packages", "coding-agent", "dist", "cli.js"),
     homeDir: context.homeDir,
+    platform: context.platform,
   })
 
   return {
     ok: true,
     action: "install",
-    ...leftAloneReport(context.homeDir, launcherPath === undefined),
+    ...leftAloneReport(context.homeDir, context.platform),
     agentDir: context.agentDir,
     settingsPath: context.settingsPath,
     pluginPath: context.pluginPath,
@@ -92,12 +98,12 @@ export async function runSenpiUninstaller(options: SenpiInstallOptions = {}): Pr
   const nextPackages = packages.filter((entry) => entry !== context.pluginPath)
   settings.packages = nextPackages
   const backupPath = await writeSettingsAtomically(context.settingsPath, settings)
-  const launcherRemoved = uninstallLocalLauncher(context.homeDir)
+  uninstallLocalLauncher(context.homeDir)
 
   return {
     ok: true,
     action: "uninstall",
-    ...leftAloneReport(context.homeDir, !launcherRemoved),
+    ...leftAloneReport(context.homeDir, context.platform),
     agentDir: context.agentDir,
     settingsPath: context.settingsPath,
     pluginPath: context.pluginPath,
@@ -164,11 +170,38 @@ function fileExistsSync(path: string): boolean {
   return existsSync(path)
 }
 
-function leftAloneReport(homeDir: string, untouched: boolean): Pick<SenpiInstallResult, "launcherLeftAlone"> {
-  if (!untouched) return {}
-  const path = localLauncherPath(homeDir)
-  const ownership = launcherOwnership(path)
-  return ownership.kind === "foreign"
-    ? { launcherLeftAlone: { path, reason: `${path} was left alone: it is not a launcher this installer wrote (${ownership.reason})` } }
-    : {}
+// After the run, every launcher file still at its path that this installer did not write was left alone; omo.cmd only
+// matters on Windows, where the command omo resolves to it.
+function leftAloneReport(homeDir: string, platform: NodeJS.Platform): Pick<SenpiInstallResult, "launchersLeftAlone"> {
+  const candidates = [
+    {
+      file: "omo" as const,
+      path: localLauncherPath(homeDir),
+      ownership: launcherOwnership(localLauncherPath(homeDir)),
+    },
+    ...(platform === "win32"
+      ? [
+          {
+            file: "omo.cmd" as const,
+            path: localLauncherCmdPath(homeDir),
+            ownership: launcherCmdOwnership(localLauncherCmdPath(homeDir)),
+          },
+        ]
+      : []),
+  ]
+  const leftAlone = candidates.flatMap(({ file, path, ownership }) =>
+    ownership.kind === "foreign"
+      ? [
+          {
+            file,
+            path,
+            reason:
+              file === "omo.cmd"
+                ? `${path} was left alone: it is not a wrapper this installer wrote (${ownership.reason}); the command omo still resolves to it`
+                : `${path} was left alone: it is not a launcher this installer wrote (${ownership.reason})`,
+          },
+        ]
+      : [],
+  )
+  return leftAlone.length === 0 ? {} : { launchersLeftAlone: leftAlone }
 }
