@@ -237,50 +237,51 @@ async function smoke(): Promise<number> {
   return failed ? 1 : 0
 }
 
-// `--control`: the check the "delivered but the application never received it" pointer cells need before that
-// reading is a fact about the release. The SAME background pixel click is sent twice on a fresh fixture: as the
-// catalog sends it, then after the driver itself raises and focuses the window (the tool refuses foreground here).
-// The fixture's own press count after each send is the verdict, and the engine's reading at the aim point comes with it.
+// `--control`: an independent check of the x11 "delivered but the application never received it" cells. The release
+// sends an element-routed background click on a fresh fixture; then xdotool, outside the tool, raises the window and
+// clicks the SAME global point the element's bounds give. If xdotool's click registers, the point is right and the
+// release's delivery is what was lost; if it does not, the bounds are off and the cells stay unclassified.
 async function control(): Promise<number> {
   const say = (line: string): number => (console.log(`LEGACY_CONTROL ${line}`), 1)
   if (!("ready" in shippedTool)) return say(`status=unavailable reason=${JSON.stringify(shippedTool.unavailable)}`)
   const fixtures = hostFixtures(process.platform, process.env, session)
   if (!("ready" in fixtures)) return say(`status=unavailable reason=${JSON.stringify(fixtures.unavailable)}`)
-  const [os, desk] = process.platform === "win32" ? (["windows", "console"] as const) : (["x11", "xorg"] as const)
-  const cell = catalogFor(os, desk).find(
+  if (process.platform !== "linux") return say("skipped: this control is for x11")
+  const cell = catalogFor("x11", "xorg").find(
     (entry) =>
-      entry.toolkit === "native" && entry.action === "click" && entry.targeting === "px" && entry.mode === "background",
+      entry.toolkit === "native" && entry.action === "click" && entry.targeting === "ax" && entry.mode === "background",
   )
-  if (cell === undefined) throw new Error("the catalog has no native background pixel click")
+  if (cell === undefined) throw new Error("the catalog has no native background accessibility click")
   const target = fixtures.ready.target(cell)
   if ("unavailable" in target) return say(`status=unavailable reason=${JSON.stringify(target.unavailable)}`)
-  const context = hostContext(session())
-  const send = async (label: string): Promise<void> => {
-    const outcome = await shippedTool.ready.execute(
-      `conformance-control-${label}`,
-      { action: "run", code: cellCode(cell, target) },
-      context,
-    )
-    const value = isRecord(outcome) && isRecord(outcome.details) ? outcome.details.value : outcome
-    const pressed = await settled(() => fixtures.ready.read(cell), 1, SETTLE_MS)
-    say(`${label} outcome=${JSON.stringify(value)} pressCount=${JSON.stringify(pressed)}`)
+  const xdotool = async (...args: string[]): Promise<string> => {
+    const child = Bun.spawn(["xdotool", ...args], { stdout: "pipe", stderr: "pipe" })
+    const [out, err, code] = await Promise.all([
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+      child.exited,
+    ])
+    return `exit=${code} ${(out + err).trim().slice(0, 160)}`
   }
   try {
     await fixtures.ready.reset(cell)
-    await send("background")
-    if (process.platform === "linux") {
-      const raise = Bun.spawn(["xdotool", "search", "--name", `^${target.title}$`, "windowactivate", "--sync"], {
-        stdout: "pipe",
-        stderr: "pipe",
-      })
-      const [out, err, code] = await Promise.all([
-        new Response(raise.stdout).text(),
-        new Response(raise.stderr).text(),
-        raise.exited,
-      ])
-      say(`raise exit=${code} ${(out + err).trim().slice(0, 200)}`)
-    } else say("raise skipped: this control is for x11")
-    await send("raised")
+    const outcome = await shippedTool.ready.execute(
+      "conformance-control-release",
+      { action: "run", code: cellCode(cell, target) },
+      hostContext(session()),
+    )
+    const value = isRecord(outcome) && isRecord(outcome.details) ? outcome.details.value : outcome
+    const afterRelease = await settled(() => fixtures.ready.read(cell), 1, SETTLE_MS)
+    say(`release outcome=${JSON.stringify(value)} pressCount=${JSON.stringify(afterRelease)}`)
+    const aim = isRecord(value) && isRecord(value.aim) && isRecord(value.aim.point) ? value.aim.point : undefined
+    if (aim === undefined || typeof aim.x !== "number" || typeof aim.y !== "number")
+      return say("independent click skipped: the release reported no aim point")
+    say(`raise ${await xdotool("search", "--name", `^${target.title}$`, "windowactivate", "--sync")}`)
+    say(
+      `xdotool click at ${aim.x},${aim.y} ${await xdotool("mousemove", "--sync", String(aim.x), String(aim.y), "click", "1")}`,
+    )
+    const afterIndependent = await settled(() => fixtures.ready.read(cell), 2, SETTLE_MS)
+    say(`independent pressCount=${JSON.stringify(afterIndependent)} (release left ${JSON.stringify(afterRelease)})`)
     return 0
   } finally {
     await fixtures.ready.stop()

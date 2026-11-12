@@ -135,9 +135,9 @@ jobs:
           set -euo pipefail
           dbus-run-session -- bun script/qa/computer/conformance/drivers/legacy.ts --smoke | tee "${RUNNER_TEMP}/computer-baseline/smoke.log"
 
-      # The control for the "delivered but the application never received it" cells: the same background pixel click
-      # before and after the driver raises the window itself. Its own result is the evidence, so it never fails the job.
-      - name: Control, background pixel click before and after a raise
+      # The control for the "delivered but the application never received it" cells: the release's background click,
+      # then an independent xdotool click at the same point. Its own result is the evidence, so it never fails the job.
+      - name: Control, release click then an independent click at the same point
         shell: bash
         run: |
           set +e -uo pipefail
