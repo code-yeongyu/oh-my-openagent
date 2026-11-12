@@ -6,7 +6,7 @@ import { readdir, writeFile } from "../fs/resilient"
 import type { MemoryWriteLock } from "../tools/commit-write"
 import type { MemoryIdentityPaths } from "./layout"
 import { assertMergePathConfined, attachLeftoverDirs, createInTarget, removeCreatedDirs } from "./merge-paths"
-import { identityIdOf, planIdentityMerge, type MergeAction, type MergePlan } from "./merge-plan"
+import { identityIdOf, leavesNothingOut, planIdentityMerge, type MergeAction, type MergePlan } from "./merge-plan"
 import { markIdentityMerged, readIdentityRecord } from "./record"
 
 const MERGED_FROM_TRAILER = "Omo-Merged-From"
@@ -68,7 +68,8 @@ export async function applyIdentityMerge(options: ApplyIdentityMergeOptions): Pr
     if (lockedSince !== undefined && lockedSince === preview.sourceHead) return { plan: { ...preview, actions: [] } }
     const plan = await planIdentityMerge(source, target, lockedSince)
     const writes = plan.actions.filter(
-      (action): action is Exclude<MergeAction, { action: "skip" }> => action.action !== "skip",
+      (action): action is Extract<MergeAction, { action: "add" | "keep-aside" }> =>
+        action.action === "add" || action.action === "keep-aside",
     )
     if (writes.length === 0 || plan.sourceHead === null) return { plan }
     const oids = new Map((await sourceRepo.lsTreeBlobs(plan.sourceHead)).map((entry) => [entry.path, entry.oid]))
@@ -113,8 +114,8 @@ export async function applyIdentityMerge(options: ApplyIdentityMergeOptions): Pr
       ].join("\n")
       const sha = (await targetRepo.commitWrite(destinations, message, author)).sha
       // Marked before the lock is released: a crash between the commit and the mark would make a rerun plan
-      // from scratch and write a second set of aside copies.
-      await markIdentityMerged(source.root, plan.sourceId, targetId, plan.sourceHead)
+      // from scratch and write a second set of aside copies. A store with an entry left out stays unmarked.
+      if (leavesNothingOut(plan)) await markIdentityMerged(source.root, plan.sourceId, targetId, plan.sourceHead)
       return { plan, sha }
     } catch (error) {
       await targetRepo.restorePaths(written)
@@ -124,7 +125,7 @@ export async function applyIdentityMerge(options: ApplyIdentityMergeOptions): Pr
       throw error
     }
   })
-  if (outcome.sha === undefined && outcome.plan.sourceHead !== null)
+  if (outcome.sha === undefined && outcome.plan.sourceHead !== null && leavesNothingOut(outcome.plan))
     await markIdentityMerged(source.root, outcome.plan.sourceId, targetId, outcome.plan.sourceHead)
   const leftover = outcome.leftoverDirs?.length ? { leftoverDirs: outcome.leftoverDirs } : {}
   return outcome.sha === undefined

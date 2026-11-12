@@ -164,7 +164,7 @@ describe("/memory-merge (#10070)", () => {
     expect(existsSync(join(target.paths.repo, "system/persona.md"))).toBe(true)
     expect(existsSync(join(target.paths.repo, ".git/hooks/pre-commit"))).toBe(true)
   }, 60_000)
-  test("#given two stores that map here, one holding a tree entry whose name is not a plain path #when /memory-merge runs dry and then with --apply #then the other store is still reported and merged and the refused one changes nothing (#12974 security)", async () => {
+  test("#given two stores that map here, one holding a tree entry whose name is not a plain path #when /memory-merge runs dry and then with --apply #then both stores are reported and merged and the report names the entry left out (#12974 security)", async () => {
     const { pi, target, old, targetRepo, env, main } = await desktopLayout()
     const sub = join(main, "packages", "sub")
     mkdirSync(sub, { recursive: true })
@@ -195,7 +195,10 @@ describe("/memory-merge (#10070)", () => {
 
     expect(dry).toContain(old.id)
     expect(dry).toContain(refused.id)
+    expect(dry).toContain("notes\\..\\system\\persona.md (not-a-plain-path)")
     expect(applied).toContain(`merged ${old.id}`)
+    expect(applied).toContain(`merged ${refused.id}`)
+    expect(applied).toContain("notes\\..\\system\\persona.md (not-a-plain-path)")
     expect(await readFile(join(target.paths.repo, "system/persona.md"), "utf8")).toBe(note("main persona"))
     expect((await targetRepo.status()).trim()).toBe("")
   }, 60_000)

@@ -70,10 +70,10 @@ describe("identity merge (#10070)", () => {
     expect(await readFile(join(target.paths.repo, aside), "utf8")).toBe(note("user edit"))
     const fresh = rerun.plan.actions.find((action) => action.path === "notes/diff.md")
     expect(fresh?.action).toBe("keep-aside")
-    expect(fresh !== undefined && fresh.action !== "skip" ? fresh.destination : "").not.toBe(aside)
+    expect(fresh !== undefined && fresh.action === "keep-aside" ? fresh.destination : "").not.toBe(aside)
     expect(
       await readFile(
-        join(target.paths.repo, fresh !== undefined && fresh.action !== "skip" ? fresh.destination : ""),
+        join(target.paths.repo, fresh !== undefined && fresh.action === "keep-aside" ? fresh.destination : ""),
         "utf8",
       ),
     ).toBe(note("source v2"))

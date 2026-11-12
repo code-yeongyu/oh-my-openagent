@@ -4,7 +4,7 @@ import { existsSync } from "node:fs"
 import { mkdir, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
-import { applyIdentityMerge, planIdentityMerge } from "./merge"
+import { applyIdentityMerge, planIdentityMerge, type MergeAction } from "./merge"
 import {
   AUTHOR,
   changedEntries,
@@ -15,10 +15,23 @@ import {
   lock,
   memoryRoot,
   note,
+  plumb,
   removeMergeRoots,
 } from "./merge.test-support"
 
 afterEach(removeMergeRoots)
+
+const unplaceable = (actions: readonly MergeAction[]) => actions.filter((action) => action.action === "unplaceable")
+
+/** The same store without the entry commitTreePath added: its parent tree less that top-level name. */
+function dropTreeEntry(repoDir: string, path: string): void {
+  const top = path.split("/")[0]
+  const kept = plumb(repoDir, ["ls-tree", "-z", "HEAD~1"])
+    .split("\0")
+    .filter((line) => line !== "" && !line.endsWith(`\t${top}`))
+  const tree = plumb(repoDir, ["mktree", "-z"], [...kept, ""].join("\0")).trim()
+  plumb(repoDir, ["update-ref", "HEAD", plumb(repoDir, ["commit-tree", tree, "-p", "HEAD", "-m", "without it"]).trim()])
+}
 
 describe("identity merge (#10070)", () => {
   // Skipped on Windows because the fixture cannot be built there: Windows git refuses a backslash index path
@@ -26,7 +39,7 @@ describe("identity merge (#10070)", () => {
   // escape is still covered on Windows by the table row "notes\\..\\..\\outside.md" in
   // "#given a source tree entry named %j ... both refuse it" below, whose tree is built with git mktree.
   it.skipIf(process.platform === "win32")(
-    "#given a source path whose backslashes decode to a climb out of the repository #when the merge applies #then it is refused and nothing is written outside",
+    "#given a source path whose backslashes decode to a climb out of the repository #when the merge applies #then the entry is left out and named, only the plain file is committed and nothing is written outside",
     async () => {
       const root = await memoryRoot()
       const target = await identity(root, "project-aaaa1111", { "notes/base.md": note("base") }, ["/work/project"])
@@ -51,16 +64,12 @@ describe("identity merge (#10070)", () => {
       const before = await target.repo.head()
       const escaped = join(target.paths.repo, "..", "outside.md")
 
-      const outcome = await applyIdentityMerge({
-        source: source.paths,
-        target: target.paths,
-        lock,
-        author: AUTHOR,
-      }).catch((error: unknown) => error)
+      const result = await applyIdentityMerge({ source: source.paths, target: target.paths, lock, author: AUTHOR })
 
-      expect(outcome).toBeInstanceOf(Error)
-      expect(String(outcome)).toContain("outside the memory repository")
-      expect(await target.repo.head()).toBe(before)
+      expect(unplaceable(result.plan.actions)).toStrictEqual([
+        { path: "notes\\..\\..\\outside.md", action: "unplaceable", reason: "not-a-plain-path" },
+      ])
+      expect(plumb(target.paths.repo, ["diff", "--name-only", before ?? "", "HEAD"]).trim()).toBe("notes/ok.md")
       expect(existsSync(escaped)).toBe(false)
     },
     30_000,
@@ -87,42 +96,47 @@ describe("identity merge (#10070)", () => {
     ["skills/.git::$INDEX_ALLOCATION/config", "[core]\n\tbare = false\n"],
     ["skills/.g\u200cit/config", "[core]\n\tbare = false\n"],
   ])(
-    "#given a source tree entry named %j #when the merge is planned and applied #then both refuse it and nothing in or beside the target repository changes (#12974 security)",
+    "#given a source tree entry named %j #when the merge is planned and applied #then both name it unplaceable and nothing in or beside the target changes beyond what the store without it merges (#12974 security)",
     async (path, content) => {
-      const root = await memoryRoot()
-      const target = await identity(
-        root,
-        "project-aaaa1111",
-        { "notes/base.md": note("base"), "system/persona.md": note("target persona") },
-        ["/work/project"],
-      )
-      const hook = join(target.paths.repo, ".git/hooks/pre-commit")
-      await mkdir(dirname(hook), { recursive: true })
-      await writeFile(hook, "#!/bin/sh\nexit 0\n", { mode: 0o755 })
-      const source = await identity(root, "project-feature-bbbb2222", { "notes/ok.md": note("ok") }, [
-        "/work/project-feature",
-      ])
-      commitTreePath(source.paths.repo, path, content)
-      const before = await fingerprint(target.paths.root, GIT_READ_STATE)
+      const merged = await mergeTreeEntry(path, content, true)
+      const control = await mergeTreeEntry(path, content, false)
 
-      const planned = await planIdentityMerge(source.paths, target.paths).then(
-        () => "planned",
-        (error: unknown) => String(error),
-      )
-      const applied = await applyIdentityMerge({
-        source: source.paths,
-        target: target.paths,
-        lock,
-        author: AUTHOR,
-      }).then(
-        (result) => result.status,
-        (error: unknown) => String(error),
-      )
-
-      expect(changedEntries(before, await fingerprint(target.paths.root, GIT_READ_STATE))).toEqual([])
-      expect(planned).toContain(path)
-      expect(applied).toContain(path)
+      expect(merged.changed).toStrictEqual(control.changed)
+      expect(merged.written).toStrictEqual(control.written)
+      expect(merged.status).toBe(control.status)
+      expect(unplaceable(merged.planned)).toStrictEqual([{ path, action: "unplaceable", reason: "not-a-plain-path" }])
+      expect(unplaceable(merged.applied)).toStrictEqual([{ path, action: "unplaceable", reason: "not-a-plain-path" }])
     },
-    30_000,
+    60_000,
   )
 })
+
+/** Merges a store holding `path` (or, as the control, the same store without it) into a target with a planted hook. */
+async function mergeTreeEntry(path: string, content: string, withEntry: boolean) {
+  const root = await memoryRoot()
+  const target = await identity(
+    root,
+    "project-aaaa1111",
+    { "notes/base.md": note("base"), "system/persona.md": note("target persona") },
+    ["/work/project"],
+  )
+  const hook = join(target.paths.repo, ".git/hooks/pre-commit")
+  await mkdir(dirname(hook), { recursive: true })
+  await writeFile(hook, "#!/bin/sh\nexit 0\n", { mode: 0o755 })
+  const source = await identity(root, "project-feature-bbbb2222", { "notes/ok.md": note("ok") }, [
+    "/work/project-feature",
+  ])
+  commitTreePath(source.paths.repo, path, content)
+  if (!withEntry) dropTreeEntry(source.paths.repo, path)
+  const before = await fingerprint(target.paths.root, GIT_READ_STATE)
+
+  const planned = (await planIdentityMerge(source.paths, target.paths)).actions
+  const result = await applyIdentityMerge({ source: source.paths, target: target.paths, lock, author: AUTHOR })
+
+  const after = await fingerprint(target.paths.root, GIT_READ_STATE)
+  const changed = changedEntries(before, after)
+  const written = Object.fromEntries(
+    changed.filter((name) => !name.startsWith("repo/.git/")).map((name) => [name, after[name]]),
+  )
+  return { planned, applied: result.plan.actions, status: result.status, changed, written }
+}

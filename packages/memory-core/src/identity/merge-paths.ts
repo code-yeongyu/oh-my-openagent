@@ -63,18 +63,25 @@ export async function createInTarget(repo: string, destination: string, created:
  * as an ordinary character, so a name like notes\\..\\..\\x.md would climb out once a platform treats it as a
  * separator. Absolute paths and empty, '.' or '..' segments (after normalising backslashes) are refused.
  */
-export function assertMergePathConfined(path: string): void {
+export function isMergePathConfined(path: string): boolean {
   const normalized = path.replaceAll("\\", "/")
   const windowsAbsolute = /^[a-zA-Z]:\//.test(normalized)
   const segments = normalized.split("/")
-  if (
+  return !(
     normalized.startsWith("/") ||
     windowsAbsolute ||
     segments.some((segment) => segment === "" || segment === "." || segment === "..")
-  ) {
-    throw new Error(`memory merge: ${path} is outside the memory repository; nothing was merged`)
-  }
+  )
 }
+
+/** The last check before a planned destination is created: a path that is not confined aborts the whole merge. */
+export function assertMergePathConfined(path: string): void {
+  if (!isMergePathConfined(path))
+    throw new Error(`memory merge: ${path} is outside the memory repository; nothing was merged`)
+}
+
+/** Why a source entry was left out of a merge: its name is not a plain path on every disk. */
+export type UnplaceableReason = "not-a-plain-path"
 
 export interface LeftoverDir {
   /** Relative to the repository, `/`-separated. */

@@ -69,7 +69,7 @@ async function runMemoryMerge(deps: MemoryCommandDeps, args: string, ctx: Memory
 
   if (!apply) {
     const lines = await Promise.all(
-      // One store whose plan is refused (a tree entry that is not a plain path) must not hide the others.
+      // One store whose plan is refused (its repository cannot be read) must not hide the others.
       found.predecessors.map((predecessor) =>
         planIdentityMerge(
           predecessor.paths,
@@ -121,7 +121,7 @@ async function runMemoryMerge(deps: MemoryCommandDeps, args: string, ctx: Memory
         results.push(`merged ${predecessor.id} (${result.sha.slice(0, 7)}): ${counts(result.plan)}${leftover}`)
       } else {
         results.push(
-          `${predecessor.id}: ${result.status === "already-merged" ? "already merged" : "nothing to merge"}${leftover}`,
+          `${predecessor.id}: ${result.status === "already-merged" ? "already merged" : "nothing to merge"}${leftOut(result.plan)}${leftover}`,
         )
       }
     } catch (error) {
@@ -137,9 +137,17 @@ function describePlan(plan: MergePlan): string {
 }
 
 function counts(plan: MergePlan): string {
-  const tally = { add: 0, "keep-aside": 0, skip: 0 }
+  const tally = { add: 0, "keep-aside": 0, skip: 0, unplaceable: 0 }
   for (const action of plan.actions) tally[action.action] += 1
-  return `${tally.add} to add, ${tally["keep-aside"]} kept aside under reference/merged/${plan.sourceId}/, ${tally.skip} identical`
+  return `${tally.add} to add, ${tally["keep-aside"]} kept aside under reference/merged/${plan.sourceId}/, ${tally.skip} identical${leftOut(plan)}`
+}
+
+/** The entries a merge leaves out, each with its reason, so the user can fix or remove them in the source store. */
+function leftOut(plan: MergePlan): string {
+  const entries = plan.actions.flatMap((action) =>
+    action.action === "unplaceable" ? [`${action.path} (${action.reason})`] : [],
+  )
+  return entries.length === 0 ? "" : `; ${entries.length} left out, so the store stays unmerged: ${entries.join(", ")}`
 }
 
 function writerLock(identity: MemoryCommandIdentity): MemoryWriteLock {
