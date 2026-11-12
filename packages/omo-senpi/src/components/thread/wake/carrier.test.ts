@@ -115,6 +115,8 @@ describe("the carrier lifts, reads finished, and hands back", () => {
     expect(await carrier.wake("s1")).toMatchObject({ kind: "open" })
     expect(await store.woken.list()).toMatchObject([{ durable_id: "s1", state: "open" }])
     expect(sent(fake, "wake")).toHaveLength(1)
+    const [open] = sent(fake, "open_session")
+    expect(Object.keys(open ?? {}).sort()).toEqual(["cwd", "id", "retain_on_disconnect", "sessionPath", "type"])
 
     expect(await carrier.evaluate("s1")).toEqual({ kind: "released" })
     const [release] = sent(fake, "release_session")
