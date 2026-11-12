@@ -130,6 +130,7 @@ export function wireEventBridge(
     const reconciliation = await engine.lifecycle.reconcileOnSessionStart(sessionId, signal)
     if (!active()) return onReconciled()
     if (sessionId !== undefined) await runPause?.reconciled(sessionId)
+    if (sessionId !== undefined) engine.controlRequester?.rearm(sessionId)
     onReconciled()
     if (!active()) return
     const livenessRecords = new Map<string, ReturnType<typeof engine.manager.get>>()
@@ -233,6 +234,7 @@ export function wireEventBridge(
         : new Set([parentSessionId])
     // The inbox lets go of this session's handles before suspension tears any of them down (#12349).
     await engine.controlOwner?.release()
+    engine.controlRequester?.stop()
     for (const sessionId of parentSessionIds) {
       const continuing =
         reason === "new" || reason === "quit"

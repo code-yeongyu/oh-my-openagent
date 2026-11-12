@@ -101,6 +101,12 @@ export type CancelResultDetails =
       readonly status: TaskStatus
       readonly undelivered_messages?: number
     }
+  | {
+      readonly kind: "owner_cannot_apply"
+      readonly task_id: string
+      readonly owner_pid: number
+      readonly reason: "owner_unsupported" | "handle_gone" | "channel_disabled"
+    }
   | { readonly kind: "not_found"; readonly reason: string }
   | { readonly kind: "invalid_arguments"; readonly reason: string }
 

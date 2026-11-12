@@ -25,6 +25,7 @@ import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
 import { createTaskRecord, isSpawnSpecV1, nextRunEpoch, parseTaskId, syncTaskIdFloor } from "../state"
 import { TaskIdSpaceExhaustedError } from "../state/id"
 import { withHostClaim } from "../state/host-claim"
+import { ControlInbox } from "../control/control-inbox"
 import type {
   AwaitingInputReason,
   EffectiveModelRecord,
@@ -326,6 +327,7 @@ class TaskManagerImpl implements TaskManager {
       endSend: (taskId) => this.endSend(taskId),
       isEvicting: (taskId) => this.isEvicting(taskId),
       isLaunching: (taskId) => this.#launching.has(taskId),
+      remoteCancel: (record, reason) => this.#options.remoteCancel?.()?.(record, reason),
       sendWhileRunHeld: createHeldSend(options.admissionBarrier, {
         liveHandle: (taskId) => this.#live.get(taskId)?.handle,
         pauseTask: (taskId, owner) => this.#runPause.pauseTask(taskId, owner),
@@ -333,6 +335,7 @@ class TaskManagerImpl implements TaskManager {
         holdTaskInput: (taskId, input) => this.#runPause.holdTaskInput(taskId, input),
         noteParticipant: (record, owner, childSeq) => this.#options.onPausedChild?.(record, owner, childSeq),
         load: (taskId) => this.#tryLoad(taskId) ?? undefined,
+        remote: () => this.#options.remoteHeldSend?.(),
       }),
       // A rung that runtime fallback is closing is never steered, interrupted through, or revived: its
       // handle is being torn down, and the fallback path retires it once the close ends.
@@ -394,8 +397,9 @@ class TaskManagerImpl implements TaskManager {
         ),
       ownedByLiveHost: (record) =>
         record.host_pid !== undefined &&
-        record.host_pid !== this.#hostPid &&
-        (options.isProcessAlive ?? defaultSignaller.isAlive)(record.host_pid),
+        (record.host_pid !== this.#hostPid
+          ? (options.isProcessAlive ?? defaultSignaller.isAlive)(record.host_pid)
+          : ControlInbox.heldBySibling(options.store.stateDir, this.#hostPid, record.task_id, this.#managerInstance)),
       track: (taskId, handle, model, epoch, turn) => this.#outcome.trackOutcome(taskId, handle, model, epoch, turn),
     })
     this.#outcome = createOutcomeTracker({

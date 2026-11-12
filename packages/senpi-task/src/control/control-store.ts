@@ -38,12 +38,15 @@ export type RegisterWrite =
     }
 
 // Callers already inside the task's record lock (the cancel carry's one mutation) use this form.
-function writeRegisterLocked(control: ControlStore, incoming: ControlRegister): RegisterWrite {
+export function writeRegisterLocked(control: ControlStore, incoming: ControlRegister): RegisterWrite {
   const name = registerName(incoming.taskId, incoming.parentSessionId)
   const prior = readRegister(control, name)
   if (prior.kind === "refused" && prior.reason === "control_dir_unsafe")
     return { kind: "refused", reason: "control_dir_unsafe" }
-  const merged = mergeRegister(prior.kind === "ok" ? prior.register : undefined, incoming)
+  const answered = readAckFile(control, incoming.taskId, incoming.parentSessionId)?.guidance?.map(
+    (entry) => entry.inputId,
+  )
+  const merged = mergeRegister(prior.kind === "ok" ? prior.register : undefined, incoming, new Set(answered))
   if (merged.kind === "guidance_too_large") return { kind: "refused", reason: "guidance_too_large" }
   if (!merged.changed && prior.kind === "ok") return { kind: "unchanged", register: merged.register }
   const written = writeControlFile(controlDir(control.stateDir), name, JSON.stringify(merged.register), control.env)

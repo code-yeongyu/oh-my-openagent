@@ -7,6 +7,7 @@ import type {
   EffectiveModelRecord,
   ResolvedModelRecord,
   ResidencyState,
+  TaskRecord,
   TaskRunStats,
   TaskStatus,
   AwaitingInputReason,
@@ -59,6 +60,8 @@ export type TaskSnapshot = {
   readonly awaiting_input?: AwaitingInputDetails
   // A cancel waits for this child's lost connection; it may still be running on its host.
   readonly stop?: string
+  // The child runs in another live omo process (#12349): where it runs and whether this process can reach it.
+  readonly owner?: string
   // The child has not launched yet: its start-time fallback model is waiting for a lane slot.
   readonly start_queued?: StartQueued
   readonly execution_mode: string
@@ -110,6 +113,7 @@ export type TaskOutputDeps = {
   readonly transcriptReader?: TranscriptReader
   readonly resolveCallerSessionId?: CallerSessionResolver
   readonly now?: () => number
+  readonly ownerStatus?: (record: TaskRecord) => string | undefined
 }
 
 export type TaskOutputToolResult = AgentToolResult<TaskOutputDetails>

@@ -312,6 +312,7 @@ function registerTaskTools(
     stateDir: engine.stateDir,
     resolveCallerSessionId,
     notices: engine.host.notices.list,
+    ownerStatus: (record) => engine.controlRequester?.channel.ownerStatus(record),
   })
   const { forgetSession, ...outputTool } = output
   pi.registerTool({ ...outputTool, runs: "brain" })
