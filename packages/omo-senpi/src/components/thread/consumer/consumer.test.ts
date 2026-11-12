@@ -155,6 +155,18 @@ describe("a handed delivery", () => {
     expect(woken).toEqual([])
   })
 
+  test("#given two sender devices that use the same command id #when both hand a record in #then each gets its own answer, keyed by its own sender device", async () => {
+    const { sessions, service, consumer } = setup()
+    writeSessionFile(sessions, "t")
+    await consumer.start()
+    const [fromA, fromB] = await Promise.all([
+      service.inbound({ command_id: "same", sender_device: "dev-a", durable_id: "t", record: record("d-a") }),
+      service.inbound({ command_id: "same", sender_device: "dev-b", durable_id: "t", record: record("d-b") }),
+    ])
+    expect(fromA).toMatchObject({ kind: "queued", delivery_id: "d-a" })
+    expect(fromB).toMatchObject({ kind: "queued", delivery_id: "d-b" })
+  })
+
   test("#given a question whether this directory holds a durable id #when it is asked #then it answers from the session files here", async () => {
     const { sessions, service, consumer } = setup()
     writeSessionFile(sessions, "t")

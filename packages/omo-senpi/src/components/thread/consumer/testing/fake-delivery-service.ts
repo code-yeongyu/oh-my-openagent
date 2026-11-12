@@ -19,7 +19,7 @@ export type FakeDeliveryService = {
   /** `delivery.pending` and `delivery.drained` are refused with this code from now on. */
   readonly refuseMarks: (code: string) => void
   readonly onAnswer: (listener: () => Promise<void>) => void
-  /** Hands a delivery to the declared consumer; resolves with the consumer's `delivery.answer` reply. */
+  /** Hands a delivery to the declared consumer; resolves with the consumer's `delivery.answer` reply for that (sender device, command id). */
   readonly inbound: (event: DeliveryInboundEvent) => Promise<Record<string, unknown>>
   /** Asks the consumer `delivery.holds`; resolves with its `delivery.held` answer. */
   readonly holds: (event: DeliveryHoldsEvent) => Promise<boolean>
@@ -45,10 +45,13 @@ export function createFakeDeliveryService(options: { readonly admitted: boolean 
       calls.push({ type: "deliveries.serve", agent_dir: request.agent_dir, v: request.v })
       if (serveRefusal !== undefined) throw refusal(serveRefusal)
     },
-    answer: async (commandId, reply) => {
+    answer: async (delivery, reply) => {
       await answerListener?.()
-      answers.get(commandId)?.(reply)
-      answers.delete(commandId)
+      const key = `${delivery.sender_device}\u0000${delivery.command_id}`
+      const waiting = answers.get(key)
+      if (waiting === undefined) throw refusal("unknown_delivery")
+      answers.delete(key)
+      waiting(reply)
     },
     held: async (askId, holds) => {
       helds.get(askId)?.(holds)
@@ -98,7 +101,7 @@ export function createFakeDeliveryService(options: { readonly admitted: boolean 
           reject(new Error("no consumer is declared"))
           return
         }
-        answers.set(event.command_id, resolve)
+        answers.set(`${event.sender_device}\u0000${event.command_id}`, resolve)
         inboundListener(event)
       }),
     holds: (event) =>
