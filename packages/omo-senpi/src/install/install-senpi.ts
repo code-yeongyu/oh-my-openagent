@@ -6,7 +6,8 @@ import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
 
 import { resolveAgentHome } from "../components/agent-home/resolve-agent-home"
-import { installLocalLauncher, uninstallLocalLauncher } from "./local-launcher"
+import { launcherOwnership } from "./launcher-ownership"
+import { installLocalLauncher, localLauncherPath, uninstallLocalLauncher } from "./local-launcher"
 import { ensurePluginArtifacts } from "./plugin-artifacts"
 import {
   dedupePackages,
@@ -39,6 +40,8 @@ export interface SenpiInstallResult {
   readonly settingsPath: string
   readonly pluginPath: string
   readonly launcherPath?: string | undefined
+  /** The launcher path holds a file this installer did not write (a compiled omo, another install's launcher, a symlink): it was neither replaced nor removed. */
+  readonly launcherLeftAlone?: { readonly path: string; readonly reason: string } | undefined
   readonly changed: boolean
   readonly backupPath: string
   readonly removed?: boolean
@@ -71,6 +74,7 @@ export async function runSenpiInstaller(options: SenpiInstallOptions = {}): Prom
   return {
     ok: true,
     action: "install",
+    ...leftAloneReport(context.homeDir, launcherPath === undefined),
     agentDir: context.agentDir,
     settingsPath: context.settingsPath,
     pluginPath: context.pluginPath,
@@ -88,11 +92,12 @@ export async function runSenpiUninstaller(options: SenpiInstallOptions = {}): Pr
   const nextPackages = packages.filter((entry) => entry !== context.pluginPath)
   settings.packages = nextPackages
   const backupPath = await writeSettingsAtomically(context.settingsPath, settings)
-  uninstallLocalLauncher(context.homeDir)
+  const launcherRemoved = uninstallLocalLauncher(context.homeDir)
 
   return {
     ok: true,
     action: "uninstall",
+    ...leftAloneReport(context.homeDir, !launcherRemoved),
     agentDir: context.agentDir,
     settingsPath: context.settingsPath,
     pluginPath: context.pluginPath,
@@ -157,4 +162,13 @@ function findRepoRoot(importerDir: string): string {
 
 function fileExistsSync(path: string): boolean {
   return existsSync(path)
+}
+
+function leftAloneReport(homeDir: string, untouched: boolean): Pick<SenpiInstallResult, "launcherLeftAlone"> {
+  if (!untouched) return {}
+  const path = localLauncherPath(homeDir)
+  const ownership = launcherOwnership(path)
+  return ownership.kind === "foreign"
+    ? { launcherLeftAlone: { path, reason: `${path} was left alone: it is not a launcher this installer wrote (${ownership.reason})` } }
+    : {}
 }
