@@ -230,22 +230,27 @@ impl Drop for Session {
     }
 }
 
-/// The next request; an idle wait ends early when the display-awake grace runs out.
-fn next(worker: &Worker, requests: &flume::Receiver<Message>) -> Option<Message> {
+/// The next request; an idle wait ends early when the display-awake grace
+/// runs out or the object-mode idle flush is due.
+fn next(worker: &mut Worker, requests: &flume::Receiver<Message>) -> Option<Message> {
     loop {
-        let Some(deadline) = worker.awake.deadline() else {
+        let flush = worker.idle_wait().map(|wait| std::time::Instant::now() + wait);
+        let Some(deadline) = [worker.awake.deadline(), flush].into_iter().flatten().min() else {
             return requests.recv().ok();
         };
         match requests.recv_deadline(deadline) {
             Ok(message) => return Some(message),
-            Err(flume::RecvTimeoutError::Timeout) => worker.awake.expire(std::time::Instant::now()),
+            Err(flume::RecvTimeoutError::Timeout) => {
+                worker.awake.expire(std::time::Instant::now());
+                worker.flush_if_idle();
+            }
             Err(flume::RecvTimeoutError::Disconnected) => return None,
         }
     }
 }
 
 fn serve(mut worker: Worker, requests: &flume::Receiver<Message>) {
-    while let Some(message) = next(&worker, requests) {
+    while let Some(message) = next(&mut worker, requests) {
         let (reply, result) = match message {
             Message::Close { ack } => {
                 drop(worker);

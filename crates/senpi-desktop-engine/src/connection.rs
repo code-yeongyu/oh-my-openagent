@@ -14,11 +14,11 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use parking_lot::Mutex;
-use senpi_desktop_core::error::DesktopError;
+use senpi_desktop_core::error::{DesktopError, ErrorReport};
 use senpi_desktop_core::methods::Method;
 use senpi_desktop_core::protocol::{MethodRejection, RequestId, RpcRequest};
 use serde_json::Value;
-use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::sync::mpsc::error::{SendError, TrySendError};
 use tokio::sync::{mpsc, oneshot};
 
@@ -30,6 +30,14 @@ use dispatch::dispatch;
 
 /// Reply lines buffered ahead of a slow reader of the output.
 const OUTBOUND_CAPACITY: usize = 256;
+
+/// The longest request line, newline excluded (DESIGN 9, request size); a
+/// longer one is discarded unread and answered `request_too_large` under the
+/// id read from its bytes as they stream past (see [`IdSniff`]).
+pub(crate) const MAX_REQUEST_BYTES: usize = 1 << 20;
+
+/// The longest id value an oversized line may carry and still be answered.
+const MAX_ID_BYTES: usize = 1024;
 
 struct Queued {
     id: RequestId,
@@ -231,15 +239,27 @@ async fn read_requests<R: AsyncRead + Unpin>(
     let mut reader = BufReader::new(reader);
     let mut line = Vec::new();
     loop {
-        line.clear();
-        if reader.read_until(b'\n', &mut line).await? == 0 {
-            return Ok(());
-        }
-        let text = line.trim_ascii();
-        if text.is_empty() {
-            continue;
-        }
-        let Some(reply) = handle_line(engine, text, queue, in_flight) else {
+        let reply = match read_line(&mut reader, &mut line).await? {
+            Line::End => return Ok(()),
+            Line::TooLarge(Sniffed::Id(id)) => Some(failure_line(Some(id), Failure::Engine(request_too_large(true)))),
+            // A notification is never answered, oversized or not.
+            Line::TooLarge(Sniffed::Notification) => None,
+            Line::TooLarge(Sniffed::Unknown) => {
+                // No caller can be told which request failed, so none may
+                // keep waiting: say why, then close the connection.
+                let refusal = failure_line(None, Failure::Engine(request_too_large(false)));
+                deliver(engine, out, refusal).await.unwrap_or(());
+                return Ok(());
+            }
+            Line::Read => {
+                let text = line.trim_ascii();
+                if text.is_empty() {
+                    continue;
+                }
+                handle_line(engine, text, queue, in_flight)
+            }
+        };
+        let Some(reply) = reply else {
             continue;
         };
         if deliver(engine, out, reply).await.is_err() {
@@ -247,6 +267,200 @@ async fn read_requests<R: AsyncRead + Unpin>(
             return Ok(());
         }
     }
+}
+
+enum Line {
+    End,
+    Read,
+    /// Longer than [`MAX_REQUEST_BYTES`]: discarded, with what its bytes said
+    /// about its id.
+    TooLarge(Sniffed),
+}
+
+/// Reads one line into `line`, keeping at most [`MAX_REQUEST_BYTES`] of it in
+/// memory; the rest of an oversized line is consumed and dropped, its id read
+/// on the way.
+async fn read_line<R: AsyncBufRead + Unpin>(reader: &mut R, line: &mut Vec<u8>) -> io::Result<Line> {
+    line.clear();
+    let mut sniff: Option<IdSniff> = None;
+    loop {
+        let available = reader.fill_buf().await?;
+        if available.is_empty() {
+            return Ok(match sniff {
+                Some(sniff) => Line::TooLarge(sniff.finish()),
+                None if line.is_empty() => Line::End,
+                None => Line::Read,
+            });
+        }
+        let newline = available.iter().position(|&byte| byte == b'\n');
+        let content = &available[..newline.unwrap_or(available.len())];
+        if let Some(sniff) = sniff.as_mut() {
+            sniff.feed(content);
+        } else if line.len() + content.len() > MAX_REQUEST_BYTES {
+            let mut started = IdSniff::default();
+            started.feed(line);
+            started.feed(content);
+            *line = Vec::new();
+            sniff = Some(started);
+        } else {
+            line.extend_from_slice(content);
+        }
+        let consumed = newline.map_or(available.len(), |index| index + 1);
+        reader.consume(consumed);
+        if newline.is_some() {
+            return Ok(sniff.map_or(Line::Read, |sniff| Line::TooLarge(sniff.finish())));
+        }
+    }
+}
+
+/// What an oversized line said about its id.
+#[derive(Debug, PartialEq)]
+enum Sniffed {
+    Id(RequestId),
+    /// A whole object without an `id` member.
+    Notification,
+    /// Not an object, cut short, or an id that is not a number or string.
+    Unknown,
+}
+
+/// Reads the top-level `"id"` member of a request line from its bytes as they
+/// stream past, holding at most [`MAX_ID_BYTES`] of them; nested members are
+/// skipped, so an `"id"` inside `params` is never taken for the request's.
+#[derive(Default)]
+struct IdSniff {
+    state: SniffState,
+    /// The member key, or the id value, being read.
+    held: Vec<u8>,
+    /// Nesting inside the member value being read.
+    depth: usize,
+    in_string: bool,
+    escaped: bool,
+}
+
+#[derive(Default)]
+enum SniffState {
+    /// Before the opening `{`.
+    #[default]
+    Open,
+    /// Before a member key.
+    Key,
+    KeyText,
+    Colon,
+    Value {
+        id: bool,
+    },
+    Done(Sniffed),
+}
+
+impl IdSniff {
+    fn feed(&mut self, bytes: &[u8]) {
+        for &byte in bytes {
+            if matches!(self.state, SniffState::Done(_)) {
+                return;
+            }
+            self.step(byte);
+        }
+    }
+
+    fn finish(self) -> Sniffed {
+        match self.state {
+            SniffState::Done(sniffed) => sniffed,
+            _ => Sniffed::Unknown,
+        }
+    }
+
+    fn step(&mut self, byte: u8) {
+        let blank = byte.is_ascii_whitespace();
+        match self.state {
+            SniffState::Open if byte == b'{' => self.state = SniffState::Key,
+            SniffState::Key if byte == b'"' => {
+                self.held.clear();
+                self.state = SniffState::KeyText;
+            }
+            SniffState::Key if byte == b'}' => self.state = SniffState::Done(Sniffed::Notification),
+            SniffState::Open | SniffState::Key | SniffState::Colon if blank => {}
+            SniffState::Open | SniffState::Key => self.state = SniffState::Done(Sniffed::Unknown),
+            SniffState::KeyText => self.key_byte(byte),
+            SniffState::Colon if byte == b':' => {
+                let id = self.held == b"id";
+                self.held.clear();
+                self.depth = 0;
+                self.state = SniffState::Value { id };
+            }
+            SniffState::Colon => self.state = SniffState::Done(Sniffed::Unknown),
+            SniffState::Value { id } => self.value_byte(byte, id),
+            SniffState::Done(_) => {}
+        }
+    }
+
+    /// A byte of a member key; only the first three are kept, enough to tell
+    /// `id` from every other key.
+    fn key_byte(&mut self, byte: u8) {
+        if self.escaped {
+            self.escaped = false;
+        } else if byte == b'\\' {
+            self.escaped = true;
+        } else if byte == b'"' {
+            self.state = SniffState::Colon;
+            return;
+        }
+        if self.held.len() < 3 {
+            self.held.push(byte);
+        }
+    }
+
+    fn value_byte(&mut self, byte: u8, id: bool) {
+        if self.in_string {
+            if self.escaped {
+                self.escaped = false;
+            } else if byte == b'\\' {
+                self.escaped = true;
+            } else if byte == b'"' {
+                self.in_string = false;
+            }
+        } else {
+            match byte {
+                b'"' => self.in_string = true,
+                b'{' | b'[' => self.depth += 1,
+                b'}' | b']' if self.depth > 0 => self.depth -= 1,
+                b',' | b'}' if self.depth == 0 => {
+                    self.state = match (id, byte) {
+                        (true, _) => SniffState::Done(
+                            serde_json::from_slice(self.held.trim_ascii()).map_or(Sniffed::Unknown, Sniffed::Id),
+                        ),
+                        (false, b',') => SniffState::Key,
+                        (false, _) => SniffState::Done(Sniffed::Notification),
+                    };
+                    return;
+                }
+                _ => {}
+            }
+        }
+        if id {
+            if self.held.len() == MAX_ID_BYTES {
+                self.state = SniffState::Done(Sniffed::Unknown);
+                return;
+            }
+            self.held.push(byte);
+        }
+    }
+}
+
+/// `answered`: the reply carries the request's id; otherwise the connection
+/// closes after it, since no caller can match it to a request.
+fn request_too_large(answered: bool) -> DesktopError {
+    let outcome = if answered {
+        "send smaller requests"
+    } else {
+        "its id could not be read, so this connection closes; send smaller requests"
+    };
+    DesktopError::internal(format!(
+        "the request line is longer than {MAX_REQUEST_BYTES} bytes and was discarded; {outcome}"
+    ))
+    .with_report(ErrorReport {
+        reason: Some("request_too_large".to_owned()),
+        ..ErrorReport::default()
+    })
 }
 
 /// The immediate reply to one input line, if any.
@@ -342,4 +556,85 @@ async fn write_lines<W: AsyncWrite + Unpin>(
         writer.flush().await?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod line_cap_tests {
+    use tokio::io::BufReader;
+
+    use senpi_desktop_core::protocol::RequestId;
+
+    use super::{read_line, IdSniff, Line, Sniffed, MAX_REQUEST_BYTES};
+
+    async fn lines(input: Vec<u8>) -> Vec<(bool, usize)> {
+        let mut reader = BufReader::with_capacity(4096, input.as_slice());
+        let mut line = Vec::new();
+        let mut read = Vec::new();
+        loop {
+            match read_line(&mut reader, &mut line).await.expect("in-memory reads succeed") {
+                Line::End => return read,
+                Line::TooLarge(_) => read.push((true, line.len())),
+                Line::Read => read.push((false, line.len())),
+            }
+        }
+    }
+
+    /// Sniffs `text` fed in 7-byte chunks, so tokens straddle chunk edges.
+    fn sniffed(text: &str) -> Sniffed {
+        let mut sniff = IdSniff::default();
+        for chunk in text.as_bytes().chunks(7) {
+            sniff.feed(chunk);
+        }
+        sniff.finish()
+    }
+
+    #[test]
+    fn the_top_level_id_is_read_wherever_it_sits() {
+        let big = "x".repeat(4096);
+        assert_eq!(sniffed(r#"{"jsonrpc":"2.0","id":42,"method":"m","params":{}}"#), Sniffed::Id(RequestId::Number(42)));
+        assert_eq!(
+            sniffed(&format!(r#"{{ "params" : {{"id":1,"t":"{big}\"}}","a":[{{}}]}} , "id" : "req-7" }}"#)),
+            Sniffed::Id(RequestId::String("req-7".to_owned()))
+        );
+        // The id is known before the rest of the line arrives.
+        assert_eq!(sniffed(&format!(r#"{{"id":-3,"params":{{"t":"{big}"#)), Sniffed::Id(RequestId::Number(-3)));
+    }
+
+    #[test]
+    fn a_line_without_a_readable_id_is_a_notification_or_unknown() {
+        assert_eq!(sniffed(r#"{"method":"m","params":{"id":1}}"#), Sniffed::Notification);
+        assert_eq!(sniffed(r#"{"method":"m","params":{"t":"#), Sniffed::Unknown);
+        assert_eq!(sniffed(r#"[{"id":1}]"#), Sniffed::Unknown);
+        assert_eq!(sniffed(r#"{"id":null,"method":"m"}"#), Sniffed::Unknown);
+        assert_eq!(sniffed(r#"{"id" 1}"#), Sniffed::Unknown);
+        assert_eq!(sniffed(&format!(r#"{{"id":"{}"}}"#, "x".repeat(super::MAX_ID_BYTES))), Sniffed::Unknown);
+    }
+
+    #[tokio::test]
+    async fn an_oversized_line_is_dropped_and_the_next_line_still_reads() {
+        // Given
+        let mut input = vec![b'x'; MAX_REQUEST_BYTES + 1];
+        input.extend_from_slice(b"\nok\n");
+        // When
+        let read = lines(input).await;
+        // Then
+        assert_eq!(read, vec![(true, 0), (false, 2)]);
+    }
+
+    #[tokio::test]
+    async fn a_line_of_exactly_the_cap_is_read_whole() {
+        // Given
+        let mut input = vec![b'x'; MAX_REQUEST_BYTES];
+        input.push(b'\n');
+        // When
+        let read = lines(input).await;
+        // Then
+        assert_eq!(read, vec![(false, MAX_REQUEST_BYTES)]);
+    }
+
+    #[tokio::test]
+    async fn an_unterminated_last_line_is_still_read_or_refused() {
+        assert_eq!(lines(b"tail".to_vec()).await, vec![(false, 4)]);
+        assert_eq!(lines(vec![b'x'; MAX_REQUEST_BYTES + 7]).await, vec![(true, 0)]);
+    }
 }
