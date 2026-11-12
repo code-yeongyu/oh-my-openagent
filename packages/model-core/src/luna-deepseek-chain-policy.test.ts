@@ -68,14 +68,14 @@ const VERTEX_FLASH_MEDIUM = {
 } satisfies FallbackEntry
 
 describe("Vertex Model Garden DeepSeek lane", () => {
-  test("quick adds the non-reasoning Vertex Flash rung right after first-party DeepSeek", () => {
+  test("#given the quick chain #when scanning rung 3 #then the non-reasoning Vertex Flash rung sits right after first-party DeepSeek", () => {
     const quick = CATEGORY_MODEL_REQUIREMENTS["quick"].fallbackChain
 
     expect(quick[3]).toEqual(VERTEX_FLASH_OFF)
   })
 
   test.each(["explore", "librarian"])(
-    "%s keeps first-party DeepSeek max, then the Vertex Flash medium lane",
+    "#given the %s chain #when scanning rung 4 #then first-party DeepSeek max is followed by the Vertex Flash medium lane",
     (agentName) => {
       const chain = AGENT_MODEL_REQUIREMENTS[agentName].fallbackChain
 
@@ -83,7 +83,7 @@ describe("Vertex Model Garden DeepSeek lane", () => {
     },
   )
 
-  test("unspecified-low follows deepseek-v4-pro with the Vertex Flash medium lane", () => {
+  test("#given the unspecified-low chain #when deepseek-v4-pro is located #then the Vertex Flash medium lane follows it", () => {
     const chain = CATEGORY_MODEL_REQUIREMENTS["unspecified-low"].fallbackChain
     const proIndex = chain.findIndex((entry) => entry.model === "deepseek-v4-pro")
 
@@ -91,7 +91,7 @@ describe("Vertex Model Garden DeepSeek lane", () => {
     expect(chain[proIndex + 1]).toEqual(VERTEX_FLASH_MEDIUM)
   })
 
-  test("a Vertex-only machine resolves the quick chain onto the Garden Flash model", () => {
+  test("#given a Vertex-only machine #when resolving the quick chain #then it lands on the Garden's namespaced Flash via provider-fallback", () => {
     const resolved = resolveModelWithFallback({
       fallbackChain: CATEGORY_MODEL_REQUIREMENTS["quick"].fallbackChain,
       availableModels: new Set(["vertex-garden/deepseek-ai/deepseek-v4.1-flash-maas"]),
