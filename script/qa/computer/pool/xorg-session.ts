@@ -111,3 +111,13 @@ export async function teardown(
   receipts.push(`procs ${left}`)
   return ok && socketGone && left === 0
 }
+
+export async function revokeUinputGrant(user: string): Promise<string> {
+  if (!existsSync("/dev/uinput")) return `uinput ACL REMOVED ${user} (no device)`
+  await run(["sudo", "-n", "setfacl", "-x", `u:${user}`, "/dev/uinput"])
+  const acl = await run(["getfacl", "-p", "/dev/uinput"])
+  if (acl.code !== 0) return `uinput ACL UNREAD ${user}: ${tail(acl.err, 1)}`
+  return acl.out.split("\n").some((line) => line.startsWith(`user:${user}:`))
+    ? `uinput ACL LEFT ${user}`
+    : `uinput ACL REMOVED ${user}`
+}

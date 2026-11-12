@@ -11,7 +11,7 @@ import {
   type Verdict,
   xiAtLeast21,
 } from "./xorg-uinput-ledger.ts"
-import { readLog, run, startXorg, tail, teardown, until, type Xorg } from "./xorg-session.ts"
+import { readLog, revokeUinputGrant, run, startXorg, tail, teardown, until, type Xorg } from "./xorg-session.ts"
 
 const KEY_F13 = 183
 const X_KEYCODE_OFFSET = 8
@@ -165,8 +165,17 @@ async function measureRaw(r: Readings, x: Xorg, kb: VirtualKeyboard, readers: Bu
 }
 
 export async function measureOnce(workdir: string, runIndex: number): Promise<RunResult> {
-  const r = new Readings()
   const receipts: string[] = []
+  try {
+    return await measureGranted(workdir, runIndex, receipts)
+  } finally {
+    const revoked = await revokeUinputGrant(userInfo().username)
+    receipts.push(revoked)
+  }
+}
+
+async function measureGranted(workdir: string, runIndex: number, receipts: string[]): Promise<RunResult> {
+  const r = new Readings()
   if (!(await measureUinput(r))) {
     r.skipFrom("uinput-writable", "uinput-module")
     r.skipFrom("xorg-dummy", "uinput-writable")

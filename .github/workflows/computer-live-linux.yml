@@ -63,7 +63,12 @@ jobs:
           if pgrep -x Xorg >/dev/null; then echo "Xorg LEFT $(pgrep -x Xorg | tr '\n' ' ')"; left=1; else echo "Xorg procs 0"; fi
           if grep -q 'omo-qa-' /proc/bus/input/devices; then echo "uinput devices LEFT"; left=1; else echo "uinput devices REMOVED"; fi
           sockets=$(find /tmp/.X11-unix -maxdepth 1 -name 'X*' 2>/dev/null | wc -l)
-          echo "X sockets left ${sockets}"
+          if test "$sockets" -eq 0; then echo "X sockets REMOVED"; else echo "X sockets LEFT ${sockets}"; left=1; fi
+          if test -e /dev/uinput && getfacl -p /dev/uinput 2>/dev/null | grep -q "^user:$(id -un):"; then
+            echo "uinput ACL LEFT $(id -un)"; left=1
+          else
+            echo "uinput ACL REMOVED $(id -un)"
+          fi
           exit "$left"
 
       - name: Upload evidence
@@ -73,3 +78,16 @@ jobs:
           name: computer-live-linux-xorg-uinput
           path: ${{ runner.temp }}/computer-live-linux
           if-no-files-found: warn
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Computer live Linux (xorg-uinput)
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Probe, three runs: uinput module, uinput writable by the job user, real Xorg with the dummy driver, libinput hotplug of a uinput keyboard, XI 2.1+, XI2 raw key events from that keyboard (XTEST positive control).
+            - Graded ledger: every row must read CONFIRMS on every run.
+            - Teardown: Xorg processes, uinput devices, X sockets and the uinput ACL grant removed.
+          JOB_SUMMARY_NEXT: Open the computer-live-linux-xorg-uinput artifact for the ledger TSV and the probe log.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

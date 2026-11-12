@@ -86,7 +86,9 @@ async function main(argv: readonly string[]): Promise<number> {
         perQuestion.get(q.id)?.push(result.readings.get(q.id) ?? { verdict: "UNMEASURED", observed: "not reached" })
       }
       for (const line of result.receipts) console.log(`run ${i + 1}: ${line}`)
-      teardownOk &&= !result.receipts.some((l) => / LEFT |DESTROY-FAILED|TEARDOWN incomplete|^procs [1-9]/.test(l))
+      teardownOk &&= !result.receipts.some((l) =>
+        / LEFT | UNREAD |DESTROY-FAILED|TEARDOWN incomplete|^procs [1-9]/.test(l),
+      )
     }
   } finally {
     rmSync(workdir, { recursive: true, force: true })
