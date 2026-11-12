@@ -8,6 +8,8 @@ mod admit;
 mod display_awake;
 mod lease_hook;
 mod send;
+#[cfg(test)]
+mod integration_tests;
 mod settings;
 
 pub use admit::{Admission, Blocked};

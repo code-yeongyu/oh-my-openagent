@@ -2,7 +2,7 @@
 // Do not edit by hand; run `bun run --cwd packages/omo-computer-protocol generate`.
 
 /** sha256 of the schema file this module was generated from; the schema-drift test compares it. */
-export const SCHEMA_SHA256 = "e8d03727cce8c913a43f78402a91bc5e289fbcbf175940a460453a2860948f6e" as const
+export const SCHEMA_SHA256 = "cb9eb3ba49f722e7471cdbb5c9eba23b670537772dbf3599029ebdc79ee4590b" as const
 
 /** The wire protocol version `engine.hello` reports. */
 export const PROTOCOL_VERSION = "1" as const
@@ -399,10 +399,8 @@ export type ActionReport = {
 	auditIds?: string[]
 	timings?: Timings | null
 	evidence: Evidence[]
+	urlPolicy?: UrlPolicyStamp | null
 	observation: UntrustedText
-	paused?: Pause[]
-	session?: SessionState | null
-	target?: TargetLiveness | null
 }
 
 export type AdvanceClockParams = {
@@ -1057,8 +1055,18 @@ export type McpSettings = {
 	tier: Tier
 }
 
+export type MenuItem = {
+	label: string
+	enabled: boolean
+	checked: boolean
+	accelerator?: string | null
+	submenu: boolean
+	path: string[]
+	observation: UntrustedText
+}
+
 export type MenuItems = {
-	items: ElementInfo[]
+	items: MenuItem[]
 	truncated?: boolean | null
 	observation: UntrustedText
 }
@@ -1204,13 +1212,6 @@ export type PasteParams = {
 	runGeneration?: number | null
 	observeAfter?: ObserveOptions | null
 }
-
-export type Pause = {
-	reason: PauseReason
-	ms: number
-}
-
-export type PauseReason = "screen_locked" | "user_active" | "system_suspended"
 
 export type PermissionReport = {
 	state: PermissionState
@@ -1496,15 +1497,6 @@ export type SurfacePredicate = {
 
 export type SurfaceState = "appeared" | "gone"
 
-export type TargetLiveness = {
-	state: TargetState
-	pid: number
-	exitCode?: number | null
-	signal?: number | null
-}
-
-export type TargetState = "exited" | "unresponsive"
-
 export type TextRange = {
 	start: number
 	end: number
@@ -1557,6 +1549,8 @@ export type UnknownLiteral = "unknown"
 export type UntrustedText = {
 	untrustedText: true
 }
+
+export type UrlPolicyStamp = "unknown"
 
 export type UserActive = {
 	active: Tristate

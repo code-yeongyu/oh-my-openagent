@@ -57,7 +57,7 @@ impl Session {
         ceiling_ms: Option<u64>,
     ) -> Result<Admission, Blocked> {
         let window = window_of(&call.target);
-        let mut admitted = self.guard.admit_on_with(self.backend.as_mut(), call, stages);
+        let mut admitted = self.guard.admit_on_with(self.backend.as_mut(), call, stages.clone());
         let mut paused = Vec::new();
         let mut pid = None;
         let may_pause = admitted.as_ref().map_or_else(|r| r.gate == Gate::Lock, |_| true);

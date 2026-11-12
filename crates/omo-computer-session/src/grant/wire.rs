@@ -51,7 +51,8 @@ impl Session {
                 self.preview_subscribe();
                 Value::Null
             }),
-            _ => return None,
+            // Row 25 (R31): its own methods, served by its own session module.
+            _ => return crate::menus::wire::host_call(self, method, params),
         };
         Some(outcome)
     }
