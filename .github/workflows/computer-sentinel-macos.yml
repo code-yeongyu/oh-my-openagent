@@ -74,6 +74,22 @@ jobs:
           echo "EXIT $code" | tee -a "$OUT/qa-failure.txt"
           grep -qx 'detector window_raised missed the planted raise' "$OUT/qa-failure.txt" && [ "$code" = 1 ]
 
+      - name: Write job summary
+        if: always()
+        shell: bash
+        run: |
+          OUT="$RUNNER_TEMP/sentinel-evidence"
+          {
+            echo "### Computer sentinel self-test (${{ matrix.os }})"
+            for leg in qa-happy qa-failure; do
+              echo ""
+              echo "**${leg}**"
+              echo '```'
+              grep -hE '^(SENTINEL_SELFTEST|SENTINEL_NEGATIVE_CONTROL|SENTINEL_OBSERVER|detector |plant |null run|sentinel: |EXIT )' "$OUT/$leg.txt" 2>/dev/null || echo "no transcript"
+              echo '```'
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload evidence
         if: always()
         uses: actions/upload-artifact@v7
