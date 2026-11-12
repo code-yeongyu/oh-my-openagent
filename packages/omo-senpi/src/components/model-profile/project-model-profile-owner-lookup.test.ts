@@ -2,10 +2,7 @@
 
 import { describe, expect, test } from "bun:test"
 import { execFileSync } from "node:child_process"
-import { chmodSync, existsSync, realpathSync, statSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
-
-import { testTempDir } from "../../../test-support/temp-dir"
+import { existsSync, statSync } from "node:fs"
 
 import * as projectModelProfileRpc from "./project-model-profile-rpc"
 
@@ -90,11 +87,12 @@ describe("project model_profile RPC owner home lookup (#13207, #13209)", () => {
     exec: (file: string, args: readonly string[]) => string,
     which: (command: string) => string | null = (command) => `/opt/tools/bin/${command}`,
     nsswitch: () => string | null = () => "passwd: files systemd\ngroup: files\n",
+    passwdFile: () => string | null = () => "root:x:0:0:root:/root:/bin/sh\n",
   ): string | null | undefined {
     const { lookupHomeOfUid, runPasswdLookup } = projectModelProfileRpc
     return lookupHomeOfUid(
       uid,
-      (asked) => runPasswdLookup(asked, { platform, exec, which, nsswitch }),
+      (asked) => runPasswdLookup(asked, { platform, exec, which, nsswitch, passwdFile }),
       () => 4_000_000 + uid,
     )
   }
@@ -146,33 +144,40 @@ describe("project model_profile RPC owner home lookup (#13207, #13209)", () => {
     ).toBeUndefined()
   })
 
-  test.skipIf(process.platform === "win32")(
-    "#given PATH holds only a relative entry and the session folder ships its own getent and id #when the default runner looks this account up #then the planted binaries never run",
-    () => {
-      const work = realpathSync(testTempDir("omo-owner-lookup-planted-"))
-      const marker = join(work, "planted-ran")
-      for (const name of ["getent", "id"]) {
-        const planted = join(work, name)
-        writeFileSync(planted, `#!/bin/sh\necho ran > "${marker}"\necho "x:x:0:0::/planted:/bin/sh"\n`)
-        chmodSync(planted, 0o755)
-      }
-      const previousPath = process.env.PATH
-      const previousCwd = process.cwd()
-      process.env.PATH = "."
-      process.chdir(work)
-      try {
-        projectModelProfileRpc.runPasswdLookup(process.getuid?.() ?? 0)
-      } catch {
-        // A host without the system lookup binary fails the lookup; only whether the planted copy ran matters here.
-      } finally {
-        process.chdir(previousCwd)
-        if (previousPath === undefined) delete process.env.PATH
-        else process.env.PATH = previousPath
-      }
+  // compat reads NIS through `+`/`-` lines in /etc/passwd, and older glibc uses it for passwd when nsswitch.conf is
+  // missing or has no passwd line, so a NIS outage there also ends in getent exit 2.
+  test("#given passwd uses compat, named in nsswitch.conf or as the default with +/- lines in /etc/passwd #when getent exits 2 #then the lookup failed", () => {
+    const notFound = () => {
+      throw exitError(2)
+    }
+    const nisLines = () => "root:x:0:0:root:/root:/bin/sh\n+@staff::::::\n"
 
-      expect(existsSync(marker)).toBe(false)
-    },
-  )
+    expect(lookupThroughRunner(424263, "linux", notFound, undefined, () => "passwd: compat\n")).toBeUndefined()
+    expect(lookupThroughRunner(424264, "linux", notFound, undefined, () => null, nisLines)).toBeUndefined()
+    expect(
+      lookupThroughRunner(
+        424265,
+        "linux",
+        notFound,
+        undefined,
+        () => "group: files\n",
+        () => "-baduser::::::\n",
+      ),
+    ).toBeUndefined()
+    expect(
+      lookupThroughRunner(
+        424266,
+        "linux",
+        notFound,
+        undefined,
+        () => null,
+        () => {
+          throw Object.assign(new Error("EACCES: permission denied"), { code: "EACCES" })
+        },
+      ),
+    ).toBeUndefined()
+    expect(lookupThroughRunner(424267, "linux", notFound, undefined, () => null)).toBeNull()
+  })
 
   test("#given the lookup binary is not on PATH, times out or fails otherwise #when the default runner looks the uid up #then the lookup failed", () => {
     let spawned = 0
