@@ -2288,6 +2288,60 @@ const LOGIC_CHECKS: readonly Check[] = [
     },
   },
   {
+    finding: "SETUP precompiled native assembly (hosted run 43220783638)",
+    async run() {
+      const bad: string[] = []
+      const helper = psCode(source("sp-n.ps1")).join("\n")
+      const compile = helper.slice(helper.indexOf("function Compile {"), helper.indexOf("function Emit("))
+      // load the precompiled assembly from the very bytes whose sha256 matched its recorded value
+      if (!/\$NativeDll = Join-Path \$PSScriptRoot 'sp-n-native\.dll'/.test(helper))
+        bad.push("the helper does not look for sp-n-native.dll beside itself")
+      const order = [
+        /Test-Path -LiteralPath \$NativeDll/,
+        /\[IO\.File\]::ReadAllBytes\(\$NativeDll\)/,
+        /SHA256/,
+        /throw "native assembly sha256 mismatch/,
+        /\[Reflection\.Assembly\]::Load\(\$bytes\)/,
+        /\} else \{/,
+        /Add-Type -TypeDefinition \$SpNNative/,
+      ].map((re) => compile.search(re))
+      if (order.some((i) => i < 0) || order.some((v, i) => i > 0 && v < (order[i - 1] ?? 0)))
+        bad.push(`Compile does not check, load, then fall back to Add-Type in that order (${order.join(",")})`)
+      if (/LoadFile|LoadFrom|Add-Type -Path/.test(compile)) bad.push("Compile loads by path, not the hashed bytes")
+      if ((helper.match(/Add-Type -TypeDefinition/g) ?? []).length !== 2)
+        bad.push("Add-Type -TypeDefinition appears outside Compile's fallback and the build leg")
+      if (!/if \(\$Leg -eq 'build-native'\) \{ BuildNative; exit 0 \}\n\s+Compile/.test(helper))
+        bad.push("no build-native leg ahead of Compile in the handled path")
+      if (!/-OutputAssembly \$NativeDll -OutputType Library/.test(helper)) bad.push("BuildNative writes no library")
+      if (!/\$r\['native'\] = \$script:NativeFrom/.test(helper)) bad.push("Emit does not report which native type it used")
+      const yml = existsSync(WORKFLOW) ? readFileSync(WORKFLOW, "utf8") : ""
+      const build = yml.indexOf("sp-n.ps1 -Leg build-native")
+      if (build < 0 || build > yml.indexOf("-Leg precondition")) bad.push("the workflow does not precompile before the legs run")
+      if (!/^sp-n-native\.dll\*?$/m.test(existsSync(join(HERE, ".gitignore")) ? source(".gitignore") : ""))
+        bad.push("the built assembly is not ignored by git")
+      // packaging only: nothing in the helpers changes a token, an integrity level or a privilege
+      const files = [...LEG_FILES, "sp-n.ps1", "sp-n-target.ps1", "sp-n-native-win32.ps1", "sp-n-native-input.ps1"]
+      const tok = files.filter((f) =>
+        /AdjustTokenPrivileges|SetTokenInformation|OpenProcessToken|DuplicateToken|CreateProcessAsUser|CreateRestrictedToken/.test(
+          source(f),
+        ),
+      )
+      if (tok.length) bad.push(`token or privilege calls in ${tok.join(",")}`)
+      // the ledger notes of the rows whose helper runs restricted carry the assembly used, one segment, replaced
+      const note = (n: string, native: unknown) => nativeNote(n, native)
+      const cases: Array<[string, unknown, string]> = [
+        ["-", "precompiled sha256=ab12", "native assembly: precompiled sha256=ab12"],
+        ["x; native assembly: precompiled sha256=00", "precompiled sha256=ab12", "x; native assembly: precompiled sha256=ab12"],
+        ["design-adopted (y)", undefined, "design-adopted (y)"],
+      ]
+      for (const [n, v, want] of cases)
+        if (note(n, v) !== want) bad.push(`nativeNote(${n}, ${String(v)}) = ${note(n, v)}, want ${want}`)
+      if (!/nativeNote\(carriedNote\(notes\.get\(id\)\), elevated\.ids\.includes\(id\) \? ctx\.facts\.native : undefined\)/.test(source("probe-sp-n.ts")))
+        bad.push("the measure pass does not record the native assembly in the elevated rows' notes")
+      return bad.length ? bad.join("; ") : undefined
+    },
+  },
+  {
     finding: "SWALLOW read-state",
     async run() {
       const all = [...LEG_FILES, "sp-n.ps1", "sp-n-target.ps1"].map((f) => [f, source(f)] as const)
