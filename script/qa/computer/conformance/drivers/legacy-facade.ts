@@ -101,7 +101,7 @@ export const observer: Observer = {
   },
 }
 
-export function emptyJournal(): CellResult["journal"] {
+function emptyJournal(): CellResult["journal"] {
   const none = { signal: "none", firstAt: null, count: 0 } as const
   return {
     key_focus: none,
