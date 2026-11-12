@@ -1397,7 +1397,7 @@ senpi-desktop-session	rust	senpi-desktop-session::worker_ax::type_text_tests::te
 senpi-desktop-session	rust	senpi-desktop-session::worker_ax::type_text_tests::foreground_element_typing_needs_the_grant	pending	crates/senpi-desktop-session/src/worker_ax/type_text_tests.rs:112
 senpi-desktop-session	rust	senpi-desktop-session::worker_ax::type_text_tests::an_element_that_never_takes_focus_gets_no_keys_and_the_refusal_names_the_focus	pending	crates/senpi-desktop-session/src/worker_ax/type_text_tests.rs:144
 senpi-desktop-session	rust	senpi-desktop-session::worker_ax::type_text_tests::an_unanswered_insertion_is_unconfirmed_after_it_landed	pending	crates/senpi-desktop-session/src/worker_ax/type_text_tests.rs:172
-senpi-desktop-session	rust	senpi-desktop-session::worker_capture::tests::base64_matches_the_rfc_4648_vectors	ported:omo-computer-session::frames::capture::base64_tests::base64_matches_rfc_4648	crates/senpi-desktop-session/src/worker_capture.rs:132
+senpi-desktop-session	rust	senpi-desktop-session::worker_capture::tests::base64_matches_the_rfc_4648_vectors	ported:omo-computer-session::frames::reply::base64_tests::base64_matches_rfc_4648	crates/senpi-desktop-session/src/worker_capture.rs:132
 senpi-desktop-session	rust	senpi-desktop-session::worker_capture::tests::base64_uses_the_standard_alphabet_for_high_bits	pending	crates/senpi-desktop-session/src/worker_capture.rs:148
 senpi-desktop-session	rust	senpi-desktop-session::worker_clipboard::tests::a_written_text_reads_back	pending	crates/senpi-desktop-session/src/worker_clipboard/tests.rs:20
 senpi-desktop-session	rust	senpi-desktop-session::worker_clipboard::tests::a_write_is_audited_by_length_and_digest_never_its_text	pending	crates/senpi-desktop-session/src/worker_clipboard/tests.rs:34

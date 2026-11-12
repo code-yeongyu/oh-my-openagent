@@ -5,12 +5,16 @@
 
 pub(crate) mod admit;
 mod capture;
+mod reply;
 mod session_wire;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod trace_tests;
 
-pub use capture::{CapturedFrame, ARTIFACT_TTL_MS};
+pub use capture::CapturedFrame;
+pub use reply::ARTIFACT_TTL_MS;
 
 use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
