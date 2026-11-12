@@ -45,11 +45,18 @@ async function isRecoverableOwner(owner: OwnerSnapshot, now: number, incompleteL
   return now - owner.mtimeMs > incompleteLockGraceMs
 }
 
+/**
+ * A proven-dead record that a Windows sharing error kept on disk. Retrying is right for a short hold
+ * (a releasing owner or a reader), but a refusal that outlasts the caller's wait (an ACL that denies
+ * delete) must reach the caller: `blockedBy` becomes the cause of the eventual contention error.
+ */
+export type ReclaimBlocked = { readonly blockedBy: unknown }
+
 async function reclaimStaleRecoveryLock(
   recoveryPath: string,
   now: number,
   incompleteLockGraceMs: number,
-): Promise<boolean> {
+): Promise<boolean | ReclaimBlocked> {
   const stale = await readOwner(recoveryPath)
   if (stale === null || !(await isRecoverableOwner(stale, now, incompleteLockGraceMs))) return false
 
@@ -59,7 +66,7 @@ async function reclaimStaleRecoveryLock(
   } catch (error) {
     if (errorCode(error) === "ENOENT") return false
     // Windows refuses to rename a file another process holds open; leave it to that holder.
-    if (isUnlinkSharingError(error)) return false
+    if (isUnlinkSharingError(error, currentCandidateFs().isSharingError)) return { blockedBy: error }
     throw error
   }
 
@@ -84,7 +91,7 @@ export async function recoverStaleOwner(
   contender: LockRecord,
   now: number,
   incompleteLockGraceMs: number,
-): Promise<boolean> {
+): Promise<boolean | ReclaimBlocked> {
   if (!(await isRecoverableOwner(snapshot, now, incompleteLockGraceMs))) return false
 
   const recoveryPath = `${lockPath}.recovery`
@@ -101,7 +108,9 @@ export async function recoverStaleOwner(
     // lock, a publish here is a doomed create+fsync+link+unlink cycle repeated on every retry tick.
     const recoveryOwner = await readOwner(recoveryPath)
     if (recoveryOwner === null && (await publishExclusive(recoveryPath, recoveryRecord))) break
-    if (attempt > 0 || !(await reclaimStaleRecoveryLock(recoveryPath, now, incompleteLockGraceMs))) return false
+    if (attempt > 0) return false
+    const reclaimed = await reclaimStaleRecoveryLock(recoveryPath, now, incompleteLockGraceMs)
+    if (reclaimed !== true) return reclaimed
   }
 
   try {
@@ -123,7 +132,7 @@ export async function recoverStaleOwner(
       // means the owner already removed it, and a Windows sharing error means its release (or a
       // reader) still holds it open or delete-pending, so it is left to that holder for the next poll.
       if (errorCode(error) === "ENOENT") return true
-      if (isUnlinkSharingError(error, currentCandidateFs().isSharingError)) return false
+      if (isUnlinkSharingError(error, currentCandidateFs().isSharingError)) return { blockedBy: error }
       throw error
     }
     // Record the reclaimed previous owner so consumers that gate on dead-owner evidence (the

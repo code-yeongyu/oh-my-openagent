@@ -15,14 +15,22 @@ export type AcquireLockOptions = {
 
 const INCOMPLETE_LOCK_GRACE_MS = 5_000
 
+function contentionMessage(lockPath: string, blockedBy: unknown): string {
+  if (blockedBy === undefined) return `Lock is held: ${lockPath}`
+  const reason = blockedBy instanceof Error ? blockedBy.message : String(blockedBy)
+  return `Lock is held: ${lockPath} (its dead owner's record could not be removed: ${reason})`
+}
+
 export class LockContentionError extends Error {
   readonly retriable = true
 
+  /** `blockedBy`: the error that kept a proven-dead owner's record on disk at the last attempt. */
   constructor(
     readonly lockPath: string,
     readonly owner: LockRecord | null,
+    blockedBy?: unknown,
   ) {
-    super(`Lock is held: ${lockPath}`)
+    super(contentionMessage(lockPath, blockedBy), blockedBy === undefined ? undefined : { cause: blockedBy })
     this.name = "LockContentionError"
   }
 }
@@ -101,12 +109,14 @@ async function acquireLoop(
     // A live owner that slipped in after this contender reclaimed the dead one is the dead owner's
     // successor; this acquisition succeeds it and must not keep the dead-owner proof (omo #10199 r5).
     recoveredDeadOwner = forfeitDeadOwnerProof(lockPath, record, recoveredDeadOwner)
-    if (await recoverStaleOwner(lockPath, owner, record, now(), incompleteLockGraceMs)) {
+    const recovery = await recoverStaleOwner(lockPath, owner, record, now(), incompleteLockGraceMs)
+    if (recovery === true) {
       recoveredDeadOwner = true
       continue
     }
     options.signal?.throwIfAborted()
-    if (now() >= deadline) throw new LockContentionError(lockPath, owner.record)
+    if (now() >= deadline)
+      throw new LockContentionError(lockPath, owner.record, recovery === false ? undefined : recovery.blockedBy)
     await delay(Math.min(lockRetryDelayMs(attempt, retryDelayMs), Math.max(1, deadline - now())), options.signal)
   }
 }
