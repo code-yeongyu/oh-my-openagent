@@ -435,6 +435,19 @@ describe("neutralizeCrossRepoReferences emphasis, encoding and following pairs",
 })
 
 describe("neutralizeCrossRepoReferences performance", () => {
+  test.each([
+    ["open brackets", "[".repeat(100_000)],
+    ["host then dot segments", "github.com/x/" + "../".repeat(33_000)],
+    ["unclosed links", "[a](".repeat(25_000)],
+    ["nested parentheses", "[a](" + "(".repeat(50_000)],
+    ["dotted labels", "a.".repeat(50_000)],
+  ])("#given %s #when neutralized #then it completes under one second", (_label, text) => {
+    const started = performance.now()
+    neutralizeCrossRepoReferences(text)
+    findPrivateReferences(text)
+    expect(performance.now() - started).toBeLessThan(1000)
+  })
+
   test("#given 100k characters of a. #when neutralized #then it completes under one second", () => {
     const text = "a.".repeat(50_000)
     const started = performance.now()

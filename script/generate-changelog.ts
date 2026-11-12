@@ -1,7 +1,12 @@
 #!/usr/bin/env bun
 
 import { $ } from "bun"
-import { assertDenyListConfigured, neutralizeCrossRepoReferences } from "./changelog-release-notes"
+import {
+  assertDenyListConfigured,
+  assertNoPrivateNames,
+  neutralizeCrossRepoReferences,
+  PrivateNameLeakError,
+} from "./changelog-release-notes"
 import { RELEASE_VERSION_PATTERN } from "./release-latest-flag"
 
 export { neutralizeCrossRepoReferences }
@@ -153,7 +158,15 @@ async function main() {
   if (notes.length === 0) {
     console.log("No notable changes")
   } else {
-    console.log(notes.join("\n"))
+    const body = notes.join("\n")
+    try {
+      assertNoPrivateNames(body)
+    } catch (error) {
+      if (!(error instanceof PrivateNameLeakError)) throw error
+      console.error(error.message)
+      process.exit(1)
+    }
+    console.log(body)
   }
 }
 

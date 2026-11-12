@@ -1,5 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { assertDenyListConfigured, neutralizeCrossRepoReferences, normalizeForDeny } from "./changelog-release-notes"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { fileURLToPath } from "node:url"
+import {
+  assertDenyListConfigured,
+  composeReleaseBody,
+  neutralizeCrossRepoReferences,
+  verifyNoPrivateNames,
+} from "./changelog-release-notes"
 
 const DENY_ENV = "RELEASE_NOTES_PRIVATE_NAMES"
 const REQUIRE_ENV = "CI_RELEASE_NOTES_REQUIRE_DENY"
@@ -21,21 +30,6 @@ afterEach(() => {
   if (savedRequire === undefined) delete process.env[REQUIRE_ENV]
   else process.env[REQUIRE_ENV] = savedRequire
 })
-
-const NAME_CHAR = /[a-z0-9._-]/
-
-/** True when the normalized text still holds a deny entry at non-name boundaries. */
-function holdsDenyEntry(text: string, entries: readonly string[]): boolean {
-  const normalized = normalizeForDeny(text)
-  for (const entry of entries) {
-    for (let at = normalized.indexOf(entry); at >= 0; at = normalized.indexOf(entry, at + 1)) {
-      const before = normalized.charAt(at - 1)
-      const after = normalized.charAt(at + entry.length)
-      if ((at === 0 || !NAME_CHAR.test(before)) && (after === "" || !NAME_CHAR.test(after))) return true
-    }
-  }
-  return false
-}
 
 // One row per leak shape found across the review rounds.
 const SHAPES: ReadonlyArray<readonly [string, string]> = [
@@ -74,17 +68,37 @@ const SHAPES: ReadonlyArray<readonly [string, string]> = [
   ["bare name url", "https://github.com/hidden-tool"],
   ["private name in link text", "[hidden-tool#3](https://github.com/code-yeongyu/senpi)"],
   ["plain owner/repo", "ported from acme-org/acme-svc last week"],
+  ["dot segment after owner", "https://github.com/acme-org/./acme-svc"],
+  ["percent-encoded dot segment", "https://github.com/acme-org/%2e/acme-svc"],
+  ["dot segment in markdown link", "[x](https://github.com/acme-org/./acme-svc)"],
+  ["dot segment in autolink", "<https://github.com/acme-org/./acme-svc>"],
+  ["parent segment", "https://github.com/acme-org/x/../acme-svc"],
+  ["plain owner/name for a bare entry", "synced with code-yeongyu/hidden-tool today"],
+  ["foreign owner for a bare entry", "some-owner/hidden-tool"],
+  ["bare entry as a prose word", "see hidden-tool today"],
+  [".git suffix on prose owner/name", "clone acme-org/acme-svc.git first"],
+  [".git suffix on ssh ghe url", "ssh://git@ghe.example.com/acme-org/acme-svc.git"],
+  [".git suffix on a host-less bare name", "https://git.example.com/hidden-tool.git"],
+  ["github pages", "https://acme-org.github.io/acme-svc/"],
+  ["zero-width space split", "acme-org/acme\u200b-svc"],
+  ["numeric entity zero-width split", "acme-org/acme&#8203;-svc"],
+  ["html comment split", "acme-org/<!---->acme-svc"],
+  ["html tag split", "acme-org/<b>acme-svc</b>"],
+  ["fullwidth solidus", "acme-org\uff0facme-svc"],
+  ["fullwidth letters", "acme-org/\uff41\uff43\uff4d\uff45-svc"],
+  ["hex entity solidus", "acme-org&#x2f;acme-svc"],
+  ["word joiner and bom splits", "acme-org/ac\u2060me\ufeff-svc"],
 ]
 
 describe("name-based deny pass shape table", () => {
   test("covers every review-round shape", () => {
-    expect(SHAPES.length).toBeGreaterThanOrEqual(30)
+    expect(SHAPES.length).toBeGreaterThanOrEqual(50)
   })
 
   for (const [label, input] of SHAPES) {
     test("#given " + label + " #when neutralized #then no deny entry survives", () => {
       const output = neutralizeCrossRepoReferences(input)
-      expect(holdsDenyEntry(output, ENTRIES)).toBe(false)
+      expect(verifyNoPrivateNames(output, ENTRIES)).toEqual([])
       expect(output).toContain("tracked internally")
     })
   }
@@ -136,23 +150,102 @@ describe("name-based deny pass leaves public text alone", () => {
   })
 })
 
-describe("bare names only match in reference contexts", () => {
-  test("#given deny docs #when prose uses the word #then it stays, references go", () => {
+describe("a deny entry redacts its name without any context", () => {
+  test("#given deny docs #when prose uses the word #then every token holding it is redacted", () => {
     process.env[DENY_ENV] = "docs"
     expect(neutralizeCrossRepoReferences("Updated the docs and the API docs.")).toBe(
-      "Updated the docs and the API docs.",
+      "Updated the tracked internally and the API tracked internally.",
     )
     expect(neutralizeCrossRepoReferences("see docs#12")).toBe("see tracked internally")
     expect(neutralizeCrossRepoReferences("https://github.com/x/docs")).toBe("tracked internally")
     expect(neutralizeCrossRepoReferences("[x](https://github.com/x/docs/pull/1)")).toBe("tracked internally")
-    expect(neutralizeCrossRepoReferences("see https://docs.github.com/en/actions")).toBe(
-      "see https://docs.github.com/en/actions",
-    )
+    expect(neutralizeCrossRepoReferences("see https://docs.github.com/en/actions")).toBe("see tracked internally")
   })
 
   test("#given deny owner/repo #when plain text names it #then it is redacted", () => {
     process.env[DENY_ENV] = "acme-org/acme-svc"
     expect(neutralizeCrossRepoReferences("acme-org/acme-svc")).toBe("tracked internally")
+    expect(neutralizeCrossRepoReferences("see acme-svc now")).toBe("see tracked internally now")
+  })
+
+  test("#given a name inside a longer name #when neutralized #then it is kept", () => {
+    process.env[DENY_ENV] = "docs"
+    expect(neutralizeCrossRepoReferences("my-docs docs2 docs_x xdocs")).toBe("my-docs docs2 docs_x xdocs")
+  })
+
+  test("#given deny entries and public-only text #when neutralized #then it is byte-identical", () => {
+    const text = "Fixed a crash in the parser (#12) and bumped deps.\n\nSee https://example.com/guide."
+    expect(neutralizeCrossRepoReferences(text)).toBe(text)
+  })
+})
+
+describe("verifyNoPrivateNames", () => {
+  test("#given clean text #when verified #then no line is reported", () => {
+    expect(verifyNoPrivateNames("one\ntwo\nthree", ENTRIES)).toEqual([])
+  })
+
+  test("#given names on lines 2 and 4 #when verified #then those 1-based lines are returned", () => {
+    expect(verifyNoPrivateNames("ok\nsee acme-svc here\nfine\nHidden-Tool", ENTRIES)).toEqual([2, 4])
+  })
+
+  test("#given a comment split across words #when verified #then the normalized view still finds it", () => {
+    expect(verifyNoPrivateNames("fine\nacme<!-- x -->-svc", ENTRIES)).toEqual([2])
+  })
+
+  test("#given a comment spanning lines #when verified #then line numbers stay aligned", () => {
+    expect(verifyNoPrivateNames("a<!--\n\n-->\nhidden-tool", ENTRIES)).toEqual([4])
+  })
+
+  test("#given no names #when verified #then nothing is reported", () => {
+    expect(verifyNoPrivateNames("hidden-tool", [])).toEqual([])
+  })
+})
+
+describe("the published body backstop", () => {
+  const identity = (text: string): string => text
+
+  test("#given a redactor that misses a shape #when the body is composed #then it refuses with line numbers and no name", () => {
+    let message = ""
+    try {
+      composeReleaseBody("fine\nsee acme-svc here", "x\nhidden-tool", "footer", identity)
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error)
+    }
+    expect(message).toBe("release notes still name a private repository on line(s) 2,5 - refusing to publish")
+    expect(message).not.toContain("acme")
+    expect(message).not.toContain("hidden")
+  })
+
+  test("#given the real redactor #when the body is composed #then it is published", () => {
+    expect(composeReleaseBody("see acme-svc here", "", "footer")).toBe("see tracked internally here\n\nfooter\n")
+  })
+
+  test("#given print-release-notes and a shape the redactor misses #when run #then it exits 1 naming only line numbers", async () => {
+    const changelog = await Bun.file(new URL("../CHANGELOG.md", import.meta.url)).text()
+    const version = /^## \[(\d+\.\d+\.\d+)\]/m.exec(changelog)?.[1]
+    if (!version) throw new Error("CHANGELOG.md has no released section")
+    const dir = mkdtempSync(join(tmpdir(), "notes-backstop-"))
+    try {
+      const contributors = join(dir, "contributors.md")
+      writeFileSync(contributors, "thanks acme<!-- x -->-svc\n")
+      const child = Bun.spawn(
+        ["bun", fileURLToPath(new URL("./print-release-notes.ts", import.meta.url)), version, contributors],
+        { env: { ...process.env, [DENY_ENV]: "acme-org/acme-svc" }, stdout: "pipe", stderr: "pipe" },
+      )
+      const [stderr, stdout, code] = await Promise.all([
+        new Response(child.stderr).text(),
+        new Response(child.stdout).text(),
+        child.exited,
+      ])
+      expect(code).toBe(1)
+      expect(stderr.trim()).toMatch(
+        /^release notes still name a private repository on line\(s\) [\d,]+ - refusing to publish$/,
+      )
+      expect(stderr).not.toContain("acme")
+      expect(stdout).toBe("")
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
 
@@ -192,6 +285,12 @@ describe("name-based deny pass performance", () => {
     ["backslashes", "\\".repeat(SIZE)],
     ["near-miss name", "hidden-too ".repeat(SIZE / 11)],
     ["repeated entry prefix", "hidden-tool-".repeat(SIZE / 12)],
+    ["open brackets", "[".repeat(SIZE)],
+    ["host then dot segments", "github.com/x/" + "../".repeat(33_000)],
+    ["dotted labels", "a.".repeat(SIZE / 2)],
+    ["unclosed comments", "<!--".repeat(SIZE / 4)],
+    ["unclosed tags", "<a ".repeat(SIZE / 3)],
+    ["unclosed links", "[a](".repeat(SIZE / 4)],
   ]
   for (const [label, input] of inputs) {
     test("#given a 100k char " + label + " input #when neutralized #then it finishes under one second", () => {

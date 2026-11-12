@@ -145,23 +145,131 @@ const NON_REPO_GITHUB_HOSTS = new Set([
 // Sticky matchers: they read at lastIndex instead of slicing, so every scan stays linear.
 const OWNER_REPO_AT = /([\w.-]+)\/([\w.-]*[\w-])/y
 const REPO_AT = /[\w.-]*[\w-]/y
-const RELATIVE_OWNER_REPO = /(?:\.\.\/)+([\w.-]+)\/([\w.-]*[\w-])/g
 const REPO_REFERENCE_HASH = /#\d+(?![A-Za-z0-9])/g
 const EMPHASIS_CHARS = "_*~`"
 const TRAILING_CHARS = ".,;:!?*_~"
 
-// The tokenizer. One pass, left to right, so the inside of a kept public token is never rewritten again.
-// Groups: 1-2 markdown link (text, target; the target may hold one level of balanced parentheses), 3 an angle
-// autolink holding a URL, 4 a URL token. Plain-text repo#N references live in the gaps between tokens and are
-// found by scanRepoReferences, a linear scanner (a single regex for them backtracks quadratically).
+// The tokenizer: scanTokens below, one hand-written left-to-right pass (no regex over unbounded input, so the cost
+// stays linear however adversarial the text). It yields markdown links (text, target; the target may hold one level
+// of balanced parentheses), angle autolinks holding a URL and URL tokens, so the inside of a kept public token is
+// never rewritten again. Plain-text repo#N references live in the gaps between tokens and are found by
+// scanRepoReferences, a linear scanner (a single regex for them backtracks quadratically).
 // A URL token starts at http(s)://, at another clone scheme, at a protocol-relative "//" or at a bare GitHub host,
 // and runs to whitespace or a closing bracket, quote or backtick; trailing sentence punctuation and emphasis
 // delimiters stay outside it.
-const MARKDOWN_LINK = String.raw`\[([^\]]*)\]\(((?:[^\s()]|\([^\s()]*\))*)\)`
-const ANGLE_URL = String.raw`<(?=[^\s<>]*(?:\/\/|github\.com|githubusercontent\.com))([^\s<>]+)>`
-const URL_START = String.raw`https?(?::\/\/|%3a%2f%2f)|(?<![\w./+-])(?:ssh|git|ftp|svn|git\+ssh):\/\/|(?<![A-Za-z0-9.-])(?=(?:[a-z0-9-]+\.)*(?:github\.com|[a-z0-9-]+\.githubusercontent\.com)\.*(?::\d+)?(?:[/:]|%2f|%3a))`
-const URL_TOKEN = "(?:" + URL_START + ')[^\\s)\\]<>"`]*'
-const TOKEN_PATTERN = new RegExp([MARKDOWN_LINK, ANGLE_URL, "(" + URL_TOKEN + ")"].join("|"), "gi")
+const URL_SCHEMES = ["ssh://", "git://", "ftp://", "svn://", "git+ssh://"]
+const HTTP_STARTS = ["http://", "https://", "http%3a%2f%2f", "https%3a%2f%2f"]
+const GITHUB_HOST_SUFFIX = ".github.com"
+const USERCONTENT_SUFFIX = ".githubusercontent.com"
+
+interface Token {
+  kind: "link" | "angle" | "url"
+  start: number
+  end: number
+  /** Markdown link text; empty for the other kinds. */
+  text: string
+  /** Markdown link target, the autolink URL or the URL token. */
+  target: string
+}
+
+function startsWithAt(text: string, at: number, prefix: string): boolean {
+  return text.slice(at, at + prefix.length).toLowerCase() === prefix
+}
+
+function isSpace(ch: string): boolean {
+  return /\s/.test(ch)
+}
+
+function isUrlStop(ch: string): boolean {
+  return ch === ")" || ch === "]" || ch === "<" || ch === ">" || ch === '"' || ch === "`" || isSpace(ch)
+}
+
+/** Index of the ")" closing a markdown link target that starts at `from`, or -1. One level of nested parentheses. */
+function linkTargetEnd(text: string, from: number): number {
+  let at = from
+  while (at < text.length) {
+    const ch = text.charAt(at)
+    if (ch === "(") {
+      let close = at + 1
+      while (close < text.length && !/[\s()]/.test(text.charAt(close))) close++
+      if (text.charAt(close) !== ")") return -1
+      at = close + 1
+    } else if (ch === ")" || isSpace(ch)) {
+      break
+    } else {
+      at++
+    }
+  }
+  return text.charAt(at) === ")" ? at : -1
+}
+
+function urlStartsAt(text: string, at: number): boolean {
+  const first = text.charAt(at).toLowerCase()
+  if (first === "h" && HTTP_STARTS.some((start) => startsWithAt(text, at, start))) return true
+  const before = at > 0 ? text.charAt(at - 1) : ""
+  if (/[sgf]/.test(first) && (before === "" || !/[\w./+-]/.test(before))) {
+    if (URL_SCHEMES.some((scheme) => startsWithAt(text, at, scheme))) return true
+  }
+  // A bare GitHub host: only at the start of a hostname run, so every run is read once.
+  if (!/[a-z0-9-]/i.test(first) || (before !== "" && /[A-Za-z0-9.-]/.test(before))) return false
+  let runEnd = at
+  while (runEnd < text.length && /[A-Za-z0-9.-]/.test(text.charAt(runEnd))) runEnd++
+  let hostEnd = runEnd
+  while (hostEnd > at && text.charAt(hostEnd - 1) === ".") hostEnd--
+  const host = text.slice(at, hostEnd).toLowerCase()
+  const isGithub = host === "github.com" || host.endsWith(GITHUB_HOST_SUFFIX)
+  const isUserContent = host.endsWith(USERCONTENT_SUFFIX) && host.length > USERCONTENT_SUFFIX.length
+  if (!(isGithub || isUserContent) || host.includes("..")) return false
+  const after = text.charAt(runEnd)
+  return after === "/" || after === ":" || startsWithAt(text, runEnd, "%2f") || startsWithAt(text, runEnd, "%3a")
+}
+
+/** Every markdown link, angle autolink and URL token in the text, in order, in one linear pass. */
+function scanTokens(text: string): Token[] {
+  const tokens: Token[] = []
+  let closeAt = -2
+  let failedClose = -3
+  let at = 0
+  while (at < text.length) {
+    const ch = text.charAt(at)
+    if (ch === "[") {
+      if (closeAt !== -1 && closeAt <= at) closeAt = text.indexOf("]", at + 1)
+      if (closeAt >= 0 && closeAt !== failedClose && text.charAt(closeAt + 1) === "(") {
+        const end = linkTargetEnd(text, closeAt + 2)
+        if (end >= 0) {
+          tokens.push({
+            kind: "link",
+            start: at,
+            end: end + 1,
+            text: text.slice(at + 1, closeAt),
+            target: text.slice(closeAt + 2, end),
+          })
+          at = end + 1
+          continue
+        }
+        failedClose = closeAt
+      }
+    } else if (ch === "<") {
+      let end = at + 1
+      while (end < text.length && text.charAt(end) !== "<" && text.charAt(end) !== ">" && !isSpace(text.charAt(end)))
+        end++
+      const run = text.slice(at + 1, end)
+      if (run && text.charAt(end) === ">" && /\/\/|github\.com|githubusercontent\.com/i.test(run)) {
+        tokens.push({ kind: "angle", start: at, end: end + 1, text: "", target: run })
+        at = end + 1
+        continue
+      }
+    } else if (urlStartsAt(text, at)) {
+      let end = at
+      while (end < text.length && !isUrlStop(text.charAt(end))) end++
+      tokens.push({ kind: "url", start: at, end, text: "", target: text.slice(at, end) })
+      at = end
+      continue
+    }
+    at++
+  }
+  return tokens
+}
 
 function isPublicPair(owner: string, repo: string): boolean {
   return PUBLIC_QUALIFIED_REPOS.has((owner + "/" + repo).toLowerCase())
@@ -253,7 +361,7 @@ function isPrivateGithubUrl(host: string, text: string, start: number): boolean 
 
 /**
  * Owner/repo pairs that follow a GitHub host in forms other than the first path segment pair: fork syntax
- * <owner>:<repo> (compare links read main...<owner>:<repo>:branch) and relative ../<owner>/<repo> paths.
+ * <owner>:<repo> (compare links read main...<owner>:<repo>:branch). Relative ../ paths are resolved first.
  * Any pair not on the allowlist makes the token private.
  */
 function hasPrivateFollowingPair(text: string, from: number): boolean {
@@ -273,11 +381,6 @@ function hasPrivateFollowingPair(text: string, from: number): boolean {
     if (ownerStart > from && text.charAt(ownerStart - 1) === ":") continue
     if (!isPublicPair(owner, repo.replace(/\.git$/i, ""))) return true
   }
-  for (const relative of text.slice(from).matchAll(RELATIVE_OWNER_REPO)) {
-    const [, owner, repo] = relative
-    if (owner === undefined || repo === undefined) continue
-    if (!isPublicPair(owner, repo.replace(/\.git$/i, ""))) return true
-  }
   return false
 }
 
@@ -287,6 +390,24 @@ function trimEmphasis(text: string): string {
   while (start < end && EMPHASIS_CHARS.includes(text.charAt(start))) start++
   while (end > start && EMPHASIS_CHARS.includes(text.charAt(end - 1))) end--
   return text.slice(start, end)
+}
+
+/**
+ * Resolve "." and ".." path segments the way a URL parser does: github.com/owner/./repo and
+ * github.com/other/../owner/repo both name owner/repo. A ".." that would climb above the first segment is dropped.
+ */
+function resolveDotSegments(text: string): string {
+  if (!text.includes("/.") && !text.startsWith("./") && !text.startsWith("../")) return text
+  const out: string[] = []
+  for (const segment of text.split("/")) {
+    if (segment === ".") continue
+    if (segment === "..") {
+      out.pop()
+      continue
+    }
+    out.push(segment)
+  }
+  return out.join("/")
 }
 
 /**
@@ -312,7 +433,15 @@ function normalizeForDetection(token: string): string {
  * public. This is the single definition of "private" for neutralization.
  */
 export function findPrivateReferences(token: string): boolean {
-  const text = normalizeForDetection(token)
+  const decoded = normalizeForDetection(token)
+  if (detectPrivateReferences(decoded)) return true
+  // The same token read as a URL parser would resolve it: dot segments applied. Both readings are judged, so a
+  // path that climbs out of an allowlisted repo into a private one is caught either way.
+  const resolved = resolveDotSegments(decoded)
+  return resolved !== decoded && detectPrivateReferences(resolved)
+}
+
+function detectPrivateReferences(text: string): boolean {
   let firstRepoHostEnd = -1
   for (const found of text.matchAll(GITHUB_URL_START)) {
     const host = found[1]
@@ -342,22 +471,20 @@ function splitTrailing(token: string): [string, string] {
 function neutralizeAllowlist(text: string): string {
   let result = ""
   let last = 0
-  for (const found of text.matchAll(TOKEN_PATTERN)) {
-    const [match, linkText, linkTarget, angleUrl, urlToken] = found
-    result += replacePlainReferences(text.slice(last, found.index))
-    last = found.index + match.length
-    if (linkTarget !== undefined) {
-      result += findPrivateReferences(linkTarget)
+  for (const token of scanTokens(text)) {
+    result += replacePlainReferences(text.slice(last, token.start))
+    last = token.end
+    const match = text.slice(token.start, token.end)
+    if (token.kind === "link") {
+      result += findPrivateReferences(token.target)
         ? NEUTRALIZED
-        : "[" + neutralizeAllowlist(linkText ?? "") + "](" + linkTarget + ")"
-    } else if (angleUrl !== undefined) {
+        : "[" + neutralizeAllowlist(token.text) + "](" + token.target + ")"
+    } else if (token.kind === "angle") {
       // The whole autolink goes, angle brackets included: a bare <tracked internally> would render as an HTML tag.
-      result += findPrivateReferences(angleUrl) ? NEUTRALIZED : match
-    } else if (urlToken !== undefined) {
-      const [url, tail] = splitTrailing(urlToken)
-      result += findPrivateReferences(url) ? NEUTRALIZED + tail : match
+      result += findPrivateReferences(token.target) ? NEUTRALIZED : match
     } else {
-      result += match
+      const [url, tail] = splitTrailing(token.target)
+      result += findPrivateReferences(url) ? NEUTRALIZED + tail : match
     }
   }
   return result + replacePlainReferences(text.slice(last))
@@ -367,9 +494,13 @@ function neutralizeAllowlist(text: string): string {
 // Name-based DENY pass. The allowlist above judges URL shapes; this second layer judges NAMES, so a new URL
 // spelling cannot leak a repository the deny list names. The list lives in RELEASE_NOTES_PRIVATE_NAMES
 // (newline or comma separated, each entry "owner/repo" or a bare repo name) and is never logged.
-// An "owner/repo" entry matches anywhere. A bare name is often an ordinary word (docs, api), so it matches only in
-// reference contexts: inside a link, autolink or URL token, as the repo part of name#N, or inside a GitHub-host or
-// relative-path word - never as a free-standing prose word.
+// Every entry yields its repo NAME (the part after the last "/") and, when qualified, its full owner/name. A token
+// (markdown link, autolink, URL token or plain word) is replaced WHOLE when a name occurs in it between characters
+// outside [a-z0-9_-] (the start or end of the token counts; "." and "/" are boundaries), in its raw form or in
+// either normalized form. There is no reference-context requirement: a name that is also an ordinary word is
+// over-redacted on purpose, because a missed private name is worse than a hidden common word.
+// verifyNoPrivateNames is the runtime backstop: it re-checks the final text and the entry points refuse to publish
+// when a line still names a private repository.
 // ---------------------------------------------------------------------------------------------------------
 const DENY_ENV = "RELEASE_NOTES_PRIVATE_NAMES"
 const DENY_REQUIRE_ENV = "CI_RELEASE_NOTES_REQUIRE_DENY"
@@ -391,44 +522,45 @@ const HTML_ENTITIES: Readonly<Record<string, string>> = {
   grave: "`",
   tilde: "~",
 }
-const DENY_NAME_CHAR = /[a-z0-9._-]/
+const DENY_NAME_CHAR = /[a-z0-9_-]/
 const DENY_NORMALIZE_PASSES = 8
-const REFERENCE_CONTEXT = /github\.com|githubusercontent\.com|:\/\/|\.\.\/|^\/\//
-
-interface DenyEntry {
-  raw: string
-  normalized: string
-}
-
-interface DenyList {
-  qualified: DenyEntry[]
-  bare: DenyEntry[]
-}
+const ZERO_WIDTH = /[\u200b-\u200d\u2060\ufeff]/g
+const HTML_TAG = /<\/?[a-z][^<>]*>/gi
 
 let cachedDenyRaw: string | undefined
-let cachedDenyList: DenyList = { qualified: [], bare: [] }
+let cachedNeedles: string[] = []
 
-function parseDenyList(raw: string): DenyList {
-  const list: DenyList = { qualified: [], bare: [] }
-  const seen = new Set<string>()
-  for (const part of raw.split(/[\n,]/)) {
-    const entry = part.trim().toLowerCase()
-    if (!entry || seen.has(entry)) continue
-    seen.add(entry)
-    const normalized = normalizeForDeny(entry)
-    if (!normalized) continue
-    ;(entry.includes("/") ? list.qualified : list.bare).push({ raw: entry, normalized })
-  }
-  return list
+function readDenyNames(): string[] {
+  return (process.env[DENY_ENV] ?? "")
+    .split(/[\n,]/)
+    .map((part) => part.trim())
+    .filter(Boolean)
 }
 
-function denyList(): DenyList {
+/** The strings searched for: each entry's repo name and, when qualified, its full owner/name, in raw and normalized spelling. */
+function denyNeedles(names: readonly string[]): string[] {
+  const needles = new Set<string>()
+  for (const name of names) {
+    const entry = name.trim().toLowerCase()
+    if (!entry) continue
+    for (const form of new Set([entry, normalizeForDeny(entry)])) {
+      const qualified = form.replace(/^\/+/, "").replace(/\/+$/, "")
+      if (!qualified) continue
+      needles.add(qualified)
+      const repo = qualified.slice(qualified.lastIndexOf("/") + 1)
+      if (repo) needles.add(repo)
+    }
+  }
+  return [...needles]
+}
+
+function currentNeedles(): string[] {
   const raw = process.env[DENY_ENV] ?? ""
   if (raw !== cachedDenyRaw) {
     cachedDenyRaw = raw
-    cachedDenyList = parseDenyList(raw)
+    cachedNeedles = denyNeedles(readDenyNames())
   }
-  return cachedDenyList
+  return cachedNeedles
 }
 
 /**
@@ -437,8 +569,7 @@ function denyList(): DenyList {
  */
 export function assertDenyListConfigured(): void {
   if (process.env[DENY_REQUIRE_ENV] !== "1") return
-  const list = parseDenyList(process.env[DENY_ENV] ?? "")
-  if (list.qualified.length + list.bare.length === 0) {
+  if (denyNeedles(readDenyNames()).length === 0) {
     throw new Error(DENY_ENV + " is unset or empty, but " + DENY_REQUIRE_ENV + "=1 requires a deny list")
   }
 }
@@ -447,102 +578,144 @@ function decodeEntity(match: string, body: string): string {
   if (body.startsWith("#")) {
     const hex = body.charAt(1) === "x" || body.charAt(1) === "X"
     const code = Number.parseInt(body.slice(hex ? 2 : 1), hex ? 16 : 10)
-    return Number.isInteger(code) && code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : match
+    if (!Number.isInteger(code) || code <= 0 || code > 0x10ffff) return match
+    return lineSafe(String.fromCodePoint(code))
   }
   return HTML_ENTITIES[body.toLowerCase()] ?? match
 }
 
+/** A decoded line break would shift line numbers, so it becomes a space. */
+function lineSafe(char: string): string {
+  return char === "\n" || char === "\r" ? " " : char
+}
+
+function keepNewlines(span: string): string {
+  return span.replace(/[^\n]/g, "")
+}
+
+/** Drop HTML comments in one linear pass, keeping their line breaks. An unterminated comment is left alone. */
+function stripHtmlComments(text: string): string {
+  let result = ""
+  let at = 0
+  for (;;) {
+    const open = text.indexOf("<!--", at)
+    if (open < 0) break
+    const close = text.indexOf("-->", open + 4)
+    if (close < 0) break
+    result += text.slice(at, open) + keepNewlines(text.slice(open, close + 3))
+    at = close + 3
+  }
+  return result + text.slice(at)
+}
+
 /**
- * A normalized copy of text for NAME detection only: percent-decoded and HTML-entity-decoded until stable
- * (bounded), markdown-unescaped, backslashes turned into slashes, repeated slashes collapsed, emphasis markers
- * stripped, a root dot after a hostname collapsed, lowercased. Every step is linear.
+ * The line-preserving half of the normalizer: NFKC, then (until stable, bounded) percent- and HTML-entity-decoding,
+ * zero-width characters, HTML comments and HTML tags removed. The number of lines never changes.
  */
-export function normalizeForDeny(text: string): string {
+function foldForDeny(text: string): string {
   let current = text
   for (let pass = 0; pass < DENY_NORMALIZE_PASSES; pass++) {
-    const next = current
-      .replace(/%([0-9a-f]{2})/gi, (_, hex: string) => String.fromCharCode(Number.parseInt(hex, 16)))
-      .replace(/&(#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|[a-zA-Z]{2,8});/g, decodeEntity)
+    const next = stripHtmlTags(
+      stripHtmlComments(
+        current
+          .normalize("NFKC")
+          .replace(/%([0-9a-f]{2})/gi, (_, hex: string) => lineSafe(String.fromCharCode(Number.parseInt(hex, 16))))
+          .replace(/&(#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|[a-zA-Z]{2,8});/g, decodeEntity)
+          .replace(ZERO_WIDTH, ""),
+      ),
+    )
     if (next === current) break
     current = next
   }
   return current
+}
+
+function stripHtmlTags(text: string): string {
+  return text.replace(HTML_TAG, keepNewlines)
+}
+
+function finishLine(line: string): string {
+  const slashed = line
     .replace(/\\([!-/:-@[-`{-~])/g, "$1")
-    .replace(/\\/g, "/")
+    .replace(/[\\\u2044\u2215\uff0f]/g, "/")
     .replace(/[_*~`]/g, "")
     .replace(/\/{2,}/g, "/")
+  return resolveDotSegments(slashed)
     .replace(/(?<=[a-z0-9])\.+(?=[/:])/gi, "")
+    .replace(/\.git(?![a-z0-9_-])/gi, "")
     .toLowerCase()
 }
 
-/** True when the entry sits in the text between non-name characters (a trailing sentence dot counts as one). */
-function hasBoundedEntry(text: string, entry: string): boolean {
-  if (!entry) return false
-  for (let at = text.indexOf(entry); at >= 0; at = text.indexOf(entry, at + 1)) {
-    if (at > 0 && DENY_NAME_CHAR.test(text.charAt(at - 1))) continue
-    const end = at + entry.length
-    const after = text.charAt(end)
-    if (after === "" || !DENY_NAME_CHAR.test(after)) return true
-    if (after === "." && (end + 1 >= text.length || !DENY_NAME_CHAR.test(text.charAt(end + 1)))) return true
+function finishFolded(folded: string): string {
+  return folded.split("\n").map(finishLine).join("\n")
+}
+
+/**
+ * A normalized copy of text for NAME detection only: NFKC, percent- and HTML-entity-decoded until stable
+ * (bounded), zero-width characters, HTML comments and tags removed, markdown-unescaped, backslashes and fullwidth
+ * solidi turned into slashes, repeated slashes collapsed, dot segments resolved, a ".git" suffix and a root dot
+ * after a hostname dropped, lowercased. Every step is linear and line breaks are preserved.
+ */
+function normalizeForDeny(text: string): string {
+  return finishFolded(foldForDeny(text))
+}
+
+/** The views of a text a name is searched in: raw, folded (before path resolution) and fully normalized. */
+function denyViews(text: string): string[] {
+  const folded = foldForDeny(text)
+  return [text.toLowerCase(), folded.toLowerCase(), finishFolded(folded)]
+}
+
+/** True when the needle sits in the text between characters outside [a-z0-9_-] (text start and end count). */
+function hasBoundedName(text: string, needle: string): boolean {
+  for (let at = text.indexOf(needle); at >= 0; at = text.indexOf(needle, at + 1)) {
+    const before = at > 0 ? text.charAt(at - 1) : ""
+    const after = text.charAt(at + needle.length)
+    if ((before === "" || !DENY_NAME_CHAR.test(before)) && (after === "" || !DENY_NAME_CHAR.test(after))) return true
   }
   return false
 }
 
-function matchesAny(raw: string, normalized: string, entries: readonly DenyEntry[]): boolean {
-  return entries.some((entry) => hasBoundedEntry(raw, entry.raw) || hasBoundedEntry(normalized, entry.normalized))
+function viewsHoldNeedle(views: readonly string[], needles: readonly string[]): boolean {
+  return needles.some((needle) => views.some((view) => hasBoundedName(view, needle)))
 }
 
-/** True when a link, autolink or URL token (always a reference context) names a deny entry. */
-function tokenIsDenied(token: string, list: DenyList): boolean {
-  const raw = token.toLowerCase()
-  const normalized = normalizeForDeny(token)
-  return matchesAny(raw, normalized, list.qualified) || matchesAny(raw, normalized, list.bare)
-}
-
-/** True when a plain-text word names a deny entry: owner/repo anywhere, a bare name only in a reference context. */
-function wordIsDenied(word: string, list: DenyList): boolean {
-  const raw = word.toLowerCase()
-  const normalized = normalizeForDeny(word)
-  if (matchesAny(raw, normalized, list.qualified)) return true
-  if (list.bare.length === 0) return false
-  if (REFERENCE_CONTEXT.test(raw) || REFERENCE_CONTEXT.test(normalized)) return matchesAny(raw, normalized, list.bare)
-  return scanRepoReferences(normalized).some((reference) =>
-    list.bare.some((entry) => reference.repo === entry.normalized),
-  )
+/** True when a link, autolink, URL token or plain word names a deny entry. */
+function isDenied(token: string, needles: readonly string[]): boolean {
+  return viewsHoldNeedle(denyViews(token), needles)
 }
 
 const WORD_WRAPPERS = EMPHASIS_CHARS + "([{<\"'"
 const WORD_TAIL_WRAPPERS = EMPHASIS_CHARS + TRAILING_CHARS + ")]}>\"'"
 
-function denyPlainText(text: string, list: DenyList): string {
-  return text.replace(/\S+/g, (word) => {
+// U+FEFF counts as whitespace to \\s but is invisible, so it must not split a word.
+function denyPlainText(text: string, needles: readonly string[]): string {
+  return text.replace(/(?:\S|\ufeff)+/g, (word) => {
     let start = 0
     let end = word.length
     while (start < end && WORD_WRAPPERS.includes(word.charAt(start))) start++
     while (end > start && WORD_TAIL_WRAPPERS.includes(word.charAt(end - 1))) end--
     const core = word.slice(start, end)
-    return core && wordIsDenied(core, list) ? word.slice(0, start) + NEUTRALIZED + word.slice(end) : word
+    return core && isDenied(core, needles) ? word.slice(0, start) + NEUTRALIZED + word.slice(end) : word
   })
 }
 
 /** Second layer: per token (same tokenizer as the allowlist pass), replace anything that names a deny entry. */
-function neutralizeDenied(text: string, list: DenyList): string {
+function neutralizeDenied(text: string, needles: readonly string[]): string {
   let result = ""
   let last = 0
-  for (const found of text.matchAll(TOKEN_PATTERN)) {
-    const [match, , linkTarget, angleUrl, urlToken] = found
-    result += denyPlainText(text.slice(last, found.index), list)
-    last = found.index + match.length
-    if (linkTarget !== undefined || angleUrl !== undefined) {
-      result += tokenIsDenied(match, list) ? NEUTRALIZED : match
-    } else if (urlToken !== undefined) {
-      const [url, tail] = splitTrailing(urlToken)
-      result += tokenIsDenied(url, list) ? NEUTRALIZED + tail : match
+  for (const token of scanTokens(text)) {
+    result += denyPlainText(text.slice(last, token.start), needles)
+    last = token.end
+    if (token.kind === "url") {
+      const [url, tail] = splitTrailing(token.target)
+      result += isDenied(url, needles) ? NEUTRALIZED + tail : text.slice(token.start, token.end)
     } else {
-      result += match
+      const match = text.slice(token.start, token.end)
+      result += isDenied(match, needles) ? NEUTRALIZED : match
     }
   }
-  return result + denyPlainText(text.slice(last), list)
+  return result + denyPlainText(text.slice(last), needles)
 }
 
 /**
@@ -551,14 +724,57 @@ function neutralizeDenied(text: string, list: DenyList): string {
  */
 export function neutralizeCrossRepoReferences(text: string): string {
   const allowed = neutralizeAllowlist(text)
-  const list = denyList()
-  return list.qualified.length + list.bare.length === 0 ? allowed : neutralizeDenied(allowed, list)
+  const needles = currentNeedles()
+  return needles.length === 0 ? allowed : neutralizeDenied(allowed, needles)
 }
 
-/** Release body = authored notes, then the contributor block, then the install footer. */
-export function composeReleaseBody(notes: string, contributors: string, installFooter: string): string {
-  const parts = [neutralizeCrossRepoReferences(notes.trim())]
-  if (contributors.trim()) parts.push(neutralizeCrossRepoReferences(contributors.trim()))
+/**
+ * The runtime backstop. Normalizes the whole final text the same way the redactor does and returns the 1-based
+ * numbers of the lines that still hold a repo name or owner/name from `names` (raw, folded or normalized). It
+ * never returns the text or the name.
+ */
+export function verifyNoPrivateNames(finalText: string, names: readonly string[]): number[] {
+  const needles = denyNeedles(names)
+  if (needles.length === 0) return []
+  const folded = foldForDeny(finalText)
+  const raw = finalText.toLowerCase().split("\n")
+  const foldedLines = folded.toLowerCase().split("\n")
+  const finished = finishFolded(folded).split("\n")
+  const lines: number[] = []
+  for (let index = 0; index < raw.length; index++) {
+    const views = [raw[index] ?? "", foldedLines[index] ?? "", finished[index] ?? ""]
+    if (viewsHoldNeedle(views, needles)) lines.push(index + 1)
+  }
+  return lines
+}
+
+/** Thrown when the final body still names a private repository. Its message carries line numbers only. */
+export class PrivateNameLeakError extends Error {}
+
+/** Refuse a final published text that still names a deny-list repository. Reads the deny list from the environment. */
+export function assertNoPrivateNames(finalText: string): void {
+  const lines = verifyNoPrivateNames(finalText, readDenyNames())
+  if (lines.length > 0) {
+    throw new PrivateNameLeakError(
+      "release notes still name a private repository on line(s) " + lines.join(",") + " - refusing to publish",
+    )
+  }
+}
+
+/**
+ * Release body = authored notes, then the contributor block, then the install footer. The finished body is
+ * verified against the deny list before it is returned; `redact` is injectable so the backstop can be tested.
+ */
+export function composeReleaseBody(
+  notes: string,
+  contributors: string,
+  installFooter: string,
+  redact: (text: string) => string = neutralizeCrossRepoReferences,
+): string {
+  const parts = [redact(notes.trim())]
+  if (contributors.trim()) parts.push(redact(contributors.trim()))
   if (installFooter.trim()) parts.push(installFooter.trim())
-  return `${parts.join("\n\n")}\n`
+  const body = parts.join("\n\n") + "\n"
+  assertNoPrivateNames(body)
+  return body
 }

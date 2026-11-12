@@ -1356,6 +1356,8 @@ jobs:
         run: bun run script/generate-changelog.ts > "$RUNNER_TEMP/draft-release-notes.md"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_NOTES_PRIVATE_NAMES: ${{ secrets.RELEASE_NOTES_PRIVATE_NAMES }}
+          CI_RELEASE_NOTES_REQUIRE_DENY: "1"
 
       - name: Create or update draft release
         env:
