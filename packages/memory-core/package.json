@@ -26,6 +26,9 @@
     "./personas": {
       "import": "./src/personas/manifest.ts"
     },
+    "./hardware-id": {
+      "import": "./src/sync/item/machine-id.ts"
+    },
     "./process-identity": {
       "import": "./src/locks/process-identity.ts"
     },
