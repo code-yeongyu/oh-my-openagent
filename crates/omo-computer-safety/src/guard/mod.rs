@@ -10,8 +10,10 @@ use omo_computer_core::results::{PermissionState, StopPathStatus};
 use omo_computer_core::session_state::Tristate;
 
 mod sources;
+mod stages;
 
 pub use sources::{Clock, MonotonicClock, OwnProcess, ProcessSource};
+pub use stages::StageVerdicts;
 
 use crate::gate::{gate, Admitted, GateFacts, GateRefusal, Tables, Tier, VerbKind};
 use crate::latch::SuspendReason;
@@ -186,6 +188,12 @@ impl Guard {
     pub fn heartbeat(&mut self) {
         let now = self.now_ms();
         self.supervisor.heartbeat(now);
+    }
+
+    /// Why the stop latch is set, or `None` while it is clear.
+    #[must_use]
+    pub const fn latch(&self) -> Option<crate::SuspendReason> {
+        self.supervisor.latch()
     }
 
     #[must_use]

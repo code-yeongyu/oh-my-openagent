@@ -27,3 +27,7 @@ T3	the sway and weston sessions of the live driver (wlroots headless, weston hea
 T3	the fake xdg-desktop-portal and the fake EIS server under script/qa/computer/linux/	47	52/53	owed
 T3	windows() listing gaps: paging, identity reason "no_pid" and the per-window cursor field	47	49	owed
 C1	the zoom wire verb on a no-display host (the method table lists zoom; the session router of this base does not dispatch it yet) - asserted by the no-display scenario once routed	47	28	owed
+C24	the two-connection replay of `v3-consent-foreground-lease.json`: a second session on another connection asking for the held foreground lease (or exec on a reserved window) answers `InputBusy{holder}` with nothing sent; at row 21 the leg is proven by the session crate's two-independent-session tests on one shared RUNTIME root (R23)	21	29	owed
+C15	AC-66's `DisplayAwakeHold` legs (`capabilities().displayAwake.state` idle/held/released/capped; `display.resume` re-arms the hold); row 21 builds `display.release` ending the lease with `user_moved_on` and no `Suspended`	21	22	owed
+C13	AC-71/AC-72 fleet legs: denial memory and the per-app stop per hand in a fanout (hand 3 denied -> hand 4 still prompts; one hand's per-app stop leaves the other 99 delivering)	21	66	owed
+C13	AC-56 fanout leg: an out-of-scope app in a fanout marks the hand `skipped{consent, app}`	21	66	owed

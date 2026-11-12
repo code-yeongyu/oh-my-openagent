@@ -7,6 +7,7 @@ use omo_computer_core::backend::{
 };
 use omo_computer_core::capabilities::Capabilities;
 use omo_computer_core::error::{EngineCode, Reason};
+use omo_computer_core::intervention::{BackendClock, InterventionSource, TextDelivery};
 use omo_computer_core::listing::{Rect, WindowInfo};
 use omo_computer_core::observation::ImageMime;
 use omo_computer_core::results::{DisplayInfo, PermissionState};
@@ -139,7 +140,8 @@ fn capture_rect(state: &FakeState, target: &Target) -> BackendResult<(Rect, f64)
 
 impl Backend for FakeBackend {
     fn capabilities(&self) -> Capabilities {
-        fake_capabilities(self.persona, self.lock().displays.len(), self.stop_path)
+        let displays = self.lock().displays.len();
+        self.with_scripted_session(fake_capabilities(self.persona, displays, self.stop_path))
     }
 
     fn windows(&mut self, filter: &WindowFilter) -> BackendResult<WindowList> {
@@ -261,10 +263,47 @@ impl Backend for FakeBackend {
         available.then(|| Box::new(FakePresence::new(self.sink.clone())) as Box<dyn Presence>)
     }
 
+    fn clock(&self) -> Option<&dyn BackendClock> {
+        Some(&self.clock)
+    }
+
+    fn intervention(&self) -> Option<&dyn InterventionSource> {
+        Some(self)
+    }
+
+    fn post_text(
+        &mut self,
+        text: &str,
+        route: Route,
+        tag: u64,
+        interrupt: &mut dyn FnMut(&dyn Backend) -> bool,
+    ) -> TextDelivery {
+        self.type_interruptible(text, route, tag, interrupt)
+    }
+
     fn ax_reader(&mut self) -> Option<&mut dyn omo_computer_core::ax::AxReader> {
         Some(self)
     }
+
+    // --- Row 21: the scripted code identity per pid and the fake host's consent view. ---
+
+    fn code_identity(&self, pid: u32) -> Option<omo_computer_core::listing::CodeIdentity> {
+        FakeBackend::code_identity(self, pid)
+    }
+
+    /// The scenario's `consent` view, with `fullAccess` set under the full-access preset.
+    fn host_consent(&self) -> Option<serde_json::Value> {
+        let state = self.lock();
+        let mut view = state.scenario.consent.clone();
+        if state.scenario.full_access_preset {
+            if let Some(map) = view.get_or_insert_with(|| serde_json::json!({})).as_object_mut() {
+                map.insert("fullAccess".to_owned(), serde_json::Value::Bool(true));
+            }
+        }
+        view
+    }
 }
+
 
 #[cfg(test)]
 mod extent_tests;

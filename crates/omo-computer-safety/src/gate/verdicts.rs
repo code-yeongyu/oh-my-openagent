@@ -33,13 +33,16 @@ verdicts! {
 
 verdicts! {
     /// Gate 6: consent and per-app scope.
-    ConsentRefusal [6] {
+    ConsentRefusal [8] {
         AppScope => ControlRequired(AppScope),
         DeniedApp => ControlRequired(DeniedApp),
         DeniedThisTurn => ControlRequired(DeniedThisTurn),
         UserStopped => ControlRequired(UserStopped),
         IdentityChanged => ControlRequired(IdentityChanged),
         ConsentOff => ControlRequired(ConsentOff),
+        // Row 21: the consent file differs from the host's last write; no stored exec tier.
+        Tampered => ControlRequired(Tampered),
+        TierMissing => ControlRequired,
     }
 }
 
