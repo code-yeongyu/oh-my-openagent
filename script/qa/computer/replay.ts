@@ -19,6 +19,10 @@
 // file must exist, else `REPLAY_ERROR supersedes_missing` (exit 2, nothing replayed), and an old case
 // in the list is not replayed but prints `SKIPPED <old> superseded by <new>`. The superseding case
 // itself always replays, and the list exits with the worst code of the cases it replayed.
+// With `--row <N>` (a `--dir` run) the list then classifies every case that did not replay clean
+// by ruling R57 (replay-owners.ts) and prints `FAIL <case> <reason>` or `owed <case> row <M>` per
+// case and the summary `replay-all R57 row=<N>: ok=.. skipped=.. failing=.. owed=..`; it exits 1
+// when any case fails, else 0.
 // Every case runs in a fresh temporary runtime dir (OMO_COMPUTER_RUNTIME_DIR) that is removed
 // afterwards, so no case sees another's leftovers. `${RUNTIME_DIR}` in a case's env values is
 // replaced with that dir, and a case may plant its starting state there before the engine starts:
@@ -29,6 +33,7 @@ import { constants } from "node:fs"
 import { access, chmod, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path"
+import { classify, type Outcome, readLedgers } from "./replay-owners"
 
 const ROOT = resolve(import.meta.dir, "../../..")
 const DEFAULT_DELTAS = join(ROOT, "crates/omo-computer-core/parity/ORACLE-DELTAS.tsv")
@@ -346,6 +351,7 @@ type Options = {
   readonly dirs: readonly string[]
   readonly deltas: string
   readonly assertSinkEmpty: boolean
+  readonly row: number | undefined
 }
 
 function args(argv: readonly string[]): Options {
@@ -360,9 +366,14 @@ function args(argv: readonly string[]): Options {
   const dirs = values("--dir")
   if (!engine || (cases.length === 0 && dirs.length === 0))
     throw new InputError(
-      "usage: replay.ts --engine <binary> --case <file> [--case <file> ...] [--dir <dir> ...] [--assert-sink-empty] [--deltas <tsv>]",
+      "usage: replay.ts --engine <binary> --case <file> [--case <file> ...] [--dir <dir> ...] [--assert-sink-empty] [--deltas <tsv>] [--row <N>]",
     )
+  const rowArg = value("--row")
+  const row = rowArg === undefined ? undefined : Number(rowArg)
+  if (row !== undefined && !(Number.isInteger(row) && row > 0 && dirs.length > 0))
+    throw new InputError("--row needs a row number and a --dir")
   return {
+    row,
     engine: resolve(engine),
     cases: cases.map((file) => resolve(file)),
     dirs: dirs.map((dir) => resolve(dir)),
@@ -411,25 +422,37 @@ async function replay(argv: readonly string[]): Promise<number> {
   const only = listed[0]
   if (listed.length === 1 && opts.dirs.length === 0 && only !== undefined) return replayCase(opts, only)
   let code = 0
+  const outcomes: Outcome[] = []
   for (const casePath of listed) {
     const skip = skips.get(casePath)
     if (skip) {
       console.log(`SKIPPED ${skip.old} superseded by ${skip.by}`)
+      outcomes.push({ name: caseName(casePath), status: "skipped" })
       continue
     }
+    let caseCode = 2
     try {
-      code = Math.max(code, await replayCase(opts, casePath))
+      caseCode = await replayCase(opts, casePath)
     } catch (error) {
       console.log(`REPLAY_ERROR ${describe(error)}`)
-      code = 2
     }
+    code = Math.max(code, caseCode)
+    outcomes.push({ name: caseName(casePath), status: caseCode === 0 ? "ok" : "failed" })
   }
-  return code
+  if (opts.row === undefined) return code
+  const verdict = classify(opts.row, outcomes, await readLedgers(join(ROOT, "crates/omo-computer-core/parity")))
+  console.log(verdict.lines.join("\n"))
+  return verdict.failing > 0 ? 1 : 0
+}
+
+// A case as its result lines name it: the repository-relative path, else the path given.
+function caseName(casePath: string): string {
+  const rel = relative(ROOT, casePath)
+  return rel.startsWith("..") ? casePath : rel
 }
 
 async function replayCase(opts: Options, casePath: string): Promise<number> {
-  const rel = relative(ROOT, casePath)
-  const name = rel.startsWith("..") ? casePath : rel
+  const name = caseName(casePath)
   const spec = parseCase(
     parseJson(await readText(casePath, "case file"), "case file"),
     name,
