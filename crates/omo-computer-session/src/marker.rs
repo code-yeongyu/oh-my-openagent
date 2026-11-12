@@ -311,7 +311,7 @@ fn owner_ok(_file: &File) -> bool {
 }
 
 #[cfg(unix)]
-fn euid() -> u32 {
+pub(crate) fn euid() -> u32 {
     // SAFETY: geteuid has no preconditions and cannot fail.
     unsafe { libc::geteuid() }
 }

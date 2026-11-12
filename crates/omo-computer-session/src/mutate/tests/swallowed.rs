@@ -20,7 +20,7 @@ use crate::budget::PermitKind;
 use crate::marker::{MarkerRead, MarkerStore, MemoryMarkers, PreInputMarker};
 
 /// An audit whose admission passes and whose every append fails, as a disk filling mid-run.
-struct FailingAppend;
+pub(super) struct FailingAppend;
 
 impl AuditSink for FailingAppend {
     fn admit(&self) -> Result<(), Refusal> {
@@ -38,7 +38,7 @@ impl AuditSink for FailingAppend {
 
 /// Markers whose clear always fails.
 #[derive(Default)]
-struct FailingClear(MemoryMarkers);
+pub(super) struct FailingClear(MemoryMarkers);
 
 impl MarkerStore for FailingClear {
     fn read(&self, issuer: &str, scope: &str) -> MarkerRead {
@@ -106,6 +106,9 @@ fn audit_append_failure_on_a_partial_send_answers_write_failed() {
     assert_eq!(refused.warning.as_deref(), Some("write_failed"));
 }
 
+/// Pins the CONSERVATIVE a3 disposition, not the ideal one: a call that sent nothing but
+/// whose marker could not be cleared re-drives as `delivery_uncertain/unsafe` and its callId
+/// is then poison-recorded for good. Fail-closed and logged; a later row may refine it.
 #[test]
 fn a_failing_marker_clear_after_a_zero_send_refusal_is_logged_and_stays_closed() {
     let run = Run::new();

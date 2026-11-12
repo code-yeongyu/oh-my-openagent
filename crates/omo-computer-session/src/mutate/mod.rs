@@ -153,27 +153,37 @@ impl Funnel {
 
     /// The audit sink, opened at first use; a file that cannot be opened refuses every exec.
     fn audit(&mut self) -> &mut dyn AuditSink {
-        let generation = self.generation;
-        let spec = &self.audit_spec;
-        self.audit
-            .get_or_insert_with(|| match spec {
-                AuditSpec::Memory => Box::new(MemoryAudit::new(LOCAL_HAND, generation)),
-                AuditSpec::Dir(dir) => {
-                    match AuditWriter::open(
-                        dir,
-                        LOCAL_HAND,
-                        generation,
-                        WriterId::current(),
-                        AuditLimits::default(),
-                    ) {
-                        Ok(writer) => Box::new(writer),
-                        Err(_) => Box::new(UnavailableAudit::at(crate::audit::audit_path(
-                            dir, LOCAL_HAND,
-                        ))),
-                    }
-                }
-            })
-            .as_mut()
+        let sink = match self.audit.take() {
+            Some(sink) => sink,
+            None => self.open_audit(),
+        };
+        self.audit.insert(sink).as_mut()
+    }
+
+    /// The per-hand audit writer; one that cannot be opened is logged and refuses every exec.
+    fn open_audit(&mut self) -> Box<dyn AuditSink> {
+        let dir = match &self.audit_spec {
+            AuditSpec::Memory => return Box::new(MemoryAudit::new(LOCAL_HAND, self.generation)),
+            AuditSpec::Dir(dir) => dir.clone(),
+        };
+        let opened = AuditWriter::open(
+            &dir,
+            LOCAL_HAND,
+            self.generation,
+            WriterId::current(),
+            AuditLimits::default(),
+        );
+        match opened {
+            Ok(writer) => Box::new(writer),
+            Err(error) => {
+                self.warn(format!(
+                    "audit file not opened, every exec refuses: {error}"
+                ));
+                Box::new(UnavailableAudit::at(crate::audit::audit_path(
+                    &dir, LOCAL_HAND,
+                )))
+            }
+        }
     }
 
     pub(crate) fn set_session_id(&mut self, id: String) {
