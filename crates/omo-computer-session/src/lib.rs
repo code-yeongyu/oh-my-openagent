@@ -3,12 +3,18 @@
 pub mod audit;
 pub mod batch;
 pub mod budget;
+pub mod consent;
 pub mod diff;
+pub mod grant;
+pub mod lease;
 pub mod lock;
 pub mod marker;
 pub mod mutate;
 pub mod observe;
+pub mod presence;
+pub mod preview;
 pub mod refs;
+pub mod reservation;
 mod session;
 
 pub use mutate::{Binding, Mutation, Refused, SecureInputProbe, SecureProbe};

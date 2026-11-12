@@ -252,6 +252,29 @@ impl Backend for FakeBackend {
     fn ax_reader(&mut self) -> Option<&mut dyn omo_computer_core::ax::AxReader> {
         Some(self)
     }
+
+    // --- Row 21: the scripted code identity per pid and the fake host's consent view. ---
+
+    fn code_identity(&self, pid: u32) -> Option<omo_computer_core::listing::CodeIdentity> {
+        FakeBackend::code_identity(self, pid)
+    }
+
+    /// The scenario's `consent` block, with `fullAccess` set when the scenario scripts the
+    /// full-access preset; neither present is no host view.
+    fn host_consent(&self) -> Option<serde_json::Value> {
+        let state = self.lock();
+        let full_access = state.scenario.full_access_preset;
+        match state.scenario.consent.clone() {
+            Some(serde_json::Value::Object(mut view)) => {
+                if full_access {
+                    view.insert("fullAccess".to_owned(), serde_json::Value::Bool(true));
+                }
+                Some(serde_json::Value::Object(view))
+            }
+            Some(other) => Some(other),
+            None => full_access.then(|| serde_json::json!({ "fullAccess": true })),
+        }
+    }
 }
 
 #[cfg(test)]
