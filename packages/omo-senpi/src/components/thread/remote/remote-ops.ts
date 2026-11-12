@@ -102,8 +102,10 @@ export async function holderTarget(
       ? rows.find((candidate) => candidate.device === holder.device && candidate.session_id === located.sessionId)
       : undefined
   if (row !== undefined) return { where: "remote", row }
-  // omo#13037 A4.3.2: the holder's device answered the probe for a session no engine lists: an ended row from that answer.
-  if (located.kind === "ok") return { where: "remote", row: endedRow(holder.device, located.sessionId, holder.session_id) }
+  // omo#13037 A4.3.2: the holder's device answered the probe for a session no engine lists: an ended row from that answer,
+  // only while this device's service can carry the wake (else today's not_found below).
+  if (located.kind === "ok" && (await remote.sessions.canWake?.()) === true)
+    return { where: "remote", row: endedRow(holder.device, located.sessionId, holder.session_id) }
   return fail(
     "not_found",
     `The alias names thread ${holder.session_id} on device ${holder.device}, which that device does not list.`,
