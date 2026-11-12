@@ -149,19 +149,30 @@ final class Recorder: NSObject {
     }
   }
 
+  // A window-created notification arrives while its owner is still building the window, so reads of it can each take
+  // the full AX timeout. They run on a background queue; the event keeps the notification's own time, and the result is
+  // recorded back on the main thread, so the 20 Hz sampler never waits on another app.
   func windowAdded(_ element: AXUIElement) {
-    AXUIElementSetMessagingTimeout(element, 0.05)
-    var pid: pid_t = 0
-    AXUIElementGetPid(element, &pid)
-    var number: CGWindowID = 0
-    if let windowOfElement { _ = windowOfElement(element, &number) }
-    if number != 0 { knownWindows.insert(number) }
-    let layer = listWindows()?.first { $0.number == number }?.layer ?? 0
-    send("dialog", [
-      "kind": "window_added", "id": "ax:\(pid)#\(number)", "ownerPid": Int(pid), "layer": layer,
-      "role": axString(element, kAXRoleAttribute) ?? "", "subrole": axString(element, kAXSubroleAttribute) ?? "",
-    ])
+    let at = uptimeMs()
+    DispatchQueue.global(qos: .userInitiated).async {
+      AXUIElementSetMessagingTimeout(element, 0.05)
+      var pid: pid_t = 0
+      AXUIElementGetPid(element, &pid)
+      var number: CGWindowID = 0
+      if let windowOfElement { _ = windowOfElement(element, &number) }
+      let role = axString(element, kAXRoleAttribute) ?? ""
+      let subrole = axString(element, kAXSubroleAttribute) ?? ""
+      let layer = listWindows()?.first { $0.number == number }?.layer ?? 0
+      DispatchQueue.main.async {
+        if number != 0 { self.knownWindows.insert(number) }
+        self.send("dialog", [
+          "t": at, "kind": "window_added", "id": "ax:\(pid)#\(number)", "ownerPid": Int(pid), "layer": layer,
+          "role": role, "subrole": subrole,
+        ])
+      }
+    }
   }
+
 
   func onTap(_ type: CGEventType, _ event: CGEvent) {
     if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
