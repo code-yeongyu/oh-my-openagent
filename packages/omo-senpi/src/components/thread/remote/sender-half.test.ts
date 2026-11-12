@@ -365,11 +365,33 @@ describe("#13037 the sender half reaches a session on another device that is not
       await fixture.surface(hit.remote).run("thread_send", { thread: GONE, message: "hi" })
       const miss = fixture.account({ rows: [B_ROW, C_ROW] })
       await fixture.surface(miss.remote).run("thread_send", { thread: GONE, message: "hi" })
-      expect({ reply: count(reply), alias: count(alias), hit: count(hit), miss: count(miss) }).toEqual({
+      const liveReply = fixture.account({ rows: [B_ROW] })
+      await fixture
+        .surface(liveReply.remote, {
+          callerReplyTargets: () => ["dur-on-b"],
+          callerReplySenders: () => [{ session_id: "dur-on-b", device: "b" }],
+        })
+        .run("thread_send", { thread: "dur-on-b", message: "reply" })
+      const liveAlias = fixture.account({ rows: [B_ROW], aliases: new Map([["bee", { session_id: "dur-on-b", device: "b" }]]) })
+      await fixture.surface(liveAlias.remote).run("thread_send", { thread: "bee", message: "hi" })
+      const liveId = fixture.account({ rows: [B_ROW, C_ROW], live: [B_ROW.session_id, C_ROW.session_id] })
+      await fixture.surface(liveId.remote).run("thread_send", { thread: OTHER, message: "hi" })
+      expect({
+        reply: count(reply),
+        liveReply: count(liveReply),
+        alias: count(alias),
+        liveAlias: count(liveAlias),
+        hit: count(hit),
+        miss: count(miss),
+        liveId: count(liveId),
+      }).toEqual({
         reply: { listings: { all: 0, device: 1 }, lookups: 1, commands: 1 },
+        liveReply: { listings: { all: 0, device: 1 }, lookups: 0, commands: 2 },
         alias: { listings: { all: 1, device: 0 }, lookups: 0, commands: 1 },
+        liveAlias: { listings: { all: 1, device: 0 }, lookups: 0, commands: 2 },
         hit: { listings: { all: 1, device: 0 }, lookups: 2, commands: 1 },
         miss: { listings: { all: 1, device: 0 }, lookups: 2, commands: 0 },
+        liveId: { listings: { all: 1, device: 0 }, lookups: 0, commands: 2 },
       })
     })
   })
