@@ -48,7 +48,16 @@ function withScope(addenda: string | undefined, body: (scope: Scope) => void): v
   mkdirSync(join(run, "evidence"), { recursive: true })
   const git = (...args: string[]): void => {
     const result = Bun.spawnSync(
-      ["git", "-c", "user.name=guard-test", "-c", "user.email=guard-test@example.invalid", "-c", "commit.gpgsign=false", ...args],
+      [
+        "git",
+        "-c",
+        "user.name=guard-test",
+        "-c",
+        "user.email=guard-test@example.invalid",
+        "-c",
+        "commit.gpgsign=false",
+        ...args,
+      ],
       { cwd: root, env, stdout: "pipe", stderr: "pipe" },
     )
     if (result.exitCode !== 0) throw new Error(`git ${args.join(" ")} failed: ${result.stderr.toString()}`)
