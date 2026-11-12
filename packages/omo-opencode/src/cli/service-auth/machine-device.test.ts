@@ -3,7 +3,7 @@ import { type CredentialStore, InvalidCredentialState, KeychainLockedError } fro
 import { MachineAlreadySignedIn, MachineCredentialUnreadable, refuseSecondMachineDevice } from "./machine-device"
 import type { Credentials } from "./protocol"
 import { createSession, type DeviceServiceHandoff, type MachineDeviceState } from "./session"
-import { fakeApi, grant, privateKeys, refusal, temporaryHome } from "./test-support"
+import { fakeApi, grant, memorySecrets, privateKeys, refusal, temporaryHome } from "./test-support"
 
 // #6503: a device is the physical machine, and the machine's one device service holds it. `omo login` must never mint
 // a second account device for a machine that already has one, whether the CLI's own store or the device service holds it.
@@ -107,51 +107,42 @@ describe("omo login reuses this machine's device instead of registering another"
     await expect(refused).rejects.not.toThrow("--new-device")
   })
 
-  for (const failure of [new InvalidCredentialState("unreadable")]) {
-    test(`a ${failure.constructor.name} blocks a new device and names the path the service accepts`, async () => {
-      const store: CredentialStore = {
-        read: async () => {
-          throw failure
-        },
-        readAuthoritative: async () => {
-          throw failure
-        },
-        write: async () => {
-          throw new Error("nothing may be written")
-        },
-        clear: async () => {
-          throw new Error("nothing may be cleared")
-        },
-      }
-      const session = createSession({
-        api: fakeApi(() => new Response(null, { status: 204 })),
-        store,
-        home: await temporaryHome(),
-        beforeKeysDiscarded: async () => undefined,
-      })
-      const refused = refuseSecondMachineDevice(session, service(absent))
-      await expect(refused).rejects.toBeInstanceOf(MachineCredentialUnreadable)
-      await expect(refused).rejects.toThrow(
-        "Remove this computer's device on the Devices page if it is still listed, then run omo account forget, then run omo login.",
-      )
-      await expect(refused).rejects.toThrow("has its device service forget the device, without signing the device out")
-      await expect(refused).rejects.not.toThrow("--new-device")
-      // No device service at all is the same as one that holds nothing.
-      await expect(refuseSecondMachineDevice(session, undefined)).rejects.toThrow("then run omo account forget")
-      // #13265 design gate A2: a device service that holds the device makes the item a damaged copy; never offer forget.
-      const heldRefusal = refuseSecondMachineDevice(
+  // #13265 design gate (A1, A2 corrected, D1): the error comes from the REAL parse path, so the refusal is checked
+  // against the message production builds, and the whole rendered text is asserted: the store's own recovery sentence
+  // must not leak into it.
+  test("an unreadable stored sign-in refuses with one recovery, chosen by what the device service holds", async () => {
+    const secrets = memorySecrets()
+    const store = secrets.store("https://api.omo.dev")
+    await store.write(stored)
+    for (const key of secrets.values.keys()) secrets.values.set(key, "{ damaged")
+    await expect(store.read()).rejects.toBeInstanceOf(InvalidCredentialState)
+    const session = createSession({
+      api: fakeApi(() => new Response(null, { status: 204 })),
+      store,
+      home: await temporaryHome(),
+      beforeKeysDiscarded: async () => undefined,
+    })
+    const steps =
+      "To start over, remove this computer's device on the Devices page if it is still listed, then run omo account forget, then sign in again. omo account forget ends this computer's local sign-in and has its device service forget the device, without signing the device out on the OmO service."
+    const absentMessage = `omo could not read this computer's stored OmO sign-in, so it did not register another device. ${steps}`
+    await expect(refuseSecondMachineDevice(session, service(absent))).rejects.toMatchObject({
+      constructor: MachineCredentialUnreadable,
+      message: absentMessage,
+    })
+    await expect(refuseSecondMachineDevice(session, undefined)).rejects.toMatchObject({ message: absentMessage })
+    await expect(
+      refuseSecondMachineDevice(
         session,
         service({ kind: "held", device: { id: "dev-desktop", name: "OmO Desktop on Studio" } }),
-      )
-      await expect(heldRefusal).rejects.toBeInstanceOf(MachineCredentialUnreadable)
-      await expect(heldRefusal).rejects.toThrow("repair it from the OmO desktop app")
-      await expect(heldRefusal).rejects.not.toThrow("forget")
-      // A device service that does not answer keeps the did-not-answer refusal.
-      const unknownRefusal = refuseSecondMachineDevice(session, service({ kind: "unknown", reason: "timed_out" }))
-      await expect(unknownRefusal).rejects.toBeInstanceOf(MachineAlreadySignedIn)
-      await expect(unknownRefusal).rejects.toThrow("is installed but did not answer")
+      ),
+    ).rejects.toMatchObject({
+      constructor: MachineCredentialUnreadable,
+      message: `omo could not read this computer's stored OmO sign-in, so it did not register another device. This computer's OmO device service holds its device, OmO Desktop on Studio. These steps end that device's sign-in on this computer too, so the OmO desktop app is signed out here and needs a sign-in afterwards. ${steps}`,
     })
-  }
+    const unknownRefusal = refuseSecondMachineDevice(session, service({ kind: "unknown", reason: "timed_out" }))
+    await expect(unknownRefusal).rejects.toBeInstanceOf(MachineAlreadySignedIn)
+    await expect(unknownRefusal).rejects.toThrow("is installed but did not answer (timed_out)")
+  })
 
   test("a machine with no device anywhere may enroll", async () => {
     await expect(refuseSecondMachineDevice(await sessionWith(null), service(absent))).resolves.toBeUndefined()

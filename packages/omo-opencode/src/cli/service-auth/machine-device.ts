@@ -12,6 +12,21 @@ export class MachineCredentialUnreadable extends SignInError {}
 const UNREADABLE = Symbol("unreadable stored sign-in")
 
 /**
+ * The refusal for an unreadable stored sign-in (#13265 design gate, A2 corrected). It states the reason in its own words:
+ * the store's own sentence orders a different recovery, so printing it would give two disagreeing orders. A device
+ * service that holds the device adds what the steps cost, because forgetting also ends that device here.
+ */
+function unreadableRefusal(heldDeviceName: string | undefined): MachineCredentialUnreadable {
+  const cost =
+    heldDeviceName === undefined
+      ? ""
+      : ` This computer's OmO device service holds its device, ${terminalText(heldDeviceName)}. These steps end that device's sign-in on this computer too, so the OmO desktop app is signed out here and needs a sign-in afterwards.`
+  return new MachineCredentialUnreadable(
+    `omo could not read this computer's stored OmO sign-in, so it did not register another device.${cost} To start over, remove this computer's device on the Devices page if it is still listed, then run omo account forget, then sign in again. omo account forget ends this computer's local sign-in and has its device service forget the device, without signing the device out on the OmO service.`,
+  )
+}
+
+/**
  * Attach before mint (#6503 final contract section 5): the machine's one device service holds its account device, and
  * the desktop app and the CLI use it instead of registering devices of their own. Runs before `omo login` asks for a
  * code or generates keys. Only confirmed absence starts a registration: a usable stored sign-in, an uncertain refresh,
@@ -23,7 +38,7 @@ export async function refuseSecondMachineDevice(
   session: Pick<Session, "accessSnapshot">,
   deviceService: DeviceServiceHandoff | undefined,
 ): Promise<void> {
-  let unreadable: string | undefined
+  let unreadable = false
   const stored = await session.accessSnapshot().catch((error: unknown) => {
     // A locked or unreadable store is not "nothing stored": its item may be this machine's device, and the service keeps
     // one device per machine (a second registration over it is refused, or leaves two live devices for a row enrolled
@@ -35,7 +50,7 @@ export async function refuseSecondMachineDevice(
     }
     // An unreadable item's recovery depends on whether the device service holds the device (#13265 design gate A2).
     if (error instanceof InvalidCredentialState) {
-      unreadable = terminalText(error.message)
+      unreadable = true
       return UNREADABLE
     }
     if (!(error instanceof SessionEnded)) throw error
@@ -53,16 +68,8 @@ export async function refuseSecondMachineDevice(
     )
   }
   const held = (await deviceService?.machineDevice?.()) ?? { kind: "absent" as const }
-  if (unreadable !== undefined && held.kind === "held") {
-    // A broken copy of a working sign-in: the desktop app holds the device. Forgetting here would end that device too.
-    throw new MachineCredentialUnreadable(
-      `omo could not read this computer's OmO sign-in (${unreadable}), so it did not register another device. This computer's OmO device service holds its device, ${terminalText(held.device.name)}, so the stored sign-in is a damaged copy of it: repair it from the OmO desktop app.`,
-    )
-  }
-  if (unreadable !== undefined && held.kind === "absent") {
-    throw new MachineCredentialUnreadable(
-      `omo could not read this computer's OmO sign-in (${unreadable}), so it did not register another device. Remove this computer's device on the Devices page if it is still listed, then run omo account forget, then run omo login. omo account forget ends this computer's local sign-in and has its device service forget the device, without signing the device out on the OmO service.`,
-    )
+  if (unreadable && held.kind !== "unknown") {
+    throw unreadableRefusal(held.kind === "held" ? held.device.name : undefined)
   }
   if (held.kind === "held") {
     throw new MachineAlreadySignedIn(
