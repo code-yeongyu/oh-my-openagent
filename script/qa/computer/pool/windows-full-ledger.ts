@@ -22,11 +22,41 @@ type Leg = {
 // `scenario` is the name a later Windows backend row adds to script/qa/computer/windows.ts; until the driver quotes
 // it the leg is reported blocked with backend_not_built, never run and never counted as a pass.
 export const LEGS: readonly Leg[] = [
-  { leg: "elevated", question: "q1 can the engine run at medium integrity beside an elevated fixture", scenario: "elevated-target-refused", job: "host", judge: verdictElevated },
-  { leg: "lock", question: "q2 can the session be locked and unlocked from a scheduled task", scenario: "screen-locked-last", job: "session", judge: verdictLock },
-  { leg: "disconnect", question: "q3 can the session be disconnected and reconnected", scenario: "session-disconnected-capture", job: "session", judge: verdictDisconnect },
-  { leg: "mixed-dpi", question: "q4 can a second virtual monitor at 150 % scaling be added through an indirect display driver", scenario: "mixed-dpi-capture", job: "host", judge: verdictMixedDpi },
-  { leg: "secure-desktop", question: "q5 is the elevation prompt's secure desktop reachable for the refusal leg", scenario: "secure-desktop-refused", job: "host", judge: verdictSecureDesktop },
+  {
+    leg: "elevated",
+    question: "q1 can the engine run at medium integrity beside an elevated fixture",
+    scenario: "elevated-target-refused",
+    job: "host",
+    judge: verdictElevated,
+  },
+  {
+    leg: "lock",
+    question: "q2 can the session be locked and unlocked from a scheduled task",
+    scenario: "screen-locked-last",
+    job: "session",
+    judge: verdictLock,
+  },
+  {
+    leg: "disconnect",
+    question: "q3 can the session be disconnected and reconnected",
+    scenario: "session-disconnected-capture",
+    job: "session",
+    judge: verdictDisconnect,
+  },
+  {
+    leg: "mixed-dpi",
+    question: "q4 can a second virtual monitor at 150 % scaling be added through an indirect display driver",
+    scenario: "mixed-dpi-capture",
+    job: "host",
+    judge: verdictMixedDpi,
+  },
+  {
+    leg: "secure-desktop",
+    question: "q5 is the elevation prompt's secure desktop reachable for the refusal leg",
+    scenario: "secure-desktop-refused",
+    job: "host",
+    judge: verdictSecureDesktop,
+  },
 ]
 
 const VERDICTS: readonly Verdict[] = ["CONFIRMS", "CONTRADICTS", "UNMEASURED"]
@@ -40,7 +70,13 @@ export function parseFacts(text: string): { readonly facts: readonly Facts[]; re
     if (line.trim() === "") continue
     try {
       const v: unknown = JSON.parse(line)
-      if (typeof v === "object" && v !== null && !Array.isArray(v) && typeof Object.getOwnPropertyDescriptor(v, "leg")?.value === "string") facts.push(Object.fromEntries(Object.entries(v)))
+      if (
+        typeof v === "object" &&
+        v !== null &&
+        !Array.isArray(v) &&
+        typeof Object.getOwnPropertyDescriptor(v, "leg")?.value === "string"
+      )
+        facts.push(Object.fromEntries(Object.entries(v)))
       else rejected += 1
     } catch {
       rejected += 1
@@ -49,20 +85,41 @@ export function parseFacts(text: string): { readonly facts: readonly Facts[]; re
   return { facts, rejected }
 }
 
-export type LedgerRow = { readonly question: string; readonly leg: LegId; readonly verdict: Verdict; readonly evidence: string; readonly rerun: string; readonly host: string; readonly measuredAt: string }
+export type LedgerRow = {
+  readonly question: string
+  readonly leg: LegId
+  readonly verdict: Verdict
+  readonly evidence: string
+  readonly rerun: string
+  readonly host: string
+  readonly measuredAt: string
+}
 
-export function ledgerRows(facts: readonly Facts[], at: { readonly host: string; readonly measuredAt: string }): readonly LedgerRow[] {
+export function ledgerRows(
+  facts: readonly Facts[],
+  at: { readonly host: string; readonly measuredAt: string },
+): readonly LedgerRow[] {
   return LEGS.map((l) => {
     const r = combineRuns(facts.filter((f) => f["leg"] === l.leg).map(l.judge))
     const rerun = `powershell -NoProfile -ExecutionPolicy Bypass -File ${PROBE} -Leg ${l.leg} -Out facts.jsonl (job ${l.job} of computer-live-windows-full.yml)`
-    return { question: l.question, leg: l.leg, verdict: r.verdict, evidence: r.evidence, rerun, host: at.host, measuredAt: at.measuredAt }
+    return {
+      question: l.question,
+      leg: l.leg,
+      verdict: r.verdict,
+      evidence: r.evidence,
+      rerun,
+      host: at.host,
+      measuredAt: at.measuredAt,
+    }
   })
 }
 
 const cell = (s: string) => s.replace(/[\t\r\n]+/g, " ").trim()
 
 export function ledgerTsv(rows: readonly LedgerRow[]): string {
-  const lines = rows.map((r) => [r.question, r.leg, r.verdict, r.evidence, r.rerun, r.host, r.measuredAt].map(cell).join("\t"))
+  const lines = rows.map((r) =>
+    [r.question, r.leg, r.verdict, r.evidence, r.rerun, r.host, r.measuredAt].map(cell).join("\t"),
+  )
   return `${[HEADER, ...lines].join("\n")}\n`
 }
 
@@ -89,7 +146,13 @@ export function validateLedger(tsv: string): readonly string[] {
 }
 
 export function ledgerVerdicts(tsv: string): Readonly<Record<LegId, Verdict>> {
-  const out: Record<LegId, Verdict> = { elevated: "UNMEASURED", lock: "UNMEASURED", disconnect: "UNMEASURED", "mixed-dpi": "UNMEASURED", "secure-desktop": "UNMEASURED" }
+  const out: Record<LegId, Verdict> = {
+    elevated: "UNMEASURED",
+    lock: "UNMEASURED",
+    disconnect: "UNMEASURED",
+    "mixed-dpi": "UNMEASURED",
+    "secure-desktop": "UNMEASURED",
+  }
   for (const line of tsv.split(/\r?\n/).slice(1)) {
     const [, leg = "", verdict = ""] = line.split("\t")
     if (isLeg(leg) && isVerdict(verdict)) out[leg] = verdict
@@ -108,7 +171,8 @@ export function planLegs(verdicts: Readonly<Record<LegId, Verdict>>, guestOn: bo
   })
 }
 
-export const planLine = (p: PlannedLeg): string => (p.tier === "blocked" ? `leg=${p.leg} tier=blocked reason=${p.reason}` : `leg=${p.leg} tier=${p.tier}`)
+export const planLine = (p: PlannedLeg): string =>
+  p.tier === "blocked" ? `leg=${p.leg} tier=blocked reason=${p.reason}` : `leg=${p.leg} tier=${p.tier}`
 
 export function decideTier(plan: readonly PlannedLeg[]): "hosted" | "guest" | "partial" {
   if (plan.every((p) => p.tier === "hosted")) return "hosted"
@@ -119,7 +183,12 @@ export function scenarioBuilt(driverSource: string | null, scenario: string): bo
   return driverSource !== null && (driverSource.includes(`"${scenario}"`) || driverSource.includes(`'${scenario}'`))
 }
 
-export type SetCounts = { readonly pass: number; readonly fail: number; readonly blocked: number; readonly notBuilt: number }
+export type SetCounts = {
+  readonly pass: number
+  readonly fail: number
+  readonly blocked: number
+  readonly notBuilt: number
+}
 
 export function setLine(tier: "hosted" | "guest", c: SetCounts): string {
   const base = `SET windows-full tier=${tier} pass=${c.pass} fail=${c.fail} blocked=${c.blocked}`
@@ -128,13 +197,20 @@ export function setLine(tier: "hosted" | "guest", c: SetCounts): string {
 
 export type JobState = "started" | "queued" | "absent"
 
-export function guestJobState(jobs: readonly { readonly name: string; readonly status: string }[], name: string): JobState {
+export function guestJobState(
+  jobs: readonly { readonly name: string; readonly status: string }[],
+  name: string,
+): JobState {
   const job = jobs.find((j) => j.name === name)
   if (!job) return "absent"
   return job.status === "queued" || job.status === "waiting" || job.status === "pending" ? "queued" : "started"
 }
 
-export function decideWatch(state: JobState, elapsedS: number, deadlineS: number): "ok" | "wait" | "runner_unavailable" {
+export function decideWatch(
+  state: JobState,
+  elapsedS: number,
+  deadlineS: number,
+): "ok" | "wait" | "runner_unavailable" {
   if (state === "started") return "ok"
   return elapsedS >= deadlineS ? "runner_unavailable" : "wait"
 }

@@ -1,6 +1,13 @@
 import { describe, expect, test } from "bun:test"
 
-import { type Facts, verdictDisconnect, verdictElevated, verdictLock, verdictMixedDpi, verdictSecureDesktop } from "./windows-full-verdicts.ts"
+import {
+  type Facts,
+  verdictDisconnect,
+  verdictElevated,
+  verdictLock,
+  verdictMixedDpi,
+  verdictSecureDesktop,
+} from "./windows-full-verdicts.ts"
 
 const HIGH = "S-1-16-12288"
 const MEDIUM = "S-1-16-8192"
@@ -27,7 +34,9 @@ describe("[ADP-26] q1 elevated: a real Medium-to-High boundary", () => {
   })
 
   test("Medium input that lands contradicts it: the runner enforces no UIPI", () => {
-    const v = verdictElevated(elevated({ medium: { postOk: true, postError: 0, sendCount: 1, postLanded: true, sendLanded: false } }))
+    const v = verdictElevated(
+      elevated({ medium: { postOk: true, postError: 0, sendCount: 1, postLanded: true, sendLanded: false } }),
+    )
     expect(v.verdict).toBe("CONTRADICTS")
     expect(v.evidence).toContain("medium post landed")
   })
@@ -54,7 +63,10 @@ describe("[ADP-26] q2 lock and q3 disconnect: observed AND restored", () => {
     run: 1,
     sessionId: 2,
     before: ACTIVE,
-    timeline: [{ ms: 10, ...ACTIVE }, { ms: 900, ...session(0, 0, null) }],
+    timeline: [
+      { ms: 10, ...ACTIVE },
+      { ms: 900, ...session(0, 0, null) },
+    ],
     restore: { taskResult: 0, after: ACTIVE },
     ...over,
   })
@@ -64,7 +76,14 @@ describe("[ADP-26] q2 lock and q3 disconnect: observed AND restored", () => {
   })
 
   test("a lock that was never read is UNMEASURED (a failed desktop read proves nothing)", () => {
-    const v = verdictLock(lock({ timeline: [{ ms: 10, ...ACTIVE }, { ms: 900, ...session(0, -1, null) }] }))
+    const v = verdictLock(
+      lock({
+        timeline: [
+          { ms: 10, ...ACTIVE },
+          { ms: 900, ...session(0, -1, null) },
+        ],
+      }),
+    )
     expect(v.verdict).toBe("UNMEASURED")
   })
 
@@ -80,7 +99,11 @@ describe("[ADP-26] q2 lock and q3 disconnect: observed AND restored", () => {
     sessionId: 2,
     before: ACTIVE,
     holdTargetMs: 8000,
-    timeline: [{ ms: 10, ...ACTIVE }, { ms: 200, ...session(4, 1, null) }, { ms: 8100, ...session(4, 1, null) }],
+    timeline: [
+      { ms: 10, ...ACTIVE },
+      { ms: 200, ...session(4, 1, null) },
+      { ms: 8100, ...session(4, 1, null) },
+    ],
     restore: { taskResult: 0, after: ACTIVE },
     ...over,
   })
@@ -93,7 +116,13 @@ describe("[ADP-26] q2 lock and q3 disconnect: observed AND restored", () => {
 
   test("a session that reconnects on its own before the window contradicts", () => {
     const v = verdictDisconnect(
-      disc({ timeline: [{ ms: 10, ...ACTIVE }, { ms: 200, ...session(4, 1, null) }, { ms: 1900, ...ACTIVE }] }),
+      disc({
+        timeline: [
+          { ms: 10, ...ACTIVE },
+          { ms: 200, ...session(4, 1, null) },
+          { ms: 1900, ...ACTIVE },
+        ],
+      }),
     )
     expect(v.verdict).toBe("CONTRADICTS")
     expect(v.evidence).toContain("reconnected by itself")
@@ -122,7 +151,14 @@ describe("[ADP-26] q4 mixed DPI: two monitors, the second at 144 effective DPI",
   })
 
   test("a secondary stuck at 96 contradicts, with the read named", () => {
-    const v = verdictMixedDpi(dpi({ monitors: [{ primary: true, dpi: 96 }, { primary: false, dpi: 96 }] }))
+    const v = verdictMixedDpi(
+      dpi({
+        monitors: [
+          { primary: true, dpi: 96 },
+          { primary: false, dpi: 96 },
+        ],
+      }),
+    )
     expect(v.verdict).toBe("CONTRADICTS")
     expect(v.evidence).toContain("dpi=96")
   })
@@ -132,7 +168,9 @@ describe("[ADP-26] q4 mixed DPI: two monitors, the second at 144 effective DPI",
   })
 
   test("an install that failed is UNMEASURED; a clean install with one monitor contradicts", () => {
-    const failed = dpi({ install: { downloadOk: true, certOk: true, deviceOk: false, driverOk: false, error: "e=0xE0000203" } })
+    const failed = dpi({
+      install: { downloadOk: true, certOk: true, deviceOk: false, driverOk: false, error: "e=0xE0000203" },
+    })
     expect(verdictMixedDpi(failed).verdict).toBe("UNMEASURED")
     expect(verdictMixedDpi(dpi({ monitors: [{ primary: true, dpi: 96 }] })).verdict).toBe("CONTRADICTS")
   })
@@ -161,7 +199,9 @@ describe("[ADP-26] q5 secure desktop for the refusal leg", () => {
   })
 
   test("no prompt with EnableLUA=0 read from the registry contradicts and names the values", () => {
-    const v = verdictSecureDesktop(sd({ enableLua: 0, promptOnSecureDesktop: 0, consentSeen: false, desktops: ["Default"] }))
+    const v = verdictSecureDesktop(
+      sd({ enableLua: 0, promptOnSecureDesktop: 0, consentSeen: false, desktops: ["Default"] }),
+    )
     expect(v.verdict).toBe("CONTRADICTS")
     expect(v.evidence).toContain("EnableLUA=0")
   })

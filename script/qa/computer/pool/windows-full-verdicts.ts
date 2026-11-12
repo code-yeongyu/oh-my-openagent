@@ -21,7 +21,9 @@ const TARGET_DPI = 144
 const PER_MONITOR_AWARE = 2
 
 const field = (o: unknown, k: string): unknown =>
-  typeof o === "object" && o !== null && !Array.isArray(o) ? Object.entries(o).find(([key]) => key === k)?.[1] : undefined
+  typeof o === "object" && o !== null && !Array.isArray(o)
+    ? Object.entries(o).find(([key]) => key === k)?.[1]
+    : undefined
 const num = (o: unknown, k: string): number | null => {
   const v = field(o, k)
   return typeof v === "number" && Number.isFinite(v) ? v : null
@@ -54,20 +56,43 @@ export function verdictElevated(f: Facts): Reading {
   const m = field(f, "medium")
   const channels = (["post", "send"] as const).filter((ch) => yes(c, `${ch}Landed`))
   const labels = `worker=${worker} control=${control} fixture=${fixture}`
-  if (channels.length === 0) return reading("UNMEASURED", `${labels}; no High control landed, so a Medium drop proves nothing`)
+  if (channels.length === 0)
+    return reading("UNMEASURED", `${labels}; no High control landed, so a Medium drop proves nothing`)
   const landed = channels.filter((ch) => yes(m, `${ch}Landed`))
   const detail = `${labels}; controls landed: ${channels.join(",")}; medium post ok=${yes(m, "postOk")} error=${num(m, "postError")}, SendInput count=${num(m, "sendCount")}`
-  if (landed.length > 0) return reading("CONTRADICTS", `medium ${landed.join(" and ")} landed in the High fixture (no UIPI boundary); ${detail}`)
-  return reading("CONFIRMS", `medium input dropped on ${channels.join(" and ")} while the High control landed; ${detail}`)
+  if (landed.length > 0)
+    return reading(
+      "CONTRADICTS",
+      `medium ${landed.join(" and ")} landed in the High fixture (no UIPI boundary); ${detail}`,
+    )
+  return reading(
+    "CONFIRMS",
+    `medium input dropped on ${channels.join(" and ")} while the High control landed; ${detail}`,
+  )
 }
 
-type SessionSample = { readonly ms: number; readonly connect: number | null; readonly lock: number | null; readonly desktop: string | null }
+type SessionSample = {
+  readonly ms: number
+  readonly connect: number | null
+  readonly lock: number | null
+  readonly desktop: string | null
+}
 const samples = (f: Facts): readonly SessionSample[] =>
-  list(f, "timeline").map((s) => ({ ms: num(s, "ms") ?? 0, connect: num(s, "connect"), lock: num(s, "lock"), desktop: str(s, "desktop") }))
-const describe = (s: unknown): string => `connect=${num(s, "connect")} lock=${num(s, "lock")} desktop=${str(s, "desktop")}`
+  list(f, "timeline").map((s) => ({
+    ms: num(s, "ms") ?? 0,
+    connect: num(s, "connect"),
+    lock: num(s, "lock"),
+    desktop: str(s, "desktop"),
+  }))
+const describe = (s: unknown): string =>
+  `connect=${num(s, "connect")} lock=${num(s, "lock")} desktop=${str(s, "desktop")}`
 const restored = (f: Facts): boolean => {
   const after = field(field(f, "restore"), "after")
-  return num(after, "connect") === WTS_ACTIVE && num(after, "lock") === SESSION_UNLOCKED && str(after, "desktop") === "Default"
+  return (
+    num(after, "connect") === WTS_ACTIVE &&
+    num(after, "lock") === SESSION_UNLOCKED &&
+    str(after, "desktop") === "Default"
+  )
 }
 const restoreText = (f: Facts): string => {
   const r = field(f, "restore")
@@ -79,7 +104,11 @@ export function verdictLock(f: Facts): Reading {
   if (err) return err
   const tl = samples(f)
   const locked = tl.find((s) => s.lock === SESSION_LOCKED)
-  if (!locked) return reading("UNMEASURED", `no WTS_SESSIONSTATE_LOCK read in ${tl.length} samples; a failed desktop read proves nothing`)
+  if (!locked)
+    return reading(
+      "UNMEASURED",
+      `no WTS_SESSIONSTATE_LOCK read in ${tl.length} samples; a failed desktop read proves nothing`,
+    )
   const seen = `lock flag read at ${locked.ms} ms; ${restoreText(f)}`
   if (!restored(f)) return reading("CONTRADICTS", `locked session not restored by a SYSTEM task; ${seen}`)
   return reading("CONFIRMS", `locked and restored (connected, unlocked, input desktop Default); ${seen}`)
@@ -108,15 +137,20 @@ export function verdictMixedDpi(f: Facts): Reading {
   if (err) return err
   const ins = field(f, "install")
   const steps = ["downloadOk", "certOk", "deviceOk", "driverOk"].filter((k) => !yes(ins, k))
-  if (steps.length > 0) return reading("UNMEASURED", `driver install incomplete (${steps.join(",")} false): ${str(ins, "error") ?? "-"}`)
+  if (steps.length > 0)
+    return reading("UNMEASURED", `driver install incomplete (${steps.join(",")} false): ${str(ins, "error") ?? "-"}`)
   const awareness = num(f, "awareness")
-  if (awareness !== PER_MONITOR_AWARE) return reading("UNMEASURED", `DPI read from awareness ${awareness}, not per-monitor aware`)
+  if (awareness !== PER_MONITOR_AWARE)
+    return reading("UNMEASURED", `DPI read from awareness ${awareness}, not per-monitor aware`)
   const mons = list(f, "monitors")
   const shown = mons.map((m) => `${yes(m, "primary") ? "primary" : "secondary"} dpi=${num(m, "dpi")}`).join("; ")
-  if (!mons.some((m) => yes(m, "primary"))) return reading("UNMEASURED", `no primary monitor in the enumeration [${shown}]`)
+  if (!mons.some((m) => yes(m, "primary")))
+    return reading("UNMEASURED", `no primary monitor in the enumeration [${shown}]`)
   const secondary = mons.filter((m) => !yes(m, "primary"))
-  if (secondary.length === 0) return reading("CONTRADICTS", `driver installed but only one monitor enumerated [${shown}]`)
-  if (secondary.some((m) => num(m, "dpi") === TARGET_DPI)) return reading("CONFIRMS", `${mons.length} monitors [${shown}]`)
+  if (secondary.length === 0)
+    return reading("CONTRADICTS", `driver installed but only one monitor enumerated [${shown}]`)
+  if (secondary.some((m) => num(m, "dpi") === TARGET_DPI))
+    return reading("CONFIRMS", `${mons.length} monitors [${shown}]`)
   return reading("CONTRADICTS", `secondary never reached ${TARGET_DPI} effective DPI [${shown}]`)
 }
 
@@ -129,7 +163,8 @@ export function verdictSecureDesktop(f: Facts): Reading {
   const policy = `EnableLUA=${lua} PromptOnSecureDesktop=${num(f, "promptOnSecureDesktop")} ConsentPromptBehaviorAdmin=${num(f, "consentPromptBehaviorAdmin")}`
   const desktops = list(f, "desktops").filter((d) => typeof d === "string")
   const seen = `${policy}; input desktops read [${desktops.join(",")}]`
-  if (yes(f, "consentSeen") && desktops.includes("Winlogon")) return reading("CONFIRMS", `consent.exe up on Winlogon; ${seen}`)
+  if (yes(f, "consentSeen") && desktops.includes("Winlogon"))
+    return reading("CONFIRMS", `consent.exe up on Winlogon; ${seen}`)
   if (yes(f, "consentSeen")) return reading("UNMEASURED", `consent.exe up but Winlogon never read; ${seen}`)
   if (!yes(f, "controlSeen")) return reading("UNMEASURED", `process list missed its own control; ${seen}`)
   if (lua === 0) return reading("CONTRADICTS", `no elevation prompt: ${seen}`)

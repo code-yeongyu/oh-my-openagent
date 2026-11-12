@@ -105,7 +105,11 @@ async function runScenario(driver: string, scenario: string): Promise<boolean> {
   const proc = Bun.spawn(["bun", driver, "--scenario", scenario, "--json"], { stdout: "pipe", stderr: "inherit" })
   const out = await new Response(proc.stdout).text()
   await proc.exited
-  const last = out.trim().split("\n").reverse().find((l) => l.startsWith("{"))
+  const last = out
+    .trim()
+    .split("\n")
+    .reverse()
+    .find((l) => l.startsWith("{"))
   console.log(`scenario ${scenario}: ${last ?? "no JSON line"}`)
   return proc.exitCode === 0 && last !== undefined && /"verdict"\s*:\s*"PASS"/.test(last)
 }
@@ -139,12 +143,17 @@ async function listJobs(): Promise<readonly { readonly name: string; readonly st
     return v
   }
   const url = `https://api.github.com/repos/${env("GITHUB_REPOSITORY")}/actions/runs/${env("GITHUB_RUN_ID")}/attempts/${env("GITHUB_RUN_ATTEMPT")}/jobs?per_page=100`
-  const res = await fetch(url, { headers: { authorization: `Bearer ${env("GITHUB_TOKEN")}`, accept: "application/vnd.github+json" } })
+  const res = await fetch(url, {
+    headers: { authorization: `Bearer ${env("GITHUB_TOKEN")}`, accept: "application/vnd.github+json" },
+  })
   if (!res.ok) throw new Error(`jobs read failed: HTTP ${res.status}`)
   const body: unknown = await res.json()
   const jobs: unknown = typeof body === "object" && body !== null ? Reflect.get(body, "jobs") : null
   if (!Array.isArray(jobs)) throw new Error("jobs read returned no jobs array")
-  return jobs.map((j: unknown) => ({ name: String(Reflect.get(Object(j), "name")), status: String(Reflect.get(Object(j), "status")) }))
+  return jobs.map((j: unknown) => ({
+    name: String(Reflect.get(Object(j), "name")),
+    status: String(Reflect.get(Object(j), "status")),
+  }))
 }
 
 async function watchGuest(args: readonly string[]): Promise<number> {

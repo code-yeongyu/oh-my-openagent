@@ -43,7 +43,10 @@ describe("[ADP-26] runs, ledger and validation", () => {
   })
 
   test("the ledger has one row per question, verdict in column 3 and evidence in column 4", () => {
-    const rows = ledgerRows([elevated(1), elevated(2)], { host: "hosted windows-latest", measuredAt: "2026-11-12T10:00:00Z" })
+    const rows = ledgerRows([elevated(1), elevated(2)], {
+      host: "hosted windows-latest",
+      measuredAt: "2026-11-12T10:00:00Z",
+    })
     expect(rows.map((r) => r.leg)).toEqual(LEGS.map((l) => l.leg))
     const tsv = ledgerTsv(rows)
     const lines = tsv.trimEnd().split("\n")
@@ -67,7 +70,13 @@ describe("[ADP-26] runs, ledger and validation", () => {
 })
 
 describe("[ADP-26] tier plan, runs and the guest watchdog", () => {
-  const verdicts = { elevated: "CONFIRMS", lock: "UNMEASURED", disconnect: "CONTRADICTS", "mixed-dpi": "CONFIRMS", "secure-desktop": "CONTRADICTS" } as const
+  const verdicts = {
+    elevated: "CONFIRMS",
+    lock: "UNMEASURED",
+    disconnect: "CONTRADICTS",
+    "mixed-dpi": "CONFIRMS",
+    "secure-desktop": "CONTRADICTS",
+  } as const
 
   test("CONFIRMS runs hosted; the rest go to the guest when it is on, else blocked with no_windows_host", () => {
     const off = planLegs(verdicts, false)
@@ -79,7 +88,13 @@ describe("[ADP-26] tier plan, runs and the guest watchdog", () => {
   test("the tier decision is hosted, guest or partial", () => {
     expect(decideTier(planLegs(verdicts, false))).toBe("partial")
     expect(decideTier(planLegs(verdicts, true))).toBe("guest")
-    const all = { elevated: "CONFIRMS", lock: "CONFIRMS", disconnect: "CONFIRMS", "mixed-dpi": "CONFIRMS", "secure-desktop": "CONFIRMS" } as const
+    const all = {
+      elevated: "CONFIRMS",
+      lock: "CONFIRMS",
+      disconnect: "CONFIRMS",
+      "mixed-dpi": "CONFIRMS",
+      "secure-desktop": "CONFIRMS",
+    } as const
     expect(decideTier(planLegs(all, false))).toBe("hosted")
   })
 
@@ -93,7 +108,9 @@ describe("[ADP-26] tier plan, runs and the guest watchdog", () => {
     expect(setLine("hosted", { pass: 0, fail: 0, blocked: 2, notBuilt: 2 })).toBe(
       "SET windows-full tier=hosted pass=0 fail=0 blocked=2 reason=backend_not_built",
     )
-    expect(setLine("guest", { pass: 1, fail: 0, blocked: 0, notBuilt: 0 })).toBe("SET windows-full tier=guest pass=1 fail=0 blocked=0")
+    expect(setLine("guest", { pass: 1, fail: 0, blocked: 0, notBuilt: 0 })).toBe(
+      "SET windows-full tier=guest pass=1 fail=0 blocked=0",
+    )
   })
 
   test("the watchdog fails with runner_unavailable when the guest job has not started by the deadline", () => {
@@ -103,7 +120,12 @@ describe("[ADP-26] tier plan, runs and the guest watchdog", () => {
     ]
     expect(guestJobState(jobs, "computer live windows-full (guest)")).toBe("queued")
     expect(guestJobState([], "computer live windows-full (guest)")).toBe("absent")
-    expect(guestJobState([{ name: "computer live windows-full (guest)", status: "in_progress" }], "computer live windows-full (guest)")).toBe("started")
+    expect(
+      guestJobState(
+        [{ name: "computer live windows-full (guest)", status: "in_progress" }],
+        "computer live windows-full (guest)",
+      ),
+    ).toBe("started")
     expect(decideWatch("queued", 100, 900)).toBe("wait")
     expect(decideWatch("queued", 900, 900)).toBe("runner_unavailable")
     expect(decideWatch("absent", 900, 900)).toBe("runner_unavailable")
