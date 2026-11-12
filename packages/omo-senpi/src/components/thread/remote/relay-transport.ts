@@ -278,7 +278,7 @@ export function createRelayTransport(
         const reason = decision.kind === "refuse" ? decision.reason : "turn_conflict"
         const mapped = REFUSAL_CODES[reason] ?? {
           code: "internal_error" as const,
-          next: "Call thread_list and check the target.",
+          next: "Run tool.thread_list in an eval cell and check the target.",
         }
         return fail(
           mapped.code,

@@ -93,7 +93,7 @@ function fail(
     error: threadToolFailure(
       code,
       message,
-      NEXT_ACTION[code] ?? "Call thread_list and retry after checking the target.",
+      NEXT_ACTION[code] ?? "Run tool.thread_list in an eval cell and retry after checking the target.",
       details,
     ),
   }
