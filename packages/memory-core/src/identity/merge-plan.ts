@@ -13,7 +13,7 @@ export type MergeAction =
    */
   | { readonly path: string; readonly action: "skip"; readonly reason?: "earlier-aside-copy" }
   | { readonly path: string; readonly action: "keep-aside"; readonly destination: string }
-  /** Left out of the merge: nothing is written for it anywhere, and the source is not marked merged. */
+  /** Left out of the merge: nothing is written for it anywhere, and its path stays pending in the merge record. */
   | { readonly path: string; readonly action: "unplaceable"; readonly reason: UnplaceableReason }
 
 export interface MergePlan {
@@ -25,11 +25,13 @@ export interface MergePlan {
 /**
  * `since` is the source head of an earlier merge into this target: only files that changed after it are
  * considered, so a rerun brings in new work without re-adding files the target deleted meanwhile.
+ * `pending` are the paths that merge left out; they are considered again even when unchanged.
  */
 export async function planIdentityMerge(
   source: MemoryIdentityPaths,
   target: MemoryIdentityPaths,
   since?: string,
+  pending: readonly string[] = [],
 ): Promise<MergePlan> {
   const sourceId = identityIdOf(source)
   const sourceRepo = new GitMemoryRepo({ dir: source.repo, agentId: sourceId })
@@ -52,8 +54,9 @@ export async function planIdentityMerge(
             entry.oid,
           ]),
         )
+  const stillPending = new Set(pending)
   const actions = [...sourceBlobs]
-    .filter((entry) => mergedBefore?.get(entry.path) !== entry.oid)
+    .filter((entry) => mergedBefore?.get(entry.path) !== entry.oid || stillPending.has(entry.path))
     .sort((left, right) => left.path.localeCompare(right.path))
     .map((entry): MergeAction => {
       if (entry.path.startsWith(`${MERGED_ASIDE_ROOT}/`))
@@ -82,9 +85,9 @@ export async function planIdentityMerge(
   return { sourceId, sourceHead, actions }
 }
 
-/** Whether applying `plan` brings in every source entry, so the source may be marked merged. */
-export function leavesNothingOut(plan: MergePlan): boolean {
-  return plan.actions.every((action) => action.action !== "unplaceable")
+/** The source paths `plan` leaves out, sorted: what the merge record keeps pending for the next run. */
+export function pendingPathsOf(plan: MergePlan): string[] {
+  return plan.actions.flatMap((action) => (action.action === "unplaceable" ? [action.path] : [])).sort()
 }
 
 /** `plan` with each entry in `leftOut` (keyed by source path) turned into an `unplaceable` action. */

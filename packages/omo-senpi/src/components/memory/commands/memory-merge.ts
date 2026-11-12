@@ -75,6 +75,7 @@ async function runMemoryMerge(deps: MemoryCommandDeps, args: string, ctx: Memory
           predecessor.paths,
           identity.identityPaths,
           predecessor.mergedInto === identity.identity ? predecessor.mergedHead : undefined,
+          predecessor.mergedInto === identity.identity ? (predecessor.pendingPaths ?? []) : [],
         ).then(
           describePlan,
           (error: unknown) =>
@@ -162,7 +163,7 @@ function leftOut(plan: MergePlan): string {
   const entries = plan.actions.flatMap((action) =>
     action.action === "unplaceable" ? [`${action.path} (${action.reason})`] : [],
   )
-  return entries.length === 0 ? "" : `; ${entries.length} left out, so the store stays unmerged: ${entries.join(", ")}`
+  return entries.length === 0 ? "" : `; ${entries.length} left out and still pending: ${entries.join(", ")}`
 }
 
 function writerLock(identity: MemoryCommandIdentity): MemoryWriteLock {

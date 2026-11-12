@@ -81,7 +81,7 @@ describe("identity merge around a source entry that is not a plain path (#10070)
       "notes/b.md",
       "reference/merged/project-feature-bbbb2222/notes/diff.md",
     ])
-    expect((await readIdentityRecord(merged.source.paths.root))?.mergedInto).toBeUndefined()
+    expect((await readIdentityRecord(merged.source.paths.root))?.pendingPaths).toStrictEqual([HOOK_PATH])
   }, 60_000)
 
   it("#given a store holding only dot-named entries and an aside copy from an earlier merge #when it is merged #then each is named, nothing is written and the store is not marked merged (#13203 security review)", async () => {
@@ -111,7 +111,7 @@ describe("identity merge around a source entry that is not a plain path (#10070)
     })
     expect(changedEntries(before, await fingerprint(target.paths.root, GIT_READ_STATE))).toStrictEqual([])
     expect(await target.repo.head()).toBe(headBefore)
-    expect((await readIdentityRecord(source.paths.root))?.mergedInto).toBeUndefined()
+    expect((await readIdentityRecord(source.paths.root))?.pendingPaths).toStrictEqual(["../x.md", ".gitignore"])
   }, 30_000)
 
   it("#given a store whose every entry is not a plain path #when it is merged #then nothing is committed, the target is unchanged, every entry is named and the store is not marked merged", async () => {
@@ -132,6 +132,9 @@ describe("identity merge around a source entry that is not a plain path (#10070)
     ])
     expect(changedEntries(before, await fingerprint(target.paths.root, GIT_READ_STATE))).toStrictEqual([])
     expect(await target.repo.head()).toBe(headBefore)
-    expect((await readIdentityRecord(source.paths.root))?.mergedInto).toBeUndefined()
+    expect((await readIdentityRecord(source.paths.root))?.pendingPaths).toStrictEqual([
+      "notes\\..\\..\\outside.md",
+      "skills/.git/config",
+    ])
   }, 30_000)
 })

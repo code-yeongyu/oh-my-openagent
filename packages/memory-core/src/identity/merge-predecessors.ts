@@ -15,6 +15,8 @@ export interface MergePredecessor {
   /** Set once `/memory-merge --apply` merged this store; a later run merges only newer commits. */
   readonly mergedInto?: string
   readonly mergedHead?: string
+  /** Paths that merge left out; while any remain the store is not fully merged. */
+  readonly pendingPaths?: readonly string[]
 }
 
 export interface MergePredecessors {
@@ -50,6 +52,7 @@ export async function findMergePredecessors(
         spellings: record.spellings,
         ...(record.mergedInto === undefined ? {} : { mergedInto: record.mergedInto }),
         ...(record.mergedHead === undefined ? {} : { mergedHead: record.mergedHead }),
+        ...(record.pendingPaths === undefined ? {} : { pendingPaths: record.pendingPaths }),
       })
     } else {
       unmapped.push(id)
@@ -74,6 +77,7 @@ export async function findMergePredecessors(
       spellings: [dir],
       ...(record?.mergedInto === undefined ? {} : { mergedInto: record.mergedInto }),
       ...(record?.mergedHead === undefined ? {} : { mergedHead: record.mergedHead }),
+      ...(record?.pendingPaths === undefined ? {} : { pendingPaths: record.pendingPaths }),
     })
   }
   return { predecessors, unmapped }

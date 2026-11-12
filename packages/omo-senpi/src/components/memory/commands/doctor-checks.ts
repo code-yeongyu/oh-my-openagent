@@ -351,7 +351,8 @@ export async function checkMemoryFragmentation(
   )
   const pending: string[] = []
   for (const predecessor of predecessors) {
-    if (predecessor.mergedInto !== identity) {
+    // A store merged with entries left out is not fully merged until those entries are placed.
+    if (predecessor.mergedInto !== identity || (predecessor.pendingPaths?.length ?? 0) > 0) {
       pending.push(predecessor.id)
       continue
     }

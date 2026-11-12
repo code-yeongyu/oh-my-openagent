@@ -16,12 +16,12 @@ import {
 import {
   identityIdOf,
   leaveOut,
-  leavesNothingOut,
+  pendingPathsOf,
   planIdentityMerge,
   type MergeAction,
   type MergePlan,
 } from "./merge-plan"
-import { markIdentityMerged, readIdentityRecord } from "./record"
+import { markIdentityMerged, readIdentityRecord, type IdentityRecord } from "./record"
 
 const MERGED_FROM_TRAILER = "Omo-Merged-From"
 const MERGED_HEAD_TRAILER = "Omo-Merged-Head"
@@ -57,10 +57,10 @@ export async function applyIdentityMerge(options: ApplyIdentityMergeOptions): Pr
   const { source, target, lock, author } = options
   const record = await readIdentityRecord(source.root).catch(() => undefined)
   const targetId = identityIdOf(target)
-  const since = record?.mergedInto === targetId ? record.mergedHead : undefined
-  const preview = await planIdentityMerge(source, target, since)
+  const { since, pending } = mergeProgress(record, targetId)
+  const preview = await planIdentityMerge(source, target, since, pending)
   if (preview.sourceHead === null) return { status: "nothing-to-merge", plan: preview }
-  if (since === preview.sourceHead) return { status: "already-merged", plan: preview }
+  if (since === preview.sourceHead && pending.length === 0) return { status: "already-merged", plan: preview }
   const sourceRepo = new GitMemoryRepo({ dir: source.repo, agentId: preview.sourceId })
   const targetRepo = new GitMemoryRepo({ dir: target.repo, agentId: targetId })
   // The plan that is written is made inside the lock: another writer may have created a path in the
@@ -78,9 +78,10 @@ export async function applyIdentityMerge(options: ApplyIdentityMergeOptions): Pr
     await targetRepo.cleanCheck()
     // Read the merge record again under the lock: a concurrent apply may have merged this source meanwhile.
     const current = await readIdentityRecord(source.root).catch(() => undefined)
-    const lockedSince = current?.mergedInto === targetId ? current.mergedHead : undefined
-    if (lockedSince !== undefined && lockedSince === preview.sourceHead) return { plan: { ...preview, actions: [] } }
-    const plan = await planIdentityMerge(source, target, lockedSince)
+    const locked = mergeProgress(current, targetId)
+    if (locked.since !== undefined && locked.since === preview.sourceHead && locked.pending.length === 0)
+      return { plan: { ...preview, actions: [] } }
+    const plan = await planIdentityMerge(source, target, locked.since, locked.pending)
     const writes = plan.actions.filter(
       (action): action is Extract<MergeAction, { action: "add" | "keep-aside" }> =>
         action.action === "add" || action.action === "keep-aside",
@@ -138,8 +139,9 @@ export async function applyIdentityMerge(options: ApplyIdentityMergeOptions): Pr
       ].join("\n")
       const sha = (await targetRepo.commitWrite(written, message, author)).sha
       // Marked before the lock is released: a crash between the commit and the mark would make a rerun plan
-      // from scratch and write a second set of aside copies. A store with an entry left out stays unmarked.
-      if (leavesNothingOut(applied)) await markIdentityMerged(source.root, plan.sourceId, targetId, plan.sourceHead)
+      // from scratch and write a second set of aside copies. Entries left out are recorded as pending, so a
+      // rerun plans only them and the commits after this head, never what this merge already placed.
+      await markIdentityMerged(source.root, plan.sourceId, targetId, plan.sourceHead, pendingPathsOf(applied))
       return { plan: applied, sha, leftoverDirs: leftover.map((dir) => dir.path) }
     } catch (error) {
       await targetRepo.restorePaths(written)
@@ -150,12 +152,27 @@ export async function applyIdentityMerge(options: ApplyIdentityMergeOptions): Pr
       throw error
     }
   })
-  if (outcome.sha === undefined && outcome.plan.sourceHead !== null && leavesNothingOut(outcome.plan))
-    await markIdentityMerged(source.root, outcome.plan.sourceId, targetId, outcome.plan.sourceHead)
+  if (outcome.sha === undefined && outcome.plan.sourceHead !== null)
+    await markIdentityMerged(
+      source.root,
+      outcome.plan.sourceId,
+      targetId,
+      outcome.plan.sourceHead,
+      pendingPathsOf(outcome.plan),
+    )
   const leftover = outcome.leftoverDirs?.length ? { leftoverDirs: outcome.leftoverDirs } : {}
   return outcome.sha === undefined
     ? { status: "nothing-to-merge", plan: outcome.plan, ...leftover }
     : { status: "merged", sha: outcome.sha, plan: outcome.plan, ...leftover }
+}
+
+/** Where an earlier merge into `targetId` stopped: the source head it merged and the paths it left out. */
+function mergeProgress(
+  record: IdentityRecord | undefined,
+  targetId: string,
+): { readonly since: string | undefined; readonly pending: readonly string[] } {
+  if (record?.mergedInto !== targetId) return { since: undefined, pending: [] }
+  return { since: record.mergedHead, pending: record.pendingPaths ?? [] }
 }
 
 function requiredOid(oids: ReadonlyMap<string, string>, path: string): string {

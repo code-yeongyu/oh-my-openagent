@@ -91,7 +91,7 @@ describe("identity merge around a destination already taken on the target disk (
     expect(merged.repoChanged).toStrictEqual([...GOOD_WRITES, ...MERGED_DIRS].sort())
     expect(merged.committed).toStrictEqual(GOOD_WRITES)
     expect(merged.clean).toBe(true)
-    expect((await readIdentityRecord(merged.source.paths.root))?.mergedInto).toBeUndefined()
+    expect((await readIdentityRecord(merged.source.paths.root))?.pendingPaths).toStrictEqual(["local/mine.md"])
   }, 30_000)
 
   it("#given a planned file whose directory is a tracked link out of the repository #when the store is merged #then nothing is written outside or through the link and the other files merge in one commit", async () => {
@@ -106,6 +106,6 @@ describe("identity merge around a destination already taken on the target disk (
     expect(merged.repoChanged).toStrictEqual([...GOOD_WRITES, ...MERGED_DIRS].sort())
     expect(merged.committed).toStrictEqual(GOOD_WRITES)
     expect(merged.clean).toBe(true)
-    expect((await readIdentityRecord(merged.source.paths.root))?.mergedInto).toBeUndefined()
+    expect((await readIdentityRecord(merged.source.paths.root))?.pendingPaths).toStrictEqual(["linked/kept.md"])
   }, 30_000)
 })
