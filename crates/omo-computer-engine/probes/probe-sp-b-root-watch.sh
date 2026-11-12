@@ -9,20 +9,42 @@
 #               (it SIGKILLs the engine and exits 137).
 #   pdeathsig - PDEATHSIG re-armed after the drop and no pidfd poll; the kernel SIGKILLs the launcher.
 #   none      - neither watch (negative control): the launcher must still be alive after 2 s.
-# Prints one JSON line. Exit 2: usage or not root. Exit 3: python3 missing.
+# Prints one JSON line. Exit 2: usage or not root. Exit 3: python3 missing. Exit 4: the stand-in never
+# reported ready (or the ready pipe closed empty). Exit 5: pidfd_open is unavailable to this script.
+# On exit 4 and 5 every stand-in process is killed and reaped first; stderr names the cause.
+# Optional 4th argument, a fault seam for the probe's own checks: empty-ready (the launcher closes the
+# ready pipe without writing) or pidfd-fail (this script treats pidfd_open as failed).
 set -eu
-[ $# -eq 3 ] || { echo "usage: probe-sp-b-root-watch.sh <uid> <gid> <pidfd|pdeathsig|none>" >&2; exit 2; }
+[ $# -eq 3 ] || [ $# -eq 4 ] || { echo "usage: probe-sp-b-root-watch.sh <uid> <gid> <pidfd|pdeathsig|none> [empty-ready|pidfd-fail]" >&2; exit 2; }
+case "${4:-}" in ""|empty-ready|pidfd-fail) ;; *) echo "SP-B root-watch: unknown fault $4" >&2; exit 2 ;; esac
 case "$3" in pidfd|pdeathsig|none) ;; *) echo "SP-B root-watch: unknown mode $3" >&2; exit 2 ;; esac
 [ "$(id -u)" = 0 ] || { echo "SP-B root-watch: must run as root" >&2; exit 2; }
 command -v python3 >/dev/null 2>&1 || { echo "SP-B precondition missing: python3 not found" >&2; exit 3; }
-exec python3 - "$1" "$2" "$3" <<'PY'
+exec python3 - "$1" "$2" "$3" "${4:-}" <<'PY'
 import ctypes, json, os, select, signal, sys, time
 
 libc = ctypes.CDLL(None, use_errno=True)
 PR_SET_PDEATHSIG, PR_GET_PDEATHSIG, PR_SET_CHILD_SUBREAPER = 1, 2, 36
 SYS_PIDFD_OPEN = 434
 WINDOW_MS = 2000
-uid, gid, mode = int(sys.argv[1]), int(sys.argv[2]), sys.argv[3]
+uid, gid, mode, fault = int(sys.argv[1]), int(sys.argv[2]), sys.argv[3], sys.argv[4]
+
+def bail(code, why, pids):
+    # Kill and reap every stand-in this script knows about, then exit with a distinct code.
+    for p in pids:
+        try:
+            os.kill(p, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+    signal.alarm(5)
+    try:
+        while True:
+            os.waitpid(-1, 0)
+    except ChildProcessError:
+        pass
+    signal.alarm(0)
+    print(f"SP-B root-watch: {why}", file=sys.stderr)
+    sys.exit(code)
 
 def pidfd_open(pid):
     return libc.syscall(SYS_PIDFD_OPEN, pid, 0)
@@ -65,6 +87,9 @@ if agent == 0:
             signal.pause()
             os._exit(0)
         os.close(eng_w)
+        if fault == "empty-ready":
+            os.kill(engine, signal.SIGKILL)
+            os._exit(1)
         if os.read(eng_r, 1) != b"r":
             os.kill(engine, signal.SIGKILL)
             os._exit(1)
@@ -78,18 +103,24 @@ if agent == 0:
             os._exit(137)
         signal.pause()
         os._exit(0)
+    os.close(ready_w)  # only the launcher writes; its exit then reads as EOF in this script
     signal.pause()
     os._exit(0)
 
 os.close(ready_w)
 readable, _, _ = select.select([ready_r], [], [], 10)
 if not readable:
-    os.kill(agent, signal.SIGKILL)
-    print("SP-B root-watch: stand-in never became ready", file=sys.stderr)
-    sys.exit(1)
-ready = json.loads(os.read(ready_r, 4096).decode().splitlines()[0])
+    bail(4, "stand-in never became ready within 10 s", [agent])
+data = os.read(ready_r, 4096).decode()
+if not data.strip():
+    bail(4, "ready pipe closed without a report (the launcher ended before it was ready)", [agent])
+ready = json.loads(data.splitlines()[0])
 launcher, engine = ready["launcher"], ready["engine"]
-fds = {pidfd_open(launcher): "launcher", pidfd_open(engine): "engine"}
+fd_l = -1 if fault == "pidfd-fail" else pidfd_open(launcher)
+fd_e = -1 if fault == "pidfd-fail" else pidfd_open(engine)
+if fd_l < 0 or fd_e < 0:
+    bail(5, "pidfd_open failed for the stand-in launcher or engine", [agent, launcher, engine])
+fds = {fd_l: "launcher", fd_e: "engine"}
 poller = select.poll()
 for fd in fds:
     poller.register(fd, select.POLLIN)

@@ -19,6 +19,7 @@ type Row = {
   condition: string
   owner: string
   rootLeg?: true
+  source?: true
   measure: (ctx: Ctx) => Promise<Measured>
 }
 type SourceCheck = { kind: "present" | "absent"; pattern: string; paths: string[] }
@@ -29,6 +30,10 @@ type Ctx = { bin: string; home: string; spec: SourceSpec; specPath: string; allo
 const LEDGER_HEADER = ["id", "gap", "condition", "measured", "verdict", "rerun", "host_build", "owner", "evidence"]
 const SCRIPT = "crates/omo-computer-engine/probes/probe-sp-b.ts"
 const HELPER = path.join(import.meta.dir, "probe-sp-b-root-watch.sh")
+
+// A precondition found during a measurement: thrown so the caller's finally still cleans up, then
+// reported by main as one exit-2 line.
+class PreconditionError extends Error {}
 
 const fail = (line: string, code = 2): never => {
   process.stderr.write(`${line}\n`)
@@ -80,7 +85,8 @@ const manifestWith = async (ctx: Ctx, name: string, desc: unknown) => {
 
 const sourceRow = async (ctx: Ctx, id: string, expect: Verdict): Promise<Measured> => {
   const row = ctx.spec.rows[id]
-  if (!row) return { verdict: "CHANGED", measured: `no source check for ${id} in the local check file` }
+  // loadSpec already refused a file without this entry; reaching here without it is a bug, not a finding.
+  if (!row) throw new Error(`source-check entry ${id} vanished after validation`)
   const results = []
   for (const check of row.checks) {
     const r = await run(["git", "-C", ctx.spec.bunshinSrc, "grep", "-nE", check.pattern, "--", ...check.paths])
@@ -114,6 +120,8 @@ type RootLeg = {
 }
 // The helper exits 3 when python3 is missing; that is a precondition, never a measurement.
 const ROOT_HELPER_NO_PYTHON = 3
+const ROOT_HELPER_NOT_READY = 4
+const ROOT_HELPER_NO_PIDFD = 5
 
 const parseRootLeg = (stdout: string): RootLeg | undefined => {
   const last = stdout.trim().split("\n").at(-1) ?? ""
@@ -149,8 +157,18 @@ const rootLeg = async (ctx: Ctx, mode: "pidfd" | "pdeathsig"): Promise<Measured>
   const uid = String(process.getuid?.() ?? 1000)
   const gid = String(process.getgid?.() ?? 1000)
   const r = await run(["sudo", "-n", "/bin/sh", HELPER, uid, gid, mode])
-  if (r.code === ROOT_HELPER_NO_PYTHON) fail("SP-B precondition missing: python3 not found for the root leg")
-  if (r.code !== 0) return { verdict: "CONTRADICTS", measured: `helper exited ${r.code}: ${r.stderr.trim()}` }
+  if (r.code === ROOT_HELPER_NO_PYTHON)
+    throw new PreconditionError("SP-B precondition missing: python3 not found for the root leg")
+  // Only a parsed report can contradict. Any helper failure is no measurement, reported with its code and stderr.
+  if (r.code !== 0) {
+    const kind =
+      r.code === ROOT_HELPER_NOT_READY
+        ? "stand-in never reported ready"
+        : r.code === ROOT_HELPER_NO_PIDFD
+          ? "pidfd_open unavailable to the helper"
+          : "helper failed"
+    return { verdict: "UNMEASURED", measured: `${kind} (exited ${r.code}); stderr: ${r.stderr.trim() || "<empty>"}` }
+  }
   const d = parseRootLeg(r.stdout)
   // No parseable report is no measurement: say so with the helper's stderr, never a verdict built on a default.
   if (!d)
@@ -158,11 +176,17 @@ const rootLeg = async (ctx: Ctx, mode: "pidfd" | "pdeathsig"): Promise<Measured>
       verdict: "UNMEASURED",
       measured: `root leg gave no parseable report (stdout ${JSON.stringify(r.stdout.trim().slice(0, 80))}); stderr: ${r.stderr.trim() || "<empty>"}`,
     }
+  if (d.mode !== mode)
+    return {
+      verdict: "UNMEASURED",
+      measured: `helper reported mode ${d.mode} for the ${mode} leg; not a measurement of this leg`,
+    }
+  if (mode === "pidfd" && d.hostWatch !== "pidfd")
+    return { verdict: "UNMEASURED", measured: `pidfd_open unavailable in the launcher (hostWatch ${d.hostWatch})` }
   const wantEnd = mode === "pidfd" ? "exit 137" : "signal 9"
   const ok =
     d.pdeathsigAfterDrop === 0 &&
     d.launcherEnded === wantEnd &&
-    (mode !== "pidfd" || d.hostWatch === "pidfd") &&
     d.launcherGoneMs >= 0 &&
     d.launcherGoneMs <= 2000 &&
     d.engineGoneMs >= 0 &&
@@ -202,6 +226,7 @@ const rows: Row[] = [
     gap: "persistent session",
     condition: "sidecar process lifetime per call (source)",
     owner: "row 64",
+    source: true,
     measure: (ctx) => sourceRow(ctx, "B-01b", "open-with-row"),
   },
   {
@@ -263,6 +288,7 @@ const rows: Row[] = [
     gap: "image artifact type",
     condition: "artifact reference field set (source)",
     owner: "row 63",
+    source: true,
     measure: (ctx) => sourceRow(ctx, "B-04b", "open-with-row"),
   },
   {
@@ -282,6 +308,7 @@ const rows: Row[] = [
     gap: "root agent without a display",
     condition: "graphical session environment import (source)",
     owner: "row 62",
+    source: true,
     measure: (ctx) => sourceRow(ctx, "B-05b", "open-with-row"),
   },
   {
@@ -336,6 +363,7 @@ const rows: Row[] = [
     gap: "TCC on the agent",
     condition: "responsible process for the agent's own permission checks (source)",
     owner: "row 62",
+    source: true,
     measure: (ctx) => sourceRow(ctx, "B-07a", "open-with-row"),
   },
   {
@@ -350,6 +378,7 @@ const rows: Row[] = [
     gap: "TCC on the agent",
     condition: "macOS installer domain choice when no GUI domain exists (source)",
     owner: "row 64 prerequisite",
+    source: true,
     measure: (ctx) => sourceRow(ctx, "B-07c", "needs-installer"),
   },
   {
@@ -397,6 +426,7 @@ const rows: Row[] = [
     gap: "capability advert",
     condition: "advert refreshed while connected (source)",
     owner: "-",
+    source: true,
     measure: (ctx) => sourceRow(ctx, "B-08c", "closed"),
   },
   {
@@ -404,6 +434,7 @@ const rows: Row[] = [
     gap: "sidecar audit",
     condition: "per-call audit record on the sidecar path (source)",
     owner: "row 64",
+    source: true,
     measure: (ctx) => sourceRow(ctx, "B-09", "open-with-row"),
   },
   {
@@ -433,6 +464,7 @@ const rows: Row[] = [
     gap: "MCP",
     condition: "MCP anywhere in the tracked source (source)",
     owner: "row 64",
+    source: true,
     measure: (ctx) => sourceRow(ctx, "B-10b", "open-with-row"),
   },
 ]
@@ -468,9 +500,15 @@ const ledgerLine = (r: Row & Measured) =>
 
 // --write rewrites the whole ledger; --write with --row replaces (or adds) that one row, keeping the rest
 // and the row order of this script.
-const writeLedger = async (file: string, results: Array<Row & Measured>, single: boolean) => {
-  const kept = single ? parseLedger(await readFile(file, "utf8")) : new Map<string, { verdict: string; line: string }>()
-  for (const r of results) kept.set(r.id, { verdict: r.verdict, line: ledgerLine(r) })
+// A row this run did not measure (the root leg without --allow-sudo) keeps its committed line.
+const writeLedger = async (
+  file: string,
+  results: Array<Row & Measured>,
+  existing: Map<string, { verdict: string; line: string }>,
+) => {
+  const kept = new Map(existing)
+  for (const r of results)
+    if (!(r.notRun && kept.has(r.id))) kept.set(r.id, { verdict: r.verdict, line: ledgerLine(r) })
   const order = rows.map((r) => r.id)
   const ids = [...kept.keys()].sort((a, b) => order.indexOf(a) - order.indexOf(b))
   const body = ids.map((id) => kept.get(id)?.line ?? "")
@@ -478,7 +516,7 @@ const writeLedger = async (file: string, results: Array<Row & Measured>, single:
 }
 
 // Every way the local check file can be unusable is one precondition line naming the file and the reason.
-const loadSpec = async (specPath: string): Promise<SourceSpec> => {
+const loadSpec = async (specPath: string, sourceIds: string[]): Promise<SourceSpec> => {
   const why = (reason: string): never =>
     fail(`SP-B precondition missing: local bunshin source-check file ${reason} (${specPath})`)
   let text = ""
@@ -497,7 +535,48 @@ const loadSpec = async (specPath: string): Promise<SourceSpec> => {
   }
   if (typeof raw !== "object" || raw === null || !("bunshinSrc" in raw) || !("rows" in raw))
     why("lacks bunshinSrc or rows")
-  return raw as SourceSpec
+  const spec = raw as SourceSpec
+  if (typeof spec.rows !== "object" || spec.rows === null || Array.isArray(spec.rows))
+    why("has rows that is not an object")
+  const missing = sourceIds.filter((id) => !(id in spec.rows))
+  if (missing.length) why(`lacks entries for rows ${missing.join(", ")}`)
+  const invalid = sourceIds.filter((id) => !validEntry(spec.rows[id]))
+  if (invalid.length)
+    why(
+      `has rows without a usable check (need at least one check, each with kind present|absent, a non-empty pattern and a paths list): ${invalid.join(", ")}`,
+    )
+  return spec
+}
+
+const validEntry = (entry: unknown): boolean => {
+  if (typeof entry !== "object" || entry === null || !("checks" in entry)) return false
+  const checks: unknown = entry.checks
+  if (!Array.isArray(checks) || checks.length === 0) return false
+  return checks.every(
+    (c: unknown) =>
+      typeof c === "object" &&
+      c !== null &&
+      "kind" in c &&
+      (c.kind === "present" || c.kind === "absent") &&
+      "pattern" in c &&
+      typeof c.pattern === "string" &&
+      c.pattern.length > 0 &&
+      "paths" in c &&
+      Array.isArray(c.paths) &&
+      c.paths.every((p: unknown) => typeof p === "string"),
+  )
+}
+
+// A ledger the run must read is a precondition: one exit-2 line naming the file and the reason.
+const readLedger = async (file: string, purpose: string) => {
+  try {
+    return parseLedger(await readFile(file, "utf8"))
+  } catch (e) {
+    const code = e instanceof Error && "code" in e ? String(e.code) : "unknown"
+    return fail(
+      `SP-B precondition missing: ledger for ${purpose} ${code === "ENOENT" ? "not found" : `unreadable (${code})`} (${file})`,
+    )
+  }
 }
 
 // The root leg is opt-in: it needs Linux, passwordless sudo and python3 under sudo, each a precondition.
@@ -531,27 +610,44 @@ const main = async () => {
     )
   const runRoot = process.env.CU_RUN ?? path.join(os.homedir(), "omo-runs", "cu-v3")
   const specPath = process.env.SPB_SOURCE_CHECKS ?? path.join(runRoot, "evidence", "task-11.bunshin-source-checks.json")
-  const spec = await loadSpec(specPath)
+  const spec = await loadSpec(
+    specPath,
+    rows.filter((r) => r.source).map((r) => r.id),
+  )
   if ((await run(["git", "-C", spec.bunshinSrc, "rev-parse", "HEAD"])).code !== 0)
     fail("SP-B precondition missing: the bunshin checkout named by the source-check file is not a git checkout")
 
   const selected = only ? rows.filter((r) => r.id === only) : rows
   if (selected.length === 0) fail(`SP-B: unknown row ${only}`)
+  if (verify && !allowSudo && selected.every((r) => r.rootLeg))
+    fail(`SP-B: --verify --row ${only} would check nothing: it is a root-leg row, pass --allow-sudo`)
   if (allowSudo && selected.some((r) => r.rootLeg)) await checkRootPreconditions()
-  const expected = verify ? parseLedger(await readFile(verify, "utf8")) : undefined
+  const expected = verify ? await readLedger(verify, "--verify") : undefined
+  // --write --row merges into an existing ledger; a full --write keeps the committed rows it cannot measure.
+  const existing = writeTo
+    ? only
+      ? await readLedger(writeTo, "--write --row")
+      : await readFile(writeTo, "utf8").then(parseLedger, () => new Map<string, { verdict: string; line: string }>())
+    : new Map<string, { verdict: string; line: string }>()
   const home = await mkdtemp(path.join(tmpdir(), "sp-b-"))
   const ctx: Ctx = { bin: bin ?? "", home, spec, specPath, allowSudo }
   const results: Array<Row & Measured> = []
+  let precondition = ""
   try {
     for (const row of selected) {
-      const m = await row
-        .measure(ctx)
-        .catch((e: Error) => ({ verdict: "UNMEASURED" as Verdict, measured: `measurement error: ${e.message}` }))
+      const m = await row.measure(ctx).catch((e: Error) => {
+        if (e instanceof PreconditionError) throw e
+        return { verdict: "UNMEASURED" as Verdict, measured: `measurement error: ${e.message}` }
+      })
       results.push({ ...row, ...m })
     }
+  } catch (e) {
+    if (!(e instanceof PreconditionError)) throw e
+    precondition = e.message
   } finally {
     await rm(home, { recursive: true, force: true })
   }
+  if (precondition) fail(precondition)
 
   let mismatches = 0
   let notRun = 0
@@ -584,7 +680,7 @@ const main = async () => {
         2,
       )}\n`,
     )
-  if (writeTo) await writeLedger(writeTo, results, Boolean(only))
+  if (writeTo) await writeLedger(writeTo, results, existing)
   if (expected) {
     const tail = notRun ? ` not_run=${notRun} (root leg needs --allow-sudo)` : ""
     process.stdout.write(

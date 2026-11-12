@@ -27,9 +27,12 @@ Modes and their combinations:
   a mismatch, and never writes. Every ledger row must be measured, so a ledger row the probe no
   longer has is a mismatch.
 - `--verify <ledger> --row <id>` measures and compares that one row only. The other ledger rows
-  are not checked.
+  are not checked. For a root-leg row without `--allow-sudo` it would check nothing, so it exits 2
+  and says so.
 - `--row <id>` alone measures one row and prints it.
-- `--write <ledger>` measures every row and rewrites the whole ledger.
+- `--write <ledger>` measures every row and rewrites the whole ledger. A row this run did not measure
+  (the root leg without `--allow-sudo`) keeps its committed line; it is never overwritten with
+  `UNMEASURED`.
 - `--write <ledger> --row <id>` measures one row and replaces (or adds) only that row. Every other
   row of the existing ledger is kept as it is, so the ledger must already exist and parse.
 - `--verify` and `--write` cannot be combined.
@@ -49,6 +52,12 @@ Preconditions. Each one that is missing ends the run with exit 2 and a single li
   `git grep` checks behind the `(source)` rows. Bunshin internals stay in that run-local file
   and in the proof file the `evidence` column points to. Neither belongs in this repository.
 - With `--allow-sudo` only: Linux, passwordless `sudo`, and `python3` as root.
+- The ledger that `--verify`, or `--write --row`, has to read.
+
+The source-check file is validated before anything is measured. It needs an entry for every
+`(source)` row. Each entry needs at least one check, and each check needs a `kind` of `present`
+or `absent`, a non-empty `pattern`, and a `paths` list (an empty list searches the whole
+checkout). A file that fails any of this exits 2 with one line naming the file and the rows.
 
 The root leg (rows `B-05c` and `B-05e`) runs root code, so it runs only with `--allow-sudo`.
 Without the flag both rows read `UNMEASURED` with the reason. `--verify` reports them as
@@ -70,8 +79,11 @@ the launcher is still alive after the 2 s window and the helper kills it. The li
 real launcher (`B-05d`) waits for row 62.
 
 Errors are never verdicts. A row whose measurement throws (for example a failed `git grep`)
-reads `UNMEASURED` with the error text. A root leg whose helper prints no parseable report
-reads `UNMEASURED` with the helper's stderr. A source-check file that is missing, unreadable,
+reads `UNMEASURED` with the error text. A root leg whose helper fails reads `UNMEASURED` with its exit code and stderr:
+no parseable report, exit 4 (the stand-in never reported ready), exit 5 (`pidfd_open`
+unavailable), or any other code such as a traceback or a timeout. The same holds for a report
+of the wrong mode, and for a pidfd leg whose launcher had no pidfd. Only a parsed report of the
+right mode can read `CONTRADICTS`. A source-check file that is missing, unreadable,
 empty, not JSON or without `bunshinSrc`/`rows` ends the run with one exit-2 line that names
 the file and the reason.
 
