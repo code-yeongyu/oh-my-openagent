@@ -15,7 +15,7 @@ import type { SenpiExtensionAPI } from "../../extension/types"
 import { BUILTIN_MODEL_PROFILES } from "./builtin-profiles"
 import { lookupHomeOfUid } from "./owner-home-lookup"
 
-export { homeFromPasswdEntry, lookupHomeOfUid, OWNER_LOOKUP_FAILURE_TTL_MS } from "./owner-home-lookup"
+export { homeFromPasswdEntry, lookupHomeOfUid, OWNER_LOOKUP_TTL_MS, runPasswdLookup } from "./owner-home-lookup"
 
 /**
  * Read and set a folder's `model_profile` (its `.omo/omo.jsonc`) over RPC (#13188), so a client that reaches a
@@ -74,11 +74,13 @@ const MAX_PROFILE_LENGTH = 200
 const INVISIBLE_OR_CONTROL = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Cs}\p{Default_Ignorable_Code_Point}\p{M}]/u
 
 // A home folder's `.omo` is a user layer (omo-config-core loader/paths.ts), never a project layer: this account's
-// HOME, and the home the user database records for the account that owns the folder. That record is looked up for
-// every folder, this account's own included, because under Bun `userInfo().homedir` is `$HOME` too, so an overridden
-// HOME would otherwise hide this account's real home. When the lookup fails (no lookup binary, a down user database),
-// a folder another account owns is refused. win32 has no uid to look up, so a folder beside this account's home is
-// refused there instead.
+// HOME, the home the user database records for this account's uid, and the one it records for the folder's owner.
+// This account's record is looked up for every folder, whoever owns its home (a UID-mapped container hands this uid a
+// home another uid owns), because under Bun `userInfo().homedir` is `$HOME` too, so an overridden HOME would otherwise
+// hide this account's real home. When that lookup fails (no lookup binary, a down user database), every folder at or
+// above a HOME this process sees is refused, since the real home cannot be ruled out there; when the owner's lookup
+// fails, a folder another account owns is refused. win32 has no uid to look up, so a folder beside this account's home
+// is refused there instead.
 
 const realOrSelf = (path: string): string => {
   try {
@@ -105,6 +107,13 @@ function sameDirectory(path: string, folder: { readonly dev: number; readonly in
   }
 }
 
+function atOrAbove(home: string, folder: { readonly dev: number; readonly ino: number }): boolean {
+  for (let path = realOrSelf(home); ; path = dirname(path)) {
+    if (sameDirectory(path, folder)) return true
+    if (path === dirname(path)) return false
+  }
+}
+
 // Same directory by identity, not by spelling: a symlink, a bind mount or a case-insensitive volume names one folder
 // several ways.
 function isHomeFolder(cwd: string, deps: ProjectModelProfileDeps): boolean {
@@ -119,9 +128,13 @@ function isHomeFolder(cwd: string, deps: ProjectModelProfileDeps): boolean {
   if (ownHomes.some((home) => sameDirectory(home, folder))) return true
   const ownUid = process.getuid?.()
   if (ownUid !== undefined) {
-    const ownerHome = (deps.homeOfUid ?? lookupHomeOfUid)(folder.uid)
-    if (ownerHome !== undefined) return ownerHome !== null && sameDirectory(ownerHome, folder)
-    return folder.uid !== ownUid
+    const homeOfUid = deps.homeOfUid ?? lookupHomeOfUid
+    const ownPasswdHome = homeOfUid(ownUid)
+    if (typeof ownPasswdHome === "string" && sameDirectory(ownPasswdHome, folder)) return true
+    if (ownPasswdHome === undefined && ownHomes.some((home) => atOrAbove(home, folder))) return true
+    if (folder.uid === ownUid) return false
+    const ownerHome = homeOfUid(folder.uid)
+    return ownerHome === undefined || (ownerHome !== null && sameDirectory(ownerHome, folder))
   }
   const accountsRoot = deps.accountsRoot === undefined ? defaultAccountsRoot() : deps.accountsRoot
   return accountsRoot !== null && sameDirectory(accountsRoot, statSync(dirname(realOrSelf(cwd))))
