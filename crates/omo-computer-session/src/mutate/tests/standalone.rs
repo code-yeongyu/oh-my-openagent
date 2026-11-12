@@ -82,7 +82,7 @@ const fn is_root() -> bool {
 
 /// Plants the case's `runtime.plant` under `root`, directory modes last; answers the
 /// directories whose mode was narrowed.
-fn plant(root: &Path, case: &Value, _as_root: bool) -> Vec<PathBuf> {
+fn plant(root: &Path, case: &Value, as_root: bool) -> Vec<PathBuf> {
     let items = case["runtime"]["plant"]
         .as_array()
         .cloned()
@@ -103,6 +103,14 @@ fn plant(root: &Path, case: &Value, _as_root: bool) -> Vec<PathBuf> {
         .filter_map(|item| {
             let narrowed = mode(item)?;
             let target = root.join(item["path"].as_str()?);
+            // Root ignores a mode without owner write: a plain file at the dir's path refuses
+            // every write under it, root included, so the case's refusal holds as root too.
+            if as_root && narrowed & 0o200 == 0 {
+                fs::remove_dir_all(&target).expect("planted dir removed");
+                fs::write(&target, b"read-only as root: a file where the dir goes")
+                    .expect("a file in its place");
+                return None;
+            }
             set_mode(&target, narrowed);
             Some(target)
         })
