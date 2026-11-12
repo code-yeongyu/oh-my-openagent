@@ -40,6 +40,17 @@ namespace OmoHwl {
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string szDevice;
     }
 
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public struct DevMode {
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string dmDeviceName;
+        public short dmSpecVersion; public short dmDriverVersion; public short dmSize; public short dmDriverExtra; public int dmFields;
+        public int dmPositionX; public int dmPositionY; public int dmDisplayOrientation; public int dmDisplayFixedOutput;
+        public short dmColor; public short dmDuplex; public short dmYResolution; public short dmTTOption; public short dmCollate;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string dmFormName;
+        public short dmLogPixels; public int dmBitsPerPel; public int dmPelsWidth; public int dmPelsHeight; public int dmDisplayFlags; public int dmDisplayFrequency;
+        public int dmICMMethod; public int dmICMIntent; public int dmMediaType; public int dmDitherType; public int dmReserved1; public int dmReserved2; public int dmPanningWidth; public int dmPanningHeight;
+    }
+
     [StructLayout(LayoutKind.Sequential)]
     public struct DevInfoData { public uint cbSize; public Guid ClassGuid; public uint DevInst; public IntPtr Reserved; }
 
@@ -56,6 +67,24 @@ namespace OmoHwl {
         [DllImport("user32.dll")] static extern int DisplayConfigGetDeviceInfo(ref DpiGet p);
         [DllImport("user32.dll")] static extern int DisplayConfigGetDeviceInfo(ref SourceName p);
         [DllImport("user32.dll")] static extern int DisplayConfigSetDeviceInfo(ref DpiSet p);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern bool EnumDisplaySettings(string device, int mode, ref DevMode dm);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int ChangeDisplaySettingsEx(string device, ref DevMode dm, IntPtr hwnd, uint flags, IntPtr lParam);
+
+        // Windows offers a scale step only when the mode is large enough for it (800x600 allows 100 % alone), so the
+        // secondary is switched to its largest listed mode first. Returns "WxH rc=<ChangeDisplaySettingsEx result>".
+        public static string SetLargestMode(string device) {
+            DevMode best = new DevMode(); best.dmSize = (short)Marshal.SizeOf(typeof(DevMode));
+            DevMode dm = new DevMode(); dm.dmSize = best.dmSize;
+            long area = 0;
+            for (int i = 0; EnumDisplaySettings(device, i, ref dm); i++) {
+                long a = (long)dm.dmPelsWidth * dm.dmPelsHeight;
+                if (a > area) { area = a; best = dm; }
+            }
+            if (area == 0) { return "no modes listed for " + device; }
+            best.dmFields = 0x80000 | 0x100000;
+            int rc = ChangeDisplaySettingsEx(device, ref best, IntPtr.Zero, 1, IntPtr.Zero);
+            return best.dmPelsWidth + "x" + best.dmPelsHeight + " rc=" + rc;
+        }
 
         // DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 is the pseudo-handle -4; the read-back is the awareness actually in force.
         public static int MakePerMonitorAware() {

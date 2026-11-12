@@ -15,9 +15,9 @@ function Child-DpiRead {
 
 function Read-Dpi([string]$dir) {
 	$out = Join-Path $dir ('dpi-' + [guid]::NewGuid().ToString('N') + '.json')
-	$id = [OmoHwl.Token]::Start((Child-Command 'dpi-read' "-WorkerOut `"$out`""), $KeepLabel)
+	$id = [OmoHwl.Token]::Start((Child-Command 'dpi-read' $out), $KeepLabel)
 	[void](Wait-Exit $id 30000)
-	return ((Wait-File $out 5000 "$out.err") | ConvertFrom-Json)
+	return ((Wait-File $out 5000 $out) | ConvertFrom-Json)
 }
 
 function Get-Sha256([string]$path) {
@@ -63,6 +63,8 @@ function Leg-MixedDpi {
 		while ($sw.ElapsedMilliseconds -lt 30000 -and @($read.monitors).Count -le @($facts.monitorsBefore).Count) { Start-Sleep -Milliseconds 500; $read = Read-Dpi $dir }
 		$secondary = @($read.monitors | Where-Object { -not $_.primary }) | Select-Object -First 1
 		if ($null -ne $secondary) {
+			$facts.mode = [OmoHwl.Display]::SetLargestMode([string]$secondary.device)
+			Start-Sleep -Milliseconds 1500
 			$facts.setScale = [OmoHwl.Display]::SetScale([string]$secondary.device, 150)
 			$sw.Restart()
 			do { Start-Sleep -Milliseconds 500; $read = Read-Dpi $dir } while ($sw.ElapsedMilliseconds -lt 10000 -and -not @($read.monitors | Where-Object { -not $_.primary -and $_.dpi -eq 144 }))

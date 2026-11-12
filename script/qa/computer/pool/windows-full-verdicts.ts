@@ -144,14 +144,15 @@ export function verdictMixedDpi(f: Facts): Reading {
     return reading("UNMEASURED", `DPI read from awareness ${awareness}, not per-monitor aware`)
   const mons = list(f, "monitors")
   const shown = mons.map((m) => `${yes(m, "primary") ? "primary" : "secondary"} dpi=${num(m, "dpi")}`).join("; ")
+  const scaleSteps = `mode=${str(f, "mode") ?? "-"} setScale=${str(f, "setScale") || "ok"}`
   if (!mons.some((m) => yes(m, "primary")))
     return reading("UNMEASURED", `no primary monitor in the enumeration [${shown}]`)
   const secondary = mons.filter((m) => !yes(m, "primary"))
   if (secondary.length === 0)
     return reading("CONTRADICTS", `driver installed but only one monitor enumerated [${shown}]`)
   if (secondary.some((m) => num(m, "dpi") === TARGET_DPI))
-    return reading("CONFIRMS", `${mons.length} monitors [${shown}]`)
-  return reading("CONTRADICTS", `secondary never reached ${TARGET_DPI} effective DPI [${shown}]`)
+    return reading("CONFIRMS", `${mons.length} monitors [${shown}]; ${scaleSteps}`)
+  return reading("CONTRADICTS", `secondary never reached ${TARGET_DPI} effective DPI [${shown}]; ${scaleSteps}`)
 }
 
 export function verdictSecureDesktop(f: Facts): Reading {

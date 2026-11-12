@@ -7,20 +7,32 @@ $MediumLabel = 'S-1-16-8192'
 # PowerShell passes $null to a .NET string parameter as ""; [NullString]::Value is how "keep the caller's label" reaches C#.
 $KeepLabel = [NullString]::Value
 
-function Child-Command([string]$leg, [string]$extra) {
-	return "`"$PSHOME\powershell.exe`" -NoProfile -ExecutionPolicy Bypass -File `"$Entry`" -Leg $leg $extra"
+# A child reports through -WorkerOut <file>; it writes <file>.err when it throws, and cmd captures its stdout and stderr
+# in <file>.log, so a child that dies before its own handler still leaves a trace.
+function Child-Command([string]$leg, [string]$workerOut, [string]$extra = '') {
+	$ps = "`"$PSHOME\powershell.exe`" -NoProfile -ExecutionPolicy Bypass -File `"$Entry`" -Leg $leg -WorkerOut `"$workerOut`" $extra"
+	return "`"$env:SystemRoot\System32\cmd.exe`" /d /s /c `"$ps > `"$workerOut.log`" 2>&1`""
 }
 
+# The run directory carries an explicit Low mandatory label, so a Medium worker can always write its report there;
+# an unwritable directory must never read as a dropped input.
 function New-RunDir {
-	return [IO.Directory]::CreateDirectory((Join-Path ([IO.Path]::GetTempPath()) ('omo-hwl-' + [guid]::NewGuid().ToString('N')))).FullName
+	$dir = [IO.Directory]::CreateDirectory((Join-Path ([IO.Path]::GetTempPath()) ('omo-hwl-' + [guid]::NewGuid().ToString('N')))).FullName
+	$ErrorActionPreference = 'Continue'
+	& icacls.exe $dir /setintegritylevel '(OI)(CI)low' | Out-Null
+	if ($LASTEXITCODE -ne 0) { throw "icacls could not label $dir low (exit $LASTEXITCODE)" }
+	return $dir
 }
 
-# A child that fails writes <its -WorkerOut>.err; pass that path so its own error is reported instead of a timeout.
-function Wait-File([string]$path, [int]$timeoutMs, [string]$errPath = '') {
+function Wait-File([string]$path, [int]$timeoutMs, [string]$workerOut = '') {
 	$sw = [Diagnostics.Stopwatch]::StartNew()
 	while (-not [IO.File]::Exists($path)) {
-		if ($errPath -and [IO.File]::Exists($errPath)) { throw "child failed: $([IO.File]::ReadAllText($errPath).Trim())" }
-		if ($sw.ElapsedMilliseconds -gt $timeoutMs) { throw "timed out after $timeoutMs ms waiting for $path" }
+		if ($workerOut -and [IO.File]::Exists("$workerOut.err")) { throw "child failed: $([IO.File]::ReadAllText("$workerOut.err").Trim())" }
+		if ($sw.ElapsedMilliseconds -gt $timeoutMs) {
+			$log = if ($workerOut -and [IO.File]::Exists("$workerOut.log")) { [IO.File]::ReadAllText("$workerOut.log").Trim() } else { '<no child log>' }
+			if ($log.Length -gt 600) { $log = $log.Substring($log.Length - 600) }
+			throw "timed out after $timeoutMs ms waiting for $path; child log: $log"
+		}
 		Start-Sleep -Milliseconds 50
 	}
 	Start-Sleep -Milliseconds 50
@@ -34,8 +46,11 @@ function Wait-Exit([int]$id, [int]$timeoutMs) {
 	return $false
 }
 
+# Children run under cmd, so the whole tree is ended.
 function Stop-Child([int]$id) {
-	try { $p = [Diagnostics.Process]::GetProcessById($id); $p.Kill(); [void]$p.WaitForExit(5000) } catch { }
+	$ErrorActionPreference = 'Continue'
+	& taskkill.exe /T /F /PID $id 2>&1 | Out-Null
+	try { [void][Diagnostics.Process]::GetProcessById($id).WaitForExit(5000) } catch { }
 	$left = @([Diagnostics.Process]::GetProcesses() | Where-Object { $_.Id -eq $id }).Count
 	[Console]::Out.WriteLine("child $id procs $left")
 }
@@ -72,9 +87,9 @@ function Child-WorkerInput {
 function Leg-Elevated {
 	Remove-Item Env:PSModulePath -ErrorAction SilentlyContinue
 	$dir = New-RunDir
-	$fixturePid = [OmoHwl.Token]::Start((Child-Command 'fixture' "-WorkerOut `"$dir\fixture.txt`""), $KeepLabel)
+	$fixturePid = [OmoHwl.Token]::Start((Child-Command 'fixture' "$dir\fixture.txt"), $KeepLabel)
 	try {
-		$parts = (Wait-File "$dir\fixture.txt" 30000 "$dir\fixture.txt.err").Split(' ')
+		$parts = (Wait-File "$dir\fixture.txt" 30000 "$dir\fixture.txt").Split(' ')
 		$form = [IntPtr][long]$parts[0]; $edit = [IntPtr][long]$parts[1]
 		$facts = @{ leg = 'elevated'; run = $Run; fixtureLabel = [OmoHwl.Token]::IntegritySid($fixturePid) }
 		$controlMs = 0
@@ -82,9 +97,9 @@ function Leg-Elevated {
 			[void][OmoHwl.Input]::SetForegroundWindow($form)
 			$foreground = [OmoHwl.Input]::GetForegroundWindow() -eq $form
 			$out = "$dir\$($arm.name).json"
-			$workerPid = [OmoHwl.Token]::Start((Child-Command 'worker-input' "-Edit $($edit.ToInt64()) -Marker $($arm.chars) -WorkerOut `"$out`""), $arm.label)
+			$workerPid = [OmoHwl.Token]::Start((Child-Command 'worker-input' $out "-Edit $($edit.ToInt64()) -Marker $($arm.chars)"), $arm.label)
 			$exited = Wait-Exit $workerPid 60000
-			$report = (Wait-File $out 5000 "$out.err") | ConvertFrom-Json
+			$report = (Wait-File $out 5000 $out) | ConvertFrom-Json
 			$window = if ($arm.name -eq 'control') { 3000 } else { [Math]::Max(2000, 10 * $controlMs) }
 			$landed = Watch-Text $edit $arm.chars $window
 			$post = $landed[[string]$arm.chars[0]]; $send = $landed[[string]$arm.chars[1]]
@@ -121,7 +136,7 @@ function Leg-SecureDesktop {
 	$dir = New-RunDir
 	$facts = @{ leg = 'secure-desktop'; run = $Run }
 	foreach ($p in (Read-Policy).GetEnumerator()) { $facts[$p.Key] = $p.Value }
-	$workerPid = [OmoHwl.Token]::Start((Child-Command 'worker-runas' "-WorkerOut `"$dir\runas.json`""), $MediumLabel)
+	$workerPid = [OmoHwl.Token]::Start((Child-Command 'worker-runas' "$dir\runas.json"), $MediumLabel)
 	try {
 		$desktops = New-Object Collections.Generic.List[string]
 		$consent = $false; $control = $false
@@ -134,7 +149,7 @@ function Leg-SecureDesktop {
 			if (@([Diagnostics.Process]::GetProcessesByName('consent')).Count -gt 0) { $consent = $true }
 			Start-Sleep -Milliseconds 100
 		}
-		$facts.workerLabel = (Wait-File "$dir\runas.json.label" 5000 "$dir\runas.json.err")
+		$facts.workerLabel = (Wait-File "$dir\runas.json.label" 5000 "$dir\runas.json")
 		$facts.consentSeen = $consent; $facts.controlSeen = $control; $facts.desktops = @($desktops)
 		if ([IO.File]::Exists("$dir\runas.json")) { $facts.runas = ([IO.File]::ReadAllText("$dir\runas.json") | ConvertFrom-Json) }
 		Emit $facts

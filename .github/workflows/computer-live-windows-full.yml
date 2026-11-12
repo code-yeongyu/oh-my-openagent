@@ -84,6 +84,19 @@ jobs:
           path: ${{ runner.temp }}/hwl/host.jsonl
           if-no-files-found: warn
 
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Computer live Windows full - host
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Interactive-desktop smoke and host facts (session id, input desktop, UAC policy values).
+            - q1 elevated (two runs), q5 secure desktop (two runs), q4 mixed DPI; each leg writes one JSON fact line, an errored leg its error.
+          JOB_SUMMARY_NEXT: Open the windows-full-facts-host artifact; the ledger job turns it into verdicts.
+        run: |
+          GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
   session:
     name: computer live windows-full (session)
     runs-on: windows-latest
@@ -124,11 +137,23 @@ jobs:
           path: ${{ runner.temp }}/hwl/lock.jsonl
           if-no-files-found: warn
 
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Computer live Windows full - session
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - q3 disconnect and reconnect through a SYSTEM task, then q2 lock and unlock, last.
+          JOB_SUMMARY_NEXT: Open the windows-full-facts-session and windows-full-facts-lock artifacts.
+        run: |
+          GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
   ledger:
     name: computer live windows-full (ledger and plan)
     needs: [host, session]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
@@ -169,3 +194,18 @@ jobs:
           name: windows-full-ledger
           path: ${{ runner.temp }}/windows-full
           if-no-files-found: warn
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Computer live Windows full - ledger
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds and validates hosted-windows-live.tsv from the facts and prints the tier of each leg (no guest runner in part 1).
+          JOB_SUMMARY_NEXT: Open the windows-full-ledger artifact; the row stays open until part 2 runs the legs' scenarios.
+        run: |
+          GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+          if test -f "${RUNNER_TEMP}/windows-full/hosted-windows-live.tsv"; then
+            { echo; echo '| leg | verdict |'; echo '|---|---|'; awk -F'\t' 'NR>1{print "| "$2" | "$3" |"}' "${RUNNER_TEMP}/windows-full/hosted-windows-live.tsv"; } >> "$GITHUB_STEP_SUMMARY"
+          fi
