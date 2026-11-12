@@ -71,9 +71,23 @@ describe("omo login reuses this machine's device instead of registering another"
     await expect(refused).rejects.toBeInstanceOf(MachineAlreadySignedIn)
   })
 
-  test("an uncertain refresh keeps its credential and is not absence", async () => {
+  // The real refresh path throws refresh_recovery_expired for a stored refreshState "uncertain". omo can never use that
+  // sign-in again, but forget would also end a device the device service holds, so the recovery follows that state.
+  test("an uncertain refresh gives the destructive steps only when no device service holds the device", async () => {
     const session = await sessionWith({ ...stored, refreshState: "uncertain" })
-    await expect(refuseSecondMachineDevice(session, service(absent))).rejects.toBeInstanceOf(MachineAlreadySignedIn)
+    const absentRefusal = refuseSecondMachineDevice(session, service(absent))
+    await expect(absentRefusal).rejects.toBeInstanceOf(MachineAlreadySignedIn)
+    await expect(absentRefusal).rejects.toThrow("then run omo account forget")
+    const heldRefusal = refuseSecondMachineDevice(
+      session,
+      service({ kind: "held", device: { id: "dev-desktop", name: "OmO Desktop on Studio" } }),
+    )
+    await expect(heldRefusal).rejects.toBeInstanceOf(MachineAlreadySignedIn)
+    await expect(heldRefusal).rejects.toThrow("OmO Desktop on Studio")
+    await expect(heldRefusal).rejects.not.toThrow("forget")
+    const unknownRefusal = refuseSecondMachineDevice(session, service({ kind: "unknown", reason: "timed_out" }))
+    await expect(unknownRefusal).rejects.toThrow("is installed but did not answer (timed_out)")
+    await expect(unknownRefusal).rejects.not.toThrow("forget")
   })
 
   // A locked or unreadable credential store is not "nothing stored": its item may be this machine's device, so neither
