@@ -437,7 +437,7 @@ describe("identity merge (#10070)", () => {
     ])
   }, 30_000)
 
-  it.each(["system./new.md", "system /new.md", "system:s/new.md", "sys\u200ctem/new.md"])(
+  it.each(["system./new.md", "system /new.md", "system:s/new.md", "sys\u200ctem/new.md", "\u017fystem/new.md"])(
     "#given a source tree entry %j whose first name a disk reads as system #when the merge is planned #then it goes aside like system/ (#12974 review LOW)",
     async (path) => {
       const root = await memoryRoot()

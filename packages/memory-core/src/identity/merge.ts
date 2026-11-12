@@ -245,7 +245,9 @@ export async function planIdentityMerge(
       const foldedCollision = existing === undefined && targetFolded.has(entry.path.toLowerCase())
       // A disk reads `system.`, `system ` and `system:s` as `system`, so the first name is folded the way isPlainTreePath folds `.git`.
       const [first = "", ...rest] = entry.path.split("/")
-      const inSystem = rest.length > 0 && foldTreeName(first) === "system"
+      // A first name outside ASCII is never folded (case folding differs by disk: APFS and NTFS map U+017F to s),
+      // so it goes aside like system/ instead of guessing how the target disk reads it.
+      const inSystem = rest.length > 0 && (/[^\x00-\x7f]/u.test(first) || foldTreeName(first) === "system")
       if (existing === undefined && !foldedCollision && !inSystem) {
         return { path: entry.path, action: "add", destination: entry.path }
       }
