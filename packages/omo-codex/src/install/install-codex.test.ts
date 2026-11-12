@@ -1,7 +1,7 @@
 /// <reference path="../../../../bun-test.d.ts" />
 /// <reference types="bun-types" />
 
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, readdir, readFile, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -9,13 +9,13 @@ import { findRepoRoot, findRepoRootFromImporter, resolveCodexInstallerBinDir, ru
 import { createRepoWithBuiltComponentBins } from "./install-codex-test-fixtures"
 import { findMissingSpawnedScripts } from "./spawned-script-targets"
 import {
-  createLegacyCodexHome,
   liveLegacyEndpointFor,
   startLegacyDaemonProcess,
   stopChild,
   waitForChildReady,
   writeLegacyVersionState,
 } from "./lsp-daemon-reaper.test-support"
+import { createCodexInstallSandbox, disposeCodexInstallSandboxes } from "../../scripts/install-test-fixtures.mjs"
 
 const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = process.platform === "win32" ? 120_000 : 20_000
 
@@ -38,6 +38,8 @@ async function listRelativeFiles(root: string, prefix = ""): Promise<string[]> {
 function formatTomlString(value: string): string {
   return JSON.stringify(value)
 }
+
+afterEach(disposeCodexInstallSandboxes)
 
 describe("install-codex", () => {
   test("#given npm platform binary package #when resolving vendored repo root #then finds sibling wrapper package", async () => {
@@ -135,8 +137,9 @@ describe("install-codex", () => {
     "#given codex installer #when installing omo #then registers local marketplace and cached plugin",
     async () => {
       // given
-      const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-"))
-      const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-"))
+      const sandbox = createCodexInstallSandbox("install-codex")
+      const codexHome = sandbox.codexHome
+      const binDir = sandbox.binDir
       const repoRoot = process.cwd()
       const legacyCacheRoot = join(codexHome, "plugins", "cache", "code-yeongyu-codex-plugins", "omo", "0.1.0")
       await mkdir(legacyCacheRoot, { recursive: true })
@@ -146,13 +149,13 @@ describe("install-codex", () => {
       )
 
       // when
-      const first = await runCodexInstaller({
-        codexHome,
-        binDir,
-        repoRoot,
-        astGrepInstaller: skipAstGrepInstall,
-        runCommand: async () => undefined,
-      })
+      const first = await runCodexInstaller(
+        sandbox.options({
+          repoRoot,
+          astGrepInstaller: skipAstGrepInstall,
+          runCommand: async () => undefined,
+        }),
+      )
 
       // then
       expect(first.marketplaceName).toBe("sisyphuslabs")
@@ -255,8 +258,9 @@ describe("install-codex", () => {
     "#given codex installer #when installing omo #then never spawns a repo script that is not shipped",
     async () => {
       // given
-      const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-sot-"))
-      const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-sot-"))
+      const sandbox = createCodexInstallSandbox("install-codex")
+      const codexHome = sandbox.codexHome
+      const binDir = sandbox.binDir
       const home = await mkdtemp(join(tmpdir(), "omo-codex-user-home-sot-"))
       const repoRoot = process.cwd()
       const invocations: Array<{
@@ -266,16 +270,16 @@ describe("install-codex", () => {
       }> = []
 
       // when
-      await runCodexInstaller({
-        codexHome,
-        binDir,
-        repoRoot,
-        astGrepInstaller: skipAstGrepInstall,
-        env: { HOME: home },
-        runCommand: async (command, args, options) => {
-          invocations.push({ command, args: [...args], home: options.env?.HOME })
-        },
-      })
+      await runCodexInstaller(
+        sandbox.options({
+          repoRoot,
+          astGrepInstaller: skipAstGrepInstall,
+          env: { HOME: home },
+          runCommand: async (command, args, options) => {
+            invocations.push({ command, args: [...args], home: options.env?.HOME })
+          },
+        }),
+      )
 
       // then
       const missingScripts = await findMissingSpawnedScripts({ invocations, repoRoot })
@@ -288,20 +292,21 @@ describe("install-codex", () => {
     "#given repoRoot without root CLI dist #when installing omo #then warns about the skipped omo runtime wrapper",
     async () => {
       // given
-      const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-no-dist-"))
-      const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-no-dist-"))
+      const sandbox = createCodexInstallSandbox("install-codex")
+      const codexHome = sandbox.codexHome
+      const binDir = sandbox.binDir
       const repoRoot = await createRepoWithBuiltComponentBins({ includeRootCliDist: false })
       const logs: string[] = []
 
       // when
-      await runCodexInstaller({
-        codexHome,
-        binDir,
-        repoRoot,
-        astGrepInstaller: skipAstGrepInstall,
-        runCommand: async () => undefined,
-        log: (line) => logs.push(line),
-      })
+      await runCodexInstaller(
+        sandbox.options({
+          repoRoot,
+          astGrepInstaller: skipAstGrepInstall,
+          runCommand: async () => undefined,
+          log: (line) => logs.push(line),
+        }),
+      )
 
       // then
       const cliPath = join(repoRoot, "dist", "cli", "index.js")
@@ -319,9 +324,11 @@ describe("install-codex", () => {
     "#given a live unverifiable legacy daemon dir #when installing omo #then it warns and does not copy legacy IPC state into the OMO home",
     async () => {
       // given
-      const codexHome = createLegacyCodexHome("omo-codex-home-legacy-daemon-")
-      const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-legacy-daemon-"))
-      const home = await mkdtemp(join(tmpdir(), "omo-codex-user-home-legacy-daemon-"))
+      // The legacy daemon's unix socket lives under this codexHome, so the sandbox root keeps the path short enough.
+      const sandbox = createCodexInstallSandbox("legacy-daemon")
+      const codexHome = sandbox.codexHome
+      const binDir = sandbox.binDir
+      const home = sandbox.home
       const endpoint = liveLegacyEndpointFor({ codexHome, version: "0.1.0" })
       const daemon = startLegacyDaemonProcess({ endpoint })
       await waitForChildReady(daemon)
@@ -335,15 +342,15 @@ describe("install-codex", () => {
 
       try {
         // when
-        await runCodexInstaller({
-          codexHome,
-          binDir,
-          repoRoot: process.cwd(),
-          astGrepInstaller: skipAstGrepInstall,
-          runCommand: async () => undefined,
-          env: { HOME: home },
-          log: (line) => logs.push(line),
-        })
+        await runCodexInstaller(
+          sandbox.options({
+            repoRoot: process.cwd(),
+            astGrepInstaller: skipAstGrepInstall,
+            runCommand: async () => undefined,
+            env: { HOME: home },
+            log: (line) => logs.push(line),
+          }),
+        )
 
         // then
         expect(logs.some((line) => line.includes("Warning: deferred legacy Codex LSP daemon cleanup for v0.1.0"))).toBe(
@@ -365,19 +372,20 @@ describe("install-codex", () => {
     "#given autonomous permissions requested #when installing omo #then writes Codex autonomy settings",
     async () => {
       // given
-      const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-autonomous-home-"))
-      const binDir = await mkdtemp(join(tmpdir(), "omo-codex-autonomous-bin-"))
+      const sandbox = createCodexInstallSandbox("install-codex")
+      const codexHome = sandbox.codexHome
+      const binDir = sandbox.binDir
       const repoRoot = process.cwd()
 
       // when
-      await runCodexInstaller({
-        codexHome,
-        binDir,
-        repoRoot,
-        astGrepInstaller: skipAstGrepInstall,
-        runCommand: async () => undefined,
-        autonomousPermissions: true,
-      })
+      await runCodexInstaller(
+        sandbox.options({
+          repoRoot,
+          astGrepInstaller: skipAstGrepInstall,
+          runCommand: async () => undefined,
+          autonomousPermissions: true,
+        }),
+      )
 
       // then
       const configContent = await readFile(join(codexHome, "config.toml"), "utf8")

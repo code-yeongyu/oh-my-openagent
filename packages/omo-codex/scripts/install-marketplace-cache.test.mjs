@@ -4,14 +4,15 @@ import { join } from "node:path"
 import test from "node:test"
 
 import { installMarketplaceLocally } from "./install-local.mjs"
-import { makeTempDir, writeJson, writePluginAt } from "./install-test-fixtures.mjs"
+import { createCodexInstallSandbox, makeTempDir, writeJson, writePluginAt } from "./install-test-fixtures.mjs"
 
 const legacyCodexPluginMarketplace = ["code", "yeongyu", "codex", "plugins"].join("-")
 
 test("#given local marketplace #when installing #then copies versioned plugins and enables config", async () => {
   const repoRoot = await makeTempDir()
-  const codexHome = await makeTempDir()
-  const binDir = await makeTempDir()
+  const sandbox = createCodexInstallSandbox("marketplace-cache")
+  const codexHome = sandbox.codexHome
+  const binDir = sandbox.binDir
   const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
   const pluginRoot = join(codexPackageRoot, "plugin")
 
@@ -57,20 +58,21 @@ test("#given local marketplace #when installing #then copies versioned plugins a
   )
 
   const commands = []
-  const result = await installMarketplaceLocally({
-    repoRoot,
-    codexHome,
-    binDir,
-    platform: "linux",
-    runCommand: async (command, args, options) => {
-      commands.push([command, args, options.cwd])
-      if (command === "npm" && args.join(" ") === "run build") {
-        await mkdir(join(options.cwd, "dist"), { recursive: true })
-        await writeFile(join(options.cwd, "dist", "cli.js"), "#!/usr/bin/env node\nconsole.log(1)\n")
-      }
-    },
-    log: () => {},
-  })
+  const result = await installMarketplaceLocally(
+    sandbox.options({
+      repoRoot,
+
+      platform: "linux",
+      runCommand: async (command, args, options) => {
+        commands.push([command, args, options.cwd])
+        if (command === "npm" && args.join(" ") === "run build") {
+          await mkdir(join(options.cwd, "dist"), { recursive: true })
+          await writeFile(join(options.cwd, "dist", "cli.js"), "#!/usr/bin/env node\nconsole.log(1)\n")
+        }
+      },
+      log: () => {},
+    }),
+  )
 
   assert.deepEqual(
     result.installed.map((plugin) => `${plugin.name}@${plugin.version}`),
@@ -117,7 +119,8 @@ test("#given local marketplace #when installing #then copies versioned plugins a
 
 test("#given sisyphuslabs marketplace #when installing #then registers the local built marketplace cache", async () => {
   const repoRoot = await makeTempDir()
-  const codexHome = await makeTempDir()
+  const sandbox = createCodexInstallSandbox("marketplace-cache")
+  const codexHome = sandbox.codexHome
   const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
 
   await writeJson(join(codexPackageRoot, "marketplace.json"), {
@@ -150,7 +153,7 @@ test("#given sisyphuslabs marketplace #when installing #then registers the local
     ].join("\n"),
   )
 
-  await installMarketplaceLocally({ repoRoot, codexHome, runCommand: async () => {}, log: () => {} })
+  await installMarketplaceLocally(sandbox.options({ repoRoot, runCommand: async () => {}, log: () => {} }))
 
   const config = await readFile(join(codexHome, "config.toml"), "utf8")
   assert.match(config, /\[marketplaces\.sisyphuslabs\]/)

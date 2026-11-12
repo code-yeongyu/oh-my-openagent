@@ -1,11 +1,12 @@
 /// <reference path="../../../../bun-test.d.ts" />
 /// <reference types="bun-types" />
 
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { runCodexInstaller } from "./install-codex"
+import { createCodexInstallSandbox, disposeCodexInstallSandboxes } from "../../scripts/install-test-fixtures.mjs"
 
 const resolveTestGitBash = () => ({ found: true, path: "C:\\Git\\bin\\bash.exe", source: "env" }) as const
 
@@ -38,14 +39,17 @@ async function createPackagedCodexRepoRoot(): Promise<string> {
   return repoRoot
 }
 
+afterEach(disposeCodexInstallSandboxes)
+
 describe("install-codex project-local cleanup", () => {
   test(
     "#given stale project-local Codex config #when installing Codex Light #then repairs the local conflict before returning success",
     async () => {
       // given
-      const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-project-cleanup-"))
-      const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-project-cleanup-"))
-      const projectRoot = await mkdtemp(join(tmpdir(), "omo-codex-project-cleanup-install-"))
+      const sandbox = createCodexInstallSandbox("project-cleanup")
+      const codexHome = sandbox.codexHome
+      const binDir = sandbox.binDir
+      const projectRoot = sandbox.dir("omo-codex-project-cleanup-install-")
       const projectDirectory = join(projectRoot, "nested")
       const projectConfigPath = join(projectRoot, ".codex", "config.toml")
       const repoRoot = await createPackagedCodexRepoRoot()
@@ -60,16 +64,16 @@ describe("install-codex project-local cleanup", () => {
       )
 
       // when
-      const result = await runCodexInstaller({
-        codexHome,
-        binDir,
-        repoRoot,
-        projectDirectory,
-        platform: "win32",
-        astGrepInstaller: skipAstGrepInstall,
-        gitBashResolver: resolveTestGitBash,
-        runCommand: async () => undefined,
-      })
+      const result = await runCodexInstaller(
+        sandbox.options({
+          repoRoot,
+          projectDirectory,
+          platform: "win32",
+          astGrepInstaller: skipAstGrepInstall,
+          gitBashResolver: resolveTestGitBash,
+          runCommand: async () => undefined,
+        }),
+      )
 
       // then
       expect(result.projectCleanup.configPath).toBe(projectConfigPath)
@@ -90,9 +94,10 @@ describe("install-codex project-local cleanup", () => {
     "#given only global CODEX_HOME config under a parent directory #when installing Codex Light #then project cleanup leaves it to the global config updater",
     async () => {
       // given
-      const homeRoot = await mkdtemp(join(tmpdir(), "omo-codex-home-parent-cleanup-"))
+      const sandbox = createCodexInstallSandbox("project-cleanup")
+      const homeRoot = sandbox.dir("home-root")
       const codexHome = join(homeRoot, ".codex")
-      const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-parent-cleanup-"))
+      const binDir = sandbox.binDir
       const projectDirectory = join(homeRoot, "workspace", "nested")
       const globalConfigPath = join(codexHome, "config.toml")
       const repoRoot = await createPackagedCodexRepoRoot()
@@ -115,16 +120,17 @@ describe("install-codex project-local cleanup", () => {
       )
 
       // when
-      const result = await runCodexInstaller({
-        codexHome,
-        binDir,
-        repoRoot,
-        projectDirectory,
-        platform: "win32",
-        astGrepInstaller: skipAstGrepInstall,
-        gitBashResolver: resolveTestGitBash,
-        runCommand: async () => undefined,
-      })
+      const result = await runCodexInstaller(
+        sandbox.options({
+          codexHome,
+          repoRoot,
+          projectDirectory,
+          platform: "win32",
+          astGrepInstaller: skipAstGrepInstall,
+          gitBashResolver: resolveTestGitBash,
+          runCommand: async () => undefined,
+        }),
+      )
 
       // then
       expect(result.projectCleanup.configPath).toBeNull()
@@ -141,26 +147,27 @@ describe("install-codex project-local cleanup", () => {
     "#given project cleanup hits a filesystem edge #when installing Codex Light #then install succeeds and reports skipped cleanup",
     async () => {
       // given
-      const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-project-edge-"))
-      const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-project-edge-"))
-      const projectRoot = await mkdtemp(join(tmpdir(), "omo-codex-project-edge-"))
+      const sandbox = createCodexInstallSandbox("project-cleanup")
+      const codexHome = sandbox.codexHome
+      const binDir = sandbox.binDir
+      const projectRoot = sandbox.dir("omo-codex-project-edge-")
       const projectDirectory = join(projectRoot, "not-a-directory")
       const logs: string[] = []
       const repoRoot = await createPackagedCodexRepoRoot()
       await writeFile(projectDirectory, "file, not directory\n")
 
       // when
-      const result = await runCodexInstaller({
-        codexHome,
-        binDir,
-        repoRoot,
-        projectDirectory,
-        platform: "win32",
-        astGrepInstaller: skipAstGrepInstall,
-        gitBashResolver: resolveTestGitBash,
-        runCommand: async () => undefined,
-        log: (message) => logs.push(message),
-      })
+      const result = await runCodexInstaller(
+        sandbox.options({
+          repoRoot,
+          projectDirectory,
+          platform: "win32",
+          astGrepInstaller: skipAstGrepInstall,
+          gitBashResolver: resolveTestGitBash,
+          runCommand: async () => undefined,
+          log: (message) => logs.push(message),
+        }),
+      )
 
       // then
       expect(result.projectCleanup.projectRoot).toBeNull()

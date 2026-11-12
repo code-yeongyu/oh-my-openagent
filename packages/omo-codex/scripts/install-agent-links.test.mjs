@@ -4,7 +4,7 @@ import { join } from "node:path"
 import test from "node:test"
 
 import { installMarketplaceLocally } from "./install-local.mjs"
-import { makeTempDir, writeJson, writePluginAt } from "./install-test-fixtures.mjs"
+import { createCodexInstallSandbox, makeTempDir, writeJson, writePluginAt } from "./install-test-fixtures.mjs"
 
 const legacyCodexPluginMarketplace = ["code", "yeongyu", "codex", "plugins"].join("-")
 
@@ -13,7 +13,8 @@ test(
   { skip: process.platform === "win32" ? "test sets up a Unix legacy symlink fixture" : false },
   async () => {
     const repoRoot = await makeTempDir()
-    const codexHome = await makeTempDir()
+    const sandbox = createCodexInstallSandbox("agent-links")
+    const codexHome = sandbox.codexHome
     const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
     const pluginRoot = join(codexPackageRoot, "plugin")
     const agentsRoot = join(pluginRoot, "components", "ultrawork", "agents")
@@ -44,13 +45,15 @@ test(
       join(codexHome, "agents", "explorer.toml"),
     )
 
-    const result = await installMarketplaceLocally({
-      repoRoot,
-      codexHome,
-      platform: "linux",
-      runCommand: async () => {},
-      log: () => {},
-    })
+    const result = await installMarketplaceLocally(
+      sandbox.options({
+        repoRoot,
+
+        platform: "linux",
+        runCommand: async () => {},
+        log: () => {},
+      }),
+    )
 
     assert.equal(result.installed.length, 1)
     const snapshotPluginPath = join(codexHome, ".tmp", "marketplaces", "sisyphuslabs", "plugins", "omo")
@@ -73,7 +76,8 @@ test(
 
 test("#given local sisyphuslabs install #when plugin cache is pruned #then agent files still resolve from Codex home", async () => {
   const repoRoot = await makeTempDir()
-  const codexHome = await makeTempDir()
+  const sandbox = createCodexInstallSandbox("agent-links")
+  const codexHome = sandbox.codexHome
   const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
   const pluginRoot = join(codexPackageRoot, "plugin")
   const agentsRoot = join(pluginRoot, "components", "ultrawork", "agents")
@@ -90,13 +94,15 @@ test("#given local sisyphuslabs install #when plugin cache is pruned #then agent
   await writeFile(join(snapshotRoot, ".git", "config"), '[remote "origin"]\n')
   await writeFile(join(snapshotRoot, ".codex-marketplace-install.json"), '{"source_type":"git"}\n')
 
-  const result = await installMarketplaceLocally({
-    repoRoot,
-    codexHome,
-    platform: "linux",
-    runCommand: async () => {},
-    log: () => {},
-  })
+  const result = await installMarketplaceLocally(
+    sandbox.options({
+      repoRoot,
+
+      platform: "linux",
+      runCommand: async () => {},
+      log: () => {},
+    }),
+  )
 
   const pluginPath = result.installed[0].path
   await rm(pluginPath, { recursive: true, force: true })
@@ -110,7 +116,8 @@ test("#given local sisyphuslabs install #when plugin cache is pruned #then agent
 
 test("#given local sisyphuslabs install #when temporary marketplace snapshot is removed #then agent files still resolve from Codex home", async () => {
   const repoRoot = await makeTempDir()
-  const codexHome = await makeTempDir()
+  const sandbox = createCodexInstallSandbox("agent-links")
+  const codexHome = sandbox.codexHome
   const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
   const pluginRoot = join(codexPackageRoot, "plugin")
   const agentsRoot = join(pluginRoot, "components", "ultrawork", "agents")
@@ -124,13 +131,15 @@ test("#given local sisyphuslabs install #when temporary marketplace snapshot is 
   await writeFile(join(agentsRoot, "explorer.toml"), 'name = "explorer"\n')
   await writeFile(join(agentsRoot, "plan.toml"), 'name = "plan"\n')
 
-  await installMarketplaceLocally({
-    repoRoot,
-    codexHome,
-    platform: "linux",
-    runCommand: async () => {},
-    log: () => {},
-  })
+  await installMarketplaceLocally(
+    sandbox.options({
+      repoRoot,
+
+      platform: "linux",
+      runCommand: async () => {},
+      log: () => {},
+    }),
+  )
   await rm(join(codexHome, ".tmp", "marketplaces", "sisyphuslabs"), { recursive: true, force: true })
   await rm(join(codexHome, "plugins", "cache", "sisyphuslabs"), { recursive: true, force: true })
 
@@ -140,7 +149,8 @@ test("#given local sisyphuslabs install #when temporary marketplace snapshot is 
 
 test("#given bundled ultrawork plan #when installing locally #then fresh installs write bundled default xhigh", async () => {
   const repoRoot = await makeTempDir()
-  const codexHome = await makeTempDir()
+  const sandbox = createCodexInstallSandbox("agent-links")
+  const codexHome = sandbox.codexHome
   const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
   const pluginRoot = join(codexPackageRoot, "plugin")
   const agentsRoot = join(pluginRoot, "components", "ultrawork", "agents")
@@ -153,13 +163,15 @@ test("#given bundled ultrawork plan #when installing locally #then fresh install
   await mkdir(agentsRoot, { recursive: true })
   await writeFile(join(agentsRoot, "plan.toml"), 'name = "plan"\nmodel = "gpt-5.5"\nmodel_reasoning_effort = "xhigh"\n')
 
-  await installMarketplaceLocally({
-    repoRoot,
-    codexHome,
-    platform: "linux",
-    runCommand: async () => {},
-    log: () => {},
-  })
+  await installMarketplaceLocally(
+    sandbox.options({
+      repoRoot,
+
+      platform: "linux",
+      runCommand: async () => {},
+      log: () => {},
+    }),
+  )
 
   assert.equal(
     await readFile(join(codexHome, "agents", "plan.toml"), "utf8"),
@@ -169,7 +181,8 @@ test("#given bundled ultrawork plan #when installing locally #then fresh install
 
 test("#given bundled ultrawork plan #when reinstalling without edits #then bundled xhigh stays intact", async () => {
   const repoRoot = await makeTempDir()
-  const codexHome = await makeTempDir()
+  const sandbox = createCodexInstallSandbox("agent-links")
+  const codexHome = sandbox.codexHome
   const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
   const pluginRoot = join(codexPackageRoot, "plugin")
   const agentsRoot = join(pluginRoot, "components", "ultrawork", "agents")
@@ -182,20 +195,24 @@ test("#given bundled ultrawork plan #when reinstalling without edits #then bundl
   await mkdir(agentsRoot, { recursive: true })
   await writeFile(join(agentsRoot, "plan.toml"), 'name = "plan"\nmodel = "gpt-5.5"\nmodel_reasoning_effort = "xhigh"\n')
 
-  await installMarketplaceLocally({
-    repoRoot,
-    codexHome,
-    platform: "linux",
-    runCommand: async () => {},
-    log: () => {},
-  })
-  await installMarketplaceLocally({
-    repoRoot,
-    codexHome,
-    platform: "linux",
-    runCommand: async () => {},
-    log: () => {},
-  })
+  await installMarketplaceLocally(
+    sandbox.options({
+      repoRoot,
+
+      platform: "linux",
+      runCommand: async () => {},
+      log: () => {},
+    }),
+  )
+  await installMarketplaceLocally(
+    sandbox.options({
+      repoRoot,
+
+      platform: "linux",
+      runCommand: async () => {},
+      log: () => {},
+    }),
+  )
 
   assert.equal(
     await readFile(join(codexHome, "agents", "plan.toml"), "utf8"),
@@ -205,7 +222,8 @@ test("#given bundled ultrawork plan #when reinstalling without edits #then bundl
 
 test("#given user edited installed ultrawork plan #when reinstalling after snapshot refresh #then high survives", async () => {
   const repoRoot = await makeTempDir()
-  const codexHome = await makeTempDir()
+  const sandbox = createCodexInstallSandbox("agent-links")
+  const codexHome = sandbox.codexHome
   const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
   const pluginRoot = join(codexPackageRoot, "plugin")
   const agentsRoot = join(pluginRoot, "components", "ultrawork", "agents")
@@ -218,24 +236,28 @@ test("#given user edited installed ultrawork plan #when reinstalling after snaps
   await mkdir(agentsRoot, { recursive: true })
   await writeFile(join(agentsRoot, "plan.toml"), 'name = "plan"\nmodel = "gpt-5.5"\nmodel_reasoning_effort = "xhigh"\n')
 
-  await installMarketplaceLocally({
-    repoRoot,
-    codexHome,
-    platform: "linux",
-    runCommand: async () => {},
-    log: () => {},
-  })
+  await installMarketplaceLocally(
+    sandbox.options({
+      repoRoot,
+
+      platform: "linux",
+      runCommand: async () => {},
+      log: () => {},
+    }),
+  )
   await writeFile(
     join(codexHome, "agents", "plan.toml"),
     'name = "plan"\nmodel = "gpt-5.5"\nmodel_reasoning_effort = "high"\n',
   )
-  await installMarketplaceLocally({
-    repoRoot,
-    codexHome,
-    platform: "linux",
-    runCommand: async () => {},
-    log: () => {},
-  })
+  await installMarketplaceLocally(
+    sandbox.options({
+      repoRoot,
+
+      platform: "linux",
+      runCommand: async () => {},
+      log: () => {},
+    }),
+  )
 
   const installedPlan = await readFile(join(codexHome, "agents", "plan.toml"), "utf8")
   assert.ok(installedPlan.includes('model_reasoning_effort = "high"'))
@@ -247,7 +269,8 @@ test("#given user edited installed ultrawork plan #when reinstalling after snaps
 
 test("#given user removed installed ultrawork service tier #when reinstalling after snapshot refresh #then removal survives", async () => {
   const repoRoot = await makeTempDir()
-  const codexHome = await makeTempDir()
+  const sandbox = createCodexInstallSandbox("agent-links")
+  const codexHome = sandbox.codexHome
   const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
   const pluginRoot = join(codexPackageRoot, "plugin")
   const agentsRoot = join(pluginRoot, "components", "ultrawork", "agents")
@@ -263,24 +286,28 @@ test("#given user removed installed ultrawork service tier #when reinstalling af
     'name = "explorer"\nmodel = "gpt-5.5"\nmodel_reasoning_effort = "low"\nservice_tier = "fast"\n',
   )
 
-  await installMarketplaceLocally({
-    repoRoot,
-    codexHome,
-    platform: "linux",
-    runCommand: async () => {},
-    log: () => {},
-  })
+  await installMarketplaceLocally(
+    sandbox.options({
+      repoRoot,
+
+      platform: "linux",
+      runCommand: async () => {},
+      log: () => {},
+    }),
+  )
   await writeFile(
     join(codexHome, "agents", "explorer.toml"),
     'name = "explorer"\nmodel = "gpt-5.5"\nmodel_reasoning_effort = "low"\n',
   )
-  await installMarketplaceLocally({
-    repoRoot,
-    codexHome,
-    platform: "linux",
-    runCommand: async () => {},
-    log: () => {},
-  })
+  await installMarketplaceLocally(
+    sandbox.options({
+      repoRoot,
+
+      platform: "linux",
+      runCommand: async () => {},
+      log: () => {},
+    }),
+  )
 
   const installedExplorer = await readFile(join(codexHome, "agents", "explorer.toml"), "utf8")
   assert.equal(installedExplorer.includes("service_tier"), false)
@@ -288,7 +315,8 @@ test("#given user removed installed ultrawork service tier #when reinstalling af
 
 test("#given user edited installed ultrawork plan #when reinstalling after snapshot refresh #then bundled snapshot target retains xhigh", async () => {
   const repoRoot = await makeTempDir()
-  const codexHome = await makeTempDir()
+  const sandbox = createCodexInstallSandbox("agent-links")
+  const codexHome = sandbox.codexHome
   const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
   const pluginRoot = join(codexPackageRoot, "plugin")
   const agentsRoot = join(pluginRoot, "components", "ultrawork", "agents")
@@ -301,24 +329,28 @@ test("#given user edited installed ultrawork plan #when reinstalling after snaps
   await mkdir(agentsRoot, { recursive: true })
   await writeFile(join(agentsRoot, "plan.toml"), 'name = "plan"\nmodel = "gpt-5.5"\nmodel_reasoning_effort = "xhigh"\n')
 
-  await installMarketplaceLocally({
-    repoRoot,
-    codexHome,
-    platform: "linux",
-    runCommand: async () => {},
-    log: () => {},
-  })
+  await installMarketplaceLocally(
+    sandbox.options({
+      repoRoot,
+
+      platform: "linux",
+      runCommand: async () => {},
+      log: () => {},
+    }),
+  )
   await writeFile(
     join(codexHome, "agents", "plan.toml"),
     'name = "plan"\nmodel = "gpt-5.5"\nmodel_reasoning_effort = "high"\n',
   )
-  await installMarketplaceLocally({
-    repoRoot,
-    codexHome,
-    platform: "linux",
-    runCommand: async () => {},
-    log: () => {},
-  })
+  await installMarketplaceLocally(
+    sandbox.options({
+      repoRoot,
+
+      platform: "linux",
+      runCommand: async () => {},
+      log: () => {},
+    }),
+  )
 
   const snapshotPlan = await readFile(
     join(

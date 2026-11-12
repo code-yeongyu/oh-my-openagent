@@ -1,12 +1,13 @@
 /// <reference path="../../../../bun-test.d.ts" />
 /// <reference types="bun-types" />
 
-import { describe, expect, setDefaultTimeout, test } from "bun:test"
+import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { mkdtemp, readFile, rm, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { runCodexInstaller } from "./install-codex"
 import { createRepoWithGitBashHooksFixture, EXPECTED_GIT_BASH_HOOKS } from "./install-codex-test-fixtures"
+import { createCodexInstallSandbox, disposeCodexInstallSandboxes } from "../../scripts/install-test-fixtures.mjs"
 
 const [GIT_BASH_PRE_TOOL_USE_HOOK, GIT_BASH_POST_COMPACT_HOOK] = EXPECTED_GIT_BASH_HOOKS
 
@@ -16,29 +17,32 @@ const skipAstGrepInstall = async () => ({ kind: "skipped" as const, reason: "tes
 // that filesystem work fits on a loaded Windows runner.
 setDefaultTimeout(process.platform === "win32" ? 30_000 : 5_000)
 
+afterEach(disposeCodexInstallSandboxes)
+
 describe("install-codex Git Bash hooks", () => {
   test("#given simulated Windows Codex install #when installing omo #then enables git_bash MCP and trusts shell hooks", async () => {
     // given
     const testRoot = await mkdtemp(join(tmpdir(), "omo-codex-git-bash-win-"))
     const repoRoot = await createRepoWithGitBashHooksFixture(process.cwd())
-    const codexHome = join(testRoot, "codex")
-    const binDir = join(testRoot, "bin")
+    const sandbox = createCodexInstallSandbox("git-bash-hooks")
+    const codexHome = sandbox.codexHome
+    const binDir = sandbox.binDir
 
     try {
       // when
-      const result = await runCodexInstaller({
-        codexHome,
-        binDir,
-        repoRoot,
-        platform: "win32",
-        astGrepInstaller: skipAstGrepInstall,
-        gitBashResolver: () => ({
-          found: true,
-          path: "C:\\Program Files\\Git\\bin\\bash.exe",
-          source: "program-files",
+      const result = await runCodexInstaller(
+        sandbox.options({
+          repoRoot,
+          platform: "win32",
+          astGrepInstaller: skipAstGrepInstall,
+          gitBashResolver: () => ({
+            found: true,
+            path: "C:\\Program Files\\Git\\bin\\bash.exe",
+            source: "program-files",
+          }),
+          runCommand: async () => undefined,
         }),
-        runCommand: async () => undefined,
-      })
+      )
 
       // then
       const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
@@ -66,19 +70,20 @@ describe("install-codex Git Bash hooks", () => {
     // given
     const testRoot = await mkdtemp(join(tmpdir(), "omo-codex-git-bash-linux-"))
     const repoRoot = await createRepoWithGitBashHooksFixture(process.cwd())
-    const codexHome = join(testRoot, "codex")
-    const binDir = join(testRoot, "bin")
+    const sandbox = createCodexInstallSandbox("git-bash-hooks")
+    const codexHome = sandbox.codexHome
+    const binDir = sandbox.binDir
 
     try {
       // when
-      const result = await runCodexInstaller({
-        codexHome,
-        binDir,
-        repoRoot,
-        platform: "linux",
-        astGrepInstaller: skipAstGrepInstall,
-        runCommand: async () => undefined,
-      })
+      const result = await runCodexInstaller(
+        sandbox.options({
+          repoRoot,
+          platform: "linux",
+          astGrepInstaller: skipAstGrepInstall,
+          runCommand: async () => undefined,
+        }),
+      )
 
       // then
       const configContent = await readFile(join(codexHome, "config.toml"), "utf8")

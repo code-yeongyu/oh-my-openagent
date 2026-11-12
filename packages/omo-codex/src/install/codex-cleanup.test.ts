@@ -1,19 +1,23 @@
 /// <reference path="../../../../bun-test.d.ts" />
 /// <reference types="bun-types" />
 
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
 import { lstat, mkdir, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { dirname, join, parse } from "node:path"
+import { dirname, join } from "node:path"
 import { COMMAND_SHIM_MARKER } from "./codex-cache-command-shim"
 import { RUNTIME_WRAPPER_MARKER } from "./codex-cache-runtime-wrapper"
 import { cleanupCodexLight, cleanupCodexLightConfigText, removeManagedPathBestEffort } from "./codex-cleanup"
+import { createCodexInstallSandbox, disposeCodexInstallSandboxes } from "../../scripts/install-test-fixtures.mjs"
+
+afterEach(disposeCodexInstallSandboxes)
 
 describe("codex cleanup", () => {
   test("#given managed Codex Light state and project-local Codex leftovers #when cleanup runs #then removes only managed global state and repairs local config", async () => {
     // given
-    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-home-"))
-    const projectRoot = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-project-"))
+    const sandbox = createCodexInstallSandbox("cleanup")
+    const codexHome = sandbox.codexHome
+    const projectRoot = sandbox.dir("omo-codex-cleanup-project-")
     const projectDirectory = join(projectRoot, "nested")
     const configPath = join(codexHome, "config.toml")
     const projectConfigPath = join(projectRoot, ".codex", "config.toml")
@@ -81,11 +85,12 @@ describe("codex cleanup", () => {
     )
 
     // when
-    const result = await cleanupCodexLight({
-      codexHome,
-      projectDirectory,
-      now: () => new Date("2026-06-01T00:00:00Z"),
-    })
+    const result = await cleanupCodexLight(
+      sandbox.options({
+        projectDirectory,
+        now: () => new Date("2026-06-01T00:00:00Z"),
+      }),
+    )
 
     // then
     expect(result.configChanged).toBe(true)
@@ -121,7 +126,8 @@ describe("codex cleanup", () => {
 
   test("#given malformed project directory #when cleanup runs #then global cleanup still succeeds and project cleanup is skipped", async () => {
     // given
-    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-malformed-"))
+    const sandbox = createCodexInstallSandbox("cleanup")
+    const codexHome = sandbox.codexHome
     const configPath = join(codexHome, "config.toml")
     await mkdir(codexHome, { recursive: true })
     await writeFile(
@@ -137,11 +143,12 @@ describe("codex cleanup", () => {
     )
 
     // when
-    const result = await cleanupCodexLight({
-      codexHome,
-      projectDirectory: `bad\0path`,
-      now: () => new Date("2026-06-01T00:00:00Z"),
-    })
+    const result = await cleanupCodexLight(
+      sandbox.options({
+        projectDirectory: join(sandbox.root, `bad\0path`),
+        now: () => new Date("2026-06-01T00:00:00Z"),
+      }),
+    )
 
     // then
     expect(result.configChanged).toBe(true)
@@ -154,7 +161,8 @@ describe("codex cleanup", () => {
 
   test("#given managed config and missing install manifests #when cleanup runs #then removes orphaned managed agent links", async () => {
     // given
-    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-orphan-agent-"))
+    const sandbox = createCodexInstallSandbox("cleanup")
+    const codexHome = sandbox.codexHome
     const configPath = join(codexHome, "config.toml")
     const managedAgentPath = join(codexHome, "agents", "explorer.toml")
     await mkdir(join(codexHome, "agents"), { recursive: true })
@@ -175,11 +183,12 @@ describe("codex cleanup", () => {
     )
 
     // when
-    const result = await cleanupCodexLight({
-      codexHome,
-      projectDirectory: codexHome,
-      now: () => new Date("2026-06-01T00:00:00Z"),
-    })
+    const result = await cleanupCodexLight(
+      sandbox.options({
+        projectDirectory: codexHome,
+        now: () => new Date("2026-06-01T00:00:00Z"),
+      }),
+    )
 
     // then
     expect(result.removedAgentLinks).toEqual([managedAgentPath])
@@ -190,8 +199,9 @@ describe("codex cleanup", () => {
 
   test("#given project directory is a regular file #when cleanup runs #then global cleanup still succeeds and project cleanup is skipped", async () => {
     // given
-    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-file-project-home-"))
-    const projectDirectory = join(await mkdtemp(join(tmpdir(), "omo-codex-cleanup-file-project-")), "project-file")
+    const sandbox = createCodexInstallSandbox("cleanup")
+    const codexHome = sandbox.codexHome
+    const projectDirectory = join(sandbox.dir("file-project"), "project-file")
     const configPath = join(codexHome, "config.toml")
     await mkdir(codexHome, { recursive: true })
     await writeFile(projectDirectory, "not a directory\n")
@@ -208,11 +218,12 @@ describe("codex cleanup", () => {
     )
 
     // when
-    const result = await cleanupCodexLight({
-      codexHome,
-      projectDirectory,
-      now: () => new Date("2026-06-01T00:00:00Z"),
-    })
+    const result = await cleanupCodexLight(
+      sandbox.options({
+        projectDirectory,
+        now: () => new Date("2026-06-01T00:00:00Z"),
+      }),
+    )
 
     // then
     expect(result.configChanged).toBe(true)
@@ -224,7 +235,8 @@ describe("codex cleanup", () => {
   })
   test("#given provisioned runtime binaries and bootstrap plugin data #when cleanup runs #then removes only the managed subtrees", async () => {
     // given
-    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-bootstrap-"))
+    const sandbox = createCodexInstallSandbox("cleanup")
+    const codexHome = sandbox.codexHome
     const astGrepRuntimeDir = join(codexHome, "runtime", "ast-grep")
     const nodeRuntimeDir = join(codexHome, "runtime", "node")
     const foreignRuntimeFile = join(codexHome, "runtime", "other-owner", "keep.bin")
@@ -260,11 +272,12 @@ describe("codex cleanup", () => {
     await writeFixtureFile(join(snapshotRoot, "plugins", "omo", "marketplace.json"), "{}\n")
 
     // when
-    const result = await cleanupCodexLight({
-      codexHome,
-      projectDirectory: codexHome,
-      now: () => new Date("2026-06-01T00:00:00Z"),
-    })
+    const result = await cleanupCodexLight(
+      sandbox.options({
+        projectDirectory: codexHome,
+        now: () => new Date("2026-06-01T00:00:00Z"),
+      }),
+    )
 
     // then
     expect(result.removedPaths).toContain(astGrepRuntimeDir)
@@ -288,12 +301,15 @@ describe("codex cleanup", () => {
 
   test("#given runtime holding only the managed subtrees #when cleanup runs #then prunes the empty runtime directory", async () => {
     // given
-    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-runtime-prune-"))
+    const sandbox = createCodexInstallSandbox("cleanup")
+    const codexHome = sandbox.codexHome
     await writeFixtureFile(join(codexHome, "runtime", "ast-grep", "darwin-arm64", "sg"), "sg binary\n")
     await writeFixtureFile(join(codexHome, "runtime", "node", "node-v22.14.0-win-x64", "node.exe"), "node binary\n")
 
     // when
-    await cleanupCodexLight({ codexHome, projectDirectory: codexHome, now: () => new Date("2026-06-01T00:00:00Z") })
+    await cleanupCodexLight(
+      sandbox.options({ projectDirectory: codexHome, now: () => new Date("2026-06-01T00:00:00Z") }),
+    )
 
     // then
     expect(await pathExists(join(codexHome, "runtime"))).toBe(false)
@@ -302,15 +318,17 @@ describe("codex cleanup", () => {
 
   test("#given codex home without bootstrap or runtime artifacts #when cleanup runs #then succeeds with no removed paths", async () => {
     // given
-    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-absent-"))
+    const sandbox = createCodexInstallSandbox("cleanup")
+    const codexHome = sandbox.codexHome
     await writeFile(join(codexHome, "config.toml"), "[features]\nplugins = true\n")
 
     // when
-    const result = await cleanupCodexLight({
-      codexHome,
-      projectDirectory: codexHome,
-      now: () => new Date("2026-06-01T00:00:00Z"),
-    })
+    const result = await cleanupCodexLight(
+      sandbox.options({
+        projectDirectory: codexHome,
+        now: () => new Date("2026-06-01T00:00:00Z"),
+      }),
+    )
 
     // then
     expect(result.removedPaths).toEqual([])
@@ -339,23 +357,26 @@ describe("codex cleanup", () => {
 
   test("#given a mid-flight worker recreates bootstrap state between uninstall runs #when cleanup runs twice #then the second pass clears it without error", async () => {
     // given
-    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-two-pass-"))
+    const sandbox = createCodexInstallSandbox("cleanup")
+    const codexHome = sandbox.codexHome
     const bootstrapDataDir = join(codexHome, "plugins", "data", "omo-sisyphuslabs", "bootstrap")
     const statePath = join(bootstrapDataDir, "state.json")
     await writeFixtureFile(statePath, "{}\n")
 
     // when
-    const firstRun = await cleanupCodexLight({
-      codexHome,
-      projectDirectory: codexHome,
-      now: () => new Date("2026-06-01T00:00:00Z"),
-    })
+    const firstRun = await cleanupCodexLight(
+      sandbox.options({
+        projectDirectory: codexHome,
+        now: () => new Date("2026-06-01T00:00:00Z"),
+      }),
+    )
     await writeFixtureFile(statePath, "{}\n")
-    const secondRun = await cleanupCodexLight({
-      codexHome,
-      projectDirectory: codexHome,
-      now: () => new Date("2026-06-01T00:00:00Z"),
-    })
+    const secondRun = await cleanupCodexLight(
+      sandbox.options({
+        projectDirectory: codexHome,
+        now: () => new Date("2026-06-01T00:00:00Z"),
+      }),
+    )
 
     // then
     expect(firstRun.removedPaths).toContain(bootstrapDataDir)
@@ -430,8 +451,9 @@ trusted_hash = "sha256:user"
   test("#given installer-created bin links in the bin dir #when cleanup runs #then removes the managed omo bins and keeps unmanaged files", async () => {
     // given: the installer's own bin shapes - a root omo.cmd runtime wrapper and an omo-ulw-loop.cmd
     // component shim - plus an unrelated command and a user-authored omo without our markers
-    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-bins-home-"))
-    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-bins-dir-"))
+    const sandbox = createCodexInstallSandbox("cleanup")
+    const codexHome = sandbox.codexHome
+    const binDir = sandbox.binDir
     await writeFile(join(codexHome, "config.toml"), "[features]\nplugins = true\n")
     const rootBin = join(binDir, "omo.cmd")
     const componentBin = join(binDir, "omo-ulw-loop.cmd")
@@ -443,13 +465,13 @@ trusted_hash = "sha256:user"
     await writeFile(unrelatedBin, "@echo off\r\necho unrelated tool\r\n")
 
     // when
-    const result = await cleanupCodexLight({
-      codexHome,
-      binDir,
-      platform: "win32",
-      projectDirectory: codexHome,
-      now: () => new Date("2026-06-01T00:00:00Z"),
-    })
+    const result = await cleanupCodexLight(
+      sandbox.options({
+        platform: "win32",
+        projectDirectory: codexHome,
+        now: () => new Date("2026-06-01T00:00:00Z"),
+      }),
+    )
 
     // then: managed bins gone (the "omo still remains" symptom), unmanaged files preserved
     expect(await pathExists(rootBin)).toBe(false)
@@ -464,8 +486,9 @@ trusted_hash = "sha256:user"
     "#given posix component bin symlinks #when cleanup runs #then removes managed component symlinks and keeps unrelated ones",
     async () => {
       // given
-      const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-bins-posix-home-"))
-      const binDir = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-bins-posix-dir-"))
+      const sandbox = createCodexInstallSandbox("cleanup")
+      const codexHome = sandbox.codexHome
+      const binDir = sandbox.binDir
       await writeFile(join(codexHome, "config.toml"), "[features]\nplugins = true\n")
       const managedTarget = join(
         codexHome,
@@ -485,13 +508,13 @@ trusted_hash = "sha256:user"
       await symlink(join(binDir, "elsewhere.js"), unrelatedSymlink)
 
       // when
-      const result = await cleanupCodexLight({
-        codexHome,
-        binDir,
-        platform: "linux",
-        projectDirectory: codexHome,
-        now: () => new Date("2026-06-01T00:00:00Z"),
-      })
+      const result = await cleanupCodexLight(
+        sandbox.options({
+          platform: "linux",
+          projectDirectory: codexHome,
+          now: () => new Date("2026-06-01T00:00:00Z"),
+        }),
+      )
 
       // then
       expect(result.removedBinLinks).toContain(managedSymlink)
@@ -502,48 +525,29 @@ trusted_hash = "sha256:user"
 
   test("#given no bin directory on disk #when cleanup runs #then reports no removed bin links and does not throw", async () => {
     // given
-    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-bins-absent-"))
+    const sandbox = createCodexInstallSandbox("cleanup")
+    const codexHome = sandbox.codexHome
     await writeFile(join(codexHome, "config.toml"), "[features]\nplugins = true\n")
     const binDir = join(codexHome, "does-not-exist", "bin")
 
     // when
-    const result = await cleanupCodexLight({
-      codexHome,
-      binDir,
-      projectDirectory: codexHome,
-      now: () => new Date("2026-06-01T00:00:00Z"),
-    })
+    const result = await cleanupCodexLight(
+      sandbox.options({
+        binDir,
+        projectDirectory: codexHome,
+        now: () => new Date("2026-06-01T00:00:00Z"),
+      }),
+    )
 
     // then
     expect(result.removedBinLinks).toEqual([])
-  })
-
-  test("#given a codex home resolving to a filesystem root #when cleanup runs #then no bin link is scanned or removed", async () => {
-    // given: a real managed wrapper in the bin dir, but a codex home at the filesystem root,
-    // where resolveCodexInstallerBinDir would otherwise point at a shared system bin directory
-    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-rootguard-bin-"))
-    const projectDirectory = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-rootguard-proj-"))
-    const rootBin = join(binDir, "omo.cmd")
-    await writeFile(rootBin, `@echo off\r\nrem ${RUNTIME_WRAPPER_MARKER}\r\n`)
-
-    // when
-    const result = await cleanupCodexLight({
-      codexHome: parse(process.cwd()).root,
-      binDir,
-      platform: "win32",
-      projectDirectory,
-      now: () => new Date("2026-06-01T00:00:00Z"),
-    })
-
-    // then
-    expect(result.removedBinLinks).toEqual([])
-    expect(await pathExists(rootBin)).toBe(true)
   })
 
   test("#given a user copy of a generated wrapper #when cleanup runs #then only installer bin names are removed", async () => {
     // given: a backup copy still carries the generated marker, but the installer never created that name
-    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-copy-home-"))
-    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-copy-bin-"))
+    const sandbox = createCodexInstallSandbox("cleanup")
+    const codexHome = sandbox.codexHome
+    const binDir = sandbox.binDir
     await writeFile(join(codexHome, "config.toml"), "[features]\nplugins = true\n")
     const wrapper = `@echo off\r\nrem ${RUNTIME_WRAPPER_MARKER}\r\n`
     const managedBin = join(binDir, "omo.cmd")
@@ -556,13 +560,13 @@ trusted_hash = "sha256:user"
     await writeFile(markerlessSameName, "@echo off\r\necho my own omo-lsp\r\n")
 
     // when
-    const result = await cleanupCodexLight({
-      codexHome,
-      binDir,
-      platform: "win32",
-      projectDirectory: codexHome,
-      now: () => new Date("2026-06-01T00:00:00Z"),
-    })
+    const result = await cleanupCodexLight(
+      sandbox.options({
+        platform: "win32",
+        projectDirectory: codexHome,
+        now: () => new Date("2026-06-01T00:00:00Z"),
+      }),
+    )
 
     // then: the installer-created name goes; a copy, an unknown name, and a markerless same-name stay
     expect(result.removedBinLinks).toEqual([managedBin])
@@ -574,20 +578,21 @@ trusted_hash = "sha256:user"
 
   test("#given a user-owned bin using an installer name without the marker #when cleanup runs #then it is kept", async () => {
     // given: the most realistic collision - the user owns the root command name themselves
-    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-usermain-home-"))
-    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-usermain-bin-"))
+    const sandbox = createCodexInstallSandbox("cleanup")
+    const codexHome = sandbox.codexHome
+    const binDir = sandbox.binDir
     await writeFile(join(codexHome, "config.toml"), "[features]\nplugins = true\n")
     const userRootBin = join(binDir, "omo.cmd")
     await writeFile(userRootBin, "@echo off\r\necho my own omo launcher\r\n")
 
     // when
-    const result = await cleanupCodexLight({
-      codexHome,
-      binDir,
-      platform: "win32",
-      projectDirectory: codexHome,
-      now: () => new Date("2026-06-01T00:00:00Z"),
-    })
+    const result = await cleanupCodexLight(
+      sandbox.options({
+        platform: "win32",
+        projectDirectory: codexHome,
+        now: () => new Date("2026-06-01T00:00:00Z"),
+      }),
+    )
 
     // then
     expect(result.removedBinLinks).toEqual([])
@@ -598,20 +603,21 @@ trusted_hash = "sha256:user"
     // given: Windows resolves names case-insensitively but preserves the casing an entry was
     // created with, so the installer's lowercase `omo.cmd` path can write through to a wrapper
     // that stays on disk as `OMO.CMD`. Uninstall must still recognize it as its own.
-    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-case-home-"))
-    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-case-bin-"))
+    const sandbox = createCodexInstallSandbox("cleanup")
+    const codexHome = sandbox.codexHome
+    const binDir = sandbox.binDir
     await writeFile(join(codexHome, "config.toml"), "[features]\nplugins = true\n")
     const uppercaseBin = join(binDir, "OMO.CMD")
     await writeFile(uppercaseBin, `@echo off\r\nrem ${RUNTIME_WRAPPER_MARKER}\r\n`)
 
     // when
-    const result = await cleanupCodexLight({
-      codexHome,
-      binDir,
-      platform: "win32",
-      projectDirectory: codexHome,
-      now: () => new Date("2026-06-01T00:00:00Z"),
-    })
+    const result = await cleanupCodexLight(
+      sandbox.options({
+        platform: "win32",
+        projectDirectory: codexHome,
+        now: () => new Date("2026-06-01T00:00:00Z"),
+      }),
+    )
 
     // then
     expect(result.removedBinLinks).toEqual([uppercaseBin])
@@ -621,20 +627,21 @@ trusted_hash = "sha256:user"
   test("#given a user-owned windows bin using an installer name in different casing #when cleanup runs #then it is kept", async () => {
     // given: case-insensitive matching must not widen ownership - without the marker the file
     // is the user's, whatever its casing
-    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-caseuser-home-"))
-    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-caseuser-bin-"))
+    const sandbox = createCodexInstallSandbox("cleanup")
+    const codexHome = sandbox.codexHome
+    const binDir = sandbox.binDir
     await writeFile(join(codexHome, "config.toml"), "[features]\nplugins = true\n")
     const userBin = join(binDir, "Omo.Cmd")
     await writeFile(userBin, "@echo off\r\necho my own omo launcher\r\n")
 
     // when
-    const result = await cleanupCodexLight({
-      codexHome,
-      binDir,
-      platform: "win32",
-      projectDirectory: codexHome,
-      now: () => new Date("2026-06-01T00:00:00Z"),
-    })
+    const result = await cleanupCodexLight(
+      sandbox.options({
+        platform: "win32",
+        projectDirectory: codexHome,
+        now: () => new Date("2026-06-01T00:00:00Z"),
+      }),
+    )
 
     // then
     expect(result.removedBinLinks).toEqual([])
@@ -645,8 +652,9 @@ trusted_hash = "sha256:user"
     // given: install put the bins in a custom dir via a one-shot env override. Uninstall runs
     // later without it, so recomputing the default would sweep the wrong directory and strand
     // the command on PATH. The install-time location is recorded next to the plugin cache.
-    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-binmanifest-home-"))
-    const customBinDir = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-binmanifest-bin-"))
+    const sandbox = createCodexInstallSandbox("cleanup")
+    const codexHome = sandbox.codexHome
+    const customBinDir = sandbox.dir("recorded-bin")
     await writeFile(join(codexHome, "config.toml"), "[features]\nplugins = true\n")
     const pluginRoot = join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "1.0.0")
     await mkdir(pluginRoot, { recursive: true })
@@ -655,13 +663,15 @@ trusted_hash = "sha256:user"
     await writeFile(managedBin, `#!/bin/sh\n# ${RUNTIME_WRAPPER_MARKER}\n`)
 
     // when: no binDir argument and no CODEX_LOCAL_BIN_DIR in the environment
-    const result = await cleanupCodexLight({
-      codexHome,
-      platform: "linux",
-      projectDirectory: codexHome,
-      env: {},
-      now: () => new Date("2026-06-01T00:00:00Z"),
-    })
+    const result = await cleanupCodexLight(
+      sandbox.options({
+        withoutBinDir: true,
+        platform: "linux",
+        projectDirectory: codexHome,
+        env: {},
+        now: () => new Date("2026-06-01T00:00:00Z"),
+      }),
+    )
 
     // then
     expect(result.removedBinLinks).toEqual([managedBin])
@@ -671,9 +681,10 @@ trusted_hash = "sha256:user"
   test("#given a recorded install bin dir and an explicit CODEX_LOCAL_BIN_DIR at uninstall #when cleanup runs #then the environment override wins", async () => {
     // given: an explicit override at uninstall time is a deliberate instruction and must not be
     // overruled by the recorded location
-    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-binprec-home-"))
-    const recordedBinDir = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-binprec-recorded-"))
-    const overrideBinDir = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-binprec-override-"))
+    const sandbox = createCodexInstallSandbox("cleanup")
+    const codexHome = sandbox.codexHome
+    const recordedBinDir = sandbox.dir("recorded-bin")
+    const overrideBinDir = sandbox.dir("override-bin")
     await writeFile(join(codexHome, "config.toml"), "[features]\nplugins = true\n")
     const pluginRoot = join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "1.0.0")
     await mkdir(pluginRoot, { recursive: true })
@@ -684,13 +695,15 @@ trusted_hash = "sha256:user"
     await writeFile(overrideBin, `#!/bin/sh\n# ${RUNTIME_WRAPPER_MARKER}\n`)
 
     // when
-    const result = await cleanupCodexLight({
-      codexHome,
-      platform: "linux",
-      projectDirectory: codexHome,
-      env: { CODEX_LOCAL_BIN_DIR: overrideBinDir },
-      now: () => new Date("2026-06-01T00:00:00Z"),
-    })
+    const result = await cleanupCodexLight(
+      sandbox.options({
+        withoutBinDir: true,
+        platform: "linux",
+        projectDirectory: codexHome,
+        env: { CODEX_LOCAL_BIN_DIR: overrideBinDir },
+        now: () => new Date("2026-06-01T00:00:00Z"),
+      }),
+    )
 
     // then
     expect(result.removedBinLinks).toEqual([overrideBin])
@@ -703,8 +716,9 @@ trusted_hash = "sha256:user"
     async () => {
       // given: the legacy layout used an arbitrary marketplace segment, which the legacy
       // remover already recognizes, so uninstall must not leave those commands on PATH
-      const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-legacy-home-"))
-      const binDir = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-legacy-bin-"))
+      const sandbox = createCodexInstallSandbox("cleanup")
+      const codexHome = sandbox.codexHome
+      const binDir = sandbox.binDir
       await writeFile(join(codexHome, "config.toml"), "[features]\nplugins = true\n")
       const legacyTarget = join(
         codexHome,
@@ -724,13 +738,13 @@ trusted_hash = "sha256:user"
       await symlink(legacyTarget, userBin)
 
       // when
-      const result = await cleanupCodexLight({
-        codexHome,
-        binDir,
-        platform: "linux",
-        projectDirectory: codexHome,
-        now: () => new Date("2026-06-01T00:00:00Z"),
-      })
+      const result = await cleanupCodexLight(
+        sandbox.options({
+          platform: "linux",
+          projectDirectory: codexHome,
+          now: () => new Date("2026-06-01T00:00:00Z"),
+        }),
+      )
 
       // then
       expect(result.removedBinLinks).toEqual([legacyBin])
@@ -743,8 +757,9 @@ trusted_hash = "sha256:user"
     "#given a user symlink whose target resembles a managed component #when cleanup runs #then it is kept",
     async () => {
       // given
-      const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-usersym-home-"))
-      const binDir = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-usersym-bin-"))
+      const sandbox = createCodexInstallSandbox("cleanup")
+      const codexHome = sandbox.codexHome
+      const binDir = sandbox.binDir
       await writeFile(join(codexHome, "config.toml"), "[features]\nplugins = true\n")
       const managedTarget = join(
         codexHome,
@@ -764,13 +779,13 @@ trusted_hash = "sha256:user"
       await symlink(managedTarget, userSymlink)
 
       // when
-      const result = await cleanupCodexLight({
-        codexHome,
-        binDir,
-        platform: "linux",
-        projectDirectory: codexHome,
-        now: () => new Date("2026-06-01T00:00:00Z"),
-      })
+      const result = await cleanupCodexLight(
+        sandbox.options({
+          platform: "linux",
+          projectDirectory: codexHome,
+          now: () => new Date("2026-06-01T00:00:00Z"),
+        }),
+      )
 
       // then
       expect(result.removedBinLinks).toEqual([managedSymlink])

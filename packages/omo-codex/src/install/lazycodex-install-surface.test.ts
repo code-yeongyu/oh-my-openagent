@@ -1,7 +1,7 @@
 /// <reference path="../../../../bun-test.d.ts" />
 /// <reference types="bun-types" />
 
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, readdir, readFile, readlink, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -11,6 +11,7 @@ import {
   EXPECTED_OMO_COMPONENT_BINS,
   expectedBinName,
 } from "./install-codex-test-fixtures"
+import { createCodexInstallSandbox, disposeCodexInstallSandboxes } from "../../scripts/install-test-fixtures.mjs"
 
 const STALE_CODEX_COMPONENT_BINS = [
   "codex-comment-checker",
@@ -34,23 +35,26 @@ const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = process.platform === "win32" ?
 
 const skipAstGrepInstall = async () => ({ kind: "skipped" as const, reason: "test" })
 
+afterEach(disposeCodexInstallSandboxes)
+
 describe("lazycodex install surface", () => {
   test(
     "#given codex installer #when installing omo #then exposes durable LazyCodex agent roles",
     async () => {
       // given
-      const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-lazycodex-agents-"))
-      const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-lazycodex-agents-"))
+      const sandbox = createCodexInstallSandbox("install-surface")
+      const codexHome = sandbox.codexHome
+      const binDir = sandbox.binDir
       const repoRoot = await createRepoWithBuiltComponentBins({ agentNames: LAZYCODEX_AGENT_ROLE_NAMES })
 
       // when
-      await runCodexInstaller({
-        codexHome,
-        binDir,
-        repoRoot,
-        astGrepInstaller: skipAstGrepInstall,
-        runCommand: async () => undefined,
-      })
+      await runCodexInstaller(
+        sandbox.options({
+          repoRoot,
+          astGrepInstaller: skipAstGrepInstall,
+          runCommand: async () => undefined,
+        }),
+      )
 
       // then
       const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
@@ -69,18 +73,19 @@ describe("lazycodex install surface", () => {
     "#given codex installer #when installing omo #then links documented component binaries to cached runtimes",
     async () => {
       // given
-      const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-bins-"))
-      const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-bins-"))
+      const sandbox = createCodexInstallSandbox("install-surface")
+      const codexHome = sandbox.codexHome
+      const binDir = sandbox.binDir
       const repoRoot = await createRepoWithBuiltComponentBins()
 
       // when
-      const result = await runCodexInstaller({
-        codexHome,
-        binDir,
-        repoRoot,
-        astGrepInstaller: skipAstGrepInstall,
-        runCommand: async () => undefined,
-      })
+      const result = await runCodexInstaller(
+        sandbox.options({
+          repoRoot,
+          astGrepInstaller: skipAstGrepInstall,
+          runCommand: async () => undefined,
+        }),
+      )
 
       // then
       const pluginPath = result.installed[0]?.path ?? ""
@@ -144,8 +149,9 @@ describe("lazycodex install surface", () => {
     "#given Codex prunes an old plugin cache version #when LazyCodex roles were installed #then roles still resolve from Codex home",
     async () => {
       // given
-      const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-autoupdate-"))
-      const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-autoupdate-"))
+      const sandbox = createCodexInstallSandbox("install-surface")
+      const codexHome = sandbox.codexHome
+      const binDir = sandbox.binDir
       const marketplaceRoot = join(codexHome, ".tmp", "marketplaces", "sisyphuslabs")
       await mkdir(join(marketplaceRoot, ".git"), { recursive: true })
       await writeFile(join(marketplaceRoot, ".git", "config"), '[remote "origin"]\n')
@@ -153,13 +159,13 @@ describe("lazycodex install surface", () => {
       const repoRoot = await createRepoWithBuiltComponentBins({ agentNames: LAZYCODEX_AGENT_ROLE_NAMES })
 
       // when
-      const result = await runCodexInstaller({
-        codexHome,
-        binDir,
-        repoRoot,
-        astGrepInstaller: skipAstGrepInstall,
-        runCommand: async () => undefined,
-      })
+      const result = await runCodexInstaller(
+        sandbox.options({
+          repoRoot,
+          astGrepInstaller: skipAstGrepInstall,
+          runCommand: async () => undefined,
+        }),
+      )
       const pluginPath = result.installed[0]?.path
       if (pluginPath === undefined) {
         throw new Error("Codex installer did not report an installed plugin path")
@@ -193,18 +199,19 @@ describe("lazycodex install surface", () => {
     "#given Codex temporary marketplace snapshot is removed #when LazyCodex roles were installed #then roles still resolve from Codex home",
     async () => {
       // given
-      const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-clean-snapshot-"))
-      const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-clean-snapshot-"))
+      const sandbox = createCodexInstallSandbox("install-surface")
+      const codexHome = sandbox.codexHome
+      const binDir = sandbox.binDir
       const repoRoot = await createRepoWithBuiltComponentBins({ agentNames: LAZYCODEX_AGENT_ROLE_NAMES })
 
       // when
-      await runCodexInstaller({
-        codexHome,
-        binDir,
-        repoRoot,
-        astGrepInstaller: skipAstGrepInstall,
-        runCommand: async () => undefined,
-      })
+      await runCodexInstaller(
+        sandbox.options({
+          repoRoot,
+          astGrepInstaller: skipAstGrepInstall,
+          runCommand: async () => undefined,
+        }),
+      )
       await rm(join(codexHome, ".tmp", "marketplaces", "sisyphuslabs"), { recursive: true, force: true })
       await rm(join(codexHome, "plugins", "cache", "sisyphuslabs"), { recursive: true, force: true })
 

@@ -1,11 +1,12 @@
 /// <reference path="../../../../bun-test.d.ts" />
 /// <reference types="bun-types" />
 
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
 import { lstat, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { runCodexInstaller } from "./install-codex"
+import { createCodexInstallSandbox, disposeCodexInstallSandboxes } from "../../scripts/install-test-fixtures.mjs"
 
 const INSTALL_CODEX_LEGACY_AGENT_PURGE_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000
 
@@ -34,13 +35,16 @@ Verdict rules:
 Be concise, specific, and strict."""
 `
 
+afterEach(disposeCodexInstallSandboxes)
+
 describe("install-codex legacy agent purge", () => {
   test(
     "#given retired managed reviewer artifacts and user agents #when installing omo #then purges only managed legacy reviewer artifacts",
     async () => {
       // given
-      const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-retired-reviewer-"))
-      const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-retired-reviewer-"))
+      const sandbox = createCodexInstallSandbox("legacy-purge")
+      const codexHome = sandbox.codexHome
+      const binDir = sandbox.binDir
       const agentsDir = join(codexHome, "agents")
       await mkdir(agentsDir, { recursive: true })
       await writeFile(
@@ -58,13 +62,13 @@ describe("install-codex legacy agent purge", () => {
       await writeFile(join(agentsDir, "user-custom.toml"), 'name = "user-custom"\nmodel = "gpt-5.5"\n')
 
       // when
-      await runCodexInstaller({
-        codexHome,
-        binDir,
-        repoRoot: process.cwd(),
-        astGrepInstaller: skipAstGrepInstall,
-        runCommand: async () => undefined,
-      })
+      await runCodexInstaller(
+        sandbox.options({
+          repoRoot: process.cwd(),
+          astGrepInstaller: skipAstGrepInstall,
+          runCommand: async () => undefined,
+        }),
+      )
 
       // then
       const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
@@ -82,8 +86,9 @@ describe("install-codex legacy agent purge", () => {
     "#given custom file using retired reviewer filename #when installing omo #then preserves the unproven user TOML",
     async () => {
       // given
-      const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-custom-reviewer-"))
-      const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-custom-reviewer-"))
+      const sandbox = createCodexInstallSandbox("legacy-purge")
+      const codexHome = sandbox.codexHome
+      const binDir = sandbox.binDir
       const agentsDir = join(codexHome, "agents")
       const customReviewer = 'name = "codex-ultrawork-reviewer"\ndescription = "My local reviewer override"\n'
       await mkdir(agentsDir, { recursive: true })
@@ -94,13 +99,13 @@ describe("install-codex legacy agent purge", () => {
       await writeFile(join(agentsDir, "codex-ultrawork-reviewer.toml"), customReviewer)
 
       // when
-      await runCodexInstaller({
-        codexHome,
-        binDir,
-        repoRoot: process.cwd(),
-        astGrepInstaller: skipAstGrepInstall,
-        runCommand: async () => undefined,
-      })
+      await runCodexInstaller(
+        sandbox.options({
+          repoRoot: process.cwd(),
+          astGrepInstaller: skipAstGrepInstall,
+          runCommand: async () => undefined,
+        }),
+      )
 
       // then
       const configContent = await readFile(join(codexHome, "config.toml"), "utf8")

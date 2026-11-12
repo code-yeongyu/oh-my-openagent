@@ -1,11 +1,12 @@
 /// <reference path="../../../../bun-test.d.ts" />
 /// <reference types="bun-types" />
 
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
 import { mkdtemp, readFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { runCodexInstaller } from "./install-codex"
+import { createCodexInstallSandbox, disposeCodexInstallSandboxes } from "../../scripts/install-test-fixtures.mjs"
 
 const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = 30_000
 
@@ -18,22 +19,25 @@ type CachedMcpManifest = {
   }
 }
 
+afterEach(disposeCodexInstallSandboxes)
+
 describe("install-codex MCP manifest", () => {
   test(
     "#given codex installer #when installing omo #then caches research MCPs without ast-grep MCP",
     async () => {
       // given
-      const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-mcp-"))
-      const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-mcp-"))
+      const sandbox = createCodexInstallSandbox("mcp-manifest")
+      const codexHome = sandbox.codexHome
+      const binDir = sandbox.binDir
 
       // when
-      const result = await runCodexInstaller({
-        codexHome,
-        binDir,
-        repoRoot: process.cwd(),
-        astGrepInstaller: skipAstGrepInstall,
-        runCommand: async () => undefined,
-      })
+      const result = await runCodexInstaller(
+        sandbox.options({
+          repoRoot: process.cwd(),
+          astGrepInstaller: skipAstGrepInstall,
+          runCommand: async () => undefined,
+        }),
+      )
 
       // then
       const pluginPath = result.installed[0]?.path ?? ""

@@ -5,13 +5,14 @@ import test from "node:test"
 
 import { installMarketplaceLocally } from "./install-local.mjs"
 import { repairNearestProjectLocalCodexArtifacts } from "./install-dist/install-local.mjs"
-import { makeTempDir, writeJson, writePluginAt } from "./install-test-fixtures.mjs"
+import { createCodexInstallSandbox, makeTempDir, writeJson, writePluginAt } from "./install-test-fixtures.mjs"
 
 test("#given stale project-local Codex config #when Node installer runs #then repairs the local conflict", async () => {
   const repoRoot = await makeTempDir()
-  const codexHome = await makeTempDir()
-  const binDir = await makeTempDir()
-  const projectRoot = await makeTempDir()
+  const sandbox = createCodexInstallSandbox("project-cleanup")
+  const codexHome = sandbox.codexHome
+  const binDir = sandbox.binDir
+  const projectRoot = sandbox.dir("project-root")
   const projectDirectory = join(projectRoot, "nested")
   const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
   const pluginRoot = join(codexPackageRoot, "plugin")
@@ -32,20 +33,21 @@ test("#given stale project-local Codex config #when Node installer runs #then re
     ),
   )
 
-  const result = await installMarketplaceLocally({
-    repoRoot,
-    codexHome,
-    binDir,
-    projectDirectory,
-    platform: "linux",
-    runCommand: async (command, args, options) => {
-      if (command === "npm" && args.join(" ") === "run build") {
-        await mkdir(join(options.cwd, "dist"), { recursive: true })
-        await writeFile(join(options.cwd, "dist", "cli.js"), "#!/usr/bin/env node\n")
-      }
-    },
-    log: () => {},
-  })
+  const result = await installMarketplaceLocally(
+    sandbox.options({
+      repoRoot,
+      projectDirectory,
+
+      platform: "linux",
+      runCommand: async (command, args, options) => {
+        if (command === "npm" && args.join(" ") === "run build") {
+          await mkdir(join(options.cwd, "dist"), { recursive: true })
+          await writeFile(join(options.cwd, "dist", "cli.js"), "#!/usr/bin/env node\n")
+        }
+      },
+      log: () => {},
+    }),
+  )
 
   assert.equal(result.projectCleanup.configPath, projectConfigPath)
   assert.equal(result.projectCleanup.changed, true)
@@ -58,7 +60,8 @@ test("#given stale project-local Codex config #when Node installer runs #then re
 })
 
 test("#given root and nested project-local Codex configs #when script cleanup runs #then it repairs every loaded project layer", async () => {
-  const projectRoot = await makeTempDir()
+  const sandbox = createCodexInstallSandbox("install-project-local-cleanup")
+  const projectRoot = sandbox.dir("project-root")
   const projectDirectory = join(projectRoot, "nested")
   const rootConfigPath = join(projectRoot, ".codex", "config.toml")
   const nestedConfigPath = join(projectDirectory, ".codex", "config.toml")
@@ -104,7 +107,8 @@ test("#given root and nested project-local Codex configs #when script cleanup ru
 })
 
 test("#given no project-local config and CODEX_HOME in the parent chain #when script cleanup runs #then global Codex config is not treated as project state", async () => {
-  const homeRoot = await makeTempDir()
+  const sandbox = createCodexInstallSandbox("install-project-local-cleanup")
+  const homeRoot = sandbox.dir("home-root")
   const codexHome = join(homeRoot, ".codex")
   const projectDirectory = join(homeRoot, "workspace", "nested")
   const globalConfigPath = join(codexHome, "config.toml")
@@ -128,8 +132,9 @@ test("#given no project-local config and CODEX_HOME in the parent chain #when sc
 test("#given project-local config is a symlink to CODEX_HOME #when script cleanup runs #then it skips the link without mutating the target", async () => {
   if (process.platform === "win32") return
 
-  const codexHome = await makeTempDir()
-  const projectRoot = await makeTempDir()
+  const sandbox = createCodexInstallSandbox("project-cleanup")
+  const codexHome = sandbox.codexHome
+  const projectRoot = sandbox.dir("project-root")
   const globalConfigPath = join(codexHome, "config.toml")
   const projectConfigPath = join(projectRoot, ".codex", "config.toml")
 
@@ -158,8 +163,9 @@ test("#given project-local config is a symlink to CODEX_HOME #when script cleanu
 test("#given project-local Codex config is a symlink #when script cleanup runs #then symlink target is not modified", async () => {
   if (process.platform === "win32") return
 
-  const projectRoot = await makeTempDir()
-  const codexHome = await makeTempDir()
+  const sandbox = createCodexInstallSandbox("project-cleanup")
+  const projectRoot = sandbox.dir("project-root")
+  const codexHome = sandbox.codexHome
   const victimDir = await makeTempDir()
   const victimConfigPath = join(victimDir, "victim.toml")
   const projectConfigPath = join(projectRoot, `.codex`, "config.toml")
@@ -194,8 +200,9 @@ test("#given project-local Codex config is a symlink #when script cleanup runs #
 test("#given project-local .codex directory is a symlink #when script cleanup runs #then symlink target is not modified", async () => {
   if (process.platform === "win32") return
 
-  const projectRoot = await makeTempDir()
-  const codexHome = await makeTempDir()
+  const sandbox = createCodexInstallSandbox("project-cleanup")
+  const projectRoot = sandbox.dir("project-root")
+  const codexHome = sandbox.codexHome
   const outsideCodexDir = await makeTempDir()
   const outsideConfigPath = join(outsideCodexDir, "config.toml")
   const projectCodexPath = join(projectRoot, ".codex")
@@ -228,7 +235,8 @@ test("#given project-local .codex directory is a symlink #when script cleanup ru
 })
 
 test("#given malformed project directory from the environment #when script cleanup runs #then it skips project-local cleanup without failing install", async () => {
-  const codexHome = await makeTempDir()
+  const sandbox = createCodexInstallSandbox("project-cleanup")
+  const codexHome = sandbox.codexHome
 
   const result = await repairNearestProjectLocalCodexArtifacts({
     startDirectory: `bad${"\0"}path`,
@@ -246,7 +254,8 @@ test("#given malformed project directory from the environment #when script clean
 })
 
 test("#given absent project directory from the script surface #when script cleanup runs #then it skips project-local cleanup without throwing", async () => {
-  const codexHome = await makeTempDir()
+  const sandbox = createCodexInstallSandbox("project-cleanup")
+  const codexHome = sandbox.codexHome
 
   const result = await repairNearestProjectLocalCodexArtifacts({ codexHome })
 
@@ -262,9 +271,10 @@ test("#given absent project directory from the script surface #when script clean
 
 test("#given project cleanup hits a filesystem edge #when Node installer runs #then install succeeds and reports skipped cleanup", async () => {
   const repoRoot = await makeTempDir()
-  const codexHome = await makeTempDir()
-  const binDir = await makeTempDir()
-  const projectRoot = await makeTempDir()
+  const sandbox = createCodexInstallSandbox("project-cleanup")
+  const codexHome = sandbox.codexHome
+  const binDir = sandbox.binDir
+  const projectRoot = sandbox.dir("project-root")
   const projectDirectory = join(projectRoot, "not-a-directory")
   const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
   const pluginRoot = join(codexPackageRoot, "plugin")
@@ -277,20 +287,22 @@ test("#given project cleanup hits a filesystem edge #when Node installer runs #t
   await writePluginAt(pluginRoot, "alpha", "1.2.3")
   await writeFile(projectDirectory, "file, not directory\n")
 
-  const result = await installMarketplaceLocally({
-    repoRoot,
-    codexHome,
-    binDir,
-    projectDirectory,
-    platform: "linux",
-    runCommand: async (command, args, options) => {
-      if (command === "npm" && args.join(" ") === "run build") {
-        await mkdir(join(options.cwd, "dist"), { recursive: true })
-        await writeFile(join(options.cwd, "dist", "cli.js"), "#!/usr/bin/env node\n")
-      }
-    },
-    log: (message) => logs.push(message),
-  })
+  const result = await installMarketplaceLocally(
+    sandbox.options({
+      codexHome,
+      repoRoot,
+      projectDirectory,
+
+      platform: "linux",
+      runCommand: async (command, args, options) => {
+        if (command === "npm" && args.join(" ") === "run build") {
+          await mkdir(join(options.cwd, "dist"), { recursive: true })
+          await writeFile(join(options.cwd, "dist", "cli.js"), "#!/usr/bin/env node\n")
+        }
+      },
+      log: (message) => logs.push(message),
+    }),
+  )
 
   assert.equal(result.projectCleanup.projectRoot, null)
   assert.equal(result.projectCleanup.changed, false)
