@@ -96,3 +96,19 @@ fn preview_frames_never_reach_model_context() {
     assert_eq!(frames.len(), 1, "the frame went to the host outbox only");
     assert!(s.take_preview_frames().is_empty());
 }
+
+#[test]
+fn host_call_serves_only_its_own_table_methods_with_typed_params() {
+    use omo_computer_core::methods::Method;
+    let mut s = session(&json!({}), &RecordingSink::default(), None);
+    assert!(s.host_call(Method::Click, json!({})).is_none(), "not a host call");
+    assert!(s.host_call(Method::MenuItems, json!({})).is_none(), "a later row's method answers None here");
+    let granted = s.host_call(Method::ControlGrant, json!({ "reason": "r" })).expect("served").expect("granted");
+    assert_eq!(granted["active"], json!(true));
+    assert!(matches!(
+        s.host_call(Method::ControlGrant, json!({ "reason": 7 })),
+        Some(Err(crate::grant::HostCallError::Params(_)))
+    ));
+    assert_eq!(s.host_call(Method::ControlAcquire, json!({})).expect("served").expect("lease")["active"], json!(true));
+    assert!(matches!(s.host_call(Method::ControlAcquire, json!({})), Some(Err(crate::grant::HostCallError::Refused(_)))));
+}

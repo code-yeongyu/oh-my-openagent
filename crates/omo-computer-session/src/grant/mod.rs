@@ -8,6 +8,7 @@
 
 mod host;
 mod state;
+mod wire;
 #[cfg(test)]
 mod presence_tests;
 #[cfg(test)]
@@ -16,6 +17,7 @@ mod session_tests;
 mod tests;
 
 pub use state::{wall_clock, Control, MachineClock, Plan};
+pub use wire::HostCallError;
 
 use omo_computer_core::methods::Method;
 use omo_computer_safety::gate::verdicts::LeaseRefusal;

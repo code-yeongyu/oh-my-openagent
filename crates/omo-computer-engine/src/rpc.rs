@@ -5,6 +5,7 @@
 
 use omo_computer_core::backend::Refusal;
 use omo_computer_core::methods::Method;
+use omo_computer_session::grant::HostCallError;
 use omo_computer_session::{Refused, Session};
 use serde::de::DeserializeOwned;
 use serde_json::{json, Map, Value};
@@ -92,42 +93,22 @@ fn dispatch(session: &mut Session, name: &str, params: Value) -> Result<Value, F
         }
         Method::Click => json!(session.click(parse(params)?).map_err(|r| refused_call(&r))?),
         Method::TypeText => json!(session.type_text(parse(params)?).map_err(|r| refused_call(&r))?),
-        _ => return grant_dispatch(session, method, params).unwrap_or_else(|| Err(not_found())),
+        _ => {
+            return session.host_call(method, params).map_or_else(|| Err(not_found()), |r| r.map_err(host_failure))
+        }
     };
     Ok(value)
 }
 
-// --- Row 21: the host-only grant, lease, display and preview verbs. ---
+// --- Rows 21-27: the session's host calls (R31); row 28 moves this into the engine router. ---
 
-fn grant_dispatch(session: &mut Session, method: Method, params: Value) -> Option<Result<Value, Failure>> {
-    let empty = |params: Value| parse::<omo_computer_core::params::EmptyParams>(params).map(drop);
-    let outcome = match method {
-        Method::ControlGrant => parse(params).map(|p| json!(session.control_grant(p))),
-        Method::ControlAcquire => empty(params)
-            .and_then(|()| session.control_acquire().map(|s| json!(s)).map_err(|r| refused_call(&r))),
-        Method::ControlRevoke => empty(params).map(|()| {
-            session.control_revoke();
-            Value::Null
-        }),
-        Method::ControlRelease => empty(params).map(|()| {
-            session.control_release();
-            Value::Null
-        }),
-        Method::DisplayRelease => empty(params).map(|()| {
-            session.display_release();
-            Value::Null
-        }),
-        Method::DisplayResume => empty(params).map(|()| {
-            session.display_resume();
-            Value::Null
-        }),
-        Method::PreviewSubscribe => empty(params).map(|()| {
-            session.preview_subscribe();
-            Value::Null
-        }),
-        _ => return None,
-    };
-    Some(outcome)
+fn host_failure(error: HostCallError) -> Failure {
+    match error {
+        HostCallError::Params(error) => {
+            failure(INVALID_PARAMS, "Invalid params", Some(json!({ "detail": error.to_string() })))
+        }
+        HostCallError::Refused(refused) => refused_call(&refused),
+    }
 }
 
 /// A refusal on the wire: the closed engine code's number and name, `data.code` as v1 wrote
