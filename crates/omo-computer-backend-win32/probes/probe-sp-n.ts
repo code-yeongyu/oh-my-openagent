@@ -30,7 +30,23 @@ export const WEBVIEW2_NUPKG_SHA256 = "ef128016dd1e51c59178c827ed5b8aa3322c57afa8
 const HOSTED = "hosted windows-latest"
 const WARM = 5
 const RUNS = 31
-const FRAME_MS = 1000 / 60
+// Every bound a verdict applies, each with its source line in the pinned design. A timing row with no bound here
+// reads NEW-EDGE with its numbers ("first recorded"), never CONTRADICTS: Windows timings are targets until measured.
+export const BOUNDS = {
+  pollMs: { value: 1, cite: "design/d-windows.md:130 (each hop polls at 1 ms)" },
+  hangGuardMs: { value: 5000, cite: "design/d-windows.md:130 (each hop bounded by a 5 s hang guard)" },
+  wheelAfterRaise: {
+    value: 1,
+    cite: "design/d-windows.md:128 (DwmFlush before pointer: doc numbers 6/6 lost -> 18/18, re-measured)",
+  },
+  coverWindow: { value: 0, cite: "design/d-windows.md:393 (cover-window oracle reads > 0 -> hide_ack)" },
+  // a validity gate on the oracle itself, not a finding: the no-affinity control must show the overlay
+  coverWindowControl: {
+    value: 0.9,
+    cite: "design/d-windows.md:393 (the cover-window oracle must see an unflagged overlay)",
+  },
+} as const
+type Bound = { readonly value: number; readonly cite: string }
 
 // INVALID: a row measured by a probe with a known defect; kept with the reading, superseded by the next run.
 export type Verdict = "CONFIRMS" | "CONTRADICTS" | "NEW-EDGE" | "UNMEASURED" | "INVALID"
@@ -140,7 +156,7 @@ export const SPEC: Readonly<Record<string, Spec>> = {
       [
         `n-barrier-fg-ms-${key}`,
         {
-          question: `what does the routed-and-consumed barrier cost for ${label} (old doc comment: well under a frame, 5 s hang guard)`,
+          question: `what does the routed-and-consumed barrier cost for ${label} (design: no time bound, only the 5 s hang guard per hop)`,
           condition: FG,
         },
       ],
@@ -464,11 +480,13 @@ const UN = (reason: string): Result => ({ measured: `UNMEASURED: ${reason}`, ver
 // A timing row decides only outside a 10 % band around its limit; inside it one run cannot decide, so two
 // back-to-back runs (--measure then --verify) do not flip between CONFIRMS and CONTRADICTS.
 export const TIMING_BAND = 0.1
-export function timingVerdict(p95: number, limit: number, measured: string): Result {
+export function timingVerdict(p95: number, bound: Bound | undefined, measured: string): Result {
   if (!Number.isFinite(p95)) return UN(`no samples; ${measured}`)
-  if (p95 <= limit * (1 - TIMING_BAND)) return { measured, verdict: "CONFIRMS" }
-  if (p95 > limit * (1 + TIMING_BAND)) return { measured, verdict: "CONTRADICTS" }
-  return UN(`p95 ${p95} ms within ${TIMING_BAND * 100} % of the ${Number(limit.toFixed(3))} ms limit; ${measured}`)
+  if (!bound) return { measured: `first recorded: p95 ${p95}; ${measured}`, verdict: "NEW-EDGE" }
+  const m = `${measured}; bound ${bound.value} ms per ${bound.cite}`
+  if (p95 <= bound.value * (1 - TIMING_BAND)) return { measured: m, verdict: "CONFIRMS" }
+  if (p95 > bound.value * (1 + TIMING_BAND)) return { measured: m, verdict: "CONTRADICTS" }
+  return UN(`p95 ${p95} ms within ${TIMING_BAND * 100} % of the ${bound.value} ms bound; ${m}`)
 }
 
 // The wheel rows count only when the settled-foreground control delivered every wheel: without that, a 0 could
@@ -486,13 +504,21 @@ export function wheelResults(control: Tally, flush: Tally, delay: Tally): Record
     "n-wheel-after-raise-dwmflush": proven
       ? {
           measured: `delivered ${flush.delivered}/${flush.runs}; ${c}; foreground by ${flush.acquire ?? "-"}`,
-          verdict: pick(flush.runs > 0 && flush.delivered === flush.runs, "CONFIRMS", "CONTRADICTS"),
+          verdict: pick(
+            flush.runs > 0 && flush.delivered / flush.runs >= BOUNDS.wheelAfterRaise.value,
+            "CONFIRMS",
+            "CONTRADICTS",
+          ),
         }
       : UN(`${why}; delivered ${flush.delivered}/${flush.runs}`),
     "n-wheel-after-raise-5ms": proven
       ? {
           measured: `lost ${delay.runs - delay.delivered}/${delay.runs}; ${c}; foreground by ${delay.acquire ?? "-"}`,
-          verdict: pick(delay.runs > 0 && delay.delivered === 0, "CONFIRMS", "CONTRADICTS"),
+          verdict: pick(
+            delay.runs > 0 && (delay.runs - delay.delivered) / delay.runs >= BOUNDS.wheelAfterRaise.value,
+            "CONFIRMS",
+            "CONTRADICTS",
+          ),
         }
       : UN(`${why}; lost ${delay.runs - delay.delivered}/${delay.runs}`),
   }
@@ -588,12 +614,12 @@ const timers: Group = {
       "n-dwmflush-ms":
         num(d.hresult) !== 0
           ? { measured: `${ms(d)} hresult=${num(d.hresult)}`, verdict: "NEW-EDGE" }
-          : timingVerdict(num(d.p95), 35, `${ms(d)} hresult=${num(d.hresult)}`),
-      "n-poll-sleep1-ms": timingVerdict(num(sleep1.p95), 2, ms(sleep1)),
+          : timingVerdict(num(d.p95), undefined, `${ms(d)} hresult=${num(d.hresult)}`),
+      "n-poll-sleep1-ms": timingVerdict(num(sleep1.p95), BOUNDS.pollMs, ms(sleep1)),
       "n-poll-hrtimer1-ms":
         hr.error !== undefined
           ? { measured: `CreateWaitableTimerExW error ${num(hr.error)}`, verdict: "NEW-EDGE" }
-          : timingVerdict(num(hr.p95), 2, ms(hr)),
+          : timingVerdict(num(hr.p95), BOUNDS.pollMs, ms(hr)),
     }
   },
 }
@@ -640,8 +666,8 @@ const barriers: Group = {
           }
           const fgMs = `${ms(obj(fg.stats))} hang-guard expiries ${RUNS - Math.min(count(fg.runs, "routed"), count(fg.runs, "consumed"))} not foreground ${count(fg.runs, "notForeground")}/${RUNS}`
           out[`n-barrier-fg-ms-${key}`] = fgDone
-            ? timingVerdict(num(at(fg, "stats", "p95")), FRAME_MS, fgMs)
-            : { measured: fgMs, verdict: "CONTRADICTS" }
+            ? timingVerdict(num(at(fg, "stats", "p95")), undefined, fgMs)
+            : { measured: `${fgMs}; a hop hit the hang guard (${BOUNDS.hangGuardMs.cite})`, verdict: "CONTRADICTS" }
         }
         const po = await leg(ctx, "posted-barrier", { ...oracle(t), ch: "y", warm: WARM, n: RUNS, away })
         const poDone = count(po.runs, "consumed") === RUNS
@@ -654,8 +680,8 @@ const barriers: Group = {
           : UN(`the effect oracle never saw a foreground char; ${measured}`)
         const poMs = `${ms(obj(po.stats))} hang-guard expiries ${RUNS - count(po.runs, "consumed")}`
         out[`n-barrier-posted-ms-${key}`] = poDone
-          ? timingVerdict(num(at(po, "stats", "p95")), FRAME_MS, poMs)
-          : { measured: poMs, verdict: "CONTRADICTS" }
+          ? timingVerdict(num(at(po, "stats", "p95")), undefined, poMs)
+          : { measured: `${poMs}; a hop hit the hang guard (${BOUNDS.hangGuardMs.cite})`, verdict: "CONTRADICTS" }
       } catch (e) {
         // one family's failed leg makes only its own rows UNMEASURED, with the leg's error
         const missing = ids.filter((id) => !(id in out))
@@ -754,10 +780,10 @@ const affinity: Group = {
     const control = await leg(ctx, "affinity", { top: t.top, exclude: false })
     const ex = await leg(ctx, "affinity", { top: t.top, exclude: true })
     const m = (j: Json, k: string) => num(at(j, k, "magenta"))
-    const seen = m(control, "wgcMonitor") >= 0.9
+    const seen = m(control, "wgcMonitor") >= BOUNDS.coverWindowControl.value
     const pre = seen ? "" : "UNMEASURED: the no-affinity control did not show the overlay; "
     const v = (x: number, oracleOk = seen): Verdict =>
-      !oracleOk || !(x >= 0) ? "UNMEASURED" : pick(x < 0.01, "CONFIRMS", "CONTRADICTS")
+      !oracleOk || !(x >= 0) ? "UNMEASURED" : pick(x <= BOUNDS.coverWindow.value, "CONFIRMS", "CONTRADICTS")
     return {
       "n-affinity-control-wgc-monitor": {
         measured: `magenta=${m(control, "wgcMonitor")} gdi=${m(control, "gdiBitBlt")} affinityRead=${num(control.affinityRead)}`,
@@ -777,7 +803,7 @@ const affinity: Group = {
       },
       "n-affinity-gdi-bitblt": {
         measured: `${pre}magenta=${m(ex, "gdiBitBlt")} control=${m(control, "gdiBitBlt")}`,
-        verdict: v(m(ex, "gdiBitBlt"), m(control, "gdiBitBlt") >= 0.9),
+        verdict: v(m(ex, "gdiBitBlt"), m(control, "gdiBitBlt") >= BOUNDS.coverWindowControl.value),
       },
     }
   },
@@ -884,7 +910,9 @@ export function sessionProblem(
   after: Json | undefined,
 ): string | undefined {
   if (num(r.helperSid) !== sid) return `the capture read session ${str(r.helperSid)}, not the run's session ${sid}`
-  const seen = arr(r.timeline).length ? `; states seen: ${arr(r.timeline).map(str).join(" | ")}` : ""
+  // a list of strings: arr() would turn each entry into {} and lose it
+  const timeline = Array.isArray(r.timeline) ? r.timeline.map(str) : []
+  const seen = timeline.length ? `; states seen: ${timeline.join(" | ")}` : ""
   const [before, during, end] = [obj(r.before), obj(r.during), obj(r.duringEnd)]
   if (state === "locked") {
     const lock = (j: Json) => str(j.lock) || "(no read)"
@@ -906,14 +934,66 @@ export function sessionProblem(
 export const CANNOT_RESTORE =
   "cannot restore session on this host: a locked session cannot be unlocked without credentials; this pass does not lock (run with --allow-irreversible, last, on a host that can unlock)"
 
-// One --verify comparison: rows of other hosts and rows this pass did not re-measure are skipped with the reason.
+// Timing rows ("ms" in the id) across two passes. Unbounded rows stay NEW-EDGE: "first recorded: p95 a / b", plus
+// "; unstable on this host" when the passes differ by more than the band. Bounded rows: the WORSE pass decides
+// (CONFIRMS < inside-the-band UNMEASURED < CONTRADICTS) with both values. Not a timing pair: undefined.
+export const isTimingRow = (id: string) => /(^|-)ms(-|$)/.test(id)
+export const p95Of = (measured: string) => Number(/p95[= ]([\d.]+)/.exec(measured)?.[1])
+const timingRank = (r: Result) =>
+  r.verdict === "CONFIRMS"
+    ? 0
+    : r.verdict === "CONTRADICTS"
+      ? 2
+      : r.verdict === "UNMEASURED" && /within \d+ % of the/.test(r.measured)
+        ? 1
+        : undefined
+export function worstOfPasses(
+  id: string,
+  a: Result,
+  b: Result,
+): { readonly result: Result; readonly unstable?: string } | undefined {
+  if (!isTimingRow(id)) return undefined
+  const [pa, pb] = [p95Of(a.measured), p95Of(b.measured)]
+  const differ = Math.abs(pa - pb) > TIMING_BAND * Math.max(pa, pb)
+  const both = `p95 ${pa} / ${pb}`
+  if (a.verdict === "NEW-EDGE" && b.verdict === "NEW-EDGE") {
+    const rest = b.measured.replace(/^first recorded: [^;]*; /, "")
+    return {
+      result: {
+        measured: `first recorded: ${both}${differ ? "; unstable on this host" : ""}; ${rest}`,
+        verdict: "NEW-EDGE",
+      },
+      unstable: differ ? `unstable on this host: ${both}` : undefined,
+    }
+  }
+  const [ra, rb] = [timingRank(a), timingRank(b)]
+  if (ra === undefined || rb === undefined) return undefined
+  if (ra === rb) return { result: b }
+  const worse = ra > rb ? a : b
+  return {
+    result: { measured: `unstable on this host: ${both}; worse pass: ${worse.measured}`, verdict: worse.verdict },
+    unstable: `unstable on this host: ${both}`,
+  }
+}
+
+// One --verify comparison: rows of other hosts and rows this pass did not re-measure are skipped with the reason;
+// timing rows compare worst-of-passes, so jitter across a bound reads UNSTABLE, never DIFF.
 export function verifyLine(
   row: LedgerRow,
   result: Result | undefined,
   host: string,
-): { readonly kind: "SAME" | "DIFF" | "SKIP"; readonly text: string } {
+): { readonly kind: "SAME" | "DIFF" | "SKIP" | "UNSTABLE"; readonly text: string } {
   if (row.host !== host) return { kind: "SKIP", text: `SKIP ${row.id} host=${row.host}` }
   if (result?.skip) return { kind: "SKIP", text: `SKIP ${row.id}: not re-measured by this pass: ${result.skip}` }
+  const w = result
+    ? worstOfPasses(row.id, { measured: row.measured, verdict: row.verdict as Verdict }, result)
+    : undefined
+  if (w?.unstable && w.result.verdict !== row.verdict)
+    return {
+      kind: "UNSTABLE",
+      text: `UNSTABLE ${row.id} ledger=${row.verdict} now=${result?.verdict} worst=${w.result.verdict} (${w.unstable}): jitter, not a difference`,
+    }
+  if (w?.unstable) return { kind: "SAME", text: `SAME ${row.id} ${row.verdict} worst of passes (${w.unstable})` }
   if (!result || result.verdict !== row.verdict)
     return {
       kind: "DIFF",
@@ -1140,7 +1220,7 @@ export function mergeLedger(before: readonly LedgerRow[], host: string, fresh: R
 }
 // A note survives a re-measure, except a probe-defect or SUSPECT note: the re-measure is what supersedes it.
 export const carriedNote = (n: string | undefined) =>
-  n && n !== "-" && !n.startsWith("probe defect") && !n.startsWith("SUSPECT") ? n : "-"
+  n && n !== "-" && !/^(probe defect|SUSPECT|lock state unproven)/.test(n) ? n : "-"
 export const rerun = (id: string) => `bun ${SELF} --verify ${LEDGER} --row ${id}`
 export const ledgerLine = (id: string, r: Result, host: string, build: string, notes = "-") => {
   const spec = SPEC[id] ?? { question: "unknown row", condition: "-" }
@@ -2102,7 +2182,8 @@ const LOGIC_CHECKS: readonly Check[] = [
               bad.push(`connect=${c} sid=${h} after=${JSON.stringify(after)}: ${p ?? "accepted"}`)
           }
       const early = sessionProblem("disconnected", r(0, sid), sid, restored) ?? ""
-      if (!early.includes("states seen")) bad.push("a missed WTSDisconnected does not report the states it saw")
+      if (!early.includes("1800ms connect=4"))
+        bad.push(`a missed WTSDisconnected does not report the states it saw: ${early}`)
       return bad.length ? bad.join("; ") : undefined
     },
   },
@@ -2213,16 +2294,83 @@ const LOGIC_CHECKS: readonly Check[] = [
     },
   },
   {
+    finding: "TIMING design-bounds (hosted run 43138273860)",
+    async run() {
+      const id = "n-barrier-fg-ms-wpf"
+      const row = (r: Result, rid = id): LedgerRow =>
+        Object.fromEntries(
+          HEADER.map((h) => [
+            h,
+            h === "id" ? rid : h === "host" ? "h" : h === "verdict" ? r.verdict : h === "measured" ? r.measured : "x",
+          ]),
+        ) as LedgerRow
+      const free = (p: number) => timingVerdict(p, undefined, `p50=1ms p95=${p}ms n=31`)
+      const poll = (p: number) => timingVerdict(p, BOUNDS.pollMs, `p50=1ms p95=${p}ms n=31`)
+      const bad: string[] = []
+      const one = free(14.531)
+      if (one.verdict !== "NEW-EDGE" || !one.measured.startsWith("first recorded: p95 14.531;"))
+        bad.push(`unbounded, one pass: ${one.verdict} ${one.measured}`)
+      const agree = worstOfPasses(id, free(14.5), free(14.9))
+      if (
+        agree?.result.verdict !== "NEW-EDGE" ||
+        agree.unstable ||
+        !agree.result.measured.startsWith("first recorded: p95 14.5 / 14.9;")
+      )
+        bad.push(`unbounded, agreeing passes: ${JSON.stringify(agree)}`)
+      const differ = worstOfPasses(id, free(14.531), free(23.079))
+      if (
+        differ?.result.verdict !== "NEW-EDGE" ||
+        !differ.result.measured.startsWith("first recorded: p95 14.531 / 23.079; unstable on this host")
+      )
+        bad.push(`unbounded, differing passes: ${JSON.stringify(differ)}`)
+      if (verifyLine(row(free(14.531)), free(23.079), "h").kind === "DIFF")
+        bad.push("unbounded: verify DIFFs on jitter")
+      const [lo, hi] = [poll(0.5), poll(16)]
+      if (lo.verdict !== "CONFIRMS" || !lo.measured.includes("design/d-windows.md:130"))
+        bad.push(`bounded under: ${lo.verdict} ${lo.measured}`)
+      if (hi.verdict !== "CONTRADICTS" || !hi.measured.includes("design/d-windows.md:130"))
+        bad.push(`bounded over: ${hi.verdict} ${hi.measured}`)
+      const w = worstOfPasses("n-poll-hrtimer1-ms", lo, hi)
+      if (w?.result.verdict !== "CONTRADICTS" || !w.result.measured.includes("p95 0.5 / 16"))
+        bad.push(`bounded straddle: ${JSON.stringify(w)}`)
+      if (verifyLine(row(lo, "n-poll-hrtimer1-ms"), hi, "h").kind === "DIFF")
+        bad.push("bounded straddle: verify DIFFs on jitter")
+      if (
+        verifyLine(
+          row({ measured: "m", verdict: "CONFIRMS" }, "n-uipi-sendinput"),
+          { measured: "m", verdict: "CONTRADICTS" },
+          "h",
+        ).kind !== "DIFF"
+      )
+        bad.push("a non-timing change does not DIFF")
+      // static: every bound carries a design citation, and no verdict applies a number of its own
+      const uncited = Object.entries(BOUNDS)
+        .filter(([, b]) => !/^design\/d-[a-z-]+\.md:\d+ \(/.test(b.cite))
+        .map(([k]) => k)
+      if (uncited.length) bad.push(`bounds without a design citation: ${uncited.join(",")}`)
+      const self = source("probe-sp-n.ts")
+      const calls = [...self.matchAll(/timingVerdict\(num\([^)]*\)[^,]*, ([^,]+), /g)].map((m) => m[1]?.trim() ?? "")
+      const rogue = calls.filter((a) => a !== "undefined" && !/^BOUNDS\.\w+$/.test(a))
+      if (calls.length < 5 || rogue.length)
+        bad.push(`timing calls with a bound of their own: ${rogue.join(",") || `only ${calls.length} calls found`}`)
+      if (/FRAME_MS|>= 0\.9\b|< 0\.01\b/.test(self.slice(0, self.indexOf("const LOGIC_CHECKS"))))
+        bad.push("an uncited number still decides a verdict")
+      if (!/0\.98[^\n]*d-windows\.md:80|d-windows\.md:80[^\n]*\n[^\n]*0\.98/.test(source("sp-n-native-capture.ps1")))
+        bad.push("the near-black 98 % bound has no design citation")
+      return bad.length ? bad.join("; ") : undefined
+    },
+  },
+  {
     finding: "LOW timing-flap",
     async run() {
-      const cases: Array<[number, number, Verdict]> = [
-        [16.157, 35, "CONFIRMS"],
-        [1.534, 2, "CONFIRMS"],
-        [2.05, 2, "UNMEASURED"],
-        [16, 2, "CONTRADICTS"],
-        [Number.NaN, 2, "UNMEASURED"],
+      const cases: Array<[number, Bound | undefined, Verdict]> = [
+        [0.5, BOUNDS.pollMs, "CONFIRMS"],
+        [1.05, BOUNDS.pollMs, "UNMEASURED"],
+        [16, BOUNDS.pollMs, "CONTRADICTS"],
+        [Number.NaN, BOUNDS.pollMs, "UNMEASURED"],
+        [16.2, undefined, "NEW-EDGE"],
       ]
-      const bad = cases.filter(([p, l, v]) => timingVerdict(p, l, "m").verdict !== v)
+      const bad = cases.filter(([p, b, v]) => timingVerdict(p, b, "m").verdict !== v)
       return bad.length ? `timing verdicts wrong for ${JSON.stringify(bad)}` : undefined
     },
   },
@@ -2284,6 +2432,23 @@ const LEDGER_CHECKS: readonly Check[] = [
       return bad.length
         ? `locked rows without a positive lock read or an INVALID note: ${bad.map((r) => `${r.id}@${r.host}`).join(",")}`
         : undefined
+    },
+  },
+  {
+    finding: "LEDGER design-bounds",
+    async run() {
+      const rows = readLedger(join(HERE, "win32-delivery.tsv")).filter((r) => r.host === HOSTED && isTimingRow(r.id))
+      const bad = rows.filter(
+        (r) =>
+          (r.verdict === "CONTRADICTS" || r.verdict === "CONFIRMS") && !/design\/d-windows\.md:\d+/.test(r.measured),
+      )
+      const wpf = rows.find((r) => r.id === "n-barrier-fg-ms-wpf")
+      if (
+        !wpf?.measured.startsWith("first recorded: p95 14.531 / 23.079; unstable on this host") ||
+        wpf.verdict !== "NEW-EDGE"
+      )
+        return `n-barrier-fg-ms-wpf is not the unbounded two-pass reading: ${wpf?.verdict} ${wpf?.measured.slice(0, 80)}`
+      return bad.length ? `timing verdicts without a design bound: ${bad.map((r) => r.id).join(",")}` : undefined
     },
   },
   {

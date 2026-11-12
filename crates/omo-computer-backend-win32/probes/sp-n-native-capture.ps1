@@ -14,6 +14,7 @@ public static partial class SpN {
     }
     double frac = sampled == 0 ? 1 : (double)black / sampled;
     h["w"] = f.W; h["h"] = f.H; h["nearBlack"] = Math.Round(frac, 4);
+    // near-black bound: >= 98 % of every 4th pixel near black, per design/d-windows.md:80 (PrintWindow floor)
     h["class"] = frac >= 0.98 ? "black_frame" : "frame";
     return h;
   }
