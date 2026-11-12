@@ -29,7 +29,7 @@ export function cleanRun(extra: readonly SentinelEvent[] = []): SentinelEvent[] 
     events.push({ t: at + 40, kind: "field", text: typed, final: false })
   }
   for (let t = 0; t <= 4_000; t += 50) events.push({ t, kind: "tick" })
-  events.push({ t: START, kind: "start" }, { t: STOP, kind: "stop", pendingReads: 0 })
+  events.push({ t: START, kind: "start" }, { t: STOP, kind: "stop", pendingReads: 0, pendingRegistrations: 0 })
   events.push({ t: 4_000, kind: "field", text: typed, final: true })
   return [...events, ...extra].sort((a, b) => a.t - b.t)
 }

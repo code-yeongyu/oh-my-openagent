@@ -43,7 +43,10 @@ const sampled = (fields: Partial<WindowAdded> = {}): WindowAdded => ({
   ...fields,
 })
 
-const withStop = (fields: { readonly pendingReads?: number }): SentinelEvent[] =>
+const withStop = (fields: {
+  readonly pendingReads?: number
+  readonly pendingRegistrations?: number
+}): SentinelEvent[] =>
   cleanRun().map((event) => (event.kind === "stop" ? { t: event.t, kind: "stop", ...fields } : event))
 
 describe("a new window whose attributes could not be read", () => {
@@ -113,20 +116,33 @@ describe("which branch of the dialog detector fired", () => {
 
 describe("new-window reads still running at stop", () => {
   test("a stop marker that reports pending reads is a dialog fault, never a clean window", () => {
-    const summary = summarize(withStop({ pendingReads: 2 }))
+    const summary = summarize(withStop({ pendingReads: 2, pendingRegistrations: 0 }))
     expect(summary.faults).toContain("dialog: 2 new-window reads were still running at stop")
     expect(verdict(summary)).toBe("invalid")
   })
 
   test("a stop marker with no pending reads changes nothing", () => {
-    expect(summarize(withStop({ pendingReads: 0 })).faults).toEqual([])
+    expect(summarize(withStop({ pendingReads: 0, pendingRegistrations: 0 })).faults).toEqual([])
+  })
+
+  // A registration still being retried at stop has not yet reported its gap. The harness keeps only events up to the
+  // final field read, so that gap's fact would be cut off and the gap read as clean; the stop marker counts it instead.
+  test("a stop marker that reports registrations still being retried is a dialog fault", () => {
+    const summary = summarize(withStop({ pendingReads: 0, pendingRegistrations: 1 }))
+    expect(summary.faults).toEqual(["dialog: 1 window-observer registrations were still being retried at stop"])
+    expect(verdict(summary)).toBe("invalid")
   })
 })
 
 describe("a fact the recorder did not report is a fault, not a clean read", () => {
   test("a stop marker without its pending-read count", () => {
-    const summary = summarize(withStop({}))
+    const summary = summarize(withStop({ pendingRegistrations: 0 }))
     expect(summary.faults).toEqual(["dialog: stop marker did not report pending new-window reads"])
+  })
+
+  test("a stop marker without its pending-registration count", () => {
+    const summary = summarize(withStop({ pendingReads: 0 }))
+    expect(summary.faults).toEqual(["dialog: stop marker did not report window-observer registrations still running"])
   })
 
   const { axError: _axError, ...noError } = axWindow()
