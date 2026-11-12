@@ -2,7 +2,13 @@ import { existsSync, readdirSync, realpathSync, rmSync } from "node:fs"
 import { userInfo } from "node:os"
 import { basename, dirname, join, resolve } from "node:path"
 
-import { loadOmoConfig, OmoConfigWriteError, resolveHomeDir, updateOmoConfig } from "@oh-my-opencode/omo-config-core"
+import {
+  loadOmoConfig,
+  OmoConfigWriteError,
+  type OmoConfigWriteFileSystem,
+  resolveHomeDir,
+  updateOmoConfig,
+} from "@oh-my-opencode/omo-config-core"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { BUILTIN_MODEL_PROFILES } from "./builtin-profiles"
@@ -41,6 +47,13 @@ export type ProjectModelProfileReply =
   | ({ readonly kind: "ok" } & ProjectModelProfileState)
   | { readonly kind: "refused"; readonly code: ProjectModelProfileRefusalCode; readonly message: string }
 
+/** Seams for tests: the writer's file system, where accounts' home folders live, and how a backup copy is removed. */
+export interface ProjectModelProfileDeps {
+  readonly fileSystem?: OmoConfigWriteFileSystem
+  readonly accountsRoot?: string
+  readonly removeFile?: (path: string) => void
+}
+
 export interface ProjectModelProfileSession {
   readonly cwd: string
   readonly isProjectTrusted: () => boolean
@@ -60,17 +73,18 @@ const realOrSelf = (path: string): string => {
 
 // A home folder's `.omo` is a user layer (omo-config-core loader/paths.ts), never a project layer: this account's
 // HOME and account home, and any other account's home directory.
-function isHomeFolder(cwd: string): boolean {
+function isHomeFolder(cwd: string, deps: ProjectModelProfileDeps): boolean {
   const folder = realOrSelf(cwd)
   if ([resolveHomeDir(), userInfo().homedir].some((home) => realOrSelf(home) === folder)) return true
-  const accountsRoot = dirname(realOrSelf(userInfo().homedir))
+  const accountsRoot = realOrSelf(deps.accountsRoot ?? dirname(userInfo().homedir))
   return dirname(folder) === accountsRoot && basename(folder).length > 0
 }
 
 // The writer's pre-write copies of this folder's omo config (`<file>.bak.<stamp>`), written before the atomic rename.
-function removeBackups(path: string): void {
+function removeBackups(path: string, deps: ProjectModelProfileDeps): void {
   const prefix = `${basename(path)}.bak.`
-  for (const name of readdirSync(dirname(path))) if (name.startsWith(prefix)) rmSync(join(dirname(path), name), { force: true })
+  const remove = deps.removeFile ?? ((file: string) => rmSync(file, { force: true }))
+  for (const name of readdirSync(dirname(path))) if (name.startsWith(prefix)) remove(join(dirname(path), name))
 }
 
 function projectConfigPath(cwd: string): string {
@@ -116,9 +130,12 @@ const stateReply = (cwd: string): ProjectModelProfileReply => {
   return { kind: "ok", ...state }
 }
 
-export function getProjectModelProfile(session: ProjectModelProfileSession | undefined): ProjectModelProfileReply {
+export function getProjectModelProfile(
+  session: ProjectModelProfileSession | undefined,
+  deps: ProjectModelProfileDeps = {},
+): ProjectModelProfileReply {
   if (session === undefined) return refused("no_session", "No session is bound to answer for a folder.")
-  if (isHomeFolder(session.cwd))
+  if (isHomeFolder(session.cwd, deps))
     return refused("home_folder", "The home folder has no project config; its .omo is the user layer.")
   return stateReply(session.cwd)
 }
@@ -126,12 +143,13 @@ export function getProjectModelProfile(session: ProjectModelProfileSession | und
 export function setProjectModelProfile(
   session: ProjectModelProfileSession | undefined,
   data: unknown,
+  deps: ProjectModelProfileDeps = {},
 ): ProjectModelProfileReply {
   if (session === undefined) return refused("no_session", "No session is bound to answer for a folder.")
   const value = typeof data === "object" && data !== null ? Reflect.get(data, "modelProfile") : undefined
   if (value !== null && typeof value !== "string")
     return refused("invalid_model_profile", "modelProfile must be a string or null.")
-  if (isHomeFolder(session.cwd))
+  if (isHomeFolder(session.cwd, deps))
     return refused("home_folder", "The home folder has no project config; its .omo is the user layer.")
   if (!session.isProjectTrusted())
     return refused("project_not_trusted", "The folder is not trusted; its omo config is not changed.")
@@ -146,9 +164,10 @@ export function setProjectModelProfile(
       scope: "project",
       projectDir: session.cwd,
       edits: [{ path: ["model_profile"], value: value ?? undefined }],
+      ...(deps.fileSystem === undefined ? {} : { fileSystem: deps.fileSystem }),
     })
   } catch (error) {
-    removeBackups(target)
+    removeBackups(target, deps)
     if (error instanceof OmoConfigWriteError && error.operation === "parse")
       return refused("project_config_parse_error", error.message)
     return refused("project_config_write_failed", error instanceof Error ? error.message : String(error))
@@ -157,7 +176,7 @@ export function setProjectModelProfile(
   // copy that cannot be removed is reported with the read-back, never as a failed write.
   let leftover: string | null = null
   try {
-    removeBackups(target)
+    removeBackups(target, deps)
   } catch (error) {
     leftover = error instanceof Error ? error.message : String(error)
   }

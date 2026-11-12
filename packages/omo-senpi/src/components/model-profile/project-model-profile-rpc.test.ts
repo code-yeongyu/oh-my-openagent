@@ -3,6 +3,8 @@
 import { describe, expect, test } from "bun:test"
 import { chmodSync, mkdirSync, readdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs"
 import { userInfo } from "node:os"
+
+import { DEFAULT_WRITE_FILE_SYSTEM } from "@oh-my-opencode/omo-config-core"
 import { join } from "node:path"
 
 import { testTempDir } from "../../../test-support/temp-dir"
@@ -175,6 +177,42 @@ describe("project model_profile RPC (#13188)", () => {
     }
     expect(readdirSync(join(cwd, ".omo")).sort()).toEqual(["omo.jsonc"])
     expect(configText(cwd)).toBe(COMMENTED)
+  })
+
+  test("#given the rename fails after the backup was written #when set #then no backup is left and the file is intact", () => {
+    const cwd = folder(COMMENTED)
+    const failingRename = { ...DEFAULT_WRITE_FILE_SYSTEM, renameSync: () => { throw new Error("rename refused") } }
+
+    const reply = setProjectModelProfile(trusted(cwd), { modelProfile: "a/b" }, { fileSystem: failingRename })
+
+    expect(reply).toMatchObject({ kind: "refused", code: "project_config_write_failed" })
+    expect(readdirSync(join(cwd, ".omo")).filter((name) => !name.endsWith(".tmp")).sort()).toEqual(["omo.jsonc"])
+    expect(configText(cwd)).toBe(COMMENTED)
+  })
+
+  test("#given removing the backup fails after the write landed #when set #then the write is reported as landed", () => {
+    const cwd = folder(COMMENTED)
+
+    const reply = setProjectModelProfile(trusted(cwd), { modelProfile: "a/b" }, {
+      removeFile: () => {
+        throw new Error("cleaner raced us")
+      },
+    })
+
+    expect(reply).toMatchObject({ kind: "ok", modelProfile: "a/b", backupNotRemoved: "cleaner raced us" })
+    expect(configText(cwd)).toContain('"model_profile": "a/b"')
+  })
+
+  test("#given another account's home folder #when a pin is set #then it is refused and nothing is written", () => {
+    const accountsRoot = folder()
+    const other = join(accountsRoot, "someone-else")
+    mkdirSync(join(other, ".omo"), { recursive: true })
+    writeFileSync(join(other, ".omo", "omo.jsonc"), COMMENTED)
+
+    const reply = setProjectModelProfile(trusted(other), { modelProfile: "a/b" }, { accountsRoot })
+
+    expect(reply).toMatchObject({ kind: "refused", code: "home_folder" })
+    expect(readFileSync(join(other, ".omo", "omo.jsonc"), "utf8")).toBe(COMMENTED)
   })
 
   test("#given no bound session #when either verb runs #then it answers no_session", () => {
