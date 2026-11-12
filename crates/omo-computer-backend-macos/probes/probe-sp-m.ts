@@ -646,6 +646,43 @@ function spaceDecision(spaces: ReadonlyArray<number | undefined>, currentSpace: 
   return spaces.includes(currentSpace) ? "on" : "off"
 }
 
+// The hwcapture verdict for one returned frame. `alpha` is `unread` when the image's data provider or its bytes
+// could not be read: that is not a frame property, so it is never 'fully transparent' and never CONTRADICTS.
+function frameDecision(
+  w: number,
+  h: number,
+  alpha: "opaque" | "transparent" | "unread",
+): { verdict: Verdict; behaves: string } {
+  const opaque = alpha === "opaque"
+  const ok = w > 0 && h > 0 && opaque
+  return {
+    verdict: ok ? "CONFIRMS" : "CONTRADICTS",
+    behaves: `image ${bucket8(w)}x${bucket8(h)} ${opaque ? "non-transparent" : "fully transparent"}`,
+  }
+}
+
+// The auth-offsets verdict. An unreadable candidate pointer is a failed candidate (the design's fail-closed
+// exception: the runtime degrades to pointer_only), and the ledger names it in `measured`.
+function authOffsetsOutcome(hits: number[], positions: number[], unreadable: number[]): Outcome {
+  void unreadable
+  const measured = `hits=[${hits.join(",")}];sentinelAt=[${positions.join(",")}]`
+  if (hits.length === 1)
+    return {
+      verdict: "CONFIRMS",
+      resolves: "-",
+      behaves: `exactly one candidate (${hits[0]}) carries the sentinel`,
+      measured,
+      reason: "-",
+    }
+  return {
+    verdict: "CONTRADICTS",
+    resolves: "-",
+    behaves: hits.length === 0 ? "no candidate carries the sentinel" : `${hits.length} candidates carry the sentinel`,
+    measured,
+    reason: "this version's fleet reads pointer_only",
+  }
+}
+
 function qCopySpaces(): Outcome {
   const n = native()
   const r = resolveAll(PATHS.skylight, [
@@ -1265,6 +1302,12 @@ function pendingRow(q: Question, major: number, reason: string): LedgerRow {
   }
 }
 
+// Command-line options that change what a measuring run does.
+function hostOptions(args: string[]): { withCapture: boolean } {
+  void args
+  return { withCapture: false }
+}
+
 function buildHost(args: string[]): Host {
   const { major, build } = precondition()
   return { major, build, session: sessionFacts(), withCapture: args.includes("--with-capture") }
@@ -1460,6 +1503,34 @@ function selfTest(): number {
   expect(
     "windowFromFields: unreadable bounds drop the entry",
     () => windowFromFields({ ...fields, w: undefined }) === undefined,
+  )
+  // fold of the review at bd138d2e74
+  expect("frameDecision: an unread data provider is UNMEASURED, not 'fully transparent'", () => {
+    const d = frameDecision(640, 480, "unread")
+    return d.verdict === "UNMEASURED" && !d.behaves.includes("fully transparent")
+  })
+  expect(
+    "frameDecision: a transparent frame is CONTRADICTS",
+    () => frameDecision(640, 480, "transparent").verdict === "CONTRADICTS",
+  )
+  expect("frameDecision: an opaque frame CONFIRMS", () => frameDecision(640, 480, "opaque").verdict === "CONFIRMS")
+  expect(
+    "spaceDecision: an unreadable Space entry is 'unread', not 'off'",
+    () => spaceDecision([3, undefined], 7) === "unread",
+  )
+  expect("spaceDecision: a readable match still decides 'on'", () => spaceDecision([7, undefined], 7) === "on")
+  expect("spaceDecision: an empty list is 'unread', not 'off'", () => spaceDecision([], 7) === "unread")
+  expect("authOffsetsOutcome: unreadable candidates are counted and named in measured", () => {
+    const o = authOffsetsOutcome([], [], [24, 32])
+    return o.measured.includes("unreadable=2[24,32]") && o.reason.includes("fail-closed")
+  })
+  expect("authOffsetsOutcome: a clean read with no hit reports unreadable=0", () =>
+    authOffsetsOutcome([], [], []).measured.includes("unreadable=0[]"),
+  )
+  expect("hostOptions: no flag leaves the capture leg off", () => hostOptions(["--measure"]).withCapture === false)
+  expect(
+    "hostOptions: --with-capture turns it on",
+    () => hostOptions(["--verify", "x", "--with-capture"]).withCapture === true,
   )
   // a file that is not an SP-M ledger: one-line refusal, exit 2
   const bad = `${process.env.TMPDIR ?? "/tmp"}/sp-m-self-test-${process.pid}.tsv`
