@@ -41,6 +41,13 @@ pub struct DesktopSessionOptions {
     /// errors carry `disposition`; send it only to an engine whose
     /// `engine.hello` lists `action-report`.
     pub report_mode: ReportMode,
+    /// Whether `session.open` named `reportMode` at all (set by the engine, never on the
+    /// wire). A protocol-1 caller that did not keeps byte-equal null-mode replies, where
+    /// ax snapshots ignore `root` and `skeleton`; a caller that chose a mode gets a typed
+    /// error for an option its mode cannot honour instead (#13170).
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub report_mode_explicit: bool,
     /// What a background action does when the user is using the target app.
     pub intervention: InterventionPolicy,
     /// macOS background key priming; accepted and stored, not acted on yet.
@@ -84,6 +91,7 @@ impl Default for DesktopSessionOptions {
             screenshot_gc: ScreenshotGc::default(),
             capture_caps: CaptureCaps::default(),
             report_mode: ReportMode::default(),
+            report_mode_explicit: false,
             intervention: InterventionPolicy::default(),
             macos_key_priming: KeyPriming::default(),
             trace: false,

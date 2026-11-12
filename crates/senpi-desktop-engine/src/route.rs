@@ -54,7 +54,10 @@ impl Engine {
                 Ok(Route::Immediate(to_result(Self::hello())))
             }
             Method::SessionOpen => {
-                let options: DesktopSessionOptions = parse(params)?;
+                // A non-null `reportMode` is a caller choice; absent (protocol 1) is not (#13170).
+                let explicit = params.get("reportMode").is_some_and(|mode| !mode.is_null());
+                let mut options: DesktopSessionOptions = parse(params)?;
+                options.report_mode_explicit = explicit;
                 self.stop_paths().set_policy(StopPolicy {
                     allow_host_relay_only: options.allow_host_relay_only_stop,
                 });

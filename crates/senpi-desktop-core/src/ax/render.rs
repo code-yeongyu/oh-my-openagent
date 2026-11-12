@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 
 use super::walk::{filter_node, label, walk_observed, walk_raw, WalkNode, WalkState};
 use super::{AxBackend, AxRegistry, DEFAULT_DEADLINE_MS};
-use crate::error::{CoreResult, DesktopError};
+use crate::error::{CoreResult, DesktopError, ErrorCode};
 use crate::report::ReportMode;
 use crate::types::{AxCut, AxSnapshot, AxSnapshotOptions, DesktopWindow};
 
@@ -90,11 +90,26 @@ pub fn snapshot(
     options: &AxSnapshotOptions,
 ) -> CoreResult<AxSnapshot> {
     let object = registry.report_mode() == ReportMode::Object;
+    // An option a read cannot honour fails loudly instead of returning the full tree as
+    // success (#13170): no snapshot implements `since`, and `root` (so `drill`) and
+    // `skeleton` need an object-mode session. A protocol-1 session that never named
+    // `reportMode` keeps its byte-equal replies (fixture ax-drill-v1-control).
+    if options.since.is_some() {
+        return Err(DesktopError::new(
+            ErrorCode::AxUnsupported,
+            "ax snapshot option `since` is not supported; read the window again",
+        ));
+    }
+    if !object && registry.report_mode_explicit() && (options.root.is_some() || options.skeleton == Some(true)) {
+        return Err(DesktopError::new(
+            ErrorCode::AxUnsupported,
+            "ax snapshot options `root` (and drill) and `skeleton` need a session opened with `reportMode: object`",
+        ));
+    }
     let timeout = Duration::from_millis(options.timeout_ms.unwrap_or(DEFAULT_DEADLINE_MS));
     // Measured from the request, so the root lookup counts against it; a
     // deadline past what `Instant` can hold never stops the walk.
     let deadline = object.then(|| Instant::now().checked_add(timeout)).flatten();
-    // Object mode only: a null-mode reply ignores `root` and `skeleton`.
     let drill = options.root.as_deref().filter(|_| object);
     let (generation, parent, root) = if let Some(reference) = drill {
         let handle = registry.resolve(reference)?;

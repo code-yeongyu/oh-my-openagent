@@ -480,7 +480,8 @@ fn a_drill_on_a_ref_of_another_window_is_an_invalid_target() {
 
 #[test]
 fn null_mode_ignores_skeleton_and_root_and_fills_no_generation() {
-    // Given: two null-mode registries that each read the window once.
+    // Given: two null-mode registries that each read the window once. A protocol-1
+    // session never named `reportMode`, so its replies stay byte-equal (#13170 keeps this).
     let second = |options: &AxSnapshotOptions| {
         let mut registry = AxRegistry::default();
         snapshot(&mut titled_levels(), &mut registry, &window(), &AxSnapshotOptions::default()).unwrap();
@@ -496,4 +497,35 @@ fn null_mode_ignores_skeleton_and_root_and_fills_no_generation() {
     // Then
     assert_eq!(ignored, plain);
     assert_eq!((ignored.generation, ignored.parent, ignored.complete), (None, None, None));
+}
+
+#[test]
+fn an_explicit_null_mode_session_refuses_root_and_skeleton_with_a_typed_error() {
+    // Given: a session that chose `reportMode: null` and has read the window once
+    // (#13170: it asked for these options, so they must not be dropped silently).
+    let read = |options: &AxSnapshotOptions| {
+        let mut registry = AxRegistry::with_report_mode(crate::report::ReportMode::Null).with_explicit_mode(true);
+        snapshot(&mut titled_levels(), &mut registry, &window(), &AxSnapshotOptions::default()).unwrap();
+        snapshot(&mut titled_levels(), &mut registry, &window(), options)
+    };
+    let rooted = AxSnapshotOptions { root: Some("e4".into()), ..AxSnapshotOptions::default() };
+    // When / Then
+    for options in [rooted, skeleton()] {
+        let error = read(&options).unwrap_err();
+        assert_eq!(error.code, crate::error::ErrorCode::AxUnsupported, "{options:?}");
+    }
+    // And a plain read in that session still answers.
+    assert!(read(&AxSnapshotOptions::default()).is_ok());
+}
+
+#[test]
+fn since_is_refused_in_every_report_mode_because_no_read_honours_it() {
+    // Given: `since` asks for changed nodes only, which no snapshot implements (#13170).
+    let since = AxSnapshotOptions { since: Some(1), ..AxSnapshotOptions::default() };
+    for mut registry in [AxRegistry::default(), object_registry()] {
+        // When
+        let error = snapshot(&mut titled_levels(), &mut registry, &window(), &since).unwrap_err();
+        // Then
+        assert_eq!(error.code, crate::error::ErrorCode::AxUnsupported);
+    }
 }
