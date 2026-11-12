@@ -433,18 +433,25 @@ describe("#13037 the sender half reaches a session on another device that is not
     test.each([
       ["the gates null", false],
       ["the gates set", true],
-    ] as const)("#given %s and the device list failing #then it is today's not_found, not internal_error", async (_case, wakeFeature) => {
-      const a = fixture.account({ rows: [B_ROW, C_ROW], devicesFail: true, wakeFeature })
-      const result = await fixture.surface(a.remote).run("thread_send", { thread: GONE, message: "hi" })
-      expect(messageOf(result)).toEqual(messageOf((await today([B_ROW, C_ROW], { devicesFail: true })).result))
-      expect(messageOf(result)?.code).toBe("not_found")
-    })
+    ] as const)(
+      "#given %s and the device list failing #then it is today's not_found, not internal_error",
+      async (_case, wakeFeature) => {
+        const a = fixture.account({ rows: [B_ROW, C_ROW], devicesFail: true, wakeFeature })
+        const result = await fixture.surface(a.remote).run("thread_send", { thread: GONE, message: "hi" })
+        expect(messageOf(result)).toEqual(messageOf((await today([B_ROW, C_ROW], { devicesFail: true })).result))
+        expect(messageOf(result)?.code).toBe("not_found")
+      },
+    )
   })
 
   describe("review: a receiving side's free-form refusal reason is bounded before it reaches the person", () => {
     test("#given a long multi-line reason with control characters #then the message is one bounded line", async () => {
       const reason = `${"x".repeat(600)}\nsecond line\u0007\u001b[31m`
-      const a = account({ rows: [B_ROW, C_ROW], ended: { c: { [GONE]: "rk-c-gone" } }, wakeOutcome: queuedEnvelope({ kind: "refused", reason }) })
+      const a = account({
+        rows: [B_ROW, C_ROW],
+        ended: { c: { [GONE]: "rk-c-gone" } },
+        wakeOutcome: queuedEnvelope({ kind: "refused", reason }),
+      })
       const result = await fixture.surface(a.remote).run("thread_send", { thread: GONE, message: "hi" })
       const error = (result as { error: { message: string; details?: { reason?: string } } }).error
       for (const text of [error.message, error.details?.reason ?? ""]) {
