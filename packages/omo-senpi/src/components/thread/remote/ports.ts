@@ -103,6 +103,8 @@ export type RemoteSessionsPort = {
   ) => Promise<RemoteCommandOutcome | { readonly kind: "unavailable" }>
   /** Whether `wake` can be sent at all, read before deciding a lane (nothing is sent). Absent: false. */
   readonly canWake?: () => Promise<boolean>
+  /** omo#13037: this device's own service can make the single probe (read from its connection; no round trip). */
+  readonly canLookup?: () => Promise<boolean>
   /**
    * The records `device`'s session writes from now on (none of the ones before), on the attach this port holds for it.
    * Refused, typed, when that attach cannot be made.
