@@ -113,11 +113,6 @@ impl Session {
 
     /// The lease ends under the user (the next report reads `user_moved_on`, no `Suspended`).
     pub(crate) fn end_lease(&mut self, why: LeaseEnd) {
-        // Row 22 (R26): every lease-end path releases a HELD display-awake hold; display.release
-        // parks it even when idle. (Session open's close_control must not park an idle hold.)
-        if matches!(why, LeaseEnd::DisplayRelease) || self.display_awake.holds_display_awake() {
-            self.display_awake = self.display_awake.release();
-        }
         self.funnel.control.presence.end(why);
         self.funnel.control.slot.release(&self.funnel.control.token);
         self.funnel.control.lease_epoch = None;
@@ -137,8 +132,6 @@ impl Session {
 
     /// `display.resume`: re-arms the display-awake hold only; it restores no lease.
     pub fn display_resume(&mut self) {
-        // Row 22 (R26): display.resume re-arms the hold row 22 owns.
-        self.display_awake = self.display_awake.resume();
         self.funnel.control.display_released = false;
         self.funnel.control.lease_hook.display_resumed(self.backend.as_mut());
     }

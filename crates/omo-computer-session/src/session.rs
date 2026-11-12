@@ -48,7 +48,7 @@ pub struct Session {
     pub(crate) frames: crate::frames::FrameStore,
     pub(crate) trace: crate::trace::Trace,
     /// The session-scoped display-awake hold (design row C22).
-    pub(crate) display_awake: crate::intervention::DisplayAwakeHold,
+    pub(crate) display_awake: crate::intervention::SharedHold,
 }
 
 impl Session {
@@ -69,7 +69,8 @@ impl Session {
 
     #[must_use]
     pub fn with_guard(backend: Box<dyn Backend>, guard: Guard) -> Self {
-        Self {
+        let display_awake = crate::intervention::SharedHold::default();
+        let mut session = Self {
             backend,
             guard,
             opened: None,
@@ -77,8 +78,10 @@ impl Session {
             refs: crate::refs::RefRegistry::default(),
             frames: crate::frames::FrameStore::default(),
             trace: crate::trace::Trace::default(),
-            display_awake: crate::intervention::DisplayAwakeHold::Idle,
-        }
+            display_awake: display_awake.clone(),
+        };
+        session.set_lease_hook(Box::new(crate::intervention::DisplayAwakeLeaseHook(display_awake)));
+        session
     }
 
     /// Opens (or re-opens) the session and answers its capabilities and a fresh resume token.
