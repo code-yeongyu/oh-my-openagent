@@ -2131,11 +2131,9 @@
         "script/build-brand-logo.ts",
         "script/build-cli-node.ts",
         "script/build-codex-install.ts",
-        // #9903: run by path from ci.yml and .github/scripts/ci-root-shard-2.sh, the PR gate workflow, and by hand (restore)
+        // #9903, #13192: run by path from ci.yml, .github/scripts/ci-root-shard-2.sh and the publish workflows
         "script/build-generated.ts",
-        "script/check-generated-bundles.ts",
         "script/check-generated-tree.ts",
-        "script/restore-generated.ts",
         "script/build-model-capabilities.ts",
         "script/build-omo-binary.ts",
         "script/build-omo-native.ts",

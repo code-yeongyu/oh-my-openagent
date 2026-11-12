@@ -3,8 +3,8 @@ import { fileURLToPath } from "node:url"
 
 import { isGeneratedBundlePath, loadGeneratedBundlePatterns } from "./generated-bundles.ts"
 
-// The two-way check (the list equals what the release generators write) builds the plugin, so it runs with the
-// Senpi suite after the build: packages/omo-senpi/plugin/scripts/generated-bundles-list.test.mjs.
+// The check that every output the full build writes is listed and ignored builds the plugin, so it runs with the Senpi
+// suite after the build: packages/omo-senpi/plugin/scripts/generated-bundles-list.test.mjs.
 const repositoryRoot = fileURLToPath(new URL("..", import.meta.url))
 const RUNTIME = "packages/omo-senpi/plugin/runtime"
 
@@ -25,6 +25,11 @@ describe("generated bundle list", () => {
     { path: `${RUNTIME}/dag/library.js`, listed: false },
     { path: `${RUNTIME}/bunshin-ts-old/sdk.js`, listed: false },
     { path: `${RUNTIME}/thread-sdk/x/sdk.js`, listed: false },
+    { path: "packages/omo-senpi/plugin/scripts/install.mjs", listed: true },
+    { path: "packages/omo-senpi/plugin/scripts/build-install.mjs", listed: false },
+    { path: "packages/omo-native/bin/lib/reflection-lock.generated.js", listed: true },
+    { path: "packages/omo-native/bin/lib/brand-logo.generated.js", listed: true },
+    { path: "packages/omo-native/bin/lib/brand-logo.generated.d.ts", listed: false },
   ])("#given the ECMAScript patterns #when $path is matched #then listed is $listed", ({ path, listed }) => {
     // given
     const patterns = loadGeneratedBundlePatterns()
@@ -36,16 +41,17 @@ describe("generated bundle list", () => {
     expect(matched).toBe(listed)
   })
 
-  test("#given the list #when each pattern is matched against the tracked files #then every pattern matches one", () => {
+  // Replaces the PR gate (#13192): the listed outputs are build outputs, never tracked, so a PR that adds one back fails.
+  test("#given the list #when matched against the tracked files #then no tracked file is a listed output", () => {
     // given
     const tracked = trackedFiles()
     const patterns = loadGeneratedBundlePatterns()
 
     // when
-    const dead = patterns.filter((pattern) => !tracked.some((path) => pattern.test(path))).map(String)
+    const trackedOutputs = tracked.filter((path) => isGeneratedBundlePath(path, patterns))
 
     // then
-    expect(patterns.length).toBeGreaterThan(0)
-    expect(dead).toEqual([])
+    expect(tracked.length).toBeGreaterThan(0)
+    expect(trackedOutputs).toEqual([])
   })
 })

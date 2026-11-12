@@ -1,8 +1,8 @@
 import { execFileSync } from "node:child_process"
 import { readFileSync } from "node:fs"
 
-// The generated outputs that only the release commit may change (#9903), read from the list next to this file. The
-// PR gate runs the BASE branch's copy of this module, so a PR cannot shorten the list that judges it.
+// The generated outputs (#9903, #13192), read from the list next to this file. None is tracked: the build writes them and
+// git ignores them.
 const LIST_URL = new URL("./generated-bundles.json", import.meta.url)
 
 export function loadGeneratedBundlePatterns(): readonly RegExp[] {

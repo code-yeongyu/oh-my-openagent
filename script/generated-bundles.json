@@ -1,11 +1,14 @@
 {
-  "//": "Generated outputs that only the release commit may change (#9903): exactly what publish.yml regenerates and stages. Feature PRs never commit them; build with `bun script/build-generated.ts`, restore with `bun script/restore-generated.ts`. Each pattern is an anchored regular expression over a repository-relative path.",
+  "//": "Build outputs that are never tracked (#13192): every path a pattern matches is written by `bun script/build-generated.ts` and ignored by git. script/generated-bundles.test.ts fails when a tracked file matches. Each pattern is an anchored ECMAScript regular expression over a repository-relative path.",
   "dialect": "ecmascript",
   "patterns": [
     "^packages/omo-senpi/plugin/extensions/[^/]+$",
     "^packages/omo-senpi/plugin/runtime/(?:agent-toolkit-sdk|bunshin-ts|thread-sdk)/[^/]+\\.js$",
     "^packages/omo-senpi/plugin/runtime/rollback-migrate\\.js$",
     "^packages/omo-codex/scripts/install-dist/install-local\\.mjs$",
-    "^packages/omo-native/bin/lib/service-auth\\.generated\\.js$"
+    "^packages/omo-native/bin/lib/service-auth\\.generated\\.js$",
+    "^packages/omo-senpi/plugin/scripts/install\\.mjs$",
+    "^packages/omo-native/bin/lib/reflection-lock\\.generated\\.js$",
+    "^packages/omo-native/bin/lib/brand-logo\\.generated\\.js$"
   ]
 }
