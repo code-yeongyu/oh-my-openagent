@@ -25,6 +25,8 @@ export interface ProjectModelProfileState {
   readonly exists: boolean
   readonly modelProfile: string | null
   readonly parseError: string | null
+  /** Set only when a write landed but the writer's pre-write copy could not be removed. */
+  readonly backupNotRemoved?: string
 }
 
 export type ProjectModelProfileRefusalCode =
@@ -151,9 +153,16 @@ export function setProjectModelProfile(
       return refused("project_config_parse_error", error.message)
     return refused("project_config_write_failed", error instanceof Error ? error.message : String(error))
   }
-  // The write is an atomic rename, so the pre-write copy has served its purpose; removing it never fails the write.
-  removeBackups(target)
-  return stateReply(session.cwd)
+  // The write is an atomic rename, so the pre-write copy has served its purpose. The write already landed, so a
+  // copy that cannot be removed is reported with the read-back, never as a failed write.
+  let leftover: string | null = null
+  try {
+    removeBackups(target)
+  } catch (error) {
+    leftover = error instanceof Error ? error.message : String(error)
+  }
+  const reply = stateReply(session.cwd)
+  return leftover === null || reply.kind !== "ok" ? reply : { ...reply, backupNotRemoved: leftover }
 }
 
 export function registerProjectModelProfileRpc(
