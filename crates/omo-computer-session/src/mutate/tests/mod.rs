@@ -98,16 +98,19 @@ impl Run {
             .collect()
     }
 
-    /// Every byte the engine wrote under its roots (audit, markers, artifacts).
+    /// Every byte the engine wrote under its roots (audit, markers, artifacts). An entry or
+    /// file that cannot be read fails the walk: a skipped file would read as clean.
     pub(super) fn everything_written(&self) -> String {
         let mut text = String::new();
         let mut stack = vec![self.dir.path().to_owned()];
         while let Some(dir) = stack.pop() {
-            for entry in fs::read_dir(dir).expect("readable").filter_map(Result::ok) {
-                let path = entry.path();
+            for entry in fs::read_dir(dir).expect("readable") {
+                let path = entry.expect("a readable dir entry").path();
                 if path.is_dir() {
                     stack.push(path);
-                } else if let Ok(bytes) = fs::read(&path) {
+                } else {
+                    let bytes = fs::read(&path)
+                        .unwrap_or_else(|error| panic!("{}: {error}", path.display()));
                     text.push_str(&String::from_utf8_lossy(&bytes));
                 }
             }
