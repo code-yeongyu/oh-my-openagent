@@ -1,15 +1,20 @@
 #!/usr/bin/env bun
-// Builds every generated output on script/generated-bundles.json: the generators the release job runs (publish.yml,
-// prepare job). Feature PRs never commit these outputs (#9903), so anything that reads them from a checkout builds
-// first. Run as `bun script/build-generated.ts`.
+// Builds every generated output on script/generated-bundles.json, plus the tracked daemon launch spec, so the tree check
+// that follows covers it (#13192). None of the listed outputs is tracked, so anything that reads one from a checkout
+// builds first. Inputs come first: build-install.mjs bundles the local launcher, which imports the brand logo module.
+// Run as `bun script/build-generated.ts`.
 import { fileURLToPath } from "node:url"
 
 const root = fileURLToPath(new URL("..", import.meta.url))
 
 const GENERATORS: readonly (readonly string[])[] = [
-  ["node", "packages/omo-senpi/plugin/scripts/build-extension.mjs"],
-  [process.execPath, "script/build-codex-install.ts"],
+  [process.execPath, "script/build-brand-logo.ts"],
+  [process.execPath, "script/build-reflection-lock.ts"],
   [process.execPath, "script/build-service-auth.ts"],
+  [process.execPath, "script/build-codex-install.ts"],
+  ["node", "packages/omo-senpi/plugin/scripts/build-extension.mjs"],
+  ["node", "packages/omo-senpi/plugin/scripts/build-daemon-launch-spec.mjs"],
+  ["node", "packages/omo-senpi/plugin/scripts/build-install.mjs"],
 ]
 
 for (const command of GENERATORS) {
