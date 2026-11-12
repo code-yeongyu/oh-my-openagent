@@ -1,11 +1,14 @@
 import { existsSync } from "node:fs"
+import { resolve } from "node:path"
 
-import type { Check } from "./preflight.ts"
+import { type Check, repoPath } from "./preflight.ts"
 import type { OsName } from "./vocabulary.ts"
 
 export type ObserverStatus = { readonly kind: "records" } | { readonly kind: "unavailable"; readonly reason: string }
 
 type RecordsOn = (os: OsName) => boolean
+
+const REPO = resolve(import.meta.dir, "../../../..")
 
 function recordsOnOf(loaded: unknown): RecordsOn | undefined {
   if (typeof loaded !== "object" || loaded === null || !("recordsOn" in loaded)) return undefined
@@ -20,12 +23,12 @@ function recordsOnOf(loaded: unknown): RecordsOn | undefined {
  */
 export async function observerCheck(sentinel: string, os: OsName): Promise<{ check: Check; status: ObserverStatus }> {
   if (!existsSync(sentinel)) {
-    const detail = `${sentinel} (row 3) is not on this checkout`
+    const detail = `${repoPath(REPO, sentinel)} (row 3) is not on this checkout`
     return { check: { name: "desktop-observer", ok: false, detail }, status: { kind: "unavailable", reason: detail } }
   }
   const recordsOn = recordsOnOf(await import(sentinel))
   if (recordsOn === undefined) {
-    const detail = `${sentinel} does not export recordsOn(os)`
+    const detail = `${repoPath(REPO, sentinel)} does not export recordsOn(os)`
     return { check: { name: "desktop-observer", ok: false, detail }, status: { kind: "unavailable", reason: detail } }
   }
   if (recordsOn(os))
