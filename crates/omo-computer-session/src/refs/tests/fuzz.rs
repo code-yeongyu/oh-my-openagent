@@ -1,13 +1,16 @@
-//! A seeded property test of A1 numbering. Each seed scripts random reads of a window with two
-//! groups of rows (add, remove, move across groups, recreate, lookalike, return of a removed
-//! row) and, between full reads, random drills of one group. After every read it checks:
+//! A seeded property test of A1 numbering. Each seed scripts random reads of a window whose rows
+//! sit three levels deep (window / group / subgroup / row): add, remove, move across subgroups,
+//! recreate, lookalike, return of a removed row. Between full reads it drills random containers
+//! of random VALID generations - older full reads and earlier drills included, so drills of
+//! drills nest - and the next full read follows. After every read it checks:
 //! (a) an object present in the previous read keeps its number;
 //! (b) no number is held by two elements of one read;
 //! (c) a number never moves away from an object present in the read;
 //! (d) a diff never marks as changed (`~`) a number whose baseline object is still present
 //!     under another number (a false relabel);
-//! (e) a drill never gives an element the number of a live element of its parent generation
-//!     outside the drilled subtree, unless it is that same native object.
+//! (e) a drill never gives an element a number that any valid generation of the window holds
+//!     for another live element: under another native object still present, or (without one)
+//!     outside the drilled element's subtree in that generation.
 //! The seeds are fixed and the run is bounded.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -33,6 +36,7 @@ struct Row {
     role: &'static str,
     id: Option<&'static str>,
     object: Option<u64>,
+    /// group * 2 + subgroup.
     group: usize,
 }
 
@@ -50,10 +54,11 @@ impl Row {
 }
 
 fn window(rows: &[Row]) -> Node {
-    let group = |g: usize| {
-        let kids = rows.iter().filter(|r| r.group == g).map(Row::node).collect();
-        el("group", &format!("G{g}")).obj(3 + u64::try_from(g).unwrap_or(0)).kids(kids)
+    let sub = |s: usize| {
+        let kids = rows.iter().filter(|r| r.group == s).map(Row::node).collect();
+        el("group", &format!("S{s}")).obj(5 + u64::try_from(s).unwrap_or(0)).kids(kids)
     };
+    let group = |g: usize| el("group", &format!("G{g}")).obj(3 + u64::try_from(g).unwrap_or(0)).kids(vec![sub(2 * g), sub(2 * g + 1)]);
     el("window", "W").obj(1).kids(vec![group(0), group(1)])
 }
 
@@ -64,7 +69,7 @@ fn script(rng: &mut Lcg, reads: usize) -> Vec<Vec<Row>> {
     let mut next = 10_u64;
     let mut fresh = |rng: &mut Lcg| {
         next += 1;
-        Row { title: format!("r{next}"), role: roles[rng.below(3)], id: ids[rng.below(3)], object: (rng.below(5) != 0).then_some(next), group: rng.below(2) }
+        Row { title: format!("r{next}"), role: roles[rng.below(3)], id: ids[rng.below(3)], object: (rng.below(5) != 0).then_some(next), group: rng.below(4) }
     };
     let mut rows: Vec<Row> = (0..rng.below(5) + 1).map(|_| fresh(rng)).collect();
     let mut gone: Vec<Row> = Vec::new();
@@ -77,7 +82,7 @@ fn script(rng: &mut Lcg, reads: usize) -> Vec<Vec<Row>> {
                 1 if !rows.is_empty() => gone.push(rows.remove(rng.below(rows.len()))),
                 2 if !rows.is_empty() => {
                     let mut row = rows.remove(rng.below(rows.len()));
-                    row.group = rng.below(2);
+                    row.group = rng.below(4);
                     rows.insert(rng.below(rows.len() + 1), row);
                 }
                 3 if !rows.is_empty() => {
@@ -104,26 +109,47 @@ fn script(rng: &mut Lcg, reads: usize) -> Vec<Vec<Row>> {
     out
 }
 
-/// (e): drill entries that took the number of a live parent element outside the subtree.
-fn drill_breaches(refs: &RefRegistry, parent: u64, group: usize, sub: u64) -> Vec<String> {
-    let parent = refs.generation("w", parent).expect("parent");
-    let root = parent.entries.iter().position(|e| e.read.title.as_deref() == Some(&*format!("G{group}"))).unwrap_or(0);
-    let inside = |mut i: usize| loop {
-        if i == root {
+/// Whether entry `at` of `generation` is the element numbered `root` or lies under it.
+fn under(generation: &crate::refs::Generation, mut at: usize, root: u64) -> bool {
+    loop {
+        if generation.entries[at].n == root {
             return true;
         }
-        match parent.entries[i].parent {
-            Some(up) => i = up,
+        match generation.entries[at].parent {
+            Some(up) => at = up,
             None => return false,
         }
-    };
-    let outside: BTreeMap<u64, Option<u64>> = (0..parent.entries.len()).filter(|i| !inside(*i)).map(|i| (parent.entries[i].n, parent.entries[i].object.map(|o| o.0))).collect();
-    let sub = refs.generation("w", sub).expect("sub-generation");
-    sub.entries
-        .iter()
-        .filter(|e| outside.get(&e.n).is_some_and(|o| o.is_none() || *o != e.object.map(|x| x.0)))
-        .map(|e| format!("(e) drill gave {:?} e{} of a live element outside G{group}", e.read.title, e.n))
-        .collect()
+    }
+}
+
+/// (e): drill entries holding a number another valid generation holds for another element.
+fn drill_breaches(refs: &RefRegistry, sub: u64) -> Vec<String> {
+    let drilled = refs.generation("w", sub).expect("sub-generation");
+    let root = drilled.entries[0].n;
+    // Live: present in the newest full read or in the drill's own read. A recreated element that
+    // inherited a number in a full read (A1 rule 2) left its old object dead, not foreign.
+    let live: BTreeSet<u64> = refs.latest("w").into_iter().chain([drilled]).flat_map(|g| g.entries.iter().filter_map(|e| e.object.map(|o| o.0))).collect();
+    let others: Vec<&crate::refs::Generation> = refs.windows["w"].generations.values().filter(|g| g.number != sub).collect();
+    let mut out = Vec::new();
+    for entry in &drilled.entries {
+        // Continuity: the same native object already held this number in a valid generation, so
+        // the drill decided nothing (a number a full read handed on is checked by (a)-(d)).
+        let kept = entry.object.is_some_and(|o| others.iter().any(|g| g.position(entry.n).is_some_and(|at| g.entries[at].object == Some(o))));
+        if kept {
+            continue;
+        }
+        let foreign = refs.windows["w"].generations.values().filter(|g| g.number != sub).find_map(|other| {
+            let at = other.position(entry.n)?;
+            let held = &other.entries[at];
+            let foreign = match held.object {
+                Some(object) => entry.object != Some(object) && live.contains(&object.0),
+                None => !under(other, at, root),
+            };
+            foreign.then(|| format!("(e) drill s{sub} gave {:?} e{} that s{} holds for {:?}", entry.read.title, entry.n, other.number, held.read.title))
+        });
+        out.extend(foreign);
+    }
+    out
 }
 
 fn breaches(seed: u64, reads: usize) -> Vec<String> {
@@ -162,16 +188,21 @@ fn breaches(seed: u64, reads: usize) -> Vec<String> {
             }
         }
         last_holder.extend(now.iter().map(|(o, n)| (*n, *o)));
-        if index + 1 < script.len() && rng.below(2) == 0 {
-            let group = rng.below(2);
-            let parent = refs.generation("w", observation.generation).expect("read");
-            if let Some(at) = parent.entries.iter().position(|e| e.read.title.as_deref() == Some(&*format!("G{group}"))) {
-                let token = parent.token(at);
-                tree.show("w", index + 1);
-                let sub = drill(&mut refs, &mut tree, &token, None, true).expect("drill").generation;
-                out.extend(drill_breaches(&refs, observation.generation, group, sub).into_iter().map(|b| format!("seed {seed} read {index}: {b}")));
+        if index + 1 < script.len() && rng.below(3) != 0 {
+            tree.show("w", index + 1);
+            for _ in 0..rng.below(3) + 1 {
+                let valid: Vec<u64> = refs.windows["w"].generations.keys().copied().collect();
+                let from = if rng.below(2) == 0 { valid[valid.len() - 1] } else { valid[rng.below(valid.len())] };
+                let generation = refs.generation("w", from).expect("valid");
+                let containers: Vec<usize> = (0..generation.entries.len()).filter(|i| generation.entries[*i].read.role == "group").collect();
+                if containers.is_empty() {
+                    continue;
+                }
+                let token = generation.token(containers[rng.below(containers.len())]);
+                let Ok(drilled) = drill(&mut refs, &mut tree, &token, None, true) else { continue };
+                out.extend(drill_breaches(&refs, drilled.generation).into_iter().map(|b| format!("seed {seed} read {index}: {b}")));
                 // A drill is a read too: its holders are the latest holders of their numbers.
-                last_holder.extend(holders(&refs, sub).into_iter().map(|(o, n)| (n, o)));
+                last_holder.extend(holders(&refs, drilled.generation).into_iter().map(|(o, n)| (n, o)));
             }
         }
         previous = Some((observation.generation, now));

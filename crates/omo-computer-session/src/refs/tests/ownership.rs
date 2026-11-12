@@ -92,3 +92,65 @@ fn a_drill_never_gives_a_lookalike_the_number_of_a_live_element_outside_its_subt
         assert_eq!(resolved.live.title.as_deref(), Some("X"), "{case}");
     }
 }
+
+fn n_titled(refs: &RefRegistry, generation: u64, title: &str) -> u64 {
+    let generation = refs.generation("w", generation).expect("generation");
+    generation.entries.iter().find(|e| e.read.title.as_deref() == Some(title)).unwrap_or_else(|| panic!("{title}")).n
+}
+
+fn token_of(refs: &RefRegistry, generation: u64, title: &str) -> String {
+    let generation = refs.generation("w", generation).expect("generation");
+    generation.token(generation.entries.iter().position(|e| e.read.title.as_deref() == Some(title)).unwrap_or_else(|| panic!("{title}")))
+}
+
+#[test]
+fn a_drill_of_a_drill_never_gives_a_lookalike_the_number_of_a_live_element() {
+    // The verifier's repro: W[X(row), G[S[k]]]; drill G, then S gains Y(row), then drill S from
+    // the first drill. X lives in the full read the sub-generations hang under.
+    for (case, x, y) in [
+        ("objects", el("listitem", "X").id("row").obj(21), el("listitem", "Y").id("row").obj(99)),
+        ("no objects", el("listitem", "X").id("row"), el("listitem", "Y").id("row")),
+    ] {
+        let shape = |s_kids: Vec<Node>| el("window", "W").obj(1).kids(vec![x.clone(), el("group", "G").obj(3).kids(vec![el("group", "S").obj(5).kids(s_kids)])]);
+        let mut tree = Tree::default().window("w", 1, vec![shape(vec![el("button", "k").obj(4)]), shape(vec![el("button", "k").obj(4), y.clone()])]);
+        let mut refs = RefRegistry::default();
+        let full = read(&mut refs, &mut tree, None).generation;
+        let x_n = n_titled(&refs, full, "X");
+        let first = { let t = token_of(&refs, full, "G"); drill(&mut refs, &mut tree, &t, None, true) }.expect("drill G").generation;
+        tree.show("w", 1);
+        let second = { let t = token_of(&refs, first, "S"); drill(&mut refs, &mut tree, &t, None, true) }.expect("drill S").generation;
+        assert_ne!(n_titled(&refs, second, "Y"), x_n, "{case}: Y must not take e{x_n} of the live X");
+        let resolved = refs.resolve(&format!("s{full}:e{x_n}"), true, &mut tree).expect("X resolves");
+        assert_eq!(resolved.live.title.as_deref(), Some("X"), "{case}");
+    }
+}
+
+#[test]
+fn a_drill_of_an_older_generation_never_takes_a_newer_live_number_and_the_next_read_keeps_it() {
+    // The verifier's repro: s1 W[G[k]]; s2 adds X(row); G gains Y(row); drill s1:G; then a
+    // full read since s2.
+    for (case, x, y) in [
+        ("objects", el("listitem", "X").id("row").obj(21), el("listitem", "Y").id("row").obj(99)),
+        ("no objects", el("listitem", "X").id("row"), el("listitem", "Y").id("row")),
+    ] {
+        let g = |kids: Vec<Node>| el("group", "G").obj(3).kids(kids);
+        let k = || el("button", "k").obj(4);
+        let v0 = el("window", "W").obj(1).kids(vec![g(vec![k()])]);
+        let v1 = el("window", "W").obj(1).kids(vec![x.clone(), g(vec![k()])]);
+        let v2 = el("window", "W").obj(1).kids(vec![x.clone(), g(vec![k(), y.clone()])]);
+        let mut tree = Tree::default().window("w", 1, vec![v0, v1, v2]);
+        let mut refs = RefRegistry::default();
+        let s1 = read(&mut refs, &mut tree, None).generation;
+        tree.show("w", 1);
+        let s2 = read(&mut refs, &mut tree, Some(s1)).generation;
+        let x_n = n_titled(&refs, s2, "X");
+        tree.show("w", 2);
+        let drilled = { let t = token_of(&refs, s1, "G"); drill(&mut refs, &mut tree, &t, None, true) }.expect("drill s1:G").generation;
+        assert_ne!(n_titled(&refs, drilled, "Y"), x_n, "{case}: Y must not take e{x_n} of the live X");
+        let next = read(&mut refs, &mut tree, Some(s2));
+        if case == "objects" {
+            assert_eq!(n_titled(&refs, next.generation, "X"), x_n, "{case}: X keeps its number in the next full read");
+            assert_eq!(next.diff_fallback, None, "{case}: nothing moved");
+        }
+    }
+}
