@@ -28,7 +28,7 @@ This skill runs on the native lead team tools. Members are background children r
 | Hand off to the planner | `task` | `category` XOR `subagent_type`, `load_skills: ["ulw-plan"]`, `run_in_background: false` |
 | Disband the team | `team_delete` | `team_run_id`, `force: true` |
 
-Members receive your rounds as injected follow-ups inside their child process; they reply to you with `task_send({ to: "lead", message: "..." })`. You are the information broker — members never see each other's replies except through the bundles you forward.
+Members receive your rounds as injected follow-ups inside their child process; they reply to you with `tool.task_send({ to: "lead", message: "..." })` in an eval cell. You are the information broker — members never see each other's replies except through the bundles you forward.
 
 **Delivery is injection-driven.** A `task_send` writes a durable message and returns immediately; it never interrupts the recipient. Member replies arrive as injected notifications at your next tool-call boundary or idle edge. After sending round N to all members, keep doing independent lead work or end your turn — each reply lands as an injected notification, and the round is complete once every expected reply has arrived.
 
@@ -244,7 +244,7 @@ From here on, "every member" means the roster `team_create` accepted: 5 members,
 
 ### Phase 2: Round 1 — Independent analysis
 
-Send the same task to every member via one `task_send` call per member. Each call is `task_send({ to: "<member>", team_run_id, message })` where message is:
+Send the same task to every member via one `tool.task_send` call per member, in an eval cell. Each call is `tool.task_send({ to: "<member>", team_run_id, message })` where message is:
 
 ```
 <hyperplan-round-1-task>
@@ -259,7 +259,7 @@ Each finding must be <=3 sentences and SPECIFIC (cite files, line numbers, alter
 
 DO NOT critique anything yet. DO NOT propose a synthesized plan. JUST findings from your role's perspective.
 
-When done, reply with your findings via task_send to "lead".
+When done, reply with your findings via tool.task_send({ to: "lead", message }) in an eval cell.
 </hyperplan-round-1-task>
 ```
 
@@ -306,7 +306,7 @@ Output format - for each of the other members:
 
 Be HOSTILE. Be RELENTLESS. No collegial hedging. If a finding is weak, EVISCERATE it. If you find a finding strong, say "STANDS — [reason]" and move on.
 
-When done, reply with your attacks via task_send to "lead".
+When done, reply with your attacks via tool.task_send({ to: "lead", message }) in an eval cell.
 </hyperplan-round-2-task>
 ```
 
@@ -335,7 +335,7 @@ Be HONEST. If you were wrong, concede. If you were right, defend with concrete e
 
 Output format per finding: "[finding #N] DEFEND/REFINE/CONCEDE: [explanation <=3 sentences]"
 
-When done, reply via task_send to "lead".
+When done, reply via tool.task_send({ to: "lead", message }) in an eval cell.
 </hyperplan-round-3-task>
 ```
 

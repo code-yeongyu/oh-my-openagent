@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import type { ToolDefinition } from "@code-yeongyu/senpi"
@@ -120,6 +121,9 @@ async function runTree(maxDepth: number, hostedParent = false) {
   const deps = engine.taskToolDeps(() => EMPTY_SKILL_INVOCATIONS)
   const { renderCall: _renderCall, renderResult: _renderResult, ...taskTool } = createTaskTool(deps)
   tools.push(taskTool)
+  // The task family is eval-only while codemode's eval exists (#12915); these scripted children call `task`
+  // directly, and ancestry is independent of the call surface, so their sessions load without codemode.
+  const restoreSettings = disableCodemodeForChildren((await loadSenpiBarrel()).getAgentDir())
   try {
     const started = await buildTaskExecute(deps)(
       "root-call",
@@ -153,8 +157,19 @@ async function runTree(maxDepth: number, hostedParent = false) {
     for (const parentSessionId of parents) {
       await engine.lifecycle.suspendOnSessionShutdown({ parentSessionId, reason: "quit" })
     }
+    restoreSettings()
     machine.cleanup()
   }
+}
+
+// In-process children read the global settings of senpi's agent dir (the test run's temporary home).
+function disableCodemodeForChildren(agentDir: string): () => void {
+  const path = join(agentDir, "settings.json")
+  const prior = existsSync(path) ? readFileSync(path, "utf8") : undefined
+  const settings: Record<string, unknown> = prior === undefined ? {} : JSON.parse(prior)
+  mkdirSync(agentDir, { recursive: true })
+  writeFileSync(path, `${JSON.stringify({ ...settings, disabledBuiltinExtensions: ["codemode"] })}\n`)
+  return () => (prior === undefined ? rmSync(path, { force: true }) : writeFileSync(path, prior))
 }
 
 describe("nested in-process task ancestry (#10732)", () => {

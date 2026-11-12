@@ -15,7 +15,7 @@ export function heartbeatRequestId(): string {
 const STOPPED = Symbol("heartbeat stopped")
 
 export function unresponsiveMessage(taskId: string): string {
-  return `ended: the child stopped answering for 30 s (3 heartbeats). Action: inspect task_output ${taskId}; run it again with task`
+  return `ended: the child stopped answering for 30 s (3 heartbeats). Action: inspect tool.task_output({ task_id: "${taskId}" }) in an eval cell; run it again with tool.task`
 }
 
 /** One probe at a time; a state answer or session event is evidence of life. */

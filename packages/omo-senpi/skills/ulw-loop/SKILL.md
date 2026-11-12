@@ -84,16 +84,16 @@ Under team mode, isolate and land per unit:
 
 ## Native Senpi Task Contract
 
-Senpi already exposes its real subagent spawn surface through the omo-senpi `task` component. Use it directly. Do not route delegation through external agent-protocol threads or another harness.
+Senpi already exposes its real subagent spawn surface through the omo-senpi `task` component. The task family is eval-only: call each tool below as `tool.<name>(...)` inside an eval cell. Do not route delegation through external agent-protocol threads or another harness.
 
 | Intent | Native Senpi tool |
 | --- | --- |
-| Spawn one worker | `task({ prompt, subagent_type | category, run_in_background: true })` |
-| Fan out independent workers | `task({ tasks: [{ prompt, subagent_type | category }, ...], run_in_background: true })` |
-| Send context or correction | `task_send({ to, message })` (`to` is the task id or name) |
-| Inspect one midpoint | `task_output({ task_id, mode: "tail" })` |
-| Stop a runaway worker | `task_cancel({ task_id })` |
-| Coordinate overlapping work | `team_create`, `task_create`, `task_get`, `task_list`, `task_update`; communicate with `task_send` |
+| Spawn one worker | `tool.task({ prompt, subagent_type | category, run_in_background: true })` |
+| Fan out independent workers | `tool.task({ tasks: [{ prompt, subagent_type | category }, ...], run_in_background: true })` |
+| Send context or correction | `tool.task_send({ to, message })` (`to` is the task id or name) |
+| Inspect one midpoint | `tool.task_output({ task_id, mode: "tail" })` |
+| Stop a runaway worker | `tool.task_cancel({ task_id })` |
+| Coordinate overlapping work | `team_create`, `task_create`, `task_get`, `task_list`, `task_update`; communicate with `tool.task_send` |
 
 Every worker prompt starts with `TASK:` and names `DELIVERABLE`, `SCOPE`, `VERIFY`, and `STOP WHEN`. Put requested skill names and all required context inside `prompt`; children do not inherit interview context automatically.
 

@@ -165,6 +165,14 @@ function assertClickAudited(run) {
   if (!audit.some((record) => record.action === "click"))
     throw new Error(`E21: the computer run's audit has no click record: ${JSON.stringify(audit).slice(0, 400)}`)
 }
+function assertChildRanFromCell(run) {
+  const end = run.client.events.find((event) => event.type === "tool_execution_end" && event.toolName === "eval")
+  if (!end) throw new Error("E22: the eval cell never finished")
+  const printed = (end.result?.content ?? []).map((part) => part?.text ?? "").join("\n")
+  if (end.isError || !printed.includes("E22-CHILD false CHILD-DONE"))
+    throw new Error(`E22: the cell's tool.task did not run a child to completion: ${printed.slice(0, 400)}`)
+}
+
 /** The fake provider's model, as a category model reference. */
 const FAKE_MODEL = "mock/mock-model"
 
@@ -249,8 +257,12 @@ const cases = [
           toolCalls: [
             {
               id: "call_task",
-              name: "task",
-              args: { category: "eqcat", prompt: "say CHILD-DONE", run_in_background: false, name: "eqchild" },
+              name: "eval",
+              args: {
+                language: "js",
+                summary: "delegate one foreground sub-agent",
+                code: 'const r = await tool.task({ category: "eqcat", prompt: "say CHILD-DONE", run_in_background: false, name: "eqchild" }); print("E22-CHILD " + String(r.hasError) + " " + r.text)',
+              },
             },
           ],
         },
@@ -266,6 +278,7 @@ const cases = [
       await openSettled(run)
       answerUiRequests(run)
       await run.prompt("delegate one foreground sub-agent")
+      assertChildRanFromCell(run)
       await run.close()
     },
   },

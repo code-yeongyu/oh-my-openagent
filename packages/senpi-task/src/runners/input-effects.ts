@@ -140,7 +140,7 @@ export function createInputEffects(input: {
             ? {
                 reason: "input_refused",
                 detail: String(error),
-                action: "inspect task_output before sending another message",
+                action: "inspect tool.task_output({ task_id }) in an eval cell before sending another message",
               }
             : { reason: conflict.reason, detail: conflict.detail, action: conflict.action },
         )

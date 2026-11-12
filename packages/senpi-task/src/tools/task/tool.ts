@@ -1,5 +1,6 @@
 import type { ToolDefinition } from "@code-yeongyu/senpi"
 
+import { TASK_FAMILY_EXPOSURE } from "../exposure"
 import { normalizeTaskToolArguments } from "./argument-normalization"
 import { buildTaskToolDescription, TASK_PROMPT_GUIDELINES, TASK_PROMPT_SNIPPET } from "./description"
 import { buildTaskExecute } from "./execute"
@@ -20,6 +21,7 @@ export function createTaskTool(deps: TaskToolDeps): ToolDefinition<typeof TaskTo
     name: TASK_TOOL_NAME,
     label: "Task",
     description: buildTaskToolDescription({ omoConfig: deps.omoConfig, agents: deps.agents }),
+    exposure: TASK_FAMILY_EXPOSURE,
     promptSnippet: TASK_PROMPT_SNIPPET,
     promptGuidelines: [...TASK_PROMPT_GUIDELINES],
     parameters: TaskToolParams,

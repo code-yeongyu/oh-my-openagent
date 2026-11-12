@@ -4,6 +4,7 @@ import type { Static } from "typebox"
 
 import type { TaskStatus } from "../../state"
 import { withDroppedSteeringNotice } from "../../state/queued-steering"
+import { TASK_FAMILY_EXPOSURE } from "../exposure"
 import { renderTaskCancelCall, renderTaskCancelResult } from "./renderers"
 import { toolResult } from "./tool-result"
 import type { CancelManager, CancelResultDetails, CancelToolResult } from "./types"
@@ -82,7 +83,7 @@ export async function runTaskCancel(manager: CancelManager, params: TaskCancelIn
     case "released":
       return toolResult(
         withDroppedSteeringNotice(
-          `Task ${outcome.task_id} had already finished (${outcome.status}); its retained child or queued continuation is now released. The result stays readable with task_output, and task_send revives it.`,
+          `Task ${outcome.task_id} had already finished (${outcome.status}); its retained child or queued continuation is now released. The result stays readable with tool.task_output({ task_id }) in an eval cell, and tool.task_send revives it.`,
           outcome.undelivered_messages ?? 0,
         ),
         {
@@ -112,10 +113,7 @@ export function createTaskCancelTool(
     name: "task_cancel",
     label: "Task Cancel",
     description: DESCRIPTION,
-    // Rarely used: searchable and activated by name on first call (#11454).
-    exposure: "search",
-    allowLazyActivation: true,
-    searchKeywords: ["cancel child", "stop task", "abort subagent"],
+    exposure: TASK_FAMILY_EXPOSURE,
     parameters: TaskCancelParams,
     execute: (_toolCallId, params) => runTaskCancel(deps.manager, params),
     renderCall: (args, theme) => renderTaskCancelCall(args, theme),

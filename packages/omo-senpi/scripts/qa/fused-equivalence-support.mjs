@@ -46,6 +46,26 @@ export function splitStatusChannels(client) {
   }
 }
 
+const isRunningCell = (cell) => cell?.status === "running"
+const isEvalProgressSnapshot = (event) => {
+  if (event?.type !== "tool_execution_update" || event.toolName !== "eval") return false
+  const cells = event.partialResult?.details?.cells
+  return Array.isArray(cells) && cells.length > 0 && cells.every(isRunningCell)
+}
+
+/**
+ * The eval tool streams a progress snapshot of its running cells on a timer while a cell runs, so how many
+ * `tool_execution_update` events a long cell emits, and what the cell had printed when each fired, is wall-clock sampling,
+ * not session behavior (E22 drives a child through `tool.task` in a cell). The queued and complete transitions and the
+ * tool_execution_end carry the cell's state and full output; the mid-run snapshots are dropped from the turn list.
+ */
+export function dropEvalProgressSnapshots(client) {
+  const listKey = Array.isArray(client.turn) ? "turn" : "events"
+  const events = client[listKey]
+  if (!Array.isArray(events)) throw new Error(`unexpected O6 shape from the harness: ${Object.keys(client).join(",")}`)
+  return { ...client, [listKey]: events.filter((event) => !isEvalProgressSnapshot(event)) }
+}
+
 /** Per O6 client, each status channel's snapshot count: written to the receipt next to the compare result. */
 export function statusCounts(observations) {
   return (observations?.O6 ?? []).map((client) =>

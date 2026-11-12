@@ -257,7 +257,7 @@ function wireJobWidgets(pi: SenpiExtensionAPI, engine: TaskEngine, cwd: string, 
 function registerRemovedTeamWaitHint(pi: SenpiExtensionAPI): void {
   pi.registerRemovedToolHint?.(
     "team_wait",
-    "team_wait was removed - team messages arrive as steered notifications; send updates with task_send and end your turn.",
+    "team_wait was removed - team messages arrive as steered notifications; send updates with tool.task_send in an eval cell and end your turn.",
   )
 }
 

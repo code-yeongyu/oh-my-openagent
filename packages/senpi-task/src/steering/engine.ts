@@ -31,8 +31,9 @@ import {
 } from "../runners/rpc-host/session-wire"
 import { InputUncertainError, InputConflictError } from "../runners/input-effects"
 
-const TASK_OUTPUT_SUGGESTION = "Use task_output to read the final result."
-const NOT_FOUND_SUGGESTION = "Use /tasks to see available tasks, or task_output to read a known task."
+const TASK_OUTPUT_SUGGESTION = "Use tool.task_output({ task_id }) in an eval cell to read the final result."
+const NOT_FOUND_SUGGESTION =
+  "Use /tasks to see available tasks, or tool.task_output({ task_id }) in an eval cell to read a known task."
 
 export function createSteeringEngine(port: SteeringPort): SteeringEngine {
   const pendingSends = new Map<string, number>()
@@ -183,8 +184,8 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
           ? `Task ${record.task_id} ended: ${record.error_message}. Its transcript and worktree are kept.`
           : `Task ${record.task_id} exited before its last message was acknowledged.`,
         suggestion: lost
-          ? "Read its work with task_output and start a new task to continue it."
-          : "Inspect task_output before resending.",
+          ? "Read its work with tool.task_output({ task_id }) in an eval cell and start a new task to continue it."
+          : "Inspect tool.task_output({ task_id }) in an eval cell before resending.",
       }
     }
 

@@ -15,8 +15,8 @@ This skill may include examples copied from the OpenCode harness. In Senpi, do n
 | `call_omo_agent(subagent_type="librarian", ...)` | `task` tool with `subagent_type: "librarian"` |
 | worker/implementation `task(...)` | `task` tool with `category` from the delegation router (`quick`, `unspecified-low`, `unspecified-high`, `deep-low`, `deep-high`, `ultrabrain`, `visual-engineering`, `writing`); honor the plan's `Recommended task executor category:` line |
 | final-review / gate-reviewer `task(...)` | fresh `task` with `subagent_type: "omo-native-gate-reviewer"` (the builtin gate reviewer, category-routed `deep-high` then `unspecified-high`) and the review inputs; `plan-reviewer`/`plan-consultant` are plan-gated curated reviewers, spawnable only while the plan gate is open |
-| `background_output(task_id="...")` | `task_output` tool with the task id |
-| `team_*(...)` | Lead team tools (`team_create`, `task_create`, ...); send with `task_send`, then keep working or end your turn — member and lead mail arrive as injected notifications, never poll for it |
+| `background_output(task_id="...")` | `tool.task_output({ task_id })` in an eval cell |
+| `team_*(...)` | Lead team tools (`team_create`, `task_create`, ...); send with `tool.task_send` in an eval cell, then keep working or end your turn — member and lead mail arrive as injected notifications, never poll for it |
 
 If a code block below conflicts with this section, this section wins.
 

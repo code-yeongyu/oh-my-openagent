@@ -34,7 +34,7 @@ function result(text: string, details: TaskToolDetails): AgentToolResult<TaskToo
 }
 
 function continuationFooter(taskId: string): string {
-  return `\n\n[task_id: ${taskId} - continue with task_send(to="${taskId}", message="...")]`
+  return `\n\n[task_id: ${taskId} - continue in an eval cell with tool.task_send({ to: "${taskId}", message: "..." })]`
 }
 
 function syncResult(

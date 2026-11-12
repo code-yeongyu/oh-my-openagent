@@ -17,12 +17,12 @@ export function backgroundStartText(started: StartedResult, labels: StartLabels)
   const label = labels.taskSummary ?? labels.description ?? started.name
   const base =
     label === started.task_id
-      ? `Started task ${started.task_id} (${started.status})${queue}. Completion is automatically delivered. End your turn if no independent work remains; otherwise keep working. Use task_send only to steer it.`
-      : `Started task ${label} (${started.task_id}, ${started.status})${queue}. Completion is automatically delivered. End your turn if no independent work remains; otherwise keep working. Use task_send only to steer it.`
+      ? `Started task ${started.task_id} (${started.status})${queue}. Completion is automatically delivered. End your turn if no independent work remains; otherwise keep working. Use tool.task_send({ to, message }) in an eval cell only to steer it.`
+      : `Started task ${label} (${started.task_id}, ${started.status})${queue}. Completion is automatically delivered. End your turn if no independent work remains; otherwise keep working. Use tool.task_send({ to, message }) in an eval cell only to steer it.`
   return base
 }
 
 export function backgroundConversionText(started: StartedResult, labels: StartLabels, budgetSeconds: number): string {
-  const prefix = `Foreground wait reached the prompt-cache-safe budget (${budgetSeconds}s) for task ${started.task_id}; the task continues in background. Completion will arrive as a notification; steer with task_send, read with task_output.`
+  const prefix = `Foreground wait reached the prompt-cache-safe budget (${budgetSeconds}s) for task ${started.task_id}; the task continues in background. Completion will arrive as a notification; steer with tool.task_send({ to, message }) and read with tool.task_output({ task_id }) in an eval cell.`
   return `${prefix}\n\n${backgroundStartText(started, labels)}`
 }

@@ -33,7 +33,7 @@ This skill is authored against the native senpi task + team tool surface. You co
 | End a lane | `task_cancel` | — |
 | Disband the team at the end | `team_delete` | `team_run_id`, `force: true` |
 
-Members receive your mail as injected follow-ups inside their child process; they report to you with `task_send({ to: "lead", message: "..." })`. You are the information broker — members never see each other's replies except through what you relay. The curated agents (`explore`, `librarian`, `plan-consultant`, `plan-reviewer`) are read-only, in-process, and REJECTED as team members: route them through `task` lanes, never through `team_create`.
+Members receive your mail as injected follow-ups inside their child process; they report to you with `tool.task_send({ to: "lead", message: "..." })` in an eval cell. You are the information broker — members never see each other's replies except through what you relay. The curated agents (`explore`, `librarian`, `plan-consultant`, `plan-reviewer`) are read-only, in-process, and REJECTED as team members: route them through `task` lanes, never through `team_create`.
 
 ## Authority while active
 

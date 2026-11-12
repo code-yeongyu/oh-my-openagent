@@ -29,6 +29,7 @@ const evalCall = (language, summary, code) => ({ name: "eval", args: { language,
 const fake = await startFakeModelServer([
   { toolCalls: [{ name: "thread_list", args: { all_scope: true } }] },
   { toolCalls: [{ name: "generate_image", args: { prompt: "qa" } }] },
+  { toolCalls: [{ name: "task_output", args: { task_id: "st_qa_missing" } }] },
   // The cells print a summary of the listing: the eval tool truncates a long result, and a full listing
   // with session paths is one.
   {
@@ -60,6 +61,15 @@ const fake = await startFakeModelServer([
   },
   // A failing call inside a cell is an eval error that names the tool: thread_read without its
   // required `thread` argument.
+  {
+    toolCalls: [
+      evalCall(
+        "js",
+        "QA: task_output from a js cell",
+        'const r = await tool.task_output({ task_id: "st_qa_missing" }); print("TASK_OUTPUT_CELL " + String(r.hasError) + " " + r.text.slice(0, 200))',
+      ),
+    ],
+  },
   {
     toolCalls: [
       evalCall(
@@ -100,7 +110,7 @@ const surfaces = await client.request({ type: "get_loaded_surfaces", sessionId: 
 // session-work barrier while session_start runs, and `prompt()` waits for that barrier to settle.
 await client.promptAndSettle(
   caller.routingId,
-  "List the threads directly, generate an image directly, then list the threads from a js cell and a py cell, then generate an image from a cell.",
+  "List the threads directly, generate an image directly, read a task directly, then list the threads from a js cell and a py cell, generate an image from a cell, read a task from a cell, and read a thread without arguments from a cell.",
   { streamingBehavior: "followUp" },
 )
 const messages = await client.messages(caller.routingId)
@@ -126,12 +136,14 @@ for (const message of messages) {
 }
 const direct = calls.find((call) => call.name === "thread_list")
 const directImage = calls.find((call) => call.name === "generate_image")
+const directTaskOutput = calls.find((call) => call.name === "task_output")
 const evalCalls = calls.filter((call) => call.name === "eval")
 const cellFor = (language, needle) =>
   evalCalls.find((call) => call.args?.language === language && String(call.args?.code ?? "").includes(needle))
 const jsList = cellFor("js", "thread_list")
 const pyList = cellFor("py", "thread_list")
 const jsImage = cellFor("js", "generate_image")
+const jsTaskOutput = cellFor("js", "task_output")
 const jsBadRead = cellFor("js", "thread_read({})")
 // The system prompt the host sent the model on its first request: the eval-only paragraph must name
 // every withheld tool's cell form, so the names stay discoverable.
@@ -206,14 +218,36 @@ const image = imageDetails(jsImage?.text)
 // stand on their own.
 const engineHidesGenerateImage = systemPrompt.includes("tool.generate_image(")
 const evalParagraph = systemPrompt.slice(systemPrompt.indexOf("Eval-only tools"))
-const namedForms = ["tool.thread_list(", "tool.thread_send(", "tool.thread_report(", "tool.generate_image("].filter(
-  (form) => evalParagraph.includes(form),
+const namedForms = [
+  "tool.thread_list(",
+  "tool.thread_send(",
+  "tool.thread_report(",
+  "tool.task(",
+  "tool.task_output(",
+  "tool.generate_image(",
+].filter((form) => evalParagraph.includes(form))
+report.assert(
+  "direct-task-output-refused-with-eval-hint",
+  directTaskOutput !== undefined &&
+    /Tool task_output not found/.test(directTaskOutput.text) &&
+    directTaskOutput.text.includes("tool.task_output("),
+  `direct=${JSON.stringify(directTaskOutput?.text ?? null).slice(0, 300)}`,
+)
+report.assert(
+  "js-cell-task-output-reaches-tool",
+  jsTaskOutput !== undefined &&
+    /TASK_OUTPUT_CELL (true|false) .*st_qa_missing|TASK_OUTPUT_CELL (true|false) .*(unknown|not found|no such|not_found)/i.test(
+      jsTaskOutput.text,
+    ),
+  `task_output_cell=${JSON.stringify(jsTaskOutput?.text ?? null).slice(0, 300)}`,
 )
 report.assert(
   "system-prompt-names-thread-eval-forms",
   namedForms.includes("tool.thread_list(") &&
     namedForms.includes("tool.thread_send(") &&
-    namedForms.includes("tool.thread_report("),
+    namedForms.includes("tool.thread_report(") &&
+    namedForms.includes("tool.task(") &&
+    namedForms.includes("tool.task_output("),
   `named=${JSON.stringify(namedForms)} paragraph_head=${JSON.stringify(evalParagraph.slice(0, 200))}`,
 )
 if (engineHidesGenerateImage) {

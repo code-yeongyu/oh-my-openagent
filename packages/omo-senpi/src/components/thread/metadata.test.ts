@@ -122,4 +122,15 @@ describe("thread family metadata shape", () => {
     expect(typeof THREAD_FAMILY_PROMPT_GUIDELINES).toBe("string")
     expect(THREAD_FAMILY_PROMPT_GUIDELINES.length).toBeGreaterThan(0)
   })
+
+  test("the routing clause sends child-task work to tool.task in an eval cell, never to a direct task call", () => {
+    const routed = THREAD_TOOL_METADATA.filter((entry) => entry.description.includes("spawn a child task instead"))
+
+    expect(routed.length).toBeGreaterThan(0)
+    for (const entry of routed) {
+      expect(entry.description).toContain("tool.task(")
+      expect(entry.description).toContain("eval cell")
+      expect(entry.description).not.toMatch(/instead, use task\./)
+    }
+  })
 })

@@ -5,13 +5,14 @@ import { CATEGORY_CALLER_GUIDANCE } from "../../category"
 import { listTaskAgents, listTaskCategories } from "./categories"
 import type { TaskCategoryInfo } from "./types"
 
-export const TASK_PROMPT_SNIPPET = "Spawn one child or fan out a batch; use task_send to continue an existing child."
+export const TASK_PROMPT_SNIPPET =
+  "Spawn one child or fan out a batch; continue an existing child with tool.task_send({ to, message }) in an eval cell."
 
 export const TASK_PROMPT_GUIDELINES: readonly string[] = [
   "Spawn children with run_in_background=true.",
   "NEVER pass model together with category: category-routed tasks take their model from omo.json (categories.<name>.models).",
-  'Continue an existing child with task_send(to="st_...", message="..."); task always spawns.',
-  "Use task_output for one midpoint status or transcript peek; use task_cancel to end a child.",
+  'Continue an existing child with tool.task_send({ to: "st_...", message: "..." }) in an eval cell; task always spawns.',
+  "Use tool.task_output({ task_id }) for one midpoint status or transcript peek; use tool.task_cancel to end a child.",
   "Pass task_summary (one line, <=80 chars) on every spawn: the user's footer/widget UI shows it instead of the raw prompt, so it should say WHAT was delegated.",
 ]
 
@@ -64,6 +65,6 @@ run_in_background is batch-wide: set it once at the top level. An item-level cop
 name is an optional stable handle. model is an explicit override for subagent_type spawns ONLY.
 isolated runs a child in a checkout clone; it defaults to task.isolation.enabled. apply controls merge-back; false retains artifacts only. merge selects patch or branch. Batch items inherit these three options unless overridden. apply and merge require isolation to be enabled.
 NEVER combine model with category: a category-routed task always takes its model from omo.json (categories.<name>.models), so passing both fails with invalid_arguments.
-task_send continues an existing child; task always spawns.
+tool.task_send({ to, message }) in an eval cell continues an existing child; task always spawns.
 Prompts MUST be in English.`
 }

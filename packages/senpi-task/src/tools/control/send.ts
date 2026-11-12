@@ -3,6 +3,7 @@ import { log } from "@oh-my-opencode/utils"
 import type { TSchema } from "typebox"
 
 import { settledWithin } from "../../manager/settled-within"
+import { TASK_FAMILY_EXPOSURE } from "../exposure"
 import { runTeamSend } from "../team/messaging"
 import type { TeamToolsService } from "../team/types"
 import { defaultResolveCallerSessionId } from "./caller-session"
@@ -191,6 +192,7 @@ export function createTaskSendTool(deps: TaskSendDeps): ToolDefinition<typeof Ta
     name: "task_send",
     label: "Task Send",
     description: DESCRIPTION,
+    exposure: TASK_FAMILY_EXPOSURE,
     parameters: TaskSendParams,
     execute: (_toolCallId, params, signal, _onUpdate, ctx) =>
       runTaskSend(deps.manager, params, resolveCaller(ctx), deps.teamRouting, {
@@ -227,6 +229,7 @@ export function createMemberScopedTaskSendTool(
     name: "task_send",
     label: "Task Send",
     description: MEMBER_SCOPED_DESCRIPTION,
+    exposure: TASK_FAMILY_EXPOSURE,
     parameters: MemberScopedTaskSendParams,
     execute: (_toolCallId, params: MemberScopedTaskSendInput, signal, _onUpdate, ctx) =>
       runTaskSend(

@@ -1,5 +1,5 @@
 // EQ.omo observation (fused-equivalence-e2e.mjs): the senpi harness's collectors plus the plugin's own rules.
-import { dropTimestampOffsets, splitStatusChannels } from "./fused-equivalence-support.mjs"
+import { dropEvalProgressSnapshots, dropTimestampOffsets, splitStatusChannels } from "./fused-equivalence-support.mjs"
 import { collectPluginState } from "./fused-equivalence-plugin-state.mjs"
 
 /**
@@ -68,7 +68,7 @@ function dropMeasurements(node) {
 export function observeOmo(run, observables, harness) {
   const raw = Object.fromEntries(observables.map((id) => [id, dropMeasurements(harness.collectors[id](run))]))
   if (raw.O5) raw.O5 = { ...raw.O5, plugin: dropMeasurements(collectPluginState(run)) }
-  if (raw.O6) raw.O6 = raw.O6.map(splitStatusChannels)
+  if (raw.O6) raw.O6 = raw.O6.map(splitStatusChannels).map(dropEvalProgressSnapshots)
   const normalize = harness.createNormalizer({
     roots: [
       { prefix: run.box.dir, token: "<sandbox>" },

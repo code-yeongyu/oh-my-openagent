@@ -75,7 +75,7 @@ function replacementCause(event: unknown): RunnerOutcome | undefined {
   return {
     status: "interrupted",
     cause: "session_replaced",
-    message: `The child's session was replaced${by === undefined ? "" : ` (${by})`}${target === undefined ? "" : ` by ${target}`}, which stopped its running turn. Use task_send to continue it in the new session.`,
+    message: `The child's session was replaced${by === undefined ? "" : ` (${by})`}${target === undefined ? "" : ` by ${target}`}, which stopped its running turn. Use tool.task_send({ to, message }) in an eval cell to continue it in the new session.`,
   }
 }
 

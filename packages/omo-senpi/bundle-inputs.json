@@ -2220,6 +2220,7 @@
     "packages/senpi-task/src/tools/control/send-shutdown.ts",
     "packages/senpi-task/src/tools/control/send.ts",
     "packages/senpi-task/src/tools/control/tool-result.ts",
+    "packages/senpi-task/src/tools/exposure.ts",
     "packages/senpi-task/src/tools/output/index.ts",
     "packages/senpi-task/src/tools/output/output.ts",
     "packages/senpi-task/src/tools/output/render.ts",
