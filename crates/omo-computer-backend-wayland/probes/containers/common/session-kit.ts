@@ -1,8 +1,10 @@
 // SP-W in-session toolkit: runs INSIDE a probe container, under a session started by session.sh.
 import { mkdirSync } from "node:fs"
+import { parseGlobals } from "./verdicts.ts"
 
 export type Compositor = "gnome" | "kde" | "sway"
-export type Answer = { answer: boolean | null; observed: string; reason?: string }
+// precondition: set when the answer only reflects a missing portal that every step of the question needs
+export type Answer = { answer: boolean | null; observed: string; reason?: string; precondition?: string }
 
 export const COMMON = "/probes/containers/common"
 
@@ -75,9 +77,10 @@ export async function outputRects(): Promise<Rect[]> {
   return rects
 }
 
-export async function globals(): Promise<string[]> {
+// null = wayland-info failed or listed nothing: no reading, never "not advertised"
+export async function globals(): Promise<string[] | null> {
   const r = await run(["wayland-info"], 20_000)
-  return [...r.out.matchAll(/interface: '([^']+)'/g)].map((m) => m[1] ?? "")
+  return parseGlobals(r.out, r.code)
 }
 
 // Independent reader: a focused wev window logs the wl_keyboard events it receives (line-buffered through stdbuf).

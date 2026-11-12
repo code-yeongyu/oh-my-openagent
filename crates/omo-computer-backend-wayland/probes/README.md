@@ -17,7 +17,15 @@ bun crates/omo-computer-backend-wayland/probes/probe-sp-w.ts --compositor sway [
 bun crates/omo-computer-backend-wayland/probes/probe-sp-w.ts --write crates/omo-computer-backend-wayland/probes/wayland-portal.tsv --compositor kde
 # measure every row again; exits 0 only if every verdict is identical
 bun crates/omo-computer-backend-wayland/probes/probe-sp-w.ts --verify crates/omo-computer-backend-wayland/probes/wayland-portal.tsv
+# the probe's own checks, no container: typecheck, the answer-rule tests, the interface-parser tests
+bun crates/omo-computer-backend-wayland/probes/probe-sp-w.ts --self-test
 ```
+
+`--self-test` is part of `bun run test:computer`, which CI runs.
+
+The mode comes from `--in-session`. Without it, the probe runs the host path (Docker), except inside a probe image (`/.dockerenv` and no `docker` client), where it takes the in-session path. A devcontainer with Docker therefore runs the host path.
+
+If a container exits before reporting a requested row, that row is written as `UNMEASURED` with the exit code (`ROWS_MISSING` is logged). It never keeps its old ledger value.
 
 The probe runs containers one at a time. Each starts with `--cpus=2` and `--rm`, and is force-removed afterwards. Before each `docker build` or `docker run`, the probe waits until the host's 1-minute load average is under 2x `nproc`, and logs the `uptime` reading it started on (`LOAD_GATE ...`). It also logs one `CONTAINER_START` and one `CONTAINER_REMOVED` line per container.
 
@@ -39,11 +47,13 @@ The ledger is tab-separated, with a header row. Its columns are:
 | 6 | `rerun` | the command that measures this row again, from the repository root |
 | 7 | `observed` | what was measured; rectangles are in 8 px buckets |
 | 8 | `host_build` | measurement date, host kernel, Docker version, pinned base image digest, built image id, and package versions |
-| 9 | `note` | `UNMEASURED: <reason>` for a row that was not measured. On `release-on-close` rows it is `release: proven`, `release: contradicted` or `release: unproven`. Otherwise `-` |
+| 9 | `note` | `UNMEASURED: <reason>` for a row that was not measured. `precondition-absent: <portal>` for a `CONTRADICTS` row whose answer only reflects that a portal every step of the question needs is missing. On `release-on-close` rows it is `release: proven`, `release: contradicted` or `release: unproven`. Otherwise `-` |
 
 The verdict always answers the question in column 3, never a design expectation. For example, `SPW-sway-gs-version CONTRADICTS` means the GlobalShortcuts portal is absent on sway, which is what the design expects for wlroots.
 
-A row is `UNMEASURED` only when the measurement itself could not run in the container, and its note names the cause. An answer is never guessed.
+A yes or no answer comes only from a reading that could have come out the other way. Every reader failure (a crashed or timed-out client, a missing key, a failed call, a reader that lists nothing) is `UNMEASURED`, never a negative, and the note names the cause. The rules live in `containers/common/verdicts.ts` and are tested class by class in `verdicts.test.ts`.
+
+When you count rows, read `precondition-absent` rows as one portal fact repeated per question, not as independent negatives.
 
 ## How the questions are measured
 
@@ -59,12 +69,14 @@ A row is `UNMEASURED` only when the measurement itself could not run in the cont
 - **Release on socket close.** An independent `wev` client reads the seat state, and the measurement runs as follows:
   1. A second injector is armed: on GNOME and KDE this is another RemoteDesktop session's libei keyboard, on sway another virtual keyboard.
   2. The holder presses shift.
-  3. The holder is killed with SIGKILL.
-  4. 300 ms later, the second injector types `a`.
+  3. At t0, the holder is killed with SIGKILL (kill leg), or kept alive (control leg).
+  4. 300 ms after t0, the second injector types `a`.
 
-  The release is proven when the reader receives an unshifted `a` within 2 s.
+  The two legs run in separate fresh sessions and use the same read. The control leg must read shifted (`A`, or shift depressed at the key); otherwise the reader cannot see a held modifier and the row is `UNMEASURED` (`release: unproven`).
+  - control shifted, kill unshifted: `release: proven`.
+  - control shifted, kill still shifted: `release: contradicted`.
 
-  On sway, the injector's keyboard exists before the kill. wlroots keeps modifier state per keyboard device and applies the active keyboard's state to the seat, so on sway the row shows that the destroyed device's shift is no longer in effect for the focused client. On GNOME, one Escape sent through Mutter's own RemoteDesktop API first leaves the overview that gnome-shell opens at startup, so that the reader window can take focus.
+  On sway the second injector is a separate virtual keyboard, and wlroots applies the active keyboard's own modifier state to the seat. The control leg shows whether that read can see the holder's shift at all. On GNOME, one Escape sent through Mutter's own RemoteDesktop API first leaves the overview that gnome-shell opens at startup, so that the reader window can take focus.
 - **KDE window management.** `kde-pwm.py` binds `org_kde_plasma_window_management` and asks KWin to activate the older of two windows. KWin authorises protocols by executable path, through the first desktop file that names the path, and Debian's `python3.x.desktop` already names the system interpreter. The helper therefore runs from its own copy of the interpreter, which a user desktop file authorises.
 
 ## Container notes (what each image needed to run headless)

@@ -96,7 +96,7 @@ export const QUESTIONS: readonly Question[] = [
     compositors: ALL,
     question: "Does the compositor release every key its destroyed virtual device held when the owner's socket closes?",
     condition:
-      "hold shift, SIGKILL the owner, read modifiers through an independent wev client within 2 s (GNOME/KDE: libei via the portal; sway: virtual_protocols)",
+      "hold shift, SIGKILL the owner, a second injector types a, an independent wev client reads it within 2 s; a control leg (holder alive) must read shifted (GNOME/KDE: libei via the portal; sway: virtual_protocols)",
     run: releaseOnClose,
   },
   {

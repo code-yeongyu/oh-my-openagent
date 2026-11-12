@@ -10,6 +10,7 @@ import {
   rectKey,
   restartSession,
 } from "./session-kit.ts"
+import { gsAnswer, presence, restoreAnswer } from "./verdicts.ts"
 
 const SWAY = "/probes/containers/sway"
 
@@ -69,32 +70,8 @@ function backendComplaint(): string {
   }
 }
 
-// The interface presence check (iface_probe.py): absent ONLY when the frontend's interface list came back without
-// the name; a failed call is UNMEASURED with its error text, never CONTRADICTS.
-const listed = (rec: Record<string, unknown>) =>
-  Array.isArray(rec.interfaces)
-    ? ` [${rec.interfaces.map((i) => String(i).replace("org.freedesktop.", "")).join(" ")}]`
-    : ""
-
-function presence(rec: Record<string, unknown>, nameKey = "iface_name"): Answer | null {
-  const name = String(rec[nameKey] ?? rec.iface ?? "?")
-  const err = rec.iface_error ?? rec.error
-  if (rec.result === "interface_error" || err !== undefined)
-    return {
-      answer: null,
-      observed: `call errored: ${String(err)}`,
-      reason: `the interface check for ${name} errored (${String(err)}), so presence was not measured`,
-    }
-  if (rec.result === "interface_absent" || rec.absent === true)
-    return {
-      answer: false,
-      observed: `enumerated ${String(rec.interfaces_enumerated)} interfaces${listed(rec)}, ${name} not among them`,
-    }
-  return null
-}
-
 function firstGrantFailed(rec: Record<string, unknown>, log: string): Answer | null {
-  const p = presence(rec)
+  const p = presence(rec, "session")
   if (p) return p
   if (rec.start_code === 0) return null
   const complaint = backendComplaint()
@@ -122,6 +99,15 @@ function firstGrantFailed(rec: Record<string, unknown>, log: string): Answer | n
   }
 }
 
+const restored = (answer: boolean | null, observed: string): Answer =>
+  answer === null
+    ? {
+        answer,
+        observed,
+        reason: "the restore leg ended neither started nor waiting on a dialog (backend error or crashed client)",
+      }
+    : { answer, observed }
+
 export async function scRestoreSession(c: Compositor): Promise<Answer> {
   const home = await freshSession(c, "sc-restore-session", prep(c))
   const tok = `${home}/screencast.token`
@@ -133,10 +119,10 @@ export async function scRestoreSession(c: Compositor): Promise<Answer> {
   if (c === "sway") await xdpwConfig(home, "deny")
   await restartSession(c)
   const b = await portal(c, ["screencast", "--restore-file", tok, "--timeout", "15"], false)
-  return {
-    answer: b.rec.start_code === 0,
-    observed: `first grant: ${brief(a.rec, SC_KEYS)}; after session restart, no dialog answered: ${brief(b.rec, SC_KEYS)}`,
-  }
+  return restored(
+    restoreAnswer(b.rec),
+    `first grant: ${brief(a.rec, SC_KEYS)}; after session restart, no dialog answered: ${brief(b.rec, SC_KEYS)}`,
+  )
 }
 
 export async function rdRestore(c: Compositor, across: "engine" | "session"): Promise<Answer> {
@@ -149,24 +135,24 @@ export async function rdRestore(c: Compositor, across: "engine" | "session"): Pr
     return { answer: false, observed: `first grant: ${brief(a.rec, RD_KEYS)}; no restore_token returned` }
   if (across === "session") await restartSession(c)
   const b = await portal(c, ["remote", "--restore-file", tok, "--timeout", "15"], false)
-  return {
-    answer: b.rec.start_code === 0,
-    observed: `first grant: ${brief(a.rec, RD_KEYS)}; after ${across} restart, no dialog answered: ${brief(b.rec, RD_KEYS)}`,
-  }
+  return restored(
+    restoreAnswer(b.rec),
+    `first grant: ${brief(a.rec, RD_KEYS)}; after ${across} restart, no dialog answered: ${brief(b.rec, RD_KEYS)}`,
+  )
 }
 
 export async function globalShortcuts(c: Compositor): Promise<Answer> {
   await freshSession(c, "gs-version", prep(c))
-  const r = await portal(c, ["iface", "GlobalShortcuts"], false)
-  return (
-    presence(r.rec, "iface") ?? {
-      answer: true,
-      observed: `enumerated ${String(r.rec.interfaces_enumerated)} interfaces${listed(r.rec)}, org.freedesktop.portal.GlobalShortcuts version ${String(r.rec.version)}`,
-    }
-  )
+  return gsAnswer((await portal(c, ["iface", "GlobalShortcuts"], false)).rec)
 }
 
 type Device = { event?: string; abs?: number; kbd?: number; regions?: { x: number; y: number; w: number; h: number }[] }
+function helperEvents(raw: string): string[] {
+  return raw
+    .split("\n")
+    .filter((l) => l.includes('"helper"'))
+    .map((l) => String(JSON.parse(l).helper?.event ?? ""))
+}
 function helperDevices(raw: string): Device[] {
   return raw
     .split("\n")
@@ -191,13 +177,26 @@ export async function eiRegions(c: Compositor, withStream: boolean): Promise<Ans
   const r = await portal(c, args, true)
   const fail = firstGrantFailed(r.rec, r.approverLog)
   if (fail) return fail
-  if (r.rec.eis_connect_1 !== "ok") return { answer: false, observed: `ConnectToEIS: ${r.rec.eis_connect_1}` }
+  if (r.rec.eis_connect_1 !== "ok")
+    return {
+      answer: null,
+      observed: `ConnectToEIS: ${String(r.rec.eis_connect_1)}`,
+      reason: "ConnectToEIS failed, so no region could be read",
+    }
+  if (!helperEvents(r.raw).includes("connect"))
+    return {
+      answer: null,
+      observed: "the libei helper never connected",
+      reason: "no libei connection, so no region could be read",
+    }
   const abs = helperDevices(r.raw).filter((d) => d.abs)
   const regions = abs.flatMap((d) => d.regions ?? [])
   const outKeys = outs.map(rectKey)
+  if (!outKeys.length)
+    return { answer: null, observed: "xdg-output listed no output", reason: "no output rectangles to compare with" }
   const regionKeys = new Set(regions.map(rectKey))
   const seen = `outputs=[${outKeys.join(" ")}] abs_devices=${abs.length} regions=[${[...regionKeys].join(" ")}] (8px buckets)`
-  if (withStream) return { answer: outKeys.length > 0 && outKeys.every((k) => regionKeys.has(k)), observed: seen }
+  if (withStream) return { answer: outKeys.every((k) => regionKeys.has(k)), observed: seen }
   return { answer: regions.length > 0, observed: seen }
 }
 
@@ -212,8 +211,14 @@ export async function secondConnect(c: Compositor): Promise<Answer> {
   if (fail) return fail
   const report = (r.rec.eis_2_report ?? []) as { event?: string }[]
   const connected = report.some((e) => e.event === "connect") && !report.some((e) => e.event === "disconnect")
+  if (r.rec.eis_connect_1 !== "ok")
+    return {
+      answer: null,
+      observed: `first=${String(r.rec.eis_connect_1)}`,
+      reason: "the first ConnectToEIS failed, so the second one proves nothing",
+    }
   return {
-    answer: r.rec.eis_connect_1 === "ok" && r.rec.eis_connect_2 === "ok" && connected,
+    answer: r.rec.eis_connect_2 === "ok" && connected,
     observed: `first=${r.rec.eis_connect_1} second=${r.rec.eis_connect_2} second_events=[${report.map((e) => e.event).join(",")}] (first socket still open)`,
   }
 }
@@ -229,8 +234,8 @@ export async function clipboardGrant(c: Compositor): Promise<Answer> {
   const r = await portal(c, ["remote", "--screencast", "--clipboard", "--timeout", "30"], true)
   const fail = firstGrantFailed(r.rec, r.approverLog)
   if (fail) return fail
-  return {
-    answer: r.rec.clipboard_enabled === true,
-    observed: `Clipboard iface version=${JSON.stringify(r.rec.clipboard_iface_version)} ${brief(r.rec, RD_KEYS)}`,
-  }
+  const observed = `Clipboard iface version=${JSON.stringify(r.rec.clipboard_iface_version)} ${brief(r.rec, RD_KEYS)}`
+  if (typeof r.rec.clipboard_enabled !== "boolean")
+    return { answer: null, observed, reason: "Start returned no clipboard_enabled, so the grant was not read" }
+  return { answer: r.rec.clipboard_enabled, observed }
 }

@@ -1,6 +1,7 @@
 // SP-W host runner: builds and runs one probe container at a time, behind a load gate. Runs on the HOST.
 import { readFileSync } from "node:fs"
 import type { Compositor } from "./common/session-kit.ts"
+import { reconcileRows } from "./run-plan.ts"
 
 export type Row = {
   id: string
@@ -9,6 +10,7 @@ export type Row = {
   answer: boolean | null
   observed: string
   reason?: string
+  precondition?: string
   pkgs: string
 }
 
@@ -95,7 +97,15 @@ export async function runContainer(c: Compositor, ids: string[]): Promise<Row[]>
       .filter((l) => l.startsWith("SPW_ROW "))
       .map((l): Row => JSON.parse(l.slice(8)))
     if (r.code !== 0 && rows.length === 0) throw new Error(`container ${name} exited ${r.code}: ${r.out.slice(-400)}`)
-    return rows.map((row) => ({ ...row, pkgs: `${row.pkgs}|${image}` }))
+    const requested = ids.map((q) => `SPW-${c}-${q}`)
+    const { rows: all, missing } = reconcileRows(requested, rows, r.code)
+    if (missing.length) log(`ROWS_MISSING ${name} exit=${r.code}: ${missing.join(" ")} (recorded UNMEASURED)`)
+    const pkgs = rows[0]?.pkgs ?? "-"
+    return all.map((row): Row =>
+      "compositor" in row
+        ? { ...row, pkgs: `${row.pkgs}|${image}` }
+        : { ...row, compositor: c, qid: row.id.replace(`SPW-${c}-`, ""), observed: "-", pkgs: `${pkgs}|${image}` },
+    )
   } finally {
     await sh(["docker", "rm", "-f", name])
     const left = (await sh(["docker", "ps", "-a", "-q", "--filter", `name=${name}`])).out.trim()

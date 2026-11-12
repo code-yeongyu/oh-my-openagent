@@ -4,6 +4,7 @@
 // On the host (Docker required):
 //   bun probe-sp-w.ts --compositor <gnome|kde|sway> [--question <id>]   measure, print ledger rows (TSV)
 //   bun probe-sp-w.ts --write <ledger.tsv> [--compositor <c>]...        measure and (re)write those rows
+//   bun probe-sp-w.ts --self-test                                       typecheck + unit tests, no container
 //   bun probe-sp-w.ts --verify <ledger.tsv>                             measure every row again; exit 0 iff
 //                                                                       every verdict is identical
 // Inside a probe container, under a session started by containers/common/session.sh:
@@ -15,6 +16,7 @@ import { parseArgs } from "node:util"
 import { QUESTIONS } from "./containers/common/questions.ts"
 import type { Compositor } from "./containers/common/session-kit.ts"
 import { type Row, hostBuild, runContainer, sh } from "./containers/host-runner.ts"
+import { chooseMode } from "./containers/run-plan.ts"
 
 const REL = "crates/omo-computer-backend-wayland/probes"
 const COMPOSITORS: readonly Compositor[] = ["gnome", "kde", "sway"]
@@ -82,6 +84,8 @@ async function toTsv(r: Row): Promise<string[]> {
   const spec = QUESTIONS.find((q) => q.id === r.qid)
   const v = verdict(r.answer)
   let note = r.answer === null ? `UNMEASURED: ${r.reason ?? "no reason recorded"}` : "-"
+  // the answer only reflects a missing portal that the question's every step needs: say so, so counts are not misread
+  if (r.answer === false && r.precondition) note = `precondition-absent: ${r.precondition}`
   if (r.qid === "release-on-close")
     note = `release: ${v === "CONFIRMS" ? "proven" : v === "CONTRADICTS" ? "contradicted" : "unproven"}${r.answer === null ? `; ${note}` : ""}`
   const rerun = `bun ${REL}/probe-sp-w.ts --compositor ${r.compositor} --question ${r.qid}`
@@ -137,13 +141,43 @@ const { values } = parseArgs({
     write: { type: "string" },
     verify: { type: "string" },
     "in-session": { type: "boolean" },
+    "self-test": { type: "boolean" },
   },
 })
-const inContainer = existsSync("/.dockerenv")
+const hasDocker = Bun.which("docker") !== null
+const mode = chooseMode({ inSession: values["in-session"] === true, hasDocker, dockerenv: existsSync("/.dockerenv") })
 const ids = (c: Compositor) =>
   values.question ? values.question.split(",") : QUESTIONS.filter((q) => q.compositors.includes(c)).map((q) => q.id)
 
-if (inContainer) {
+// The probe's own checks, run by `bun run test:computer`: each step is its own process and its exit code decides.
+async function selfTest(): Promise<number> {
+  const repo = `${import.meta.dir}/../../..`
+  const python = Bun.which("python3") ?? Bun.which("python")
+  const steps: [string, string[] | null][] = [
+    ["typecheck", ["bun", "check", "--no-script", "--all", "-p", `${import.meta.dir}/containers/tsconfig.json`]],
+    ["bun test", ["bun", "test", `${import.meta.dir}/containers`]],
+    [
+      "python unittest",
+      python ? [python, "-m", "unittest", `${import.meta.dir}/containers/common/test_iface_probe.py`] : null,
+    ],
+  ]
+  let failed = 0
+  for (const [name, cmd] of steps) {
+    if (!cmd) {
+      failed++
+      console.log(`SELF_TEST FAIL ${name}: no python3 or python on PATH`)
+      continue
+    }
+    const code = await Bun.spawn(cmd, { cwd: repo, stdout: "inherit", stderr: "inherit" }).exited
+    if (code !== 0) failed++
+    console.log(`SELF_TEST ${code === 0 ? "OK" : "FAIL"} ${name} (exit ${code})`)
+  }
+  return failed ? 1 : 0
+}
+
+if (values["self-test"]) {
+  process.exit(await selfTest())
+} else if (mode === "session") {
   const c = requireSession()
   if (values.verify) process.exit(await verify(values.verify, (cc, i) => measureInSession(cc, i), c))
   await measureInSession(c, ids(c))

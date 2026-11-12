@@ -10,11 +10,13 @@ import {
   restartSession,
   run,
 } from "./session-kit.ts"
+import { appsFrom, gsettingsBool } from "./verdicts.ts"
 
 const UUID = "spw-readonly@sisyphuslabs.ai"
 const BUS_NAME = "ai.sisyphuslabs.SenpiShell"
 
-async function nameHasOwner(name: string): Promise<boolean> {
+// null = the bus call failed: no reading
+async function nameHasOwner(name: string): Promise<boolean | null> {
   const r = await run([
     "gdbus",
     "call",
@@ -27,7 +29,20 @@ async function nameHasOwner(name: string): Promise<boolean> {
     "org.freedesktop.DBus.NameHasOwner",
     name,
   ])
-  return r.out.includes("true")
+  if (r.code !== 0) return null
+  return r.out.includes("true") ? true : r.out.includes("false") ? false : null
+}
+
+// polls up to n x 100 ms; true as soon as owned; null if no poll could read the bus
+async function ownedWithin(n: number): Promise<boolean | null> {
+  let read = false
+  for (let i = 0; i < n; i++) {
+    const o = await nameHasOwner(BUS_NAME)
+    if (o) return true
+    if (o === false) read = true
+    await Bun.sleep(100)
+  }
+  return read ? false : null
 }
 
 // A read-only extension whose only effect is owning ai.sisyphuslabs.SenpiShell on the session bus.
@@ -64,21 +79,15 @@ export async function gnomeExtensionNoLogout(c: Compositor): Promise<Answer> {
   const zip = `${home}/${UUID}.shell-extension.zip`
   const install = await run(["gnome-extensions", "install", "--force", zip])
   const enable = await run(["gnome-extensions", "enable", UUID])
-  let owned = false
-  for (let i = 0; i < 50 && !owned; i++) {
-    owned = await nameHasOwner(BUS_NAME)
-    if (!owned) await Bun.sleep(100)
-  }
+  const owned = await ownedWithin(50)
   const steps = `pack=${pack.code} install=${install.code} enable=${enable.code}${enable.err.trim() ? ` (${enable.err.trim().slice(0, 120)})` : ""}`
   // control: the same extension after a logout and login, which proves the fixture itself works
   await restartSession(c)
-  let ownedAfterRelogin = false
-  for (let i = 0; i < 100 && !ownedAfterRelogin; i++) {
-    ownedAfterRelogin = await nameHasOwner(BUS_NAME)
-    if (!ownedAfterRelogin) await Bun.sleep(100)
-  }
+  const ownedAfterRelogin = await ownedWithin(100)
   const observed = `${steps}; ${BUS_NAME} owned within 5 s without logout=${owned}; control after logout+login owned=${ownedAfterRelogin}`
-  if (!owned && !ownedAfterRelogin)
+  if (pack.code !== 0 || install.code !== 0 || enable.code !== 0 || owned === null)
+    return { answer: null, observed, reason: "a pack, install or enable step failed, or the bus could not be read" }
+  if (ownedAfterRelogin !== true)
     return {
       answer: null,
       observed,
@@ -104,22 +113,25 @@ async function setA11yEnabled(): Promise<string> {
   ])
   return `IsEnabled write exit=${r.code}${r.err.trim() ? ` ${r.err.trim().slice(0, 120)}` : ""}`
 }
-const gsettingsA11y = async () =>
-  (await run(["gsettings", "get", "org.gnome.desktop.interface", "toolkit-accessibility"])).out.trim()
+const gsettingsA11y = async () => {
+  const r = await run(["gsettings", "get", "org.gnome.desktop.interface", "toolkit-accessibility"])
+  return gsettingsBool(r.out, r.code)
+}
 
 export async function a11yGsettings(c: Compositor): Promise<Answer> {
   await freshSession(c, "a11y-gsettings")
   const before = await gsettingsA11y()
   const wrote = await setA11yEnabled()
   let after = before
-  for (let i = 0; i < 20 && after !== "true"; i++) {
+  for (let i = 0; i < 20 && after !== true; i++) {
     await Bun.sleep(100)
     after = await gsettingsA11y()
   }
-  return {
-    answer: after === "true",
-    observed: `toolkit-accessibility before=${before}; ${wrote}; after (within 2 s)=${after}`,
-  }
+  const observed = `toolkit-accessibility before=${String(before)}; ${wrote}; after (within 2 s)=${String(after)}`
+  // a write can only be seen landing if the key was readable and false before it
+  if (before !== false || after === null)
+    return { answer: null, observed, reason: "toolkit-accessibility was unreadable, or already true before the write" }
+  return { answer: after, observed }
 }
 
 const APPS: Record<string, { cmd: string[]; names: string[] }> = {
@@ -144,21 +156,22 @@ export async function a11yRegistry(c: Compositor, app: keyof typeof APPS): Promi
   const spec = APPS[app]
   if (!spec) throw new Error(`unknown app ${app}`)
   const proc = Bun.spawn(spec.cmd, { stdout: "ignore", stderr: "pipe" })
-  let names: string[] = []
+  // a listing counts only if it named some application (the shell at least); "not in the registry" needs one
+  let names: string[] | null = null
   try {
     for (let i = 0; i < 40; i++) {
-      names = (lastJson((await run(["python3", `${COMMON}/atspi.py`, "list"])).out).apps ?? []) as string[]
-      if (names.some((n) => spec.names.includes(n))) break
+      const r = await run(["python3", `${COMMON}/atspi.py`, "list"])
+      names = appsFrom(r.out, r.code) ?? names
+      if (names?.some((n) => spec.names.includes(n))) break
       await Bun.sleep(500)
     }
   } finally {
     proc.kill(9)
   }
-  const found = names.some((n) => spec.names.includes(n))
-  return {
-    answer: found,
-    observed: `${wrote}; started ${app} after the write, no other step; registry apps within 20 s: [${names.join(", ")}]`,
-  }
+  const observed = `${wrote}; started ${app} after the write, no other step; registry apps within 20 s: [${(names ?? []).join(", ")}]`
+  if (names === null)
+    return { answer: null, observed, reason: "no AT-SPI listing succeeded, so the registry was not read" }
+  return { answer: names.some((n) => spec.names.includes(n)), observed }
 }
 
 const PWM = "org_kde_plasma_window_management"
@@ -174,6 +187,8 @@ export async function kdePwmBind(c: Compositor, launch: "plain" | "desktop-file"
   })
   if (launch === "desktop-file") await run(["kbuildsycoca6"], 60_000)
   const g = await globals()
+  if (!g)
+    return { answer: null, observed: "wayland-info failed or listed no global", reason: "the registry was not read" }
   return {
     answer: g.includes(PWM),
     observed: `${PWM} advertised to /usr/bin/wayland-info (${launch === "plain" ? "plain child process, no desktop file" : "desktop file with X-KDE-Wayland-Interfaces"}): ${g.includes(PWM)}; globals=${g.length}`,
@@ -183,6 +198,8 @@ export async function kdePwmBind(c: Compositor, launch: "plain" | "desktop-file"
 export async function wlrForeignToplevel(c: Compositor): Promise<Answer> {
   await freshSession(c, "wlr-foreign-toplevel")
   const g = await globals()
+  if (!g)
+    return { answer: null, observed: "wayland-info failed or listed no global", reason: "the registry was not read" }
   const has = g.includes("zwlr_foreign_toplevel_manager_v1")
   return {
     answer: has,
