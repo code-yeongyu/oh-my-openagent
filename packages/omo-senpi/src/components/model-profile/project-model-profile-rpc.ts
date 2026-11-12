@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, realpathSync, rmSync } from "node:fs"
+import { existsSync, readdirSync, realpathSync, rmSync, statSync } from "node:fs"
 import { userInfo } from "node:os"
 import { basename, dirname, join, resolve } from "node:path"
 
@@ -73,11 +73,21 @@ const realOrSelf = (path: string): string => {
 
 // A home folder's `.omo` is a user layer (omo-config-core loader/paths.ts), never a project layer: this account's
 // HOME and account home, and any other account's home directory.
+// Same directory by identity, not by spelling: a case-insensitive volume names one folder two ways.
+function sameDirectory(a: string, b: string): boolean {
+  try {
+    const left = statSync(a)
+    const right = statSync(b)
+    return left.dev === right.dev && left.ino === right.ino
+  } catch {
+    return realOrSelf(a) === realOrSelf(b)
+  }
+}
+
 function isHomeFolder(cwd: string, deps: ProjectModelProfileDeps): boolean {
-  const folder = realOrSelf(cwd)
-  if ([resolveHomeDir(), userInfo().homedir].some((home) => realOrSelf(home) === folder)) return true
-  const accountsRoot = realOrSelf(deps.accountsRoot ?? dirname(userInfo().homedir))
-  return dirname(folder) === accountsRoot && basename(folder).length > 0
+  if ([resolveHomeDir(), userInfo().homedir].some((home) => sameDirectory(home, cwd))) return true
+  const accountsRoot = deps.accountsRoot ?? dirname(userInfo().homedir)
+  return sameDirectory(dirname(realOrSelf(cwd)), accountsRoot) && basename(realOrSelf(cwd)).length > 0
 }
 
 // The writer's pre-write copies of this folder's omo config (`<file>.bak.<stamp>`). Only copies that did not exist before
