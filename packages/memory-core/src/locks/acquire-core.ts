@@ -3,7 +3,7 @@ import { readOwner } from "./lock-owner"
 import { forgetProvenDeadTakeover } from "./proven-dead-takeovers"
 import { publishExclusive } from "./publish"
 import { delay, lockRetryDelayMs } from "./retry-delay"
-import { recoverStaleOwner } from "./stale-owner"
+import { type BlockedRecord, recoverStaleOwner } from "./stale-owner"
 
 export type AcquireLockOptions = {
   readonly waitTimeoutMs?: number
@@ -15,14 +15,30 @@ export type AcquireLockOptions = {
 
 const INCOMPLETE_LOCK_GRACE_MS = 5_000
 
+function contentionMessage(lockPath: string, blockedBy: unknown, blockedRecord: BlockedRecord | undefined): string {
+  if (blockedBy === undefined) return `Lock is held: ${lockPath}`
+  const reason = blockedBy instanceof Error ? blockedBy.message : String(blockedBy)
+  const record = blockedRecord === "recovery" ? "its recovery lock's dead holder" : "its dead owner's record"
+  return `Lock is held: ${lockPath} (${record} could not be removed: ${reason})`
+}
+
 export class LockContentionError extends Error {
   readonly retriable = true
 
+  /**
+   * `blockedBy`: the error that kept a proven-dead record on disk at the last attempt; `blockedRecord` says
+   * whether that record was the primary lock's owner or the `.recovery` lock's holder.
+   */
   constructor(
     readonly lockPath: string,
     readonly owner: LockRecord | null,
+    blockedBy?: unknown,
+    readonly blockedRecord?: BlockedRecord,
   ) {
-    super(`Lock is held: ${lockPath}`)
+    super(
+      contentionMessage(lockPath, blockedBy, blockedRecord),
+      blockedBy === undefined ? undefined : { cause: blockedBy },
+    )
     this.name = "LockContentionError"
   }
 }
@@ -101,12 +117,16 @@ async function acquireLoop(
     // A live owner that slipped in after this contender reclaimed the dead one is the dead owner's
     // successor; this acquisition succeeds it and must not keep the dead-owner proof (omo #10199 r5).
     recoveredDeadOwner = forfeitDeadOwnerProof(lockPath, record, recoveredDeadOwner)
-    if (await recoverStaleOwner(lockPath, owner, record, now(), incompleteLockGraceMs)) {
+    const recovery = await recoverStaleOwner(lockPath, owner, record, now(), incompleteLockGraceMs)
+    if (recovery === true) {
       recoveredDeadOwner = true
       continue
     }
     options.signal?.throwIfAborted()
-    if (now() >= deadline) throw new LockContentionError(lockPath, owner.record)
+    if (now() >= deadline)
+      throw recovery === false
+        ? new LockContentionError(lockPath, owner.record)
+        : new LockContentionError(lockPath, owner.record, recovery.blockedBy, recovery.blockedRecord)
     await delay(Math.min(lockRetryDelayMs(attempt, retryDelayMs), Math.max(1, deadline - now())), options.signal)
   }
 }
