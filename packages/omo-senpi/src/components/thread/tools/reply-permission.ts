@@ -28,7 +28,7 @@ export function threadSendPermission(
  * the name it stated - never from a listing. The send step then delivers only when the address resolves to that sender
  * (`replyTargetMismatch` in tools.ts), so a name that happens to match another session is never reached unapproved.
  */
-export function isReplyToConsumedSender(
+function isReplyToConsumedSender(
   options: Pick<ThreadToolSurfaceOptions, "callerReplyTargets" | "callerReplySenders">,
   target: string,
 ): boolean {

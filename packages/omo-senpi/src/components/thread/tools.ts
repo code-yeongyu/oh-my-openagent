@@ -3,7 +3,12 @@ import { threadToolFailure } from "./errors"
 import type { ThreadToolFailure } from "./errors"
 import { type Static } from "typebox"
 import { toThreadAddressEntries } from "./address-book"
-import { checkNameConflict, normalizeThreadName, type ThreadAddressEntry } from "./addressing"
+import {
+  checkNameConflict,
+  normalizeThreadName,
+  type ThreadAddressEntry,
+  type ThreadResolveResult,
+} from "./addressing"
 import { createLocalSessionHost } from "./control/local-session-host"
 import { checkInitialSkills } from "./initial-skills"
 import {
@@ -599,7 +604,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
         ? resolveEntries(options, current)
         : toThreadAddressEntries(sendAddressBook(options, current, address, true))
     // A reply to a sender on this device resolves among this device's entries only (A4.3.1).
-    const resolved =
+    const resolved: ThreadResolveResult & { readonly all_scope?: boolean | undefined } =
       replyTo === undefined
         ? await resolveAcross(options, entries, address, callerId, scope, match)
         : resolution(options, entries, address, callerId, scope)
@@ -773,7 +778,7 @@ async function thisDeviceOf(
   senders: readonly ConsumedSender[],
 ): Promise<string | undefined> {
   if (options.remote === undefined || !senders.some((sender) => sender.device !== undefined)) return undefined
-  return await options.remote.sessions.thisDevice().catch(() => undefined)
+  return (await options.remote.sessions.thisDevice().catch(() => undefined)) ?? undefined
 }
 
 const otherDevice = (device: string | undefined, here: string | undefined): string | undefined =>

@@ -117,7 +117,9 @@ describe("#13006: a send answers the same shape and the same refusals whichever 
   test.each(LEGS)(
     "#given a run woken by the %s thread's delivery #when it replies by that sender's id and by its stated name #then both are approved without a prompt and both deliver to that sender",
     async (leg) => {
-      const { run, permission } = legs({ sender: { session_id: TARGET[leg].id, name: TARGET[leg].name } })
+      const { run, permission } = legs({
+        sender: { session_id: TARGET[leg].id, name: TARGET[leg].name, ...(leg === "remote" ? { device: "b" } : {}) },
+      })
       expect(permission({ thread: TARGET[leg].id, message: "reply" })).toEqual(approved(TARGET[leg].id))
       expect(permission({ thread: TARGET[leg].name, message: "reply" })).toEqual(approved(TARGET[leg].name))
       expect(await run("thread_send", { thread: TARGET[leg].id, message: "reply" })).toMatchObject({
