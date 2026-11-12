@@ -1,5 +1,8 @@
 {
-  "description": "Row 20 replacement of v3-stop-live-click-then-suspended.json (SUPERSEDED.tsv: frame_required, row 20): the same assertions with a capture of window 101 before the clicks of each engine process, since a click needs a frame. With the fake stop path live, the first click is admitted and its events reach the sink (one click: pointer move, button down, button up), stopPath.stop latches, and the second click answers Suspended with nothing more in the sink.",
+  "description": "Row 20 replacement of v3-stop-live-click-then-suspended.json (it supersedes that case: frame_required, row 20): the same assertions with a capture of window 101 before the clicks of each engine process, since a click needs a frame. With the fake stop path live, the first click is admitted and its events reach the sink (one click: pointer move, button down, button up), stopPath.stop latches, and the second click answers Suspended with nothing more in the sink.",
+  "supersedes": [
+    "v3-stop-live-click-then-suspended.json"
+  ],
   "transport": "stdio",
   "scenario": "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json",
   "env": {

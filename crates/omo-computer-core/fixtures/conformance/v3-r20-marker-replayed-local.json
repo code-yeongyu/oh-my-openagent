@@ -1,5 +1,8 @@
 {
-  "description": "Row 20 replacement of v3-marker-replayed-local.json (SUPERSEDED.tsv: frame_required, row 20): the same assertions with a capture of window 101 before the clicks of each engine process, since a click needs a frame. On the local stdio transport a click whose callId already completed is a replay: it answers TransactionFailed{reason:\"replayed\", callId, receipt} (the stored null-mode reply) with nothing sent, also after the engine restarts over the same runtime root; a new callId is delivered.",
+  "description": "Row 20 replacement of v3-marker-replayed-local.json (it supersedes that case: frame_required, row 20): the same assertions with a capture of window 101 before the clicks of each engine process, since a click needs a frame. On the local stdio transport a click whose callId already completed is a replay: it answers TransactionFailed{reason:\"replayed\", callId, receipt} (the stored null-mode reply) with nothing sent, also after the engine restarts over the same runtime root; a new callId is delivered.",
+  "supersedes": [
+    "v3-marker-replayed-local.json"
+  ],
   "transport": "stdio",
   "scenario": "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json",
   "env": {
