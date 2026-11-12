@@ -324,7 +324,7 @@ describe("omo account", () => {
     }
   })
 
-  // The desktop tells the person why the sign-in ended (desktop#3522), so exit 5 names the service's
+  // The desktop tells the person why the sign-in ended (the desktop app's account handoff), so exit 5 names the service's
   // refusal code; the service message never reaches stdout.
   test.each(["reauth_required", "unauthorized", "invalid_grant", "account_deleted"])(
     "a refused refresh (%s) ends the session: the item is cleared and token exits 5 naming the code",
@@ -387,7 +387,7 @@ describe("omo account", () => {
   })
 })
 
-describe("omo account on a locked OS credential store (desktop#3509)", () => {
+describe("omo account on a locked OS credential store (the desktop app's credential sharing)", () => {
   test("every verb reports keychain locked as its own exit code, never a generic failure", async () => {
     const locked = () =>
       Promise.reject(
@@ -572,7 +572,7 @@ describe("omo account storage failures do not trigger another store call", () =>
   })
 })
 
-describe("omo account on Linux, where a locked Secret Service read looks empty (desktop#3509)", () => {
+describe("omo account on Linux, where a locked Secret Service read looks empty (the desktop app's credential sharing)", () => {
   const empty = { get: async () => null, set: async () => {}, delete: async () => true }
   const linuxStore = (
     lock: "locked" | "unlocked" | "absent" | "unknown",

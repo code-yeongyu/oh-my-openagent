@@ -51,7 +51,7 @@ export type FieldCheck = typeof exactly
 
 // What this client READS from the service (welcome, refused, response, event, blob payload): a required field must be
 // present, and a field this version does not define is dropped, so a newer service that adds one keeps an installed
-// client working (omo-relay-daemon#914). The result holds only the named fields, so `exactly` on it still refuses a
+// client working (the device service's unknown-field change). The result holds only the named fields, so `exactly` on it still refuses a
 // field another variant of the same message defines. What a peer SENDS to be acted on (hello, request) stays `exactly`.
 export const known: FieldCheck = (v, required, optional = [], what = "message") => {
   if (!isRecord(v)) return fail(`${what} must be an object`)

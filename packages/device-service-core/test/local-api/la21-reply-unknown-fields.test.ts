@@ -12,7 +12,7 @@ import { exactly } from "../../src/local-api/validate-fields.ts"
 import { PEER, defaultWorld } from "./conformance/world.ts"
 import { eventExamples } from "./event-examples.ts"
 
-// LA21 (omo-relay-daemon#914): what the client READS from the service (welcome, refused, response, event, snapshot
+// LA21 (the device service's unknown-field change): what the client READS from the service (welcome, refused, response, event, snapshot
 // blob) ignores a field this version does not define, so a newer service that adds one keeps an installed client
 // working; a required field that is missing is still refused. What a peer SENDS to be acted on (hello, request) keeps
 // refusing unknown fields.
@@ -256,7 +256,7 @@ describe("LA21 what a peer sends to be acted on keeps refusing unknown fields", 
   })
 })
 
-// Mixed versions on the endpoint lookup that broke every device command (omo-relay-daemon#914). The service contract
+// Mixed versions on the endpoint lookup that broke every device command (the device service's unknown-field change). The service contract
 // (device-service 0.1.24): a client that does not ask gets exactly {endpoints}; `environments` is returned only when the
 // request carries the optional `environments: true`, which a client may send only to service_version >= 0.1.24 because
 // an older service refuses an unknown request field. This version does not send it. The 5.1.65 client decoded the

@@ -1,4 +1,4 @@
-// An in-process HTTP server speaking the todo 15 sync routes' wire (omo-service #463:
+// An in-process HTTP server speaking the todo 15 sync routes' wire (the OmO service's sync wire contract:
 // core/src/sync/routes/{uploads,writes,reads,wire,chain}.ts) and the account event stream: digests
 // and links as 43-char base64url, `{ entries }` pages of PAGE rows, the state route carrying the
 // head and the latest snapshot, `{ error: { code } }` refusals. It holds bytes, not crypto: the

@@ -1,4 +1,4 @@
-// Transport over the todo 15 sync routes (omo-service #463) and the account event stream.
+// Transport over the todo 15 sync routes (the OmO service's sync wire contract) and the account event stream.
 // Digests travel as 43-char base64url and are handled as hex inside the engine. A pull reads
 // `GET /v1/sync/batches?after=n` (at most 500 rows a page); when the cursor is below the retained
 // history it first reads the snapshot from `GET /v1/sync/state`. Each batch row names its batch id

@@ -204,7 +204,7 @@ export type DeviceCredential = {
 
 /**
  * relay-spec ADOPT_ACCOUNT_MIN_SERVICE_VERSION: the first relayd whose device.adopt accepts the optional `account`
- * (omo-relay-daemon#730). 0.1.2 shipped without it, and every older relayd refuses any unknown field, so below 0.1.3
+ * (the device service's account-adopt change). 0.1.2 shipped without it, and every older relayd refuses any unknown field, so below 0.1.3
  * device.adopt is sent exactly as before. Gated on welcome.service_version, never on a capability word (design D r9
  * section 3).
  */

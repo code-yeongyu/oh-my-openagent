@@ -6,7 +6,7 @@ import { validateResponse, validateWelcome } from "../../vendor/omo-5.1.66-decod
 
 // #12981 review: the pin is 0.1.27, so an omo through 5.1.66 (pin 0.1.3; it keeps any running service at or above its
 // pin, bootstrap.ts) talks to a 0.1.27 service that a newer omo installed. Its local API decoders refuse every field
-// they do not know. This tree's decoders ignore unknown reply fields since #914, so the old ones are vendored byte for
+// they do not know. This tree's decoders ignore unknown reply fields since the device service's unknown-field change, so the old ones are vendored byte for
 // byte from v5.1.66 (vendor/omo-5.1.66-decoder, pinned below; v5.1.65 has the same blobs, and no release tag carries
 // the lenient ones). Two recordings:
 // - device-service-0.1.27-omo-5.1.66-session-endpoints.json: the 0.1.27 local API server, recorded exactly as the 0.1.25
