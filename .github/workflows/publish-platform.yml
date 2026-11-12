@@ -623,14 +623,7 @@ jobs:
       # so every generator runs before the binary is built.
       - name: Build generated files
         if: steps.release-assets.outputs.binary_exists != 'true'
-        run: |
-          set -euo pipefail
-          bun script/build-brand-logo.ts
-          bun script/build-reflection-lock.ts
-          bun script/build-service-auth.ts
-          bun run build:codex-install
-          node packages/omo-senpi/plugin/scripts/build-extension.mjs
-          node packages/omo-senpi/plugin/scripts/build-install.mjs
+        run: bun script/build-generated.ts
 
       - name: Build release binary
         if: steps.release-assets.outputs.binary_exists != 'true'

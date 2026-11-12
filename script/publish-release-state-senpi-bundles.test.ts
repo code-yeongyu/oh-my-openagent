@@ -91,23 +91,8 @@ describe("release-state commit", () => {
   })
 })
 
-// The generators whose outputs omo-ai and the compiled binary ship, inputs first: the installer bundles the local
-// launcher, which imports the brand logo module. The payload gate pins their outputs.
-const GENERATORS = [
-  "bun script/build-brand-logo.ts",
-  "bun script/build-reflection-lock.ts",
-  "bun script/build-service-auth.ts",
-  "bun run build:codex-install",
-  "node packages/omo-senpi/plugin/scripts/build-extension.mjs",
-  "node packages/omo-senpi/plugin/scripts/build-install.mjs",
-]
-
-function generatorCommands(run: string | undefined): string[] {
-  return (run ?? "")
-    .split("\n")
-    .filter((line) => GENERATORS.includes(line.trim()))
-    .map((line) => line.trim())
-}
+// script/build-generated.ts runs every generator, inputs first; its outputs are what omo-ai and the binary ship.
+const BUILD_GENERATED = "bun script/build-generated.ts"
 
 describe("publish-main builds the generated bundles from the release commit", () => {
   const steps = jobSteps(publishWorkflow, "publish-main")
@@ -120,7 +105,7 @@ describe("publish-main builds the generated bundles from the release commit", ()
     expect(generate.index).toBeGreaterThan(stamp.index)
     expect(generate.index).toBeLessThan(payload.index)
     expect(generate.value.if).toBe(payload.value.if)
-    expect(generatorCommands(generate.value.run)).toEqual(GENERATORS)
+    expect(generate.value.run?.trim()).toBe(BUILD_GENERATED)
   })
 })
 
@@ -133,6 +118,6 @@ describe("publish-platform builds the generated bundles before compiling the bin
 
     expect(generate.index).toBeLessThan(binary.index)
     expect(generate.value.if).toBe(binary.value.if)
-    expect(generatorCommands(generate.value.run)).toEqual(GENERATORS)
+    expect(generate.value.run?.trim()).toBe(BUILD_GENERATED)
   })
 })

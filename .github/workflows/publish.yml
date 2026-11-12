@@ -937,14 +937,7 @@ jobs:
       # stamps the versions they inline. verify-omo-ai-payload.mjs --release fails the job if one is missing.
       - name: Build generated files
         if: needs.release-metadata.outputs.already_published != 'true' && inputs.lazycodex_only != true
-        run: |
-          set -euo pipefail
-          bun script/build-brand-logo.ts
-          bun script/build-reflection-lock.ts
-          bun script/build-service-auth.ts
-          bun run build:codex-install
-          node packages/omo-senpi/plugin/scripts/build-extension.mjs
-          node packages/omo-senpi/plugin/scripts/build-install.mjs
+        run: bun script/build-generated.ts
 
       - name: Build omo-ai payload
         if: needs.release-metadata.outputs.already_published != 'true' && inputs.lazycodex_only != true
