@@ -182,4 +182,20 @@ describe("an alias whose claim asks for a sign-in", () => {
     expect(reason?.startsWith("thread RPC request failed: ")).toBe(true)
     expect(reason?.endsWith("…")).toBe(true)
   })
+
+  // #13284 review LOW: the cap cuts on code points, so an astral character at the cut is kept whole, never split.
+  test("#given the rename error has an astral character across the cap #when thread_create sets an alias #then the cut keeps it whole", async () => {
+    const a = account({ claimDown: "signed_out" })
+    const { run, setSessionName } = surface(a.remote)
+    setSessionName.mockImplementation(async () => {
+      throw new Error(`${"a".repeat(299)}\u{1F600}${"b".repeat(100)}`)
+    })
+    const result = await run("thread_create", { alias: "about-me" })
+    const reason =
+      result.kind === "ok" && "local_name_unavailable_reason" in result
+        ? result.local_name_unavailable_reason
+        : undefined
+    expect(reason).toBe(`${"a".repeat(299)}\u{1F600}…`)
+    expect(reason?.isWellFormed()).toBe(true)
+  })
 })
