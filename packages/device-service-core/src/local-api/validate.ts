@@ -33,7 +33,7 @@ import {
 } from "./validate-fields.ts"
 import { endpointsData, locateData } from "./validate-delegated.ts"
 import { isRequestType, REQUEST_TYPES, validateRequestFields } from "./validate-requests.ts"
-import { deviceId, deviceRef, deviceRowOf, errorBodyOf, snapshotBlobOf, statusOf } from "./validate-shapes.ts"
+import { deviceRef, deviceRowOf, errorBodyOf, snapshotBlobOf, statusOf } from "./validate-shapes.ts"
 import { CAPABILITIES, CLIENT_NAMES, LOCAL_API_VERSION, OPTIONAL_CAPABILITIES, REFUSED_REASONS } from "./vocabulary.ts"
 
 export { EVENT_KINDS, isRequestType, REQUEST_TYPES }
@@ -142,28 +142,6 @@ const attachState = (v: unknown) => {
     changedAt: typeof changedAt === "string" ? changedAt : fail("changedAt"),
   }
 }
-// Raw 32 bytes, unpadded base64url: a machine hash and both public keys share the service's encoding.
-const base64url32 = (v: unknown, what: string): string =>
-  typeof v === "string" && /^[A-Za-z0-9_-]{43}$/.test(v) ? v : fail(what)
-const machineBinding = (v: unknown): ResponseData["device.machine_binding"] => {
-  const m = known(v, ["machine_hash", "device", "merge_device_ids"], [], "data")
-  const ids = m["merge_device_ids"]
-  return {
-    machine_hash: nullable(m["machine_hash"], (h) => base64url32(h, "machine_hash")),
-    device: nullable(m["device"], (d) => {
-      const device = known(d, ["id", "signing_public_key", "sealing_public_key"], [], "device")
-      return {
-        id: deviceId(device["id"]),
-        signing_public_key: base64url32(device["signing_public_key"], "signing_public_key"),
-        sealing_public_key: base64url32(device["sealing_public_key"], "sealing_public_key"),
-      }
-    }),
-    merge_device_ids:
-      Array.isArray(ids) && ids.length <= 16
-        ? ids.map((id) => deviceId(id, "merge_device_ids"))
-        : fail("merge_device_ids"),
-  }
-}
 const DATA: { readonly [T in RequestType]: (v: unknown) => ResponseData[T] } = {
   authenticate: empty,
   "status.get": statusOf,
@@ -172,7 +150,6 @@ const DATA: { readonly [T in RequestType]: (v: unknown) => ResponseData[T] } = {
   "refresher.register": empty,
   "device.adopt": (v) => ({ device: deviceRef(one(v, "device"), "device", known) }),
   "device.forget": empty,
-  "device.machine_binding": machineBinding,
   "device.info": (v) => ({
     device: nullable(one(v, "device"), (d) => deviceRef(d, "device", known)),
   }),
