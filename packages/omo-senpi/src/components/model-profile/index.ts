@@ -15,6 +15,7 @@ import {
   type RefreshUnavailableKeep,
   sanitizedAuthErrorDetail,
 } from "./request-auth"
+import { registerProjectModelProfileRpc, type ProjectModelProfileSession } from "./project-model-profile-rpc"
 import { resolveModelProfile, type ModelProfileResolution } from "./resolve"
 
 /**
@@ -94,6 +95,11 @@ function extractSessionId(eventCtx: unknown): string | undefined {
   if (!isRecord(manager) || typeof manager["getSessionId"] !== "function") return undefined
   const id: unknown = Reflect.apply(manager["getSessionId"], manager, [])
   return typeof id === "string" ? id : undefined
+}
+
+function readProjectTrust(eventCtx: unknown): boolean {
+  if (!isRecord(eventCtx) || typeof eventCtx["isProjectTrusted"] !== "function") return false
+  return Reflect.apply(eventCtx["isProjectTrusted"], eventCtx, []) === true
 }
 
 function extractMode(eventCtx: unknown): string | undefined {
@@ -280,7 +286,10 @@ export function createModelProfileComponent(options: ModelProfileComponentOption
       // instance, which is the conservative reading of "never clobber twice".
       const appliedSessions = new Set<string>()
       const loggedRetiredProfiles = new Set<string>()
+      let rpcSession: ProjectModelProfileSession | undefined
+      registerProjectModelProfileRpc(pi, () => rpcSession)
       pi.on("session_start", async (payload, eventCtx) => {
+        rpcSession = { cwd: extractCwd(pi, eventCtx), isProjectTrusted: () => readProjectTrust(eventCtx) }
         if (isTuiSession(eventCtx) || !isFreshSessionWithoutExplicitModel(payload)) return
         const sessionId = extractSessionId(eventCtx) ?? ""
         if (appliedSessions.has(sessionId)) return
