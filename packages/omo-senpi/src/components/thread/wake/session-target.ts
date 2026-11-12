@@ -3,7 +3,8 @@ import { closeSync, openSync, readSync } from "node:fs"
 import { findDiskSessions } from "../address-book"
 import { parseSessionLines, SESSION_FACTS_WINDOW_BYTES, summarizeSessionEntries } from "../session-facts"
 
-export type WakeSessionKind = "interactive" | "child" | "worker"
+/** `unknown`: a header this classifier cannot read, or a `kind` this build does not know. Never woken. */
+export type WakeSessionKind = "interactive" | "child" | "worker" | "unknown"
 
 export type WakeTarget =
   | { readonly kind: "gone" }
@@ -38,11 +39,15 @@ function headerOf(path: string): Record<string, unknown> | null {
 /**
  * A session the engine spawned for a task carries its ancestry in `spawnedBy`; a header that names the host's session kind
  * `worker` is one too. Neither is woken: its parent is not live, so it would ask for every gated call and park (5.2 step 2).
+ * The classifier is closed: only a header it can read, with no `kind` at all, is `interactive`. A header it cannot read
+ * and a `kind` it does not know are `unknown`, which no caller wakes or reopens.
  */
 function sessionKindOf(header: Record<string, unknown> | null): WakeSessionKind {
-  if (header?.kind === "worker") return "worker"
-  if (record(header?.spawnedBy)) return "child"
-  return "interactive"
+  if (header === null) return "unknown"
+  if (header.kind === "worker") return "worker"
+  if (record(header.spawnedBy)) return "child"
+  if (header.kind === undefined) return "interactive"
+  return "unknown"
 }
 
 export function resolveWakeTarget(sessionsDirectory: string, durableId: string): WakeTarget {
