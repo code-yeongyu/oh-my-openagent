@@ -2150,6 +2150,7 @@
         "script/oxlint/biome-ports.ts",
         "script/patch-node-require-shim.ts",
         "script/print-release-notes.ts",
+        "script/qa/computer/conformance/drivers/legacy.ts",
         "script/qa/computer/conformance/report.ts",
         "script/qa/computer/conformance/run.ts",
         "script/qa/desktop/hyprland.ts",
