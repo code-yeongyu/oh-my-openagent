@@ -268,12 +268,19 @@ impl Backend for FakeBackend {
         FakeBackend::code_identity(self, pid)
     }
 
+    /// The scenario's `consent` view, with `fullAccess` set under the full-access preset.
     fn host_consent(&self) -> Option<serde_json::Value> {
-        self.fake_host_consent()
+        let state = self.lock();
+        let mut view = state.scenario.consent.clone();
+        if state.scenario.full_access_preset {
+            if let Some(map) = view.get_or_insert_with(|| serde_json::json!({})).as_object_mut() {
+                map.insert("fullAccess".to_owned(), serde_json::Value::Bool(true));
+            }
+        }
+        view
     }
 }
 
-mod shell;
 
 #[cfg(test)]
 mod extent_tests;
