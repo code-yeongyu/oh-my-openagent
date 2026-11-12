@@ -16,7 +16,6 @@ use omo_computer_core::results::{CaptureMode, CaptureReply, LegacyFrame};
 use omo_computer_core::untrusted::UntrustedText;
 use sha2::{Digest, Sha256};
 
-use crate::audit::gc::{ArtifactStore, GcLimits};
 use crate::{Session, NOT_OPEN};
 
 /// How long an artifact frame stays readable before the age sweep may remove it (12 h).
@@ -202,14 +201,13 @@ impl Session {
     fn write_artifact(&mut self, png: &[u8]) -> Result<Written, Refusal> {
         let digest = hex(&Sha256::digest(png));
         let now = crate::audit::now_ms();
-        let written = match self.artifacts() {
-            Some(store) => store.record(&digest, "png", png, now),
-            None => ArtifactStore::new(
-                std::env::temp_dir().join("omo-computer-artifacts"),
-                GcLimits::default(),
-            )
-            .record(&digest, "png", png, now),
+        // Only the session's own artifact dir (under its STATE root) is written: a session
+        // without one has nowhere private to put the frame, so the artifact is refused.
+        let Some(store) = self.artifacts() else {
+            eprintln!("omo-computer-engine: frame over the inline budget and no artifact dir");
+            return Err(Refusal::bare(EngineCode::CaptureFailed));
         };
+        let written = store.record(&digest, "png", png, now);
         let path = written.map_err(|error| {
             eprintln!("omo-computer-engine: frame artifact not written: {error}");
             Refusal::bare(EngineCode::CaptureFailed)
