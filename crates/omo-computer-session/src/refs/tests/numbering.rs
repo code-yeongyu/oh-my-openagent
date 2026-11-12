@@ -97,9 +97,8 @@ fn role_and_native_id_keeps_its_number_when_object_recreated() {
     let g2 = snap(&mut tree, &mut refs, "w");
     let before: BTreeSet<u64> = numbers(&refs, "w", g1).into_iter().map(|(_, n)| n).collect();
     assert_eq!(n_of(&refs, "w", g2, "Email (required)"), n_of(&refs, "w", g1, "Email"), "same role and native id");
-    assert_eq!(n_of(&refs, "w", g2, "Go"), n_of(&refs, "w", g1, "Go"));
-    for fresh in ["Go again", "Email link", "Plain"] {
+    for fresh in ["Go", "Go again", "Email link", "Plain"] {
         let n = n_of(&refs, "w", g2, fresh);
-        assert!(!before.contains(&n), "{fresh}: a used number, another role, or no native id gets a new number");
+        assert!(!before.contains(&n), "{fresh}: an ambiguous match (two new `go` buttons), another role, or no native id gets a new number");
     }
 }

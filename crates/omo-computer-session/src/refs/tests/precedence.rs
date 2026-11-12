@@ -90,11 +90,11 @@ fn a_recreated_object_takes_its_old_number_while_its_twin_lives() {
         assert_eq!(n_of(&refs, "w", g2, "B"), n_of(&refs, "w", g1, "B"), "{case}: the live twin");
         assert_eq!(n_of(&refs, "w", g2, "A again"), n_of(&refs, "w", g1, "A"), "{case}: the only unclaimed role + id number");
     }
-    // Two recreated rows and one old number left: one keeps it, the other is new.
+    // Two recreated rows and one old number left: the match is not unique, so neither inherits.
     let (refs, g1, g2) = twice(vec![row("A", 21), row("B", 22)], vec![row("X", 50), row("Y", 51), row("B", 22)]);
     let old = all(&refs, g1);
     let reused = ["X", "Y"].iter().filter(|t| old.contains(&n_of(&refs, "w", g2, t))).count();
-    assert_eq!(reused, 1);
+    assert_eq!(reused, 0);
 }
 
 #[test]

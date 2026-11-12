@@ -1,7 +1,9 @@
 //! The registry against the scripted tree: numbering (A1), the generation window and its
 //! invalidating events, and the re-identification ladder.
 
+mod fuzz;
 mod numbering;
+mod ownership;
 mod precedence;
 mod resolve;
 mod window;
