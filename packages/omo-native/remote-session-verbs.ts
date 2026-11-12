@@ -241,12 +241,13 @@ async function sendTo(
       return nothingToSteer(sent) ?? show(sent, label)
     }
     // Followed before the send, so no delta of the turn it starts can arrive unseen, and aimed once the send's own
-    // reply names its lane: only that turn's deltas print and only its settle ends the wait (#13267).
+    // reply names its lane: the answer is read from the transcript anchored on this send's user entry, so only that
+    // turn's text prints and only its settle ends the wait (#13267).
     let reply = ""
     follow = await followRemote(remote, row, (text) => {
       reply += text
       if (!json) dependencies.write(text)
-    })
+    }, { text: args.text })
     if ("kind" in follow) return show(follow, label)
     const sent = await deliver()
     if (sent.kind === "error") return nothingToSteer(sent) ?? show(sent, label)
@@ -254,9 +255,6 @@ async function sendTo(
     if ("delivery" in sent)
       follow.aim(
         sent.delivery.kind === "started" ? "started" : sent.delivery.kind === "steered" ? "steered" : "queued",
-        sent.delivery.kind === "queued" || sent.delivery.kind === "queued_offline"
-          ? sent.delivery.queue_position
-          : undefined,
       )
     const end = await follow.settled
     if (!json && reply.length > 0 && !reply.endsWith("\n")) dependencies.write("\n")
