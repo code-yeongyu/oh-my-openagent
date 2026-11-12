@@ -14,7 +14,7 @@
 import { resolve } from "node:path"
 
 import { openEngine } from "./windows/engine.ts"
-import { ADMISSIONS, type Admission, type Scenario } from "./windows/scenario.ts"
+import { ADMISSIONS, type Admission, lastRegistered, type Scenario } from "./windows/scenario.ts"
 
 const ROOT = resolve(import.meta.dir, "../../..")
 const DEFAULT_ENGINE = resolve(ROOT, "target/x86_64-pc-windows-msvc/release/omo-computer-engine.exe")
@@ -31,12 +31,12 @@ function fail(why: string): never {
 
 async function load(name: string): Promise<Scenario> {
   if (!/^[a-z0-9-]+$/.test(name)) fail(`scenario name ${name} is not a file name`)
-  const module: { readonly scenario?: Partial<Scenario> } = await import(resolve(import.meta.dir, "windows", `${name}.ts`))
-  const scenario = module.scenario
-  if (scenario === undefined || typeof scenario.run !== "function") fail(`${name} exports no scenario`)
-  const admit: unknown = scenario.admit
-  if (!ADMISSIONS.includes(admit as Admission)) fail(`${name} declares no admission (os, host-relay or none)`)
-  return { name, admit: admit as Admission, run: scenario.run }
+  await import(resolve(import.meta.dir, "windows", `${name}.ts`))
+  const scenario = lastRegistered()
+  if (scenario === undefined) fail(`${name} registers no scenario`)
+  if (scenario.name !== name) fail(`${name} registered the scenario ${scenario.name}`)
+  if (!ADMISSIONS.includes(scenario.admit as Admission)) fail(`${name} declares no admission (os, host-relay or none)`)
+  return scenario
 }
 
 const name = argument("--scenario") ?? fail("--scenario <name> is required")

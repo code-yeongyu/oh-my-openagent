@@ -5,10 +5,19 @@
 import type { Engine } from "./engine.ts"
 import { openMarker } from "./marker.ts"
 import { readPng } from "./png.ts"
-import type { Outcome, Scenario } from "./scenario.ts"
+import { register, type Outcome } from "./scenario.ts"
 
-type Display = { readonly id: string; readonly bounds: { x: number; y: number; width: number; height: number }; readonly scale: number }
-type Frame = { readonly data?: string; readonly artifactPath?: string | null; readonly width: number; readonly height: number }
+type Display = {
+  readonly id: string
+  readonly bounds: { x: number; y: number; width: number; height: number }
+  readonly scale: number
+}
+type Frame = {
+  readonly data?: string
+  readonly artifactPath?: string | null
+  readonly width: number
+  readonly height: number
+}
 
 const TOLERANCE = 8
 
@@ -22,7 +31,8 @@ async function run(engine: Engine): Promise<Outcome> {
   const marker = await openMarker()
   try {
     const listed = await engine.call("displays")
-    if (listed.error !== undefined) return { pass: false, facts: { displays: listed.error }, receipts: [await marker.close()] }
+    if (listed.error !== undefined)
+      return { pass: false, facts: { displays: listed.error }, receipts: [await marker.close()] }
     const displays = listed.result as Display[]
     const cx = marker.x + marker.width / 2
     const cy = marker.y + marker.height / 2
@@ -31,7 +41,8 @@ async function run(engine: Engine): Promise<Outcome> {
     )
     if (display === undefined) return { pass: false, facts: { displays, marker }, receipts: [await marker.close()] }
     const captured = await engine.call("capture", { target: `display:${display.id}` })
-    if (captured.error !== undefined) return { pass: false, facts: { capture: captured.error }, receipts: [await marker.close()] }
+    if (captured.error !== undefined)
+      return { pass: false, facts: { capture: captured.error }, receipts: [await marker.close()] }
     const frame = captured.result as Frame
     const pixels = readPng(await frameBytes(frame))
     const quadrants = marker.colours.map((expected, index) => {
@@ -43,11 +54,18 @@ async function run(engine: Engine): Promise<Outcome> {
     })
     const scaleOk = Math.abs(display.scale - marker.dpi / 96) < 1e-9
     const physical = pixels.width === display.bounds.width && pixels.height === display.bounds.height
-    const facts = { display: display.id, scale: display.scale, dpi: marker.dpi, frame: [pixels.width, pixels.height], physical, quadrants }
+    const facts = {
+      display: display.id,
+      scale: display.scale,
+      dpi: marker.dpi,
+      frame: [pixels.width, pixels.height],
+      physical,
+      quadrants,
+    }
     return { pass: scaleOk && physical && quadrants.every(({ ok }) => ok), facts, receipts: [await marker.close()] }
   } catch (error) {
     return { pass: false, facts: { error: String(error) }, receipts: [await marker.close()] }
   }
 }
 
-export const scenario: Scenario = { name: "capture-marker-pixels", admit: "none", run }
+register({ name: "capture-marker-pixels", admit: "none", run })

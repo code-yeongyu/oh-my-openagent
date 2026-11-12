@@ -106,6 +106,7 @@ impl CaptureOs for Os {
             iconic: unsafe { IsIconic(window) }.as_bool(),
             cloaked: cloak.is_ok() && cloaked != 0,
             frame_bounds: frame_bounds(window)?,
+            elevated: super::integrity::elevated(window),
         })
     }
 

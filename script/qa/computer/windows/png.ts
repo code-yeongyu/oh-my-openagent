@@ -2,7 +2,11 @@
 // read marker pixels back without a dependency.
 import { inflateSync } from "node:zlib"
 
-type Pixels = { readonly width: number; readonly height: number; readonly at: (x: number, y: number) => [number, number, number] }
+type Pixels = {
+  readonly width: number
+  readonly height: number
+  readonly at: (x: number, y: number) => [number, number, number]
+}
 
 function paeth(a: number, b: number, c: number): number {
   const p = a + b - c

@@ -96,6 +96,42 @@ impl<O: CaptureOs> Win32Backend<O> {
         })
     }
 
+    /// `windowCapture` for one window: unavailable with `elevated_target` for an elevated window
+    /// WGC cannot serve (the floor never runs for it); the hand's `capture_route` is unchanged.
+    pub fn window_capture(&mut self, hwnd: isize) -> Availability {
+        let interactive = self.os.session_id() != 0;
+        let elevated = self.os.window(hwnd).is_some_and(|facts| facts.elevated);
+        if !interactive {
+            return Availability {
+                available: false,
+                reason: Some("not_interactive".to_owned()),
+            };
+        }
+        if elevated && !self.wgc {
+            return Availability {
+                available: false,
+                reason: Some("elevated_target".to_owned()),
+            };
+        }
+        if elevated {
+            // WGC is asked once without a frame being kept: only the item's existence matters.
+            let served = self
+                .os
+                .wgc_window(hwnd, false)
+                .is_ok_and(|frame| !capture::is_blank(&frame.bgra));
+            if !served {
+                return Availability {
+                    available: false,
+                    reason: Some("elevated_target".to_owned()),
+                };
+            }
+        }
+        Availability {
+            available: true,
+            reason: None,
+        }
+    }
+
     /// The OCR probe this backend advertises.
     pub const fn ocr_probe(&self) -> &OcrProbe {
         &self.ocr
