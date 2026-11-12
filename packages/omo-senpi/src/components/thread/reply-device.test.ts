@@ -26,10 +26,17 @@ const C_SAME_ID: RemoteSessionRow = { ...B_ROW, device: "c", session_id: "rk-on-
 const C_PLANNER: RemoteSessionRow = { ...B_ROW, device: "c", session_id: "rk-c", durable_id: "dur-c", title: "planner" }
 const C_OTHER: RemoteSessionRow = { ...B_ROW, device: "c", session_id: "rk-c", durable_id: "dur-c", title: "c thread" }
 
-function host(sessions: readonly ThreadHostSession[], onPrompt: () => void = () => {}): ThreadHost {
+function host(
+  sessions: readonly ThreadHostSession[],
+  onPrompt: () => void = () => {},
+  onList: () => void = () => {},
+): ThreadHost {
   return {
     socket: "/tmp/thread-reply-device.sock",
-    listSessions: async () => [...sessions],
+    listSessions: async () => {
+      onList()
+      return [...sessions]
+    },
     openSession: async () => ({ sessionId: "s", cwd: process.cwd() }),
     getMessages: async () => [],
     getState: async () => ({ isStreaming: false }),
@@ -90,24 +97,22 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
     }
     const logger = { info() {}, error() {}, warn() {} }
     let prompts = 0
-    // Every delivery the gateway takes for a session on this device, by target: a local thread_send's real call.
-    const enqueued: string[] = []
-    const countedStore = new Proxy(store, {
-      get: (target, property, receiver) =>
-        property === "enqueue"
-          ? (request: Parameters<GatewayStore["enqueue"]>[0]) => {
-              enqueued.push(request.target_durable_id)
-              return target.enqueue(request)
-            }
-          : Reflect.get(target, property, receiver),
-    })
+    // How often this device's sessions were listed. A reply to a sender on another device is decided before any
+    // listing (A4.3.1), so a reply that lists this device took the local path toward the session carrying the name.
+    let localListings = 0
     createThreadComponent({
-      host: host([LOCAL], () => {
-        prompts += 1
-      }),
+      host: host(
+        [LOCAL],
+        () => {
+          prompts += 1
+        },
+        () => {
+          localListings += 1
+        },
+      ),
       stateDirectory: join(agentDir, "state"),
       agentDir: () => agentDir,
-      store: countedStore,
+      store,
       remote: account.remote,
     }).register(pi as never, { logger, config: { getFlag: () => undefined } } as never)
     const ctx = { sessionManager: { getSessionId: () => "dur-caller" } }
@@ -144,8 +149,7 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
       account.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message").map((entry) => entry.device)
     // A delivery to a session on this device leaves a marker in its gateway inbox: none means nothing reached it.
     const reachedLocally = (durableId: string) => existsSync(gatewayInboxDirectory(agentDir, durableId))
-    const enqueuedFor = (durableId: string) => enqueued.filter((target) => target === durableId).length
-    return { reply, admittedOn, prompts: () => prompts, reachedLocally, enqueuedFor }
+    return { reply, admittedOn, prompts: () => prompts, reachedLocally, listings: () => localListings }
   }
 
   test("#given b's delivery states a session id that a third device also lists #when the run replies by that id #then the reply goes to b's row and nothing reaches the third device", async () => {
@@ -185,14 +189,15 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
   })
 
   test("#given b's delivery states a name a session on this device carries #when the run replies by that name #then the reply goes to the consumed sender on b, never to the local session", async () => {
-    const { reply, admittedOn, prompts, reachedLocally, enqueuedFor } = await consumed(
+    const { reply, admittedOn, prompts, reachedLocally, listings } = await consumed(
       [{ id: "device:b/d-1", session_id: "dur-on-b", name: "local peer" }],
       [B_ROW],
     )
+    const listedBefore = listings()
     expect(await reply("local peer")).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
     expect(admittedOn()).toEqual(["b"])
     expect(prompts()).toBe(0)
-    expect(enqueuedFor("dur-local")).toBe(0)
+    expect(listings() - listedBefore).toBe(0)
     expect(reachedLocally("dur-local")).toBe(false)
   })
 
