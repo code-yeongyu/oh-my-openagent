@@ -648,9 +648,10 @@ async function grantCheck(env: HostEnv, log: EvidenceLog): Promise<Measured | nu
   return grantGate(await runLeg(env, log, "gui", "open-path", currentApp(env)))
 }
 
-// pure (RED stub: keeps the old behaviour)
+// pure: "not granted" only from a report that says so; a leg with no report is NO_LAUNCH, never "not granted"
 function grantGate(result: LegResult): Measured | null {
-  return result.report?.preflight.accessibility === 1 ? null : AWAITING_H3
+  if (!result.report) return noReport(result, "grant check")
+  return result.report.preflight.accessibility === 1 ? null : AWAITING_H3
 }
 
 const AWAITING_H3: Measured = {
@@ -918,8 +919,21 @@ interface TapEvent {
   error?: string
 }
 
-// pure: the untagged-route verdict from the tap file text (null = the file could not be read) (RED stub: old behaviour)
+// pure: the untagged-route verdict from the tap file text. null = the file could not be read: NO_LAUNCH after a failed
+// launch, otherwise UNMEASURED; NO_EVENT only from a file that was read and holds no keyDown
 function tapOutcome(tapText: string | null, launchCode: number): Measured {
+  if (tapText === null)
+    return launchCode !== 0
+      ? {
+          verdict: "NO_LAUNCH",
+          measured: { launchExit: launchCode },
+          note: `the tap launch exited ${launchCode} and wrote no readable tap file`,
+        }
+      : {
+          verdict: "UNMEASURED",
+          measured: { launchExit: launchCode },
+          note: "the tap file could not be read (never written, or unreadable as the QA account); no keyDown count is claimed",
+        }
   const events = (tapText ?? "")
     .split("\n")
     .filter(Boolean)
@@ -1188,10 +1202,22 @@ async function measureRow(
 
 type CleanupStep = [label: string, step: () => Promise<string>]
 
-// runs every diagnostic step, then every teardown step (RED stub: a throwing step stops the rest)
+// runs every diagnostic step, then every teardown step. A failing step is recorded as a receipt line and never stops
+// the steps after it, so the results dir and the work dir are removed even when a diagnostic read fails.
 async function runCleanupSteps(diagnostics: CleanupStep[], teardown: CleanupStep[]): Promise<string[]> {
   const receipts: string[] = []
-  for (const [, step] of [...diagnostics, ...teardown]) receipts.push(await step())
+  const attempt = async ([label, step]: CleanupStep) => {
+    try {
+      receipts.push(await step())
+    } catch (error) {
+      receipts.push(`${label} FAILED: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+  try {
+    for (const step of diagnostics) await attempt(step)
+  } finally {
+    for (const step of teardown) await attempt(step)
+  }
   return receipts
 }
 
