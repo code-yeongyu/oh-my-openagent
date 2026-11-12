@@ -27,8 +27,20 @@ export type RemoteCommandOutcome =
    * session an endpoint open made, when the open asked for it and the host named it on the reply.
    */
   | { readonly kind: "ok"; readonly response: JsonObject; readonly local?: true; readonly located?: string }
-  | { readonly kind: "refused"; readonly reason: string }
+  /** `detail`: the receiving service's own reason in the command's receipt (`receipt.reason`), when it names one. */
+  | { readonly kind: "refused"; readonly reason: string; readonly detail?: string }
   | { readonly kind: "uncertain"; readonly reason: string }
+
+/**
+ * One single-probe look for a durable id on one device (omo#13037 A4.3.3): `found` names the device's stable key for it,
+ * `none` that the device answered and holds no such session, `silent` that it did not answer within the bound, and
+ * `unavailable` that this device's own service cannot make the single probe (no lookup is made at all).
+ */
+export type RemoteLookupOutcome =
+  | { readonly kind: "found"; readonly key: string }
+  | { readonly kind: "none" }
+  | { readonly kind: "silent"; readonly reason: string }
+  | { readonly kind: "unavailable" }
 
 export type RemoteServiceState = { readonly state: string }
 
@@ -50,7 +62,8 @@ export type RemoteSessionsPort = {
   readonly status: () => Promise<RemoteServiceState>
   readonly thisDevice: () => Promise<string | null>
   readonly devices: () => Promise<readonly RemoteDevice[]>
-  readonly sessions: () => Promise<readonly RemoteSessionRow[]>
+  /** The account's session list; with `device`, that one device's rows only (no account-wide round). */
+  readonly sessions: (filter?: { readonly device?: string }) => Promise<readonly RemoteSessionRow[]>
   /**
    * A session-less engine record (`open_session`, `list_sessions`) on `device`'s engine endpoint, with no
    * attach: the attach-less `session.command {device, endpoint, rpc}` shape (relay daemon #393). `locate` asks a
@@ -77,6 +90,19 @@ export type RemoteSessionsPort = {
     options?: { readonly fresh?: boolean },
   ) => Promise<RemoteCommandOutcome>
   readonly read: (device: string, sessionId: string, tail: number) => Promise<RemoteCommandOutcome>
+  /** omo#13037 A4.2/A4.3: one single-probe locate of `durableId` on `device`. Absent: no lookup is ever made. */
+  readonly lookup?: (device: string, durableId: string) => Promise<RemoteLookupOutcome>
+  /**
+   * omo#13037 5.4: an `admit_external_message` record to a session of `device` that no listing maps, by its durable id.
+   * `unavailable` when this device's own service cannot carry it (nothing is sent). Absent: the same as `unavailable`.
+   */
+  readonly wake?: (
+    device: string,
+    durableId: string,
+    rpc: JsonObject,
+  ) => Promise<RemoteCommandOutcome | { readonly kind: "unavailable" }>
+  /** Whether `wake` can be sent at all, read before deciding a lane (nothing is sent). Absent: false. */
+  readonly canWake?: () => Promise<boolean>
   /**
    * The records `device`'s session writes from now on (none of the ones before), on the attach this port holds for it.
    * Refused, typed, when that attach cannot be made.
@@ -144,3 +170,20 @@ export type RemoteThreadSurface = {
 
 /** The id a listing row has ABOVE the ports (decision 0027 D2): its durable id and nothing else; "" when the device publishes none. */
 export const rowThreadId = (row: RemoteSessionRow): string => row.durable_id ?? ""
+
+/**
+ * A session a device holds on disk but no engine runs (omo#13037 A4.2): built from that device's own probe answer, its
+ * stable key and the durable id. It carries no name and no folder, and its state `ended` sends a delivery down the wake path.
+ */
+export function endedRow(device: string, key: string, durableId: string): RemoteSessionRow {
+  return {
+    device,
+    session_id: key,
+    durable_id: durableId,
+    title: "",
+    project: "",
+    path: "",
+    state: "ended",
+    updated_ms: 0,
+  }
+}

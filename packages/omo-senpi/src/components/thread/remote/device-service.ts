@@ -2,6 +2,7 @@ import { outcomeOf } from "./outcome"
 import {
   connectDeviceService,
   LocalApiError,
+  WAKE_ACCEPTS,
   type CommandResult,
   type DeviceService,
   type RemoteAttach,
@@ -85,6 +86,13 @@ const sessionReason = (code: string): string => (code === "session_not_found" ? 
 // The engine records the thread tools send that change nothing on the other device (thread_read, the pre-send probe).
 // Like the port's read, every failure of one is a typed refusal: there is nothing that may have run.
 const READ_ONLY_RECORDS: ReadonlySet<string> = new Set(["get_state", "get_messages"])
+
+// omo#13037 A6: only a peer delivery carries the wake mark, and only through a service that carries it.
+const MARKED_RECORDS: ReadonlySet<string> = new Set(["admit_external_message"])
+
+// A single-probe locate that ran and found nothing: the device answered and holds no such session. Any other failure
+// means the device did not answer within the bound (or could not be reached), so the lookup counts it as silent.
+const LOOKUP_NONE: ReadonlySet<string> = new Set(["session_not_found", "peer_not_found", "peer_not_session_client"])
 
 // The one read a session's attach holds: its model catalog (`get_available_models`). The catalog does not change with
 // what the session does, so it is held until the attach shows a new snapshot (the host re-established it) or ends, and
@@ -174,8 +182,8 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     thisDevice: async () => (await (await svc()).thisDevice())?.id ?? null,
     devices: async () =>
       (await (await svc()).devices()).map((row) => ({ device: row.device, label: row.label, online: row.online })),
-    sessions: async () =>
-      (await (await svc()).sessions()).rows.map((row) => ({
+    sessions: async (filter) =>
+      (await (await svc()).sessions(filter?.device === undefined ? undefined : { device: filter.device })).rows.map((row) => ({
         device: row.device,
         session_id: row.session_id,
         ...durableIdOf(row),
@@ -235,8 +243,11 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         if (held !== undefined) return { kind: "ok", response: held, local: true }
       }
       const sentAt = catalog.snapshots()
+      // The gate is this connection's: a reconnect to an older service stops the mark.
+      const carries = MARKED_RECORDS.has(String(rpc["type"])) && (await svc().catch(() => undefined))?.carriesWakeMark === true
+      const marked = carries ? { accepts: WAKE_ACCEPTS } : undefined
       try {
-        const outcome = outcomeOf(await attached.command(record))
+        const outcome = outcomeOf(await attached.command(record, marked))
         if (isCatalog && outcome.kind === "ok") catalog.keep(key, outcome.response, sentAt)
         return readOnly && outcome.kind === "uncertain" ? { kind: "refused", reason: outcome.reason } : outcome
       } catch (error) {
@@ -279,6 +290,45 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       })
       live = true
       return { kind: "ok", watch: { ended: attached.detached, stop } }
+    },
+    lookup: async (device, durableId) => {
+      let connected: DeviceService
+      try {
+        connected = await svc()
+      } catch (error) {
+        return { kind: "silent", reason: notSentReason(error) }
+      }
+      if (!connected.takesSingleLocate) return { kind: "unavailable" }
+      try {
+        return { kind: "found", key: (await connected.locate(device, durableId, { single: true })).key }
+      } catch (error) {
+        const code = error instanceof LocalApiError ? error.code : "locate_failed"
+        return LOOKUP_NONE.has(code) ? { kind: "none" } : { kind: "silent", reason: code }
+      }
+    },
+    canWake: async () => (await svc().catch(() => undefined))?.carriesWakeMark === true,
+    wake: async (device, durableId, rpc) => {
+      let record: WireRpc
+      try {
+        record = wireRecord(rpc)
+      } catch {
+        return { kind: "refused", reason: "invalid_record" }
+      }
+      let connected: DeviceService
+      try {
+        connected = await svc()
+      } catch (error) {
+        return { kind: "refused", reason: notSentReason(error) }
+      }
+      if (!connected.carriesWakeMark) return { kind: "unavailable" }
+      try {
+        return outcomeOf(await connected.wakeCommand(device, durableId, record))
+      } catch (error) {
+        if (error instanceof LocalApiError && error.not_sent === true) return { kind: "refused", reason: error.code }
+        if (error instanceof LocalApiError && error.command_id === undefined && REFUSED_BEFORE_SENDING.has(error.code))
+          return { kind: "refused", reason: error.code }
+        return { kind: "uncertain", reason: "reply_lost" }
+      }
     },
     close: async () => {
       const open = service
