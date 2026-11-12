@@ -1197,6 +1197,38 @@
         "observation": {
           "$ref": "#/$defs/UntrustedText",
           "description": "Required on the wire: a report without `{untrustedText: true}` does not parse."
+        },
+        "paused": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Pause"
+          },
+          "description": "What the admission waited for before the send.",
+          "default": []
+        },
+        "session": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionState"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The session state sampled for this call (object mode).",
+          "default": null
+        },
+        "target": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TargetLiveness"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Present only when the target exited or stopped answering during the call.",
+          "default": null
         }
       },
       "required": [
@@ -5147,6 +5179,47 @@
         "text"
       ]
     },
+    "Pause": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "$ref": "#/$defs/PauseReason"
+        },
+        "ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "description": "Milliseconds on the hand's clock the admission waited for this reason."
+        }
+      },
+      "required": [
+        "reason",
+        "ms"
+      ],
+      "description": "One pause: `ActionReport.paused[]` per call, `RunResult.pauses[]` per run."
+    },
+    "PauseReason": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "screen_locked"
+          ]
+        },
+        {
+          "type": "string",
+          "const": "user_active",
+          "description": "The user worked in the frontmost target within [`TAKEOVER_WINDOW_MS`]."
+        },
+        {
+          "type": "string",
+          "const": "system_suspended",
+          "description": "A local hand's system went to sleep."
+        }
+      ],
+      "description": "Why a call (or a run) waited before it was admitted."
+    },
     "PermissionReport": {
       "type": "object",
       "additionalProperties": false,
@@ -6591,6 +6664,55 @@
         "appeared",
         "gone"
       ]
+    },
+    "TargetLiveness": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/TargetState"
+        },
+        "pid": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "exitCode": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        },
+        "signal": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32"
+        }
+      },
+      "required": [
+        "state",
+        "pid"
+      ],
+      "description": "`ActionReport.target`: present only when the target exited or stopped answering."
+    },
+    "TargetState": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "exited"
+          ]
+        },
+        {
+          "type": "string",
+          "const": "unresponsive",
+          "description": "The process stopped answering (AX / bus / message timeout)."
+        }
+      ],
+      "description": "The state of a target whose process stopped serving the call. A healthy target has no\n`target` member at all: `running` is never emitted."
     },
     "TextRange": {
       "anyOf": [

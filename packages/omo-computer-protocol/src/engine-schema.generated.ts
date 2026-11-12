@@ -2,7 +2,7 @@
 // Do not edit by hand; run `bun run --cwd packages/omo-computer-protocol generate`.
 
 /** sha256 of the schema file this module was generated from; the schema-drift test compares it. */
-export const SCHEMA_SHA256 = "7a923554315400abb22677f71a5f54ad1d04e396a23fb3934c8c31df6c425155" as const
+export const SCHEMA_SHA256 = "8fc43e50fe3fd18cadf28158c6953ef38334c14c3a19b3306719faa3029399a3" as const
 
 /** The wire protocol version `engine.hello` reports. */
 export const PROTOCOL_VERSION = "1" as const
@@ -400,6 +400,9 @@ export type ActionReport = {
 	timings?: Timings | null
 	evidence: Evidence[]
 	observation: UntrustedText
+	paused?: Pause[]
+	session?: SessionState | null
+	target?: TargetLiveness | null
 }
 
 export type AdvanceClockParams = {
@@ -1202,6 +1205,13 @@ export type PasteParams = {
 	observeAfter?: ObserveOptions | null
 }
 
+export type Pause = {
+	reason: PauseReason
+	ms: number
+}
+
+export type PauseReason = "screen_locked" | "user_active" | "system_suspended"
+
 export type PermissionReport = {
 	state: PermissionState
 	settingsUrl?: string | null
@@ -1485,6 +1495,15 @@ export type SurfacePredicate = {
 }
 
 export type SurfaceState = "appeared" | "gone"
+
+export type TargetLiveness = {
+	state: TargetState
+	pid: number
+	exitCode?: number | null
+	signal?: number | null
+}
+
+export type TargetState = "exited" | "unresponsive"
 
 export type TextRange = {
 	start: number

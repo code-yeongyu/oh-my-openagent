@@ -35,6 +35,7 @@ pub const POINT_REQUIRED: Refusal = Refusal::bare(EngineCode::InvalidTarget);
 pub(crate) struct Opened {
     pub(crate) report_mode: ReportMode,
     pub(crate) tag: u64,
+    pub(crate) settings: crate::intervention::OpenSettings,
 }
 
 /// The session state of one engine process.
@@ -46,6 +47,8 @@ pub struct Session {
     pub(crate) refs: crate::refs::RefRegistry,
     pub(crate) frames: crate::frames::FrameStore,
     pub(crate) trace: crate::trace::Trace,
+    /// The session-scoped display-awake hold (design row C22).
+    pub(crate) display_awake: crate::intervention::SharedHold,
 }
 
 impl Session {
@@ -66,7 +69,8 @@ impl Session {
 
     #[must_use]
     pub fn with_guard(backend: Box<dyn Backend>, guard: Guard) -> Self {
-        Self {
+        let display_awake = crate::intervention::SharedHold::default();
+        let mut session = Self {
             backend,
             guard,
             opened: None,
@@ -74,7 +78,10 @@ impl Session {
             refs: crate::refs::RefRegistry::default(),
             frames: crate::frames::FrameStore::default(),
             trace: crate::trace::Trace::default(),
-        }
+            display_awake: display_awake.clone(),
+        };
+        session.set_lease_hook(Box::new(crate::intervention::DisplayAwakeLeaseHook(display_awake)));
+        session
     }
 
     /// Opens (or re-opens) the session and answers its capabilities and a fresh resume token.
@@ -89,6 +96,7 @@ impl Session {
         self.opened = Some(Opened {
             report_mode: request.report_mode,
             tag: random_u64(),
+            settings: crate::intervention::OpenSettings::read(&request),
         });
         let resume_token = format!("{:016x}{:016x}", random_u64(), random_u64());
         self.open_control(&resume_token[..16])?;
@@ -124,8 +132,7 @@ impl Session {
     /// The capabilities in the open session's report mode; with no session, the v1 shape.
     #[must_use]
     pub fn capabilities(&self) -> CapabilitiesReply {
-        let mut capabilities = self.backend.capabilities();
-        self.guard.describe(&mut capabilities.stop_path);
+        let capabilities = self.sampled_capabilities();
         match self.opened.as_ref().map(|opened| opened.report_mode) {
             Some(ReportMode::Object) => CapabilitiesReply::Object(Box::new(capabilities)),
             Some(ReportMode::Null) | None => CapabilitiesReply::Legacy(Box::new(legacy_capabilities(
