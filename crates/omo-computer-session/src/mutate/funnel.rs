@@ -65,7 +65,9 @@ impl Session {
                     _ => None,
                 };
                 let mut refused = self.stamp(blocked.refused, object);
-                refused.detail = detail.map(Box::new);
+                if let Some(detail) = detail {
+                    refused.detail = Some(Box::new(detail));
+                }
                 return Err(self.refuse(record, Some(blocked.stage), refused));
             }
         };
