@@ -21,11 +21,16 @@ export function findDuplicates(
 ): DuplicateCandidate[] {
   const notes = [...corpus.notes.values()].filter((note) => !claimed.has(note.path)).sort(byPath)
   const archived = new Set<string>()
+  const canonicals = new Set<string>()
   const candidates: DuplicateCandidate[] = []
   const emit = (a: CleanupNote, b: CleanupNote, evidence: CleanupEvidence): void => {
     if (archived.has(a.path) || archived.has(b.path)) return
     const [canonical, other] = rank(a, b, corpus) <= 0 ? [a, b] : [b, a]
+    // A canonical already receives another copy's links and merge, so archiving it in the same pass would leave
+    // those links dangling and drop the merge; the pair is left for the next run, once the chain has settled.
+    if (canonicals.has(other.path)) return
     archived.add(other.path)
+    canonicals.add(canonical.path)
     const canonicalKeys = new Set(canonical.paragraphs.map((paragraph) => paragraph.key))
     candidates.push({
       subject: other.path,
