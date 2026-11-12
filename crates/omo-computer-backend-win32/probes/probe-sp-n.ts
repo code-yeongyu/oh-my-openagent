@@ -653,7 +653,7 @@ const isSupported: Group = {
     return {
       "n-wgc-issupported-session0":
         s0 instanceof Error
-          ? UN(`the SYSTEM task produced no result: ${s0.message}`)
+          ? UN(`errored: the SYSTEM task produced no result: ${s0.message}`)
           : {
               measured: read(s0),
               verdict:
@@ -692,6 +692,8 @@ const timers: Group = {
 // The foreground barrier's runs as verdict records. A run in which the barrier was never exercised (not foreground
 // at the send, or SendInput accepted no event) is left out of the routed / consumed / hang-guard counts and shown as
 // "skipped k/n"; with no exercised run left, both rows are SKIPPED (UNMEASURED with the reason).
+// A validity gate of the probe, not a design bound: a verdict needs more than half of the runs exercised.
+export const MIN_EXERCISED = Math.floor(RUNS / 2) + 1
 export function fgBarrierObs(fg: Json): { readonly proves: Obs; readonly ms: Obs; readonly oracleSeen: boolean } {
   if (fg.acquired !== true) {
     const s: Obs = { kind: "SKIPPED", reason: "the probe could not take the foreground for the target" }
@@ -711,6 +713,13 @@ export function fgBarrierObs(fg: Json): { readonly proves: Obs; readonly ms: Obs
   const oracleSeen = count(ex, "within2s") > 0
   if (!ex.length) {
     const s: Obs = { kind: "SKIPPED", reason: `the barrier was never exercised: ${skipped}` }
+    return { proves: s, ms: s, oracleSeen }
+  }
+  if (ex.length < MIN_EXERCISED) {
+    const s: Obs = {
+      kind: "SKIPPED",
+      reason: `too few exercised runs: ${ex.length}/${runs.length}, a verdict needs ${MIN_EXERCISED}; ${skipped}`,
+    }
     return { proves: s, ms: s, oracleSeen }
   }
   const n = ex.length
@@ -783,7 +792,7 @@ const barriers: Group = {
       } catch (e) {
         // one family's failed leg makes only its own rows UNMEASURED, with the leg's error
         const missing = ids.filter((id) => !(id in out))
-        Object.assign(out, all(missing, UN(`leg failed: ${clean((e as Error).message)}`)))
+        Object.assign(out, all(missing, UN(`errored: leg failed: ${clean((e as Error).message)}`)))
       }
     }
     return out
@@ -840,7 +849,7 @@ const chords: Group = {
         const missing = [`n-fg-chord-ctrl-a-${key}-control`, `n-posted-chord-ctrl-a-${key}`].filter(
           (id) => !(id in out),
         )
-        Object.assign(out, all(missing, UN(`leg failed: ${clean((e as Error).message)}`)))
+        Object.assign(out, all(missing, UN(`errored: leg failed: ${clean((e as Error).message)}`)))
       }
     }
     return out
@@ -915,7 +924,7 @@ const affinity: Group = {
 // The elevated UIA read: CONFIRMS only when the query completed and explicitly found no value.
 export function uiaResult(r: Json): Result {
   const measured = `name=${tail(r.uiaName)} descendants=${num(r.uiaDescendants)} value=${tail(r.uiaValue)}`
-  if (typeof r.uiaError === "string") return UN(`the UIA read failed: ${r.uiaError}; ${measured}`)
+  if (typeof r.uiaError === "string") return UN(`errored: the UIA read failed: ${r.uiaError}; ${measured}`)
   if (r.uiaQueried !== true) return UN(`the UIA read did not complete; ${measured}`)
   return { measured, verdict: pick(r.uiaValue === null, "CONFIRMS", "CONTRADICTS") }
 }
@@ -1187,7 +1196,8 @@ export function mergePasses(
     }
     out[id] = mergeTwo(id, a, b)
   }
-  return out
+  // the merged rows (the uploaded artifact) go through the one verdict function too, so they round-trip
+  return Object.fromEntries(Object.entries(out).map(([id, r]) => [id, finalRow(id, r)]))
 }
 export function verifyJob(
   pass1: readonly LedgerRow[],
@@ -1381,7 +1391,15 @@ const CITE_RULES: ReadonlyArray<readonly [RegExp, Cite]> = [
   [/^n-wheel-control-/, { noClaim: "no design line states that a settled foreground target receives the wheel" }],
   [/^n-wheel-after-raise-/, D(128, "DwmFlush before pointer: doc numbers 6/6 lost -> 18/18, re-measured")],
   [/^n-affinity-/, D(393, "cover-window oracle reads > 0 -> hide_ack")],
-  [/^n-(uipi|elevated)-/, D(151, "windows above the engine's integrity RID: UIPI drops input")],
+  [/^n-uipi-/, D(151, "windows above the engine's integrity RID: UIPI drops input silently")],
+  [/^n-elevated-/, D(151, "windows above the engine's integrity RID: PermissionDenied{band}")],
+  [
+    /^n-capture-.*-(display-off|disconnected|locked)$/,
+    D(
+      245,
+      "session state: lock / unlock / disconnect from WM_WTSSESSION_CHANGE, frames judged by the near-black oracle of design/d-windows.md:80",
+    ),
+  ],
   [/^n-capture-/, D(80, "PrintWindow floor and the near-black oracle")],
 ]
 export function buildCites(ids: readonly string[], rules = CITE_RULES): Readonly<Record<string, Cite>> {
@@ -1445,7 +1463,8 @@ export function toObs(r: Result): Obs {
     return { kind: "MEASURED", data: { outcome: "inconclusive", text: reason } }
   const m = /^(skipped|errored): ([\s\S]*)$/.exec(reason)
   if (m) return { kind: m[1] === "errored" ? "ERRORED" : "SKIPPED", reason: m[2] ?? "" }
-  return { kind: /leg failed|threw|exception|error|timeout/i.test(reason) ? "ERRORED" : "SKIPPED", reason }
+  // ERRORED only where the probe says so ("errored: "); a reason is never classified by guessing at its words
+  return { kind: "SKIPPED", reason }
 }
 // INVALID is a ledger-only state (a withdrawn reading); measurement never produces it
 export const finalRow = (id: string, r: Result, cites: Readonly<Record<string, Cite>> = ROW_CITES): Result =>
@@ -3086,7 +3105,8 @@ const LOGIC_CHECKS: readonly Check[] = [
     finding: "MERGE explicit order, both passes kept (review 79871df09c)",
     async run() {
       const bad: string[] = []
-      const vs: Verdict[] = ["CONFIRMS", "NEW-EDGE", "UNMEASURED", "CONTRADICTS"]
+      const ORDER: readonly Verdict[] = ["CONFIRMS", "NEW-EDGE", "UNMEASURED", "CONTRADICTS"]
+      const vs = ORDER
       const text = (id: string, v: Verdict, tag: string) =>
         v === "UNMEASURED"
           ? `UNMEASURED: errored: leg failed ${tag}`
@@ -3099,7 +3119,8 @@ const LOGIC_CHECKS: readonly Check[] = [
             const a: Result = { measured: text(id, v1, "pass-one"), verdict: v1 }
             const b: Result = { measured: text(id, v2, "pass-two"), verdict: v2 }
             const m = mergeTwo(id, a, b)
-            const want = MERGE_RANK[v1] >= MERGE_RANK[v2] ? v1 : v2
+            // the order pinned as a literal, independent of MERGE_RANK
+            const want = ORDER.indexOf(v1) >= ORDER.indexOf(v2) ? v1 : v2
             if (m.verdict !== want) bad.push(`${id} ${v1}+${v2}: ${m.verdict}, want ${want}`)
             if (v1 !== v2 && !(m.measured.includes("pass-one") && m.measured.includes("pass-two")))
               bad.push(`${id} ${v1}+${v2} hides a pass: ${m.measured}`)
@@ -3255,6 +3276,88 @@ const LOGIC_CHECKS: readonly Check[] = [
       if (exits !== 2 || !/process\.exit\(await runThroughCleanup\(main\)\)/.test(self))
         bad.push(`${exits} process.exit calls, not 2 through the wrapper`)
       return bad.length ? bad.join("; ") : undefined
+    },
+  },
+  {
+    finding: "NITS c9341c4b97: merged rows, exercised minimum, labels",
+    async run() {
+      const bad: string[] = []
+      // merged rows are fixed points of the verdict function, and a committed merged artifact round-trips
+      const t = (d: number, n = 6): Tally => ({ delivered: d, runs: n, acquire: "plain", notFg: 0 })
+      const row = (id: string, r: Result): LedgerRow =>
+        Object.fromEntries(
+          HEADER.map((h) => [
+            h,
+            h === "id" ? id : h === "host" ? "h" : h === "verdict" ? r.verdict : h === "measured" ? r.measured : "x",
+          ]),
+        ) as LedgerRow
+      for (const [c1, c2] of [
+        [3, 6],
+        [6, 3],
+        [0, 0],
+        [6, 6],
+      ] as const)
+        for (const [l1, l2] of [
+          [3, 6],
+          [6, 6],
+        ] as const) {
+          const p1 = Object.fromEntries(
+            Object.entries(wheelResults(t(c1), t(15, 18), t(6 - l1))).map(([id, r]) => [id, finalRow(id, r)]),
+          )
+          const p2 = Object.fromEntries(
+            Object.entries(wheelResults(t(c2), t(9, 18), t(6 - l2))).map(([id, r]) => [id, finalRow(id, r)]),
+          )
+          const merged = mergePasses(
+            Object.entries(p1).map(([id, r]) => row(id, r)),
+            p2,
+            "h",
+          )
+          for (const [id, m] of Object.entries(merged)) {
+            const f = finalRow(id, m)
+            if (f.measured !== m.measured || f.verdict !== m.verdict)
+              bad.push(`control ${c1}/${c2} ${id}: merged row is not a fixed point: ${m.measured.slice(0, 70)}`)
+          }
+          const committed = Object.entries(merged).map(([id, r]) => row(id, r))
+          const again = verifyJob(committed, merged, committed, "h", () => true)
+          if (again.diff || again.lines.some((l) => !l.startsWith("SAME ")))
+            bad.push(`control ${c1}/${c2}: a committed merged artifact does not round-trip`)
+        }
+      // a verdict needs more than half of the runs exercised
+      const ok: Json = { sent: 1, routed: true, consumed: true, atReturn: true, within2s: true }
+      const skip: Json = { sent: 0, notForeground: true }
+      for (let k = 0; k <= RUNS; k++) {
+        const o = fgBarrierObs({
+          acquired: true,
+          acquire: "plain",
+          probeClass: "Edit",
+          stats: { p50: 4, p95: 5, min: 3, max: 6, n: RUNS - k },
+          runs: [...Array<Json>(k).fill(skip), ...Array<Json>(RUNS - k).fill(ok)],
+        })
+        const p = rowVerdict("n-barrier-fg-proves-wpf", o.proves)
+        const want = RUNS - k >= MIN_EXERCISED ? "CONFIRMS" : "UNMEASURED"
+        if (p.verdict !== want) bad.push(`${RUNS - k}/${RUNS} exercised: ${p.verdict}, want ${want}`)
+      }
+      // labels: SKIPPED unless the probe says "errored: "; the UIPI not-foreground text is a skip
+      if (toObs(UN("returned 0/1 lastError=0 not foreground at send")).kind !== "SKIPPED")
+        bad.push("a skip mentioning lastError is labelled ERRORED")
+      if (toObs(UN("errored: leg failed: x")).kind !== "ERRORED") bad.push("an explicit error is not ERRORED")
+      const self = source("probe-sp-n.ts")
+      const to = self.slice(self.indexOf("export function toObs("), self.indexOf("export const finalRow"))
+      if (/\/i\.test\(reason\)|error\|timeout/.test(to))
+        bad.push("toObs still guesses the kind from the reason's words")
+      const cite = (id: string) => JSON.stringify(ROW_CITES[id])
+      if (
+        !/PermissionDenied/.test(cite("n-elevated-uia-read")) ||
+        /UIPI drops input/.test(cite("n-elevated-printwindow"))
+      )
+        bad.push("the elevated rows cite input dropping")
+      for (const id of [
+        "n-capture-wgc-monitor-display-off",
+        "n-capture-printwindow-disconnected",
+        "n-capture-wgc-window-locked",
+      ])
+        if (!/d-windows\.md:245/.test(cite(id))) bad.push(`${id} does not cite the session-state line`)
+      return bad.length ? bad.slice(0, 6).join("; ") : undefined
     },
   },
   {
