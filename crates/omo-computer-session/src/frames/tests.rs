@@ -534,3 +534,54 @@ fn default_frame_carries_pointer() {
         );
     }
 }
+
+/// An artifact frame lands only under the session's own STATE root: two sessions over two
+/// roots never share an artifact dir, and a session with no root writes nowhere shared (it
+/// refuses the artifact instead of falling back to a fixed temp path).
+#[test]
+fn artifact_frames_never_leave_the_sessions_own_root() {
+    let over_budget = json!({"target": "101", "caps": {"maxBytes": 1}, "cursor": false});
+    let mut paths = Vec::new();
+    let roots: Vec<tempfile::TempDir> = (0..2)
+        .map(|_| tempfile::tempdir().expect("tempdir"))
+        .collect();
+    for root in &roots {
+        let (backend, _) = fake(&json!({}));
+        let own = omo_computer_core::paths::Roots {
+            state: root.path().to_owned(),
+            runtime: root.path().to_owned(),
+        };
+        let mut session = Session::for_roots(Box::new(backend), &own);
+        session.open(params(json!({}))).expect("open");
+        let reply = serde_json::to_value(
+            session
+                .capture(params(over_budget.clone()))
+                .expect("artifact frame"),
+        )
+        .expect("reply JSON");
+        let path =
+            std::path::PathBuf::from(reply["artifactPath"].as_str().expect("an artifact path"));
+        assert!(
+            path.starts_with(root.path()),
+            "{} is outside {}",
+            path.display(),
+            root.path().display()
+        );
+        assert!(path.exists());
+        paths.push(path);
+    }
+    assert_ne!(
+        paths[0].parent(),
+        paths[1].parent(),
+        "two sessions share an artifact dir"
+    );
+
+    let (backend, sink) = fake(&json!({}));
+    let mut rootless = Session::new(Box::new(backend));
+    rootless.open(params(json!({}))).expect("open");
+    let refusal = rootless
+        .capture(params(over_budget))
+        .expect_err("no root: nowhere to write");
+    assert_eq!(refusal.code.wire(), "CaptureFailed");
+    assert!(sink.is_empty());
+}
