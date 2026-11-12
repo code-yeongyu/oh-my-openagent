@@ -30,6 +30,9 @@ function Leg-Facts {
 # Runs $command once as SYSTEM through the task scheduler and returns its Last Result (or a negative code when the
 # task never reported one). The task is always deleted, and its absence is read back.
 function Invoke-SystemTask([string]$name, [string]$command, [int]$timeoutMs) {
+	# Windows PowerShell 5.1 turns a native command's redirected stderr into a terminating error under Stop; the
+	# exit codes below are the result, so this function reads them with Continue.
+	$ErrorActionPreference = 'Continue'
 	& schtasks.exe /Create /TN $name /TR $command /SC ONCE /ST 23:59 /RU SYSTEM /RL HIGHEST /F | Out-Null
 	if ($LASTEXITCODE -ne 0) { return -1 }
 	try {
@@ -38,6 +41,7 @@ function Invoke-SystemTask([string]$name, [string]$command, [int]$timeoutMs) {
 		while ($sw.ElapsedMilliseconds -lt $timeoutMs) {
 			$rows = & schtasks.exe /Query /TN $name /FO CSV /V | ConvertFrom-Csv
 			$row = @($rows)[0]
+			if ($null -eq $row) { Start-Sleep -Milliseconds 200; continue }
 			# 267009 (0x41301) is 'currently running' and 267011 (0x41303) 'has not yet run': neither is a result.
 			if ($row.Status -ne 'Running' -and $row.'Last Result' -notin @('267009', '267011')) { return [int]$row.'Last Result' }
 			Start-Sleep -Milliseconds 200

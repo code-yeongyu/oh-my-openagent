@@ -167,8 +167,11 @@ export function verdictSecureDesktop(f: Facts): Reading {
     return reading("CONFIRMS", `consent.exe up on Winlogon; ${seen}`)
   if (yes(f, "consentSeen")) return reading("UNMEASURED", `consent.exe up but Winlogon never read; ${seen}`)
   if (!yes(f, "controlSeen")) return reading("UNMEASURED", `process list missed its own control; ${seen}`)
-  if (lua === 0) return reading("CONTRADICTS", `no elevation prompt: ${seen}`)
-  return reading("UNMEASURED", `no consent.exe with UAC on; ${seen}`)
+  // EnableLUA=0 (no UAC) or ConsentPromptBehaviorAdmin=0 (administrators elevate without prompting): the policy read
+  // itself says no prompt can appear, so the absence is a finding; with a prompting policy it is not.
+  if (lua === 0 || num(f, "consentPromptBehaviorAdmin") === 0)
+    return reading("CONTRADICTS", `no elevation prompt: ${seen}`)
+  return reading("UNMEASURED", `no consent.exe under a prompting policy; ${seen}`)
 }
 
 export function combineRuns(readings: readonly Reading[]): Reading {

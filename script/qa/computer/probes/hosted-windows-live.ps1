@@ -17,6 +17,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+# Inside a function of a dot-sourced file $PSCommandPath names that file, so children are started from $Entry.
+$Entry = $PSCommandPath
 $Here = Join-Path $PSScriptRoot 'hosted-windows-live'
 Add-Type -Path @((Join-Path $Here 'native-session.cs'), (Join-Path $Here 'native-display.cs'))
 . (Join-Path $Here 'legs-session.ps1')
@@ -49,7 +51,10 @@ if (-not $Out -and -not $Leg.StartsWith('fixture') -and -not $Leg.StartsWith('wo
 try {
 	& $legs[$Leg]
 } catch {
-	if (-not $Out) { throw }
+	if (-not $Out) {
+		if ($WorkerOut) { [IO.File]::WriteAllText("$WorkerOut.err", ($_ | Out-String)) }
+		throw
+	}
 	$message = $_.Exception.Message
 	Emit @{ leg = $Leg; run = $Run; error = $message }
 	[Console]::Out.WriteLine("LEG_ERROR leg=$Leg run=$Run recorded: $message")

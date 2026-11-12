@@ -17,7 +17,7 @@ function Read-Dpi([string]$dir) {
 	$out = Join-Path $dir ('dpi-' + [guid]::NewGuid().ToString('N') + '.json')
 	$id = [OmoHwl.Token]::Start((Child-Command 'dpi-read' "-WorkerOut `"$out`""), $KeepLabel)
 	[void](Wait-Exit $id 30000)
-	return ((Wait-File $out 5000) | ConvertFrom-Json)
+	return ((Wait-File $out 5000 "$out.err") | ConvertFrom-Json)
 }
 
 function Get-Sha256([string]$path) {
@@ -79,6 +79,7 @@ function Leg-MixedDpi {
 }
 
 function Remove-Vdd([string]$instanceId, $cert, [string]$settingsDir) {
+	$ErrorActionPreference = 'Continue'
 	$receipts = @()
 	if ($instanceId) {
 		$text = (& pnputil.exe /remove-device $instanceId 2>&1 | Out-String).Trim()
