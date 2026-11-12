@@ -1,0 +1,89 @@
+name: Computer live macOS probe
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [master, dev]
+    paths:
+      - ".github/workflows/computer-live-macos-probe.yml"
+      - "script/qa/computer/probes/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  probe:
+    name: hosted macos live probe (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-26]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Probe live accessibility, input and capture
+        env:
+          PROBE_IMAGE: ${{ matrix.os }}
+        run: bun script/qa/computer/probes/hosted-macos-live.ts --out "$RUNNER_TEMP/hosted-macos-live"
+
+      - name: Upload ledger fragment
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: hosted-macos-live-${{ matrix.os }}
+          path: ${{ runner.temp }}/hosted-macos-live
+          if-no-files-found: error
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Hosted macOS live probe (${{ matrix.os }})
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - One ledger row per question (q1-q8): CONFIRMS, CONTRADICTS or UNMEASURED with the measured evidence.
+            - The facts file records sw_vers, csrutil status, the runner user and the granted TCC rows of the probed services.
+          JOB_SUMMARY_NEXT: A failed step is a probe malfunction, not a verdict; read the first error in the probe step.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  ledger:
+    name: hosted macos live ledger
+    needs: probe
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: hosted-macos-live-*
+          path: fragments
+
+      - name: Merge fragments and decide
+        shell: bash
+        run: |
+          bun script/qa/computer/probes/hosted-macos-live.ts --merge hosted-macos-live.tsv fragments/*/hosted-macos-live.macos-*.tsv
+          bun script/qa/computer/probes/hosted-macos-live.ts --decide hosted-macos-live.tsv | tee -a "$GITHUB_STEP_SUMMARY"
+          cat hosted-macos-live.tsv
+
+      - name: Upload merged ledger
+        uses: actions/upload-artifact@v7
+        with:
+          name: hosted-macos-live-ledger
+          path: hosted-macos-live.tsv
+          if-no-files-found: error
