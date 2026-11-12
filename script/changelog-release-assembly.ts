@@ -36,20 +36,32 @@ export function parseNotes(text: string): Notes {
     } else if (fenced || line.trim() !== "") {
       const last = current.pop()
       const blankInFence = fenced && line.trim() === ""
-      if (last !== undefined && fenced && FENCE_LINE.test(line)) throw new Error(`a code fence under a ### bullet must start at the bullet's text: indent the fence and its code by two spaces, opening and closing lines alike: ${line}`)
-      if (last === undefined || (!blankInFence && !/^\s/.test(line))) throw new Error(`text under a ### heading must be a "- " bullet or an indented continuation of one: ${line}`)
+      if (last !== undefined && fenced && FENCE_LINE.test(line))
+        throw new Error(
+          `a code fence under a ### bullet must start at the bullet's text: indent the fence and its code by two spaces, opening and closing lines alike: ${line}`,
+        )
+      if (last === undefined || (!blankInFence && !/^\s/.test(line)))
+        throw new Error(`text under a ### heading must be a "- " bullet or an indented continuation of one: ${line}`)
       current.push(`${last}\n${line}`)
     }
   }
   // Drop surrounding blank lines but keep the first line's indentation: 4+ leading spaces make it indented code.
-  return { paragraphs: paragraphs.join("\n").replace(/^(?:[ \t]*\n)+/, "").trimEnd(), sections }
+  return {
+    paragraphs: paragraphs
+      .join("\n")
+      .replace(/^(?:[ \t]*\n)+/, "")
+      .trimEnd(),
+    sections,
+  }
 }
 
 const linkBullet = (entry: string, pr: number): string => linkEntry(entry, pr, PULL_URL)
 
 /** Every paragraph names the PR that made it (code fences untouched; see changelog-notes-markdown.ts). */
 const linkParagraphs = (text: string, pr: number): string =>
-  entriesOf(text).map((entry) => linkScanned(entry, pr, PULL_URL)).join("\n\n")
+  entriesOf(text)
+    .map((entry) => linkScanned(entry, pr, PULL_URL))
+    .join("\n\n")
 
 /** One notes text from several, in order: their paragraphs first, then one group per section name, first seen first. */
 export function mergeNotes(texts: readonly string[]): string {
@@ -60,14 +72,18 @@ export function mergeNotes(texts: readonly string[]): string {
     if (notes.paragraphs !== "") paragraphs.push(notes.paragraphs)
     for (const [name, bullets] of notes.sections) groups.set(name, [...(groups.get(name) ?? []), ...bullets])
   }
-  const sections = [...groups].filter(([, bullets]) => bullets.length > 0).map(([name, bullets]) => `### ${name}\n\n${bullets.join("\n")}`)
+  const sections = [...groups]
+    .filter(([, bullets]) => bullets.length > 0)
+    .map(([name, bullets]) => `### ${name}\n\n${bullets.join("\n")}`)
   return [...paragraphs, ...sections].join("\n\n")
 }
 
 /** The notes with every paragraph and bullet that lacks a link to `pr` linked to it (a folded car keeps its credit). */
 export function linkNotes(text: string, pr: number): string {
   const notes = parseNotes(text)
-  const sections = [...notes.sections].map(([name, bullets]) => `### ${name}\n\n${bullets.map((bullet) => linkBullet(bullet, pr)).join("\n")}`)
+  const sections = [...notes.sections].map(
+    ([name, bullets]) => `### ${name}\n\n${bullets.map((bullet) => linkBullet(bullet, pr)).join("\n")}`,
+  )
   return [linkParagraphs(notes.paragraphs, pr), ...sections].filter((part) => part !== "").join("\n\n")
 }
 
@@ -78,14 +94,19 @@ export type Assembly = { readonly body: string; readonly duplicates: readonly nu
  * links is a second copy of that entry (a PR that wrote both while the two rules overlapped): it is consumed
  * and reported in `duplicates`, never released twice.
  */
-export function assembleRelease(legacy: string, fragments: readonly { readonly pr: number; readonly content: string }[]): Assembly {
+export function assembleRelease(
+  legacy: string,
+  fragments: readonly { readonly pr: number; readonly content: string }[],
+): Assembly {
   const covered = new Set([...legacy.matchAll(OWN_PULL_LINK)].map((match) => Number(match[1])))
   const duplicates = fragments.filter((fragment) => covered.has(fragment.pr)).map((fragment) => fragment.pr)
   const kept = [...fragments].filter((fragment) => !covered.has(fragment.pr)).sort((left, right) => right.pr - left.pr)
   const old = parseNotes(legacy)
   const parsed = kept.map((fragment) => ({ pr: fragment.pr, notes: parseNotes(fragment.content) }))
   const paragraphs = assembleUnreleasedBody(
-    parsed.map(({ pr, notes }) => ({ pr, content: linkParagraphs(notes.paragraphs, pr) })).filter((entry) => entry.content !== ""),
+    parsed
+      .map(({ pr, notes }) => ({ pr, content: linkParagraphs(notes.paragraphs, pr) }))
+      .filter((entry) => entry.content !== ""),
   )
   const groups = new Map<string, string[]>()
   for (const [name, bullets] of old.sections) groups.set(name, [...bullets])
@@ -94,7 +115,9 @@ export function assembleRelease(legacy: string, fragments: readonly { readonly p
       groups.set(name, [...(groups.get(name) ?? []), ...bullets.map((bullet) => linkBullet(bullet, pr))])
     }
   }
-  const sections = [...groups].filter(([, bullets]) => bullets.length > 0).map(([name, bullets]) => `### ${name}\n\n${bullets.join("\n")}`)
+  const sections = [...groups]
+    .filter(([, bullets]) => bullets.length > 0)
+    .map(([name, bullets]) => `### ${name}\n\n${bullets.join("\n")}`)
   const body = [old.paragraphs, paragraphs, ...sections].filter((part) => part !== "").join("\n\n")
   return { body, duplicates }
 }

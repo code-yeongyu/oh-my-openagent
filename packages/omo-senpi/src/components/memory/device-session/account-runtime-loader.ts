@@ -8,13 +8,21 @@
 
 import { isMainThread } from "node:worker_threads"
 import { provideSessionWorkerData } from "@code-yeongyu/senpi/session-worker-data"
-import { type HostMemorySync, type MemorySyncSelection, MEMORY_SYNC_WORKER_DATA, selectHostMemorySyncSource } from "../desktop-sync/hostSelection"
+import {
+  type HostMemorySync,
+  type MemorySyncSelection,
+  MEMORY_SYNC_WORKER_DATA,
+  selectHostMemorySyncSource,
+} from "../desktop-sync/hostSelection"
 import { launchCarriedPrivateTable } from "../desktop-sync/launchClassification"
 import { SyncSidecarUnavailableError } from "../sync-runner"
 import type { DeviceAccountSource } from "./account-source"
 import type * as AccountRuntime from "./account-runtime"
 
-export type DeviceAccountRuntimeModule = Pick<typeof AccountRuntime, "claimInheritedDesktopSync" | "selectedAccountSource" | "serveWorkerPort" | "workerMemorySyncSelection">
+export type DeviceAccountRuntimeModule = Pick<
+  typeof AccountRuntime,
+  "claimInheritedDesktopSync" | "selectedAccountSource" | "serveWorkerPort" | "workerMemorySyncSelection"
+>
 
 const importDeviceAccountRuntime = (): Promise<DeviceAccountRuntimeModule> => import("#omo-device-account-runtime")
 let memorySyncHost: HostMemorySync | undefined
@@ -29,16 +37,19 @@ export function selectedDeviceAccountSource(
 ): DeviceAccountSource {
   let pending: Promise<DeviceAccountRuntimeModule> | undefined
   // A failed load is not cached, so the next resolve retries.
-  const runtime = (): Promise<DeviceAccountRuntimeModule> => pending ??= importRuntime().catch((error: unknown) => {
-    pending = undefined
-    throw new SyncSidecarUnavailableError("device account", error)
-  })
+  const runtime = (): Promise<DeviceAccountRuntimeModule> =>
+    (pending ??= importRuntime().catch((error: unknown) => {
+      pending = undefined
+      throw new SyncSidecarUnavailableError("device account", error)
+    }))
   let selection: () => Promise<MemorySyncSelection>
   if (isMainThread) {
-    const host = memorySyncHost ?? selectHostMemorySyncSource({
-      declared: launchCarriedPrivateTable,
-      sidecar: runtime,
-    })
+    const host =
+      memorySyncHost ??
+      selectHostMemorySyncSource({
+        declared: launchCarriedPrivateTable,
+        sidecar: runtime,
+      })
     // A duplicate/late provider is a bootstrap failure, not an unavailable account.
     if (memorySyncHost === undefined) {
       provideSessionWorkerData(MEMORY_SYNC_WORKER_DATA, host.workerData)
@@ -46,7 +57,7 @@ export function selectedDeviceAccountSource(
     }
     selection = () => host.selection
   } else {
-    selection = () => runtime().then(loaded => loaded.workerMemorySyncSelection())
+    selection = () => runtime().then((loaded) => loaded.workerMemorySyncSelection())
   }
   let source: DeviceAccountSource | undefined
   return async () => {

@@ -1,5 +1,14 @@
 import { describe, expect, test } from "bun:test"
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, relative, resolve, sep } from "node:path"
 
@@ -11,14 +20,23 @@ const BINARY_DOWNLOADER_ENTRY_POINT = join(import.meta.dir, "..", "shared", "bin
 const SERVICE_AUTH_ENTRY_POINT = join(import.meta.dir, "..", "cli", "service-auth", "index.ts")
 const PACKAGES_PATH = join(import.meta.dir, "..", "..", "..", "..", "packages")
 const CONFIG_CORE_ENTRY_POINT = join(PACKAGES_PATH, "omo-config-core", "src", "index.ts")
-const NEGATIVE_FIXTURE_ENTRY_POINT = join(import.meta.dir, "..", "..", "test", "fixtures", "config-migration", "opencode-side-effect-import.ts")
+const NEGATIVE_FIXTURE_ENTRY_POINT = join(
+  import.meta.dir,
+  "..",
+  "..",
+  "test",
+  "fixtures",
+  "config-migration",
+  "opencode-side-effect-import.ts",
+)
 const OPENCODE_IMPORT = /^@opencode-ai\//
 const PLUGIN_RUNTIME_DIRECTORY = `${sep}plugin${sep}`
 const PLUGIN_CONFIG_DIRECTORY = `${sep}plugin-config${sep}`
 
 function importSpecifiers(source: string): readonly string[] {
   const specifiers: string[] = []
-  const expression = /\bfrom\s*["']([^"']+)["']|\bimport\s*\(\s*["']([^"']+)["']\s*\)|(?:^|[;\n])\s*import\s*["']([^"']+)["']/gm
+  const expression =
+    /\bfrom\s*["']([^"']+)["']|\bimport\s*\(\s*["']([^"']+)["']\s*\)|(?:^|[;\n])\s*import\s*["']([^"']+)["']/gm
   for (const match of source.matchAll(expression)) {
     const specifier = match[1] ?? match[2] ?? match[3]
     if (specifier !== undefined) specifiers.push(specifier)
@@ -61,7 +79,11 @@ function resolveRelativeImport(sourcePath: string, specifier: string): string {
   return resolveModule(resolve(dirname(sourcePath), specifier), specifier, sourcePath)
 }
 
-function resolveWorkspaceImport(sourcePath: string, specifier: string, packages = WORKSPACE_PACKAGES): string | undefined {
+function resolveWorkspaceImport(
+  sourcePath: string,
+  specifier: string,
+  packages = WORKSPACE_PACKAGES,
+): string | undefined {
   for (const [packageName, workspace] of packages) {
     const prefix = `${packageName}/`
     if (specifier !== packageName && !specifier.startsWith(prefix)) continue
@@ -69,26 +91,36 @@ function resolveWorkspaceImport(sourcePath: string, specifier: string, packages 
     if (workspace.exports === undefined) {
       return resolveModule(join(workspace.directory, "src", subpath), specifier, sourcePath)
     }
-    let entry: unknown = typeof workspace.exports === "object" && workspace.exports !== null
-      ? Reflect.get(workspace.exports, subpath)
-      : subpath === "." ? workspace.exports : undefined
+    let entry: unknown =
+      typeof workspace.exports === "object" && workspace.exports !== null
+        ? Reflect.get(workspace.exports, subpath)
+        : subpath === "."
+          ? workspace.exports
+          : undefined
     let capture: string | undefined
     if (entry === undefined && typeof workspace.exports === "object" && workspace.exports !== null) {
-      const patterns = Object.keys(workspace.exports).filter((key) => key.includes("*"))
+      const patterns = Object.keys(workspace.exports)
+        .filter((key) => key.includes("*"))
         .sort((a, b) => b.indexOf("*") - a.indexOf("*") || b.length - a.length)
       for (const pattern of patterns) {
         const [prefix = "", suffix = ""] = pattern.split("*")
-        if (!subpath.startsWith(prefix) || !subpath.endsWith(suffix) || subpath.length < prefix.length + suffix.length) continue
+        if (!subpath.startsWith(prefix) || !subpath.endsWith(suffix) || subpath.length < prefix.length + suffix.length)
+          continue
         capture = subpath.slice(prefix.length, subpath.length - suffix.length)
         entry = Reflect.get(workspace.exports, pattern)
         break
       }
     }
-    const target: unknown = typeof entry === "object" && entry !== null
-      ? Reflect.get(entry, "import") ?? Reflect.get(entry, "default")
-      : entry
+    const target: unknown =
+      typeof entry === "object" && entry !== null
+        ? (Reflect.get(entry, "import") ?? Reflect.get(entry, "default"))
+        : entry
     if (typeof target !== "string") throw new Error(`Cannot resolve exported ${specifier} from ${sourcePath}`)
-    return resolveModule(resolve(workspace.directory, capture === undefined ? target : target.replaceAll("*", capture)), specifier, sourcePath)
+    return resolveModule(
+      resolve(workspace.directory, capture === undefined ? target : target.replaceAll("*", capture)),
+      specifier,
+      sourcePath,
+    )
   }
   return undefined
 }
@@ -117,10 +149,12 @@ describe("config-migration public subpath", () => {
     const aliasTarget = join(PACKAGES_PATH, "memory-core", "src", "locks", "process-identity.ts")
 
     expect(resolveWorkspaceImport(entryPoint, "@oh-my-opencode/memory-core/process-identity")).toBe(aliasTarget)
-    expect(moduleGraph(entryPoint)).toEqual(expect.arrayContaining([
-      aliasTarget,
-      join(PACKAGES_PATH, "memory-core", "src", "locks", "process-start-time.ts"),
-    ]))
+    expect(moduleGraph(entryPoint)).toEqual(
+      expect.arrayContaining([
+        aliasTarget,
+        join(PACKAGES_PATH, "memory-core", "src", "locks", "process-start-time.ts"),
+      ]),
+    )
   })
 
   test("an exports alias targeting a forbidden graph still fails the audit", () => {
@@ -128,16 +162,19 @@ describe("config-migration public subpath", () => {
     try {
       const packagePath = join(root, "fixture")
       mkdirSync(join(packagePath, "src"), { recursive: true })
-      writeFileSync(join(packagePath, "package.json"), JSON.stringify({
-        name: "@audit/fixture",
-        exports: {
-          "./*": { import: "./src/*.ts" },
-          "./alias": {
-            import: relative(packagePath, NEGATIVE_FIXTURE_ENTRY_POINT),
-            default: "./src/alias.ts",
+      writeFileSync(
+        join(packagePath, "package.json"),
+        JSON.stringify({
+          name: "@audit/fixture",
+          exports: {
+            "./*": { import: "./src/*.ts" },
+            "./alias": {
+              import: relative(packagePath, NEGATIVE_FIXTURE_ENTRY_POINT),
+              default: "./src/alias.ts",
+            },
           },
-        },
-      }))
+        }),
+      )
       writeFileSync(join(packagePath, "src", "alias.ts"), "export {}\n")
       const entryPoint = join(root, "entry.ts")
       writeFileSync(entryPoint, 'import "@audit/fixture/alias"\n')
@@ -146,7 +183,8 @@ describe("config-migration public subpath", () => {
       const offenders = modules.flatMap((modulePath) =>
         importSpecifiers(readFileSync(modulePath, "utf-8"))
           .filter((specifier) => OPENCODE_IMPORT.test(specifier))
-          .map((specifier) => `${modulePath} imports ${specifier}`))
+          .map((specifier) => `${modulePath} imports ${specifier}`),
+      )
 
       expect(modules).toContain(NEGATIVE_FIXTURE_ENTRY_POINT)
       expect(offenders).toEqual([`${NEGATIVE_FIXTURE_ENTRY_POINT} imports @opencode-ai/sdk`])
@@ -182,25 +220,28 @@ describe("config-migration public subpath", () => {
   test.each([
     ["binary-downloader", BINARY_DOWNLOADER_ENTRY_POINT],
     ["service-auth", SERVICE_AUTH_ENTRY_POINT],
-  ])("#given the %s entry point #when its local module graph is audited #then it imports neither OpenCode SDK modules nor plugin runtime code", (_name, entryPoint) => {
-    // given
-    const modules = moduleGraph(entryPoint)
-    const offenders: string[] = []
+  ])(
+    "#given the %s entry point #when its local module graph is audited #then it imports neither OpenCode SDK modules nor plugin runtime code",
+    (_name, entryPoint) => {
+      // given
+      const modules = moduleGraph(entryPoint)
+      const offenders: string[] = []
 
-    // when
-    for (const modulePath of modules) {
-      for (const specifier of importSpecifiers(readFileSync(modulePath, "utf-8"))) {
-        if (OPENCODE_IMPORT.test(specifier)) offenders.push(`${modulePath} imports ${specifier}`)
+      // when
+      for (const modulePath of modules) {
+        for (const specifier of importSpecifiers(readFileSync(modulePath, "utf-8"))) {
+          if (OPENCODE_IMPORT.test(specifier)) offenders.push(`${modulePath} imports ${specifier}`)
+        }
+        if (modulePath.includes(PLUGIN_RUNTIME_DIRECTORY) || modulePath.includes(PLUGIN_CONFIG_DIRECTORY)) {
+          offenders.push(`${modulePath} is plugin runtime code`)
+        }
       }
-      if (modulePath.includes(PLUGIN_RUNTIME_DIRECTORY) || modulePath.includes(PLUGIN_CONFIG_DIRECTORY)) {
-        offenders.push(`${modulePath} is plugin runtime code`)
-      }
-    }
 
-    // then
-    expect(modules.length).toBeGreaterThan(1)
-    expect(offenders).toEqual([])
-  })
+      // then
+      expect(modules.length).toBeGreaterThan(1)
+      expect(offenders).toEqual([])
+    },
+  )
 
   test("#given the config-migration entry point #when its local module graph is audited #then it imports neither OpenCode SDK modules nor plugin runtime code", () => {
     // given
@@ -236,8 +277,6 @@ describe("config-migration public subpath", () => {
     }
 
     // then
-    expect(offenders).toEqual([
-      `${NEGATIVE_FIXTURE_ENTRY_POINT} imports @opencode-ai/sdk`,
-    ])
+    expect(offenders).toEqual([`${NEGATIVE_FIXTURE_ENTRY_POINT} imports @opencode-ai/sdk`])
   })
 })

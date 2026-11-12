@@ -5,19 +5,23 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { executeBackground } from "./background-executor"
 
 describe("executeBackground", () => {
-  const launchMock = mock(async (_input?: { fallbackChain?: unknown }): Promise<{
-    id: string
-    sessionId: string | null
-    description: string
-    agent: string
-    status: string
-  }> => ({
-    id: "test-task-id",
-    sessionId: null,
-    description: "Test task",
-    agent: "test-agent",
-    status: "pending",
-  }))
+  const launchMock = mock(
+    async (_input?: {
+      fallbackChain?: unknown
+    }): Promise<{
+      id: string
+      sessionId: string | null
+      description: string
+      agent: string
+      status: string
+    }> => ({
+      id: "test-task-id",
+      sessionId: null,
+      description: "Test task",
+      agent: "test-agent",
+      status: "pending",
+    }),
+  )
   const getTaskMock = mock()
 
   const mockManager = {
@@ -152,7 +156,7 @@ describe("executeBackground", () => {
         abort: abortController.signal,
       },
       mockManager,
-      mockClient
+      mockClient,
     )
 
     //#then - background launch should still be reported as launched
@@ -189,18 +193,8 @@ describe("executeBackground", () => {
 
     //#when
     const [firstResult, secondResult] = await Promise.all([
-      executeBackground(
-        testArgs,
-        { ...testContext, abort: firstAbortController.signal },
-        mockManager,
-        mockClient,
-      ),
-      executeBackground(
-        testArgs,
-        { ...testContext, abort: secondAbortController.signal },
-        mockManager,
-        mockClient,
-      ),
+      executeBackground(testArgs, { ...testContext, abort: firstAbortController.signal }, mockManager, mockClient),
+      executeBackground(testArgs, { ...testContext, abort: secondAbortController.signal }, mockManager, mockClient),
     ])
 
     //#then - both launches still succeed and the sibling is not marked interrupted

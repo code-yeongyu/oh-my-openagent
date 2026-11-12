@@ -8,7 +8,12 @@ import { StrandedGitLockError } from "../../git/repo-lock-sweep"
 import { SyncAuthError, SyncHttpError, SyncNetworkError } from "./adapters/http-transport"
 
 export type SyncFailure =
-  | { readonly kind: "stranded_lock"; readonly paths: readonly string[]; readonly reason: string; readonly action: string }
+  | {
+      readonly kind: "stranded_lock"
+      readonly paths: readonly string[]
+      readonly reason: string
+      readonly action: string
+    }
   | { readonly kind: "auth_expired"; readonly reason: string; readonly action: string }
   | { readonly kind: "offline"; readonly reason: string; readonly action: string }
   | { readonly kind: "unknown"; readonly reason: string; readonly action: string }
@@ -55,31 +60,39 @@ const UNKNOWN: SyncFailure = {
 const MIB = 1024 * 1024
 const sizeText = (bytes: number): string => (bytes % MIB === 0 ? `${bytes / MIB} MiB` : `${bytes} bytes`)
 
-const nameKeys = (keys: readonly string[]): string => (keys.length <= 3 ? keys.join(", ") : `${keys.slice(0, 3).join(", ")} and ${keys.length - 3} more`)
+const nameKeys = (keys: readonly string[]): string =>
+  keys.length <= 3 ? keys.join(", ") : `${keys.slice(0, 3).join(", ")} and ${keys.length - 3} more`
 
 /**
  * The items sync holds back because one change to each is larger than a batch may carry. A stuck key
  * (a queued change this device cannot wind back) gets an action that promises no recovery.
  */
-export function describeOversizedItems(keys: readonly string[], limitBytes: number, stuck: readonly string[] = []): SyncFailure {
+export function describeOversizedItems(
+  keys: readonly string[],
+  limitBytes: number,
+  stuck: readonly string[] = [],
+): SyncFailure {
   const limit = sizeText(limitBytes)
   const fixable = keys.filter((key) => !stuck.includes(key))
-  const shrink = fixable.length === 0
-    ? ""
-    : `Shrink or split ${nameKeys(fixable)} to stay under ${limit}; ${fixable.length === 1 ? "it syncs" : "each syncs"} on its own once it fits.`
-  const kept = stuck.length === 0
-    ? ""
-    : `${nameKeys(stuck)} cannot be sent from this device even if made smaller; the change stays on this device, and the memory log has the detail.`
+  const shrink =
+    fixable.length === 0
+      ? ""
+      : `Shrink or split ${nameKeys(fixable)} to stay under ${limit}; ${fixable.length === 1 ? "it syncs" : "each syncs"} on its own once it fits.`
+  const kept =
+    stuck.length === 0
+      ? ""
+      : `${nameKeys(stuck)} cannot be sent from this device even if made smaller; the change stays on this device, and the memory log has the detail.`
   return {
     kind: "oversized_item",
     keys,
     stuck,
     limitBytes,
-    reason: fixable.length === 0
-      ? `A change queued on this device for ${keys.length === 1 ? "one memory file" : `${keys.length} memory files`} cannot be sent from it. Every other memory keeps syncing.`
-      : keys.length === 1
-      ? `A change to one memory file is larger than the ${limit} sync limit, so that file is not synced. Every other memory keeps syncing.`
-      : `Changes to ${keys.length} memory files are larger than the ${limit} sync limit, so those files are not synced. Every other memory keeps syncing.`,
+    reason:
+      fixable.length === 0
+        ? `A change queued on this device for ${keys.length === 1 ? "one memory file" : `${keys.length} memory files`} cannot be sent from it. Every other memory keeps syncing.`
+        : keys.length === 1
+          ? `A change to one memory file is larger than the ${limit} sync limit, so that file is not synced. Every other memory keeps syncing.`
+          : `Changes to ${keys.length} memory files are larger than the ${limit} sync limit, so those files are not synced. Every other memory keeps syncing.`,
     action: [shrink, kept].filter((part) => part !== "").join(" "),
   }
 }
@@ -90,9 +103,10 @@ export function describeSyncFailure(error: unknown): SyncFailure {
       kind: "stranded_lock",
       paths: error.paths,
       reason: "A git lock file left in the memory repository blocks sync, and OmO did not remove it on its own.",
-      action: error.paths.length === 1
-        ? `If no other session is working on this memory, run /memory unlock ${error.paths[0]}, or restart OmO.`
-        : `If no other session is working on this memory, run /memory unlock for each: ${error.paths.join(", ")}; or restart OmO.`,
+      action:
+        error.paths.length === 1
+          ? `If no other session is working on this memory, run /memory unlock ${error.paths[0]}, or restart OmO.`
+          : `If no other session is working on this memory, run /memory unlock for each: ${error.paths.join(", ")}; or restart OmO.`,
     }
   }
   if (error instanceof SyncAuthError || (error instanceof SyncHttpError && error.status === 401)) return AUTH_EXPIRED

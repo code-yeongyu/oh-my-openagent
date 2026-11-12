@@ -1,5 +1,9 @@
 import { NATIVE_EDITION_GUIDE_URL } from "../../cli/native-edition-hint"
-import { formatNativeInstallEntryCommand, NATIVE_SETUP_COMMAND, resolveNativeInstallPlan } from "../../cli/install-native"
+import {
+  formatNativeInstallEntryCommand,
+  NATIVE_SETUP_COMMAND,
+  resolveNativeInstallPlan,
+} from "../../cli/install-native"
 import {
   createNudgeStateStore,
   nativeEditionStateDir,
@@ -88,7 +92,10 @@ type TuiApi = {
   }
 }
 
-export function registerNativeEditionNudgeTui(api: TuiApi, deps: { readonly store?: NudgeStateStore } = {}): () => void {
+export function registerNativeEditionNudgeTui(
+  api: TuiApi,
+  deps: { readonly store?: NudgeStateStore } = {},
+): () => void {
   const store = deps.store ?? createNudgeStateStore(nativeEditionStateDir())
 
   const open = (): void => {

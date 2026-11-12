@@ -18,14 +18,22 @@ export type InputAdmission = "admitted" | "not_admitted"
 export type InputAdmissionRead = (ids: readonly string[]) => Promise<ReadonlyMap<string, InputAdmission> | undefined>
 
 export class InputUncertainError extends Error {
-  constructor(readonly effectId: string, override readonly cause: Error) {
-    super(`uncertain: ${unacknowledgedReason(cause)}; it may still be delivered. omo will confirm by itself; do not resend the same text.`, { cause })
+  constructor(
+    readonly effectId: string,
+    override readonly cause: Error,
+  ) {
+    super(
+      `uncertain: ${unacknowledgedReason(cause)}; it may still be delivered. omo will confirm by itself; do not resend the same text.`,
+      { cause },
+    )
   }
 }
 
 function unacknowledgedReason(cause: Error): string {
-  if (cause instanceof RpcRequestTimeout) return `the host did not acknowledge this message within ${Math.round(cause.deadlineMs / 1000)} s`
-  if (cause.name === "RpcTransportGoneError") return "the connection to the host was lost before it acknowledged this message"
+  if (cause instanceof RpcRequestTimeout)
+    return `the host did not acknowledge this message within ${Math.round(cause.deadlineMs / 1000)} s`
+  if (cause.name === "RpcTransportGoneError")
+    return "the connection to the host was lost before it acknowledged this message"
   return "the host did not acknowledge this message before its request deadline"
 }
 
@@ -61,33 +69,42 @@ export function createInputEffects(input: {
 
   const remember = (command: IdentifiedInput): void => {
     pending.set(command.clientMessageId, command)
-    store?.mutate(taskId, record => ({
+    store?.mutate(taskId, (record) => ({
       ...record,
-      uncertain_inputs: [...(record.uncertain_inputs ?? []).filter(item => item.clientMessageId !== command.clientMessageId), command],
+      uncertain_inputs: [
+        ...(record.uncertain_inputs ?? []).filter((item) => item.clientMessageId !== command.clientMessageId),
+        command,
+      ],
     }))
   }
   const forget = (command: IdentifiedInput): void => {
     pending.delete(command.clientMessageId)
-    store?.mutate(taskId, record => {
-      const remaining = record.uncertain_inputs?.filter(item => item.clientMessageId !== command.clientMessageId)
+    store?.mutate(taskId, (record) => {
+      const remaining = record.uncertain_inputs?.filter((item) => item.clientMessageId !== command.clientMessageId)
       const { uncertain_inputs: _uncertain, ...rest } = record
       return remaining === undefined || remaining.length === 0 ? rest : { ...rest, uncertain_inputs: remaining }
     })
   }
   const event = (type: string, command: IdentifiedInput, extra: Record<string, unknown> = {}): void => {
-    store?.appendEvent(taskId, { type, payload: {
-      effect_id: command.clientMessageId,
-      run_epoch: epochOf(command),
-      ...extra,
-    } })
+    store?.appendEvent(taskId, {
+      type,
+      payload: {
+        effect_id: command.clientMessageId,
+        run_epoch: epochOf(command),
+        ...extra,
+      },
+    })
   }
   const settled = (command: IdentifiedInput): void => {
     forget(command)
-    event(command.type === "prompt" && command.streamingBehavior === undefined ? "started" : "steered", command,
-      { delivered: command.type === "steer" || command.streamingBehavior === "steer" ? "steer" : "followUp" })
+    event(command.type === "prompt" && command.streamingBehavior === undefined ? "started" : "steered", command, {
+      delivered: command.type === "steer" || command.streamingBehavior === "steer" ? "steer" : "followUp",
+    })
   }
   /** The child's answer for these ids; `"unreadable"` when the read failed, `undefined` when there is no read. */
-  const admissions = async (ids: readonly string[]): Promise<ReadonlyMap<string, InputAdmission> | "unreadable" | undefined> => {
+  const admissions = async (
+    ids: readonly string[],
+  ): Promise<ReadonlyMap<string, InputAdmission> | "unreadable" | undefined> => {
     if (input.read === undefined || ids.length === 0) return undefined
     try {
       return await input.read(ids)
@@ -116,11 +133,21 @@ export function createInputEffects(input: {
         if (isUnacknowledged(error)) return
         forget(command)
         const conflict = isConflict(error) ? new InputConflictError(command.clientMessageId) : undefined
-        event("effect_failed", command, conflict === undefined
-          ? { reason: "input_refused", detail: String(error), action: "inspect task_output before sending another message" }
-          : { reason: conflict.reason, detail: conflict.detail, action: conflict.action })
+        event(
+          "effect_failed",
+          command,
+          conflict === undefined
+            ? {
+                reason: "input_refused",
+                detail: String(error),
+                action: "inspect task_output before sending another message",
+              }
+            : { reason: conflict.reason, detail: conflict.detail, action: conflict.action },
+        )
       }
-    })().finally(() => { retries.delete(command.clientMessageId) })
+    })().finally(() => {
+      retries.delete(command.clientMessageId)
+    })
     retries.set(command.clientMessageId, work)
     return work
   }
@@ -130,14 +157,18 @@ export function createInputEffects(input: {
       const own = command.clientMessageId
       let id = own ?? `${taskId}:0:${++localSeq}`
       let runEpoch: number | undefined
-      store?.mutate(taskId, record => {
+      store?.mutate(taskId, (record) => {
         runEpoch = record.notification.run_epoch
         // A caller's own id (a queued steer's entry id) is sent as it is: the child holds the input under it.
         if (own !== undefined) return { ...record, last_effect_id: own }
         const seq = Math.max(record.effect_seq ?? 0, record.host_session?.effect_seq ?? 0) + 1
         id = `${taskId}:${record.notification.run_epoch}:${seq}`
-        return { ...record, effect_seq: seq, last_effect_id: id,
-          ...(record.host_session === undefined ? {} : { host_session: { ...record.host_session, effect_seq: seq } }) }
+        return {
+          ...record,
+          effect_seq: seq,
+          last_effect_id: id,
+          ...(record.host_session === undefined ? {} : { host_session: { ...record.host_session, effect_seq: seq } }),
+        }
       })
       const identified: IdentifiedInput = { ...command, clientMessageId: id }
       try {
@@ -151,7 +182,9 @@ export function createInputEffects(input: {
         if (retrying) {
           const immediate = setImmediate(() => {
             scheduled.delete(immediate)
-            void retry(identified).catch(error => log("senpi-task input resolution failed", { taskId, error: String(error) }))
+            void retry(identified).catch((error) =>
+              log("senpi-task input resolution failed", { taskId, error: String(error) }),
+            )
           })
           scheduled.add(immediate)
         }
@@ -163,11 +196,13 @@ export function createInputEffects(input: {
       const commands = record?.uncertain_inputs ?? [...pending.values()]
       const currentEpoch = record?.notification.run_epoch
       // An id whose retry is already in flight is settled by that retry, so the log never records it both ways.
-      const stale = currentEpoch === undefined ? [] : commands.filter(command =>
-        epochOf(command) !== currentEpoch && !retries.has(command.clientMessageId))
+      const stale =
+        currentEpoch === undefined
+          ? []
+          : commands.filter((command) => epochOf(command) !== currentEpoch && !retries.has(command.clientMessageId))
       // An earlier run's input is never sent into a later run. Where the child can answer, its read decides
       // what happened to it: admitted is settled, not_admitted fails as superseded, unreadable stays uncertain.
-      const read = await admissions(stale.map(command => command.clientMessageId))
+      const read = await admissions(stale.map((command) => command.clientMessageId))
       for (const command of stale) {
         if (read === "unreadable") continue
         if (read?.get(command.clientMessageId) === "admitted") {
@@ -181,7 +216,7 @@ export function createInputEffects(input: {
           action: "send the message again if the task still needs it",
         })
       }
-      await Promise.all(commands.filter(command => !stale.includes(command)).map(retry))
+      await Promise.all(commands.filter((command) => !stale.includes(command)).map(retry))
     },
     stopRetrying(): void {
       retrying = false
@@ -202,12 +237,17 @@ function wireOf(command: IdentifiedInput): IdentifiedInput {
 }
 
 function isConflict(error: unknown): boolean {
-  return error instanceof Error && (("code" in error && error.code === "client_message_id_conflict")
-    || error.message.includes("client_message_id_conflict"))
+  return (
+    error instanceof Error &&
+    (("code" in error && error.code === "client_message_id_conflict") ||
+      error.message.includes("client_message_id_conflict"))
+  )
 }
 
 function isUnacknowledged(error: unknown): error is Error {
-  return error instanceof RpcRequestTimeout || error instanceof Error
-    && (error.message.startsWith("Timeout waiting for response to ")
-      || error.name === "RpcTransportGoneError")
+  return (
+    error instanceof RpcRequestTimeout ||
+    (error instanceof Error &&
+      (error.message.startsWith("Timeout waiting for response to ") || error.name === "RpcTransportGoneError"))
+  )
 }

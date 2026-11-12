@@ -31,9 +31,9 @@ describe("RpcProtocolClient model event forwarding (F12)", () => {
   test("#given a child that announces a model switch and a fallback revert #when both records arrive #then both fan out to subscribers with their payloads", async () => {
     // given: a child process that emits the two records on boot and then idles on stdin
     const source = [
-      "const emit = (value) => process.stdout.write(JSON.stringify(value) + \"\\n\")",
-      "emit({ type: \"model_changed\", model: { provider: \"anthropic\", id: \"claude-opus-5-5\" }, thinkingLevel: \"high\", source: \"set\" })",
-      "emit({ type: \"retry_fallback_reverted\", from: \"anthropic/claude-opus-5-5\", to: \"kimi-coding/kimi-for-coding-highspeed-unlocked\" })",
+      'const emit = (value) => process.stdout.write(JSON.stringify(value) + "\\n")',
+      'emit({ type: "model_changed", model: { provider: "anthropic", id: "claude-opus-5-5" }, thinkingLevel: "high", source: "set" })',
+      'emit({ type: "retry_fallback_reverted", from: "anthropic/claude-opus-5-5", to: "kimi-coding/kimi-for-coding-highspeed-unlocked" })',
       "process.stdin.resume()",
     ].join("\n")
     const child = spawn("node", ["--input-type=module", "-e", source], {
@@ -53,6 +53,10 @@ describe("RpcProtocolClient model event forwarding (F12)", () => {
 
     // then
     expect(seen.map((event) => event.type)).toEqual(["model_changed", "retry_fallback_reverted"])
-    expect(seen[0]).toMatchObject({ model: { provider: "anthropic", id: "claude-opus-5-5" }, thinkingLevel: "high", source: "set" })
+    expect(seen[0]).toMatchObject({
+      model: { provider: "anthropic", id: "claude-opus-5-5" },
+      thinkingLevel: "high",
+      source: "set",
+    })
   })
 })

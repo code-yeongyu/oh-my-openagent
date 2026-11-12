@@ -10,7 +10,9 @@ import type { LoadedSkill, SkillLoader, SkillResolution } from "./types"
 import { readProjectSkills, type CheckedProjectSkills } from "./checked-project-skills"
 import { readSkillFileChecked } from "@oh-my-opencode/skills-loader-core/opencode-skill-loader/checked-skill-read"
 import {
-  checkSkillPath, skillProvenance, reportSkillLoadError,
+  checkSkillPath,
+  skillProvenance,
+  reportSkillLoadError,
   type SkillProvenance,
 } from "@oh-my-opencode/skills-loader-core/opencode-skill-loader/skill-provenance"
 
@@ -25,16 +27,18 @@ export type FsSkillLoaderOptions = {
 // prompt. Empty input leaves the prompt untouched.
 export function buildSkillPrepend(skills: readonly LoadedSkill[], prompt: string): string {
   if (skills.length === 0) return prompt
-  const block = skills.map((skill) => {
-    if (skill.location === undefined) return `<skill name="${skill.name}">\n${skill.content}\n</skill>`
-    return [
-      `<skill name="${skill.name}" location="${skill.location}">`,
-      `References are relative to ${dirname(skill.location)}.`,
-      "",
-      skill.content,
-      "</skill>",
-    ].join("\n")
-  }).join("\n\n")
+  const block = skills
+    .map((skill) => {
+      if (skill.location === undefined) return `<skill name="${skill.name}">\n${skill.content}\n</skill>`
+      return [
+        `<skill name="${skill.name}" location="${skill.location}">`,
+        `References are relative to ${dirname(skill.location)}.`,
+        "",
+        skill.content,
+        "</skill>",
+      ].join("\n")
+    })
+    .join("\n\n")
   return `${block}\n\n${prompt}`
 }
 
@@ -54,12 +58,7 @@ function uniqueDirs(dirs: readonly string[]): readonly string[] {
   return [...new Set(dirs.map((dir) => resolve(dir)))]
 }
 
-function searchDirs(
-  cwd: string,
-  home: string,
-  agentDir: string,
-  extraDirs: readonly string[],
-): readonly string[] {
+function searchDirs(cwd: string, home: string, agentDir: string, extraDirs: readonly string[]): readonly string[] {
   return uniqueDirs([
     join(cwd, ".senpi", "skills"),
     ...ancestorAgentSkillDirs(cwd),
@@ -75,7 +74,10 @@ function skillBody(raw: string): string {
   if (!normalized.startsWith("---\n")) return raw
   const closing = normalized.indexOf("\n---", 4)
   if (closing < 0) return raw
-  return normalized.slice(closing + 4).replace(/^\n/, "").trim()
+  return normalized
+    .slice(closing + 4)
+    .replace(/^\n/, "")
+    .trim()
 }
 
 function readSkillFile(name: string, path: string, provenance: SkillProvenance): LoadedSkill {
@@ -115,7 +117,9 @@ function discoveredSkill(
     const skill = discovery.skills.get(name)
     // Only a blocked link that belongs to the requested skill explains its absence; another skill's link
     // would name the wrong file, so an unrelated miss stays "missing" (#10693 review L1).
-    const blocked = skill ? undefined : discovery.blocked.find((error) => blockedSkillName(error.diagnostic.path) === name)
+    const blocked = skill
+      ? undefined
+      : discovery.blocked.find((error) => blockedSkillName(error.diagnostic.path) === name)
     if (blocked) throw blocked
     const failed = skill ? undefined : discovery.errors.find((entry) => blockedSkillName(entry.path) === name)
     if (failed) throw failed.error
@@ -144,12 +148,14 @@ function readSkill(
   for (const dir of dirs) {
     const provenance = skillProvenance(dir, userDirs.includes(dir) ? "user" : "project", {
       kind: userDirs.includes(dir) ? "user" : "project-auto",
-      selectedRoot: dir, userRoots: userDirs,
+      selectedRoot: dir,
+      userRoots: userDirs,
       projectRoot: projectRoot ?? skillProvenance(dir, "project").projectRoot,
     })
     try {
       if (existsSync(dir)) checkSkillPath(dir, provenance, true)
-      const skill = directSkill(name, dir, provenance) ?? discoveredSkill(name, dir, discover, cache, provenance, projectCache)
+      const skill =
+        directSkill(name, dir, provenance) ?? discoveredSkill(name, dir, discover, cache, provenance, projectCache)
       if (skill !== undefined) return skill
     } catch (error) {
       reportSkillLoadError(error, dir)
@@ -167,7 +173,9 @@ export function createFsSkillLoader(options: FsSkillLoaderOptions = {}): SkillLo
   const extraDirs = options.extraDirs ?? []
   // The default discovery reads the senpi barrel lazily through the boundary; the loader runs on
   // the task spawn path, which awaits loadSenpiBarrel() before resolving skills.
-  const discover = options.loadSkillsFromDir ?? ((dir: Parameters<typeof discoverSkillsFromDir>[0]) => senpiBarrel().loadSkillsFromDir(dir))
+  const discover =
+    options.loadSkillsFromDir ??
+    ((dir: Parameters<typeof discoverSkillsFromDir>[0]) => senpiBarrel().loadSkillsFromDir(dir))
   return (names, cwd): SkillResolution => {
     const dirs = searchDirs(cwd, home, agentDir, extraDirs)
     const discoveryCache = new Map<string, ReturnType<typeof discoverSkillsFromDir>>()

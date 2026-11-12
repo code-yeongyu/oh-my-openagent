@@ -1,9 +1,8 @@
 //! Cross-member checks: every window a member names is listed, and every count starts at 1.
 
-use omo_computer_core::error::{self, FailureKey, Source};
-
 use super::invalid::escape;
 use super::{FakeScenario, InvalidKind, ScenarioInvalid};
+use crate::faults::Fault;
 
 fn reference(pointer: String, reason: String) -> ScenarioInvalid {
     ScenarioInvalid {
@@ -125,10 +124,11 @@ fn counts(scenario: &FakeScenario) -> Vec<(String, u32)> {
 
 pub(super) fn check(scenario: &FakeScenario) -> Result<(), ScenarioInvalid> {
     if let Some((index, failure)) = scenario.fail_next.iter().enumerate().find(|(_, failure)| {
-        error::lookup(FailureKey {
-            source: Source::Engine(failure.code),
+        Fault::Fail {
+            code: failure.code,
             reason: failure.reason,
-        })
+        }
+        .check()
         .is_err()
     }) {
         return Err(reference(

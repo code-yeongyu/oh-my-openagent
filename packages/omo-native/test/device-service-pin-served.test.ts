@@ -33,7 +33,10 @@ describe("the pinned device service is downloadable from the release origin", ()
         const base = `${DEVICE_SERVICE_ORIGIN}/${channel}/device-service/${DEVICE_SERVICE_VERSION}/`
 
         // when its signed entry files are downloaded
-        const [latest, checksums] = await Promise.all([download(`${base}latest.json`), download(`${base}checksums.txt`)])
+        const [latest, checksums] = await Promise.all([
+          download(`${base}latest.json`),
+          download(`${base}checksums.txt`),
+        ])
 
         // then latest.json names exactly the pin and checksums.txt is the pinned file
         expect(parseManifest(latest)?.version).toBe(DEVICE_SERVICE_VERSION)
