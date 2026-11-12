@@ -134,6 +134,7 @@ export async function executeBackgroundTask(
       sessionPermission: QUESTION_DENIED_SESSION_PERMISSION,
       userPermission: categoryModel?.tools ? migrateToolsToPermission(categoryModel.tools) : undefined,
       wake: args.wake,
+      groupId: args.groupId,
     })
 
     // OpenCode TUI's `Task` tool UI calculates toolcalls by looking up

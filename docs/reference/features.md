@@ -677,6 +677,13 @@ AST-aware search and rewrite now lives in the `ast-grep` skill. Load it with the
 | **background_output** | Retrieve background task results                                                                                                                                                                                                        |
 | **background_cancel** | Cancel running background tasks                                                                                                                                                                                                         |
 
+`items` (plus optional `split`) on a `task` call fans one prompt out over
+several background children: each gets the prompt plus its contiguous slice of
+`items` (`split: 2` over ten items gives 1-5 and 6-10; default one child per
+item), and all share the call's category or subagent type and skills. Unless
+the call passes `wake`, the children report once, together, in one notice
+carrying every child's result, when the last of them finishes.
+
 `task` is the broader delegation path for category routing, direct
 `subagent_type` calls, skills, and sync/background execution.
 `call_omo_agent` is the narrow compatibility path for the small
