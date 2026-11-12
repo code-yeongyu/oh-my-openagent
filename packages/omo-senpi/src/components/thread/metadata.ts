@@ -60,7 +60,7 @@ export const THREAD_TOOL_METADATA: readonly ThreadToolEntry[] = [
     name: "thread_send",
     label: "Send message to session",
     description:
-      "Delivers a message into another session that is already running, for when the user wants to talk to that session mid-task; its reply comes back through thread_read, and a bound chat thread's replies through thread_report and thread_answer" +
+      "Delivers a message into another session that is already running, for when the user wants to talk to that session mid-task; its reply comes back through tool.thread_read, and a bound chat thread's replies through tool.thread_report and tool.thread_answer" +
       ROUTE_TO_TASK,
     exposure: THREAD_TOOL_EXPOSURE,
   },
@@ -140,7 +140,7 @@ export const THREAD_TOOL_METADATA: readonly ThreadToolEntry[] = [
     name: "thread_report",
     label: "Report to chat thread",
     description:
-      "Posts a milestone, result, question or completion from this session to its bound chat thread, for when the user wants progress relayed to that chat; replies flow back through thread_read, thread_report and thread_answer",
+      "Posts a milestone, result, question or completion from this session to its bound chat thread, for when the user wants progress relayed to that chat; replies flow back through tool.thread_read, tool.thread_report and tool.thread_answer",
     exposure: THREAD_TOOL_EXPOSURE,
   },
   {

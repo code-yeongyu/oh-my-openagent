@@ -57,8 +57,8 @@ const isEvalProgressSnapshot = (event) => {
  * The eval tool streams a progress snapshot of its running cells on a timer while a cell runs, so how many
  * `tool_execution_update` events a long cell emits, and what the cell had printed when each fired, is wall-clock sampling,
  * not session behavior (E22 drives a child through `tool.task` in a cell). The queued and complete transitions and the
- * tool_execution_end carry the cell's state and full output; the first running snapshot per cell is kept with its
- * output cut to the status line, and every later mid-run snapshot is dropped from the turn list.
+ * tool_execution_end carry the cell's state and full output; the first running snapshot per cell is kept reduced
+ * to its status line and cell statuses, and every later mid-run snapshot is dropped from the turn list.
  */
 export function dropEvalProgressSnapshots(client) {
   const listKey = Array.isArray(client.turn) ? "turn" : "events"
@@ -71,8 +71,7 @@ export function dropEvalProgressSnapshots(client) {
       kept.push(event)
       continue
     }
-    // The first running snapshot per cell proves the tool streams progress; its content is whatever the cell had
-    // printed when the timer fired, so only the status line (the first line) is kept.
+    // The first running snapshot per cell proves the tool streams progress.
     if (seen.has(event.toolCallId)) continue
     seen.add(event.toolCallId)
     kept.push(firstRunningSnapshot(event))
@@ -81,17 +80,19 @@ export function dropEvalProgressSnapshots(client) {
 }
 
 const firstLine = (text) => String(text ?? "").split("\n")[0]
+/**
+ * Everything else in a running snapshot (printed output, tool call counts and lists, timings) is whatever the cell
+ * had done when the timer fired: only the status line and each cell's status are kept.
+ */
 const firstRunningSnapshot = (event) => ({
-  ...event,
+  type: event.type,
+  toolCallId: event.toolCallId,
+  toolName: event.toolName,
   partialResult: {
-    ...event.partialResult,
-    content: (event.partialResult?.content ?? []).map((part) =>
-      part?.type === "text" ? { ...part, text: firstLine(part.text) } : part,
-    ),
-    details: {
-      ...event.partialResult?.details,
-      cells: (event.partialResult?.details?.cells ?? []).map((cell) => ({ ...cell, output: firstLine(cell.output) })),
-    },
+    content: (event.partialResult?.content ?? [])
+      .filter((part) => part?.type === "text")
+      .map((part) => ({ type: "text", text: firstLine(part.text) })),
+    details: { cells: (event.partialResult?.details?.cells ?? []).map((cell) => ({ status: cell.status })) },
   },
 })
 

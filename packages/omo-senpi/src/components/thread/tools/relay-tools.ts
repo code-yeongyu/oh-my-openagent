@@ -227,7 +227,7 @@ export function createRelayTools(context: RelayToolsContext): AnyTool[] {
           return failure(
             "idempotency_uncertain",
             "An earlier completion report under this key was recorded without its arm sequence, and the session has no completion armed now: its completion was already written, or the arm is gone.",
-            "Read the binding's outbox with tool.thread_outbox({ ... }) in an eval cell to see whether the completion was sent; to arm another, report again under a new idempotency_key.",
+            "Read the binding's outbox with tool.thread_outbox in an eval cell to see whether the completion was sent; to arm another, report again under a new idempotency_key.",
           )
         options.onCompletionArmed?.(callerId, durableArmSeq)
       }

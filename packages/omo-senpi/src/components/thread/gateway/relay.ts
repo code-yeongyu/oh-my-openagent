@@ -156,9 +156,9 @@ export type GatewayRelayOptions = {
 
 const NEXT_ACTION: Partial<Record<ThreadErrorCode, string>> = {
   binding_conflict:
-    "Run tool.thread_bindings in an eval cell to find the binding that holds this thread, then thread_rebind it with its revision, or thread_unbind it first.",
+    "Run tool.thread_bindings in an eval cell to find the binding that holds this thread, then pass its revision to tool.thread_rebind, or release it first with tool.thread_unbind.",
   binding_mismatch: "Answer through the binding that asked the question; the question stays pending.",
-  binding_inactive: "Bind the thread again with tool.thread_bind({ ... }) in an eval cell.",
+  binding_inactive: "Bind the thread again with tool.thread_bind in an eval cell.",
   stale_revision: "Run tool.thread_bindings in an eval cell for the current revision and retry with it.",
   stale_token:
     "The question was asked under an earlier binding revision or session runtime; wait for the session to ask again.",
@@ -167,11 +167,11 @@ const NEXT_ACTION: Partial<Record<ThreadErrorCode, string>> = {
     "Retry after a moment: another answer is still being handed to the session, and the question goes back to pending if that fails.",
   idempotency_conflict: "Retry with a new idempotency_key.",
   idempotency_uncertain:
-    "Run tool.thread_bindings in an eval cell or thread_outbox to see the current state before retrying with a new key.",
-  scope_denied: "Report through a binding attached to this session; thread_bindings lists them.",
+    "Run tool.thread_bindings or tool.thread_outbox in an eval cell to see the current state before retrying with a new key.",
+  scope_denied: "Report through a binding attached to this session; tool.thread_bindings in an eval cell lists them.",
   unsupported: "Report only the events the binding subscribes to, through a binding with an outbound direction.",
   not_found: "Run tool.thread_bindings in an eval cell for the binding ids that exist.",
-  cursor_invalid: "Read thread_outbox again and ack a cursor it returned.",
+  cursor_invalid: "Run tool.thread_outbox in an eval cell again and ack a cursor it returned.",
   host_unavailable: "Retry when the session is running; the question stays pending.",
   invalid_arguments: "Fix the arguments and call again.",
 }
@@ -409,7 +409,7 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
           { session: claim.session_durable_id, reason: reply.error },
           malformed
             ? `The session could not read this answer (${reply.error}); answer again with text it can take. The question stays pending.`
-            : `The session refused the answer (${reply.error}): it no longer waits on this question. Read thread_outbox for a newer question and answer that one.`,
+            : `The session refused the answer (${reply.error}): it no longer waits on this question. Run tool.thread_outbox in an eval cell for a newer question and answer that one.`,
         )
       }
       await confirm({ ...own, answer: request.answer, answered_by: answeredBy })

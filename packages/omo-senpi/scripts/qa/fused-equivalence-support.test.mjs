@@ -59,12 +59,15 @@ describe("splitStatusChannels", () => {
 })
 
 describe("dropEvalProgressSnapshots", () => {
-  const update = (status, text) => ({
+  const update = (status, text, toolCalls = []) => ({
     type: "tool_execution_update",
     toolCallId: "call_1",
     toolName: "eval",
     args: {},
-    partialResult: { content: [{ type: "text", text }], details: { cells: [{ status }] } },
+    partialResult: {
+      content: [{ type: "text", text }],
+      details: { cells: [{ status, output: text }], toolCallCount: toolCalls.length, toolCalls },
+    },
   })
 
   test("#given a cell that streamed two mid-run snapshots #when dropped #then the queued, first running and complete transitions remain", () => {
@@ -88,7 +91,15 @@ describe("dropEvalProgressSnapshots", () => {
       "complete",
       "tool_execution_end",
     ])
-    expect(kept[2].partialResult.content[0].text).toBe("1/1 cells running")
+    expect(kept[2]).toEqual({
+      type: "tool_execution_update",
+      toolCallId: "call_1",
+      toolName: "eval",
+      partialResult: {
+        content: [{ type: "text", text: "1/1 cells running" }],
+        details: { cells: [{ status: "running" }] },
+      },
+    })
   })
 
   test("#given another tool's running update #when dropped #then it is untouched", () => {
@@ -104,6 +115,19 @@ describe("dropEvalProgressSnapshots", () => {
     }
 
     expect(dropEvalProgressSnapshots(one)).toEqual(dropEvalProgressSnapshots(two))
+  })
+
+  test("#given two runs whose first snapshot fired before and after the cell's first tool call #when dropped #then their turn lists are equal", () => {
+    const early = { turn: [update("queued", "q"), update("running", "1/1 cells running"), update("complete", "c")] }
+    const late = {
+      turn: [
+        update("queued", "q"),
+        update("running", "1/1 cells running\n↳ last: CHILD-DONE", [{ name: "task" }]),
+        update("complete", "c"),
+      ],
+    }
+
+    expect(dropEvalProgressSnapshots(early)).toEqual(dropEvalProgressSnapshots(late))
   })
 })
 

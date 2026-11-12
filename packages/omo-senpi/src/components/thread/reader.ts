@@ -242,7 +242,7 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
     return fail(
       "invalid_arguments",
       `Unknown read mode "${String(mode)}".`,
-      'Retry with mode set to "status", "tail", or "page", or run tool.thread_list() in an eval cell to confirm the thread first.',
+      'Retry with mode set to "status", "tail", or "page", or run tool.thread_list in an eval cell to confirm the thread first.',
     )
   }
 

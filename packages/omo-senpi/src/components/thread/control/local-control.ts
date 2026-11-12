@@ -31,7 +31,7 @@ export function createLocalControl(
         throw refuse(
           "unsupported",
           `Thread ${threadId} belongs to an interactive terminal, which closes it when the terminal exits.`,
-          "Close that terminal, or run tool.thread_interrupt({ thread_id }) in an eval cell to stop its turn.",
+          "Close that terminal, or run tool.thread_interrupt({ thread }) in an eval cell to stop its turn.",
           { command: "close_session" },
         )
       if (port.closeSession === undefined)

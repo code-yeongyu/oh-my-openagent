@@ -123,7 +123,7 @@ function guardInput(value: string, what: string): Guarded {
       error: addressError(
         "invalid_arguments",
         `The ${what} must be a string.`,
-        `Pass a thread_id or a unique name from thread_list as the ${what}.`,
+        `Pass a thread_id or a unique name as the ${what}; tool.thread_list in an eval cell shows them.`,
       ),
     }
   }
@@ -133,7 +133,7 @@ function guardInput(value: string, what: string): Guarded {
       error: addressError(
         "invalid_arguments",
         `The ${what} contains control characters.`,
-        `Remove the control characters and retry, or pass an address from thread_list.`,
+        `Remove the control characters and retry, or pass an address that tool.thread_list in an eval cell returned.`,
       ),
     }
   }
@@ -144,7 +144,7 @@ function guardInput(value: string, what: string): Guarded {
       error: addressError(
         "invalid_arguments",
         `The ${what} is empty.`,
-        `Pass a thread_id or a unique name from thread_list as the ${what}.`,
+        `Pass a thread_id or a unique name as the ${what}; tool.thread_list in an eval cell shows them.`,
       ),
     }
   }
@@ -306,7 +306,7 @@ export function resolveTarget(
       return addressError(
         "caller_context_missing",
         "Scoping an id hit needs the caller's workspace root, which this call did not provide.",
-        "Set all_scope to address every workspace, or run tool.thread_list() in an eval cell from a session that knows its workspace.",
+        "Set all_scope to address every workspace, or run tool.thread_list in an eval cell from a session that knows its workspace.",
       )
     }
     if (sameWorkspace(idHit.cwd, callerRoot, rootResolver)) {
@@ -336,7 +336,7 @@ export function resolveTarget(
       return addressError(
         "caller_context_missing",
         "Scoped address resolution needs the caller's workspace root, which this call did not provide.",
-        "Set all_scope to address every workspace, or run tool.thread_list() in an eval cell from a session that knows its workspace.",
+        "Set all_scope to address every workspace, or run tool.thread_list in an eval cell from a session that knows its workspace.",
       )
     }
     // A thread on another device belongs to the account, not to a workspace of this device: it stays visible (decision 0027).
@@ -431,14 +431,14 @@ export function fuzzyMatch(entries: readonly ThreadAddressEntry[], query: string
     return addressError(
       "ambiguous_target",
       `${entries.length} threads are in scope; the fuzzy scan is capped at ${FUZZY_MAX_CANDIDATES}.`,
-      "Run tool.thread_list() in an eval cell, pick the intended thread, and pass its thread_id instead of a fuzzy query.",
+      "Run tool.thread_list in an eval cell, pick the intended thread, and pass its thread_id instead of a fuzzy query.",
     )
   }
   if (entries.length === 0) {
     return addressError(
       "not_found",
       "There is no thread to match.",
-      "run tool.thread_list in an eval cell to see the addressable threads.",
+      "Run tool.thread_list in an eval cell to see the addressable threads.",
     )
   }
 
