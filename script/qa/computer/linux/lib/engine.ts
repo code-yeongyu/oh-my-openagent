@@ -92,8 +92,8 @@ export class Engine {
   }
 
   /** Opens the session for `admit` and, for `host-relay`, keeps its heartbeat up. */
-  async open(admit: Admit): Promise<JsonObject> {
-    const params: JsonObject = { reportMode: "object" }
+  async open(admit: Admit, mode: "object" | "null" = "object"): Promise<JsonObject> {
+    const params: JsonObject = mode === "object" ? { reportMode: "object" } : {}
     if (admit === "host-relay") params.allowHostRelayOnlyStop = true
     const opened = (await this.call("session.open", params)) as JsonObject
     if (admit === "host-relay") {

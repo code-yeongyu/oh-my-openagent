@@ -27,6 +27,10 @@ pub struct CapturedFrame {
     pub geometry: FrameGeometry,
     pub bytes: FrameBytes,
     pub cursor: CursorMode,
+    /// How the pixels were produced, when the backend reported it (row 47).
+    pub route: Option<CaptureRoute>,
+    /// `Some(true)` when windows covering the target may show in the pixels (row 47).
+    pub occluders_visible: Option<bool>,
 }
 
 impl Session {
@@ -133,16 +137,20 @@ impl Session {
         };
         let frame_id = self.frames.record(target, geometry.clone(), mode);
         self.trace.remember_frame(target, &bytes.bytes);
+        let cursor = bytes.cursor.unwrap_or(if cursor {
+            CursorMode::Os
+        } else {
+            CursorMode::None
+        });
+        let (route, occluders_visible) = (bytes.route, bytes.occluders_visible);
         Ok(CapturedFrame {
             frame_id,
             target: target.to_owned(),
             geometry,
             bytes,
-            cursor: if cursor {
-                CursorMode::Os
-            } else {
-                CursorMode::None
-            },
+            cursor,
+            route,
+            occluders_visible,
         })
     }
 }

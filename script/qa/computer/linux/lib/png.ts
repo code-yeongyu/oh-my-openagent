@@ -23,7 +23,11 @@ export function decodePng(bytes: Uint8Array): Raster {
       if (depth !== 8) throw new Error(`PNG bit depth ${depth} is not 8`)
       if (colour !== 2 && colour !== 6) throw new Error(`PNG colour type ${colour} is not RGB or RGBA`)
       if (body[12] !== 0) throw new Error("interlaced PNG")
-      header = { width: view.getUint32(at + 8, false), height: view.getUint32(at + 12, false), channels: colour === 6 ? 4 : 3 }
+      header = {
+        width: view.getUint32(at + 8, false),
+        height: view.getUint32(at + 12, false),
+        channels: colour === 6 ? 4 : 3,
+      }
     }
     if (kind === "IDAT") parts.push(new Uint8Array(body))
     if (kind === "IEND") break
