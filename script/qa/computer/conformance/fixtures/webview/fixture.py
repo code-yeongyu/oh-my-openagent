@@ -36,7 +36,7 @@ class Host:
 
     def open_window(self, on_loaded=None):
         number = len(self.windows) + 1
-        window = Gtk.Window(title="Document" if number == 1 else f"Document {number}")
+        window = Gtk.Window(title="Conformance Document" if number == 1 else f"Conformance Document {number}")
         window.set_wmclass("conformance-fixture", APP)
         window.set_default_size(640, 720)
         content = WebKit2.UserContentManager()
@@ -111,6 +111,7 @@ class Host:
             "schema": SCHEMA,
             "app": APP,
             "toolkit": "webview",
+            "windows": [window.get_title() for window in self.windows],
             "fields": dict(main["fields"]),
             "saved": dict(main["saved"], savedDocuments=saved_documents),
         }

@@ -7,6 +7,7 @@ import { type Action, OS_NAMES, type Oracle } from "../vocabulary.ts"
 import { FixtureProcess } from "./fixture-process.ts"
 
 type Field = Oracle["field"]
+const MAIN_WINDOW = "Conformance Document"
 type Leg = { readonly name: string; readonly fields: readonly string[]; readonly run: (dir: string) => Promise<string> }
 
 function catalogOracles(): { effect: ReadonlyMap<Action, Oracle>; initial: ReadonlyMap<Field, Oracle["equals"]> } {
@@ -66,9 +67,24 @@ function legs(command: readonly string[], sabotage: string): Leg[] {
       await fixture.send("menu File/Save")
       check(differences({ title: "Quarterly plan", savedDocuments: 1 }, fixture.report().saved), "after File > Save")
     })
+  const titles = (expected: readonly string[], seen: readonly string[], when: string) => {
+    if (JSON.stringify(seen) !== JSON.stringify(expected))
+      throw new Error(`${when}: windows ${JSON.stringify(seen)} expected ${JSON.stringify(expected)}`)
+  }
+  const windowTitles: Leg = {
+    name: "windows:titles",
+    fields: [],
+    run: (dir) =>
+      withFixture(command, sabotage, dir, async (fixture) => {
+        titles([MAIN_WINDOW], fixture.report().windows, "at start")
+        await fixture.send("menu File/New Window")
+        titles([MAIN_WINDOW, `${MAIN_WINDOW} 2`], fixture.report().windows, "after File > New Window")
+      }),
+  }
   const savedFields = ["title", "savedDocuments"]
   return [
     ...actionLegs,
+    windowTitles,
     { name: "document:save", fields: savedFields, run: saveDocument },
     {
       name: "deterministic",

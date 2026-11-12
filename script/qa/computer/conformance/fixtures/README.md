@@ -1,8 +1,9 @@
 # Conformance fixture apps
 
 The apps the conformance catalog (`../catalog.ts`) and the model-free task set (`../taskset/tasks.ts`) run against: a
-native toolkit app per OS, an Electron app and a web-view app. Each is the app "Conformance Fixture" with the window
-"Document", and each holds the widgets every catalog action needs.
+native toolkit app per OS, an Electron app and a web-view app. Each holds the widgets every catalog action needs, in the window
+"Conformance Document"; File > New Window opens "Conformance Document 2". A window is selected by TITLE, never by the
+app display name, so the title carries the app's name and the display name does not matter.
 
 | directory | toolkit | built with | hosted job |
 |---|---|---|---|
@@ -21,8 +22,9 @@ reported as an ENVIRONMENT failure in the job summary, never as a fixture failur
 Each app writes its state to the path given by `--report <path>` after every change, by a write to a temporary file and
 a rename. The shape is the same on every OS (`fixture-report.ts`, schema `omo-conformance-fixture/1`):
 
+- `windows`: the title of every open window, read from the toolkit itself.
 - `fields`: the catalog oracle fields (`value`, `receivedKeys`, `pressCount`, `scrollSteps`, `dragOrder`,
-  `menuSelection`), read live from the window "Document".
+  `menuSelection`), read live from the window "Conformance Document".
 - `saved`: the task-set oracle fields at the last File > Save of that window, plus `savedDocuments`, the number of
   windows saved.
 
