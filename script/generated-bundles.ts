@@ -7,6 +7,11 @@ const LIST_URL = new URL("./generated-bundles.json", import.meta.url)
 
 export function loadGeneratedBundlePatterns(): readonly RegExp[] {
   const list: unknown = JSON.parse(readFileSync(LIST_URL, "utf8"))
+  // The patterns use ECMAScript syntax such as (?:...), which POSIX tools read differently; tooling outside the
+  // repository that reads this list checks the same field.
+  const dialect = typeof list === "object" && list !== null && "dialect" in list ? list.dialect : undefined
+  if (dialect !== "ecmascript")
+    throw new Error(`generated-bundles.json: dialect must be "ecmascript", got ${JSON.stringify(dialect)}`)
   const patterns = typeof list === "object" && list !== null && "patterns" in list ? list.patterns : undefined
   if (!Array.isArray(patterns) || patterns.length === 0) throw new Error("generated-bundles.json has no patterns")
   return patterns.map((pattern) => {

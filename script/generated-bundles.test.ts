@@ -3,14 +3,10 @@ import { fileURLToPath } from "node:url"
 
 import { isGeneratedBundlePath, loadGeneratedBundlePatterns } from "./generated-bundles.ts"
 
+// The two-way check (the list equals what the release generators write) builds the plugin, so it runs with the
+// Senpi suite after the build: packages/omo-senpi/plugin/scripts/generated-bundles-list.test.mjs.
 const repositoryRoot = fileURLToPath(new URL("..", import.meta.url))
-// Every tracked file below these directories is written by a generator the release job runs (publish.yml), so a
-// new output there must join the list or feature PRs could commit it unchecked (#9903).
-const GENERATED_DIRECTORIES = [
-  "packages/omo-senpi/plugin/extensions/",
-  "packages/omo-senpi/plugin/runtime/",
-  "packages/omo-codex/scripts/install-dist/",
-]
+const RUNTIME = "packages/omo-senpi/plugin/runtime"
 
 function trackedFiles(): readonly string[] {
   const result = Bun.spawnSync(["git", "ls-files", "-z"], { cwd: repositoryRoot })
@@ -22,19 +18,22 @@ function trackedFiles(): readonly string[] {
 }
 
 describe("generated bundle list", () => {
-  test("#given tracked files under the generated directories #when matched against the list #then every one is listed", () => {
+  test.each([
+    { path: `${RUNTIME}/thread-sdk/sdk.js`, listed: true },
+    { path: `${RUNTIME}/rollback-migrate.js`, listed: true },
+    { path: `${RUNTIME}/dag/sdk.js`, listed: false },
+    { path: `${RUNTIME}/dag/library.js`, listed: false },
+    { path: `${RUNTIME}/bunshin-ts-old/sdk.js`, listed: false },
+    { path: `${RUNTIME}/thread-sdk/x/sdk.js`, listed: false },
+  ])("#given the ECMAScript patterns #when $path is matched #then listed is $listed", ({ path, listed }) => {
     // given
-    const generated = trackedFiles().filter((path) =>
-      GENERATED_DIRECTORIES.some((directory) => path.startsWith(directory)),
-    )
     const patterns = loadGeneratedBundlePatterns()
 
     // when
-    const unlisted = generated.filter((path) => !isGeneratedBundlePath(path, patterns))
+    const matched = isGeneratedBundlePath(path, patterns)
 
     // then
-    expect(generated.length).toBeGreaterThan(0)
-    expect(unlisted).toEqual([])
+    expect(matched).toBe(listed)
   })
 
   test("#given the list #when each pattern is matched against the tracked files #then every pattern matches one", () => {
