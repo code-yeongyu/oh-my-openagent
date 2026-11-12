@@ -7,8 +7,8 @@ type PromptAsyncCall = Parameters<ParentWakeNotifierClientForTest["session"]["pr
 
 const FINAL_WAKE =
   "<system-reminder>\n[BACKGROUND TASK COMPLETED]\n[ALL BACKGROUND TASKS COMPLETE]\n**Completed:**\n- `task-a`: task A\n- `task-b`: task B\n</system-reminder>"
-const PROGRESS_WAKE =
-  "<system-reminder>\n[BACKGROUND TASK RESULT READY]\n**ID:** `task-a`\n**1 task still in progress.** You WILL be notified when ALL complete.\n</system-reminder>"
+const EARLIER_WAKE =
+  "<system-reminder>\n[BACKGROUND TASK COMPLETED]\n<task-id>task-a</task-id>\n<result>\nA's answer\n</result>\n</system-reminder>"
 
 function createNotifier(): {
   readonly notifier: ParentWakeNotifier
@@ -66,11 +66,11 @@ function countOccurrences(text: string, needle: string): number {
 }
 
 describe("ParentWakeNotifier final notification merge", () => {
-  test("#given a progress wake is pending before final wake #when flushed #then final completion is delivered without stale progress", async () => {
+  test("#given an earlier task notice is pending before the final one #when flushed #then both are delivered in order in one wake", async () => {
     // given
     const { notifier, promptAsyncCalls } = createNotifier()
-    const sessionID = "parent-final-supersedes-progress"
-    notifier.queuePendingParentWake(sessionID, PROGRESS_WAKE, { agent: "sisyphus" }, false)
+    const sessionID = "parent-every-notice-kept"
+    notifier.queuePendingParentWake(sessionID, EARLIER_WAKE, { agent: "sisyphus" }, false)
     notifier.queuePendingParentWake(sessionID, FINAL_WAKE, { agent: "sisyphus" }, true)
 
     try {
@@ -80,11 +80,11 @@ describe("ParentWakeNotifier final notification merge", () => {
       // then
       expect(promptAsyncCalls).toHaveLength(1)
       const notificationText = getPromptText(promptAsyncCalls[0])
-      expect(
-        notificationText.startsWith("<system-reminder>\n[BACKGROUND TASK COMPLETED]\n[ALL BACKGROUND TASKS COMPLETE]"),
-      ).toBe(true)
-      expect(notificationText).not.toContain("[BACKGROUND TASK RESULT READY]")
-      expect(notificationText).not.toContain("still in progress")
+      expect(notificationText.indexOf("<task-id>task-a</task-id>")).toBeGreaterThan(-1)
+      expect(notificationText.indexOf("<task-id>task-a</task-id>")).toBeLessThan(
+        notificationText.indexOf("[ALL BACKGROUND TASKS COMPLETE]"),
+      )
+      expect(notificationText).toContain("A's answer")
       expect(promptAsyncCalls[0]?.body.noReply).toBe(false)
     } finally {
       notifier.shutdown()
