@@ -1,13 +1,7 @@
 // SP-W question registry: one entry per question and condition of the SP-W spike. A ledger row is one entry
 // on one compositor. The answer to each binary question is CONFIRMS (yes) or CONTRADICTS (no).
-import {
-  a11yGsettings,
-  a11yRegistry,
-  gnomeExtensionNoLogout,
-  kdeActivate,
-  kdePwmBind,
-  wlrForeignToplevel,
-} from "./desktop-questions.ts"
+import { a11yGsettings, a11yRegistry, gnomeExtensionNoLogout } from "./desktop-questions.ts"
+import { kdeActivate, kdePwmBind, wlrForeignToplevel } from "./kwin-questions.ts"
 import {
   clipboardGrant,
   eiRegions,
