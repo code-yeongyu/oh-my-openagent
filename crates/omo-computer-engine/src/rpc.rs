@@ -135,7 +135,6 @@ fn refused(refusal: &Refusal) -> Failure {
     failure(refusal.code.number(), refusal.code.wire(), Some(data))
 }
 
-#[allow(dead_code)]
 /// R60c: a refusal whose row reads its disposition from the inner stage (a gated drag point)
 /// carries that stage pair's disposition and next call, looked up in the same table.
 fn inner_disposition(refusal: &Refusal, detail: Option<&Value>, data: &mut Value) {
@@ -186,6 +185,7 @@ fn refused_call(refused: &Refused) -> Failure {
         if let Some(target) = stamps.target {
             data["target"] = json!(target);
         }
+        inner_disposition(&refused.refusal, refused.detail.as_deref(), data);
         if let (Some(Value::Object(detail)), Some(data)) = (refused.detail.as_deref(), data.as_object_mut()) {
             for (key, value) in detail {
                 data.entry(key.clone()).or_insert_with(|| value.clone());
