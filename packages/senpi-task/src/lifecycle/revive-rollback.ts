@@ -78,7 +78,12 @@ function rollbackClaim(
   try {
     context.store.mutate(taskId, (fresh) => {
       if (!holdsClaim(context, fresh, claim)) return fresh
-      const { host_pid: _hostPid, residency_claim: _released, ...withoutHost } = fresh
+      const {
+        host_pid: _hostPid,
+        host_manager_instance: _hostManagerInstance,
+        residency_claim: _released,
+        ...withoutHost
+      } = fresh
       if (residency === "rpc_detached") {
         return { ...withoutHost, residency_state: residency, updated_at: nowIso(context) }
       }

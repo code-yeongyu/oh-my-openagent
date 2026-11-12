@@ -61,12 +61,15 @@ import { AdmissionBarrier } from "../../../../senpi-task/src/pause/admission-bar
 import type { ChildPausePort, ChildCreationPort } from "../../../../senpi-task/src/pause/ports"
 import type { TaskPauseMethods } from "../../../../senpi-task/src/manager/run-pause"
 import { createEngineRunPause } from "./engine-run-pause"
+import { registerControlOwner, type ControlOwnerRegistration } from "./engine-control-owner"
 import { nativeChildPausePort } from "../../../../senpi-task/src/pause/native-child-pause"
 
 export { admitAdapter } from "./engine-admission"
 
 export interface TaskEngine {
   readonly runPause?: ReturnType<typeof createEngineRunPause>
+  // This session's membership in the process control inbox (#12349); released before shutdown suspends handles.
+  readonly controlOwner?: ControlOwnerRegistration
   readonly admissionBarrier: AdmissionBarrier
   readonly manager: TaskManager & TaskPauseMethods
   // The session's package-aware inherited extension list, shared with every child-launch producer.
@@ -230,6 +233,7 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
       kernelToolBindings,
       isolation,
       onStoreMutation: storeChain.onMutation,
+      hostManagerInstance: () => managerRef?.managerInstance,
     },
   })
 
@@ -308,6 +312,16 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
   })
   managerRef = manager
   const runPause = createEngineRunPause({ stateDir: baseStore.stateDir, manager, barrier: admissionBarrier, runtime })
+  const controlOwner = registerControlOwner({
+    stateDir: baseStore.stateDir,
+    store: storeChain.store,
+    manager,
+    barrier: admissionBarrier,
+    runPause,
+    sessionId: () => runtime.sessionId(),
+    ownsRecord: (record) => registry.ownsRecord?.(record) === true,
+    channel: settings.control_channel !== false,
+  })
   registerTaskMemoryReporter(deps.pi, {
     residentTaskIds: () => manager.residentTaskIds(),
     residentFigures: () => baseStore.residentFigures(),
@@ -326,6 +340,7 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
 
   return {
     runPause,
+    controlOwner,
     admissionBarrier,
     manager,
     resolveInheritedExtensions,

@@ -83,7 +83,7 @@ export function createTaskRunPause(ports: {
   // The owner is saved on the record so a restarted host re-holds the child under exactly this run.
   function remember(taskId: string, owner: RunPauseOwner): void {
     owners.set(taskId, owner)
-    ports.store.mutate(taskId, (fresh) => ({
+    ports.store.mutate(taskId, ({ run_pause_resumed: _previous, ...fresh }) => ({
       ...fresh,
       run_pause: {
         parent_session_id: owner.parentSessionId,
@@ -232,7 +232,15 @@ export function createTaskRunPause(ports: {
       })
       if (!unpaused.applied) throw new Error("paused child changed while resuming")
       owners.delete(taskId)
-      ports.store.mutate(taskId, ({ run_pause: _resumed, ...fresh }) => fresh)
+      // The record names the Resume that released it, so a late register for it never re-pauses the child (#12349).
+      ports.store.mutate(taskId, ({ run_pause: _resumed, ...fresh }) => ({
+        ...fresh,
+        run_pause_resumed: {
+          resume_id: request.resumeId,
+          parent_session_id: request.parentSessionId,
+          parent_pause_seq: request.parentPauseSeq,
+        },
+      }))
       // The returned promise belongs to turnId even when already settled; never waitForOutcome here.
       ports.track(taskId, handle, record.model, record.notification.run_epoch, result)
       const receipt = { turnId: result.turnId }

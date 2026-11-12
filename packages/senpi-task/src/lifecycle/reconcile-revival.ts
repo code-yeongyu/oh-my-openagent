@@ -173,7 +173,7 @@ function disposeSuspendedTerminalWithoutTranscript(
         return fresh
       if (!isSuspendedResidency(fresh.residency_state) || !TERMINAL_STATUSES.has(fresh.status)) return fresh
       applied = true
-      const { host_pid: _hostPid, ...rest } = fresh
+      const { host_pid: _hostPid, host_manager_instance: _hostManagerInstance, ...rest } = fresh
       return { ...rest, residency_state: "disposed", updated_at: nowIso(context) }
     })
   } catch {

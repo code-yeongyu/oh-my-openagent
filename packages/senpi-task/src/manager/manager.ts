@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import { mkdirSync } from "node:fs"
 import { join } from "node:path"
 
@@ -24,6 +24,7 @@ import { RpcProcessRunner } from "../runners/rpc-process"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
 import { createTaskRecord, isSpawnSpecV1, nextRunEpoch, parseTaskId, syncTaskIdFloor } from "../state"
 import { TaskIdSpaceExhaustedError } from "../state/id"
+import { withHostClaim } from "../state/host-claim"
 import type {
   AwaitingInputReason,
   EffectiveModelRecord,
@@ -225,6 +226,7 @@ class TaskManagerImpl implements TaskManager {
   readonly #now: () => number
   readonly #runStats = new Map<string, RunStatsTracker>()
   readonly #hostPid: number
+  readonly #managerInstance: string
   readonly #concurrency: TaskConcurrency
   readonly #rpcRespawnRunner: RpcRespawnRunner
   readonly #names = new NameRegistry()
@@ -290,6 +292,7 @@ class TaskManagerImpl implements TaskManager {
     }
     this.#now = options.now ?? Date.now
     this.#hostPid = options.hostPid ?? process.pid
+    this.#managerInstance = options.managerInstance ?? randomUUID()
     this.#rpcRespawnRunner = options.rpcRespawnRunner ?? new RpcProcessRunner()
     this.#concurrency =
       options.concurrency ??
@@ -308,6 +311,7 @@ class TaskManagerImpl implements TaskManager {
       barrier: options.admissionBarrier,
       concurrency: this.#concurrency,
       hostPid: this.#hostPid,
+      hostManagerInstance: this.#managerInstance,
       runners: options.runners,
       launch: (context) => {
         if (context.record.notify_on_terminal) this.#background.add(context.record.task_id)
@@ -380,6 +384,7 @@ class TaskManagerImpl implements TaskManager {
           {
             store: options.store,
             hostPid: this.#hostPid,
+            hostManagerInstance: this.#managerInstance,
             isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
             respawn: (paused, sessionPath) => this.respawn(paused, sessionPath, undefined, { paused: true }),
             reattach: (paused, handle) => this.reattach(paused, handle),
@@ -415,6 +420,7 @@ class TaskManagerImpl implements TaskManager {
         options,
         concurrency: this.#concurrency,
         hostPid: this.#hostPid,
+        hostManagerInstance: this.#managerInstance,
         get: (taskId) => this.get(taskId),
         pending: (taskId) => this.hasPendingSends(taskId),
         cancel: (taskId) => this.cancelTask(taskId),
@@ -633,12 +639,11 @@ class TaskManagerImpl implements TaskManager {
         this.#now(),
       )
       const taskId = spec.admission?.taskId ?? draft.task_id
-      const claimDraft: TaskRecord = {
-        ...draft,
-        task_id: taskId,
-        name: requestedRegistration?.name ?? taskId,
-        host_pid: this.#hostPid,
-      }
+      const claimDraft: TaskRecord = withHostClaim(
+        { ...draft, task_id: taskId, name: requestedRegistration?.name ?? taskId },
+        this.#hostPid,
+        this.#managerInstance,
+      )
       claimed = claimTaskRecord(this.#options.store, claimDraft, {
         nameFollowsId: requestedRegistration === undefined,
         ...(requestedRegistration === undefined
@@ -1129,6 +1134,12 @@ class TaskManagerImpl implements TaskManager {
       : { runStartEpoch: tracker.runStartEpoch, stats: tracker.snapshot(this.#now()) }
   }
 
+  get managerInstance(): string {
+    return this.#managerInstance
+  }
+  holdsLiveHandle(taskId: string): boolean {
+    return this.#live.has(taskId)
+  }
   residentTaskIds(): readonly string[] {
     return [...new Set([...this.#live.keys(), ...this.#cleanupOwners.keys()])]
   }
@@ -1307,7 +1318,7 @@ class TaskManagerImpl implements TaskManager {
       if (fresh.child_session_id !== undefined || fresh.host_session !== undefined || fresh.pid !== undefined)
         return fresh
       parked = true
-      const { host_pid: _hostPid, started_at: _startedAt, ...rest } = fresh
+      const { host_pid: _hostPid, host_manager_instance: _hostManagerInstance, started_at: _startedAt, ...rest } = fresh
       return { ...rest, residency_state: "persisted_only", updated_at: nowIso(this.#now) }
     })
     if (parked) {

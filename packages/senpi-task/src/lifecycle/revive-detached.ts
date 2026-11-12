@@ -24,6 +24,7 @@ export function rollbackDetachedRevival(context: LifecycleContext, prior: TaskRe
     rolledBack = true
     const {
       host_pid: _hostPid,
+      host_manager_instance: _hostManagerInstance,
       final_response: _freshFinal,
       error_message: _freshError,
       failure_kind: _freshFailureKind,

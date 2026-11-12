@@ -231,6 +231,8 @@ export function wireEventBridge(
             }),
           )
         : new Set([parentSessionId])
+    // The inbox lets go of this session's handles before suspension tears any of them down (#12349).
+    await engine.controlOwner?.release()
     for (const sessionId of parentSessionIds) {
       const continuing =
         reason === "new" || reason === "quit"
