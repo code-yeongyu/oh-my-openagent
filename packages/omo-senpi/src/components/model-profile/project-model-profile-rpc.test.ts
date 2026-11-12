@@ -11,6 +11,7 @@ import { testTempDir } from "../../../test-support/temp-dir"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import type { ComponentContext } from "../../extension/types"
 import { createModelProfileComponent } from "./index"
+import * as projectModelProfileRpc from "./project-model-profile-rpc"
 import {
   getProjectModelProfile,
   PROJECT_MODEL_PROFILE_GET,
@@ -223,6 +224,14 @@ describe("project model_profile RPC (#13188)", () => {
 
     expect(readdirSync(join(cwd, ".omo")).sort()).toEqual(["omo.jsonc", "omo.jsonc.bak.2020-01-01T00-00-00-000Z"])
     expect(readFileSync(join(cwd, ".omo", "omo.jsonc.bak.2020-01-01T00-00-00-000Z"), "utf8")).toBe("theirs")
+  })
+
+  test("#given a home at the top of the file system or a missing home #when the accounts root is derived #then there is none", () => {
+    const { accountsRootFor } = projectModelProfileRpc
+    expect(accountsRootFor("/")).toBeNull()
+    expect(accountsRootFor("/nonexistent-home-for-a-service-user")).toBeNull()
+    const home = folder()
+    expect(accountsRootFor(home)).toBe(realpathSync(join(home, "..")))
   })
 
   test("#given no bound session #when either verb runs #then it answers no_session", () => {

@@ -84,9 +84,20 @@ function sameDirectory(a: string, b: string): boolean {
   }
 }
 
+/**
+ * Where accounts' home folders live, taken from this account's home: its parent, but only when the home exists and that
+ * parent is not the file system root (an account whose home is `/root` or `/nonexistent` names no accounts root).
+ */
+export function accountsRootFor(home: string): string | null {
+  if (!existsSync(home)) return null
+  const parent = dirname(realOrSelf(home))
+  return parent === dirname(parent) ? null : parent
+}
+
 function isHomeFolder(cwd: string, deps: ProjectModelProfileDeps): boolean {
   if ([resolveHomeDir(), userInfo().homedir].some((home) => sameDirectory(home, cwd))) return true
-  const accountsRoot = deps.accountsRoot ?? dirname(userInfo().homedir)
+  const accountsRoot = deps.accountsRoot ?? accountsRootFor(userInfo().homedir)
+  if (accountsRoot === null) return false
   return sameDirectory(dirname(realOrSelf(cwd)), accountsRoot) && basename(realOrSelf(cwd)).length > 0
 }
 
