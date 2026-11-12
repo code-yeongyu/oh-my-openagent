@@ -46,9 +46,9 @@ async function wake(args: readonly string[], stateDir: string, wakeMark: string 
       stateDir,
       connect: () => connectDeviceService({ version: "5.1.70", stateDir, minimums: { wakeMark, singleLocate: null } }),
       now: () => 1_790_000_400_000,
-      output: (line) => out.push(line),
+      output: (line: string) => out.push(line),
       write: () => {},
-      error: (line) => err.push(line),
+      error: (line: string) => err.push(line),
     } as unknown as Parameters<typeof runRemoteVerb>[0],
     ["wake", ...args],
   )
@@ -88,13 +88,16 @@ describe("omo remote wake", () => {
   test.each([
     ["the gate constant is unset", GATE, null],
     ["the service is older than the gate", "1.3.9", GATE],
-  ] as const)("#given %s #when set on #then nothing is sent and the line names the wake", async (_case, version, gate) => {
-    const svc = await owner(version)
-    const set = await wake(["on"], svc.stateDir, gate)
-    expect(set.code).toBe(REMOTE_EXIT.unavailable)
-    expect(set.err.join("\n")).toMatch(/wake/i)
-    expect(sent(svc)).toBe(0)
-  })
+  ] as const)(
+    "#given %s #when set on #then nothing is sent and the line names the wake",
+    async (_case, version, gate) => {
+      const svc = await owner(version)
+      const set = await wake(["on"], svc.stateDir, gate)
+      expect(set.code).toBe(REMOTE_EXIT.unavailable)
+      expect(set.err.join("\n")).toMatch(/wake/i)
+      expect(sent(svc)).toBe(0)
+    },
+  )
 
   test("#given a set through a service at the gate, then a reconnect to an older one #when set again #then the second run sends nothing", async () => {
     const current = await owner()
