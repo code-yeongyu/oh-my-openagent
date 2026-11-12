@@ -1,0 +1,219 @@
+name: Desktop bench
+
+# Computer-use latency bench, base against head on one runner (docs/reference/computer-use-eval.md): the job builds the desktop
+# engine at both refs, runs head's cu-eval bench against each in alternating rounds, and fails when any op's
+# head wall p50 is more than 30% (and more than 0.5 ms) above the base's. Path-gated, so it never runs on an
+# unrelated PR; workflow_dispatch works once this file is on the default branch.
+on:
+  workflow_dispatch:
+    inputs:
+      base_ref:
+        description: Branch, tag or SHA to compare the dispatched ref against
+        required: true
+        default: dev
+  pull_request:
+    paths:
+      - ".github/workflows/desktop-bench.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "crates/senpi-desktop-*/**"
+      - "packages/senpi-desktop-*/**"
+      - "packages/omo-senpi/scripts/qa/cu-eval/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  desktop-bench:
+    name: Computer-use bench (base vs head)
+    runs-on: ubuntu-26.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out head
+        uses: actions/checkout@v7
+        with:
+          path: head
+          persist-credentials: false
+
+      - name: Check out base
+        uses: actions/checkout@v7
+        with:
+          path: base
+          ref: ${{ github.event.pull_request.base.sha || inputs.base_ref }}
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Setup Rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Each checkout builds with the toolchain its own rust-toolchain.toml pins.
+          for side in head base; do
+            toolchain=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' "$side/rust-toolchain.toml")
+            rustup toolchain install "$toolchain" --profile minimal
+          done
+          rustup default "$(sed -n 's/^channel *= *"\(.*\)"/\1/p' head/rust-toolchain.toml)"
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: desktop-bench
+          workspaces: |
+            head -> target
+            base -> target
+
+      - name: Install JavaScript dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd head && bun install --frozen-lockfile --ignore-scripts)
+          (cd base && bun install --frozen-lockfile --ignore-scripts)
+
+      - name: Build the desktop engine at base and head
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd head && cargo build --release -p senpi-desktop-engine --locked)
+          (cd base && cargo build --release -p senpi-desktop-engine --locked)
+
+      - name: Bench base and head, compare p50
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || inputs.base_ref }}
+          HEAD_SHA: ${{ github.sha }}
+          BENCH_ROUNDS: "10"
+          BENCH_RUNS: "30"
+          BENCH_WARMUP: "3"
+        run: |
+          set -euo pipefail
+          out="${BENCH_OUT:-${RUNNER_TEMP}/desktop-bench}"
+          head_engine="${HEAD_ENGINE:-$PWD/head/target/release/senpi-desktop-engine}"
+          base_engine="${BASE_ENGINE:-$PWD/base/target/release/senpi-desktop-engine}"
+          harness="head/packages/omo-senpi/scripts/qa/cu-eval"
+          mkdir -p "$out"
+          if test ! -f "$harness/bench.mjs"; then
+            echo "::error::head has no cu-eval bench at $harness"
+            exit 1
+          fi
+          if test ! -f base/packages/senpi-desktop-sdk/src/index.ts; then
+            echo "::error::base has no packages/senpi-desktop-sdk, so there is no computer-use surface to compare against"
+            exit 1
+          fi
+          # One harness for both sides: head's cu-eval runs inside each checkout, so only the SDK and the engine differ.
+          rm -rf base/packages/omo-senpi/scripts/qa/cu-eval
+          mkdir -p base/packages/omo-senpi/scripts/qa
+          cp -R "$harness" base/packages/omo-senpi/scripts/qa/cu-eval
+          # Interleaved rounds, with the side that goes first swapped every round, spread runner noise over both sides;
+          # each side keeps its best p50 per op.
+          for round in $(seq 1 "$BENCH_ROUNDS"); do
+            order="base head"
+            if test $((round % 2)) -eq 0; then order="head base"; fi
+            for side in $order; do
+              engine="$base_engine"
+              if test "$side" = head; then engine="$head_engine"; fi
+              status=0
+              (cd "$side" && timeout 600 bun packages/omo-senpi/scripts/qa/cu-eval/bench.mjs --fake-engine \
+                --engine "$engine" --runs "$BENCH_RUNS" --warmup "$BENCH_WARMUP" \
+                --out "$out/$side-$round.json" >"$out/$side-$round.log" 2>&1) || status=$?
+              # Exit 1 alone means an op lost a sample to a concurrent stop-path heartbeat reply; compare.mjs bounds that loss.
+              if test "$status" -gt 1 || test ! -s "$out/$side-$round.json"; then
+                cat "$out/$side-$round.log" >&2
+                echo "::error::$side bench round $round exited $status"
+                exit 1
+              fi
+            done
+          done
+          cat >"$out/compare.mjs" <<'EOF'
+          import { appendFileSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
+          import { join } from "node:path"
+          import { pathToFileURL } from "node:url"
+
+          const [evalCore, out] = process.argv.slice(2)
+          const { compareBench, REGRESSION_RATIO, REGRESSION_FLOOR_MS } = await import(pathToFileURL(evalCore).href)
+          const rounds = (side) =>
+            readdirSync(out)
+              .filter((name) => new RegExp(`^${side}-\\d+\\.json$`).test(name))
+              .sort((a, b) => Number(a.match(/\d+/)[0]) - Number(b.match(/\d+/)[0]))
+              .map((name) => JSON.parse(readFileSync(join(out, name), "utf8")))
+          const best = (runs) => {
+            const ops = {}
+            for (const run of runs) {
+              for (const [op, stats] of Object.entries(run.ops)) {
+                const p50s = [...(ops[op]?.p50s ?? []), stats.wallMs.p50]
+                ops[op] = { p50s, wallMs: { p50: Math.min(...p50s) } }
+              }
+            }
+            return { ops, load: runs.map((run) => run.load) }
+          }
+          const runs = Number(process.env.BENCH_RUNS)
+          const minSamples = Math.ceil(runs * 0.9)
+          let lost = 0
+          for (const side of ["base", "head"]) {
+            for (const [index, run] of rounds(side).entries()) {
+              for (const [op, stats] of Object.entries(run.ops)) {
+                lost += runs - stats.wallMs.n
+                if (stats.wallMs.n < minSamples) {
+                  console.log(`::error::${side} round ${index + 1} kept ${stats.wallMs.n} of ${runs} ${op} samples (needs ${minSamples})`)
+                  process.exit(1)
+                }
+              }
+            }
+          }
+          const base = best(rounds("base"))
+          const head = best(rounds("head"))
+          if (Object.keys(base.ops).length === 0 || Object.keys(head.ops).length === 0) {
+            console.log("::error::a side produced no bench rounds")
+            process.exit(1)
+          }
+          const comparison = compareBench(head, base)
+          const failed = new Set(comparison.regressions.map((regression) => regression.op))
+          const rows = Object.keys(base.ops).map((op) => {
+            const b = base.ops[op].wallMs.p50
+            const h = head.ops[op]?.wallMs.p50
+            const delta = h === undefined ? "missing" : `${h >= b ? "+" : ""}${Math.round(((h - b) / b) * 1000) / 10}%`
+            return { op, base: b, head: h ?? null, delta, verdict: failed.has(op) ? "FAIL" : "ok" }
+          })
+          for (const row of rows) console.log(`${row.op.padEnd(12)} base p50 ${row.base} ms  head p50 ${row.head} ms  ${row.delta}  ${row.verdict}`)
+          const short = (sha) => (sha ?? "unknown").slice(0, 12)
+          const line =
+            `bench comparison: base ${short(process.env.BASE_SHA)} vs head ${short(process.env.HEAD_SHA)}: ` +
+            `${comparison.ok ? "PASS" : "FAIL"} (${rows.length} ops, ${failed.size} regressed, best p50 of ${rounds("head").length} rounds, ${lost} samples lost, ` +
+            `fail above x${REGRESSION_RATIO} and +${REGRESSION_FLOOR_MS} ms)`
+          console.log(line)
+          writeFileSync(join(out, "comparison.json"), `${JSON.stringify({ line, comparison, rows, load: { base: base.load, head: head.load } }, null, 2)}\n`)
+          if (process.env.GITHUB_STEP_SUMMARY) {
+            const table = rows.map((row) => `| ${row.op} | ${row.base} | ${row.head} | ${row.delta} | ${row.verdict} |`).join("\n")
+            appendFileSync(process.env.GITHUB_STEP_SUMMARY, `## Computer-use bench\n\n${line}\n\n| Op | Base p50 ms | Head p50 ms | Delta | Verdict |\n| --- | --- | --- | --- | --- |\n${table}\n\n`)
+          }
+          process.exit(comparison.ok ? 0 : 1)
+          EOF
+          bun "$out/compare.mjs" "$PWD/$harness/eval-core.mjs" "$out"
+
+      - name: Upload bench results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-bench
+          path: ${{ runner.temp }}/desktop-bench/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Desktop bench (base vs head)
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Release desktop engine built at the base and at the head of this run.
+            - Head's cu-eval bench, fake backend, alternating base/head rounds; the best wall p50 per op is compared.
+            - A head p50 more than 30% and more than 0.5 ms above the base's fails the job.
+          JOB_SUMMARY_NEXT: Open the desktop-bench artifact; comparison.json names each regressed op with both p50 values and the host load of every round.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash head/.github/scripts/write-job-summary.sh

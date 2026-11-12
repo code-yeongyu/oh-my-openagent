@@ -34,6 +34,12 @@ A live sdk-direct task runs its restore steps and teardown ops on every exit pat
 
 `bench.mjs` runs 3 warm-up and 30 measured rounds of `windows`, `capture`, `observe`, `ax.query`, `click`, `ax.setValue`, `ax.typeText` and (fake only) `ax.perform`. It records wall time at the stdio port and the engine's per-stage `ActionReport.timings` (microseconds) as nearest-rank p50/p95, with the host load averages before and after. `--write-baseline` writes `baselines/<platform>-<arch>-<fake|live>.json`. `--compare <baseline>` exits 1 when an op's wall p50 rises more than 30% above the baseline and by more than 0.5 ms.
 
+## CI regression job
+
+`.github/workflows/desktop-bench.yml` runs on a pull request only when it touches `crates/senpi-desktop-*`, `packages/senpi-desktop-*`, `packages/omo-senpi/scripts/qa/cu-eval/`, the Cargo manifests, the toolchain pin or the workflow itself; `workflow_dispatch` takes a `base_ref` (default `dev`) once the file is on the default branch. One job checks out the PR's base and the PR's merge result, builds `senpi-desktop-engine` at both, and runs the head's `bench.mjs --fake-engine` against each in 10 interleaved rounds of 30 measured runs, swapping which side goes first every round. The head's harness is copied into the base checkout, so only the SDK and the engine differ between the sides. Each side keeps its best wall p50 per op, and the job fails when any head p50 is more than 30% and more than 0.5 ms above the base's, the same rule as `--compare`.
+
+The step prints one line per op and a closing `bench comparison: base <sha> vs head <sha>: PASS|FAIL (...)` line, writes the same table to the job summary, and uploads every round's JSON plus `comparison.json` as the `desktop-bench` artifact. A round that keeps fewer than 90% of an op's samples fails the job (a concurrent stop-path heartbeat reply can displace a sample, so a single lost sample is tolerated and counted). A base without `packages/senpi-desktop-sdk` fails with that reason, since there is nothing to compare against.
+
 ## Commands
 
 ```bash
