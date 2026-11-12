@@ -18,6 +18,13 @@ on:
       - ".github/workflows/computer-baseline-legacy.yml"
       - "script/qa/computer/conformance/drivers/legacy*.ts"
       - "script/qa/computer/conformance/baselines/**"
+  push:
+    branches:
+      - "test/cu-is-row08-baseline"
+    paths:
+      - ".github/workflows/computer-baseline-legacy.yml"
+      - "script/qa/computer/conformance/drivers/legacy*.ts"
+      - "script/qa/computer/conformance/baselines/**"
 
 permissions:
   contents: read
