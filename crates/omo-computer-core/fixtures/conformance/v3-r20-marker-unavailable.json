@@ -1,13 +1,21 @@
 {
-  "description": "Row 20 replacement of v3-marker-unavailable.json (it supersedes that case: frame_required, row 20): the same assertions with a capture of window 101 before the clicks of each engine process, since a click needs a frame. With the markers directory under the runtime root this case names made read-only (chmod 500) before the run, a click answers TransactionFailed{reason:\"marker_unavailable\"} and nothing is sent: the fake sink file under that root stays empty. Without the read-only directory the click is delivered and this case mismatches. The QA scenario creates that directory (the fake sink file is created in it at engine start) and its markers directory with mode 0500, and restores the mode after the run.",
+  "description": "Row 20 replacement of v3-r17-marker-unavailable.json (it supersedes that case: frame_required, row 20): the same assertions and planted state with a capture of window 101 before the clicks of each engine process, since a click needs a frame. With the markers directory of the case's fresh runtime dir planted read-only (0500) before the engine starts, a click answers TransactionFailed{reason:\"marker_unavailable\"} and nothing is sent.",
   "supersedes": [
-    "v3-marker-unavailable.json"
+    "v3-r17-marker-unavailable.json"
   ],
   "transport": "stdio",
   "scenario": "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json",
   "env": {
-    "OMO_COMPUTER_FAKE_STOP_PATH": "live",
-    "OMO_COMPUTER_RUNTIME_DIR": "target/qa-computer-v3/marker-unavailable"
+    "OMO_COMPUTER_FAKE_STOP_PATH": "live"
+  },
+  "runtime": {
+    "plant": [
+      {
+        "path": "markers",
+        "dir": true,
+        "mode": "0500"
+      }
+    ]
   },
   "steps": [
     {

@@ -1,13 +1,12 @@
 {
-  "description": "Row 20 replacement of v3-marker-written-before-input.json (it supersedes that case: frame_required, row 20): the same assertions with a capture of window 101 before the clicks of each engine process, since a click needs a frame. A delivered click leaves its pre-input marker at markers/local/default.json under the runtime root this case names (so the QA scenario can list it after the run); the marker names the case's callId and carries the stored receipt. The directory must not hold a marker of this callId before the run (a second run over it is a replay). The QA scenario creates that directory empty before the run (the fake sink file is created in it at engine start).",
+  "description": "Row 20 replacement of v3-r17-marker-written-before-input.json (it supersedes that case: frame_required, row 20): the same assertions and planted state with a capture of window 101 before the clicks of each engine process, since a click needs a frame. A delivered click leaves its pre-input marker at markers/local/default.json under the case's runtime dir; the marker names the case's callId and carries the stored receipt. The driver gives the case a fresh, empty runtime dir, so no marker of this callId exists before the run.",
   "supersedes": [
-    "v3-marker-written-before-input.json"
+    "v3-r17-marker-written-before-input.json"
   ],
   "transport": "stdio",
   "scenario": "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json",
   "env": {
-    "OMO_COMPUTER_FAKE_STOP_PATH": "live",
-    "OMO_COMPUTER_RUNTIME_DIR": "target/qa-computer-v3/marker-written-before-input"
+    "OMO_COMPUTER_FAKE_STOP_PATH": "live"
   },
   "steps": [
     {
