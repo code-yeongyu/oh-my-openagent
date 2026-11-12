@@ -6,14 +6,20 @@
 
 mod admit;
 mod display_awake;
+mod lease_hook;
 mod send;
+mod settings;
 
 pub use admit::{Admission, Blocked};
-pub use display_awake::{DisplayAwakeHold, HoldLimits};
+pub use display_awake::{DisplayAwakeHold, HoldLimits, SharedHold};
+pub(crate) use lease_hook::DisplayAwakeLeaseHook;
 pub use send::{units, Ended, Outcome, Stop};
+pub use settings::OpenSettings;
 
 use omo_computer_core::backend::Backend;
-use omo_computer_core::intervention::within_takeover_window;
+use omo_computer_core::intervention::{
+    within_takeover_window, DEFAULT_DISPLAY_AWAKE_GRACE_MS, DEFAULT_DISPLAY_AWAKE_SESSION_CAP_MS,
+};
 use omo_computer_core::settings::Intervention;
 
 /// The takeover gate: the target app is frontmost and the user touched it within the window.
@@ -55,6 +61,19 @@ impl MidSend {
                 .intervention()
                 .and_then(|reads| reads.last_user_input_ms(self.pid))
                 .is_some_and(|last| last > self.since_ms)
+    }
+}
+
+impl crate::Session {
+    /// The display-awake hold's two settings, with the contract's defaults.
+    pub(crate) fn hold_limits(&self) -> HoldLimits {
+        self.opened.as_ref().map_or(
+            HoldLimits {
+                grace_ms: DEFAULT_DISPLAY_AWAKE_GRACE_MS,
+                session_cap_ms: DEFAULT_DISPLAY_AWAKE_SESSION_CAP_MS,
+            },
+            |opened| opened.settings.hold_limits,
+        )
     }
 }
 

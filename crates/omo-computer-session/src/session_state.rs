@@ -70,3 +70,13 @@ pub fn ceiling_refusal(reason: PauseReason) -> Refusal {
     }
 }
 
+
+impl crate::Session {
+    /// The backend's capabilities with the session state its probes read now and the stop path.
+    pub(crate) fn sampled_capabilities(&self) -> omo_computer_core::capabilities::Capabilities {
+        let mut capabilities = self.backend.capabilities();
+        capabilities.session = sample(self.backend.as_ref());
+        self.guard.describe(&mut capabilities.stop_path);
+        capabilities
+    }
+}

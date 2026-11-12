@@ -87,12 +87,6 @@ pub trait Backend: Send {
         None
     }
 
-    /// The accessibility reads the observation model walks and re-identifies through; `None`
-    /// reads `AxUnsupported{snapshot_unsupported}`.
-    fn ax_reader(&mut self) -> Option<&mut dyn crate::ax::AxReader> {
-        None
-    }
-
     /// The backend's monotonic clock and its wait; `None` (the default) when it has none,
     /// which makes an admission that would pause answer at once instead.
     fn clock(&self) -> Option<&dyn crate::intervention::BackendClock> {
@@ -125,6 +119,28 @@ pub trait Backend: Send {
             Ok(_) => crate::intervention::TextDelivery { sent: of, of, refusal: None, interrupted: false },
             Err(refusal) => crate::intervention::TextDelivery { sent: 0, of, refusal: Some(refusal), interrupted: false },
         }
+    }
+
+    /// The accessibility reads the observation model walks and re-identifies through; `None`
+    /// reads `AxUnsupported{snapshot_unsupported}`.
+    fn ax_reader(&mut self) -> Option<&mut dyn crate::ax::AxReader> {
+        None
+    }
+
+    // --- Row 21: consent bound to code identity, and the host's consent view. ---
+
+    /// The signed code identity of `pid`'s executable, read without prompting. `None` is
+    /// `identity_unavailable`: a consent entry then binds to the path alone.
+    fn code_identity(&self, pid: u32) -> Option<crate::listing::CodeIdentity> {
+        let _ = pid;
+        None
+    }
+
+    /// The consent view the hand tool host hands the engine at `session.open`, as the host
+    /// wrote it (`design/d-safety.md` '## Approval and consent'). `None`: no host view, and the
+    /// session keeps its default view.
+    fn host_consent(&self) -> Option<serde_json::Value> {
+        None
     }
 }
 

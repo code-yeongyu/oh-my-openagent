@@ -4,6 +4,8 @@
 //! `display_awake_session_cap_ms`; `display.release` parks it `released`, and nothing
 //! re-acquires it until `display.resume`.
 
+use std::sync::{Arc, Mutex, PoisonError};
+
 /// The two settings that bound the hold.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HoldLimits {
@@ -80,6 +82,30 @@ impl DisplayAwakeHold {
     #[must_use]
     pub const fn holds_display_awake(self) -> bool {
         matches!(self, Self::Held { .. })
+    }
+}
+
+/// The ONE owner of the session's hold (R45): the `Session` field and the lease hook hold
+/// clones of this handle, so the exec path that acquires and the hook that releases never
+/// keep two copies that drift.
+#[derive(Debug, Clone)]
+pub struct SharedHold(Arc<Mutex<DisplayAwakeHold>>);
+
+impl Default for SharedHold {
+    fn default() -> Self {
+        Self(Arc::new(Mutex::new(DisplayAwakeHold::Idle)))
+    }
+}
+
+impl SharedHold {
+    #[must_use]
+    pub fn get(&self) -> DisplayAwakeHold {
+        *self.0.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    pub fn update(&self, step: impl FnOnce(DisplayAwakeHold) -> DisplayAwakeHold) {
+        let mut hold = self.0.lock().unwrap_or_else(PoisonError::into_inner);
+        *hold = step(*hold);
     }
 }
 

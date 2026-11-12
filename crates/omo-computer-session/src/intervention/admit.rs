@@ -5,6 +5,7 @@
 
 use omo_computer_core::backend::{Route, WindowFilter};
 use omo_computer_core::intervention::Pause;
+use omo_computer_safety::guard::StageVerdicts;
 use omo_computer_safety::{Call, Gate, TargetRef};
 
 use crate::liveness::{exited, unresponsive, WINDOW_NOT_FOUND};
@@ -52,10 +53,11 @@ impl Session {
         &mut self,
         call: &Call<'_>,
         route: Route,
+        stages: StageVerdicts,
         ceiling_ms: Option<u64>,
     ) -> Result<Admission, Blocked> {
         let window = window_of(&call.target);
-        let mut admitted = self.guard.admit_on(self.backend.as_mut(), call);
+        let mut admitted = self.guard.admit_on_with(self.backend.as_mut(), call, stages);
         let mut paused = Vec::new();
         let mut pid = None;
         let may_pause = admitted.as_ref().map_or_else(|r| r.gate == Gate::Lock, |_| true);
@@ -64,7 +66,7 @@ impl Session {
             match self.pause_admission(pid, ceiling_ms) {
                 Ok(waited) => {
                     if !waited.is_empty() || admitted.is_err() {
-                        admitted = self.guard.admit_on(self.backend.as_mut(), call);
+                        admitted = self.guard.admit_on_with(self.backend.as_mut(), call, stages);
                     }
                     paused = waited;
                 }

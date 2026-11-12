@@ -99,6 +99,8 @@ pub struct FakeScenario {
     pub session_timeline: Vec<SessionMark>,
     /// Fake-clock milliseconds between two typed Unicode scalars of one text.
     pub typing_unit_ms: Option<u64>,
+    // --- Row 21: the fake host's consent view handed to the engine at `session.open`. ---
+    pub consent: Option<serde_json::Value>,
 }
 
 impl FakeScenario {

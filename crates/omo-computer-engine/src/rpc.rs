@@ -5,6 +5,7 @@
 
 use omo_computer_core::backend::Refusal;
 use omo_computer_core::methods::Method;
+use omo_computer_session::grant::HostCallError;
 use omo_computer_session::{Refused, Session, Unresolved};
 use serde::de::DeserializeOwned;
 use serde_json::{json, Map, Value};
@@ -101,9 +102,22 @@ fn dispatch(session: &mut Session, name: &str, params: Value) -> Result<Value, F
         Method::AxDrill => json!(session.drill(parse(params)?).map_err(|u| unresolved(&u))?),
         Method::AxNode => json!(session.ax_node(parse(params)?).map_err(|u| unresolved(&u))?),
         Method::AxChildren => json!(session.ax_children(parse(params)?).map_err(|u| unresolved(&u))?),
-        _ => return Err(not_found()),
+        _ => {
+            return session.host_call(method, params).map_or_else(|| Err(not_found()), |r| r.map_err(host_failure))
+        }
     };
     Ok(value)
+}
+
+// --- Rows 21-27: the session's host calls (R31); row 28 moves this into the engine router. ---
+
+fn host_failure(error: HostCallError) -> Failure {
+    match error {
+        HostCallError::Params(error) => {
+            failure(INVALID_PARAMS, "Invalid params", Some(json!({ "detail": error.to_string() })))
+        }
+        HostCallError::Refused(refused) => refused_call(&refused),
+    }
 }
 
 /// A refusal on the wire: the closed engine code's number and name, `data.code` as v1 wrote
@@ -149,6 +163,11 @@ fn refused_call(refused: &Refused) -> Failure {
         }
         if let Some(target) = stamps.target {
             data["target"] = json!(target);
+        }
+        if let (Some(Value::Object(detail)), Some(data)) = (refused.detail.as_deref(), data.as_object_mut()) {
+            for (key, value) in detail {
+                data.entry(key.clone()).or_insert_with(|| value.clone());
+            }
         }
     }
     failure
