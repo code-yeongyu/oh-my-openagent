@@ -45,15 +45,16 @@ jobs:
             echo "generated-bundles-gate: PASS - queued PRs have already passed their PR gate"
             exit 0
           fi
-          # The gate that judges a PR is the BASE branch's copy of the checker and its list (#9903, as #10710 does
-          # for the changelog gate): a PR cannot change its own verdict. Only a base that predates the gate falls back
-          # to the PR's copy.
+          # The gate that judges a PR is the BASE branch's copy of the checker and its list (#9903, as #10710 does for the
+          # changelog gate), started so that bun reads no bunfig.toml, tsconfig.json or .env from the PR checkout: the PR
+          # cannot change the checker, the list or the runtime that judges it. A pull_request run still uses the PR's copy
+          # of this workflow file, so edits to it need review. Only a base that predates the gate falls back to the PR's copy.
           gate="$RUNNER_TEMP/generated-bundles-gate-base"
           mkdir -p "$gate"
           git fetch --no-tags origin "$GENERATED_GATE_BASE_REF"
           git archive "origin/$GENERATED_GATE_BASE_REF" script | tar -x -C "$gate"
           if [ -f "$gate/script/check-generated-bundles.ts" ] && [ -f "$gate/script/generated-bundles.json" ]; then
-            bun "$gate/script/check-generated-bundles.ts"
+            bun --config=/dev/null --tsconfig-override=/dev/null --no-env-file "$gate/script/check-generated-bundles.ts"
           else
             echo "generated-bundles-gate: NOTICE - the base branch predates this gate; running the PR's copy (bootstrap only)"
             bun script/check-generated-bundles.ts

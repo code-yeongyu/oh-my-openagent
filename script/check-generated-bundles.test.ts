@@ -167,4 +167,38 @@ describe("generated bundles gate", () => {
       expect(result.exitCode).toBe(expected)
     },
   )
+
+  // The gate runs the base branch's checker with the PR checkout as the working directory, where bun would read the
+  // PR's bunfig.toml (a preload runs before the checker), tsconfig.json and .env. Each gate's base-copy invocation must
+  // start bun so that none of them is read; this runs that exact invocation against a checkout whose preload rewrites
+  // the exit code.
+  test.each([
+    { workflow: "generated-bundles-gate.yml", checker: "check-generated-bundles.ts" },
+    { workflow: "changelog-gate.yml", checker: "check-pr-changelog.ts" },
+  ])(
+    "#given a PR checkout whose bunfig.toml preload rewrites the exit code #when $workflow starts its base checker #then the checker's failure stands",
+    ({ workflow, checker }) => {
+      // given
+      const text = readFileSync(fileURLToPath(new URL(`../.github/workflows/${workflow}`, import.meta.url)), "utf8")
+      const invocation = new RegExp(`^\\s*bun((?:\\s+--[\\w-]+(?:=\\S+)?)*)\\s+"\\$gate/script/${checker}"`, "m").exec(
+        text,
+      )
+      const flags = (invocation?.[1] ?? "")
+        .trim()
+        .split(/\s+/)
+        .filter((flag) => flag.length > 0)
+      const dir = mkdtempSync(join(tmpdir(), "generated-bundles-gate-config-"))
+      fixtures.push(dir)
+      put(dir, "pr/flip.ts", 'process.on("exit", () => { process.exitCode = 0 })\n')
+      put(dir, "pr/bunfig.toml", 'preload = ["./flip.ts"]\n')
+      put(dir, "gate/checker.ts", "process.exit(1)\n")
+
+      // when
+      const result = Bun.spawnSync([process.execPath, ...flags, join(dir, "gate/checker.ts")], { cwd: join(dir, "pr") })
+
+      // then
+      expect(invocation).not.toBeNull()
+      expect(result.exitCode).toBe(1)
+    },
+  )
 })

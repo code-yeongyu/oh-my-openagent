@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 // PR gate (#9903): a feature PR must not change a generated output on the list; only the release-state PR may. The
-// workflow runs the base branch's copy of this script and its list, so a PR cannot edit its own verdict.
+// workflow runs the base branch's copy of this script and its list, with bun reading no config from the PR checkout.
 import { GATE_CONFIG } from "./changelog-gate.config.ts"
 import { git, isGeneratedBundlePath, loadGeneratedBundlePatterns, nulSeparated } from "./generated-bundles.ts"
 import { isReleaseStatePr } from "./release-pr-marker.ts"
