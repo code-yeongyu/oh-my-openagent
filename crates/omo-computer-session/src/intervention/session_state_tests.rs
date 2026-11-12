@@ -4,7 +4,6 @@
 
 use omo_computer_core::intervention::{Pause, PauseReason};
 use omo_computer_core::session_state::Tristate;
-use serde_json::json;
 
 use super::tests::{fake, object_session, report, wire, FramedClick};
 
