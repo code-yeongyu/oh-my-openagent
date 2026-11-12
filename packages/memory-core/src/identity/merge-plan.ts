@@ -68,11 +68,10 @@ export async function planIdentityMerge(
       if (existing === undefined && !foldedCollision && !inSystem) {
         return { path: entry.path, action: "add", destination: entry.path }
       }
-      return {
-        path: entry.path,
-        action: "keep-aside",
-        destination: freeAsidePath(sourceId, sourceHead, entry.path, targetBlobs, targetFolded),
-      }
+      const destination = freeAsidePath(sourceId, sourceHead, entry, targetBlobs, targetFolded)
+      return destination === undefined
+        ? { path: entry.path, action: "skip" }
+        : { path: entry.path, action: "keep-aside", destination }
     })
   return { sourceId, sourceHead, actions }
 }
