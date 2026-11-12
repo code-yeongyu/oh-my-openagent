@@ -144,19 +144,29 @@ export function replyData(response: JsonObject): JsonObject {
   return typeof data === "object" && data !== null && !Array.isArray(data) ? (data as JsonObject) : {}
 }
 
+/** How the send a follow belongs to was answered, so it prints only that send's own turn (#13267). */
+type RemoteFollowLane = "started" | "queued" | "steered"
+
 export type RemoteFollow = {
-  /** "settled" once the session's run settles (`agent_settled`), "session_closed" when its close cut the run short, else the reason its attach ended first. */
+  /** "settled" once the turn this send started settles (`agent_settled`), "session_closed" when its close cut the run short, else the reason its attach ended first. */
   readonly settled: Promise<string>
   readonly stop: () => void
+  /**
+   * Names how the send's delivery answered, once its reply is known: `started` arms at the turn the send starts (its
+   * records may already sit in the buffer, having outrun the reply), `queued` first skips the running turn's settle,
+   * `steered` prints from the aim, because the steered turn started before this follow. Until the aim nothing is
+   * written and nothing settles: the attach's replayed history is never this send's answer (#13267).
+   */
+  readonly aim: (lane: RemoteFollowLane) => void
 }
 
 const isRecord = (value: unknown): value is JsonObject =>
   typeof value === "object" && value !== null && !Array.isArray(value)
 
 /**
- * Follows another device's session from now on: each assistant text delta (`message_update` / `text_delta`) goes to
- * `onText` in the order the session wrote it, until its run settles, with a line break between the text of separate
- * messages or content blocks. Start it before the send it follows.
+ * Follows another device's session from now on: each assistant text delta (`message_update` / `text_delta`) of the
+ * turn the send `aim` names goes to `onText` in the order the session wrote it, until that turn's run settles, with a
+ * line break between the text of separate messages or content blocks. Start it before the send it follows.
  */
 export async function followRemote(
   remote: RemoteThreadSurface,
@@ -171,7 +181,17 @@ export async function followRemote(
   })
   let last: { readonly index: unknown; readonly endsLine: boolean } | undefined
   let newMessage = false
-  const watched = await remote.sessions.watch(row.device, row.session_id, (record) => {
+  // Which records reach onText (#13267): `unaimed` buffers everything (an attach's replayed history is never this
+  // send's answer), `await-turn` drops records until the send's own `agent_start` (the wire's turn-open record, the
+  // pair of the `agent_settled` that ends it), `queued-wait` additionally drops the running turn's settle first (the
+  // send waits behind it), and `following` is the send's own turn.
+  type Gate =
+    | { kind: "unaimed"; buffered: JsonObject[] }
+    | { kind: "await-turn" }
+    | { kind: "queued-wait" }
+    | { kind: "following" }
+  let gate: Gate = { kind: "unaimed", buffered: [] }
+  const followRecord = (record: JsonObject): void => {
     // senpi settles a turn the session's close cut short with reason session_closed: that turn never finished.
     if (record["type"] === "agent_settled")
       return settle(record["reason"] === "session_closed" ? "session_closed" : "settled")
@@ -190,8 +210,49 @@ export async function followRemote(
     newMessage = false
     last = { index: event["contentIndex"], endsLine: delta.endsWith("\n") }
     onText(delta)
+  }
+  const aim: RemoteFollow["aim"] = (lane) => {
+    if (gate.kind !== "unaimed") return
+    const buffered = gate.buffered
+    let lastSettled = -1
+    let openTurn = -1
+    for (const [index, record] of buffered.entries()) {
+      if (record["type"] === "agent_settled") lastSettled = index
+      else if (record["type"] === "agent_start") openTurn = index
+    }
+    // The buffered turn that never settled is the send's own when the send started it or it follows a settled turn;
+    // for a queued send it is the running turn the send waits behind, so its settle is skipped first.
+    const ownTurn = openTurn > lastSettled && (lane === "started" || lastSettled >= 0)
+    last = undefined
+    newMessage = false
+    if (lane === "steered" || ownTurn) {
+      gate = { kind: "following" }
+      if (ownTurn) for (const record of buffered.slice(openTurn + 1)) followRecord(record)
+      return
+    }
+    gate = lane === "queued" && lastSettled < 0 ? { kind: "queued-wait" } : { kind: "await-turn" }
+  }
+  const watched = await remote.sessions.watch(row.device, row.session_id, (record) => {
+    const type = record["type"]
+    if (gate.kind === "unaimed") {
+      gate.buffered.push(record)
+      return
+    }
+    if (gate.kind === "await-turn") {
+      if (type === "agent_start") {
+        last = undefined
+        newMessage = false
+        gate = { kind: "following" }
+      }
+      return
+    }
+    if (gate.kind === "queued-wait") {
+      if (type === "agent_settled") gate = { kind: "await-turn" }
+      return
+    }
+    followRecord(record)
   })
   if (watched.kind !== "ok") return outcomeFailure(watched, row.device)
   void watched.watch.ended.then(settle)
-  return { settled, stop: watched.watch.stop }
+  return { settled, stop: watched.watch.stop, aim }
 }
