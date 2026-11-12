@@ -420,6 +420,56 @@ describe("omo-ai payload verifier", () => {
     })
   })
 
+  describe("#given the requirements helper fails", () => {
+    const payload = [
+      ...new Set([
+        ...PACKED_ARTIFACTS,
+        ...RELEASE_GENERATED_ARTIFACTS,
+        ...skillPaths(PACKED_SKILL_COUNT),
+        KEYCHAIN_HELPER,
+      ]),
+    ]
+    const runWithHelper = (requirementsHelper: string) =>
+      runVerifierOnPayload(
+        payload,
+        {},
+        { args: ["--release"], modes: { [KEYCHAIN_HELPER]: 0o755 }, requirementsHelper },
+      )
+    const errorLines = (output: string) =>
+      output.split("\n").filter((line) => line.includes("script/plugin-required-outputs.ts"))
+
+    test("#when it prints output that is not JSON #then one line names the helper, with no stack", () => {
+      const run = runWithHelper('console.log("not json at all")\n')
+      expect(run.exitCode).not.toBe(0)
+      expect(run.output).toContain("script/plugin-required-outputs.ts")
+      expect(run.output).toContain("printed output that is not JSON")
+      expect(run.output).not.toContain("    at ")
+      expect(errorLines(run.output)).toHaveLength(1)
+    })
+
+    test('#when an entry of "generated" is malformed #then one line names that field, with no stack', () => {
+      const run = runWithHelper(
+        'console.log(JSON.stringify({ pluginOutputs: ["extensions/omo.js"], generated: [{ label: 7 }] }))\n',
+      )
+      expect(run.exitCode).not.toBe(0)
+      expect(run.output).toContain("script/plugin-required-outputs.ts")
+      expect(run.output).toContain('"generated"')
+      expect(run.output).not.toContain("    at ")
+      expect(errorLines(run.output)).toHaveLength(1)
+    })
+
+    test("#when it exits non-zero #then one line names the helper and only the first stderr line", () => {
+      const run = runWithHelper(
+        'console.error("first stderr line")\nconsole.error("    at somewhere (file.ts:1:1)")\nprocess.exit(3)\n',
+      )
+      expect(run.exitCode).not.toBe(0)
+      expect(run.output).toContain("script/plugin-required-outputs.ts")
+      expect(run.output).toContain("first stderr line")
+      expect(run.output).not.toContain("    at ")
+      expect(errorLines(run.output)).toHaveLength(1)
+    })
+  })
+
   describe("#given the release preflight gate (--release-preflight)", () => {
     const complete = [...PACKED_ARTIFACTS, ...skillPaths(PACKED_SKILL_COUNT), ...RELEASE_GENERATED_ARTIFACTS]
 

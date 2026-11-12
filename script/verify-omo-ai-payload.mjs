@@ -72,6 +72,8 @@ const toPackedPath = (repoPath) => {
 
 // The list lives in TypeScript behind a workspace alias, so this node process reads it through one call of the job's
 // pinned bun (setup-bun in every job that runs this gate); a missing bun is an error line, not a stack trace.
+const HELPER_NAME = "script/plugin-required-outputs.ts"
+
 function readPluginRequirements() {
   const result = spawnSync(
     "bun",
@@ -83,13 +85,36 @@ function readPluginRequirements() {
   )
   if (result.error !== undefined)
     throw new Error(`reading REQUIRED_PLUGIN_ARTIFACTS needs bun: ${result.error.message}`)
-  if (result.status !== 0) throw new Error(`reading REQUIRED_PLUGIN_ARTIFACTS failed: ${result.stderr.trim()}`)
-  const read = JSON.parse(result.stdout)
-  if (read.manifestError !== undefined) return read
-  // A release check with nothing to check must not pass.
-  const nonEmpty = (value) => Array.isArray(value) && value.length > 0
-  if (!nonEmpty(read.pluginOutputs) || !nonEmpty(read.generated)) {
+  // Every failure of the helper ends in ONE line that names it and the cause, never a stack trace or a raw parser error.
+  if (result.status !== 0) {
+    const lines = (result.stderr ?? "").trim().split("\n")
+    const firstLine = lines.find((line) => /^\s*error:/i.test(line))?.trim() ?? lines[0] ?? ""
+    throw new Error(`${HELPER_NAME} exited ${result.status}: ${firstLine}`)
+  }
+  let read
+  try {
+    read = JSON.parse(result.stdout)
+  } catch {
+    throw new Error(`${HELPER_NAME} printed output that is not JSON: ${result.stdout.trim().split("\n")[0] ?? ""}`)
+  }
+  if (read?.manifestError !== undefined) return read
+  const strings = (value) => Array.isArray(value) && value.length > 0 && value.every((v) => typeof v === "string")
+  const entries = (value) =>
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every((v) => typeof v?.label === "string" && typeof v?.source === "string")
+  // A release check with nothing to check, or one whose entries are malformed, must not pass.
+  const empty = (value) => Array.isArray(value) && value.length === 0
+  if (empty(read?.pluginOutputs) || empty(read?.generated)) {
     throw new Error("the plugin requirement list is empty: refusing to pass a release check with nothing to check")
+  }
+  if (!strings(read?.pluginOutputs)) {
+    throw new Error(`${HELPER_NAME} gave no usable "pluginOutputs": expected a non-empty array of strings`)
+  }
+  if (!entries(read?.generated)) {
+    throw new Error(
+      `${HELPER_NAME} gave no usable "generated": expected a non-empty array of { label: string, source: string }`,
+    )
   }
   return read
 }
