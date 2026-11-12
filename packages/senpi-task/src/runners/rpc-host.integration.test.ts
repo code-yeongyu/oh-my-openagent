@@ -27,7 +27,7 @@ setDefaultTimeout(DAEMON_WORLD_TIMEOUT_MS)
 const worlds: HostWorld[] = []
 
 afterEach(async () => {
-  for (const world of worlds.splice(0)) await world.cleanup()
+  for (const world of worlds.splice(0)) await awaitWithinTestBudget(world.cleanup(), "the daemon world cleaning up")
 })
 
 async function daemonWorld(options: FakeHostOptions = {}): Promise<HostWorld> {
@@ -65,7 +65,7 @@ function contextRole(session: { readonly context: unknown }): unknown {
 describe("two parents on one daemon", () => {
   test("#given two parent sessions sharing one daemon #when each starts 16 children #then it holds 32 retained worker sessions, hidden from a default listing, with nothing errored", async () => {
     // given / when
-    const { world, a, b } = await twoParents()
+    const { world, a, b } = await awaitWithinTestBudget(twoParents(), "two parents with 16 children each")
 
     // then
     const sessions = world.host.sessions()
@@ -77,8 +77,15 @@ describe("two parents on one daemon", () => {
     expect(distinct(sessions.map((session) => session.autoTitle))).toEqual([false])
     expect(distinct(sessions.map((session) => session.attachments))).toEqual([1])
     // I4: a worker session is invisible until a client asks for one.
-    expect(await listFakeHostSessions(world.host.socketPath)).toEqual([])
-    expect(await listFakeHostSessions(world.host.socketPath, { includeWorkers: true })).toHaveLength(32)
+    expect(
+      await awaitWithinTestBudget(listFakeHostSessions(world.host.socketPath), "the host listing its parent sessions"),
+    ).toEqual([])
+    expect(
+      await awaitWithinTestBudget(
+        listFakeHostSessions(world.host.socketPath, { includeWorkers: true }),
+        "the host listing its worker sessions",
+      ),
+    ).toHaveLength(32)
 
     const records = [...a.records(), ...b.records()]
     expect(records).toHaveLength(32)
@@ -92,7 +99,7 @@ describe("two parents on one daemon", () => {
 
   test("#given 32 live children #when parent A shuts down #then its 16 sessions stay on the daemon and only its records park", async () => {
     // given
-    const { world, a, b } = await twoParents()
+    const { world, a, b } = await awaitWithinTestBudget(twoParents(), "two parents with 16 children each")
     const parkedPaths = new Set(a.sessionPaths())
 
     // when
@@ -122,7 +129,7 @@ describe("two parents on one daemon", () => {
 
   test("#given a parent that parked its 16 children #when it starts a new session #then all 16 reattach without replaying a prompt", async () => {
     // given
-    const { world, a } = await twoParents()
+    const { world, a } = await awaitWithinTestBudget(twoParents(), "two parents with 16 children each")
     await awaitWithinTestBudget(
       a.lifecycle.suspendOnSessionShutdown({ parentSessionId: "parent-a", reason: "session_shutdown" }),
       "parent A's 16 children parking on session shutdown",
@@ -151,7 +158,7 @@ describe("two parents on one daemon", () => {
 
   test("#given a daemon that died under 32 live children #when they park and it comes back #then the next session start reconciles every child", async () => {
     // given
-    const { world, a, b } = await twoParents()
+    const { world, a, b } = await awaitWithinTestBudget(twoParents(), "two parents with 16 children each")
     // Pin the idle branch before the crash. The revival contract splits on whether a turn was in
     // flight: a mid-turn restart reopens and re-prompts exactly once, an idle one reopens with no
     // prompt. `startChildren` returns once each child has STARTED, not once its opening turn has
@@ -262,9 +269,12 @@ describe("two parents on one daemon", () => {
 describe("daemon refusals", () => {
   test("#given a daemon without session_context #when both parents start their children #then all 32 run on the per-child runner and each parent warns once", async () => {
     // given
-    const { world, a, b } = await twoParents(
-      { capabilities: ["multi_session", "extension_events", "session_kind", "retain_on_disconnect"] },
-      { useFallback: true },
+    const { world, a, b } = await awaitWithinTestBudget(
+      twoParents(
+        { capabilities: ["multi_session", "extension_events", "session_kind", "retain_on_disconnect"] },
+        { useFallback: true },
+      ),
+      "two parents with 16 children each on the per-child runner",
     )
 
     // then
@@ -289,7 +299,7 @@ describe("daemon refusals", () => {
     world.host.failOpen({ code: "invalid_launch_profile", detail: "the daemon loads another extension set" })
 
     // when
-    const [started] = await a.startChildren(1)
+    const [started] = await awaitWithinTestBudget(a.startChildren(1), "parent A's child connecting")
 
     // then - an unusable launch profile is NOT a fallback reason: nothing runs as its own process.
     // A refusal that lands after the start report window (#10042) is reported as `starting` and the
@@ -329,6 +339,7 @@ describe("daemon refusals", () => {
 describe("cold revival of a daemon-hosted child", () => {
   test("#given an idle-parked daemon child #when task_send targets it #then the session reopens once and delivers without replaying the prompt", async () => {
     // given / when
+    useTestTimeout(DAEMON_WORLD_TIMEOUT_MS)
     const result = await awaitWithinTestBudget(realColdReviveHostSession(), "the cold-revived host session")
 
     // then
