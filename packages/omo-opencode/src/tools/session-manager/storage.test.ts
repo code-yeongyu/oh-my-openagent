@@ -1,13 +1,11 @@
 import { describe, test, expect, beforeEach, afterEach, afterAll, mock } from "bun:test"
 import { mkdirSync, writeFileSync, rmSync, existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
+import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
-import { processTempDir } from "../../../../../test-support/process-temp-dir"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
-// The ./constants mock below redirects the shared storage paths it re-exports for the rest of the process, so
-// later files can write into this root after it is removed: it lives in the process temp dir (#13286).
-const TEST_DIR = join(processTempDir(), `omo-test-session-manager-${randomUUID()}`)
+const TEST_DIR = join(tmpdir(), `omo-test-session-manager-${randomUUID()}`)
 const TEST_MESSAGE_STORAGE = join(TEST_DIR, "message")
 const TEST_PART_STORAGE = join(TEST_DIR, "part")
 const TEST_SESSION_STORAGE = join(TEST_DIR, "session")
@@ -15,11 +13,21 @@ const TEST_TODO_DIR = join(TEST_DIR, "todos")
 const TEST_TRANSCRIPT_DIR = join(TEST_DIR, "transcripts")
 let sqliteBackend = false
 
+// mock.restore() does not reach the modules that re-export a mocked one (the shared barrel, session-manager/index.ts),
+// so they kept this file's fixture paths for every later file in the process. afterAll re-mocks each module with the
+// real exports captured here, which bun carries to the re-exports too. The storage paths are mocked only in
+// opencode-storage-paths, the module that owns them, and restored last (#13286).
+const STORAGE_PATH_KEYS = new Set(["OPENCODE_STORAGE", "MESSAGE_STORAGE", "PART_STORAGE", "SESSION_STORAGE"])
+const realModules: Record<string, Record<string, unknown>> = {
+  "./constants": Object.fromEntries(
+    Object.entries(await import("./constants")).filter(([key]) => !STORAGE_PATH_KEYS.has(key)),
+  ),
+  "../../shared/opencode-storage-detection": { ...(await import("../../shared/opencode-storage-detection")) },
+  "../../shared/opencode-message-dir": { ...(await import("../../shared/opencode-message-dir")) },
+  "../../shared/opencode-storage-paths": { ...(await import("../../shared/opencode-storage-paths")) },
+}
+
 mock.module("./constants", () => ({
-  OPENCODE_STORAGE: TEST_DIR,
-  MESSAGE_STORAGE: TEST_MESSAGE_STORAGE,
-  PART_STORAGE: TEST_PART_STORAGE,
-  SESSION_STORAGE: TEST_SESSION_STORAGE,
   TODO_DIR: TEST_TODO_DIR,
   TRANSCRIPT_DIR: TEST_TRANSCRIPT_DIR,
   SESSION_LIST_DESCRIPTION: "test",
@@ -66,6 +74,7 @@ mock.module("../../shared/opencode-message-dir", () => ({
 
 afterAll(() => {
   mock.restore()
+  for (const [specifier, exports] of Object.entries(realModules)) mock.module(specifier, () => exports)
 })
 
 const { getAllSessions, getMessageDir, sessionExists, readSessionMessages, readSessionTodos, getSessionInfo } =
