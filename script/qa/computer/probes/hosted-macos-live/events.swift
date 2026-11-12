@@ -35,18 +35,31 @@ func skyLightPostToPid() -> (@convention(c) (pid_t, CGEvent) -> Void)? {
   return unsafeBitCast(symbol, to: Post.self)
 }
 
+func postGlobalClick(at point: CGPoint) {
+  let source = CGEventSource(stateID: .hidSystemState)
+  for type in [CGEventType.mouseMoved, .leftMouseDown, .leftMouseUp] {
+    guard let event = CGEvent(mouseEventSource: source, mouseType: type, mouseCursorPosition: point, mouseButton: .left)
+    else { fail("click: CGEvent creation failed") }
+    if type != .mouseMoved { event.setIntegerValueField(.mouseEventClickState, value: 1) }
+    event.post(tap: .cghidEventTap)
+    usleep(type == .mouseMoved ? 150_000 : 80_000)
+  }
+}
+
 func postMouse(pid: pid_t, windowNumber: Int64, at point: CGPoint, route: String) {
   let skyLight = route == "sl" ? skyLightPostToPid() : nil
   if route == "sl" && skyLight == nil { fail("click: SLEventPostToPid did not resolve", code: 3) }
+  if route == "hid" {
+    postGlobalClick(at: point)
+    return
+  }
   for type in [CGEventType.leftMouseDown, .leftMouseUp] {
     guard let event = CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: point, mouseButton: .left)
     else { fail("click: CGEvent creation failed") }
     event.setIntegerValueField(.mouseEventClickState, value: 1)
     if let underPointer = CGEventField(rawValue: 91) { event.setIntegerValueField(underPointer, value: windowNumber) }
     if let canHandle = CGEventField(rawValue: 92) { event.setIntegerValueField(canHandle, value: windowNumber) }
-    if route == "hid" {
-      event.post(tap: .cghidEventTap)
-    } else if let skyLight {
+    if let skyLight {
       skyLight(pid, event)
     } else {
       event.postToPid(pid)

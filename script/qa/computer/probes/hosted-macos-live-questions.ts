@@ -133,18 +133,35 @@ async function frontmost(probe: Probe, pid: string): Promise<string | null> {
   return again.frontmost === true ? null : `fixture is not frontmost after activate ${short(activated)}`
 }
 
+function provenAim(probe: Probe, frame: readonly number[]): readonly string[] | string {
+  const [left = 0, top = 0, width = 0, height = 0] = frame
+  const middle = top + height / 2
+  const candidates = [
+    [left + width / 2, middle],
+    [left + Math.min(height / 2, 10), middle],
+  ]
+  const misses: string[] = []
+  for (const [x = 0, y = 0] of candidates) {
+    const hit = probe.control(["ax-hit", String(x), String(y)])
+    if (hit.role === "AXCheckBox" && hit.pid === probe.fixture.pid) return [String(x), String(y)]
+    misses.push(`(${x},${y}) hit ${short(hit)}`)
+  }
+  return `no candidate point inside the AX frame ${short(frame)} hit-tests to the fixture checkbox: ${misses.join("; ")}`
+}
+
 export async function askPidClick(probe: Probe): Promise<Answer> {
   const pid = String(probe.fixture.pid)
   const target = probe.control(["ax-checkbox", pid])
   const frame = frameOf(target)
   if (frame === null) return unmeasured(`control failed: no AX frame for the fixture checkbox ${short(target)}`)
-  const [left = 0, top = 0, width = 0, height = 0] = frame
-  const aim = [String(left + width / 2), String(top + height / 2)]
+  const aimed = provenAim(probe, frame)
+  if (typeof aimed === "string") return unmeasured(`aim not proven: ${aimed}`)
+  const aim = aimed
   const notFront = await frontmost(probe, pid)
   if (notFront !== null) return unmeasured(`control not run: ${notFront}`)
   const global = await clickAt(probe, aim, "hid")
   if (typeof global === "string") return unmeasured(`control failed: global HID click ${global}`)
-  const where = `aim ${short(aim)} from AX frame ${short(frame)}, fixture frontmost`
+  const where = `aim ${short(aim)} proven by AX hit-test inside frame ${short(frame)}, fixture frontmost`
   if (global.toggled === undefined)
     return unmeasured(
       `global=not pid=untried: the global click at the same point did not toggle (${global.note}); ${where}`,

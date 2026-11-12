@@ -70,3 +70,15 @@ func axFrame(_ element: AXUIElement) -> [Double]? {
   else { return nil }
   return [Double(origin.x), Double(origin.y), Double(extent.width), Double(extent.height)]
 }
+
+func axHit(x: Double, y: Double) -> [String: Any] {
+  var element: AXUIElement?
+  let error = AXUIElementCopyElementAtPosition(AXUIElementCreateSystemWide(), Float(x), Float(y), &element)
+  guard error == .success, let element else { return ["axError": Int(error.rawValue)] }
+  var pid: pid_t = 0
+  AXUIElementGetPid(element, &pid)
+  return [
+    "axError": 0, "pid": Int(pid), "role": (axValue(element, kAXRoleAttribute) as? String) ?? "",
+    "title": (axValue(element, kAXTitleAttribute) as? String) ?? "",
+  ]
+}
