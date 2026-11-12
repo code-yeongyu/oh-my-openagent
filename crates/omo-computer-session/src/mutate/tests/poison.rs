@@ -15,18 +15,31 @@ fn redrive_after(tamper: impl FnOnce(&Path), restore: impl FnOnce(&Path)) {
     let run = Run::new();
     die_after_input(&run, "c-tamper", 1);
     let mut first = run.session(Box::new(run.fake()));
-    first.click(click("c-tamper")).expect_err("the first re-drive is refused");
+    first
+        .click(click("c-tamper"))
+        .expect_err("the first re-drive is refused");
     drop(first);
     let uncertain = run.dir.path().join("markers/local/default.uncertain");
-    assert!(uncertain.join("c-tamper").exists(), "the poison record was written");
+    assert!(
+        uncertain.join("c-tamper").exists(),
+        "the poison record was written"
+    );
     tamper(&uncertain);
     let mut restarted = run.session(Box::new(run.fake()));
     let redrive = restarted.click(click("c-tamper"));
     restore(&uncertain);
     let redrive = redrive.expect_err("a tampered poison record still refuses the crashed callId");
-    assert_eq!(wire(&redrive), ("TransactionFailed", Some("recovery_required")));
+    assert_eq!(
+        wire(&redrive),
+        ("TransactionFailed", Some("recovery_required"))
+    );
     assert_eq!(redrive.interrupted, Some(Disposition::UNCERTAIN_UNSAFE));
-    assert_eq!(run.sink.len(), 3, "delivered exactly once: {:?}", run.sink.lines());
+    assert_eq!(
+        run.sink.len(),
+        3,
+        "delivered exactly once: {:?}",
+        run.sink.lines()
+    );
 }
 
 #[cfg(unix)]
