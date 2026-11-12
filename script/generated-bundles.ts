@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process"
 import { readFileSync } from "node:fs"
 
 // The generated outputs that only the release commit may change (#9903), read from the list next to this file. The
-// PR gate runs the BASE branch's copy of this module, so a PR cannot shorten the list that judges it.
+// PR gate runs the BASE branch's copy of this module, so a PR's edit to the list does not judge that PR.
 const LIST_URL = new URL("./generated-bundles.json", import.meta.url)
 
 export function loadGeneratedBundlePatterns(): readonly RegExp[] {
@@ -22,6 +22,23 @@ export function loadGeneratedBundlePatterns(): readonly RegExp[] {
     return new RegExp(pattern)
   })
 }
+
+// The generators whose outputs the list names: the ones the release job runs. script/build-generated.ts runs exactly
+// these, and the list test builds through them. `fixedOutputs` names the files of a generator that has no output
+// override, so the list test can account for them without writing into the tree.
+export const RELEASE_GENERATORS: readonly {
+  readonly script: string
+  readonly runtime: "node" | "bun"
+  readonly fixedOutputs?: readonly string[]
+}[] = [
+  { script: "packages/omo-senpi/plugin/scripts/build-extension.mjs", runtime: "node" },
+  { script: "script/build-codex-install.ts", runtime: "bun" },
+  {
+    script: "script/build-service-auth.ts",
+    runtime: "bun",
+    fixedOutputs: ["packages/omo-native/bin/lib/service-auth.generated.js"],
+  },
+]
 
 export function isGeneratedBundlePath(path: string, patterns: readonly RegExp[]): boolean {
   return patterns.some((pattern) => pattern.test(path))

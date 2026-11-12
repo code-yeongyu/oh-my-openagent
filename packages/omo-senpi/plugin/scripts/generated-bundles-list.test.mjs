@@ -6,16 +6,15 @@ import { join, relative } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { buildCodexInstaller } from "../../../../script/build-codex-install.ts"
+import { RELEASE_GENERATORS } from "../../../../script/generated-bundles.ts"
 
-// #9903: script/generated-bundles.json must name exactly the files the release job's generators write (publish.yml
-// prepare job: build-extension.mjs, build-codex-install.ts, build-service-auth.ts), no more and no less. A listed file
-// no generator writes is source that the PR gate would forbid editing; a written file that is tracked and unlisted
-// is a bundle feature PRs could commit again. This builds every output into a temporary root and compares.
+// #9903: every tracked file script/generated-bundles.json lists must be written by a release generator
+// (RELEASE_GENERATORS), and every file those generators write must be matched by the list. A listed file no generator
+// writes is source that would be treated as generated; a written file the list does not match is a bundle feature PRs
+// could commit again. This builds every output into a temporary root and checks both inclusions.
 const repositoryRoot = fileURLToPath(new URL("../../../../", import.meta.url))
 const PLUGIN = "packages/omo-senpi/plugin"
 const CODEX_INSTALL_DIST = "packages/omo-codex/scripts/install-dist"
-// build-service-auth.ts has one fixed target (its \`target\` constant); it writes nothing else.
-const SERVICE_AUTH_TARGET = "packages/omo-native/bin/lib/service-auth.generated.js"
 // Hand-written source that ships under plugin/runtime beside the generated bundles: the dag SDK and its library loader.
 // No generator writes them; script/build-omo-native.ts copies the directory from the tree. Add a new hand-written
 // runtime file here on purpose.
@@ -70,10 +69,22 @@ async function codexInstallerOutputs() {
   return filesBelow(distRoot).map((path) => `${CODEX_INSTALL_DIST}/${path}`)
 }
 
+// Each release generator's outputs, built into the temporary root where the generator takes an output override. A
+// generator with neither an override known here nor declared fixedOutputs cannot be accounted for, so the test refuses.
+async function generatorOutputs(generator) {
+  if (generator.script === `${PLUGIN}/scripts/build-extension.mjs`) return pluginOutputs()
+  if (generator.script === "script/build-codex-install.ts") return codexInstallerOutputs()
+  if (generator.fixedOutputs !== undefined) return [...generator.fixedOutputs]
+  throw new Error(
+    `cannot observe the outputs of ${generator.script}: add an output override here or declare fixedOutputs`,
+  )
+}
+
 describe("generated bundle list", () => {
-  test("#given the release generators built into a temporary root #when compared with the listed tracked files #then they are the same set", async () => {
+  test("#given the release generators built into a temporary root #when compared with the listed tracked files #then every listed file is written and every written file is listed", async () => {
     // given
-    const written = new Set([...pluginOutputs(), ...(await codexInstallerOutputs()), SERVICE_AUTH_TARGET])
+    const written = new Set()
+    for (const generator of RELEASE_GENERATORS) for (const path of await generatorOutputs(generator)) written.add(path)
     const patterns = listPatterns()
     const tracked = trackedFiles()
     const listed = new Set(tracked.filter((path) => patterns.some((pattern) => pattern.test(path))))
