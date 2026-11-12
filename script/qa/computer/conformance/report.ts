@@ -13,6 +13,8 @@ interface Report {
   readonly skipped: number
   readonly disturbed: number
   readonly unobserved: number
+  /** Cells the hand reported delivered, whatever the verdict: `delivered` counts only those that also passed. */
+  readonly observedDelivered: number
   readonly problems: readonly string[]
   /** The run's shape faults: a missing, duplicate, undeclared or contradictory cell, or an empty catalog. */
   readonly structural: readonly string[]
@@ -95,6 +97,7 @@ export function buildReport(catalog: readonly Cell[], results: readonly CellResu
   const problems: string[] = []
   const structural: string[] = []
   const counts = { delivered: 0, refused: 0, failed: 0, skipped: 0, disturbed: 0, unobserved: 0 }
+  const observedDelivered = results.filter((result) => result.observed.kind === "delivered").length
   const declared = groupBy(catalog, cellId)
   const observed = groupBy(results, (result) => result.id)
   if (catalog.length === 0) structural.push("empty catalog")
@@ -131,6 +134,7 @@ export function buildReport(catalog: readonly Cell[], results: readonly CellResu
     session: first?.session ?? "unknown",
     cells: declared.size,
     ...counts,
+    observedDelivered,
     problems: [...structural, ...problems],
     structural,
   }
@@ -168,10 +172,10 @@ function main(argv: readonly string[]): number {
   const report = buildReport(catalogFor(run.os, run.session), run.results)
   if (argv.includes("--check-schema") || argv.includes("--summary")) {
     for (const fault of report.structural) console.log(fault)
-    const { cells, delivered, refused, failed, disturbed, unobserved } = report
+    const { cells, delivered, refused, failed, disturbed, unobserved, observedDelivered } = report
     if (argv.includes("--summary")) {
       console.log(
-        `cells=${cells} delivered=${delivered} refused=${refused} failed=${failed} disturbed=${disturbed} unobserved=${unobserved}`,
+        `cells=${cells} delivered=${delivered} refused=${refused} failed=${failed} disturbed=${disturbed} unobserved=${unobserved} observed_delivered=${observedDelivered}`,
       )
     } else if (report.structural.length === 0) console.log(`SCHEMA ok ${run.os}/${run.session} cells=${cells}`)
     return report.structural.length === 0 ? 0 : 1
