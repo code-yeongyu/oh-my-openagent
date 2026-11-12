@@ -172,6 +172,15 @@ final class Recorder: NSObject {
     send("pointer", ["kind": "pointer", "via": "tap", "x": event.location.x, "y": event.location.y])
   }
 
+  // The final field read is the typing verdict, so a read that only timed out (the app was busy) is retried for up to
+  // a second; a read that failed outright, or still times out at the deadline, is a fault.
+  func finalRead(deadline: Double) {
+    let text = fieldText()
+    if let text, text != Recorder.busy { return emit(["kind": "field", "text": text, "final": true]) }
+    if text == Recorder.busy, uptimeMs() < deadline { return after(0.05) { self.finalRead(deadline: deadline) } }
+    fault("typing", text == nil ? "final field read failed" : "final field read timed out for 1 s")
+  }
+
   func command(_ words: [String]) {
     switch words.first {
     case "start":
@@ -181,11 +190,7 @@ final class Recorder: NSObject {
       recording = false
       emit(["kind": "stop"])
     case "final":
-      if let text = fieldText(), text != Recorder.busy {
-        emit(["kind": "field", "text": text, "final": true])
-      } else {
-        fault("typing", "final field read failed")
-      }
+      finalRead(deadline: uptimeMs() + 1_000)
     case "snapshot":
       emitSnapshot()
     case "quit":
