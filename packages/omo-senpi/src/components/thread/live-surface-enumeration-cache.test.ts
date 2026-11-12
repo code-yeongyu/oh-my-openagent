@@ -187,4 +187,83 @@ describe("live thread surface endpoint cache", () => {
       }
     },
   )
+
+  describe("one enumeration shared by every surface of the process (#12989)", () => {
+    function sharedHost(enumerations: Map<string, never>, agentDir: string, gate?: Promise<void>) {
+      const counter = { calls: 0 }
+      let clock = 1_000
+      const surface = createLiveThreadSurface({} as never, {
+        env: { SENPI_RPC_SOCKET: "/tmp/omo-enum-cache-missing.sock", OMO_CODING_AGENT_DIR: agentDir },
+        exists: () => false,
+        registry: async () => [],
+        now: () => clock,
+        enumerations,
+        statusAll: async (): Promise<readonly HostEndpointReport[]> => {
+          counter.calls += 1
+          if (gate !== undefined && counter.calls === 1) await gate
+          return []
+        },
+      } as never)
+      return {
+        surface,
+        counter,
+        advance: (ms: number) => {
+          clock += ms
+        },
+      }
+    }
+
+    test("#given two sessions' surfaces over one agent dir #when both list inside the cache window #then the engine is asked once", async () => {
+      // given
+      const enumerations = new Map<string, never>()
+      const first = sharedHost(enumerations, "/tmp/omo-enum-shared-a")
+      const second = sharedHost(enumerations, "/tmp/omo-enum-shared-a")
+
+      // when
+      await first.surface.listView({ offline: true })
+      await second.surface.listView({ offline: true })
+
+      // then
+      expect(first.counter.calls + second.counter.calls).toBe(1)
+    })
+
+    test("#given surfaces over two different agent dirs #when both list inside the cache window #then each agent dir is enumerated on its own", async () => {
+      // given
+      const enumerations = new Map<string, never>()
+      const first = sharedHost(enumerations, "/tmp/omo-enum-shared-a")
+      const second = sharedHost(enumerations, "/tmp/omo-enum-shared-b")
+
+      // when
+      await first.surface.listView({ offline: true })
+      await second.surface.listView({ offline: true })
+
+      // then
+      expect([first.counter.calls, second.counter.calls]).toEqual([1, 1])
+    })
+
+    test("#given one session's enumeration stuck past its deadline #when another session of the process lists #then it starts a fresh enumeration instead of waiting", async () => {
+      // given
+      const enumerations = new Map<string, never>()
+      let release: () => void = () => {}
+      const gate = new Promise<void>((done) => {
+        release = done
+      })
+      const stuck = sharedHost(enumerations, "/tmp/omo-enum-shared-a", gate)
+      const pending = stuck.surface.listView({ offline: true })
+      for (let turn = 0; turn < 100 && stuck.counter.calls === 0; turn++) await Promise.resolve()
+      expect(stuck.counter.calls).toBe(1)
+      try {
+        // when
+        const other = sharedHost(enumerations, "/tmp/omo-enum-shared-a")
+        other.advance(HOST_ENDPOINTS_ENUMERATION_DEADLINE_MS)
+        await within(other.surface.listView({ offline: true }), "a second session behind a stuck shared enumeration")
+
+        // then
+        expect(other.counter.calls).toBe(1)
+      } finally {
+        release()
+        await pending
+      }
+    })
+  })
 })
