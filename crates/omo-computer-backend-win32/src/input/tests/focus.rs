@@ -27,8 +27,26 @@ const EDIT: isize = 0x1004;
 
 #[test]
 fn posted_target_is_the_focused_child_never_the_frame() {
-    assert_eq!(focus_child(&Scripted { thread: Some(7), focus: Some(EDIT) }, FRAME), Ok(EDIT));
-    for os in [Scripted { thread: Some(7), focus: None }, Scripted { thread: None, focus: Some(EDIT) }] {
+    assert_eq!(
+        focus_child(
+            &Scripted {
+                thread: Some(7),
+                focus: Some(EDIT)
+            },
+            FRAME
+        ),
+        Ok(EDIT)
+    );
+    for os in [
+        Scripted {
+            thread: Some(7),
+            focus: None,
+        },
+        Scripted {
+            thread: None,
+            focus: Some(EDIT),
+        },
+    ] {
         let refusal = focus_child(&os, FRAME).expect_err("no focus target");
         assert_eq!(refusal.code, EngineCode::BackgroundUnavailable);
         assert_eq!(refusal.reason, Some(Reason::NoFocusTarget.wire()));
