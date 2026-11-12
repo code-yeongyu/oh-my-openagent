@@ -24,6 +24,7 @@ export type Probe = {
   readonly fixture: Fixture
   readonly textEditPid: number | null
   readonly scratch: string
+  readonly settleMs: number
 }
 
 const PROBE_KEYCODE = "80"
@@ -89,16 +90,16 @@ function stateLines(file: string): string[] {
     : []
 }
 
-async function nextState(file: string, before: number): Promise<string | undefined> {
+async function nextState(file: string, before: number, settleMs: number): Promise<string | undefined> {
   const lines = await until(
     () => stateLines(file),
     (read) => read.length > before,
-    5_000,
+    settleMs,
   )
   return lines.length > before ? lines.at(-1) : undefined
 }
 
-const CLICK_ROUTES = [
+const PID_ROUTES = [
   ["cg", "CGEventPostToPid"],
   ["sl", "SLEventPostToPid"],
 ] as const
@@ -110,43 +111,60 @@ function frameOf(read: Json): readonly number[] | null {
   return numbers.length === 4 ? numbers : null
 }
 
-export async function askPidClick(probe: Probe): Promise<Answer> {
+type ClickResult = { readonly toggled: string | undefined; readonly note: string }
+
+async function clickAt(probe: Probe, aim: readonly string[], route: string): Promise<ClickResult | string> {
   const { fixture } = probe
-  const pid = String(fixture.pid)
+  const before = stateLines(fixture.stateFile).length
+  const click = probe.invoke(["click", String(fixture.pid), String(fixture.windowNumber), ...aim, route])
+  const error = failed(click)
+  if (error !== null) return error
+  const toggled = await nextState(fixture.stateFile, before, probe.settleMs)
+  return {
+    toggled,
+    note: `${route}: ${toggled === undefined ? "no toggle" : `toggled ${toggled}`} after ${short(click)}`,
+  }
+}
+
+async function frontmost(probe: Probe, pid: string): Promise<string | null> {
+  if (probe.control(["frontmost", pid]).frontmost === true) return null
+  const activated = probe.control(["activate", pid])
+  const again = probe.control(["frontmost", pid])
+  return again.frontmost === true ? null : `fixture is not frontmost after activate ${short(activated)}`
+}
+
+export async function askPidClick(probe: Probe): Promise<Answer> {
+  const pid = String(probe.fixture.pid)
   const target = probe.control(["ax-checkbox", pid])
   const frame = frameOf(target)
   if (frame === null) return unmeasured(`control failed: no AX frame for the fixture checkbox ${short(target)}`)
   const [left = 0, top = 0, width = 0, height = 0] = frame
   const aim = [String(left + width / 2), String(top + height / 2)]
-  const attempts: string[] = []
-  let posted = false
-  for (const [route, name] of CLICK_ROUTES) {
-    const before = stateLines(fixture.stateFile).length
-    const click = probe.invoke(["click", pid, String(fixture.windowNumber), ...aim, route])
-    const error = failed(click)
-    if (error !== null) {
-      attempts.push(`${name}: ${error}`)
+  const notFront = await frontmost(probe, pid)
+  if (notFront !== null) return unmeasured(`control not run: ${notFront}`)
+  const global = await clickAt(probe, aim, "hid")
+  if (typeof global === "string") return unmeasured(`control failed: global HID click ${global}`)
+  const where = `aim ${short(aim)} from AX frame ${short(frame)}, fixture frontmost`
+  if (global.toggled === undefined)
+    return unmeasured(
+      `global=not pid=untried: the global click at the same point did not toggle (${global.note}); ${where}`,
+    )
+  const notes = [global.note]
+  for (const [route, name] of PID_ROUTES) {
+    const pidClick = await clickAt(probe, aim, route)
+    if (typeof pidClick === "string") {
+      notes.push(`${name}: ${pidClick}`)
       continue
     }
-    posted = true
-    const state = await nextState(fixture.stateFile, before)
-    if (state === undefined) {
-      attempts.push(`${name}: no toggle within 5 s of ${short(click)}`)
-      continue
-    }
+    notes.push(`${name} ${pidClick.note}`)
+    if (pidClick.toggled === undefined) continue
     const ax = probe.control(["ax-checkbox", pid])
-    const evidence = `${name} aimed at the AX frame ${short(frame)}; ${short(click)}; fixture report ${state}; AX read-back ${short(ax.value)}; earlier routes: ${attempts.join("; ") || "none"}`
-    return ax.value === (state === "on" ? 1 : 0) ? confirms(evidence) : contradicts(`AX disagrees: ${evidence}`)
+    const evidence = `global=toggled pid=toggled (${name}); ${where}; ${notes.join("; ")}; AX read-back ${short(ax.value)}`
+    return ax.value === (pidClick.toggled === "on" ? 1 : 0)
+      ? confirms(evidence)
+      : contradicts(`AX disagrees: ${evidence}`)
   }
-  if (!posted) return unmeasured(`no route posted: ${attempts.join("; ")}`)
-  const controlBefore = stateLines(fixture.stateFile).length
-  const press = probe.control(["ax-press", pid])
-  const controlState = await nextState(fixture.stateFile, controlBefore)
-  if (controlState === undefined)
-    return unmeasured(`control failed: AX press ${short(press)} did not toggle the fixture`)
-  return contradicts(
-    `aimed at the AX frame ${short(frame)}: ${attempts.join("; ")}; control AX press toggled to ${controlState}`,
-  )
+  return contradicts(`global=toggled pid=not: ${where}; ${notes.join("; ")}`)
 }
 
 export function askCapture(probe: Probe): Answer {

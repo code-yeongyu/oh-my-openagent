@@ -165,7 +165,7 @@ async function probeRunner(args: readonly string[], image: string): Promise<numb
     killFixture = started.kill
     const textEditPid = await openTextEdit(scratch)
     const invoke = directInvoke(binary)
-    const probe: Probe = { invoke, control: invoke, fixture: started.fixture, textEditPid, scratch }
+    const probe: Probe = { invoke, control: invoke, fixture: started.fixture, textEditPid, scratch, settleMs: 5_000 }
     const results = await answers(only, probe, binary, subject)
     const symbols = `${JSON.stringify(invoke(["symbols"]))}\n`
     writeFileSync(join(out, `cuv3-symbols.${image}.json`), symbols)
@@ -205,8 +205,9 @@ async function main(args: readonly string[]): Promise<number> {
   }
   const decide = argValue(args, "--decide")
   if (decide !== undefined) {
-    console.log(`HOSTED_MACOS_LIVE=${decideHostedMacosLive(parseLedger(readFileSync(decide, "utf8")))}`)
-    return 0
+    const decision = decideHostedMacosLive(parseLedger(readFileSync(decide, "utf8")))
+    console.log(`HOSTED_MACOS_LIVE=${decision}`)
+    return decision === "unmeasured" ? 1 : 0
   }
   const image = process.env.PROBE_IMAGE
   const reason = unsupportedHostReason({

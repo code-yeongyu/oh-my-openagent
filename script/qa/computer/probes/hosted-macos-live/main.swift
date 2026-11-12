@@ -89,6 +89,12 @@ case "dialogs":
   let list = (CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]]) ?? []
   let found = list.compactMap { $0[kCGWindowOwnerName as String] as? String }.filter { owners.contains($0) }
   emit(["windows": found])
+case "frontmost":
+  let front = NSWorkspace.shared.frontmostApplication
+  emit(["frontmost": front?.processIdentifier == pidArgument(2), "frontPid": Int(front?.processIdentifier ?? -1)])
+case "activate":
+  let app = NSRunningApplication(processIdentifier: pidArgument(2))
+  emit(["activated": app?.activate(options: [.activateAllWindows]) ?? false])
 case "symbols":
   emit(symbolReport())
 case "disclaim":

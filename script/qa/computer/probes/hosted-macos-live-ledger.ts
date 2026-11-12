@@ -72,10 +72,16 @@ export function mergeLedgers(texts: readonly string[]): string {
   return `${[LEDGER_HEADER, ...rows.map(formatRow)].join("\n")}\n`
 }
 
-export function decideHostedMacosLive(rows: readonly LedgerRow[]): "yes" | "no" {
-  const confirmed = (question: Question, image: string) =>
-    rows.some((row) => row.question === question && row.image === image && row.verdict === "CONFIRMS")
-  return IMAGES.every((image) => LIVE_TIER_QUESTIONS.every((question) => confirmed(question, image))) ? "yes" : "no"
+export type HostedMacosLive = "yes" | "no" | "unmeasured"
+
+export function decideHostedMacosLive(rows: readonly LedgerRow[]): HostedMacosLive {
+  const verdicts = IMAGES.flatMap((image) =>
+    LIVE_TIER_QUESTIONS.map(
+      (question) => rows.find((row) => row.question === question && row.image === image)?.verdict,
+    ),
+  )
+  if (verdicts.some((verdict) => verdict === undefined || verdict === "UNMEASURED")) return "unmeasured"
+  return verdicts.every((verdict) => verdict === "CONFIRMS") ? "yes" : "no"
 }
 
 export type HostFacts = {

@@ -44,7 +44,13 @@ func postMouse(pid: pid_t, windowNumber: Int64, at point: CGPoint, route: String
     event.setIntegerValueField(.mouseEventClickState, value: 1)
     if let underPointer = CGEventField(rawValue: 91) { event.setIntegerValueField(underPointer, value: windowNumber) }
     if let canHandle = CGEventField(rawValue: 92) { event.setIntegerValueField(canHandle, value: windowNumber) }
-    if let skyLight { skyLight(pid, event) } else { event.postToPid(pid) }
+    if route == "hid" {
+      event.post(tap: .cghidEventTap)
+    } else if let skyLight {
+      skyLight(pid, event)
+    } else {
+      event.postToPid(pid)
+    }
     usleep(40_000)
   }
 }

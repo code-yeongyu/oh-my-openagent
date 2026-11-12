@@ -49,7 +49,12 @@ function combined(legs: Legs, route: string): Answer {
     : verdicts.includes("UNMEASURED")
       ? "UNMEASURED"
       : "CONTRADICTS"
-  return { verdict, evidence: `route: ${route}; ${summarize(legs)}` }
+  const notConfirmed = Object.entries(legs).filter(([, leg]) => leg.verdict !== "CONFIRMS")
+  const onlyQ3 = verdict === "CONTRADICTS" && notConfirmed.length === 1 && notConfirmed[0]?.[0] === "q3"
+  const inherited = onlyQ3
+    ? "the grant took effect (q1, q2, q4 and q5 CONFIRMS as the subject itself); this row is CONTRADICTS only through its q3 sub-leg, inherited from q3; "
+    : ""
+  return { verdict, evidence: `${inherited}route: ${route}; ${summarize(legs)}` }
 }
 
 type GrantRoute = { readonly label: string; readonly csreqHex: string | null }
@@ -120,22 +125,37 @@ async function askRemoved(subject: Probe, subjectPath: string, restarted: boolea
     const read = subject.control(["dialogs", ...DIALOG_OWNERS])
     return Array.isArray(read.windows) ? read.windows.filter((name): name is string => typeof name === "string") : []
   }
-  const before = new Set(dialogProcesses())
+  const newDialogProcesses = async (): Promise<string[]> => {
+    const before = new Set(dialogProcesses())
+    return until(
+      () => dialogProcesses().filter((name) => !before.has(name)),
+      (names) => names.length > 0,
+      5_000,
+    )
+  }
+  const baseline = await newDialogProcesses()
   const windowsBefore = dialogWindows()
+  const callStarted = Date.now()
   const read = subject.invoke(["trusted"])
   const tap = subject.invoke(["tap-create"])
   const appeared = await until(
-    () => dialogProcesses().filter((name) => !before.has(name)),
+    () => dialogProcesses().filter((name) => !new Set(baseline).has(name)),
     (names) => names.length > 0,
-    5_000,
+    Math.max(0, 5_000 - (Date.now() - callStarted)),
   )
   const windowsAfter = dialogWindows()
   const newWindows = windowsAfter.length - windowsBefore.length
-  const evidence = `rows removed, ${restart}; subject ${short(read)}; tap ${short(tap)}; new dialog processes in 5 s ${short(appeared)}; dialog windows before ${short(windowsBefore)} after ${short(windowsAfter)}; control q6=${granted.verdict}`
+  const evidence = `rows removed, ${restart}; control window with no call: new dialog processes ${short(baseline)}; subject ${short(read)}; tap ${short(tap)}; new dialog processes within 5 s of the call ${short(appeared)}; dialog windows before ${short(windowsBefore)} after ${short(windowsAfter)}; control q6=${granted.verdict}`
   if (typeof read.helperError === "string" || typeof tap.helperError === "string")
     return { verdict: "UNMEASURED", evidence: `helper call failed; ${evidence}` }
   const denied = read.axTrusted === false && read.screenCapturePreflight === false && tap.created === false
-  const quiet = appeared.length === 0 && newWindows <= 0
+  if (newWindows > 0) return { verdict: "CONTRADICTS", evidence: `a dialog window appeared; ${evidence}` }
+  if (baseline.length > 0)
+    return {
+      verdict: "UNMEASURED",
+      evidence: `dialog processes start without any probe call here, so a start is unattributable; ${evidence}`,
+    }
+  const quiet = appeared.length === 0
   return { verdict: denied && quiet ? "CONFIRMS" : "CONTRADICTS", evidence }
 }
 

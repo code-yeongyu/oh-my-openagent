@@ -74,19 +74,36 @@ jobs:
           pattern: hosted-macos-live-*
           path: fragments
 
-      - name: Merge fragments and decide
+      - name: Merge fragments
         shell: bash
         run: |
           bun script/qa/computer/probes/hosted-macos-live.ts --merge hosted-macos-live.tsv fragments/*/hosted-macos-live.macos-*.tsv
-          bun script/qa/computer/probes/hosted-macos-live.ts --decide hosted-macos-live.tsv | tee -a "$GITHUB_STEP_SUMMARY"
           cat hosted-macos-live.tsv
 
       - name: Upload merged ledger
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: hosted-macos-live-ledger
           path: hosted-macos-live.tsv
           if-no-files-found: error
+
+      - name: Decide HOSTED_MACOS_LIVE
+        shell: bash
+        run: |
+          set -o pipefail
+          bun script/qa/computer/probes/hosted-macos-live.ts --decide hosted-macos-live.tsv | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Every probe job succeeded
+        if: always()
+        shell: bash
+        env:
+          PROBE_RESULT: ${{ needs.probe.result }}
+        run: |
+          if [ "$PROBE_RESULT" != success ]; then
+            echo "a probe job ended '$PROBE_RESULT', so the ledger is not a measurement of both images"
+            exit 1
+          fi
 
       - name: Write job summary
         if: always()
