@@ -50,7 +50,34 @@ async function output(command: readonly string[]): Promise<{ code: number; text:
   return { code, text: (code === 0 ? stdout : stderr).trim().slice(0, 400) }
 }
 
+// Symbolic hotkeys 79 and 81 are "Move left/right a space" (Control-Left/Right). A hosted image may ship them off;
+// they are turned on for this QA session and the settings are re-read so the Space plant can use them.
+async function enableSpaceHotkeys(): Promise<string> {
+  for (const [id, key] of [
+    ["79", "123"],
+    ["81", "124"],
+  ] as const) {
+    const value = `<dict><key>enabled</key><true/><key>value</key><dict><key>parameters</key><array><integer>65535</integer><integer>${key}</integer><integer>8650752</integer></array><key>type</key><string>standard</string></dict></dict>`
+    const written = await output([
+      "/usr/bin/defaults",
+      "write",
+      "com.apple.symbolichotkeys",
+      "AppleSymbolicHotKeys",
+      "-dict-add",
+      id,
+      value,
+    ])
+    if (written.code !== 0) return `hotkey_${id}_failed:${written.text}`
+  }
+  const reread = await output([
+    "/System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings",
+    "-u",
+  ])
+  return reread.code === 0 ? "hotkeys=on" : `hotkeys_reread_failed:${reread.text}`
+}
+
 export async function ensureSecondSpace(session: MacSession): Promise<string> {
+  const hotkeys = await enableSpaceHotkeys()
   const opened = await output(["/usr/bin/open", "-a", "Mission Control"])
   if (opened.code !== 0) return `mission_control_failed:${opened.text}`
   await Bun.sleep(1_500)
@@ -63,5 +90,6 @@ export async function ensureSecondSpace(session: MacSession): Promise<string> {
   }
   const clicked = await output(["/usr/bin/osascript", "-e", ADD_DESKTOP])
   await Bun.sleep(1_000)
-  return clicked.code === 0 ? `add_desktop_clicked=${clicked.text}` : `add_desktop_failed:${clicked.text}`
+  const added = clicked.code === 0 ? `add_desktop_clicked=${clicked.text}` : `add_desktop_failed:${clicked.text}`
+  return `${added} ${hotkeys}`
 }

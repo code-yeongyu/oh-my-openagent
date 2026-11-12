@@ -71,7 +71,10 @@ async function activation(session: MacSession, helpers: HelperPaths): Promise<Pl
   const back = typist.next((reply) => reply.ctl === "activated", RESTORE_MS, "typist back in front")
   typist.send("activate")
   const reply = await back
-  if (reply.frontmost !== true) throw new Error("the typist could not take the front back after the activation plant")
+  if (reply.frontmost !== true || reply.key !== true)
+    throw new Error(
+      `the typist did not take the front and key focus back after the activation plant: ${JSON.stringify(reply)}`,
+    )
   return { plantedAt: line.t }
 }
 

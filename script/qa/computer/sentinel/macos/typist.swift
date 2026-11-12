@@ -61,6 +61,14 @@ final class Typist: NSObject {
     }
   }
 
+  // An activation through LaunchServices brings the app forward without making its window key again; keystrokes
+  // then reach no field. Every segment and every return from an activation re-keys the field explicitly.
+  func takeKeyFocus() {
+    window.makeKeyAndOrderFront(nil)
+    window.makeFirstResponder(field)
+    field.setSelectedRange(NSRange(location: field.string.utf16.count, length: 0))
+  }
+
   func journal(_ event: NSEvent) {
     guard event.type == .keyDown else {
       emit(["kind": "leak", "what": "mouse"])
@@ -105,7 +113,7 @@ final class Typist: NSObject {
       expected = []
       window.makeFirstResponder(nil)
       field.string = ""
-      window.makeFirstResponder(field)
+      takeKeyFocus()
       emit(["ctl": "reset"])
     case "yield":
       guard let pid = words.dropFirst().first.flatMap({ pid_t($0) }), let app = NSRunningApplication(processIdentifier: pid)
@@ -115,7 +123,11 @@ final class Typist: NSObject {
     case "activate":
       if #available(macOS 14.0, *) { NSApp.activate() } else { NSApp.activate(ignoringOtherApps: true) }
       after(0.15) {
-        emit(["ctl": "activated", "frontmost": NSWorkspace.shared.frontmostApplication?.processIdentifier == getpid()])
+        self.takeKeyFocus()
+        emit([
+          "ctl": "activated", "frontmost": NSWorkspace.shared.frontmostApplication?.processIdentifier == getpid(),
+          "key": self.window.isKeyWindow && self.window.firstResponder === self.field,
+        ])
       }
     case "drop-next":
       dropNext = true

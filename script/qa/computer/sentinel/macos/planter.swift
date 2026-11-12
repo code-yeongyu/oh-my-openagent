@@ -26,9 +26,16 @@ final class Planter: NSObject {
       .post(tap: .cghidEventTap)
   }
 
-  func postKey(_ code: CGKeyCode, flags: CGEventFlags) {
-    for down in [true, false] {
-      let event = CGEvent(keyboardEventSource: source, virtualKey: code, keyDown: down)
+  // A system hotkey (Control-Arrow switches Spaces) is matched on real modifier key events, so the Control key itself
+  // goes down before the arrow and up after it, as a keyboard would send them.
+  func postControlChord(_ code: CGKeyCode) {
+    let control: CGKeyCode = 59
+    let arrow: CGEventFlags = [.maskControl, .maskNumericPad, .maskSecondaryFn]
+    let sequence: [(CGKeyCode, Bool, CGEventFlags)] = [
+      (control, true, .maskControl), (code, true, arrow), (code, false, arrow), (control, false, []),
+    ]
+    for (key, down, flags) in sequence {
+      let event = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: down)
       event?.flags = flags
       event?.post(tap: .cghidEventTap)
     }
@@ -81,11 +88,11 @@ final class Planter: NSObject {
       guard let before = activeSpaceId() else { return failed("space", "active Space id unreadable") }
       guard (managedSpaceCount() ?? 0) >= 2 else { return failed("space", "fewer than two Spaces exist") }
       let postedAt = uptimeMs()
-      postKey(124, flags: .maskControl)
+      postControlChord(124)
       after(0.45) {
         guard activeSpaceId() != before else { return self.failed("space", "Control-Right did not change the active Space") }
         self.planted("space", at: postedAt)
-        self.postKey(123, flags: .maskControl)
+        self.postControlChord(123)
         self.restored("space")
       }
     case "alert":
