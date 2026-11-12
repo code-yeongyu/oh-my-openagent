@@ -192,18 +192,21 @@ describe("live thread surface endpoint cache", () => {
     function sharedHost(enumerations: Map<string, never>, agentDir: string, gate?: Promise<void>) {
       const counter = { calls: 0 }
       let clock = 1_000
-      const surface = createLiveThreadSurface({} as never, {
-        env: { SENPI_RPC_SOCKET: "/tmp/omo-enum-cache-missing.sock", OMO_CODING_AGENT_DIR: agentDir },
-        exists: () => false,
-        registry: async () => [],
-        now: () => clock,
-        enumerations,
-        statusAll: async (): Promise<readonly HostEndpointReport[]> => {
-          counter.calls += 1
-          if (gate !== undefined && counter.calls === 1) await gate
-          return []
-        },
-      } as never)
+      const surface = createLiveThreadSurface(
+        {} as never,
+        {
+          env: { SENPI_RPC_SOCKET: "/tmp/omo-enum-cache-missing.sock", OMO_CODING_AGENT_DIR: agentDir },
+          exists: () => false,
+          registry: async () => [],
+          now: () => clock,
+          enumerations,
+          statusAll: async (): Promise<readonly HostEndpointReport[]> => {
+            counter.calls += 1
+            if (gate !== undefined && counter.calls === 1) await gate
+            return []
+          },
+        } as never,
+      )
       return {
         surface,
         counter,

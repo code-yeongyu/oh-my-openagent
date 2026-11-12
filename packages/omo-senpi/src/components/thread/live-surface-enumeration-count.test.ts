@@ -25,7 +25,10 @@ function sessionFile(agentDir: string, id: string, name: string): void {
     { type: "message", timestamp: "2026-11-12T10:01:00.000Z", message: { role: "user", content: "an earlier turn" } },
     { type: "session_info", timestamp: "2026-11-12T10:02:00.000Z", name },
   ]
-  writeFileSync(join(dir, `2026-11-12T10-00-00-000Z_${id}.jsonl`), `${lines.map((l) => JSON.stringify(l)).join("\n")}\n`)
+  writeFileSync(
+    join(dir, `2026-11-12T10-00-00-000Z_${id}.jsonl`),
+    `${lines.map((l) => JSON.stringify(l)).join("\n")}\n`,
+  )
 }
 
 async function enumerationsForOneSend(clock: "frozen" | "spaced", send: "first" | "reply"): Promise<number> {
