@@ -10,7 +10,9 @@
 // Prints `REPLAY_OK <case> steps=<n>` or one line per mismatch and exits 1; then the teardown
 // receipts `procs <n>` and `dir REMOVED <path>`. Only a reply mismatch exits 1: every input or
 // setup error (arguments, an unreadable or malformed case or delta file, an engine that cannot
-// be spawned) prints `REPLAY_ERROR <why>` and exits 2.
+// be spawned) prints `REPLAY_ERROR <why>` and exits 2. A case with no `transport` is replayed
+// over stdio only when ORACLE-PROVENANCE.tsv lists it as an imported oracle case (the v1 corpus
+// predates the field); any other case without one is refused `REPLAY_ERROR transport_missing`.
 import { constants } from "node:fs"
 import { access, mkdtemp, readdir, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -18,6 +20,7 @@ import { join, relative, resolve } from "node:path"
 
 const ROOT = resolve(import.meta.dir, "../../..")
 const DEFAULT_DELTAS = join(ROOT, "crates/omo-computer-core/parity/ORACLE-DELTAS.tsv")
+const PROVENANCE = join(ROOT, "crates/omo-computer-core/parity/ORACLE-PROVENANCE.tsv")
 const SINK_PREFIX = "fake-sink-" // the engine's per-process sink file under OMO_COMPUTER_RUNTIME_DIR
 const MESSAGE_TIMEOUT_MS = 10_000
 const EXIT_TIMEOUT_MS = 5_000
@@ -32,6 +35,11 @@ type Case = { readonly transport: Transport; readonly scenario: string | undefin
 type Delta = { readonly kind: string; readonly pointer: string; readonly pattern: readonly string[]; readonly imported: unknown; readonly v3: unknown; matched: number }
 
 class InputError extends Error {}
+class TransportMissing extends InputError {
+  constructor(name: string) {
+    super(`transport_missing: ${name} names no transport and ORACLE-PROVENANCE.tsv does not list it as an imported oracle case`)
+  }
+}
 
 const describe = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
@@ -63,9 +71,11 @@ function parseStep(raw: unknown, index: number): Step {
   return { restart: false, send, expect: expectations, sink }
 }
 
-function parseCase(raw: unknown): Case {
+function parseCase(raw: unknown, name: string, imported: boolean): Case {
   if (!isRecord(raw)) throw new InputError("the case is not an object")
-  const { transport, scenario, env = {}, steps } = raw
+  const { scenario, env = {}, steps } = raw
+  if (raw.transport === undefined && !imported) throw new TransportMissing(name)
+  const transport = raw.transport ?? "stdio"
   if (!isTransport(transport)) throw new InputError(`unknown transport ${JSON.stringify(transport)}`)
   if (scenario !== undefined && typeof scenario !== "string") throw new InputError("scenario must be a path")
   if (!isRecord(env) || !Object.values(env).every((value) => typeof value === "string")) throw new InputError("env must map names to strings")
@@ -82,6 +92,11 @@ function matches(pattern: readonly string[], pointer: string): boolean {
     pat.length === segs.length && pat.every((seg, i) => seg === "*" || seg === segs[i])
   if (pattern[0] === "**") return path.length >= pattern.length - 1 && fits(pattern.slice(1), path.slice(path.length - pattern.length + 1))
   return fits(pattern, path)
+}
+
+async function isImported(casePath: string): Promise<boolean> {
+  const rows = (await readText(PROVENANCE, "provenance manifest")).trim().split("\n").slice(1)
+  return rows.some((row) => resolve(ROOT, row.split("\t")[0] ?? "") === casePath)
 }
 
 async function loadDeltas(file: string, casePath: string): Promise<Delta[]> {
@@ -165,8 +180,10 @@ class Peer {
   }
 
   send(message: unknown): void {
-    this.proc.stdin.write(`${JSON.stringify(message)}\n`)
-    this.proc.stdin.flush()
+    try {
+      this.proc.stdin.write(`${JSON.stringify(message)}\n`)
+      this.proc.stdin.flush()
+    } catch { /* the engine is gone: its missing replies are reported as mismatches */ }
   }
 
   next(): Promise<unknown> {
@@ -209,7 +226,7 @@ async function replay(argv: readonly string[]): Promise<number> {
   const opts = args(argv)
   const rel = relative(ROOT, opts.casePath)
   const name = rel.startsWith("..") ? opts.casePath : rel
-  const spec = parseCase(parseJson(await readText(opts.casePath, "case file"), "case file"))
+  const spec = parseCase(parseJson(await readText(opts.casePath, "case file"), "case file"), name, await isImported(opts.casePath))
   await access(opts.engine, constants.X_OK).catch((error: unknown) => {
     throw new InputError(`the engine ${opts.engine} is not an executable file: ${describe(error)}`)
   })
