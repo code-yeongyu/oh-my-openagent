@@ -101,7 +101,7 @@ export function createRemoteThreadFixture() {
       live?: readonly string[]
       records?: readonly JsonObject[]
       rows?: readonly RemoteSessionRow[]
-      registryDown?: "refused" | "throws"
+      registryDown?: "refused" | "throws" | "signed_out"
       chainCountLimit?: number
       relayKeys?: ReadonlyMap<string, string>
     } = {},
@@ -240,7 +240,7 @@ export function createRemoteThreadFixture() {
             error: {
               code: "alias_registry_unavailable",
               message: "the alias registry could not be reached",
-              details: { reason: "sign_in" },
+              details: { reason: options.registryDown === "signed_out" ? "sign_in" : "network" },
             },
           })
     const registry: AliasRegistry = {
@@ -282,14 +282,16 @@ export function createRemoteThreadFixture() {
       aliasesOf: async (ids) =>
         registryCalls.push("aliasesOf") > 0 && options.failAliasesOf === true
           ? Promise.reject(new Error("alias registry failed"))
-          : {
-              kind: "ok",
-              value: new Map(
-                [...aliases]
-                  .filter(([, holder]) => ids.includes(holder.session_id))
-                  .map(([alias, holder]) => [holder.session_id, alias]),
-              ),
-            },
+          : options.registryDown !== undefined
+            ? await down()
+            : {
+                kind: "ok",
+                value: new Map(
+                  [...aliases]
+                    .filter(([, holder]) => ids.includes(holder.session_id))
+                    .map(([alias, holder]) => [holder.session_id, alias]),
+                ),
+              },
     }
     const remote: RemoteThreadSurface = {
       sessions: {
@@ -381,7 +383,7 @@ export function createRemoteThreadFixture() {
       status: "open",
     }
     const sessions = extra.sessions ?? [local]
-    const openSession = mock(async () => {
+    const openSession = mock(async (_request: Parameters<ThreadHost["openSession"]>[0]) => {
       const created: ThreadHostSession = {
         sessionId: "route-created",
         durableSessionId: "dur-created-here",
@@ -393,6 +395,7 @@ export function createRemoteThreadFixture() {
       return created
     })
     const closed: Array<readonly [string, string | undefined]> = []
+    const setSessionName = mock(async (_sessionId: string, _name: string) => {})
     const host: ThreadHost = {
       socket: "/tmp/thread-remote-test.sock",
       listSessions: async () => sessions,
@@ -401,7 +404,7 @@ export function createRemoteThreadFixture() {
       getState: async () => ({ isStreaming: false }),
       prompt: async () => ({ turnId: "turn-local" }),
       interrupt: async () => engine.interrupt,
-      setSessionName: async () => {},
+      setSessionName,
       setModel: async (_s, provider, id) => ({ provider, id }),
       getAvailableModels: async () => [],
       setThinkingLevel: async (_s, level) => {
@@ -459,7 +462,7 @@ export function createRemoteThreadFixture() {
       if (parse === undefined) throw new Error("thread_send declares no permission parser")
       return parse(args, process.cwd())
     }
-    return { run, permission, openSession, store, closed, agentDir }
+    return { run, permission, openSession, setSessionName, store, closed, agentDir }
   }
 
   return { account, surface, cleanup }
