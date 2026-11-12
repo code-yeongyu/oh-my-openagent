@@ -94,11 +94,21 @@ describe("a handed delivery", () => {
       committedAtAnswer = (await h.store().list({ target_durable_id: "t" })).length
     })
     const reply = await service.inbound({ command_id: "c-1", sender_device: "dev-a", durable_id: "t", record: record("d-1") })
-    expect(reply).toMatchObject({ kind: "queued", delivery_id: "d-1", deduplicated: false, waiting_on: { kind: "wake" } })
+    expect(reply.data).toMatchObject({ kind: "queued", delivery_id: "d-1", deduplicated: false, waiting_on: { kind: "wake" } })
     expect(committedAtAnswer).toBe(1)
     await consumer.idle()
     expect(service.calls).toContainEqual({ type: "peer.admitted", device: "dev-a" })
     expect(woken).toEqual(["t"])
+  })
+
+  test("#given a handed record #when the consumer answers #then the reply is the engine's RPC response envelope with the kind inside data", async () => {
+    const { sessions, service, consumer } = setup()
+    writeSessionFile(sessions, "t")
+    await consumer.start()
+    const reply = await service.inbound({ command_id: "c-1", sender_device: "dev-a", durable_id: "t", record: record("d-1") })
+    expect(Object.keys(reply).sort()).toEqual(["data", "success", "type"])
+    expect(reply).toMatchObject({ type: "response", success: true, data: { kind: "queued", deduplicated: false } })
+    expect(typeof reply.data.stored_command_id).toBe("string")
   })
 
   test("#given a record repeated by the same device #when it is handed in again #then the answer comes from the row with deduplicated set, and the admission check and the wake still run", async () => {
@@ -107,7 +117,7 @@ describe("a handed delivery", () => {
     await consumer.start()
     await service.inbound({ command_id: "c-1", sender_device: "dev-a", durable_id: "t", record: record("d-1") })
     const again = await service.inbound({ command_id: "c-2", sender_device: "dev-a", durable_id: "t", record: record("d-1") })
-    expect(again).toMatchObject({ kind: "queued", delivery_id: "d-1", deduplicated: true })
+    expect(again.data).toMatchObject({ kind: "queued", delivery_id: "d-1", deduplicated: true })
     await consumer.idle()
     expect(woken).toEqual(["t", "t"])
   })
@@ -136,7 +146,7 @@ describe("a handed delivery", () => {
       arrange(sessions)
       await consumer.start()
       const reply = await service.inbound({ command_id: "c-1", sender_device: "dev-a", durable_id: "t", record: record("d-1") })
-      expect(reply).toEqual({ kind: "refused", reason })
+      expect(reply.data).toEqual({ kind: "refused", reason })
       await consumer.idle()
       expect(await h.store().list({ target_durable_id: "t" })).toEqual([])
       expect(woken).toEqual([])
@@ -163,8 +173,8 @@ describe("a handed delivery", () => {
       service.inbound({ command_id: "same", sender_device: "dev-a", durable_id: "t", record: record("d-a") }),
       service.inbound({ command_id: "same", sender_device: "dev-b", durable_id: "t", record: record("d-b") }),
     ])
-    expect(fromA).toMatchObject({ kind: "queued", delivery_id: "d-a" })
-    expect(fromB).toMatchObject({ kind: "queued", delivery_id: "d-b" })
+    expect(fromA.data).toMatchObject({ kind: "queued", delivery_id: "d-a" })
+    expect(fromB.data).toMatchObject({ kind: "queued", delivery_id: "d-b" })
   })
 
   test("#given a question whether this directory holds a durable id #when it is asked #then it answers from the session files here", async () => {
@@ -182,7 +192,7 @@ describe("A5: the consumer's side of the local delivery messages", () => {
     writeSessionFile(sessions, "t")
     await consumer.start()
     service.refuseAnswers()
-    expect(await service.inbound({ command_id: "c-1", sender_device: "dev-a", durable_id: "t", record: record("d-1") })).toEqual({
+    expect((await service.inbound({ command_id: "c-1", sender_device: "dev-a", durable_id: "t", record: record("d-1") })).data).toEqual({
       kind: "unknown_delivery",
     })
     await consumer.idle()
@@ -194,11 +204,11 @@ describe("A5: the consumer's side of the local delivery messages", () => {
     const { h, sessions, service, consumer } = setup()
     writeSessionFile(sessions, "t")
     await consumer.start()
-    expect(await service.inbound({ command_id: "c-1", sender_device: "dev-a", durable_id: "t", record: record("d-1") })).toMatchObject({
+    expect((await service.inbound({ command_id: "c-1", sender_device: "dev-a", durable_id: "t", record: record("d-1") })).data).toMatchObject({
       deduplicated: false,
       stored_command_id: "c-1",
     })
-    expect(await service.inbound({ command_id: "c-2", sender_device: "dev-a", durable_id: "t", record: record("d-1") })).toMatchObject({
+    expect((await service.inbound({ command_id: "c-2", sender_device: "dev-a", durable_id: "t", record: record("d-1") })).data).toMatchObject({
       deduplicated: true,
       stored_command_id: "c-1",
     })

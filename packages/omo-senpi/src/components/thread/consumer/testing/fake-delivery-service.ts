@@ -5,6 +5,9 @@ import type {
   DeliveryServicePort,
 } from "../port"
 
+/** `delivery.answer`'s reply as the service reads it: the engine's RPC response envelope (A5 addendum 2). */
+export type AnswerEnvelope = { readonly type: string; readonly success: boolean; readonly data: Record<string, any> }
+
 export type FakeServiceCall =
   | { readonly type: "deliveries.serve"; readonly agent_dir: string; readonly v: number }
   | { readonly type: "delivery.pending"; readonly pairs: readonly DeliveryPendingPair[] }
@@ -24,7 +27,7 @@ export type FakeDeliveryService = {
   /** The next `delivery.drained` report is answered as kept, still expecting this command id (the backstop, A5.3). */
   readonly expectOnDrained: (commandId: string) => void
   /** Hands a delivery to the declared consumer; resolves with the consumer's `delivery.answer` reply for that (sender device, command id). */
-  readonly inbound: (event: DeliveryInboundEvent) => Promise<Record<string, unknown>>
+  readonly inbound: (event: DeliveryInboundEvent) => Promise<AnswerEnvelope>
   /** Asks the consumer `delivery.holds`; resolves with its `delivery.held` answer. */
   readonly holds: (event: DeliveryHoldsEvent) => Promise<boolean>
 }
@@ -43,7 +46,7 @@ export function createFakeDeliveryService(options: { readonly admitted: boolean 
   let expecting: string | undefined
   let inboundListener: ((event: DeliveryInboundEvent) => void) | undefined
   let holdsListener: ((event: DeliveryHoldsEvent) => void) | undefined
-  const answers = new Map<string, (reply: Record<string, unknown>) => void>()
+  const answers = new Map<string, (reply: AnswerEnvelope) => void>()
   const helds = new Map<string, (holds: boolean) => void>()
 
   const port: DeliveryServicePort = {
@@ -55,14 +58,14 @@ export function createFakeDeliveryService(options: { readonly admitted: boolean 
       await answerListener?.()
       const key = `${delivery.sender_device}\u0000${delivery.command_id}`
       if (answersRefused) {
-        answers.get(key)?.({ kind: "unknown_delivery" })
+        answers.get(key)?.({ type: "error", success: false, data: { kind: "unknown_delivery" } })
         answers.delete(key)
         throw refusal("unknown_delivery")
       }
       const waiting = answers.get(key)
       if (waiting === undefined) throw refusal("unknown_delivery")
       answers.delete(key)
-      waiting(reply)
+      waiting(reply as AnswerEnvelope)
     },
     held: async (askId, holds) => {
       helds.get(askId)?.(holds)
