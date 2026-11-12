@@ -1,5 +1,5 @@
 import { join } from "node:path"
-import { windowsNodeDiscoveryLines } from "./codex-cache-command-shim"
+import { escapeCmdQuoted, windowsNodeDiscoveryLines } from "./codex-cache-command-shim"
 
 export const RUNTIME_WRAPPER_MARKER = "OMO_GENERATED_RUNTIME_WRAPPER"
 
@@ -63,11 +63,14 @@ export function windowsRuntimeWrapper(
   binDir: string,
   nodeCliPath: string,
 ): string {
-  const ulwLoopBin = join(binDir, "omo-ulw-loop.cmd")
+  const ulwLoopBin = escapeCmdQuoted(join(binDir, "omo-ulw-loop.cmd"))
+  const cli = escapeCmdQuoted(cliPath)
+  const nodeCli = escapeCmdQuoted(nodeCliPath)
   return [
     "@echo off",
     `rem ${RUNTIME_WRAPPER_MARKER}`,
-    `if not defined CODEX_HOME set "CODEX_HOME=${codexHome}"`,
+    // Before `setlocal EnableDelayedExpansion` (in the node discovery lines), so only `%` is special here.
+    `if not defined CODEX_HOME set "CODEX_HOME=${escapeCmdQuoted(codexHome, false)}"`,
     `set "OMO_INVOCATION_NAME=${binName}"`,
     'set "OMO_EDITION=codex"',
     ...windowsNodeDiscoveryLines(),
@@ -76,25 +79,26 @@ export function windowsRuntimeWrapper(
     `  "${ulwLoopBin}" ulw-loop %*`,
     "  exit /b %ERRORLEVEL%",
     ")",
-    `if "%OMO_RUNTIME%"=="node" if defined OMO_NODE_BINARY if exist "${nodeCliPath}" (`,
-    `  "%OMO_NODE_BINARY%" "${nodeCliPath}" %*`,
+    `if "%OMO_RUNTIME%"=="node" if defined OMO_NODE_BINARY if exist "${nodeCli}" (`,
+    `  "%OMO_NODE_BINARY%" "${nodeCli}" %*`,
     "  exit /b %ERRORLEVEL%",
     ")",
     'if not defined BUN_BINARY where bun >nul 2>nul && set "BUN_BINARY=bun"',
     'if not defined BUN_BINARY if exist "%USERPROFILE%\\.bun\\bin\\bun.exe" set "BUN_BINARY=%USERPROFILE%\\.bun\\bin\\bun.exe"',
     "if not defined BUN_BINARY (",
-    `  if defined OMO_NODE_BINARY if exist "${nodeCliPath}" (`,
-    `    "%OMO_NODE_BINARY%" "${nodeCliPath}" %*`,
+    `  if defined OMO_NODE_BINARY if exist "${nodeCli}" (`,
+    `    "%OMO_NODE_BINARY%" "${nodeCli}" %*`,
     "    exit /b %ERRORLEVEL%",
     "  )",
-    `  echo ${binName}: bun runtime not found, no Node runtime was discovered from NODE_REPL_NODE_PATH or PATH, or the node fallback CLI is missing at ${nodeCliPath}; install bun from https://bun.sh or rerun LazyCodex install from Codex Desktop 1>&2`,
+    // The paths in the echo lines are quoted too: unquoted, a `)` in them (`C:\Users\Kim (Work)`) would close the block.
+    `  echo ${binName}: bun runtime not found, no Node runtime was discovered from NODE_REPL_NODE_PATH or PATH, or the node fallback CLI is missing at "${nodeCli}"; install bun from https://bun.sh or rerun LazyCodex install from Codex Desktop 1>&2`,
     "  exit /b 127",
     ")",
-    `if not exist "${cliPath}" (`,
-    `  echo ${binName}: runtime target missing at ${cliPath}; reinstall with: npx --yes lazycodex-ai@latest install --no-tui 1>&2`,
+    `if not exist "${cli}" (`,
+    `  echo ${binName}: runtime target missing at "${cli}"; reinstall with: npx --yes lazycodex-ai@latest install --no-tui 1>&2`,
     "  exit /b 1",
     ")",
-    `"%BUN_BINARY%" "${cliPath}" %*`,
+    `"%BUN_BINARY%" "${cli}" %*`,
     "",
   ].join("\r\n")
 }

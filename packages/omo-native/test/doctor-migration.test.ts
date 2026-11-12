@@ -19,7 +19,7 @@ import {
   scanOmoBins,
   shadowingOmoBins,
 } from "../bin/lib/doctor-migration.js"
-import { posixRuntimeWrapper } from "../../omo-codex/src/install/codex-cache-runtime-wrapper"
+import { posixRuntimeWrapper, windowsRuntimeWrapper } from "../../omo-codex/src/install/codex-cache-runtime-wrapper"
 import { runDoctor } from "../bin/lib/doctor.js"
 import { updateTarget } from "../bin/lib/package-paths.js"
 
@@ -321,7 +321,7 @@ describe("omo doctor migration checks", () => {
     // (toPosixPath), so doctor-migration normalizes it to the platform form before
     // reporting it, and these cases run on Windows too: CI run 42027565394 showed
     // the wrapper is classified and reported broken there, the only mismatch was
-    // the separator format. The Windows `.cmd` wrapper gap stays filed as #12560.
+    // the separator format. The Windows `.cmd` wrapper is covered below (#12560).
     test("#then it is reported as broken and the repair installer is not offered for it", () => {
       const sandbox = createSandbox()
       const { localBin, target } = installDeadWrapper(sandbox)
@@ -381,6 +381,108 @@ describe("omo doctor migration checks", () => {
         ),
       ).toBe(true)
     })
+  })
+
+  describe("#given Codex Light wrappers built by the real generator (#12560)", () => {
+    const cliIn = (codexHome: string, kind: "cli" | "cli-node" = "cli"): string =>
+      join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "4.16.2", "dist", kind, "index.js")
+    const scan = (sandbox: Sandbox, localBin: string, isWindows: boolean) =>
+      scanOmoBins({
+        isWindows,
+        homeDir: sandbox.home,
+        pathDirectories: [localBin],
+        npmPrefixes: [],
+        bunRoot: sandbox.bunRoot,
+        opencodeConfigFiles: [],
+      })
+
+    test("#when the Windows omo.cmd wrapper's runtime target is gone #then it is owned by lazycodex and reported broken", () => {
+      const sandbox = createSandbox()
+      const localBin = join(sandbox.home, ".local", "bin")
+      const codexHome = join(sandbox.home, ".codex")
+      const target = cliIn(codexHome)
+      writeFile(
+        join(localBin, "omo.cmd"),
+        windowsRuntimeWrapper("omo", target, codexHome, localBin, cliIn(codexHome, "cli-node")),
+      )
+
+      expect(scan(sandbox, localBin, true)).toEqual([
+        {
+          binPath: join(localBin, "omo.cmd"),
+          directory: localBin,
+          owner: { name: "lazycodex", version: "4.16.2" },
+          kind: "legacy",
+          broken: target,
+        },
+      ])
+    })
+
+    test("#when the Windows omo.cmd wrapper's runtime target exists #then it is owned by lazycodex and not reported broken", () => {
+      const sandbox = createSandbox()
+      const localBin = join(sandbox.home, ".local", "bin")
+      const codexHome = join(sandbox.home, ".codex")
+      writeFile(cliIn(codexHome), "#!/usr/bin/env node\n")
+      writeFile(
+        join(localBin, "omo.cmd"),
+        windowsRuntimeWrapper("omo", cliIn(codexHome), codexHome, localBin, cliIn(codexHome, "cli-node")),
+      )
+
+      const [entry] = scan(sandbox, localBin, true)
+      expect(entry?.owner).toEqual({ name: "lazycodex", version: "4.16.2" })
+      expect(entry?.broken).toBeUndefined()
+    })
+
+    test("#when the Windows omo.cmd wrapper's cache path holds %VAR% text, !, ^ and parentheses #then doctor checks the literal path cmd runs (#12811)", () => {
+      const sandbox = createSandbox()
+      const localBin = join(sandbox.home, ".local", "bin")
+      const codexHome = join(sandbox.root, "odd %TEMP% !bang^ (x)", ".codex")
+      const target = cliIn(codexHome)
+      writeFile(
+        join(localBin, "omo.cmd"),
+        windowsRuntimeWrapper("omo", target, codexHome, localBin, cliIn(codexHome, "cli-node")),
+      )
+      expect(readFileSync(join(localBin, "omo.cmd"), "utf8")).toContain("odd %%TEMP%% ^!bang^^ (x)")
+
+      expect(scan(sandbox, localBin, true)[0]?.broken).toBe(target)
+      writeFile(target, "#!/usr/bin/env node\n")
+      expect(scan(sandbox, localBin, true)[0]?.broken).toBeUndefined()
+    })
+
+    test.skipIf(process.platform === "win32")(
+      "#when a POSIX wrapper's cache path holds $ and a backtick and its target exists #then the escaped target is read back as that path and not reported broken",
+      () => {
+        const sandbox = createSandbox()
+        const localBin = join(sandbox.home, ".local", "bin")
+        const codexHome = join(sandbox.root, "we$ird`home", ".codex")
+        writeFile(cliIn(codexHome), "#!/usr/bin/env node\n")
+        writeFile(
+          join(localBin, "omo"),
+          posixRuntimeWrapper("omo", cliIn(codexHome), codexHome, localBin, cliIn(codexHome, "cli-node")),
+        )
+
+        const [entry] = scan(sandbox, localBin, false)
+        expect(entry?.owner).toEqual({ name: "lazycodex", version: "4.16.2" })
+        expect(entry?.broken).toBeUndefined()
+      },
+    )
+
+    test.skipIf(process.platform === "win32")(
+      "#when a POSIX wrapper's cache path holds a double quote and its target is gone #then it is reported broken at the unescaped path",
+      () => {
+        const sandbox = createSandbox()
+        const localBin = join(sandbox.home, ".local", "bin")
+        const codexHome = join(sandbox.root, 'quo"ted', ".codex")
+        const target = cliIn(codexHome)
+        writeFile(
+          join(localBin, "omo"),
+          posixRuntimeWrapper("omo", target, codexHome, localBin, cliIn(codexHome, "cli-node")),
+        )
+
+        const [entry] = scan(sandbox, localBin, false)
+        expect(entry?.owner).toEqual({ name: "lazycodex", version: "4.16.2" })
+        expect(entry?.broken).toBe(target)
+      },
+    )
   })
 
   describe("#given a pre-rename Codex Light wrapper in ~/.local/bin ahead of omo-ai", () => {
