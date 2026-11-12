@@ -265,7 +265,8 @@ export function targetSession(view: ThreadHostView, durableId: string): ThreadHo
 
 /**
  * Decision 0027: ONE resolver over this device's entries and the relay transport's address book. A local hit never needs
- * the relay. Fuzzy handoff compares local and live remote candidates together; ended remote sessions are not candidates. Absent remote setup leaves a local miss unchanged; a configured relay's failed lookup, failing
+ * the relay. Fuzzy handoff compares local and live remote candidates together; an ended (resumable) remote session ranks
+ * below them and joins only when none of them matched. Absent remote setup leaves a local miss unchanged; a configured relay's failed lookup, failing
  * transport state (anything but connected once set up), plan refusal or alias holder's typed failure answers before not_found. An alias or entry on another
  * device is account-wide: the local scope no longer applies to it.
  */
@@ -316,10 +317,15 @@ export async function resolveAcross(
     ),
   }))
   if (book.entries.length === 0 && here.kind === "ok") return here
-  // Ended sessions on other devices are not handoff targets: they stay out of the fuzzy candidate set, so a large
-  // account's history does not push the combined set over the fuzzy cap (ambiguous_target) when the live match is unique.
-  const candidates = match === "fuzzy" ? book.entries.filter((entry) => entry.status === "live") : book.entries
-  const across = resolve([...local, ...candidates])
+  // An ended session on another device is resumable, and an exact name or id still reaches it. For fuzzy it ranks below
+  // every local and live remote candidate: those are compared first, so a large account's history cannot push a unique
+  // live match over the fuzzy cap, and the ended rows join the comparison only when nothing local or live matched.
+  const live = match === "fuzzy" ? book.entries.filter((entry) => entry.status === "live") : book.entries
+  const first = resolve([...local, ...live])
+  const across =
+    first.kind === "error" && first.code === "not_found" && live.length < book.entries.length
+      ? resolve([...local, ...book.entries])
+      : first
   if (across.kind === "ok")
     return {
       ...across,
