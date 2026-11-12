@@ -24,6 +24,7 @@ import { ExtensionTransactionEndedError } from "./extension-transaction"
 import type { GatewayResolution, GatewayResolve } from "./engine"
 import type { StoreExtensionRegistration } from "./store-extensions"
 import type {
+  DeliveryRow,
   GatewayStoreConfig,
   GatewayStoreEvent,
   IntakeOutcome,
@@ -87,34 +88,43 @@ function argsHash(value: unknown): string {
 }
 
 /**
- * Takes in a record another device's service attested, for a session on this device that is not running (#13037, design
- * 5.5). Every refusal here happens before the commit; an accepted record is the enqueue transaction's row, receipt, budgets
- * and inbox marker in one commit, its receipt completed with the answer so a repeat from the same device replays it.
+ * A repeat of a delivery whose row is still stored after its receipt expired: answered from that row as the first answer
+ * was, with `deduplicated` set, when it carries what the row holds; any other content is an `idempotency_conflict`, as
+ * the receipt's argument hash would have answered (the review LOWs of #13212).
  */
-/** A row already taken in under this ledger id, answered as the first answer was, with `deduplicated` set. */
 function answerFromLedgerRow(
-  ctx: ops.StoreContext,
+  row: DeliveryRow,
+  queuePosition: number,
   ledgerId: string,
   record: IntakeRequest["record"],
-): IntakeOutcome | undefined {
-  const found = ctx.sql.one(["delivery_id"], "SELECT delivery_id FROM deliveries WHERE ledger_id = ?", [ledgerId])
-  if (found === undefined) return undefined
-  const view = ops.deliveryView(ctx, String(found.delivery_id))
-  if (view === null) return undefined
-  if (view.row.target_durable_id !== record.sessionId)
-    return refusal("idempotency_conflict", "This delivery id was already taken in for another session.", {
+): IntakeOutcome {
+  const sameContent =
+    row.target_durable_id === record.sessionId &&
+    row.verbatim_text === record.text &&
+    row.verbatim_display_text === record.displayText &&
+    row.hop === record.chainCount &&
+    row.envelope.origin !== undefined &&
+    "session" in row.envelope.origin &&
+    row.envelope.origin.session === (record.sender.kind === "agent" ? record.sender.session_id : undefined)
+  if (!sameContent)
+    return refusal("idempotency_conflict", "This delivery id was already taken in with other content.", {
       ledger_id: ledgerId,
     })
   return {
     kind: "queued",
     delivery_id: record.deliveryId,
-    row_id: view.row.delivery_id,
+    row_id: row.delivery_id,
     ledger_id: ledgerId,
-    queue_position: view.queue_position,
+    queue_position: queuePosition,
     deduplicated: true,
   }
 }
 
+/**
+ * Takes in a record another device's service attested, for a session on this device that is not running (#13037, design
+ * 5.5). Every refusal here happens before the commit; an accepted record is the enqueue transaction's row, receipt, budgets
+ * and inbox marker in one commit, its receipt completed with the answer so a repeat from the same device replays it.
+ */
 async function intake(ctx: ops.StoreContext, request: IntakeRequest): Promise<IntakeOutcome> {
   const record = request.record
   const device = request.attested_device
@@ -202,16 +212,17 @@ async function intake(ctx: ops.StoreContext, request: IntakeRequest): Promise<In
           ledger_id: ledgerId,
           queue_position: position,
         }),
+        existing: (row, position) => ({ kind: "replay", result: answerFromLedgerRow(row, position, ledgerId, record) }),
       },
     )
   } catch (error) {
-    // The receipt is only the fast path: once it expired (30 days) the row can still be here, and two consumers can race
-    // past the receipt check. Either way the insert meets the unique index on ledger_id; the repeat is answered from the
-    // row that holds it, never with the raw constraint error (the base's review LOW).
+    // The ledger row is looked up inside the same transaction before the insert, so the unique index on ledger_id is
+    // never met here; if it is, intake still answers from the row rather than let the raw constraint error out.
     if (!(error instanceof Error && /UNIQUE constraint failed: deliveries\.ledger_id/.test(error.message))) throw error
-    const raced = answerFromLedgerRow(ctx, ledgerId, record)
-    if (raced === undefined) throw error
-    return raced
+    const held = ctx.sql.one(["delivery_id"], "SELECT delivery_id FROM deliveries WHERE ledger_id = ?", [ledgerId])
+    const view = held === undefined ? null : ops.deliveryView(ctx, String(held.delivery_id))
+    if (view === null) throw error
+    return answerFromLedgerRow(view.row, view.queue_position, ledgerId, record)
   }
   if (outcome.kind === "inserted") {
     return {
@@ -223,8 +234,10 @@ async function intake(ctx: ops.StoreContext, request: IntakeRequest): Promise<In
       deduplicated: false,
     }
   }
-  if (outcome.kind === "replay")
-    return { ...(outcome.result as Extract<IntakeOutcome, { kind: "queued" }>), deduplicated: true }
+  if (outcome.kind === "replay") {
+    const result = outcome.result as IntakeOutcome
+    return result.kind === "queued" ? { ...result, deduplicated: true } : result
+  }
   return outcome
 }
 

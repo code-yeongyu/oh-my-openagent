@@ -632,6 +632,11 @@ export type IntakeFields = {
   readonly verbatim_text: string
   readonly verbatim_display_text: string
   readonly answer: (row: DeliveryRow, queuePosition: number) => unknown
+  /**
+   * The answer for a ledger id a row already holds (its receipt expired): read inside the transaction, right after the
+   * receipt check and before the backlog, placement and budget checks, so a repeat is never refused for capacity.
+   */
+  readonly existing: (row: DeliveryRow, queuePosition: number) => EnqueueOutcome
 }
 
 export async function enqueue(
@@ -657,6 +662,14 @@ export async function enqueue(
     const receipt = selectReceipt(ctx, request.sender_principal, request.receipt.idempotency_key)
     if (receipt !== undefined) {
       const outcome = classifyReceipt(ctx, request, receipt)
+      ctx.sql.exec(commitSql)
+      committed = true
+      return outcome
+    }
+    const held = intakeFields === undefined ? [] : selectRows(ctx, "ledger_id = ?", [intakeFields.ledger_id])
+    const heldRow = held[0]
+    if (intakeFields !== undefined && heldRow !== undefined) {
+      const outcome = intakeFields.existing(heldRow, queuePosition(ctx, heldRow))
       ctx.sql.exec(commitSql)
       committed = true
       return outcome
