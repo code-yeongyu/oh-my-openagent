@@ -49,6 +49,8 @@ const LSREGISTER =
   "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 const HEADER = ["id", "question", "condition", "host", "verdict", "rerun", "host_build", "measured", "evidence", "note"]
 const LEG_TIMEOUT_MS = 20_000
+// the probe's exit codes; README.md documents each one and --self-test checks that the two agree
+const EXIT = { ok: 0, failed: 1, precondition: 2 } as const
 
 type Os = 15 | 26
 type HostRole = "h1" | "h2" | "h4"
@@ -1292,6 +1294,55 @@ async function cleanup(env: HostEnv) {
 
 // ---------------------------------------------------------------------------------------------- self-test
 
+// pure: every exit code the README documents, compared with the code's. `source` is this file's text: main must return
+// only the named exit codes (no bare numeric literal), so the README and the code share one table.
+function exitCodeDocProblems(readme: string, source: string): string[] {
+  const problems: string[] = []
+  const documented = (re: RegExp, what: string): number | null => {
+    const m = re.exec(readme.replace(/\s+/g, " "))
+    if (!m?.[1]) {
+      problems.push(`README does not document ${what}`)
+      return null
+    }
+    return Number(m[1])
+  }
+  const expect = (got: number | null, want: number, what: string) => {
+    if (got !== null && got !== want) problems.push(`README says ${what} exits ${got}, the code exits ${want}`)
+  }
+  expect(
+    documented(/without a person \(exit (\d+), `VERIFY_OK`\)/, "--verify VERIFY_OK"),
+    EXIT.ok,
+    "--verify VERIFY_OK",
+  )
+  expect(
+    documented(/ends `VERIFY_FAILED` \(exit (\d+)\)/, "--verify VERIFY_FAILED"),
+    EXIT.failed,
+    "--verify VERIFY_FAILED",
+  )
+  expect(
+    documented(/exits (\d+) with one line naming the first missing precondition/, "the precondition exit"),
+    EXIT.precondition,
+    "a missing precondition",
+  )
+  expect(
+    documented(/`--cleanup` exits (\d+) when every receipt is clean/, "--cleanup with clean receipts"),
+    cleanupExitCode(["procs 0", "dir REMOVED /w"]),
+    "--cleanup with clean receipts",
+  )
+  const failedCode = documented(
+    /`--cleanup` exits \d+ when every receipt is clean and (\d+) when any receipt contains `FAILED` or `STILL PRESENT`/,
+    "--cleanup with a FAILED or STILL PRESENT receipt",
+  )
+  expect(failedCode, cleanupExitCode(["launchctl list FAILED: x"]), "--cleanup with a FAILED receipt")
+  expect(failedCode, cleanupExitCode(["dir STILL PRESENT /w"]), "--cleanup with a STILL PRESENT receipt")
+  const mainStart = /^async function main\(/m.exec(source)?.index
+  if (mainStart === undefined) problems.push("the source has no top-level main()")
+  const mainText = mainStart === undefined ? "" : source.slice(mainStart)
+  const bare = mainText.split("\n").filter((l) => /\breturn\s+\d+\b|\?\s*\d+\s*:\s*\d+/.test(l))
+  for (const line of bare) problems.push(`main returns a bare exit code: ${line.trim()}`)
+  return problems
+}
+
 // --self-test: the pure classification logic and the row table against fixed inputs; runs on any host, exits 1 on a
 // mismatch. It is the probe's unit coverage (the row's write scope allows no separate test file).
 async function selfTest(): Promise<number> {
@@ -1567,6 +1618,54 @@ async function selfTest(): Promise<number> {
   const prefixVerdicts = new Set<string>()
   for (let i = 0; i < complete.length; i++) prefixVerdicts.add(tapVerdict(complete.slice(0, i), 0))
   cases.push(["tap class: every truncation of a complete file is UNMEASURED", [...prefixVerdicts], ["UNMEASURED"]])
+  // class: every line must parse to a JSON OBJECT. Each non-object value in each position makes the file incomplete:
+  // UNMEASURED (NO_LAUNCH after a failed launch), never a throw, never counted as an event
+  const nonObjects = ["null", "0", "5", "-1.5", '"text"', "[]", "[1,2]", "true", "false"]
+  const placements: Array<[string, (v: string) => string]> = [
+    ["only line", (v) => v],
+    ["before tapReady", (v) => `${v}\n${ready}\n${done}`],
+    ["between tapReady and tapDone", (v) => `${ready}\n${v}\n${done}`],
+    ["after tapDone", (v) => `${ready}\n${done}\n${v}`],
+    ["between keyDowns", (v) => `${ready}\n${key0}\n${v}\n${key0}\n${done}`],
+  ]
+  for (const value of nonObjects)
+    for (const [where, place] of placements) {
+      cases.push([`tap non-object ${value} ${where}, exit 0 -> UNMEASURED`, tapVerdict(place(value), 0), "UNMEASURED"])
+      cases.push([`tap non-object ${value} ${where}, exit 1 -> NO_LAUNCH`, tapVerdict(place(value), 1), "NO_LAUNCH"])
+    }
+  cases.push([
+    "tap non-object: the reason names the line",
+    (() => {
+      try {
+        return tapOutcome(`${ready}\nnull\n${done}`, 0).note.includes("not a JSON object")
+      } catch {
+        return false
+      }
+    })(),
+    true,
+  ])
+  // class: the exit codes README.md documents match the code, and the check itself catches drift
+  const readme = readFileSync(join(PROBE_DIR, "README.md"), "utf8")
+  const source = readFileSync(join(PROBE_DIR, "probe-sp-t.ts"), "utf8")
+  cases.push(
+    ["exit codes: README matches the code", exitCodeDocProblems(readme, source), []],
+    [
+      "exit codes: a README that gives --cleanup a wrong code is caught",
+      exitCodeDocProblems(readme.replace(/(`--cleanup` exits \d+ when every receipt is clean and )\d+/, "$12"), source)
+        .length > 0,
+      true,
+    ],
+    [
+      "exit codes: a README without the --cleanup sentence is caught",
+      exitCodeDocProblems(readme.replace(/`--cleanup` exits/g, "cleanup prints"), source).length > 0,
+      true,
+    ],
+    [
+      "exit codes: a bare numeric return in main is caught",
+      exitCodeDocProblems(readme, `${source}\n    return 3\n`).some((p) => p.includes("bare exit code")),
+      true,
+    ],
+  )
   // class: --cleanup exits non-zero when any receipt reports a failure, after every step has run
   cases.push(
     ["cleanup exit: all receipts clean -> 0", cleanupExitCode(["procs 0", "dir REMOVED /w"]), 0],
