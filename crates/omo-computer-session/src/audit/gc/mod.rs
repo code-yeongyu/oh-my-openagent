@@ -130,7 +130,7 @@ impl ArtifactStore {
 
     /// `artifact.release(digest)`: deletes the artifact; a second release is a no-op.
     /// A removal that fails for any reason but "not there" reads as not released, never as a
-    /// quiet second release: it is logged now and carried into the next sweep's warnings.
+    /// quiet second release: it is logged once, now, and carried into the next sweep's report.
     pub fn release(&mut self, digest: &str) -> bool {
         let mut released = false;
         for suffix in SUFFIXES {
@@ -160,7 +160,8 @@ impl ArtifactStore {
 
     /// The age sweep, then the cap sweep down to 80 % of each cap.
     pub fn sweep(&mut self, now_ms: u64, trigger: SweepTrigger) -> SweepReport {
-        let mut warnings = std::mem::take(&mut self.release_warnings);
+        let carried = std::mem::take(&mut self.release_warnings);
+        let mut warnings = Vec::new();
         let mut entries = self.entries(&mut warnings);
         let mut removed = 0;
         entries.retain(|entry| {
@@ -186,12 +187,15 @@ impl ArtifactStore {
                 }
             }
         }
+        // Each failure is logged once, where it happens: this sweep's own here, a release's
+        // at release(). The report still carries both.
         if !warnings.is_empty() {
             eprintln!(
                 "omo-computer-engine: warn artifact sweep: {}",
                 warnings.join("; ")
             );
         }
+        let warnings = [carried, warnings].concat();
         let report = SweepReport {
             trigger,
             at_ms: now_ms,
