@@ -9,25 +9,28 @@
 // While one is missing a cell is recorded `not_run` naming it and nothing is sent: an action whose effect or
 // disturbance cannot be read would be a guess.
 
-import { mkdtempSync, readFileSync, realpathSync } from "node:fs"
+import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { dirname, join, resolve } from "node:path"
+import { join } from "node:path"
 
 import { cellId } from "../catalog.ts"
 import type { Driver } from "../driver.ts"
 import type { Task } from "../taskset/tasks.ts"
 import type { Cell, CellResult } from "../vocabulary.ts"
 import { cellCode, type FixtureTarget } from "./legacy-code.ts"
+import { linuxFixtures } from "./legacy-fixtures.ts"
+import { isRecord, loadShippedTool, shippedBundle, type Slot } from "./legacy-release.ts"
 
 type Journal = CellResult["journal"]
 type Observed = CellResult["observed"]
 
 export interface Fixtures {
-  target(cell: Cell): FixtureTarget
+  target(cell: Cell): FixtureTarget | { readonly unavailable: string }
   reset(cell: Cell): Promise<void>
   read(cell: Cell): Promise<unknown>
   resetTask(task: Task): Promise<void>
   saved(task: Task): Promise<Readonly<Record<string, unknown>>>
+  stop(): Promise<void>
 }
 
 export interface Observer {
@@ -39,7 +42,6 @@ export interface ShippedTool {
 }
 
 type HostContext = Readonly<Record<string, unknown>>
-type Slot<T> = { readonly ready: T } | { readonly unavailable: string }
 
 interface LegacyDriverParts {
   /** The host session directory the shipped tool writes its audit log into. */
@@ -60,9 +62,6 @@ const EMPTY_JOURNAL: Journal = {
   dialog: NONE,
   activation: NONE,
 }
-
-const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
-  typeof value === "object" && value !== null
 
 /**
  * The shipped runtime's engine errors carry `code`, `hint`, `permission` and `reason`, and never say whether input
@@ -122,92 +121,37 @@ export function createLegacyDriver(parts: LegacyDriverParts): Driver {
       const available = ready(parts)
       if (typeof available === "string") return notRun(cell, available)
       const { tool, fixtures, observer } = available
-      const code = cellCode(cell, fixtures.target(cell))
-      await fixtures.reset(cell)
-      const started = performance.now()
-      const { value, journal } = await observer.observe(() => run(tool, code))
-      const durationMs = performance.now() - started
-      return {
-        id: cellId(cell),
-        observed: readOutcome(value),
-        oracle: { observed: await fixtures.read(cell) },
-        durationMs,
-        journal,
+      const target = fixtures.target(cell)
+      if ("unavailable" in target) return notRun(cell, `fixture_unavailable: ${target.unavailable}`)
+      const code = cellCode(cell, target)
+      try {
+        await fixtures.reset(cell)
+        const started = performance.now()
+        const { value, journal } = await observer.observe(() => run(tool, code))
+        const durationMs = performance.now() - started
+        const observed = await fixtures.read(cell)
+        return { id: cellId(cell), observed: readOutcome(value), oracle: { observed }, durationMs, journal }
+      } finally {
+        await fixtures.stop()
       }
     },
     async runTask(task) {
       if (!("ready" in parts.tool)) throw new Error(`task ${task.id} cannot run: ${parts.tool.unavailable}`)
       if (!("ready" in parts.fixtures)) throw new Error(`task ${task.id} cannot run: ${parts.fixtures.unavailable}`)
+      const tool = parts.tool.ready
       const fixtures = parts.fixtures.ready
-      await fixtures.resetTask(task)
-      let cells = 0
-      for (const cell of task.cells) {
-        cells += 1
-        const result = await run(parts.tool.ready, cell.code)
-        if (isRecord(result) && result.isError === true) break
+      try {
+        await fixtures.resetTask(task)
+        let cells = 0
+        for (const cell of task.cells) {
+          cells += 1
+          const result = await run(tool, cell.code).catch((error: unknown) => ({ isError: true, error }))
+          if (isRecord(result) && result.isError === true) break
+        }
+        return { saved: await fixtures.saved(task), cells }
+      } finally {
+        await fixtures.stop()
       }
-      return { saved: await fixtures.saved(task), cells }
-    },
-  }
-}
-
-/** `OMO_BIN` is the `omo` launcher of a global `omo-ai` install; its package root holds the shipped bundle. */
-function shippedBundle(
-  env: Readonly<Record<string, string | undefined>>,
-): Slot<{ path: string; launcher: string; version: string }> {
-  const bin = env.OMO_BIN?.trim()
-  if (!bin) return { unavailable: "OMO_BIN is not set to the omo launcher of an installed omo-ai release" }
-  let root: string
-  let manifest: unknown
-  try {
-    root = resolve(dirname(realpathSync(bin)), "..")
-    manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"))
-  } catch (error) {
-    return {
-      unavailable: `cannot read the release behind OMO_BIN=${bin}: ${error instanceof Error ? error.message : String(error)}`,
-    }
-  }
-  if (!isRecord(manifest) || manifest.name !== "omo-ai" || typeof manifest.version !== "string")
-    return { unavailable: `${root} is not an omo-ai release` }
-  return {
-    ready: {
-      path: join(root, "plugin/extensions/omo-computer-use.js"),
-      launcher: join(root, "bin", "omo.js"),
-      version: manifest.version,
-    },
-  }
-}
-
-async function loadShippedTool(): Promise<Slot<ShippedTool>> {
-  const bundle = shippedBundle(process.env)
-  if ("unavailable" in bundle) return bundle
-  // The release's own launcher sets OMO_BIN to its real path before the engine starts, and the engine acquisition
-  // reads the release version from it; a symlinked OMO_BIN would fall back to the locator instead.
-  process.env.OMO_BIN = bundle.ready.launcher
-  const settingsPath = process.env.OMO_RELEASE_SETTINGS?.trim()
-  if (!settingsPath)
-    return { unavailable: "OMO_RELEASE_SETTINGS is not set to the release tag's computer settings module" }
-  const settingsModule: unknown = await import(settingsPath)
-  if (!isRecord(settingsModule) || typeof settingsModule.resolveComputerSettings !== "function")
-    return { unavailable: `${settingsPath} does not export resolveComputerSettings` }
-  const loaded: unknown = await import(bundle.ready.path)
-  if (!isRecord(loaded) || typeof loaded.createComputerUseRuntime !== "function")
-    return { unavailable: `${bundle.ready.path} does not export createComputerUseRuntime` }
-  const runtime: unknown = loaded.createComputerUseRuntime({
-    settings: settingsModule.resolveComputerSettings(undefined),
-    executeTool: async (name: string) => {
-      throw new Error(`tool.${name}() is not available in the conformance baseline`)
-    },
-    onEngineError: (code: string) => console.error(`legacy engine error: ${code}`),
-  })
-  const tool = isRecord(runtime) ? runtime.computerTool : undefined
-  if (!isRecord(tool) || typeof tool.execute !== "function")
-    return { unavailable: `${bundle.ready.path} returned no computer tool` }
-  const execute = tool.execute
-  return {
-    ready: {
-      execute: (id, input, context): Promise<unknown> =>
-        Promise.resolve(execute(id, input, undefined, undefined, context)),
     },
   }
 }
@@ -220,9 +164,10 @@ const session = (): string => (sessionDir ??= mkdtempSync(join(tmpdir(), "confor
 export const driver: Driver = createLegacyDriver({
   session,
   tool: shippedTool,
-  fixtures: {
-    unavailable: "the fixture apps of row 4 (script/qa/computer/conformance/fixtures/) are not on this checkout",
-  },
+  fixtures:
+    process.platform === "linux"
+      ? { ready: linuxFixtures(session) }
+      : { unavailable: `no fixture apps of row 4 are ready on ${process.platform} yet` },
   observer: {
     unavailable:
       "no desktop observer is wired for this OS: row 3 builds the macOS observer, rows 27, 30 and 31 the Windows and Linux recorders",

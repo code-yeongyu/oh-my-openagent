@@ -4,8 +4,8 @@ name: Computer baseline (shipped runtime)
 # installed on a hosted runner, its own computer-use bundle is driven through `run.ts --driver legacy` with default
 # settings, and the conformance catalog and the model-free task set record what it really does. No model is called and
 # no credential is used: the release comes from the public npm registry and its engine from the public GitHub release.
-# A run ends ENVIRONMENT_ERROR while the fixture apps (row 4) or the desktop observer for the OS (rows 3, 27, 30, 31)
-# are missing; macOS joins with the live tier of row 5.
+# A cell is recorded not_run while its fixture app (row 4) or the desktop observer for the OS (rows 3, 30, 31) is
+# missing. Linux runs here; Windows joins when its fixture app is ready and macOS with the live tier of row 5.
 on:
   workflow_dispatch:
     inputs:
@@ -60,11 +60,19 @@ jobs:
           done
           echo "OMO_RELEASE_SETTINGS=$PWD/$SETTINGS_DIR/.release-settings/settings.ts" >> "$GITHUB_ENV"
 
-      - name: Install Xorg with the dummy video driver and the accessibility bus
+      - name: Install Xorg, the accessibility bus and the fixture apps' toolkits
+        shell: bash
         run: |
-          sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get update
-          sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y --no-install-recommends \
-            xserver-xorg-core xserver-xorg-video-dummy x11-utils dbus-x11 at-spi2-core
+          set -uo pipefail
+          apt() { sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get "$@"; }
+          for attempt in 1 2 3; do
+            if apt update && apt install -y --no-install-recommends xserver-xorg-core xserver-xorg-video-dummy \
+              x11-utils dbus-x11 at-spi2-core python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1; then
+              echo "apt attempt ${attempt} ok"; exit 0
+            fi
+            echo "apt attempt ${attempt} failed"; sleep $((attempt * 15))
+          done
+          exit 1
 
       - name: Start Xorg
         shell: bash
@@ -113,10 +121,12 @@ jobs:
           set -uo pipefail
           left=0
           sudo pkill -x Xorg 2>/dev/null || true
+          pkill -f 'conformance/fixtures/.*/fixture.py' 2>/dev/null || true
           for name in senpi-desktop-engine Xorg; do
             for _ in $(seq 1 25); do pgrep -x "$name" >/dev/null || break; sleep 0.2; done
             if pgrep -x "$name" >/dev/null; then echo "${name} LEFT $(pgrep -x "$name" | tr '\n' ' ')"; left=1; else echo "${name} procs 0"; fi
           done
+          if pgrep -f 'conformance/fixtures/.*/fixture.py' >/dev/null; then echo "fixture LEFT"; left=1; else echo "fixture procs 0"; fi
           exit "$left"
 
       - name: Upload evidence
@@ -135,96 +145,10 @@ jobs:
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
             - Installs the released omo-ai and takes its default computer settings from the release tag's own resolver.
+            - Drives the Linux native and web-view fixture apps; a cell without its fixture or observer is recorded not_run.
             - Smoke: the release's computer tool reaches its own engine with no model and no credential.
             - Runs the conformance catalog and the task set through run.ts --driver legacy on real Xorg.
-            - Teardown: the engine and Xorg processes are gone.
+            - Teardown: the engine, fixture and Xorg processes are gone.
           JOB_SUMMARY_NEXT: Open the computer-baseline-legacy-x11 artifact for run.json, environment.json and the logs.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
-  windows:
-    name: computer baseline legacy (windows)
-    runs-on: windows-latest
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.4.4"
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile --ignore-scripts
-
-      - name: The release's own default settings
-        shell: bash
-        run: |
-          set -euo pipefail
-          git fetch --no-tags --depth=1 origin "refs/tags/v${RELEASE}:refs/tags/v${RELEASE}"
-          mkdir -p "$SETTINGS_DIR/.release-settings"
-          for file in settings.ts host-policy.ts; do
-            git show "v${RELEASE}:$SETTINGS_DIR/src/${file}" > "$SETTINGS_DIR/.release-settings/${file}"
-            echo "settings ${file} from v${RELEASE} $(git rev-parse "v${RELEASE}:$SETTINGS_DIR/src/${file}")"
-          done
-          echo "OMO_RELEASE_SETTINGS=$PWD/$SETTINGS_DIR/.release-settings/settings.ts" >> "$GITHUB_ENV"
-
-      - name: Interactive-desktop smoke
-        shell: powershell
-        run: ./script/qa/desktop/windows/interactive-desktop-smoke.ps1
-
-      - name: Install the released omo-ai
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm install --global "omo-ai@${RELEASE}"
-          echo "OMO_BIN=$(cygpath -w "$(npm prefix --global)")\\node_modules\\omo-ai\\bin\\omo.js" >> "$GITHUB_ENV"
-          echo "omo-ai $(npm ls --global --depth=0 omo-ai | grep -o 'omo-ai@[^ ]*')"
-
-      - name: Shipped tool reaches its engine (no model, no credential)
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p "${RUNNER_TEMP}/computer-baseline"
-          bun script/qa/computer/conformance/drivers/legacy.ts --smoke | tee "${RUNNER_TEMP}/computer-baseline/smoke.log"
-
-      - name: Catalog and task set on the shipped runtime
-        shell: bash
-        run: |
-          set -uo pipefail
-          qa="${RUNNER_TEMP}/computer-baseline"
-          bun script/qa/computer/conformance/run.ts --os windows --all --driver legacy --out "$qa/catalog" | tee "$qa/catalog.log"
-          catalog=${PIPESTATUS[0]}
-          bun script/qa/computer/conformance/run.ts --os windows --taskset --driver legacy --out "$qa/taskset" | tee "$qa/taskset.log"
-          taskset=${PIPESTATUS[0]}
-          echo "catalog EXIT ${catalog} taskset EXIT ${taskset}"
-          test "$catalog" -eq 0 && test "$taskset" -eq 0
-
-      - name: Teardown receipts
-        if: always()
-        shell: powershell
-        run: |
-          $left = Get-Process -Name senpi-desktop-engine* -ErrorAction SilentlyContinue
-          if ($left) { "senpi-desktop-engine LEFT $($left.Id -join ' ')"; exit 1 } else { "senpi-desktop-engine procs 0" }
-
-      - name: Upload evidence
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: computer-baseline-legacy-windows
-          path: ${{ runner.temp }}/computer-baseline
-          if-no-files-found: warn
-
-      - name: Write job summary
-        if: always()
-        shell: bash
-        env:
-          JOB_SUMMARY_TITLE: Computer baseline, shipped runtime (windows)
-          JOB_SUMMARY_STATUS: ${{ job.status }}
-          JOB_SUMMARY_DETAILS: |
-            - Installs the released omo-ai and takes its default computer settings from the release tag's own resolver.
-            - Smoke: the release's computer tool reaches its own engine with no model and no credential.
-            - Runs the conformance catalog and the task set through run.ts --driver legacy in the interactive session.
-            - Teardown: no engine process is left.
-          JOB_SUMMARY_NEXT: Open the computer-baseline-legacy-windows artifact for run.json, environment.json and the logs.
-        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

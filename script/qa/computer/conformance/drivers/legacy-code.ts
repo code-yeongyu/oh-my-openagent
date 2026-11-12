@@ -1,7 +1,7 @@
 import type { Cell } from "../vocabulary.ts"
 
 interface FixtureElement {
-  readonly role: string
+  readonly role?: string
   readonly title: string
 }
 
@@ -17,10 +17,17 @@ const TEXT = JSON.stringify("conformance")
 const CHORD = JSON.stringify("ctrl+k")
 const SCROLL_DY = 120
 
-const lookup = (name: string, element: FixtureElement): string[] => [
-  `const ${name} = (await win.find({ role: ${JSON.stringify(element.role)}, title: ${JSON.stringify(element.title)}, limit: 1 }))[0]`,
-  `if (${name} === undefined) return { kind: "error", message: ${JSON.stringify(`fixture element ${element.role} "${element.title}" not found`)} }`,
-]
+const lookup = (name: string, element: FixtureElement): string[] => {
+  const query =
+    element.role === undefined
+      ? { title: element.title, limit: 1 }
+      : { role: element.role, title: element.title, limit: 1 }
+  const missing = `fixture element "${element.title}" not found`
+  return [
+    `const ${name} = (await win.find(${JSON.stringify(query)}))[0]`,
+    `if (${name} === undefined) return { kind: "error", message: ${JSON.stringify(missing)} }`,
+  ]
+}
 
 // The shipped pointer verbs take pixels of the window's latest capture, so an element's bounds (global logical
 // points) are mapped into that frame.

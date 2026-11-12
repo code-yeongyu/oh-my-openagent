@@ -71,6 +71,7 @@ const fixtures = (read: unknown): Fixtures => ({
   read: async () => read,
   resetTask: async () => {},
   saved: async () => ({}),
+  stop: async () => {},
 })
 
 const observer: Observer = {
@@ -184,7 +185,14 @@ describe("legacy driver against the shipped run facade", () => {
       fixtures: { ready: fixtures(1) },
       observer: { unavailable: "no observer" },
     }).runCell(cell)
+    const noToolkit = await createLegacyDriver({
+      session,
+      tool: { ready: tool },
+      fixtures: { ready: { ...fixtures(1), target: () => ({ unavailable: "no electron app" }) } },
+      observer: { ready: observer },
+    }).runCell(cell)
     expect(noFixture.observed).toEqual({ kind: "not_run", reason: "fixture_unavailable: no fixture" })
+    expect(noToolkit.observed).toEqual({ kind: "not_run", reason: "fixture_unavailable: no electron app" })
     expect(noObserver.observed).toEqual({ kind: "not_run", reason: "observer_unavailable: no observer" })
     expect(tool.calls).toBe(0)
   })
