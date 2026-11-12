@@ -62,5 +62,4 @@ pub(crate) fn post(window: isize, message: &Posted) -> windows::core::Result<()>
             LPARAM(message.lparam),
         )
     }
-    .is_ok()
 }
