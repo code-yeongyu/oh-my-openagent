@@ -49,16 +49,23 @@ pub fn diagnose(backend: &dyn Backend, facts: &HostFacts) -> Diagnosis {
     let probe = backend.probe_permissions();
     let capabilities = backend.capabilities();
     let states = [probe.capture, probe.input, probe.accessibility];
-    let permissions = PERMISSIONS
+    let mut permissions: BTreeMap<String, PermissionReport> = PERMISSIONS
         .iter()
         .zip(states)
         .map(|(name, state)| ((*name).to_owned(), report(state, name, facts)))
         .collect();
-    let ok = states.iter().all(|state| *state == PermissionState::Granted)
+    let mut chain = facts.chain.clone();
+    let mut checks = Vec::new();
+    if let Some(probes) = backend.diagnose() {
+        chain.extend(probes.chain);
+        permissions.extend(probes.permissions);
+        checks = probes.checks;
+    }
+    let ok = permissions.values().all(|report| report.state == PermissionState::Granted)
         && facts.identity.matches == IdentityMatch::Match;
     Diagnosis {
         ok,
-        chain: facts.chain.clone(),
+        chain,
         responsible_process: facts.responsible_process.clone(),
         attach_via: facts.attach_via,
         permissions,
@@ -69,6 +76,7 @@ pub fn diagnose(backend: &dyn Backend, facts: &HostFacts) -> Diagnosis {
         stop_path: capabilities.stop_path,
         release_helper: capabilities.release_helper,
         observation: UntrustedText,
+        checks,
     }
 }
 
@@ -99,6 +107,7 @@ mod tests {
 
     struct ProbeOnly {
         probe: PermissionProbe,
+        extra: Option<crate::backend::BackendProbes>,
         probes: Cell<u32>,
         captures: Cell<u32>,
     }
@@ -106,6 +115,10 @@ mod tests {
     impl Backend for ProbeOnly {
         fn capabilities(&self) -> Capabilities {
             refusing_capabilities()
+        }
+
+        fn diagnose(&self) -> Option<crate::backend::BackendProbes> {
+            self.extra.clone()
         }
 
         fn probe_permissions(&self) -> PermissionProbe {
@@ -122,6 +135,7 @@ mod tests {
     fn backend(capture: PermissionState, input: PermissionState, accessibility: PermissionState) -> ProbeOnly {
         ProbeOnly {
             probe: PermissionProbe { capture, input, accessibility },
+            extra: None,
             probes: Cell::new(0),
             captures: Cell::new(0),
         }
@@ -188,5 +202,35 @@ mod tests {
         assert_eq!(diagnosis.session, unknown_session_state());
         assert_eq!(diagnosis.lock_policy, "per_call");
         assert_eq!(diagnosis.stop_path, refusing_capabilities().stop_path);
+    }
+    #[test]
+    fn no_backend_probes_leave_the_report_as_it_was() {
+        use PermissionState::Granted;
+        let diagnosis = diagnose(&backend(Granted, Granted, Granted), &facts(IdentityMatch::Match));
+        let wire = serde_json::to_value(&diagnosis).expect("wire");
+        assert!(wire.get("checks").is_none(), "no checks member when the backend adds none");
+        assert_eq!(diagnosis.permissions.len(), 3);
+        assert!(diagnosis.chain.is_empty());
+        assert!(diagnosis.ok);
+    }
+
+    #[test]
+    fn backend_probes_join_the_report_and_checks_never_feed_ok() {
+        use crate::results::{ChainLink, ChainRole, PermissionReport, ProbeCheck, ProbeState};
+        use PermissionState::{Denied, Granted};
+        let mut probing = backend(Granted, Granted, Granted);
+        probing.extra = Some(crate::backend::BackendProbes {
+            chain: vec![ChainLink { role: ChainRole::Helper, pid: 7, path: "x11-helper".to_owned(), cdhash: None, session_context: "x11".to_owned() }],
+            permissions: [("accessibility".to_owned(), PermissionReport { state: Denied, settings_url: None, relaunch_required: None })].into(),
+            checks: vec![ProbeCheck { name: "compositor".to_owned(), state: ProbeState::Unavailable, reason: Some("none_running".to_owned()) }],
+        });
+        let diagnosis = diagnose(&probing, &facts(IdentityMatch::Match));
+        assert_eq!(diagnosis.chain.len(), 1, "the backend's link joins the chain");
+        assert_eq!(diagnosis.permissions["accessibility"].state, Denied, "a backend entry replaces the generic probe");
+        assert!(!diagnosis.ok, "a backend denial is not ready");
+        let wire = serde_json::to_value(&diagnosis).expect("wire");
+        assert_eq!(wire["checks"], serde_json::json!([{ "name": "compositor", "state": "unavailable", "reason": "none_running" }]));
+        probing.extra.as_mut().expect("probes").permissions.clear();
+        assert!(diagnose(&probing, &facts(IdentityMatch::Match)).ok, "an unavailable check alone never makes ok false");
     }
 }

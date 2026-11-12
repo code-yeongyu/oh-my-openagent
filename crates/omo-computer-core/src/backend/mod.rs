@@ -12,7 +12,7 @@ pub use refusal::{BackendResult, Refusal};
 pub use refusing::{refusing_capabilities, unknown_session_state};
 pub use sources::{AxEventSource, EpochSource, NoAxEvents, NoEpochSource, Presence, StopListener};
 pub use types::{
-    AxEvent, AxSnapshot, CaptureOptions, Delivered, EpochChange, FrameBytes, InputEvent,
+    AxEvent, AxSnapshot, BackendProbes, CaptureOptions, Delivered, EpochChange, FrameBytes, InputEvent,
     PermissionProbe, Ref, Resolved, Route, Semantic, SnapshotRequest, TaggedInput, Target,
     WindowFilter, WindowList,
 };
@@ -69,6 +69,11 @@ pub trait Backend: Send {
     }
 
     /// The tri-state permission read; never prompts. Unknown by default, which is never granted.
+    /// R62: the backend's own doctor checks; `None` (the default) adds nothing to `diagnose`.
+    fn diagnose(&self) -> Option<BackendProbes> {
+        None
+    }
+
     fn probe_permissions(&self) -> PermissionProbe {
         PermissionProbe {
             capture: PermissionState::Unknown,

@@ -2,7 +2,7 @@
 // Do not edit by hand; run `bun run --cwd packages/omo-computer-protocol generate`.
 
 /** sha256 of the schema file this module was generated from; the schema-drift test compares it. */
-export const SCHEMA_SHA256 = "cb9eb3ba49f722e7471cdbb5c9eba23b670537772dbf3599029ebdc79ee4590b" as const
+export const SCHEMA_SHA256 = "1ad29b87946c8f39efbf1a8a5160b573f8dec45ee155df5b5c145cbea121fb0c" as const
 
 /** The wire protocol version `engine.hello` reports. */
 export const PROTOCOL_VERSION = "1" as const
@@ -401,6 +401,9 @@ export type ActionReport = {
 	evidence: Evidence[]
 	urlPolicy?: UrlPolicyStamp | null
 	observation: UntrustedText
+	paused?: Pause[]
+	session?: SessionState | null
+	target?: TargetLiveness | null
 }
 
 export type AdvanceClockParams = {
@@ -719,6 +722,7 @@ export type Diagnosis = {
 	stopPath: StopPathCapability
 	releaseHelper?: ReleaseHelper | null
 	observation: UntrustedText
+	checks?: ProbeCheck[]
 }
 
 export type DiffFallback = "baseline_incomplete" | "current_incomplete" | "since_expired" | "window_changed" | "menu_root" | "reordered" | "not_shorter" | "query_projection"
@@ -1213,6 +1217,13 @@ export type PasteParams = {
 	observeAfter?: ObserveOptions | null
 }
 
+export type Pause = {
+	reason: PauseReason
+	ms: number
+}
+
+export type PauseReason = "screen_locked" | "user_active" | "system_suspended"
+
 export type PermissionReport = {
 	state: PermissionState
 	settingsUrl?: string | null
@@ -1242,6 +1253,14 @@ export type PressParams = {
 	runGeneration?: number | null
 	observeAfter?: ObserveOptions | null
 }
+
+export type ProbeCheck = {
+	name: string
+	state: ProbeState
+	reason?: string | null
+}
+
+export type ProbeState = "ok" | "unavailable" | "unknown"
 
 export type RaiseWindowParams = {
 	windowId: string
@@ -1496,6 +1515,15 @@ export type SurfacePredicate = {
 }
 
 export type SurfaceState = "appeared" | "gone"
+
+export type TargetLiveness = {
+	state: TargetState
+	pid: number
+	exitCode?: number | null
+	signal?: number | null
+}
+
+export type TargetState = "exited" | "unresponsive"
 
 export type TextRange = {
 	start: number

@@ -134,3 +134,13 @@ pub struct AxEvent {
     pub kind: String,
     pub window: String,
 }
+
+/// R62: what a backend's own doctor checks add to `diagnose` (row 50's X11 chain and the like):
+/// spawn-chain links after the host's, permission entries by name, and checks that are not
+/// permissions (they never feed `ok`). Reads only; never prompts.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct BackendProbes {
+    pub chain: Vec<crate::results::ChainLink>,
+    pub permissions: std::collections::BTreeMap<String, crate::results::PermissionReport>,
+    pub checks: Vec<crate::results::ProbeCheck>,
+}
