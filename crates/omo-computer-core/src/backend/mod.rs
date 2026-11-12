@@ -99,6 +99,18 @@ pub trait Backend: Send {
         None
     }
 
+    /// The keys the user holds physically, which a release never lifts (row 23); empty (the
+    /// default) when the backend cannot tell them apart.
+    fn user_held_keys(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// The pointer's point, read without posting anything (`pointer()`, row 23); `None` (the
+    /// default) when the backend cannot read it.
+    fn pointer(&self) -> Option<crate::params::Point> {
+        None
+    }
+
     /// Types `text` as one stroke that `interrupt` may end between Unicode scalars (asked
     /// before every scalar after the first). The default cannot be interrupted: it sends the
     /// whole text as one `post_input`, exactly as a Text event, and reports every scalar.

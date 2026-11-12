@@ -69,7 +69,7 @@ impl Session {
 
     #[must_use]
     pub fn with_guard(backend: Box<dyn Backend>, guard: Guard) -> Self {
-        crate::intervention::with_display_awake(Self {
+        crate::holds::with_holds(crate::intervention::with_display_awake(Self {
             backend,
             guard,
             opened: None,
@@ -78,7 +78,7 @@ impl Session {
             frames: crate::frames::FrameStore::default(),
             trace: crate::trace::Trace::default(),
             display_awake: crate::intervention::SharedHold::default(),
-        })
+        }))
     }
 
     /// Opens (or re-opens) the session and answers its capabilities and a fresh resume token.

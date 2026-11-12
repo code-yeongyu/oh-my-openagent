@@ -213,6 +213,14 @@ impl Backend for FakeBackend {
 
     fn post_input(&mut self, input: &TaggedInput, route: Route) -> BackendResult<Delivered> {
         self.call(FakeMethod::of_input(&input.event), |state, _| {
+            if matches!(input.event, InputEvent::Scroll { .. }) {
+                state.scroll_run = state.scroll_run.saturating_add(1);
+                if state.scenario.scroll_cap.is_some_and(|cap| state.scroll_run > cap) {
+                    return Ok(Delivered { count: 0, of: 1 });
+                }
+            } else {
+                state.scroll_run = 0;
+            }
             match &input.event {
                 InputEvent::PointerMove(point) => state.cursor = Some(*point),
                 InputEvent::Key { key, down: true } => {
@@ -266,6 +274,14 @@ impl Backend for FakeBackend {
 
     fn intervention(&self) -> Option<&dyn InterventionSource> {
         Some(self)
+    }
+
+    fn user_held_keys(&self) -> Vec<String> {
+        self.lock().scenario.held_keys.clone()
+    }
+
+    fn pointer(&self) -> Option<omo_computer_core::params::Point> {
+        self.lock().cursor
     }
 
     fn post_text(

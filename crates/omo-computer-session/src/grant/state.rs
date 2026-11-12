@@ -40,6 +40,8 @@ pub struct Control {
     pub(crate) lease_epoch: Option<u64>,
     pub(crate) clock: MachineClock,
     pub(crate) lease_hook: Box<dyn LeaseHook>,
+    /// Row 23's held-input ledger: holds need the foreground lease, and every lease end releases them.
+    pub(crate) holds: crate::holds::SharedLedger,
 }
 
 impl Default for Control {
@@ -60,6 +62,7 @@ impl Default for Control {
             lease_epoch: None,
             clock: wall_clock(),
             lease_hook: Box::new(NoLeaseHook),
+            holds: crate::holds::SharedLedger::default(),
         }
     }
 }

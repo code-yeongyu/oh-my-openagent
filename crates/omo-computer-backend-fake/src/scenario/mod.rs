@@ -87,6 +87,8 @@ pub struct FakeScenario {
     pub window_frame_policy: BTreeMap<String, FramePolicy>,
     /// Keys the user holds physically at start.
     pub held_keys: Vec<String>,
+    /// The route's wheel-step cap per scroll: steps past it deliver 0 of 1 (row 23, R48c).
+    pub scroll_cap: Option<u32>,
     pub full_access_preset: bool,
     pub target_exit: Vec<TargetExit>,
     /// Window id -> the session or hand that holds its reservation.

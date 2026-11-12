@@ -26,3 +26,10 @@ C24	the two-connection replay of `v3-consent-foreground-lease.json`: a second se
 C15	AC-66's `DisplayAwakeHold` legs (`capabilities().displayAwake.state` idle/held/released/capped; `display.resume` re-arms the hold); row 21 builds `display.release` ending the lease with `user_moved_on` and no `Suspended`	21	22	owed
 C13	AC-71/AC-72 fleet legs: denial memory and the per-app stop per hand in a fanout (hand 3 denied -> hand 4 still prompts; one hand's per-app stop leaves the other 99 delivering)	21	66	owed
 C13	AC-56 fanout leg: an out-of-scope app in a fanout marks the hand `skipped{consent, app}`	21	66	owed
+C9	`elementAt(x, y)` answers the element under the point with the hit-test click runs before send (needs a real per-OS accessibility hit-test; no stub, R50)	23	43	owed
+C9	`elementAt(x, y)` answers the element under the point with the hit-test click runs before send (needs a real per-OS accessibility hit-test; no stub, R50)	23	48	owed
+C9	`elementAt(x, y)` answers the element under the point with the hit-test click runs before send (needs a real per-OS accessibility hit-test; no stub, R50)	23	59	owed
+C9	click report `hit{role,label}` and the per-OS delivery-evidence kinds (`barrier_consumed`, `xi2_raw_confirm`) for `click_reports_point_and_delivery_evidence` (row 23 asserts `delivered` + `route` now; R50)	23	43	owed
+C9	click report `hit{role,label}` and the per-OS delivery-evidence kinds (`barrier_consumed`, `xi2_raw_confirm`) for `click_reports_point_and_delivery_evidence` (row 23 asserts `delivered` + `route` now; R50)	23	48	owed
+C9	click report `hit{role,label}` and the per-OS delivery-evidence kinds (`barrier_consumed`, `xi2_raw_confirm`) for `click_reports_point_and_delivery_evidence` (row 23 asserts `delivered` + `route` now; R50)	23	59	owed
+C9	a true in-flight `cancel` exit path for a held key (needs a cancel RPC; row 23 covers cancel as `control.revoke` during a held `key.down`, R49)	23	28	owed

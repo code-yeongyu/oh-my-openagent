@@ -109,6 +109,8 @@ Internal{no_clipboard_route}	engine	Internal	no_clipboard_route	COMPUTER_UNAVAIL
 Internal{launch_needs_user}	engine	Internal	launch_needs_user	COMPUTER_UNAVAILABLE	design/d-macos.md:214	1843f52647d94bd21850a1ac2f354871b8bdbfb94bcbe507c9839dedf52b014c	I-5
 Internal{audit_unavailable}	engine	Internal	audit_unavailable	COMPUTER_AUDIT_UNAVAILABLE	design/d-sdk-skill.md:556	6e215dbd19652c8d376f693c96d052d5e144f8971057c3229515b956e84a9814	I-5
 Internal{request_too_large}	engine	Internal	request_too_large	COMPUTER_INVALID_ARGUMENTS	design/d-remote.md:260	b10c1c7146342579ba04c97371364942d687e4857271feeb3bf6019b0ffb3cd6	interpretation I-14
+Internal{hold_duration}	engine	Internal	hold_duration	COMPUTER_INVALID_ARGUMENTS	design/d-sdk-skill.md:531	b0e16a73d0e89355ff58793644e7e8ddb2a4efda12942cc49a0270cf9ef9a2f1	R48a: shape (3), spelling from cu-v3-plan
+Internal{scroll_steps}	engine	Internal	scroll_steps	COMPUTER_INVALID_ARGUMENTS	design/d-sdk-skill.md:531	b0e16a73d0e89355ff58793644e7e8ddb2a4efda12942cc49a0270cf9ef9a2f1	R48a: shape (3), spelling from cu-v3-plan
 StopPathUnavailable{deaf}	engine	StopPathUnavailable	deaf	COMPUTER_SUPERVISOR_NOT_LIVE	design/d-sdk-skill.md:471	af29e231dd5b11f0e63d7a42d0f8f06fd04c5d60370267bd700c64b299d4eca5	-
 StopPathUnavailable{host_relay_not_allowed}	engine	StopPathUnavailable	host_relay_not_allowed	COMPUTER_SUPERVISOR_NOT_LIVE	design/d-sdk-skill.md:472	a337a0f00630ad4059f8ade8dfe648dbe1d608bbdb36ac09fcc035ddb62d0ad8	-
 StopPathUnavailable{heartbeat_stale}	engine	StopPathUnavailable	heartbeat_stale	COMPUTER_SUPERVISOR_NOT_LIVE	design/d-sdk-skill.md:473	299ec46cc0024893cde0718fa9cbc05e6c70d6b4e8b281f6ef4d92193d75e88a	-
