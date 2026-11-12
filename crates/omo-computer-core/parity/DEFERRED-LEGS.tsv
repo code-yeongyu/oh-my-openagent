@@ -38,3 +38,4 @@ C9	`two-sessions-drag-drop-onto-held-window-input-busy.json` (InputBusy{window, 
 C8	the imported `ax-type-text.json` replay: its `stopPath.changed` and v1 `audit` notification legs (the notification channel); row 24 proves ax.snapshot / ax.typeText with its own v3 cases (R56a)	24	28	owed
 C8	the imported `ax-unconfirmed.json` replay: its `stopPath.changed` and v1 `audit` notification legs (the notification channel); row 24 proves AxUnconfirmed for ax.perform / ax.setValue / ax.focus with its own v3 cases (R56a)	24	28	owed
 C8	the v1-consumer case `03-stdio-click-type-text-null.json` (whole case: host-relay notification, v1 audit notification, v1 capture size scaling 64x48), in row 28's v1_consumers suite (R56a)	24	28	owed
+C9	a drag point refused by another session's reservation: InputBusy's {window, holder} flat beside the stage pair (R60b), reachable only with two sessions (R60c)	23	85	owed
