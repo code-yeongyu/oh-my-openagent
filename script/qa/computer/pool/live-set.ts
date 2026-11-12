@@ -45,6 +45,8 @@ export function receiptLine(receipt: ScenarioReceipt): string {
   }
 }
 
+const NOTHING_RAN_EXIT = 3
+
 export type SetSummary = { readonly line: string; readonly exitCode: number }
 
 export function summarizeSet(os: string, receipts: readonly ScenarioReceipt[]): SetSummary {
@@ -56,15 +58,10 @@ export function summarizeSet(os: string, receipts: readonly ScenarioReceipt[]): 
   ]
   const blockedPart = reasons.length === 0 ? "" : ` reason=${reasons.join(",")}`
   const line = `SET ${os} pass=${count("pass")} fail=${count("fail")} blocked=${count("blocked")}${blockedPart}`
-  return { line, exitCode: count("fail") > 0 || receipts.length === 0 ? 1 : 0 }
+  const exitCode = count("fail") > 0 || receipts.length === 0 ? 1 : count("pass") === 0 ? NOTHING_RAN_EXIT : 0
+  return { line, exitCode }
 }
 
 export function blockedSet(reason: string, route: ScenarioReceipt["route"]): ScenarioReceipt[] {
   return MACOS_SCENARIOS.map((scenario) => ({ scenario, route, outcome: { kind: "blocked", reason } }))
-}
-
-export type Teardown = { readonly procs: number; readonly removedDir: string; readonly extra: readonly string[] }
-
-export function teardownLines(teardown: Teardown): string[] {
-  return [`procs ${teardown.procs}`, `dir REMOVED ${teardown.removedDir}`, ...teardown.extra]
 }

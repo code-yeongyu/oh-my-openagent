@@ -40,10 +40,10 @@ export function planGuest(host: PoolHost, major: MacosMajor, runId: string): Gue
   if (host.platform !== "darwin" || host.arch !== "arm64")
     return { kind: "refused", reason: `pool host must be Apple silicon macOS, got ${host.platform}/${host.arch}` }
   if (host.hypervisor === null) return { kind: "refused", reason: "no hypervisor command on the pool host" }
-  if (host.consoleUser !== null && host.consoleUser === host.runnerUser)
+  if (host.consoleUser !== null)
     return {
       kind: "refused",
-      reason: `the pool runs as ${host.runnerUser}, who holds the console session; guests run only on a host nobody is using`,
+      reason: `${host.consoleUser} is signed in at the console; guests run only on a host nobody is using`,
     }
   const baseImage = host.baseImages[major]
   if (baseImage === undefined)
@@ -55,7 +55,3 @@ export function planGuest(host: PoolHost, major: MacosMajor, runId: string): Gue
 }
 
 export type GuestListing = { readonly name: string; readonly running: boolean }
-
-export function strayGuests(listing: readonly GuestListing[], keep: ReadonlySet<string>): string[] {
-  return listing.filter((guest) => isPoolGuest(guest.name) && !keep.has(guest.name)).map((guest) => guest.name)
-}

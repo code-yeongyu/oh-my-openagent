@@ -9,7 +9,9 @@ guests: one clone per macOS major per run, on a Mac compute host the lead places
 
 1. `bun script/qa/computer/pool/macos-vm.ts --up <15|26> --run-id <id>` clones the recorded base image
    of that major into a guest named `omo-cu-macos<major>-<id>` and starts it headless. The guest registers
-   itself as an ephemeral runner with the labels `computer-live-macos` and `macos-<major>`.
+   itself as an ephemeral runner with the labels `computer-live-macos` and `macos-<major>`. `--up` waits up
+   to 120 s for the hypervisor to list the guest as running; a guest that never runs is deleted and `--up`
+   exits 1.
 2. The job on that runner builds the engine and its helper bundle with a run-local ad-hoc identity, grants
    it inside the guest, starts the fixture apps and runs the live scenario set. Each scenario prints one
    line (`script/qa/computer/pool/live-set.ts`):
@@ -21,7 +23,8 @@ guests: one clone per macOS major per run, on a Mac compute host the lead places
    ```
 
    then one summary line, `SET macos pass=<n> fail=<n> blocked=<n>[ reason=<reasons>]`. A set with a
-   failure, or with no scenario at all, exits 1. Before the macOS backend exists every scenario reads
+   failure, or with no scenario at all, exits 1; a set where nothing passed (every scenario blocked) exits
+   3, so a job never shows green while nothing ran. Before the macOS backend exists every scenario reads
    `BLOCKED reason=backend_not_built`, which is the honest starting state.
 3. `bun script/qa/computer/pool/macos-vm.ts --down <15|26> --run-id <id>` always runs after the job and
    deletes the guest.
@@ -31,17 +34,21 @@ the hosted runner's second-process keystroke is untagged, but that route is neve
 
 ## Teardown receipts
 
-Every run ends with these lines, in this order:
+`--down` prints two measured lines, in this order:
 
 ```text
-procs 0
-dir REMOVED <path>
+procs <n>
 guest DELETED omo-cu-macos<major>-<id>
 ```
 
-`guest NOT DELETED <name> (<reason>)` makes the teardown exit 1. `--sweep` deletes any guest this pool
-minted (a name matching `omo-cu-<...>`) that is still listed, and prints one receipt per guest; it never
-touches a guest whose name it did not mint, including the base images.
+`procs` counts the hypervisor's `run` processes still serving that guest; a count that cannot be read
+prints `procs UNREAD`. Any count other than 0, `procs UNREAD`, or `guest NOT DELETED <name> (<reason>)`
+makes the teardown exit 1. A failed guest list during the delete still prints the `NOT DELETED` line with
+the list error as its reason.
+
+`--sweep` deletes stopped guests this pool minted (names matching `omo-cu-<...>`) and keeps running ones,
+printing `guest KEPT <name>` for each, because a running guest may belong to a live run. It never touches a
+guest whose name it did not mint, including the base images.
 
 ## Pool host
 
@@ -51,8 +58,8 @@ touches a guest whose name it did not mint, including the base images.
 | `POOL_BASE_IMAGE_15`, `POOL_BASE_IMAGE_26` | the recorded base image of each major |
 
 `macos-vm.ts` refuses, with the reason and exit 2, on a host that is not Apple-silicon macOS, has no
-hypervisor command, has no base image for the major, or whose console session belongs to the pool's own
-user: a guest never runs in a person's session.
+hypervisor command, has no base image for the major, or where anyone is signed in at the console: guests run only on a host
+nobody is using. Teardown is never refused for that reason.
 
 The first setup of a base image is a hands-on step, done once per major by a person at that Mac: sign in,
 then allow Accessibility and Screen Recording for the QA identity. Every later guest is a headless clone.

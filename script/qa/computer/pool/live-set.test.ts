@@ -1,12 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import {
-  blockedSet,
-  MACOS_SCENARIOS,
-  receiptLine,
-  type ScenarioReceipt,
-  summarizeSet,
-  teardownLines,
-} from "./live-set.ts"
+import { blockedSet, MACOS_SCENARIOS, receiptLine, type ScenarioReceipt, summarizeSet } from "./live-set.ts"
 
 const pass: ScenarioReceipt = {
   scenario: "frame-verbs",
@@ -36,13 +29,5 @@ describe("receipt lines", () => {
     expect(receiptLine(pass)).toBe(
       "SCENARIO frame-verbs route=synthetic-user PASS oracle=fixture report moved 40 px refusal=minimized window refused",
     )
-  })
-
-  test("teardown prints the process count and the removed directory before any extra receipt", () => {
-    expect(teardownLines({ procs: 0, removedDir: "/tmp/x", extra: ["guest DELETED g1"] })).toEqual([
-      "procs 0",
-      "dir REMOVED /tmp/x",
-      "guest DELETED g1",
-    ])
   })
 })
