@@ -115,8 +115,10 @@ describe("#13037 the sender half reaches a session on another device that is not
     })
   })
 
+  // A7.2.6: "online device" in these rows reads "online device that lists the feature"; the sender's own service answers
+  // the empty page for any other device, which lookup-answers.test.ts pins as "answered, none".
   describe("A4.3.3 a bare session id that no listing holds", () => {
-    test("#given exactly one other device holds it #when it is sent to #then one single-probe query per online device finds it and the record goes to that device", async () => {
+    test("#given exactly one other device holds it #when it is sent to #then one single-probe query per online device that lists the feature finds it and the record goes to that device", async () => {
       const a = account({ rows: [B_ROW, C_ROW], ended: { c: { [GONE]: "rk-c-gone" } } })
       const { run } = fixture.surface(a.remote)
       expect(await run("thread_send", { thread: GONE, message: "hi" })).toMatchObject({
@@ -150,7 +152,7 @@ describe("#13037 the sender half reaches a session on another device that is not
       nothingSent(a)
     })
 
-    test("#given no device holds it and one online device did not answer #then it is host_unavailable naming that device", async () => {
+    test("#given no device holds it and one online device that lists the feature did not answer #then it is host_unavailable naming that device", async () => {
       const a = account({ rows: [B_ROW, C_ROW], silent: ["c"] })
       const { run } = fixture.surface(a.remote)
       expect(await run("thread_send", { thread: GONE, message: "hi" })).toMatchObject({
@@ -190,7 +192,7 @@ describe("#13037 the sender half reaches a session on another device that is not
       expect({ lookups: a.lookups, sent: a.sent }).toEqual({ lookups: [], sent: [] })
     })
 
-    test("#given the lookup runs #then it sends at most one query per online device", async () => {
+    test("#given the lookup runs #then it sends at most one query per online device that lists the feature", async () => {
       const a = account({ rows: [B_ROW, C_ROW, { ...C_ROW, session_id: "rk-c-2", durable_id: "dur-c-2" }] })
       const { run } = fixture.surface(a.remote)
       await run("thread_send", { thread: GONE, message: "hi" })
