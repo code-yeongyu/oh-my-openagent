@@ -1,11 +1,15 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { readdirSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 
 import { load } from "js-yaml"
 
 import { jobSteps, publishWorkflow, readWorkflow, stepAt } from "./keychain-helper-workflow.test-support"
+import { moduleGraphStepsBeforeBuild } from "./module-graph-build-order"
 
 // Release and CI contract (#13192): generated outputs are not tracked, so a job that installs with --ignore-scripts and
 // then bundles, tests or runs code that imports one of them must build them first, under the same condition.
@@ -207,6 +211,30 @@ describe("every workflow job is classified as a generated-output reader or not",
   test("no classification names a job that no longer exists", () => {
     const existing = new Set(jobs)
     expect([...readers, ...Object.keys(READS_NOTHING)].filter((job) => !existing.has(job))).toEqual([])
+  })
+})
+
+describe("in every job, a step that resolves the module graph of repository code comes after a build step", () => {
+  test("today's workflows", () => {
+    expect(
+      moduleGraphStepsBeforeBuild(fileURLToPath(new URL("../.github/workflows/", import.meta.url)), BUILDS),
+    ).toEqual([])
+  })
+
+  test("a test step added to a job that builds nothing is reported with its job and step", () => {
+    const root = mkdtempSync(join(tmpdir(), "module-graph-build-order-"))
+    try {
+      mkdirSync(join(root, "workflows"))
+      const steps = (first: string) =>
+        `jobs:\n  probe:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Install dependencies\n        run: ${first}\n      - name: Probe\n        run: bun test script/no-raw-tls-client.test.ts\n`
+      writeFileSync(join(root, "workflows", "unbuilt.yml"), steps("bun install --frozen-lockfile --ignore-scripts"))
+      writeFileSync(join(root, "workflows", "built.yml"), steps("bun install --frozen-lockfile"))
+      expect(moduleGraphStepsBeforeBuild(join(root, "workflows"), BUILDS)).toEqual([
+        { job: "unbuilt.yml probe", step: "Probe", command: "bun test script/no-raw-tls-client.test.ts" },
+      ])
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 })
 
