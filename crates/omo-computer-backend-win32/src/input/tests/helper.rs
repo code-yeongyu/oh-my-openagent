@@ -12,13 +12,22 @@ fn release_helper_inside_a_job_refuses_every_held_verb() {
     for verb in [VerbKind::Hold, VerbKind::HoldingInput] {
         let refusal = admit(state, verb).expect_err("refused before any OS call");
         assert_eq!(refusal.code, EngineCode::StopPathUnavailable);
-        assert_eq!(refusal.reason, Some(Reason::ReleaseHelperUnavailable.wire()));
+        assert_eq!(
+            refusal.reason,
+            Some(Reason::ReleaseHelperUnavailable.wire())
+        );
     }
-    assert!(admit(state, VerbKind::AxAction).is_ok(), "UIA action verbs hold nothing");
+    assert!(
+        admit(state, VerbKind::AxAction).is_ok(),
+        "UIA action verbs hold nothing"
+    );
     assert!(admit(state, VerbKind::Read).is_ok());
     let capability = state.capability();
     assert!(!capability.available);
-    assert_eq!(capability.reason, Some(ReleaseHelperReason::EnclosingJobNoBreakaway));
+    assert_eq!(
+        capability.reason,
+        Some(ReleaseHelperReason::EnclosingJobNoBreakaway)
+    );
     assert!(state.ax_only());
 }
 
@@ -29,7 +38,12 @@ fn unproven_helper_refuses_holds_alone_and_a_helper_outside_every_job_admits_all
     assert!(admit(unproven, VerbKind::HoldingInput).is_ok());
     assert!(!unproven.ax_only());
     let out = HelperState::from_read_back(Some(false));
-    for verb in [VerbKind::Hold, VerbKind::HoldingInput, VerbKind::AxAction, VerbKind::Read] {
+    for verb in [
+        VerbKind::Hold,
+        VerbKind::HoldingInput,
+        VerbKind::AxAction,
+        VerbKind::Read,
+    ] {
         assert!(admit(out, verb).is_ok());
     }
     assert!(out.capability().available);

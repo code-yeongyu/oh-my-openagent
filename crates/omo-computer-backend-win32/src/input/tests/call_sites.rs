@@ -10,23 +10,38 @@ fn sources(dir: &std::path::Path, out: &mut Vec<(String, String)>) {
             }
             sources(&path, out);
         } else if path.extension().is_some_and(|ext| ext == "rs") && !path.ends_with("tests.rs") {
-            out.push((path.display().to_string(), std::fs::read_to_string(&path).expect("source")));
+            out.push((
+                path.display().to_string(),
+                std::fs::read_to_string(&path).expect("source"),
+            ));
         }
     }
 }
 
 fn calls(needle: &str) -> Vec<String> {
     let mut files = Vec::new();
-    sources(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src"), &mut files);
+    sources(
+        &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src"),
+        &mut files,
+    );
     files
         .iter()
-        .flat_map(|(path, text)| text.lines().filter(|line| line.contains(needle) && !line.trim_start().starts_with("//")).map(move |_| path.clone()))
+        .flat_map(|(path, text)| {
+            text.lines()
+                .filter(|line| line.contains(needle) && !line.trim_start().starts_with("//"))
+                .map(move |_| path.clone())
+        })
         .collect()
 }
 
 #[test]
 fn single_sendinput_call_site() {
     assert_eq!(calls("SendInput(").len(), 1, "{:?}", calls("SendInput("));
-    assert_eq!(calls("PostMessageW(").len(), 1, "{:?}", calls("PostMessageW("));
+    assert_eq!(
+        calls("PostMessageW(").len(),
+        1,
+        "{:?}",
+        calls("PostMessageW(")
+    );
     assert!(calls("enigo").is_empty());
 }
