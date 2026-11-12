@@ -100,6 +100,44 @@ describe("computer-is-gates --adoption", () => {
   })
 })
 
+describe("computer-is-gates --adoption ledger rules", () => {
+  const cases: readonly { readonly name: string; readonly lines: readonly string[]; readonly finding: string }[] = [
+    {
+      name: "a duplicate id",
+      lines: [entry("ADP-1", "goat-cu", "adopt", "4"), entry("ADP-1", "goat", "adopt", "5")],
+      finding: "ADOPTION ledger line 3: id ADP-1 appears twice",
+    },
+    {
+      name: "a rejected entry that names rows",
+      lines: [entry("ADP-1", "goat-cu", "reject", "4")],
+      finding: "ADOPTION ledger line 2: ADP-1 is rejected but names rows 4",
+    },
+    {
+      name: "a row number past the program's last row",
+      lines: [entry("ADP-1", "goat-cu", "adopt", "4, 999")],
+      finding: "ADOPTION ledger line 2: ADP-1 names row 999, outside the program's rows 1-51",
+    },
+    {
+      name: "row 0",
+      lines: [entry("ADP-1", "goat-cu", "adopt", "0")],
+      finding: "ADOPTION ledger line 2: ADP-1 names row 0, outside the program's rows 1-51",
+    },
+    { name: "a ledger with no entries", lines: [], finding: "ADOPTION ledger has no entries" },
+  ]
+  for (const { name, lines, finding } of cases) {
+    test(`${name} is a finding`, () => {
+      withFixtureRepo((repo) => {
+        seed(repo, { "script/computer-adoption.tsv": ledger(...lines), "THIRD-PARTY-NOTICES.md": notices() })
+
+        const result = runGates(["--adoption"], repo.options)
+
+        expect(result.exitCode).toBe(1)
+        expect(result.lines).toContain(finding)
+      })
+    })
+  }
+})
+
 describe("computer-is-gates --adoption --row", () => {
   test("counts a row's entries and the ones a tracked test or scenario is tagged with", () => {
     withFixtureRepo((repo) => {
@@ -125,6 +163,20 @@ describe("computer-is-gates --adoption --row", () => {
       const full = runGates(["--adoption", "--row", "3"], repo.options)
       expect(full.lines).toEqual(["ADOPTION row=3 entries=2 proven=2"])
       expect(full.exitCode).toBe(0)
+    })
+  })
+
+  test("a row that takes no ledger entry fails instead of reporting an empty pass", () => {
+    withFixtureRepo((repo) => {
+      seed(repo, {
+        "script/computer-adoption.tsv": ledger(entry("ADP-1", "goat-cu", "adopt", "4")),
+        "THIRD-PARTY-NOTICES.md": notices(),
+      })
+
+      const result = runGates(["--adoption", "--row", "7"], repo.options)
+
+      expect(result.lines).toEqual(["ADOPTION row=7 entries=0 proven=0", "ADOPTION row=7 takes no ledger entry"])
+      expect(result.exitCode).toBe(1)
     })
   })
 

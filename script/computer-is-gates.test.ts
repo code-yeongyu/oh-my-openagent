@@ -118,7 +118,7 @@ describe("computer-is-gates --gate", () => {
 
   test("a ref that does not resolve is a failure that names it, never a pass", () => {
     withFixtureRepo((repo) => {
-      seed(repo, { contract: { rows: [], artifacts: [] } })
+      seed(repo, { contract: { rows: [2], artifacts: [] } })
 
       const result = runGates(["--gate", "contract", "--ref", "no-such-ref"], repo.options)
 
@@ -127,6 +127,23 @@ describe("computer-is-gates --gate", () => {
       expect(result.lines[0]).toStartWith("GATE contract ERROR ")
       expect(result.lines[0]).toContain("no-such-ref")
     })
+  })
+
+  test("an empty artifact path or a gate with nothing to check is a config failure, never a pass", () => {
+    for (const gate of [
+      { rows: [2], artifacts: [""] },
+      { rows: [], artifacts: [] },
+    ]) {
+      withFixtureRepo((repo) => {
+        seed(repo, { contract: gate })
+
+        const result = runGates(["--gate", "contract", "--ref", "dev"], repo.options)
+
+        expect(result.exitCode).toBe(1)
+        expect(result.lines).toHaveLength(1)
+        expect(result.lines[0]).toStartWith("GATE config ERROR gate contract: ")
+      })
+    }
   })
 
   test("a malformed gate config fails with the reason instead of checking nothing", () => {
