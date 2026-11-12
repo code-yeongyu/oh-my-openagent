@@ -191,7 +191,6 @@ fn delivered(left: &Left) {
 }
 
 #[test]
-#[ignore = "UNOBSERVED at row 17: no backend reports a secure focus through the Backend trait, so the stdio engine's SecureInputProbe never fires (DEFERRED-LEGS C14, owed to row 26); run with --ignored to observe the RED"]
 fn engine_process_secure_type_leaves_no_digest_in_audit_marker_or_trace() {
     let case = case();
     let secret = secret(&case);
