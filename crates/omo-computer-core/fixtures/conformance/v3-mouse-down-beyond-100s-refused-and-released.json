@@ -1,0 +1,416 @@
+{
+  "description": "Row 23 (d-sdk-skill.md:272, R48a): holdMouse past 100 s is refused InvalidArguments{hold_duration} naming /duration with nothing sent; a held button is released at its press origin by mouse.up (warp, then button-up).",
+  "transport": "stdio",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/v3-drag-destinations.json",
+  "env": {
+    "OMO_COMPUTER_FAKE_STOP_PATH": "live"
+  },
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session.open",
+        "params": {
+          "reportMode": "object"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayCount": 1,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capture": {
+                  "available": true,
+                  "route": "composite"
+                },
+                "windowCapture": {
+                  "available": true
+                },
+                "windowInput": {
+                  "available": true
+                },
+                "observe": true,
+                "settle": true,
+                "ocr": false,
+                "background_window_input": true,
+                "background_window_input_basis": "route_available",
+                "inputModes": [
+                  "pointer",
+                  "keyboard",
+                  "ax"
+                ],
+                "backgroundReach": "full",
+                "toolkitRoutes": {
+                  "seeded": [],
+                  "learned": []
+                },
+                "session": {
+                  "screenLocked": "unknown",
+                  "displayAsleep": "unknown",
+                  "userActive": {
+                    "active": "unknown",
+                    "lastInputAgeMs": null
+                  },
+                  "secureInputActive": "unknown",
+                  "sessionActive": "unknown",
+                  "screensaverActive": "unknown",
+                  "pauseReasons": [],
+                  "sampledAt": 0
+                },
+                "sessionProbes": {
+                  "screenLocked": "none",
+                  "displayAsleep": "none",
+                  "userActive": "none",
+                  "secureInputActive": "none",
+                  "sessionActive": "none",
+                  "screensaverActive": "none",
+                  "sessionActiveDeliveryVerified": false
+                },
+                "displayAwake": {
+                  "state": "idle",
+                  "graceMs": 0,
+                  "capMs": 0,
+                  "heldSinceMs": null,
+                  "mechanism": "unavailable"
+                },
+                "surfaces": [],
+                "routeLadder": [],
+                "sendOnEnter": {
+                  "keys": 0
+                },
+                "stopPath": {
+                  "kind": "global",
+                  "hostRelayLive": false,
+                  "allowHostRelayOnly": false,
+                  "listener": "xi2-raw",
+                  "deaf": false,
+                  "stale": false
+                }
+              },
+              "resumeToken": "3ba8bf2dd0486fa5caee6d395688dcdf"
+            }
+          },
+          "variable": [
+            "/result"
+          ]
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "stopPath.start",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "suspended": false,
+              "globalLive": true,
+              "hostRelayLive": false,
+              "heartbeatFresh": true,
+              "stopPath": "global",
+              "reason": null
+            }
+          },
+          "variable": [
+            "/result"
+          ]
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "control.grant",
+        "params": {
+          "reason": "fixture"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "result": {
+              "active": true,
+              "reason": "fixture",
+              "grantedAt": null
+            }
+          },
+          "variable": [
+            "/result"
+          ]
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "capture",
+        "params": {
+          "target": "101"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "result": {
+              "frameId": "frame-318f835bb482fb58-1",
+              "target": "101",
+              "width": 800,
+              "height": 600,
+              "coordinateWidth": 800,
+              "coordinateHeight": 600,
+              "scale": 1,
+              "cursor": "os",
+              "session": {
+                "screenLocked": "unknown",
+                "displayAsleep": "unknown",
+                "userActive": {
+                  "active": "unknown",
+                  "lastInputAgeMs": null
+                },
+                "secureInputActive": "unknown",
+                "sessionActive": "unknown",
+                "screensaverActive": "unknown",
+                "pauseReasons": [],
+                "sampledAt": 0
+              },
+              "observation": {
+                "untrustedText": true
+              }
+            }
+          },
+          "variable": [
+            "/result"
+          ]
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "holdMouse",
+        "params": {
+          "target": "101",
+          "x": 50,
+          "y": 50,
+          "duration": 100001
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "error": {
+              "code": -32013,
+              "message": "Internal",
+              "data": {
+                "code": "Internal",
+                "hint": null,
+                "reason": "hold_duration",
+                "field": "duration",
+                "message": "/duration: expected 0..=100 s"
+              }
+            }
+          },
+          "variable": []
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "method": "mouse.down",
+        "params": {
+          "target": "101",
+          "x": 50,
+          "y": 50
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 6,
+            "result": {
+              "disposition": {
+                "delivery": "delivered_unverified",
+                "retry": "unsafe"
+              },
+              "delivered": {
+                "count": 2,
+                "of": 2
+              },
+              "effect": "unverifiable",
+              "route": "foreground_hid",
+              "auditIds": [
+                "13bb943806a2d4ec"
+              ],
+              "evidence": [],
+              "observation": {
+                "untrustedText": true
+              },
+              "session": {
+                "screenLocked": "unknown",
+                "displayAsleep": "unknown",
+                "userActive": {
+                  "active": "unknown",
+                  "lastInputAgeMs": null
+                },
+                "secureInputActive": "unknown",
+                "sessionActive": "unknown",
+                "screensaverActive": "unknown",
+                "pauseReasons": [],
+                "sampledAt": 0
+              }
+            }
+          },
+          "variable": [
+            "/result/auditIds",
+            "/result/session"
+          ]
+        }
+      ],
+      "sink": 3
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "method": "move",
+        "params": {
+          "target": "101",
+          "x": 300,
+          "y": 300
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 7,
+            "result": {
+              "disposition": {
+                "delivery": "delivered_unverified",
+                "retry": "unsafe"
+              },
+              "delivered": {
+                "count": 1,
+                "of": 1
+              },
+              "effect": "unverifiable",
+              "route": "foreground_hid",
+              "auditIds": [
+                "2d9159f3d1b7d329"
+              ],
+              "evidence": [],
+              "observation": {
+                "untrustedText": true
+              },
+              "session": {
+                "screenLocked": "unknown",
+                "displayAsleep": "unknown",
+                "userActive": {
+                  "active": "unknown",
+                  "lastInputAgeMs": null
+                },
+                "secureInputActive": "unknown",
+                "sessionActive": "unknown",
+                "screensaverActive": "unknown",
+                "pauseReasons": [],
+                "sampledAt": 0
+              }
+            }
+          },
+          "variable": [
+            "/result/auditIds",
+            "/result/session"
+          ]
+        }
+      ],
+      "sink": 4
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 8,
+        "method": "mouse.up",
+        "params": {
+          "target": "101"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 8,
+            "result": {
+              "disposition": {
+                "delivery": "delivered_unverified",
+                "retry": "unsafe"
+              },
+              "delivered": {
+                "count": 2,
+                "of": 2
+              },
+              "effect": "unverifiable",
+              "route": "foreground_hid",
+              "auditIds": [
+                "a223a4a0d7fefa59"
+              ],
+              "evidence": [],
+              "observation": {
+                "untrustedText": true
+              },
+              "session": {
+                "screenLocked": "unknown",
+                "displayAsleep": "unknown",
+                "userActive": {
+                  "active": "unknown",
+                  "lastInputAgeMs": null
+                },
+                "secureInputActive": "unknown",
+                "sessionActive": "unknown",
+                "screensaverActive": "unknown",
+                "pauseReasons": [],
+                "sampledAt": 0
+              }
+            }
+          },
+          "variable": [
+            "/result/auditIds",
+            "/result/session"
+          ]
+        }
+      ],
+      "sink": 6
+    }
+  ]
+}
