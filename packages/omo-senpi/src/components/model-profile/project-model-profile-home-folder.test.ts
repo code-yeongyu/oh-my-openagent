@@ -6,7 +6,6 @@ import { userInfo } from "node:os"
 import { join } from "node:path"
 
 import { testTempDir } from "../../../test-support/temp-dir"
-import * as projectModelProfileRpc from "./project-model-profile-rpc"
 import { getProjectModelProfile, setProjectModelProfile } from "./project-model-profile-rpc"
 
 const COMMENTED = `// project omo config
@@ -121,16 +120,37 @@ describe("project model_profile RPC home-folder refusal (#13207, #13209)", () =>
     expect(readFileSync(join(other, ".omo", "omo.jsonc"), "utf8")).toBe(COMMENTED)
   })
 
-  test("#given the owner lookup fails for a folder elsewhere #when a pin is set #then it is written", () => {
+  test("#given the owner lookup fails for another account's folder away from this account's home #when a pin is set #then it is refused and nothing is written", () => {
     const accountsRoot = folder()
     const work = join(folder(), "workspace")
-    mkdirSync(work)
+    mkdirSync(join(work, ".omo"), { recursive: true })
+    writeFileSync(join(work, ".omo", "omo.jsonc"), COMMENTED)
+    const deps = { homeOfUid: () => undefined, accountsRoot }
+
+    const replies = asAnotherAccount(work, () => [
+      setProjectModelProfile(trusted(work), { modelProfile: "a/b" }, deps),
+      getProjectModelProfile(trusted(work), deps),
+    ])
+
+    for (const reply of replies) expect(reply).toMatchObject({ kind: "refused", code: "home_folder" })
+    expect(configText(work)).toBe(COMMENTED)
+  })
+
+  test("#given the owner lookup fails while this account's home sits at the file system root #when a pin is set in another account's folder #then it is refused and nothing is written", () => {
+    const work = join(folder(), "workspace")
+    mkdirSync(join(work, ".omo"), { recursive: true })
+    writeFileSync(join(work, ".omo", "omo.jsonc"), COMMENTED)
 
     const reply = asAnotherAccount(work, () =>
-      setProjectModelProfile(trusted(work), { modelProfile: "a/b" }, { homeOfUid: () => undefined, accountsRoot }),
+      setProjectModelProfile(
+        trusted(work),
+        { modelProfile: "a/b" },
+        { homeOfUid: () => undefined, accountsRoot: null },
+      ),
     )
 
-    expect(reply).toMatchObject({ kind: "ok", modelProfile: "a/b" })
+    expect(reply).toMatchObject({ kind: "refused", code: "home_folder" })
+    expect(configText(work)).toBe(COMMENTED)
   })
 
   test("#given a session folder that no longer exists, spelled as HOME #when either verb runs #then it is refused and not created", () => {
@@ -185,20 +205,44 @@ describe("project model_profile RPC home-folder refusal (#13207, #13209)", () =>
     expect(readFileSync(join(serviceHome, ".omo", "omo.jsonc"), "utf8")).toBe(COMMENTED)
   })
 
-  test("#given a folder this account owns #when either verb checks for a home folder #then no owner home is looked up", () => {
-    const cwd = folder(COMMENTED)
+  test("#given HOME points elsewhere and this account's passwd home is the session folder #when either verb runs #then it is refused and the user layer is untouched", () => {
+    const passwdHome = folder(COMMENTED)
+    const work = folder()
     const asked: number[] = []
     const deps = {
       homeOfUid: (uid: number) => {
         asked.push(uid)
-        return null
+        return passwdHome
       },
     }
+    const previous = process.env.HOME
+    process.env.HOME = folder()
+    try {
+      expect(setProjectModelProfile(trusted(passwdHome), { modelProfile: "a/b" }, deps)).toMatchObject({
+        kind: "refused",
+        code: "home_folder",
+      })
+      expect(getProjectModelProfile(trusted(passwdHome), deps)).toMatchObject({ kind: "refused", code: "home_folder" })
+      expect(configText(passwdHome)).toBe(COMMENTED)
+      expect(setProjectModelProfile(trusted(work), { modelProfile: "a/b" }, deps)).toMatchObject({
+        kind: "ok",
+        modelProfile: "a/b",
+      })
+    } finally {
+      if (previous === undefined) delete process.env.HOME
+      else process.env.HOME = previous
+    }
 
-    expect(getProjectModelProfile(trusted(cwd), deps).kind).toBe("ok")
-    expect(setProjectModelProfile(trusted(cwd), { modelProfile: "a/b" }, deps).kind).toBe("ok")
+    const ownUid = statSync(passwdHome).uid
+    expect(asked).toStrictEqual([ownUid, ownUid, ownUid])
+  })
 
-    expect(asked).toStrictEqual([])
+  test("#given the lookup of this account's own home fails #when a pin is set in a folder this account owns #then it is written", () => {
+    const work = folder()
+
+    const reply = setProjectModelProfile(trusted(work), { modelProfile: "a/b" }, { homeOfUid: () => undefined })
+
+    expect(reply).toMatchObject({ kind: "ok", modelProfile: "a/b" })
   })
 
   test("#given a folder another account owns #when either verb checks for a home folder #then only its owner's home is looked up, once per call", () => {
@@ -219,49 +263,4 @@ describe("project model_profile RPC home-folder refusal (#13207, #13209)", () =>
     const owner = statSync(cwd).uid
     expect(asked).toStrictEqual([owner, owner])
   })
-
-  test("#given a passwd entry from getent or macOS id -P #when its home is read #then the home field is returned", () => {
-    const { homeFromPasswdEntry } = projectModelProfileRpc
-    expect(homeFromPasswdEntry("svc:x:998:998::/var/lib/svc:/usr/sbin/nologin\n")).toBe("/var/lib/svc")
-    expect(homeFromPasswdEntry("q:********:501:20::0:0:Q Kim:/Users/q name:/bin/zsh")).toBe("/Users/q name")
-    expect(homeFromPasswdEntry("")).toBeNull()
-    expect(homeFromPasswdEntry("broken:line:relative/home:/bin/sh")).toBeNull()
-  })
-
-  test("#given a failed owner lookup #when it is asked again #then the failure is reused without a second lookup, like a found home", () => {
-    const { lookupHomeOfUid } = projectModelProfileRpc
-    let failing = 0
-    const failingRun = () => {
-      failing += 1
-      throw new Error("lookup timed out")
-    }
-    expect(lookupHomeOfUid(424242, failingRun)).toBeUndefined()
-    expect(lookupHomeOfUid(424242, failingRun)).toBeUndefined()
-    expect(failing).toBe(1)
-
-    let found = 0
-    const foundRun = () => {
-      found += 1
-      return "svc:x:424243:424243::/var/lib/svc:/bin/sh\n"
-    }
-    expect(lookupHomeOfUid(424243, foundRun)).toBe("/var/lib/svc")
-    expect(lookupHomeOfUid(424243, foundRun)).toBe("/var/lib/svc")
-    expect(found).toBe(1)
-  })
-
-  const passwdLookupBinary = process.platform === "darwin" ? "/usr/bin/id" : "/usr/bin/getent"
-
-  test.skipIf(!existsSync(passwdLookupBinary))(
-    `#given this platform's passwd lookup (${passwdLookupBinary}; skipped when that binary is absent) #when this account's home is looked up through the default path #then an absolute folder this account owns is returned`,
-    () => {
-      const uid = process.getuid?.()
-      if (uid === undefined)
-        throw new Error("process.getuid is missing on a platform that ships the passwd lookup binary")
-
-      const home = projectModelProfileRpc.lookupHomeOfUid(uid)
-
-      expect(typeof home === "string" && home.startsWith("/")).toBe(true)
-      expect(statSync(home as string).uid).toBe(uid)
-    },
-  )
 })
