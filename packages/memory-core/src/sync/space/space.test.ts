@@ -172,9 +172,18 @@ describe("resolveSpaceInRepo / git-backed config", () => {
   // config: no system config, an empty global file and a temp HOME. A machine whose gitconfig rewrites
   // github.com (url.<x>.insteadOf) would otherwise change the repository identity this suite asserts.
   const GIT_ENV_NAMES = ["GIT_CONFIG_NOSYSTEM", "GIT_CONFIG_GLOBAL", "HOME", "USERPROFILE"] as const
+  const isInjectedGitConfig = (name: string) =>
+    name === "GIT_CONFIG_COUNT" ||
+    name === "GIT_CONFIG_PARAMETERS" ||
+    name.startsWith("GIT_CONFIG_KEY_") ||
+    name.startsWith("GIT_CONFIG_VALUE_")
   const savedEnv = new Map<string, string | undefined>()
   beforeEach(() => {
     for (const name of GIT_ENV_NAMES) savedEnv.set(name, process.env[name])
+    for (const name of Object.keys(process.env).filter(isInjectedGitConfig)) {
+      savedEnv.set(name, process.env[name])
+      delete process.env[name]
+    }
     const home = mkdtempSync(join(tmpdir(), "omo-space-home-"))
     dirs.push(home)
     const globalConfig = join(home, "empty-gitconfig")
