@@ -215,6 +215,16 @@ describe("project model_profile RPC (#13188)", () => {
     expect(readFileSync(join(other, ".omo", "omo.jsonc"), "utf8")).toBe(COMMENTED)
   })
 
+  test("#given a backup copy made earlier by someone else #when a pin is set #then that copy stays", () => {
+    const cwd = folder(COMMENTED)
+    writeFileSync(join(cwd, ".omo", "omo.jsonc.bak.2020-01-01T00-00-00-000Z"), "theirs")
+
+    expect(setProjectModelProfile(trusted(cwd), { modelProfile: "a/b" }).kind).toBe("ok")
+
+    expect(readdirSync(join(cwd, ".omo")).sort()).toEqual(["omo.jsonc", "omo.jsonc.bak.2020-01-01T00-00-00-000Z"])
+    expect(readFileSync(join(cwd, ".omo", "omo.jsonc.bak.2020-01-01T00-00-00-000Z"), "utf8")).toBe("theirs")
+  })
+
   test("#given no bound session #when either verb runs #then it answers no_session", () => {
     expect(getProjectModelProfile(undefined)).toMatchObject({ kind: "refused", code: "no_session" })
     expect(setProjectModelProfile(undefined, { modelProfile: "daily-heavy" })).toMatchObject({

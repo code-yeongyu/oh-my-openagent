@@ -80,11 +80,17 @@ function isHomeFolder(cwd: string, deps: ProjectModelProfileDeps): boolean {
   return dirname(folder) === accountsRoot && basename(folder).length > 0
 }
 
-// The writer's pre-write copies of this folder's omo config (`<file>.bak.<stamp>`), written before the atomic rename.
-function removeBackups(path: string, deps: ProjectModelProfileDeps): void {
+// The writer's pre-write copies of this folder's omo config (`<file>.bak.<stamp>`). Only copies that did not exist before
+// this write are ours to remove; a copy someone else made stays.
+function backupNames(path: string): ReadonlySet<string> {
   const prefix = `${basename(path)}.bak.`
+  if (!existsSync(dirname(path))) return new Set()
+  return new Set(readdirSync(dirname(path)).filter((name) => name.startsWith(prefix)))
+}
+
+function removeNewBackups(path: string, before: ReadonlySet<string>, deps: ProjectModelProfileDeps): void {
   const remove = deps.removeFile ?? ((file: string) => rmSync(file, { force: true }))
-  for (const name of readdirSync(dirname(path))) if (name.startsWith(prefix)) remove(join(dirname(path), name))
+  for (const name of backupNames(path)) if (!before.has(name)) remove(join(dirname(path), name))
 }
 
 function projectConfigPath(cwd: string): string {
@@ -159,6 +165,7 @@ export function setProjectModelProfile(
   if (value !== null && !validProfile(value, current.profileIds))
     return refused("invalid_model_profile", `${JSON.stringify(value)} is not a profile id or a provider/model pin.`)
   const target = current.path
+  const backupsBefore = backupNames(target)
   try {
     updateOmoConfig({
       scope: "project",
@@ -167,7 +174,7 @@ export function setProjectModelProfile(
       ...(deps.fileSystem === undefined ? {} : { fileSystem: deps.fileSystem }),
     })
   } catch (error) {
-    removeBackups(target, deps)
+    removeNewBackups(target, backupsBefore, deps)
     if (error instanceof OmoConfigWriteError && error.operation === "parse")
       return refused("project_config_parse_error", error.message)
     return refused("project_config_write_failed", error instanceof Error ? error.message : String(error))
@@ -176,7 +183,7 @@ export function setProjectModelProfile(
   // copy that cannot be removed is reported with the read-back, never as a failed write.
   let leftover: string | null = null
   try {
-    removeBackups(target, deps)
+    removeNewBackups(target, backupsBefore, deps)
   } catch (error) {
     leftover = error instanceof Error ? error.message : String(error)
   }
