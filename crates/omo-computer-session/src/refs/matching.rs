@@ -5,16 +5,16 @@
 //! (1) the backend reports the same native object, and that object is the latest holder of
 //! the number; else (2) its role + native id tuple matches an old entry UNIQUELY (one free old
 //! number for that tuple, one unmatched element carrying it) and that old entry is not live
-//! under another native object in this read or, for a drill, in the parent generation. A drill
-//! reads a sub-generation whose parent stays valid (line 58), so every number live in the
-//! parent outside the drilled subtree is reserved (ruling R18). Anything else is not a match:
-//! the element gets the next counter number.
+//! under another native object in this read or, for a drill, in any valid generation of the
+//! window. A drill reads a sub-generation whose parent stays valid (line 58), so every number a
+//! valid generation holds outside the drilled subtree is reserved (ruling R18). Anything else is
+//! not a match: the element gets the next counter number.
 
 use std::collections::{BTreeMap, HashSet};
 
 use omo_computer_core::ax::{NativeObject, NodeRead, Walk};
 
-use super::entry::Identity;
+use super::entry::{Generation, Identity};
 use super::RefRegistry;
 
 /// Role + native id.
@@ -34,33 +34,51 @@ pub struct Drilled<'a> {
     pub identity: &'a Identity,
 }
 
-/// What a drill's parent generation keeps for itself.
+/// What the valid generations of a window keep from a drill's lookalikes.
 #[derive(Debug, Default)]
 pub(crate) struct Reserved {
-    /// Numbers of parent elements outside the drilled subtree.
+    /// Numbers a valid generation holds outside the drilled element's subtree.
     numbers: HashSet<u64>,
-    /// Native objects of the parent generation.
+    /// Native objects of the valid generations.
     objects: HashSet<NativeObject>,
 }
 
+/// Entry `at` of `generation` is the element numbered `root` or lies under it.
+fn under(generation: &Generation, mut at: usize, root: u64) -> bool {
+    loop {
+        if generation.entries[at].n == root {
+            return true;
+        }
+        match generation.entries[at].parent {
+            Some(up) => at = up,
+            None => return false,
+        }
+    }
+}
+
 impl RefRegistry {
+    /// A drill reads part of the window, so "live" means live in ANY valid generation of the
+    /// window - every full read and sub-generation still inside the 8-generation window, the
+    /// full read the drill hangs under and newer reads than the one it resolved from included
+    /// (line 58, ruling R18). A full read sees the whole window: nothing is reserved, and
+    /// liveness is presence in that read.
     pub(crate) fn reserved(&self, window: &str, drilled: Option<&Drilled<'_>>) -> Reserved {
-        let Some((drilled, parent)) = drilled.and_then(|d| Some((d, self.generation(window, d.from)?))) else {
+        let Some(refs) = drilled.and(self.windows.get(window)) else {
             return Reserved::default();
         };
-        let inside = |mut at: usize| loop {
-            if at == drilled.index {
-                return true;
-            }
-            match parent.entries[at].parent {
-                Some(up) => at = up,
-                None => return false,
-            }
+        let Some(root) = drilled.and_then(|d| refs.generations.get(&d.from)?.entries.get(d.index)).map(|entry| entry.n) else {
+            return Reserved::default();
         };
-        Reserved {
-            numbers: (0..parent.entries.len()).filter(|i| !inside(*i)).map(|i| parent.entries[i].n).collect(),
-            objects: parent.entries.iter().filter_map(|entry| entry.object).collect(),
+        let mut reserved = Reserved::default();
+        for generation in refs.generations.values() {
+            for (at, entry) in generation.entries.iter().enumerate() {
+                if !under(generation, at, root) {
+                    reserved.numbers.insert(entry.n);
+                }
+                reserved.objects.extend(entry.object);
+            }
         }
+        reserved
     }
 
     /// The number of every node of `walk`, by the verdict above.
