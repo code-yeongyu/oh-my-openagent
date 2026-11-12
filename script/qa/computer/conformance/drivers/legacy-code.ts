@@ -45,6 +45,34 @@ const CENTRE = [
   "}",
 ]
 
+// A synthetic pointer event lands on whatever is under the pointer. Each pointer cell asks the engine what it reads at
+// the element's centre; a pixel cell whose point is not on its target sends nothing, and a delivered cell carries
+// the reading, so "delivered but not received" can only be claimed when the point was on the element.
+const AIM = [
+  "let aimed = null",
+  "const aim = async (element) => {",
+  "  const box = await element.bounds()",
+  '  if (box === null) throw new Error("fixture element has no bounds")',
+  "  const point = { x: Math.round(box.x + box.width / 2), y: Math.round(box.y + box.height / 2) }",
+  "  const at = await desktop.elementAt(point.x, point.y)",
+  "  aimed = { point, window: win.bounds, role: at?.role ?? null, title: at?.title ?? null }",
+  "  return aimed",
+  "}",
+]
+
+const POINTER: ReadonlySet<Cell["action"]> = new Set(["click", "typeText", "scroll", "drag"])
+
+function aimLines(cell: Cell, target: FixtureTarget): string[] {
+  if (!POINTER.has(cell.action)) return []
+  const title = JSON.stringify(target.element.title)
+  const check = ["const seen = await aim(el)"]
+  if (cell.targeting !== "px") return check
+  return [
+    ...check,
+    `if (seen.title !== ${title}) return { kind: "error", message: "aim point is not on the target; the engine reads " + JSON.stringify(seen), aim: seen }`,
+  ]
+}
+
 function actionLines(cell: Cell, target: FixtureTarget): string[] {
   const opts = cell.mode === "foreground" ? `{ delivery: "foreground" }` : "undefined"
   const pointAt = ["const [x, y] = await centre(el)"]
@@ -96,8 +124,10 @@ export function cellCode(cell: Cell, target: FixtureTarget): string {
     ...windowLookup(target),
     ...lookup("el", target.element),
     ...CENTRE,
+    ...AIM,
+    ...aimLines(cell, target),
     ...actionLines(cell, target),
-    'return { kind: "delivered" }',
+    'return { kind: "delivered", aim: aimed }',
   ]
   return [
     "try {",

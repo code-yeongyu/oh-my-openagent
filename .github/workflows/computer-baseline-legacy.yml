@@ -74,7 +74,7 @@ jobs:
           apt() { sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get "$@"; }
           for attempt in 1 2 3; do
             if apt update && apt install -y --no-install-recommends xserver-xorg-core xserver-xorg-video-dummy \
-              x11-utils dbus-x11 at-spi2-core python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1 openbox; then
+              x11-utils dbus-x11 at-spi2-core python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1 openbox xdotool; then
               echo "apt attempt ${attempt} ok"; exit 0
             fi
             echo "apt attempt ${attempt} failed"; sleep $((attempt * 15))
@@ -134,6 +134,15 @@ jobs:
         run: |
           set -euo pipefail
           dbus-run-session -- bun script/qa/computer/conformance/drivers/legacy.ts --smoke | tee "${RUNNER_TEMP}/computer-baseline/smoke.log"
+
+      # The control for the "delivered but the application never received it" cells: the same background pixel click
+      # before and after the driver raises the window itself. Its own result is the evidence, so it never fails the job.
+      - name: Control, background pixel click before and after a raise
+        shell: bash
+        run: |
+          set +e -uo pipefail
+          dbus-run-session -- bun script/qa/computer/conformance/drivers/legacy.ts --control | tee "${RUNNER_TEMP}/computer-baseline/control.log"
+          echo "control EXIT ${PIPESTATUS[0]}"
 
       - name: Catalog and task set on the shipped runtime
         shell: bash

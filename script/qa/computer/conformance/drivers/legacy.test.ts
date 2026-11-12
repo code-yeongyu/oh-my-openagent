@@ -51,7 +51,10 @@ function facade(sent: Sent[], refuse?: string) {
     menu: { select: record("win.menu.select") },
   }
   const listed = [{ id: "w1", app: "python3", title: TARGET.title, pid: 42 }]
+  const inside = (x: number, y: number) =>
+    x >= ELEMENT.x && x <= ELEMENT.x + ELEMENT.width && y >= ELEMENT.y && y <= ELEMENT.y + ELEMENT.height
   return {
+    elementAt: async (x: number, y: number) => (inside(x, y) ? { role: "button", title: TARGET.element.title } : null),
     windows: async (filter?: { title?: string }) =>
       filter?.title === undefined ? listed : listed.filter((entry) => entry.title.includes(filter.title ?? "")),
     window: async (id: string) => {

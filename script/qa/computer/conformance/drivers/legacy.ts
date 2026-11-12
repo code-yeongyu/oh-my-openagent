@@ -13,7 +13,7 @@ import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { cellId } from "../catalog.ts"
+import { catalogFor, cellId } from "../catalog.ts"
 import type { Driver } from "../driver.ts"
 import type { Task } from "../taskset/tasks.ts"
 import type { Cell, CellResult } from "../vocabulary.ts"
@@ -168,6 +168,10 @@ export function createLegacyDriver(parts: LegacyDriverParts): Driver {
         const { value, journal } = await observer.observe(() => run(tool, code))
         const durationMs = performance.now() - started
         const observed = await settled(() => fixtures.read(cell), cell.oracle.equals, parts.settleMs ?? SETTLE_MS)
+        const returned = isRecord(value) && isRecord(value.details) ? value.details.value : undefined
+        const aim = isRecord(returned) ? returned.aim : undefined
+        if (aim !== undefined)
+          console.log(`CELL_EVIDENCE ${cellId(cell)} aim=${JSON.stringify(aim)} fixture=${JSON.stringify(observed)}`)
         const result = { id: cellId(cell), observed: readOutcome(value), oracle: { observed }, durationMs, journal }
         return observer.reason === undefined ? result : { ...result, observerUnavailable: observer.reason }
       } finally {
@@ -233,4 +237,55 @@ async function smoke(): Promise<number> {
   return failed ? 1 : 0
 }
 
+// `--control`: the check the "delivered but the application never received it" pointer cells need before that
+// reading is a fact about the release. The SAME background pixel click is sent twice on a fresh fixture: as the
+// catalog sends it, then after the driver itself raises and focuses the window (the tool refuses foreground here).
+// The fixture's own press count after each send is the verdict, and the engine's reading at the aim point comes with it.
+async function control(): Promise<number> {
+  const say = (line: string): number => (console.log(`LEGACY_CONTROL ${line}`), 1)
+  if (!("ready" in shippedTool)) return say(`status=unavailable reason=${JSON.stringify(shippedTool.unavailable)}`)
+  const fixtures = hostFixtures(process.platform, process.env, session)
+  if (!("ready" in fixtures)) return say(`status=unavailable reason=${JSON.stringify(fixtures.unavailable)}`)
+  const [os, desk] = process.platform === "win32" ? (["windows", "console"] as const) : (["x11", "xorg"] as const)
+  const cell = catalogFor(os, desk).find(
+    (entry) =>
+      entry.toolkit === "native" && entry.action === "click" && entry.targeting === "px" && entry.mode === "background",
+  )
+  if (cell === undefined) throw new Error("the catalog has no native background pixel click")
+  const target = fixtures.ready.target(cell)
+  if ("unavailable" in target) return say(`status=unavailable reason=${JSON.stringify(target.unavailable)}`)
+  const context = hostContext(session())
+  const send = async (label: string): Promise<void> => {
+    const outcome = await shippedTool.ready.execute(
+      `conformance-control-${label}`,
+      { action: "run", code: cellCode(cell, target) },
+      context,
+    )
+    const value = isRecord(outcome) && isRecord(outcome.details) ? outcome.details.value : outcome
+    const pressed = await settled(() => fixtures.ready.read(cell), 1, SETTLE_MS)
+    say(`${label} outcome=${JSON.stringify(value)} pressCount=${JSON.stringify(pressed)}`)
+  }
+  try {
+    await fixtures.ready.reset(cell)
+    await send("background")
+    if (process.platform === "linux") {
+      const raise = Bun.spawn(["xdotool", "search", "--name", `^${target.title}$`, "windowactivate", "--sync"], {
+        stdout: "pipe",
+        stderr: "pipe",
+      })
+      const [out, err, code] = await Promise.all([
+        new Response(raise.stdout).text(),
+        new Response(raise.stderr).text(),
+        raise.exited,
+      ])
+      say(`raise exit=${code} ${(out + err).trim().slice(0, 200)}`)
+    } else say("raise skipped: this control is for x11")
+    await send("raised")
+    return 0
+  } finally {
+    await fixtures.ready.stop()
+  }
+}
+
 if (import.meta.main && process.argv.includes("--smoke")) process.exit(await smoke())
+if (import.meta.main && process.argv.includes("--control")) process.exit(await control())
