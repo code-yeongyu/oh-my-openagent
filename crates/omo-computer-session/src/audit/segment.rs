@@ -115,25 +115,36 @@ pub(super) fn truncated(event: &AuditEvent) -> AuditEvent {
 }
 
 /// The last `lineHash` of the audit file at `path`: the previous segment's chain link.
+/// `Ok(None)` when there is no file; a file that is there and cannot be read is an error.
 pub(super) fn last_line_hash(path: &Path) -> io::Result<Option<String>> {
-    let Ok(file) = File::open(path) else {
-        return Ok(None);
+    let file = match File::open(path) {
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        opened => opened?,
     };
-    Ok(BufReader::new(file)
-        .lines()
-        .map_while(Result::ok)
-        .filter_map(|text| serde_json::from_str::<Value>(&text).ok())
-        .filter_map(|line| {
+    let mut last = None;
+    for text in BufReader::new(file).lines() {
+        let hash = serde_json::from_str::<Value>(&text?).ok().and_then(|line| {
             line.get("lineHash")
                 .and_then(Value::as_str)
                 .map(str::to_owned)
-        })
-        .last())
+        });
+        if hash.is_some() {
+            last = hash;
+        }
+    }
+    Ok(last)
 }
 
-/// The chain link a new segment starts from.
+/// The chain link a new segment starts from. An audit file that cannot be read is logged
+/// (the link then restarts at `meta`, as before) instead of breaking the chain unseen.
 pub(super) fn chain_link(path: &Path) -> Option<String> {
-    last_line_hash(path).unwrap_or(None)
+    last_line_hash(path).unwrap_or_else(|error| {
+        eprintln!(
+            "omo-computer-engine: warn audit chain link not read from {}, prev restarts at meta: {error}",
+            path.display()
+        );
+        None
+    })
 }
 
 #[cfg(unix)]
