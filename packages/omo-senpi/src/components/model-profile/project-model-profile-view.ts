@@ -1,4 +1,9 @@
-import { loadOmoConfig, type OmoConfigEnv, resolveOmoProfileName } from "@oh-my-opencode/omo-config-core"
+import {
+  loadOmoConfig,
+  normalizeLegacyModelFields,
+  type OmoConfigEnv,
+  resolveOmoProfileName,
+} from "@oh-my-opencode/omo-config-core"
 
 import { projectConfigPath } from "./project-config-path"
 
@@ -42,7 +47,8 @@ function pickStrings(record: Readonly<Record<string, unknown>>, keys: readonly s
 function modelEntry(entry: unknown): unknown {
   if (typeof entry === "string") return entry
   const record = asRecord(entry)
-  return record === null ? null : pickStrings(record, MODEL_ENTRY_KEYS)
+  // A layer is the file as written, so a deprecated `reasoningEffort` / `variant` is folded into `reasoning` the way the schema folds it.
+  return record === null ? null : pickStrings(normalizeLegacyModelFields(record), MODEL_ENTRY_KEYS)
 }
 
 function modelProfiles(value: unknown): Record<string, unknown> | undefined {
@@ -77,6 +83,11 @@ function flatModelProfileKeys(config: Readonly<Record<string, unknown>>): Record
   const pad = modelPad(config["model_pad"])
   if (pad !== undefined) kept["model_pad"] = pad
   return kept
+}
+
+/** One config layer reduced to the keys a model-profile resolver reads. */
+export function modelProfileLayer(config: Readonly<Record<string, unknown>>): Record<string, unknown> {
+  return modelProfileKeys(config, true)
 }
 
 // A harness block holds only flat model-profile keys, so it is read one level deep and never walked further.
@@ -116,8 +127,8 @@ export function viewProjectModelProfile(
   return {
     kind: "ok",
     layers: {
-      user: modelProfileKeys(userLayer?.config ?? {}, true),
-      ...(projectLayer === undefined ? {} : { project: modelProfileKeys(projectLayer.config, true) }),
+      user: modelProfileLayer(userLayer?.config ?? {}),
+      ...(projectLayer === undefined ? {} : { project: modelProfileLayer(projectLayer.config) }),
       ...(activeProfile === undefined ? {} : { activeProfile }),
     },
   }
