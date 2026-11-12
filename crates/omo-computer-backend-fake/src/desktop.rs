@@ -7,6 +7,7 @@ use omo_computer_core::backend::{
 };
 use omo_computer_core::capabilities::Capabilities;
 use omo_computer_core::error::{EngineCode, Reason};
+use omo_computer_core::intervention::{BackendClock, InterventionSource, TextDelivery};
 use omo_computer_core::listing::{Rect, WindowInfo};
 use omo_computer_core::observation::ImageMime;
 use omo_computer_core::results::{DisplayInfo, PermissionState};
@@ -139,7 +140,8 @@ fn capture_rect(state: &FakeState, target: &Target) -> BackendResult<(Rect, f64)
 
 impl Backend for FakeBackend {
     fn capabilities(&self) -> Capabilities {
-        fake_capabilities(self.persona, self.lock().displays.len(), self.stop_path)
+        let displays = self.lock().displays.len();
+        self.with_scripted_session(fake_capabilities(self.persona, displays, self.stop_path))
     }
 
     fn windows(&mut self, filter: &WindowFilter) -> BackendResult<WindowList> {
@@ -260,6 +262,24 @@ impl Backend for FakeBackend {
 
     fn ax_reader(&mut self) -> Option<&mut dyn omo_computer_core::ax::AxReader> {
         Some(self)
+    }
+
+    fn clock(&self) -> Option<&dyn BackendClock> {
+        Some(&self.clock)
+    }
+
+    fn intervention(&self) -> Option<&dyn InterventionSource> {
+        Some(self)
+    }
+
+    fn post_text(
+        &mut self,
+        text: &str,
+        route: Route,
+        tag: u64,
+        interrupt: &mut dyn FnMut(&dyn Backend) -> bool,
+    ) -> TextDelivery {
+        self.type_interruptible(text, route, tag, interrupt)
     }
 }
 

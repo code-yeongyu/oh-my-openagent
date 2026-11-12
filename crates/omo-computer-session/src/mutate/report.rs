@@ -36,6 +36,9 @@ pub(super) struct Sent {
     pub(super) effect: Effect,
     pub(super) audit_id: Option<String>,
     pub(super) warning: Option<String>,
+    pub(super) paused: Vec<omo_computer_core::intervention::Pause>,
+    pub(super) session: Option<omo_computer_core::session_state::SessionState>,
+    pub(super) target: Option<omo_computer_core::intervention::TargetLiveness>,
 }
 
 /// # Errors
@@ -67,6 +70,9 @@ pub(super) fn reply(
         timings: None,
         evidence: Vec::new(),
         observation: UntrustedText,
+        paused: sent.paused,
+        session: sent.session,
+        target: sent.target,
     };
     ActionReport::new(ReportContext::new(verb, None), parts).map(|report| ExecReply(Some(report)))
 }

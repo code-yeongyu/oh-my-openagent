@@ -3,7 +3,8 @@
 
 use std::hash::{BuildHasher, Hasher};
 
-use omo_computer_core::backend::{Refusal, TaggedInput};
+use omo_computer_core::backend::Delivered;
+use omo_computer_core::params::ReportMode;
 use omo_computer_core::report::Disposition;
 use omo_computer_core::results::ExecReply;
 use serde_json::json;
@@ -11,8 +12,10 @@ use serde_json::json;
 use super::record::{target_id, Record};
 use super::recovery::Verdict;
 use super::report::{self, Sent};
-use super::{Mutation, Refused, MARKER_UNAVAILABLE, TRANSACTION_FAILED};
+use super::{Mutation, Refused, Stamps, MARKER_UNAVAILABLE, TRANSACTION_FAILED};
 use crate::budget::PermitKind;
+use crate::intervention::{Ended, MidSend, Stop};
+use crate::session_state::sample;
 use crate::marker::Receipt;
 use crate::{Session, NOT_OPEN};
 
@@ -23,22 +26,24 @@ impl Session {
     /// The gate's, the marker's or the backend's refusal; nothing is sent on any refusal
     /// produced before the send.
     pub(crate) fn mutate(&mut self, mutation: Mutation<'_>) -> Result<ExecReply, Refused> {
-        let (report_mode, tag) = {
+        let (report_mode, tag, policy, ceiling) = {
             let opened = self.opened.as_ref().ok_or(NOT_OPEN)?;
-            (opened.report_mode, opened.tag)
+            (opened.report_mode, opened.tag, opened.intervention, opened.pause_ceiling_ms)
         };
+        let object = report_mode == ReportMode::Object;
         self.funnel.audit().admit()?;
         let call_id = mutation.call_id.clone().unwrap_or_else(mint_call_id);
         let target = target_id(&mutation.call.target);
         let secure = self.funnel.secure.secure(self.backend.as_ref(), target);
         let mut record = Record::new(&self.funnel, &mutation, &call_id, secure);
-        if let Err(refused) = self.guard.admit_on(self.backend.as_mut(), &mutation.call) {
-            return Err(self.refuse(
-                record,
-                Some(format!("{:?}", refused.gate)),
-                refused.refusal.into(),
-            ));
-        }
+        let pausing = object.then_some(ceiling);
+        let admission = match self.admit_call(&mutation.call, mutation.route, pausing) {
+            Ok(admission) => admission,
+            Err(blocked) => {
+                let refused = self.stamp(blocked.refused, object);
+                return Err(self.refuse(record, Some(blocked.stage), refused));
+            }
+        };
         if let Some(frame) = mutation.frame_refusal {
             return Err(self.refuse(record, Some("Frame".to_owned()), frame.refusal().into()));
         }
@@ -70,37 +75,43 @@ impl Session {
         if self.funnel.markers.create(&record.marker).is_err() {
             return Err(self.refuse(record, Some("Marker".to_owned()), MARKER_UNAVAILABLE.into()));
         }
-        let of = u32::try_from(mutation.events.len()).unwrap_or(u32::MAX);
-        let (count, failure) = self.send(mutation.events, mutation.route, tag);
+        let watch = admission
+            .pid
+            .and_then(|pid| MidSend::start(self.backend.as_ref(), pid, policy));
+        let outcome = self.send_watched(mutation.events, mutation.route, tag, watch, target);
         drop(lock);
+        let (count, of) = (outcome.count, outcome.of);
         if let Some((target, frame_id)) = mutation.consume.as_ref().filter(|_| count > 0) {
             self.frames.consume(target, frame_id);
         }
         let read_back = report::read_back(report::settle());
-        match failure {
-            Some(refusal) if count == 0 => {
+        let paused = if object { admission.paused } else { Vec::new() };
+        let session = object.then(|| sample(self.backend.as_ref()));
+        match outcome.stop {
+            Some(Stop::Refused(refusal)) if count == 0 => {
                 let issuer = record.marker.binding.issuer.clone();
                 let scope = record.marker.binding.scope.clone();
                 let _ = self.funnel.markers.clear(&issuer, &scope);
-                Err(self.refuse(record, None, refusal.into()))
+                let refused = Refused::from(refusal).with_paused(paused);
+                let refused = self.stamp(refused, object);
+                Err(self.refuse(record, None, refused))
             }
-            Some(refusal) => {
-                record.sent(
-                    count,
-                    of,
-                    Disposition::UNCERTAIN_UNSAFE,
-                    "unverifiable",
-                    Some(&refusal),
-                );
-                let stored =
-                    json!({ "error": { "code": refusal.code.wire(), "reason": refusal.reason } });
+            Some(stop) => {
+                let ended = Ended::of(stop, count);
+                record.sent(count, of, ended.disposition, "unverifiable", Some(&ended.refusal));
+                let stored = json!({ "error": { "code": ended.refusal.code.wire(), "reason": ended.refusal.reason } });
                 self.store_receipt(&mut record, stored);
                 let _ = self.funnel.audit().append(record.event);
                 Err(Refused {
-                    refusal,
                     call_id: Some(call_id),
-                    receipt: None,
-                    interrupted: Some(Disposition::UNCERTAIN_UNSAFE),
+                    interrupted: ended.interrupted,
+                    stamps: Box::new(Stamps {
+                        delivered: object.then_some(Delivered { count, of }),
+                        paused,
+                        session,
+                        target: ended.target,
+                    }),
+                    ..Refused::from(ended.refusal)
                 })
             }
             None => {
@@ -119,6 +130,9 @@ impl Session {
                     effect: read_back.effect,
                     warning: appended.is_err().then(|| "write_failed".to_owned()),
                     audit_id: appended.ok(),
+                    paused,
+                    session,
+                    target: None,
                 };
                 let reply =
                     report::reply(report_mode, mutation.method, sent).unwrap_or_else(|rejection| {
@@ -132,23 +146,6 @@ impl Session {
                 Ok(reply)
             }
         }
-    }
-
-    /// The one side-effect sink: every event in order, stopping at the first refusal.
-    fn send(
-        &mut self,
-        events: Vec<omo_computer_core::backend::InputEvent>,
-        route: omo_computer_core::backend::Route,
-        tag: u64,
-    ) -> (u32, Option<Refusal>) {
-        let mut count = 0;
-        for event in events {
-            match self.backend.post_input(&TaggedInput { event, tag }, route) {
-                Ok(_) => count += 1,
-                Err(refusal) => return (count, Some(refusal)),
-            }
-        }
-        (count, None)
     }
 
     fn store_receipt(&mut self, record: &mut Record, reply: serde_json::Value) {

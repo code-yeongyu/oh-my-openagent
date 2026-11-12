@@ -2,7 +2,7 @@
 // Do not edit by hand; run `bun run --cwd packages/omo-computer-protocol generate`.
 
 /** sha256 of the schema file this module was generated from; the schema-drift test compares it. */
-export const SCHEMA_SHA256 = "b3b3d676b5c6bc93259885c279007402715c4a6eb57e68de457e1f9034c24f81" as const
+export const SCHEMA_SHA256 = "da974ea42139f11b748beee5d1c92057e224ba5d674d1c5c0406a79b368b3dde" as const
 
 /** The wire protocol version `engine.hello` reports. */
 export const PROTOCOL_VERSION = "1" as const
@@ -400,6 +400,9 @@ export type ActionReport = {
 	timings?: Timings | null
 	evidence: Evidence[]
 	observation: UntrustedText
+	paused?: Pause[]
+	session?: SessionState | null
+	target?: TargetLiveness | null
 }
 
 export type AdvanceClockParams = {
@@ -719,8 +722,6 @@ export type Diagnosis = {
 	releaseHelper?: ReleaseHelper | null
 	observation: UntrustedText
 }
-
-export type DiffFallback = "baseline_incomplete" | "current_incomplete" | "since_expired" | "window_changed" | "menu_root" | "reordered" | "not_shorter" | "query_projection"
 
 export type DisplayAwake = {
 	state: DisplayAwakeState
@@ -1112,8 +1113,6 @@ export type Observation = {
 	frame?: Frame | null
 	tree?: string | null
 	diff?: string | null
-	diffFallback?: DiffFallback | null
-	baseline?: number | null
 	focused?: ElementInfo | null
 	selectedText?: string | null
 	complete: boolean
@@ -1201,6 +1200,13 @@ export type PasteParams = {
 	runGeneration?: number | null
 	observeAfter?: ObserveOptions | null
 }
+
+export type Pause = {
+	reason: PauseReason
+	ms: number
+}
+
+export type PauseReason = "screen_locked" | "user_active" | "system_suspended"
 
 export type PermissionReport = {
 	state: PermissionState
@@ -1485,6 +1491,15 @@ export type SurfacePredicate = {
 }
 
 export type SurfaceState = "appeared" | "gone"
+
+export type TargetLiveness = {
+	state: TargetState
+	pid: number
+	exitCode?: number | null
+	signal?: number | null
+}
+
+export type TargetState = "exited" | "unresponsive"
 
 export type TextRange = {
 	start: number
