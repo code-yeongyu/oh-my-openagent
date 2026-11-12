@@ -66,10 +66,6 @@ fn action(response: Response) -> ActionReport {
     }
 }
 
-/// Wall time a busy host takes from the test around a refusal: longer than
-/// any bound a wall clock could set on "at once".
-const REFUSAL_STALL: Duration = Duration::from_millis(1_100);
-
 /// An object-mode harness on fake time.
 fn opened_on_fake_time(overlay: &Value) -> Harness {
     let options = DesktopSessionOptions { report_mode: ReportMode::Object, trace: true, ..DesktopSessionOptions::default() };
@@ -91,8 +87,7 @@ fn the_battery_refuses_a_disabled_element_at_once_and_sends_nothing() {
     // Given: a visible, still, disabled button.
     let mut harness = opened_on_fake_time(&scene(button(&json!({"enabled": false})), &[]));
     let reference = harness.focused_ref();
-    // When: a loaded host deschedules this thread around the press.
-    std::thread::sleep(REFUSAL_STALL);
+    // When
     let error = press(&mut harness, reference).expect_err("refused");
     // Then: no auto-wait for a terminal state.
     refused_fast(&harness, &error, "disabled");
@@ -104,8 +99,7 @@ fn the_battery_refuses_an_action_the_element_does_not_offer_at_once() {
     // Given: a button that offers only `click`.
     let mut harness = opened_on_fake_time(&scene(button(&json!({"actions": ["click"]})), &[]));
     let reference = harness.focused_ref();
-    // When: a loaded host deschedules this thread around the request.
-    std::thread::sleep(REFUSAL_STALL);
+    // When
     let error = harness
         .process(Op::AxPerform(AxPerformParams { ref_: reference, action: "increment".to_owned() }))
         .expect_err("refused");
