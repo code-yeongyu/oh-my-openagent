@@ -22,7 +22,10 @@ export function planCode(surface, plan) {
   const lines = [RUN_PRELUDE, `const win = ${windowExpr(surface.window)};`, "let n = 0;"]
   for (const step of plan) {
     const w = step.window === undefined ? "win" : `(${windowExpr(step.window)})`
-    const el = step.el === undefined ? "" : `(await pick(${w}, ${JSON.stringify(step.el.role)}, ${JSON.stringify(step.el.name)}, false))`
+    const el =
+      step.el === undefined
+        ? ""
+        : `(await pick(${w}, ${JSON.stringify(step.el.role)}, ${JSON.stringify(step.el.name)}, false))`
     if (step.op === "press") lines.push(`await ${el}.press(); n++;`)
     else if (step.op === "setValue") lines.push(`await ${el}.setValue(${JSON.stringify(step.value)}); n++;`)
     else if (step.op === "type") lines.push(`await ${el}.type(${JSON.stringify(step.text)}); n++;`)
@@ -50,13 +53,22 @@ export function readbackCode(surface) {
 }
 
 function centerOf(scenario, filter, { role, name }) {
-  const win = scenario.windows.find((w) => (filter.title === undefined || w.title === filter.title) && w.app === filter.app)
+  const win = scenario.windows.find(
+    (w) => (filter.title === undefined || w.title === filter.title) && w.app === filter.app,
+  )
   const stack = win === undefined ? [] : [scenario.ax[win.id]]
   while (stack.length > 0) {
     const node = stack.shift()
     if (node === undefined) continue
-    if (node.role === role && (name === "" || node.title === name || node.description === name) && node.bounds !== undefined) {
-      return { x: Math.round(node.bounds.x + node.bounds.width / 2), y: Math.round(node.bounds.y + node.bounds.height / 2) }
+    if (
+      node.role === role &&
+      (name === "" || node.title === name || node.description === name) &&
+      node.bounds !== undefined
+    ) {
+      return {
+        x: Math.round(node.bounds.x + node.bounds.width / 2),
+        y: Math.round(node.bounds.y + node.bounds.height / 2),
+      }
     }
     stack.push(...(node.children ?? []))
   }
@@ -91,14 +103,29 @@ export function modelScript(arm, surface) {
   if (arm === "model-tool") own.push(computerRun(planCode(surface, surface.plan)))
   else {
     // `computer_actions` is declared once the computer tool is active (#9048); a screenshot activates it.
-    own.push({ type: "tool_call", name: "computer", arguments: { action: "call", chain: [{ method: "screenshot" }] }, harness: true })
+    own.push({
+      type: "tool_call",
+      name: "computer",
+      arguments: { action: "call", chain: [{ method: "screenshot" }] },
+      harness: true,
+    })
     own.push({ type: "tool_call", name: "computer_actions", arguments: { action: "screenshot" } })
     const { actions, unreachable } = cuaActions(surface, surface.plan)
-    if (actions.length > 0) own.push({ type: "tool_call", name: "computer_actions", arguments: { action: "batch", actions } })
-    if (unreachable !== undefined) own.push({ type: "text", text: `cannot reach ${unreachable} from the screenshot`, harness: false, note: true })
+    if (actions.length > 0)
+      own.push({ type: "tool_call", name: "computer_actions", arguments: { action: "batch", actions } })
+    if (unreachable !== undefined)
+      own.push({ type: "text", text: `cannot reach ${unreachable} from the screenshot`, harness: false, note: true })
   }
-  const tail = [computerRun(readbackCode(surface)), ...(surface.restore.length > 0 ? [computerRun(planCode(surface, surface.restore))] : []), computerRun(readbackCode(surface))]
-  return { own: own.filter((step) => step.note !== true), tail, unreachable: own.find((step) => step.note === true)?.text }
+  const tail = [
+    computerRun(readbackCode(surface)),
+    ...(surface.restore.length > 0 ? [computerRun(planCode(surface, surface.restore))] : []),
+    computerRun(readbackCode(surface)),
+  ]
+  return {
+    own: own.filter((step) => step.note !== true),
+    tail,
+    unreachable: own.find((step) => step.note === true)?.text,
+  }
 }
 
 function filesNamed(root, predicate, found = []) {
@@ -181,7 +208,17 @@ export async function runModelTask({ task, arm, enginePath, senpi, mismatch }) {
             api: "openai-completions",
             baseUrl: await server.ready,
             apiKey: "fake",
-            models: [{ id: "fake-cu", name: "Fake CU", reasoning: false, input: ["text", "image"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 200000, maxTokens: 8192 }],
+            models: [
+              {
+                id: "fake-cu",
+                name: "Fake CU",
+                reasoning: false,
+                input: ["text", "image"],
+                cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+                contextWindow: 200000,
+                maxTokens: 8192,
+              },
+            ],
           },
         },
       }),
@@ -189,7 +226,14 @@ export async function runModelTask({ task, arm, enginePath, senpi, mismatch }) {
     mkdirSync(join(sandbox.cwd, ".omo"), { recursive: true })
     writeFileSync(
       join(sandbox.cwd, ".omo", "omo.jsonc"),
-      JSON.stringify({ computer: { engine_path: enginePath, allow_host_relay_only_stop: true, trace: true, ...(arm === "model-cua" ? { cua_adapter: true } : {}) } }),
+      JSON.stringify({
+        computer: {
+          engine_path: enginePath,
+          allow_host_relay_only_stop: true,
+          trace: true,
+          ...(arm === "model-cua" ? { cua_adapter: true } : {}),
+        },
+      }),
     )
     const runsOnBun = /\.(?:c|m)?js$/.test(senpi)
     const args = ["-p", "--provider", "cu-eval-fake", "--model", "fake-cu", task.prompt]
@@ -215,15 +259,24 @@ export async function runModelTask({ task, arm, enginePath, senpi, mismatch }) {
     if (run.code !== 0) throw new Error(`senpi exited ${run.code ?? run.signal}: ${run.stderr.trim().slice(-600)}`)
     const results = toolResults(sandbox.agentDir)
     const readbacks = results.map((result) => parseReadback(resultText(result))).filter((value) => value !== undefined)
-    if (readbacks.length !== 2) throw new Error(`expected 2 readbacks, found ${readbacks.length}: ${results.map(resultText).join(" | ").slice(0, 600)}`)
+    if (readbacks.length !== 2)
+      throw new Error(
+        `expected 2 readbacks, found ${readbacks.length}: ${results.map(resultText).join(" | ").slice(0, 600)}`,
+      )
     const auditFile = filesNamed(sandbox.root, (name) => name === ".computer-audit.jsonl")[0]
-    const traceLines = filesNamed(sandbox.root, (_name, path) => /[\\/]trace[\\/][^\\/]+\.jsonl$/.test(path)).flatMap((path) => core.readJsonLines(path))
+    const traceLines = filesNamed(sandbox.root, (_name, path) => /[\\/]trace[\\/][^\\/]+\.jsonl$/.test(path)).flatMap(
+      (path) => core.readJsonLines(path),
+    )
     const audit = auditFile === undefined ? [] : core.readJsonLines(auditFile)
     // The readback run sends no input, so every audit line before the first `ax.query` of the restore run is
     // the arm's own. The trace carries the boundary: the first reply after the first readback's last read.
     const ownCalls = own.filter((step) => step.harness !== true).length
-    const ownResults = results.filter((result) => result.toolName === "computer_actions" || resultText(result).includes("CUEVAL_DONE")).slice(0, ownCalls)
-    const failedOwn = ownResults.filter((result) => result.isError === true).map((result) => resultText(result).slice(0, 300))
+    const ownResults = results
+      .filter((result) => result.toolName === "computer_actions" || resultText(result).includes("CUEVAL_DONE"))
+      .slice(0, ownCalls)
+    const failedOwn = ownResults
+      .filter((result) => result.isError === true)
+      .map((result) => resultText(result).slice(0, 300))
     const boundary = readbacks[0].at
     const audited = new Set(audit.map((line) => line.action))
     const replies = traceLines.filter((line) => line.type === "reply" && audited.has(line.method))
@@ -242,7 +295,10 @@ export async function runModelTask({ task, arm, enginePath, senpi, mismatch }) {
           restoreAudit: audit.slice(auditBefore.length),
           steps: ownCalls,
           harnessCalls: steps.length - 1 - ownCalls,
-          tokens: tokenEstimate(requests, own.flatMap((step, index) => (step.harness === true ? [] : [index]))),
+          tokens: tokenEstimate(
+            requests,
+            own.flatMap((step, index) => (step.harness === true ? [] : [index])),
+          ),
           wallMs,
         },
       }),

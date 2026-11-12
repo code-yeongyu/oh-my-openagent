@@ -33,9 +33,14 @@ const here = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(here, "..", "..", "..", "..", "..")
 
 if (process.versions.bun === undefined) {
-  const child = spawnSync("bun", [fileURLToPath(import.meta.url), ...process.argv.slice(2)], { stdio: "inherit", env: withTelemetryOptOut(process.env) })
+  const child = spawnSync("bun", [fileURLToPath(import.meta.url), ...process.argv.slice(2)], {
+    stdio: "inherit",
+    env: withTelemetryOptOut(process.env),
+  })
   if (child.error !== undefined) {
-    console.log(JSON.stringify({ verdict: "FAIL", reason: `cu-eval needs bun on PATH to load the SDK: ${child.error.message}` }))
+    console.log(
+      JSON.stringify({ verdict: "FAIL", reason: `cu-eval needs bun on PATH to load the SDK: ${child.error.message}` }),
+    )
     process.exit(1)
   }
   process.exit(child.status ?? 1)
@@ -77,7 +82,9 @@ function parseArgs(argv) {
 export function locateEngine(explicit) {
   const candidates = [
     explicit,
-    process.env.CARGO_TARGET_DIR === undefined ? undefined : join(process.env.CARGO_TARGET_DIR, "release", "senpi-desktop-engine"),
+    process.env.CARGO_TARGET_DIR === undefined
+      ? undefined
+      : join(process.env.CARGO_TARGET_DIR, "release", "senpi-desktop-engine"),
     join(repoRoot, "target", "release", "senpi-desktop-engine"),
   ].filter((path) => path !== undefined)
   return candidates.map((path) => resolve(path)).find((path) => existsSync(path)) ?? resolve(candidates[0])
@@ -112,10 +119,20 @@ function errorRow(task, arm, error, wallMs = 0) {
  */
 export async function restoreAndObserve({ computer, win, surface, live, dir, remembered, readback, progress = {} }) {
   const observe = async () =>
-    live === undefined ? { windows: [], files: {} } : { windows: (await computer.windows()).map(({ app, title }) => ({ app, title })), files: live.files(surface, dir) }
+    live === undefined
+      ? { windows: [], files: {} }
+      : {
+          windows: (await computer.windows()).map(({ app, title }) => ({ app, title })),
+          files: live.files(surface, dir),
+        }
   const observed = await observe()
   const teardown = surface.restore.filter((step) => live?.TEARDOWN_OPS.has(step.op))
-  await core.runPlan(computer, win, surface.restore.filter((step) => !teardown.includes(step)), { remembered, readback, live })
+  await core.runPlan(
+    computer,
+    win,
+    surface.restore.filter((step) => !teardown.includes(step)),
+    { remembered, readback, live },
+  )
   progress.restored = true
   const restoredReadback = await core.readBack(computer, win, [...surface.readback, ...(surface.remember ?? [])])
   await core.runPlan(computer, win, teardown, { live })
@@ -131,12 +148,17 @@ export async function restoreAndObserve({ computer, win, surface, live, dir, rem
  */
 async function finishRestore({ computer, win, surface, live, remembered, restored, tornDown }) {
   const errors = []
-  const steps = surface.restore.filter((step) => (live.TEARDOWN_OPS.has(step.op) ? tornDown !== true : restored !== true))
-  const readback = steps.some((step) => step.onlyIfChanged !== undefined) ? await core.readBack(computer, win, surface.readback) : {}
+  const steps = surface.restore.filter((step) =>
+    live.TEARDOWN_OPS.has(step.op) ? tornDown !== true : restored !== true,
+  )
+  const readback = steps.some((step) => step.onlyIfChanged !== undefined)
+    ? await core.readBack(computer, win, surface.readback)
+    : {}
   for (const step of steps) {
     try {
       const key = step.onlyIfChanged
-      if (key !== undefined && ((readback[key] ?? null) === null || (remembered[key] ?? null) === null)) throw new Error(`${key} unknown, left as is`)
+      if (key !== undefined && ((readback[key] ?? null) === null || (remembered[key] ?? null) === null))
+        throw new Error(`${key} unknown, left as is`)
       await core.runPlan(computer, win, [step], { remembered, readback, live })
     } catch (error) {
       errors.push(`${step.op}${step.app === undefined ? "" : ` ${step.app}`}: ${error?.message ?? String(error)}`)
@@ -169,17 +191,30 @@ export async function runSdkTask({ task, enginePath, live, mismatch, scratch, li
   try {
     if (live$ !== undefined) live$.prepare(surface, dir)
     const started = performance.now()
-    const computer = (at.computer = await open({ kind: "spawn", launch: engineLauncher({ enginePath, env, session: { auditPath, reportMode: "object" } }) }))
+    const computer = (at.computer = await open({
+      kind: "spawn",
+      launch: engineLauncher({ enginePath, env, session: { auditPath, reportMode: "object" } }),
+    }))
     if (live$ !== undefined) await live$.waitForWindow(computer, surface.window)
     const win = (at.win = await computer.window(surface.window))
     if (surface.before !== undefined) await core.runPlan(computer, win, surface.before, { live: live$ })
-    const remembered = (at.remembered = surface.remember === undefined ? {} : await core.readBack(computer, win, surface.remember))
+    const remembered = (at.remembered =
+      surface.remember === undefined ? {} : await core.readBack(computer, win, surface.remember))
     const reports = await core.runPlan(computer, win, surface.plan, { live: live$ })
     const readback = await core.readBack(computer, win, surface.readback)
     const wallMs = performance.now() - started
     const audit = core.readJsonLines(auditPath)
     const restoreFrom = audit.length
-    const observed = await restoreAndObserve({ computer, win, surface, live: live$, dir, remembered, readback, progress: at })
+    const observed = await restoreAndObserve({
+      computer,
+      win,
+      surface,
+      live: live$,
+      dir,
+      remembered,
+      readback,
+      progress: at,
+    })
     const all = core.readJsonLines(auditPath)
     row = core.oracleRow({
       task,
@@ -224,7 +259,8 @@ async function runEval(options) {
         const mismatch = options.mismatch === "all" || options.mismatch === task.id
         const started = performance.now()
         try {
-          if (arm === "sdk-direct") rows.push(await runSdkTask({ task, enginePath, live: options.live, mismatch, scratch }))
+          if (arm === "sdk-direct")
+            rows.push(await runSdkTask({ task, enginePath, live: options.live, mismatch, scratch }))
           else rows.push(await runModelTask({ task, arm, enginePath, senpi: options.senpi, mismatch }))
         } catch (error) {
           rows.push(errorRow(task, arm, error, performance.now() - started))
@@ -234,7 +270,9 @@ async function runEval(options) {
   } finally {
     rmSync(scratch, { recursive: true, force: true })
   }
-  const byArm = Object.fromEntries(options.arms.map((arm) => [arm, core.summarize(rows.filter((row) => row.arm === arm))]))
+  const byArm = Object.fromEntries(
+    options.arms.map((arm) => [arm, core.summarize(rows.filter((row) => row.arm === arm))]),
+  )
   const summary = core.summarize(rows)
   return { enginePath, rows, byArm, summary }
 }
@@ -245,20 +283,27 @@ async function main() {
     console.log(JSON.stringify({ verdict: "FAIL", reason }))
     process.exit(2)
   }
-  if (options.unknownArms.length > 0) refuse(`unknown --arm ${options.unknownArms.join(",")}; expected ${ARMS.join(", ")} or all`)
+  if (options.unknownArms.length > 0)
+    refuse(`unknown --arm ${options.unknownArms.join(",")}; expected ${ARMS.join(", ")} or all`)
   if (options.unknownTasks.length > 0) refuse(`unknown --tasks ${options.unknownTasks.join(",")}`)
   if (options.fakeEngine === options.live) refuse("pass exactly one of --fake-engine or --live")
   if (options.live && platform() !== "darwin") refuse("--live drives real macOS apps and runs only on darwin")
   if (options.live && options.arms.some((arm) => arm !== "sdk-direct")) {
-    refuse("--live runs only the sdk-direct arm: model arms use the fake model server and the fake engine (no live model calls)")
+    refuse(
+      "--live runs only the sdk-direct arm: model arms use the fake model server and the fake engine (no live model calls)",
+    )
   }
   const enginePath = locateEngine(options.engine)
-  if (!existsSync(enginePath)) refuse(`no engine at ${enginePath}; run cargo build --release -p senpi-desktop-engine or pass --engine`)
+  if (!existsSync(enginePath))
+    refuse(`no engine at ${enginePath}; run cargo build --release -p senpi-desktop-engine or pass --engine`)
   if (options.arms.some((arm) => arm !== "sdk-direct")) {
     options.senpi ??= join(repoRoot, "node_modules", "@code-yeongyu", "senpi", "dist", "cli.js")
     if (!existsSync(options.senpi)) refuse(`no senpi at ${options.senpi}; pass --senpi or set SENPI_BIN`)
   }
-  const protectedFiles = [join(homedir(), ".senpi", "agent", "auth.json"), join(homedir(), ".omo", "agent", "auth.json")]
+  const protectedFiles = [
+    join(homedir(), ".senpi", "agent", "auth.json"),
+    join(homedir(), ".omo", "agent", "auth.json"),
+  ]
   const digest = (path) => (existsSync(path) ? createHash("sha256").update(readFileSync(path)).digest("hex") : "absent")
   const before = protectedFiles.map(digest)
   const result = await runEval(options)
@@ -281,7 +326,10 @@ async function main() {
   }
   if (options.json) process.stdout.write(text)
   else {
-    for (const row of result.rows) console.log(`${row.arm.padEnd(10)} ${row.status.padEnd(10)} restore=${row.restore.status.padEnd(10)} ${row.task}${row.error ? ` (${row.error})` : ""}`)
+    for (const row of result.rows)
+      console.log(
+        `${row.arm.padEnd(10)} ${row.status.padEnd(10)} restore=${row.restore.status.padEnd(10)} ${row.task}${row.error ? ` (${row.error})` : ""}`,
+      )
     console.log(JSON.stringify({ verdict: report.verdict, summary: result.summary }))
   }
   process.exit(code)
