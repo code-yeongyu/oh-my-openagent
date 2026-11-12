@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
 jobs:
@@ -164,6 +164,13 @@ jobs:
           echo "result=ENVIRONMENT failure, the runner could not fetch Electron after 3 attempts: $(tail -n 1 electron.log)" >> "$GITHUB_OUTPUT"
           echo "::error::ENVIRONMENT failure, the runner could not fetch Electron (not a fixture failure)"
           exit 1
+
+      # Chromium refuses to start unless its setuid sandbox helper is root-owned with mode 4755.
+      - name: Install the Chromium sandbox helper
+        run: |
+          helper="$(dirname "${{ steps.electron.outputs.binary }}")/chrome-sandbox"
+          sudo chown root:root "$helper"
+          sudo chmod 4755 "$helper"
 
       - name: Self-test
         shell: bash

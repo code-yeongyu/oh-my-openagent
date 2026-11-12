@@ -3,7 +3,7 @@
 // Electron host of the shared fixture page (../web). Usage: electron main.cjs --report <path>. Same report
 // and stdin control protocol as native-linux/fixture.py.
 const { app, BrowserWindow, Menu, ipcMain } = require("electron")
-const { renameSync, writeFileSync } = require("node:fs")
+const { createReadStream, renameSync, writeFileSync } = require("node:fs")
 const { join } = require("node:path")
 const readline = require("node:readline")
 
@@ -15,7 +15,6 @@ const windows = []
 const states = new Map()
 let initial = null
 
-if (process.platform === "linux") app.commandLine.appendSwitch("no-sandbox")
 app.setName(APP)
 
 function sorted(value) {
@@ -102,7 +101,7 @@ async function control(line) {
 }
 
 function listen() {
-  const input = readline.createInterface({ input: process.stdin })
+  const input = readline.createInterface({ input: createReadStream(null, { fd: 0 }) })
   let queue = Promise.resolve()
   input.on("line", (line) => {
     if (line === "") return
@@ -117,7 +116,10 @@ function listen() {
       ),
     )
   })
-  input.on("close", () => app.quit())
+  input.on("close", () => {
+    process.stderr.write("fixture: control input closed, quitting\n")
+    app.quit()
+  })
 }
 
 ipcMain.on("report", (event, json) => {
