@@ -1,0 +1,75 @@
+{
+  "description": "Row 27 (AC-75; R28, R52): a toolkit_routes entry that is not an exact key fails the table's load test, so session.open refuses Internal -> COMPUTER_UNAVAILABLE with data.reason route_table_invalid and data.pointer naming the entry, nothing sent; the same open with an exact key succeeds.",
+  "transport": "stdio",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/v3-diagnose-denied.json",
+  "env": {
+    "OMO_COMPUTER_FAKE_STOP_PATH": "live"
+  },
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session.open",
+        "params": {
+          "settings": {
+            "toolkit_routes": {
+              "Blend*": "canvas_gl"
+            }
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "error": {
+              "code": -32013,
+              "message": "Internal",
+              "data": {
+                "code": "Internal",
+                "hint": null,
+                "reason": "route_table_invalid",
+                "pointer": "/toolkit_routes/Blend*"
+              }
+            }
+          },
+          "variable": []
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "session.open",
+        "params": {
+          "settings": {
+            "toolkit_routes": {
+              "Krita": "canvas_gl"
+            }
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "capabilities": {},
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ],
+      "sink": 0
+    }
+  ]
+}

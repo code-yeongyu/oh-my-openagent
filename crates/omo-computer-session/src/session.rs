@@ -79,6 +79,7 @@ impl Session {
         let policy = StopPolicy::read(Transport::Local, request.allow_host_relay_only_stop);
         self.funnel.set_url_policy(&request);
         self.opened = None;
+        crate::route_ladder::open_routes(&request, crate::route_ladder::host_os())?;
         self.guard.open(policy, HostAdditions::default())?;
         self.opened = Some(Opened {
             report_mode: request.report_mode,
