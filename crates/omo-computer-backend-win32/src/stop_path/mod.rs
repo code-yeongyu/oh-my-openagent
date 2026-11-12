@@ -6,6 +6,8 @@
 
 use crate::input::{ENGINE_TAG, VK_CONTROL, VK_MENU, VK_SHIFT};
 
+#[cfg(windows)]
+pub mod hook;
 #[cfg(test)]
 mod tests;
 
