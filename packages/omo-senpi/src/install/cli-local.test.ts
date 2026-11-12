@@ -1,143 +1,31 @@
 /// <reference types="bun-types" />
 
-import { afterEach, describe, expect, test } from "bun:test"
-import { createHash } from "node:crypto"
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
-import { dirname, join, resolve } from "node:path"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { mkdir, readFile, rm } from "node:fs/promises"
+import { join, resolve } from "node:path"
+
+import { createInstallSandbox, createPluginFixture, type InstallSandbox, sandboxSpawnEnv } from "./install-test-fixture"
 
 const repoRoot = resolve(import.meta.dir, "../../../..")
 const cliPath = join(repoRoot, "packages", "omo-senpi", "src", "install", "cli-local.ts")
 const tempDirs: string[] = []
 
+// The CLI runs in a sandbox (#13192, #13253): the packed plugin is the shared fixture (one required-artifact list),
+// and the spawned installer gets an explicit environment whose home and agent dirs are scratch dirs under its root.
+let sandbox: InstallSandbox
+beforeEach(() => {
+  sandbox = createInstallSandbox()
+})
+
 async function makeAgentDir(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "omo-senpi-cli-local-test-"))
-  tempDirs.push(dir)
-  return dir
+  return sandbox.tempDir("omo-senpi-cli-local-test-")
 }
 
 async function makePackagedPlugin(): Promise<string> {
-  const pluginPath = await mkdtemp(join(tmpdir(), "omo-senpi-cli-plugin-"))
+  const pluginPath = await createPluginFixture()
   tempDirs.push(pluginPath)
-  await writeFixtureFile(join(pluginPath, "package.json"), JSON.stringify({ name: "@code-yeongyu/omo-senpi" }))
-  await writeFixtureFile(join(pluginPath, "extensions", "omo.js"), "export default {}\n")
-  await writeFixtureFile(
-    join(pluginPath, "extensions", "omo-task.js"),
-    "export const createTaskComponent = () => ({})\n",
-  )
-  await writeFixtureFile(join(pluginPath, "extensions", "omo-computer-use.js"), "export {}\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "omo-memory-doctor.js"), "export {}\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "omo-memory-memfs.js"), "export {}\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "omo-memory-palace.js"), "export {}\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "omo-device-account.js"), "export {}\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "omo-memory-commands.js"), "export {}\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "omo-session-history.js"), "export {}\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "omo-recall-store.js"), "export {}\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "omo-device-service.js"), "export {}\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "omo-telemetry-posthog.js"), "export {}\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "omo-telemetry-otlp.js"), "export {}\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "omo-memory-sync.js"), "export {}\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "loro_wasm_bg.wasm"), "")
-  await writeFixtureFile(join(pluginPath, "extensions", "CaseFolding.txt"), "")
-  await writeFixtureFile(join(pluginPath, "extensions", "omo-thread-client.js"), "export {}\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "omo-telemetry-recovery.js"), "export {}\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "omo-feedback.js"), "export {}\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "omo-desktop-toolkit.js"), "export {}\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "omo-claim-receipt.js"), "export {}\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "assets.generated.json"), "{}\n")
-  await writeFixtureFile(join(pluginPath, "runtime", "agent-toolkit-sdk", "sdk.js"), "export {}\n")
-  await writeFixtureFile(join(pluginPath, "runtime", "bunshin-ts", "sdk.js"), "export {}\n")
-  await writeFixtureFile(join(pluginPath, "runtime", "thread-sdk", "sdk.js"), "export {}\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "omo-member.js"), "export default {}\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "memory-run-supervisor.mjs"), "export {}\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "gateway-store-worker.mjs"), "export {}\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "omo-computer-run-worker.mjs"), "export {}\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "quickjs.wasm"), "")
-  await writeFixtureFile(join(pluginPath, "extensions", "reflection-persona.md"), "# reflection persona fixture\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "dream-persona.md"), "# dream persona fixture\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "facts-persona.md"), "# facts persona fixture\n")
-  await writeFixtureFile(join(pluginPath, "extensions", "kibitzer-persona.md"), "# kibitzer persona fixture\n")
-  await writeFixtureFile(
-    join(pluginPath, "daemon-launch-spec.json"),
-    '{"spec_version":1,"core":{"session_runtime":"in-process","multi_session":true,"extensions":["."]},"tunables":{},"env":{}}\n',
-  )
-  const requiredSkillNames = [
-    "ast-grep",
-    "coding-agent-sessions",
-    "debugging",
-    "frontend",
-    "git-master",
-    "init-deep",
-    "browser",
-    "lsp-setup",
-    "programming",
-    "refactor",
-    "remove-ai-slops",
-    "review-work",
-    "ultimate-browsing",
-    "ultrawork",
-    "ulw-execute",
-    "ulw-loop",
-    "ulw-plan",
-    "ulw-research",
-    "visual-qa",
-  ]
-  for (const skillName of requiredSkillNames) {
-    await writeFixtureFile(join(pluginPath, "skills", skillName, "SKILL.md"), `# ${skillName}\n`)
-  }
-  // The browser skill's bundled omowright runtime is a required payload artifact (issue #9661);
-  // the fixture mirrors the required set so the installer's integrity check passes.
-  await writeFixtureFile(join(pluginPath, "skills", "browser", "runtime", "omowright", "index.js"), "export {}\n")
-  await writeFixtureFile(join(pluginPath, "skills", "browser", "runtime", "omowright", "page-bundle.js"), "\n")
-  // Credential-gated skill: staged outside pi.skills but still a required payload artifact.
-  await writeFixtureFile(join(pluginPath, "skills-conditional", "x-search", "SKILL.md"), "# x-search\n")
-  const astGrepRuntime = join(pluginPath, "runtime", "ast-grep-mcp", "cli.js")
-  await writeFixtureFile(astGrepRuntime, "console.log('ast-grep')\n")
-  await chmod(astGrepRuntime, 0o755)
-  await writeFixtureFile(
-    join(pluginPath, "runtime", "ast-grep-mcp", "manifest.json"),
-    `${JSON.stringify(
-      {
-        sha256: createHash("sha256")
-          .update(await readFile(astGrepRuntime))
-          .digest("hex"),
-        mode: 0o755,
-        stagedAtUtc: "2026-08-03T00:00:00.000Z",
-      },
-      null,
-      2,
-    )}\n`,
-  )
-  const toolkitDispatcher = join(pluginPath, "runtime", "agent-toolkit", "cli.js")
-  await writeFixtureFile(toolkitDispatcher, "console.log('agent-toolkit')\n")
-  await writeFixtureFile(
-    join(pluginPath, "runtime", "agent-toolkit", "ulw-loop", "cli.js"),
-    "console.log('ulw-loop')\n",
-  )
-  const toolkitShim = join(pluginPath, "runtime", "agent-toolkit", "omo-agent-toolkit")
-  await writeFixtureFile(toolkitShim, '#!/bin/sh\nexec node "$(dirname "$0")/cli.js" "$@"\n')
-  await chmod(toolkitShim, 0o755)
-  await writeFixtureFile(
-    join(pluginPath, "runtime", "agent-toolkit", "omo-agent-toolkit.cmd"),
-    '@echo off\r\nnode "%~dp0cli.js" %*\r\n',
-  )
-  await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "cli.js"), "console.log('cli')\n")
-  await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "index.js"), "export {}\n")
-  await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "index.d.ts"), "export {}\n")
-  await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "daemon-client.js"), "export {}\n")
-  await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "daemon-client.d.ts"), "export {}\n")
-  await writeFixtureFile(
-    join(pluginPath, "runtime", "lsp-daemon", "dist", "package.json"),
-    JSON.stringify({ version: "0.1.0" }),
-  )
-  await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", ".omo-runtime-manifest.json"), "{}\n")
   await buildInstaller(pluginPath)
   return pluginPath
-}
-
-async function writeFixtureFile(path: string, content: string): Promise<void> {
-  await mkdir(dirname(path), { recursive: true })
-  await writeFile(path, content, "utf8")
 }
 
 async function buildInstaller(pluginPath: string): Promise<void> {
@@ -175,13 +63,13 @@ async function runCliLocal(
 ): Promise<{ readonly exitCode: number; readonly stdout: string; readonly stderr: string }> {
   const proc = Bun.spawn(["node", join(pluginPath, "scripts", "install.mjs"), action], {
     cwd: repoRoot,
-    env: {
-      ...process.env,
+    env: sandboxSpawnEnv(sandbox.root, sandbox.env, {
       HOME: join(agentDir, "home"),
+      USERPROFILE: join(agentDir, "home"),
       OMO_CODING_AGENT_DIR: agentDir,
       SENPI_CODING_AGENT_DIR: agentDir,
       PI_CODING_AGENT_DIR: agentDir,
-    },
+    }),
     stdout: "pipe",
     stderr: "pipe",
   })
@@ -194,6 +82,7 @@ async function runCliLocal(
 }
 
 afterEach(async () => {
+  await sandbox.dispose()
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
 })
 
