@@ -2,6 +2,7 @@
 //! invalidating events, and the re-identification ladder.
 
 mod numbering;
+mod precedence;
 mod resolve;
 mod window;
 
