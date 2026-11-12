@@ -2,6 +2,10 @@
 //! silent "not released", and the GC goes on with the next entry. Triggered without
 //! permissions, so it holds as root too: a DIRECTORY where the artifact's file goes makes
 //! the delete fail (EISDIR on Linux, EPERM on macOS, access denied on Windows).
+//!
+//! The failure is LOGGED once, by release() when it happens (stderr is not observable from
+//! a test); the sweep logs only its own new warnings. The REPORT is the observable record:
+//! the next sweep's warnings carry it exactly once, as asserted below.
 
 use std::fs;
 
