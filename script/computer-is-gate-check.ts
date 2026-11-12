@@ -32,6 +32,8 @@ function parseGate(name: string, value: unknown): Gate {
   const { rows, artifacts } = value
   if (!isRowList(rows)) throw new GateConfigError(`gate ${name}: rows must be a list of positive integers`)
   if (!isPathList(artifacts)) throw new GateConfigError(`gate ${name}: artifacts must be a list of repository paths`)
+  if (rows.length === 0 && artifacts.length === 0)
+    throw new GateConfigError(`gate ${name}: has no rows and no artifacts to check`)
   return { name, rows, artifacts }
 }
 

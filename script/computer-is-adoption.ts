@@ -14,6 +14,8 @@ const LEDGER = "script/computer-adoption.tsv"
 const NOTICES = "THIRD-PARTY-NOTICES.md"
 const COLUMNS = ["id", "source", "head", "licence", "verdict", "mechanism", "rows"] as const
 const VERDICTS = ["adopt", "adapt", "probe", "reject"] as const
+// The ideal-state plan has 51 rows (todos 1-51); ledger rows name those, never cu-v3 rows.
+const LAST_PROGRAM_ROW = 51
 const PORT_MARKER = /adoption-port: (ADP-\d+)/g
 const PROOF_TAG = /\[(ADP-\d+)\]/
 const PROOF_PATH = /(\.(test|spec)\.[cm]?[jt]sx?$|_test\.rs$|(^|\/)(tests?|qa|scenarios?)\/)/
@@ -50,6 +52,8 @@ function parseEntry(cells: readonly string[], seen: ReadonlySet<string>): Entry 
   const rows = parseRows(rowsField)
   if (rows === undefined) return `${id} rows '${rowsField}' is not a comma-separated list of row numbers`
   if (verdict === "reject" && rows.length > 0) return `${id} is rejected but names rows ${rowsField}`
+  const outside = rows.find((row) => row < 1 || row > LAST_PROGRAM_ROW)
+  if (outside !== undefined) return `${id} names row ${outside}, outside the program's rows 1-${LAST_PROGRAM_ROW}`
   return { id, source, verdict, rows }
 }
 
@@ -65,6 +69,7 @@ function readLedger(cwd: string): Ledger {
     if (typeof parsed === "string") problems.push(`ADOPTION ledger line ${index + 2}: ${parsed}`)
     else entries.push(parsed)
   })
+  if (entries.length === 0 && problems.length === 0) problems.push("ADOPTION ledger has no entries")
   return { entries, problems }
 }
 
@@ -126,6 +131,7 @@ export function adoptionRow(cwd: string, git: Git, row: number): CheckResult {
     .filter((entry) => !proven.has(entry.id))
     .map((entry) => `ADOPTION row=${row} ${entry.id} has no tagged test or scenario`)
   const summary = `ADOPTION row=${row} entries=${forRow.length} proven=${forRow.length - unproven.length}`
-  const findings = [...problems, ...unproven]
+  const empty = forRow.length === 0 ? [`ADOPTION row=${row} takes no ledger entry`] : []
+  const findings = [...problems, ...empty, ...unproven]
   return { exitCode: findings.length === 0 ? 0 : 1, lines: [summary, ...findings] }
 }
