@@ -1174,6 +1174,17 @@ export function worstOfPasses(
 // Count rows ("-proves-") across two passes: the WORSE pass decides (CONFIRMS < NEW-EDGE < CONTRADICTS; on a tie,
 // the pass with fewer hits), and every count that differs is recorded "k/n vs k2/n".
 export const isCountRow = (id: string) => /-proves-|^n-wheel-/.test(id)
+// Rows whose "k/n" is one call's return against what that call submitted, judged all-or-nothing (not a hit tally
+// over runs): two passes merge by MERGE_RANK with both texts kept, never by count.
+export const PREDICATE_ROWS: ReadonlySet<string> = new Set(["n-uipi-sendinput"])
+// A measured row that shows a k/n count yet is neither a count, a timing nor a predicate row: its passes would not
+// merge worst-of, so the self-test refuses it in the committed ledger.
+export const outsideWorstOf = (r: { readonly id: string; readonly verdict: string; readonly measured: string }) =>
+  /^(CONFIRMS|CONTRADICTS)$/.test(r.verdict) &&
+  /\d+\/\d+/.test(r.measured) &&
+  !isCountRow(r.id) &&
+  !isTimingRow(r.id) &&
+  !PREDICATE_ROWS.has(r.id)
 // The one merge order: CONTRADICTS > UNMEASURED (a pass that failed to measure) > NEW-EDGE > CONFIRMS.
 export const MERGE_RANK: Readonly<Record<Verdict, number>> = {
   CONFIRMS: 0,
@@ -3238,13 +3249,7 @@ const LOGIC_CHECKS: readonly Check[] = [
       }
       // static: every committed row judged on counts is aggregated worst-of, and verify reaches the plain
       // comparison only after the gate, the count and the timing paths
-      const counted = readLedger(join(HERE, "win32-delivery.tsv")).filter(
-        (r) =>
-          /^(CONFIRMS|CONTRADICTS)$/.test(r.verdict) &&
-          /\d+\/\d+/.test(r.measured) &&
-          !isCountRow(r.id) &&
-          !isTimingRow(r.id),
-      )
+      const counted = readLedger(join(HERE, "win32-delivery.tsv")).filter(outsideWorstOf)
       if (counted.length) bad.push(`count rows outside worst-of: ${[...new Set(counted.map((r) => r.id))].join(",")}`)
       const self = source("probe-sp-n.ts")
       const mp = self.slice(self.indexOf("export function mergePasses("), self.indexOf("export function verifyJob("))
