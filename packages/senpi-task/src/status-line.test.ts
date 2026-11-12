@@ -55,6 +55,58 @@ describe("taskIdentityLabel", () => {
 })
 
 describe("formatStatusTarget", () => {
+  for (const observed of [
+    { provider: "chatgpt-subscription", model_id: "gpt-6-luna", service_tier: "auto" },
+    { provider: "chatgpt-subscription", model_id: "gpt-6-luna" },
+    { provider: "chatgpt-subscription", model_id: "gpt-6-astra", service_tier: "priority" },
+    { provider: "openai", model_id: "gpt-6-luna", service_tier: "priority" },
+  ]) {
+    test(`#given a planned fast alias and observed ${JSON.stringify(observed)} #when formatted #then the observed route wins`, () => {
+      // given / when / then: a downgrade or model switch must not inherit the old fast label.
+      expect(
+        formatStatusTarget({
+          category: "quick",
+          resolvedModel: {
+            provider: "chatgpt-subscription",
+            model_id: "gpt-6-luna-fast",
+            display: "chatgpt-subscription/gpt-6-luna-fast",
+            source: "category",
+          },
+          effectiveModel: {
+            ...observed,
+            display: "observed",
+            source: "set",
+            reasoning: "low",
+            switched_by_operator: true,
+          },
+        }),
+      ).toBe(`category:quick(${observed.provider}/${observed.model_id}:low) (switched by operator)`)
+    })
+  }
+
+  test("#given a planned fast alias and a priority observation of its base #when formatted #then the alias stays visible", () => {
+    // given / when / then: Senpi starts the alias on the base id; the row keeps the validated alias.
+    expect(
+      formatStatusTarget({
+        category: "quick",
+        resolvedModel: {
+          provider: "chatgpt-subscription",
+          model_id: "gpt-6-luna-fast",
+          display: "chatgpt-subscription/gpt-6-luna-fast",
+          source: "category",
+        },
+        effectiveModel: {
+          provider: "chatgpt-subscription",
+          model_id: "gpt-6-luna",
+          service_tier: "priority",
+          display: "observed",
+          source: "category",
+          reasoning: "low",
+        },
+      }),
+    ).toBe("category:quick(chatgpt-subscription/gpt-6-luna-fast:low)")
+  })
+
   test("#given a category and resolved model #when formatted #then model metadata qualifies the category", () => {
     // given / when / then
     expect(

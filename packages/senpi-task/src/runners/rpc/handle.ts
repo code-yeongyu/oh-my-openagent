@@ -26,6 +26,16 @@ import { createInputDelivery } from "../input-delivery"
 import { createRpcRunPause } from "./native-run-pause"
 import { createTurnClaim } from "./turn-claim"
 import { createTaskParentControl } from "../task-parent-control"
+import { reportedEffectiveModel, type ModelIdentity } from "../pinned-model-equivalence"
+
+// A partial identity is not an observation. Recording one kept a provider-error turn from settling.
+function readWireModel(
+  model: { readonly provider?: unknown; readonly id?: unknown } | undefined,
+): ModelIdentity | undefined {
+  if (typeof model?.provider !== "string" || model.provider.length === 0) return undefined
+  if (typeof model.id !== "string" || model.id.length === 0) return undefined
+  return { provider: model.provider, id: model.id }
+}
 
 export type CreateRpcChildHandleOptions = {
   readonly inputStore?: import("../../store").TaskRecordStore
@@ -59,6 +69,8 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
   const exitWaiters: Array<(outcome: ChildExitOutcome) => void> = []
   let reachedIdle = false
   let sessionId: string | undefined
+  let model: ModelIdentity | undefined
+  let serviceTier: string | undefined
   let finalText: string | undefined
   let turnBaseline: string | undefined
   let turnOutcome: RunnerOutcome | undefined
@@ -106,6 +118,17 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
   let heartbeatActivity = (): void => {}
   client.onEvent((event) => {
     heartbeatActivity()
+    if (event.type === "model_changed") {
+      const identity = readWireModel(event.model)
+      if (identity !== undefined) model = identity
+    }
+    if (event.type === "service_tier_changed" && typeof event.tier === "string" && event.tier.length > 0) {
+      serviceTier = event.tier
+    }
+    if ((event.type === "message_start" || event.type === "message_end") && event.message.role === "assistant") {
+      const identity = readWireModel({ provider: event.message.provider, id: event.message.model })
+      if (identity !== undefined) model = identity
+    }
     // A run the child starts on its own after its turn settled (a monitor or background job woke it)
     // is a new turn: the next outcome is that run's, never the settled one again (omo#9069).
     if (event.type === "agent_start" && turnOutcome !== undefined && outcome === undefined) {
@@ -144,6 +167,13 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     onState: (response) => {
       lastSeenAt = now()
       sessionId = readSessionId(response) ?? sessionId
+      if (response.command === "get_state" && response.success) {
+        const identity = readWireModel(response.data.model)
+        if (identity !== undefined) model = identity
+        if (typeof response.data.serviceTier === "string" && response.data.serviceTier.length > 0) {
+          serviceTier = response.data.serviceTier
+        }
+      }
     },
     onFailure: (error) => {
       if (!isHarmlessRpcShutdownError(error))
@@ -246,6 +276,9 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     runPause,
     get sessionId() {
       return sessionId
+    },
+    get reportedModel() {
+      return reportedEffectiveModel(model, serviceTier)
     },
     get pid() {
       return child.pid ?? undefined

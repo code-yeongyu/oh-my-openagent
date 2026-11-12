@@ -71,10 +71,18 @@ export function formatTargetIdentity(input: Pick<StatusTargetInput, "category" |
 // is the only useful signal left.
 export function formatTargetWithModel(input: StatusTargetInput): string | undefined {
   const identity = formatTargetIdentity(input)
+  const observed = input.effectiveModel
+  const planned = input.resolvedModel
+  // Senpi starts a priority alias on its base model. Keep the validated alias visible only
+  // while the child's observed identity and tier still agree with that plan.
+  const effective =
+    observed?.service_tier === "priority" &&
+    planned?.provider === observed.provider &&
+    planned.model_id === `${observed.model_id}-fast`
+      ? { ...observed, model_id: planned.model_id }
+      : observed
   const model =
-    formatStatusModel(input.effectiveModel) ??
-    formatStatusModel(input.resolvedModel) ??
-    optionalRendererText(input.model)
+    formatStatusModel(effective) ?? formatStatusModel(input.resolvedModel) ?? optionalRendererText(input.model)
   const target =
     identity !== undefined
       ? model === undefined
