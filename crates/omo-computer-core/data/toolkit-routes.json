@@ -1,0 +1,159 @@
+{
+  "note": "Row 27: the per-toolkit route table as DATA. 'routes' are exact keys only (bundle id / WM_CLASS / window class); every row cites the design-pin line that names it (src/routes/design-excerpt.txt). 'membership' is the chromium_electron class matcher, a separate shape (d-windows.md:157 'the class matcher as DATA'). Names the pin gives without an exact key are never seeded.",
+  "routes": [
+    {
+      "os": "macos",
+      "keyKind": "bundle_id",
+      "key": "org.blenderfoundation.blender",
+      "class": "canvas_gl",
+      "cite": "design/d-macos.md:159"
+    },
+    {
+      "os": "macos",
+      "keyKind": "bundle_id",
+      "key": "com.tcltk.wish",
+      "class": "pointer_hw",
+      "cite": "design/d-macos.md:103"
+    },
+    {
+      "os": "macos",
+      "keyKind": "bundle_id",
+      "key": "org.libreoffice.script",
+      "class": "pointer_hw",
+      "cite": "design/d-macos.md:103"
+    },
+    {
+      "os": "x11",
+      "keyKind": "wm_class",
+      "key": "Blender",
+      "class": "canvas_gl",
+      "cite": "design/d-linux.md:82"
+    },
+    {
+      "os": "x11",
+      "keyKind": "wm_class",
+      "key": "Wish",
+      "class": "pointer_hw",
+      "cite": "waves/analysis/ideal-state.md:386"
+    },
+    {
+      "os": "x11",
+      "keyKind": "wm_class",
+      "key": "libreoffice",
+      "class": "pointer_hw",
+      "cite": "waves/analysis/ideal-state.md:386"
+    },
+    {
+      "os": "x11",
+      "keyKind": "wm_class",
+      "key": "Google-chrome",
+      "class": "chromium_electron",
+      "cite": "design/d-linux.md:78"
+    },
+    {
+      "os": "x11",
+      "keyKind": "wm_class",
+      "key": "Chromium",
+      "class": "chromium_electron",
+      "cite": "design/d-linux.md:78"
+    },
+    {
+      "os": "x11",
+      "keyKind": "wm_class",
+      "key": "firefox",
+      "class": "chromium_electron",
+      "cite": "design/d-linux.md:78"
+    },
+    {
+      "os": "x11",
+      "keyKind": "wm_class",
+      "key": "Navigator",
+      "class": "chromium_electron",
+      "cite": "design/d-linux.md:78"
+    },
+    {
+      "os": "x11",
+      "keyKind": "wm_class",
+      "key": "Electron",
+      "class": "chromium_electron",
+      "cite": "design/d-linux.md:78"
+    },
+    {
+      "os": "windows",
+      "keyKind": "window_class",
+      "key": "TkTopLevel",
+      "class": "pointer_hw",
+      "cite": "waves/analysis/ideal-state.md:386"
+    },
+    {
+      "os": "windows",
+      "keyKind": "window_class",
+      "key": "SALFRAME",
+      "class": "pointer_hw",
+      "cite": "waves/analysis/ideal-state.md:386"
+    },
+    {
+      "os": "windows",
+      "keyKind": "window_class",
+      "key": "Chrome_WidgetWin_1",
+      "class": "chromium_electron",
+      "cite": "design/d-windows.md:157"
+    },
+    {
+      "os": "windows",
+      "keyKind": "window_class",
+      "key": "Chrome_RenderWidgetHostHWND",
+      "class": "chromium_electron",
+      "cite": "design/d-windows.md:157"
+    }
+  ],
+  "membership": {
+    "windows": {
+      "class": "chromium_electron",
+      "prefixWithSuffix": [
+        "Chrome_WidgetWin_"
+      ],
+      "startsWith": [
+        "CefBrowser"
+      ],
+      "exact": [
+        "Chrome_RenderWidgetHostHWND"
+      ],
+      "notMembers": [
+        "Chrome_WidgetWin_",
+        "ChromeLikeWidgetWin",
+        "Widget_Chrome_Host"
+      ],
+      "cite": "design/d-windows.md:157"
+    },
+    "x11": {
+      "class": "chromium_electron",
+      "exactWmClass": [
+        "Google-chrome",
+        "Chromium",
+        "firefox",
+        "Navigator",
+        "Electron"
+      ],
+      "cite": "design/d-linux.md:78"
+    },
+    "macos": {
+      "class": "chromium_electron",
+      "bundleIds": [
+        "com.google.Chrome",
+        "com.google.chrome.for.testing",
+        "org.chromium.Chromium",
+        "com.brave.Browser",
+        "com.microsoft.edgemac",
+        "company.thebrowser.Browser",
+        "com.vivaldi.Vivaldi",
+        "com.operasoftware.Opera"
+      ],
+      "match": "the id itself, or the id followed by '.' and more",
+      "cite": [
+        "design/d-macos.md:159",
+        "macos/process.rs:238-247 @ 4ad629ea51"
+      ]
+    }
+  }
+}

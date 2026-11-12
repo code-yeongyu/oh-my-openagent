@@ -6,7 +6,7 @@
 
 closed_names! {
     /// Every `data.reason` any stage, gate, backend default or layer emits.
-    Reason [144] {
+    Reason [145] {
         NotInteractive = "not_interactive",
         PromptPending = "prompt_pending",
         Revoked = "revoked",
@@ -151,6 +151,8 @@ closed_names! {
         ConcealedClipboard = "concealed_clipboard",
         SecretNoClipboardRoute = "secret_no_clipboard_route",
         Unmeasured = "unmeasured",
+        // Row 27: the toolkit route table failed its load test (R28: the existing Unavailable code).
+        RouteTableInvalid = "route_table_invalid",
     }
 }
 

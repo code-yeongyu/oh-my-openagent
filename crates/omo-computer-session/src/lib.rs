@@ -15,6 +15,7 @@ pub mod mutate;
 pub mod observe;
 pub mod pause;
 pub mod refs;
+pub mod route_ladder;
 pub mod session_state;
 mod session;
 pub mod trace;
