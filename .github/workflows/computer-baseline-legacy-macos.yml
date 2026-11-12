@@ -1,0 +1,134 @@
+name: Computer baseline (shipped runtime, hosted macOS)
+
+# The hosted macOS leg of the shipped-runtime baseline (ideal-state plan row 8), measurement branch only. A hosted macOS
+# runner never delivers pid-routed input to a window (#13227), so only the accessibility routes are measured here; every
+# pointer, drag, scroll and key cell is recorded not_run with that reason. Two passes in one job, each with its own
+# JSON: A, the driver launched plainly (its trust comes from the runner's agent, as a CLI's trust comes from the terminal
+# a person launched it from); B, the driver launched as its own responsible process and granted by row 2's helper.
+# It runs only on a push whose head commit message carries [run-8m], so no other push to the branch starts it.
+on:
+  push:
+    branches:
+      - "test/cu-is-row08-macos-measure"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  RELEASE: "5.1.69"
+  SETTINGS_DIR: packages/senpi-desktop-tool
+  OMO_CONFORMANCE_HOSTED_MACOS: "1"
+
+jobs:
+  macos:
+    name: computer baseline legacy (macos, hosted, accessibility routes)
+    if: contains(github.event.head_commit.message, '[run-8m]')
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: The release's own default settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "refs/tags/v${RELEASE}:refs/tags/v${RELEASE}"
+          mkdir -p "$SETTINGS_DIR/.release-settings"
+          for file in settings.ts host-policy.ts; do
+            git show "v${RELEASE}:$SETTINGS_DIR/src/${file}" > "$SETTINGS_DIR/.release-settings/${file}"
+            echo "settings ${file} from v${RELEASE} $(git rev-parse "v${RELEASE}:$SETTINGS_DIR/src/${file}")"
+          done
+          echo "OMO_RELEASE_SETTINGS=$PWD/$SETTINGS_DIR/.release-settings/settings.ts" >> "$GITHUB_ENV"
+
+      - name: Build the macOS fixture app and the probe helper
+        shell: bash
+        run: |
+          set -euo pipefail
+          qa="${RUNNER_TEMP}/computer-baseline"
+          mkdir -p "$qa"
+          app=$(bash script/qa/computer/conformance/fixtures/native-macos/build.sh "$RUNNER_TEMP/fixture" | tail -n 1)
+          test -x "$app"
+          echo "OMO_CONFORMANCE_FIXTURE_APP=$app" >> "$GITHUB_ENV"
+          helper="$RUNNER_TEMP/probe-helper"
+          xcrun swiftc -O -o "$helper" script/qa/computer/probes/hosted-macos-live/*.swift \
+            -framework AppKit -framework ApplicationServices -framework ScreenCaptureKit
+          codesign -f -s - -i dev.omo.computer.probe "$helper"
+          echo "PROBE_HELPER=$helper" >> "$GITHUB_ENV"
+          sw_vers | tee "$qa/os.txt"
+
+      - name: Install the released omo-ai
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --global "omo-ai@${RELEASE}"
+          echo "OMO_BIN=$(command -v omo)" >> "$GITHUB_ENV"
+          echo "omo-ai $(npm ls --global --depth=0 omo-ai | grep -o 'omo-ai@[^ ]*')"
+          codesign -dv "$(realpath "$(command -v bun)")" 2>&1 | grep -E '^(Identifier|Authority|TeamIdentifier)' | head -4
+
+      - name: Pass A, the driver launched plainly
+        id: pass_a
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -uo pipefail
+          out="${RUNNER_TEMP}/computer-baseline/pass-a"
+          mkdir -p "$out"
+          bun script/qa/computer/conformance/drivers/legacy-macos-grant.ts --probe --helper "$PROBE_HELPER" | tee "$out/trust.log"
+          bun script/qa/computer/conformance/drivers/legacy.ts --smoke | tee "$out/smoke.log"
+          bun script/qa/computer/conformance/run.ts --os macos --all --driver legacy --out "$out/catalog" | tee "$out/catalog.log"
+          echo "pass A catalog EXIT ${PIPESTATUS[0]}"
+
+      - name: Pass B, the driver as its own responsible process, granted by row 2's helper
+        id: pass_b
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -uo pipefail
+          out="${RUNNER_TEMP}/computer-baseline/pass-b"
+          bun script/qa/computer/conformance/drivers/legacy-macos-grant.ts --helper "$PROBE_HELPER" --out "$out" \
+            -- "$PWD/script/qa/computer/conformance/run.ts" --os macos --all --driver legacy --out "$out/catalog" | tee "$out.log"
+          echo "pass B EXIT ${PIPESTATUS[0]}"
+
+      - name: Teardown receipts
+        if: always()
+        shell: bash
+        run: |
+          set -uo pipefail
+          left=0
+          pkill -f 'Conformance Fixture' 2>/dev/null || true
+          for name in senpi-desktop-engine 'Conformance Fixture'; do
+            for _ in $(seq 1 25); do pgrep -f "$name" >/dev/null || break; sleep 0.2; done
+            if pgrep -f "$name" >/dev/null; then echo "${name} LEFT"; left=1; else echo "${name} procs 0"; fi
+          done
+          exit "$left"
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: computer-baseline-legacy-macos
+          path: ${{ runner.temp }}/computer-baseline
+          if-no-files-found: warn
+
+      - name: Fail when either pass failed
+        if: always()
+        shell: bash
+        env:
+          PASS_A: ${{ steps.pass_a.outcome }}
+          PASS_B: ${{ steps.pass_b.outcome }}
+        run: |
+          echo "pass A ${PASS_A}, pass B ${PASS_B}"
+          test "$PASS_A" = success && test "$PASS_B" = success
