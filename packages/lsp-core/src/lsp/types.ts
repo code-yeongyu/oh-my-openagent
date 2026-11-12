@@ -25,7 +25,7 @@ export interface ServerLookupInfo {
 export type ServerLookupResult =
   | { status: "found"; server: ResolvedServer }
   | { status: "not_configured"; extension: string; availableServers: string[] }
-  | { status: "not_installed"; server: ServerLookupInfo; installHint: string }
+  | { status: "not_installed"; server: ServerLookupInfo; installHint: string; searchedFrom?: string }
 
 export interface Position {
   line: number

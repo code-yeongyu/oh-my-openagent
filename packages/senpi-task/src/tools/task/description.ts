@@ -45,6 +45,14 @@ export function buildTaskToolDescription(input: DescriptionInput): string {
     gatedAgents.length === 0
       ? ""
       : "\n  plan-reviewer is one-shot: spawn it, read task_output, optionally task_cancel; task_send is always refused. The harness replaces the plan-reviewer spawn prompt with the canonical plan-review contract (one .omo/plans/*.md path only) - any other prompt content is discarded, so pass the plan path and nothing else."
+  const maxDepth = input.omoConfig.task?.max_depth ?? 1
+  // The default depth limit; an agent's own max_depth or allowed_subagents can widen it for that agent (#12522).
+  const depthLine =
+    maxDepth === 0
+      ? "Nesting limit: max_depth is 0, so task spawns are refused unless an agent's own settings allow them."
+      : maxDepth === 1
+        ? "Nesting limit: max_depth is 1, so by default a child cannot spawn children of its own (an agent's own max_depth or allowed_subagents can allow it); delegate from this session instead."
+        : `Nesting limit: max_depth is ${maxDepth}; by default a spawn that would run deeper is refused (an agent's own max_depth or allowed_subagents can change that).`
   return `Spawn one child task or fan out a batch.
 
 Choose exactly one input form:
@@ -65,5 +73,6 @@ name is an optional stable handle. model is an explicit override for subagent_ty
 isolated runs a child in a checkout clone; it defaults to task.isolation.enabled. apply controls merge-back; false retains artifacts only. merge selects patch or branch. Batch items inherit these three options unless overridden. apply and merge require isolation to be enabled.
 NEVER combine model with category: a category-routed task always takes its model from omo.json (categories.<name>.models), so passing both fails with invalid_arguments.
 task_send continues an existing child; task always spawns.
+${depthLine}
 Prompts MUST be in English.`
 }
