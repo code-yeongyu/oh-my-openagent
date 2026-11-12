@@ -26,6 +26,9 @@ pub mod reservation;
 mod session;
 pub mod session_state;
 pub mod trace;
+mod clipboard;
+pub(crate) mod value_verbs;
+mod window_frame;
 
 pub use epoch::EpochChanged;
 pub use frames::CapturedFrame;

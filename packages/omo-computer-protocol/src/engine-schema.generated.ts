@@ -2,7 +2,7 @@
 // Do not edit by hand; run `bun run --cwd packages/omo-computer-protocol generate`.
 
 /** sha256 of the schema file this module was generated from; the schema-drift test compares it. */
-export const SCHEMA_SHA256 = "e8d03727cce8c913a43f78402a91bc5e289fbcbf175940a460453a2860948f6e" as const
+export const SCHEMA_SHA256 = "6c1b6a6e1c22df360d06e40eb5bd97d5903711a33977d90f2f9ba56f5f49388b" as const
 
 /** The wire protocol version `engine.hello` reports. */
 export const PROTOCOL_VERSION = "1" as const
@@ -395,6 +395,8 @@ export type ActionReport = {
 	openedSurfaces?: Surface[]
 	nextCall?: string | null
 	note?: string | null
+	reason?: RefusalReason | null
+	nothingSent?: boolean | null
 	warning?: string | null
 	auditIds?: string[]
 	timings?: Timings | null
@@ -838,7 +840,7 @@ export type Evidence = {
 
 export type EvidenceClass = "receipt" | "observation"
 
-export type EvidenceKind = "barrier_consumed" | "xi2_raw_confirm" | "value_readback" | "focus_readback" | "menu_readback" | "ax_notification" | "settle_frame_diff" | "ax_change"
+export type EvidenceKind = "barrier_consumed" | "xi2_raw_confirm" | "value_readback" | "focus_readback" | "menu_readback" | "ax_notification" | "settle_frame_diff" | "ax_change" | "frame_readback"
 
 export type ExecReply = null | ActionReport
 
@@ -1252,6 +1254,8 @@ export type Rect = {
 	width: number
 	height: number
 }
+
+export type RefusalReason = "secure_focus" | "concealed_clipboard" | "secret_no_clipboard_route"
 
 export type ReleaseHelper = {
 	available: boolean

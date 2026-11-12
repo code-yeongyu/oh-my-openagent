@@ -47,6 +47,7 @@ impl crate::Session {
             frames: crate::frames::FrameStore::default(),
             trace: crate::trace::Trace::default(),
             display_awake: crate::intervention::SharedHold::default(),
+            ax_generation: None,
         }))
     }
 }

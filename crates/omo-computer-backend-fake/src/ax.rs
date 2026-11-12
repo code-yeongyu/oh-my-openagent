@@ -18,6 +18,12 @@ fn stale() -> Refusal {
     Refusal::bare(EngineCode::StaleRef)
 }
 
+/// The store key of the node a ref names.
+fn value_key(reference: &Ref, window: &str) -> String {
+    let index = parse_ref(&reference.0).map_or(0, |(_, index)| index);
+    format!("{window}#{index}")
+}
+
 /// The node a ref names and the window it lives in.
 fn lookup<'a>(
     state: &'a FakeState,
@@ -95,9 +101,11 @@ impl AxBackend for FakeBackend {
     fn resolve(&mut self, reference: &Ref) -> BackendResult<Resolved> {
         self.call(FakeMethod::AxResolve, |state, _| {
             let (node, window, generation) = lookup(state, reference)?;
-            Ok(Resolved {
-                element: element_info(&reference.0, node, &window, generation),
-            })
+            let mut element = element_info(&reference.0, node, &window, generation);
+            if let Some(written) = state.ax_values.get(&value_key(reference, &window)) {
+                element.value = Some(written.clone());
+            }
+            Ok(Resolved { element })
         })
     }
 
@@ -117,6 +125,59 @@ impl AxBackend for FakeBackend {
             self.sink.record(line);
             // An unanswered write went out and nothing confirms it: `AxUnconfirmed`, whose
             // table row reads `delivery_uncertain/unsafe` with something sent.
+            if outcome == CallOutcome::CannotComplete {
+                return Err(Refusal::bare(EngineCode::AxUnconfirmed));
+            }
+            Ok(Delivered { count: 1, of: 1 })
+        })
+    }
+
+    fn set_value(&mut self, reference: &Ref, value: &str) -> BackendResult<Delivered> {
+        self.call(FakeMethod::AxSetValue, |state, outcome| {
+            let (node, window, _) = lookup(state, reference)?;
+            if !supports(node, "set_value") {
+                return Err(Refusal::new(EngineCode::AxUnsupported, Reason::PerformUnsupported.wire()));
+            }
+            let key = value_key(reference, &window);
+            state.ax_values.insert(key, value.to_owned());
+            self.sink.record(format!("ax_set_value ref={} chars={}", reference.0, value.chars().count()));
+            if outcome == CallOutcome::CannotComplete {
+                return Err(Refusal::bare(EngineCode::AxUnconfirmed));
+            }
+            Ok(Delivered { count: 1, of: 1 })
+        })
+    }
+
+    fn read_value(&mut self, reference: &Ref) -> BackendResult<Option<String>> {
+        let state = self.lock();
+        let (node, window, _) = lookup(&state, reference)?;
+        if let Some(scripted) = state.scenario.value_readback.as_ref().and_then(|map| map.get(reference.0.rsplit(':').next().unwrap_or(&reference.0))) {
+            return Ok(scripted.clone());
+        }
+        Ok(state.ax_values.get(&value_key(reference, &window)).cloned().or_else(|| node.value.clone()))
+    }
+
+    fn insert_text(&mut self, reference: &Ref, text: &str) -> BackendResult<Delivered> {
+        self.call(FakeMethod::AxTypeText, |state, outcome| {
+            let (node, window, _) = lookup(state, reference)?;
+            if !supports(node, "type_text") {
+                return Err(Refusal::new(EngineCode::AxUnsupported, Reason::PerformUnsupported.wire()));
+            }
+            let key = value_key(reference, &window);
+            let before = state.ax_values.get(&key).cloned().or_else(|| node.value.clone()).unwrap_or_default();
+            state.ax_values.insert(key, before + text);
+            self.sink.record(format!("ax_type_text ref={} chars={}", reference.0, text.chars().count()));
+            if outcome == CallOutcome::CannotComplete {
+                return Err(Refusal::bare(EngineCode::AxUnconfirmed));
+            }
+            Ok(Delivered { count: 1, of: 1 })
+        })
+    }
+
+    fn focus(&mut self, reference: &Ref) -> BackendResult<Delivered> {
+        self.call(FakeMethod::AxFocus, |state, outcome| {
+            lookup(state, reference)?;
+            self.sink.record(format!("ax_focus ref={}", reference.0));
             if outcome == CallOutcome::CannotComplete {
                 return Err(Refusal::bare(EngineCode::AxUnconfirmed));
             }

@@ -35,3 +35,6 @@ C9	click report `hit{role,label}` and the per-OS delivery-evidence kinds (`barri
 C9	a true in-flight `cancel` exit path for a held key (needs a cancel RPC; row 23 covers cancel as `control.revoke` during a held `key.down`, R49)	23	28	owed
 C9	`self-target-drag-drop-onto-own-terminal.json` (SelfTarget for a drop on the session's own terminal): needs the host's self-set additions wired into guard.open at session.open; row 16's session-level gate test covers the stage meanwhile (R55)	23	73	owed
 C9	`two-sessions-drag-drop-onto-held-window-input-busy.json` (InputBusy{window, holder} for a drop on another session's reserved window): needs two sessions on one hand (R55)	23	85	owed
+C8	the imported `ax-type-text.json` replay: its `stopPath.changed` and v1 `audit` notification legs (the notification channel); row 24 proves ax.snapshot / ax.typeText with its own v3 cases (R56a)	24	28	owed
+C8	the imported `ax-unconfirmed.json` replay: its `stopPath.changed` and v1 `audit` notification legs (the notification channel); row 24 proves AxUnconfirmed for ax.perform / ax.setValue / ax.focus with its own v3 cases (R56a)	24	28	owed
+C8	the v1-consumer case `03-stdio-click-type-text-null.json` (whole case: host-relay notification, v1 audit notification, v1 capture size scaling 64x48), in row 28's v1_consumers suite (R56a)	24	28	owed

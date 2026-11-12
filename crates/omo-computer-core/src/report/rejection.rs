@@ -48,6 +48,8 @@ pub enum ReportRejection {
     PartialWithoutDelivered,
     /// `refused` whose delivery is not `not_delivered`.
     RefusedButSent { delivery: Delivery },
+    /// R60a: `reason` and `nothingSent: true` are present exactly when the effect is `refused`.
+    RefusedMembersMismatch,
     /// `delivered.count` greater than `delivered.of`.
     DeliveredCountExceedsTotal,
 }

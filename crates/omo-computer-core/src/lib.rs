@@ -3,6 +3,7 @@
 pub mod ax;
 pub mod backend;
 pub mod capabilities;
+pub mod clipboard;
 pub mod doc;
 pub mod env;
 pub mod error;
@@ -25,6 +26,7 @@ pub mod schema;
 pub mod session_state;
 pub mod settings;
 pub mod untrusted;
+pub mod window_frame;
 
 #[cfg(test)]
 mod protocol_test;

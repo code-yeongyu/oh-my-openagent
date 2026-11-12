@@ -7,6 +7,7 @@
 use std::borrow::Cow;
 
 use schemars::{JsonSchema, Schema, SchemaGenerator};
+use crate::listing::Rect;
 use serde::{Deserialize, Serialize};
 
 use super::rejection::ReportRejection;
@@ -31,10 +32,13 @@ pub enum EvidenceKind {
     SettleFrameDiff,
     /// A window-wide accessibility change during the settle window.
     AxChange,
+    /// Row 24 (R59): a window frame read back after a frame verb; a receipt when every edge is
+    /// within 1 px of the frame asked for (design row C8), both recorded raw.
+    FrameReadback,
 }
 
 impl EvidenceKind {
-    pub const ALL: [Self; 8] = [
+    pub const ALL: [Self; 9] = [
         Self::BarrierConsumed,
         Self::Xi2RawConfirm,
         Self::ValueReadback,
@@ -43,6 +47,7 @@ impl EvidenceKind {
         Self::AxNotification,
         Self::SettleFrameDiff,
         Self::AxChange,
+        Self::FrameReadback,
     ];
 
     /// A read of the target after the send: what makes an effect `observed`.
@@ -50,7 +55,11 @@ impl EvidenceKind {
     pub const fn reads_target(self) -> bool {
         matches!(
             self,
-            Self::ValueReadback | Self::FocusReadback | Self::MenuReadback | Self::AxNotification
+            Self::ValueReadback
+                | Self::FocusReadback
+                | Self::MenuReadback
+                | Self::AxNotification
+                | Self::FrameReadback
         )
     }
 }
@@ -92,6 +101,7 @@ impl Evidence {
             EvidenceKind::ValueReadback if intended.is_some() && intended == value => {
                 EvidenceClass::Receipt
             }
+            EvidenceKind::FrameReadback if super::frame_text::within_1px(intended, value) => EvidenceClass::Receipt,
             _ => EvidenceClass::Observation,
         }
     }
@@ -125,6 +135,20 @@ impl Evidence {
             intended,
             value,
             baseline,
+            event: None,
+        }
+    }
+
+    /// A frame verb's read-back (R59): the frame asked for and the frame read, both raw.
+    #[must_use]
+    pub fn frame_readback(intended: Rect, value: Rect, baseline: Option<Rect>) -> Self {
+        let (intended, value) = (Some(super::frame_text::of(intended)), Some(super::frame_text::of(value)));
+        Self {
+            kind: EvidenceKind::FrameReadback,
+            class: Self::derived_class(EvidenceKind::FrameReadback, intended.as_deref(), value.as_deref()),
+            intended,
+            value,
+            baseline: baseline.map(super::frame_text::of),
             event: None,
         }
     }
@@ -267,3 +291,4 @@ impl JsonSchema for Evidence {
         WireEvidence::json_schema(generator)
     }
 }
+

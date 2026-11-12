@@ -23,6 +23,9 @@ pub struct Mutation<'a> {
     pub frame_refusal: Option<FrameRefusal>,
     /// `consume:true`: the `(target, frameId)` a delivery consumes.
     pub consume: Option<(String, String)>,
+    /// Row 24: a write that is not input events (an AX write, the clipboard, a window frame),
+    /// sent instead of `events`; its value is read back after the send.
+    pub write: Option<crate::value_verbs::Write>,
 }
 
 impl<'a> Mutation<'a> {
@@ -47,6 +50,7 @@ impl<'a> Mutation<'a> {
             keys: Vec::new(),
             frame_refusal: None,
             consume: None,
+            write: None,
         }
     }
 
@@ -65,7 +69,16 @@ impl<'a> Mutation<'a> {
             keys: Vec::new(),
             frame_refusal: None,
             consume: None,
+            write: None,
         }
+    }
+
+    /// Row 24: sends `write` instead of input events.
+    #[must_use]
+    pub fn with_write(mut self, write: crate::value_verbs::Write) -> Self {
+        self.events = Vec::new();
+        self.write = Some(write);
+        self
     }
 
     #[must_use]

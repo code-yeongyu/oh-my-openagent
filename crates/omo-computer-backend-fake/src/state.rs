@@ -40,6 +40,8 @@ pub struct FakeState {
     /// Input posts so far, for `stop_chord_after_posts`.
     pub posts: u32,
     pub clipboard: Option<String>,
+    /// Values written by AX writes (row 24), keyed by `<window>#<node index>`.
+    pub ax_values: BTreeMap<String, String>,
     pub focus_read_pos: BTreeMap<String, usize>,
     pub focus_record_pos: BTreeMap<FocusRecordKind, usize>,
     /// Snapshot generation -> the window it walked.
@@ -88,6 +90,7 @@ impl FakeState {
             held: BTreeSet::new(),
             scroll_run: 0,
             posts: 0,
+            ax_values: BTreeMap::new(),
             clipboard: scenario.clipboard.as_ref().and_then(|c| c.text.clone()),
             focus_read_pos: BTreeMap::new(),
             focus_record_pos: BTreeMap::new(),

@@ -1163,6 +1163,24 @@
           ],
           "default": null
         },
+        "reason": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RefusalReason"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Row 24 (R60): why an `effect:\"refused\"` report sent nothing."
+        },
+        "nothingSent": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "Row 24 (R60): `true` on a refused report: nothing was sent."
+        },
         "warning": {
           "type": [
             "string",
@@ -3390,6 +3408,11 @@
           "type": "string",
           "const": "ax_change",
           "description": "A window-wide accessibility change during the settle window."
+        },
+        {
+          "type": "string",
+          "const": "frame_readback",
+          "description": "Row 24 (R59): a window frame read back after a frame verb; a receipt when every edge is\nwithin 1 px of the frame asked for (design row C8), both recorded raw."
         }
       ],
       "description": "What an evidence entry read."
@@ -5399,6 +5422,15 @@
         "height"
       ],
       "description": "A rectangle in the coordinate space of the reply that carries it."
+    },
+    "RefusalReason": {
+      "type": "string",
+      "enum": [
+        "secure_focus",
+        "concealed_clipboard",
+        "secret_no_clipboard_route"
+      ],
+      "description": "Row 24 (R60): the pinned reasons a report is `effect:\"refused\"` with nothing sent\n(`design/d-sdk-skill.md`:555). A closed enum until the design lane rules its type."
     },
     "ReleaseHelper": {
       "type": "object",

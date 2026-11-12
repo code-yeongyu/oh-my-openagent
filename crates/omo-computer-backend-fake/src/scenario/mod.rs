@@ -92,6 +92,9 @@ pub struct FakeScenario {
     /// The user presses the stop chord right after the engine's Nth input post (row 23, R53:
     /// a stop between the units of one stroke).
     pub stop_chord_after_posts: Option<u32>,
+    /// Row 24: what an element's value read-back answers, by ref (`e2`): a string, or null for
+    /// a value that cannot be read back. An absent ref reads the value written.
+    pub value_readback: Option<BTreeMap<String, Option<String>>>,
     pub full_access_preset: bool,
     pub target_exit: Vec<TargetExit>,
     /// Window id -> the session or hand that holds its reservation.

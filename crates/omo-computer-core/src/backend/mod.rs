@@ -111,6 +111,56 @@ pub trait Backend: Send {
         None
     }
 
+    /// Row 24 (R56): the accessibility half the value verbs write through; `None` (the default)
+    /// refuses every AX write with `AxUnsupported`, nothing sent.
+    fn ax(&mut self) -> Option<&mut dyn AxBackend> {
+        None
+    }
+
+    /// Row 24 (R60): whether a secure field has focus in `window` (or anywhere, for `None`).
+    /// `None` answered: unknown (the clipboard gate decides what unknown means).
+    fn secure_focus(&self, _window: Option<&str>) -> Option<bool> {
+        None
+    }
+
+    /// Row 24 (R56): the clipboard, read for `clipboard.read` and for a paste's restore; a
+    /// concealed clipboard answers [`crate::clipboard::ClipboardRead::Concealed`] unread.
+    ///
+    /// # Errors
+    /// `Internal{clipboard}` by default: no clipboard route.
+    fn clipboard_read(&mut self) -> BackendResult<crate::clipboard::ClipboardRead> {
+        Err(Refusal::new(EngineCode::Internal, crate::error::Reason::Clipboard.wire()))
+    }
+
+    /// # Errors
+    /// `Internal{clipboard}` by default, with nothing written.
+    fn clipboard_write(&mut self, _text: &str) -> BackendResult<()> {
+        Err(Refusal::new(EngineCode::Internal, crate::error::Reason::Clipboard.wire()))
+    }
+
+    /// Row 24: asks the window manager for `frame` and answers what it applied, read back.
+    ///
+    /// # Errors
+    /// `InvalidTarget{window_frame_unavailable}` by default, with nothing sent.
+    fn set_frame(&mut self, _window: &str, _frame: crate::listing::Rect) -> BackendResult<crate::window_frame::FrameApplied> {
+        Err(Refusal::new(EngineCode::InvalidTarget, crate::error::Reason::WindowFrameUnavailable.wire()))
+    }
+
+    /// Row 24 (C8): whether the window's position can be set at all, asked BEFORE a frame write so
+    /// an immovable window answers `WindowImmovable` with nothing sent. `None` (the default):
+    /// unknown, and the write is sent.
+    fn frame_settable(&self, _window: &str) -> Option<bool> {
+        None
+    }
+
+    /// Row 24: `window.minimize` (`minimize: true`) or `window.restore` (`false`).
+    ///
+    /// # Errors
+    /// `InvalidTarget{window_frame_unavailable}` by default, with nothing sent.
+    fn set_minimized(&mut self, _window: &str, _minimize: bool) -> BackendResult<()> {
+        Err(Refusal::new(EngineCode::InvalidTarget, crate::error::Reason::WindowFrameUnavailable.wire()))
+    }
+
     /// Types `text` as one stroke that `interrupt` may end between Unicode scalars (asked
     /// before every scalar after the first). The default cannot be interrupted: it sends the
     /// whole text as one `post_input`, exactly as a Text event, and reports every scalar.
@@ -186,6 +236,39 @@ pub trait AxBackend {
             EngineCode::AxUnsupported,
             "perform_unsupported",
         ))
+    }
+
+    /// Row 24 (R56): writes `value` into the element (`ax.setValue`).
+    ///
+    /// # Errors
+    /// `AxUnsupported{perform_unsupported}` by default, with nothing sent.
+    fn set_value(&mut self, _reference: &Ref, _value: &str) -> BackendResult<Delivered> {
+        Err(Refusal::new(EngineCode::AxUnsupported, crate::error::Reason::PerformUnsupported.wire()))
+    }
+
+    /// Row 24: reads the element's value back after a write; `Ok(None)` when it has none to
+    /// read (the read-back is then `unverifiable`).
+    ///
+    /// # Errors
+    /// `AxUnsupported{resolve_unsupported}` by default.
+    fn read_value(&mut self, _reference: &Ref) -> BackendResult<Option<String>> {
+        Err(Refusal::new(EngineCode::AxUnsupported, crate::error::Reason::ResolveUnsupported.wire()))
+    }
+
+    /// Row 24: inserts `text` into a native text field at its caret (`ax.typeText` by insertion).
+    ///
+    /// # Errors
+    /// `AxUnsupported{perform_unsupported}` by default (the caller then focuses and types keys).
+    fn insert_text(&mut self, _reference: &Ref, _text: &str) -> BackendResult<Delivered> {
+        Err(Refusal::new(EngineCode::AxUnsupported, crate::error::Reason::PerformUnsupported.wire()))
+    }
+
+    /// Row 24: focuses the element (`ax.focus`).
+    ///
+    /// # Errors
+    /// `AxUnsupported{perform_unsupported}` by default, with nothing sent.
+    fn focus(&mut self, _reference: &Ref) -> BackendResult<Delivered> {
+        Err(Refusal::new(EngineCode::AxUnsupported, crate::error::Reason::PerformUnsupported.wire()))
     }
 
     /// The observer events; by default a source whose every read refuses.
