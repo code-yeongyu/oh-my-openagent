@@ -1,7 +1,8 @@
-import { existsSync } from "node:fs"
-import { join } from "node:path"
+import { existsSync, realpathSync, unlinkSync } from "node:fs"
+import { userInfo } from "node:os"
+import { join, resolve } from "node:path"
 
-import { loadOmoConfig, OmoConfigWriteError, updateOmoConfig } from "@oh-my-opencode/omo-config-core"
+import { loadOmoConfig, OmoConfigWriteError, resolveHomeDir, updateOmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { BUILTIN_MODEL_PROFILES } from "./builtin-profiles"
@@ -32,6 +33,7 @@ export type ProjectModelProfileRefusalCode =
   | "invalid_model_profile"
   | "project_config_parse_error"
   | "project_config_write_failed"
+  | "home_folder"
 
 export type ProjectModelProfileReply =
   | ({ readonly kind: "ok" } & ProjectModelProfileState)
@@ -44,11 +46,21 @@ export interface ProjectModelProfileSession {
 
 const MAX_PROFILE_LENGTH = 200
 
-const hasControlCharacter = (value: string): boolean =>
-  [...value].some((character) => {
-    const code = character.codePointAt(0) ?? 0
-    return code < 0x20 || code === 0x7f
-  })
+const INVISIBLE_OR_CONTROL = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u
+
+const realOrSelf = (path: string): string => {
+  try {
+    return realpathSync(path)
+  } catch {
+    return resolve(path)
+  }
+}
+
+// A home folder's `.omo` is the user layer (omo-config-core loader/paths.ts), never a project layer.
+function isHomeFolder(cwd: string): boolean {
+  const folder = realOrSelf(cwd)
+  return [resolveHomeDir(), userInfo().homedir].some((home) => realOrSelf(home) === folder)
+}
 
 function projectConfigPath(cwd: string): string {
   const jsonc = join(cwd, ".omo", "omo.jsonc")
@@ -76,7 +88,7 @@ export function readProjectModelProfile(cwd: string): ProjectModelProfileState &
 
 function validProfile(value: string, profileIds: ReadonlySet<string>): boolean {
   if (value.length === 0 || value.length > MAX_PROFILE_LENGTH || value !== value.trim()) return false
-  if (hasControlCharacter(value)) return false
+  if (INVISIBLE_OR_CONTROL.test(value)) return false
   if (profileIds.has(value)) return true
   const slash = value.indexOf("/")
   return slash > 0 && slash < value.length - 1
@@ -95,6 +107,8 @@ const stateReply = (cwd: string): ProjectModelProfileReply => {
 
 export function getProjectModelProfile(session: ProjectModelProfileSession | undefined): ProjectModelProfileReply {
   if (session === undefined) return refused("no_session", "No session is bound to answer for a folder.")
+  if (isHomeFolder(session.cwd))
+    return refused("home_folder", "The home folder has no project config; its .omo is the user layer.")
   return stateReply(session.cwd)
 }
 
@@ -106,6 +120,8 @@ export function setProjectModelProfile(
   const value = typeof data === "object" && data !== null ? Reflect.get(data, "modelProfile") : undefined
   if (value !== null && typeof value !== "string")
     return refused("invalid_model_profile", "modelProfile must be a string or null.")
+  if (isHomeFolder(session.cwd))
+    return refused("home_folder", "The home folder has no project config; its .omo is the user layer.")
   if (!session.isProjectTrusted())
     return refused("project_not_trusted", "The folder is not trusted; its omo config is not changed.")
   const current = readProjectModelProfile(session.cwd)
@@ -114,11 +130,13 @@ export function setProjectModelProfile(
   if (value !== null && !validProfile(value, current.profileIds))
     return refused("invalid_model_profile", `${JSON.stringify(value)} is not a profile id or a provider/model pin.`)
   try {
-    updateOmoConfig({
+    const written = updateOmoConfig({
       scope: "project",
       projectDir: session.cwd,
       edits: [{ path: ["model_profile"], value: value ?? undefined }],
     })
+    // The write is an atomic rename, so the writer's pre-write copy has served its purpose.
+    if (written.backupPath !== undefined) unlinkSync(written.backupPath)
   } catch (error) {
     if (error instanceof OmoConfigWriteError && error.operation === "parse")
       return refused("project_config_parse_error", error.message)

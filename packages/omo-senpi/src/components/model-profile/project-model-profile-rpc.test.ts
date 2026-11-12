@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { mkdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs"
+import { mkdirSync, readdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { testTempDir } from "../../../test-support/temp-dir"
@@ -104,13 +104,34 @@ describe("project model_profile RPC (#13188)", () => {
 
   test("#given values that are not a profile #when set #then each is refused before any write", () => {
     const cwd = folder(COMMENTED)
-    for (const modelProfile of ["not-a-profile", "provider/", "/model", " daily-heavy", "a/b\nc", 42, "x".repeat(201)]) {
+    for (const modelProfile of ["not-a-profile", "provider/", "/model", " daily-heavy", "a/b\nc", "a/b\u2028c", "a/\u202eb", "a/\u200bb", 42, "x".repeat(201)]) {
       expect(setProjectModelProfile(trusted(cwd), { modelProfile })).toMatchObject({
         kind: "refused",
         code: "invalid_model_profile",
       })
     }
     expect(configText(cwd)).toBe(COMMENTED)
+  })
+
+  test("#given repeated sets #when each succeeds #then no backup copies are left in .omo", () => {
+    const cwd = folder(COMMENTED)
+    for (const modelProfile of ["daily-heavy", "a/b", null, "daily-normal", "c/d"])
+      expect(setProjectModelProfile(trusted(cwd), { modelProfile }).kind).toBe("ok")
+    expect(readdirSync(join(cwd, ".omo")).sort()).toEqual(["omo.jsonc"])
+  })
+
+  test("#given the session folder is HOME #when either verb runs #then it is refused and the user layer is untouched", () => {
+    const home = folder(COMMENTED)
+    const previous = process.env.HOME
+    process.env.HOME = home
+    try {
+      expect(setProjectModelProfile(trusted(home), { modelProfile: "a/b" })).toMatchObject({ kind: "refused", code: "home_folder" })
+      expect(getProjectModelProfile(trusted(home))).toMatchObject({ kind: "refused", code: "home_folder" })
+      expect(configText(home)).toBe(COMMENTED)
+    } finally {
+      if (previous === undefined) delete process.env.HOME
+      else process.env.HOME = previous
+    }
   })
 
   test("#given no bound session #when either verb runs #then it answers no_session", () => {
