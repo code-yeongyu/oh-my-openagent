@@ -106,4 +106,28 @@ describe("memory cleanup link integrity", () => {
       expect(plan.held.map((finding) => finding.held.split(",")[0])).toStrictEqual([`would repoint a link in ${path}`])
     },
   )
+
+  it("#given an archived note in a subfolder whose relative link already dangled and a root file of that name #when applied #then the archived link keeps its old folder and gains no target", async () => {
+    // given
+    const { dir, repo } = await repoWith([
+      {
+        relativePath: "reference/deep/old-LIFTED.md",
+        content: memory("Old deep", "The hold was lifted; [gone](missing.md) was never written."),
+      },
+      { relativePath: "missing.md", content: "A root file that happens to share the name.\n" },
+    ])
+    const before = await danglingLinks(dir)
+
+    // when
+    const { applied } = await run(repo)
+
+    // then
+    const archive = await read(dir, "ARCHIVE.md")
+    expect([...archive.matchAll(/\[gone\]\(([^)]*)\)/g)].map((found) => found[1])).toStrictEqual([
+      "reference/deep/missing.md",
+    ])
+    expect(applied.applied).toBe(true)
+    expect(before).toStrictEqual([["reference/deep/old-LIFTED.md", "missing.md"]])
+    expect(await danglingLinks(dir)).toStrictEqual([["ARCHIVE.md", "reference/deep/missing.md"]])
+  })
 })
