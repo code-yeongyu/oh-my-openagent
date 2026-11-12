@@ -48,7 +48,8 @@ public static partial class SpN {
   // WTS_CONNECTSTATE_CLASS of a session: 0 Active, 1 Connected, 4 Disconnected, ...
   public static int ConnectState(uint sid) {
     IntPtr buf; uint n;
-    if (!WTSQuerySessionInformationW(IntPtr.Zero, sid, 8, out buf, out n)) return -1;
+    if (!WTSQuerySessionInformationW(IntPtr.Zero, sid, 8, out buf, out n))
+      throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(), "WTSQuerySessionInformationW(session " + sid + ") failed");
     int v = Marshal.ReadInt32(buf); WTSFreeMemory(buf); return v;
   }
 
@@ -93,13 +94,14 @@ public static partial class SpN {
     uint n = SendInput(1, a, INPUT_SIZE); err = Marshal.GetLastWin32Error(); return n;
   }
   // The *To variants send nothing unless h is the foreground window at the moment of the send.
-  public static uint SendCharsTo(IntPtr h, string s, out int err) {
-    if (GetForegroundWindow() != h) { err = -1; return 0; }
+  public static uint SendCharsTo(IntPtr h, string s, out int err, out bool notForeground) {
+    notForeground = GetForegroundWindow() != h;
+    if (notForeground) { err = 0; return 0; }
     return SendChars(s, out err);
   }
-  public static uint SendChordTo(IntPtr h, ushort mod, ushort vk) {
-    if (GetForegroundWindow() != h) return 0;
-    return SendChord(mod, vk);
+  public static uint SendChordTo(IntPtr h, ushort mod, ushort vk, out bool notForeground) {
+    notForeground = GetForegroundWindow() != h;
+    return notForeground ? 0 : SendChord(mod, vk);
   }
   // Last-error reads happen here, directly after the call that set them, never later from PowerShell.
   public static bool PostCharTo(IntPtr h, char c, out int err) {

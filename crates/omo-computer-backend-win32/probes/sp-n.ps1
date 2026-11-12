@@ -63,7 +63,7 @@ function HostFacts {
     elevated = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
     integrity = Integrity
     inputDesktop = [SpN]::InputDesktop()
-    connectState = [SpN]::ConnectState($sid)
+    connectState = $(try { [SpN]::ConnectState($sid) } catch { "error: $($_.Exception.Message)" })
     consoleSessionId = [SpN]::WTSGetActiveConsoleSessionId()
     monitors = $screens
     monitorCount = $screens.Count
@@ -71,20 +71,42 @@ function HostFacts {
   }
 }
 
+# A target's state file: @{ ok = $true; state } or @{ ok = $false; error }, never $null. A read can race the
+# target's rename, so it retries; the last error is kept and returned, never dropped.
 function ReadState([string]$path) {
+  $last = 'not written'
   for ($i = 0; $i -lt 20; $i++) {
-    try { if (Test-Path $path) { return Get-Content -Raw $path | ConvertFrom-Json } } catch { }
+    try {
+      if (Test-Path -LiteralPath $path) {
+        $s = Get-Content -Raw -LiteralPath $path | ConvertFrom-Json
+        if ($null -ne $s) { return @{ ok = $true; state = $s } }
+        $last = 'empty file'
+      }
+    } catch { $last = $_.Exception.Message }
     Start-Sleep -Milliseconds 25
   }
-  return $null
+  return @{ ok = $false; error = "$path : $last" }
 }
 
-# Effect oracle per target: the target's own state file, or WM_GETTEXT on Notepad's edit.
+# Effect oracle per target: the target's own state file, or WM_GETTEXT on Notepad's edit. A failed read throws,
+# so the leg reports legError and its rows are UNMEASURED; it is never counted as "no effect".
 function EffectText($t) {
-  if ($t.state) { $s = ReadState $t.state; if ($s) { return [string]$s.text } ; return $null }
-  return [SpN]::GetTextOf([IntPtr][int64]$t.edit)
+  if ($t.state) {
+    $r = ReadState $t.state
+    if (-not $r.ok) { throw "state read failed: $($r.error)" }
+    return [string]$r.state.text
+  }
+  $text = [SpN]::GetTextOf([IntPtr][int64]$t.edit)
+  if ($null -eq $text) { throw 'WM_GETTEXT on the edit control failed or timed out' }
+  return $text
 }
-function CountChar([string]$s, [char]$c) { if ($null -eq $s) { return -1 }; return ($s.ToCharArray() | Where-Object { $_ -eq $c }).Count }
+function WheelCount([string]$path) {
+  $r = ReadState $path
+  if (-not $r.ok) { throw "state read failed: $($r.error)" }
+  if ($null -eq $r.state.wheel) { throw "state has no wheel counter: $path" }
+  return [int]$r.state.wheel
+}
+function CountChar([string]$s, [char]$c) { return @($s.ToCharArray() | Where-Object { $_ -eq $c }).Count }
 function WaitCount($t, [char]$c, [int]$want, [int]$ms) {
   $sw = [Diagnostics.Stopwatch]::StartNew()
   do { if ((CountChar (EffectText $t) $c) -ge $want) { return $true }; Start-Sleep -Milliseconds 10 } while ($sw.ElapsedMilliseconds -lt $ms)
@@ -95,4 +117,5 @@ $a = if ($ArgFile) { Get-Content -Raw $ArgFile | ConvertFrom-Json } else { [pscu
 Compile
 
 if (-not (Get-Command "Leg-$Leg" -ErrorAction SilentlyContinue)) { [Console]::Error.WriteLine("unknown leg $Leg"); exit 2 }
-& "Leg-$Leg" $a
+# A leg that throws reports legError (with the line), which the probe raises; it never reads as a result.
+try { & "Leg-$Leg" $a } catch { Emit @{ legError = "$($_.Exception.Message) (line $($_.InvocationInfo.ScriptLineNumber))" }; exit 1 }

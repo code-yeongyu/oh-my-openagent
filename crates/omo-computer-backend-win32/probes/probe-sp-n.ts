@@ -14,7 +14,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { randomBytes } from "node:crypto"
 import { tmpdir } from "node:os"
-import { join, relative } from "node:path"
+import { basename, join, relative } from "node:path"
 
 const HERE = import.meta.dir
 const HELPER = join(HERE, "sp-n.ps1")
@@ -264,6 +264,13 @@ async function run(cmd: string[], live?: Set<Killable>): Promise<{ code: number;
   }
 }
 
+// One leg's JSON line; a leg that failed reports legError, which is raised here, never read as a result.
+export function legResult(line: string, name: string): Json {
+  const j = obj(JSON.parse(line))
+  if (typeof j.legError === "string") throw new Error(`leg ${name} failed: ${j.legError}`)
+  return j
+}
+
 async function leg(ctx: Ctx, name: string, arg: Json = {}): Promise<Json> {
   if (ctx.token.aborted) throw new Error(`leg ${name} not started: the group ran out of budget`)
   const argFile = join(ctx.tmp, `${name}-${Date.now()}-${Math.random().toString(36).slice(2)}.json`)
@@ -277,22 +284,32 @@ async function leg(ctx: Ctx, name: string, arg: Json = {}): Promise<Json> {
     .filter((l) => l.startsWith("{"))
     .at(-1)
   if (!line) throw new Error(`leg ${name} exited ${r.code}: ${r.out.split(/\r?\n/).slice(-3).join(" | ")}`)
-  return obj(JSON.parse(line))
+  return legResult(line, name)
 }
 
-async function waitFile(path: string, ms: number): Promise<Json | undefined> {
+// The JSON a helper wrote to path, waiting up to ms for it. A file never written, a file still unreadable at the
+// deadline (with its last parse error) and a helper's legError all reject: none of them is read as "no result".
+export async function waitFile(path: string, ms: number): Promise<Json> {
   const end = Date.now() + ms
+  let lastError = ""
   while (Date.now() < end) {
     if (existsSync(path)) {
       try {
-        return obj(JSON.parse(readFileSync(path, "utf8")))
-      } catch {
-        // another process is still writing it; read again
+        return legResult(readFileSync(path, "utf8"), basename(path))
+      } catch (e) {
+        const message = (e as Error).message
+        // a helper that reported its own failure is final; a parse error may be a write in progress
+        if (message.startsWith("leg ")) throw e
+        lastError = message
       }
     }
     await Bun.sleep(100)
   }
-  return undefined
+  throw new Error(
+    lastError
+      ? `${basename(path)}: unreadable after ${ms / 1000} s: ${lastError}`
+      : `${basename(path)}: not written within ${ms / 1000} s`,
+  )
 }
 
 // Every path is quoted: the run's directories may contain spaces.
@@ -304,7 +321,7 @@ export function psCommand(dir: string, name: string, arg: Json, out: string): st
 
 // A leg as a medium-integrity process (basic-user trust level of this account). It cannot write the
 // administrators-only shared directory, so its argument and result live in this user's run directory.
-async function medium(ctx: Ctx, name: string, arg: Json): Promise<Json | undefined> {
+async function medium(ctx: Ctx, name: string, arg: Json): Promise<Json> {
   const out = join(ctx.tmp, `${name}.medium.json`)
   rmSync(out, { force: true })
   await run(["runas.exe", "/trustlevel:0x20000", psCommand(ctx.tmp, name, arg, out)], ctx.live)
@@ -371,14 +388,14 @@ async function startTarget(ctx: Ctx, kind: "edit" | "wpf" | "webview2", title: s
   const proc = Bun.spawn(cmd, { stdout: "ignore", stderr: Bun.file(errFile) })
   ctx.spawned.push(proc)
   ctx.pending.set(title, proc)
-  const ready = await Promise.race([waitFile(state, 60_000), proc.exited.then(() => undefined)])
+  const ready = await Promise.race([
+    waitFile(state, 60_000).catch((e: Error) => e),
+    proc.exited.then((code) => new Error(`exited ${code} before it was ready`)),
+  ])
   ctx.pending.delete(title)
-  if (!ready) {
+  if (ready instanceof Error) {
     const why = existsSync(errFile) ? clean(readFileSync(errFile, "utf8")).slice(-200) : ""
-    ctx.notes.set(
-      title,
-      `the ${title} target did not start${proc.exitCode !== null ? ` (exit ${proc.exitCode})` : " within 60 s"}${why ? `: ${why}` : ""}`,
-    )
+    ctx.notes.set(title, `the ${title} target did not start: ${ready.message}${why ? `; stderr: ${why}` : ""}`)
     return
   }
   const child = kind === "webview2" ? "Chrome_RenderWidgetHostHWND" : undefined
@@ -490,7 +507,7 @@ const hostFacts: Group = {
       f.inAdministrators === true && f.elevated === true && num(f.sessionId) !== 0 && f.inputDesktop === "Default"
     return {
       "n-host-admin": {
-        measured: `inAdministrators=${str(f.inAdministrators)} elevated=${str(f.elevated)} integrity=${str(f.integrity)} sessionId=${num(f.sessionId)} inputDesktop=${str(f.inputDesktop)} connectState=${num(f.connectState)}`,
+        measured: `inAdministrators=${str(f.inAdministrators)} elevated=${str(f.elevated)} integrity=${str(f.integrity)} sessionId=${num(f.sessionId)} inputDesktop=${str(f.inputDesktop)} connectState=${str(f.connectState)}`,
         verdict: pick(admin, "CONFIRMS", "CONTRADICTS"),
       },
       "n-host-second-monitor": {
@@ -517,18 +534,23 @@ const isSupported: Group = {
     const drop: Cleanup = { name: "drop-s0", run: () => dropTask("s0") }
     ctx.cleanups.push(drop)
     const started = await asSystem(ctx, "s0", psCommand(ctx.shared, "issupported", {}, out))
-    const s0 = started.code === 0 ? await waitFile(out, 45_000) : undefined
+    const s0 =
+      started.code === 0
+        ? await waitFile(out, 45_000).catch((e: Error) => e)
+        : new Error(`schtasks: ${started.out.split(/\r?\n/)[0]}`)
     ctx.cleanups.splice(ctx.cleanups.indexOf(drop), 1)
     await dropTask("s0")
     const read = (j: Json) =>
       `sessionId=${num(j.sessionId)} isSupported=${str(j.isSupported)} hresult=${num(j.hresult)}`
     return {
-      "n-wgc-issupported-session0": !s0
-        ? UN(`the SYSTEM task produced no result (schtasks: ${started.out.split(/\r?\n/)[0]})`)
-        : {
-            measured: read(s0),
-            verdict: num(s0.sessionId) !== 0 ? "UNMEASURED" : pick(s0.isSupported === false, "CONFIRMS", "CONTRADICTS"),
-          },
+      "n-wgc-issupported-session0":
+        s0 instanceof Error
+          ? UN(`the SYSTEM task produced no result: ${s0.message}`)
+          : {
+              measured: read(s0),
+              verdict:
+                num(s0.sessionId) !== 0 ? "UNMEASURED" : pick(s0.isSupported === false, "CONFIRMS", "CONTRADICTS"),
+            },
       "n-wgc-issupported-interactive": {
         measured: read(here),
         verdict: pick(here.isSupported === true, "CONFIRMS", "CONTRADICTS"),
@@ -560,7 +582,7 @@ const timers: Group = {
 }
 
 const barriers: Group = {
-  budgetS: 220,
+  budgetS: 200,
   ids: FAMILIES.flatMap(([k]) => [
     `n-barrier-fg-proves-${k}`,
     `n-barrier-fg-ms-${k}`,
@@ -585,37 +607,43 @@ const barriers: Group = {
         )
         continue
       }
-      const fg = await leg(ctx, "fg-barrier", { ...oracle(t), ch: "x", warm: WARM, n: RUNS })
-      const fgDone = count(fg.runs, "routed") === RUNS && count(fg.runs, "consumed") === RUNS
-      const oracleSeen = count(fg.runs, "within2s") > 0
-      if (fg.acquired !== true)
-        Object.assign(out, all(ids.slice(0, 2), UN("the probe could not take the foreground for the target")))
-      else {
-        const measured = `sent ${count(fg.runs, "sent")}/${RUNS} routed ${count(fg.runs, "routed")}/${RUNS} consumed ${count(fg.runs, "consumed")}/${RUNS} effect at barrier return ${count(fg.runs, "atReturn")}/${RUNS} within 2 s ${count(fg.runs, "within2s")}/${RUNS} paint probe ${str(fg.probeClass)} foreground by ${str(fg.acquire)}`
-        out[`n-barrier-fg-proves-${key}`] = {
-          measured,
-          verdict: !oracleSeen
-            ? "UNMEASURED"
-            : pick(fgDone && count(fg.runs, "atReturn") === RUNS, "CONFIRMS", "CONTRADICTS"),
+      try {
+        const fg = await leg(ctx, "fg-barrier", { ...oracle(t), ch: "x", warm: WARM, n: RUNS })
+        const fgDone = count(fg.runs, "routed") === RUNS && count(fg.runs, "consumed") === RUNS
+        const oracleSeen = count(fg.runs, "within2s") > 0
+        if (fg.acquired !== true)
+          Object.assign(out, all(ids.slice(0, 2), UN("the probe could not take the foreground for the target")))
+        else {
+          const measured = `sent ${count(fg.runs, "sent")}/${RUNS} routed ${count(fg.runs, "routed")}/${RUNS} consumed ${count(fg.runs, "consumed")}/${RUNS} effect at barrier return ${count(fg.runs, "atReturn")}/${RUNS} within 2 s ${count(fg.runs, "within2s")}/${RUNS} paint probe ${str(fg.probeClass)} foreground by ${str(fg.acquire)}`
+          out[`n-barrier-fg-proves-${key}`] = {
+            measured,
+            verdict: !oracleSeen
+              ? "UNMEASURED"
+              : pick(fgDone && count(fg.runs, "atReturn") === RUNS, "CONFIRMS", "CONTRADICTS"),
+          }
+          const fgMs = `${ms(obj(fg.stats))} hang-guard expiries ${RUNS - Math.min(count(fg.runs, "routed"), count(fg.runs, "consumed"))} not foreground ${count(fg.runs, "notForeground")}/${RUNS}`
+          out[`n-barrier-fg-ms-${key}`] = fgDone
+            ? timingVerdict(num(at(fg, "stats", "p95")), FRAME_MS, fgMs)
+            : { measured: fgMs, verdict: "CONTRADICTS" }
         }
-        const fgMs = `${ms(obj(fg.stats))} hang-guard expiries ${RUNS - Math.min(count(fg.runs, "routed"), count(fg.runs, "consumed"))} not foreground ${count(fg.runs, "notForeground")}/${RUNS}`
-        out[`n-barrier-fg-ms-${key}`] = fgDone
-          ? timingVerdict(num(at(fg, "stats", "p95")), FRAME_MS, fgMs)
-          : { measured: fgMs, verdict: "CONTRADICTS" }
+        const po = await leg(ctx, "posted-barrier", { ...oracle(t), ch: "y", warm: WARM, n: RUNS, away })
+        const poDone = count(po.runs, "consumed") === RUNS
+        const measured = `posted ${count(po.runs, "posted")}/${RUNS} consumed ${count(po.runs, "consumed")}/${RUNS} effect at return ${count(po.runs, "atReturn")}/${RUNS} within 2 s ${count(po.runs, "within2s")}/${RUNS} dst ${str(po.dstClass)} targetForeground=${str(po.foregroundIsTarget)}`
+        // Notepad must land; the drop matrix refuses the other two families, so nothing landing CONFIRMS it.
+        const landed =
+          key === "notepad" ? poDone && count(po.runs, "atReturn") === RUNS : count(po.runs, "within2s") === 0
+        out[`n-barrier-posted-proves-${key}`] = oracleSeen
+          ? { measured, verdict: pick(landed, "CONFIRMS", "CONTRADICTS") }
+          : UN(`the effect oracle never saw a foreground char; ${measured}`)
+        const poMs = `${ms(obj(po.stats))} hang-guard expiries ${RUNS - count(po.runs, "consumed")}`
+        out[`n-barrier-posted-ms-${key}`] = poDone
+          ? timingVerdict(num(at(po, "stats", "p95")), FRAME_MS, poMs)
+          : { measured: poMs, verdict: "CONTRADICTS" }
+      } catch (e) {
+        // one family's failed leg makes only its own rows UNMEASURED, with the leg's error
+        const missing = ids.filter((id) => !(id in out))
+        Object.assign(out, all(missing, UN(`leg failed: ${clean((e as Error).message)}`)))
       }
-      const po = await leg(ctx, "posted-barrier", { ...oracle(t), ch: "y", warm: WARM, n: RUNS, away })
-      const poDone = count(po.runs, "consumed") === RUNS
-      const measured = `posted ${count(po.runs, "posted")}/${RUNS} consumed ${count(po.runs, "consumed")}/${RUNS} effect at return ${count(po.runs, "atReturn")}/${RUNS} within 2 s ${count(po.runs, "within2s")}/${RUNS} dst ${str(po.dstClass)} targetForeground=${str(po.foregroundIsTarget)}`
-      // Notepad must land; the drop matrix refuses the other two families, so nothing landing CONFIRMS it.
-      const landed =
-        key === "notepad" ? poDone && count(po.runs, "atReturn") === RUNS : count(po.runs, "within2s") === 0
-      out[`n-barrier-posted-proves-${key}`] = oracleSeen
-        ? { measured, verdict: pick(landed, "CONFIRMS", "CONTRADICTS") }
-        : UN(`the effect oracle never saw a foreground char; ${measured}`)
-      const poMs = `${ms(obj(po.stats))} hang-guard expiries ${RUNS - count(po.runs, "consumed")}`
-      out[`n-barrier-posted-ms-${key}`] = poDone
-        ? timingVerdict(num(at(po, "stats", "p95")), FRAME_MS, poMs)
-        : { measured: poMs, verdict: "CONTRADICTS" }
     }
     return out
   },
@@ -643,35 +671,43 @@ const chords: Group = {
         )
         continue
       }
-      const fg = await leg(ctx, "chord", { ...oracle(t), route: "fg" })
-      const fgActs = fg.acquired === true && str(fg.after) === "Z"
-      out[`n-fg-chord-ctrl-a-${key}-control`] =
-        fg.acquired !== true
-          ? UN("foreground not acquired")
-          : {
-              measured: `before=${tail(fg.before)} after=${tail(fg.after)} foreground by ${str(fg.acquire)}`,
-              verdict: pick(fgActs, "CONFIRMS", "CONTRADICTS"),
-            }
-      const po = await leg(ctx, "chord", { ...oracle(t), route: "posted", away: ctx.targets.get("SPN-COVER")?.top })
-      const before = str(po.before)
-      const after = str(po.after)
-      const measured = `before=${tail(before)} after=${tail(after)} dst ${str(po.dstClass)}`
-      const verdict: Verdict =
-        after === "Z"
-          ? "CONTRADICTS"
-          : after.startsWith(before) && after.slice(before.length).toLowerCase() === "az"
-            ? "CONFIRMS"
-            : "NEW-EDGE"
-      out[`n-posted-chord-ctrl-a-${key}`] = fgActs
-        ? { measured, verdict }
-        : UN(`the SendInput control did not act; ${measured}`)
+      try {
+        const fg = await leg(ctx, "chord", { ...oracle(t), route: "fg" })
+        const fgActs = fg.acquired === true && str(fg.after) === "Z"
+        out[`n-fg-chord-ctrl-a-${key}-control`] =
+          fg.acquired !== true
+            ? UN("foreground not acquired")
+            : {
+                measured: `before=${tail(fg.before)} after=${tail(fg.after)} foreground by ${str(fg.acquire)}`,
+                verdict: pick(fgActs, "CONFIRMS", "CONTRADICTS"),
+              }
+        const po = await leg(ctx, "chord", { ...oracle(t), route: "posted", away: ctx.targets.get("SPN-COVER")?.top })
+        const before = str(po.before)
+        const after = str(po.after)
+        const measured = `before=${tail(before)} after=${tail(after)} dst ${str(po.dstClass)}`
+        const verdict: Verdict =
+          after === "Z"
+            ? "CONTRADICTS"
+            : after.startsWith(before) && after.slice(before.length).toLowerCase() === "az"
+              ? "CONFIRMS"
+              : "NEW-EDGE"
+        out[`n-posted-chord-ctrl-a-${key}`] = fgActs
+          ? { measured, verdict }
+          : UN(`the SendInput control did not act; ${measured}`)
+      } catch (e) {
+        // one family's failed leg makes only its own rows UNMEASURED, with the leg's error
+        const missing = [`n-fg-chord-ctrl-a-${key}-control`, `n-posted-chord-ctrl-a-${key}`].filter(
+          (id) => !(id in out),
+        )
+        Object.assign(out, all(missing, UN(`leg failed: ${clean((e as Error).message)}`)))
+      }
     }
     return out
   },
 }
 
 const wheel: Group = {
-  budgetS: 90,
+  budgetS: 80,
   ids: ["n-wheel-control-settled", "n-wheel-after-raise-dwmflush", "n-wheel-after-raise-5ms"],
   async run(ctx) {
     const t = ctx.targets.get("SPN-EDIT")
@@ -730,8 +766,16 @@ const affinity: Group = {
   },
 }
 
+// The elevated UIA read: CONFIRMS only when the query completed and explicitly found no value.
+export function uiaResult(r: Json): Result {
+  const measured = `name=${tail(r.uiaName)} descendants=${num(r.uiaDescendants)} value=${tail(r.uiaValue)}`
+  if (typeof r.uiaError === "string") return UN(`the UIA read failed: ${r.uiaError}; ${measured}`)
+  if (r.uiaQueried !== true) return UN(`the UIA read did not complete; ${measured}`)
+  return { measured, verdict: pick(r.uiaValue === null, "CONFIRMS", "CONTRADICTS") }
+}
+
 const elevated: Group = {
-  budgetS: 75,
+  budgetS: 65,
   ids: [
     "n-uipi-sendinput",
     "n-uipi-postmessage",
@@ -745,12 +789,12 @@ const elevated: Group = {
     if (!t || !state) return all(this.ids, UN(notStarted(ctx, "SPN-ELEV")))
     const before = str((await waitFile(state, 5000))?.text)
     const r = await medium(ctx, "uipi", { top: t.top, edit: t.edit })
-    if (!r) return all(this.ids, UN("the medium-integrity helper produced no result"))
     await Bun.sleep(1000)
     const after = str((await waitFile(state, 5000))?.text)
     const got = (c: string) => after.split(c).length - before.split(c).length
     if (r.integrity !== "medium") return all(this.ids, UN(`helper integrity is ${str(r.integrity)}, not medium`))
-    const fgOk = r.foregroundIsTarget === true
+    // nothing was typed unless the target held the foreground at the send (SendCharsTo)
+    const fgOk = r.foregroundIsTarget === true && r.notForeground !== true
     const cls = (k: string) => str(at(r, k, "class"))
     return {
       "n-uipi-sendinput": {
@@ -775,11 +819,7 @@ const elevated: Group = {
         measured: `class=${cls("wgcWindow")} ${str(at(r, "wgcWindow", "info", "error"))}`.trim(),
         verdict: pick(cls("wgcWindow") === "frame", "CONFIRMS", "CONTRADICTS"),
       },
-      "n-elevated-uia-read": {
-        measured:
-          `name=${tail(r.uiaName)} descendants=${num(r.uiaDescendants)} value=${tail(r.uiaValue)} ${str(r.uiaError)}`.trim(),
-        verdict: pick(r.uiaValue === null || r.uiaValue === undefined, "CONFIRMS", "CONTRADICTS"),
-      },
+      "n-elevated-uia-read": uiaResult(r),
     }
   },
 }
@@ -806,19 +846,26 @@ function captureResults(state: CaptureState, r: Json | undefined, skip?: string)
 // ("active", or why not) is written into the rows.
 async function restoreSession(ctx: Ctx, sid: number): Promise<string> {
   const started = await asSystem(ctx, "tscon", `tscon.exe ${sid} /dest:console`).catch((e: Error) => ({
-    code: -1,
+    code: Number.NaN,
     out: e.message,
   }))
-  let back = `not-restored(schtasks=${started.code})`
+  let back = `not-restored(schtasks ${Number.isNaN(started.code) ? "not started" : `exit ${started.code}`}: ${clean(started.out).slice(0, 120)})`
+  let lastRead = ""
   for (let i = 0; i < 20; i++) {
     await Bun.sleep(500)
-    const s = await leg(ctx, "disconnect-state", { sid }).catch(() => undefined)
-    if (s && num(s.connectState) === 0 && s.inputDesktop === "Default") {
+    const s = await leg(ctx, "disconnect-state", { sid }).catch((e: Error) => e)
+    if (s instanceof Error) {
+      lastRead = s.message
+      continue
+    }
+    if (num(s.connectState) === 0 && s.inputDesktop === "Default") {
       back = "active"
+      lastRead = ""
       break
     }
+    lastRead = `connectState=${num(s.connectState)} inputDesktop=${str(s.inputDesktop)}`
   }
-  return `${back},task-${await dropTask("tscon")}`
+  return `${back}${lastRead ? `; last read: ${clean(lastRead).slice(0, 160)}` : ""},task-${await dropTask("tscon")}`
 }
 
 // The disconnected and locked legs: a capture helper waits in this session
@@ -853,11 +900,12 @@ async function sessionLeg(ctx: Ctx, t: Target, state: "disconnected" | "locked")
   const reconnect: Cleanup = { name: `reconnect-${state}`, run: (c) => restoreSession(c, sid) }
   ctx.cleanups.push(reconnect)
   const changed = await leg(ctx, state === "disconnected" ? "disconnect" : "lock")
-  const r = await waitFile(out, 30_000)
+  const read = await waitFile(out, 30_000).catch((e: Error) => e)
+  const r = read instanceof Error ? undefined : read
   ctx.cleanups.splice(ctx.cleanups.indexOf(reconnect), 1)
   const back = await restoreSession(ctx, sid)
   const skip = !r
-    ? "the capture helper produced no result"
+    ? `the capture helper produced no result: ${read instanceof Error ? read.message : "-"}`
     : state === "disconnected" && num(r.connectState) !== 4
       ? `session did not read WTSDisconnected (connectState=${num(r.connectState)}, ${JSON.stringify(changed)})`
       : state === "locked" && r.inputDesktop === "Default"
@@ -870,7 +918,7 @@ async function sessionLeg(ctx: Ctx, t: Target, state: "disconnected" | "locked")
 }
 
 const capture: Group = {
-  budgetS: 150,
+  budgetS: 130,
   cleanupS: 30,
   ids: (Object.keys(CAPTURE_STATES) as CaptureState[]).flatMap(captureIds),
   async run(ctx) {
@@ -898,11 +946,13 @@ const GROUPS: readonly Group[] = [hostFacts, isSupported, timers, barriers, chor
 
 // Budget of one probe pass (--measure or --verify): starting the targets, then every group with the time its
 // cleanups may take after a timeout. The self-test checks the hosted workflow's passes fit its job timeout.
-export const SETUP_BUDGET_S = 150
+export const SETUP_BUDGET_S = 120
 export const TOTAL_BUDGET_S = SETUP_BUDGET_S + GROUPS.reduce((s, g) => s + g.budgetS + (g.cleanupS ?? 0), 0)
 // job steps outside the probe (checkout, bun, precondition, upload: about 30 s observed) and the margin kept free
 export const JOB_OVERHEAD_S = 120
-export const JOB_MARGIN_S = 300
+export const JOB_RESERVE_S = 300
+// share of the job timeout that must stay unused after both passes, overhead and the reserve
+export const JOB_MIN_MARGIN = 0.1
 
 type Budgeted<T> =
   | { readonly timedOut: false; readonly value: T; readonly cleanup: readonly string[] }
@@ -995,8 +1045,9 @@ export function mergeLedger(before: readonly LedgerRow[], host: string, fresh: R
   for (const [id, line] of fresh) if (!done.has(id)) lines.push(line)
   return [HEADER.join("\t"), ...lines]
 }
-// A note survives a re-measure, except a probe-defect note: the re-measure is what supersedes it.
-export const carriedNote = (n: string | undefined) => (n && n !== "-" && !n.startsWith("probe defect") ? n : "-")
+// A note survives a re-measure, except a probe-defect or SUSPECT note: the re-measure is what supersedes it.
+export const carriedNote = (n: string | undefined) =>
+  n && n !== "-" && !n.startsWith("probe defect") && !n.startsWith("SUSPECT") ? n : "-"
 export const rerun = (id: string) => `bun ${SELF} --verify ${LEDGER} --row ${id}`
 export const ledgerLine = (id: string, r: Result, host: string, build: string, notes = "-") => {
   const spec = SPEC[id] ?? { question: "unknown row", condition: "-" }
@@ -1042,7 +1093,20 @@ export async function freshDir(path: string, lockDown: (p: string) => Promise<st
   return path
 }
 
-async function lockDownWindows(p: string): Promise<string | undefined> {
+const OWNER_SDDL: Readonly<Record<string, string>> = { BA: "S-1-5-32-544", SY: "S-1-5-18" }
+// What is wrong with an ACL read of the shared directory, or undefined. A failed read reports its own error.
+export function aclProblem(j: Json): string | undefined {
+  if (typeof j.legError === "string") return `ACL read failed: ${j.legError}`
+  const sddlOwner = /^O:([A-Z]{2}|S-[0-9-]+)/.exec(str(j.sddl))?.[1]
+  const owner = str(j.owner) || (sddlOwner ? (OWNER_SDDL[sddlOwner] ?? sddlOwner) : "")
+  if (!owner) return `ACL read returned no owner (owner=${JSON.stringify(j.owner)} sddl=${JSON.stringify(j.sddl)})`
+  if (owner !== "S-1-5-32-544") return `owner is ${owner}, not Administrators`
+  const sids = str(j.sids)
+  return sids === "S-1-5-18,S-1-5-32-544" ? undefined : `access list is ${sids}, not SYSTEM and Administrators only`
+}
+
+// The ACL is read back by a leg (no PowerShell code on a command line), which emits the ACL or its error.
+async function lockDownWindows(ctx: Ctx, p: string): Promise<string | undefined> {
   const set = await run([
     "icacls.exe",
     p,
@@ -1051,19 +1115,10 @@ async function lockDownWindows(p: string): Promise<string | undefined> {
     "*S-1-5-18:(OI)(CI)F",
     "*S-1-5-32-544:(OI)(CI)F",
   ])
-  if (set.code !== 0) return `icacls grant exited ${set.code}`
+  if (set.code !== 0) return `icacls grant exited ${set.code}: ${clean(set.out).slice(-200)}`
   const own = await run(["icacls.exe", p, "/setowner", "*S-1-5-32-544"])
-  if (own.code !== 0) return `icacls setowner exited ${own.code}`
-  const read = await run([
-    "powershell.exe",
-    "-NoProfile",
-    "-Command",
-    `$a = Get-Acl -LiteralPath '${p.replace(/'/g, "''")}'; $o = $a.GetOwner([Security.Principal.SecurityIdentifier]).Value; $s = @($a.Access | ForEach-Object { $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value } | Sort-Object -Unique); "$o|$($s -join ',')"`,
-  ])
-  const [owner, sids] = read.out.trim().split("|")
-  if (owner !== "S-1-5-32-544") return `owner is ${owner}, not Administrators`
-  if (sids !== "S-1-5-18,S-1-5-32-544") return `access list is ${sids}, not SYSTEM and Administrators only`
-  return undefined
+  if (own.code !== 0) return `icacls setowner exited ${own.code}: ${clean(own.out).slice(-200)}`
+  return aclProblem(await leg(ctx, "acl", { path: p }).catch((e: Error) => ({ legError: e.message })))
 }
 
 async function setup(ctx: Ctx, ids: readonly string[]) {
@@ -1198,7 +1253,7 @@ const LOGIC_CHECKS: readonly Check[] = [
     async run() {
       const self = source("probe-sp-n.ts")
       if (/mkdirSync\(ctx\.shared/.test(self)) return "the shared directory is still created with mkdirSync"
-      if (!/freshDir\(ctx\.shared, lockDownWindows\)/.test(self))
+      if (!/freshDir\(ctx\.shared, \(p\) => lockDownWindows\(ctx, p\)\)/.test(self))
         return "the shared directory is not created by freshDir"
       if (!/omo-sp-n-\$\{process\.pid\}-\$\{randomBytes/.test(self))
         return "the shared directory name is not unpredictable"
@@ -1228,11 +1283,12 @@ const LOGIC_CHECKS: readonly Check[] = [
       const timeoutS = Number(/timeout-minutes:\s*(\d+)/.exec(yml)?.[1] ?? 0) * 60
       const sum = SETUP_BUDGET_S + GROUPS.reduce((s, g) => s + g.budgetS + (g.cleanupS ?? 0), 0)
       if (TOTAL_BUDGET_S !== sum) return `TOTAL_BUDGET_S ${TOTAL_BUDGET_S} != setup + group budgets ${sum}`
-      const spent = passes * TOTAL_BUDGET_S + JOB_OVERHEAD_S + JOB_MARGIN_S
+      const spent = passes * TOTAL_BUDGET_S + JOB_OVERHEAD_S + JOB_RESERVE_S
+      const allowed = Math.floor(timeoutS * (1 - JOB_MIN_MARGIN))
       if (passes < 1 || !timeoutS) return `workflow has ${passes} probe passes and timeout ${timeoutS} s`
-      return spent <= timeoutS
+      return spent <= allowed
         ? undefined
-        : `${passes} passes x ${TOTAL_BUDGET_S} s + ${JOB_OVERHEAD_S} s overhead + ${JOB_MARGIN_S} s margin = ${spent} s > ${timeoutS} s job timeout`
+        : `${passes} passes x ${TOTAL_BUDGET_S} s + ${JOB_OVERHEAD_S} s overhead + ${JOB_RESERVE_S} s reserve = ${spent} s > ${allowed} s (${JOB_MIN_MARGIN * 100} % of the ${timeoutS} s job timeout kept free)`
     },
   },
   {
@@ -1331,6 +1387,115 @@ const LOGIC_CHECKS: readonly Check[] = [
     },
   },
   {
+    finding: "RUN acl-read (hosted run 43085201882)",
+    async run() {
+      const denied = aclProblem({ legError: "Access to the path is denied" })
+      if (!denied?.includes("Access to the path is denied")) return `a failed ACL read hides its error: ${denied}`
+      const fromSddl = aclProblem({
+        owner: "",
+        sddl: "O:BAG:SYD:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)",
+        sids: "S-1-5-18,S-1-5-32-544",
+      })
+      if (fromSddl) return `an owner present in the SDDL is not read: ${fromSddl}`
+      const self = source("probe-sp-n.ts")
+      const lock = self.slice(self.indexOf("async function lockDownWindows("), self.indexOf("async function setup("))
+      if (/"-Command"/.test(lock)) return "the ACL read is still PowerShell code on a command line"
+      return /leg\(ctx, "acl"/.test(lock) ? undefined : "the ACL read is not a leg"
+    },
+  },
+  {
+    finding: "SWALLOW uia-error",
+    async run() {
+      const cases: Array<[Json, Verdict]> = [
+        [{ uiaError: "UIA failed" }, "UNMEASURED"],
+        [{}, "UNMEASURED"],
+        [{ uiaQueried: true, uiaValue: null }, "CONFIRMS"],
+        [{ uiaQueried: true, uiaValue: "qqq" }, "CONTRADICTS"],
+      ]
+      const bad = cases.filter(([r, v]) => uiaResult(r).verdict !== v)
+      if (bad.length) return `UIA verdicts wrong for ${JSON.stringify(bad)}`
+      if (!uiaResult({ uiaError: "UIA failed" }).measured.includes("UIA failed"))
+        return "the UIA error text is not in the row"
+      return /uiaQueried'\] = \$true/.test(source("sp-n-legs-delivery.ps1"))
+        ? undefined
+        : "Leg-uipi does not mark a completed query"
+    },
+  },
+  {
+    finding: "SWALLOW leg-error",
+    async run() {
+      const thrown = await Promise.resolve()
+        .then(() => legResult('{"legError":"state read failed: x","leg":"fg-barrier"}', "fg-barrier"))
+        .then(
+          () => "a leg's legError was read as a result",
+          (e: Error) => (e.message.includes("state read failed: x") ? undefined : `wrong error: ${e.message}`),
+        )
+      if (thrown) return thrown
+      return /catch \{ Emit @\{ legError = /.test(source("sp-n.ps1"))
+        ? undefined
+        : "sp-n.ps1 does not report a failing leg as legError"
+    },
+  },
+  {
+    finding: "SWALLOW wait-file",
+    async run() {
+      const dir = join(tmpdir(), `omo-sp-n-wait-${process.pid}`)
+      mkdirSync(dir, { recursive: true })
+      try {
+        writeFileSync(join(dir, "bad.json"), "{not json")
+        writeFileSync(join(dir, "failed.json"), JSON.stringify({ legError: "Get-Acl failed" }))
+        const outcome = async (f: string) =>
+          waitFile(join(dir, f), 300).then(
+            (v: unknown) => `resolved ${JSON.stringify(v)}`,
+            (e: Error) => `rejected ${e.message}`,
+          )
+        const bad = await outcome("bad.json")
+        if (!/rejected .*(JSON|Unexpected|parse)/i.test(bad))
+          return `an unreadable file is not reported with its parse error: ${bad}`
+        const missing = await outcome("missing.json")
+        if (!/rejected .*not written/.test(missing)) return `a missing file is not reported: ${missing}`
+        const failed = await outcome("failed.json")
+        return /rejected .*Get-Acl failed/.test(failed) ? undefined : `a legError result was accepted: ${failed}`
+      } finally {
+        rmSync(dir, { recursive: true, force: true })
+      }
+    },
+  },
+  {
+    finding: "SWALLOW read-state",
+    async run() {
+      const all = [...LEG_FILES, "sp-n.ps1", "sp-n-target.ps1"].map((f) => [f, source(f)] as const)
+      const empty = all.filter(([, t]) => /catch\s*\{\s*\}/.test(t)).map(([f]) => f)
+      if (empty.length) return `empty catch blocks in ${empty.join(", ")}`
+      const main = source("sp-n.ps1")
+      if (!/ok = \$false; error = /.test(main)) return "ReadState does not return an error object"
+      if (/return -1/.test(main)) return "CountChar still turns a failed read into -1"
+      return /\[int\]\$s\.wheel/.test(source("sp-n-legs-delivery.ps1"))
+        ? "Leg-wheel still reads [int]$s.wheel (null becomes 0)"
+        : undefined
+    },
+  },
+  {
+    finding: "SWALLOW native-sentinels",
+    async run() {
+      const input = source("sp-n-native-input.ps1")
+      const connect = input.slice(
+        input.indexOf("public static int ConnectState("),
+        input.indexOf("public static string InputDesktop("),
+      )
+      if (/return -1/.test(connect)) return "ConnectState returns -1 for a failed WTSQuerySessionInformationW"
+      if (/err = -1/.test(input)) return "SendCharsTo still signals 'not foreground' as last error -1"
+      const self = source("probe-sp-n.ts")
+      const restore = self.slice(
+        self.indexOf("async function restoreSession("),
+        self.indexOf("// The disconnected and locked legs"),
+      )
+      return /\.catch\(\(\) => undefined\)/.test(restore)
+        ? "restoreSession drops the disconnect-state error"
+        : undefined
+    },
+  },
+  {
     finding: "LOW timing-flap",
     async run() {
       const cases: Array<[number, number, Verdict]> = [
@@ -1346,8 +1511,27 @@ const LOGIC_CHECKS: readonly Check[] = [
   },
 ]
 
-const INVALID_NOTE = "probe defect (return-in-loop); superseded by the next run"
+const INVALID_NOTE = "probe defect (return-in-loop); INVALID until a hosted run with the positive control succeeds"
+const SUSPECT_IDS = [
+  "n-barrier-fg-proves-wpf",
+  "n-barrier-fg-ms-wpf",
+  "n-barrier-posted-proves-wpf",
+  "n-barrier-posted-ms-wpf",
+  "n-fg-chord-ctrl-a-classic-edit-control",
+]
 const LEDGER_CHECKS: readonly Check[] = [
+  {
+    finding: "SUSPECT rows",
+    async run() {
+      const rows = readLedger(join(HERE, "win32-delivery.tsv"))
+      const bad = SUSPECT_IDS.filter((id) => {
+        const r = rows.find((x) => x.id === id && x.host === HOSTED)
+        return !r || r.verdict !== "CONFIRMS" || !r.notes.startsWith("SUSPECT")
+      })
+      if (bad.length) return `not marked SUSPECT (verdict kept): ${bad.join(",")}`
+      return carriedNote("SUSPECT: x") === "-" ? undefined : "a SUSPECT note survives the re-measure that replaces it"
+    },
+  },
   {
     finding: "HIGH wheel-rows-invalid",
     async run() {
@@ -1395,11 +1579,17 @@ async function runChecks(checks: readonly Check[]): Promise<string[]> {
 const logicChecks = () => runChecks(LOGIC_CHECKS)
 
 async function selfTest(): Promise<never> {
-  const failures = [...(await logicChecks()), ...(await runChecks(LEDGER_CHECKS))]
+  // --only <text>: run just the checks whose finding contains text, alone
+  const only = process.argv[process.argv.indexOf("--only") + 1]
+  const pick = (cs: readonly Check[]) =>
+    process.argv.includes("--only") && only ? cs.filter((c) => c.finding.includes(only)) : cs
+  if (process.argv.includes("--only") && pick([...LOGIC_CHECKS, ...LEDGER_CHECKS]).length === 0)
+    fail(`SELF-TEST no check matches --only ${only}`)
+  const failures = [...(await runChecks(pick(LOGIC_CHECKS))), ...(await runChecks(pick(LEDGER_CHECKS)))]
   for (const f of failures) console.log(`SELF-TEST FAIL ${f}`)
   console.log(
     failures.length
-      ? `SELF-TEST FAIL ${failures.length} of ${LOGIC_CHECKS.length + LEDGER_CHECKS.length} checks`
+      ? `SELF-TEST FAIL ${failures.length} checks`
       : `SELF-TEST PASS ${LOGIC_CHECKS.length + LEDGER_CHECKS.length} checks, pass budget ${TOTAL_BUDGET_S} s`,
   )
   process.exit(failures.length ? 1 : 0)
@@ -1431,7 +1621,9 @@ async function main() {
     pending: new Map(),
   }
   mkdirSync(ctx.tmp, { recursive: true })
-  await freshDir(ctx.shared, lockDownWindows).catch((e: Error) => fail(`PRECONDITION shared-dir: ${e.message}`))
+  await freshDir(ctx.shared, (p) => lockDownWindows(ctx, p)).catch((e: Error) =>
+    fail(`PRECONDITION shared-dir: ${e.message}`),
+  )
   const pre = await leg(ctx, "precondition").catch((e: Error) =>
     fail(`PRECONDITION windows-interactive-desktop: ${e.message}`),
   )

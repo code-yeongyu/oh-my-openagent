@@ -13,8 +13,9 @@ function Leg-fg-barrier($a) {
     $err = 0
     $t0 = [Diagnostics.Stopwatch]::GetTimestamp()
     # SendCharsTo sends nothing unless the target is the foreground at the moment of the send.
-    $sent = [SpN]::SendCharsTo($top, [string]$c, [ref]$err)
-    if ($sent -eq 0 -and $err -eq -1) {
+    $nf = $false
+    $sent = [SpN]::SendCharsTo($top, [string]$c, [ref]$err, [ref]$nf)
+    if ($nf) {
       if ($i -ge [int]$a.warm) { $runs += @{ sent = 0; notForeground = $true; routed = $false; consumed = $false; atReturn = $false; within2s = $false } }
       continue
     }
@@ -71,8 +72,10 @@ function Leg-chord($a) {
   } else {
     $how = [SpN]::Foreground($top)
     if (-not $how) { Emit @{ acquired = $false }; return }
-    $err = 0
-    if ([SpN]::SendChordTo($top, 0x11, 0x41) -eq 0 -or [SpN]::SendCharsTo($top, 'Z', [ref]$err) -eq 0) { Emit @{ acquired = $false; lostForeground = $true }; return }
+    $err = 0; $nf1 = $false; $nf2 = $false
+    [void][SpN]::SendChordTo($top, 0x11, 0x41, [ref]$nf1)
+    if (-not $nf1) { [void][SpN]::SendCharsTo($top, 'Z', [ref]$err, [ref]$nf2) }
+    if ($nf1 -or $nf2) { Emit @{ acquired = $false; lostForeground = $true }; return }
     $consumed = [SpN]::Routed() -and [SpN]::Consumed([SpN]::PaintProbe([IntPtr]::Zero, $top))
   }
   Start-Sleep -Milliseconds 300
@@ -89,7 +92,9 @@ function Leg-uipi($a) {
   $r['foregroundIsTarget'] = ([SpN]::GetForegroundWindow() -eq $top)
   # Nothing is typed unless the elevated target holds the foreground (SendCharsTo checks it at the send).
   $err = 0
-  $r['sendInputReturned'] = [SpN]::SendCharsTo($top, 'qqq', [ref]$err)
+  $nf = $false
+  $r['sendInputReturned'] = [SpN]::SendCharsTo($top, 'qqq', [ref]$err, [ref]$nf)
+  $r['notForeground'] = $nf
   $r['sendInputOf'] = 6
   $r['sendInputLastError'] = $err
   if ($r['sendInputReturned'] -gt 0) { [void][SpN]::Routed() }
@@ -114,6 +119,7 @@ function Leg-uipi($a) {
       $vp = $null
       if ($editEl.TryGetCurrentPattern([Windows.Automation.ValuePattern]::Pattern, [ref]$vp)) { $r['uiaValue'] = $vp.Current.Value } else { $r['uiaValue'] = $null }
     } else { $r['uiaValue'] = $null }
+    $r['uiaQueried'] = $true
   } catch { $r['uiaError'] = $_.Exception.Message }
   Emit $r
 }
@@ -130,19 +136,19 @@ function Leg-wheel($a) {
       $acq += [SpN]::Foreground($top)
       [SpN]::Pump(300); [void][SpN]::DwmFlush(); [void][SpN]::DwmFlush()
       [void][SpN]::SetCursorPos($px, $py)
-      $s = ReadState $a.state; $before = [int]$s.wheel
+      $before = WheelCount $a.state
     } else {
       $acq += [SpN]::Foreground($cover)
       [SpN]::Pump(50); [void][SpN]::DwmFlush()
       [void][SpN]::SetCursorPos($px, $py)
-      $s = ReadState $a.state; $before = [int]$s.wheel
+      $before = WheelCount $a.state
       [void][SpN]::SetForegroundWindow($top)
       if ($a.mode -eq 'dwmflush') { [void][SpN]::DwmFlush() } else { Start-Sleep -Milliseconds ([int]$a.delayMs) }
     }
     [void][SpN]::Wheel(-1)
     $sw = [Diagnostics.Stopwatch]::StartNew(); $got = $false
     # break, never return: return inside a loop leaves Leg-wheel without its Emit.
-    while ($sw.ElapsedMilliseconds -lt 1000) { $s = ReadState $a.state; if ([int]$s.wheel -gt $before) { $got = $true; break }; Start-Sleep -Milliseconds 20 }
+    while ($sw.ElapsedMilliseconds -lt 1000) { if ((WheelCount $a.state) -gt $before) { $got = $true; break }; Start-Sleep -Milliseconds 20 }
     if ($got) { $delivered++ }
   }
   Emit @{ mode = $a.mode; delivered = $delivered; runs = $runs; acquire = ($acq | Select-Object -Unique) }

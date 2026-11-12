@@ -105,6 +105,19 @@ directory.
   - `UNMEASURED`: the leg could not run. The reason is in `measured`; nothing is guessed.
   - `INVALID`: measured by a probe with a known defect. The reading stays in `measured` and the defect in
     `notes`; the next run supersedes the row.
+- A `notes` value starting `SUSPECT` marks a verdict that rests on a read path later found to swallow errors. The
+  verdict is kept as measured, and the next measurement of the row drops the note.
+
+## Errors are results, never verdicts
+
+A failed read is never counted as a negative:
+- A leg that throws emits `legError`, and the probe raises it.
+- A target state file that cannot be read makes the leg throw.
+- `waitFile` rejects with the file's last parse error, or with "not written".
+- A failed `WTSQuerySessionInformationW` raises its Win32 error.
+- A failed UIA query is UNMEASURED with its text.
+
+The affected rows read `UNMEASURED` with the error text. The self-test checks each of these paths.
 - `rerun` is the exact command that measures the row again.
 - Timings are 31 measured runs after 5 warm-ups, reported as p50 and p95.
 

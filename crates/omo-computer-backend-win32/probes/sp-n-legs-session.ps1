@@ -41,6 +41,14 @@ function Leg-find($a) {
   Emit $r
 }
 
+# The shared directory's ACL as SIDs, read in this leg so no PowerShell code travels on a command line.
+function Leg-acl($a) {
+  $acl = (Get-Item -LiteralPath $a.path -Force).GetAccessControl('Owner, Access')
+  $sids = @($acl.Access | ForEach-Object { $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value } | Sort-Object -Unique)
+  $owner = $acl.GetOwner([Security.Principal.SecurityIdentifier])
+  Emit @{ owner = $(if ($owner) { $owner.Value } else { '' }); sids = ($sids -join ','); sddl = $acl.Sddl }
+}
+
 function Leg-close($a) {
   Emit @{ posted = [SpN]::PostMessageW([IntPtr][int64]$a.top, 0x10, [IntPtr]::Zero, [IntPtr]::Zero) }
 }
