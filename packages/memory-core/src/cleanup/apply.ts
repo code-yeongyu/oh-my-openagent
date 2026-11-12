@@ -54,6 +54,7 @@ export async function applyMemoryCleanup(options: ApplyMemoryCleanupOptions): Pr
       const corpus = await scanCleanupCorpus(repo.dir)
       verifySnapshot(plan, corpus)
       const changes = await buildChanges(plan, corpus, repo.dir)
+      verifyWritesPlanned(plan, changes)
       for (const [path, content] of changes.writes) {
         await mkdir(dirname(join(repo.dir, path)), { recursive: true })
         await writeFile(join(repo.dir, path), content, "utf8")
@@ -72,6 +73,14 @@ function verifySnapshot(plan: MemoryCleanupPlan, corpus: CleanupCorpus): void {
     .filter(([path, hash]) => corpus.linking.get(path)?.contentHash !== hash)
     .map(([path]) => path)
   if (changed.length > 0) throw new MemoryCleanupStaleError(changed)
+}
+
+/** A file the report never named would be rewritten: it gained a link to an archived note after the report. */
+function verifyWritesPlanned(plan: MemoryCleanupPlan, changes: Changes): void {
+  const unplanned = [...changes.writes.keys()].filter(
+    (path) => path !== ARCHIVE_PATH && !Object.hasOwn(plan.snapshot, path),
+  )
+  if (unplanned.length > 0) throw new MemoryCleanupStaleError(unplanned.sort())
 }
 
 interface Changes {
