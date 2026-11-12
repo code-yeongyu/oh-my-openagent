@@ -20,7 +20,7 @@ use crate::budget::PermitKind;
 use crate::marker::{MarkerRead, MarkerStore, MemoryMarkers, PreInputMarker};
 
 /// An audit whose admission passes and whose every append fails, as a disk filling mid-run.
-struct FailingAppend;
+pub(super) struct FailingAppend;
 
 impl AuditSink for FailingAppend {
     fn admit(&self) -> Result<(), Refusal> {
@@ -38,7 +38,7 @@ impl AuditSink for FailingAppend {
 
 /// Markers whose clear always fails.
 #[derive(Default)]
-struct FailingClear(MemoryMarkers);
+pub(super) struct FailingClear(MemoryMarkers);
 
 impl MarkerStore for FailingClear {
     fn read(&self, issuer: &str, scope: &str) -> MarkerRead {
