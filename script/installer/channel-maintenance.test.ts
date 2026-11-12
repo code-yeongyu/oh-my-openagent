@@ -147,15 +147,41 @@ describe("recreateChannel", () => {
     }
   })
 
-  // Same rule as publish.yml's omo-ai metadata step: a prerelease ships on beta, a stable release on latest.
-  test.each([
-    { channel: "latest", version: "5.2.0-beta.1" },
-    { channel: "beta", version: "5.1.49" },
-  ] as const)("refuses $version for channels/$channel before any request", async ({ channel, version }) => {
+  // Same rule as publish.yml: a prerelease never lands on latest.
+  test("refuses a prerelease for channels/latest before any request", async () => {
     const fetch = recordFetch([])
     try {
-      await expect(recreateChannel(credentials, channel, version, () => {})).rejects.toThrow(`not channels/${channel}`)
+      await expect(recreateChannel(credentials, "latest", "5.2.0-beta.1", () => {})).rejects.toThrow(
+        "not channels/latest",
+      )
       expect(fetch.mock.calls).toHaveLength(0)
+    } finally {
+      fetch.mockRestore()
+    }
+  })
+
+  // beta is never older than latest (#12987), so a stable version is a valid beta pointer.
+  test("writes a stable version to channels/beta", async () => {
+    const fetch = recordFetch([
+      { status: 200 },
+      { status: 200, body: "5.1.0\n" },
+      { status: 204 },
+      { status: 200 },
+      { status: 200, body: "5.1.66\n" },
+    ])
+    try {
+      await recreateChannel(credentials, "beta", "5.1.66", () => {})
+      const sent = requests(fetch)
+      expect(sent.map((request) => [request.method, request.url])).toEqual([
+        ["HEAD", `${base}/releases/v5.1.66/.complete`],
+        ["GET", `${base}/channels/beta`],
+        ["DELETE", `${base}/channels/beta`],
+        ["PUT", `${base}/channels/beta`],
+        ["GET", `${base}/channels/beta`],
+      ])
+      const put = sent[3]
+      if (!(put?.body instanceof Blob)) throw new Error("expected a fixed-length PUT body")
+      expect(await put.body.text()).toBe("5.1.66\n")
     } finally {
       fetch.mockRestore()
     }
