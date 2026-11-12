@@ -206,6 +206,12 @@ describe("[ADP-26] q5 secure desktop for the refusal leg", () => {
     expect(v.evidence).toContain("EnableLUA=0")
   })
 
+  test("no prompt with UAC on but ConsentPromptBehaviorAdmin=0 (elevate without prompting) contradicts", () => {
+    const v = verdictSecureDesktop(sd({ consentPromptBehaviorAdmin: 0, consentSeen: false, desktops: ["Default"] }))
+    expect(v.verdict).toBe("CONTRADICTS")
+    expect(v.evidence).toContain("ConsentPromptBehaviorAdmin=0")
+  })
+
   test("no prompt while the process list missed its own control is UNMEASURED", () => {
     const v = verdictSecureDesktop(sd({ enableLua: 0, consentSeen: false, controlSeen: false, desktops: ["Default"] }))
     expect(v.verdict).toBe("UNMEASURED")
