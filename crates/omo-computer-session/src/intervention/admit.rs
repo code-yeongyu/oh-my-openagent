@@ -82,9 +82,17 @@ impl Session {
             let crashed = refused.gate == Gate::Target
                 && exited(self.backend.as_ref(), window).is_some();
             let refusal = if crashed { WINDOW_NOT_FOUND } else { refused.refusal };
+            let mut out = Refused::from(refusal).with_paused(paused);
+            // R54: a refused drag point names the point and the refusing stage's own code.
+            out.detail = refused.drag.filter(|_| !crashed).map(|drag| {
+                Box::new(serde_json::json!({
+                    "point": drag.point.map(|p| serde_json::json!({ "x": p.x, "y": p.y })),
+                    "code": drag.inner.code.wire(),
+                }))
+            });
             return Err(Blocked {
                 stage: format!("{:?}", refused.gate),
-                refused: Refused::from(refusal).with_paused(paused),
+                refused: out,
             });
         }
         if let Some(refusal) = route_refusal(&sample(self.backend.as_ref()), route) {

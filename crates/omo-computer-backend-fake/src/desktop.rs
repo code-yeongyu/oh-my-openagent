@@ -213,6 +213,10 @@ impl Backend for FakeBackend {
 
     fn post_input(&mut self, input: &TaggedInput, route: Route) -> BackendResult<Delivered> {
         self.call(FakeMethod::of_input(&input.event), |state, _| {
+            state.posts = state.posts.saturating_add(1);
+            if state.scenario.stop_chord_after_posts == Some(state.posts) {
+                state.stop_pressed = true;
+            }
             if matches!(input.event, InputEvent::Scroll { .. }) {
                 state.scroll_run = state.scroll_run.saturating_add(1);
                 if state.scenario.scroll_cap.is_some_and(|cap| state.scroll_run > cap) {

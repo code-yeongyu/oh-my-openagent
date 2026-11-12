@@ -103,3 +103,21 @@ fn mouse_down_beyond_100_s_is_refused_and_released() {
     let up = reached.call(Method::MouseUp, json!({"target": "101"})).expect("mouse.up after the bound");
     assert_eq!((up["effect"].clone(), up["delivered"].clone()), (json!("partial"), json!({"count": 0, "of": 1})));
 }
+
+#[test]
+fn the_engine_session_releases_a_held_key_on_connection_close() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let sink = omo_computer_backend_fake::RecordingSink::default();
+    let scenario = omo_computer_backend_fake::FakeScenario::from_json(&format!("{{{}}}", super::WINDOWS)).expect("scenario");
+    let fake = omo_computer_backend_fake::FakeBackend::with_parts(scenario, omo_computer_backend_fake::FakeClock::default(), sink.clone())
+        .with_stop_path(omo_computer_backend_fake::StopPathScript::Live);
+    let roots = omo_computer_core::paths::Roots { state: dir.path().join("state"), runtime: dir.path().join("run") };
+    let mut session = crate::Session::for_roots(Box::new(fake), &roots);
+    session.open(serde_json::from_value(json!({"reportMode": "object"})).expect("open")).expect("open");
+    session.stop_path_start(serde_json::from_value(json!({})).expect("start"));
+    session.control_grant(serde_json::from_value(json!({"reason": "test"})).expect("grant"));
+    session.host_call(Method::KeyDown, json!({"target": "101", "chord": "shift"})).expect("served").expect("key.down");
+    session.close();
+    let posts: Vec<String> = sink.lines().into_iter().filter(|l| l.starts_with("post_input")).collect();
+    assert!(posts.last().is_some_and(|l| ends_with(l, SHIFT_UP)), "the engine's close releases the key: {posts:?}");
+}

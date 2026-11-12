@@ -12,7 +12,6 @@ mod settings;
 
 pub use admit::{Admission, Blocked};
 pub use display_awake::{DisplayAwakeHold, HoldLimits, SharedHold};
-pub(crate) use lease_hook::with_display_awake;
 pub(crate) use send::post_one;
 pub use send::{units, Ended, Outcome, Stop};
 pub use settings::OpenSettings;
@@ -79,6 +78,10 @@ impl crate::Session {
 }
 
 #[cfg(test)]
+mod engine_session_tests;
+#[cfg(test)]
 mod session_state_tests;
+#[cfg(test)]
+mod stop_tests;
 #[cfg(test)]
 mod tests;

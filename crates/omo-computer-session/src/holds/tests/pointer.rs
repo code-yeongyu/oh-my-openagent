@@ -41,6 +41,9 @@ fn drag_drop_onto_a_denied_app_is_refused_with_nothing_pressed() {
     f.grant();
     let refused = f.call(Method::Drag, json!({"target": "desktop", "from": {"x": 10, "y": 10}, "to": {"x": 900, "y": 100}})).expect_err("denied drop");
     assert_eq!(reason(&refused), ("InvalidTarget", Some("drag_destination")));
+    let detail = refused.detail.as_deref().cloned().expect("the refused point (R54)");
+    assert_eq!(detail["point"], json!({"x": 900.0, "y": 100.0}), "{detail}");
+    assert_eq!(detail["code"], json!("ControlRequired"), "the scope stage refuses a denied app: {detail}");
     assert!(f.inputs().is_empty(), "nothing pressed: {:?}", f.inputs());
 }
 
@@ -50,6 +53,8 @@ fn window_drag_to_a_point_outside_the_frame_resolves_the_destination() {
     f.grant();
     let refused = f.call(Method::Drag, json!({"target": "101", "from": {"x": 10, "y": 10}, "to": {"x": 900, "y": 100}})).expect_err("resolved outside");
     assert_eq!(reason(&refused), ("InvalidTarget", Some("drag_destination")));
+    let detail = refused.detail.as_deref().cloned().expect("the refused point (R54)");
+    assert_eq!(detail["point"], json!({"x": 900.0, "y": 100.0}), "resolved as a desktop point: {detail}");
     assert!(f.inputs().is_empty(), "{:?}", f.inputs());
 }
 
