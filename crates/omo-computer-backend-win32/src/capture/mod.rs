@@ -18,6 +18,8 @@ mod pixels;
 mod gdi;
 #[cfg(all(test, windows))]
 mod live_tests;
+#[cfg(test)]
+mod tests;
 #[cfg(windows)]
 pub(crate) mod os;
 #[cfg(windows)]

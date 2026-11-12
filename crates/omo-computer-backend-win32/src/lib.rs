@@ -10,5 +10,3 @@ pub mod ocr;
 
 pub use backend::Win32Backend;
 
-#[cfg(test)]
-mod tests;
