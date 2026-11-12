@@ -57,14 +57,14 @@ export async function refuseSecondMachineDevice(
     // An uncertain refresh keeps its credential and keys: held, not absent (#12948 recovery).
     if (error.code === "refresh_recovery_expired") {
       throw new MachineAlreadySignedIn(
-        "This computer's OmO sign-in has a refresh whose outcome is unknown. omo kept its credential and keys and did not register another device. Run omo logout to end that sign-in, then run omo login again.",
+        "This computer's OmO sign-in has a refresh whose outcome is unknown. omo kept its credential and keys and did not register another device. To start over, remove this computer's device on the Devices page if it is still listed, then run omo account forget, then sign in again. omo account forget ends this computer's local sign-in and has its device service forget the device, without signing the device out on the OmO service.",
       )
     }
     return null
   })
   if (stored !== null && stored !== UNREADABLE) {
     throw new MachineAlreadySignedIn(
-      `This computer is already signed in to OmO as ${terminalText(stored.device.name)}, and omo uses that device. Run omo logout first to sign in again.`,
+      `This computer is already signed in to OmO as ${terminalText(stored.device.name)}, and omo uses that device.`,
     )
   }
   const held = (await deviceService?.machineDevice?.()) ?? { kind: "absent" as const }
@@ -73,7 +73,7 @@ export async function refuseSecondMachineDevice(
   }
   if (held.kind === "held") {
     throw new MachineAlreadySignedIn(
-      `This computer's OmO device service already holds its device, ${terminalText(held.device.name)}. omo uses that device instead of registering another one: sign in from the OmO desktop app to share it with omo, or run omo logout first to sign this computer in again.`,
+      `This computer's OmO device service already holds its device, ${terminalText(held.device.name)}. omo uses that device instead of registering another one: sign in from the OmO desktop app to share it with omo.`,
     )
   }
   if (held.kind === "unknown") {
