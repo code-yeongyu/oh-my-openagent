@@ -116,6 +116,15 @@ function readPluginRequirements() {
       `${HELPER_NAME} gave no usable "generated": expected a non-empty array of { label: string, source: string }`,
     )
   }
+  for (const entry of read.generated) {
+    try {
+      new RegExp(entry.source)
+    } catch {
+      throw new Error(
+        `${HELPER_NAME} gave a "generated" entry whose source is not a regular expression: ${entry.label}`,
+      )
+    }
+  }
   return read
 }
 

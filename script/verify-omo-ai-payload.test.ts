@@ -458,6 +458,17 @@ describe("omo-ai payload verifier", () => {
       expect(errorLines(run.output)).toHaveLength(1)
     })
 
+    test("#when a generated entry's source is not a regular expression #then one line names the helper and that label", () => {
+      const run = runWithHelper(
+        'console.log(JSON.stringify({ pluginOutputs: ["extensions/omo.js"], generated: [{ label: "bad-entry", source: "(" }] }))\n',
+      )
+      expect(run.exitCode).not.toBe(0)
+      expect(run.output).toContain("script/plugin-required-outputs.ts")
+      expect(run.output).toContain("bad-entry")
+      expect(run.output).not.toContain("    at ")
+      expect(errorLines(run.output)).toHaveLength(1)
+    })
+
     test("#when it exits non-zero #then one line names the helper and only the first stderr line", () => {
       const run = runWithHelper(
         'console.error("first stderr line")\nconsole.error("    at somewhere (file.ts:1:1)")\nprocess.exit(3)\n',
