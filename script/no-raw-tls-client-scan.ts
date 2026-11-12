@@ -122,7 +122,74 @@ export const KNOWN_BUILT_RUNTIMES = [
 export const THIRD_PARTY_EXCLUDED_BUNDLES: string[] = []
 
 export function isKnownBuiltRuntime(relativePath: string): boolean {
-  return KNOWN_BUILT_RUNTIMES.includes(relativePath)
+  return KNOWN_BUILT_RUNTIMES.includes(relativePath) || isGeneratedOutput(relativePath)
+}
+
+// The shipped bundles are build outputs that git does not track (#13192), and bundled third-party code enters what we
+// ship only through them, so the scan reads them from the built tree. The set is derived from
+// script/generated-bundles.json: every scannable file under a pattern's fixed directory that the pattern matches. A
+// literal pattern names one output that must exist in CI; a pattern with a wildcard must match at least one file.
+const GENERATED_PATTERNS: readonly string[] = (
+  JSON.parse(readFileSync(path.join(WORKSPACE_ROOT, "script", "generated-bundles.json"), "utf8")) as {
+    patterns: string[]
+  }
+).patterns
+
+function isGeneratedOutput(relativePath: string): boolean {
+  return GENERATED_PATTERNS.some((pattern) => new RegExp(pattern).test(relativePath))
+}
+
+function patternLiteral(pattern: string): string | undefined {
+  const body = pattern.replace(/^\^/, "").replace(/\$/, "").replaceAll("\\.", ".")
+  return /[\\[\](){}*+?|^$]/.test(body) ? undefined : body
+}
+
+function patternDirectory(pattern: string): string {
+  const body = pattern.replace(/^\^/, "")
+  const meta = body.search(/[\\[\](){}*+?|$]/)
+  const fixed = meta < 0 ? body : body.slice(0, meta)
+  return fixed.slice(0, fixed.lastIndexOf("/"))
+}
+
+export function discoverGeneratedOutputs(): string[] {
+  const found = new Set<string>()
+  const walk = (relative: string): void => {
+    let entries: Array<{ name: string; isDirectory(): boolean }>
+    try {
+      entries = readdirSync(path.join(WORKSPACE_ROOT, relative), { withFileTypes: true })
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return
+      throw error
+    }
+    for (const entry of entries) {
+      const rel = relative + "/" + entry.name
+      if (entry.isDirectory()) walk(rel)
+      else if (isGeneratedOutput(rel) && isScannedSourceFile(rel)) found.add(rel)
+    }
+  }
+  for (const directory of new Set(GENERATED_PATTERNS.map(patternDirectory))) walk(directory)
+  return [...found].sort()
+}
+
+export function evaluateGeneratedOutputProbe(input: {
+  patterns: readonly string[]
+  discovered: readonly string[]
+  ci: string | undefined
+}): string[] {
+  if (input.ci === undefined) return []
+  const failures: string[] = []
+  for (const pattern of input.patterns) {
+    const literal = patternLiteral(pattern)
+    if (literal !== undefined && !isScannedSourceFile(literal)) continue
+    const regex = new RegExp(pattern)
+    if (input.discovered.some((file) => regex.test(file))) continue
+    failures.push(
+      "CI: no built output matches " +
+        pattern +
+        " (script/generated-bundles.json). The job must build the generated outputs before this scan so it reads what ships.",
+    )
+  }
+  return failures
 }
 
 export type BuiltRuntimeProbeVerdict = { scanned: string[]; failures: string[] }
@@ -259,9 +326,15 @@ export function collectShippedSourceFiles(): string[] {
     discovered: discoverPluginBuiltRuntimes(),
     ci: process.env.CI,
   })
-  if (probe.failures.length > 0) {
-    throw new Error(probe.failures.join("\n"))
+  const generated = discoverGeneratedOutputs()
+  const failures = [
+    ...probe.failures,
+    ...evaluateGeneratedOutputProbe({ patterns: GENERATED_PATTERNS, discovered: generated, ci: process.env.CI }),
+  ]
+  if (failures.length > 0) {
+    throw new Error(failures.join("\n"))
   }
+  files.push(...generated)
   for (const runtime of probe.scanned) {
     if (isScannedSourceFile(runtime)) files.push(runtime)
   }
