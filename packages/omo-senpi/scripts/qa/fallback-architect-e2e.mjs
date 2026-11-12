@@ -85,14 +85,7 @@ function seedScenario(scenario) {
 function driveSenpi(senpiBin, scenario) {
   return spawnSync(
     senpiBin,
-    [
-      "-e",
-      mockProvider,
-      "-p",
-      "--session-dir",
-      scenario.sessionDir,
-      "design a caching layer for the fixture service",
-    ],
+    ["-e", mockProvider, "-p", "--session-dir", scenario.sessionDir, "design a caching layer for the fixture service"],
     {
       cwd: scenario.sandbox.cwd,
       env: {

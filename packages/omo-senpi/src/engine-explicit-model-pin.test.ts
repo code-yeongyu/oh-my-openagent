@@ -75,7 +75,9 @@ async function runPrintTurn(launch: Launch): Promise<RunResult> {
   )
   // The runner's own session, agent dirs and a pinned runner's NO_FALLBACK switch must not reach the probed engine.
   const inherited = Object.fromEntries(
-    Object.entries(process.env).filter(([key]) => !/^(PI_|SENPI_|OMO_)/.test(key) && key !== "DBUS_SESSION_BUS_ADDRESS"),
+    Object.entries(process.env).filter(
+      ([key]) => !/^(PI_|SENPI_|OMO_)/.test(key) && key !== "DBUS_SESSION_BUS_ADDRESS",
+    ),
   )
   const env: NodeJS.ProcessEnv = {
     ...withTelemetryOptOut(inherited),
