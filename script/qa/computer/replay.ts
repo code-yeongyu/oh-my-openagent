@@ -1,7 +1,8 @@
 #!/usr/bin/env bun
 // Replays one corpus case against an engine binary the way a consumer drives it.
 //
-//   bun script/qa/computer/replay.ts --engine <binary> --case <file> [--assert-sink-empty] [--deltas <tsv>]
+//   bun script/qa/computer/replay.ts --engine <binary> --case <file> [--case <file> ...] [--dir <dir> ...]
+//                                    [--assert-sink-empty] [--deltas <tsv>]
 //
 // Every reply is deep-compared with the case's expected messages modulo the case's `variable`
 // JSON pointers and the lines of ORACLE-DELTAS.tsv (row 3's rule: an `additive` line accepts an
@@ -13,10 +14,21 @@
 // be spawned) prints `REPLAY_ERROR <why>` and exits 2. A case with no `transport` is replayed
 // over stdio only when ORACLE-PROVENANCE.tsv lists it as an imported oracle case (the v1 corpus
 // predates the field); any other case without one is refused `REPLAY_ERROR transport_missing`.
+// Several `--case` files, or every `*.json` case of a `--dir`, replay as one list, in order. A case
+// may carry `"supersedes": [<old case file name>, ...]` (names resolved beside the case): every named
+// file must exist, else `REPLAY_ERROR supersedes_missing` (exit 2, nothing replayed), and an old case
+// in the list is not replayed but prints `SKIPPED <old> superseded by <new>`. The superseding case
+// itself always replays, and the list exits with the worst code of the cases it replayed.
+// Every case runs in a fresh temporary runtime dir (OMO_COMPUTER_RUNTIME_DIR) that is removed
+// afterwards, so no case sees another's leftovers. `${RUNTIME_DIR}` in a case's env values is
+// replaced with that dir, and a case may plant its starting state there before the engine starts:
+// `"runtime": {"plant": [{"path": <relative>, "content": <text>, "mode": "0600"} |
+// {"path": <relative>, "dir": true, "mode": "0500"}]}` (files default to 0600, parents are 0700,
+// directory modes are applied after every file).
 import { constants } from "node:fs"
-import { access, mkdtemp, readdir, readFile, rm } from "node:fs/promises"
+import { access, chmod, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join, relative, resolve } from "node:path"
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path"
 
 const ROOT = resolve(import.meta.dir, "../../..")
 const DEFAULT_DELTAS = join(ROOT, "crates/omo-computer-core/parity/ORACLE-DELTAS.tsv")
@@ -24,6 +36,7 @@ const PROVENANCE = join(ROOT, "crates/omo-computer-core/parity/ORACLE-PROVENANCE
 const SINK_PREFIX = "fake-sink-" // the engine's per-process sink file under OMO_COMPUTER_RUNTIME_DIR
 const MESSAGE_TIMEOUT_MS = 10_000
 const EXIT_TIMEOUT_MS = 5_000
+const RUNTIME_PLACEHOLDER = "$" + "{RUNTIME_DIR}"
 const TRANSPORT_ARGS = { stdio: ["--stdio"], mcp: ["--mcp"], oneshot: ["--oneshot"] } as const
 
 type Transport = keyof typeof TRANSPORT_ARGS
@@ -36,10 +49,17 @@ type Step =
       readonly expect: readonly Expectation[]
       readonly sink: number | undefined
     }
+type Plant = {
+  readonly path: string
+  readonly dir: boolean
+  readonly content: string | undefined
+  readonly mode: number | undefined
+}
 type Case = {
   readonly transport: Transport
   readonly scenario: string | undefined
   readonly env: Readonly<Record<string, string>>
+  readonly plant: readonly Plant[]
   readonly steps: readonly Step[]
 }
 type Delta = {
@@ -100,6 +120,47 @@ function parseStep(raw: unknown, index: number): Step {
   return { restart: false, send, expect: expectations, sink }
 }
 
+function parsePlant(runtime: unknown): Plant[] {
+  if (runtime === undefined) return []
+  if (!isRecord(runtime) || !Array.isArray(runtime.plant)) throw new InputError("runtime must be { plant: [...] }")
+  return runtime.plant.map((item: unknown, index): Plant => {
+    const at = `runtime.plant[${index}]`
+    if (!isRecord(item) || typeof item.path !== "string") throw new InputError(`${at} needs a path`)
+    const path = item.path
+    if (path === "" || isAbsolute(path) || path.split("/").includes(".."))
+      throw new InputError(`${at}.path must stay inside the runtime dir`)
+    const dir = item.dir === true
+    const content = typeof item.content === "string" ? item.content : undefined
+    if (dir === (content !== undefined)) throw new InputError(`${at} needs either content or dir: true`)
+    const { mode } = item
+    if (mode !== undefined && !(typeof mode === "string" && /^0?[0-7]{3}$/.test(mode)))
+      throw new InputError(`${at}.mode must be an octal string such as "0600"`)
+    return { path, dir, content, mode: mode === undefined ? undefined : Number.parseInt(mode, 8) }
+  })
+}
+
+// Plants a case's starting state under `runtime`; answers the directories whose mode it narrowed.
+async function plantIn(runtime: string, items: readonly Plant[]): Promise<string[]> {
+  for (const item of items) {
+    const target = join(runtime, item.path)
+    if (item.dir) {
+      await mkdir(target, { recursive: true, mode: 0o700 })
+      continue
+    }
+    await mkdir(dirname(target), { recursive: true, mode: 0o700 })
+    await writeFile(target, item.content ?? "")
+    await chmod(target, item.mode ?? 0o600)
+  }
+  const narrowed: string[] = []
+  for (const item of items) {
+    if (!item.dir || item.mode === undefined) continue
+    const target = join(runtime, item.path)
+    await chmod(target, item.mode)
+    narrowed.push(target)
+  }
+  return narrowed
+}
+
 function parseCase(raw: unknown, name: string, imported: boolean): Case {
   if (!isRecord(raw)) throw new InputError("the case is not an object")
   const { scenario, env = {}, steps } = raw
@@ -114,6 +175,7 @@ function parseCase(raw: unknown, name: string, imported: boolean): Case {
     transport,
     scenario,
     env: Object.fromEntries(Object.entries(env).map(([k, v]) => [k, String(v)])),
+    plant: parsePlant(raw.runtime),
     steps: steps.map(parseStep),
   }
 }
@@ -278,36 +340,105 @@ async function sinkCount(dir: string): Promise<number> {
   return texts.reduce((sum, text) => sum + text.split("\n").filter((line) => line.trim() !== "").length, 0)
 }
 
-function args(argv: readonly string[]) {
+type Options = {
+  readonly engine: string
+  readonly cases: readonly string[]
+  readonly dirs: readonly string[]
+  readonly deltas: string
+  readonly assertSinkEmpty: boolean
+}
+
+function args(argv: readonly string[]): Options {
   const value = (flag: string) => {
     const i = argv.indexOf(flag)
     return i >= 0 ? argv[i + 1] : undefined
   }
+  const values = (flag: string) =>
+    argv.flatMap((arg, i) => (arg === flag && argv[i + 1] !== undefined ? [argv[i + 1] ?? ""] : []))
   const engine = value("--engine")
-  const file = value("--case")
-  if (!engine || !file)
-    throw new InputError("usage: replay.ts --engine <binary> --case <file> [--assert-sink-empty] [--deltas <tsv>]")
+  const cases = values("--case")
+  const dirs = values("--dir")
+  if (!engine || (cases.length === 0 && dirs.length === 0))
+    throw new InputError(
+      "usage: replay.ts --engine <binary> --case <file> [--case <file> ...] [--dir <dir> ...] [--assert-sink-empty] [--deltas <tsv>]",
+    )
   return {
     engine: resolve(engine),
-    casePath: resolve(file),
+    cases: cases.map((file) => resolve(file)),
+    dirs: dirs.map((dir) => resolve(dir)),
     deltas: resolve(value("--deltas") ?? DEFAULT_DELTAS),
     assertSinkEmpty: argv.includes("--assert-sink-empty"),
   }
 }
 
+// Every `*.json` file of `dir`, in name order.
+async function casesIn(dir: string): Promise<string[]> {
+  const names = await readdir(dir).catch((error: unknown) => {
+    throw new InputError(`cannot read the case directory ${dir}: ${describe(error)}`)
+  })
+  return names
+    .filter((name) => name.endsWith(".json"))
+    .sort()
+    .map((name) => join(dir, name))
+}
+
+type Superseded = { readonly old: string; readonly by: string }
+
+// The old cases the listed cases supersede, keyed by path; a named file that does not exist is an input error.
+async function supersededBy(listed: readonly string[]): Promise<Map<string, Superseded>> {
+  const skips = new Map<string, Superseded>()
+  for (const casePath of listed) {
+    const raw = parseJson(await readText(casePath, "case file"), "case file")
+    if (!isRecord(raw) || raw.supersedes === undefined) continue
+    if (!isStrings(raw.supersedes)) throw new InputError(`${basename(casePath)}: supersedes must list case file names`)
+    for (const old of raw.supersedes) {
+      const oldPath = resolve(dirname(casePath), old)
+      const exists = await access(oldPath, constants.R_OK).then(
+        () => true,
+        () => false,
+      )
+      if (!exists) throw new InputError(`supersedes_missing: ${basename(casePath)} names ${old}, which does not exist`)
+      skips.set(oldPath, { old, by: basename(casePath) })
+    }
+  }
+  return skips
+}
+
 async function replay(argv: readonly string[]): Promise<number> {
   const opts = args(argv)
-  const rel = relative(ROOT, opts.casePath)
-  const name = rel.startsWith("..") ? opts.casePath : rel
+  const listed = [...opts.cases, ...(await Promise.all(opts.dirs.map(casesIn))).flat()]
+  const skips = await supersededBy(listed)
+  const only = listed[0]
+  if (listed.length === 1 && opts.dirs.length === 0 && only !== undefined) return replayCase(opts, only)
+  let code = 0
+  for (const casePath of listed) {
+    const skip = skips.get(casePath)
+    if (skip) {
+      console.log(`SKIPPED ${skip.old} superseded by ${skip.by}`)
+      continue
+    }
+    try {
+      code = Math.max(code, await replayCase(opts, casePath))
+    } catch (error) {
+      console.log(`REPLAY_ERROR ${describe(error)}`)
+      code = 2
+    }
+  }
+  return code
+}
+
+async function replayCase(opts: Options, casePath: string): Promise<number> {
+  const rel = relative(ROOT, casePath)
+  const name = rel.startsWith("..") ? casePath : rel
   const spec = parseCase(
-    parseJson(await readText(opts.casePath, "case file"), "case file"),
+    parseJson(await readText(casePath, "case file"), "case file"),
     name,
-    await isImported(opts.casePath),
+    await isImported(casePath),
   )
   await access(opts.engine, constants.X_OK).catch((error: unknown) => {
     throw new InputError(`the engine ${opts.engine} is not an executable file: ${describe(error)}`)
   })
-  const deltas = await loadDeltas(opts.deltas, opts.casePath)
+  const deltas = await loadDeltas(opts.deltas, casePath)
   const runtime = await mkdtemp(join(tmpdir(), "omo-replay-"))
   const failures: string[] = []
   const peers: Peer[] = []
@@ -318,7 +449,7 @@ async function replay(argv: readonly string[]): Promise<number> {
     ...Object.fromEntries(inherited),
     OMO_COMPUTER_BACKEND: "fake",
     OMO_COMPUTER_RUNTIME_DIR: runtime,
-    ...spec.env,
+    ...Object.fromEntries(Object.entries(spec.env).map(([k, v]) => [k, v.replaceAll(RUNTIME_PLACEHOLDER, runtime)])),
   }
   if (spec.scenario) env.OMO_COMPUTER_FAKE_SCENARIO = resolve(ROOT, spec.scenario)
   const spawn = () => {
@@ -331,7 +462,9 @@ async function replay(argv: readonly string[]): Promise<number> {
   }
   const persistent = spec.transport !== "oneshot"
   let completed = false
+  let narrowed: string[] = []
   try {
+    narrowed = await plantIn(runtime, spec.plant)
     let peer = persistent ? spawn() : undefined
     for (const [index, step] of spec.steps.entries()) {
       const label = `step=${index + 1}`
@@ -367,6 +500,8 @@ async function replay(argv: readonly string[]): Promise<number> {
     if (failures.length > 0) console.log(failures.join("\n"))
     else if (completed) console.log(`REPLAY_OK ${name} steps=${spec.steps.length}`)
     const alive = peers.filter((peer) => peer.proc.exitCode === null && peer.proc.signalCode === null).length
+    for (const path of narrowed)
+      await chmod(path, 0o700).catch((error: unknown) => console.log(`TEARDOWN ${path}: ${describe(error)}`))
     await rm(runtime, { recursive: true, force: true })
     console.log(`procs ${alive}\ndir REMOVED ${runtime}`)
   }

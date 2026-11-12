@@ -5,6 +5,7 @@ mod marker;
 mod poison;
 mod recovery;
 mod secure;
+mod standalone;
 
 use std::fs;
 use std::path::PathBuf;
