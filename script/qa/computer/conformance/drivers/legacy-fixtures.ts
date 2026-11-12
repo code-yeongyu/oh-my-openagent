@@ -7,7 +7,7 @@ import type { FixtureTarget } from "./legacy-code.ts"
 import type { Fixtures } from "./legacy.ts"
 
 const FIXTURES = resolve(import.meta.dir, "../fixtures")
-const APP = { app: "Conformance Fixture", title: "Document" }
+const APP = { title: "Conformance Document" }
 
 type Apps = Partial<Record<Toolkit, readonly string[]>>
 

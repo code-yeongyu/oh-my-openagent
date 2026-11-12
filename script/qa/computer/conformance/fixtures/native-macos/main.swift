@@ -78,7 +78,7 @@ final class Fixture: NSObject {
             current[section]?[sabotage] = initial?[section]?[sabotage]
         }
         let report: [String: Any] = [
-            "schema": "omo-conformance-fixture/1", "app": "Conformance Fixture", "toolkit": "native",
+            "schema": "omo-conformance-fixture/1", "app": "Conformance Fixture", "toolkit": "native", "windows": windows.map(\.title),
             "fields": current["fields"] ?? [:], "saved": current["saved"] ?? [:],
         ]
         guard var data = try? JSONSerialization.data(withJSONObject: report, options: [.sortedKeys, .prettyPrinted]) else { return }

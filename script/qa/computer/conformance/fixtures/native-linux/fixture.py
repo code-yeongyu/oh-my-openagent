@@ -3,7 +3,7 @@
 
 Usage: fixture.py --report <path>
 
-Opens the window "Document" of the app "Conformance Fixture" and writes its state to <path> as JSON
+Opens the window "Conformance Document" of the app "Conformance Fixture" and writes its state to <path> as JSON
 (schema omo-conformance-fixture/1, see ../fixture-report.ts) after every change, by a write to a
 temporary file and a rename, so a reader never sees a half-written report. The report is the only
 oracle input; nothing in the UI under test is read back.
@@ -13,7 +13,7 @@ that needs no engine, used by the self-test (../self-test.ts):
   poke <action>        perform one catalog action's effect through the toolkit (click, ax.perform,
                        typeText, ax.setValue, keyChord, scroll, drag, menu.select)
   set <label> <text>   replace the text of the field <label>
-  menu <A>/<B>         activate the menu item B of the menu A in the window "Document"
+  menu <A>/<B>         activate the menu item B of the menu A in the window "Conformance Document"
   quit                 close and exit
 Each line is answered by "OK <line>" after the report is written, or "ERR <reason>".
 
@@ -61,6 +61,7 @@ class Fixture:
             "schema": SCHEMA,
             "app": APP,
             "toolkit": "native",
+            "windows": [window.get_title() for window in self.windows],
             "fields": {
                 "value": main.text.text("Value"),
                 "receivedKeys": ",".join(main.chords),
@@ -91,8 +92,8 @@ def control(fixture, line):
         return None
     if words[0] == "poke" and len(words) == 2:
         poke(main, words[1])
-    elif words[0] == "menu" and len(words) == 2:
-        main.menu_items[words[1]].activate()
+    elif words[0] == "menu" and len(words) >= 2:
+        main.menu_items[line[len("menu ") :]].activate()
     elif words[0] == "set" and len(words) >= 2:
         label, _space, text = line[len("set ") :].partition(" ")
         main.text.set(label, text)

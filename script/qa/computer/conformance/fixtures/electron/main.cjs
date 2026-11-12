@@ -19,13 +19,15 @@ app.setName(APP)
 
 function sorted(value) {
   if (value === null || typeof value !== "object") return value
+  if (Array.isArray(value)) return value.map(sorted)
   return Object.fromEntries(Object.keys(value).sort().map((key) => [key, sorted(value[key])]))
 }
 
 function compose() {
   const main = states.get(windows[0].id)
   const savedDocuments = windows.filter((window) => states.get(window.id)?.savedOnce).length
-  return { schema: SCHEMA, app: APP, toolkit: "electron", fields: { ...main.fields }, saved: { ...main.saved, savedDocuments } }
+  const titles = windows.map((window) => window.getTitle())
+  return { schema: SCHEMA, app: APP, toolkit: "electron", windows: titles, fields: { ...main.fields }, saved: { ...main.saved, savedDocuments } }
 }
 
 function writeReport() {
@@ -41,7 +43,7 @@ function writeReport() {
 
 function openWindow() {
   const number = windows.length + 1
-  const title = number === 1 ? "Document" : `Document ${number}`
+  const title = number === 1 ? "Conformance Document" : `Conformance Document ${number}`
   const window = new BrowserWindow({
     title,
     width: 640,

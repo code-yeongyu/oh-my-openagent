@@ -32,7 +32,7 @@ namespace ConformanceFixture
         {
             this.fixture = fixture;
             Fields = new TextFields(fixture.Changed);
-            Text = number == 1 ? "Document" : "Document " + number;
+            Text = number == 1 ? "Conformance Document" : "Conformance Document " + number;
             ClientSize = new Size(640, 720);
             KeyPreview = true;
             KeyDown += OnChord;

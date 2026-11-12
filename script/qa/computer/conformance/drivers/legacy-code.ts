@@ -6,7 +6,6 @@ interface FixtureElement {
 }
 
 export interface FixtureTarget {
-  readonly app: string
   readonly title: string
   readonly element: FixtureElement
   readonly dragTo?: FixtureElement

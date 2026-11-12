@@ -28,6 +28,7 @@ namespace ConformanceFixture
                 { "schema", Schema },
                 { "app", DocumentForm.App },
                 { "toolkit", "native" },
+                { "windows", windows.ConvertAll(window => window.Text) },
                 { "fields", fields },
                 { "saved", saved },
             };
@@ -71,6 +72,17 @@ namespace ConformanceFixture
                 text.Append('}');
             }
             else if (value is string) AppendString(text, (string)value);
+            else if (value is List<string>)
+            {
+                text.Append('[');
+                var items = (List<string>)value;
+                for (int i = 0; i < items.Count; i++)
+                {
+                    if (i > 0) text.Append(',');
+                    AppendString(text, items[i]);
+                }
+                text.Append(']');
+            }
             else if (value is bool) text.Append((bool)value ? "true" : "false");
             else if (value is int) text.Append(((int)value).ToString(System.Globalization.CultureInfo.InvariantCulture));
             else throw new ArgumentException("cannot write " + value.GetType().Name + " to the report");

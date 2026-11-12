@@ -24,7 +24,7 @@ final class DocumentWindow: NSWindow {
         fields = TextFields(onChange: changed)
         super.init(contentRect: NSRect(x: 100, y: 100, width: 640, height: 720),
                    styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
-        title = number == 1 ? "Document" : "Document \(number)"
+        title = number == 1 ? "Conformance Document" : "Conformance Document \(number)"
         isReleasedWhenClosed = false
         let stack = NSStackView()
         stack.orientation = .vertical

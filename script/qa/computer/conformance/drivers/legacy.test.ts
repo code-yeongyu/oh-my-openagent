@@ -16,8 +16,7 @@ const WINDOW = { x: 100, y: 50, width: 400, height: 300 }
 const ELEMENT = { x: 110, y: 60, width: 20, height: 10 }
 
 const TARGET: FixtureTarget = {
-  app: "Conformance Fixture",
-  title: "Document",
+  title: "Conformance Document",
   element: { role: "button", title: "Press" },
   dragTo: { role: "row", title: "a" },
   menuPath: ["Edit", "Conformance"],
