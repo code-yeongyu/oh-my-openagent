@@ -11,7 +11,7 @@ use omo_computer_core::settle_profile::SettleRegime;
 use super::busy::{wait_clear, Busy};
 use super::feed::feed;
 use super::quiet::{quiet_window, Bounds, Picking, Settled};
-use crate::Session;
+use crate::{Refused, Session};
 
 /// `InputBusy{reason:"target_busy"}`: the target was still busy at the regime's cap, and
 /// nothing was sent.
@@ -90,8 +90,8 @@ impl Session {
     /// The busy wait before a send to `window`, up to the cap of the regime in force.
     ///
     /// # Errors
-    /// [`TARGET_BUSY`] when the target is still busy at the cap.
-    pub(crate) fn busy_before_send(&mut self, window: Option<&str>) -> Result<(), Refusal> {
+    /// [`TARGET_BUSY`] with its [`BusyDetail`] when the target is still busy at the cap.
+    pub(crate) fn busy_before_send(&mut self, window: Option<&str>) -> Result<(), Refused> {
         let Some(window) = window else {
             return Ok(());
         };
@@ -101,7 +101,17 @@ impl Session {
         };
         match wait_clear(&mut feed, window, cap_ms) {
             Busy::Clear { .. } => Ok(()),
-            Busy::Timeout { .. } => Err(TARGET_BUSY),
+            Busy::Timeout {
+                indicator,
+                waited_ms,
+            } => Err(Refused {
+                busy: Some(BusyDetail {
+                    indicator,
+                    waited_ms,
+                    retry_after_ms: cap_ms,
+                }),
+                ..TARGET_BUSY.into()
+            }),
         }
     }
 

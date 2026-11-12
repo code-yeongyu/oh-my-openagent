@@ -43,7 +43,7 @@ impl Session {
             return Err(self.refuse(record, Some("Frame".to_owned()), frame.refusal().into()));
         }
         if let Err(busy) = self.busy_before_send(target) {
-            return Err(self.refuse(record, Some("Busy".to_owned()), busy.into()));
+            return Err(self.refuse(record, Some("Busy".to_owned()), busy));
         }
         let _permit = self.funnel.permits.try_take(PermitKind::Exec);
         match self.funnel.recover(&call_id) {
