@@ -95,6 +95,7 @@ impl Session {
                     call_id: Some(call_id),
                     receipt: None,
                     interrupted: Some(Disposition::UNCERTAIN_UNSAFE),
+                    warning: None,
                 })
             }
             None => {
@@ -119,10 +120,8 @@ impl Session {
                         eprintln!("omo-computer-engine: action report rejected: {rejection:?}");
                         ExecReply(None)
                     });
-                self.store_receipt(
-                    &mut record,
-                    serde_json::to_value(&reply).unwrap_or_default(),
-                );
+                let receipt = self.funnel.receipt_of(&reply);
+                self.store_receipt(&mut record, receipt);
                 Ok(reply)
             }
         }

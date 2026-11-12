@@ -7,6 +7,7 @@ mod poison;
 mod recovery;
 mod secure;
 mod standalone;
+mod swallowed;
 
 use std::fs;
 use std::path::PathBuf;

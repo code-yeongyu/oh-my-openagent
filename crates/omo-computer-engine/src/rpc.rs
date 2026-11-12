@@ -210,6 +210,7 @@ mod tests {
             call_id: Some("k-1".to_owned()),
             receipt: None,
             interrupted: Some(omo_computer_core::report::Disposition::UNCERTAIN_UNSAFE),
+            warning: None,
         };
         let Failure { data, .. } = refused_call(&interrupted);
         let data = data.expect("data");
