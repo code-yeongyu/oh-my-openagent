@@ -49,6 +49,30 @@ pub(crate) fn report(reply: ExecReply) -> omo_computer_core::report::ActionRepor
     reply.0.expect("an object-mode reply carries the ActionReport")
 }
 
+/// A click on window 101 that names a frame of it captured first (row 20's frame rule, R25);
+/// when the capture itself is refused the click goes without one, so an earlier stage answers.
+/// A foreground click takes row 21's human grant first.
+pub(crate) trait FramedClick {
+    fn framed_click(&mut self, delivery: Option<&str>) -> Result<ExecReply, Refused>;
+}
+
+impl FramedClick for Session {
+    fn framed_click(&mut self, delivery: Option<&str>) -> Result<ExecReply, Refused> {
+        let mut call = json!({"target": "101", "x": 10, "y": 10});
+        if let Ok(frame) = self.capture_frame("101", true, None) {
+            call["frameId"] = json!(frame.frame_id);
+        }
+        if let Some(delivery) = delivery {
+            if delivery == "foreground" {
+                // Row 21: foreground delivery needs the human grant first (AC-12).
+                self.control_grant(params(json!({ "reason": "test" })));
+            }
+            call["delivery"] = json!(delivery);
+        }
+        self.click(params(call))
+    }
+}
+
 #[test]
 fn typetext_interrupted_reports_exact_delivered_count() {
     let (backend, sink) = fake(
@@ -88,7 +112,7 @@ fn user_active_200ms_before_send_pauses_instead_of_sending() {
     backend.clock().advance(1_000);
     let mut session = object_session(Box::new(backend));
     let reply = session
-        .click(params(json!({"target": "101", "x": 10, "y": 10})))
+        .framed_click(None)
         .expect("sends once the user paused for 1500 ms");
     let first = report(reply);
     assert_eq!(
@@ -103,7 +127,7 @@ fn user_active_200ms_before_send_pauses_instead_of_sending() {
     let (backend, sink) = fake(r#","user_input_timeline":[{"t_ms":0,"pid":4242,"kind":"key"}]"#);
     backend.clock().advance(1_600);
     let reply = object_session(Box::new(backend))
-        .click(params(json!({"target": "101", "x": 10, "y": 10})))
+        .framed_click(None)
         .expect("1600 ms before sends at once");
     assert!(report(reply).paused().is_empty());
     assert_eq!(sink.len(), 3);
@@ -113,7 +137,7 @@ fn user_active_200ms_before_send_pauses_instead_of_sending() {
         .collect();
     let (backend, sink) = fake(&format!(r#","user_input_timeline":[{}]"#, steady.join(",")));
     let refused = object_session(Box::new(backend))
-        .click(params(json!({"target": "101", "x": 10, "y": 10})))
+        .framed_click(None)
         .expect_err("the user never paused within the ceiling");
     assert_eq!(wire(&refused), ("UserIntervened", None));
     assert_eq!(refused.stamps.paused.first().map(|p| p.reason), Some(PauseReason::UserActive));
@@ -130,7 +154,7 @@ fn null_mode_never_pauses_a_v1_call() {
     let mut session = Session::new(Box::new(backend));
     session.open(params(json!({}))).expect("open");
     session.stop_path_start(params(json!({})));
-    let reply = session.click(params(json!({"target": "101", "x": 10, "y": 10})));
+    let reply = session.framed_click(None);
     assert_eq!(reply, Ok(ExecReply(None)));
     assert_eq!(clock.now_ms(), 1_000, "no wait in a null-mode session");
     assert_eq!(sink.len(), 3);
@@ -234,7 +258,7 @@ fn a_window_that_crashed_before_admission_is_window_not_found_with_nothing_sent(
     let mut backend = backend;
     assert!(backend.windows(&WindowFilter::default()).is_ok(), "the read that fires the exit");
     let refused = object_session(Box::new(backend))
-        .click(params(json!({"target": "101", "x": 10, "y": 10})))
+        .framed_click(None)
         .expect_err("crashed");
     assert_eq!(wire(&refused), ("WindowNotFound", None));
     assert_eq!(refused.stamps.target, None);
@@ -245,9 +269,43 @@ fn a_window_that_crashed_before_admission_is_window_not_found_with_nothing_sent(
 fn a_healthy_call_carries_no_target_member() {
     let (backend, _sink) = fake("");
     let reply = object_session(Box::new(backend))
-        .click(params(json!({"target": "101", "x": 10, "y": 10})))
+        .framed_click(None)
         .expect("healthy");
     let value = serde_json::to_value(report(reply)).expect("json");
     assert!(value.get("target").is_none(), "{value}");
     assert!(value.get("session").is_some(), "object mode stamps the session: {value}");
+}
+
+#[test]
+fn a_foreground_lease_ending_releases_the_display_awake_hold_and_nothing_reacquires_it() {
+    let (backend, _sink) = fake("");
+    let mut session = object_session(Box::new(backend));
+    assert!(session.framed_click(None).is_ok(), "the click delivered");
+    assert!(session.display_awake.holds_display_awake(), "an exec acquires the hold");
+    // Row 21's foreground lease, then the lease ends under the user.
+    session.control_grant(params(json!({ "reason": "test" })));
+    session.control_release();
+    assert_eq!(
+        session.display_awake,
+        crate::intervention::DisplayAwakeHold::Released,
+        "the lease ending releases the hold"
+    );
+    assert!(session.framed_click(None).is_ok(), "background click still delivers");
+    assert!(
+        !session.display_awake.holds_display_awake(),
+        "nothing re-acquires the hold after the lease ended"
+    );
+}
+
+#[test]
+fn an_exec_after_session_open_acquires_the_display_awake_hold() {
+    let (backend, _sink) = fake("");
+    let mut session = object_session(Box::new(backend));
+    assert_eq!(
+        session.display_awake,
+        crate::intervention::DisplayAwakeHold::Idle,
+        "session.open leaves the hold idle, not parked"
+    );
+    assert!(session.framed_click(None).is_ok(), "the click delivered");
+    assert!(session.display_awake.holds_display_awake(), "the exec acquires the hold");
 }

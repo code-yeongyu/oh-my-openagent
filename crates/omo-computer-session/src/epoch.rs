@@ -24,12 +24,12 @@ impl Session {
         for window in windows {
             self.refs.expire(&window, Expiry::Epoch);
         }
-        self.epoch_events.push(EpochChanged { reason, epoch });
+        self.frames.events.push(EpochChanged { reason, epoch });
     }
 
     /// The `epoch.changed` notifications not yet taken, oldest first.
     pub fn take_epoch_events(&mut self) -> Vec<EpochChanged> {
-        std::mem::take(&mut self.epoch_events)
+        std::mem::take(&mut self.frames.events)
     }
 
     /// The session epoch.

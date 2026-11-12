@@ -2,33 +2,25 @@
 //! the thinnest `click` and `typeText`. Both verbs reach the backend only through the mutate
 //! funnel (`crate::mutate`); consent, receipts and settle policy are added there by later rows.
 
-use std::collections::hash_map::RandomState;
-use std::hash::{BuildHasher, Hasher};
-
-use omo_computer_core::backend::{Backend, InputEvent, PermissionProbe, Refusal, Route};
+use omo_computer_core::backend::{Backend, InputEvent, PermissionProbe, Refusal};
 use omo_computer_core::error::EngineCode;
 use omo_computer_core::capabilities::{Capabilities, InputMode, LegacyCapabilities};
 use omo_computer_core::params::{
-    Button, ClickParams, Delivery, Point, ReportMode, SessionOpenParams, TypeTextParams,
+    Button, ClickParams, ReportMode, SessionOpenParams, TypeTextParams,
 };
 use omo_computer_core::params::{StopPathStartParams, StopPathStopParams};
 use omo_computer_core::paths::Roots;
-use omo_computer_core::requests::{
-    read_click, read_session_open, read_type_text, TraceMode, V1Request, Verb,
-};
+use omo_computer_core::requests::{read_click, read_session_open, read_type_text, V1Request, Verb};
 use omo_computer_core::methods::Method;
 use omo_computer_core::results::{
     CapabilitiesReply, ExecReply, PermissionState, SessionOpened, StopPathStatus,
 };
-use omo_computer_core::intervention::DEFAULT_PAUSE_CEILING_MS;
 use omo_computer_core::session_state::Tristate;
-use omo_computer_core::settings::Intervention;
-use omo_computer_safety::{Call, Guard, HostAdditions, NoHolds, StopPolicy, TargetRef, Transport, VerbKind};
+use omo_computer_safety::{Call, Guard, HostAdditions, StopPolicy, TargetRef, Transport, VerbKind};
 
 use crate::audit::gc::SweepTrigger;
-use crate::frames::admit::frame_key;
-use crate::mutate::{Funnel, Mutation, Refused};
-use crate::trace::Trace;
+use crate::frames::random_u64;
+use crate::mutate::{key_event, route_for, Funnel, Mutation, Refused};
 
 /// `stopReason` while no stop path is armed: `session.open` arms none (`stopPath.start` does).
 pub const NO_GLOBAL_LISTENER: &str = "no-global-listener";
@@ -43,8 +35,7 @@ pub const POINT_REQUIRED: Refusal = Refusal::bare(EngineCode::InvalidTarget);
 pub(crate) struct Opened {
     pub(crate) report_mode: ReportMode,
     pub(crate) tag: u64,
-    pub(crate) intervention: Intervention,
-    pub(crate) pause_ceiling_ms: u64,
+    pub(crate) settings: crate::intervention::OpenSettings,
 }
 
 /// The session state of one engine process.
@@ -55,8 +46,9 @@ pub struct Session {
     pub(crate) funnel: Funnel,
     pub(crate) refs: crate::refs::RefRegistry,
     pub(crate) frames: crate::frames::FrameStore,
-    pub(crate) epoch_events: Vec<crate::epoch::EpochChanged>,
-    pub(crate) trace: Trace,
+    pub(crate) trace: crate::trace::Trace,
+    /// The session-scoped display-awake hold (design row C22).
+    pub(crate) display_awake: crate::intervention::DisplayAwakeHold,
 }
 
 impl Session {
@@ -84,8 +76,8 @@ impl Session {
             funnel: Funnel::in_memory(),
             refs: crate::refs::RefRegistry::default(),
             frames: crate::frames::FrameStore::default(),
-            epoch_events: Vec::new(),
-            trace: Trace::default(),
+            trace: crate::trace::Trace::default(),
+            display_awake: crate::intervention::DisplayAwakeHold::Idle,
         }
     }
 
@@ -101,23 +93,12 @@ impl Session {
         self.opened = Some(Opened {
             report_mode: request.report_mode,
             tag: random_u64(),
-            intervention: request.intervention.unwrap_or(Intervention::Pause),
-            pause_ceiling_ms: request
-                .config
-                .as_ref()
-                .and_then(|config| config.timing.pause_ceiling_ms)
-                .unwrap_or(DEFAULT_PAUSE_CEILING_MS),
+            settings: crate::intervention::OpenSettings::read(&request),
         });
         let resume_token = format!("{:016x}{:016x}", random_u64(), random_u64());
-        self.funnel.set_session_id(resume_token[..16].to_owned());
+        self.open_control(&resume_token[..16])?;
         self.funnel.sweep(SweepTrigger::Open);
-        let trace_dir = self.artifacts().map(|store| store.dir().to_owned());
-        self.trace = Trace::open(
-            request.trace.unwrap_or(TraceMode::Off),
-            trace_dir,
-            &resume_token[..16],
-            crate::audit::now_ms(),
-        );
+        self.open_trace(request.trace, &resume_token[..16]);
         Ok(SessionOpened {
             capabilities: self.capabilities(),
             resume_token,
@@ -132,7 +113,7 @@ impl Session {
 
     /// `stopPath.stop{source}`: latches and commits the stop.
     pub fn stop_path_stop(&mut self, params: StopPathStopParams) -> StopPathStatus {
-        self.guard.stop(params.source.as_deref(), &mut NoHolds).1
+        self.stop_control(params.source.as_deref())
     }
 
     /// `stopPath.heartbeat` from the session's host.
@@ -148,9 +129,7 @@ impl Session {
     /// The capabilities in the open session's report mode; with no session, the v1 shape.
     #[must_use]
     pub fn capabilities(&self) -> CapabilitiesReply {
-        let mut capabilities = self.backend.capabilities();
-        capabilities.session = crate::session_state::sample(self.backend.as_ref());
-        self.guard.describe(&mut capabilities.stop_path);
+        let capabilities = self.sampled_capabilities();
         match self.opened.as_ref().map(|opened| opened.report_mode) {
             Some(ReportMode::Object) => CapabilitiesReply::Object(Box::new(capabilities)),
             Some(ReportMode::Null) | None => CapabilitiesReply::Legacy(Box::new(legacy_capabilities(
@@ -161,11 +140,10 @@ impl Session {
     }
 
     pub fn close(&mut self) {
+        self.close_control();
         if self.opened.take().is_some() {
             self.funnel.sweep(SweepTrigger::IdleExit);
-            if let Err(error) = self.trace.close(crate::audit::now_ms()) {
-                eprintln!("omo-computer-engine: warn trace manifest not finalised: {error}");
-            }
+            self.close_trace();
         }
     }
 
@@ -189,16 +167,8 @@ impl Session {
             unreachable!("read_click always reads a click");
         };
         let at = at.ok_or(POINT_REQUIRED)?;
-        let key = frame_key(request.target.as_deref());
-        let (point, frame_refusal, consumes) =
-            match self.admit_frame(&key, request.frame_id.as_deref(), at.x, at.y) {
-                Ok(admitted) => (
-                    admitted.point,
-                    None,
-                    consume.then(|| (key.clone(), admitted.frame_id)),
-                ),
-                Err(refusal) => (Point { x: at.x, y: at.y }, Some(refusal), None),
-            };
+        let (key, point, check) =
+            self.frame_for(request.target.as_deref(), request.frame_id.as_deref(), at, consume);
         let call = Call {
             verb: VerbKind::Pointer,
             target: TargetRef::read(request.target.as_deref()),
@@ -215,14 +185,11 @@ impl Session {
             events.push(InputEvent::Button { button, down: false });
         }
         events.extend(modifiers.iter().rev().map(|key| key_event(key, false)));
-        let result = self.mutate(
-            Mutation::exec(Method::Click, call, events, route, &request.authority)
-                .with_frame(request.frame_id.clone())
-                .with_frame_check(frame_refusal, consumes)
-                .with_keys(modifiers),
-        );
-        self.trace_turn(Method::Click, dispatched, &key, &result);
-        result
+        let mutation = Mutation::exec(Method::Click, call, events, route, &request.authority)
+            .with_frame(request.frame_id.clone())
+            .with_frame_check(check.0, check.1)
+            .with_keys(modifiers);
+        self.traced(dispatched, &key, mutation)
     }
 
     /// # Errors
@@ -240,32 +207,8 @@ impl Session {
             force: false,
         };
         let route = route_for(Some(target.as_str()), None);
-        let result = self.mutate(Mutation::typed(Method::TypeText, call, route, text));
-        self.trace_turn(Method::TypeText, dispatched, &target, &result);
-        result
+        self.traced(dispatched, &target, Mutation::typed(Method::TypeText, call, route, text))
     }
-}
-
-fn key_event(key: &str, down: bool) -> InputEvent {
-    InputEvent::Key {
-        key: key.to_owned(),
-        down,
-    }
-}
-
-/// A call aimed at a window goes to that window in the background unless it asks for the
-/// foreground; a call with no target can only reach the foreground.
-fn route_for(target: Option<&str>, delivery: Option<Delivery>) -> Route {
-    match (target, delivery) {
-        (Some(_), None | Some(Delivery::Background)) => Route::BackgroundWindow,
-        (None, _) | (Some(_), Some(Delivery::Foreground)) => Route::ForegroundHid,
-    }
-}
-
-fn random_u64() -> u64 {
-    let mut hasher = RandomState::new().build_hasher();
-    hasher.write_u32(std::process::id());
-    hasher.finish()
 }
 
 const fn permission(state: PermissionState) -> &'static str {

@@ -16,6 +16,12 @@ pub const QUIET_WINDOW_MS: u64 = 5_000;
 /// The default of `computer.pause_ceiling_ms`: a pause that lasts longer ends the call typed.
 pub const DEFAULT_PAUSE_CEILING_MS: u64 = 120_000;
 
+/// The default of `computer.display_awake_grace_ms` (design/d-loop-migration.md:72).
+pub const DEFAULT_DISPLAY_AWAKE_GRACE_MS: u64 = 60_000;
+
+/// The default of `computer.display_awake_session_cap_ms` (design/d-loop-migration.md:72).
+pub const DEFAULT_DISPLAY_AWAKE_SESSION_CAP_MS: u64 = 14_400_000;
+
 /// How often a paused admission re-samples the session state and the stop path.
 pub const PAUSE_TICK_MS: u64 = 100;
 
