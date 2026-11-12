@@ -113,6 +113,22 @@ describe("computer-v3-guards --scope with SCOPE-ADDENDA.tsv", () => {
     })
   })
 
+  test("a brace, a '..' segment or an absolute path is a finding, never a silent non-match", () => {
+    const lines = [
+      "2\tcrates/omo-computer-engine/tests/{a,b}.rs\tR46",
+      "2\tcrates/omo-computer-engine/../omo-computer-engine/tests/x.rs\tR46",
+      "2\t/home/someone/repo/crates/omo-computer-engine/tests/x.rs\tR46",
+      `2\t${admitted}\tR46`,
+    ]
+    withScope(`${header}${lines.join("\n")}\n`, (scope) => {
+      const result = scope("2")
+      expect(result.exitCode).toBe(1)
+      expect(result.findings).toHaveLength(3)
+      for (const line of [2, 3, 4])
+        expect(result.findings.filter((finding) => finding.includes(`SCOPE-ADDENDA.tsv line ${line} `))).toHaveLength(1)
+    })
+  })
+
   test("a missing addenda file changes nothing", () => {
     withScope(undefined, (scope) => {
       const result = scope("2")

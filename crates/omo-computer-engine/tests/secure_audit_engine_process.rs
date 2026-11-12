@@ -28,6 +28,10 @@ const PLAIN_SCENARIO: &str =
 const SECURE_INPUT_SCENARIO: &str =
     "crates/omo-computer-backend-fake/fixtures/v3-secure-input-on.json";
 const REPLY_TIMEOUT: Duration = Duration::from_secs(10);
+const AUDIT: &str = "audit/computer/local/audit.jsonl";
+const MARKER: &str = "markers/local/default.json";
+/// Every fake persona: the secure legs run on each through the engine process.
+const PERSONAS: [&str; 4] = ["macos", "x11", "wayland", "win32"];
 
 fn repo() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -68,59 +72,88 @@ struct Left {
     /// `<root>/fake-sink-<engine pid>.log`: the one file the engine's fake backend records
     /// its delivered input to (engine `route.rs`, `SINK_FILE_PREFIX` + the process id).
     sink_path: PathBuf,
-    typed_reply: Value,
 }
 
 impl Left {
-    fn read(&self, relative: &str) -> String {
-        fs::read_to_string(self.root.path().join(relative)).unwrap_or_default()
+    /// An engine-state file that MUST exist and be non-empty: a missing one fails the test,
+    /// never reads as clean.
+    fn state(&self, relative: &str) -> String {
+        let path = self.root.path().join(relative);
+        let text = fs::read_to_string(&path)
+            .unwrap_or_else(|error| panic!("engine state {} is missing: {error}", path.display()));
+        assert!(!text.trim().is_empty(), "empty: {}", path.display());
+        text
     }
 
-    fn audit(&self) -> String {
-        self.read("audit/computer/local/audit.jsonl")
+    fn marker(&self) -> Value {
+        serde_json::from_str(&self.state(MARKER)).expect("the marker is JSON")
     }
 
-    fn marker(&self) -> String {
-        self.read("markers/local/default.json")
-    }
-
-    /// Every file under the root but the audit and the marker (read on their own): the trace,
-    /// any other engine state, and anything new that appears. Exactly ONE file is excluded, by
-    /// its exact path: `sink_path`, the fake backend's SIMULATED KEYBOARD, which records each
-    /// delivered event (`text "<typed>"`, fake `desktop.rs`) and so must hold the typed text:
-    /// typing a secret into a secure field still delivers it. `sink()` reads it, and each test
-    /// asserts the delivery there, so the exclusion cannot hide a missing one.
-    fn rest(&self) -> String {
-        let skip = [
-            self.root.path().join("audit/computer/local/audit.jsonl"),
-            self.root.path().join("markers/local/default.json"),
-            self.sink_path.clone(),
-        ];
-        let mut text = String::new();
+    /// Every file under the root, by path; a directory entry that cannot be read fails.
+    fn files(&self) -> Vec<PathBuf> {
+        let mut files = Vec::new();
         let mut stack = vec![self.root.path().to_owned()];
         while let Some(dir) = stack.pop() {
-            for entry in fs::read_dir(dir).expect("readable").filter_map(Result::ok) {
-                let path = entry.path();
+            for entry in fs::read_dir(&dir).expect("a readable dir") {
+                let path = entry.expect("a readable dir entry").path();
                 if path.is_dir() {
                     stack.push(path);
-                } else if !skip.contains(&path) {
-                    text.push_str(&String::from_utf8_lossy(
-                        &fs::read(&path).unwrap_or_default(),
-                    ));
+                } else {
+                    files.push(path);
                 }
             }
+        }
+        files
+    }
+
+    /// Every file under the root but the audit and the marker (read on their own): any other
+    /// engine state and anything new that appears. Exactly ONE file is excluded, by its exact
+    /// path: `sink_path`, the fake backend's SIMULATED KEYBOARD, which records each delivered
+    /// event (`text "<typed>"`, fake `desktop.rs`) and so must hold the typed text: typing a
+    /// secret into a secure field still delivers it. `sink()` reads it, and each test asserts
+    /// the delivery there, so the exclusion cannot hide a missing one.
+    fn rest(&self) -> String {
+        let skip = [AUDIT, MARKER].map(|relative| self.root.path().join(relative));
+        let mut text = String::new();
+        let others = self.files().into_iter();
+        for path in others.filter(|path| !skip.contains(path) && *path != self.sink_path) {
+            let bytes =
+                fs::read(&path).unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+            text.push_str(&String::from_utf8_lossy(&bytes));
         }
         text
     }
 
-    /// The fake backend's recording sink: what the simulated keyboard received.
+    /// Occurrences of `needle` in [the audit, the marker, every other file] (see `rest`).
+    fn on_disk(&self, needle: &str) -> [usize; 3] {
+        [self.state(AUDIT), self.state(MARKER), self.rest()]
+            .map(|text| text.matches(needle).count())
+    }
+
+    /// The trace: this engine writes NONE. The v3 engine has no session trace writer yet
+    /// (DEFERRED-LEGS C1, owed to row 20), so no file or directory under the root may be one.
+    /// The day a trace appears this fails, and the trace must then be read, asserted
+    /// non-empty and grepped here like the audit and the marker.
+    fn assert_no_trace(&self) {
+        let traces: Vec<PathBuf> = self
+            .files()
+            .into_iter()
+            .filter(|path| {
+                let relative = path.strip_prefix(self.root.path()).unwrap_or(path);
+                relative.to_string_lossy().contains("trace")
+                    || relative.starts_with("senpi-computer-sessions")
+            })
+            .collect();
+        assert!(traces.is_empty(), "grep the trace too: {traces:?}");
+    }
+
     fn sink(&self) -> String {
         fs::read_to_string(&self.sink_path).expect("the engine's fake sink file")
     }
 
     fn typed_line(&self) -> Value {
         let lines: Vec<Value> = self
-            .audit()
+            .state(AUDIT)
             .lines()
             .map(|line| serde_json::from_str(line).expect("an audit line is JSON"))
             .filter(|line: &Value| line["action"] == "typeText")
@@ -130,8 +163,19 @@ impl Left {
     }
 }
 
-/// Runs the case's steps on a fresh engine process over `scenario`, one reply per step.
-fn run_engine(case: &Value, scenario: &str) -> Left {
+/// `scenario` with the fake's `persona` field set, written under `dir` (outside the root).
+fn as_persona(scenario: &str, persona: &str, dir: &Path) -> PathBuf {
+    let text = fs::read_to_string(repo().join(scenario)).expect("the scenario");
+    let mut json: Value = serde_json::from_str(&text).expect("scenario JSON");
+    json["persona"] = json!(persona);
+    let path = dir.join(format!("{persona}.json"));
+    fs::write(&path, json.to_string()).expect("the persona scenario");
+    path
+}
+
+/// Runs the case's steps on a fresh engine process over `scenario`, one reply per step, and
+/// checks the typeText was delivered.
+fn run_engine(case: &Value, scenario: &Path) -> Left {
     let root = tempfile::tempdir().expect("runtime root");
     let mut command = Command::new(engine());
     command
@@ -141,7 +185,7 @@ fn run_engine(case: &Value, scenario: &str) -> Left {
         .envs(std::env::vars().filter(|(name, _)| !name.starts_with("OMO_COMPUTER_")))
         .env("OMO_COMPUTER_BACKEND", "fake")
         .env("OMO_COMPUTER_RUNTIME_DIR", root.path())
-        .env("OMO_COMPUTER_FAKE_SCENARIO", repo().join(scenario))
+        .env("OMO_COMPUTER_FAKE_SCENARIO", scenario)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
@@ -160,89 +204,56 @@ fn run_engine(case: &Value, scenario: &str) -> Left {
             }
         }
     });
-    let mut typed_reply = Value::Null;
+    let mut typed = Value::Null;
     for step in case["steps"].as_array().expect("steps") {
         writeln!(stdin, "{}", step["send"]).expect("a request line");
         stdin.flush().expect("flushed");
         let line = replies
             .recv_timeout(REPLY_TIMEOUT)
-            .expect("the engine replies within the bound");
-        let reply: Value = serde_json::from_str(&line).expect("a reply is JSON");
+            .expect("a reply within the bound");
         if step["send"]["method"] == "typeText" {
-            typed_reply = reply;
+            typed = serde_json::from_str(&line).expect("a reply is JSON");
         }
     }
     drop(stdin);
     let status = child.wait().expect("the engine exits");
     reader.join().expect("the reader ends");
-    assert!(
-        status.success(),
-        "the engine exits 0 at stdin close: {status}"
-    );
-    Left {
-        root,
-        sink_path,
-        typed_reply,
-    }
+    assert!(status.success(), "engine exit: {status}");
+    let delivered = typed["result"].is_null() && typed.get("error").is_none();
+    assert!(delivered, "delivered: {typed}");
+    Left { root, sink_path }
 }
 
-fn delivered(left: &Left) {
-    assert_eq!(
-        left.typed_reply["result"],
-        Value::Null,
-        "{}",
-        left.typed_reply
-    );
-    assert!(
-        left.typed_reply.get("error").is_none(),
-        "{}",
-        left.typed_reply
-    );
-}
-
-/// The case's type into a secure context on `scenario`: length only, no digest, anywhere.
+/// The case's type into a secure context on `scenario`, on every fake persona: length
+/// only, `redacted_secure`, no digest and no text in the audit, the marker or any other file.
 fn assert_length_only(case: &Value, scenario: &str) {
     let secret = secret(case);
     let needle = sha256_16(&secret);
-    let left = run_engine(case, scenario);
-    delivered(&left);
-    let typed = left.typed_line();
-    let counts = [
-        ("audit", left.audit().matches(&needle).count()),
-        ("marker", left.marker().matches(&needle).count()),
-        ("trace and the rest", left.rest().matches(&needle).count()),
-    ];
-    assert_eq!(
-        counts,
-        [("audit", 0), ("marker", 0), ("trace and the rest", 0)],
-        "sha256_16(secret) = {needle} on disk; typeText line {typed}"
-    );
-    let everything = [left.audit(), left.marker(), left.rest()].concat();
-    assert_eq!(
-        everything.matches(&secret).count(),
-        0,
-        "the secret is on disk"
-    );
-    assert!(
-        left.sink().contains(&secret),
-        "the simulated keyboard received the secret: the exclusion hides no missing delivery"
-    );
-    assert_eq!(
-        typed["text"],
-        json!({ "length": secret.chars().count() }),
-        "{typed}"
-    );
-    assert_eq!(typed["warnings"], json!(["redacted_secure"]), "{typed}");
+    let personas = tempfile::tempdir().expect("persona scenarios");
+    let length = json!({ "length": secret.chars().count() });
+    let redacted = json!(["redacted_secure"]);
+    for persona in PERSONAS {
+        let left = run_engine(case, &as_persona(scenario, persona, personas.path()));
+        let (typed, marker) = (left.typed_line(), left.marker());
+        let got = [
+            &typed["text"],
+            &marker["text"],
+            &typed["warnings"],
+            &marker["warnings"],
+        ];
+        assert_eq!(got, [&length, &length, &redacted, &redacted], "{persona}");
+        left.assert_no_trace();
+        // [digest, secret] x [audit, marker, rest]: all zero.
+        let counts = [left.on_disk(&needle), left.on_disk(&secret)];
+        assert_eq!(counts, [[0; 3]; 2], "{persona}: {needle}");
+        assert!(left.sink().contains(&secret), "{persona}: no delivery");
+    }
 }
 
 #[test]
 fn engine_process_secure_type_leaves_no_digest_in_audit_marker_or_trace() {
     let case = case();
-    let scenario = case["scenario"]
-        .as_str()
-        .expect("the case's secure scenario")
-        .to_owned();
-    assert_length_only(&case, &scenario);
+    assert_length_only(&case, case["scenario"].as_str().expect("scenario"));
 }
 
 /// The same type under OS-wide Secure Input (`secure_input_on`), no secure field focused.
@@ -255,25 +266,21 @@ fn engine_process_secure_input_type_leaves_no_digest_in_audit_marker_or_trace() 
 fn engine_process_plain_type_keeps_the_digest_the_grep_looks_for() {
     let case = case();
     let secret = secret(&case);
-    let needle = sha256_16(&secret);
-    let left = run_engine(&case, PLAIN_SCENARIO);
-    delivered(&left);
-    let typed = left.typed_line();
-    assert_eq!(typed["text"]["sha256_16"], json!(needle), "{typed}");
-    assert!(
-        left.audit().matches(&needle).count() >= 1,
-        "the grep sees the digest"
-    );
+    let digest = sha256_16(&secret);
+    let left = run_engine(&case, &repo().join(PLAIN_SCENARIO));
+    let (typed, marker) = (left.typed_line(), left.marker());
+    let got = [&typed["text"]["sha256_16"], &marker["text"]["sha256_16"]];
+    assert_eq!(got, [&json!(digest), &json!(digest)]);
+    // The grep sees a digest when one is there: in the audit and the marker.
     assert_eq!(
-        [left.audit(), left.marker(), left.rest()]
-            .concat()
-            .matches(&secret)
-            .count(),
-        0,
-        "the plain text itself is never on disk"
+        left.on_disk(&digest).map(|count| count > 0),
+        [true, true, false]
     );
-    assert!(
-        left.sink().contains(&secret),
-        "the simulated keyboard received the text"
+    left.assert_no_trace();
+    assert_eq!(
+        left.on_disk(&secret),
+        [0; 3],
+        "the plain text is never on disk"
     );
+    assert!(left.sink().contains(&secret), "no delivery");
 }
