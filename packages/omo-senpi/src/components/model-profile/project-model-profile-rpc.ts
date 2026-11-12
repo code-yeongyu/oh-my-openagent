@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process"
 import { randomUUID } from "node:crypto"
 import { existsSync, realpathSync, rmSync, statSync } from "node:fs"
 import { userInfo } from "node:os"
@@ -12,10 +11,11 @@ import {
   updateOmoConfig,
 } from "@oh-my-opencode/omo-config-core"
 
-import { log } from "@oh-my-opencode/utils"
-
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { BUILTIN_MODEL_PROFILES } from "./builtin-profiles"
+import { lookupHomeOfUid } from "./owner-home-lookup"
+
+export { homeFromPasswdEntry, lookupHomeOfUid, OWNER_LOOKUP_FAILURE_TTL_MS } from "./owner-home-lookup"
 
 /**
  * Read and set a folder's `model_profile` (its `.omo/omo.jsonc`) over RPC (#13188), so a client that reaches a
@@ -59,7 +59,7 @@ export interface ProjectModelProfileDeps {
   readonly fileSystem?: OmoConfigWriteFileSystem
   /** The home folder of the account with this uid, null when there is no such account, undefined when the lookup failed. */
   readonly homeOfUid?: (uid: number) => string | null | undefined
-  /** The folder accounts' homes sit in, used only when the owner lookup failed; defaults to this account home's parent. */
+  /** The folder accounts' homes sit in, used only where there is no uid to look up (win32); defaults to this account home's parent. */
   readonly accountsRoot?: string | null
   readonly removeFile?: (path: string) => void
 }
@@ -74,55 +74,11 @@ const MAX_PROFILE_LENGTH = 200
 const INVISIBLE_OR_CONTROL = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Cs}\p{Default_Ignorable_Code_Point}\p{M}]/u
 
 // A home folder's `.omo` is a user layer (omo-config-core loader/paths.ts), never a project layer: this account's
-// HOME and account home, and the home of the account that owns the folder. Only a folder another account owns is looked
-// up, once per owner for the process, so an account known only through NSS/LDAP is covered. When that lookup fails
-// (no lookup binary, a down user database, win32), any folder beside this account's home is refused instead.
-
-/** The home field of one passwd entry: `getent passwd <uid>` (7 fields) or macOS `id -P <uid>` (10 fields). */
-export function homeFromPasswdEntry(entry: string): string | null {
-  const fields = entry.split("\n")[0]?.split(":") ?? []
-  if (fields.length < 7) return null
-  const home = fields[fields.length - 2]
-  return home !== undefined && home.startsWith("/") ? home : null
-}
-
-function runPasswdLookup(uid: number): string {
-  const [command, args] =
-    process.platform === "darwin"
-      ? (["/usr/bin/id", ["-P", String(uid)]] as const)
-      : (["/usr/bin/getent", ["passwd", String(uid)]] as const)
-  return execFileSync(command, [...args], {
-    encoding: "utf8",
-    timeout: 2_000,
-    stdio: ["ignore", "pipe", "ignore"],
-    windowsHide: true,
-  })
-}
-
-const homeByUid = new Map<number, string | null | undefined>()
-
-/**
- * The home of the account with this uid: null when there is no such account, undefined when the lookup failed. Every
- * answer, a failure included, is reused for the process, so a down user database blocks at most one call per owner.
- */
-export function lookupHomeOfUid(
-  uid: number,
-  run: (uid: number) => string = runPasswdLookup,
-): string | null | undefined {
-  if (homeByUid.has(uid)) return homeByUid.get(uid)
-  let home: string | null | undefined
-  try {
-    home = homeFromPasswdEntry(run(uid))
-  } catch (error) {
-    log("[model-profile] owner home lookup failed; folders beside this account's home are refused instead", {
-      uid,
-      error: error instanceof Error ? error.message : String(error),
-    })
-    home = undefined
-  }
-  homeByUid.set(uid, home)
-  return home
-}
+// HOME, and the home the user database records for the account that owns the folder. That record is looked up for
+// every folder, this account's own included, because under Bun `userInfo().homedir` is `$HOME` too, so an overridden
+// HOME would otherwise hide this account's real home. When the lookup fails (no lookup binary, a down user database),
+// a folder another account owns is refused. win32 has no uid to look up, so a folder beside this account's home is
+// refused there instead.
 
 const realOrSelf = (path: string): string => {
   try {
@@ -161,9 +117,12 @@ function isHomeFolder(cwd: string, deps: ProjectModelProfileDeps): boolean {
     return ownHomes.some((home) => realOrSelf(home) === realOrSelf(cwd))
   }
   if (ownHomes.some((home) => sameDirectory(home, folder))) return true
-  if (folder.uid === process.getuid?.()) return false
-  const ownerHome = (deps.homeOfUid ?? lookupHomeOfUid)(folder.uid)
-  if (ownerHome !== undefined) return ownerHome !== null && sameDirectory(ownerHome, folder)
+  const ownUid = process.getuid?.()
+  if (ownUid !== undefined) {
+    const ownerHome = (deps.homeOfUid ?? lookupHomeOfUid)(folder.uid)
+    if (ownerHome !== undefined) return ownerHome !== null && sameDirectory(ownerHome, folder)
+    return folder.uid !== ownUid
+  }
   const accountsRoot = deps.accountsRoot === undefined ? defaultAccountsRoot() : deps.accountsRoot
   return accountsRoot !== null && sameDirectory(accountsRoot, statSync(dirname(realOrSelf(cwd))))
 }
