@@ -1,0 +1,52 @@
+# Facts collector for the Windows live tier's five hosted-runner questions (q1 elevated, q2 lock, q3 disconnect,
+# q4 mixed-dpi, q5 secure-desktop). Each -Leg appends ONE JSON line of raw observations to -Out; it never decides a
+# verdict. script/qa/computer/pool/windows-full.ts reads the lines and owns every verdict rule.
+# Windows PowerShell 5.1; natives are compiled once from hosted-windows-live/*.cs. The legs lock, disconnect and
+# install a display driver, so run them only on a disposable runner, never in a person's session.
+param(
+	[Parameter(Mandatory = $true)][string]$Leg,
+	[string]$Out = '',
+	[int]$Run = 1,
+	[string]$WorkerOut = '',
+	[string]$Edit = '0',
+	[string]$Marker = '',
+	[int]$HoldMs = 8000,
+	[string]$VddZip = '',
+	[string]$VddSha256 = ''
+)
+
+$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
+$Here = Join-Path $PSScriptRoot 'hosted-windows-live'
+Add-Type -Path @((Join-Path $Here 'native-session.cs'), (Join-Path $Here 'native-display.cs'))
+. (Join-Path $Here 'legs-session.ps1')
+. (Join-Path $Here 'legs-integrity.ps1')
+. (Join-Path $Here 'legs-display.ps1')
+
+function Emit($fields) {
+	$line = ($fields | ConvertTo-Json -Compress -Depth 8)
+	if ($Out) { [IO.File]::AppendAllText($Out, $line + "`n", (New-Object Text.UTF8Encoding $false)) }
+	[Console]::Out.WriteLine($line)
+}
+
+# The same script is the child for the fixture and the workers; they report through -WorkerOut, not -Out.
+$legs = @{
+	'facts' = { Leg-Facts }
+	'disconnect' = { Leg-Disconnect }
+	'lock' = { Leg-Lock }
+	'elevated' = { Leg-Elevated }
+	'secure-desktop' = { Leg-SecureDesktop }
+	'mixed-dpi' = { Leg-MixedDpi }
+	'fixture' = { Child-Fixture }
+	'worker-input' = { Child-WorkerInput }
+	'worker-runas' = { Child-WorkerRunas }
+	'dpi-read' = { Child-DpiRead }
+}
+if (-not $legs.ContainsKey($Leg)) { throw "unknown leg '$Leg' (known: $(($legs.Keys | Sort-Object) -join ', '))" }
+if (-not $Out -and -not $Leg.StartsWith('fixture') -and -not $Leg.StartsWith('worker') -and $Leg -ne 'dpi-read') { throw "-Out is required for leg '$Leg'" }
+try {
+	& $legs[$Leg]
+} catch {
+	if ($Out) { Emit @{ leg = $Leg; run = $Run; error = $_.Exception.Message } }
+	throw
+}

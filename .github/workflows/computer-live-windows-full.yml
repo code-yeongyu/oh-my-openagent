@@ -1,0 +1,293 @@
+name: Computer live Windows full
+
+# The Windows live tier of the computer-use engine. Two hosted jobs measure what the hosted runner can carry for
+# the five full legs (elevated target, lock, disconnect, mixed DPI, secure desktop): `host` runs the legs that leave
+# the session as it was, `session` runs the disconnect and then the lock, last, on a VM of its own. `ledger` turns
+# their facts into crates/omo-computer-backend-win32/probes/hosted-windows-live.tsv and plans each leg: CONFIRMS runs
+# on the hosted runner, anything else goes to an owned Windows guest when the repository variable
+# COMPUTER_WINDOWS_GUEST is `on`, and is printed `blocked reason=no_windows_host` otherwise. A leg whose scenario the
+# Windows driver does not have yet prints `blocked reason=backend_not_built`; nothing is counted as a pass.
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/computer-live-windows-full.yml"
+      - "crates/omo-computer-backend-win32/**"
+      - "script/qa/computer/windows.ts"
+      - "script/qa/computer/probes/hosted-windows-live.ps1"
+      - "script/qa/computer/probes/hosted-windows-live/**"
+      - "script/qa/computer/pool/windows-full*.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PROBE: script/qa/computer/probes/hosted-windows-live.ps1
+  # VirtualDrivers/Virtual-Display-Driver 24.10.27, VirtualDisplayDriver-x64.zip (MIT); the leg refuses any other bytes.
+  VDD_SHA256: b7a36f341f2a0ce43cc2afe7894d30dd8fef7b6f60ef9491aab2ef77663a42fd
+
+jobs:
+  host:
+    name: computer live windows-full (host)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    outputs:
+      image: ${{ steps.image.outputs.image }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - id: image
+        shell: bash
+        run: echo "image=${ImageOS:-windows}-${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
+
+      - name: Interactive-desktop smoke
+        shell: powershell
+        run: ./script/qa/desktop/windows/interactive-desktop-smoke.ps1
+
+      - name: Host facts (session=interactive)
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\hwl" | Out-Null
+          & $env:PROBE -Leg facts -Out "$env:RUNNER_TEMP\hwl\host.jsonl"
+
+      # Each leg records its own failure as a fact (it reads UNMEASURED in the ledger), so one leg's error never
+      # hides the others; the step still shows as failed.
+      - name: q1 elevated, run 1
+        continue-on-error: true
+        shell: powershell
+        run: '& $env:PROBE -Leg elevated -Run 1 -Out "$env:RUNNER_TEMP\hwl\host.jsonl"'
+
+      - name: q1 elevated, run 2
+        continue-on-error: true
+        shell: powershell
+        run: '& $env:PROBE -Leg elevated -Run 2 -Out "$env:RUNNER_TEMP\hwl\host.jsonl"'
+
+      - name: q5 secure desktop, run 1
+        continue-on-error: true
+        shell: powershell
+        run: '& $env:PROBE -Leg secure-desktop -Run 1 -Out "$env:RUNNER_TEMP\hwl\host.jsonl"'
+
+      - name: q5 secure desktop, run 2
+        continue-on-error: true
+        shell: powershell
+        run: '& $env:PROBE -Leg secure-desktop -Run 2 -Out "$env:RUNNER_TEMP\hwl\host.jsonl"'
+
+      - name: q4 mixed DPI (driver install, removed again)
+        continue-on-error: true
+        shell: powershell
+        run: '& $env:PROBE -Leg mixed-dpi -Run 1 -VddSha256 $env:VDD_SHA256 -Out "$env:RUNNER_TEMP\hwl\host.jsonl"'
+
+      - name: Upload facts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-full-facts-host
+          path: ${{ runner.temp }}/hwl/host.jsonl
+          if-no-files-found: warn
+
+  session:
+    name: computer live windows-full (session)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Session facts
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\hwl" | Out-Null
+          & $env:PROBE -Leg facts -Out "$env:RUNNER_TEMP\hwl\session.jsonl"
+
+      - name: q3 disconnect and reconnect
+        continue-on-error: true
+        shell: powershell
+        run: '& $env:PROBE -Leg disconnect -HoldMs 8000 -Out "$env:RUNNER_TEMP\hwl\session.jsonl"'
+
+      - name: Upload facts before the lock
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-full-facts-session
+          path: ${{ runner.temp }}/hwl/session.jsonl
+          if-no-files-found: warn
+
+      # Last: a locked session may not come back without credentials.
+      - name: q2 lock and unlock
+        continue-on-error: true
+        shell: powershell
+        run: '& $env:PROBE -Leg lock -HoldMs 3000 -Out "$env:RUNNER_TEMP\hwl\lock.jsonl"'
+
+      - name: Upload lock facts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-full-facts-lock
+          path: ${{ runner.temp }}/hwl/lock.jsonl
+          if-no-files-found: warn
+
+  ledger:
+    name: computer live windows-full (ledger and plan)
+    needs: [host, session]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      guest_legs: ${{ steps.plan.outputs.guest_legs }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: windows-full-facts-*
+          path: ${{ runner.temp }}/facts
+          merge-multiple: true
+
+      - name: Ledger
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="${RUNNER_TEMP}/windows-full"
+          mkdir -p "$out"
+          bun script/qa/computer/pool/windows-full.ts --ledger "${RUNNER_TEMP}/facts/host.jsonl" "${RUNNER_TEMP}/facts/session.jsonl" "${RUNNER_TEMP}/facts/lock.jsonl" \
+            --out "$out/hosted-windows-live.tsv" --host "hosted windows-latest (${{ needs.host.outputs.image || 'image unknown' }})"
+          bun script/qa/computer/pool/windows-full.ts --validate "$out/hosted-windows-live.tsv"
+
+      - id: plan
+        name: Plan the legs
+        shell: bash
+        env:
+          GUEST: ${{ vars.COMPUTER_WINDOWS_GUEST == 'on' && 'on' || 'off' }}
+        run: |
+          set -euo pipefail
+          out="${RUNNER_TEMP}/windows-full"
+          bun script/qa/computer/pool/windows-full.ts --plan "$out/hosted-windows-live.tsv" --guest "$GUEST" --out "$out/plan.json" | tee "$out/plan.txt"
+          echo "guest_legs=$(grep -c 'tier=guest' "$out/plan.txt" || true)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload ledger and plan
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-full-ledger
+          path: ${{ runner.temp }}/windows-full
+          if-no-files-found: warn
+
+  legs-hosted:
+    name: computer live windows-full (hosted legs)
+    needs: ledger
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: windows-full-ledger
+          path: ${{ runner.temp }}/windows-full
+
+      - name: Hosted legs
+        shell: pwsh
+        run: bun script/qa/computer/pool/windows-full.ts --run --tier hosted --plan "$env:RUNNER_TEMP/windows-full/plan.json"
+
+  legs-guest:
+    name: computer live windows-full (guest)
+    needs: ledger
+    if: vars.COMPUTER_WINDOWS_GUEST == 'on' && needs.ledger.outputs.guest_legs != '0'
+    runs-on: [self-hosted, windows, computer-live-windows-full]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: windows-full-ledger
+          path: ${{ runner.temp }}/windows-full
+
+      - name: Guest legs
+        shell: pwsh
+        run: bun script/qa/computer/pool/windows-full.ts --run --tier guest --plan "$env:RUNNER_TEMP/windows-full/plan.json"
+
+  guest-watchdog:
+    name: computer live windows-full (guest watchdog)
+    needs: ledger
+    if: vars.COMPUTER_WINDOWS_GUEST == 'on' && needs.ledger.outputs.guest_legs != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: The guest job must start within 15 minutes
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bun script/qa/computer/pool/windows-full.ts --watch-guest --job "computer live windows-full (guest)" --deadline-s 900
+
+  # TEMPORARY, removed before this pull request is marked ready: measures the SP-N rows of the open Windows spike at
+  # its pinned head on this runner image, read-only (its branch is never pushed and its ledger never edited); the
+  # ledger is uploaded as an artifact for that spike's own lane.
+  cuv3-sp-n:
+    name: TEMPORARY SP-N measurement at e0e08a12 (informs the Windows spike)
+    runs-on: windows-latest
+    timeout-minutes: 40
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: e0e08a126e4c8abdfbf9fefe13326e1e08610c6e
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Interactive desktop precondition
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File crates/omo-computer-backend-win32/probes/sp-n.ps1 -Leg precondition
+
+      - name: Measure SP-N
+        shell: pwsh
+        run: bun crates/omo-computer-backend-win32/probes/probe-sp-n.ts --measure --out "$env:RUNNER_TEMP/win32-delivery.tsv" --host "hosted windows-latest"
+
+      - name: Verify SP-N against the fresh measurement
+        shell: pwsh
+        run: bun crates/omo-computer-backend-win32/probes/probe-sp-n.ts --verify "$env:RUNNER_TEMP/win32-delivery.tsv" --host "hosted windows-latest"
+
+      - name: Upload ledger
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cuv3-sp-n-win32-delivery
+          path: ${{ runner.temp }}/win32-delivery.tsv
+          if-no-files-found: warn
