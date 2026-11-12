@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { DEFAULT_TEST_TIMEOUT_MS, remainingTestTime } from "../../../../../test-support/test-deadline"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 import { OmoTaskSettingsSchema, type OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 
@@ -214,7 +214,7 @@ export function launchSettled(manager: LaunchObserver, result: StartResult, test
 export async function launchSettled(
   manager: LaunchObserver,
   input: string | StartResult,
-  testTimeoutMs = DEFAULT_TEST_TIMEOUT_MS,
+  testTimeoutMs?: number,
 ): Promise<void | string> {
   if (typeof input !== "string" && (input.kind !== "started" || input.starting !== true)) return input.kind
   if (manager.whenLaunched === undefined) throw new Error("the manager exposes no whenLaunched")
@@ -222,7 +222,8 @@ export async function launchSettled(
   // This is the manager's latched in-flight promise, not a next-event listener: even a launch
   // that settled before `start` returned cannot be missed. Subscribe before arming the deadline.
   const launched = manager.whenLaunched(taskId)
-  // All launches in a test share its budget; each child must not start a new stopwatch.
+  // All launches in a test share its budget; each child must not start a new stopwatch. Without an explicit
+  // timeout the budget is the one the test declared (`useTestTimeout`), not the suite default.
   const remainingMs = remainingTestTime(testTimeoutMs)
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
@@ -233,7 +234,7 @@ export async function launchSettled(
           () =>
             reject(
               new Error(
-                `awaited whenLaunched(${taskId}); exhausted launch settlement share of ${testTimeoutMs} ms test budget`,
+                `awaited whenLaunched(${taskId}); exhausted launch settlement share of ${testTimeoutMs === undefined ? "the declared" : `${testTimeoutMs} ms`} test budget`,
               ),
             ),
           remainingMs,

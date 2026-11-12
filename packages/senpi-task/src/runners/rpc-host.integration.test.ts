@@ -1,4 +1,6 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
+
+import { awaitWithinTestBudget, useTestTimeout } from "../../../../test-support/test-deadline"
 
 import { realColdReviveHostSession } from "../lifecycle/__fixtures__/real-cold-revive"
 import type { ReconcileOutcome } from "../lifecycle"
@@ -13,6 +15,15 @@ import { startHostWorld, type HostWorld, type ParentSession } from "./rpc-host/_
  */
 
 const CHILDREN_PER_PARENT = 16
+
+/**
+ * The backstop for this file. Starting, parking and reattaching up to 32 children over a real unix socket is CPU
+ * work whose wall time follows the host: under 1 s per test on an idle machine, past 20 s under a 5% CPU quota.
+ * Every wait inside is on its own event (a launch settling, a connection count, a reconcile result), so this bound
+ * only catches a hang; `daemonWorld` declares it to the budget waits so they fail naming the event first.
+ */
+const DAEMON_WORLD_TIMEOUT_MS = 120_000
+setDefaultTimeout(DAEMON_WORLD_TIMEOUT_MS)
 const worlds: HostWorld[] = []
 
 afterEach(async () => {
@@ -20,6 +31,7 @@ afterEach(async () => {
 })
 
 async function daemonWorld(options: FakeHostOptions = {}): Promise<HostWorld> {
+  useTestTimeout(DAEMON_WORLD_TIMEOUT_MS)
   const world = await startHostWorld(options)
   worlds.push(world)
   return world
@@ -89,7 +101,7 @@ describe("two parents on one daemon", () => {
       reason: "session_shutdown",
     })
     // The daemon's own view settles when the 16 detached connections are gone - parent B keeps 16.
-    await world.host.waitForConnections(16)
+    await awaitWithinTestBudget(world.host.waitForConnections(16), "parent B's 16 connections after parent A parked")
 
     // then
     expect(summary.suspended_rpc).toBe(16)
@@ -109,7 +121,7 @@ describe("two parents on one daemon", () => {
     // given
     const { world, a } = await twoParents()
     await a.lifecycle.suspendOnSessionShutdown({ parentSessionId: "parent-a", reason: "session_shutdown" })
-    await world.host.waitForConnections(16)
+    await awaitWithinTestBudget(world.host.waitForConnections(16), "parent B's 16 connections after parent A parked")
     const paths = a.sessionPaths()
 
     // when
@@ -185,7 +197,7 @@ describe("two parents on one daemon", () => {
     // when - a newer generation takes the socket and the old one drains
     world.host.handoff()
     await b.lifecycle.suspendOnSessionShutdown({ parentSessionId: "parent-b", reason: "host_handoff" })
-    await world.host.waitForConnections(0)
+    await awaitWithinTestBudget(world.host.waitForConnections(0), "the drained generation's connections closing")
     const b2 = world.connect("parent-b", { maxDrainAttempts: 2 })
     const draining = await b2.lifecycle.reconcileOnSessionStart("parent-b")
 
@@ -277,7 +289,7 @@ describe("daemon refusals", () => {
     })
 
     // then
-    expect((await answered).payload.id).toBe("ui-1")
+    expect((await awaitWithinTestBudget(answered, "the child's extension_ui_response")).payload.id).toBe("ui-1")
     expect(world.host.sessions()).toHaveLength(1)
     expect(distinct(a.records().map((record) => record.status))).toEqual(["running"])
   })
