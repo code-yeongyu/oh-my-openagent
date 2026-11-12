@@ -1,4 +1,4 @@
-import { closeSync, lstatSync, openSync, readSync } from "node:fs"
+import { closeSync, lstatSync, openSync, readSync, type Stats } from "node:fs"
 
 /**
  * Whether a file at the launcher path is a shim this installer wrote (#13254).
@@ -25,9 +25,7 @@ const OWNED_CMD = Buffer.from(LAUNCHER_CMD_SHIM, "utf8")
 const MAX_SHIM_BYTES = 64 * 1024
 
 export type LauncherOwnership =
-  | { readonly kind: "absent" }
-  | { readonly kind: "owned" }
-  | { readonly kind: "foreign"; readonly reason: string }
+  { readonly kind: "absent" } | { readonly kind: "owned" } | { readonly kind: "foreign"; readonly reason: string }
 
 function readPrefix(path: string, length: number): Buffer {
   const fd = openSync(path, "r")
@@ -40,8 +38,13 @@ function readPrefix(path: string, length: number): Buffer {
   }
 }
 
-function classify(path: string, isOwned: (prefix: Buffer, size: number) => boolean, prefixBytes: number): LauncherOwnership {
-  let stat
+function classify(
+  path: string,
+  isOwned: (prefix: Buffer, size: number) => boolean,
+  prefixBytes: number,
+  io: { readonly readPrefix: (path: string, length: number) => Buffer },
+): LauncherOwnership {
+  let stat: Stats
   try {
     stat = lstatSync(path)
   } catch (error) {
@@ -50,22 +53,31 @@ function classify(path: string, isOwned: (prefix: Buffer, size: number) => boole
   }
   if (stat.isSymbolicLink()) return { kind: "foreign", reason: "it is a symbolic link to another file" }
   if (!stat.isFile()) return { kind: "foreign", reason: "it is not a regular file" }
-  if (stat.size > MAX_SHIM_BYTES) return { kind: "foreign", reason: `it is ${stat.size} bytes, larger than any launcher this installer writes` }
-  let prefix
+  if (stat.size > MAX_SHIM_BYTES)
+    return { kind: "foreign", reason: `it is ${stat.size} bytes, larger than any launcher this installer writes` }
+  let prefix: Buffer
   try {
-    prefix = readPrefix(path, prefixBytes)
+    prefix = io.readPrefix(path, prefixBytes)
   } catch (error) {
     return { kind: "foreign", reason: `it cannot be read (${(error as NodeJS.ErrnoException).code ?? "error"})` }
   }
-  return isOwned(prefix, stat.size) ? { kind: "owned" } : { kind: "foreign", reason: "it does not start with this installer's launcher header" }
+  return isOwned(prefix, stat.size)
+    ? { kind: "owned" }
+    : { kind: "foreign", reason: "it does not start with this installer's launcher header" }
 }
 
 const HEADER_BYTES = Math.max(...OWNED_HEADERS.map((header) => header.length))
 
-export function launcherOwnership(path: string): LauncherOwnership {
-  return classify(path, (prefix) => OWNED_HEADERS.some((header) => prefix.subarray(0, header.length).equals(header)), HEADER_BYTES)
+// io is a test seam only: no production caller passes it.
+export function launcherOwnership(path: string, io = { readPrefix }): LauncherOwnership {
+  return classify(
+    path,
+    (prefix) => OWNED_HEADERS.some((header) => prefix.subarray(0, header.length).equals(header)),
+    HEADER_BYTES,
+    io,
+  )
 }
 
-export function launcherCmdOwnership(path: string): LauncherOwnership {
-  return classify(path, (prefix, size) => size === OWNED_CMD.length && prefix.equals(OWNED_CMD), OWNED_CMD.length)
+export function launcherCmdOwnership(path: string, io = { readPrefix }): LauncherOwnership {
+  return classify(path, (prefix, size) => size === OWNED_CMD.length && prefix.equals(OWNED_CMD), OWNED_CMD.length, io)
 }
