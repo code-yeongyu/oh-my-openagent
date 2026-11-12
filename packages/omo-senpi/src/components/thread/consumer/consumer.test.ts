@@ -142,7 +142,11 @@ describe("a restart that is not acknowledged reads the wake off", () => {
   test.each([
     ["throws", (service: FakeDeliveryService) => service.refuseServe("internal_error"), "throws"],
     ["is refused as unknown", (service: FakeDeliveryService) => service.refuseServe("unknown_type"), "unsupported"],
-    ["gets an acknowledgement it cannot decode", (service: FakeDeliveryService) => service.ackServe({ wake: true, surprise: 1 }), "unsupported"],
+    [
+      "gets an acknowledgement it cannot decode",
+      (service: FakeDeliveryService) => service.ackServe({ wake: true, surprise: 1 }),
+      "unsupported",
+    ],
   ] as const)(
     "#given a consumer told on #when a second start %s, with no stop() before it #then the wake reads off",
     async (_case, fail, answer) => {
