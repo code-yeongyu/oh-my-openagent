@@ -2,6 +2,7 @@ import { threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from 
 import type { ThreadTranscriptEntry } from "../reader"
 import type { ModelChoice } from "../tools/model-match"
 import type { ThreadCloseOutcome } from "../tools/ports"
+import type { ThreadSummary } from "../contracts"
 
 /**
  * One live thread's controls, wherever it is held: the session on this device's endpoint, or the session on another
@@ -15,6 +16,8 @@ export type SessionControl = {
   readonly device?: string
   /** The thread's title as its listing names it. */
   readonly title: string
+  /** Names on the target device that a rename must not take. */
+  readonly visible: () => Promise<readonly ThreadSummary[]>
   /** The engine's own `interrupt`: an idle session answers `interrupted: false`. */
   readonly interrupt: (turnId?: string) => Promise<{ readonly interrupted: boolean; readonly turn_id?: string }>
   /** The one close ladder (`close-ladder.ts`) on the thread's engine. */

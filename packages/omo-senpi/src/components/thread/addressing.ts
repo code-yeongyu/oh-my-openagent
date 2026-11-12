@@ -345,13 +345,7 @@ export function resolveTarget(
     )
   }
 
-  // An ended session on another device is reachable by id only, never by its title (it is not a live peer to talk to).
-  // A local resumable thread stays name-addressable (its contract today); making that one rule is #13012.
-  const matches = visible.filter(
-    (entry) =>
-      normalizeThreadName(entry.name) === guard.normalized &&
-      !(entry.transport !== undefined && entry.status === "resumable"),
-  )
+  const matches = visible.filter((entry) => normalizeThreadName(entry.name) === guard.normalized)
   if (matches.length === 1) return { kind: "ok", entry: matches[0], resolution: "name" }
   if (matches.length >= 2) {
     return addressError(
