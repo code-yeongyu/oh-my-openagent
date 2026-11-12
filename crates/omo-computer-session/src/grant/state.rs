@@ -114,12 +114,16 @@ impl Control {
                 plan.consent_detail = denial.detail;
             }
         }
-        plan.foreground = route == Route::ForegroundHid
-            || matches!(target, TargetRef::Desktop)
-            || is_global_target(target_str);
+        // `design/d-safety.md` '### Full access': input lands globally only for the eight
+        // desktop / display-target methods (`posts_globally`, by where input lands); any other
+        // method aimed at no window reserves nothing and needs no lease unless sent foreground.
+        let global = super::GLOBAL_INPUT.contains(&method)
+            && (matches!(target, TargetRef::Desktop) || is_global_target(target_str));
+        plan.foreground = route == Route::ForegroundHid || global;
         plan.windows = match target {
             TargetRef::Window(id) if !is_global_target(Some(id)) => vec![(*id).to_owned()],
-            _ => windows.iter().map(|w| w.id.clone()).collect(),
+            _ if global => windows.iter().map(|w| w.id.clone()).collect(),
+            _ => Vec::new(),
         };
         self.grant.reconcile(stop_epoch);
         if self.lease_epoch.is_some_and(|epoch| epoch != stop_epoch) {
