@@ -55,6 +55,7 @@ impl Funnel {
             call_id: Some(marker.binding.call_id.clone()),
             receipt: None,
             interrupted,
+            warning: None,
         };
         Ok(match (marker.receipt.as_ref(), same) {
             (Some(receipt), true) => Verdict::Refuse {
@@ -100,5 +101,6 @@ fn uncertain(call_id: &str) -> Refused {
         call_id: Some(call_id.to_owned()),
         receipt: None,
         interrupted: Some(Disposition::UNCERTAIN_UNSAFE),
+        warning: None,
     }
 }
