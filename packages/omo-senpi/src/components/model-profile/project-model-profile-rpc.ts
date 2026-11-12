@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process"
 import { randomUUID } from "node:crypto"
-import { existsSync, readFileSync, realpathSync, rmSync, statSync } from "node:fs"
+import { existsSync, rmSync, statSync } from "node:fs"
 import { userInfo } from "node:os"
 import { join } from "node:path"
 
@@ -11,6 +11,8 @@ import {
   resolveHomeDir,
   updateOmoConfig,
 } from "@oh-my-opencode/omo-config-core"
+
+import { log } from "@oh-my-opencode/utils"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { BUILTIN_MODEL_PROFILES } from "./builtin-profiles"
@@ -49,10 +51,11 @@ export type ProjectModelProfileReply =
   | ({ readonly kind: "ok" } & ProjectModelProfileState)
   | { readonly kind: "refused"; readonly code: ProjectModelProfileRefusalCode; readonly message: string }
 
-/** Seams for tests: the writer's file system, the machine's account home folders, and how a backup copy is removed. */
+/** Seams for tests: the writer's file system, the home of the account with a uid, and how a backup copy is removed. */
 export interface ProjectModelProfileDeps {
   readonly fileSystem?: OmoConfigWriteFileSystem
-  readonly accountHomes?: () => readonly string[]
+  /** The home folder of the account with this uid, or null when the lookup failed or there is no such account. */
+  readonly homeOfUid?: (uid: number) => string | null
   readonly removeFile?: (path: string) => void
 }
 
@@ -66,71 +69,66 @@ const MAX_PROFILE_LENGTH = 200
 const INVISIBLE_OR_CONTROL = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Cs}\p{Default_Ignorable_Code_Point}\p{M}]/u
 
 // A home folder's `.omo` is a user layer (omo-config-core loader/paths.ts), never a project layer: this account's
-// HOME and account home, and the home of every account in the machine's user database.
+// HOME and account home, and the home of the account that owns the folder. Only that one account is looked up, so the
+// check costs one user-database lookup and one stat per call, and an account known only through NSS/LDAP is covered.
 
-/** Home folders listed in an `/etc/passwd`-format text (field 6). */
-export function homesFromPasswd(text: string): string[] {
-  const homes: string[] = []
-  for (const line of text.split("\n")) {
-    if (line.startsWith("#")) continue
-    const fields = line.split(":")
-    if (fields.length >= 7 && fields[5] !== undefined && fields[5].startsWith("/")) homes.push(fields[5])
-  }
-  return homes
+/** The home field of one passwd entry: `getent passwd <uid>` (7 fields) or macOS `id -P <uid>` (10 fields). */
+export function homeFromPasswdEntry(entry: string): string | null {
+  const fields = entry.split("\n")[0]?.split(":") ?? []
+  if (fields.length < 7) return null
+  const home = fields[fields.length - 2]
+  return home !== undefined && home.startsWith("/") ? home : null
 }
 
-/** Home folders listed by `dscl . -list /Users NFSHomeDirectory` (record name, then the path). */
-export function homesFromDscl(text: string): string[] {
-  const homes: string[] = []
-  for (const line of text.split("\n")) {
-    const match = /^\S+\s+(\/.*?)\s*$/u.exec(line)
-    if (match?.[1] !== undefined) homes.push(match[1])
-  }
-  return homes
+function runPasswdLookup(uid: number): string {
+  const [command, args] =
+    process.platform === "darwin"
+      ? (["/usr/bin/id", ["-P", String(uid)]] as const)
+      : (["/usr/bin/getent", ["passwd", String(uid)]] as const)
+  return execFileSync(command, [...args], { encoding: "utf8", timeout: 2_000, stdio: ["ignore", "pipe", "ignore"] })
 }
 
-let systemAccountHomes: readonly string[] | undefined
+const homeByUid = new Map<number, string>()
 
-// Read once per process: local accounts from /etc/passwd and, on macOS, Directory Services (where /etc/passwd lists only
-// system accounts). An account that comes and goes only through another name service is not listed.
-function accountHomesFromUserDatabase(): readonly string[] {
-  if (systemAccountHomes !== undefined) return systemAccountHomes
-  const homes = new Set<string>()
+/** The home of the account with this uid. A found home is reused for the process; a failed lookup is logged and retried. */
+export function lookupHomeOfUid(uid: number, run: (uid: number) => string = runPasswdLookup): string | null {
+  const known = homeByUid.get(uid)
+  if (known !== undefined) return known
+  let home: string | null
   try {
-    for (const home of homesFromPasswd(readFileSync("/etc/passwd", "utf8"))) homes.add(home)
-  } catch {}
-  if (process.platform === "darwin") {
-    try {
-      const listing = execFileSync("/usr/bin/dscl", [".", "-list", "/Users", "NFSHomeDirectory"], {
-        encoding: "utf8",
-        timeout: 5_000,
-        stdio: ["ignore", "pipe", "ignore"],
-      })
-      for (const home of homesFromDscl(listing)) homes.add(home)
-    } catch {}
+    home = homeFromPasswdEntry(run(uid))
+  } catch (error) {
+    log("[model-profile] owner home lookup failed; only this account's homes are refused", {
+      uid,
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return null
   }
-  systemAccountHomes = [...homes]
-  return systemAccountHomes
+  if (home !== null) homeByUid.set(uid, home)
+  return home
+}
+
+function sameDirectory(path: string, folder: { readonly dev: number; readonly ino: number }): boolean {
+  try {
+    const candidate = statSync(path)
+    return candidate.dev === folder.dev && candidate.ino === folder.ino
+  } catch {
+    return false
+  }
 }
 
 // Same directory by identity, not by spelling: a symlink, a bind mount or a case-insensitive volume names one folder
 // several ways.
 function isHomeFolder(cwd: string, deps: ProjectModelProfileDeps): boolean {
-  let folder: { readonly dev: number; readonly ino: number }
+  let folder: { readonly dev: number; readonly ino: number; readonly uid: number }
   try {
     folder = statSync(cwd)
   } catch {
     return false
   }
-  const homes = [resolveHomeDir(), userInfo().homedir, ...(deps.accountHomes ?? accountHomesFromUserDatabase)()]
-  return homes.some((home) => {
-    try {
-      const candidate = statSync(home)
-      return candidate.dev === folder.dev && candidate.ino === folder.ino
-    } catch {
-      return false
-    }
-  })
+  if ([resolveHomeDir(), userInfo().homedir].some((home) => sameDirectory(home, folder))) return true
+  const ownerHome = (deps.homeOfUid ?? lookupHomeOfUid)(folder.uid)
+  return ownerHome !== null && sameDirectory(ownerHome, folder)
 }
 
 // The writer's pre-write copy goes to a name only this write uses, so cleanup removes exactly that copy and never a
