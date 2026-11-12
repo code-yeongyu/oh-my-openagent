@@ -33,7 +33,9 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
       lastUnavailable = code
       options.warn?.("memory sync status unavailable", {
         code,
-        ...(error === undefined ? {} : { error: error instanceof Error ? `${error.name}: ${error.message}` : String(error) }),
+        ...(error === undefined
+          ? {}
+          : { error: error instanceof Error ? `${error.name}: ${error.message}` : String(error) }),
       })
     }
     return unavailable(code)
