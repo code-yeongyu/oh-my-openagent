@@ -11,7 +11,7 @@ describe("task-set reference cells", () => {
     )
     expect(selectors.length).toBeGreaterThan(0)
     for (const selector of selectors) {
-      expect(selector).toContain("title:")
+      expect(selector).toMatch(/title: "Conformance Document( 2)?"/)
       expect(selector).not.toContain("app:")
     }
   })
