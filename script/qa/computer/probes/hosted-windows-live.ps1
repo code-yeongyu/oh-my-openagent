@@ -24,7 +24,8 @@ $NativeSources = @((Join-Path $Here 'native-session.cs'), (Join-Path $Here 'nati
 # A Medium child cannot compile (Add-Type fails with 'a required privilege is not held'), so a parent leg compiles the
 # natives once into its run directory and its children load that library instead.
 if ($env:OMO_HWL_NATIVE_DLL -and [IO.File]::Exists($env:OMO_HWL_NATIVE_DLL)) {
-	[void][Reflection.Assembly]::LoadFrom($env:OMO_HWL_NATIVE_DLL)
+	# Loaded from bytes: LoadFrom on a file under the run's temp directory fails with 0x80131515 on the runner.
+	[void][Reflection.Assembly]::Load([IO.File]::ReadAllBytes($env:OMO_HWL_NATIVE_DLL))
 } else {
 	Add-Type -Path $NativeSources
 }
