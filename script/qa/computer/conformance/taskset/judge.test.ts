@@ -18,7 +18,8 @@ describe("task-set judging used by run.ts --taskset", () => {
     expect(taskFailure(task, { saved: {}, cells: task.cells.length })).toContain("saved fields not as declared")
   })
 
-  test("a replay that needed more than six cells fails even with the right saved document", () => {
+  test("the reference-cell cap is exactly six: six cells pass, seven fail", () => {
+    expect(taskFailure(task, { saved: asDeclared, cells: 6 })).toBeUndefined()
     expect(taskFailure(task, { saved: asDeclared, cells: 7 })).toBe("used 7 cells, more than 6")
   })
 })
