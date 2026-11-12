@@ -85,6 +85,21 @@ describe("disturbance sentinel summary", () => {
     expect(summarize(lossy).signals.typing.firstAt).toBe(2_540)
   })
 
+  test("typing: a typist reset (index 0, field cleared) starts a new sequence and is no disturbance", () => {
+    const events = cleanRun([
+      { t: 1_200, kind: "typed", index: 0, char: "x" },
+      { t: 1_240, kind: "field", text: "x", final: false },
+    ]).filter((event) => !(event.kind === "typed" && event.t > 1_200) && !(event.kind === "field" && event.t > 1_240))
+    const withFinal = [...events, { t: 3_600, kind: "field" as const, text: "x", final: true }]
+    expect(happened(withFinal)).toEqual([])
+    expect(summarize(withFinal).faults).toEqual([])
+  })
+
+  test("typing: a skipped index that is not a reset is a fault", () => {
+    const events = cleanRun([{ t: 1_200, kind: "typed", index: 7, char: "x" }])
+    expect(summarize(events).faults).toContain("typing: typist sent index 7 after 1")
+  })
+
   test("typing: an extra character in the field happened", () => {
     const events = cleanRun([{ t: 1_700, kind: "field", text: "abX", final: false }])
     expect(happened(events)).toEqual(["typing"])
