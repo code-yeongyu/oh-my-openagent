@@ -1,9 +1,15 @@
 import { AMBIGUOUS_CANDIDATE_LIMIT, normalizeThreadName, type ThreadCandidate } from "../addressing"
-import type { ThreadStatus, ThreadToolResult } from "../contracts"
+import type { ThreadLocalAliasNote, ThreadStatus, ThreadToolResult } from "../contracts"
 import { createRelaySessionHost, listedThread } from "../control/relay-session-host"
 import type { HostedThread, SessionHost, SessionOpenRequest } from "../control/session-host"
 import { threadToolFailure } from "../errors"
-import { rowThreadId, type AliasRegistry, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
+import {
+  rowThreadId,
+  type AliasError,
+  type AliasRegistry,
+  type RemoteSessionRow,
+  type RemoteThreadSurface,
+} from "./ports"
 import { aliasFailure, deviceOnline, remoteAvailable } from "./remote-ops"
 
 type LocalEntry = {
@@ -85,8 +91,24 @@ export type LocalPlacement = {
  */
 type OpenFields = Pick<SessionOpenRequest, "cwd" | "sessionPath" | "forkFrom">
 
+/**
+ * Why an alias stays the thread's name on its own device (#13104): no account holds it - the registry asks for a sign-in
+ * (a desktop launch always does), this surface has no registry, or there is no remote surface at all.
+ */
+export type LocalAliasReason = NonNullable<ThreadLocalAliasNote["alias_unavailable"]>
+
+const signedOut = (error: AliasError): boolean =>
+  error.code === "alias_registry_unavailable" && error.details?.reason === "sign_in"
+
+/** `localAlias`: the alias is not account-wide; the create names the thread by it unless a name was given. */
 export type CreatePlan =
-  | { readonly kind: "open"; readonly host: SessionHost; readonly request: OpenFields; readonly creates: boolean }
+  | {
+      readonly kind: "open"
+      readonly host: SessionHost
+      readonly request: OpenFields
+      readonly creates: boolean
+      readonly localAlias?: LocalAliasReason
+    }
   | { readonly kind: "done"; readonly result: ThreadToolResult; readonly device?: string }
 
 const alreadyLive = (thread: HostedThread, device?: string): CreatePlan => ({
@@ -144,7 +166,7 @@ export async function planCreate(
       ),
     }
   if (remote === undefined) {
-    if (value.alias !== undefined || value.device !== undefined)
+    if (value.device !== undefined || (value.alias !== undefined && value.thread !== undefined))
       return {
         kind: "done",
         result: {
@@ -157,12 +179,20 @@ export async function planCreate(
         },
       }
     if (value.thread !== undefined) return openHere(value.thread)
-    return value.fork_from === undefined
-      ? create(local.host)
-      : here({ ...(value.cwd === undefined ? {} : { cwd: value.cwd }), forkFrom: value.fork_from }, true)
+    const plan =
+      value.fork_from === undefined
+        ? create(local.host)
+        : here({ ...(value.cwd === undefined ? {} : { cwd: value.cwd }), forkFrom: value.fork_from }, true)
+    return value.alias === undefined || plan.kind !== "open" ? plan : { ...plan, localAlias: "no_remote" }
   }
-  if (value.alias !== undefined) {
-    if (remote.aliases === undefined) return { kind: "done", result: ALIASES_UNAVAILABLE }
+  // An alias no account can hold is the new thread's local name (#13104); opening an existing thread by it still needs the account.
+  let localAlias: LocalAliasReason | undefined
+  const scoped = (plan: CreatePlan): CreatePlan =>
+    localAlias === undefined || plan.kind !== "open" ? plan : { ...plan, localAlias }
+  if (value.alias !== undefined && remote.aliases === undefined) {
+    if (value.thread !== undefined) return { kind: "done", result: ALIASES_UNAVAILABLE }
+    localAlias = "no_registry"
+  } else if (value.alias !== undefined && remote.aliases !== undefined) {
     const held = await remote.aliases
       .resolve(value.alias)
       .catch((error: unknown): Awaited<ReturnType<AliasRegistry["resolve"]>> => ({
@@ -186,7 +216,11 @@ export async function planCreate(
           ),
         },
       }
-    if (held.error.code !== "alias_not_found") return { kind: "done", result: aliasFailure(held.error) }
+    if (held.error.code !== "alias_not_found") {
+      if (value.thread !== undefined || !signedOut(held.error))
+        return { kind: "done", result: aliasFailure(held.error) }
+      localAlias = "sign_in"
+    }
   }
   if (value.thread !== undefined) {
     const target = await local.locate(value.thread)
@@ -221,16 +255,18 @@ export async function planCreate(
       ...(value.cwd === undefined ? {} : { cwd: value.cwd }),
       forkFrom: source.kind === "remote" ? (source.row.durable_id ?? source.row.session_id) : source.address,
     }
-    return source.kind === "remote"
-      ? { kind: "open", host: createRelaySessionHost(remote, source.row.device), request: fork, creates: true }
-      : here(fork, true)
+    return scoped(
+      source.kind === "remote"
+        ? { kind: "open", host: createRelaySessionHost(remote, source.row.device), request: fork, creates: true }
+        : here(fork, true),
+    )
   }
-  if (value.device === undefined) return create(local.host)
+  if (value.device === undefined) return scoped(create(local.host))
   const unavailable = await remoteAvailable(remote)
   if (unavailable !== undefined) return { kind: "done", result: unavailable }
   const target = await targetDevice(remote, value.device)
   if ("result" in target) return { kind: "done", result: target.result }
-  return create(target.id === undefined ? local.host : createRelaySessionHost(remote, target.id))
+  return scoped(create(target.id === undefined ? local.host : createRelaySessionHost(remote, target.id)))
 }
 
 /**
@@ -273,17 +309,21 @@ export async function withAlias(
   return { ...result, thread: { ...result.thread, alias: claimed.value.alias } } as ThreadToolResult
 }
 
-/** thread_rename's alias half: claim when the thread holds none, else an atomic rename; a duplicate is alias_taken. */
+/**
+ * thread_rename's alias half: claim when the thread holds none, else an atomic rename; a duplicate is alias_taken. With
+ * no account to hold it (#13104) it changes nothing and answers `local`, so the caller can make the alias the name.
+ */
 export async function renameAlias(
   remote: RemoteThreadSurface | undefined,
   threadId: string,
   device: string | undefined,
   alias: string,
   key: string,
-): Promise<ThreadToolResult | undefined> {
-  if (remote?.aliases === undefined) return ALIASES_UNAVAILABLE
+): Promise<ThreadToolResult | { readonly local: LocalAliasReason } | undefined> {
+  if (remote === undefined) return { local: "no_remote" }
+  if (remote.aliases === undefined) return { local: "no_registry" }
   const current = await remote.aliases.aliasesOf([threadId])
-  if (current.kind === "error") return aliasFailure(current.error)
+  if (current.kind === "error") return signedOut(current.error) ? { local: "sign_in" } : aliasFailure(current.error)
   const from = current.value.get(threadId)
   const holderDevice = device ?? (await remote.sessions.thisDevice()) ?? ""
   const changed =
