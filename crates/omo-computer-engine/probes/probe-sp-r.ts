@@ -110,7 +110,7 @@ const stateRun = (m: PairOut, note: string): Run => {
     )
   const off = f["listeners_off_loopback"] === "0" && f["udp_discovery_sockets"] === "0"
   return {
-    measured: `lsof control ok (${f["control_listeners"] ?? "?"} listeners seen, ${f["control_off_loopback"] ?? "?"} off loopback); device service ${f["version"] ?? ""}; listeners ${f["listeners_total"] ?? "?"} (off loopback ${f["listeners_off_loopback"] ?? "?"}); unix sockets ${f["unix_sockets"] ?? "?"}; discovery sockets ${f["udp_discovery_sockets"] ?? "?"}; load ${f["load"] ?? "?"}/${f["cores"] ?? "?"}`,
+    measured: `lsof control ok (${f["control_tool"] ?? "?"} listeners on loopback and all interfaces: ${f["control_listeners"] ?? "?"} seen, ${f["control_off_loopback"] ?? "?"} off loopback); device service ${f["version"] ?? ""}; listeners ${f["listeners_total"] ?? "?"} (off loopback ${f["listeners_off_loopback"] ?? "?"}); unix sockets ${f["unix_sockets"] ?? "?"}; discovery sockets ${f["udp_discovery_sockets"] ?? "?"}; load ${f["load"] ?? "?"}/${f["cores"] ?? "?"}`,
     verdict: off ? "CONTRADICTS" : "NEW-EDGE",
     note,
   }

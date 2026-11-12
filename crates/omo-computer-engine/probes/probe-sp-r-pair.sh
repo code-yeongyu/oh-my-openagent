@@ -25,7 +25,7 @@ bun=$(command -v bun || ls "$HOME/.bun/bin/bun" 2> /dev/null)
 work=""
 ctl=""
 cleanup() {
-  [ -n "$ctl" ] && kill "$ctl" 2> /dev/null
+  [ -n "$ctl" ] && kill $(echo "$ctl" | tr ',' ' ') 2> /dev/null
   [ -n "$work" ] && rm -rf "$work"
 }
 trap cleanup EXIT
@@ -40,10 +40,35 @@ off_loopback() { grep -c -v -E '^(127\.[0-9.]+|\[::1\]|localhost):' "$1" || true
 case "$mode" in
   state)
     command -v lsof > /dev/null 2>&1 || missing "lsof"
-    [ -n "$bun" ] || missing "bun (it runs the positive-control listener)"
     work=$(mktemp -d "${TMPDIR:-/tmp}/sp-r-state.XXXXXX") || missing "a temp dir"
-    # Positive control: a listener this script owns, on loopback and on all interfaces, must show up in lsof first.
-    cat > "$work/control.js" << 'EOF'
+    # Positive control: listeners this script owns, one on loopback and one on all interfaces, must show up in lsof
+    # before the device service is read. On macOS they are /usr/bin/nc (Apple-signed, so the application firewall's
+    # built-in allowance covers it and no dialog can appear); elsewhere bun. SP_R_PAIR_CONTROL=nc|bun picks one.
+    tool="${SP_R_PAIR_CONTROL:-}"
+    [ -n "$tool" ] || { [ "$(uname -s)" = Darwin ] && tool=nc || tool=bun; }
+    case "$tool" in
+      nc)
+        command -v nc > /dev/null 2>&1 || missing "nc (it runs the positive-control listener)"
+        try=0
+        while :; do
+          try=$((try + 1))
+          lo=$(( (($$ + try * 7919 + $(date +%s)) % 20000) + 30000 ))
+          all=$((lo + 1))
+          nc -l 127.0.0.1 "$lo" < /dev/null > /dev/null 2>&1 &
+          p1=$!
+          nc -l "$all" < /dev/null > /dev/null 2>&1 &
+          p2=$!
+          ctl="$p1,$p2"
+          sleep 0.5
+          kill -0 "$p1" 2> /dev/null && kill -0 "$p2" 2> /dev/null && break
+          kill "$p1" "$p2" 2> /dev/null
+          ctl=""
+          [ $try -lt 3 ] || missing "the positive-control listener did not start"
+        done
+        ;;
+      bun)
+        [ -n "$bun" ] || missing "bun (it runs the positive-control listener)"
+        cat > "$work/control.js" << 'EOF'
 const s = { data() {} }
 const lo = Bun.listen({ hostname: "127.0.0.1", port: 0, socket: s })
 const all = Bun.listen({ hostname: "0.0.0.0", port: 0, socket: s })
@@ -51,22 +76,25 @@ require("node:fs").writeFileSync(process.argv[2] + ".tmp", `${lo.port} ${all.por
 require("node:fs").renameSync(process.argv[2] + ".tmp", process.argv[2])
 setTimeout(() => process.exit(0), 60_000)
 EOF
-    "$bun" "$work/control.js" "$work/ports" sp-r-control > /dev/null 2>&1 &
-    ctl=$!
-    i=0
-    while [ ! -s "$work/ports" ] && [ $i -lt 100 ]; do
-      sleep 0.1
-      i=$((i + 1))
-    done
-    [ -s "$work/ports" ] || missing "the positive-control listener did not start"
-    read -r lo all < "$work/ports"
+        "$bun" "$work/control.js" "$work/ports" sp-r-control > /dev/null 2>&1 &
+        ctl=$!
+        i=0
+        while [ ! -s "$work/ports" ] && [ $i -lt 100 ]; do
+          sleep 0.1
+          i=$((i + 1))
+        done
+        [ -s "$work/ports" ] || missing "the positive-control listener did not start"
+        read -r lo all < "$work/ports"
+        ;;
+      *) missing "SP_R_PAIR_CONTROL must be nc or bun" ;;
+    esac
     listen_rows "$ctl" > "$work/ctl"
     c_total=$(wc -l < "$work/ctl" | tr -d ' ')
     c_off=$(off_loopback "$work/ctl")
     grep -q -E ":$lo\$" "$work/ctl" && grep -q -E ":$all\$" "$work/ctl" && [ "$c_total" = 2 ] && [ "$c_off" = 1 ] ||
       missing "lsof positive control failed: it saw $c_total of 2 control listeners ($c_off of 1 off loopback)"
-    echo "control=ok control_listeners=$c_total control_off_loopback=$c_off"
-    kill "$ctl" 2> /dev/null
+    echo "control=ok control_tool=$tool control_listeners=$c_total control_off_loopback=$c_off"
+    kill $(echo "$ctl" | tr ',' ' ') 2> /dev/null
     ctl=""
     # The device service, matched literally on its command line (SP_R_PAIR_SERVICE_MATCH lets the self-test point
     # at its own fake); ps is read into a file first so the matcher never sees its own command line.

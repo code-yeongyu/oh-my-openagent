@@ -54,10 +54,19 @@ run_helper() { # extra PATH dir (or ""), then helper args; output in $work/out, 
   SP_R_PAIR_MAX_LOAD=100000 PATH="$p" sh "$helper" "$@" > "$work/out" 2>&1
   rc=$?
 }
+# The helper gets a private TMPDIR, so its temp dirs and its bun control (whose script lives there) are attributable
+# to this run even when another run is going; nc control listeners carry no path, so they are counted against a
+# baseline taken before the first case.
+export TMPDIR="$work/tmp"
+mkdir -p "$TMPDIR"
+nc_count() { ps -axo command= | grep -c -E '^nc -l (127\.0\.0\.1 )?[0-9]+$'; }
+nc_base=$(nc_count)
 leftovers() { # processes or temp files the helper left behind
-  n=$(ps -axo command= | grep -c -E 'sp-r-[c]ontrol')
-  f=$(ls -d "${TMPDIR:-/tmp}"/sp-r-state.* 2> /dev/null | wc -l | tr -d ' ')
-  echo $((n + f))
+  n=$(ps -axo command= | grep -F "$TMPDIR/" | grep -c -v -F 'grep')
+  f=$(ls -d "$TMPDIR"/sp-r-state.* 2> /dev/null | wc -l | tr -d ' ')
+  d=$(($(nc_count) - nc_base))
+  [ $d -lt 0 ] && d=0
+  echo $((n + f + d))
 }
 field() { tr ' ' '\n' < "$work/out" | sed -n "s/^$1=//p" | head -1; }
 
@@ -88,18 +97,22 @@ run_helper "$work/blind" state
 check "lsof blind to the device service -> exit 2" "$([ $rc -eq 2 ] && ! grep -q 'listeners_total=' "$work/out" && echo 0 || echo 1)" "exit $rc: $(cat "$work/out")"
 
 # 5-7. real lsof: the control comes first and passes, then the reading is trusted.
+tools="bun"
+nc -h 2>&1 | grep -q -i -E 'openbsd|apple|usage: nc' && tools="bun nc"
+for tool in $tools; do
 for mode in any lo none; do
   start_svc "$mode"
-  run_helper "" state
+  SP_R_PAIR_CONTROL=$tool run_helper "" state
   case $mode in any) want_t=1 want_o=1 ;; lo) want_t=1 want_o=0 ;; none) want_t=0 want_o=0 ;; esac
   ok=1
   [ $rc -eq 0 ] && [ "$(field control)" = ok ] && [ "$(field target_visible)" = yes ] &&
     [ "$(field listeners_total)" = "$want_t" ] && [ "$(field listeners_off_loopback)" = "$want_o" ] && ok=0
-  check "real lsof, service listening $mode -> control ok, listeners $want_t, off loopback $want_o" "$ok" "exit $rc: $(cat "$work/out")"
+  check "real lsof, $tool control, service listening $mode -> control ok, listeners $want_t, off loopback $want_o" "$ok" "exit $rc: $(cat "$work/out")"
   cl=$(grep -n 'control=ok' "$work/out" | head -1 | cut -d: -f1)
   rl=$(grep -n 'listeners_total=' "$work/out" | head -1 | cut -d: -f1)
-  check "control shown before the reading ($mode)" "$([ -n "$cl" ] && [ -n "$rl" ] && [ "$cl" -lt "$rl" ] && echo 0 || echo 1)" "$(cat "$work/out")"
-  check "nothing left behind ($mode)" "$([ "$(leftovers)" = 0 ] && echo 0 || echo 1)" "$(leftovers) leftovers"
+  check "control shown before the reading ($mode, $tool control)" "$([ -n "$cl" ] && [ -n "$rl" ] && [ "$cl" -lt "$rl" ] && echo 0 || echo 1)" "$(cat "$work/out")"
+  check "nothing left behind ($mode, $tool control)" "$([ "$(leftovers)" = 0 ] && echo 0 || echo 1)" "$(leftovers) leftovers"
+done
 done
 
 # 8. no device service: reported as absent (the probe makes that UNMEASURED), control still first.
