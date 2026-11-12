@@ -134,7 +134,7 @@ jobs:
       - name: Catalog and task set on the shipped runtime
         shell: bash
         run: |
-          set -uo pipefail
+          set +e -uo pipefail
           qa="${RUNNER_TEMP}/computer-baseline"
           dbus-run-session -- bun script/qa/computer/conformance/run.ts --os x11 --all --driver legacy --out "$qa/catalog" | tee "$qa/catalog.log"
           catalog=${PIPESTATUS[0]}
@@ -260,7 +260,7 @@ jobs:
       - name: Catalog and task set on the shipped runtime
         shell: bash
         run: |
-          set -uo pipefail
+          set +e -uo pipefail
           qa="${RUNNER_TEMP}/computer-baseline"
           bun script/qa/computer/conformance/run.ts --os windows --all --driver legacy --out "$qa/catalog" | tee "$qa/catalog.log"
           catalog=${PIPESTATUS[0]}
