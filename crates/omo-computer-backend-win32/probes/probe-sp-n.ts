@@ -382,9 +382,22 @@ async function leg(ctx: Ctx, name: string, arg: Json = {}): Promise<Json> {
   return legResult(line, name)
 }
 
+// A helper started with -Out writes <out>.started ({ pid }) first; at the deadline it names why nothing came.
+export type HelperWatch = { readonly started: string; readonly alive: (pid: number) => Promise<boolean> }
+async function helperFate(w: HelperWatch): Promise<string> {
+  if (!existsSync(w.started)) return "the helper never started (no start marker)"
+  const pid = num(obj(JSON.parse(readFileSync(w.started, "utf8"))).pid)
+  return (await w.alive(pid))
+    ? `the helper (pid ${pid}) is still running`
+    : `the helper (pid ${pid}) exited without writing a result (silent exit)`
+}
+// Whether a process is still running (tasklist: a medium-integrity helper is visible to the elevated probe).
+const pidAlive = async (pid: number) =>
+  (await run(["tasklist.exe", "/FI", `PID eq ${pid}`, "/NH", "/FO", "CSV"])).out.includes(`"${pid}"`)
+
 // The JSON a helper wrote to path, waiting up to ms for it. A file never written, a file still unreadable at the
 // deadline (with its last parse error) and a helper's legError all reject: none of them is read as "no result".
-export async function waitFile(path: string, ms: number): Promise<Json> {
+export async function waitFile(path: string, ms: number, helper?: HelperWatch): Promise<Json> {
   const end = Date.now() + ms
   let lastError = ""
   while (Date.now() < end) {
@@ -403,7 +416,7 @@ export async function waitFile(path: string, ms: number): Promise<Json> {
   throw new Error(
     lastError
       ? `${basename(path)}: unreadable after ${ms / 1000} s: ${lastError}`
-      : `${basename(path)}: not written within ${ms / 1000} s`,
+      : `${basename(path)}: not written within ${ms / 1000} s${helper ? `; ${await helperFate(helper)}` : ""}`,
   )
 }
 
@@ -419,8 +432,9 @@ export function psCommand(dir: string, name: string, arg: Json, out: string): st
 async function medium(ctx: Ctx, name: string, arg: Json): Promise<Json> {
   const out = join(ctx.tmp, `${name}.medium.json`)
   rmSync(out, { force: true })
+  rmSync(`${out}.started`, { force: true })
   await run(["runas.exe", "/trustlevel:0x20000", psCommand(ctx.tmp, name, arg, out)], ctx.live)
-  return waitFile(out, 60_000)
+  return waitFile(out, 60_000, { started: `${out}.started`, alive: pidAlive })
 }
 
 // A command as SYSTEM through a one-shot scheduled task (Session 0). The task runs a .cmd wrapper, because

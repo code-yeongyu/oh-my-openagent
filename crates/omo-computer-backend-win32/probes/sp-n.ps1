@@ -21,8 +21,6 @@ using System.Text;
 using System.Threading;
 
 '@
-foreach ($f in 'win32', 'input', 'capture') { . (Join-Path $PSScriptRoot "sp-n-native-$f.ps1") }
-foreach ($f in 'delivery', 'capture', 'session') { . (Join-Path $PSScriptRoot "sp-n-legs-$f.ps1") }
 
 function Compile {
   if (-not ('SpN' -as [type])) { Add-Type -TypeDefinition $SpNNative -Language CSharp }
@@ -31,7 +29,8 @@ function Compile {
 
 function Emit([hashtable]$r) {
   $r['leg'] = $Leg
-  $r['sessionId'] = [SpN]::OwnSession()
+  # a setup error is emitted before the native type exists
+  $r['sessionId'] = if ('SpN' -as [type]) { [SpN]::OwnSession() } else { $null }
   $json = $r | ConvertTo-Json -Depth 8 -Compress
   if ($Out) {
     [IO.File]::WriteAllText("$Out.tmp", $json)
@@ -131,8 +130,17 @@ function WaitCount($t, [char]$c, [int]$want, [int]$ms) {
   return $false
 }
 
-$a = if ($ArgFile) { Get-Content -Raw $ArgFile | ConvertFrom-Json } else { [pscustomobject]@{} }
-Compile
+# Setup runs in the handled path: a failure here (a fragment, the start marker, the argument file, the native
+# type) reports legError with its line, so the probe records the rows UNMEASURED with that text, never a timeout
+# (hosted run 43220783638: Add-Type threw in a restricted process and the helper exited without a word). The
+# start marker lets the probe tell a helper that never started from one that exited without a result.
+try {
+  if ($Out) { [IO.File]::WriteAllText("$Out.started", (@{ pid = $PID } | ConvertTo-Json -Compress)) }
+  foreach ($f in 'win32', 'input', 'capture') { . (Join-Path $PSScriptRoot "sp-n-native-$f.ps1") }
+  foreach ($f in 'delivery', 'capture', 'session') { . (Join-Path $PSScriptRoot "sp-n-legs-$f.ps1") }
+  $a = if ($ArgFile) { Get-Content -Raw $ArgFile | ConvertFrom-Json } else { [pscustomobject]@{} }
+  Compile
+} catch { Emit @{ legError = "setup failed: $($_.Exception.Message) (line $($_.InvocationInfo.ScriptLineNumber))" }; exit 1 }
 
 if (-not (Get-Command "Leg-$Leg" -ErrorAction SilentlyContinue)) { [Console]::Error.WriteLine("unknown leg $Leg"); exit 2 }
 # A leg that throws reports legError (with the line), which the probe raises; it never reads as a result.
