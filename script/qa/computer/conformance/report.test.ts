@@ -84,7 +84,7 @@ function passingRun(
   return [first, second, third]
 }
 
-describe("conformance report (ADP-1 declared-outcome catalog)", () => {
+describe("conformance report, declared-outcome catalog [ADP-1]", () => {
   test("a complete run with every declared outcome passes", () => {
     const report = buildReport(catalog, passingRun())
     expect(report.problems).toEqual([])

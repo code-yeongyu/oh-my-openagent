@@ -28,7 +28,7 @@ function run(dir: string, engine: string) {
   }
 }
 
-describe("environment preflight (ADP-3)", () => {
+describe("environment preflight [ADP-3]", () => {
   test("a missing engine ends the run as ENVIRONMENT_ERROR before any cell, never as a smaller green matrix", () => {
     withDir((dir) => {
       const result = run(dir, join(dir, "no-such-engine"))
