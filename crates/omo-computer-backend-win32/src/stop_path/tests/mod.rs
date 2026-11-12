@@ -3,6 +3,7 @@
 //! rule, the foreground chord, presence exclusion, and the Windows readers of the self set and
 //! the protected table.
 
+mod awake;
 mod foreground;
 mod hooks;
 mod marker;
