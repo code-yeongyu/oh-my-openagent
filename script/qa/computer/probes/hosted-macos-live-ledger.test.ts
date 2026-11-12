@@ -39,21 +39,33 @@ describe("ledger rows", () => {
   test("merge orders fragments by image then question and refuses a duplicate pair", () => {
     const rows = fullLedger(() => "CONFIRMS")
     const fragment = (image: string) =>
-      `${[LEDGER_HEADER, ...rows.filter((row) => row.image === image).reverse().map(formatRow)].join("\n")}\n`
+      `${[
+        LEDGER_HEADER,
+        ...rows
+          .filter((row) => row.image === image)
+          .reverse()
+          .map(formatRow),
+      ].join("\n")}\n`
     const merged = parseLedger(mergeLedgers([fragment("macos-26"), fragment("macos-15")]))
     expect(merged).toHaveLength(16)
     expect(merged.map((row) => `${row.image}:${row.question}`).slice(0, 2)).toEqual(["macos-15:q1", "macos-15:q2"])
-    expect(() => mergeLedgers([fragment("macos-15"), fragment("macos-15")])).toThrow(/^duplicate ledger row q\d@macos-15$/)
+    expect(() => mergeLedgers([fragment("macos-15"), fragment("macos-15")])).toThrow(
+      /^duplicate ledger row q\d@macos-15$/,
+    )
   })
 })
 
 describe("HOSTED_MACOS_LIVE decision", () => {
   test("yes only when q2, q3, q4 and q6 confirm on both images", () => {
-    expect(decideHostedMacosLive(fullLedger((question) => (question === "q7" ? "CONTRADICTS" : "CONFIRMS")))).toBe("yes")
+    expect(decideHostedMacosLive(fullLedger((question) => (question === "q7" ? "CONTRADICTS" : "CONFIRMS")))).toBe(
+      "yes",
+    )
   })
 
   test("one live-tier question that does not confirm on one image makes it no", () => {
-    const rows = fullLedger((question, image) => (question === "q6" && image === "macos-26" ? "UNMEASURED" : "CONFIRMS"))
+    const rows = fullLedger((question, image) =>
+      question === "q6" && image === "macos-26" ? "UNMEASURED" : "CONFIRMS",
+    )
     expect(decideHostedMacosLive(rows)).toBe("no")
   })
 

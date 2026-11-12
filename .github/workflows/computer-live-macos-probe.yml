@@ -60,7 +60,7 @@ jobs:
     name: hosted macos live ledger
     needs: probe
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
@@ -87,3 +87,14 @@ jobs:
           name: hosted-macos-live-ledger
           path: hosted-macos-live.tsv
           if-no-files-found: error
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Hosted macOS live ledger
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Merges the per-image ledger fragments into one ledger and prints the HOSTED_MACOS_LIVE decision.
+          JOB_SUMMARY_NEXT: A failed merge names the fragment or row it refused; read the probe job of that image first.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

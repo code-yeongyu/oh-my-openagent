@@ -54,7 +54,11 @@ function combined(legs: Legs, route: string): Answer {
 
 type GrantRoute = { readonly label: string; readonly csreqHex: string | null }
 
-async function tryRoute(subject: Probe, subjectPath: string, route: GrantRoute): Promise<{ legs: Legs; note: string } | string> {
+async function tryRoute(
+  subject: Probe,
+  subjectPath: string,
+  route: GrantRoute,
+): Promise<{ legs: Legs; note: string } | string> {
   const inserted = insertProbeRows(subjectPath, route.csreqHex)
   if (inserted.code !== 0) return `system TCC insert refused (${route.label}): ${inserted.stderr.slice(0, 200)}`
   const direct = await subjectLegs(subject)
@@ -71,11 +75,14 @@ async function askGranted(subject: Probe, subjectPath: string): Promise<{ answer
     restarted: false,
   })
   if (typeof baseline.helperError === "string") return early(`disclaimed spawn failed: ${baseline.helperError}`)
-  if (baseline.responsiblePid !== baseline.pid) return early(`subject is not its own responsible process: ${short(baseline)}`)
+  if (baseline.responsiblePid !== baseline.pid)
+    return early(`subject is not its own responsible process: ${short(baseline)}`)
   if (baseline.axTrusted === true) return early(`subject read trusted before any row existed: ${short(baseline)}`)
   const csreq = designatedRequirementHex(subjectPath, subject.scratch)
   const routes: GrantRoute[] = [
-    ...(csreq === null ? [] : [{ label: "sudo sqlite3 insert, client path + designated requirement", csreqHex: csreq }]),
+    ...(csreq === null
+      ? []
+      : [{ label: "sudo sqlite3 insert, client path + designated requirement", csreqHex: csreq }]),
     { label: "sudo sqlite3 insert, client path, NULL csreq", csreqHex: null },
   ]
   const history: string[] = [`baseline denied ${short(baseline)}`, `client ${subjectPath}`]
@@ -92,7 +99,10 @@ async function askGranted(subject: Probe, subjectPath: string): Promise<{ answer
     deleteProbeRows(subjectPath)
   }
   if (last === undefined) return { answer: { verdict: "CONTRADICTS", evidence: history.join("; ") }, restarted: false }
-  return { answer: combined(last.legs, `${last.note}; ${history.join("; ")}`), restarted: last.note.includes("restart system") }
+  return {
+    answer: combined(last.legs, `${last.note}; ${history.join("; ")}`),
+    restarted: last.note.includes("restart system"),
+  }
 }
 
 async function askRemoved(subject: Probe, subjectPath: string, restarted: boolean, granted: Answer): Promise<Answer> {
@@ -102,7 +112,10 @@ async function askRemoved(subject: Probe, subjectPath: string, restarted: boolea
   const restart = restarted ? restartTccd() : "no tccd restart"
   const detector = subject.control(["dialogs", "omo-probe"])
   if (!Array.isArray(detector.windows) || detector.windows.length === 0)
-    return { verdict: "UNMEASURED", evidence: `control failed: the window detector did not see the fixture ${short(detector)}` }
+    return {
+      verdict: "UNMEASURED",
+      evidence: `control failed: the window detector did not see the fixture ${short(detector)}`,
+    }
   const dialogWindows = (): string[] => {
     const read = subject.control(["dialogs", ...DIALOG_OWNERS])
     return Array.isArray(read.windows) ? read.windows.filter((name): name is string => typeof name === "string") : []
@@ -111,7 +124,11 @@ async function askRemoved(subject: Probe, subjectPath: string, restarted: boolea
   const windowsBefore = dialogWindows()
   const read = subject.invoke(["trusted"])
   const tap = subject.invoke(["tap-create"])
-  const appeared = await until(() => dialogProcesses().filter((name) => !before.has(name)), (names) => names.length > 0, 5_000)
+  const appeared = await until(
+    () => dialogProcesses().filter((name) => !before.has(name)),
+    (names) => names.length > 0,
+    5_000,
+  )
   const windowsAfter = dialogWindows()
   const newWindows = windowsAfter.length - windowsBefore.length
   const evidence = `rows removed, ${restart}; subject ${short(read)}; tap ${short(tap)}; new dialog processes in 5 s ${short(appeared)}; dialog windows before ${short(windowsBefore)} after ${short(windowsAfter)}; control q6=${granted.verdict}`

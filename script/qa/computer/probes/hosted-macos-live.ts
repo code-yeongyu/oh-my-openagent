@@ -4,11 +4,28 @@
 //   bun script/qa/computer/probes/hosted-macos-live.ts --merge <ledger.tsv> <fragment.tsv>...
 //   bun script/qa/computer/probes/hosted-macos-live.ts --decide <ledger.tsv>
 
-import { appendFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import {
+  appendFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { askGrantRoute } from "./hosted-macos-live-grant.ts"
-import { countProbeRows, deleteProbeRows, grantedRows, pidOf, run, SYSTEM_TCC_DB, until } from "./hosted-macos-live-host.ts"
+import {
+  countProbeRows,
+  deleteProbeRows,
+  grantedRows,
+  pidOf,
+  run,
+  SYSTEM_TCC_DB,
+  until,
+} from "./hosted-macos-live-host.ts"
 import {
   decideHostedMacosLive,
   formatRow,
@@ -73,7 +90,11 @@ async function startFixture(binary: string, scratch: string): Promise<{ fixture:
   const stateFile = join(scratch, "fixture.state")
   const readyFile = join(scratch, "fixture.ready")
   const child = Bun.spawn([binary, "fixture", stateFile, readyFile], { stdout: "ignore", stderr: "ignore" })
-  const ready = await until(() => run("/bin/cat", [readyFile]).stdout, (text) => text !== "", 15_000)
+  const ready = await until(
+    () => run("/bin/cat", [readyFile]).stdout,
+    (text) => text !== "",
+    15_000,
+  )
   if (ready === "") throw new Error("the fixture app wrote no ready file within 15 s")
   const parsed: unknown = JSON.parse(ready)
   const field = (key: string) => Number(typeof parsed === "object" && parsed !== null ? Reflect.get(parsed, key) : NaN)
@@ -85,10 +106,19 @@ async function openTextEdit(scratch: string): Promise<number | null> {
   const document = join(scratch, "probe-note.txt")
   writeFileSync(document, "hosted macOS live probe\n")
   run("/usr/bin/open", ["-g", "-F", "-a", "TextEdit", document, "--args", "-ApplePersistenceIgnoreState", "YES"])
-  return until(() => pidOf("TextEdit"), (pid) => pid !== null, 15_000)
+  return until(
+    () => pidOf("TextEdit"),
+    (pid) => pid !== null,
+    15_000,
+  )
 }
 
-async function answers(only: Question | undefined, probe: Probe, binary: string, subject: string): Promise<Map<Question, Answer>> {
+async function answers(
+  only: Question | undefined,
+  probe: Probe,
+  binary: string,
+  subject: string,
+): Promise<Map<Question, Answer>> {
   const wanted = (question: Question) => only === undefined || only === question
   const result = new Map<Question, Answer>()
   if (wanted("q1")) result.set("q1", askTrusted(probe))
@@ -110,7 +140,9 @@ function teardown(scratch: string, subject: string, killFixture: (() => void) | 
   run("/usr/bin/osascript", ["-e", 'tell application "TextEdit" to quit saving no'])
   deleteProbeRows(subject)
   const rows = countProbeRows(subject)
-  const procs = run("/usr/bin/pgrep", ["-f", scratch]).stdout.split("\n").filter((line) => line !== "").length
+  const procs = run("/usr/bin/pgrep", ["-f", scratch])
+    .stdout.split("\n")
+    .filter((line) => line !== "").length
   rmSync(scratch, { recursive: true, force: true })
   console.log(`teardown: procs ${procs}; probe tcc rows ${rows}; dir REMOVED ${scratch}`)
 }
@@ -152,7 +184,10 @@ async function probeRunner(args: readonly string[], image: string): Promise<numb
     const summary = process.env.GITHUB_STEP_SUMMARY
     if (summary !== undefined) {
       const table = rows.map((row) => `| ${row.question} | ${row.image} | ${row.verdict} |`).join("\n")
-      appendFileSync(summary, `### Hosted macOS live probe (${image})\n\n| question | image | verdict |\n| --- | --- | --- |\n${table}\n`)
+      appendFileSync(
+        summary,
+        `### Hosted macOS live probe (${image})\n\n| question | image | verdict |\n| --- | --- | --- |\n${table}\n`,
+      )
     }
     return 0
   } finally {
@@ -181,7 +216,9 @@ async function main(args: readonly string[]): Promise<number> {
     image,
   })
   if (reason !== null || image === undefined) {
-    console.error(`hosted-macos-live: unsupported host (${reason}); this probe runs only on a GitHub-hosted macOS runner and wrote no ledger row`)
+    console.error(
+      `hosted-macos-live: unsupported host (${reason}); this probe runs only on a GitHub-hosted macOS runner and wrote no ledger row`,
+    )
     return 2
   }
   return probeRunner(args, image)

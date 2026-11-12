@@ -25,7 +25,11 @@ function parseObject(text: string): Json | null {
 
 export function helper(binary: string, args: readonly string[], timeoutMs = 60_000): Json {
   const ran = run(binary, args, timeoutMs)
-  return parseObject(ran.stdout) ?? { helperError: `exit ${ran.code}: ${ran.stderr || ran.stdout || "no output"}`.slice(0, 300) }
+  return (
+    parseObject(ran.stdout) ?? {
+      helperError: `exit ${ran.code}: ${ran.stderr || ran.stdout || "no output"}`.slice(0, 300),
+    }
+  )
 }
 
 export function short(value: unknown): string {
@@ -104,7 +108,9 @@ const DIALOG_PROCESSES = [
 
 export function dialogProcesses(): string[] {
   const listed = run("/bin/ps", ["-axo", "comm="]).stdout.split("\n")
-  return listed.map((line) => line.split("/").at(-1) ?? "").filter((name) => (DIALOG_PROCESSES as readonly string[]).includes(name))
+  return listed
+    .map((line) => line.split("/").at(-1) ?? "")
+    .filter((name) => (DIALOG_PROCESSES as readonly string[]).includes(name))
 }
 
 export function pidOf(name: string): number | null {

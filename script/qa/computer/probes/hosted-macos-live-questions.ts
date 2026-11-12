@@ -66,7 +66,11 @@ export function askTrusted(probe: Probe): Answer {
 export async function askAxTree(probe: Probe): Promise<Answer> {
   if (probe.textEditPid === null) return unmeasured("TextEdit did not start, so there was no window to read")
   const pid = String(probe.textEditPid)
-  const tree = await until(() => probe.invoke(["ax-tree", pid]), (read) => numberField(read, "windows") > 0, 10_000)
+  const tree = await until(
+    () => probe.invoke(["ax-tree", pid]),
+    (read) => numberField(read, "windows") > 0,
+    10_000,
+  )
   const error = failed(tree)
   if (error !== null) return unmeasured(error)
   const hasTextArea = numberField(tree.roles, "AXTextArea") > 0
@@ -78,11 +82,19 @@ export async function askAxTree(probe: Probe): Promise<Answer> {
 }
 
 function stateLines(file: string): string[] {
-  return existsSync(file) ? readFileSync(file, "utf8").split("\n").filter((line) => line !== "") : []
+  return existsSync(file)
+    ? readFileSync(file, "utf8")
+        .split("\n")
+        .filter((line) => line !== "")
+    : []
 }
 
 async function nextState(file: string, before: number): Promise<string | undefined> {
-  const lines = await until(() => stateLines(file), (read) => read.length > before, 5_000)
+  const lines = await until(
+    () => stateLines(file),
+    (read) => read.length > before,
+    5_000,
+  )
   return lines.length > before ? lines.at(-1) : undefined
 }
 
@@ -130,8 +142,11 @@ export async function askPidClick(probe: Probe): Promise<Answer> {
   const controlBefore = stateLines(fixture.stateFile).length
   const press = probe.control(["ax-press", pid])
   const controlState = await nextState(fixture.stateFile, controlBefore)
-  if (controlState === undefined) return unmeasured(`control failed: AX press ${short(press)} did not toggle the fixture`)
-  return contradicts(`aimed at the AX frame ${short(frame)}: ${attempts.join("; ")}; control AX press toggled to ${controlState}`)
+  if (controlState === undefined)
+    return unmeasured(`control failed: AX press ${short(press)} did not toggle the fixture`)
+  return contradicts(
+    `aimed at the AX frame ${short(frame)}: ${attempts.join("; ")}; control AX press toggled to ${controlState}`,
+  )
 }
 
 export function askCapture(probe: Probe): Answer {
@@ -141,7 +156,8 @@ export function askCapture(probe: Probe): Answer {
   if (read.preflight === false && read.stats === undefined)
     return contradicts(`CGPreflightScreenCaptureAccess answered false: ${short(read)}`)
   if (read.stats === undefined) return unmeasured(`capture returned no image: ${short(read)}`)
-  const pixels = numberField(read.stats, "nonBlackFraction") > 0.5 && numberField(read.stats, "fixtureColorFraction") > 0.3
+  const pixels =
+    numberField(read.stats, "nonBlackFraction") > 0.5 && numberField(read.stats, "fixtureColorFraction") > 0.3
   const evidence = `capture ${short(read)}`
   return read.preflight === true && pixels ? confirms(evidence) : contradicts(evidence)
 }
