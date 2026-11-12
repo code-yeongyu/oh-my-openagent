@@ -449,6 +449,22 @@ describe("#13037 the sender half reaches a session on another device that is not
   })
 
   describe("review: a receiving side's free-form refusal reason is bounded before it reaches the person", () => {
+    const shownOf = async (reason: string) => {
+      const a = account({ rows: [B_ROW, C_ROW], ended: { c: { [GONE]: "rk-c-gone" } }, wakeOutcome: queuedEnvelope({ kind: "refused", reason }) })
+      const result = await fixture.surface(a.remote).run("thread_send", { thread: GONE, message: "hi" })
+      return (result as { error: { details?: { reason?: string } } }).error.details?.reason ?? ""
+    }
+
+    test("#given combining marks and letters that render blank #then only what reads as text is shown", async () => {
+      expect(await shownOf("a\u0336b\u3164c\u2800d")).toBe("abcd")
+    })
+
+    test("#given a cut that would fall inside a surrogate pair #then it is cut by code point and leaves no half pair", async () => {
+      const shown = await shownOf(`${"x".repeat(119)}\u{1F600}tail`)
+      expect(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(shown)).toBe(false)
+      expect(Array.from(shown)).toHaveLength(120)
+    })
+
     test("#given a long multi-line reason with control characters #then the message is one bounded line", async () => {
       // The format characters come first, inside the shown length, so the cut cannot hide them.
       const reason = `\u202Eevil\u2066\u200B${"x".repeat(600)}\nsecond line\u0007\u001b[31m`
