@@ -77,8 +77,8 @@ export async function runSelfTest(options: SelfTestOptions): Promise<{ exitCode:
     targetPids: [],
     withPlanter: true,
     ...(options.drop === undefined ? {} : { drop: options.drop }),
-    beforeTypist: async () => {
-      const spaces = await ensureSecondSpace()
+    beforeTypist: async (opened) => {
+      const spaces = await ensureSecondSpace(opened)
       console.log(`SENTINEL_SETUP spaces=${spaces}`)
     },
   })

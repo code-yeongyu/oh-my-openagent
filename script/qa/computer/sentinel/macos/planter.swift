@@ -50,15 +50,9 @@ final class Planter: NSObject {
         self.background.order(.below, relativeTo: Int(typistWindow))
         self.restored("window_raised")
       }
-    case "activate":
-      guard numbers.count == 2 else { return failed("activation", "usage: activate <idle pid> <typist pid>") }
-      let error = axSetFrontmost(numbers[0])
-      guard error == .success else { return failed("activation", "AXFrontmost on the idle app failed (\(error.rawValue))") }
-      planted("activation")
-      after(0.3) {
-        _ = axSetFrontmost(numbers[1])
-        self.restored("activation")
-      }
+    case "hover-top":
+      if let screen = NSScreen.screens.first { CGWarpMouseCursorPosition(CGPoint(x: screen.frame.midX, y: 1)) }
+      emit(["ctl": "hovered"])
     case "pointer", "warp":
       let plant = words.first == "warp" ? "warp" : "pointer"
       guard let start = pointerLocation() else { return failed(plant, "cursor position unreadable") }
@@ -122,13 +116,42 @@ final class Planter: NSObject {
   }
 }
 
+// macOS 14+ activation is cooperative: the frontmost typist has already yielded to this app, which now activates,
+// holds the front for a moment, and yields back so the typist can take it again.
+func activateThenYield(to typistPid: pid_t?) {
+  guard #available(macOS 14.0, *), let typistPid, let typist = NSRunningApplication(processIdentifier: typistPid) else {
+    return emit(["ctl": "plant_failed", "plant": "activation", "detail": "needs macOS 14 cooperative activation and a typist pid"])
+  }
+  let at = uptimeMs()
+  NSApp.activate()
+  after(0.15) {
+    guard NSWorkspace.shared.frontmostApplication?.processIdentifier == getpid() else {
+      return emit(["ctl": "plant_failed", "plant": "activation", "detail": "the idle app did not become frontmost"])
+    }
+    emit(["ctl": "planted", "plant": "activation", "t": at])
+    after(0.3) {
+      NSApp.yieldActivation(to: typist)
+      emit(["ctl": "restoring", "plant": "activation"])
+    }
+  }
+}
+
 @main
 enum PlanterMain {
   static func main() {
     let app = NSApplication.shared
     if CommandLine.arguments.contains("--idle") {
       app.setActivationPolicy(.regular)
-      readCommands { if $0.first == "quit" { exit(0) } }
+      readCommands { words in
+        switch words.first {
+        case "activate":
+          activateThenYield(to: words.dropFirst().first.flatMap { pid_t($0) })
+        case "quit":
+          exit(0)
+        default:
+          emit(["ctl": "error", "detail": "idle: unknown command \(words.joined(separator: " "))"])
+        }
+      }
       DispatchQueue.main.async { emit(["ctl": "hello", "role": "idle", "pid": Int(getpid())]) }
     } else {
       app.setActivationPolicy(.accessory)

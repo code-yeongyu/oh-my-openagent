@@ -7,8 +7,10 @@ import ApplicationServices
 
 final class Typist: NSObject {
   let window: NSWindow
-  let field = NSTextField(frame: NSRect(x: 20, y: 110, width: 440, height: 24))
-  let other = NSTextField(frame: NSRect(x: 20, y: 60, width: 440, height: 24))
+  // Text views, not text fields: a text field selects all of its text when it regains focus, so the next keystroke
+  // would replace it and a focus steal would always read as a typing loss too.
+  let field = Typist.textView(NSRect(x: 20, y: 100, width: 440, height: 40), "sentinel.field")
+  let other = Typist.textView(NSRect(x: 20, y: 40, width: 440, height: 40), "sentinel.other")
   let source = CGEventSource(stateID: .hidSystemState)
   let alphabet = Array("abcdefghijklmnopqrstuvwxyz")
   var index = 0
@@ -16,13 +18,24 @@ final class Typist: NSObject {
   var dropNext = false
   var expected: [String] = []
 
+  static func textView(_ frame: NSRect, _ identifier: String) -> NSTextView {
+    let view = NSTextView(frame: frame)
+    view.isRichText = false
+    view.isAutomaticSpellingCorrectionEnabled = false
+    view.isContinuousSpellCheckingEnabled = false
+    view.isAutomaticTextReplacementEnabled = false
+    view.isAutomaticQuoteSubstitutionEnabled = false
+    view.isAutomaticDashSubstitutionEnabled = false
+    view.isAutomaticTextCompletionEnabled = false
+    view.setAccessibilityIdentifier(identifier)
+    return view
+  }
+
   init(frame: NSRect) {
     window = NSWindow(contentRect: frame, styleMask: [.titled], backing: .buffered, defer: false)
     super.init()
     window.title = "Sentinel Typist"
     window.collectionBehavior = [.canJoinAllSpaces]
-    field.setAccessibilityIdentifier("sentinel.field")
-    other.setAccessibilityIdentifier("sentinel.other")
     window.contentView?.addSubview(field)
     window.contentView?.addSubview(other)
     NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown]) {
@@ -91,9 +104,19 @@ final class Typist: NSObject {
       index = 0
       expected = []
       window.makeFirstResponder(nil)
-      field.stringValue = ""
+      field.string = ""
       window.makeFirstResponder(field)
       emit(["ctl": "reset"])
+    case "yield":
+      guard let pid = words.dropFirst().first.flatMap({ pid_t($0) }), let app = NSRunningApplication(processIdentifier: pid)
+      else { return emit(["ctl": "error", "detail": "usage: yield <pid>"]) }
+      if #available(macOS 14.0, *) { NSApp.yieldActivation(to: app) }
+      emit(["ctl": "yielded"])
+    case "activate":
+      if #available(macOS 14.0, *) { NSApp.activate() } else { NSApp.activate(ignoringOtherApps: true) }
+      after(0.15) {
+        emit(["ctl": "activated", "frontmost": NSWorkspace.shared.frontmostApplication?.processIdentifier == getpid()])
+      }
     case "drop-next":
       dropNext = true
     case "cover":

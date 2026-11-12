@@ -12,7 +12,7 @@ type SessionOptions = {
   readonly targetPids: readonly number[]
   readonly withPlanter: boolean
   readonly drop?: string
-  readonly beforeTypist?: () => Promise<void>
+  readonly beforeTypist?: (session: MacSession) => Promise<void>
 }
 
 const HELLO_MS = 15_000
@@ -35,6 +35,7 @@ export class MacSession {
   recorder: Helper | undefined
   typist: Helper | undefined
   planter: Helper | undefined
+  idle: Helper | undefined
   typistPid = 0
   typistWindow = 0
   idlePid = 0
@@ -61,10 +62,11 @@ export class MacSession {
       if (options.withPlanter) {
         const [planter] = await session.start("planter", [options.helpers.planter])
         session.planter = planter
-        const [, idle] = await session.start("idle", [options.helpers.planter, "--idle"])
-        session.idlePid = numberField(idle, "pid")
+        const [idle, idleHello] = await session.start("idle", [options.helpers.planter, "--idle"])
+        session.idle = idle
+        session.idlePid = numberField(idleHello, "pid")
       }
-      await options.beforeTypist?.()
+      await options.beforeTypist?.(session)
       const [typist, hello] = await session.start("typist", [options.helpers.typist])
       if (hello.frontmost !== true) throw new Error("typist could not become the frontmost app; no synthetic user")
       session.typist = typist
