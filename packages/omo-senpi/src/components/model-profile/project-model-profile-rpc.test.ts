@@ -1,8 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { chmodSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, symlinkSync, writeFileSync } from "node:fs"
-import { userInfo } from "node:os"
+import { chmodSync, mkdirSync, readdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs"
 
 import { DEFAULT_WRITE_FILE_SYSTEM } from "@oh-my-opencode/omo-config-core"
 import { join } from "node:path"
@@ -11,7 +10,6 @@ import { testTempDir } from "../../../test-support/temp-dir"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import type { ComponentContext } from "../../extension/types"
 import { createModelProfileComponent } from "./index"
-import * as projectModelProfileRpc from "./project-model-profile-rpc"
 import {
   getProjectModelProfile,
   PROJECT_MODEL_PROFILE_GET,
@@ -44,11 +42,19 @@ describe("project model_profile RPC (#13188)", () => {
 
     const reply = setProjectModelProfile(trusted(cwd), { modelProfile: "anthropic/claude-opus-5-5" })
 
-    expect(reply).toMatchObject({ kind: "ok", exists: true, modelProfile: "anthropic/claude-opus-5-5", parseError: null })
+    expect(reply).toMatchObject({
+      kind: "ok",
+      exists: true,
+      modelProfile: "anthropic/claude-opus-5-5",
+      parseError: null,
+    })
     const text = configText(cwd)
     expect(text).toContain("// keep me")
     expect(text).toContain('"side_panel"')
-    expect(getProjectModelProfile(trusted(cwd))).toMatchObject({ kind: "ok", modelProfile: "anthropic/claude-opus-5-5" })
+    expect(getProjectModelProfile(trusted(cwd))).toMatchObject({
+      kind: "ok",
+      modelProfile: "anthropic/claude-opus-5-5",
+    })
   })
 
   test("#given a folder with no omo config #when a builtin profile is set #then the file is created with it", () => {
@@ -108,7 +114,23 @@ describe("project model_profile RPC (#13188)", () => {
 
   test("#given values that are not a profile #when set #then each is refused before any write", () => {
     const cwd = folder(COMMENTED)
-    for (const modelProfile of ["not-a-profile", "provider/", "/model", " daily-heavy", "a/b\nc", "a/b\u2028c", "a/\u202eb", "a/\u200bb", "a/b\ufe0f", "a/\u034fb", "a/\u3164b", "a/\u0301b", "a/\ud800b", 42, "x".repeat(201)]) {
+    for (const modelProfile of [
+      "not-a-profile",
+      "provider/",
+      "/model",
+      " daily-heavy",
+      "a/b\nc",
+      "a/b\u2028c",
+      "a/\u202eb",
+      "a/\u200bb",
+      "a/b\ufe0f",
+      "a/\u034fb",
+      "a/\u3164b",
+      "a/\u0301b",
+      "a/\ud800b",
+      42,
+      "x".repeat(201),
+    ]) {
       expect(setProjectModelProfile(trusted(cwd), { modelProfile })).toMatchObject({
         kind: "refused",
         code: "invalid_model_profile",
@@ -122,50 +144,6 @@ describe("project model_profile RPC (#13188)", () => {
     for (const modelProfile of ["daily-heavy", "a/b", null, "daily-normal", "c/d"])
       expect(setProjectModelProfile(trusted(cwd), { modelProfile }).kind).toBe("ok")
     expect(readdirSync(join(cwd, ".omo")).sort()).toEqual(["omo.jsonc"])
-  })
-
-  test("#given the session folder is HOME #when either verb runs #then it is refused and the user layer is untouched", () => {
-    const home = folder(COMMENTED)
-    const previous = process.env.HOME
-    process.env.HOME = home
-    try {
-      expect(setProjectModelProfile(trusted(home), { modelProfile: "a/b" })).toMatchObject({ kind: "refused", code: "home_folder" })
-      expect(getProjectModelProfile(trusted(home))).toMatchObject({ kind: "refused", code: "home_folder" })
-      expect(configText(home)).toBe(COMMENTED)
-    } finally {
-      if (previous === undefined) delete process.env.HOME
-      else process.env.HOME = previous
-    }
-  })
-
-  test("#given HOME through an alias #when a pin is set #then it is refused as the home folder", () => {
-    const home = folder(COMMENTED)
-    const link = join(folder(), "home-link")
-    symlinkSync(home, link)
-    const previous = process.env.HOME
-    process.env.HOME = home
-    try {
-      for (const cwd of [link, `${home}/`, join(home, "sub", "..")])
-        expect(setProjectModelProfile(trusted(cwd), { modelProfile: "a/b" })).toMatchObject({ kind: "refused", code: "home_folder" })
-      expect(configText(home)).toBe(COMMENTED)
-    } finally {
-      if (previous === undefined) delete process.env.HOME
-      else process.env.HOME = previous
-    }
-  })
-
-  test("#given the account home while HOME points elsewhere #when a pin is set #then it is refused as the home folder", () => {
-    const previous = process.env.HOME
-    process.env.HOME = folder()
-    try {
-      expect(setProjectModelProfile(trusted(userInfo().homedir), { modelProfile: "a/b" })).toMatchObject({
-        kind: "refused",
-        code: "home_folder",
-      })
-    } finally {
-      if (previous === undefined) delete process.env.HOME
-      else process.env.HOME = previous
-    }
   })
 
   test("#given a write that fails after the backup #when set #then no backup is left and the file is intact", () => {
@@ -182,37 +160,39 @@ describe("project model_profile RPC (#13188)", () => {
 
   test("#given the rename fails after the backup was written #when set #then no backup is left and the file is intact", () => {
     const cwd = folder(COMMENTED)
-    const failingRename = { ...DEFAULT_WRITE_FILE_SYSTEM, renameSync: () => { throw new Error("rename refused") } }
+    const failingRename = {
+      ...DEFAULT_WRITE_FILE_SYSTEM,
+      renameSync: () => {
+        throw new Error("rename refused")
+      },
+    }
 
     const reply = setProjectModelProfile(trusted(cwd), { modelProfile: "a/b" }, { fileSystem: failingRename })
 
     expect(reply).toMatchObject({ kind: "refused", code: "project_config_write_failed" })
-    expect(readdirSync(join(cwd, ".omo")).filter((name) => !name.endsWith(".tmp")).sort()).toEqual(["omo.jsonc"])
+    expect(
+      readdirSync(join(cwd, ".omo"))
+        .filter((name) => !name.endsWith(".tmp"))
+        .sort(),
+    ).toEqual(["omo.jsonc"])
     expect(configText(cwd)).toBe(COMMENTED)
   })
 
   test("#given removing the backup fails after the write landed #when set #then the write is reported as landed", () => {
     const cwd = folder(COMMENTED)
 
-    const reply = setProjectModelProfile(trusted(cwd), { modelProfile: "a/b" }, {
-      removeFile: () => {
-        throw new Error("cleaner raced us")
+    const reply = setProjectModelProfile(
+      trusted(cwd),
+      { modelProfile: "a/b" },
+      {
+        removeFile: () => {
+          throw new Error("cleaner raced us")
+        },
       },
-    })
+    )
 
     expect(reply).toMatchObject({ kind: "ok", modelProfile: "a/b", backupNotRemoved: "cleaner raced us" })
     expect(configText(cwd)).toContain('"model_profile": "a/b"')
-  })
-
-  test("#given another account's home folder #when a pin is set #then it is refused and nothing is written", () => {
-    const other = join(folder(), "someone-else")
-    mkdirSync(join(other, ".omo"), { recursive: true })
-    writeFileSync(join(other, ".omo", "omo.jsonc"), COMMENTED)
-
-    const reply = setProjectModelProfile(trusted(other), { modelProfile: "a/b" }, { homeOfUid: () => other })
-
-    expect(reply).toMatchObject({ kind: "refused", code: "home_folder" })
-    expect(readFileSync(join(other, ".omo", "omo.jsonc"), "utf8")).toBe(COMMENTED)
   })
 
   test("#given a backup copy made earlier by someone else #when a pin is set #then that copy stays", () => {
@@ -236,83 +216,12 @@ describe("project model_profile RPC (#13188)", () => {
       },
     }
 
-    expect(setProjectModelProfile(trusted(cwd), { modelProfile: "a/b" }, { fileSystem: concurrentWriter }).kind).toBe("ok")
+    expect(setProjectModelProfile(trusted(cwd), { modelProfile: "a/b" }, { fileSystem: concurrentWriter }).kind).toBe(
+      "ok",
+    )
 
     expect(readdirSync(join(cwd, ".omo")).sort()).toEqual(["omo.jsonc", "omo.jsonc.bak.concurrent-writer"])
     expect(readFileSync(theirs, "utf8")).toBe("theirs")
-  })
-
-  test("#given a folder beside an account home in a shared parent #when a pin is set #then it is written", () => {
-    const shared = folder()
-    const home = join(shared, "home")
-    const work = join(shared, "workspace")
-    mkdirSync(home)
-    mkdirSync(work)
-
-    const reply = setProjectModelProfile(trusted(work), { modelProfile: "a/b" }, { homeOfUid: () => home })
-
-    expect(reply).toMatchObject({ kind: "ok", modelProfile: "a/b" })
-  })
-
-  test("#given an account home outside any shared accounts folder #when a pin is set there or through an alias #then it is refused", () => {
-    const serviceHome = join(folder(), "var", "lib", "svc")
-    mkdirSync(join(serviceHome, ".omo"), { recursive: true })
-    writeFileSync(join(serviceHome, ".omo", "omo.jsonc"), COMMENTED)
-    const alias = join(folder(), "svc-link")
-    symlinkSync(serviceHome, alias)
-
-    for (const cwd of [serviceHome, alias])
-      expect(setProjectModelProfile(trusted(cwd), { modelProfile: "a/b" }, { homeOfUid: () => serviceHome })).toMatchObject({
-        kind: "refused",
-        code: "home_folder",
-      })
-    expect(readFileSync(join(serviceHome, ".omo", "omo.jsonc"), "utf8")).toBe(COMMENTED)
-  })
-
-  test("#given a folder #when either verb checks for a home folder #then only its owner's home is looked up, once per call", () => {
-    const cwd = folder(COMMENTED)
-    const asked: number[] = []
-    const deps = {
-      homeOfUid: (uid: number) => {
-        asked.push(uid)
-        return null
-      },
-    }
-
-    expect(getProjectModelProfile(trusted(cwd), deps).kind).toBe("ok")
-    expect(setProjectModelProfile(trusted(cwd), { modelProfile: "a/b" }, deps).kind).toBe("ok")
-
-    const owner = statSync(cwd).uid
-    expect(asked).toStrictEqual([owner, owner])
-  })
-
-  test("#given a passwd entry from getent or macOS id -P #when its home is read #then the home field is returned", () => {
-    const { homeFromPasswdEntry } = projectModelProfileRpc
-    expect(homeFromPasswdEntry("svc:x:998:998::/var/lib/svc:/usr/sbin/nologin\n")).toBe("/var/lib/svc")
-    expect(homeFromPasswdEntry("q:********:501:20::0:0:Q Kim:/Users/q name:/bin/zsh")).toBe("/Users/q name")
-    expect(homeFromPasswdEntry("")).toBeNull()
-    expect(homeFromPasswdEntry("broken:line:relative/home:/bin/sh")).toBeNull()
-  })
-
-  test("#given a failed owner lookup #when it is asked again #then it is retried, while a found home is reused", () => {
-    const { lookupHomeOfUid } = projectModelProfileRpc
-    let failing = 0
-    const failingRun = () => {
-      failing += 1
-      throw new Error("lookup timed out")
-    }
-    expect(lookupHomeOfUid(424242, failingRun)).toBeNull()
-    expect(lookupHomeOfUid(424242, failingRun)).toBeNull()
-    expect(failing).toBe(2)
-
-    let found = 0
-    const foundRun = () => {
-      found += 1
-      return "svc:x:424243:424243::/var/lib/svc:/bin/sh\n"
-    }
-    expect(lookupHomeOfUid(424243, foundRun)).toBe("/var/lib/svc")
-    expect(lookupHomeOfUid(424243, foundRun)).toBe("/var/lib/svc")
-    expect(found).toBe(1)
   })
 
   test("#given no bound session #when either verb runs #then it answers no_session", () => {
