@@ -27,6 +27,7 @@ namespace ConformanceFixtureWeb
         private Dictionary<string, object> initialSaved;
         public readonly List<Form> Windows = new List<Form>();
         public readonly List<WebView2> Views = new List<WebView2>();
+        private readonly string appKey = AppUserModelId.Set("dev.omo.conformance-fixture.webview");
 
         public Host(string reportPath)
         {
@@ -150,6 +151,7 @@ namespace ConformanceFixtureWeb
                 { "app", "Conformance Fixture" },
                 { "toolkit", "webview" },
                 { "windows", titles },
+                { "appKey", appKey },
                 { "fields", new SortedDictionary<string, object>(fields, StringComparer.Ordinal) },
                 { "saved", new SortedDictionary<string, object>(saved, StringComparer.Ordinal) },
             };
@@ -216,6 +218,27 @@ namespace ConformanceFixtureWeb
                 Console.Out.Flush();
             }
             ui.Post(state => Application.Exit(), null);
+        }
+    }
+}
+
+namespace ConformanceFixtureWeb
+{
+    public static class AppUserModelId
+    {
+        [System.Runtime.InteropServices.DllImport("shell32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, PreserveSig = false)]
+        private static extern void SetCurrentProcessExplicitAppUserModelID(string id);
+
+        [System.Runtime.InteropServices.DllImport("shell32.dll", PreserveSig = false)]
+        private static extern void GetCurrentProcessExplicitAppUserModelID(out System.IntPtr id);
+
+        public static string Set(string id)
+        {
+            SetCurrentProcessExplicitAppUserModelID(id);
+            System.IntPtr read;
+            GetCurrentProcessExplicitAppUserModelID(out read);
+            try { return System.Runtime.InteropServices.Marshal.PtrToStringUni(read); }
+            finally { System.Runtime.InteropServices.Marshal.FreeCoTaskMem(read); }
         }
     }
 }

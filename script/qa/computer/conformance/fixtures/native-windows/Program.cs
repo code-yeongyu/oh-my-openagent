@@ -13,13 +13,14 @@ namespace ConformanceFixture
         private readonly string reportPath;
         private readonly string sabotage = Environment.GetEnvironmentVariable("CONFORMANCE_FIXTURE_SABOTAGE") ?? "";
         public readonly List<DocumentForm> Windows = new List<DocumentForm>();
+        public readonly string AppKey = AppUserModelId.Set("dev.omo.conformance-fixture.native");
         private SortedDictionary<string, object> initial;
 
         public Fixture(string reportPath)
         {
             this.reportPath = reportPath;
             OpenWindow();
-            initial = Report.Snapshot(Windows);
+            initial = Report.Snapshot(Windows, AppKey);
             WriteReport();
         }
 
@@ -41,7 +42,7 @@ namespace ConformanceFixture
 
         public void WriteReport()
         {
-            SortedDictionary<string, object> report = Report.Snapshot(Windows);
+            SortedDictionary<string, object> report = Report.Snapshot(Windows, AppKey);
             if (sabotage.Length > 0) Report.Pin(report, initial, sabotage);
             Report.Write(reportPath, report);
         }
@@ -120,6 +121,27 @@ namespace ConformanceFixture
                 Console.Out.Flush();
             }
             main.BeginInvoke(new Action(Application.Exit));
+        }
+    }
+}
+
+namespace ConformanceFixture
+{
+    public static class AppUserModelId
+    {
+        [System.Runtime.InteropServices.DllImport("shell32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, PreserveSig = false)]
+        private static extern void SetCurrentProcessExplicitAppUserModelID(string id);
+
+        [System.Runtime.InteropServices.DllImport("shell32.dll", PreserveSig = false)]
+        private static extern void GetCurrentProcessExplicitAppUserModelID(out System.IntPtr id);
+
+        public static string Set(string id)
+        {
+            SetCurrentProcessExplicitAppUserModelID(id);
+            System.IntPtr read;
+            GetCurrentProcessExplicitAppUserModelID(out read);
+            try { return System.Runtime.InteropServices.Marshal.PtrToStringUni(read); }
+            finally { System.Runtime.InteropServices.Marshal.FreeCoTaskMem(read); }
         }
     }
 }

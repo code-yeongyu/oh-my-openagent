@@ -3,12 +3,13 @@
 // Electron host of the shared fixture page (../web). Usage: electron main.cjs --report <path>. Same report
 // and stdin control protocol as native-linux/fixture.py.
 const { app, BrowserWindow, Menu, ipcMain } = require("electron")
-const { createReadStream, renameSync, writeFileSync } = require("node:fs")
+const { createReadStream, readFileSync, renameSync, writeFileSync } = require("node:fs")
 const { join } = require("node:path")
 const readline = require("node:readline")
 
 const APP = "Conformance Fixture"
 const SCHEMA = "omo-conformance-fixture/1"
+const APP_KEY = "dev.omo.conformance-fixture.electron"
 const SABOTAGE = process.env.CONFORMANCE_FIXTURE_SABOTAGE ?? ""
 const reportPath = process.argv[process.argv.indexOf("--report") + 1]
 const windows = []
@@ -16,6 +17,14 @@ const states = new Map()
 let initial = null
 
 app.setName(APP)
+if (process.platform === "linux") app.commandLine.appendSwitch("class", APP_KEY)
+if (process.platform === "win32") app.setAppUserModelId(APP_KEY)
+
+function appKey() {
+  if (process.platform !== "darwin") return APP_KEY
+  const plist = readFileSync(join(process.execPath, "..", "..", "Info.plist"), "utf8")
+  return /<key>CFBundleIdentifier<\/key>\s*<string>([^<]+)<\/string>/.exec(plist)?.[1] ?? ""
+}
 
 function sorted(value) {
   if (value === null || typeof value !== "object") return value
@@ -27,7 +36,7 @@ function compose() {
   const main = states.get(windows[0].id)
   const savedDocuments = windows.filter((window) => states.get(window.id)?.savedOnce).length
   const titles = windows.map((window) => window.getTitle())
-  return { schema: SCHEMA, app: APP, toolkit: "electron", windows: titles, fields: { ...main.fields }, saved: { ...main.saved, savedDocuments } }
+  return { schema: SCHEMA, app: APP, toolkit: "electron", windows: titles, appKey: appKey(), fields: { ...main.fields }, saved: { ...main.saved, savedDocuments } }
 }
 
 function writeReport() {

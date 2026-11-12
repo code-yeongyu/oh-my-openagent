@@ -10,12 +10,14 @@ from pathlib import Path
 
 import gi
 
+gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 gi.require_version("WebKit2", "4.1")
-from gi.repository import GLib, Gtk, WebKit2  # noqa: E402
+from gi.repository import Gdk, GLib, Gtk, WebKit2  # noqa: E402
 
 APP = "Conformance Fixture"
 SCHEMA = "omo-conformance-fixture/1"
+APP_KEY = "dev.omo.conformance-fixture.webview"
 SABOTAGE = os.environ.get("CONFORMANCE_FIXTURE_SABOTAGE", "")
 PAGE = (Path(__file__).resolve().parent.parent / "web" / "index.html").as_uri()
 BRIDGE = "window.conformanceHost = { post: (json) => window.webkit.messageHandlers.report.postMessage(json) }"
@@ -37,7 +39,6 @@ class Host:
     def open_window(self, on_loaded=None):
         number = len(self.windows) + 1
         window = Gtk.Window(title="Conformance Document" if number == 1 else f"Conformance Document {number}")
-        window.set_wmclass("conformance-fixture", APP)
         window.set_default_size(640, 720)
         content = WebKit2.UserContentManager()
         content.add_script(
@@ -112,6 +113,7 @@ class Host:
             "app": APP,
             "toolkit": "webview",
             "windows": [window.get_title() for window in self.windows],
+            "appKey": Gdk.get_program_class(),
             "fields": dict(main["fields"]),
             "saved": dict(main["saved"], savedDocuments=saved_documents),
         }
@@ -147,6 +149,8 @@ def main():
     if len(sys.argv) != 3 or sys.argv[1] != "--report":
         print("usage: fixture.py --report <path>", file=sys.stderr)
         return 2
+    GLib.set_prgname(APP_KEY)
+    Gdk.set_program_class(APP_KEY)
     host = Host(sys.argv[2])
 
     def say(text):

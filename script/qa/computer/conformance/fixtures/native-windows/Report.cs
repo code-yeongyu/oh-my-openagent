@@ -9,7 +9,7 @@ namespace ConformanceFixture
     {
         public const string Schema = "omo-conformance-fixture/1";
 
-        public static SortedDictionary<string, object> Snapshot(List<DocumentForm> windows)
+        public static SortedDictionary<string, object> Snapshot(List<DocumentForm> windows, string appKey)
         {
             DocumentForm main = windows[0];
             var fields = new SortedDictionary<string, object>(StringComparer.Ordinal)
@@ -29,6 +29,7 @@ namespace ConformanceFixture
                 { "app", DocumentForm.App },
                 { "toolkit", "native" },
                 { "windows", windows.ConvertAll(window => window.Text) },
+                { "appKey", appKey },
                 { "fields", fields },
                 { "saved", saved },
             };

@@ -27,12 +27,14 @@ import sys
 
 import gi
 
+gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 from document_window import APP, DocumentWindow  # noqa: E402
-from gi.repository import GLib, Gtk  # noqa: E402
+from gi.repository import Gdk, GLib, Gtk  # noqa: E402
 from poke import poke  # noqa: E402
 
 SCHEMA = "omo-conformance-fixture/1"
+APP_KEY = "dev.omo.conformance-fixture.native"
 SABOTAGE = os.environ.get("CONFORMANCE_FIXTURE_SABOTAGE", "")
 
 
@@ -62,6 +64,7 @@ class Fixture:
             "app": APP,
             "toolkit": "native",
             "windows": [window.get_title() for window in self.windows],
+            "appKey": Gdk.get_program_class(),
             "fields": {
                 "value": main.text.text("Value"),
                 "receivedKeys": ",".join(main.chords),
@@ -107,6 +110,8 @@ def main():
     if len(sys.argv) != 3 or sys.argv[1] != "--report":
         print("usage: fixture.py --report <path>", file=sys.stderr)
         return 2
+    GLib.set_prgname(APP_KEY)
+    Gdk.set_program_class(APP_KEY)
     fixture = Fixture(sys.argv[2])
     first = fixture.windows[0]
 

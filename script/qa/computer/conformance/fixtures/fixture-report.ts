@@ -43,6 +43,7 @@ const fixtureReportSchema = z
     app: z.literal("Conformance Fixture"),
     toolkit: z.enum(["native", "electron", "webview"]),
     windows: z.array(z.string()),
+    appKey: z.string().min(1),
     fields: catalogFields,
     saved: savedDocument,
   })

@@ -117,7 +117,7 @@ final class Host: NSObject, WKScriptMessageHandler {
         if saved[sabotage] != nil { saved[sabotage] = initial?["saved"]?[sabotage] }
         let report: [String: Any] = [
             "schema": "omo-conformance-fixture/1", "app": "Conformance Fixture", "toolkit": "webview",
-            "windows": windows.map(\.window.title), "fields": fields, "saved": saved,
+            "windows": windows.map(\.window.title), "appKey": Bundle.main.bundleIdentifier ?? "", "fields": fields, "saved": saved,
         ]
         guard var data = try? JSONSerialization.data(withJSONObject: report, options: [.sortedKeys, .prettyPrinted]) else { return }
         data.append(0x0A)

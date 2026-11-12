@@ -14,7 +14,7 @@ cat > "$bundle/Contents/Info.plist" <<'PLIST'
 <plist version="1.0">
 <dict>
   <key>CFBundleName</key><string>Conformance Fixture</string>
-  <key>CFBundleIdentifier</key><string>dev.omo.conformance-fixture-web</string>
+  <key>CFBundleIdentifier</key><string>dev.omo.conformance-fixture.webview</string>
   <key>CFBundleExecutable</key><string>Conformance Fixture</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>NSPrincipalClass</key><string>NSApplication</string>

@@ -21,7 +21,6 @@ class DocumentWindow(Gtk.Window):
     def __init__(self, fixture, number):
         super().__init__(title="Conformance Document" if number == 1 else f"Conformance Document {number}")
         self.fixture = fixture
-        self.set_wmclass("conformance-fixture", APP)
         self.set_default_size(640, 720)
         self.press_count = 0
         self.scroll_steps = 0

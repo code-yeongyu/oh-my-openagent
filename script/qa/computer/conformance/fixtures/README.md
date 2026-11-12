@@ -19,6 +19,19 @@ The Linux image carries Xvfb and Tk but no GTK bindings, and Tk exports no AT-SP
 could not be delivered on it; that is why the Linux apps install GTK. Every install retries three times and a failure is
 reported as an ENVIRONMENT failure in the job summary, never as a fixture failure.
 
+## App keys
+
+A task that targets an app reads `windows()`, matches the app key and selects the window by id. Each app has one stable
+key, the same string on every OS, and reports it in `appKey`:
+
+| app | key | macOS (bundle id) | X11 (WM_CLASS class) and Wayland (app_id) | Windows (AUMID) |
+|---|---|---|---|---|
+| native | `dev.omo.conformance-fixture.native` | `Info.plist`, read back from the bundle | `Gdk.set_program_class` and `GLib.set_prgname`, class read back | `SetCurrentProcessExplicitAppUserModelID`, read back |
+| electron | `dev.omo.conformance-fixture.electron` | the job copies `Electron.app`, sets the id and re-signs it ad hoc; read back from `Info.plist` | Chromium's `--class` switch; Electron cannot read it back, so the set value is reported | `app.setAppUserModelId`; reported as set |
+| webview | `dev.omo.conformance-fixture.webview` | `Info.plist`, read back from the bundle | as native | as native |
+
+The self-test takes the expected key (`--app-key`) and fails when the report differs.
+
 ## Report
 
 Each app writes its state to the path given by `--report <path>` after every change, by a write to a temporary file and

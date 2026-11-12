@@ -61,13 +61,13 @@ jobs:
 
       - name: Self-test
         run: |
-          xvfb-run -a bun script/qa/computer/conformance/fixtures/self-test.ts --fixture native-linux -- \
+          xvfb-run -a bun script/qa/computer/conformance/fixtures/self-test.ts --fixture native-linux --app-key dev.omo.conformance-fixture.native -- \
             /usr/bin/python3 script/qa/computer/conformance/fixtures/native-linux/fixture.py
 
       - name: Sabotage legs (each must turn the self-test red)
         run: |
           for field in value receivedKeys pressCount scrollSteps dragOrder menuSelection title savedDocuments; do
-            xvfb-run -a bun script/qa/computer/conformance/fixtures/self-test.ts --fixture native-linux --sabotage "$field" -- \
+            xvfb-run -a bun script/qa/computer/conformance/fixtures/self-test.ts --fixture native-linux --app-key dev.omo.conformance-fixture.native --sabotage "$field" -- \
               /usr/bin/python3 script/qa/computer/conformance/fixtures/native-linux/fixture.py | tail -n 1
             test "${PIPESTATUS[0]}" -eq 0
           done
@@ -106,13 +106,13 @@ jobs:
 
       - name: Self-test
         shell: bash
-        run: bun script/qa/computer/conformance/fixtures/self-test.ts --fixture native-windows -- "$RUNNER_TEMP/ConformanceFixture.exe"
+        run: bun script/qa/computer/conformance/fixtures/self-test.ts --fixture native-windows --app-key dev.omo.conformance-fixture.native -- "$RUNNER_TEMP/ConformanceFixture.exe"
 
       - name: Sabotage legs (each must turn the self-test red)
         shell: bash
         run: |
           for field in value receivedKeys pressCount scrollSteps dragOrder menuSelection title savedDocuments; do
-            bun script/qa/computer/conformance/fixtures/self-test.ts --fixture native-windows --sabotage "$field" -- \
+            bun script/qa/computer/conformance/fixtures/self-test.ts --fixture native-windows --app-key dev.omo.conformance-fixture.native --sabotage "$field" -- \
               "$RUNNER_TEMP/ConformanceFixture.exe" | tail -n 1
             test "${PIPESTATUS[0]}" -eq 0
           done
@@ -174,13 +174,13 @@ jobs:
 
       - name: Self-test
         shell: bash
-        run: xvfb-run -a bun script/qa/computer/conformance/fixtures/self-test.ts --fixture electron-linux -- "${{ steps.electron.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs
+        run: xvfb-run -a bun script/qa/computer/conformance/fixtures/self-test.ts --fixture electron-linux --app-key dev.omo.conformance-fixture.electron -- "${{ steps.electron.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs
 
       - name: Sabotage legs (each must turn the self-test red)
         shell: bash
         run: |
           for field in value receivedKeys pressCount scrollSteps dragOrder menuSelection title savedDocuments; do
-            xvfb-run -a bun script/qa/computer/conformance/fixtures/self-test.ts --fixture electron-linux --sabotage "$field" -- "${{ steps.electron.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs | tail -n 1
+            xvfb-run -a bun script/qa/computer/conformance/fixtures/self-test.ts --fixture electron-linux --app-key dev.omo.conformance-fixture.electron --sabotage "$field" -- "${{ steps.electron.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs | tail -n 1
             test "${PIPESTATUS[0]}" -eq 0
           done
 
@@ -234,13 +234,13 @@ jobs:
 
       - name: Self-test
         shell: bash
-        run: bun script/qa/computer/conformance/fixtures/self-test.ts --fixture electron-windows -- "${{ steps.electron.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs
+        run: bun script/qa/computer/conformance/fixtures/self-test.ts --fixture electron-windows --app-key dev.omo.conformance-fixture.electron -- "${{ steps.electron.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs
 
       - name: Sabotage legs (each must turn the self-test red)
         shell: bash
         run: |
           for field in value receivedKeys pressCount scrollSteps dragOrder menuSelection title savedDocuments; do
-            bun script/qa/computer/conformance/fixtures/self-test.ts --fixture electron-windows --sabotage "$field" -- "${{ steps.electron.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs | tail -n 1
+            bun script/qa/computer/conformance/fixtures/self-test.ts --fixture electron-windows --app-key dev.omo.conformance-fixture.electron --sabotage "$field" -- "${{ steps.electron.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs | tail -n 1
             test "${PIPESTATUS[0]}" -eq 0
           done
 
@@ -299,13 +299,13 @@ jobs:
 
       - name: Self-test
         shell: bash
-        run: xvfb-run -a bun script/qa/computer/conformance/fixtures/self-test.ts --fixture webview-linux -- /usr/bin/python3 script/qa/computer/conformance/fixtures/webview/fixture.py
+        run: xvfb-run -a bun script/qa/computer/conformance/fixtures/self-test.ts --fixture webview-linux --app-key dev.omo.conformance-fixture.webview -- /usr/bin/python3 script/qa/computer/conformance/fixtures/webview/fixture.py
 
       - name: Sabotage legs (each must turn the self-test red)
         shell: bash
         run: |
           for field in value receivedKeys pressCount scrollSteps dragOrder menuSelection title savedDocuments; do
-            xvfb-run -a bun script/qa/computer/conformance/fixtures/self-test.ts --fixture webview-linux --sabotage "$field" -- /usr/bin/python3 script/qa/computer/conformance/fixtures/webview/fixture.py | tail -n 1
+            xvfb-run -a bun script/qa/computer/conformance/fixtures/self-test.ts --fixture webview-linux --app-key dev.omo.conformance-fixture.webview --sabotage "$field" -- /usr/bin/python3 script/qa/computer/conformance/fixtures/webview/fixture.py | tail -n 1
             test "${PIPESTATUS[0]}" -eq 0
           done
 
@@ -343,13 +343,13 @@ jobs:
 
       - name: Self-test
         shell: bash
-        run: bun script/qa/computer/conformance/fixtures/self-test.ts --fixture native-macos -- "${{ steps.build.outputs.binary }}"
+        run: bun script/qa/computer/conformance/fixtures/self-test.ts --fixture native-macos --app-key dev.omo.conformance-fixture.native -- "${{ steps.build.outputs.binary }}"
 
       - name: Sabotage legs (each must turn the self-test red)
         shell: bash
         run: |
           for field in value receivedKeys pressCount scrollSteps dragOrder menuSelection title savedDocuments; do
-            bun script/qa/computer/conformance/fixtures/self-test.ts --fixture native-macos --sabotage "$field" -- "${{ steps.build.outputs.binary }}" | tail -n 1
+            bun script/qa/computer/conformance/fixtures/self-test.ts --fixture native-macos --app-key dev.omo.conformance-fixture.native --sabotage "$field" -- "${{ steps.build.outputs.binary }}" | tail -n 1
             test "${PIPESTATUS[0]}" -eq 0
           done
 
@@ -401,15 +401,25 @@ jobs:
           echo "::error::ENVIRONMENT failure, the runner could not fetch Electron (not a fixture failure)"
           exit 1
 
+      - name: Give the Electron app the fixture's bundle id
+        id: bundle
+        run: |
+          src=$(dirname "$(dirname "$(dirname "${{ steps.electron.outputs.binary }}")")")
+          dst="$RUNNER_TEMP/Conformance Fixture Electron.app"
+          cp -R "$src" "$dst"
+          plutil -replace CFBundleIdentifier -string dev.omo.conformance-fixture.electron "$dst/Contents/Info.plist"
+          codesign --force --deep --sign - "$dst"
+          echo "binary=$dst/Contents/MacOS/Electron" >> "$GITHUB_OUTPUT"
+
       - name: Self-test
         shell: bash
-        run: bun script/qa/computer/conformance/fixtures/self-test.ts --fixture electron-macos -- "${{ steps.electron.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs
+        run: bun script/qa/computer/conformance/fixtures/self-test.ts --fixture electron-macos --app-key dev.omo.conformance-fixture.electron -- "${{ steps.bundle.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs
 
       - name: Sabotage legs (each must turn the self-test red)
         shell: bash
         run: |
           for field in value receivedKeys pressCount scrollSteps dragOrder menuSelection title savedDocuments; do
-            bun script/qa/computer/conformance/fixtures/self-test.ts --fixture electron-macos --sabotage "$field" -- "${{ steps.electron.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs | tail -n 1
+            bun script/qa/computer/conformance/fixtures/self-test.ts --fixture electron-macos --app-key dev.omo.conformance-fixture.electron --sabotage "$field" -- "${{ steps.bundle.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs | tail -n 1
             test "${PIPESTATUS[0]}" -eq 0
           done
 
@@ -445,13 +455,13 @@ jobs:
 
       - name: Self-test
         shell: bash
-        run: bun script/qa/computer/conformance/fixtures/self-test.ts --fixture webview-macos -- "${{ steps.build.outputs.binary }}"
+        run: bun script/qa/computer/conformance/fixtures/self-test.ts --fixture webview-macos --app-key dev.omo.conformance-fixture.webview -- "${{ steps.build.outputs.binary }}"
 
       - name: Sabotage legs (each must turn the self-test red)
         shell: bash
         run: |
           for field in value receivedKeys pressCount scrollSteps dragOrder menuSelection title savedDocuments; do
-            bun script/qa/computer/conformance/fixtures/self-test.ts --fixture webview-macos --sabotage "$field" -- "${{ steps.build.outputs.binary }}" | tail -n 1
+            bun script/qa/computer/conformance/fixtures/self-test.ts --fixture webview-macos --app-key dev.omo.conformance-fixture.webview --sabotage "$field" -- "${{ steps.build.outputs.binary }}" | tail -n 1
             test "${PIPESTATUS[0]}" -eq 0
           done
 
@@ -519,13 +529,13 @@ jobs:
 
       - name: Self-test
         shell: bash
-        run: bun script/qa/computer/conformance/fixtures/self-test.ts --fixture webview-windows -- "$RUNNER_TEMP/webview/ConformanceFixtureWeb.exe"
+        run: bun script/qa/computer/conformance/fixtures/self-test.ts --fixture webview-windows --app-key dev.omo.conformance-fixture.webview -- "$RUNNER_TEMP/webview/ConformanceFixtureWeb.exe"
 
       - name: Sabotage legs (each must turn the self-test red)
         shell: bash
         run: |
           for field in value receivedKeys pressCount scrollSteps dragOrder menuSelection title savedDocuments; do
-            bun script/qa/computer/conformance/fixtures/self-test.ts --fixture webview-windows --sabotage "$field" -- "$RUNNER_TEMP/webview/ConformanceFixtureWeb.exe" | tail -n 1
+            bun script/qa/computer/conformance/fixtures/self-test.ts --fixture webview-windows --app-key dev.omo.conformance-fixture.webview --sabotage "$field" -- "$RUNNER_TEMP/webview/ConformanceFixtureWeb.exe" | tail -n 1
             test "${PIPESTATUS[0]}" -eq 0
           done
 

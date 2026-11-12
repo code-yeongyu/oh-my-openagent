@@ -47,7 +47,7 @@ async function withFixture(
   }
 }
 
-function legs(command: readonly string[], sabotage: string): Leg[] {
+function legs(command: readonly string[], sabotage: string, appKey: string): Leg[] {
   const { effect, initial } = catalogOracles()
   const untouched: Record<string, unknown> = Object.fromEntries(initial)
   const actionLegs = [...effect].map(([action, oracle]): Leg => ({
@@ -72,11 +72,13 @@ function legs(command: readonly string[], sabotage: string): Leg[] {
       throw new Error(`${when}: windows ${JSON.stringify(seen)} expected ${JSON.stringify(expected)}`)
   }
   const windowTitles: Leg = {
-    name: "windows:titles",
+    name: "windows:titles-and-app-key",
     fields: [],
     run: (dir) =>
       withFixture(command, sabotage, dir, async (fixture) => {
         titles([MAIN_WINDOW], fixture.report().windows, "at start")
+        const reported = fixture.report().appKey
+        if (reported !== appKey) throw new Error(`appKey ${JSON.stringify(reported)} expected ${JSON.stringify(appKey)}`)
         await fixture.send("menu File/New Window")
         titles([MAIN_WINDOW, `${MAIN_WINDOW} 2`], fixture.report().windows, "after File > New Window")
       }),
@@ -102,11 +104,12 @@ function legs(command: readonly string[], sabotage: string): Leg[] {
 async function main(): Promise<number> {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
-    options: { fixture: { type: "string" }, sabotage: { type: "string", default: "" } },
+    options: { fixture: { type: "string" }, "app-key": { type: "string" }, sabotage: { type: "string", default: "" } },
   })
   const name = values.fixture
-  if (name === undefined || positionals.length === 0) {
-    console.error("usage: self-test.ts --fixture <name> [--sabotage <field>] -- <fixture command...>")
+  const appKey = values["app-key"]
+  if (name === undefined || appKey === undefined || positionals.length === 0) {
+    console.error("usage: self-test.ts --fixture <name> --app-key <key> [--sabotage <field>] -- <fixture command...>")
     return 2
   }
   const sabotage = values.sabotage
@@ -114,7 +117,7 @@ async function main(): Promise<number> {
   const failed: Leg[] = []
   let passed = 0
   try {
-    for (const leg of legs(positionals, sabotage)) {
+    for (const leg of legs(positionals, sabotage, appKey)) {
       const dir = join(root, leg.name.replace(/[^a-zA-Z0-9.-]/g, "_"))
       try {
         for (const sub of ["first", "second"]) mkdirSync(join(dir, sub), { recursive: true })
