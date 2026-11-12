@@ -64,6 +64,8 @@ pub struct ArtifactStore {
     limits: GcLimits,
     next_timer_ms: Option<u64>,
     sweeps: Vec<SweepReport>,
+    /// Release errors since the last sweep: carried into its report's warnings.
+    release_warnings: Vec<String>,
 }
 
 /// `senpi-computer-<digest>.<ext>`.
@@ -80,6 +82,7 @@ impl ArtifactStore {
             limits,
             next_timer_ms: None,
             sweeps: Vec::new(),
+            release_warnings: Vec::new(),
         }
     }
 
@@ -126,8 +129,8 @@ impl ArtifactStore {
     }
 
     /// `artifact.release(digest)`: deletes the artifact; a second release is a no-op.
-    /// A removal that fails for any reason but "not there" is logged and reads as not
-    /// released, never as a quiet second release.
+    /// A removal that fails for any reason but "not there" reads as not released, never as a
+    /// quiet second release: it is logged now and carried into the next sweep's warnings.
     pub fn release(&mut self, digest: &str) -> bool {
         let mut released = false;
         for suffix in SUFFIXES {
@@ -135,10 +138,11 @@ impl ArtifactStore {
             match fs::remove_file(&path) {
                 Ok(()) => released = true,
                 Err(error) if error.kind() == io::ErrorKind::NotFound => {}
-                Err(error) => eprintln!(
-                    "omo-computer-engine: warn artifact release {}: {error}",
-                    path.display()
-                ),
+                Err(error) => {
+                    let line = format!("{}: {error}", path.display());
+                    eprintln!("omo-computer-engine: warn artifact release {line}");
+                    self.release_warnings.push(line);
+                }
             }
         }
         released
@@ -156,7 +160,7 @@ impl ArtifactStore {
 
     /// The age sweep, then the cap sweep down to 80 % of each cap.
     pub fn sweep(&mut self, now_ms: u64, trigger: SweepTrigger) -> SweepReport {
-        let mut warnings = Vec::new();
+        let mut warnings = std::mem::take(&mut self.release_warnings);
         let mut entries = self.entries(&mut warnings);
         let mut removed = 0;
         entries.retain(|entry| {
