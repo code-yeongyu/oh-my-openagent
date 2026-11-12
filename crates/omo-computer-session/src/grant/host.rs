@@ -108,9 +108,7 @@ impl Session {
 
     /// `control.release`: this session's lease ends; the grant stays.
     pub fn control_release(&mut self) {
-        self.funnel.control.presence.release();
-        self.funnel.control.slot.release(&self.funnel.control.token);
-        self.funnel.control.lease_epoch = None;
+        self.end_lease(LeaseEnd::Release);
     }
 
     /// The lease ends under the user (the next report reads `user_moved_on`, no `Suspended`).
@@ -118,6 +116,12 @@ impl Session {
         self.funnel.control.presence.end(why);
         self.funnel.control.slot.release(&self.funnel.control.token);
         self.funnel.control.lease_epoch = None;
+        self.funnel.control.lease_hook.lease_ended(self.backend.as_mut(), why);
+    }
+
+    /// Installs the lease-end hook a later row's state lives in (R45).
+    pub fn set_lease_hook(&mut self, hook: Box<dyn super::LeaseHook>) {
+        self.funnel.control.lease_hook = hook;
     }
 
     /// `display.release`: ends the lease and lets the display sleep; the run continues.
@@ -129,6 +133,7 @@ impl Session {
     /// `display.resume`: re-arms the display-awake hold only; it restores no lease.
     pub fn display_resume(&mut self) {
         self.funnel.control.display_released = false;
+        self.funnel.control.lease_hook.display_resumed(self.backend.as_mut());
     }
 
     #[must_use]
