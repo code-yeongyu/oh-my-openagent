@@ -291,6 +291,11 @@ export type LiveThreadSurfaceOptions = {
   readonly connect?: ThreadSocketConnect
   readonly now?: () => number
   /**
+   * The clock an in-flight enumeration's deadline is timed on. Monotonic (`performance.now`) by default, so a forward
+   * jump of the wall clock (sleep, NTP) never abandons an enumeration that is about to answer.
+   */
+  readonly monotonic?: () => number
+  /**
    * Where enumerations are shared. Defaults to the process-wide map when the engine CLI and the registry on disk are
    * the real ones; a surface given its own `statusAll` or `registry` keeps a private map unless it passes one here.
    */
@@ -336,6 +341,7 @@ export function createLiveThreadSurface(
   const exists = options.exists ?? existsSync
   const connect = options.connect ?? ((path: string) => createConnection(path))
   const now = options.now ?? Date.now
+  const monotonic = options.monotonic ?? (() => performance.now())
   const statusAll = options.statusAll ?? engineHostStatusAll(env)
   const registry = options.registry ?? (() => listRegistryEndpoints(resolveAgentHome({ env })))
   const readSecret = options.readSecret ?? ((socket: string) => readFileSync(controlSocketSecretPath(socket)))
@@ -344,10 +350,9 @@ export function createLiveThreadSurface(
     options.enumerations ??
     (options.statusAll === undefined && options.registry === undefined ? processEnumerations : new Map())
   // The answer depends on the agent dir (the CLI's and the registry's), the legacy socket merged into it, and the
-  // engine that is asked; surfaces agreeing on all three share one enumeration.
-  let enumerationKey: string | undefined
+  // engine that is asked; surfaces agreeing on all three share one enumeration. It is read from `env` on every call,
+  // as the engine runner and the registry read it, so an env that moves never files a new answer under the old key.
   const keyOfEnumeration = (): string => {
-    if (enumerationKey !== undefined) return enumerationKey
     let engine: readonly string[] = []
     if (options.statusAll === undefined) {
       try {
@@ -357,8 +362,7 @@ export function createLiveThreadSurface(
         engine = []
       }
     }
-    enumerationKey = JSON.stringify([resolve(resolveAgentHome({ env })), resolve(legacy), engine])
-    return enumerationKey
+    return JSON.stringify([resolve(resolveAgentHome({ env })), resolve(legacy), engine])
   }
   // Session files each endpoint listed on its last answer: a host that stopped cleanly released its
   // claims, and this is then the only record of which threads it held.
@@ -475,14 +479,15 @@ export function createLiveThreadSurface(
     // One that has not answered by its deadline is abandoned: the next caller starts afresh and its late answer is dropped.
     const key = keyOfEnumeration()
     const current = now()
+    const elapsed = monotonic()
     let enumeration = enumerations.get(key)
     if (
       enumeration === undefined ||
-      (enumeration.expiresAt === undefined ? enumeration.abandonAt <= current : enumeration.expiresAt <= current)
+      (enumeration.expiresAt === undefined ? enumeration.abandonAt <= elapsed : enumeration.expiresAt <= current)
     ) {
       const started: SharedEnumeration = {
         expiresAt: undefined,
-        abandonAt: current + HOST_ENDPOINTS_ENUMERATION_DEADLINE_MS,
+        abandonAt: elapsed + HOST_ENDPOINTS_ENUMERATION_DEADLINE_MS,
         endpoints: enumerate(),
       }
       enumeration = started
@@ -496,8 +501,15 @@ export function createLiveThreadSurface(
         },
       )
     }
-    const known = await enumeration.endpoints
-    for (const endpoint of known) kinds.set(resolve(endpoint.socket), endpoint.kind)
+    const answered = enumeration
+    const known = await answered.endpoints
+    // A caller still waiting on an abandoned enumeration gets its whole list, but its late answer never replaces a
+    // kind the enumeration that took its place already recorded.
+    const stale = enumerations.get(key) !== answered
+    for (const endpoint of known) {
+      const socket = resolve(endpoint.socket)
+      if (!stale || !kinds.has(socket)) kinds.set(socket, endpoint.kind)
+    }
     return known
   }
 
