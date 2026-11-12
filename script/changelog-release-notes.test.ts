@@ -3,6 +3,7 @@ import {
   assertUtcDate,
   composeReleaseBody,
   extractReleaseNotes,
+  findPrivateReferences,
   neutralizeCrossRepoReferences,
   stampUnreleased,
 } from "./changelog-release-notes"
@@ -233,5 +234,129 @@ describe("neutralizeCrossRepoReferences API, raw and nested URLs", () => {
     expect(neutralizeCrossRepoReferences("[acme-org/acme-svc#3](https://example.com/x)")).toStrictEqual(
       "[tracked internally](https://example.com/x)",
     )
+  })
+})
+
+describe("neutralizeCrossRepoReferences review-round findings", () => {
+  test("#given a non-GitHub URL carrying a private owner/repo#N #when neutralized #then the whole URL is replaced", () => {
+    expect(neutralizeCrossRepoReferences("see https://example.com/x?r=acme-org/acme-svc#3 now")).toStrictEqual(
+      "see tracked internally now",
+    )
+  })
+
+  test("#given a non-GitHub markdown link carrying a scheme-less private GitHub path #when neutralized #then the whole link is replaced", () => {
+    expect(neutralizeCrossRepoReferences("a [x](https://example.com/?u=github.com/acme-org/acme-svc) b")).toStrictEqual(
+      "a tracked internally b",
+    )
+  })
+
+  test("#given a private URL nested in a kept public GitHub URL #when neutralized #then the whole URL is replaced", () => {
+    expect(
+      neutralizeCrossRepoReferences(
+        "see https://github.com/code-yeongyu/senpi/blob/main/x?ref=https://github.com/acme-org/acme-svc now",
+      ),
+    ).toStrictEqual("see tracked internally now")
+  })
+
+  test("#given a codeload host naming a private repo #when neutralized #then it is replaced", () => {
+    expect(
+      neutralizeCrossRepoReferences(
+        "get https://codeload.github.com/acme-org/acme-svc/zip/main and codeload.github.com/acme-org/acme-svc/zip/main",
+      ),
+    ).toStrictEqual("get tracked internally and tracked internally")
+  })
+
+  test("#given a codeload host naming a public repo #when neutralized #then it is unchanged", () => {
+    const text = "https://codeload.github.com/code-yeongyu/senpi/zip/main"
+    expect(neutralizeCrossRepoReferences(text)).toStrictEqual(text)
+  })
+})
+
+describe("neutralizeCrossRepoReferences invariant", () => {
+  const PRIVATE_INPUTS = [
+    "[a](https://github.com/acme-org/acme-svc/issues/1)",
+    "[a](github.com/acme-org/acme-svc)",
+    "[a](www.github.com/acme-org/acme-svc)",
+    "[a](https://example.com/?r=acme-org/acme-svc#3)",
+    "[a](https://example.com/?u=https://github.com/acme-org/acme-svc)",
+    "[a](https://example.com/?u=github.com/acme-org/acme-svc)",
+    "[a](https://github.com/code-yeongyu/senpi/blob/main/x?ref=https://github.com/acme-org/acme-svc)",
+    "[acme-org/acme-svc#3](https://github.com/acme-org/acme-svc)",
+    "<https://github.com/acme-org/acme-svc>",
+    "<github.com/acme-org/acme-svc/pull/2>",
+    "<https://example.com/?r=acme-org/acme-svc#3>",
+    "<https://api.github.com/repos/acme-org/acme-svc/pulls/1>",
+    "https://github.com/acme-org/acme-svc",
+    "http://github.com/acme-org/acme-svc/pull/9.",
+    "github.com/acme-org/acme-svc",
+    "www.github.com/acme-org/acme-svc/issues/4",
+    "HTTPS://GITHUB.COM/ACME-ORG/ACME-SVC/pull/1",
+    "Github.com/Acme-Org/Acme-Svc",
+    "https://api.github.com/repos/acme-org/acme-svc/issues/5",
+    "api.github.com/repos/acme-org/acme-svc",
+    "https://raw.githubusercontent.com/acme-org/acme-svc/main/a.md",
+    "raw.githubusercontent.com/acme-org/acme-svc/main/a.md",
+    "https://codeload.github.com/acme-org/acme-svc/zip/main",
+    "https://gist.github.com/acme-org/abc123",
+    "https://github.com/code-yeongyu/senpi/blob/main/x?ref=https://github.com/acme-org/acme-svc",
+    "https://github.com/code-yeongyu/senpi?u=github.com/acme-org/acme-svc",
+    "https://example.com/redirect?to=https://github.com/acme-org/acme-svc",
+    "https://web.archive.org/web/2024/https://github.com/acme-org/acme-svc",
+    "https://example.com/?r=acme-svc#3",
+    "https://example.com/?see=acme-org/acme-svc#3",
+    "git clone https://github.com/acme-org/acme-svc.git",
+    "git clone git@github.com:acme-org/acme-svc.git",
+    "git clone ssh://git@github.com/acme-org/acme-svc.git",
+    "https://api.github.com/repos/settings/acme-svc",
+    "//github.com/acme-org/acme-svc",
+    "fixed acme-svc#9 and acme-org/acme-svc#10 (see https://github.com/acme-org/acme-svc/pull/9).",
+    "x_https://github.com/acme-org/acme-svc/pull/9",
+    "[a](https://example.com/a_(b)?r=https://github.com/acme-org/acme-svc)",
+    "see https://github.com/acme-org/acme-svc#readme, [x](https://github.com/code-yeongyu/senpi) ok",
+  ]
+
+  test.each(PRIVATE_INPUTS)(
+    "#given private-bearing input %p #when neutralized #then no private reference survives",
+    (text) => {
+      expect(findPrivateReferences(text)).toBe(true)
+      expect(findPrivateReferences(neutralizeCrossRepoReferences(text))).toBe(false)
+    },
+  )
+
+  const PUBLIC_INPUTS = [
+    "[omo#12](https://github.com/code-yeongyu/oh-my-openagent/pull/12)",
+    "<https://github.com/code-yeongyu/senpi/pull/4>",
+    "https://github.com/code-yeongyu/senpi/blob/main/README.md?plain=1#L10",
+    "HTTPS://GITHUB.COM/CODE-YEONGYU/SENPI/issues/1",
+    "github.com/code-yeongyu/oh-my-opencode",
+    "www.github.com/sisyphuslabs/doriterm/pull/3",
+    "https://api.github.com/repos/code-yeongyu/lazycodex/pulls/2",
+    "https://raw.githubusercontent.com/code-yeongyu/senpi/main/a.md",
+    "https://codeload.github.com/code-yeongyu/oh-my-openagent/zip/main",
+    "git clone https://github.com/code-yeongyu/oh-my-openagent.git",
+    "git clone git@github.com:code-yeongyu/senpi.git",
+    "https://github.com/settings/tokens",
+    "[t](https://github.com/apps/renovate)",
+    "https://github.com/code-yeongyu/senpi/pull/12#issuecomment-5",
+    "https://example.com/docs?page=2",
+    "[docs](https://example.com/guide)",
+    "https://docs.github.com/en/actions",
+    "https://web.archive.org/web/2024/https://github.com/code-yeongyu/senpi",
+    "https://example.com/github.com/acme-org/acme-svc",
+    "fixed senpi#6412 and omo#12 and code-yeongyu/senpi#7 (PR#3, GH#4)",
+    "plain text with no references at all.",
+  ]
+
+  test.each(PUBLIC_INPUTS)("#given public-only input %p #when neutralized #then it is byte-identical", (text) => {
+    expect(findPrivateReferences(text)).toBe(false)
+    expect(neutralizeCrossRepoReferences(text)).toBe(text)
+  })
+
+  test("#given an unrelated mid-sentence mix #when neutralized #then only the private parts are replaced", () => {
+    expect(
+      neutralizeCrossRepoReferences(
+        "a senpi#1 b acme-svc#2 c https://github.com/code-yeongyu/senpi d <https://github.com/acme-org/acme-svc> e",
+      ),
+    ).toBe("a senpi#1 b tracked internally c https://github.com/code-yeongyu/senpi d tracked internally e")
   })
 })
