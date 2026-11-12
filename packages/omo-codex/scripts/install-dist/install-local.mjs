@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:b462373b788d6cbb6274a720a789cd9890bec194f0046fa4244b682dcd18a9c0:612349da2cab8071906290a1f06abe363a7f38274195493934bf4ae3bc59e173
+// omo-codex-install:7b5f0e80829fb070bb331cf6119fa1f5ccf7f2ebce7bc8ece18e008525df3e4d:ab8d8f49b62ea85eac2589329ebadf86f03af928699d085d47da477ab43cf1de
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -19712,7 +19712,7 @@ var OmoComputerSettingsLayerSchema = object({
   screenshot_gc: object({ enabled: boolean2(), stale_ms: nonNegativeInteger, scan_interval_ms: nonNegativeInteger }).partial().strict(),
   engine_path: string2().min(1),
   cua_adapter: boolean2(),
-  run_sandbox: _enum(["vm", "quickjs"]).describe("Where model-written `run` code executes: `vm` (default) or `quickjs`, the QuickJS cell; host-origin runs always use `vm`"),
+  run_sandbox: _enum(["vm", "quickjs"]).describe("Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"),
   intervention: _enum(["continue", "pause"]).describe("What a background action does while the user uses the target app (default: continue)"),
   macos_key_priming: _enum(["on", "off"]).describe("macOS background keys first make the target window key (default: off)"),
   trace: boolean2().describe("Per-request timing traces (default: false)")
