@@ -71,7 +71,7 @@ export const handDeviceKeys = async (options: {
   try {
     if (options.when === "not_adopted" && adopted(await service.status())) return "already_adopted"
     const answered = await service.adopt(options.credential)
-    // relayd #983: a service holding another live device of the account attaches to it and adopts nothing. This sign-in's
+    // The device service's attach-on-adopt rule: a service holding another live device of the account attaches to it and adopts nothing. This sign-in's
     // keys are NOT the machine's device then; the caller must not treat them as adopted.
     if (answered.id !== options.credential.device.id) {
       options.log?.(
