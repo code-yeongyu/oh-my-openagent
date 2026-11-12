@@ -49,8 +49,10 @@ mod endpoint {
 
     /// A bound endpoint: the checked directory, the held instance lock, and the
     /// inodes this daemon created, removed on drop only while they are still its
-    /// own. The listener and the token file stay open until then, so neither
-    /// inode number can be reused by a successor's file before the check.
+    /// own. The token file stays open until then, so its inode number cannot
+    /// be reused before the check; the listener closes before the removal
+    /// (T25-24), and the instance lock, held until after it, keeps a successor
+    /// daemon from binding a new socket in between.
     pub struct Bound {
         pub(super) endpoint: String,
         pub(super) listener: Option<UnixListener>,
@@ -58,7 +60,14 @@ mod endpoint {
         socket: (u64, u64),
         token: Option<(File, (u64, u64))>,
         _lock: File,
+        /// Runs with the socket's path just before the exit removes it.
+        #[cfg(test)]
+        pub(super) before_remove: Option<BeforeRemove>,
     }
+
+    /// A test's look at the socket's path just before the exit removes it.
+    #[cfg(test)]
+    pub(super) type BeforeRemove = Box<dyn FnOnce(&Path) + Send>;
 
     /// Checks the endpoint's directory, takes the instance lock, unlinks a
     /// stale socket only after a failed connect, and binds.
@@ -80,6 +89,8 @@ mod endpoint {
             socket,
             token: None,
             _lock: lock,
+            #[cfg(test)]
+            before_remove: None,
         })
     }
 
@@ -157,6 +168,10 @@ mod endpoint {
 
     impl Drop for Bound {
         fn drop(&mut self) {
+            #[cfg(test)]
+            if let Some(hook) = self.before_remove.take() {
+                hook(&self.dir.socket());
+            }
             Self::remove_own(&self.dir.socket(), self.socket);
             if let Some((_, token)) = &self.token {
                 Self::remove_own(&self.dir.entry(&self.dir.sibling("resume")), *token);
@@ -286,10 +301,15 @@ async fn listen_checked(
         });
         while tasks.try_join_next().is_some() {}
     };
-    while tasks.join_next().await.is_some() {}
-    // The bound socket's inode stays referenced until the listener closes.
-    drop(bound);
+    // T25-24: the listener closes first, so a client connecting from now on
+    // is refused at once (and starts or finds a successor) instead of waiting
+    // unaccepted; one that was waiting unaccepted sees a reset before any reply
+    // byte, which the client retries once. The socket and token are removed
+    // afterwards, still under the instance lock, so no successor can bind
+    // between the close and the inode check.
     drop(listener);
+    while tasks.join_next().await.is_some() {}
+    drop(bound);
     served
 }
 

@@ -34,8 +34,11 @@ afterEach(async () => {
   for (const step of cleanup.splice(0).reverse()) await step()
 })
 
+// A unix socket path holds about 104 bytes: under a longer TMPDIR the fake daemon's `listen` fails EINVAL.
+const BASE = path.join(tmpdir(), "senpi-attach-XXXXXX", "e.sock").length < 100 ? tmpdir() : "/tmp"
+
 function privateDir(mode = 0o700): string {
-  const dir = fs.mkdtempSync(path.join(tmpdir(), "senpi-attach-"))
+  const dir = fs.mkdtempSync(path.join(BASE, "senpi-attach-"))
   fs.chmodSync(dir, mode)
   cleanup.push(() => fs.rmSync(dir, { recursive: true, force: true }))
   return dir
@@ -253,6 +256,18 @@ describe.skipIf(process.platform === "win32")("sdk attach over a unix socket", (
 
     expect(refused.data.reason).toBe("server_refused")
     expect(daemon.connections).toEqual([[]])
+  })
+
+  it("#given an already-aborted signal #when a call is made #then it is cancelled and nothing is sent", async () => {
+    const daemon = await fakeDaemon()
+    const port = await attachUds(daemon.endpoint, environment({}))
+    cleanup.push(() => port.close())
+
+    const outcome = port.call("windows", {}, { signal: AbortSignal.abort() }).catch((error: unknown) => error)
+    await port.call("capabilities", {})
+
+    expect(await outcome).toMatchObject({ code: "Cancelled", nothingSent: true })
+    expect(daemon.connections[0]?.map((line) => JSON.parse(line).method)).toEqual(["capabilities"])
   })
 
   it("#given a request in flight #when the daemon drops the connection #then the call rejects as Closed", async () => {

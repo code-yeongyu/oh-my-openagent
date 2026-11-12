@@ -51,20 +51,96 @@ pub fn token_file(endpoint: &str) -> std::path::PathBuf {
 /// # Errors
 /// The daemon is not reachable or its reply is not JSON.
 pub fn exchange(endpoint: &str, request: &Value) -> io::Result<Value> {
-    let stream = connect_until(endpoint, Instant::now() + BUSY_GUARD, &is_busy)?;
-    exchange_over(stream, request)
+    retry_reset_once(|| {
+        let stream = connect_until(endpoint, Instant::now() + BUSY_GUARD, &is_busy)?;
+        exchange_over(stream, request)
+    })
+}
+
+/// A reset or broken pipe before the first byte from the daemon on a Unix
+/// socket: a daemon that was exiting closed its listener with this connection
+/// still unaccepted (T25-24), so no daemon read the request. Only a Unix socket
+/// proves that. On Windows the named pipe is a `File`, and a daemon that read
+/// and ran the request, then closed the pipe before replying (a crash, a failed
+/// `serve_connection`), surfaces as the same `BrokenPipe`; a retry there could
+/// run a click or typing twice, so it is never marked there.
+#[derive(Debug)]
+struct ResetBeforeReply(io::Error);
+
+impl std::fmt::Display for ResetBeforeReply {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "the daemon reset the connection before replying: {}", self.0)
+    }
+}
+
+impl std::error::Error for ResetBeforeReply {}
+
+/// Runs `attempt` again, once, when it failed with [`ResetBeforeReply`]. Any
+/// other failure, a second reset, or a reset after a reply byte is returned.
+fn retry_reset_once<T>(mut attempt: impl FnMut() -> io::Result<T>) -> io::Result<T> {
+    match attempt() {
+        Err(error) if error.get_ref().is_some_and(|inner| inner.is::<ResetBeforeReply>()) => attempt(),
+        outcome => outcome,
+    }
+}
+
+/// A stream that counts the bytes read from it.
+struct Counted<S> {
+    inner: S,
+    read: usize,
+}
+
+impl<S: io::Read> io::Read for Counted<S> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let read = self.inner.read(buf)?;
+        self.read += read;
+        Ok(read)
+    }
+}
+
+impl<S: Write> Write for Counted<S> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.inner.write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+/// Marks a reset or broken pipe as [`ResetBeforeReply`] while nothing was read,
+/// on a Unix socket only.
+fn before_reply(error: io::Error, read: usize) -> io::Error {
+    if is_reset_before_reply(&error, read, cfg!(unix)) {
+        io::Error::new(error.kind(), ResetBeforeReply(error))
+    } else {
+        error
+    }
+}
+
+/// Whether `error` after `read` reply bytes proves no daemon read the request:
+/// never off a `unix_socket` (see [`ResetBeforeReply`]); the platform picks it.
+fn is_reset_before_reply(error: &io::Error, read: usize, unix_socket: bool) -> bool {
+    unix_socket && read == 0 && matches!(error.kind(), io::ErrorKind::ConnectionReset | io::ErrorKind::BrokenPipe)
 }
 
 /// Writes `request` and returns the first reply line. Notifications of the
 /// shared session (another client's audit or stop change) can arrive first
 /// and are skipped.
-fn exchange_over(mut stream: impl io::Read + Write, request: &Value) -> io::Result<Value> {
-    writeln!(stream, "{request}")?;
-    stream.flush()?;
+fn exchange_over(stream: impl io::Read + Write, request: &Value) -> io::Result<Value> {
+    let mut stream = Counted { inner: stream, read: 0 };
+    // One write for the whole line: the daemon never sees part of a request.
+    stream
+        .write_all(format!("{request}\n").as_bytes())
+        .map_err(|error| before_reply(error, 0))?;
+    stream.flush().map_err(|error| before_reply(error, 0))?;
     let mut reader = BufReader::new(stream);
     loop {
         let mut line = String::new();
-        if reader.read_line(&mut line)? == 0 {
+        let read = reader
+            .read_line(&mut line)
+            .map_err(|error| before_reply(error, reader.get_ref().read))?;
+        if read == 0 {
             return Err(io::Error::new(
                 io::ErrorKind::UnexpectedEof,
                 "the daemon closed the connection before replying",
@@ -146,14 +222,16 @@ fn connect(endpoint: &str) -> io::Result<std::fs::File> {
 /// # Errors
 /// The daemon could not be started or never accepted within the guard.
 pub fn exchange_or_start(endpoint: &str, serve_args: &[String], request: &Value) -> io::Result<Value> {
-    // The connection that finds the daemon carries the request: a separate probe would take a
-    // named pipe's only free instance, and the real connect would then find it busy.
-    let stream = match connect_until(endpoint, Instant::now() + BUSY_GUARD, &is_busy) {
-        Ok(stream) => stream,
-        Err(error) if refusal(&error) => return Err(error),
-        Err(_) => start_and_connect(endpoint, serve_args)?,
-    };
-    exchange_over(stream, request)
+    retry_reset_once(|| {
+        // The connection that finds the daemon carries the request: a separate probe would take a
+        // named pipe's only free instance, and the real connect would then find it busy.
+        let stream = match connect_until(endpoint, Instant::now() + BUSY_GUARD, &is_busy) {
+            Ok(stream) => stream,
+            Err(error) if refusal(&error) => return Err(error),
+            Err(_) => start_and_connect(endpoint, serve_args)?,
+        };
+        exchange_over(stream, request)
+    })
 }
 
 /// Starts the daemon and connects once it accepts. A start that exits before
@@ -249,95 +327,10 @@ fn read_token(endpoint: &str) -> io::Result<String> {
     std::fs::read_to_string(token_file(endpoint))
 }
 
+#[cfg(test)]
+#[path = "client_retry_tests.rs"]
+mod retry_tests;
+
 #[cfg(all(test, unix))]
-mod tests {
-    use std::io::Read;
-    use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
-    use std::os::unix::net::UnixListener;
-    use std::path::PathBuf;
-
-    use serde_json::json;
-
-    use super::{connect_checked, exchange_or_start, exchange_over};
-    use crate::peer::{euid, is_refusal};
-
-    fn private_dir(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("senpi-client-{name}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::DirBuilder::new().mode(0o700).create(&dir).expect("private dir");
-        dir
-    }
-
-    /// The bytes a server reads from one client before that client closes.
-    fn bytes_received(dir: &std::path::Path, lookup: fn(i32) -> std::io::Result<u32>) -> (std::io::Error, usize) {
-        let socket = dir.join("e.sock");
-        let listener = UnixListener::bind(&socket).expect("bind");
-        let server = std::thread::spawn(move || {
-            let (mut stream, _) = listener.accept().expect("accept");
-            let mut received = Vec::new();
-            stream.read_to_end(&mut received).expect("read until the client closes");
-            received.len()
-        });
-        let refused = connect_checked(socket.to_str().expect("utf-8"), lookup).expect_err("refused");
-        (refused, server.join().expect("server thread"))
-    }
-
-    #[test]
-    fn t25_25_a_socket_served_by_another_euid_is_closed_before_any_byte() {
-        // Given
-        let dir = private_dir("other-euid");
-        // When
-        let (refused, received) = bytes_received(&dir, |_| Ok(euid().wrapping_add(1)));
-        // Then
-        assert!(is_refusal(&refused), "{refused}");
-        assert_eq!(received, 0);
-        std::fs::remove_dir_all(&dir).expect("cleanup");
-    }
-
-    #[test]
-    fn t25_25_a_failed_server_credential_lookup_is_closed_before_any_byte() {
-        // Given
-        let dir = private_dir("lookup-fails");
-        // When
-        let (refused, received) = bytes_received(&dir, |_| Err(std::io::Error::other("no credentials")));
-        // Then
-        assert!(is_refusal(&refused), "{refused}");
-        assert_eq!(received, 0);
-        std::fs::remove_dir_all(&dir).expect("cleanup");
-    }
-
-    #[test]
-    fn another_clients_notification_before_the_reply_is_skipped() {
-        // Given: the shared session fans a notification out before this client's reply.
-        let (client, mut daemon) = std::os::unix::net::UnixStream::pair().expect("socket pair");
-        let server = std::thread::spawn(move || {
-            let mut request = String::new();
-            std::io::BufRead::read_line(&mut std::io::BufReader::new(&daemon), &mut request).expect("request");
-            std::io::Write::write_all(
-                &mut daemon,
-                b"{\"jsonrpc\":\"2.0\",\"method\":\"stopPath.changed\",\"params\":{}}\n{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":7}\n",
-            )
-            .expect("lines written");
-        });
-        // When
-        let reply = exchange_over(client, &json!({"jsonrpc": "2.0", "id": 1, "method": "displays"})).expect("reply");
-        // Then
-        assert_eq!(reply, json!({"jsonrpc": "2.0", "id": 1, "result": 7}));
-        server.join().expect("server thread");
-    }
-
-    #[test]
-    fn t25_17_a_loose_endpoint_directory_is_refused_without_an_auto_start() {
-        // Given: a directory group and other can enter.
-        let dir = private_dir("loose");
-        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755)).expect("chmod");
-        let socket = dir.join("e.sock");
-        // When
-        let refused = exchange_or_start(socket.to_str().expect("utf-8"), &[], &json!({"id": 1}))
-            .expect_err("refused");
-        // Then
-        assert!(is_refusal(&refused), "{refused}");
-        assert!(!socket.exists(), "no daemon was started");
-        std::fs::remove_dir_all(&dir).expect("cleanup");
-    }
-}
+#[path = "client_tests.rs"]
+mod tests;
