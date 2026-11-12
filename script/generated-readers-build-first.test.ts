@@ -51,3 +51,54 @@ describe("codex-compatibility builds the generated files after its --ignore-scri
       expect(stepAt(steps, reader).index).toBeGreaterThan(generate.index)
   })
 })
+
+// Every job the static reader inventory (#13192) found reading an untracked output on its own tree, with the step that builds it first and the
+// steps that read it. A job loses its guard when the builder disappears, moves after a reader, or its install gains --ignore-scripts.
+const BUILDS = /bun script\/build-generated\.ts|\bbun run build\b(?![:\w-])|bun install(?![^\n]*--ignore-scripts)/
+const READERS: ReadonlyArray<readonly [workflow: string, job: string, builder: string, readers: readonly string[]]> = [
+  ["ci.yml", "test", "Install dependencies", ["Run tests"]],
+  [
+    "ci.yml",
+    "macos-combined",
+    "Install dependencies",
+    ["Run root test shard 1", "Run root test shard 2", "Run Codex platform smoke", "Run Senpi compatibility tests"],
+  ],
+  [
+    "ci.yml",
+    "codex-compatibility",
+    "Build generated files",
+    ["Run full Codex compatibility suite", "Build Codex platform smoke prerequisites"],
+  ],
+  [
+    "ci.yml",
+    "senpi-compatibility",
+    "Verify generated outputs and committed Senpi files are current",
+    ["Run Senpi compatibility tests"],
+  ],
+  ["ci.yml", "omo-ai-payload-check", "Install dependencies", ["Build omo-native"]],
+  [
+    "ci.yml",
+    "native-binary-parity",
+    "Install dependencies",
+    ["Build the standalone binary and the npm launcher payload"],
+  ],
+  ["publish-platform.yml", "build", "Build generated files", ["Build release binary"]],
+  [
+    "publish.yml",
+    "release-build-preflight",
+    "Build generated files",
+    ["Build omo-ai payload", "Build the release job's CLI bundles"],
+  ],
+  ["publish.yml", "publish-main", "Build generated files", ["Build omo-ai payload"]],
+  ["publish.yml", "release", "Build generated files", ["Sync LazyCodex Codex marketplace"]],
+  ["web-ci.yml", "format-lint-typecheck-build", "Install dependencies", ["Unit tests"]],
+]
+
+describe("every job that reads a generated output builds it first", () => {
+  test.each(READERS)("%s %s: %s runs a build before its readers", (workflow, job, builder, readers) => {
+    const steps = jobSteps(readWorkflow(workflow), job)
+    const build = stepAt(steps, builder)
+    expect(build.value.run ?? "").toMatch(BUILDS)
+    for (const reader of readers) expect(stepAt(steps, reader).index).toBeGreaterThan(build.index)
+  })
+})
