@@ -396,13 +396,18 @@ export function createRemoteThreadFixture() {
     })
     const closed: Array<readonly [string, string | undefined]> = []
     const setSessionName = mock(async (_sessionId: string, _name: string) => {})
+    // How often a session on this device was prompted directly (a delivery never prompts; this counts any leak).
+    let localPrompts = 0
     const host: ThreadHost = {
       socket: "/tmp/thread-remote-test.sock",
       listSessions: async () => sessions,
       openSession,
       getMessages: async () => [...engine.messages],
       getState: async () => ({ isStreaming: false }),
-      prompt: async () => ({ turnId: "turn-local" }),
+      prompt: async () => {
+        localPrompts += 1
+        return { turnId: "turn-local" }
+      },
       interrupt: async () => engine.interrupt,
       setSessionName,
       setModel: async (_s, provider, id) => ({ provider, id }),
@@ -462,7 +467,7 @@ export function createRemoteThreadFixture() {
       if (parse === undefined) throw new Error("thread_send declares no permission parser")
       return parse(args, process.cwd())
     }
-    return { run, permission, openSession, setSessionName, store, closed, agentDir }
+    return { run, permission, openSession, setSessionName, store, closed, agentDir, prompts: () => localPrompts }
   }
 
   return { account, surface, cleanup }

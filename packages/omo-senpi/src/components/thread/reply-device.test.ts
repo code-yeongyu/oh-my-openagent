@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtempSync, rmSync } from "node:fs"
+import { existsSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { createThreadComponent } from "./component"
 import type { ThreadToolResult } from "./contracts"
+import { gatewayInboxDirectory } from "./gateway/paths"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import type { RemoteSessionRow } from "./remote/ports"
 import { B_ROW, createRemoteThreadFixture } from "./thread-remote-fixture"
@@ -25,14 +26,17 @@ const C_SAME_ID: RemoteSessionRow = { ...B_ROW, device: "c", session_id: "rk-on-
 const C_PLANNER: RemoteSessionRow = { ...B_ROW, device: "c", session_id: "rk-c", durable_id: "dur-c", title: "planner" }
 const C_OTHER: RemoteSessionRow = { ...B_ROW, device: "c", session_id: "rk-c", durable_id: "dur-c", title: "c thread" }
 
-function host(sessions: readonly ThreadHostSession[]): ThreadHost {
+function host(sessions: readonly ThreadHostSession[], onPrompt: () => void = () => {}): ThreadHost {
   return {
     socket: "/tmp/thread-reply-device.sock",
     listSessions: async () => [...sessions],
     openSession: async () => ({ sessionId: "s", cwd: process.cwd() }),
     getMessages: async () => [],
     getState: async () => ({ isStreaming: false }),
-    prompt: async () => ({ turnId: "turn-local" }),
+    prompt: async () => {
+      onPrompt()
+      return { turnId: "turn-local" }
+    },
     interrupt: async () => ({}),
     setSessionName: async () => {},
     setModel: async (_sessionId, provider, modelId) => ({ provider, id: modelId }),
@@ -85,8 +89,11 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
       sendUserMessage() {},
     }
     const logger = { info() {}, error() {}, warn() {} }
+    let prompts = 0
     createThreadComponent({
-      host: host([LOCAL]),
+      host: host([LOCAL], () => {
+        prompts += 1
+      }),
       stateDirectory: join(agentDir, "state"),
       agentDir: () => agentDir,
       store,
@@ -124,7 +131,9 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
     }
     const admittedOn = () =>
       account.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message").map((entry) => entry.device)
-    return { reply, admittedOn }
+    // A delivery to a session on this device leaves a marker in its gateway inbox: none means nothing reached it.
+    const reachedLocally = (durableId: string) => existsSync(gatewayInboxDirectory(agentDir, durableId))
+    return { reply, admittedOn, prompts: () => prompts, reachedLocally }
   }
 
   test("#given b's delivery states a session id that a third device also lists #when the run replies by that id #then the reply goes to b's row and nothing reaches the third device", async () => {
@@ -164,12 +173,13 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
   })
 
   test("#given b's delivery states a name a session on this device carries #when the run replies by that name #then the reply goes to the consumed sender on b, never to the local session", async () => {
-    const { reply, admittedOn } = await consumed(
+    const { reply, admittedOn, prompts, reachedLocally } = await consumed(
       [{ id: "device:b/d-1", session_id: "dur-on-b", name: "local peer" }],
       [B_ROW],
     )
     expect(await reply("local peer")).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
     expect(admittedOn()).toEqual(["b"])
+    expect({ prompts: prompts(), reached: reachedLocally("dur-local") }).toEqual({ prompts: 0, reached: false })
   })
 
   test("#given deliveries from b and from c that state one session id #when the run replies by that id #then it is ambiguous_target and nothing is sent", async () => {
