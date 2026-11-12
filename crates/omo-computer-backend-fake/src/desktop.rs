@@ -234,6 +234,10 @@ impl Backend for FakeBackend {
         let available = self.lock().scenario.presence_surface.unwrap_or(true);
         available.then(|| Box::new(FakePresence::new(self.sink.clone())) as Box<dyn Presence>)
     }
+
+    fn ax_reader(&mut self) -> Option<&mut dyn omo_computer_core::ax::AxReader> {
+        Some(self)
+    }
 }
 
 #[cfg(test)]
