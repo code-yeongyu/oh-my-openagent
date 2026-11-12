@@ -14,6 +14,7 @@ import {
   SENPI_LOADER_ALIASES,
   THREAD_SDK_RELATIVE_PATH,
 } from "./build-extension-core.mjs"
+import { writeBuildStamp } from "./build-stamp.mjs"
 import { checkExtensionCurrent } from "./check-extension-current.mjs"
 
 export {
@@ -56,6 +57,8 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
     console.log(`omo-senpi extension build is current: ${result.output}`)
   } else {
     await buildExtension()
+    // #13232: record the commit this in-tree build was made from; an output override writes no stamp.
+    writeBuildStamp(join(scriptDir, ".."))
     console.log(
       `Built omo-senpi extensions: ${outputPath}, ${taskOutputPath}, ${memberOutputPath}, ${supervisorOutputPath}, ${advisorRuntimeOutputPath}, ${sidePanelRuntimeOutputPath}, ${computerUseOutputPath}, ${gatewayStoreWorkerOutputPath}, ${threadSdkOutputPath}`,
     )

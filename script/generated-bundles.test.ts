@@ -31,6 +31,9 @@ describe("generated bundle list", () => {
     { path: "packages/omo-native/bin/lib/reflection-lock.generated.js", listed: true },
     { path: "packages/omo-native/bin/lib/brand-logo.generated.js", listed: true },
     { path: "packages/omo-native/bin/lib/brand-logo.generated.d.ts", listed: false },
+    // #13232: the commit an in-tree plugin build was made from.
+    { path: "packages/omo-senpi/plugin/.build-stamp", listed: true },
+    { path: "packages/omo-senpi/plugin/scripts/build-stamp.mjs", listed: false },
   ])("#given the ECMAScript patterns #when $path is matched #then listed is $listed", ({ path, listed }) => {
     // given
     const patterns = loadGeneratedBundlePatterns()

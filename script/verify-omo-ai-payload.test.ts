@@ -67,6 +67,9 @@ const RELEASE_GENERATED_ARTIFACTS = [
 
 // Every literal output the list names under a directory omo-ai ships (packages/omo-native -> package root,
 // packages/omo-senpi/plugin -> plugin/). Read from the list itself: a newly listed output joins this table.
+// The one listed output under a shipped root that never ships: the commit a checkout build was made from (#13232).
+const CHECKOUT_BUILD_STAMP = "plugin/.build-stamp"
+
 const LISTED_SHIPPED_LITERALS = (
   JSON.parse(readFileSync(generatedListSource, "utf8")) as { patterns: string[] }
 ).patterns
@@ -79,6 +82,7 @@ const LISTED_SHIPPED_LITERALS = (
         ? [`plugin/${path.slice("packages/omo-senpi/plugin/".length)}`]
         : [],
   )
+  .filter((path) => path !== CHECKOUT_BUILD_STAMP)
 
 interface VerifierRun {
   readonly exitCode: number
@@ -387,6 +391,34 @@ describe("omo-ai payload verifier", () => {
         expect(run.output).not.toContain("missing artifact:")
         expect(run.exitCode).toBe(0)
       })
+    })
+  })
+
+  // #13232: the stamp records the commit a checkout build was made from; a published package has no checkout.
+  describe("#given a packed payload that carries a checkout build stamp", () => {
+    test("#then it fails naming plugin/.build-stamp as a forbidden path", () => {
+      // given
+      const payload = [...PACKED_ARTIFACTS, ...skillPaths(PACKED_SKILL_COUNT), CHECKOUT_BUILD_STAMP]
+
+      // when
+      const run = runVerifierOnPayload(payload)
+
+      // then
+      expect(run.output).toContain("forbidden paths")
+      expect(run.output).toContain(CHECKOUT_BUILD_STAMP)
+      expect(run.exitCode).toBe(1)
+    })
+
+    test("#then a release payload without it is not reported missing", () => {
+      // given
+      const payload = [...PACKED_ARTIFACTS, ...RELEASE_GENERATED_ARTIFACTS, ...skillPaths(PACKED_SKILL_COUNT)]
+
+      // when
+      const run = runVerifierOnPayload(payload, {}, { args: ["--release-preflight"] })
+
+      // then
+      expect(run.output).not.toContain(`missing artifact: ${CHECKOUT_BUILD_STAMP}`)
+      expect(run.exitCode).toBe(0)
     })
   })
 })

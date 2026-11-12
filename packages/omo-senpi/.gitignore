@@ -5,6 +5,8 @@
 /plugin/runtime/thread-sdk/*.js
 /plugin/runtime/rollback-migrate.js
 /plugin/scripts/install.mjs
+# The commit an in-tree plugin build was made from (#13232); plugin/scripts/build-stamp.mjs writes and reads it.
+/plugin/.build-stamp
 /plugin/skills/
 /plugin/skills-conditional/
 /plugin/runtime/ast-grep-mcp/
