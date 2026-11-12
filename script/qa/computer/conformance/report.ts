@@ -22,13 +22,22 @@ function changedSignals(result: CellResult, allowed: readonly SignalId[]): Signa
 }
 
 function oracleProblem(cell: Cell, result: CellResult): string | undefined {
-  if (result.oracle.held) return undefined
+  if (result.oracle.observed === cell.oracle.equals) return undefined
   const { field, equals } = cell.oracle
   return `oracle ${field} == ${JSON.stringify(equals)} does not hold (fixture reads ${JSON.stringify(result.oracle.observed)})`
 }
 
+function inconsistentSignals(result: CellResult): SignalId[] {
+  return SIGNAL_IDS.filter((id) => {
+    const { signal, count, firstAt } = result.journal[id]
+    return signal === "happened" ? count === 0 || firstAt === null : count !== 0 || firstAt !== null
+  })
+}
+
 function cellProblem(cell: Cell, result: CellResult): string | undefined {
   const { observed } = result
+  const inconsistent = inconsistentSignals(result)
+  if (inconsistent.length > 0) return `observer journal contradicts itself: ${inconsistent.join(",")}`
   if (observed.kind === "error") return `error: ${observed.message}`
   if (observed.kind === "not_run") return undefined
   if ("deliver" in cell.expect) {

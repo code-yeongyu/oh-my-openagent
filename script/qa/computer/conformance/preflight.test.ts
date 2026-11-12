@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -40,6 +40,16 @@ describe("environment preflight (ADP-3)", () => {
       expect(result.environment.checks.filter((check) => !check.ok).map((check) => check.name)).toContain(
         "engine-binary",
       )
+    })
+  })
+
+  test("an ENVIRONMENT_ERROR in a reused output directory leaves no earlier run.json beside its record", () => {
+    withDir((dir) => {
+      mkdirSync(join(dir, "out"))
+      writeFileSync(join(dir, "out", "run.json"), "{}")
+      const result = run(dir, join(dir, "no-such-engine"))
+      expect(result.exitCode).toBe(3)
+      expect(result.ranCells).toBe(false)
     })
   })
 

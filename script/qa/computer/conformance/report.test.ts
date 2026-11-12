@@ -60,7 +60,7 @@ function delivered(cell: Cell, journal = quiet()): CellResult {
   return {
     id: cellId(cell),
     observed: { kind: "delivered" },
-    oracle: { held: true, observed: "x" },
+    oracle: { observed: cell.oracle.equals },
     durationMs: 40,
     journal,
   }
@@ -70,7 +70,7 @@ function refused(cell: Cell, code: string, nothingSent = true): CellResult {
   return {
     id: cellId(cell),
     observed: { kind: "refused", code, nothingSent },
-    oracle: { held: true, observed: "a,b,c" },
+    oracle: { observed: cell.oracle.equals },
     durationMs: 40,
     journal: quiet(),
   }
@@ -167,9 +167,23 @@ describe("conformance report (ADP-1 declared-outcome catalog)", () => {
   })
 
   test("a delivered cell whose fixture oracle does not hold fails", () => {
-    const wrong = { ...delivered(deliverCell), oracle: { held: false, observed: "hell" } }
+    const wrong = { ...delivered(deliverCell), oracle: { observed: "hell" } }
     expect(buildReport(catalog, passingRun(wrong)).problems).toEqual([
       `cell ${cellId(deliverCell)}: oracle value == "hello" does not hold (fixture reads "hell")`,
+    ])
+  })
+
+  test("a refusal whose fixture state changed fails even though the hand refused", () => {
+    const touched = { ...refused(refuseCell, "BackgroundUnavailable"), oracle: { observed: "b,a,c" } }
+    expect(buildReport(catalog, passingRun(undefined, touched)).problems).toEqual([
+      `cell ${cellId(refuseCell)}: oracle dragOrder == "a,b,c" does not hold (fixture reads "b,a,c")`,
+    ])
+  })
+
+  test("an observer journal entry that contradicts itself fails", () => {
+    const journal = { ...quiet(), pointer: { signal: "none" as const, firstAt: 50, count: 7 } }
+    expect(buildReport(catalog, passingRun(delivered(deliverCell, journal))).problems).toEqual([
+      `cell ${cellId(deliverCell)}: observer journal contradicts itself: pointer`,
     ])
   })
 
@@ -187,9 +201,7 @@ describe("conformance report (ADP-1 declared-outcome catalog)", () => {
   test("the CLI names the missing cell of a finished run and exits 1", () => {
     const fake = catalogFor("fake", "headless")
     const results = fake.map((cell) =>
-      "deliver" in cell.expect
-        ? { ...delivered(cell), oracle: { held: true, observed: cell.oracle.equals } }
-        : refused(cell, cell.expect.refuse[0] ?? "no declared code"),
+      "deliver" in cell.expect ? delivered(cell) : refused(cell, cell.expect.refuse[0] ?? "no declared code"),
     )
     const dir = mkdtempSync(join(tmpdir(), "conformance-report-"))
     try {

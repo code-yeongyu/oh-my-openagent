@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 
@@ -13,7 +13,7 @@ const SENTINEL = join(REPO, "script/qa/computer/sentinel/sentinel.ts")
 
 interface Driver {
   runCell(cell: Cell): Promise<CellResult>
-  runTask(task: Task): Promise<{ readonly held: boolean; readonly cells: number }>
+  runTask(task: Task): Promise<{ readonly saved: Readonly<Record<string, unknown>>; readonly cells: number }>
 }
 
 type DriverName = "engine" | "legacy"
@@ -88,8 +88,12 @@ async function runTaskset(options: Options, driver: Driver): Promise<number> {
   let pass = 0
   for (const task of TASKS) {
     const outcome = await driver.runTask(task)
-    if (outcome.held && outcome.cells <= MAX_REFERENCE_CELLS) pass += 1
-    else console.log(`task ${task.id}: oracle held=${outcome.held} cells=${outcome.cells}`)
+    const wrong = task.oracle.filter((expected) => outcome.saved[expected.field] !== expected.equals)
+    if (wrong.length === 0 && outcome.cells <= MAX_REFERENCE_CELLS) pass += 1
+    else
+      console.log(
+        `task ${task.id}: saved fields not as declared: ${wrong.map((w) => w.field).join(",") || "none"} cells=${outcome.cells}`,
+      )
   }
   const most = Math.max(...TASKS.map((task) => task.cells.length))
   console.log(`TASKSET ${options.os} tasks=${TASKS.length} pass=${pass} reference_max_cells=${most}`)
@@ -105,6 +109,7 @@ async function main(argv: readonly string[]): Promise<number> {
     return 2
   }
   mkdirSync(options.out, { recursive: true })
+  rmSync(join(options.out, "run.json"), { force: true })
   const environment = await preflight(options, probes(options))
   writeFileSync(join(options.out, "environment.json"), JSON.stringify(environment, null, 2))
   const slot = DRIVERS[options.driver]

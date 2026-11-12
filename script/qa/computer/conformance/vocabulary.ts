@@ -102,7 +102,7 @@ const observed = z.discriminatedUnion("kind", [
 const cellResultSchema = z.object({
   id: z.string(),
   observed,
-  oracle: z.object({ held: z.boolean(), observed: z.unknown() }),
+  oracle: z.object({ observed: z.unknown() }),
   durationMs: z.number().nonnegative(),
   journal: z.object({
     key_focus: signalSummary,
