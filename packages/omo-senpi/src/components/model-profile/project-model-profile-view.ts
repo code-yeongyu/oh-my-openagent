@@ -79,6 +79,11 @@ function flatModelProfileKeys(config: Readonly<Record<string, unknown>>): Record
   return kept
 }
 
+/** One config layer reduced to the keys a model-profile resolver reads. */
+export function modelProfileLayer(config: Readonly<Record<string, unknown>>): Record<string, unknown> {
+  return modelProfileKeys(config, true)
+}
+
 // A harness block holds only flat model-profile keys, so it is read one level deep and never walked further.
 function modelProfileKeys(config: Readonly<Record<string, unknown>>, withProfiles: boolean): Record<string, unknown> {
   const kept = flatModelProfileKeys(config)
@@ -116,8 +121,8 @@ export function viewProjectModelProfile(
   return {
     kind: "ok",
     layers: {
-      user: modelProfileKeys(userLayer?.config ?? {}, true),
-      ...(projectLayer === undefined ? {} : { project: modelProfileKeys(projectLayer.config, true) }),
+      user: modelProfileLayer(userLayer?.config ?? {}),
+      ...(projectLayer === undefined ? {} : { project: modelProfileLayer(projectLayer.config) }),
       ...(activeProfile === undefined ? {} : { activeProfile }),
     },
   }
