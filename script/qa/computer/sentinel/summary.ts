@@ -141,6 +141,12 @@ export function summarize(events: readonly SentinelEvent[], options: { readonly 
         if (event.pendingReads === undefined) faults.push("dialog: stop marker did not report pending new-window reads")
         else if (event.pendingReads > 0)
           faults.push(`dialog: ${event.pendingReads} new-window reads were still running at stop`)
+        if (event.pendingRegistrations === undefined)
+          faults.push("dialog: stop marker did not report window-observer registrations still running")
+        else if (event.pendingRegistrations > 0)
+          faults.push(
+            `dialog: ${event.pendingRegistrations} window-observer registrations were still being retried at stop`,
+          )
         break
       case "focus":
         observe("key_focus", event.t, event.value, event.via === "notification")

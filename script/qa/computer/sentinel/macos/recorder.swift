@@ -30,6 +30,9 @@ final class Recorder: NSObject {
   var knownWindows: Set<UInt32> = []
   var windowsListed = false
   var pendingReads = 0
+  // pids whose window observer is registered, and pids whose registration is still being retried
+  var registered: Set<pid_t> = []
+  var registering: Set<pid_t> = []
   var stopping = false
 
   init(userPid: pid_t, targetPids: [pid_t], fieldIdentifier: String) {
@@ -117,22 +120,36 @@ final class Recorder: NSObject {
     if windowsListed { armed("dialog", "notification+sample") } else { fault("dialog", "window list unreadable") }
   }
 
-  // A just-launched app with a user interface often refuses registration until its AX server is up, so only such an
-  // app is retried, for up to 2 s; a background agent is tried once and never costs the main thread a retry round.
-  // Every gap is reported with the moment it began (`since`): a registration that came late as observer_late, one
-  // that never came as observer_failed. The reducer judges the gap's overlap with the recording, and does not judge
-  // the target's own apps or apps without a UI. An app that has quit is not reported.
+  // A just-launched app often refuses registration until its AX server is up. It is retried for up to 2 s while its
+  // activation policy is regular or not yet decided (.prohibited, which a launching app can still leave); a
+  // background agent (.accessory) is tried once and never costs the main thread a retry round. The policy is re-read
+  // at every attempt, so an app that turns regular mid-retry is reported as regular, and an app that turns regular
+  // later is registered again when it activates. Every gap is reported with the moment it began (`since`): a
+  // registration that came late as observer_late, one that never came as observer_failed. The reducer judges the
+  // gap's overlap with the recording, and does not judge the target's own apps or apps without a UI. A registration
+  // still being retried is counted in `registering`, which `stop` waits for and reports. An app that has quit is not
+  // reported.
   func watchWindows(of pid: pid_t, attempt: Int = 1, since: Double = uptimeMs()) {
+    if attempt == 1 && registering.contains(pid) { return }
     let error = observe(pid, AXUIElementCreateApplication(pid), [kAXWindowCreatedNotification, kAXSheetCreatedNotification])
-    guard let app = NSRunningApplication(processIdentifier: pid), !app.isTerminated else { return }
+    guard let app = NSRunningApplication(processIdentifier: pid), !app.isTerminated else {
+      registering.remove(pid)
+      return
+    }
     let regular = app.activationPolicy == .regular
     if error == .success {
+      registered.insert(pid)
+      registering.remove(pid)
       if attempt > 1 {
         emit(["kind": "observer_late", "pid": Int(pid), "attempts": attempt, "regular": regular, "since": since])
       }
       return
     }
-    if regular && attempt < 10 { return after(0.2) { self.watchWindows(of: pid, attempt: attempt + 1, since: since) } }
+    if app.activationPolicy != .accessory && attempt < 10 {
+      registering.insert(pid)
+      return after(0.2) { self.watchWindows(of: pid, attempt: attempt + 1, since: since) }
+    }
+    registering.remove(pid)
     emit([
       "kind": "observer_failed", "pid": Int(pid), "axError": axErrorName(error), "attempts": attempt,
       "regular": regular, "since": since,
@@ -146,6 +163,8 @@ final class Recorder: NSObject {
   @objc func activated(_ note: Notification) {
     let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
     send("activation", ["kind": "activation", "via": "notification", "pid": Int(app?.processIdentifier ?? -1)])
+    // An app that was a background agent at launch and turned regular since gets its window observer now.
+    if let pid = app?.processIdentifier, !registered.contains(pid) { watchWindows(of: pid) }
   }
 
   @objc func launched(_ note: Notification) {
@@ -204,12 +223,15 @@ final class Recorder: NSObject {
     }
   }
 
-  // `stop <ms>` waits up to that long for new-window reads still running, then reports how many were left; `final`
-  // waits for it. The harness sends both budgets and waits at least that long for each marker.
+  // `stop <ms>` waits up to that long for new-window reads and observer registrations still running, then reports how
+  // many of each were left; `final` waits for it. The harness sends both budgets and waits at least that long for each
+  // marker. A registration left running would report its gap after the final read, where the harness cuts it off.
   func drainThenStop(deadline: Double) {
-    if pendingReads > 0 && uptimeMs() < deadline { return after(0.05) { self.drainThenStop(deadline: deadline) } }
+    if (pendingReads > 0 || !registering.isEmpty) && uptimeMs() < deadline {
+      return after(0.05) { self.drainThenStop(deadline: deadline) }
+    }
     recording = false
-    emit(["kind": "stop", "pendingReads": pendingReads])
+    emit(["kind": "stop", "pendingReads": pendingReads, "pendingRegistrations": registering.count])
     stopping = false
   }
 

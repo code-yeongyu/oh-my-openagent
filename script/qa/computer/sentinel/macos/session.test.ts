@@ -30,7 +30,7 @@ for await (const line of console) {
   if (command === "stop")
     setTimeout(() => {
       stopped = true
-      emit({ t: Date.now(), kind: "stop", pendingReads: 1 })
+      emit({ t: Date.now(), kind: "stop", pendingReads: 1, pendingRegistrations: 0 })
       if (finalAsked) finalRead()
     }, Number(argument ?? 4_000) - 100)
   if (command === "final") {

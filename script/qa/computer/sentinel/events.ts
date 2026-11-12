@@ -21,7 +21,7 @@ export type SentinelEvent = { readonly t: number } & (
   | { readonly kind: "armed"; readonly signal: Signal; readonly via: string }
   | { readonly kind: "fault"; readonly signal: Signal; readonly detail: string }
   | { readonly kind: "tick" | "start" }
-  | { readonly kind: "stop"; readonly pendingReads?: number }
+  | { readonly kind: "stop"; readonly pendingReads?: number; readonly pendingRegistrations?: number }
   | { readonly kind: "focus" | "space"; readonly via: Via; readonly value: string }
   | { readonly kind: "order"; readonly windows: readonly string[] }
   | { readonly kind: "typed"; readonly index: number; readonly char: string }
@@ -88,7 +88,7 @@ const SHAPES: Readonly<Record<SentinelEvent["kind"], Readonly<Record<string, Che
   fault: { signal: oneOf(...SIGNALS), detail: str },
   tick: {},
   start: {},
-  stop: { pendingReads: optional(num) },
+  stop: { pendingReads: optional(num), pendingRegistrations: optional(num) },
   focus: { via, value: str },
   space: { via, value: str },
   order: { windows: listOf(str) },
