@@ -1,0 +1,122 @@
+{
+  "description": "Row 27 (AC-57, AC-82): diagnose answers through the engine with every permission tri-state (capture Granted, input Denied, accessibility Unknown), ok:false for the denial, the session block with the live SessionState and the lockPolicy string, and sends nothing: no dialog, no input.",
+  "transport": "stdio",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/diagnose-denied.json",
+  "env": {
+    "OMO_COMPUTER_FAKE_STOP_PATH": "live"
+  },
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session.open",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "cursorOverlay": false,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "granted",
+                "axPermission": "granted",
+                "displayCount": 1,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": null,
+                "integrityLevel": null,
+                "screenLocked": false,
+                "displayAsleep": false
+              },
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "diagnose",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "ok": false,
+              "chain": [],
+              "responsibleProcess": "omo-computer-engine",
+              "permissions": {
+                "accessibility": {
+                  "state": "Unknown"
+                },
+                "capture": {
+                  "state": "Granted"
+                },
+                "input": {
+                  "state": "Denied"
+                }
+              },
+              "identity": {
+                "match": "unknown"
+              },
+              "consentAuthority": "file_only",
+              "session": {
+                "screenLocked": "unknown",
+                "displayAsleep": "unknown",
+                "userActive": {
+                  "active": "unknown",
+                  "lastInputAgeMs": null
+                },
+                "secureInputActive": "unknown",
+                "sessionActive": "unknown",
+                "screensaverActive": "unknown",
+                "pauseReasons": [],
+                "sampledAt": 0
+              },
+              "lockPolicy": "unknown",
+              "stopPath": {
+                "kind": "global",
+                "hostRelayLive": false,
+                "allowHostRelayOnly": false,
+                "listener": "xi2-raw",
+                "deaf": false,
+                "stale": false
+              },
+              "observation": {
+                "untrustedText": true
+              }
+            }
+          },
+          "variable": [
+            "/result/responsibleProcess"
+          ]
+        }
+      ],
+      "sink": 0
+    }
+  ]
+}

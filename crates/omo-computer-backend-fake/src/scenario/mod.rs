@@ -107,6 +107,8 @@ pub struct FakeScenario {
     pub surfaces: BTreeMap<String, FakeAxNode>,
     /// Window id -> the focused web area's URL; `null` scripts an unreadable one.
     pub browser_urls: BTreeMap<String, Option<String>>,
+    // --- Row 27: the permission states `diagnose` reads; absent means every one granted. ---
+    pub permissions: Option<FakePermissions>,
 }
 
 /// One scripted `apps.list()` entry; its identity is the pid's scripted code identity.
@@ -122,6 +124,15 @@ pub struct FakeApp {
     pub source: omo_computer_core::listing::AppSource,
     #[serde(default)]
     pub path: Option<String>,
+}
+
+/// Row 27: scripted permission states, each `granted` / `denied` / `unknown`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FakePermissions {
+    pub capture: omo_computer_core::results::PermissionState,
+    pub input: omo_computer_core::results::PermissionState,
+    pub accessibility: omo_computer_core::results::PermissionState,
 }
 
 impl FakeScenario {

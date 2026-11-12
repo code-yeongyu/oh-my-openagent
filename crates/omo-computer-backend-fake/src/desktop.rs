@@ -173,11 +173,14 @@ impl Backend for FakeBackend {
     }
 
     fn probe_permissions(&self) -> PermissionProbe {
-        PermissionProbe {
-            capture: PermissionState::Granted,
-            input: PermissionState::Granted,
-            accessibility: PermissionState::Granted,
-        }
+        self.lock().scenario.permissions.map_or(
+            PermissionProbe {
+                capture: PermissionState::Granted,
+                input: PermissionState::Granted,
+                accessibility: PermissionState::Granted,
+            },
+            |p| PermissionProbe { capture: p.capture, input: p.input, accessibility: p.accessibility },
+        )
     }
 
     fn epoch_source(&mut self) -> Box<dyn EpochSource> {
