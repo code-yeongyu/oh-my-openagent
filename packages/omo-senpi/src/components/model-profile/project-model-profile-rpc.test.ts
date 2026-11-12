@@ -350,5 +350,9 @@ describe("project model_profile RPC (#13188)", () => {
       kind: "ok",
       modelProfile: "daily-heavy",
     })
+    expect(handlers.get("omo.project.model_profile.view")?.(undefined)).toMatchObject({
+      kind: "ok",
+      layers: { project: { model_profile: "daily-heavy" } },
+    })
   })
 })
