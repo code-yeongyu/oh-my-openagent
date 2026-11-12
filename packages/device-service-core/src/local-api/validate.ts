@@ -142,13 +142,13 @@ const attachState = (v: unknown) => {
     changedAt: typeof changedAt === "string" ? changedAt : fail("changedAt"),
   }
 }
-const sessionWakeState = (v: unknown) => {
+const sessionWakeState = (v: unknown): ResponseData["control.session_wake.get"] => {
   const m = known(v, ["enabled", "stored", "changedAt", "overridden"], [], "data")
   const s = m["stored"]
   const changedAt = m["changedAt"]
   return {
     enabled: bool(m["enabled"], "enabled"),
-    stored: s === null || typeof s === "boolean" || s === "unreadable" ? s : fail("stored"),
+    stored: s === null || typeof s === "boolean" ? s : s === "unreadable" ? "unreadable" : fail("stored"),
     changedAt: typeof changedAt === "string" ? changedAt : fail("changedAt"),
     overridden: bool(m["overridden"], "overridden"),
   }

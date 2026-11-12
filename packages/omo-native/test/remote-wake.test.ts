@@ -39,14 +39,17 @@ async function wake(args: readonly string[], stateDir: string, wakeMark: string 
   const err: string[] = []
   const code = await runRemoteVerb(
     {
-      accountShow: async () => ({ exitCode: 0, stdout: JSON.stringify({ signedIn: true }) }),
+      accountShow: async () => ({
+        exitCode: 0,
+        stdout: JSON.stringify({ signedIn: true, device: { id: "dev-self", name: "This Mac" }, refreshState: "ok" }),
+      }),
       stateDir,
       connect: () => connectDeviceService({ version: "5.1.70", stateDir, minimums: { wakeMark, singleLocate: null } }),
       now: () => 1_790_000_400_000,
       output: (line) => out.push(line),
       write: () => {},
       error: (line) => err.push(line),
-    } as Parameters<typeof runRemoteVerb>[0],
+    } as unknown as Parameters<typeof runRemoteVerb>[0],
     ["wake", ...args],
   )
   return { code, out, err }

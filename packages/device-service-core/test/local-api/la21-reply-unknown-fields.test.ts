@@ -24,6 +24,7 @@ const NEWER = { environments: [{ environment_id: "env-1", revoked: false, closed
 const deviceRow = world.devices[0]
 if (deviceRow === undefined) throw new Error("the world lists a device")
 const attachState = { attached: true, changedAt: "2026-11-09T12:00:00.000Z" }
+const wakeState = { enabled: false, stored: null, changedAt: "", overridden: false }
 
 // One answer per request type; a new request type without a row fails typecheck here.
 const answers: { readonly [T in RequestType]: ResponseData[T] } = {
@@ -49,6 +50,8 @@ const answers: { readonly [T in RequestType]: ResponseData[T] } = {
   "owner.shutdown_for_upgrade": {},
   "session.endpoints": { endpoints: [KEY] },
   "session.locate": { device: PEER, key: KEY, session: `${PEER}.${KEY}` },
+  "control.session_wake.get": wakeState,
+  "control.session_wake.set": wakeState,
   "control.attach.get": attachState,
   "control.attach.set": attachState,
 }

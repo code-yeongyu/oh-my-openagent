@@ -113,6 +113,7 @@ export type {
   CommandRpc,
   CommandStateEvent,
   ControlAttachState,
+  ControlSessionWakeState,
   DetachReason,
   DeviceRef,
   DeviceRow,
