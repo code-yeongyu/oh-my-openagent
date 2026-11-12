@@ -10,7 +10,8 @@
 //!     under another number (a false relabel);
 //! (e) a drill never gives an element a number another element holds live in a valid
 //!     generation: another native object still holding it after the number's last full-read
-//!     hand-over, or (without objects) a latest holder outside the drilled element's subtree.
+//!     hand-over, or (without objects) a latest holder outside the drilled element's subtree or
+//!     inside it and present in the drill.
 //! The seeds are fixed and the run is bounded.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -150,13 +151,23 @@ fn drill_breaches(refs: &RefRegistry, sub: u64) -> Vec<String> {
             (entry.object != Some(held) && holds_live(held.0, entry.n))
                 .then(|| format!("(e) drill s{sub} gave {:?} e{} that object {} ({:?}) holds live in s{}", entry.read.title, entry.n, held.0, g.entries[at].read.title, g.number))
         });
-        // Without native objects nothing tells two elements apart: the number's latest holder
-        // (its entry in the newest valid generation holding it) outside the drilled element's
-        // subtree is another element.
+        // Without native objects nothing tells two elements apart by identity, so the oracle uses
+        // the script's ground truth, the row title. The number's latest holder (its entry in the
+        // newest valid generation holding it) is another element when it is object-less and
+        // lies outside the drilled element's subtree, or lies inside it and is present in the
+        // drill under its own title (case C4: an object-less holder present beside the element
+        // that took its number).
         let by_place = || {
             let (g, at) = others.iter().rev().find_map(|g| g.position(entry.n).map(|at| (*g, at)))?;
-            (g.entries[at].object.is_none() && !under(g, at, root))
-                .then(|| format!("(e) drill s{sub} gave {:?} e{} whose latest holder {:?} in s{} lies outside the subtree", entry.read.title, entry.n, g.entries[at].read.title, g.number))
+            let held = &g.entries[at];
+            if held.object.is_some() {
+                return None;
+            }
+            if !under(g, at, root) {
+                return Some(format!("(e) drill s{sub} gave {:?} e{} whose latest holder {:?} in s{} lies outside the subtree", entry.read.title, entry.n, held.read.title, g.number));
+            }
+            let present = held.read.title != entry.read.title && drilled.entries.iter().any(|e| e.read.title == held.read.title);
+            present.then(|| format!("(e) drill s{sub} gave {:?} e{} whose latest holder {:?} in s{} is present in the drill", entry.read.title, entry.n, held.read.title, g.number))
         };
         out.extend(by_object.or_else(by_place));
     }
@@ -219,6 +230,24 @@ fn breaches(seed: u64, reads: usize) -> Vec<String> {
         previous = Some((observation.generation, now));
     }
     out
+}
+
+/// Case C4 through the oracle itself: under a numbering that lets the returning O take the
+/// number of the present object-less Z, invariant (e) must report it.
+#[test]
+fn the_oracle_sees_case_c4() {
+    let o = || el("listitem", "O").id("row").obj(21);
+    let z = || el("listitem", "Z").id("row");
+    let g = |kids: Vec<Node>| el("window", "W").obj(1).kids(vec![el("group", "G").obj(3).kids(kids)]);
+    let mut tree = Tree::default().window("w", 1, vec![g(vec![o()]), g(vec![z()]), g(vec![z(), o()])]);
+    let mut refs = RefRegistry::default();
+    let s1 = read(&mut refs, &mut tree, None).generation;
+    tree.show("w", 1);
+    let s2 = read(&mut refs, &mut tree, Some(s1)).generation;
+    tree.show("w", 2);
+    let token = refs.generation("w", s2).map(|g| g.token(1)).expect("G");
+    let drilled = drill(&mut refs, &mut tree, &token, None, true).expect("drill G").generation;
+    assert_eq!(drill_breaches(&refs, drilled), Vec::<String>::new());
 }
 
 #[test]

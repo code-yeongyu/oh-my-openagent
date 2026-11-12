@@ -154,3 +154,25 @@ fn a_drill_of_an_older_generation_never_takes_a_newer_live_number_and_the_next_r
         }
     }
 }
+
+#[test]
+fn a_drill_never_lets_a_returning_object_take_the_number_of_a_present_objectless_holder() {
+    // The verifier's case C4: s1 G[O(row, object 21)]; s2 O is gone and the object-less
+    // lookalike Z (same role and id) inherits O's number inside G; then O returns beside Z and
+    // G is drilled. Z is present in the drill, so O must not take Z's number back.
+    let o = || el("listitem", "O").id("row").obj(21);
+    let z = || el("listitem", "Z").id("row");
+    let g = |kids: Vec<Node>| el("window", "W").obj(1).kids(vec![el("group", "G").obj(3).kids(kids)]);
+    let mut tree = Tree::default().window("w", 1, vec![g(vec![o()]), g(vec![z()]), g(vec![z(), o()])]);
+    let mut refs = RefRegistry::default();
+    let s1 = read(&mut refs, &mut tree, None).generation;
+    tree.show("w", 1);
+    let s2 = read(&mut refs, &mut tree, Some(s1)).generation;
+    let z_n = n_titled(&refs, s2, "Z");
+    assert_eq!(z_n, n_titled(&refs, s1, "O"), "Z inherits O's number in a full read O is absent from");
+    tree.show("w", 2);
+    let drilled = { let t = token_of(&refs, s2, "G"); drill(&mut refs, &mut tree, &t, None, true) }.expect("drill G").generation;
+    let (o_n, z_now) = (n_titled(&refs, drilled, "O"), n_titled(&refs, drilled, "Z"));
+    assert_ne!(o_n, z_n, "O must not take e{z_n} from the present Z");
+    assert_ne!(o_n, z_now, "one number per element in the drill");
+}
