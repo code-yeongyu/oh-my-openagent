@@ -21,6 +21,7 @@ pub mod observe;
 pub mod pause;
 pub mod presence;
 pub mod preview;
+pub mod diagnose_wire;
 pub mod recording;
 pub mod refs;
 pub mod route_ladder;

@@ -29,7 +29,7 @@ pub(crate) fn host_call(session: &mut Session, method: Method, params: Value) ->
         Method::OpenSystemSurface => {
             typed::<OpenSystemSurfaceParams>(params).and_then(|p| refused(session.open_system_surface(p.kind)))
         }
-        _ => return None,
+        _ => return crate::diagnose_wire::host_call(session, method, params),
     };
     Some(outcome)
 }
