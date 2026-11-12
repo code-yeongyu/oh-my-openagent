@@ -111,6 +111,21 @@ describe("a handed delivery", () => {
     expect(typeof reply.data.stored_command_id).toBe("string")
   })
 
+  test.each([
+    ["held", { wait: "held" as const, hold_kinds: ["session_hold"] }, "hold"],
+    ["waiting for a person", { wait: "waiting" as const, hold_kinds: [] }, "approval"],
+  ])(
+    "#given a session stored as %s #when a record is handed in #then waiting_on names that wait by kind only, with no device",
+    async (_label, wait, kind) => {
+      const { store, sessions, service, consumer } = setup()
+      writeSessionFile(sessions, "t")
+      await store.sessionWait.write({ durable_id: "t", ...wait, file_size: 1 })
+      await consumer.start()
+      const reply = await service.inbound({ command_id: "c-1", sender_device: "dev-a", durable_id: "t", record: record("d-1") })
+      expect(reply.data.waiting_on).toEqual({ kind })
+    },
+  )
+
   test("#given a record repeated by the same device #when it is handed in again #then the answer comes from the row with deduplicated set, and the admission check and the wake still run", async () => {
     const { sessions, service, woken, consumer } = setup()
     writeSessionFile(sessions, "t")
