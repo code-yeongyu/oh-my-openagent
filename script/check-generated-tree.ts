@@ -1,18 +1,8 @@
 #!/usr/bin/env bun
-// Tree invariant after `bun script/build-generated.ts` (#9903). Mode `pr`: a listed output may differ from the commit,
-// because feature PRs never commit them; any other modified or untracked path fails, since it is either a stale
-// PR-committed generated file or an output nobody listed. Mode `release` (the release-state PR): nothing may differ,
-// byte for byte, so the committed outputs equal the rebuild.
-import { git, isGeneratedBundlePath, loadGeneratedBundlePatterns, nulSeparated } from "./generated-bundles.ts"
-
-const MODES = ["pr", "release"] as const
-type TreeMode = (typeof MODES)[number]
-
-function parseMode(): TreeMode | undefined {
-  const at = process.argv.indexOf("--mode")
-  const value = at === -1 ? undefined : process.argv[at + 1]
-  return MODES.find((mode) => mode === value)
-}
+// Tree invariant after `bun script/build-generated.ts` (#13192): the build modifies no tracked file and every path it
+// writes is ignored, so `git status` is empty. A modified tracked file is a derived file whose committed copy is stale
+// (the daemon launch spec); an untracked file is a new output nobody listed and ignored.
+import { git, nulSeparated } from "./generated-bundles.ts"
 
 // `git status --porcelain=v1 -z`: "XY path", and a rename or copy carries its source as the next entry.
 function statusEntries(output: string): { readonly status: string; readonly path: string }[] {
@@ -28,29 +18,17 @@ function statusEntries(output: string): { readonly status: string; readonly path
 }
 
 function run(): number {
-  const mode = parseMode()
-  if (mode === undefined) {
-    console.error("usage: bun script/check-generated-tree.ts --mode pr|release")
-    return 2
-  }
   const root = git(process.cwd(), ["rev-parse", "--show-toplevel"]).trim()
-  const patterns = loadGeneratedBundlePatterns()
-  const entries = statusEntries(git(root, ["status", "--porcelain=v1", "-z", "--untracked-files=all"]))
-  const problems = mode === "release" ? entries : entries.filter(({ path }) => !isGeneratedBundlePath(path, patterns))
+  const problems = statusEntries(git(root, ["status", "--porcelain=v1", "-z", "--untracked-files=all"]))
   if (problems.length === 0) {
-    console.log(`check-generated-tree: PASS (${mode}) - ${entries.length} listed output(s) differ from the commit`)
+    console.log("check-generated-tree: PASS - the build changed no tracked file and wrote only ignored paths")
     return 0
   }
-  console.error(
-    mode === "release"
-      ? "check-generated-tree: FAIL (release) - the committed outputs differ from the rebuild:"
-      : "check-generated-tree: FAIL (pr) - the build changed paths that are not on script/generated-bundles.json:",
-  )
+  console.error("check-generated-tree: FAIL - the build left the tree dirty:")
   for (const { status, path } of problems) console.error(`  ${status} ${path}`)
-  if (mode === "pr")
-    console.error(
-      "A modified tracked file is a stale PR-committed generated file: run its generator and commit the result. An untracked file is a new output: add it to the list.",
-    )
+  console.error(
+    "A modified tracked file is stale: run its generator and commit the result. An untracked file is an output nobody listed: add it to script/generated-bundles.json and the ignore rules.",
+  )
   return 1
 }
 

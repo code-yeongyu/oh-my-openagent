@@ -840,32 +840,19 @@ jobs:
       # Linux only: digestBuildSources hashes repo-relative paths (build-extension.mjs:140,143),
       # which are backslash-separated on Windows, so the source digest is platform-dependent and
       # a committed artifact can never match on every OS. One platform is enough to catch drift.
-      # #9903: feature PRs do not commit the outputs on script/generated-bundles.json, so this step builds all of
-      # them and checks the tree: on a PR a listed output may differ, anything else may not. A release branch of this
-      # repository (the release-state PR) commits the rebuild, so there the tree must match it byte for byte and the
-      # marker check still runs first. The stricter mode is the safe side for any other release/* branch.
+      # #13192: no build output on script/generated-bundles.json is tracked, so this step builds all of them (and the
+      # tracked daemon launch spec) and checks the tree: the build modifies no tracked file and writes only ignored paths.
       - name: Verify generated outputs and committed Senpi files are current
         if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.os == 'ubuntu-latest'
         shell: bash
-        env:
-          RELEASE_STATE_CANDIDATE: ${{ startsWith(github.head_ref, 'release/') && github.event.pull_request.head.repo.full_name == github.repository && '1' || '0' }}
         run: |
           set -euo pipefail
-          mode=pr
-          if [ "$RELEASE_STATE_CANDIDATE" = "1" ]; then
-            mode=release
-            node packages/omo-senpi/plugin/scripts/build-extension.mjs --check
-          fi
           bun script/build-generated.ts
-          bun script/check-generated-tree.ts --mode "$mode"
-          # The installer embeds the required-artifact list, so a stale copy demands files the
-          # plugin no longer ships and refuses to install. Nothing else in CI reads it.
-          node packages/omo-senpi/plugin/scripts/build-install.mjs --check
-          # The merge gate reads this map at the base tip to tell whether a PR can change a committed
-          # bundle; it is traced from the three generators above, so a stale map is a red build.
+          bun script/check-generated-tree.ts
+          # The merge gate reads this map at the base tip to tell whether a PR changes a bundle's inputs; it is traced
+          # from the generators above, so a stale map is a red build. Its first recipe step, build-extension.mjs
+          # --check, runs build-daemon-launch-spec.mjs --check first, which guards the tracked daemon-launch-spec.json.
           bun run bundle-inputs:check
-          # Every launcher's SENPI_BRAND logo comes from this generated module; it must match the icon asset.
-          bun run brand-logo:check
 
       - name: Run Senpi compatibility tests
         id: senpi-tests-posix
@@ -906,6 +893,9 @@ jobs:
         env:
           WINDOWS_TEST_SHARD: senpi-compatibility
         run: |
+          # #13192: the tests read generated outputs that are no longer tracked, as on POSIX.
+          bun script/build-generated.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           bun run build:senpi-plugin
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $packDirectory = Join-Path $env:RUNNER_TEMP "omo-senpi-pack"
