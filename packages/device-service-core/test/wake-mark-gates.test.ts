@@ -33,11 +33,18 @@ type Calls = {
   readonly locates: unknown[]
 }
 
-async function spiedService(minimums?: { readonly wakeMark: string | null; readonly singleLocate: string | null }) {
+async function spiedService(
+  minimums?: { readonly wakeMark: string | null; readonly singleLocate: string | null },
+  serviceVersion?: string,
+) {
   const stateDir = mkdtempSync(join(tmpdir(), "dsc-wake-"))
   chmodSync(stateDir, 0o700)
   dirs.push(stateDir)
-  const owner = await startFakeOwner({ stateDir, world: defaultWorld() })
+  const world = defaultWorld()
+  const owner = await startFakeOwner({
+    stateDir,
+    world: serviceVersion === undefined ? world : { ...world, service_version: serviceVersion },
+  })
   owners.push(owner)
   const calls: Calls = { commands: [], wakes: [], locates: [] }
   const service = await connectDeviceService({
@@ -103,6 +110,16 @@ describe("omo#13037: the wake mark and the single-probe locate are gated on the 
     expect(calls.wakes.map(([device, durableId, rpc]) => [device, durableId, rpc])).toEqual([[PEER, "dur-1", ADMIT]])
     await service.locate(PEER, "dur-1", { single: true }).catch(() => undefined)
     expect(calls.locates).toEqual([{ device: PEER, engine_id: "dur-1", single: true }])
+  })
+
+  test("#given one connection to a service at the minimum and a later one to an older service #then each connection reads its own welcome: the later one carries no mark", async () => {
+    const minimums = { wakeMark: "1.4.0", singleLocate: "1.4.0" }
+    const first = await spiedService(minimums, "1.4.0")
+    const later = await spiedService(minimums, "1.3.9")
+    expect([first.service.carriesWakeMark, later.service.carriesWakeMark]).toEqual([true, false])
+    const attach = await later.service.attach(PEER, SESSION_ID)
+    await attach.command(ADMIT, { accepts: ["session-wake:v1"] }).catch(() => undefined)
+    expect(later.calls.commands).toEqual([[ADMIT, undefined]])
   })
 
   test("#given a service below the minimum #then neither the mark nor the single probe is sent", async () => {
