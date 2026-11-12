@@ -1,5 +1,5 @@
 {
-  "description": "Row 19 failure path: an unchanged click on window 101 settles at 500 ms; the window then shows a spinner (t=100 ms) that never clears, so the observe returns at the unchanged regime's 1,000 ms cap with settle.outcome timeout naming the indicator and the tree as read, and the click that follows answers InputBusy{target_busy} with nothing sent (the sink stays at the first click's three lines).",
+  "description": "Row 19 failure path: an unchanged click on window 101 settles at 500 ms; the window then shows a spinner (t=100 ms) that never clears, so the observe returns at the unchanged regime's 1,000 ms cap with settle.outcome timeout naming the indicator and the tree as read, and the click that follows answers InputBusy{target_busy} with data.indicator \"spinner\", data.waitedMs 1000 and data.retryAfterMs 1000, and nothing sent (the sink stays at the first click's three lines).",
   "transport": "stdio",
   "scenario": "crates/omo-computer-backend-fake/fixtures/v3-busy-target-at-cap.json",
   "env": {
@@ -295,7 +295,10 @@
               "data": {
                 "code": "InputBusy",
                 "hint": null,
-                "reason": "target_busy"
+                "reason": "target_busy",
+                "indicator": "spinner",
+                "waitedMs": 1000,
+                "retryAfterMs": 1000
               }
             }
           },

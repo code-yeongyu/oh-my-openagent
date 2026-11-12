@@ -1,11 +1,12 @@
 //! The post-send settle picks its regime from what it saw, and the busy wait before a send.
 
 use omo_computer_core::error::{EngineCode, Reason};
-use omo_computer_core::observation::SettleOutcome;
+use omo_computer_core::observation::{BusyIndicator, SettleOutcome};
 use omo_computer_core::settle_profile::SettleRegime;
 use serde_json::{json, Value};
 
 use super::{expected, report_settle, Rig};
+use crate::settle::BusyDetail;
 
 #[test]
 fn after_input_changed_settles_at_150ms_quiet() {
@@ -81,5 +82,22 @@ fn exec_on_busy_target_at_cap_sends_nothing_and_is_input_busy() {
         rig.clock.now_ms(),
         1_000,
         "the unchanged regime's cap, never longer"
+    );
+}
+
+#[test]
+fn busy_refusal_carries_indicator_waited_and_retry_after() {
+    let mut rig = Rig::new(json!({
+        "busy_timeline": [{"t_ms": 0, "window": "101", "busy": true, "indicator": "spinner"}]
+    }));
+    let refused = rig.click().expect_err("a busy target is not sent to");
+    assert_eq!(
+        refused.busy,
+        Some(BusyDetail {
+            indicator: BusyIndicator::Spinner,
+            waited_ms: 1_000,
+            retry_after_ms: 1_000,
+        }),
+        "the wire's data.indicator, data.waitedMs and data.retryAfterMs"
     );
 }

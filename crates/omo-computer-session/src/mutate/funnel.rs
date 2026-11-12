@@ -107,6 +107,7 @@ impl Session {
                     call_id: Some(call_id),
                     receipt: None,
                     interrupted: Some(Disposition::UNCERTAIN_UNSAFE),
+                    busy: None,
                 })
             }
             None => {

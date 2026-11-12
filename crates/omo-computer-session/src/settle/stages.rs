@@ -4,7 +4,7 @@
 
 use omo_computer_core::backend::Refusal;
 use omo_computer_core::error::{EngineCode, Reason};
-use omo_computer_core::observation::SettleOutcome;
+use omo_computer_core::observation::{BusyIndicator, SettleOutcome};
 use omo_computer_core::requests::SettleSpec;
 use omo_computer_core::settle_profile::SettleRegime;
 
@@ -16,6 +16,16 @@ use crate::Session;
 /// `InputBusy{reason:"target_busy"}`: the target was still busy at the regime's cap, and
 /// nothing was sent.
 pub const TARGET_BUSY: Refusal = Refusal::new(EngineCode::InputBusy, Reason::TargetBusy.wire());
+
+/// What a busy-at-cap exec refusal carries on the wire beside `InputBusy{target_busy}`: the
+/// indicator still shown, how long the wait ran, and when the same call may be retried (the cap
+/// of the regime in force, the bound a `waitFor({settle})` would wait).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BusyDetail {
+    pub indicator: BusyIndicator,
+    pub waited_ms: u64,
+    pub retry_after_ms: u64,
+}
 
 /// The regime the last input's settle picked; before any input, `unchanged`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
