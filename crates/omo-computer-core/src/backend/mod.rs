@@ -142,6 +142,13 @@ pub trait Backend: Send {
     fn host_consent(&self) -> Option<serde_json::Value> {
         None
     }
+
+    // --- Row 25: menus, apps, system surfaces and the focused web area's URL. ---
+
+    /// The shell reads; `None` reads `AxUnsupported`.
+    fn shell_reader(&mut self) -> Option<&mut dyn crate::surface::ShellReader> {
+        None
+    }
 }
 
 /// The accessibility half of a backend.

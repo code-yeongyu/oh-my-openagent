@@ -76,6 +76,7 @@ fn event_line(event: &InputEvent) -> String {
         InputEvent::Key { key, down } => format!("key {} down={down}", quoted(key)),
         InputEvent::Scroll { dx, dy } => format!("scroll dx={dx} dy={dy}"),
         InputEvent::Text(text) => format!("text {}", quoted(text)),
+        row25 => shell::event_line(row25),
     }
 }
 
@@ -288,19 +289,19 @@ impl Backend for FakeBackend {
         FakeBackend::code_identity(self, pid)
     }
 
-    /// The scenario's `consent` view, with `fullAccess` set under the full-access preset.
     fn host_consent(&self) -> Option<serde_json::Value> {
-        let state = self.lock();
-        let mut view = state.scenario.consent.clone();
-        if state.scenario.full_access_preset {
-            if let Some(map) = view.get_or_insert_with(|| serde_json::json!({})).as_object_mut() {
-                map.insert("fullAccess".to_owned(), serde_json::Value::Bool(true));
-            }
-        }
-        view
+        self.fake_host_consent()
+    }
+
+    // --- Row 25: menus, apps, system surfaces and the focused web area's URL. ---
+
+    fn shell_reader(&mut self) -> Option<&mut dyn omo_computer_core::surface::ShellReader> {
+        Some(self)
     }
 }
 
+
+mod shell;
 
 #[cfg(test)]
 mod extent_tests;

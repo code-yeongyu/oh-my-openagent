@@ -198,6 +198,7 @@ mod tests {
             evidence: Vec::new(),
             observation: crate::untrusted::UntrustedText,
             paused: Vec::new(),
+            url_policy: None,
             session: None,
             target: None,
         }
