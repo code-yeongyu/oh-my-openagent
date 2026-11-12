@@ -29,7 +29,7 @@ class DragList(Gtk.EventBox):
         self.render()
 
     def row_at(self, event):
-        _ok, _x, y = self.translate_coordinates(self.rows, int(event.x), int(event.y))
+        _x, y = self.translate_coordinates(self.rows, int(event.x), int(event.y))
         return self.rows.get_row_at_y(y), y
 
     def on_press(self, _box, event):

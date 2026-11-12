@@ -7,7 +7,7 @@ import type { Oracle } from "../vocabulary.ts"
  * catalog oracle fields (live state of the window "Document"); `saved` holds that document's state at its
  * last File > Save plus how many windows were saved, the fields the task set's oracles read.
  */
-export const FIXTURE_REPORT_SCHEMA = "omo-conformance-fixture/1"
+const FIXTURE_REPORT_SCHEMA = "omo-conformance-fixture/1"
 
 const catalogFields = z
   .object({
