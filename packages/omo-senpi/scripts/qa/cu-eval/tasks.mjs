@@ -37,12 +37,20 @@ function window(id, app, title, x, y, focused = true) {
 }
 
 function node(role, nativeRole, title, x, y, width, height, extra = {}) {
-  return { role, native_role: nativeRole, ...(title === null ? {} : { title }), bounds: { x, y, width, height }, ...extra }
+  return {
+    role,
+    native_role: nativeRole,
+    ...(title === null ? {} : { title }),
+    bounds: { x, y, width, height },
+    ...extra,
+  }
 }
 
 const button = (title, x, y) => node("button", "AXButton", title, x, y, 60, 40, { actions: ["press"] })
-const textfield = (title, x, y) => node("textfield", "AXTextField", title, x, y, 300, 28, { value: "", actions: ["focus"] })
-const textarea = (title, x, y) => node("textarea", "AXTextArea", title, x, y, 760, 480, { value: "", actions: ["focus"] })
+const textfield = (title, x, y) =>
+  node("textfield", "AXTextField", title, x, y, 300, 28, { value: "", actions: ["focus"] })
+const textarea = (title, x, y) =>
+  node("textarea", "AXTextArea", title, x, y, 760, 480, { value: "", actions: ["focus"] })
 
 function scenario(windows, ax, extra = {}) {
   return { displays: [DISPLAY], windows, ax, ...extra }
@@ -57,7 +65,9 @@ const TWO_WINDOW_TEXT = "only the second window"
 
 /** Audit lines of `action` that succeeded on `target`. */
 function auditCount(audit, action, target) {
-  return audit.filter((line) => line.action === action && line.status === "success" && (target === undefined || line.target === target)).length
+  return audit.filter(
+    (line) => line.action === action && line.status === "success" && (target === undefined || line.target === target),
+  ).length
 }
 
 /**
@@ -76,7 +86,9 @@ export function pressesReached(audit, target, n) {
 export function textLanded(value, audit, text) {
   if (value === text) return true
   const sha = createHash("sha256").update(text).digest("hex").slice(0, 16)
-  return audit.some((line) => line.action === "typeText" && line.status === "success" && line.textSha256 === sha) ? null : false
+  return audit.some((line) => line.action === "typeText" && line.status === "success" && line.textSha256 === sha)
+    ? null
+    : false
 }
 
 const calcWin = window("301", "Calculator", "Calculator", 200, 150)
@@ -114,12 +126,22 @@ export const TASKS = [
       readback: [{ key: "display", el: { role: "statictext", name: "display" }, field: "value" }],
       expect: { presses: 4 },
       oracle: ({ audit, expect }) => [
-        { check: `${expect.presses} keypad presses reached the calculator window`, kind: "audit", ok: pressesReached(audit, "301", expect.presses) },
+        {
+          check: `${expect.presses} keypad presses reached the calculator window`,
+          kind: "audit",
+          ok: pressesReached(audit, "301", expect.presses),
+        },
         // The fake runs no arithmetic: the display result is a live-only oracle.
         { check: "the display shows 56", kind: "ax", ok: null, why: "the fake backend runs no app logic" },
       ],
       restore: [{ op: "press", el: { role: "button", name: "clear" } }],
-      postcheck: ({ audit }) => [{ check: "the clear press reached the calculator", kind: "audit", ok: auditCount(audit, "ax.perform", "301") >= 1 }],
+      postcheck: ({ audit }) => [
+        {
+          check: "the clear press reached the calculator",
+          kind: "audit",
+          ok: auditCount(audit, "ax.perform", "301") >= 1,
+        },
+      ],
     },
     live: {
       setup: [["open", "-a", "Calculator"]],
@@ -136,8 +158,13 @@ export const TASKS = [
       oracle: ({ readback, expect }) => [
         { check: "the display shows 56", kind: "ax", ok: digits(readback.display) === expect.display },
       ],
-      restore: [{ op: "press", el: { role: "button", name: "All Clear" }, optional: true }, { op: "quit", app: "Calculator" }],
-      postcheck: ({ readback }) => [{ check: "the display is cleared again", kind: "ax", ok: digits(readback.display) === "0" }],
+      restore: [
+        { op: "press", el: { role: "button", name: "All Clear" }, optional: true },
+        { op: "quit", app: "Calculator" },
+      ],
+      postcheck: ({ readback }) => [
+        { check: "the display is cleared again", kind: "ax", ok: digits(readback.display) === "0" },
+      ],
     },
   },
   {
@@ -161,11 +188,21 @@ export const TASKS = [
       readback: [],
       expect: { presses: 1 },
       oracle: ({ audit, expect }) => [
-        { check: "the sidebar press reached the Finder window", kind: "audit", ok: pressesReached(audit, "311", expect.presses) },
+        {
+          check: "the sidebar press reached the Finder window",
+          kind: "audit",
+          ok: pressesReached(audit, "311", expect.presses),
+        },
         { check: "the window now shows Downloads", kind: "ax", ok: null, why: "the fake backend runs no app logic" },
       ],
       restore: [{ op: "press", el: { role: "row", name: "Recents" } }],
-      postcheck: ({ audit }) => [{ check: "the return press reached the Finder window", kind: "audit", ok: auditCount(audit, "ax.perform", "311") >= 1 }],
+      postcheck: ({ audit }) => [
+        {
+          check: "the return press reached the Finder window",
+          kind: "audit",
+          ok: auditCount(audit, "ax.perform", "311") >= 1,
+        },
+      ],
     },
     live: {
       setup: [["open", "-a", "Finder", "/Applications"]],
@@ -174,11 +211,19 @@ export const TASKS = [
       readback: [],
       expect: { title: "Downloads" },
       oracle: ({ windows, expect }) => [
-        { check: "a Finder window shows Downloads", kind: "ax", ok: windows.some((w) => w.app === "Finder" && w.title === expect.title) },
+        {
+          check: "a Finder window shows Downloads",
+          kind: "ax",
+          ok: windows.some((w) => w.app === "Finder" && w.title === expect.title),
+        },
       ],
       restore: [{ op: "press", el: { role: "row", name: "Applications" } }, { op: "closeWindow" }],
       postcheck: ({ windows }) => [
-        { check: "no eval Finder window is left open", kind: "ax", ok: !windows.some((w) => w.app === "Finder" && ["Downloads", "Applications"].includes(w.title)) },
+        {
+          check: "no eval Finder window is left open",
+          kind: "ax",
+          ok: !windows.some((w) => w.app === "Finder" && ["Downloads", "Applications"].includes(w.title)),
+        },
       ],
     },
   },
@@ -193,7 +238,11 @@ export const TASKS = [
       readback: [{ key: "document", el: { role: "textarea", name: "document" }, field: "value" }],
       expect: { document: KOREAN_TEXT },
       oracle: ({ readback, audit, expect }) => [
-        { check: "the document holds the Korean text exactly", kind: "ax", ok: textLanded(readback.document, audit, expect.document) },
+        {
+          check: "the document holds the Korean text exactly",
+          kind: "ax",
+          ok: textLanded(readback.document, audit, expect.document),
+        },
         { check: "Save was never pressed", kind: "audit", ok: auditCount(audit, "ax.perform", "321") === 0 },
       ],
       restore: [{ op: "setValue", el: { role: "textarea", name: "document" }, value: "" }],
@@ -206,11 +255,20 @@ export const TASKS = [
       plan: [{ op: "type", el: { role: "textarea", name: "" }, text: KOREAN_TEXT }],
       readback: [{ key: "document", el: { role: "textarea", name: "" }, field: "value" }],
       expect: { document: KOREAN_TEXT },
-      oracle: ({ readback, expect }) => [{ check: "the document holds the Korean text exactly", kind: "ax", ok: readback.document === expect.document }],
-      restore: [{ op: "setValue", el: { role: "textarea", name: "" }, value: "" }, { op: "closeWindow", discard: true }],
+      oracle: ({ readback, expect }) => [
+        { check: "the document holds the Korean text exactly", kind: "ax", ok: readback.document === expect.document },
+      ],
+      restore: [
+        { op: "setValue", el: { role: "textarea", name: "" }, value: "" },
+        { op: "closeWindow", discard: true },
+      ],
       postcheck: ({ files, windows }) => [
         { check: "the file on disk is unchanged (never saved)", kind: "file", ok: files["cu-eval-korean.txt"] === "" },
-        { check: "the document window is closed", kind: "ax", ok: !windows.some((w) => w.title.startsWith("cu-eval-korean")) },
+        {
+          check: "the document window is closed",
+          kind: "ax",
+          ok: !windows.some((w) => w.title.startsWith("cu-eval-korean")),
+        },
       ],
     },
   },
@@ -244,7 +302,9 @@ export const TASKS = [
         { op: "setValue", el: { role: "textfield", name: "Name" }, value: "" },
         { op: "setValue", el: { role: "textfield", name: "Email" }, value: "" },
       ],
-      postcheck: ({ readback }) => [{ check: "both fields are cleared", kind: "ax", ok: readback.name === "" && readback.email === "" }],
+      postcheck: ({ readback }) => [
+        { check: "both fields are cleared", kind: "ax", ok: readback.name === "" && readback.email === "" },
+      ],
     },
     live: {
       files: {
@@ -271,7 +331,9 @@ export const TASKS = [
         { op: "setValue", el: { role: "textfield", name: "Email" }, value: "" },
         { op: "closeWindow" },
       ],
-      postcheck: ({ windows }) => [{ check: "the form tab is closed", kind: "ax", ok: !windows.some((w) => w.title.includes("cu-eval form")) }],
+      postcheck: ({ windows }) => [
+        { check: "the form tab is closed", kind: "ax", ok: !windows.some((w) => w.title.includes("cu-eval form")) },
+      ],
     },
   },
   {
@@ -280,18 +342,30 @@ export const TASKS = [
     prompt: "In System Settings > Accessibility > Display, turn Reduce motion on.",
     fake: {
       scenario: scenario([settingsWin], {
-        341: root(settingsWin, [node("checkbox", "AXCheckBox", "Reduce motion", 400, 300, 40, 24, { value: "0", actions: ["press"] })]),
+        341: root(settingsWin, [
+          node("checkbox", "AXCheckBox", "Reduce motion", 400, 300, 40, 24, { value: "0", actions: ["press"] }),
+        ]),
       }),
       window: { app: "System Settings" },
       plan: [{ op: "press", el: { role: "checkbox", name: "Reduce motion" } }],
       readback: [{ key: "toggle", el: { role: "checkbox", name: "Reduce motion" }, field: "value" }],
       expect: { presses: 1 },
       oracle: ({ audit, expect }) => [
-        { check: "the toggle press reached System Settings", kind: "audit", ok: pressesReached(audit, "341", expect.presses) },
+        {
+          check: "the toggle press reached System Settings",
+          kind: "audit",
+          ok: pressesReached(audit, "341", expect.presses),
+        },
         { check: "the switch reads on", kind: "ax", ok: null, why: "the fake backend runs no app logic" },
       ],
       restore: [{ op: "press", el: { role: "checkbox", name: "Reduce motion" } }],
-      postcheck: ({ audit }) => [{ check: "the restoring press reached System Settings", kind: "audit", ok: auditCount(audit, "ax.perform", "341") >= 1 }],
+      postcheck: ({ audit }) => [
+        {
+          check: "the restoring press reached System Settings",
+          kind: "audit",
+          ok: auditCount(audit, "ax.perform", "341") >= 1,
+        },
+      ],
     },
     live: {
       setup: [["open", "x-apple.systempreferences:com.apple.preference.universalaccess?Seeing_Display"]],
@@ -301,9 +375,16 @@ export const TASKS = [
       readback: [{ key: "toggle", el: { role: "checkbox", name: "Reduce motion" }, field: "value" }],
       expect: {},
       oracle: ({ readback, remembered }) => [
-        { check: "the switch flipped", kind: "ax", ok: readback.toggle !== null && readback.toggle !== remembered.toggle },
+        {
+          check: "the switch flipped",
+          kind: "ax",
+          ok: readback.toggle !== null && readback.toggle !== remembered.toggle,
+        },
       ],
-      restore: [{ op: "press", el: { role: "checkbox", name: "Reduce motion" }, onlyIfChanged: "toggle" }, { op: "quit", app: "System Settings" }],
+      restore: [
+        { op: "press", el: { role: "checkbox", name: "Reduce motion" }, onlyIfChanged: "toggle" },
+        { op: "quit", app: "System Settings" },
+      ],
       postcheck: ({ remembered, readback }) => [
         { check: "the switch is back to its original value", kind: "ax", ok: readback.toggle === remembered.toggle },
       ],
@@ -322,7 +403,12 @@ export const TASKS = [
       plan: [{ op: "type", el: { role: "textarea", name: "document" }, text: TWO_WINDOW_TEXT }],
       readback: [
         { key: "second", el: { role: "textarea", name: "document" }, field: "value" },
-        { key: "first", window: { app: "TextEdit", title: "cu-eval-a.txt" }, el: { role: "textarea", name: "document" }, field: "value" },
+        {
+          key: "first",
+          window: { app: "TextEdit", title: "cu-eval-a.txt" },
+          el: { role: "textarea", name: "document" },
+          field: "value",
+        },
       ],
       expect: { second: TWO_WINDOW_TEXT, first: "" },
       oracle: ({ readback, audit, expect }) => [
@@ -330,7 +416,9 @@ export const TASKS = [
         { check: "the other window is untouched", kind: "ax", ok: readback.first === expect.first },
       ],
       restore: [{ op: "setValue", el: { role: "textarea", name: "document" }, value: "" }],
-      postcheck: ({ readback }) => [{ check: "both documents are empty again", kind: "ax", ok: readback.second === "" && readback.first === "" }],
+      postcheck: ({ readback }) => [
+        { check: "both documents are empty again", kind: "ax", ok: readback.second === "" && readback.first === "" },
+      ],
     },
     live: {
       files: { "cu-eval-a.txt": "", "cu-eval-b.txt": "" },
@@ -339,7 +427,12 @@ export const TASKS = [
       plan: [{ op: "type", el: { role: "textarea", name: "" }, text: TWO_WINDOW_TEXT }],
       readback: [
         { key: "second", el: { role: "textarea", name: "" }, field: "value" },
-        { key: "first", window: { app: "TextEdit", title: "cu-eval-a.txt" }, el: { role: "textarea", name: "" }, field: "value" },
+        {
+          key: "first",
+          window: { app: "TextEdit", title: "cu-eval-a.txt" },
+          el: { role: "textarea", name: "" },
+          field: "value",
+        },
       ],
       expect: { second: TWO_WINDOW_TEXT, first: "" },
       oracle: ({ readback, expect }) => [
@@ -352,7 +445,11 @@ export const TASKS = [
         { op: "closeWindow", window: { app: "TextEdit", title: "cu-eval-a.txt" }, discard: true },
       ],
       postcheck: ({ files, windows }) => [
-        { check: "neither file on disk changed", kind: "file", ok: files["cu-eval-a.txt"] === "" && files["cu-eval-b.txt"] === "" },
+        {
+          check: "neither file on disk changed",
+          kind: "file",
+          ok: files["cu-eval-a.txt"] === "" && files["cu-eval-b.txt"] === "",
+        },
         { check: "both eval windows are closed", kind: "ax", ok: !windows.some((w) => w.title.startsWith("cu-eval-")) },
       ],
     },
@@ -362,22 +459,41 @@ export const TASKS = [
     title: "메뉴 경로 선택",
     prompt: "In the TextEdit window, choose Format > Text > Show Ruler from the menu bar.",
     fake: {
-      scenario: scenario([menuWin], { 361: root(menuWin, [textarea("document", 130, 140)]) }, {
-        menus: {
-          361: [
-            { title: "File", children: [{ title: "Save", shortcut: "Cmd+S" }] },
-            { title: "Format", children: [{ title: "Text", children: [{ title: "Show Ruler" }, { title: "Align Left" }] }] },
-          ],
+      scenario: scenario(
+        [menuWin],
+        { 361: root(menuWin, [textarea("document", 130, 140)]) },
+        {
+          menus: {
+            361: [
+              { title: "File", children: [{ title: "Save", shortcut: "Cmd+S" }] },
+              {
+                title: "Format",
+                children: [{ title: "Text", children: [{ title: "Show Ruler" }, { title: "Align Left" }] }],
+              },
+            ],
+          },
         },
-      }),
+      ),
       window: { app: "TextEdit" },
       plan: [{ op: "menu", path: ["Format", "Text", "Show Ruler"] }],
       readback: [{ key: "submenu", menu: ["Format", "Text"] }],
       expect: { selects: 1, item: "Show Ruler" },
       oracle: ({ readback, audit, expect }) => [
-        { check: "the menu command reached the window", kind: "audit", ok: auditCount(audit, "menus.select", "361") >= expect.selects },
-        { check: "the path exists in the window's menu", kind: "ax", ok: Array.isArray(readback.submenu) && readback.submenu.includes(expect.item) },
-        { check: "no other menu command was chosen", kind: "audit", ok: auditCount(audit, "menus.select", "361") <= expect.selects },
+        {
+          check: "the menu command reached the window",
+          kind: "audit",
+          ok: auditCount(audit, "menus.select", "361") >= expect.selects,
+        },
+        {
+          check: "the path exists in the window's menu",
+          kind: "ax",
+          ok: Array.isArray(readback.submenu) && readback.submenu.includes(expect.item),
+        },
+        {
+          check: "no other menu command was chosen",
+          kind: "audit",
+          ok: auditCount(audit, "menus.select", "361") <= expect.selects,
+        },
       ],
       restore: [],
       postcheck: () => [],
@@ -390,12 +506,23 @@ export const TASKS = [
       readback: [{ key: "submenu", menu: ["Format", "Text"] }],
       expect: { item: "Hide Ruler" },
       oracle: ({ readback, expect }) => [
-        { check: "the ruler is shown (the menu now offers Hide Ruler)", kind: "ax", ok: Array.isArray(readback.submenu) && readback.submenu.includes(expect.item) },
+        {
+          check: "the ruler is shown (the menu now offers Hide Ruler)",
+          kind: "ax",
+          ok: Array.isArray(readback.submenu) && readback.submenu.includes(expect.item),
+        },
       ],
-      restore: [{ op: "menu", path: ["Format", "Text", "Hide Ruler"] }, { op: "closeWindow", discard: true }],
+      restore: [
+        { op: "menu", path: ["Format", "Text", "Hide Ruler"] },
+        { op: "closeWindow", discard: true },
+      ],
       postcheck: ({ files, windows }) => [
         { check: "the file on disk is unchanged", kind: "file", ok: files["cu-eval-menu.txt"] === "" },
-        { check: "the eval window is closed", kind: "ax", ok: !windows.some((w) => w.title.startsWith("cu-eval-menu")) },
+        {
+          check: "the eval window is closed",
+          kind: "ax",
+          ok: !windows.some((w) => w.title.startsWith("cu-eval-menu")),
+        },
       ],
     },
   },
@@ -404,4 +531,3 @@ export const TASKS = [
 function digits(value) {
   return typeof value === "string" ? value.replace(/[^0-9.-]/g, "") : null
 }
-

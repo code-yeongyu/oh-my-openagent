@@ -21,7 +21,8 @@ export function dispositionHistogram(reports) {
 
 function mergeHistograms(histograms) {
   const merged = {}
-  for (const histogram of histograms) for (const [key, count] of Object.entries(histogram)) merged[key] = (merged[key] ?? 0) + count
+  for (const histogram of histograms)
+    for (const [key, count] of Object.entries(histogram)) merged[key] = (merged[key] ?? 0) + count
   return merged
 }
 
@@ -57,7 +58,13 @@ export function compareBench(current, baseline) {
     }
     const limit = base.wallMs.p50 * REGRESSION_RATIO
     if (now.wallMs.p50 > limit && now.wallMs.p50 - base.wallMs.p50 > REGRESSION_FLOOR_MS) {
-      regressions.push({ op, reason: "p50", baselineP50: base.wallMs.p50, currentP50: now.wallMs.p50, limit: Math.round(limit * 1000) / 1000 })
+      regressions.push({
+        op,
+        reason: "p50",
+        baselineP50: base.wallMs.p50,
+        currentP50: now.wallMs.p50,
+        limit: Math.round(limit * 1000) / 1000,
+      })
     }
   }
   return { ok: regressions.length === 0, ratio: REGRESSION_RATIO, floorMs: REGRESSION_FLOOR_MS, regressions }
@@ -66,7 +73,10 @@ export function compareBench(current, baseline) {
 /** The QA control: every expected value of `expect` is made wrong, so an honest oracle must fail. */
 export function mismatched(expect) {
   return Object.fromEntries(
-    Object.entries(expect).map(([key, value]) => [key, typeof value === "number" ? value + 100 : `${String(value)} (mismatch)`]),
+    Object.entries(expect).map(([key, value]) => [
+      key,
+      typeof value === "number" ? value + 100 : `${String(value)} (mismatch)`,
+    ]),
   )
 }
 
@@ -92,9 +102,12 @@ function named(node, name) {
 
 /** One element of `win` by `{ role, name }`; `last` picks the last match (a calculator's result line). */
 async function findElement(win, { role, name }, { last = false } = {}) {
-  const matches = (await win.find({ role })).filter((element) => element.node?.role === role && named(element.node, name))
+  const matches = (await win.find({ role })).filter(
+    (element) => element.node?.role === role && named(element.node, name),
+  )
   const element = last ? matches.at(-1) : matches[0]
-  if (element === undefined) throw new Error(`no ${role} named ${JSON.stringify(name)} in ${win.app} ${JSON.stringify(win.title)}`)
+  if (element === undefined)
+    throw new Error(`no ${role} named ${JSON.stringify(name)} in ${win.app} ${JSON.stringify(win.title)}`)
   return element
 }
 
@@ -112,7 +125,8 @@ export async function runPlan(computer, win, plan, { remembered = {}, readback =
       else if (step.op === "setValue") reports.push(await (await findElement(target, step.el)).setValue(step.value))
       else if (step.op === "type") reports.push(await (await findElement(target, step.el)).type(step.text))
       else if (step.op === "menu") reports.push(await target.menu.select(step.path))
-      else if (live !== undefined && live.ops[step.op] !== undefined) reports.push(...(await live.ops[step.op](computer, target, step)))
+      else if (live !== undefined && live.ops[step.op] !== undefined)
+        reports.push(...(await live.ops[step.op](computer, target, step)))
       else throw new Error(`unknown plan op ${step.op}`)
     } catch (error) {
       if (step.optional === true) continue
@@ -153,7 +167,12 @@ function expectOf(surface, mismatch) {
 /** The oracle judges what the plan left; the post-check judges the restored readback, audit, windows and files. */
 export function oracleRow({ task, arm, surface, mismatch, outcome }) {
   const checks = surface.oracle({ ...outcome, expect: expectOf(surface, mismatch) }).map(normalizeCheck)
-  const restored = { readback: outcome.restoredReadback, audit: outcome.restoreAudit, windows: outcome.restoredWindows, files: outcome.restoredFiles }
+  const restored = {
+    readback: outcome.restoredReadback,
+    audit: outcome.restoreAudit,
+    windows: outcome.restoredWindows,
+    files: outcome.restoredFiles,
+  }
   const restoreChecks = (surface.postcheck({ ...outcome, ...restored }) ?? []).map(normalizeCheck)
   return {
     task: task.id,
@@ -180,7 +199,9 @@ function normalizeCheck(check) {
 export function summarize(rows) {
   const counts = { pass: 0, fail: 0, unverified: 0, error: 0, skipped: 0 }
   for (const row of rows) counts[row.status] = (counts[row.status] ?? 0) + 1
-  const restoreFailed = rows.filter((row) => row.restore?.status === "fail" || row.restore?.status === "error").map((row) => row.task)
+  const restoreFailed = rows
+    .filter((row) => row.restore?.status === "fail" || row.restore?.status === "error")
+    .map((row) => row.task)
   return {
     tasks: rows.length,
     ...counts,
@@ -193,5 +214,7 @@ export function summarize(rows) {
 
 /** Exit 0 only when every task ran, none failed, and every restore post-check held. */
 export function exitCodeFor(summary) {
-  return summary.fail === 0 && summary.error === 0 && summary.skipped === 0 && summary.restoreFailed.length === 0 ? 0 : 1
+  return summary.fail === 0 && summary.error === 0 && summary.skipped === 0 && summary.restoreFailed.length === 0
+    ? 0
+    : 1
 }

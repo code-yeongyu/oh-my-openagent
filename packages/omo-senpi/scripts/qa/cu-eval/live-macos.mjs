@@ -7,7 +7,8 @@ import { join } from "node:path"
 
 function run(command, args) {
   const result = spawnSync(command, args, { encoding: "utf8", timeout: 30_000 })
-  if (result.status !== 0) throw new Error(`${command} ${args.join(" ")} exited ${result.status}: ${(result.stderr ?? "").trim()}`)
+  if (result.status !== 0)
+    throw new Error(`${command} ${args.join(" ")} exited ${result.status}: ${(result.stderr ?? "").trim()}`)
   return result.stdout
 }
 
@@ -30,7 +31,11 @@ export function prepare(surface, dir) {
   const filesDir = join(dir, "files")
   mkdirSync(filesDir, { recursive: true })
   for (const [name, content] of Object.entries(surface.files ?? {})) writeFileSync(join(filesDir, name), content)
-  for (const [command, ...args] of surface.setup ?? []) run(command, args.map((arg) => arg.replaceAll("{dir}", filesDir)))
+  for (const [command, ...args] of surface.setup ?? [])
+    run(
+      command,
+      args.map((arg) => arg.replaceAll("{dir}", filesDir)),
+    )
 }
 
 /** Each scratch file's content now, `null` when it is gone: the "never saved" oracle. */
@@ -45,9 +50,12 @@ export function files(surface, dir) {
 
 /** Closes one window by title through its app's own scripting, discarding edits; never the user's other windows. */
 function closeTitled(app, title) {
-  if (app === "TextEdit") osascript(`tell application "TextEdit" to close (every document whose name is ${quoted(title)}) saving no`)
-  else if (app === "Safari") osascript(`tell application "Safari" to close (every tab of every window whose name contains ${quoted(title)})`)
-  else if (app === "Finder") osascript(`tell application "Finder" to close (every window whose name is ${quoted(title)})`)
+  if (app === "TextEdit")
+    osascript(`tell application "TextEdit" to close (every document whose name is ${quoted(title)}) saving no`)
+  else if (app === "Safari")
+    osascript(`tell application "Safari" to close (every tab of every window whose name contains ${quoted(title)})`)
+  else if (app === "Finder")
+    osascript(`tell application "Finder" to close (every window whose name is ${quoted(title)})`)
   else throw new Error(`no close recipe for ${app}`)
 }
 
@@ -72,7 +80,8 @@ export const TEARDOWN_OPS = new Set(["quit", "closeWindow"])
 /** Waits (READ polling, no fixed sleep) until the task's window exists. */
 export async function waitForWindow(computer, filter, timeoutMs = 20_000) {
   const verdict = await computer.verify({ kind: "windowExists", window: filter }, { timeoutMs, intervalMs: 200 })
-  if (verdict.status !== "satisfied") throw new Error(`window ${JSON.stringify(filter)} did not appear within ${timeoutMs} ms (${verdict.status})`)
+  if (verdict.status !== "satisfied")
+    throw new Error(`window ${JSON.stringify(filter)} did not appear within ${timeoutMs} ms (${verdict.status})`)
 }
 
 let benchDocument

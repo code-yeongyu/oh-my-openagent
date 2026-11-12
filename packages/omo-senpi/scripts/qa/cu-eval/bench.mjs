@@ -22,9 +22,17 @@ const here = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(here, "..", "..", "..", "..", "..")
 
 if (process.versions.bun === undefined) {
-  const child = spawnSync("bun", [fileURLToPath(import.meta.url), ...process.argv.slice(2)], { stdio: "inherit", env: withTelemetryOptOut(process.env) })
+  const child = spawnSync("bun", [fileURLToPath(import.meta.url), ...process.argv.slice(2)], {
+    stdio: "inherit",
+    env: withTelemetryOptOut(process.env),
+  })
   if (child.error !== undefined) {
-    console.log(JSON.stringify({ verdict: "FAIL", reason: `the bench needs bun on PATH to load the SDK: ${child.error.message}` }))
+    console.log(
+      JSON.stringify({
+        verdict: "FAIL",
+        reason: `the bench needs bun on PATH to load the SDK: ${child.error.message}`,
+      }),
+    )
     process.exit(1)
   }
   process.exit(child.status ?? 1)
@@ -38,9 +46,35 @@ const { locateEngine } = await import("./run.mjs")
 /** One window with a text area and a button: every op below has a target. */
 const BENCH_SCENARIO = {
   displays: [
-    { id: "1", name: "Built-in Display", x: 0, y: 0, width: 1920, height: 1080, scale: 1, pixelX: 0, pixelY: 0, pixelWidth: 1920, pixelHeight: 1080, isPrimary: true },
+    {
+      id: "1",
+      name: "Built-in Display",
+      x: 0,
+      y: 0,
+      width: 1920,
+      height: 1080,
+      scale: 1,
+      pixelX: 0,
+      pixelY: 0,
+      pixelWidth: 1920,
+      pixelHeight: 1080,
+      isPrimary: true,
+    },
   ],
-  windows: [{ id: "401", title: "cu-bench.txt", app: "TextEdit", pid: 4401, x: 100, y: 100, width: 760, height: 584, focused: true, elevated: null }],
+  windows: [
+    {
+      id: "401",
+      title: "cu-bench.txt",
+      app: "TextEdit",
+      pid: 4401,
+      x: 100,
+      y: 100,
+      width: 760,
+      height: 584,
+      focused: true,
+      elevated: null,
+    },
+  ],
   ax: {
     401: {
       role: "window",
@@ -48,8 +82,21 @@ const BENCH_SCENARIO = {
       title: "cu-bench.txt",
       bounds: { x: 100, y: 100, width: 760, height: 584 },
       children: [
-        { role: "textarea", native_role: "AXTextArea", title: "document", value: "", bounds: { x: 110, y: 140, width: 740, height: 480 }, actions: ["focus"] },
-        { role: "button", native_role: "AXButton", title: "Bench", bounds: { x: 760, y: 640, width: 80, height: 30 }, actions: ["press"] },
+        {
+          role: "textarea",
+          native_role: "AXTextArea",
+          title: "document",
+          value: "",
+          bounds: { x: 110, y: 140, width: 740, height: 480 },
+          actions: ["focus"],
+        },
+        {
+          role: "button",
+          native_role: "AXButton",
+          title: "Bench",
+          bounds: { x: 760, y: 640, width: 80, height: 30 },
+          actions: ["press"],
+        },
       ],
     },
   },
@@ -57,7 +104,9 @@ const BENCH_SCENARIO = {
 
 /** A fresh element each time: a capture or snapshot starts a new ref generation, so refs do not outlive a round. */
 async function element(win, role, title) {
-  const [found] = (await win.find({ role })).filter((candidate) => candidate.node?.role === role && (title === undefined || candidate.node?.title === title))
+  const [found] = (await win.find({ role })).filter(
+    (candidate) => candidate.node?.role === role && (title === undefined || candidate.node?.title === title),
+  )
   if (found === undefined) throw new Error(`bench target ${role} ${title ?? ""} is missing`)
   return found
 }
@@ -77,12 +126,21 @@ export const OPS = {
   },
   "ax.setValue": { method: "ax.setValue", run: async (ctx) => (await element(ctx.win, "textarea")).setValue("") },
   "ax.typeText": { method: "ax.typeText", run: async (ctx) => (await element(ctx.win, "textarea")).type("bench") },
-  "ax.perform": { method: "ax.perform", run: async (ctx) => (await element(ctx.win, "button", "Bench")).press(), fakeOnly: true },
+  "ax.perform": {
+    method: "ax.perform",
+    run: async (ctx) => (await element(ctx.win, "button", "Bench")).press(),
+    fakeOnly: true,
+  },
 }
 
 function load() {
   const [one, five, fifteen] = loadavg()
-  return { load1: Math.round(one * 100) / 100, load5: Math.round(five * 100) / 100, load15: Math.round(fifteen * 100) / 100, cpus: cpus().length }
+  return {
+    load1: Math.round(one * 100) / 100,
+    load5: Math.round(five * 100) / 100,
+    load15: Math.round(fifteen * 100) / 100,
+    cpus: cpus().length,
+  }
 }
 
 function hostKey(live) {
@@ -94,7 +152,8 @@ export function foldSamples(samples) {
   const ops = {}
   for (const [op, list] of Object.entries(samples)) {
     const stages = {}
-    for (const sample of list) for (const [stage, us] of Object.entries(sample.timings ?? {})) (stages[stage] ??= []).push(us)
+    for (const sample of list)
+      for (const [stage, us] of Object.entries(sample.timings ?? {})) (stages[stage] ??= []).push(us)
     ops[op] = {
       wallMs: core.stats(list.map((sample) => sample.wallMs)),
       stagesUs: Object.fromEntries(Object.entries(stages).map(([stage, values]) => [stage, core.stats(values)])),
@@ -120,14 +179,29 @@ async function runBench({ enginePath, live, runs, warmup }) {
   let last
   let hello
   const onReply = (method, result, wallMs) => {
-    last = { method, wallMs, timings: result !== null && typeof result === "object" ? (result.timings ?? result.report?.timings ?? null) : null }
+    last = {
+      method,
+      wallMs,
+      timings:
+        result !== null && typeof result === "object" ? (result.timings ?? result.report?.timings ?? null) : null,
+    }
   }
   const computer = await connect({
     kind: "spawn",
-    launch: engineLauncher({ enginePath, env, session: { reportMode: "object", trace: true }, onReply, opened: (info) => (hello = info) }),
+    launch: engineLauncher({
+      enginePath,
+      env,
+      session: { reportMode: "object", trace: true },
+      onReply,
+      opened: (info) => (hello = info),
+    }),
   })
   const before = load()
-  const samples = Object.fromEntries(Object.keys(OPS).filter((op) => !(live && OPS[op].fakeOnly)).map((op) => [op, []]))
+  const samples = Object.fromEntries(
+    Object.keys(OPS)
+      .filter((op) => !(live && OPS[op].fakeOnly))
+      .map((op) => [op, []]),
+  )
   try {
     if (livePrep !== undefined) await livePrep.waitForWindow(computer, { app: "TextEdit", title: "cu-bench" })
     const win = await computer.window(live ? { app: "TextEdit", title: "cu-bench" } : { app: "TextEdit" })
@@ -137,7 +211,8 @@ async function runBench({ enginePath, live, runs, warmup }) {
         last = undefined
         await OPS[op].run(ctx)
         const reply = last
-        if (round >= warmup && reply?.method === OPS[op].method) samples[op].push({ wallMs: reply.wallMs, timings: reply.timings })
+        if (round >= warmup && reply?.method === OPS[op].method)
+          samples[op].push({ wallMs: reply.wallMs, timings: reply.timings })
       }
     }
     await (await element(win, "textarea")).setValue("")
@@ -150,10 +225,17 @@ async function runBench({ enginePath, live, runs, warmup }) {
     schema: 1,
     hostKey: hostKey(live),
     surface: live ? "live-macos" : "fake-engine",
-    engine: { version: hello?.hello?.engineVersion ?? null, buildSha: hello?.hello?.buildSha ?? null, features: hello?.features ?? [] },
+    engine: {
+      version: hello?.hello?.engineVersion ?? null,
+      buildSha: hello?.hello?.buildSha ?? null,
+      features: hello?.features ?? [],
+    },
     runs,
     warmup,
-    unit: { wallMs: "ms, request write to reply read at the stdio port", stagesUs: "engine ActionReport.timings, microseconds" },
+    unit: {
+      wallMs: "ms, request write to reply read at the stdio port",
+      stagesUs: "engine ActionReport.timings, microseconds",
+    },
     load: { before, after: load() },
     generatedAt: new Date().toISOString(),
     ops: foldSamples(samples),
@@ -175,13 +257,17 @@ async function main() {
   if (live && platform() !== "darwin") refuse("--live benches real macOS apps and runs only on darwin")
   const runs = Number(value("--runs") ?? 30)
   const warmup = Number(value("--warmup") ?? 3)
-  if (!Number.isInteger(runs) || runs < 1 || !Number.isInteger(warmup) || warmup < 0) refuse("--runs must be a positive integer and --warmup a non-negative one")
+  if (!Number.isInteger(runs) || runs < 1 || !Number.isInteger(warmup) || warmup < 0)
+    refuse("--runs must be a positive integer and --warmup a non-negative one")
   const enginePath = locateEngine(value("--engine"))
   if (!existsSync(enginePath)) refuse(`no engine at ${enginePath}`)
   const result = await runBench({ enginePath, live, runs, warmup })
-  const missing = Object.entries(result.ops).filter(([, op]) => op.wallMs.n !== runs).map(([op]) => op)
+  const missing = Object.entries(result.ops)
+    .filter(([, op]) => op.wallMs.n !== runs)
+    .map(([op]) => op)
   const comparePath = value("--compare")
-  const comparison = comparePath === undefined ? undefined : core.compareBench(result, JSON.parse(readFileSync(comparePath, "utf8")))
+  const comparison =
+    comparePath === undefined ? undefined : core.compareBench(result, JSON.parse(readFileSync(comparePath, "utf8")))
   const report = { ...result, ...(comparison === undefined ? {} : { comparison }), missingSamples: missing }
   const text = `${JSON.stringify(report, null, 2)}\n`
   const out = value("--out")
@@ -196,7 +282,10 @@ async function main() {
   }
   if (argv.includes("--json")) process.stdout.write(text)
   else {
-    for (const [op, stats] of Object.entries(result.ops)) console.log(`${op.padEnd(12)} wall p50 ${stats.wallMs.p50} ms p95 ${stats.wallMs.p95} ms  stages ${JSON.stringify(stats.stagesUs)}`)
+    for (const [op, stats] of Object.entries(result.ops))
+      console.log(
+        `${op.padEnd(12)} wall p50 ${stats.wallMs.p50} ms p95 ${stats.wallMs.p95} ms  stages ${JSON.stringify(stats.stagesUs)}`,
+      )
     if (comparison !== undefined) console.log(JSON.stringify(comparison))
   }
   process.exit(missing.length === 0 && (comparison?.ok ?? true) ? 0 : 1)

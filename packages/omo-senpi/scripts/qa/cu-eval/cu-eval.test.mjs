@@ -5,7 +5,16 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { OPS, foldSamples } from "./bench.mjs"
-import { compareBench, dispositionHistogram, exitCodeFor, judge, mismatched, oracleRow, percentile, summarize } from "./eval-core.mjs"
+import {
+  compareBench,
+  dispositionHistogram,
+  exitCodeFor,
+  judge,
+  mismatched,
+  oracleRow,
+  percentile,
+  summarize,
+} from "./eval-core.mjs"
 import { cuaActions, modelScript, parseReadback, planCode, readbackCode, traceDisposition } from "./model-arms.mjs"
 import { restoreAndObserve, runSdkTask } from "./run.mjs"
 import { TASKS, pressesReached, textLanded } from "./tasks.mjs"
@@ -32,16 +41,28 @@ describe("cu-eval tasks", () => {
   })
 
   test("#given the form task's real readback #when the expected values are right #then it passes", () => {
-    expect(oracle("safari-form-fill", { readback: { name: "Eval Tester", email: "eval@example.com" }, audit: [] })).toBe("pass")
+    expect(
+      oracle("safari-form-fill", { readback: { name: "Eval Tester", email: "eval@example.com" }, audit: [] }),
+    ).toBe("pass")
   })
 
   test("#given the same readback #when a wrong expected value is injected #then the oracle marks the task fail", () => {
-    expect(oracle("safari-form-fill", { readback: { name: "Eval Tester", email: "eval@example.com" }, audit: [] }, true)).toBe("fail")
-    expect(oracle("textedit-two-windows-target", { readback: { second: "only the second window", first: "" }, audit: [] }, true)).toBe("fail")
+    expect(
+      oracle("safari-form-fill", { readback: { name: "Eval Tester", email: "eval@example.com" }, audit: [] }, true),
+    ).toBe("fail")
+    expect(
+      oracle(
+        "textedit-two-windows-target",
+        { readback: { second: "only the second window", first: "" }, audit: [] },
+        true,
+      ),
+    ).toBe("fail")
   })
 
   test("#given text typed into the wrong window #when judged #then the two-window task fails", () => {
-    expect(oracle("textedit-two-windows-target", { readback: { second: "", first: "only the second window" }, audit: [] })).toBe("fail")
+    expect(
+      oracle("textedit-two-windows-target", { readback: { second: "", first: "only the second window" }, audit: [] }),
+    ).toBe("fail")
   })
 
   test("#given an effect only app logic shows #when the fake ran the presses #then the task is unverified, never pass", () => {
@@ -72,10 +93,17 @@ describe("cu-eval arms", () => {
   })
 
   test("#given the CUA arm #when a plan has a menu path #then the scripted model cannot reach it and sends nothing for it", () => {
-    expect(cuaActions(byId["menu-path-select"].fake, byId["menu-path-select"].fake.plan)).toEqual({ actions: [], unreachable: "menu Format > Text > Show Ruler" })
+    expect(cuaActions(byId["menu-path-select"].fake, byId["menu-path-select"].fake.plan)).toEqual({
+      actions: [],
+      unreachable: "menu Format > Text > Show Ruler",
+    })
     const calculator = cuaActions(byId["calculator-multiply"].fake, byId["calculator-multiply"].fake.plan)
     expect(calculator.actions[0]).toEqual({ action: "click", x: 250, y: 320 })
-    expect(modelScript("model-cua", byId["calculator-multiply"].fake).own.map((step) => step.name)).toEqual(["computer", "computer_actions", "computer_actions"])
+    expect(modelScript("model-cua", byId["calculator-multiply"].fake).own.map((step) => step.name)).toEqual([
+      "computer",
+      "computer_actions",
+      "computer_actions",
+    ])
   })
 
   test("#given a live task whose teardown closes the window #when restored #then the oracle sees the window open and the post-check sees it closed", async () => {
@@ -95,8 +123,22 @@ describe("cu-eval arms", () => {
       oracle: ({ windows }) => [{ check: "a Finder window shows Downloads", kind: "ax", ok: shows(windows) }],
       postcheck: ({ windows }) => [{ check: "no eval Finder window is left open", kind: "ax", ok: !shows(windows) }],
     }
-    const observed = await restoreAndObserve({ computer, win: {}, surface, live, dir: "", remembered: {}, readback: {} })
-    const row = oracleRow({ task: { id: "t", title: "t" }, arm: "sdk-direct", surface, mismatch: false, outcome: { ...observed, reports: [], audit: [], restoreAudit: [], steps: 1, wallMs: 1 } })
+    const observed = await restoreAndObserve({
+      computer,
+      win: {},
+      surface,
+      live,
+      dir: "",
+      remembered: {},
+      readback: {},
+    })
+    const row = oracleRow({
+      task: { id: "t", title: "t" },
+      arm: "sdk-direct",
+      surface,
+      mismatch: false,
+      outcome: { ...observed, reports: [], audit: [], restoreAudit: [], steps: 1, wallMs: 1 },
+    })
     expect(open).toBe(false)
     expect(row.status).toBe("pass")
     expect(row.restore.status).toBe("pass")
@@ -134,7 +176,15 @@ describe("cu-eval arms", () => {
     const scratch = mkdtempSync(join(tmpdir(), "cu-eval-test-"))
     try {
       const task = { id: "t", title: "t", live: surface }
-      const row = await runSdkTask({ task, enginePath: "unused", live: true, mismatch: false, scratch, liveHarness, open: async () => computer })
+      const row = await runSdkTask({
+        task,
+        enginePath: "unused",
+        live: true,
+        mismatch: false,
+        scratch,
+        liveHarness,
+        open: async () => computer,
+      })
       expect(row.status).toBe("error")
       expect(row.error).toContain('no button named "Missing"')
       expect(calls).toEqual(["restore", "teardown", "close"])
@@ -156,7 +206,13 @@ describe("cu-eval arms", () => {
   })
 
   test("#given rows #when summarized #then only fail, error, skip or a failed restore make the exit code non-zero", () => {
-    const row = (status, restore = "pass") => ({ status, restore: { status: restore }, dispositions: {}, steps: 1, wallMs: 1 })
+    const row = (status, restore = "pass") => ({
+      status,
+      restore: { status: restore },
+      dispositions: {},
+      steps: 1,
+      wallMs: 1,
+    })
     expect(exitCodeFor(summarize([row("pass"), row("unverified")]))).toBe(0)
     expect(exitCodeFor(summarize([row("pass"), row("fail")]))).toBe(1)
     expect(exitCodeFor(summarize([row("pass", "fail")]))).toBe(1)
@@ -169,8 +225,17 @@ describe("cu-eval bench", () => {
     expect(percentile([5, 1, 3, 2, 4], 50)).toBe(3)
     expect(percentile([5, 1, 3, 2, 4], 95)).toBe(5)
     expect(percentile([], 50)).toBe(null)
-    const folded = foldSamples({ click: [{ wallMs: 1, timings: { dispatch: 10 } }, { wallMs: 3, timings: null }] })
-    expect(folded.click).toEqual({ wallMs: { n: 2, p50: 1, p95: 3 }, stagesUs: { dispatch: { n: 1, p50: 10, p95: 10 } }, timedRuns: 1 })
+    const folded = foldSamples({
+      click: [
+        { wallMs: 1, timings: { dispatch: 10 } },
+        { wallMs: 3, timings: null },
+      ],
+    })
+    expect(folded.click).toEqual({
+      wallMs: { n: 2, p50: 1, p95: 3 },
+      stagesUs: { dispatch: { n: 1, p50: 10, p95: 10 } },
+      timedRuns: 1,
+    })
   })
 
   test("#given a baseline #when an op's p50 rises past 30% and the noise floor #then it is a regression", () => {
@@ -178,7 +243,9 @@ describe("cu-eval bench", () => {
     expect(compareBench(at(1.2), at(1)).ok).toBe(true)
     // Above 30% but within the 0.5 ms floor: noise on a sub-millisecond op, not a regression.
     expect(compareBench(at(1.45), at(1)).ok).toBe(true)
-    expect(compareBench(at(2), at(1)).regressions).toEqual([{ op: "click", reason: "p50", baselineP50: 1, currentP50: 2, limit: 1.3 }])
+    expect(compareBench(at(2), at(1)).regressions).toEqual([
+      { op: "click", reason: "p50", baselineP50: 1, currentP50: 2, limit: 1.3 },
+    ])
     expect(compareBench({ ops: {} }, at(1)).regressions).toEqual([{ op: "click", reason: "missing" }])
   })
 
