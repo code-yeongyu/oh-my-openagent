@@ -2,7 +2,7 @@
 // Do not edit by hand; run `bun run --cwd packages/omo-computer-protocol generate`.
 
 /** sha256 of the schema file this module was generated from; the schema-drift test compares it. */
-export const SCHEMA_SHA256 = "b3b3d676b5c6bc93259885c279007402715c4a6eb57e68de457e1f9034c24f81" as const
+export const SCHEMA_SHA256 = "70feffb17711beb34a7ce46f2076396e7967d84d3ed54231a150302f79c32b70" as const
 
 /** The wire protocol version `engine.hello` reports. */
 export const PROTOCOL_VERSION = "1" as const
@@ -718,6 +718,7 @@ export type Diagnosis = {
 	stopPath: StopPathCapability
 	releaseHelper?: ReleaseHelper | null
 	observation: UntrustedText
+	checks?: ProbeCheck[]
 }
 
 export type DiffFallback = "baseline_incomplete" | "current_incomplete" | "since_expired" | "window_changed" | "menu_root" | "reordered" | "not_shorter" | "query_projection"
@@ -1231,6 +1232,14 @@ export type PressParams = {
 	runGeneration?: number | null
 	observeAfter?: ObserveOptions | null
 }
+
+export type ProbeCheck = {
+	name: string
+	state: ProbeState
+	reason?: string | null
+}
+
+export type ProbeState = "ok" | "unavailable" | "unknown"
 
 export type RaiseWindowParams = {
 	windowId: string
