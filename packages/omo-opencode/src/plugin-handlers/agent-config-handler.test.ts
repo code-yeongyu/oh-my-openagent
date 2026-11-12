@@ -115,49 +115,24 @@ describe("applyAgentConfig builtin override protection", () => {
       atlas: builtinAtlasConfig,
     })
 
-    createSisyphusJuniorAgentSpy = spyOn(
-      sisyphusJunior,
-      "createSisyphusJuniorAgentWithOverrides",
-    ).mockReturnValue(sisyphusJuniorConfig)
+    createSisyphusJuniorAgentSpy = spyOn(sisyphusJunior, "createSisyphusJuniorAgentWithOverrides").mockReturnValue(
+      sisyphusJuniorConfig,
+    )
 
-    discoverConfigSourceSkillsSpy = spyOn(
-      skillLoader,
-      "discoverConfigSourceSkills",
-    ).mockResolvedValue([])
-    discoverUserClaudeSkillsSpy = spyOn(
-      skillLoader,
-      "discoverUserClaudeSkills",
-    ).mockResolvedValue([])
-    discoverProjectClaudeSkillsSpy = spyOn(
-      skillLoader,
-      "discoverProjectClaudeSkills",
-    ).mockResolvedValue([])
-    discoverOpencodeGlobalSkillsSpy = spyOn(
-      skillLoader,
-      "discoverOpencodeGlobalSkills",
-    ).mockResolvedValue([])
-    discoverOpencodeProjectSkillsSpy = spyOn(
-      skillLoader,
-      "discoverOpencodeProjectSkills",
-    ).mockResolvedValue([])
-    discoverProjectAgentsSkillsSpy = spyOn(
-      skillLoader,
-      "discoverProjectAgentsSkills",
-    ).mockResolvedValue([])
-    discoverGlobalAgentsSkillsSpy = spyOn(
-      skillLoader,
-      "discoverGlobalAgentsSkills",
-    ).mockResolvedValue([])
+    discoverConfigSourceSkillsSpy = spyOn(skillLoader, "discoverConfigSourceSkills").mockResolvedValue([])
+    discoverUserClaudeSkillsSpy = spyOn(skillLoader, "discoverUserClaudeSkills").mockResolvedValue([])
+    discoverProjectClaudeSkillsSpy = spyOn(skillLoader, "discoverProjectClaudeSkills").mockResolvedValue([])
+    discoverOpencodeGlobalSkillsSpy = spyOn(skillLoader, "discoverOpencodeGlobalSkills").mockResolvedValue([])
+    discoverOpencodeProjectSkillsSpy = spyOn(skillLoader, "discoverOpencodeProjectSkills").mockResolvedValue([])
+    discoverProjectAgentsSkillsSpy = spyOn(skillLoader, "discoverProjectAgentsSkills").mockResolvedValue([])
+    discoverGlobalAgentsSkillsSpy = spyOn(skillLoader, "discoverGlobalAgentsSkills").mockResolvedValue([])
 
     loadUserAgentsSpy = spyOn(agentLoader, "loadUserAgents").mockReturnValue({})
     loadProjectAgentsSpy = spyOn(agentLoader, "loadProjectAgents").mockReturnValue({})
     loadOpencodeGlobalAgentsSpy = spyOn(agentLoader, "loadOpencodeGlobalAgents").mockReturnValue({})
     loadOpencodeProjectAgentsSpy = spyOn(agentLoader, "loadOpencodeProjectAgents").mockReturnValue({})
     loadAgentDefinitionsSpy = spyOn(agentLoader, "loadAgentDefinitions").mockReturnValue({})
-    readOpencodeConfigAgentsSpy = spyOn(
-      agentLoader,
-      "readOpencodeConfigAgents",
-    ).mockReturnValue({})
+    readOpencodeConfigAgentsSpy = spyOn(agentLoader, "readOpencodeConfigAgents").mockReturnValue({})
 
     migrateAgentConfigSpy = spyOn(shared, "migrateAgentConfig").mockImplementation(
       (config: Record<string, unknown>) => config,
@@ -377,7 +352,7 @@ describe("applyAgentConfig builtin override protection", () => {
     // then
     expect((result[getAgentListDisplayName("sisyphus")] as AgentConfig).model).toBe("openai/gpt-5.5")
     expect((result[getAgentListDisplayName("explore")] as AgentConfig).model).toBe(
-      "minimax-cn-coding-plan/MiniMax-M2.5-highspeed"
+      "minimax-cn-coding-plan/MiniMax-M2.5-highspeed",
     )
   })
 

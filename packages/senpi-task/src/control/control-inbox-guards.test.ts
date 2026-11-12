@@ -16,7 +16,11 @@ afterEach(async () => {
 
 const T1 = "st_00000001"
 const T2 = "st_00000002"
-const run = (taskId: string) => ({ parentSessionId: "parent-1", parentPauseSeq: 2, runRef: { kind: "task" as const, id: taskId } })
+const run = (taskId: string) => ({
+  parentSessionId: "parent-1",
+  parentPauseSeq: 2,
+  runRef: { kind: "task" as const, id: taskId },
+})
 
 function host(store: TaskRecordStore, pid: number, now: () => number, owner: FakeOwner = fakeOwner(store, pid)) {
   const inbox = ControlInbox.for({ stateDir: store.stateDir, hostPid: pid, store, autoStart: false, now })
@@ -30,7 +34,14 @@ function setup(tasks: readonly string[] = [T1]) {
   let now = 1_000_000
   const { owner, inbox } = host(store, 7201, () => now)
   for (const taskId of tasks) owner.live.add(taskId)
-  return { store, owner, inbox, advance: (ms: number) => { now += ms } }
+  return {
+    store,
+    owner,
+    inbox,
+    advance: (ms: number) => {
+      now += ms
+    },
+  }
 }
 
 const ack = (store: TaskRecordStore, taskId = T1) => readAckFile(controlFor(store), taskId, "parent-1")
@@ -39,7 +50,10 @@ describe("owner inbox guard cases (design section 7)", () => {
   test("#given the owner suspends between validation and the call #when reconciled #then handle_gone and no paused write (test 18, F13)", async () => {
     const { store, owner, inbox } = setup()
     const ancestry = owner.inAncestry
-    owner.inAncestry = (record, parent) => { owner.live.delete(T1); return ancestry(record, parent) }
+    owner.inAncestry = (record, parent) => {
+      owner.live.delete(T1)
+      return ancestry(record, parent)
+    }
     writeRegister(store, controlFor(store), want())
     await inbox.tick()
     expect(ack(store)).toMatchObject({ state: "refused", reason: "handle_gone" })
@@ -51,7 +65,10 @@ describe("owner inbox guard cases (design section 7)", () => {
     const { store, owner, inbox, advance } = setup()
     await owner.pauseTask(T1, run(T1))
     let calls = 0
-    owner.resumePausedTask = async () => { calls += 1; return { otherHoldLive: true, childSeq: 4 } }
+    owner.resumePausedTask = async () => {
+      calls += 1
+      return { otherHoldLive: true, childSeq: 4 }
+    }
     writeRegister(store, controlFor(store), want({ phase: "resumed", resumeId: "r-1" }))
     await inbox.tick()
     advance(5_000)
@@ -66,15 +83,34 @@ describe("owner inbox guard cases (design section 7)", () => {
     owner.barrier?.close("parent-1", 2)
     const order: string[] = []
     const hold = owner.holdTaskInput
-    owner.holdTaskInput = async (taskId, input) => { order.push(`hold:${taskId}`); return hold(taskId, input) }
+    owner.holdTaskInput = async (taskId, input) => {
+      order.push(`hold:${taskId}`)
+      return hold(taskId, input)
+    }
     const resume = owner.resumePausedTask
-    owner.resumePausedTask = async (taskId, request) => { order.push(`resume:${taskId}`); return resume(taskId, request) }
-    for (const taskId of [T1, T2]) writeRegister(store, controlFor(store), want({ taskId, runRef: { kind: "task", id: taskId },
-      phase: "resumed", resumeId: "r-1", guidance: [{ inputId: `send-${taskId}`, revision: 0, text: "go" }] }))
+    owner.resumePausedTask = async (taskId, request) => {
+      order.push(`resume:${taskId}`)
+      return resume(taskId, request)
+    }
+    for (const taskId of [T1, T2])
+      writeRegister(
+        store,
+        controlFor(store),
+        want({
+          taskId,
+          runRef: { kind: "task", id: taskId },
+          phase: "resumed",
+          resumeId: "r-1",
+          guidance: [{ inputId: `send-${taskId}`, revision: 0, text: "go" }],
+        }),
+      )
     await inbox.tick()
     expect(owner.barrier?.state("parent-1")).toEqual({ kind: "open" })
     expect(order).toEqual([`hold:${T1}`, `resume:${T1}`, `hold:${T2}`, `resume:${T2}`])
-    expect(ack(store, T2)).toMatchObject({ state: "resumed", guidance: [{ inputId: `send-${T2}`, outcome: "delivered" }] })
+    expect(ack(store, T2)).toMatchObject({
+      state: "resumed",
+      guidance: [{ inputId: `send-${T2}`, outcome: "delivered" }],
+    })
   })
 
   test("#given a throwing child inside the own-Stop release #when ticked #then the barrier still opens and the sibling resumes (test 20h, r5-4)", async () => {
@@ -86,7 +122,12 @@ describe("owner inbox guard cases (design section 7)", () => {
       if (taskId === T1) throw new Error("child transport lost")
       return resume(taskId, request)
     }
-    for (const taskId of [T1, T2]) writeRegister(store, controlFor(store), want({ taskId, runRef: { kind: "task", id: taskId }, phase: "resumed", resumeId: "r-1" }))
+    for (const taskId of [T1, T2])
+      writeRegister(
+        store,
+        controlFor(store),
+        want({ taskId, runRef: { kind: "task", id: taskId }, phase: "resumed", resumeId: "r-1" }),
+      )
     await inbox.tick()
     expect(owner.barrier?.state("parent-1")).toEqual({ kind: "open" })
     expect(ack(store, T2)).toMatchObject({ state: "resumed" })
@@ -99,14 +140,21 @@ describe("owner inbox guard cases (design section 7)", () => {
     owner.barrier?.close("parent-1", 2)
     const load = owner.load
     let failNext = true
-    owner.load = taskId => {
-      if (taskId === T1 && failNext) { failNext = false; throw new Error("record read failed") }
+    owner.load = (taskId) => {
+      if (taskId === T1 && failNext) {
+        failNext = false
+        throw new Error("record read failed")
+      }
       return load(taskId)
     }
     writeRegister(store, controlFor(store), want({ phase: "resumed", resumeId: "r-1" }))
     await inbox.tick()
     expect(store.load(T1)?.status).toBe("paused")
-    writeRegister(store, controlFor(store), want({ taskId: T2, runRef: { kind: "task", id: T2 }, phase: "resumed", resumeId: "r-1" }))
+    writeRegister(
+      store,
+      controlFor(store),
+      want({ taskId: T2, runRef: { kind: "task", id: T2 }, phase: "resumed", resumeId: "r-1" }),
+    )
     await inbox.tick()
     expect(owner.barrier?.state("parent-1")).toEqual({ kind: "open" })
     expect(ack(store, T1)).toMatchObject({ state: "resumed" })
@@ -120,7 +168,11 @@ describe("owner inbox guard cases (design section 7)", () => {
     writeRegister(store, controlFor(store), want({ phase: "resumed", resumeId: "r-1" }))
     await inbox.tick()
     expect(store.load(T2)?.status).toBe("paused")
-    writeRegister(store, controlFor(store), want({ taskId: T2, runRef: { kind: "task", id: T2 }, phase: "resumed", resumeId: "r-1" }))
+    writeRegister(
+      store,
+      controlFor(store),
+      want({ taskId: T2, runRef: { kind: "task", id: T2 }, phase: "resumed", resumeId: "r-1" }),
+    )
     await inbox.tick()
     expect(ack(store, T2)).toMatchObject({ state: "resumed" })
     expect(owner.calls.resume).toBe(2)
@@ -128,19 +180,36 @@ describe("owner inbox guard cases (design section 7)", () => {
 
   test("#given a flag-less cancel answered cancel_pending #when it keeps answering so #then the register waits with no owner_failed (test 20c)", async () => {
     const { store, owner, inbox, advance } = setup()
-    owner.cancelAnswer = taskId => ({ kind: "cancel_pending", task_id: taskId, previous_status: "running", reason: "recovering" })
-    writeRegister(store, controlFor(store), want({ phase: "cancelled", cancel: { requestedAt: new Date(0).toISOString() } }))
-    for (let attempt = 0; attempt < 12; attempt += 1) { await inbox.tick(); advance(61_000) }
+    owner.cancelAnswer = (taskId) => ({
+      kind: "cancel_pending",
+      task_id: taskId,
+      previous_status: "running",
+      reason: "recovering",
+    })
+    writeRegister(
+      store,
+      controlFor(store),
+      want({ phase: "cancelled", cancel: { requestedAt: new Date(0).toISOString() } }),
+    )
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      await inbox.tick()
+      advance(61_000)
+    }
     expect(ack(store)).toBeUndefined()
     expect(owner.calls.cancel.length).toBeGreaterThanOrEqual(12)
   })
 
   test("#given a cancel-final record whose cancel keeps throwing #when ticked past ten attempts #then it is still retried, never owner_failed (test 20c)", async () => {
     const { store, owner, inbox, advance } = setup()
-    store.mutate(T1, fresh => ({ ...fresh, cancel_requested: { requested_at: new Date(0).toISOString() } }))
-    owner.cancelTask = async () => { throw new Error("host unreachable") }
+    store.mutate(T1, (fresh) => ({ ...fresh, cancel_requested: { requested_at: new Date(0).toISOString() } }))
+    owner.cancelTask = async () => {
+      throw new Error("host unreachable")
+    }
     writeRegister(store, controlFor(store), want())
-    for (let attempt = 0; attempt < 12; attempt += 1) { await inbox.tick(); advance(61_000) }
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      await inbox.tick()
+      advance(61_000)
+    }
     expect(ack(store)).toBeUndefined()
   })
 
@@ -148,14 +217,21 @@ describe("owner inbox guard cases (design section 7)", () => {
     const { store, owner, inbox, advance } = setup([T1, T2])
     for (const taskId of [T1, T2]) await owner.pauseTask(taskId, run(taskId))
     owner.barrier?.close("parent-1", 2)
-    writeRegister(store, controlFor(store), want({ taskId: T2, runRef: { kind: "task", id: T2 }, phase: "resumed", resumeId: "r-1" }))
+    writeRegister(
+      store,
+      controlFor(store),
+      want({ taskId: T2, runRef: { kind: "task", id: T2 }, phase: "resumed", resumeId: "r-1" }),
+    )
     advance(1)
-    store.mutate(T1, fresh => ({ ...fresh, cancel_requested: { requested_at: new Date(0).toISOString() } }))
+    store.mutate(T1, (fresh) => ({ ...fresh, cancel_requested: { requested_at: new Date(0).toISOString() } }))
     utimesSync(join(controlDir(store.stateDir), registerName(T2, "parent-1")), new Date(1000), new Date(1000))
     writeRegister(store, controlFor(store), want({ phase: "resumed", resumeId: "r-1" }))
     const resumed: string[] = []
     const resume = owner.resumePausedTask
-    owner.resumePausedTask = async (taskId, request) => { resumed.push(taskId); return resume(taskId, request) }
+    owner.resumePausedTask = async (taskId, request) => {
+      resumed.push(taskId)
+      return resume(taskId, request)
+    }
     await inbox.tick()
     expect(resumed).toEqual([T2])
     expect(ack(store, T1)).toMatchObject({ state: "cancelled" })
@@ -163,7 +239,11 @@ describe("owner inbox guard cases (design section 7)", () => {
 
   test("#given an answered cancel #when a later Stop S+1 is written #then the sticky register is not re-acted on (test 20j, owner half)", async () => {
     const { store, owner, inbox } = setup()
-    writeRegister(store, controlFor(store), want({ phase: "cancelled", cancel: { requestedAt: new Date(0).toISOString() } }))
+    writeRegister(
+      store,
+      controlFor(store),
+      want({ phase: "cancelled", cancel: { requestedAt: new Date(0).toISOString() } }),
+    )
     await inbox.tick()
     writeRegister(store, controlFor(store), want({ pauseSeq: 3 }))
     await inbox.tick()
@@ -176,7 +256,7 @@ describe("owner inbox guard cases (design section 7)", () => {
     writeRegister(store, controlFor(store), want())
     await ControlInbox.for({ stateDir: store.stateDir, hostPid: 7201, store }).tick()
     await unregisters.splice(0)[0]?.()
-    store.mutate(T1, fresh => ({ ...fresh, host_pid: 7202 }))
+    store.mutate(T1, (fresh) => ({ ...fresh, host_pid: 7202 }))
     const reborn = fakeOwner(store, 7202)
     for (const [taskId, engine] of owner.engines) reborn.engines.set(taskId, engine)
     reborn.live.add(T1)
@@ -190,12 +270,29 @@ describe("owner inbox guard cases (design section 7)", () => {
 
   test("#given control files older than a day #when the inbox sweeps #then only a terminal child's files go (test 23, GC)", async () => {
     const { store } = setup([T1, T2])
-    for (const taskId of [T1, T2]) writeRegister(store, controlFor(store), want({ taskId, runRef: { kind: "task", id: taskId }, phase: "cancelled", cancel: { requestedAt: new Date(0).toISOString() } }))
-    store.mutate(T2, fresh => ({ ...fresh, status: "completed" }))
+    for (const taskId of [T1, T2])
+      writeRegister(
+        store,
+        controlFor(store),
+        want({
+          taskId,
+          runRef: { kind: "task", id: taskId },
+          phase: "cancelled",
+          cancel: { requestedAt: new Date(0).toISOString() },
+        }),
+      )
+    store.mutate(T2, (fresh) => ({ ...fresh, status: "completed" }))
     const old = new Date(0)
-    for (const taskId of [T1, T2]) utimesSync(join(controlDir(store.stateDir), registerName(taskId, "parent-1")), old, old)
+    for (const taskId of [T1, T2])
+      utimesSync(join(controlDir(store.stateDir), registerName(taskId, "parent-1")), old, old)
     await unregisters.splice(0)[0]?.()
-    const later = ControlInbox.for({ stateDir: store.stateDir, hostPid: 7203, store, autoStart: false, now: () => 2 * 24 * 60 * 60 * 1000 })
+    const later = ControlInbox.for({
+      stateDir: store.stateDir,
+      hostPid: 7203,
+      store,
+      autoStart: false,
+      now: () => 2 * 24 * 60 * 60 * 1000,
+    })
     const idle = fakeOwner(store, 7203)
     unregisters.push(later.register(idle, { channel: true, liveTasks: () => 0 }))
     await later.tick()

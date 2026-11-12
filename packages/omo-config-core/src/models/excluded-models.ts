@@ -6,7 +6,10 @@
  */
 
 function patternExpression(pattern: string): RegExp {
-  const escaped = pattern.split("*").map((part) => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(".*")
+  const escaped = pattern
+    .split("*")
+    .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&"))
+    .join(".*")
   return new RegExp(`^${escaped}$`, "i")
 }
 

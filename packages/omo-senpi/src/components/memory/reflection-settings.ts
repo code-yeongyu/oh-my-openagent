@@ -4,9 +4,7 @@ import {
   type OmoMemorySettings,
 } from "@oh-my-opencode/omo-config-core"
 
-export function resolveMemorySettings(
-  settings: OmoMemorySettings | undefined,
-): OmoMemorySettings {
+export function resolveMemorySettings(settings: OmoMemorySettings | undefined): OmoMemorySettings {
   return settings ?? OmoMemorySettingsSchema.parse({})
 }
 

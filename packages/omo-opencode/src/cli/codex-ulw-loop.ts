@@ -77,7 +77,11 @@ function resolveLocalUlwLoopBin(env: NodeJS.ProcessEnv, homeDir: string): string
   return candidates.find((candidate) => existsSync(candidate)) ?? null
 }
 
-function resolveLegacyLocalOmoBin(env: NodeJS.ProcessEnv, homeDir: string, currentExecutablePaths: readonly string[]): string | null {
+function resolveLegacyLocalOmoBin(
+  env: NodeJS.ProcessEnv,
+  homeDir: string,
+  currentExecutablePaths: readonly string[],
+): string | null {
   const candidates = resolveCodexComponentBinCandidates({ executableName: "omo", env, homeDir })
   return (
     candidates.find(

@@ -13,7 +13,10 @@ const PREVIOUSLY_BUNDLED_AGENT_MODELS: ReadonlySet<string> = new Set([
   "gpt-6-astra",
 ])
 
-export function handEditedAgentModel(installedModel: string | null, receipt: AgentModelReceipt | undefined): string | null {
+export function handEditedAgentModel(
+  installedModel: string | null,
+  receipt: AgentModelReceipt | undefined,
+): string | null {
   if (installedModel === null) return null
   if (receipt?.model !== undefined) return installedModel === receipt.model ? null : installedModel
   return PREVIOUSLY_BUNDLED_AGENT_MODELS.has(installedModel) ? null : installedModel

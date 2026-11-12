@@ -98,8 +98,10 @@ const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000
  *   once rather than behind the delay: control sessions exit within seconds and dispose() would cancel it.
  */
 export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}): MemoryMaintenance {
-  const createRepo = options.createRepo
-    ?? ((context: MemoryIdentityContext) => new GitMemoryRepo({ dir: context.identityPaths.repo, agentId: context.identity }))
+  const createRepo =
+    options.createRepo ??
+    ((context: MemoryIdentityContext) =>
+      new GitMemoryRepo({ dir: context.identityPaths.repo, agentId: context.identity }))
   const delayMs = options.delayMs ?? DEFAULT_DELAY_MS
   const intervalMs = options.intervalMs ?? DEFAULT_INTERVAL_MS
   const minLooseObjects = options.minLooseObjects ?? DEFAULT_MIN_LOOSE_OBJECTS
@@ -140,7 +142,7 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
       )
       if (resumePending) return true
     }
-    const last = Number(await repo.configGet(RETENTION_STAMP_CONFIG_KEY) ?? Number.NaN)
+    const last = Number((await repo.configGet(RETENTION_STAMP_CONFIG_KEY)) ?? Number.NaN)
     return !(Number.isFinite(last) && now() - last < intervalMs)
   }
 
@@ -160,7 +162,9 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
         reflectionEnabled: options.reflectionEnabled?.(context) ?? true,
         ...(options.isLiveSession === undefined ? {} : { isLiveSession: options.isLiveSession }),
         ...(options.ownedSidecars === undefined ? {} : { ownedSidecars: options.ownedSidecars() }),
-        ...(options.logger === undefined ? {} : { info: options.logger.info.bind(options.logger), warn: options.logger.warn.bind(options.logger) }),
+        ...(options.logger === undefined
+          ? {}
+          : { info: options.logger.info.bind(options.logger), warn: options.logger.warn.bind(options.logger) }),
       })
     } catch (error) {
       if (signal.aborted) throw error
@@ -183,7 +187,8 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
     const memoryRoot = dirname(dirname(context.identityPaths.root))
     const state = await readHostSweepState(memoryRoot)
     const completedAt = state.completedAt === undefined ? Number.NaN : Date.parse(state.completedAt)
-    if (state.cursor === undefined && Number.isFinite(completedAt) && now() - completedAt < HOST_SWEEP_INTERVAL_MS) return
+    if (state.cursor === undefined && Number.isFinite(completedAt) && now() - completedAt < HOST_SWEEP_INTERVAL_MS)
+      return
     const { runMaintenanceHostSweep } = await loadMemoryCommandsRuntime()
     signal.throwIfAborted()
     await runMaintenanceHostSweep({
@@ -201,27 +206,34 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
     if (!existsSync(context.identityPaths.repo)) return
     const record = await createLockRecord("memory-maintenance", { runId: `maintenance-${process.pid}` })
     try {
-      await withLock(memoryMaintenanceLockPath(context.identityPaths.locks), record, async () => {
-        signal.throwIfAborted()
-        const repo = createRepo(context)
-        const last = Number(await repo.configGet(STAMP_KEY) ?? Number.NaN)
-        if (!(Number.isFinite(last) && now() - last < intervalMs)) {
-          await repo.configSet(STAMP_KEY, String(now()))
-          const result = await repo.maintain({ minLooseObjects, timeoutMs, signal })
-          if (result.status === "packed") {
-            options.logger?.info("omo-senpi memory repo packed", {
-              identity: context.identity,
-              looseObjectsBefore: result.looseObjectsBefore,
-              looseObjectsAfter: result.looseObjectsAfter,
-            })
+      await withLock(
+        memoryMaintenanceLockPath(context.identityPaths.locks),
+        record,
+        async () => {
+          signal.throwIfAborted()
+          const repo = createRepo(context)
+          const last = Number((await repo.configGet(STAMP_KEY)) ?? Number.NaN)
+          if (!(Number.isFinite(last) && now() - last < intervalMs)) {
+            await repo.configSet(STAMP_KEY, String(now()))
+            const result = await repo.maintain({ minLooseObjects, timeoutMs, signal })
+            if (result.status === "packed") {
+              options.logger?.info("omo-senpi memory repo packed", {
+                identity: context.identity,
+                looseObjectsBefore: result.looseObjectsBefore,
+                looseObjectsAfter: result.looseObjectsAfter,
+              })
+            }
           }
-        }
-        if (await retentionDue(context, repo)) await retain(context, repo, signal)
-        await sweepHost(context, signal).catch((error: unknown) => {
-          if (signal.aborted) throw error
-          options.logger?.warn("omo-senpi memory host sweep failed", { error: error instanceof Error ? error.message : String(error) })
-        })
-      }, { waitTimeoutMs: 0 })
+          if (await retentionDue(context, repo)) await retain(context, repo, signal)
+          await sweepHost(context, signal).catch((error: unknown) => {
+            if (signal.aborted) throw error
+            options.logger?.warn("omo-senpi memory host sweep failed", {
+              error: error instanceof Error ? error.message : String(error),
+            })
+          })
+        },
+        { waitTimeoutMs: 0 },
+      )
     } catch (error) {
       // Another session or process holds the pass: it is that runner's job, not a failure.
       if (error instanceof LockContentionError) return
@@ -254,13 +266,15 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
       const timer = setTimeout(() => {
         timers.delete(timer)
         const signal = abort.signal
-        void run(context, signal).catch((error: unknown) => {
-          if (signal.aborted) return
-          options.logger?.warn("omo-senpi memory repo maintenance failed", {
-            identity: context.identity,
-            error: error instanceof Error ? error.message : String(error),
+        void run(context, signal)
+          .catch((error: unknown) => {
+            if (signal.aborted) return
+            options.logger?.warn("omo-senpi memory repo maintenance failed", {
+              identity: context.identity,
+              error: error instanceof Error ? error.message : String(error),
+            })
           })
-        }).finally(finish)
+          .finally(finish)
       }, delayMs)
       // A short-lived process (a print run, a test) exits without waiting for it.
       timer.unref?.()

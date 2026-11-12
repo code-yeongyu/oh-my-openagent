@@ -53,4 +53,3 @@ describe("checkAndInterruptStaleTasks abort failure on a confirmed-gone session"
     expect(notify).toHaveBeenCalledTimes(1)
   })
 })
-

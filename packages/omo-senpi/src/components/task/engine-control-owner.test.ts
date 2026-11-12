@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { existsSync } from "node:fs"
-import { cleanupProjects, seedRecord, tempStore } from "../../../../senpi-task/src/lifecycle/__fixtures__/lifecycle-fakes"
+import {
+  cleanupProjects,
+  seedRecord,
+  tempStore,
+} from "../../../../senpi-task/src/lifecycle/__fixtures__/lifecycle-fakes"
 import { controlFor, fakeOwner, want } from "../../../../senpi-task/src/control/__fixtures__/owner-fakes"
 import { ControlInbox } from "../../../../senpi-task/src/control/control-inbox"
 import { ownersDir } from "../../../../senpi-task/src/control/control-paths"
@@ -27,10 +31,13 @@ function managerOver(store: TaskRecordStore, instance: string) {
     managerInstance: instance,
     holdsLiveHandle: (taskId: string) => owner.live.has(taskId),
     get: (taskId: string) => store.load(taskId) ?? undefined,
-    list: () => store.list().records.map(record => ({ record })),
+    list: () => store.list().records.map((record) => ({ record })),
     residentTaskIds: () => [...owner.live],
-    pauseTask: owner.pauseTask, holdTaskInput: owner.holdTaskInput, observeTaskHold: owner.observeTaskHold,
-    resumePausedTask: owner.resumePausedTask, cancelTask: owner.cancelTask,
+    pauseTask: owner.pauseTask,
+    holdTaskInput: owner.holdTaskInput,
+    observeTaskHold: owner.observeTaskHold,
+    resumePausedTask: owner.resumePausedTask,
+    cancelTask: owner.cancelTask,
   } as unknown as TaskManager & TaskPauseMethods
   return { owner, manager }
 }
@@ -38,10 +45,23 @@ function managerOver(store: TaskRecordStore, instance: string) {
 function register(store: TaskRecordStore, instance: string, channel: boolean) {
   const { owner, manager } = managerOver(store, instance)
   const barrier = new AdmissionBarrier()
-  const runPause = createEngineRunPause({ stateDir: store.stateDir, manager, barrier,
-    runtime: { getPauseState: () => undefined, fenceRun: () => undefined } })
-  const registration = registerControlOwner({ stateDir: store.stateDir, store, manager, barrier, runPause,
-    sessionId: () => "parent-1", ownsRecord: record => record.parent_session_id === "parent-1", channel, hostPid: HOST })
+  const runPause = createEngineRunPause({
+    stateDir: store.stateDir,
+    manager,
+    barrier,
+    runtime: { getPauseState: () => undefined, fenceRun: () => undefined },
+  })
+  const registration = registerControlOwner({
+    stateDir: store.stateDir,
+    store,
+    manager,
+    barrier,
+    runPause,
+    sessionId: () => "parent-1",
+    ownsRecord: (record) => record.parent_session_id === "parent-1",
+    channel,
+    hostPid: HOST,
+  })
   registrations.push(registration)
   return owner
 }
@@ -65,7 +85,10 @@ describe("control owner wiring and the task.control_channel switch (design 3.3 k
     const owner = register(store, "owner-on", true)
     writeRegister(store, controlFor(store), want())
     await ControlInbox.for({ stateDir: store.stateDir, hostPid: HOST, store }).tick()
-    expect(readAckFile(controlFor(store), "st_00000001", "parent-1")).toMatchObject({ state: "held", owner: { managerInstance: "owner-on" } })
+    expect(readAckFile(controlFor(store), "st_00000001", "parent-1")).toMatchObject({
+      state: "held",
+      owner: { managerInstance: "owner-on" },
+    })
     expect(owner.calls.pause).toBe(1)
     expect(existsSync(ownersDir(store.stateDir))).toBe(true)
   })

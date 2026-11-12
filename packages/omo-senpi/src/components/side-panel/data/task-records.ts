@@ -83,9 +83,7 @@ export function panelChildFromRecord(record: PanelTaskRecord): PanelChildUpdate 
     name: label(record),
     ...(record.category === undefined ? {} : { category: record.category }),
     status: childStatus(record),
-    ...(recoveryPresentation(record) !== undefined
-      ? { parkedReason: recoveryPresentation(record)?.cause }
-      : {}),
+    ...(recoveryPresentation(record) !== undefined ? { parkedReason: recoveryPresentation(record)?.cause } : {}),
     ...(childHost(record) === undefined ? {} : { host: childHost(record) }),
     startedAt: timestamp(record.started_at) ?? timestamp(record.created_at) ?? 0,
     ...(timestamp(record.terminal_at) === undefined ? {} : { finishedAt: timestamp(record.terminal_at) }),

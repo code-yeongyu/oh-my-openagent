@@ -48,14 +48,14 @@ describe("findGitRoot", () => {
   test.skipIf(hasGitAncestor(tmpdir()))(
     "#given a directory outside any repository #when searched #then nothing is found",
     () => {
-    // given
-    const root = scratch()
+      // given
+      const root = scratch()
 
-    // when
-    const found = findGitRoot(root)
+      // when
+      const found = findGitRoot(root)
 
-    // then
-    expect(found).toBeUndefined()
+      // then
+      expect(found).toBeUndefined()
     },
   )
 })

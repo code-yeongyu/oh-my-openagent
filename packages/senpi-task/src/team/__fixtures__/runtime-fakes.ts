@@ -51,7 +51,12 @@ export type FakeTeamManagerOptions = {
   readonly releaseFinishedResidentOnCancel?: boolean
 }
 
-function buildRecord(taskId: string, spec: ManagerStartSpec, status: TaskStatus, resolvedModel?: ResolvedModelRecord): TaskRecord {
+function buildRecord(
+  taskId: string,
+  spec: ManagerStartSpec,
+  status: TaskStatus,
+  resolvedModel?: ResolvedModelRecord,
+): TaskRecord {
   const timestamp = new Date().toISOString()
   return {
     task_id: taskId,

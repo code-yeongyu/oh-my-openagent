@@ -13,9 +13,16 @@ const posix = process.platform !== "win32"
 
 function register(overrides: Partial<ControlRegister> = {}): ControlRegister {
   return {
-    version: 1, taskId: "st_00000001", runEpoch: 1, parentSessionId: "parent-1", pauseSeq: 2,
-    runRef: { kind: "task", id: "st_00000001" }, phase: "paused",
-    requester: { pid: 4242, managerInstance: "requester-a" }, writtenAt: new Date(0).toISOString(), ...overrides,
+    version: 1,
+    taskId: "st_00000001",
+    runEpoch: 1,
+    parentSessionId: "parent-1",
+    pauseSeq: 2,
+    runRef: { kind: "task", id: "st_00000001" },
+    phase: "paused",
+    requester: { pid: 4242, managerInstance: "requester-a" },
+    writtenAt: new Date(0).toISOString(),
+    ...overrides,
   }
 }
 
@@ -51,8 +58,15 @@ describe("control register max-merge (design 3.1, tests 11 and 12)", () => {
   test("#given guidance at S #when the seq moves to S+1 #then the entry is carried forward, highest revision wins", () => {
     const { store, control } = setup()
     writeRegister(store, control, register({ guidance: [{ inputId: "send-1", revision: 0, text: "first" }] }))
-    writeRegister(store, control, register({ pauseSeq: 3, guidance: [{ inputId: "send-1", revision: 1, text: "edited" }] }))
-    expect(current(control)).toMatchObject({ pauseSeq: 3, guidance: [{ inputId: "send-1", revision: 1, text: "edited" }] })
+    writeRegister(
+      store,
+      control,
+      register({ pauseSeq: 3, guidance: [{ inputId: "send-1", revision: 1, text: "edited" }] }),
+    )
+    expect(current(control)).toMatchObject({
+      pauseSeq: 3,
+      guidance: [{ inputId: "send-1", revision: 1, text: "edited" }],
+    })
   })
 
   test("#given an owner acted on content A #when a requester wrote paused@S+1 meanwhile #then the content-compared delete keeps it", () => {
@@ -69,8 +83,9 @@ describe("control register max-merge (design 3.1, tests 11 and 12)", () => {
     const { store, control } = setup()
     const eight = Array.from({ length: 8 }, (_, index) => ({ inputId: `send-${index}`, revision: 0, text: "x" }))
     writeRegister(store, control, register({ guidance: eight }))
-    expect(writeRegister(store, control, register({ guidance: [{ inputId: "send-9", revision: 0, text: "y" }] })))
-      .toEqual({ kind: "refused", reason: "guidance_too_large" })
+    expect(
+      writeRegister(store, control, register({ guidance: [{ inputId: "send-9", revision: 0, text: "y" }] })),
+    ).toEqual({ kind: "refused", reason: "guidance_too_large" })
     expect(current(control)?.guidance).toHaveLength(8)
   })
 })
@@ -96,10 +111,33 @@ describe.if(posix)("control directory and file rules (design 3.1 / 3.3 step 1, t
   })
 
   test.each([
-    ["a symlinked file", (dir: string, name: string) => { writeFileSync(join(dir, "real"), "{}", { mode: 0o600 }); symlinkSync(join(dir, "real"), join(dir, name)) }],
-    ["mode 0644", (dir: string, name: string) => { writeFileSync(join(dir, name), "{}"); chmodSync(join(dir, name), 0o644) }],
-    ["a second hard link", (dir: string, name: string) => { writeFileSync(join(dir, name), "{}", { mode: 0o600 }); linkSync(join(dir, name), join(dir, "copy")) }],
-    ["an oversized file", (dir: string, name: string) => { writeFileSync(join(dir, name), "x".repeat(16 * 1024 + 1), { mode: 0o600 }) }],
+    [
+      "a symlinked file",
+      (dir: string, name: string) => {
+        writeFileSync(join(dir, "real"), "{}", { mode: 0o600 })
+        symlinkSync(join(dir, "real"), join(dir, name))
+      },
+    ],
+    [
+      "mode 0644",
+      (dir: string, name: string) => {
+        writeFileSync(join(dir, name), "{}")
+        chmodSync(join(dir, name), 0o644)
+      },
+    ],
+    [
+      "a second hard link",
+      (dir: string, name: string) => {
+        writeFileSync(join(dir, name), "{}", { mode: 0o600 })
+        linkSync(join(dir, name), join(dir, "copy"))
+      },
+    ],
+    [
+      "an oversized file",
+      (dir: string, name: string) => {
+        writeFileSync(join(dir, name), "x".repeat(16 * 1024 + 1), { mode: 0o600 })
+      },
+    ],
   ])("#given %s #when the owner reads it #then it is refused", (_label, plant) => {
     const { store, control } = setup()
     const dir = controlDir(store.stateDir)
@@ -112,10 +150,15 @@ describe.if(posix)("control directory and file rules (design 3.1 / 3.3 step 1, t
     const { store, control } = setup()
     const dir = controlDir(store.stateDir)
     writeControlFile(dir, "want-x.json", "{}", control.env)
-    const foreign = { ...control.env, lstat: (path: string) => {
-      const stat = lstatSync(path)
-      return path.endsWith("want-x.json") ? Object.assign(Object.create(Object.getPrototypeOf(stat)), stat, { uid: (stat.uid + 1) }) : stat
-    } }
+    const foreign = {
+      ...control.env,
+      lstat: (path: string) => {
+        const stat = lstatSync(path)
+        return path.endsWith("want-x.json")
+          ? Object.assign(Object.create(Object.getPrototypeOf(stat)), stat, { uid: stat.uid + 1 })
+          : stat
+      },
+    }
     expect(readControlFile(dir, "want-x.json", foreign)).toEqual({ kind: "refused", reason: "file_unsafe" })
     expect(readControlFile(dir, "want-x.json", control.env).kind).toBe("ok")
   })

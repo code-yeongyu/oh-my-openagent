@@ -38,8 +38,7 @@ export function writeFileAtomically(
   } catch (error) {
     const isWindows = process.platform === "win32"
     const isPermissionError =
-      error instanceof Error &&
-      (error.message.includes("EPERM") || error.message.includes("EACCES"))
+      error instanceof Error && (error.message.includes("EPERM") || error.message.includes("EACCES"))
 
     if (isWindows && isPermissionError) {
       unlinkSync(filePath)

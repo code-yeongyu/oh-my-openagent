@@ -53,7 +53,13 @@ export type OutcomeTrackerPorts = {
 }
 
 export type OutcomeTracker = {
-  readonly trackOutcome: (taskId: string, handle: ManagedChildHandle, model: string, epoch: number, turn?: ResumedChildTurn) => void
+  readonly trackOutcome: (
+    taskId: string,
+    handle: ManagedChildHandle,
+    model: string,
+    epoch: number,
+    turn?: ResumedChildTurn,
+  ) => void
   // The manager no longer owns this task's handle: stop watching it for parks.
   readonly release: (taskId: string) => void
 }
@@ -95,7 +101,8 @@ function ownedRecord(
     fresh.residency_state === "persisted_only" ||
     fresh.residency_state === "rpc_detached" ||
     fresh.notification.run_epoch !== epoch
-  ) return null
+  )
+    return null
   return fresh
 }
 
@@ -231,7 +238,8 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
     if (stampedDurableIds.has(handle) || ownedRecord(ports, taskId, handle, epoch) === null) return
     stampedDurableIds.add(handle)
     ports.store.mutate(taskId, (fresh) =>
-      fresh.child_session_id === id ? fresh : { ...fresh, child_session_id: id, updated_at: nowIso(ports.now) })
+      fresh.child_session_id === id ? fresh : { ...fresh, child_session_id: id, updated_at: nowIso(ports.now) },
+    )
   }
 
   function release(taskId: string): void {
@@ -252,7 +260,13 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
   // The run a pending cancel stopped. The cancel normally wrote the terminal record and let the handle
   // go; when its write failed the run is still ours, and it ends as cancelled here - never as the
   // failure the stop caused, which would also start a runtime fallback.
-  async function settleStopped(taskId: string, handle: ManagedChildHandle, model: string, epoch: number, stopped: Promise<void>): Promise<void> {
+  async function settleStopped(
+    taskId: string,
+    handle: ManagedChildHandle,
+    model: string,
+    epoch: number,
+    stopped: Promise<void>,
+  ): Promise<void> {
     await stopped
     // A teardown that already let the handle go must not strand the run: the record of this same run,
     // still non-terminal with its cancel on it, is still the cancel's to end.
@@ -261,10 +275,20 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
     ports.releaseSlot(taskId, model, epoch)
     const runStats = ports.runStatsSnapshot(taskId)
     const timestamp = nowIso(ports.now)
-    persistTerminal(taskId, owned, timestamp, { type: "cancel", timestamp, ...(runStats === undefined ? {} : { run_stats: runStats }) })
+    persistTerminal(taskId, owned, timestamp, {
+      type: "cancel",
+      timestamp,
+      ...(runStats === undefined ? {} : { run_stats: runStats }),
+    })
   }
 
-  function trackOutcome(taskId: string, handle: ManagedChildHandle, model: string, epoch: number, turn?: ResumedChildTurn): void {
+  function trackOutcome(
+    taskId: string,
+    handle: ManagedChildHandle,
+    model: string,
+    epoch: number,
+    turn?: ResumedChildTurn,
+  ): void {
     watchParks(taskId, handle, epoch)
     watchReplaced(taskId, handle, epoch)
     const tracking = {}
@@ -292,13 +316,15 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
             if (turns.get(taskId) !== tracking) return
             const stopped = ports.stopSettlement?.(taskId)
             const paused = ports.pauseSettlement?.(taskId, epoch)
-            const settling = stopped !== undefined
-              ? settleStopped(taskId, handle, model, epoch, stopped)
-              : paused !== undefined
-                ? settlePaused(ports, taskId, handle, epoch, paused).then(handled => {
-                  if (!handled && turns.get(taskId) === tracking) return settleErrorOutcome({ ...input, timestamp: nowIso(ports.now) })
-                })
-                : settleErrorOutcome({ ...input, timestamp: nowIso(ports.now) })
+            const settling =
+              stopped !== undefined
+                ? settleStopped(taskId, handle, model, epoch, stopped)
+                : paused !== undefined
+                  ? settlePaused(ports, taskId, handle, epoch, paused).then((handled) => {
+                      if (!handled && turns.get(taskId) === tracking)
+                        return settleErrorOutcome({ ...input, timestamp: nowIso(ports.now) })
+                    })
+                  : settleErrorOutcome({ ...input, timestamp: nowIso(ports.now) })
             void settling.catch((error: unknown) => {
               log("senpi-task manager error outcome tracking failed", { taskId, error: String(error) })
             })
@@ -326,11 +352,20 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
         }
 
         ports.releaseSlot(taskId, model, epoch)
-        const settling = settleIsolationFor(ports, owned, outcome.status === "completed" && outcome.finalResponse.length > 0)
+        const settling = settleIsolationFor(
+          ports,
+          owned,
+          outcome.status === "completed" && outcome.finalResponse.length > 0,
+        )
         if (settling !== undefined) await settling
         const runStatsField = runStats === undefined ? {} : { run_stats: runStats }
         if (outcome.status === "completed" && outcome.finalResponse.length > 0) {
-          persistTerminal(taskId, owned, timestamp, { type: "complete", timestamp, final_response: outcome.finalResponse, ...runStatsField })
+          persistTerminal(taskId, owned, timestamp, {
+            type: "complete",
+            timestamp,
+            final_response: outcome.finalResponse,
+            ...runStatsField,
+          })
         } else if (outcome.status === "completed") {
           // A clean runner exit is not evidence that the child actually started. A session with
           // only its initiating user prompt can be reported as an empty completion; never publish

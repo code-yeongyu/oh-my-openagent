@@ -97,7 +97,12 @@ describe("formatFullSession", () => {
 
   test("#given 25 messages with messageLimit=20 and fromEnd=true #when formatFullSession runs #then the LAST 20 are returned and the final synthesis is present", async () => {
     const messages = Array.from({ length: 25 }, (_, i) =>
-      makeMessage(`msg_${String(i + 1).padStart(2, "0")}`, i === 24 ? "assistant" : "user", `BODY_${i + 1}`, 1778525000000 + (i + 1) * 1000),
+      makeMessage(
+        `msg_${String(i + 1).padStart(2, "0")}`,
+        i === 24 ? "assistant" : "user",
+        `BODY_${i + 1}`,
+        1778525000000 + (i + 1) * 1000,
+      ),
     )
     const client = makeClient(messages)
 

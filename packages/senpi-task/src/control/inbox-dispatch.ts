@@ -50,7 +50,10 @@ export function validRegister(context: DispatchContext, name: string): ValidRegi
   if (parsedName?.kind !== "want") return undefined
   const read = readRegister(context.control, name)
   if (read.kind === "absent") return undefined
-  if (read.kind === "refused") { logOnce(context, name, read.reason); return undefined }
+  if (read.kind === "refused") {
+    logOnce(context, name, read.reason)
+    return undefined
+  }
   if (read.register.taskId !== parsedName.taskId || parentKey(read.register.parentSessionId) !== parsedName.parentKey) {
     logOnce(context, name, "name_mismatch")
     return undefined
@@ -60,12 +63,20 @@ export function validRegister(context: DispatchContext, name: string): ValidRegi
 
 function ackFor(context: DispatchContext, register: ControlRegister, answer: ReconcileAnswer): ControlAck {
   return {
-    version: 1, taskId: register.taskId, runEpoch: register.runEpoch, parentSessionId: register.parentSessionId,
-    pauseSeq: register.pauseSeq, phase: register.phase, ...(register.resumeId === undefined ? {} : { resumeId: register.resumeId }),
-    state: answer.state, ...(answer.reason === undefined ? {} : { reason: answer.reason }),
-    ...(answer.childSeq === undefined ? {} : { childSeq: answer.childSeq }), ...(answer.turnId === undefined ? {} : { turnId: answer.turnId }),
+    version: 1,
+    taskId: register.taskId,
+    runEpoch: register.runEpoch,
+    parentSessionId: register.parentSessionId,
+    pauseSeq: register.pauseSeq,
+    phase: register.phase,
+    ...(register.resumeId === undefined ? {} : { resumeId: register.resumeId }),
+    state: answer.state,
+    ...(answer.reason === undefined ? {} : { reason: answer.reason }),
+    ...(answer.childSeq === undefined ? {} : { childSeq: answer.childSeq }),
+    ...(answer.turnId === undefined ? {} : { turnId: answer.turnId }),
     ...(answer.guidance === undefined || answer.guidance.length === 0 ? {} : { guidance: answer.guidance }),
-    owner: context.owner, at: new Date(context.now).toISOString(),
+    owner: context.owner,
+    at: new Date(context.now).toISOString(),
   }
 }
 
@@ -89,8 +100,13 @@ function recordFailure(context: DispatchContext, entry: ValidRegister, error: un
   const failures = (prior?.text === entry.text ? prior.failures : 0) + 1
   const delay = Math.min(BACKOFF_CEILING_MS, BACKOFF_FLOOR_MS * 2 ** (failures - 1))
   context.state.failures.set(entry.name, { text: entry.text, failures, nextAt: context.now + delay })
-  log("[senpi-task] control reconcile failed", { name: entry.name, failures, error: error instanceof Error ? error.message : String(error) })
-  if (capped && failures >= MAX_ATTEMPTS) answerRegister(context, entry, { state: "refused", reason: "owner_failed", final: false })
+  log("[senpi-task] control reconcile failed", {
+    name: entry.name,
+    failures,
+    error: error instanceof Error ? error.message : String(error),
+  })
+  if (capped && failures >= MAX_ATTEMPTS)
+    answerRegister(context, entry, { state: "refused", reason: "owner_failed", final: false })
 }
 
 // A register still owed an answer: its content was not answered yet and its backoff has elapsed.
@@ -108,7 +124,8 @@ export async function dispatchRegister(context: DispatchContext, entry: ValidReg
   const port = context.holder(entry.register.taskId)
   if (port === undefined) {
     const record = context.store.load(entry.register.taskId)
-    if (record?.host_pid === context.hostPid) answerRegister(context, entry, { state: "refused", reason: "handle_gone", final: false })
+    if (record?.host_pid === context.hostPid)
+      answerRegister(context, entry, { state: "refused", reason: "handle_gone", final: false })
     return { kind: "unaddressed" }
   }
   try {
@@ -122,11 +139,15 @@ export async function dispatchRegister(context: DispatchContext, entry: ValidReg
 }
 
 // One child inside the owner's own-Stop release transaction: same failure handling, the run's credential.
-export async function dispatchTransactionChild(context: DispatchContext, entry: ValidRegister,
-  credential: import("../pause/admission-barrier").ResumeCredential): Promise<void> {
+export async function dispatchTransactionChild(
+  context: DispatchContext,
+  entry: ValidRegister,
+  credential: import("../pause/admission-barrier").ResumeCredential,
+): Promise<void> {
   const port = context.holder(entry.register.taskId)
   const record = port?.load(entry.register.taskId)
-  if (port === undefined || record === undefined || record.cancel_requested !== undefined || record.status !== "paused") return
+  if (port === undefined || record === undefined || record.cancel_requested !== undefined || record.status !== "paused")
+    return
   try {
     const result = await resumeRecord(port, record, entry.register, credential)
     if (result.kind === "answer") answerRegister(context, entry, result.answer)

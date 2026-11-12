@@ -17,13 +17,21 @@ afterEach(async () => {
 
 const HOST = 7501
 const T1 = "st_00000001"
-const MALFORMED = ["want-not_a_task-0123456789abcdef.json", "want-..-0123456789abcdef.json", "ack-st_zz-0123456789abcdef.json"]
+const MALFORMED = [
+  "want-not_a_task-0123456789abcdef.json",
+  "want-..-0123456789abcdef.json",
+  "ack-st_zz-0123456789abcdef.json",
+]
 
 function recordingLoads(store: TaskRecordStore): { readonly store: TaskRecordStore; readonly loaded: string[] } {
   const loaded: string[] = []
   const proxy = new Proxy(store, {
     get(target, key) {
-      if (key === "load") return (taskId: string) => { loaded.push(taskId); return target.load(taskId) }
+      if (key === "load")
+        return (taskId: string) => {
+          loaded.push(taskId)
+          return target.load(taskId)
+        }
       const value: unknown = Reflect.get(target, key)
       return typeof value === "function" ? value.bind(target) : value
     },
@@ -56,7 +64,7 @@ describe("a control file name whose task id is not the store's grammar (review o
     await inbox.tick()
     expect(owner.calls.pause).toBe(1)
     expect(readAckFile(controlFor(base), T1, "parent-1")).toMatchObject({ state: "held" })
-    expect(loaded.filter(taskId => !/^st_[0-9a-f]{8}$/.test(taskId))).toEqual([])
+    expect(loaded.filter((taskId) => !/^st_[0-9a-f]{8}$/.test(taskId))).toEqual([])
   })
 
   test("#given malformed names older than a day #when the inbox sweeps #then they are removed without a store read", async () => {
@@ -67,6 +75,6 @@ describe("a control file name whose task id is not the store's grammar (review o
     now = 2 * 24 * 60 * 60 * 1000
     await inbox.tick()
     for (const name of MALFORMED) expect(existsSync(join(dir, name))).toBe(false)
-    expect(loaded.filter(taskId => !/^st_[0-9a-f]{8}$/.test(taskId))).toEqual([])
+    expect(loaded.filter((taskId) => !/^st_[0-9a-f]{8}$/.test(taskId))).toEqual([])
   })
 })

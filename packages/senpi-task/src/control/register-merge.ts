@@ -13,10 +13,11 @@ function compareRegisters(a: ControlRegister, b: ControlRegister): number {
 
 function mergeGuidance(...lists: readonly (readonly ControlGuidance[] | undefined)[]): readonly ControlGuidance[] {
   const byId = new Map<string, ControlGuidance>()
-  for (const list of lists) for (const entry of list ?? []) {
-    const prior = byId.get(entry.inputId)
-    if (prior === undefined || entry.revision > prior.revision) byId.set(entry.inputId, entry)
-  }
+  for (const list of lists)
+    for (const entry of list ?? []) {
+      const prior = byId.get(entry.inputId)
+      if (prior === undefined || entry.revision > prior.revision) byId.set(entry.inputId, entry)
+    }
   return [...byId.values()]
 }
 
@@ -31,10 +32,14 @@ const comparable = ({ writtenAt: _at, requester: _requester, ...rest }: ControlR
 export function mergeRegister(prior: ControlRegister | undefined, incoming: ControlRegister): RegisterMerge {
   if (prior === undefined) return { kind: "merged", register: incoming, changed: true }
   const winner = compareRegisters(incoming, prior) > 0 ? incoming : prior
-  const guidance = prior.runEpoch === incoming.runEpoch ? mergeGuidance(prior.guidance, incoming.guidance) : winner.guidance ?? []
+  const guidance =
+    prior.runEpoch === incoming.runEpoch ? mergeGuidance(prior.guidance, incoming.guidance) : (winner.guidance ?? [])
   if (guidance.length > GUIDANCE_MAX_ENTRIES) return { kind: "guidance_too_large" }
   const { guidance: _dropped, ...base } = winner
-  const register: ControlRegister = { ...base, ...(guidance.length === 0 ? {} : { guidance }),
-    ...(winner === prior ? { requester: incoming.requester, writtenAt: incoming.writtenAt } : {}) }
+  const register: ControlRegister = {
+    ...base,
+    ...(guidance.length === 0 ? {} : { guidance }),
+    ...(winner === prior ? { requester: incoming.requester, writtenAt: incoming.writtenAt } : {}),
+  }
   return { kind: "merged", register, changed: comparable(register) !== comparable(prior) }
 }

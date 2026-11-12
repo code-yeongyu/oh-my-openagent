@@ -22,13 +22,25 @@ const id = (n: number) => `st_${String(n).padStart(8, "0")}`
 function setup() {
   const store = tempStore()
   const owner = fakeOwner(store, HOST)
-  const inbox = ControlInbox.for({ stateDir: store.stateDir, hostPid: HOST, store, autoStart: false, now: () => 1_000_000 })
+  const inbox = ControlInbox.for({
+    stateDir: store.stateDir,
+    hostPid: HOST,
+    store,
+    autoStart: false,
+    now: () => 1_000_000,
+  })
   unregisters.push(inbox.register(owner, { channel: true, liveTasks: () => owner.live.size }))
   return { store, owner, inbox }
 }
 
 function plant(store: ReturnType<typeof tempStore>, taskId: string, hostPid: number, ageSeconds: number): void {
-  seedRecord(store, { task_id: taskId, status: "running", run_epoch: 1, host_pid: hostPid, parent_session_id: "parent-1" })
+  seedRecord(store, {
+    task_id: taskId,
+    status: "running",
+    run_epoch: 1,
+    host_pid: hostPid,
+    parent_session_id: "parent-1",
+  })
   writeRegister(store, controlFor(store), want({ taskId, runRef: { kind: "task", id: taskId } }))
   const at = new Date(1_000_000_000 - ageSeconds * 1000)
   utimesSync(join(controlDir(store.stateDir), registerName(taskId, "parent-1")), at, at)
@@ -64,8 +76,15 @@ describe("a planted register is refused (review of #12371, LOW)", () => {
     expect(parseRegister(JSON.stringify({ ...want(), extra: true }))).toBeUndefined()
   })
 
-  test.each([["missing", undefined], ["a number", 7]])("#given guidance whose text is %s #when parsed #then it is refused, never coerced", (_label, text) => {
-    expect(parseRegister(JSON.stringify(want({ guidance: [{ inputId: "send-1", revision: 0, text: text as unknown as string }] })))).toBeUndefined()
+  test.each([
+    ["missing", undefined],
+    ["a number", 7],
+  ])("#given guidance whose text is %s #when parsed #then it is refused, never coerced", (_label, text) => {
+    expect(
+      parseRegister(
+        JSON.stringify(want({ guidance: [{ inputId: "send-1", revision: 0, text: text as unknown as string }] })),
+      ),
+    ).toBeUndefined()
   })
 
   test("#given a register whose content names another task than its file name #when the owner ticks #then nothing is acted on", async () => {
@@ -74,8 +93,12 @@ describe("a planted register is refused (review of #12371, LOW)", () => {
     seedRecord(store, { task_id: id(2), status: "running", run_epoch: 1, host_pid: HOST })
     owner.live.add(id(1))
     owner.live.add(id(2))
-    writeControlFile(controlDir(store.stateDir), registerName(id(1), "parent-1"),
-      JSON.stringify(want({ taskId: id(2), runRef: { kind: "task", id: id(2) } })), controlFor(store).env)
+    writeControlFile(
+      controlDir(store.stateDir),
+      registerName(id(1), "parent-1"),
+      JSON.stringify(want({ taskId: id(2), runRef: { kind: "task", id: id(2) } })),
+      controlFor(store).env,
+    )
     await inbox.tick()
     expect(owner.calls.pause).toBe(0)
   })
