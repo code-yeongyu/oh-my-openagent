@@ -83,7 +83,8 @@ export async function scanCleanupCorpus(repoDir: string): Promise<CleanupCorpus>
       parsed = parseMemoryFile(content)
     } catch (error) {
       if (!(error instanceof FrontmatterError)) throw error
-      if (candidate) skipped.push({ path, reason: error.message })
+      // A header that does not parse may still say read_only, so outside the candidates it is skipped too.
+      if (candidate || FRONTMATTER_RE.exec(content) !== null) skipped.push({ path, reason: error.message })
     }
     const file: LinkingFile = {
       path,

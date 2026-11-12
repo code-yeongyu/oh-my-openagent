@@ -79,17 +79,12 @@ function repointSegment(path: string, text: string, targets: LinkTargets, movedF
     if (escapes(original)) return whole
     const successor = targets.removed.get(original)
     if (successor?.kind === "removed") return label
-    const nextTarget =
-      successor === undefined
-        ? resolves(original, targets.live, false)
-          ? original
-          : undefined
-        : successor.kind === "moved"
-          ? successor.path
-          : ARCHIVE_PATH
-    if (nextTarget === undefined || nextTarget === posix.normalize(posix.join(posix.dirname(path), destinationPath)))
-      return whole
-    const next = `${posix.relative(posix.dirname(path), nextTarget)}${successor?.kind === "archived" ? "" : anchor}`
+    // A link that already dangled keeps its old folder too, so a moved note never gains a target it did not have.
+    const nextTarget = successor === undefined ? original : successor.kind === "moved" ? successor.path : ARCHIVE_PATH
+    if (nextTarget === posix.normalize(posix.join(posix.dirname(path), destinationPath))) return whole
+    // A target that is the note's own new folder is written '.', never an empty destination.
+    const rebased = posix.relative(posix.dirname(path), nextTarget) || "."
+    const next = `${rebased}${successor?.kind === "archived" ? "" : anchor}`
     const replaced = /\s/.test(next) && !raw.trim().startsWith("<") ? `<${next}>` : next
     return `[${label}](${raw.replace(destination, replaced)})`
   })

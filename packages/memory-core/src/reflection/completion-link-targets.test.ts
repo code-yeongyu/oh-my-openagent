@@ -36,6 +36,42 @@ describe("link repair keeps each link's original target (#12642)", () => {
     expect(await read(worktree.dir, "b/x.md")).toContain("[the index](../a/index.md)")
   })
 
+  it("#given a renamed note whose relative link already dangled and a file of that name in its new folder #when validated #then the link keeps its old folder and gains no target", async () => {
+    // given
+    const worktree = await fixture({
+      "a/x.md": note("X", "[gone](missing.md)\n"),
+      "b/missing.md": note("B missing", "b\n"),
+    })
+    await git(worktree.dir, "mv", "a/x.md", "b/x.md")
+    await commitAll(worktree.dir, "chore(dream): move x")
+
+    // when
+    const result = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
+
+    // then
+    const moved = await read(worktree.dir, "b/x.md")
+    expect([...moved.matchAll(/\[gone\]\(([^)]*)\)/g)].map((found) => found[1])).toStrictEqual(["../a/missing.md"])
+    expect(result.status).toBe("valid")
+  })
+
+  it("#given a note renamed into the folder its relative links point at #when validated #then they become '.', never an empty destination", async () => {
+    // given
+    const worktree = await fixture({
+      "a/b/x.md": note("X", "Go [up](..) or [up](../).\n"),
+      "a/other.md": note("Other", "o\n"),
+    })
+    await git(worktree.dir, "mv", "a/b/x.md", "a/x.md")
+    await commitAll(worktree.dir, "chore(dream): move x up")
+
+    // when
+    const result = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
+
+    // then
+    const moved = await read(worktree.dir, "a/x.md")
+    expect([...moved.matchAll(/\[up\]\(([^)]*)\)/g)].map((found) => found[1])).toStrictEqual([".", "."])
+    expect(result.status).toBe("valid")
+  })
+
   it("#given an archive entry that names only the ledger's file name #when validated #then links to it point at the archive", async () => {
     // given
     const worktree = await fixture({

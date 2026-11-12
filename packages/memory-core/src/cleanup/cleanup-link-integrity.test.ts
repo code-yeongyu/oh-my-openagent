@@ -85,4 +85,78 @@ describe("memory cleanup link integrity", () => {
       "would repoint a link in reference/broken.md",
     ])
   })
+
+  it.each(["memory/reference/broken.md", "notes/broken.md"])(
+    "#given %s outside the candidates has a header that does not parse but says read_only #when planned and applied #then the finding is held and the file is never rewritten",
+    async (path) => {
+      // given
+      const content = '---\nread_only: "true"\n---\nSee [[reference/old-LIFTED]].\n'
+      const { dir, repo } = await repoWith([OLD, SIBLING, { relativePath: path, content }])
+
+      // when
+      const { plan, applied } = await run(repo)
+
+      // then
+      expect(await read(dir, path)).toBe(content)
+      expect(applied).toStrictEqual({ applied: false, reason: "nothing-to-do" })
+      expect(plan.scanned.skipped).toStrictEqual([
+        { path, reason: "frontmatter: target file frontmatter is missing 'description'" },
+      ])
+      expect(plan.findings).toStrictEqual([])
+      expect(plan.held.map((finding) => finding.held.split(",")[0])).toStrictEqual([`would repoint a link in ${path}`])
+    },
+  )
+
+  it("#given an archived note whose relative links point at its parent folder #when applied #then they become '.' at the root, never an empty destination", async () => {
+    // given
+    const { dir, repo } = await repoWith([
+      {
+        relativePath: "reference/up-LIFTED.md",
+        content: memory("Up", "The hold was lifted; go [up](..) or [up](../)."),
+      },
+      SIBLING,
+    ])
+    const before = await danglingLinks(dir)
+
+    // when
+    const { applied } = await run(repo)
+
+    // then
+    const archive = await read(dir, "ARCHIVE.md")
+    expect([...archive.matchAll(/\[up\]\(([^)]*)\)/g)].map((found) => found[1])).toStrictEqual([".", "."])
+    expect(applied.applied).toBe(true)
+    // The audit never resolves a link to the root folder, so the same two links stay counted, now from the archive.
+    expect(before).toStrictEqual([
+      ["reference/up-LIFTED.md", ".."],
+      ["reference/up-LIFTED.md", "../"],
+    ])
+    expect(await danglingLinks(dir)).toStrictEqual([
+      ["ARCHIVE.md", "."],
+      ["ARCHIVE.md", "."],
+    ])
+  })
+
+  it("#given an archived note in a subfolder whose relative link already dangled and a root file of that name #when applied #then the archived link keeps its old folder and gains no target", async () => {
+    // given
+    const { dir, repo } = await repoWith([
+      {
+        relativePath: "reference/deep/old-LIFTED.md",
+        content: memory("Old deep", "The hold was lifted; [gone](missing.md) was never written."),
+      },
+      { relativePath: "missing.md", content: "A root file that happens to share the name.\n" },
+    ])
+    const before = await danglingLinks(dir)
+
+    // when
+    const { applied } = await run(repo)
+
+    // then
+    const archive = await read(dir, "ARCHIVE.md")
+    expect([...archive.matchAll(/\[gone\]\(([^)]*)\)/g)].map((found) => found[1])).toStrictEqual([
+      "reference/deep/missing.md",
+    ])
+    expect(applied.applied).toBe(true)
+    expect(before).toStrictEqual([["reference/deep/old-LIFTED.md", "missing.md"]])
+    expect(await danglingLinks(dir)).toStrictEqual([["ARCHIVE.md", "reference/deep/missing.md"]])
+  })
 })
