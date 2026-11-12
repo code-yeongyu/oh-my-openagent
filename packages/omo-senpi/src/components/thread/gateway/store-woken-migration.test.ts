@@ -79,6 +79,8 @@ test("#given a store at the previous schema holding an intake row #when this bui
       "lease_owner",
       "lease_expires_at",
       "generation",
+      "attempts",
+      "next_attempt_at",
     ])
     // A core object: no store extension may register a table or index under this name.
     expect(

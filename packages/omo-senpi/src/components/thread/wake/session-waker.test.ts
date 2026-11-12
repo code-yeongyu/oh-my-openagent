@@ -40,7 +40,6 @@ async function setup(respond: (frame: Readonly<Record<string, unknown>>, index: 
       ensured.push(fake.frames.length)
     },
     open: createLegacyWakeOpen({ env: { SENPI_RPC_SOCKET: fake.socketPath }, keyRoot: () => h.agentDir }),
-    pause: async () => undefined,
   })
   return { h, fake, store, sessions, ensured, waker }
 }
@@ -146,19 +145,55 @@ describe("ensureSessionRunning", () => {
     },
   )
 
-  test("#given a host that keeps failing for a transient reason #when it is woken #then the open is tried three times, the answer is failed and the row is ended", async () => {
-    const { fake, store, sessions, waker } = await setup(() => refusal("host_stopping"))
+  test("#given a transient failure #when it is woken #then the open is not retried in a loop and the row goes back to requested with one attempt and a next-attempt time", async () => {
+    const { h, fake, store, sessions, waker } = await setup(() => refusal("host_stopping"))
     writeSessionFile(sessions, "s1")
-    expect(await waker.ensureSessionRunning("s1")).toMatchObject({ kind: "failed", attempts: 3 })
+    const outcome = await waker.ensureSessionRunning("s1")
+    expect(outcome).toMatchObject({ kind: "deferred", attempts: 1 })
+    expect(fake.frames).toHaveLength(1)
+    const [row] = await store.woken.list()
+    expect(row).toMatchObject({ durable_id: "s1", state: "requested", attempts: 1, lease_owner: null })
+    expect(row?.next_attempt_at).toBeGreaterThan(h.clock.now)
+    if (outcome.kind === "deferred") expect(outcome.next_attempt_at).toBe(row?.next_attempt_at ?? -1)
+  })
+
+  test("#given a deferred wake #when it is woken again before the next-attempt time #then nothing is opened and the answer names that time", async () => {
+    const { fake, store, sessions, ensured, waker } = await setup(() => refusal("host_stopping"))
+    writeSessionFile(sessions, "s1")
+    await waker.ensureSessionRunning("s1")
+    const [row] = await store.woken.list()
+    expect(await waker.ensureSessionRunning("s1")).toEqual({ kind: "not_yet", next_attempt_at: row?.next_attempt_at })
+    expect(fake.frames).toHaveLength(1)
+    expect(ensured).toHaveLength(1)
+  })
+
+  test("#given a host that keeps failing for a transient reason #when it is woken at each next-attempt time #then the third failure deletes the row and answers failed", async () => {
+    const { h, fake, store, sessions, waker } = await setup(() => refusal("host_stopping"))
+    writeSessionFile(sessions, "s1")
+    const kinds: string[] = []
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const outcome = await waker.ensureSessionRunning("s1")
+      kinds.push(outcome.kind)
+      if (outcome.kind === "deferred") h.clock.now = outcome.next_attempt_at
+    }
+    expect(kinds).toEqual(["deferred", "deferred", "failed"])
     expect(fake.frames).toHaveLength(3)
     expect(await store.woken.list()).toEqual([])
   })
 
-  test("#given a host that fails twice then opens #when it is woken #then the third attempt answers live", async () => {
-    const { fake, sessions, waker } = await setup((_frame, index) => (index < 2 ? refusal("host_stopping") : OPENED))
+  test("#given a host that fails twice then opens #when it is woken at each next-attempt time #then the third call answers live and the row is opening", async () => {
+    const { h, fake, store, sessions, waker } = await setup((_frame, index) =>
+      index < 2 ? refusal("host_stopping") : OPENED,
+    )
     writeSessionFile(sessions, "s1")
-    expect(await waker.ensureSessionRunning("s1")).toMatchObject({ kind: "live", generation: 1 })
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const outcome = await waker.ensureSessionRunning("s1")
+      if (outcome.kind !== "deferred") throw new Error(`expected deferred, got ${outcome.kind}`)
+      h.clock.now = outcome.next_attempt_at
+    }
+    expect(await waker.ensureSessionRunning("s1")).toMatchObject({ kind: "live" })
     expect(fake.frames).toHaveLength(3)
+    expect(await store.woken.list()).toMatchObject([{ durable_id: "s1", state: "opening", attempts: 2 }])
   })
 
   test("#given another carrier already started the row #when it is woken here #then it is busy and the other carrier's row is untouched", async () => {
