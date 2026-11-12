@@ -40,6 +40,27 @@ fn set_mode(path: &Path, mode: u32) {
 #[cfg(not(unix))]
 fn set_mode(_path: &Path, _mode: u32) {}
 
+/// The directories a case narrowed, put back to 0700 when dropped (a panicking replay
+/// included), so the tempdir can always be removed.
+struct Restore(Vec<PathBuf>);
+
+#[cfg(unix)]
+#[test]
+fn restore_resets_narrowed_modes_when_the_replay_panics() {
+    use std::os::unix::fs::PermissionsExt;
+    let root = tempfile::tempdir().expect("tempdir");
+    let dir = root.path().join("markers");
+    fs::create_dir(&dir).expect("dir");
+    set_mode(&dir, 0o500);
+    let replayed = std::panic::catch_unwind(|| {
+        let _restore = Restore(vec![dir.clone()]);
+        panic!("a replay step failed");
+    });
+    assert!(replayed.is_err(), "the replay panicked");
+    let mode = fs::metadata(&dir).expect("dir").permissions().mode();
+    assert_eq!(mode & 0o777, 0o700, "the narrowed mode is restored");
+}
+
 /// Plants the case's `runtime.plant` under `root`, directory modes last; answers the
 /// directories whose mode was narrowed.
 fn plant(root: &Path, case: &Value) -> Vec<PathBuf> {
