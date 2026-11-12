@@ -83,7 +83,7 @@ export async function runTaskCancel(manager: CancelManager, params: TaskCancelIn
     case "released":
       return toolResult(
         withDroppedSteeringNotice(
-          `Task ${outcome.task_id} had already finished (${outcome.status}); its retained child or queued continuation is now released. The result stays readable with task_output, and task_send revives it.`,
+          `Task ${outcome.task_id} had already finished (${outcome.status}); its retained child or queued continuation is now released. The result stays readable with tool.task_output({ task_id }) in an eval cell, and tool.task_send revives it.`,
           outcome.undelivered_messages ?? 0,
         ),
         {

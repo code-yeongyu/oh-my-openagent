@@ -10,7 +10,7 @@ export function withDroppedSteeringNotice(message: string | undefined, count: nu
 }
 export function withParkedSteeringNotice(message: string, count: number): string {
   if (count === 0) return message
-  const notice = `${count} message${count === 1 ? " sent to this task is" : "s sent to this task are"} still queued: ${count === 1 ? "it" : "they"} will be delivered first, in order, when you continue it with task_send.`
+  const notice = `${count} message${count === 1 ? " sent to this task is" : "s sent to this task are"} still queued: ${count === 1 ? "it" : "they"} will be delivered first, in order, when you continue it with tool.task_send in an eval cell.`
   return message.endsWith(notice) ? message : [message, notice].filter(Boolean).join("\n\n")
 }
 /** A terminal turn's later queued continuation owes its own terminal result when its target ends. */

@@ -29,7 +29,7 @@ export interface ThreadToolEntry {
 }
 
 /** Routing clause shared by every description: a positive alternative, never a negation. */
-const ROUTE_TO_TASK = "; to spawn a child task instead, use task."
+const ROUTE_TO_TASK = "; to spawn a child task instead, run tool.task({ ... }) in an eval cell."
 
 export const THREAD_TOOL_METADATA: readonly ThreadToolEntry[] = [
   {

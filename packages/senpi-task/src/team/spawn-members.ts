@@ -170,9 +170,9 @@ function buildMemberPrompt(spec: TeamSpec, member: TeamMember): string {
   const role = member.prompt ?? `You are team member '${member.name}' in team '${spec.name}'.`
   return [
     `You are '${member.name}', a member of team '${spec.name}' running under the senpi-task team runtime.`,
-    "Work arrives as injected messages from the lead and other members; coordinate with task_send.",
-    "After completing any immediate instructions below, report with task_send, then end your turn. Injected messages revive this resident session with more work.",
-    "When you finish assigned work, task_send the lead a summary, then end your turn and wait for an injected message.",
+    "Work arrives as injected messages from the lead and other members; coordinate with tool.task_send({ to, message }) in an eval cell.",
+    "After completing any immediate instructions below, report with tool.task_send in an eval cell, then end your turn. Injected messages revive this resident session with more work.",
+    "When you finish assigned work, send the lead a summary with tool.task_send in an eval cell, then end your turn and wait for an injected message.",
     role,
   ].join("\n\n")
 }

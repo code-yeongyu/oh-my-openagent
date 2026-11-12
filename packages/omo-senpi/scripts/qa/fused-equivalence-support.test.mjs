@@ -18,6 +18,7 @@ import {
   dropTimestampOffsets,
   goldenHostLeaks,
   pinEnginePackage,
+  dropEvalProgressSnapshots,
   splitStatusChannels,
   statusCounts,
   stopSandboxProcesses,
@@ -54,6 +55,53 @@ describe("splitStatusChannels", () => {
     const O6 = [splitStatusChannels({ turn: [status("memory", "a"), status("goal", "g"), status("memory", "b")] })]
 
     expect(statusCounts({ O6 })).toEqual([{ "setStatus:memory": 2, "setStatus:goal": 1 }])
+  })
+})
+
+describe("dropEvalProgressSnapshots", () => {
+  const update = (status, text) => ({
+    type: "tool_execution_update",
+    toolCallId: "call_1",
+    toolName: "eval",
+    args: {},
+    partialResult: { content: [{ type: "text", text }], details: { cells: [{ status }] } },
+  })
+
+  test("#given a cell that streamed two mid-run snapshots #when dropped #then only the queued and complete transitions remain", () => {
+    const client = {
+      turn: [
+        { type: "tool_execution_start", toolName: "eval" },
+        update("queued", "1/1 cells queued"),
+        update("running", "1/1 cells running"),
+        update("running", "1/1 cells running\n↳ last: CHILD-DONE"),
+        update("complete", "1/1 cells complete"),
+        { type: "tool_execution_end", toolName: "eval" },
+      ],
+    }
+
+    const kept = dropEvalProgressSnapshots(client).turn
+
+    expect(kept.map((event) => event.partialResult?.details?.cells?.[0]?.status ?? event.type)).toEqual([
+      "tool_execution_start",
+      "queued",
+      "complete",
+      "tool_execution_end",
+    ])
+  })
+
+  test("#given another tool's running update #when dropped #then it is untouched", () => {
+    const other = { ...update("running", "x"), toolName: "computer" }
+
+    expect(dropEvalProgressSnapshots({ turn: [other] }).turn).toEqual([other])
+  })
+
+  test("#given two runs that differ only in how many mid-run snapshots fired #when dropped #then their turn lists are equal", () => {
+    const one = { turn: [update("queued", "q"), update("running", "r1"), update("complete", "c")] }
+    const two = {
+      turn: [update("queued", "q"), update("running", "r1"), update("running", "r2"), update("complete", "c")],
+    }
+
+    expect(dropEvalProgressSnapshots(one)).toEqual(dropEvalProgressSnapshots(two))
   })
 })
 
