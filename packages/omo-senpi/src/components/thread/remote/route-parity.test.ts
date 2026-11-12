@@ -18,6 +18,23 @@ const endedPlanner = (title: string) => ({
   state: "ended" as const,
 })
 const PLANNER_LIVE = ["rk-on-b", "dur-on-b", "rk-old", "dur-old"]
+// The #13141 contender-floor rows, scored by trigram Dice against "billing migration" (15 trigrams). The live row
+// "billing migration postmortem" scores 30/41 = 0.7317 and clears the 0.72 accept floor. The ended row "billing
+// migration cutover runbook" scores 30/46 = 0.6522: inside [0.64, 0.72), 0.0795 behind the live row, so it blocks it.
+// The ended row "billing migration postmortem draft" scores 30/47 = 0.6383, below the 0.64 contender floor and 0.0934
+// behind, so it could not block the live row even if it were ranked.
+const endedRow = (title: string, key: string) => ({
+  ...B_ROW,
+  session_id: `rk-${key}`,
+  durable_id: `dur-${key}`,
+  path: `/home/b/.omo/agent/sessions/dur-${key}.jsonl`,
+  title,
+  state: "ended" as const,
+})
+const MIGRATION_LIVE = { ...B_ROW, title: "billing migration postmortem" }
+const CUTOVER_ENDED = endedRow("billing migration cutover runbook", "cutover")
+const DRAFT_ENDED = endedRow("billing migration postmortem draft", "postmortem-draft")
+const migrationHandoff = { thread: "billing migration", match: "fuzzy", message: "continue", all_scope: true }
 type SentCalls = ReturnType<typeof account>["sent"]
 const relayCalls = (sent: SentCalls) => sent.map((call) => [call.via, call.device, call.session, call.rpc?.["type"]])
 const admits = (sent: SentCalls) =>
@@ -185,6 +202,40 @@ describe("#13012 route parity", () => {
       expect(admits(a.sent)).toStrictEqual([["b", target[1]]])
     },
   )
+
+  test("#given an ended remote row at 0.6522 and a live row at 0.7317, inside the 0.08 margin #when fuzzy handoff runs #then it answers ambiguous_target and sends nothing", async () => {
+    const a = account({ rows: [CUTOVER_ENDED, MIGRATION_LIVE] })
+    expect(await surface(a.remote).run("thread_handoff", migrationHandoff)).toMatchObject({
+      kind: "error",
+      error: { code: "ambiguous_target" },
+    })
+    expect(relayCalls(a.sent)).toStrictEqual([])
+  })
+
+  test("#given an ended remote row at 0.6383, below the 0.64 contender floor, and a live row at 0.7317 #when fuzzy handoff runs #then the live row resolves and only it is sent to", async () => {
+    const a = account({ rows: [DRAFT_ENDED, MIGRATION_LIVE] })
+    expect(await surface(a.remote).run("thread_handoff", migrationHandoff)).toMatchObject({
+      kind: "ok",
+      thread: { thread_id: B_ROW.durable_id, device: B_ROW.device },
+      resolved_by: "fuzzy",
+    })
+    expect(admits(a.sent)).toStrictEqual([[B_ROW.device, B_ROW.session_id]])
+  })
+
+  test("#given an ambiguous fuzzy handoff that also has an ended row below the 0.64 floor #when it answers ambiguous_target #then the candidates list the ranked rows and leave that ended row out", async () => {
+    const a = account({ rows: [CUTOVER_ENDED, DRAFT_ENDED, MIGRATION_LIVE] })
+    const result = await surface(a.remote).run("thread_handoff", migrationHandoff)
+    expect(result).toMatchObject({ kind: "error", error: { code: "ambiguous_target" } })
+    const candidates =
+      (result as { error: { details?: { candidates?: readonly { id: string; device?: string }[] } } }).error.details
+        ?.candidates ?? []
+    expect(candidates.map((candidate) => [candidate.id, candidate.device])).toStrictEqual([
+      ["dur-local", "here"],
+      ["dur-cutover", "b"],
+      [B_ROW.durable_id, "b"],
+    ])
+    expect(relayCalls(a.sent)).toStrictEqual([])
+  })
 
   test("#given a local thread named exactly as the query and a live remote near-match #when fuzzy and exact handoff run #then both deliver locally and send nothing over the relay", async () => {
     const rows = [{ ...B_ROW, title: "local peer notes" }]
