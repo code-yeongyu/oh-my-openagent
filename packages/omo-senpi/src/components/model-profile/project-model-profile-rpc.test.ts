@@ -205,12 +205,11 @@ describe("project model_profile RPC (#13188)", () => {
   })
 
   test("#given another account's home folder #when a pin is set #then it is refused and nothing is written", () => {
-    const accountsRoot = folder()
-    const other = join(accountsRoot, "someone-else")
+    const other = join(folder(), "someone-else")
     mkdirSync(join(other, ".omo"), { recursive: true })
     writeFileSync(join(other, ".omo", "omo.jsonc"), COMMENTED)
 
-    const reply = setProjectModelProfile(trusted(other), { modelProfile: "a/b" }, { accountsRoot })
+    const reply = setProjectModelProfile(trusted(other), { modelProfile: "a/b" }, { accountHomes: () => [other] })
 
     expect(reply).toMatchObject({ kind: "refused", code: "home_folder" })
     expect(readFileSync(join(other, ".omo", "omo.jsonc"), "utf8")).toBe(COMMENTED)
@@ -226,12 +225,62 @@ describe("project model_profile RPC (#13188)", () => {
     expect(readFileSync(join(cwd, ".omo", "omo.jsonc.bak.2020-01-01T00-00-00-000Z"), "utf8")).toBe("theirs")
   })
 
-  test("#given a home at the top of the file system or a missing home #when the accounts root is derived #then there is none", () => {
-    const { accountsRootFor } = projectModelProfileRpc
-    expect(accountsRootFor("/")).toBeNull()
-    expect(accountsRootFor("/nonexistent-home-for-a-service-user")).toBeNull()
-    const home = folder()
-    expect(accountsRootFor(home)).toBe(realpathSync(join(home, "..")))
+  test("#given another writer's backup made during this write #when a pin is set #then that copy stays", () => {
+    const cwd = folder(COMMENTED)
+    const theirs = join(cwd, ".omo", "omo.jsonc.bak.concurrent-writer")
+    const concurrentWriter = {
+      ...DEFAULT_WRITE_FILE_SYSTEM,
+      renameSync: (from: string, to: string) => {
+        writeFileSync(theirs, "theirs")
+        DEFAULT_WRITE_FILE_SYSTEM.renameSync(from, to)
+      },
+    }
+
+    expect(setProjectModelProfile(trusted(cwd), { modelProfile: "a/b" }, { fileSystem: concurrentWriter }).kind).toBe("ok")
+
+    expect(readdirSync(join(cwd, ".omo")).sort()).toEqual(["omo.jsonc", "omo.jsonc.bak.concurrent-writer"])
+    expect(readFileSync(theirs, "utf8")).toBe("theirs")
+  })
+
+  test("#given a folder beside an account home in a shared parent #when a pin is set #then it is written", () => {
+    const shared = folder()
+    const home = join(shared, "home")
+    const work = join(shared, "workspace")
+    mkdirSync(home)
+    mkdirSync(work)
+
+    const reply = setProjectModelProfile(trusted(work), { modelProfile: "a/b" }, { accountHomes: () => [home] })
+
+    expect(reply).toMatchObject({ kind: "ok", modelProfile: "a/b" })
+  })
+
+  test("#given an account home outside any shared accounts folder #when a pin is set there or through an alias #then it is refused", () => {
+    const serviceHome = join(folder(), "var", "lib", "svc")
+    mkdirSync(join(serviceHome, ".omo"), { recursive: true })
+    writeFileSync(join(serviceHome, ".omo", "omo.jsonc"), COMMENTED)
+    const alias = join(folder(), "svc-link")
+    symlinkSync(serviceHome, alias)
+
+    for (const cwd of [serviceHome, alias])
+      expect(setProjectModelProfile(trusted(cwd), { modelProfile: "a/b" }, { accountHomes: () => [serviceHome] })).toMatchObject({
+        kind: "refused",
+        code: "home_folder",
+      })
+    expect(readFileSync(join(serviceHome, ".omo", "omo.jsonc"), "utf8")).toBe(COMMENTED)
+  })
+
+  test("#given the system user database #when account homes are read from it #then every listed home is returned", () => {
+    const { homesFromPasswd, homesFromDscl } = projectModelProfileRpc
+    expect(
+      homesFromPasswd(
+        "# comment\nroot:x:0:0:root:/root:/bin/bash\nsvc:x:998:998::/var/lib/svc:/usr/sbin/nologin\nnobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin\nbroken-line\n\n",
+      ),
+    ).toStrictEqual(["/root", "/var/lib/svc", "/nonexistent"])
+    expect(homesFromDscl("_www                    /Library/WebServer\nroot                    /var/root\nq                       /Users/q name\n")).toStrictEqual([
+      "/Library/WebServer",
+      "/var/root",
+      "/Users/q name",
+    ])
   })
 
   test("#given no bound session #when either verb runs #then it answers no_session", () => {
