@@ -698,6 +698,26 @@ function authOffsetsOutcome(hits: number[], positions: number[], unreadable: num
   }
 }
 
+// The alpha class of a frame's RGBA bytes: `unread` when no bytes could be read (null or empty), `opaque` when any
+// pixel has a non-zero alpha byte, else `transparent`.
+function frameAlpha(bytes: Uint8Array | null): "opaque" | "transparent" | "unread" {
+  void bytes
+  return "unread"
+}
+
+// The auth-offsets scan over the three candidate slots of an event record. `read` returns null for an unreadable
+// address; the scan records that candidate as unreadable, never as a clean miss.
+function scanCandidates(
+  read: (address: number, size: number) => Uint8Array | null,
+  eventAddress: number,
+  sentinel: bigint,
+): { hits: number[]; positions: number[]; unreadable: number[] } {
+  void read
+  void eventAddress
+  void sentinel
+  return { hits: [], positions: [], unreadable: [] }
+}
+
 function qCopySpaces(): Outcome {
   const n = native()
   const r = resolveAll(PATHS.skylight, [
@@ -1318,6 +1338,16 @@ function hostOptions(args: string[]): { withCapture: boolean } {
   return { withCapture: args.includes("--with-capture") }
 }
 
+// Assembles a Host from its three sources; buildHost passes the live ones, the self-test passes fixed ones.
+function hostFromParts(
+  facts: { major: number; build: string },
+  session: SessionFacts,
+  options: { withCapture: boolean },
+): Host {
+  void options
+  return { major: facts.major, build: facts.build, session, withCapture: false }
+}
+
 function buildHost(args: string[]): Host {
   const { major, build } = precondition()
   return { major, build, session: sessionFacts(), ...hostOptions(args) }
@@ -1555,11 +1585,11 @@ function selfTest(): number {
     const stderr = res.stderr.toString().trim()
     return { code: res.exitCode ?? -1, stderrLines: stderr === "" ? 0 : stderr.split("\n").length }
   }
-  expect("--measure over a bad-header ledger: exit 2, one line", () => {
+  expect("cli: --measure over a bad-header ledger exits 2 with one line", () => {
     const r = cli(["--measure", "--out", bad, "--pending", "15=r", "--pending", "26=r"])
     return r.code === 2 && r.stderrLines === 1
   })
-  expect("--verify of a bad-header ledger: exit 2, one line", () => {
+  expect("cli: --verify of a bad-header ledger exits 2 with one line", () => {
     const r = cli(["--verify", bad])
     return r.code === 2 && r.stderrLines === 1
   })
@@ -1583,6 +1613,68 @@ function selfTest(): number {
   expect("qHwCapture: without --with-capture it is UNMEASURED and names the flag", () => {
     const o = qHwCapture(granted)
     return o.verdict === "UNMEASURED" && o.reason.includes("--with-capture")
+  })
+  // fold of the review at f3ccccdc75: pure seams for the macOS-only paths
+  expect(
+    "hostFromParts: --with-capture reaches the Host",
+    () => hostFromParts({ major: 26, build: "b" }, granted.session, { withCapture: true }).withCapture === true,
+  )
+  expect(
+    "hostFromParts: no flag leaves it off",
+    () => hostFromParts({ major: 26, build: "b" }, granted.session, { withCapture: false }).withCapture === false,
+  )
+  expect(
+    "frameAlpha: no bytes is 'unread'",
+    () => frameAlpha(null) === "unread" && frameAlpha(new Uint8Array(0)) === "unread",
+  )
+  expect(
+    "frameAlpha: all-zero alpha is 'transparent'",
+    () => frameAlpha(new Uint8Array([9, 9, 9, 0, 9, 9, 9, 0])) === "transparent",
+  )
+  expect(
+    "frameAlpha: one non-zero alpha byte is 'opaque'",
+    () => frameAlpha(new Uint8Array([0, 0, 0, 0, 0, 0, 0, 7])) === "opaque",
+  )
+  // a fake address space: event at 0x1000; slot 24 unreadable, slot 32 -> record with the sentinel at byte 40,
+  // slot 16 -> a record address that cannot be read
+  const sentinel = 0x1122334455667788n
+  const record = new Uint8Array(512)
+  new DataView(record.buffer).setBigUint64(40, sentinel, true)
+  const word = (v: number): Uint8Array => {
+    const b = new Uint8Array(8)
+    new DataView(b.buffer).setBigUint64(0, BigInt(v), true)
+    return b
+  }
+  const memory = new Map<number, Uint8Array>([
+    [0x1000 + 32, word(0x2000)],
+    [0x1000 + 16, word(0x3000)],
+    [0x2000, record],
+  ])
+  const scan = scanCandidates((address) => memory.get(address) ?? null, 0x1000, sentinel)
+  expect(
+    "scanCandidates: the sentinel record is the one hit, at its position",
+    () => scan.hits.join() === "32" && scan.positions.join() === "40",
+  )
+  expect(
+    "scanCandidates: an unreadable slot and an unreadable record are both named",
+    () => scan.unreadable.join() === "24,16",
+  )
+  // the README lists every self-test group (the text before ':' of each check name), and nothing else
+  expect("readme: the self-test list names exactly the self-test groups", () => {
+    const source = readFileSync(import.meta.path, "utf8")
+    const groups = new Set([...source.matchAll(/expect\(\s*"([^":]+):/g)].map((m) => m[1] ?? ""))
+    const readme = readFileSync(`${import.meta.dir}/README.md`, "utf8")
+    const start = readme.indexOf("### Self-test checks")
+    if (start < 0) return false
+    const section = readme.slice(start).split("\n").slice(1)
+    const end = section.findIndex((l) => l.startsWith("#"))
+    const listed = new Set(
+      (end < 0 ? section : section.slice(0, end)).flatMap((l) => {
+        const m = /^- `([^`]+)`/.exec(l)
+        return m?.[1] ? [m[1]] : []
+      }),
+    )
+    return groups.size === listed.size && [...groups].every((g) => listed.has(g))
   })
   for (const f of failures) console.log(`SELF-TEST FAIL ${f}`)
   console.log(failures.length > 0 ? `SELF-TEST FAIL ${failures.length}` : "SELF-TEST PASS")
