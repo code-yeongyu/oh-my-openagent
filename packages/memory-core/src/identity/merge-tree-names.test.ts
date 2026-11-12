@@ -18,6 +18,7 @@ import {
   plumb,
   removeMergeRoots,
 } from "./merge.test-support"
+import { readIdentityRecord } from "./record"
 
 afterEach(removeMergeRoots)
 
@@ -97,6 +98,9 @@ describe("identity merge (#10070)", () => {
     ["skills/.g\u200cit/config", "[core]\n\tbare = false\n"],
     // Plain names to isPlainTreePath (`C:` folds to `c`); only the confinement check refuses this drive-absolute path.
     ["C:/x.md", note("carried")],
+    // Under the aside root but not plain: classified before the aside-copy skip, so each stays pending.
+    ["reference/merged/x/../../y.md", note("carried")],
+    ["reference/merged/x/.git/config", "[core]\n\tbare = false\n"],
   ])(
     "#given a source tree entry named %j #when the merge is planned and applied #then both name it unplaceable and nothing in or beside the target changes beyond what the store without it merges (#12974 security)",
     async (path, content) => {
@@ -108,6 +112,7 @@ describe("identity merge (#10070)", () => {
       expect(merged.status).toBe(control.status)
       expect(unplaceable(merged.planned)).toStrictEqual([{ path, action: "unplaceable", reason: "not-a-plain-path" }])
       expect(unplaceable(merged.applied)).toStrictEqual([{ path, action: "unplaceable", reason: "not-a-plain-path" }])
+      expect(merged.pending).toStrictEqual([path])
     },
     60_000,
   )
@@ -140,5 +145,6 @@ async function mergeTreeEntry(path: string, content: string, withEntry: boolean)
   const written = Object.fromEntries(
     changed.filter((name) => !name.startsWith("repo/.git/")).map((name) => [name, after[name]]),
   )
-  return { planned, applied: result.plan.actions, status: result.status, changed, written }
+  const pending = (await readIdentityRecord(source.paths.root))?.pendingPaths
+  return { planned, applied: result.plan.actions, status: result.status, changed, written, pending }
 }

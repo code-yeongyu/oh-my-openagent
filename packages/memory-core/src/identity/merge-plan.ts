@@ -59,13 +59,14 @@ export async function planIdentityMerge(
     .filter((entry) => mergedBefore?.get(entry.path) !== entry.oid || stillPending.has(entry.path))
     .sort((left, right) => left.path.localeCompare(right.path))
     .map((entry): MergeAction => {
-      if (entry.path.startsWith(`${MERGED_ASIDE_ROOT}/`))
-        return { path: entry.path, action: "skip", reason: "earlier-aside-copy" }
       // A source tree is data: plumbing or another tool can name an entry `..`, `.git` or `a\b`, and a name
       // starting with `.` configures the repository (`.gitignore`, `.gitattributes`) or climbs out of it. None
       // may become a target path (#12974 security): it is left out and named, and the rest still merges.
+      // This runs before every other rule, so no such entry is ever reported as anything but left out.
       if (entry.path.startsWith(".") || !isMergePathConfined(entry.path) || !isPlainTreePath(entry.path))
         return { path: entry.path, action: "unplaceable", reason: "not-a-plain-path" }
+      if (entry.path.startsWith(`${MERGED_ASIDE_ROOT}/`))
+        return { path: entry.path, action: "skip", reason: "earlier-aside-copy" }
       const existing = targetBlobs.get(entry.path)
       if (existing?.oid === entry.oid) return { path: entry.path, action: "skip" }
       const foldedCollision = existing === undefined && targetFolded.has(entry.path.toLowerCase())
