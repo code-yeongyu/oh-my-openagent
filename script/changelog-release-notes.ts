@@ -124,9 +124,9 @@ const RESERVED_GITHUB_PATHS = new Set([
 // A GitHub URL names a repository on github.com (optionally www.), on any other github.com subdomain
 // (api., gist., codeload., ...) and on any githubusercontent.com subdomain (raw., objects., ...). The host
 // may carry a scheme, a protocol-relative "//", an scp-style "git@" prefix, or nothing at all.
-// Scheme-less hosts are only recognized when they are not glued to a word, URL path or host label.
+// A scheme-less host is recognized after any separator, a URL path slash included, and only skipped when glued to a word or host label (notgithub.com).
 const GITHUB_HOST = String.raw`((?:[a-z0-9-]+\.)*github\.com|(?:[a-z0-9-]+\.)+githubusercontent\.com)(?::\d+)?[/:]`
-const GITHUB_URL_START = new RegExp(String.raw`(?:(?:https?:)?\/\/|(?<![\w./-]))` + GITHUB_HOST, "gi")
+const GITHUB_URL_START = new RegExp(String.raw`(?<![\w.-])` + GITHUB_HOST, "gi")
 // GitHub subdomains that never address a repository.
 const NON_REPO_GITHUB_HOSTS = new Set([
   "docs.github.com",
@@ -151,7 +151,7 @@ const REPO_REFERENCE = /\b(?:([\w.-]+)\/)?([A-Za-z][\w.-]*)#\d+\b/g
 // and runs to whitespace or a closing bracket, quote or backtick; trailing sentence punctuation stays outside it.
 const MARKDOWN_LINK = String.raw`\[([^\]]*)\]\(((?:[^\s()]|\([^\s()]*\))*)\)`
 const ANGLE_URL = String.raw`<(?=[^\s<>]*(?:\/\/|github\.com|githubusercontent\.com))([^\s<>]+)>`
-const URL_START = String.raw`https?:\/\/|(?<![\w./+-])(?:ssh|git|ftp|svn|git\+ssh):\/\/|\/\/(?=(?:[a-z0-9-]+\.)*(?:github\.com|[a-z0-9-]+\.githubusercontent\.com)(?::\d+)?[/:])|(?<![\w./-])(?=(?:[a-z0-9-]+\.)*(?:github\.com|[a-z0-9-]+\.githubusercontent\.com)(?::\d+)?[/:])`
+const URL_START = String.raw`https?:\/\/|(?<![\w./+-])(?:ssh|git|ftp|svn|git\+ssh):\/\/|(?<![\w.-])(?=(?:[a-z0-9-]+\.)*(?:github\.com|[a-z0-9-]+\.githubusercontent\.com)(?::\d+)?[/:])`
 const URL_TOKEN = "(?:" + URL_START + ')[^\\s)\\]<>"`]*'
 const CROSS_REPO_PATTERN = new RegExp(
   [MARKDOWN_LINK, ANGLE_URL, "(" + URL_TOKEN + ")", REPO_REFERENCE.source].join("|"),

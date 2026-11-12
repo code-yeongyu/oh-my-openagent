@@ -143,8 +143,23 @@ describe("neutralizeCrossRepoReferences URL boundaries", () => {
     )
   })
 
-  test("#given a scheme-less private URL inside another URL path #when neutralized #then it is untouched", () => {
-    const text = "https://example.com/github.com/acme-org/acme-svc"
+  test("#given a scheme-less private URL inside another URL path #when neutralized #then the whole URL is replaced", () => {
+    expect(neutralizeCrossRepoReferences("see https://example.com/github.com/acme-org/acme-svc now")).toStrictEqual(
+      "see tracked internally now",
+    )
+    expect(
+      neutralizeCrossRepoReferences("see web.archive.org/web/2024/github.com/acme-org/acme-svc now"),
+    ).toStrictEqual("see web.archive.org/web/2024/tracked internally now")
+  })
+
+  test("#given a public GitHub path nested in another URL path #when neutralized #then it is unchanged", () => {
+    const text =
+      "https://example.com/github.com/code-yeongyu/senpi and web.archive.org/web/2024/github.com/code-yeongyu/senpi"
+    expect(neutralizeCrossRepoReferences(text)).toStrictEqual(text)
+  })
+
+  test("#given a host merely ending in github.com #when neutralized #then it is not treated as GitHub", () => {
+    const text = "https://notgithub.com/acme-org/acme-svc and notgithub.com/acme-org/acme-svc"
     expect(neutralizeCrossRepoReferences(text)).toStrictEqual(text)
   })
 
@@ -302,6 +317,10 @@ describe("neutralizeCrossRepoReferences invariant", () => {
     "https://github.com/code-yeongyu/senpi?u=github.com/acme-org/acme-svc",
     "https://example.com/redirect?to=https://github.com/acme-org/acme-svc",
     "https://web.archive.org/web/2024/https://github.com/acme-org/acme-svc",
+    "https://web.archive.org/web/2024/github.com/acme-org/acme-svc",
+    "web.archive.org/web/2024/github.com/acme-org/acme-svc",
+    "https://example.com/github.com/acme-org/acme-svc",
+    "https://example.com/a/b/raw.githubusercontent.com/acme-org/acme-svc/main/x",
     "https://example.com/?r=acme-svc#3",
     "https://example.com/?see=acme-org/acme-svc#3",
     "git clone https://github.com/acme-org/acme-svc.git",
@@ -342,7 +361,9 @@ describe("neutralizeCrossRepoReferences invariant", () => {
     "[docs](https://example.com/guide)",
     "https://docs.github.com/en/actions",
     "https://web.archive.org/web/2024/https://github.com/code-yeongyu/senpi",
-    "https://example.com/github.com/acme-org/acme-svc",
+    "https://example.com/github.com/code-yeongyu/senpi",
+    "https://web.archive.org/web/2024/github.com/code-yeongyu/senpi",
+    "https://notgithub.com/acme-org/acme-svc",
     "fixed senpi#6412 and omo#12 and code-yeongyu/senpi#7 (PR#3, GH#4)",
     "plain text with no references at all.",
   ]
