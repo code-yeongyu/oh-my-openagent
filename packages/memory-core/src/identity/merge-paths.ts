@@ -58,6 +58,24 @@ export async function createInTarget(repo: string, destination: string, created:
   }
 }
 
+/**
+ * A tree entry is written under the target repository only as a plain relative path: git stores a backslash
+ * as an ordinary character, so a name like notes\\..\\..\\x.md would climb out once a platform treats it as a
+ * separator. Absolute paths and empty, '.' or '..' segments (after normalising backslashes) are refused.
+ */
+export function assertMergePathConfined(path: string): void {
+  const normalized = path.replaceAll("\\", "/")
+  const windowsAbsolute = /^[a-zA-Z]:\//.test(normalized)
+  const segments = normalized.split("/")
+  if (
+    normalized.startsWith("/") ||
+    windowsAbsolute ||
+    segments.some((segment) => segment === "" || segment === "." || segment === "..")
+  ) {
+    throw new Error(`memory merge: ${path} is outside the memory repository; nothing was merged`)
+  }
+}
+
 /** Removes, deepest first, the directories createInTarget made, only while they are empty, so a refused merge leaves no trace. */
 export async function removeCreatedDirs(created: readonly string[]): Promise<void> {
   for (const dir of [...created].reverse()) {
