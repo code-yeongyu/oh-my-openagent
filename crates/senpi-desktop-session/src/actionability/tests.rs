@@ -3,8 +3,8 @@
 
 #[path = "lock_tests.rs"]
 mod lock_tests;
-
-use std::time::Duration;
+#[path = "no_sleep_tests.rs"]
+mod no_sleep_tests;
 
 use senpi_desktop_backend_fake::SinkOp;
 use senpi_desktop_core::error::{DesktopError, ErrorCode, ErrorReport};
@@ -125,17 +125,11 @@ fn press_is_supported_by_any_listed_action_and_other_actions_need_their_name() {
     }
 }
 
-/// Wall time a busy host takes from the test between two of its steps.
-const HOST_STALL: Duration = Duration::from_millis(200);
-
 #[test]
 fn the_battery_waits_for_an_element_that_appears_enabled_after_500_ms() {
     // Given: hidden and disabled until 500 ms after its first read.
     let mut harness = opened_on_fake_time(&scene(button(&json!({"ready_after_ms": 500})), &[]));
     let reference = harness.focused_ref();
-    // A loaded host deschedules this thread between the snapshot and the press:
-    // host time passes, the fake's does not.
-    std::thread::sleep(HOST_STALL);
     // When
     let report = action(press(&mut harness, reference).expect("delivered after the wait"));
     // Then: the press waited the full 500 ms of fake time, and not until AUTO_WAIT.
