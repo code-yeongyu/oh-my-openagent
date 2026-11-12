@@ -26,38 +26,44 @@ function Get-Sha256([string]$path) {
 	try { return (-join ($sha.ComputeHash($s) | ForEach-Object { $_.ToString('x2') })) } finally { $s.Dispose(); $sha.Dispose() }
 }
 
+# Downloads the pinned driver package, trusts its catalog certificate, writes its settings and creates the root device.
+# Fills $install step by step; its certThumbprint is recorded before any store is touched, so cleanup can always find it.
+function Install-Vdd([string]$dir, [hashtable]$install, [string]$settingsDir) {
+	$zip = if ($VddZip) { $VddZip } else {
+		[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+		(New-Object Net.WebClient).DownloadFile($VddUrl, "$dir\vdd.zip"); "$dir\vdd.zip"
+	}
+	$install.sha256 = Get-Sha256 $zip
+	if ($install.sha256 -ne $VddSha256.ToLowerInvariant()) { throw "driver package sha256 $($install.sha256) is not the pinned $VddSha256" }
+	$install.downloadOk = $true
+	Add-Type -AssemblyName System.IO.Compression.FileSystem
+	[IO.Compression.ZipFile]::ExtractToDirectory($zip, "$dir\vdd")
+	$pkg = Join-Path $dir 'vdd\VirtualDisplayDriver'
+	$cert = New-Object Security.Cryptography.X509Certificates.X509Certificate2("$pkg\Virtual_Display_Driver.cer")
+	$install.certThumbprint = $cert.Thumbprint
+	foreach ($name in @('Root', 'TrustedPublisher')) {
+		$store = New-Object Security.Cryptography.X509Certificates.X509Store($name, 'LocalMachine'); $store.Open('ReadWrite'); $store.Add($cert); $store.Close()
+	}
+	$install.certOk = $true
+	[void][IO.Directory]::CreateDirectory($settingsDir)
+	[IO.File]::Copy("$pkg\vdd_settings.xml", "$settingsDir\vdd_settings.xml", $true)
+	$install.instanceId = [OmoHwl.Devices]::CreateRoot('Display', $DisplayClass, $VddHwid)
+	$install.deviceOk = $true
+	$update = [OmoHwl.Devices]::UpdateDriver($VddHwid, "$pkg\MttVDD.inf")
+	$install.error = $update
+	$install.driverOk = ($update -eq '' -or $update -eq 'reboot')
+}
+
 function Leg-MixedDpi {
 	Remove-Item Env:PSModulePath -ErrorAction SilentlyContinue
 	if (-not $VddSha256) { throw '-VddSha256 is required: the driver package is never installed unpinned' }
 	$dir = New-RunDir
-	$install = @{ downloadOk = $false; sha256 = ''; certOk = $false; deviceOk = $false; driverOk = $false; instanceId = ''; error = '' }
+	$install = @{ downloadOk = $false; sha256 = ''; certThumbprint = ''; certOk = $false; deviceOk = $false; driverOk = $false; instanceId = ''; error = '' }
 	$facts = @{ leg = 'mixed-dpi'; run = $Run; install = $install }
-	$cert = $null
 	$settingsDir = 'C:\VirtualDisplayDriver'
 	try {
 		$facts.monitorsBefore = @((Read-Dpi $dir).monitors)
-		$zip = if ($VddZip) { $VddZip } else {
-			[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-			(New-Object Net.WebClient).DownloadFile($VddUrl, "$dir\vdd.zip"); "$dir\vdd.zip"
-		}
-		$install.sha256 = Get-Sha256 $zip
-		if ($install.sha256 -ne $VddSha256.ToLowerInvariant()) { throw "driver package sha256 $($install.sha256) is not the pinned $VddSha256" }
-		$install.downloadOk = $true
-		Add-Type -AssemblyName System.IO.Compression.FileSystem
-		[IO.Compression.ZipFile]::ExtractToDirectory($zip, "$dir\vdd")
-		$pkg = Join-Path $dir 'vdd\VirtualDisplayDriver'
-		$cert = New-Object Security.Cryptography.X509Certificates.X509Certificate2("$pkg\Virtual_Display_Driver.cer")
-		foreach ($name in @('Root', 'TrustedPublisher')) {
-			$store = New-Object Security.Cryptography.X509Certificates.X509Store($name, 'LocalMachine'); $store.Open('ReadWrite'); $store.Add($cert); $store.Close()
-		}
-		$install.certOk = $true
-		[void][IO.Directory]::CreateDirectory($settingsDir)
-		[IO.File]::Copy("$pkg\vdd_settings.xml", "$settingsDir\vdd_settings.xml", $true)
-		$install.instanceId = [OmoHwl.Devices]::CreateRoot('Display', $DisplayClass, $VddHwid)
-		$install.deviceOk = $true
-		$update = [OmoHwl.Devices]::UpdateDriver($VddHwid, "$pkg\MttVDD.inf")
-		$install.error = $update
-		$install.driverOk = ($update -eq '' -or $update -eq 'reboot')
+		Install-Vdd $dir $install $settingsDir
 		$read = Read-Dpi $dir
 		$sw = [Diagnostics.Stopwatch]::StartNew()
 		while ($sw.ElapsedMilliseconds -lt 30000 -and @($read.monitors).Count -le @($facts.monitorsBefore).Count) { Start-Sleep -Milliseconds 500; $read = Read-Dpi $dir }
@@ -74,13 +80,13 @@ function Leg-MixedDpi {
 	} catch {
 		$facts.error = $_.Exception.Message
 	} finally {
-		$facts.cleanup = Remove-Vdd $install.instanceId $cert $settingsDir
+		$facts.cleanup = Remove-Vdd $install.instanceId $install.certThumbprint $settingsDir
 		[IO.Directory]::Delete($dir, $true); [Console]::Out.WriteLine("dir REMOVED $dir")
 	}
 	Emit $facts
 }
 
-function Remove-Vdd([string]$instanceId, $cert, [string]$settingsDir) {
+function Remove-Vdd([string]$instanceId, [string]$thumbprint, [string]$settingsDir) {
 	$ErrorActionPreference = 'Continue'
 	$receipts = @()
 	if ($instanceId) {
@@ -88,10 +94,11 @@ function Remove-Vdd([string]$instanceId, $cert, [string]$settingsDir) {
 		$receipts += "device $instanceId remove rc=$LASTEXITCODE"
 		if ($LASTEXITCODE -ne 0) { $receipts += "pnputil: $text" }
 	}
-	if ($null -ne $cert) {
+	if ($thumbprint) {
 		foreach ($name in @('Root', 'TrustedPublisher')) {
-			$store = New-Object Security.Cryptography.X509Certificates.X509Store($name, 'LocalMachine'); $store.Open('ReadWrite'); $store.Remove($cert)
-			$left = @($store.Certificates | Where-Object { $_.Thumbprint -eq $cert.Thumbprint }).Count; $store.Close()
+			$store = New-Object Security.Cryptography.X509Certificates.X509Store($name, 'LocalMachine'); $store.Open('ReadWrite')
+			@($store.Certificates | Where-Object { $_.Thumbprint -eq $thumbprint }) | ForEach-Object { $store.Remove($_) }
+			$left = @($store.Certificates | Where-Object { $_.Thumbprint -eq $thumbprint }).Count; $store.Close()
 			$receipts += "cert $name left=$left"
 		}
 	}
