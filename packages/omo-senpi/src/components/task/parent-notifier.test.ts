@@ -214,7 +214,7 @@ describe("createParentNotifier batched injection delivery", () => {
     expect(delivered[0]?.content.match(/st_1 completed/g)).toHaveLength(1)
   })
 
-  test("#given an IDLE parent #when two completions land in the same tick #then one microtask steer carries both", async () => {
+  test("#given an IDLE parent #when two completions land in the same tick #then one microtask followUp carries both", async () => {
     // given: no manual scheduler - the idle path flushes itself on the next microtask
     const delivered: Delivered[] = []
     const coordinator = new IdleInjectionCoordinator((_message, options) => {
@@ -232,13 +232,13 @@ describe("createParentNotifier batched injection delivery", () => {
     expect(delivered).toHaveLength(0)
     await Promise.resolve()
 
-    // then delivery is immediate (no exit race in print mode) and still batched into ONE steer
+    // then delivery is immediate (no exit race in print mode) and still batched into ONE followUp
     expect(delivered).toHaveLength(1)
-    expect(delivered[0]?.deliverAs).toBe("steer")
+    expect(delivered[0]?.deliverAs).toBe("followUp")
     expect(delivered[0]?.content).toMatch(/st_1 completed[\s\S]*st_2 completed/)
   })
 
-  test("#given no coordinator is wired #when a completion enqueues #then it falls back to a direct steer on the renderer channel", () => {
+  test("#given no coordinator is wired and the parent is idle #when a completion enqueues #then it falls back to a direct followUp on the renderer channel", () => {
     // given
     const pi = fakePi()
     const notifier = createParentNotifier(pi)
@@ -246,7 +246,21 @@ describe("createParentNotifier batched injection delivery", () => {
     // when
     notifier.enqueue(completionMessage("st_1"))
 
-    // then the completion still steers into the running turn through the rich channel
+    // then the completion starts a turn through the rich channel (steer into idle is not_steerable)
+    expect(pi.sent).toHaveLength(1)
+    expect(pi.sent[0]?.options).toMatchObject({ triggerTurn: true, deliverAs: "followUp" })
+    expect(pi.sent[0]?.message.customType).toBe("senpi-task.completion")
+  })
+
+  test("#given no coordinator and a streaming parent #when a completion enqueues #then it falls back to a direct steer", () => {
+    // given
+    const pi = fakePi()
+    const notifier = createParentNotifier(pi, undefined, () => true)
+
+    // when
+    notifier.enqueue(completionMessage("st_1"))
+
+    // then steer joins the running turn
     expect(pi.sent).toHaveLength(1)
     expect(pi.sent[0]?.options).toMatchObject({ triggerTurn: true, deliverAs: "steer" })
     expect(pi.sent[0]?.message.customType).toBe("senpi-task.completion")

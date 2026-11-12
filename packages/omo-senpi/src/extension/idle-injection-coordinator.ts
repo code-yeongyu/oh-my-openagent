@@ -114,9 +114,10 @@ const SOURCE_RANK: Readonly<Record<IdleInjectionSource, number>> = {
 /**
  * The single injection queue for the parent session. EVERY delivered notification (task completions,
  * team lead-messages, DAG run summaries, the ulw-loop continuation) enqueues here; a deferred flush collapses everything
- * that became ready within the batch window into exactly ONE injection, steered into the running turn
- * at the next tool-call boundary (unconditional batched-steer contract: N ready notifications never
- * produce N separate injections). comment-checker's tool_result transform is intentionally NOT routed
+ * that became ready within the batch window into exactly ONE injection: followUp (triggerTurn) when the
+ * parent is idle so the delivery STARTS a turn (unconditional batched-delivery contract: N ready
+ * notifications never produce N separate injections), steer into the running turn at the next tool-call
+ * boundary while streaming. comment-checker's tool_result transform is intentionally NOT routed
  * here.
  *
  * Receipts are a contract, not a courtesy. An ACCEPTED injection (`enqueue` returned true) always
@@ -191,9 +192,11 @@ export class IdleInjectionCoordinator {
       }) ?? undefined
   }
 
-  // Immediate coalesced flush for an IDLE parent. A microtask is soon enough to land the steer before
+  // Immediate coalesced flush for an IDLE parent. A microtask is soon enough to land the followUp before
   // senpi's print mode can decide the session is over (the windowed timer is not - live-driver proven),
   // while still batching every notification that becomes ready in the same tick into one injection.
+  // followUp + triggerTurn STARTS a turn when the parent is idle (decision.ts: steer into idle is
+  // not_steerable); the streaming scheduleFlush path stays steer to join the running turn.
   flushSoon(): void {
     if (this.#soonScheduled) return
     this.#soonScheduled = true
@@ -262,9 +265,9 @@ export class IdleInjectionCoordinator {
     if (errors.threw) this.#reportReceiptErrors([errors.first, ...errors.rest])
   }
 
-  // Flush the whole queue as one idle-edge steer. Returns how many queued items were collapsed (0 = no-op).
+  // Flush the whole queue as one idle-edge followUp. Returns how many queued items were collapsed (0 = no-op).
   flushOnIdle(): number {
-    return this.#flush("steer")
+    return this.#flush("followUp")
   }
 
   #flush(deliverAs: "steer" | "followUp"): number {

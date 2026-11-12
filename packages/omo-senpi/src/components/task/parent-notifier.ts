@@ -17,8 +17,10 @@ export const TASK_COMPLETION_MESSAGE_TYPE = "senpi-task.completion"
  * completion routes through the shared idle-injection coordinator with a DEFERRED flush, so all
  * notifications that become ready within the batch window (multiple children completing near-
  * simultaneously, a pending ulw-loop continuation, team lead-messages) collapse into exactly ONE
- * injection steered into the running turn at the next tool-call boundary. Without a coordinator
- * (composition seam absent) it falls back to a direct steer through the rich custom-message channel.
+ * injection: followUp + triggerTurn when the parent is idle so the delivery STARTS a turn, steer
+ * into the running turn at the next tool-call boundary while streaming. Without a coordinator
+ * (composition seam absent) it falls back to a direct send through the rich custom-message channel
+ * that mirrors the same split (steer while streaming, followUp when idle).
  * senpi swallows async delivery errors, so a synchronous throw here surfaces as the engine's failure.
  *
  * Batching makes delivery asynchronous, so "enqueue returned" must never be read as "delivered": the
@@ -83,7 +85,11 @@ export function createParentNotifier(
           display: message.display,
           details: message.details,
         },
-        { triggerTurn: true, deliverAs: "steer" },
+        // No coordinator: mirror the coordinator split — steer joins a running turn,
+        // followUp + triggerTurn STARTS a turn when the parent is idle (steer into idle is not_steerable).
+        isStreaming?.() === true
+          ? { triggerTurn: true, deliverAs: "steer" }
+          : { triggerTurn: true, deliverAs: "followUp" },
       )
     },
   }
