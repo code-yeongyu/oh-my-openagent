@@ -210,6 +210,27 @@ describe("runSenpiInstaller", () => {
     expect(await backupFiles(agentDir)).toHaveLength(0)
   })
 
+  // Installer contract (#13192): these sidecars are loaded by path at runtime, so a payload without one installs and
+  // then fails the first time the feature runs; the installer refuses it instead.
+  test.each(["omo-side-panel.js", "omo-onboarding-scan.js", "omo-init-deep-advisor.js"])(
+    "#given a packed plugin missing the by-path sidecar %s #when installing #then it fails naming it before settings change",
+    async (sidecar) => {
+      // given
+      const agentDir = await makeAgentDir()
+      const pluginPath = await makePluginFixture()
+      await rm(join(pluginPath, "extensions", sidecar))
+      await mkdir(agentDir, { recursive: true })
+      await writeFile(join(agentDir, "settings.json"), JSON.stringify({ packages: ["keep-me"] }), "utf8")
+
+      // when
+      const install = runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+
+      // then
+      await expect(install).rejects.toThrow(join("extensions", sidecar))
+      expect(await readSettings(agentDir)).toEqual({ packages: ["keep-me"] })
+    },
+  )
+
   test("#given a plugin that was never built #when installing #then it names the build command before settings change", async () => {
     // given
     const agentDir = await makeAgentDir()

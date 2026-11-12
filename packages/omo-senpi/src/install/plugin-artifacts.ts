@@ -127,18 +127,21 @@ export async function ensurePluginArtifacts(context: {
     )
   }
 
-  if (await hasMissingPluginArtifact(context.pluginPath)) {
-    throw new Error(`Packed omo-senpi plugin is missing required runtime artifacts at ${context.pluginPath}`)
+  const missing = await firstMissingPluginArtifact(context.pluginPath)
+  if (missing !== undefined) {
+    throw new Error(
+      `Packed omo-senpi plugin is missing required runtime artifacts at ${context.pluginPath}: ${missing}`,
+    )
   }
 
   await verifyAstGrepRuntimeIntegrity(context.pluginPath, context.platform)
 }
 
-async function hasMissingPluginArtifact(pluginPath: string): Promise<boolean> {
+async function firstMissingPluginArtifact(pluginPath: string): Promise<string | undefined> {
   for (const artifact of REQUIRED_PLUGIN_ARTIFACTS) {
-    if (!(await fileExists(join(pluginPath, artifact)))) return true
+    if (!(await fileExists(join(pluginPath, artifact)))) return artifact
   }
-  return false
+  return undefined
 }
 
 async function verifyAstGrepRuntimeIntegrity(pluginPath: string, platform: NodeJS.Platform): Promise<void> {
