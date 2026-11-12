@@ -165,6 +165,12 @@ impl<O: CaptureOs> Backend for Win32Backend<O> {
         capabilities
     }
 
+    // Row 57: the low-level hook listener; off Windows the refusing default stands.
+    #[cfg(windows)]
+    fn stop_listener(&mut self) -> BackendResult<Box<dyn omo_computer_core::backend::StopListener>> {
+        Ok(Box::new(crate::stop_path::hook::HookListener::start()))
+    }
+
     fn displays(&mut self) -> BackendResult<Vec<DisplayInfo>> {
         if self.os.session_id() == 0 {
             return Err(SESSION0);
