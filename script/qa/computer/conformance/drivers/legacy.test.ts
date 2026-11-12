@@ -6,104 +6,9 @@ import { join } from "node:path"
 import { catalogFor } from "../catalog.ts"
 import { buildReport } from "../report.ts"
 import { isDriver } from "../driver.ts"
-import type { Cell, CellResult } from "../vocabulary.ts"
-import { createLegacyDriver, driver, type Fixtures, type Observer, readOutcome, type ShippedTool } from "./legacy.ts"
-import type { FixtureTarget } from "./legacy-code.ts"
-
-type Sent = { readonly verb: string; readonly args: readonly unknown[] }
-
-const WINDOW = { x: 100, y: 50, width: 400, height: 300 }
-const ELEMENT = { x: 110, y: 60, width: 20, height: 10 }
-
-const TARGET: FixtureTarget = {
-  title: "Conformance Document",
-  element: { role: "button", title: "Press" },
-  dragTo: { role: "row", title: "a" },
-  menuPath: ["Edit", "Conformance"],
-}
-
-const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor
-
-function facade(sent: Sent[], refuse?: string) {
-  const record =
-    (verb: string) =>
-    async (...args: unknown[]) => {
-      if (refuse !== undefined) throw Object.assign(new Error("refused"), { data: { code: refuse } })
-      sent.push({ verb, args })
-    }
-  const element = {
-    bounds: async () => ELEMENT,
-    click: record("el.click"),
-    type: record("el.type"),
-    setValue: record("el.setValue"),
-    press: record("el.press"),
-    focus: async () => {},
-  }
-  const win = {
-    bounds: WINDOW,
-    find: async () => [element],
-    screenshot: async () => ({ coordinateWidth: WINDOW.width * 2, coordinateHeight: WINDOW.height * 2 }),
-    click: record("win.click"),
-    type: record("win.type"),
-    scroll: record("win.scroll"),
-    drag: record("win.drag"),
-    press: record("win.press"),
-    menu: { select: record("win.menu.select") },
-  }
-  const listed = [{ id: "w1", app: "python3", title: TARGET.title, pid: 42 }]
-  const inside = (x: number, y: number) =>
-    x >= ELEMENT.x && x <= ELEMENT.x + ELEMENT.width && y >= ELEMENT.y && y <= ELEMENT.y + ELEMENT.height
-  return {
-    elementAt: async (x: number, y: number) => (inside(x, y) ? { role: "button", title: TARGET.element.title } : null),
-    windows: async (filter?: { title?: string }) =>
-      filter?.title === undefined ? listed : listed.filter((entry) => entry.title.includes(filter.title ?? "")),
-    window: async (id: string) => {
-      if (id !== "w1") throw new Error(`unknown window ${id}`)
-      return win
-    },
-  }
-}
-
-function fakeTool(sent: Sent[], refuse?: string): ShippedTool & { calls: number } {
-  const tool = {
-    calls: 0,
-    async execute(_id: string, input: Readonly<Record<string, unknown>>) {
-      tool.calls += 1
-      const value: unknown = await new AsyncFunction("desktop", String(input.code))(facade(sent, refuse))
-      return { details: { value } }
-    },
-  }
-  return tool
-}
-
-const fixtures = (read: unknown): Fixtures => ({
-  target: () => TARGET,
-  reset: async () => {},
-  read: async () => read,
-  resetTask: async () => {},
-  saved: async () => ({}),
-  stop: async () => {},
-})
-
-const observer: Observer = {
-  async observe(act) {
-    return { value: await act(), journal: emptyJournal() }
-  },
-}
-
-function emptyJournal(): CellResult["journal"] {
-  const none = { signal: "none", firstAt: null, count: 0 } as const
-  return {
-    key_focus: none,
-    window_raised: none,
-    typing: none,
-    pointer: none,
-    clipboard: none,
-    space: none,
-    dialog: none,
-    activation: none,
-  }
-}
+import type { Cell } from "../vocabulary.ts"
+import { createLegacyDriver, driver, readOutcome } from "./legacy.ts"
+import { fakeTool, fixtures, type Listing, observer, type Sent, TARGET } from "./legacy-facade.ts"
 
 const cells = catalogFor("x11", "xorg")
 const sessionDir = mkdtempSync(join(tmpdir(), "legacy-driver-test-"))
@@ -164,6 +69,28 @@ describe("legacy driver against the shipped run facade", () => {
       observer: { ready: observer },
     }).runCell(cell)
     expect(sent[0]?.args.slice(0, 2)).toEqual([(110 + 10 - 100) * 2, (60 + 5 - 50) * 2])
+  })
+
+  test("a cell acts on the field, never on a caption of the same name, and a typing cell refuses a caption", async () => {
+    const run = (cell: Cell, listing: Listing, sent: Sent[]) =>
+      createLegacyDriver({
+        session,
+        settleMs: 0,
+        tool: { ready: fakeTool(sent, undefined, listing) },
+        fixtures: { ready: fixtures(1) },
+        observer: { ready: observer },
+      }).runCell(cell)
+    for (const cell of cells) {
+      const sent: Sent[] = []
+      const result = await run(cell, "captioned", sent)
+      expect([result.id, result.observed]).toEqual([result.id, { kind: "delivered" }])
+      expect([result.id, sent.filter((entry) => entry.verb.startsWith("caption."))]).toEqual([result.id, []])
+    }
+    for (const cell of cells.filter((entry) => ["typeText", "ax.setValue", "keyChord"].includes(entry.action))) {
+      const sent: Sent[] = []
+      const result = await run(cell, "caption-only", sent)
+      expect([result.id, result.observed.kind, sent]).toEqual([result.id, "error", []])
+    }
   })
 
   test("an engine refusal is recorded with its code and without a nothingSent claim", async () => {

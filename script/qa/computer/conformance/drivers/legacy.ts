@@ -171,8 +171,11 @@ export function createLegacyDriver(parts: LegacyDriverParts): Driver {
         const observed = await settled(() => fixtures.read(cell), cell.oracle.equals, parts.settleMs ?? SETTLE_MS)
         const returned = isRecord(value) && isRecord(value.details) ? value.details.value : undefined
         const aim = isRecord(returned) ? returned.aim : undefined
-        if (aim !== undefined)
-          console.log(`CELL_EVIDENCE ${cellId(cell)} aim=${JSON.stringify(aim)} fixture=${JSON.stringify(observed)}`)
+        const resolved = isRecord(returned) ? returned.resolved : undefined
+        if (aim !== undefined || resolved !== undefined)
+          console.log(
+            `CELL_EVIDENCE ${cellId(cell)} resolved=${JSON.stringify(resolved)} aim=${JSON.stringify(aim)} fixture=${JSON.stringify(observed)}`,
+          )
         const result = { id: cellId(cell), observed: readOutcome(value), oracle: { observed }, durationMs, journal }
         return observer.reason === undefined ? result : { ...result, observerUnavailable: observer.reason }
       } finally {

@@ -16,18 +16,34 @@ const TEXT = JSON.stringify("conformance")
 const CHORD = JSON.stringify("ctrl+k")
 const SCROLL_DY = 120
 
+// Both fixtures label a field with a caption of the same name, so a lookup by name returns the caption too. A label is
+// never the target; the resolved role, bounds and every candidate's role travel with the outcome as evidence.
+const LABEL = "/static|label/i"
+
 const lookup = (name: string, element: FixtureElement): string[] => {
   const query =
     element.role === undefined
-      ? { title: element.title, limit: 1 }
-      : { role: element.role, title: element.title, limit: 1 }
+      ? { title: element.title, limit: 10 }
+      : { role: element.role, title: element.title, limit: 10 }
   const missing = `fixture element "${element.title}" not found`
   return [
-    `const ${name} = (await win.find(${JSON.stringify(query)}))[0]`,
+    `const ${name}Found = await win.find(${JSON.stringify(query)})`,
+    `const ${name} = ${name}Found.find((entry) => !${LABEL}.test(entry.role ?? "")) ?? ${name}Found[0]`,
     `if (${name} === undefined) {`,
     `  const seen = (await win.find({ limit: 40 })).map((entry) => \`${"${entry.role}"}:${'${entry.title ?? ""}'}\`)`,
     `  return { kind: "error", message: ${JSON.stringify(missing + "; the window exposes ")} + JSON.stringify(seen) }`,
     "}",
+    `resolved.${name} = { role: ${name}.role ?? null, bounds: await Promise.resolve(${name}.bounds()).catch(() => null), candidates: ${name}Found.map((entry) => entry.role ?? null) }`,
+  ]
+}
+
+const TYPING: ReadonlySet<Cell["action"]> = new Set(["typeText", "ax.setValue", "keyChord"])
+
+// A typing cell aimed at a caption would measure the harness, not the release, so the driver refuses to send it.
+function labelCheck(cell: Cell): string[] {
+  if (!TYPING.has(cell.action)) return []
+  return [
+    `if (${LABEL}.test(el.role ?? "")) return { kind: "error", message: "the typing target resolved to a label: " + JSON.stringify(resolved.el), resolved }`,
   ]
 }
 
@@ -123,19 +139,21 @@ export function cellCode(cell: Cell, target: FixtureTarget): string {
   const body = [
     ...windowLookup(target),
     ...lookup("el", target.element),
+    ...labelCheck(cell),
     ...CENTRE,
     ...AIM,
     ...aimLines(cell, target),
     ...actionLines(cell, target),
-    'return { kind: "delivered", aim: aimed }',
+    'return { kind: "delivered", aim: aimed, resolved }',
   ]
   return [
+    "const resolved = {}",
     "try {",
     ...body.map((line) => `  ${line}`),
     "} catch (error) {",
     "  const code = error?.data?.code",
-    '  if (typeof code === "string") return { kind: "refused", code }',
-    '  return { kind: "error", message: String(error?.message ?? error) }',
+    '  if (typeof code === "string") return { kind: "refused", code, resolved }',
+    '  return { kind: "error", message: String(error?.message ?? error), resolved }',
     "}",
   ].join("\n")
 }
