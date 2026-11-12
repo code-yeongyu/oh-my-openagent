@@ -6,7 +6,7 @@ use omo_computer_core::backend::FrameBytes;
 use omo_computer_core::observation::ImageMime;
 use serde_json::json;
 
-use super::session_tests::{params, reason, session};
+use super::session_tests::{capture, params, reason, session};
 use crate::preview::{Dropped, MAX_BYTES};
 
 fn jpeg(width: u32, height: u32, len: usize) -> FrameBytes {
@@ -37,6 +37,8 @@ fn display_release_ends_lease_user_moved_on_no_suspended() {
     let sink = RecordingSink::default();
     let mut s = session(&json!({ "object": true }), &sink, None);
     s.control_grant(params(json!({ "reason": "r" })));
+    capture(&mut s, "desktop");
+    capture(&mut s, "1");
     s.click(params(json!({ "target": "desktop", "x": 5, "y": 5 }))).expect("foreground click");
     assert!(s.holds_lease());
     s.display_release();
@@ -89,6 +91,7 @@ fn preview_frames_never_reach_model_context() {
     s.control_grant(params(json!({ "reason": "r" })));
     s.control_acquire().expect("lease");
     s.offer_preview(jpeg(320, 200, 64)).expect("emitted to the host");
+    capture(&mut s, "desktop");
     let reply = s.click(params(json!({ "target": "desktop", "x": 5, "y": 5 }))).expect("click");
     let text = serde_json::to_string(&reply).expect("reply");
     assert!(!text.contains("preview") && !text.contains("image/jpeg"), "{text}");

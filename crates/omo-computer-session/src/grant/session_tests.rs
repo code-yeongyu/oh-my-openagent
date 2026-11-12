@@ -12,7 +12,7 @@ use serde_json::{json, Value};
 use crate::consent::Part;
 use crate::{Refused, Session};
 
-const SCENARIO: &str = r#"{"windows":[
+const SCENARIO: &str = r#"{"displays":[{"id":"1","name":"Built-in Display","x":0,"y":0,"width":1920,"height":1080,"scale":1.0,"pixelX":0,"pixelY":0,"pixelWidth":1920,"pixelHeight":1080,"isPrimary":true}],"windows":[
   {"id":"1","title":"t","app":"Notes","pid":4242,"x":0,"y":0,"width":100,"height":100,"focused":true,"elevated":null},
   {"id":"2","title":"u","app":"Mail","pid":4343,"x":200,"y":0,"width":100,"height":100,"focused":false,"elevated":null}]}"#;
 
@@ -55,6 +55,11 @@ fn grant(session: &mut Session) {
     session.control_grant(params(json!({ "reason": "test", "confirmationId": "c-1" })));
 }
 
+/// Row 20: a click maps through the target's newest captured frame, so tests capture first.
+pub(super) fn capture(session: &mut Session, target: &str) {
+    session.capture(params(json!({ "target": target }))).expect("capture");
+}
+
 fn desktop_click(session: &mut Session) -> Result<omo_computer_core::results::ExecReply, Refused> {
     session.click(params(json!({ "target": "desktop", "x": 5, "y": 5 })))
 }
@@ -87,6 +92,7 @@ fn foreground_lease_single_holder() {
     assert!(busy.detail.as_ref().is_some_and(|d| d["holder"]["sessionId"].is_string()));
     assert_eq!(reason(&desktop_click(&mut b)), Some(("InputBusy", None)));
     assert!(sink_b.lines().iter().all(|line| !line.contains("pointer")), "{:?}", sink_b.lines());
+    capture(&mut a, "desktop");
     assert!(desktop_click(&mut a).is_ok(), "the holder clicks");
     a.close();
     assert!(b.control_acquire().is_ok(), "a closed session frees the slot");
@@ -96,11 +102,13 @@ fn foreground_lease_single_holder() {
 fn full_access_desktop_click_needs_no_prompt_and_a_window_target_stays_background() {
     let sink = RecordingSink::default();
     let mut s = session(&json!({ "full_access_preset": true }), &sink, None);
+    capture(&mut s, "desktop");
     assert!(desktop_click(&mut s).is_ok());
     assert!(s.holds_lease());
     assert!(sink.lines().iter().any(|line| line.contains("presence show")), "{:?}", sink.lines());
     let mut plain = session(&json!({}), &RecordingSink::default(), None);
     assert_eq!(reason(&desktop_click(&mut plain)), Some(("ControlRequired", None)));
+    capture(&mut plain, "1");
     assert!(plain.click(params(json!({ "target": "1", "x": 1, "y": 1 }))).is_ok(), "background needs no grant");
 }
 

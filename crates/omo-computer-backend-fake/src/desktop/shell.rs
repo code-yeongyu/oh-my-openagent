@@ -13,21 +13,16 @@ use crate::sink::quoted;
 use crate::scenario::{FakeAxNode, FakeMenuNode};
 
 impl FakeBackend {
-    /// The scenario's `consent` block, with `fullAccess` set when the scenario scripts the
-    /// full-access preset; neither present is no host view.
+    /// The scenario's `consent` view, with `fullAccess` set under the full-access preset.
     pub(super) fn fake_host_consent(&self) -> Option<serde_json::Value> {
         let state = self.lock();
-        let full_access = state.scenario.full_access_preset;
-        match state.scenario.consent.clone() {
-            Some(serde_json::Value::Object(mut view)) => {
-                if full_access {
-                    view.insert("fullAccess".to_owned(), serde_json::Value::Bool(true));
-                }
-                Some(serde_json::Value::Object(view))
+        let mut view = state.scenario.consent.clone();
+        if state.scenario.full_access_preset {
+            if let Some(map) = view.get_or_insert_with(|| serde_json::json!({})).as_object_mut() {
+                map.insert("fullAccess".to_owned(), serde_json::Value::Bool(true));
             }
-            Some(other) => Some(other),
-            None => full_access.then(|| serde_json::json!({ "fullAccess": true })),
         }
+        view
     }
 
     fn fake_menu_tree(&self, window: &str) -> BackendResult<Vec<MenuNode>> {
