@@ -92,8 +92,8 @@ def control(fixture, line):
         return None
     if words[0] == "poke" and len(words) == 2:
         poke(main, words[1])
-    elif words[0] == "menu" and len(words) == 2:
-        main.menu_items[words[1]].activate()
+    elif words[0] == "menu" and len(words) >= 2:
+        main.menu_items[line[len("menu ") :]].activate()
     elif words[0] == "set" and len(words) >= 2:
         label, _space, text = line[len("set ") :].partition(" ")
         main.text.set(label, text)
