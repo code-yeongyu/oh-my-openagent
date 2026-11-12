@@ -1,0 +1,130 @@
+{
+  "gates": {
+    "contract": {
+      "rows": [
+        2,
+        3,
+        4,
+        5,
+        12,
+        13
+      ],
+      "artifacts": [
+        "script/computer-v3-guards.ts",
+        "crates/omo-computer-core/parity/ORACLE-PROVENANCE.tsv",
+        "crates/omo-computer-core/parity/test-parity-manifest.tsv",
+        "crates/omo-computer-engine",
+        "crates/omo-computer-core/schema/engine.schema.json"
+      ]
+    },
+    "spine": {
+      "rows": [
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27
+      ],
+      "artifacts": []
+    },
+    "surface": {
+      "rows": [
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39
+      ],
+      "artifacts": []
+    },
+    "mac": {
+      "rows": [
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46
+      ],
+      "artifacts": []
+    },
+    "linux": {
+      "rows": [
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54
+      ],
+      "artifacts": []
+    },
+    "win": {
+      "rows": [
+        55,
+        56,
+        57,
+        58,
+        59,
+        60
+      ],
+      "artifacts": []
+    },
+    "remote": {
+      "rows": [
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67
+      ],
+      "artifacts": []
+    },
+    "proof": {
+      "rows": [
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74
+      ],
+      "artifacts": []
+    },
+    "cutover": {
+      "rows": [
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82
+      ],
+      "artifacts": []
+    }
+  }
+}
