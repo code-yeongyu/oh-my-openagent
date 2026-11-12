@@ -91,14 +91,16 @@ describe("report.ts command line", () => {
     const summary = report(unread, "--summary")
     const delivered = fake.filter((cell) => "deliver" in cell.expect).length
     expect(summary.stdout).toContain("delivered=0 ")
-    expect(summary.stdout.trim()).toEndWith(`unobserved=${fake.length} observed_delivered=${delivered}`)
+    expect(summary.stdout.trim()).toEndWith(
+      `unobserved=${fake.length} observed_delivered=${delivered} failed_unwatched=0`,
+    )
   })
 
   test("--summary prints every count, disturbed and unobserved cells included", () => {
     const summary = report(withFailures(), "--summary")
     const delivered = fake.filter((cell) => "deliver" in cell.expect).length
     expect(summary.stdout.trim()).toBe(
-      `cells=${fake.length} delivered=${delivered - 2} refused=${fake.length - delivered - 1} failed=2 disturbed=1 unobserved=1 observed_delivered=${delivered}`,
+      `cells=${fake.length} delivered=${delivered - 2} refused=${fake.length - delivered - 1} failed=2 disturbed=1 unobserved=1 observed_delivered=${delivered} failed_unwatched=0`,
     )
     expect(summary.exitCode).toBe(0)
   })

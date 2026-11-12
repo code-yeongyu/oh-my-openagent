@@ -202,6 +202,9 @@ describe("conformance report, declared-outcome catalog [ADP-1]", () => {
     const missedUnwatched = { ...delivered(deliverCell, blind), oracle: { observed: "hell" } }
     const unwatched = buildReport(catalog, passingRun(missedUnwatched))
     expect([unwatched.failed, unwatched.failedUnwatched, unwatched.unobserved]).toEqual([1, 1, 0])
+    expect(unwatched.problems).toEqual([
+      `cell ${cellId(deliverCell)} [unwatched]: oracle value == "hello" does not hold (fixture reads "hell")`,
+    ])
     const missedWatched = { ...delivered(deliverCell), oracle: { observed: "hell" } }
     const watched = buildReport(catalog, passingRun(missedWatched))
     expect([watched.failed, watched.failedUnwatched]).toEqual([1, 0])
@@ -212,7 +215,7 @@ describe("conformance report, declared-outcome catalog [ADP-1]", () => {
   test("a not_observed signal that carries a count or a time contradicts itself", () => {
     const journal = { ...quiet(), pointer: { signal: "not_observed" as const, firstAt: 50, count: 1 } }
     expect(buildReport(catalog, passingRun(delivered(deliverCell, journal))).problems).toEqual([
-      `cell ${cellId(deliverCell)}: observer journal contradicts itself: pointer`,
+      `cell ${cellId(deliverCell)} [unwatched]: observer journal contradicts itself: pointer`,
     ])
   })
 
