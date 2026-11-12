@@ -4326,6 +4326,9 @@
     },
     "packages/omo-senpi/plugin": {
       "includeEntryExports": true,
+      // #bunshin-ts maps to runtime/bunshin-ts/sdk.js, a build output that is not tracked (#13192); only its bundle test
+      // imports it, so knip's verdict must not depend on whether the tree was built.
+      "ignoreUnresolved": ["#bunshin-ts"],
       // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
       // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
       // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
