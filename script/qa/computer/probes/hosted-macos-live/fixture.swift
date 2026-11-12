@@ -20,10 +20,16 @@ final class RecordingWindow: NSWindow {
     if let eventFile, event.type == .leftMouseDown || event.type == .leftMouseUp || event.type == .mouseMoved {
       let onScreen = convertPoint(toScreen: event.locationInWindow)
       let flipped = (NSScreen.screens.first?.frame.height ?? 0) - onScreen.y
-      appendLine(eventFile, "\(event.type.rawValue) \(Int(onScreen.x)) \(Int(flipped))")
+      appendLine(eventFile, "\(event.type.rawValue) \(Int(onScreen.x)) \(Int(flipped)) active=\(NSApp.isActive) key=\(isKeyWindow)")
     }
     super.sendEvent(event)
   }
+}
+
+/// A checkbox that acts on the first mouse too: AppKit otherwise swallows a click into an app the system does not
+/// consider active, which is indistinguishable from a click the control never received.
+final class FirstMouseCheckbox: NSButton {
+  override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
 final class Fixture: NSObject, NSApplicationDelegate {
@@ -32,6 +38,7 @@ final class Fixture: NSObject, NSApplicationDelegate {
   let eventFile: String
   var window: NSWindow?
   var checkbox: NSButton?
+  var firstMouse: NSButton?
 
   init(stateFile: String, readyFile: String, eventFile: String) {
     self.stateFile = stateFile
@@ -51,6 +58,10 @@ final class Fixture: NSObject, NSApplicationDelegate {
     let checkbox = NSButton(checkboxWithTitle: "probe", target: self, action: #selector(toggled))
     checkbox.frame = NSRect(x: 40, y: 100, width: 200, height: 40)
     view.addSubview(checkbox)
+    let firstMouse = FirstMouseCheckbox(checkboxWithTitle: "first mouse", target: self, action: #selector(toggledFirstMouse))
+    firstMouse.frame = NSRect(x: 40, y: 40, width: 200, height: 40)
+    view.addSubview(firstMouse)
+    self.firstMouse = firstMouse
     window.contentView = view
     window.makeKeyAndOrderFront(nil)
     NSApp.activate(ignoringOtherApps: true)
@@ -62,15 +73,24 @@ final class Fixture: NSObject, NSApplicationDelegate {
   func writeReady() {
     guard let window, let checkbox, let primary = NSScreen.screens.first else { fail("fixture: no window or screen") }
     let onScreen = window.convertToScreen(checkbox.convert(checkbox.bounds, to: nil))
-    let ready: [String: Any] = [
+    var ready: [String: Any] = [
       "pid": Int(getpid()), "windowNumber": window.windowNumber,
       "x": Double(onScreen.midX), "y": Double(primary.frame.height - onScreen.midY),
     ]
+    if let firstMouse {
+      let box = window.convertToScreen(firstMouse.convert(firstMouse.bounds, to: nil))
+      ready["firstMouseX"] = Double(box.midX)
+      ready["firstMouseY"] = Double(primary.frame.height - box.midY)
+    }
     let data = try! JSONSerialization.data(withJSONObject: ready, options: [.sortedKeys])
     FileManager.default.createFile(atPath: readyFile, contents: data)
   }
 
   @objc func toggled() {
     appendLine(stateFile, checkbox?.state == .on ? "on" : "off")
+  }
+
+  @objc func toggledFirstMouse() {
+    appendLine(stateFile, firstMouse?.state == .on ? "first-mouse-on" : "first-mouse-off")
   }
 }

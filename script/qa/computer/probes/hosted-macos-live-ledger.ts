@@ -4,6 +4,12 @@
 //   CONFIRMS     the runner allowed the leg and an independent read proved its effect
 //   CONTRADICTS  the leg ran and the runner refused it (or its effect did not show)
 //   UNMEASURED   a precondition failed, so the leg could not be asked; the evidence names the precondition
+//
+// q3 decision rule (written before the instrument run, 2026-11-13): q3 is CONFIRMS only when a pid-routed click
+// toggles the DEFAULT checkbox, and the row records the precondition the delivery needed (none / app active /
+// first mouse). A toggle of the first-mouse control alone is its own finding, never a pass. "No" is proven only
+// when nothing toggles while the window receives the events and the app reads active; anything short stays
+// UNMEASURED.
 
 export const QUESTIONS = ["q1", "q2", "q3", "q4", "q5", "q6", "q7", "q8"] as const
 export type Question = (typeof QUESTIONS)[number]

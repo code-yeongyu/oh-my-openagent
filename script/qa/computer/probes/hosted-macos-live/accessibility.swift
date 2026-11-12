@@ -30,6 +30,14 @@ func firstElement(_ root: AXUIElement, role: String, depth: Int = 0) -> AXUIElem
   return nil
 }
 
+func allElements(_ root: AXUIElement, role: String, depth: Int = 0) -> [AXUIElement] {
+  var found: [AXUIElement] = []
+  if (axValue(root, kAXRoleAttribute) as? String) == role { found.append(root) }
+  guard depth < 12 else { return found }
+  for child in axChildren(root) { found.append(contentsOf: allElements(child, role: role, depth: depth + 1)) }
+  return found
+}
+
 func axTree(_ pid: pid_t) -> [String: Any] {
   let app = AXUIElementCreateApplication(pid)
   var windowsValue: AnyObject?

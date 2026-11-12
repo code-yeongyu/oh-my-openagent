@@ -28,10 +28,13 @@ case "ax-tree":
   emit(axTree(pidArgument(2)))
 case "ax-checkbox":
   let app = AXUIElementCreateApplication(pidArgument(2))
-  guard let box = firstElement(app, role: kAXCheckBoxRole) else { emit(["found": false]) }
+  let boxes = allElements(app, role: kAXCheckBoxRole)
+  guard let box = boxes.first else { emit(["found": false]) }
+  let firstMouse = boxes.first { (axValue($0, kAXTitleAttribute) as? String) == "first mouse" }
   emit([
     "found": true, "value": (axValue(box, kAXValueAttribute) as? NSNumber)?.intValue ?? -1,
     "frame": axFrame(box) ?? NSNull(),
+    "firstMouseFrame": firstMouse.flatMap { axFrame($0) } ?? NSNull(),
   ])
 case "ax-press":
   let app = AXUIElementCreateApplication(pidArgument(2))
