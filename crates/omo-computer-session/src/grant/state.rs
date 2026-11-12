@@ -11,7 +11,7 @@ use omo_computer_safety::guard::StageVerdicts;
 use omo_computer_safety::TargetRef;
 use serde_json::{json, Value};
 
-use super::{is_global_target, ForegroundGrant};
+use super::{is_global_target, ForegroundGrant, LeaseHook, NoLeaseHook};
 use crate::consent::{AppTarget, BoundIdentity, Consent, Part};
 use crate::lease::{ControlSlot, Holder, SessionToken};
 use crate::presence::PresenceState;
@@ -39,6 +39,7 @@ pub struct Control {
     pub(crate) display_released: bool,
     pub(crate) lease_epoch: Option<u64>,
     pub(crate) clock: MachineClock,
+    pub(crate) lease_hook: Box<dyn LeaseHook>,
 }
 
 impl Default for Control {
@@ -58,6 +59,7 @@ impl Default for Control {
             display_released: false,
             lease_epoch: None,
             clock: wall_clock(),
+            lease_hook: Box::new(NoLeaseHook),
         }
     }
 }

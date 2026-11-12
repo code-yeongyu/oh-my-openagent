@@ -7,6 +7,7 @@
 //! restores.
 
 mod host;
+mod lease_hook;
 mod state;
 mod wire;
 #[cfg(test)]
@@ -16,6 +17,7 @@ mod session_tests;
 #[cfg(test)]
 mod tests;
 
+pub use lease_hook::{LeaseHook, NoLeaseHook};
 pub use state::{wall_clock, Control, MachineClock, Plan};
 pub use wire::HostCallError;
 
