@@ -78,7 +78,7 @@ If `mode: "live_safe"` is requested while `monitor.live_mode_enabled` is false, 
 
 ### `monitor_stop`
 
-Stops a monitor owned by the current session.
+Stops a monitor owned by the current session. `background_cancel(taskId="mon_...")` does the same, and `background_cancel(all=true)` stops the session's running monitors together with its background tasks.
 
 Arguments:
 
