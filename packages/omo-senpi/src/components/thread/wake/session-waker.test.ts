@@ -98,9 +98,10 @@ describe("ensureSessionRunning", () => {
     expect(await store.woken.list()).toEqual([])
   })
 
-  test.each<[string, Record<string, unknown>, "child" | "worker"]>([
+  test.each<[string, Record<string, unknown>, "child" | "worker" | "unknown"]>([
     ["a child session", { spawnedBy: { parentSessionId: "p", rootSessionId: "p", taskId: "t1" } }, "child"],
     ["a worker session", { kind: "worker" }, "worker"],
+    ["a session of a kind this build does not know", { kind: "robot" }, "unknown"],
   ])(
     "#given %s #when it is woken #then it is not wakeable, nothing is opened and no row is left",
     async (_label, header, sessionKind) => {

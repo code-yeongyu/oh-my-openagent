@@ -86,16 +86,18 @@ describe("the same-device switch", () => {
     expect(await sender.store.woken.list()).toMatchObject([{ durable_id: "t", state: "requested" }])
   })
 
-  test("#given the switch on and a child session as the target #when it sends #then it stays queued offline and nothing is requested", async () => {
-    const { sender, transport, carried } = setup({
-      enabled: true,
-      carrier: true,
-      header: { spawnedBy: { parentSessionId: "p", rootSessionId: "p", taskId: "x" } },
-    })
-    expect(await transport.deliver(delivery("t"))).toMatchObject({ kind: "ok", delivery: { kind: "queued_offline" } })
-    expect(await sender.store.woken.list()).toEqual([])
-    expect(carried).toEqual([])
-  })
+  test.each<[string, Record<string, unknown>]>([
+    ["a child session", { spawnedBy: { parentSessionId: "p", rootSessionId: "p", taskId: "x" } }],
+    ["a session of a kind this build does not know", { kind: "robot" }],
+  ])(
+    "#given the switch on and %s as the target #when it sends #then it stays queued offline and nothing is requested",
+    async (_label, header) => {
+      const { sender, transport, carried } = setup({ enabled: true, carrier: true, header })
+      expect(await transport.deliver(delivery("t"))).toMatchObject({ kind: "ok", delivery: { kind: "queued_offline" } })
+      expect(await sender.store.woken.list()).toEqual([])
+      expect(carried).toEqual([])
+    },
+  )
 })
 
 describe("what a queued row answers", () => {

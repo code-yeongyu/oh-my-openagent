@@ -257,6 +257,13 @@ describe("a handed delivery", () => {
       },
       "not_wakeable",
     ],
+    [
+      "a session of a kind this build does not know",
+      (sessions: string) => {
+        writeSessionFile(sessions, "t", { kind: "robot" })
+      },
+      "not_wakeable",
+    ],
   ])(
     "#given %s #when a record is handed in #then it is refused before any commit and nothing is woken",
     async (_label, arrange, reason) => {
