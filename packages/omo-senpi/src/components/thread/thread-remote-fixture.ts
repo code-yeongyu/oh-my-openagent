@@ -361,7 +361,11 @@ export function createRemoteThreadFixture() {
       callerChainHop?: () => number
       callerName?: () => string | undefined
       callerReplyTargets?: () => readonly string[]
-      callerReplySenders?: () => readonly { readonly session_id: string; readonly name?: string }[]
+      callerReplySenders?: () => readonly {
+        readonly session_id: string
+        readonly name?: string
+        readonly device?: string
+      }[]
       env?: Readonly<Record<string, string | undefined>>
       sessions?: ThreadHostSession[]
       engine?: Engine

@@ -1,6 +1,8 @@
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import type { ThreadResolveResult } from "../addressing"
-import { relayAddressBook, type RelayAddressBook } from "../remote/address-book"
+import { relayAddressBook, relayAddressEntry, type RelayAddressBook } from "../remote/address-book"
+import { rowThreadId, type RemoteSessionRow } from "../remote/ports"
+import { remoteAvailable } from "../remote/remote-ops"
 import {
   assembleAddressBook,
   findDiskSessions,
@@ -261,6 +263,46 @@ export function transcriptRole(role: unknown): ThreadTranscriptItem["role"] {
 
 export function targetSession(view: ThreadHostView, durableId: string): ThreadHostSession | undefined {
   return view.sessions.find((session) => (session.durableSessionId ?? session.sessionId) === durableId)
+}
+
+/**
+ * Amendment A4.3.1 of #13037: an approved reply to a sender whose delivery came from another device resolves to the
+ * account listing's row for that session id on THAT device, and nowhere else; no row there is not_found naming the device.
+ */
+export async function replyOnDevice(
+  options: ThreadToolSurfaceOptions,
+  sender: { readonly session_id: string; readonly device: string },
+): Promise<ThreadResolveResult> {
+  const missing = (): ThreadResolveResult =>
+    ({
+      kind: "error",
+      ...threadToolFailure(
+        "not_found",
+        `The sender ${sender.session_id} is not listed on device ${sender.device}, the device its delivery came from.`,
+        "Retry when that session is running on its device, or send to another thread as a normal send.",
+        { thread_id: sender.session_id, device: sender.device },
+      ),
+    }) as ThreadResolveResult
+  const remote = options.remote
+  if (remote === undefined) return missing()
+  const unavailable = await remoteAvailable(remote)
+  if (unavailable !== undefined) return { kind: "error", ...unavailable.error } as ThreadResolveResult
+  let rows: readonly RemoteSessionRow[]
+  try {
+    rows = await remote.sessions.sessions()
+  } catch (error) {
+    return {
+      kind: "error",
+      ...threadToolFailure(
+        "host_unavailable",
+        "The account's session listing could not be reached.",
+        "Retry when the device service is reachable.",
+        { reason: error instanceof Error ? error.message : String(error) },
+      ),
+    } as ThreadResolveResult
+  }
+  const row = rows.find((candidate) => candidate.device === sender.device && rowThreadId(candidate) === sender.session_id)
+  return row === undefined ? missing() : { kind: "ok", entry: relayAddressEntry(row), resolution: "id" }
 }
 
 /**

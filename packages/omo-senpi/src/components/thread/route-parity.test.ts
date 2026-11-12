@@ -60,7 +60,10 @@ describe("#13006: a send answers the same shape and the same refusals whichever 
    * `twinsOn` adds two threads named "twin" to that leg.
    */
   function legs(
-    options: { readonly sender?: { readonly session_id: string; readonly name?: string }; readonly twinsOn?: Leg } = {},
+    options: {
+      readonly sender?: { readonly session_id: string; readonly name?: string; readonly device?: string }
+      readonly twinsOn?: Leg
+    } = {},
   ) {
     const { sender, twinsOn } = options
     const rows = twinsOn === "remote" ? [B_ROW, ...B_TWINS] : [B_ROW]
@@ -128,16 +131,24 @@ describe("#13006: a send answers the same shape and the same refusals whichever 
     },
   )
 
+  // A4.3.1 of #13037: a reply resolves on the device the consumed delivery came from, so a name another thread carries
+  // never redirects it: the sender on b is reached on b, and a sender on this device that stated b's name is not found here.
   test.each(LEGS)(
-    "#given a run woken by a sender that stated the %s thread's name but is another session #when it replies by that name #then the ask is approved from the delivery, and the send refuses reply_target_mismatch without sending",
+    "#given a run woken by a sender that stated the %s thread's name but is another session #when it replies by that name #then the ask is approved from the delivery, and the send never reaches the thread carrying that name",
     async (leg) => {
-      const { run, permission, admits } = legs({ sender: { session_id: TARGET[leg].other.id, name: TARGET[leg].name } })
-      expect(permission({ thread: TARGET[leg].name, message: "reply" })).toEqual(approved(TARGET[leg].name))
-      expect(await run("thread_send", { thread: TARGET[leg].name, message: "reply" })).toMatchObject({
-        kind: "error",
-        error: { code: "reply_target_mismatch", details: { resolved_thread_id: TARGET[leg].id } },
+      const other = TARGET[leg].other
+      const { run, permission, admits } = legs({
+        sender: { session_id: other.id, name: TARGET[leg].name, ...(other.id === "dur-on-b" ? { device: "b" } : {}) },
       })
-      expect(admits()).toHaveLength(0)
+      expect(permission({ thread: TARGET[leg].name, message: "reply" })).toEqual(approved(TARGET[leg].name))
+      const result = await run("thread_send", { thread: TARGET[leg].name, message: "reply" })
+      if (leg === "local") {
+        expect(result).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
+        expect(admits()).toHaveLength(1)
+      } else {
+        expect(result).toMatchObject({ kind: "error", error: { code: "not_found" } })
+        expect(admits()).toHaveLength(0)
+      }
     },
   )
 
