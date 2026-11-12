@@ -5,6 +5,7 @@
 
 pub(crate) mod admit;
 mod capture;
+mod session_wire;
 
 #[cfg(test)]
 mod tests;
@@ -18,6 +19,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use omo_computer_core::frame::{FrameGeometry, FrameRefusal};
 use omo_computer_core::params::ReportMode;
+
+use crate::epoch::EpochChanged;
 
 /// Captures recorded by this engine process, across every session and re-open.
 static CAPTURES: AtomicU64 = AtomicU64::new(0);
@@ -39,17 +42,25 @@ pub struct FrameStore {
     /// Every id issued, with the target it was issued for.
     issued: HashMap<String, String>,
     epoch: u64,
+    /// The `epoch.changed` notifications not yet taken, oldest first.
+    pub(crate) events: Vec<EpochChanged>,
+}
+
+/// A per-process random value: a session's tag and resume token, a store's instance.
+pub(crate) fn random_u64() -> u64 {
+    let mut hasher = RandomState::new().build_hasher();
+    hasher.write_u32(std::process::id());
+    hasher.finish()
 }
 
 impl Default for FrameStore {
     fn default() -> Self {
-        let mut hasher = RandomState::new().build_hasher();
-        hasher.write_u32(std::process::id());
         Self {
-            instance: format!("{:016x}", hasher.finish()),
+            instance: format!("{:016x}", random_u64()),
             latest: HashMap::new(),
             issued: HashMap::new(),
             epoch: 0,
+            events: Vec::new(),
         }
     }
 }
