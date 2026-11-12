@@ -42,7 +42,9 @@ export function relativeOrderChanged(before: readonly string[], after: readonly 
   return a.some((id, index) => b[index] !== id)
 }
 
-export function summarize(events: readonly SentinelEvent[]): SentinelSummary {
+// `drop` is the self-test's sabotage: that detector is silenced (its verdict reads none and its own faults are
+// suppressed), so the self-test can prove that a dead detector makes the run fail.
+export function summarize(events: readonly SentinelEvent[], options: { readonly drop?: Signal } = {}): SentinelSummary {
   const ordered = [...events].sort((a, b) => a.t - b.t)
   const start = ordered.find((event) => event.kind === "start")?.t
   const stop = ordered.find((event) => event.kind === "stop")?.t
@@ -127,7 +129,10 @@ export function summarize(events: readonly SentinelEvent[]): SentinelSummary {
         } else if (inWindow(event.t) && !sent.startsWith(event.text)) mark("typing", event.t)
         break
       case "window_added":
-        if (inWindow(event.t) && !targetPids.has(event.ownerPid) && isDialog(event)) mark("dialog", event.t)
+        if (!inWindow(event.t) || targetPids.has(event.ownerPid)) break
+        if (event.axRead === "timeout")
+          faults.push(`dialog: new window ${event.id} of pid ${event.ownerPid} was unreadable (AX timeout)`)
+        else if (isDialog(event)) mark("dialog", event.t)
         break
       case "leak":
         if (inWindow(event.t)) mark(event.what === "key" ? "typing" : "pointer", event.t)
@@ -142,6 +147,13 @@ export function summarize(events: readonly SentinelEvent[]): SentinelSummary {
     const stamps = [start, ...ticks, stop]
     const gap = Math.max(...stamps.slice(1).map((t, index) => t - (stamps[index] ?? t)))
     if (gap > MAX_TICK_GAP_MS) faults.push(`sampler: no tick for ${gap} ms (20 Hz expected)`)
+  }
+
+  if (options.drop !== undefined) {
+    seen.delete(options.drop)
+    const prefix = `${options.drop}: `
+    for (let index = faults.length - 1; index >= 0; index--)
+      if (faults[index]?.startsWith(prefix)) faults.splice(index, 1)
   }
 
   const signals = Object.fromEntries(

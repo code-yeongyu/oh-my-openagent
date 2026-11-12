@@ -35,6 +35,7 @@ export type SentinelEvent = { readonly t: number } & (
       readonly role: string
       readonly subrole: string
       readonly layer: number
+      readonly axRead?: "ok" | "timeout"
     }
   | { readonly kind: "leak"; readonly what: "key" | "mouse" }
 )
@@ -53,6 +54,10 @@ const listOf =
   (value) =>
     Array.isArray(value) && value.every(item)
 const via = oneOf("notification", "sample")
+const optional =
+  (check: Check): Check =>
+  (value) =>
+    value === undefined || check(value)
 
 const SHAPES: Readonly<Record<SentinelEvent["kind"], Readonly<Record<string, Check>>>> = {
   context: { userPid: num, targetPids: listOf(num) },
@@ -69,7 +74,14 @@ const SHAPES: Readonly<Record<SentinelEvent["kind"], Readonly<Record<string, Che
   pointer: { via: oneOf("tap", "sample"), x: num, y: num },
   clipboard: { changeCount: num },
   activation: { via, pid: num },
-  window_added: { id: str, ownerPid: num, role: str, subrole: str, layer: num },
+  window_added: {
+    id: str,
+    ownerPid: num,
+    role: str,
+    subrole: str,
+    layer: num,
+    axRead: optional(oneOf("ok", "timeout")),
+  },
   leak: { what: oneOf("key", "mouse") },
 }
 

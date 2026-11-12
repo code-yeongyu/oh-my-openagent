@@ -26,7 +26,7 @@ async function trial(
   const run = await withSentinel(
     `selftest-${which ?? "null"}`,
     async () => (which === null ? undefined : plant(session, options.helpers, which)),
-    { session, windowMs: options.windowMs },
+    { session, windowMs: options.windowMs, ...(options.drop === undefined ? {} : { drop: options.drop }) },
   )
   const { result: outcome, summary } = run
   if (which === null) return { plant: null, summary }
@@ -76,7 +76,6 @@ export async function runSelfTest(options: SelfTestOptions): Promise<{ exitCode:
     helpers: options.helpers,
     targetPids: [],
     withPlanter: true,
-    ...(options.drop === undefined ? {} : { drop: options.drop }),
     beforeTypist: async (opened) => {
       const spaces = await ensureSecondSpace(opened)
       console.log(`SENTINEL_SETUP spaces=${spaces}`)
