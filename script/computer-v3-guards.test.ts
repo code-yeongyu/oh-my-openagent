@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { dirname, join } from "node:path"
+import { dirname, join, relative } from "node:path"
+
+import { generatedPath as protocolGeneratedPath } from "../packages/omo-computer-protocol/scripts/generate-protocol.ts"
 
 import { parseWriteScope, runGuard } from "./computer-v3-guards.ts"
 
@@ -392,6 +394,20 @@ describe("computer-v3-guards --scope <row> <ref> --plan <file>", () => {
 
       // then only that file is a finding
       expectFindings(scope("2"), "crates/omo-computer-core/schema/hand-written.json")
+    })
+  })
+
+  test("scope_accepts_the_protocol_generators_output_path_as_generated", () => {
+    withRepo((repo) => {
+      const scope = scopeRepo(repo)
+
+      // given the path the protocol generator writes, taken from the generator itself
+      const output = relative(join(import.meta.dir, ".."), protocolGeneratedPath)
+      repo.write({ [output]: "export {}\n" })
+      repo.commit("regenerated protocol")
+
+      // then a row that does not own it may still regenerate it
+      expectPass(scope("2"))
     })
   })
 
