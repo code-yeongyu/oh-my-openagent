@@ -1,6 +1,6 @@
-import { existsSync, realpathSync, unlinkSync } from "node:fs"
+import { existsSync, readdirSync, realpathSync, rmSync } from "node:fs"
 import { userInfo } from "node:os"
-import { join, resolve } from "node:path"
+import { basename, dirname, join, resolve } from "node:path"
 
 import { loadOmoConfig, OmoConfigWriteError, resolveHomeDir, updateOmoConfig } from "@oh-my-opencode/omo-config-core"
 
@@ -46,7 +46,7 @@ export interface ProjectModelProfileSession {
 
 const MAX_PROFILE_LENGTH = 200
 
-const INVISIBLE_OR_CONTROL = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u
+const INVISIBLE_OR_CONTROL = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Cs}\p{Default_Ignorable_Code_Point}\p{M}]/u
 
 const realOrSelf = (path: string): string => {
   try {
@@ -56,10 +56,19 @@ const realOrSelf = (path: string): string => {
   }
 }
 
-// A home folder's `.omo` is the user layer (omo-config-core loader/paths.ts), never a project layer.
+// A home folder's `.omo` is a user layer (omo-config-core loader/paths.ts), never a project layer: this account's
+// HOME and account home, and any other account's home directory.
 function isHomeFolder(cwd: string): boolean {
   const folder = realOrSelf(cwd)
-  return [resolveHomeDir(), userInfo().homedir].some((home) => realOrSelf(home) === folder)
+  if ([resolveHomeDir(), userInfo().homedir].some((home) => realOrSelf(home) === folder)) return true
+  const accountsRoot = dirname(realOrSelf(userInfo().homedir))
+  return dirname(folder) === accountsRoot && basename(folder).length > 0
+}
+
+// The writer's pre-write copies of this folder's omo config (`<file>.bak.<stamp>`), written before the atomic rename.
+function removeBackups(path: string): void {
+  const prefix = `${basename(path)}.bak.`
+  for (const name of readdirSync(dirname(path))) if (name.startsWith(prefix)) rmSync(join(dirname(path), name), { force: true })
 }
 
 function projectConfigPath(cwd: string): string {
@@ -129,19 +138,21 @@ export function setProjectModelProfile(
     return refused("project_config_parse_error", `${current.path} does not parse: ${current.parseError}`)
   if (value !== null && !validProfile(value, current.profileIds))
     return refused("invalid_model_profile", `${JSON.stringify(value)} is not a profile id or a provider/model pin.`)
+  const target = current.path
   try {
-    const written = updateOmoConfig({
+    updateOmoConfig({
       scope: "project",
       projectDir: session.cwd,
       edits: [{ path: ["model_profile"], value: value ?? undefined }],
     })
-    // The write is an atomic rename, so the writer's pre-write copy has served its purpose.
-    if (written.backupPath !== undefined) unlinkSync(written.backupPath)
   } catch (error) {
+    removeBackups(target)
     if (error instanceof OmoConfigWriteError && error.operation === "parse")
       return refused("project_config_parse_error", error.message)
     return refused("project_config_write_failed", error instanceof Error ? error.message : String(error))
   }
+  // The write is an atomic rename, so the pre-write copy has served its purpose; removing it never fails the write.
+  removeBackups(target)
   return stateReply(session.cwd)
 }
 

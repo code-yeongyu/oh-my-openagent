@@ -1,7 +1,8 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { mkdirSync, readdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs"
+import { chmodSync, mkdirSync, readdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs"
+import { userInfo } from "node:os"
 import { join } from "node:path"
 
 import { testTempDir } from "../../../test-support/temp-dir"
@@ -104,7 +105,7 @@ describe("project model_profile RPC (#13188)", () => {
 
   test("#given values that are not a profile #when set #then each is refused before any write", () => {
     const cwd = folder(COMMENTED)
-    for (const modelProfile of ["not-a-profile", "provider/", "/model", " daily-heavy", "a/b\nc", "a/b\u2028c", "a/\u202eb", "a/\u200bb", 42, "x".repeat(201)]) {
+    for (const modelProfile of ["not-a-profile", "provider/", "/model", " daily-heavy", "a/b\nc", "a/b\u2028c", "a/\u202eb", "a/\u200bb", "a/b\ufe0f", "a/\u034fb", "a/\u3164b", "a/\u0301b", "a/\ud800b", 42, "x".repeat(201)]) {
       expect(setProjectModelProfile(trusted(cwd), { modelProfile })).toMatchObject({
         kind: "refused",
         code: "invalid_model_profile",
@@ -132,6 +133,48 @@ describe("project model_profile RPC (#13188)", () => {
       if (previous === undefined) delete process.env.HOME
       else process.env.HOME = previous
     }
+  })
+
+  test("#given HOME through an alias #when a pin is set #then it is refused as the home folder", () => {
+    const home = folder(COMMENTED)
+    const link = join(folder(), "home-link")
+    symlinkSync(home, link)
+    const previous = process.env.HOME
+    process.env.HOME = home
+    try {
+      for (const cwd of [link, `${home}/`, join(home, "sub", "..")])
+        expect(setProjectModelProfile(trusted(cwd), { modelProfile: "a/b" })).toMatchObject({ kind: "refused", code: "home_folder" })
+      expect(configText(home)).toBe(COMMENTED)
+    } finally {
+      if (previous === undefined) delete process.env.HOME
+      else process.env.HOME = previous
+    }
+  })
+
+  test("#given the account home while HOME points elsewhere #when a pin is set #then it is refused as the home folder", () => {
+    const previous = process.env.HOME
+    process.env.HOME = folder()
+    try {
+      expect(setProjectModelProfile(trusted(userInfo().homedir), { modelProfile: "a/b" })).toMatchObject({
+        kind: "refused",
+        code: "home_folder",
+      })
+    } finally {
+      if (previous === undefined) delete process.env.HOME
+      else process.env.HOME = previous
+    }
+  })
+
+  test("#given a write that fails after the backup #when set #then no backup is left and the file is intact", () => {
+    const cwd = folder(COMMENTED)
+    chmodSync(join(cwd, ".omo"), 0o500)
+    try {
+      expect(setProjectModelProfile(trusted(cwd), { modelProfile: "a/b" }).kind).toBe("refused")
+    } finally {
+      chmodSync(join(cwd, ".omo"), 0o700)
+    }
+    expect(readdirSync(join(cwd, ".omo")).sort()).toEqual(["omo.jsonc"])
+    expect(configText(cwd)).toBe(COMMENTED)
   })
 
   test("#given no bound session #when either verb runs #then it answers no_session", () => {
