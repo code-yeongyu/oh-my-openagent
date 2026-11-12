@@ -11,10 +11,19 @@ fn marker_acl_is_owner_only() {
     assert_eq!(sddl, "D:P(A;;FA;;;S-1-5-21-1-2-3-1001)(A;;FA;;;SY)");
     assert!(is_owner_only(&sddl, USER));
     // Inherited (not protected), a third trustee, or a deny-free Everyone grant all fail.
-    assert!(!is_owner_only("D:(A;;FA;;;S-1-5-21-1-2-3-1001)(A;;FA;;;SY)", USER));
-    assert!(!is_owner_only("D:P(A;;FA;;;S-1-5-21-1-2-3-1001)(A;;FA;;;SY)(A;;FR;;;WD)", USER));
+    assert!(!is_owner_only(
+        "D:(A;;FA;;;S-1-5-21-1-2-3-1001)(A;;FA;;;SY)",
+        USER
+    ));
+    assert!(!is_owner_only(
+        "D:P(A;;FA;;;S-1-5-21-1-2-3-1001)(A;;FA;;;SY)(A;;FR;;;WD)",
+        USER
+    ));
     assert!(!is_owner_only("D:P(A;;FA;;;S-1-5-21-9-9-9-1001)", USER));
-    assert!(!is_owner_only("D:P", USER), "an empty DACL locks the owner out too");
+    assert!(
+        !is_owner_only("D:P", USER),
+        "an empty DACL locks the owner out too"
+    );
 }
 
 #[cfg(windows)]
