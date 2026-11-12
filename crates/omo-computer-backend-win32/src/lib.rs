@@ -9,6 +9,7 @@ pub mod displays;
 pub mod foreground;
 pub mod input;
 pub mod input_lock;
+pub mod marker_acl;
 pub mod ocr;
 pub mod overlay;
 pub mod protected;

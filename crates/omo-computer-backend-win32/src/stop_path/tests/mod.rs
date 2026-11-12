@@ -5,4 +5,5 @@
 
 mod foreground;
 mod hooks;
+mod marker;
 mod readers;
