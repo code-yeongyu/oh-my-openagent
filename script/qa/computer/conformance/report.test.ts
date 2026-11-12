@@ -17,6 +17,7 @@ const deliverCell: Cell = {
   expect: { deliver: true },
   declares: [],
   oracle: { field: "value", equals: "hello" },
+  basis: "report test",
 }
 
 const refuseCell: Cell = {
@@ -56,7 +57,13 @@ function happened(...ids: SignalId[]): Record<SignalId, SignalSummary> {
 }
 
 function delivered(cell: Cell, journal = quiet()): CellResult {
-  return { id: cellId(cell), observed: { kind: "delivered" }, oracle: { held: true, observed: "x" }, journal }
+  return {
+    id: cellId(cell),
+    observed: { kind: "delivered" },
+    oracle: { held: true, observed: "x" },
+    durationMs: 40,
+    journal,
+  }
 }
 
 function refused(cell: Cell, code: string, nothingSent = true): CellResult {
@@ -64,6 +71,7 @@ function refused(cell: Cell, code: string, nothingSent = true): CellResult {
     id: cellId(cell),
     observed: { kind: "refused", code, nothingSent },
     oracle: { held: true, observed: "a,b,c" },
+    durationMs: 40,
     journal: quiet(),
   }
 }
@@ -76,7 +84,7 @@ function passingRun(
   return [first, second, third]
 }
 
-describe("conformance report", () => {
+describe("conformance report (ADP-1 declared-outcome catalog)", () => {
   test("a complete run with every declared outcome passes", () => {
     const report = buildReport(catalog, passingRun())
     expect(report.problems).toEqual([])
@@ -96,7 +104,10 @@ describe("conformance report", () => {
   })
 
   test("a skipped cell fails the report and is counted as skipped", () => {
-    const skipped: CellResult = { ...delivered(deliverCell), observed: { kind: "not_run", reason: "fixture app missing" } }
+    const skipped: CellResult = {
+      ...delivered(deliverCell),
+      observed: { kind: "not_run", reason: "fixture app missing" },
+    }
     const report = buildReport(catalog, passingRun(skipped))
     expect(report.problems).toEqual([`skipped cell ${cellId(deliverCell)}: fixture app missing`])
     expect(report.skipped).toBe(1)
@@ -171,7 +182,16 @@ describe("conformance report", () => {
     try {
       const input = join(dir, "run.json")
       const write = (rows: CellResult[]) =>
-        writeFileSync(input, JSON.stringify({ schema: "omo-conformance-run/1", os: "fake", session: "headless", results: rows }))
+        writeFileSync(
+          input,
+          JSON.stringify({
+            schema: "omo-conformance-run/1",
+            driver: "engine",
+            os: "fake",
+            session: "headless",
+            results: rows,
+          }),
+        )
       write(results)
       const ok = Bun.spawnSync(["bun", join(import.meta.dir, "report.ts"), "--input", input])
       expect(ok.stdout.toString()).toContain(`CATALOG fake/headless cells=${fake.length} `)
