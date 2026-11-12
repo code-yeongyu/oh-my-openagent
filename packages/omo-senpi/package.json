@@ -70,6 +70,7 @@
     "@oh-my-opencode/omo-opencode": "workspace:*",
     "@oh-my-opencode/prompts-core": "workspace:*",
     "@oh-my-opencode/senpi-desktop-engine": "workspace:*",
+    "@oh-my-opencode/senpi-desktop-sdk": "workspace:*",
     "@oh-my-opencode/senpi-desktop-service": "workspace:*",
     "@oh-my-opencode/senpi-desktop-tool": "workspace:*",
     "@oh-my-opencode/senpi-task": "workspace:*",

@@ -999,7 +999,7 @@
       // pre-existing at origin dev 4686e425b5: unused export(s) syncVersion
       "packages/omo-senpi/plugin/scripts/sync-version.mjs": ["syncVersion"],
       // pre-existing at origin dev 4686e425b5: unused export(s) REASON, TARGET_TITLE, jsonLines, auditActions, sessionFiles, toolResults
-      "packages/omo-senpi/scripts/qa/computer-control-live-macos-scenarios.mjs": ["REASON", "TARGET_TITLE", "jsonLines", "auditActions", "sessionFiles", "toolResults"],
+      "packages/omo-senpi/scripts/qa/computer-control-live-macos-scenarios.mjs": ["sessionFiles"],
       // pre-existing at origin dev 4686e425b5: unused export(s) EXPECTED_EXPLORE_TOOL_ALLOW, EXPLORE_PERSONA_SENTINEL, EXPLORE_TASK_SENTINEL, analyzeCuratedSandboxFiles
       "packages/omo-senpi/scripts/qa/curated-agents-e2e-analysis.mjs": ["EXPECTED_EXPLORE_TOOL_ALLOW", "EXPLORE_PERSONA_SENTINEL", "EXPLORE_TASK_SENTINEL", "analyzeCuratedSandboxFiles"],
       // pre-existing at origin dev 4686e425b5: unused export(s) registerFixture
