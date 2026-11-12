@@ -83,13 +83,17 @@ impl Session {
                 && exited(self.backend.as_ref(), window).is_some();
             let refusal = if crashed { WINDOW_NOT_FOUND } else { refused.refusal };
             let mut out = Refused::from(refusal).with_paused(paused);
-            // R54/R55: a refused drag point names the point and the refusing stage's own code, as
-            // `stageCode` (a placeholder spelling, re-pin item 48) so the v1 `data.code` stays.
+            // R54, R60b: a refused drag point names the point and the refusing stage's pair, its
+            // engine code (`stageCode`) and that refusal's own reason (`stageReason`) when it has one.
             out.detail = refused.drag.filter(|_| !crashed).map(|drag| {
-                Box::new(serde_json::json!({
+                let mut data = serde_json::json!({
                     "point": drag.point.map(|p| serde_json::json!({ "x": p.x, "y": p.y })),
                     "stageCode": drag.inner.code.wire(),
-                }))
+                });
+                if let (Some(reason), Some(map)) = (drag.inner.reason, data.as_object_mut()) {
+                    map.insert("stageReason".to_owned(), serde_json::json!(reason));
+                }
+                Box::new(data)
             });
             return Err(Blocked {
                 stage: format!("{:?}", refused.gate),
