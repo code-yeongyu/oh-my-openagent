@@ -109,25 +109,49 @@ function engineStateOf(reply: JsonObject): EngineState {
 
 const WAITS: ReadonlySet<string> = new Set(["wake", "hold", "approval"])
 
-// A reason the receiving side wrote, as it is shown to a person: one line of plain text, at most REASON_SHOWN_MAX
-// characters (code points, so a cut never splits a surrogate pair). The rule keeps letters, digits, punctuation,
-// symbols and single spaces. Line breaks and control characters become a space; format characters (bidi overrides,
-// zero-width marks) and combining marks (an overlay stroke over the letter before it) are dropped, as are the letters
-// that render as blank space; anything else (private use, unassigned) is dropped too.
+// A reason the receiving side wrote, as it is shown to a person: one line of the reason's own text, in any script, that
+// nothing can deface or disguise. The rule:
+// - normalize to NFC; line breaks and control characters become one space;
+// - keep letters, digits, punctuation, symbols, spaces and the marks that belong to text (vowel signs, viramas, accents,
+//   emoji selectors), but drop enclosing marks and the overlay marks that strike through or box a letter;
+// - keep at most MARKS_PER_BASE_MAX marks after one character: real scripts stack few (Vietnamese 2, Devanagari 3-4,
+//   Tibetan up to 5 or 6), while a pile of dozens only exists to deface the line;
+// - drop every format character (bidi controls, the byte order mark, tag characters) except the two joiners, which
+//   Persian words and emoji sequences need; a joiner is kept only between two visible characters, never at an edge or
+//   next to a space or another joiner; drop the letters that render as blank space;
+// - cut by grapheme cluster, so a flag, a family or an accented letter is shown whole or not at all, at most
+//   REASON_SHOWN_MAX clusters and REASON_SHOWN_UNITS_MAX UTF-16 units so one huge cluster cannot blow the line.
 const REASON_SHOWN_MAX = 120
+const REASON_SHOWN_UNITS_MAX = 480
+const MARKS_PER_BASE_MAX = 6
+const DEFACING_MARKS = /[\p{Me}\u0334-\u0338\u20D2\u20D3\u20D8-\u20DA\u20E5\u20E6\u20EA\u20EB]/gu
+const HIDDEN_FORMAT = /(?![\u200C\u200D])\p{Cf}/gu
 const BLANK_LETTERS = /[\u115F\u1160\u3164\uFFA0\u2800]/gu
-const shownReason = (reason: string): string =>
-  Array.from(
-    reason
-      .replace(/[\p{Cc}\p{Zl}\p{Zp}]+/gu, " ")
-      .replace(/[\p{Cf}\p{M}]+/gu, "")
-      .replace(BLANK_LETTERS, "")
-      .replace(/[^\p{L}\p{N}\p{P}\p{S}\p{Zs}]/gu, "")
-      .replace(/\s+/g, " ")
-      .trim(),
-  )
-    .slice(0, REASON_SHOWN_MAX)
-    .join("")
+const NOT_SHOWN = /[^\p{L}\p{N}\p{P}\p{S}\p{Zs}\p{M}\u200C\u200D]/gu
+const MARK_STACK = new RegExp(`(\\p{M}{${MARKS_PER_BASE_MAX}})\\p{M}+`, "gu")
+const STRAY_JOINERS = /(?<=^|[\s\u200C\u200D])[\u200C\u200D]+|[\u200C\u200D]+(?=$|\s)/gu
+const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" })
+const shownReason = (reason: string): string => {
+  const text = reason
+    .normalize("NFC")
+    .replace(/[\p{Cc}\p{Zl}\p{Zp}]+/gu, " ")
+    .replace(HIDDEN_FORMAT, "")
+    .replace(DEFACING_MARKS, "")
+    .replace(BLANK_LETTERS, "")
+    .replace(NOT_SHOWN, "")
+    .replace(MARK_STACK, "$1")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(STRAY_JOINERS, "")
+  let shown = ""
+  let count = 0
+  for (const { segment } of graphemes.segment(text)) {
+    if (count === REASON_SHOWN_MAX || shown.length + segment.length > REASON_SHOWN_UNITS_MAX) break
+    shown += segment
+    count += 1
+  }
+  return shown
+}
 
 /**
  * omo#13037 section 5.1: what a session that is not running answers, from the receiving consumer (`data.kind` "refused")
