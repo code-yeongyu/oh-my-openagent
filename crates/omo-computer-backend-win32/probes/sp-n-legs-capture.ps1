@@ -1,10 +1,28 @@
 # SP-N capture legs: capture classes under session states, the affinity overlay and IsSupported.
 # Dot-sourced by sp-n.ps1; each Leg-<name> emits one JSON object through Emit.
 
+# waitFor 'disconnected' / 'locked': the helper starts before the probe changes the session, reads it once
+# (before), polls every 100 ms up to waitMs until the session reads WTSDisconnected / WTS_SESSIONSTATE_LOCK
+# (the timeline keeps every change it saw), then reads it again right before and after the captures.
 function Leg-capture($a) {
-  if ($a.delayMs) { Start-Sleep -Milliseconds ([int]$a.delayMs) }
   $top = [IntPtr][int64]$a.top
-  $r = @{ connectState = [SpN]::ConnectState([SpN]::OwnSession()); inputDesktop = [SpN]::InputDesktop() }
+  $sid = [SpN]::OwnSession()
+  $r = @{ helperSid = $sid }
+  if ($a.waitFor) {
+    $r['before'] = SessionRead $sid
+    $timeline = New-Object System.Collections.ArrayList
+    $sw = [Diagnostics.Stopwatch]::StartNew(); $last = ''; $met = $false
+    while ($sw.ElapsedMilliseconds -lt [int]$a.waitMs) {
+      $s = SessionRead $sid
+      $key = "connect=$($s.connectState) lock=$($s.lock) desktop=$($s.desktop)"
+      if ($key -ne $last) { [void]$timeline.Add("$($sw.ElapsedMilliseconds)ms $key"); $last = $key }
+      if (($a.waitFor -eq 'disconnected' -and $s.connectState -eq 4) -or ($a.waitFor -eq 'locked' -and $s.lock -eq 'lock')) { $met = $true; break }
+      Start-Sleep -Milliseconds 100
+    }
+    $r['timeline'] = @($timeline); $r['conditionMet'] = $met
+  }
+  $r['during'] = SessionRead $sid
+  $r['connectState'] = $r['during'].connectState; $r['inputDesktop'] = $r['during'].desktop
   $h = $null
   if ($a.displayOff) {
     $h = [SpN]::WatchDisplay(); Start-Sleep -Milliseconds 300
@@ -20,7 +38,8 @@ function Leg-capture($a) {
   $r['printWindow'] = [SpN]::Classify($pf); $r['printWindow']['ok'] = $ok
   $wi = @{}; $r['wgcWindow'] = [SpN]::Classify([SpN]::Wgc($top, [IntPtr]::Zero, 2000, $wi)); $r['wgcWindow']['info'] = $wi
   $mi = @{}; $r['wgcMonitor'] = [SpN]::Classify([SpN]::Wgc([IntPtr]::Zero, [SpN]::MonitorFromWindow($top, 2), 2000, $mi)); $r['wgcMonitor']['info'] = $mi
-  $r['connectStateAfter'] = [SpN]::ConnectState([SpN]::OwnSession())
+  $r['duringEnd'] = SessionRead $sid
+  $r['connectStateAfter'] = $r['duringEnd'].connectState
   if ($a.displayOff) {
     [SpN]::MonitorPower(-1); [SpN]::ZeroMotion(); [void][SpN]::SetThreadExecutionState(0x2)
     Start-Sleep -Milliseconds 1500

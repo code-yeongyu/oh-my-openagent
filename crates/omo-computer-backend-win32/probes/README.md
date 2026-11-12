@@ -25,10 +25,19 @@ line, exits 2 and writes nothing. `--host <label>` names the host column; the
 default is `hosted windows-latest` under GitHub Actions and
 `H6 Windows 11 VM` elsewhere.
 
-The legs that change the session (disconnect, lock, console display off) put
-the session back with a SYSTEM scheduled task (`tscon <id> /dest:console`) and
-record whether that worked in the row. Run them only on a desktop nobody is
-using.
+The legs that change the session (disconnect, lock, console display off) need a desktop nobody is using.
+
+- **Proving the state.** A capture helper starts in the run's own session, polls the session every 100 ms, and
+  keeps a timeline of the states it saw. A disconnected verdict needs `WTSDisconnected` read at capture time. A
+  locked verdict needs a positive `WTS_SESSIONSTATE_LOCK` read (`WTSSessionInfoEx` SessionFlags) at capture
+  time, with UNLOCK before the lock and after the restore. A failed `OpenInputDesktop` alone proves nothing and
+  reads UNMEASURED.
+- **Restoring.** The session is restored with a SYSTEM task (`tscon <id> /dest:console`). It counts as restored
+  only when proven: connected, `OpenInputDesktop` succeeding again, and unlocked. If a leg cannot prove that,
+  later session legs do not run.
+- **The lock leg.** A locked session cannot be unlocked without credentials, so the lock leg runs only with
+  `--allow-irreversible`, and last. Otherwise its rows read UNMEASURED with "cannot restore session on this
+  host", and `--verify` skips rows that its pass did not re-measure, saying why.
 
 On hosted CI the workflow `.github/workflows/computer-spike-windows.yml` runs
 the precondition, `--measure` and `--verify` on `windows-latest` and uploads the

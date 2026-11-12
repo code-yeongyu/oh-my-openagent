@@ -96,9 +96,27 @@ function EffectText($t) {
     if (-not $r.ok) { throw "state read failed: $($r.error)" }
     return [string]$r.state.text
   }
-  $text = [SpN]::GetTextOf([IntPtr][int64]$t.edit)
-  if ($null -eq $text) { throw 'WM_GETTEXT on the edit control failed or timed out' }
-  return $text
+  # WM_GETTEXT first; if it fails (a null or foreign edit handle), UI Automation on the same control; if both
+  # fail, the leg fails with both reasons and its rows are UNMEASURED. A failed read is never "no effect".
+  $h = [IntPtr][int64]$t.edit
+  $w = [SpN]::TextOf($h)
+  if ($w.ok) { return [string]$w.text }
+  try {
+    Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
+    $el = [Windows.Automation.AutomationElement]::FromHandle($h)
+    $p = $null
+    if ($el.TryGetCurrentPattern([Windows.Automation.ValuePattern]::Pattern, [ref]$p)) { return [string]$p.Current.Value }
+    if ($el.TryGetCurrentPattern([Windows.Automation.TextPattern]::Pattern, [ref]$p)) { return [string]$p.DocumentRange.GetText(-1) }
+    $uia = 'the control exposes neither ValuePattern nor TextPattern'
+  } catch { $uia = $_.Exception.Message }
+  throw "edit text unreadable: WM_GETTEXT: $($w.error); UI Automation: $uia"
+}
+
+# One read of a session's state: connect state, lock flag and input desktop, each with its own error text.
+function SessionRead([uint32]$sid) {
+  $l = [SpN]::SessionLock($sid)
+  $c = try { [SpN]::ConnectState($sid) } catch { "error: $($_.Exception.Message)" }
+  return @{ connectState = $c; lock = $(if ($l.error) { "error: $($l.error)" } else { $l.flags }); lockSession = $l.sessionId; desktop = [SpN]::InputDesktop() }
 }
 function WheelCount([string]$path) {
   $r = ReadState $path

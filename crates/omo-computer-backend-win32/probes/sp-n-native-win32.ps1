@@ -41,7 +41,9 @@ public static partial class SpN {
   [DllImport("user32.dll")] public static extern bool InvalidateRect(IntPtr h, ref RECT r, bool erase);
   [DllImport("user32.dll")] public static extern bool GetUpdateRect(IntPtr h, IntPtr r, bool erase);
   [DllImport("user32.dll", SetLastError = true)] public static extern bool PostMessageW(IntPtr h, uint msg, IntPtr w, IntPtr l);
-  [DllImport("user32.dll", SetLastError = true)] public static extern IntPtr SendMessageTimeoutW(IntPtr h, uint msg, IntPtr w, StringBuilder l, uint flags, uint timeout, out IntPtr result);
+  // CharSet.Unicode: the W function writes UTF-16 into the StringBuilder (the default ANSI marshalling did not)
+  [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)] public static extern IntPtr SendMessageTimeoutW(IntPtr h, uint msg, IntPtr w, StringBuilder l, uint flags, uint timeout, out IntPtr result);
+  [DllImport("user32.dll")] public static extern bool IsWindow(IntPtr h);
   [DllImport("user32.dll", SetLastError = true)] public static extern IntPtr SendMessageTimeoutW(IntPtr h, uint msg, IntPtr w, IntPtr l, uint flags, uint timeout, out IntPtr result);
   [DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc cb, IntPtr lp);
   [DllImport("user32.dll")] public static extern bool EnumChildWindows(IntPtr parent, EnumProc cb, IntPtr lp);

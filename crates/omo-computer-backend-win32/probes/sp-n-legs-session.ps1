@@ -63,5 +63,6 @@ function Leg-lock($a) {
 }
 
 function Leg-disconnect-state($a) {
-  Emit @{ connectState = [SpN]::ConnectState([uint32]$a.sid); inputDesktop = [SpN]::InputDesktop() }
+  $s = SessionRead ([uint32]$a.sid)
+  Emit @{ connectState = $s.connectState; inputDesktop = $s.desktop; lock = $s.lock }
 }

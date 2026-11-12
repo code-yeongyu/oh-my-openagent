@@ -34,7 +34,8 @@ const FRAME_MS = 1000 / 60
 
 // INVALID: a row measured by a probe with a known defect; kept with the reading, superseded by the next run.
 export type Verdict = "CONFIRMS" | "CONTRADICTS" | "NEW-EDGE" | "UNMEASURED" | "INVALID"
-type Result = { readonly measured: string; readonly verdict: Verdict }
+// skip: this pass did not re-measure the row, and why (--verify reports it and does not compare it)
+type Result = { readonly measured: string; readonly verdict: Verdict; readonly skip?: string }
 type Json = { readonly [key: string]: unknown }
 type Target = {
   readonly top: number
@@ -59,6 +60,10 @@ type Ctx = {
   cleanups: Cleanup[]
   // target processes spawned but not ready yet, killed when setup runs out of budget
   pending: Map<string, Killable>
+  // run legs that cannot be undone on every host (the session lock) only when asked
+  allowIrreversible: boolean
+  // set when a session leg could not prove the session restored; later session legs refuse to run
+  session: { unusable?: string }
 }
 type Cleanup = { readonly name: string; run(ctx: Ctx): Promise<string> }
 type Spec = { readonly question: string; readonly condition: string; readonly h6Only?: true }
@@ -451,6 +456,8 @@ const ms = (s: Json) =>
     ? `p50=${num(s.p50)}ms p95=${num(s.p95)}ms min=${num(s.min)}ms max=${num(s.max)}ms n=${num(s.n)} after ${WARM} warm-ups`
     : "no samples"
 const count = (runs: unknown, key: string) => arr(runs).filter((r) => r[key] === true).length
+// runs in which SendInput accepted at least one event (sent is the number of events, not a flag)
+export const sentRuns = (runs: unknown) => arr(runs).filter((r) => num(r.sent) > 0).length
 const pick = (cond: boolean, yes: Verdict, no: Verdict): Verdict => (cond ? yes : no)
 const UN = (reason: string): Result => ({ measured: `UNMEASURED: ${reason}`, verdict: "UNMEASURED" })
 
@@ -624,7 +631,7 @@ const barriers: Group = {
         if (fg.acquired !== true)
           Object.assign(out, all(ids.slice(0, 2), UN("the probe could not take the foreground for the target")))
         else {
-          const measured = `sent ${count(fg.runs, "sent")}/${RUNS} routed ${count(fg.runs, "routed")}/${RUNS} consumed ${count(fg.runs, "consumed")}/${RUNS} effect at barrier return ${count(fg.runs, "atReturn")}/${RUNS} within 2 s ${count(fg.runs, "within2s")}/${RUNS} paint probe ${str(fg.probeClass)} foreground by ${str(fg.acquire)}`
+          const measured = `sent ${sentRuns(fg.runs)}/${RUNS} routed ${count(fg.runs, "routed")}/${RUNS} consumed ${count(fg.runs, "consumed")}/${RUNS} effect at barrier return ${count(fg.runs, "atReturn")}/${RUNS} within 2 s ${count(fg.runs, "within2s")}/${RUNS} paint probe ${str(fg.probeClass)} foreground by ${str(fg.acquire)}`
           out[`n-barrier-fg-proves-${key}`] = {
             measured,
             verdict: !oracleSeen
@@ -835,9 +842,24 @@ const elevated: Group = {
 }
 
 const captureIds = (state: CaptureState) => CAPTURE_APIS.map(([k]) => `n-capture-${k}-${state}`)
+// active: a frame CONFIRMS. Display off (displayStateDuring read back 0): a frame is a NEW-EDGE, adopted by the
+// design (re-pin item 12: capture proceeds and reports session.displayAsleep:true); a null or black frame CONFIRMS.
+// Disconnected and locked: a null or black frame CONFIRMS, a frame CONTRADICTS.
+export function captureVerdict(state: CaptureState, cls: string, r: Json): Verdict {
+  if (state === "active") return pick(cls === "frame", "CONFIRMS", "CONTRADICTS")
+  const dark = cls === "null_frame" || cls === "black_frame"
+  if (state === "display-off")
+    return dark ? "CONFIRMS" : num(r.displayStateDuring) === 0 && cls === "frame" ? "NEW-EDGE" : "UNMEASURED"
+  return pick(dark, "CONFIRMS", "CONTRADICTS")
+}
+
 function captureResults(state: CaptureState, r: Json | undefined, skip?: string): Record<string, Result> {
   if (skip || !r) return all(captureIds(state), UN(skip ?? "no result"))
-  const session = `connectState=${num(r.connectState)}->${num(r.connectStateAfter)} inputDesktop=${str(r.inputDesktop)}${r.displayStateDuring !== undefined ? ` displayState=${num(r.displayStateBefore)}->${num(r.displayStateDuring)}->${num(r.displayStateAfterWake)}` : ""}`
+  const lockText =
+    r.during !== undefined
+      ? ` lock=${str(at(r, "before", "lock")) || "-"}->${str(at(r, "during", "lock"))}->${str(at(r, "duringEnd", "lock"))}`
+      : ""
+  const session = `connectState=${str(r.connectState)}->${str(r.connectStateAfter)} inputDesktop=${str(r.inputDesktop)}${lockText}${r.displayStateDuring !== undefined ? ` displayState=${num(r.displayStateBefore)}->${num(r.displayStateDuring)}->${num(r.displayStateAfterWake)}` : ""}`
   return Object.fromEntries(
     CAPTURE_APIS.map(([k, field]) => {
       const c = obj(r[field])
@@ -846,21 +868,74 @@ function captureResults(state: CaptureState, r: Json | undefined, skip?: string)
         /\s+/g,
         " ",
       )
-      const ok = state === "active" ? cls === "frame" : cls === "null_frame" || cls === "black_frame"
-      return [`n-capture-${k}-${state}`, { measured, verdict: pick(ok, "CONFIRMS", "CONTRADICTS") }]
+      return [`n-capture-${k}-${state}`, { measured, verdict: captureVerdict(state, cls, r) }]
     }),
   )
 }
 
+// Why a disconnected or locked capture is not evidence, or undefined when it is. A locked verdict needs a POSITIVE
+// lock read: WTS_SESSIONSTATE_LOCK at capture time (before and after the captures) and UNLOCK before the lock and
+// after the restore. A failed OpenInputDesktop alone proves nothing. A disconnected verdict needs WTSDisconnected
+// at capture time, read by a helper in the run's own session. Every read error is named, never read as a state.
+export function sessionProblem(
+  state: "disconnected" | "locked",
+  r: Json,
+  sid: number,
+  after: Json | undefined,
+): string | undefined {
+  if (num(r.helperSid) !== sid) return `the capture read session ${str(r.helperSid)}, not the run's session ${sid}`
+  const seen = arr(r.timeline).length ? `; states seen: ${arr(r.timeline).map(str).join(" | ")}` : ""
+  const [before, during, end] = [obj(r.before), obj(r.during), obj(r.duringEnd)]
+  if (state === "locked") {
+    const lock = (j: Json) => str(j.lock) || "(no read)"
+    if (lock(before) !== "unlock")
+      return `the session did not read WTS_SESSIONSTATE_UNLOCK before the lock (lock=${lock(before)})${seen}`
+    if (lock(during) !== "lock" || lock(end) !== "lock")
+      return `the session did not read WTS_SESSIONSTATE_LOCK at capture time (lock=${lock(during)}->${lock(end)}, inputDesktop=${str(during.desktop) || "(OpenInputDesktop failed)"})${seen}`
+    if (!after || str(after.lock) !== "unlock")
+      return `cannot restore session on this host: it still reads lock=${after ? str(after.lock) : "(no read)"} after the restore`
+    return undefined
+  }
+  if (num(during.connectState) !== 4 || num(end.connectState) !== 4)
+    return `the session did not read WTSDisconnected at capture time (connectState=${str(during.connectState)}->${str(end.connectState)})${seen}`
+  if (!after || num(after.connectState) !== 0 || after.inputDesktop !== "Default")
+    return `cannot restore session on this host: after the restore connectState=${after ? str(after.connectState) : "(no read)"} inputDesktop=${after ? str(after.inputDesktop) || "(OpenInputDesktop failed)" : "(no read)"}`
+  return undefined
+}
+
+export const CANNOT_RESTORE =
+  "cannot restore session on this host: a locked session cannot be unlocked without credentials; this pass does not lock (run with --allow-irreversible, last, on a host that can unlock)"
+
+// One --verify comparison: rows of other hosts and rows this pass did not re-measure are skipped with the reason.
+export function verifyLine(
+  row: LedgerRow,
+  result: Result | undefined,
+  host: string,
+): { readonly kind: "SAME" | "DIFF" | "SKIP"; readonly text: string } {
+  if (row.host !== host) return { kind: "SKIP", text: `SKIP ${row.id} host=${row.host}` }
+  if (result?.skip) return { kind: "SKIP", text: `SKIP ${row.id}: not re-measured by this pass: ${result.skip}` }
+  if (!result || result.verdict !== row.verdict)
+    return {
+      kind: "DIFF",
+      text: `DIFF ${row.id} ledger=${row.verdict} now=${result?.verdict ?? "missing"} ${clean(result?.measured ?? "")}`,
+    }
+  return { kind: "SAME", text: `SAME ${row.id} ${result.verdict} ${clean(result.measured)}` }
+}
+
 // Reconnects the session to the console through a SYSTEM task (tscon), then drops the task; the result
 // ("active", or why not) is written into the rows.
-async function restoreSession(ctx: Ctx, sid: number): Promise<string> {
+async function restoreSession(
+  ctx: Ctx,
+  sid: number,
+): Promise<{ readonly text: string; readonly restored: boolean; readonly after: Json | undefined }> {
   const started = await asSystem(ctx, "tscon", `tscon.exe ${sid} /dest:console`).catch((e: Error) => ({
     code: Number.NaN,
     out: e.message,
   }))
   let back = `not-restored(schtasks ${Number.isNaN(started.code) ? "not started" : `exit ${started.code}`}: ${clean(started.out).slice(0, 120)})`
   let lastRead = ""
+  let after: Json | undefined
+  // restored only when PROVEN: connected and active, OpenInputDesktop succeeds again (Default), and unlocked
   for (let i = 0; i < 20; i++) {
     await Bun.sleep(500)
     const s = await leg(ctx, "disconnect-state", { sid }).catch((e: Error) => e)
@@ -868,24 +943,32 @@ async function restoreSession(ctx: Ctx, sid: number): Promise<string> {
       lastRead = s.message
       continue
     }
-    if (num(s.connectState) === 0 && s.inputDesktop === "Default") {
+    after = s
+    if (num(s.connectState) === 0 && s.inputDesktop === "Default" && s.lock === "unlock") {
       back = "active"
       lastRead = ""
       break
     }
-    lastRead = `connectState=${num(s.connectState)} inputDesktop=${str(s.inputDesktop)}`
+    lastRead = `connectState=${str(s.connectState)} inputDesktop=${str(s.inputDesktop) || "(OpenInputDesktop failed)"} lock=${str(s.lock)}`
   }
-  return `${back}${lastRead ? `; last read: ${clean(lastRead).slice(0, 160)}` : ""},task-${await dropTask("tscon")}`
+  return {
+    text: `${back}${lastRead ? `; last read: ${clean(lastRead).slice(0, 160)}` : ""},task-${await dropTask("tscon")}`,
+    restored: back === "active",
+    after,
+  }
 }
 
 // The disconnected and locked legs: a capture helper waits in this session
 // while it changes state; a SYSTEM task (tscon) then reconnects it to the console.
 async function sessionLeg(ctx: Ctx, t: Target, state: "disconnected" | "locked") {
+  if (state === "locked" && !ctx.allowIrreversible)
+    return Object.fromEntries(captureIds(state).map((id) => [id, { ...UN(CANNOT_RESTORE), skip: CANNOT_RESTORE }]))
+  if (ctx.session.unusable) return all(captureIds(state), UN(ctx.session.unusable))
   const sid = num(ctx.facts.sessionId)
   const out = join(ctx.shared, `capture-${state}.json`)
   rmSync(out, { force: true })
   const argFile = join(ctx.shared, `capture-${state}.arg.json`)
-  writeFileSync(argFile, JSON.stringify({ top: t.top, delayMs: 8000 }))
+  writeFileSync(argFile, JSON.stringify({ top: t.top, waitFor: state, waitMs: 12_000 }))
   ctx.spawned.push(
     Bun.spawn(
       [
@@ -907,23 +990,20 @@ async function sessionLeg(ctx: Ctx, t: Target, state: "disconnected" | "locked")
   )
   await Bun.sleep(1500)
   // Registered before the session changes: if the group runs out of budget, runGroup still reconnects.
-  const reconnect: Cleanup = { name: `reconnect-${state}`, run: (c) => restoreSession(c, sid) }
+  const reconnect: Cleanup = { name: `reconnect-${state}`, run: async (c) => (await restoreSession(c, sid)).text }
   ctx.cleanups.push(reconnect)
   const changed = await leg(ctx, state === "disconnected" ? "disconnect" : "lock")
   const read = await waitFile(out, 30_000).catch((e: Error) => e)
   const r = read instanceof Error ? undefined : read
   ctx.cleanups.splice(ctx.cleanups.indexOf(reconnect), 1)
   const back = await restoreSession(ctx, sid)
+  if (!back.restored) ctx.session.unusable = `session not restored after the ${state} leg: ${back.text}`
   const skip = !r
-    ? `the capture helper produced no result: ${read instanceof Error ? read.message : "-"}`
-    : state === "disconnected" && num(r.connectState) !== 4
-      ? `session did not read WTSDisconnected (connectState=${num(r.connectState)}, ${JSON.stringify(changed)})`
-      : state === "locked" && r.inputDesktop === "Default"
-        ? "input desktop still Default after LockWorkStation"
-        : undefined
+    ? `the capture helper produced no result: ${read instanceof Error ? read.message : "-"}; ${JSON.stringify(changed)}`
+    : sessionProblem(state, r, sid, back.after)
   const res = captureResults(state, r, skip)
   return Object.fromEntries(
-    Object.entries(res).map(([id, x]) => [id, { ...x, measured: `${x.measured} reconnect=${back}` }]),
+    Object.entries(res).map(([id, x]) => [id, { ...x, measured: `${x.measured} reconnect=${back.text}` }]),
   )
 }
 
@@ -946,7 +1026,7 @@ const capture: Group = {
           : `GUID_CONSOLE_DISPLAY_STATE never read off (before=${num(off.displayStateBefore)} during=${num(off.displayStateDuring)})`,
       ),
       ...(await sessionLeg(ctx, t, "disconnected")),
-      // Last: a lock the reconnect cannot end leaves the desktop unusable for later legs.
+      // Last, and only with --allow-irreversible: a lock that cannot be undone leaves the desktop unusable.
       ...(await sessionLeg(ctx, t, "locked")),
     }
   },
@@ -1075,9 +1155,11 @@ function args() {
   let mode: "measure" | "verify" | undefined
   let file = LEDGER
   let host: string | undefined
+  let allowIrreversible = false
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === "--measure") mode = "measure"
+    else if (a === "--allow-irreversible") allowIrreversible = true
     else if (a === "--verify") {
       mode = "verify"
       file = argv[++i] ?? fail("USAGE --verify needs a ledger path")
@@ -1086,8 +1168,8 @@ function args() {
     else if (a === "--row") rows.push(argv[++i] ?? fail("USAGE --row needs an id"))
     else fail(`USAGE unknown argument ${a}`)
   }
-  if (!mode) fail("USAGE --measure [--out <tsv>] | --verify <tsv> [--row <id>] [--host <label>]")
-  return { mode, file, host, rows }
+  if (!mode) fail("USAGE --measure [--out <tsv>] | --verify <tsv> [--row <id>] [--host <label>] [--allow-irreversible]")
+  return { mode, file, host, rows, allowIrreversible }
 }
 
 // Creates the run's shared directory: a fresh name that must not exist yet (a pre-existing directory is refused,
@@ -1252,6 +1334,8 @@ const testCtx = (): Ctx => ({
   token: { aborted: false },
   cleanups: [],
   pending: new Map(),
+  allowIrreversible: false,
+  session: {},
 })
 // The text of a probe file. The line-ending check swaps it for a re-encoded copy to prove every source check reads
 // LF, CRLF and mixed checkouts alike (Windows checks the .ps1 files out with CRLF).
@@ -1959,6 +2043,176 @@ const LOGIC_CHECKS: readonly Check[] = [
     },
   },
   {
+    finding: "SESSION lock-positive (hosted run 43136347200)",
+    async run() {
+      const sid = 2
+      const base = (during: string, desktop: string): Json => ({
+        helperSid: sid,
+        conditionMet: during === "lock",
+        before: { lock: "unlock", desktop: "Default", connectState: 0 },
+        during: { lock: during, desktop, connectState: 0 },
+        duringEnd: { lock: during, desktop, connectState: 0 },
+      })
+      const restored: Json = { lock: "unlock", connectState: 0, inputDesktop: "Default" }
+      const flags = ["lock", "unlock", "unknown", "error: WTSQuerySessionInformationW(WTSSessionInfoEx) failed: denied"]
+      const desktops = ["Default", "Winlogon", ""]
+      const bad: string[] = []
+      for (const f of flags)
+        for (const d of desktops) {
+          const p = sessionProblem("locked", base(f, d), sid, restored)
+          if (f === "lock" ? p !== undefined : p === undefined || !p.includes(f.split(":")[0] ?? f))
+            bad.push(`lock=${f} desktop=${JSON.stringify(d)}: ${p ?? "accepted"}`)
+        }
+      if (
+        !sessionProblem("locked", { ...base("lock", ""), before: { lock: "lock" } }, sid, restored)?.includes(
+          "UNLOCK before",
+        )
+      )
+        bad.push("a session already locked before the leg is accepted")
+      if (
+        !sessionProblem("locked", base("lock", ""), sid, { lock: "lock" })?.includes(
+          "cannot restore session on this host",
+        )
+      )
+        bad.push("a session still locked after the restore is accepted")
+      if (!sessionProblem("locked", base("lock", "Default"), 3, restored)?.includes("not the run's session"))
+        bad.push("a read of another session is accepted")
+      return bad.length ? bad.join("; ") : undefined
+    },
+  },
+  {
+    finding: "SESSION disconnect-read",
+    async run() {
+      const sid = 2
+      const r = (c: unknown, helperSid: number): Json => ({
+        helperSid,
+        conditionMet: c === 4,
+        timeline: ["0ms connect=0 lock=unlock desktop=Default", "1800ms connect=4 lock=unlock desktop="],
+        during: { connectState: c },
+        duringEnd: { connectState: c },
+      })
+      const restored: Json = { connectState: 0, inputDesktop: "Default", lock: "unlock" }
+      const bad: string[] = []
+      for (const c of [4, 0, "error: WTSQuerySessionInformationW(session 2) failed"])
+        for (const h of [sid, 3])
+          for (const after of [restored, { connectState: 4, inputDesktop: "" }, undefined]) {
+            const p = sessionProblem("disconnected", r(c, h), sid, after)
+            const ok = c === 4 && h === sid && after === restored
+            if (ok ? p !== undefined : p === undefined)
+              bad.push(`connect=${c} sid=${h} after=${JSON.stringify(after)}: ${p ?? "accepted"}`)
+          }
+      const early = sessionProblem("disconnected", r(0, sid), sid, restored) ?? ""
+      if (!early.includes("states seen")) bad.push("a missed WTSDisconnected does not report the states it saw")
+      return bad.length ? bad.join("; ") : undefined
+    },
+  },
+  {
+    finding: "SESSION irreversible-skip",
+    async run() {
+      const ctx = testCtx()
+      const t: Target = { top: 1, edit: 2, state: undefined, title: "Notepad" }
+      const rows = await sessionLeg(ctx, t, "locked").catch((e: Error) => e)
+      if (rows instanceof Error) return `the lock leg ran without --allow-irreversible: ${rows.message}`
+      const bad = captureIds("locked").filter(
+        (id) => rows[id]?.verdict !== "UNMEASURED" || rows[id]?.skip !== CANNOT_RESTORE,
+      )
+      if (bad.length || ctx.spawned.length)
+        return `locked rows not skipped with the reason, or a process started: ${bad.join(",")}`
+      const row = (id: string, host: string, verdict: Verdict): LedgerRow =>
+        Object.fromEntries(
+          HEADER.map((h) => [h, h === "id" ? id : h === "host" ? host : h === "verdict" ? verdict : "x"]),
+        ) as LedgerRow
+      const v = verifyLine(
+        row("n-capture-wgc-monitor-locked", "h", "CONTRADICTS"),
+        rows["n-capture-wgc-monitor-locked"],
+        "h",
+      )
+      if (v.kind !== "SKIP" || !v.text.includes("cannot restore session"))
+        return `verify compares a row this pass cannot re-measure: ${v.text}`
+      if (verifyLine(row("a", "h", "CONFIRMS"), { measured: "m", verdict: "CONTRADICTS" }, "h").kind !== "DIFF")
+        return "verify misses a real difference"
+      if (verifyLine(row("a", "o", "CONFIRMS"), undefined, "h").kind !== "SKIP")
+        return "verify compares another host's row"
+      const self = source("probe-sp-n.ts")
+      const cap = self.slice(self.indexOf("const capture: Group = {"), self.indexOf("const GROUPS: readonly Group[]"))
+      return cap.lastIndexOf("sessionLeg(") === cap.indexOf('sessionLeg(ctx, t, "locked")')
+        ? undefined
+        : "the lock leg is not the last session leg"
+    },
+  },
+  {
+    finding: "CAPTURE display-off-new-edge",
+    async run() {
+      const r = (cls: string, during: number): Json => ({
+        printWindow: { class: cls },
+        wgcWindow: { class: cls },
+        wgcMonitor: { class: cls },
+        displayStateBefore: 1,
+        displayStateDuring: during,
+        displayStateAfterWake: 1,
+      })
+      const bad: string[] = []
+      const want: Array<[CaptureState, string, number, Verdict]> = [
+        ["display-off", "frame", 0, "NEW-EDGE"],
+        ["display-off", "null_frame", 0, "CONFIRMS"],
+        ["display-off", "black_frame", 0, "CONFIRMS"],
+        ["display-off", "frame", 1, "UNMEASURED"],
+        ["active", "frame", 1, "CONFIRMS"],
+        ["disconnected", "frame", 1, "CONTRADICTS"],
+        ["locked", "black_frame", 1, "CONFIRMS"],
+      ]
+      for (const [st, cls, d, v] of want) {
+        const got = captureResults(st, r(cls, d))
+        const wrong = Object.entries(got).filter(([, x]) => x.verdict !== v)
+        if (wrong.length) bad.push(`${st}/${cls}/display=${d}: ${wrong.map(([, x]) => x.verdict).join(",")}, want ${v}`)
+      }
+      return bad.length ? bad.join("; ") : undefined
+    },
+  },
+  {
+    finding: "NOTEPAD text-read (hosted run 43136347200)",
+    async run() {
+      const native = source("sp-n-native-input.ps1")
+      const decl = source("sp-n-native-win32.ps1")
+      const main = psCode(source("sp-n.ps1")).join("\n")
+      if (/GetTextOf/.test(native + main)) return "the old GetTextOf read is still used"
+      const textOf = native.slice(
+        native.indexOf("public static Hashtable TextOf("),
+        native.indexOf("public static Hashtable SessionLock("),
+      )
+      if (!/h == IntPtr\.Zero/.test(textOf) || !/IsWindow\(h\)/.test(textOf) || !/catch \(Exception e\)/.test(textOf))
+        return "TextOf does not turn a null, dead or failing handle into an error result"
+      if (
+        !/CharSet = CharSet\.Unicode\)\] public static extern IntPtr SendMessageTimeoutW\(IntPtr h, uint msg, IntPtr w, StringBuilder l/.test(
+          decl,
+        )
+      )
+        return "the StringBuilder SendMessageTimeoutW is not marshalled as Unicode"
+      const effect = main.slice(main.indexOf("function EffectText("), main.indexOf("function WheelCount("))
+      if (
+        !/TextOf/.test(effect) ||
+        !/ValuePattern/.test(effect) ||
+        !/TextPattern/.test(effect) ||
+        !/throw "edit text unreadable/.test(effect)
+      )
+        return "EffectText does not try WM_GETTEXT, then UI Automation, and fail with both reasons"
+      const self = source("probe-sp-n.ts")
+      return /for \(const child of \["RichEditD2DPT", "Edit"\]\)/.test(self)
+        ? undefined
+        : "Notepad is not looked up as RichEditD2DPT, then Edit"
+    },
+  },
+  {
+    finding: "BARRIER sent-count",
+    async run() {
+      const n = sentRuns([{ sent: 2 }, { sent: 0 }, { sent: true }, { sent: 1 }, {}])
+      if (n !== 2) return `sentRuns counts ${n}, want 2 (runs whose SendInput accepted events)`
+      return /count\(fg\.runs, "sent"\)/.test(source("probe-sp-n.ts"))
+        ? "a barrier row still counts sent as a flag"
+        : undefined
+    },
+  },
+  {
     finding: "LOW timing-flap",
     async run() {
       const cases: Array<[number, number, Verdict]> = [
@@ -1975,6 +2229,7 @@ const LOGIC_CHECKS: readonly Check[] = [
 ]
 
 const INVALID_NOTE = "probe defect (return-in-loop); INVALID until a hosted run with the positive control succeeds"
+const DISPLAY_OFF_NOTE = "design-adopted (re-pin item 12): capture proceeds; report session.displayAsleep:true"
 const SUSPECT_IDS = [
   "n-barrier-fg-proves-wpf",
   "n-barrier-fg-ms-wpf",
@@ -1984,34 +2239,66 @@ const SUSPECT_IDS = [
 ]
 const LEDGER_CHECKS: readonly Check[] = [
   {
+    finding: "HIGH wheel-rows-invalid",
+    async run() {
+      const rows = readLedger(join(HERE, "win32-delivery.tsv"))
+      const bad: string[] = []
+      for (const id of ["n-wheel-after-raise-dwmflush", "n-wheel-after-raise-5ms"]) {
+        const r = rows.find((x) => x.id === id && x.host === HOSTED)
+        if (!r) bad.push(`${id}: no ${HOSTED} row`)
+        else if (r.verdict === "INVALID") {
+          if (r.notes !== INVALID_NOTE) bad.push(`${id}: INVALID without the defect note`)
+        } else {
+          // a measured wheel verdict stands only on a control that delivered every wheel
+          const m = /control delivered (\d+)\/(\d+)/.exec(r.measured)
+          if (!m || m[1] !== m[2] || m[1] === "0")
+            bad.push(`${id}: ${r.verdict} without a full positive control (${r.measured.slice(0, 60)})`)
+          if (r.notes.startsWith("probe defect")) bad.push(`${id}: re-measured but still carries the defect note`)
+        }
+      }
+      return bad.length ? bad.join("; ") : undefined
+    },
+  },
+  {
     finding: "SUSPECT rows",
     async run() {
       const rows = readLedger(join(HERE, "win32-delivery.tsv"))
+      // run 43136347200 re-measured these rows with the fixed read path: the SUSPECT note is gone, the reading is real
       const bad = SUSPECT_IDS.filter((id) => {
         const r = rows.find((x) => x.id === id && x.host === HOSTED)
-        return !r || r.verdict !== "CONFIRMS" || !r.notes.startsWith("SUSPECT")
+        return !r || r.notes.startsWith("SUSPECT") || /leg failed/.test(r.measured)
       })
-      if (bad.length) return `not marked SUSPECT (verdict kept): ${bad.join(",")}`
+      if (bad.length) return `still SUSPECT or not re-measured: ${bad.join(",")}`
       return carriedNote("SUSPECT: x") === "-" ? undefined : "a SUSPECT note survives the re-measure that replaces it"
     },
   },
   {
-    finding: "HIGH wheel-rows-invalid",
+    finding: "LEDGER locked-rows",
     async run() {
-      const rows = readLedger(join(HERE, "win32-delivery.tsv"))
-      for (const id of ["n-wheel-after-raise-dwmflush", "n-wheel-after-raise-5ms"]) {
-        const r = rows.find((x) => x.id === id && x.host === HOSTED)
-        if (!r || r.verdict !== "INVALID" || r.notes !== INVALID_NOTE)
-          return `${id} on ${HOSTED}: want INVALID with "${INVALID_NOTE}", got ${r ? `${r.verdict} "${r.notes}"` : "no row"}`
-      }
-      const unsound = rows.filter(
-        (r) =>
-          r.id.startsWith("n-wheel-after-raise") &&
-          /CONFIRMS|CONTRADICTS/.test(r.verdict) &&
-          !r.measured.includes("control delivered"),
+      const rows = readLedger(join(HERE, "win32-delivery.tsv")).filter((r) => r.id.endsWith("-locked"))
+      const bad = rows.filter((r) =>
+        r.verdict === "INVALID"
+          ? !r.notes.startsWith("lock state unproven")
+          : /CONFIRMS|CONTRADICTS|NEW-EDGE/.test(r.verdict) && !/lock=unlock->lock->lock/.test(r.measured),
       )
-      return unsound.length
-        ? `wheel verdict without a positive control: ${unsound.map((r) => r.id).join(",")}`
+      return bad.length
+        ? `locked rows without a positive lock read or an INVALID note: ${bad.map((r) => `${r.id}@${r.host}`).join(",")}`
+        : undefined
+    },
+  },
+  {
+    finding: "LEDGER display-off",
+    async run() {
+      const rows = readLedger(join(HERE, "win32-delivery.tsv")).filter(
+        (r) => r.id.endsWith("-display-off") && r.host === HOSTED,
+      )
+      const bad = rows.filter(
+        (r) =>
+          (r.verdict === "CONTRADICTS" && /class=frame/.test(r.measured)) ||
+          (r.verdict === "NEW-EDGE" && r.notes !== DISPLAY_OFF_NOTE),
+      )
+      return bad.length
+        ? `display-off rows not classified as the design adopted: ${bad.map((r) => r.id).join(",")}`
         : undefined
     },
   },
@@ -2083,6 +2370,8 @@ async function main() {
     token: { aborted: false },
     cleanups: [],
     pending: new Map(),
+    allowIrreversible: opt.allowIrreversible,
+    session: {},
   }
   mkdirSync(ctx.tmp, { recursive: true })
   await freshDir(ctx.shared, (p) => lockDownWindows(ctx, p)).catch((e: Error) =>
@@ -2146,12 +2435,9 @@ async function main() {
       }
       let diff = 0
       for (const l of ledger.filter((r) => want.has(r.id))) {
-        const m = results[l.id]
-        if (l.host !== host) console.log(`SKIP ${l.id} host=${l.host}`)
-        else if (!m || m.verdict !== l.verdict) {
-          diff++
-          console.log(`DIFF ${l.id} ledger=${l.verdict} now=${m?.verdict ?? "missing"} ${clean(m?.measured ?? "")}`)
-        } else console.log(`SAME ${l.id} ${m.verdict} ${clean(m.measured)}`)
+        const v = verifyLine(l, results[l.id], host)
+        if (v.kind === "DIFF") diff++
+        console.log(v.text)
       }
       console.log(`SP-N verify on ${host} (${build}): ${Object.keys(results).length} measured, ${diff} differing`)
       return diff === 0 ? 0 : 1

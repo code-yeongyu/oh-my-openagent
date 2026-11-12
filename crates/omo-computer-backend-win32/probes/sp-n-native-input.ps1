@@ -87,12 +87,46 @@ public static partial class SpN {
     return g.hwndFocus;
   }
 
-  public static string GetTextOf(IntPtr h) {
-    IntPtr len;
-    if (SendMessageTimeoutW(h, WM_GETTEXTLENGTH, IntPtr.Zero, IntPtr.Zero, SMTO_ABORTIFHUNG, 1500, out len) == IntPtr.Zero) return null;
-    var b = new StringBuilder(len.ToInt32() + 2); IntPtr r;
-    if (SendMessageTimeoutW(h, WM_GETTEXT, (IntPtr)(len.ToInt32() + 1), b, SMTO_ABORTIFHUNG, 1500, out r) == IntPtr.Zero) return null;
-    return b.ToString();
+  // The text of an edit control by WM_GETTEXT: @{ ok; text } or @{ ok = false; error } naming the handle and class,
+  // never an exception (Windows Server 2025 Notepad gave a NullReferenceException through the old read).
+  public static Hashtable TextOf(IntPtr h) {
+    var r = H(); r["ok"] = false; r["hwnd"] = h.ToInt64();
+    if (h == IntPtr.Zero) { r["error"] = "no edit handle (0)"; return r; }
+    if (!IsWindow(h)) { r["error"] = "edit handle " + h.ToInt64() + " is not a window"; return r; }
+    r["cls"] = Cls(h);
+    try {
+      IntPtr len;
+      if (SendMessageTimeoutW(h, WM_GETTEXTLENGTH, IntPtr.Zero, IntPtr.Zero, SMTO_ABORTIFHUNG, 1500, out len) == IntPtr.Zero) {
+        r["error"] = "WM_GETTEXTLENGTH failed or timed out on " + r["cls"] + ": " + new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error()).Message; return r;
+      }
+      var b = new StringBuilder(len.ToInt32() + 2); IntPtr got;
+      if (SendMessageTimeoutW(h, WM_GETTEXT, (IntPtr)(len.ToInt32() + 1), b, SMTO_ABORTIFHUNG, 1500, out got) == IntPtr.Zero) {
+        r["error"] = "WM_GETTEXT failed or timed out on " + r["cls"] + ": " + new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error()).Message; return r;
+      }
+      r["ok"] = true; r["text"] = b.ToString();
+    } catch (Exception e) { r["error"] = e.GetType().Name + " reading " + r["cls"] + ": " + e.Message; }
+    return r;
+  }
+
+  // The lock state of a session from WTSINFOEXW (WTSSessionInfoEx): "lock" (WTS_SESSIONSTATE_LOCK = 0), "unlock"
+  // (1) or "unknown", with the session id and state read beside it; a failed read is @{ error }, never a guess.
+  public static Hashtable SessionLock(uint sid) {
+    var h = H(); IntPtr buf; uint n;
+    if (!WTSQuerySessionInformationW(IntPtr.Zero, sid, 25, out buf, out n)) {
+      h["error"] = "WTSQuerySessionInformationW(WTSSessionInfoEx) failed: " + new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error()).Message;
+      return h;
+    }
+    try {
+      int level = Marshal.ReadInt32(buf, 0);
+      if (level != 1) { h["error"] = "WTSINFOEXW level " + level + ", not 1"; return h; }
+      // WTSINFOEX_LEVEL1_W starts at offset 8 (8-byte aligned union): SessionId, SessionState, SessionFlags
+      h["sessionId"] = Marshal.ReadInt32(buf, 8);
+      h["sessionState"] = Marshal.ReadInt32(buf, 12);
+      int flags = Marshal.ReadInt32(buf, 16);
+      h["raw"] = flags;
+      h["flags"] = flags == 0 ? "lock" : flags == 1 ? "unlock" : "unknown";
+    } finally { WTSFreeMemory(buf); }
+    return h;
   }
 
   // ---------------------------------------------------------------- input
