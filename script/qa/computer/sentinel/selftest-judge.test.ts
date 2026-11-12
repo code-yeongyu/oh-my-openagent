@@ -98,9 +98,9 @@ describe("latency-pinned negative windows", () => {
 
   test("a window below 1.5 times a recorded p99 is refused, naming the action", () => {
     const record = { host: "qa", os: "macos", trials: 10, p99Ms: { raise: 400, "dropped keystroke": 1_200 } }
-    expect(admitWindow(2_000, record)).toEqual({
+    expect(admitWindow(1_700, record)).toEqual({
       ok: false,
-      reason: "window 2000 ms is below 1.5 x p99 1200 ms of dropped keystroke on qa",
+      reason: "window 1700 ms is below 1.5 x p99 1200 ms of dropped keystroke on qa",
     })
     expect(admitWindow(1_800, { ...record, p99Ms: { raise: 400 } })).toEqual({ ok: true })
   })

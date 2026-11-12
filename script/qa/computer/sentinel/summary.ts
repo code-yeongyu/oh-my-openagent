@@ -35,7 +35,7 @@ const isDialog = (window: { readonly role: string; readonly subrole: string; rea
   (window.layer >= MODAL_PANEL_LAYER && window.layer < MAIN_MENU_LAYER)
 
 // Only windows present in both reads are compared, so a window that opens or closes is not a raise.
-function relativeOrderChanged(before: readonly string[], after: readonly string[]): boolean {
+export function relativeOrderChanged(before: readonly string[], after: readonly string[]): boolean {
   const common = new Set(before.filter((id) => after.includes(id)))
   const a = before.filter((id) => common.has(id))
   const b = after.filter((id) => common.has(id))
