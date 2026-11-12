@@ -81,6 +81,16 @@ async function runCliLocal(
   return { exitCode, stdout, stderr }
 }
 
+// A failing install must be reported by the installer's own line ("missing required runtime artifacts: ..."), which a
+// later settings.json read would hide behind ENOENT.
+function assertCliResult(result: { exitCode: number; stdout: string; stderr: string }, action: string): void {
+  if (result.exitCode !== 0 || !result.stdout.trim().startsWith("{")) {
+    throw new Error(
+      `${action} failed with exit ${result.exitCode}\nstdout: ${result.stdout.trim()}\nstderr: ${result.stderr.trim()}`,
+    )
+  }
+}
+
 afterEach(async () => {
   await sandbox.dispose()
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
@@ -94,24 +104,26 @@ describe("cli-local", () => {
 
     // when
     const install = await runCliLocal("install", agentDir, pluginPath)
-    const installedSettings = JSON.parse(await readFile(join(agentDir, "settings.json"), "utf8")) as {
-      packages?: string[]
-    }
-    const uninstall = await runCliLocal("uninstall", agentDir, pluginPath)
-    const uninstalledSettings = JSON.parse(await readFile(join(agentDir, "settings.json"), "utf8")) as {
-      packages?: string[]
-    }
 
-    // then
-    expect(install.exitCode).toBe(0)
+    // then: the installer's own result first, so a refusal is reported by its line, not by a later ENOENT
+    assertCliResult(install, "install")
     const installResult = JSON.parse(install.stdout) as { readonly pluginPath: string; readonly launcherPath?: string }
     expect(installResult).toMatchObject({ ok: true, action: "install" })
     expect(install.stdout.trim().split("\n")).toHaveLength(1)
+
+    const installedSettings = JSON.parse(await readFile(join(agentDir, "settings.json"), "utf8")) as {
+      packages?: string[]
+    }
     expect(installedSettings.packages).toEqual([installResult.pluginPath])
     expect(installResult.launcherPath).toBe(join(agentDir, "home", ".local", "bin", "omo"))
-    expect(uninstall.exitCode).toBe(0)
+
+    const uninstall = await runCliLocal("uninstall", agentDir, pluginPath)
+    assertCliResult(uninstall, "uninstall")
     expect(JSON.parse(uninstall.stdout)).toMatchObject({ ok: true, action: "uninstall" })
     expect(uninstall.stdout.trim().split("\n")).toHaveLength(1)
+    const uninstalledSettings = JSON.parse(await readFile(join(agentDir, "settings.json"), "utf8")) as {
+      packages?: string[]
+    }
     expect(uninstalledSettings.packages).toEqual([])
     await expect(readFile(join(agentDir, "home", ".local", "bin", "omo"), "utf8")).rejects.toThrow()
     expect(install.stderr).toBe("")
