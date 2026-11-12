@@ -29,6 +29,7 @@ export class Engine {
   private readonly proc: Subprocess<"pipe", "pipe", "pipe">
   private readonly pending = new Map<number, (message: JsonObject) => void>()
   private readonly pumped: Promise<void>
+  private readonly stderrDrained: Promise<void>
   private stderr = ""
   private heartbeat: ReturnType<typeof setInterval> | undefined
   private next = 1
@@ -41,7 +42,7 @@ export class Engine {
       stdout: "pipe",
       stderr: "pipe",
     })
-    void this.drainStderr()
+    this.stderrDrained = this.drainStderr()
     this.pumped = this.pump()
   }
 
@@ -72,6 +73,12 @@ export class Engine {
     }
   }
 
+  /** Exit plus the end of stderr: the exit can resolve before the last stderr chunk is read. */
+  private async whenDead(): Promise<void> {
+    await this.proc.exited
+    await this.stderrDrained
+  }
+
   private died(method: string): EngineDied {
     return new EngineDied(`the engine died before ${method}: ${this.stderr.trim() || "no stderr"}`)
   }
@@ -83,9 +90,8 @@ export class Engine {
       setTimeout(() => {
         if (this.pending.delete(id)) fail(new Error(`${method} did not answer within ${CALL_TIMEOUT_MS} ms`))
       }, CALL_TIMEOUT_MS)
-      void this.proc.exited.then((code) => {
+      void this.whenDead().then(() => {
         if (this.pending.delete(id)) fail(this.died(method))
-        void code
       })
     })
     try {
@@ -93,6 +99,7 @@ export class Engine {
       this.proc.stdin.flush()
     } catch {
       this.pending.delete(id)
+      await this.whenDead()
       throw this.died(method)
     }
     const message = await settled
