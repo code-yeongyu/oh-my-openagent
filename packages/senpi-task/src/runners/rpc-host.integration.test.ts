@@ -96,10 +96,13 @@ describe("two parents on one daemon", () => {
     const parkedPaths = new Set(a.sessionPaths())
 
     // when
-    const summary = await a.lifecycle.suspendOnSessionShutdown({
-      parentSessionId: "parent-a",
-      reason: "session_shutdown",
-    })
+    const summary = await awaitWithinTestBudget(
+      a.lifecycle.suspendOnSessionShutdown({
+        parentSessionId: "parent-a",
+        reason: "session_shutdown",
+      }),
+      "parent A's 16 children parking on session shutdown",
+    )
     // The daemon's own view settles when the 16 detached connections are gone - parent B keeps 16.
     await awaitWithinTestBudget(world.host.waitForConnections(16), "parent B's 16 connections after parent A parked")
 
@@ -120,13 +123,19 @@ describe("two parents on one daemon", () => {
   test("#given a parent that parked its 16 children #when it starts a new session #then all 16 reattach without replaying a prompt", async () => {
     // given
     const { world, a } = await twoParents()
-    await a.lifecycle.suspendOnSessionShutdown({ parentSessionId: "parent-a", reason: "session_shutdown" })
+    await awaitWithinTestBudget(
+      a.lifecycle.suspendOnSessionShutdown({ parentSessionId: "parent-a", reason: "session_shutdown" }),
+      "parent A's 16 children parking on session shutdown",
+    )
     await awaitWithinTestBudget(world.host.waitForConnections(16), "parent B's 16 connections after parent A parked")
     const paths = a.sessionPaths()
 
     // when
     const restarted = world.connect("parent-a")
-    const result = await restarted.lifecycle.reconcileOnSessionStart("parent-a")
+    const result = await awaitWithinTestBudget(
+      restarted.lifecycle.reconcileOnSessionStart("parent-a"),
+      "parent A's reattach on its new session",
+    )
 
     // then
     expect(of(result.outcomes, "resumed")).toHaveLength(16)
@@ -168,12 +177,22 @@ describe("two parents on one daemon", () => {
     expect(distinct(down.map((record) => record.status))).toEqual(["running"])
 
     // when - a new generation answers on the same socket and both parents start a session
-    await world.host.restart()
+    await awaitWithinTestBudget(world.host.restart(), "the daemon's new generation accepting on the same socket")
     const a2 = world.connect("parent-a")
     const b2 = world.connect("parent-b")
     const outcomes = [
-      ...(await a2.lifecycle.reconcileOnSessionStart("parent-a")).outcomes,
-      ...(await b2.lifecycle.reconcileOnSessionStart("parent-b")).outcomes,
+      ...(
+        await awaitWithinTestBudget(
+          a2.lifecycle.reconcileOnSessionStart("parent-a"),
+          "parent A's reattach on the new generation",
+        )
+      ).outcomes,
+      ...(
+        await awaitWithinTestBudget(
+          b2.lifecycle.reconcileOnSessionStart("parent-b"),
+          "parent B's reattach on the new generation",
+        )
+      ).outcomes,
     ]
 
     // then
@@ -196,10 +215,16 @@ describe("two parents on one daemon", () => {
 
     // when - a newer generation takes the socket and the old one drains
     world.host.handoff()
-    await b.lifecycle.suspendOnSessionShutdown({ parentSessionId: "parent-b", reason: "host_handoff" })
+    await awaitWithinTestBudget(
+      b.lifecycle.suspendOnSessionShutdown({ parentSessionId: "parent-b", reason: "host_handoff" }),
+      "parent B's children parking on host handoff",
+    )
     await awaitWithinTestBudget(world.host.waitForConnections(0), "the drained generation's connections closing")
     const b2 = world.connect("parent-b", { maxDrainAttempts: 2 })
-    const draining = await b2.lifecycle.reconcileOnSessionStart("parent-b")
+    const draining = await awaitWithinTestBudget(
+      b2.lifecycle.reconcileOnSessionStart("parent-b"),
+      "parent B's reconcile against the draining host",
+    )
 
     // then
     expect(world.host.instanceId).not.toBe(beforeHandoff)
