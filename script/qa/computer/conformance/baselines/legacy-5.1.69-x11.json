@@ -12,7 +12,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 201.8276649999998,
+      "durationMs": 361.09448699999996,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -67,7 +67,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 134.71867399999974,
+      "durationMs": 286.06139699999994,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -120,7 +120,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 175.1810259999993,
+      "durationMs": 304.50802399999975,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -175,7 +175,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 142.48905000000013,
+      "durationMs": 302.1439480000008,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -230,7 +230,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 131.7983639999984,
+      "durationMs": 281.17130499999985,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -285,7 +285,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 136.89936099999977,
+      "durationMs": 278.3074239999987,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -338,7 +338,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 169.78139200000078,
+      "durationMs": 320.7171240000025,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -393,7 +393,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 146.43117299999722,
+      "durationMs": 282.45901700000104,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -446,7 +446,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 144.92223999999987,
+      "durationMs": 283.6695770000006,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -501,7 +501,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 143.80706999999893,
+      "durationMs": 276.35235300000204,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -554,7 +554,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 143.54838700000255,
+      "durationMs": 281.9670899999983,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -609,7 +609,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 141.26781199999823,
+      "durationMs": 295.7011419999981,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -662,7 +662,7 @@
       "oracle": {
         "observed": "a,b,c"
       },
-      "durationMs": 284.11517599999934,
+      "durationMs": 565.798136999998,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -717,7 +717,7 @@
       "oracle": {
         "observed": "a,b,c"
       },
-      "durationMs": 272.10640400000557,
+      "durationMs": 571.0128899999982,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -765,14 +765,12 @@
     {
       "id": "x11/xorg/native/keyChord/ax/background",
       "observed": {
-        "kind": "refused",
-        "code": "AxFailed",
-        "nothingSent": false
+        "kind": "delivered"
       },
       "oracle": {
         "observed": ""
       },
-      "durationMs": 131.3240580000056,
+      "durationMs": 276.2301710000029,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -821,13 +819,13 @@
       "id": "x11/xorg/native/keyChord/ax/foreground",
       "observed": {
         "kind": "refused",
-        "code": "AxFailed",
+        "code": "ControlRequired",
         "nothingSent": false
       },
       "oracle": {
         "observed": ""
       },
-      "durationMs": 131.78067400000145,
+      "durationMs": 274.3991229999956,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -875,14 +873,12 @@
     {
       "id": "x11/xorg/native/ax.setValue/ax/background",
       "observed": {
-        "kind": "refused",
-        "code": "AxFailed",
-        "nothingSent": false
+        "kind": "delivered"
       },
       "oracle": {
-        "observed": ""
+        "observed": "conformance"
       },
-      "durationMs": 132.68100799999957,
+      "durationMs": 283.93867400000454,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -930,14 +926,12 @@
     {
       "id": "x11/xorg/native/ax.setValue/ax/foreground",
       "observed": {
-        "kind": "refused",
-        "code": "AxFailed",
-        "nothingSent": false
+        "kind": "delivered"
       },
       "oracle": {
-        "observed": ""
+        "observed": "conformance"
       },
-      "durationMs": 134.8190839999952,
+      "durationMs": 273.0737380000064,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -990,7 +984,7 @@
       "oracle": {
         "observed": 1
       },
-      "durationMs": 129.98464100000274,
+      "durationMs": 279.7356579999978,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1043,7 +1037,7 @@
       "oracle": {
         "observed": 1
       },
-      "durationMs": 130.40065600000526,
+      "durationMs": 271.37458999999944,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1096,7 +1090,7 @@
       "oracle": {
         "observed": "Conformance"
       },
-      "durationMs": 155.9294790000058,
+      "durationMs": 318.786211000006,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1151,7 +1145,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 129.118389999996,
+      "durationMs": 268.7226290000035,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1206,7 +1200,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 4.155883999999787,
+      "durationMs": 5.151660999996238,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1261,7 +1255,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 3.5570730000035837,
+      "durationMs": 4.798538000002736,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1316,7 +1310,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 6.6448119999986375,
+      "durationMs": 4.880730999997468,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1371,7 +1365,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 4.439785000009579,
+      "durationMs": 5.364814000000479,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1426,7 +1420,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 4.291947999998229,
+      "durationMs": 4.874565999998595,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1481,7 +1475,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 3.959017999994103,
+      "durationMs": 5.236711999998079,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1536,7 +1530,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 4.1345020000007935,
+      "durationMs": 5.339957999996841,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1591,7 +1585,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 5.47743499999342,
+      "durationMs": 6.824548999997205,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1646,7 +1640,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 4.248066000000108,
+      "durationMs": 5.404042000009213,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1701,7 +1695,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 4.4472139999998035,
+      "durationMs": 5.099463999998989,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1756,7 +1750,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 4.445016999990912,
+      "durationMs": 4.781543999997666,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1811,7 +1805,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 5.104268000010052,
+      "durationMs": 5.09332899999572,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1866,7 +1860,7 @@
       "oracle": {
         "observed": "a,b,c"
       },
-      "durationMs": 4.539579999996931,
+      "durationMs": 6.7608259999979055,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1921,7 +1915,7 @@
       "oracle": {
         "observed": "a,b,c"
       },
-      "durationMs": 4.263462000002619,
+      "durationMs": 7.270003999990877,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1976,7 +1970,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 4.067402000000584,
+      "durationMs": 4.968101999998908,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -2031,7 +2025,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 3.765522999994573,
+      "durationMs": 5.027653999990434,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -2086,7 +2080,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 5.696639000001596,
+      "durationMs": 7.325368999998318,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -2141,7 +2135,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 4.158634000006714,
+      "durationMs": 6.438213000001269,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -2196,7 +2190,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 4.371194000006653,
+      "durationMs": 4.513126000005286,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -2251,7 +2245,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 4.011937000002945,
+      "durationMs": 5.768706000002567,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -2306,7 +2300,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 4.343494999993709,
+      "durationMs": 5.803809000004549,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -2361,7 +2355,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 4.343210999999428,
+      "durationMs": 5.438542000003508,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -2415,7 +2409,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 32.18956200001412,
+      "durationMs": 59.11317399999825,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -2469,7 +2463,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 48.228739999991376,
+      "durationMs": 92.78173800001969,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -2523,7 +2517,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 47.1235100000049,
+      "durationMs": 77.14961399999447,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -2577,7 +2571,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 48.24022700000205,
+      "durationMs": 81.49718400000711,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -2631,7 +2625,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 42.42204700000002,
+      "durationMs": 94.87943000000087,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -2685,7 +2679,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 47.08669200001168,
+      "durationMs": 84.05061199999182,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -2739,7 +2733,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 45.78744099999312,
+      "durationMs": 93.93321699998342,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -2793,7 +2787,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 47.27675399999134,
+      "durationMs": 104.53385700000217,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -2847,7 +2841,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 43.21432900000946,
+      "durationMs": 85.72546399998828,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -2901,7 +2895,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 49.088071000005584,
+      "durationMs": 92.82862099999329,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -2955,7 +2949,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 49.59407300001476,
+      "durationMs": 97.31651499998407,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -3009,7 +3003,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 48.2870240000193,
+      "durationMs": 94.61938699998427,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -3063,7 +3057,7 @@
       "oracle": {
         "observed": "a,b,c"
       },
-      "durationMs": 47.30046700002276,
+      "durationMs": 91.34614300000248,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -3117,7 +3111,7 @@
       "oracle": {
         "observed": "a,b,c"
       },
-      "durationMs": 43.406852000014624,
+      "durationMs": 82.20342399997753,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -3171,7 +3165,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 48.2873059999838,
+      "durationMs": 91.50264200000674,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -3225,7 +3219,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 48.898119999998016,
+      "durationMs": 98.05180700001074,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -3279,7 +3273,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 40.28630800000974,
+      "durationMs": 90.08812100000796,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -3333,7 +3327,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 41.079420000023674,
+      "durationMs": 82.44395200000145,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -3387,7 +3381,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 45.70377400002326,
+      "durationMs": 94.37275099998806,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -3441,7 +3435,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 41.8848359999829,
+      "durationMs": 80.99822999999742,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -3495,7 +3489,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 45.95000199999777,
+      "durationMs": 91.95042800001102,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -3549,7 +3543,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 48.74428000001353,
+      "durationMs": 89.5648050000018,
       "journal": {
         "key_focus": {
           "signal": "not_observed",

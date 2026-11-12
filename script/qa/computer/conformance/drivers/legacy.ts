@@ -130,13 +130,26 @@ const notRun = (cell: Cell, reason: string): CellResult => ({
 const SETTLE_MS = 3_000
 const SETTLE_STEP_MS = 100
 
+// On Windows the fixture may hold its report file open while it rewrites it, and a read then fails with EBUSY; that
+// read is retried within the same budget, and any other error, or a busy file at the deadline, still throws.
+const BUSY = Symbol("busy")
+
 async function settled(read: () => Promise<unknown>, expected: unknown, budgetMs: number): Promise<unknown> {
   const deadline = performance.now() + budgetMs
-  let value = await read()
-  while (value !== expected && performance.now() < deadline) {
-    await Bun.sleep(SETTLE_STEP_MS)
-    value = await read()
+  const attempt = async (): Promise<unknown> => {
+    try {
+      return await read()
+    } catch (error) {
+      if (isRecord(error) && error.code === "EBUSY" && performance.now() < deadline) return BUSY
+      throw error
+    }
   }
+  let value = await attempt()
+  while ((value === BUSY || value !== expected) && performance.now() < deadline) {
+    await Bun.sleep(SETTLE_STEP_MS)
+    value = await attempt()
+  }
+  if (value === BUSY) return await read()
   return value
 }
 

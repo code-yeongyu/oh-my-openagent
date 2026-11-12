@@ -7,7 +7,7 @@ import { catalogFor } from "../catalog.ts"
 import { buildReport } from "../report.ts"
 import { isDriver } from "../driver.ts"
 import type { Cell } from "../vocabulary.ts"
-import { createLegacyDriver, driver, readOutcome } from "./legacy.ts"
+import { createLegacyDriver, driver, type Fixtures, readOutcome } from "./legacy.ts"
 import { fakeTool, fixtures, type HitTest, type Listing, observer, type Sent, TARGET } from "./legacy-facade.ts"
 
 const cells = catalogFor("x11", "xorg")
@@ -131,6 +131,34 @@ describe("legacy driver against the shipped run facade", () => {
     } finally {
       console.log = log
     }
+  })
+
+  test("a fixture report that is briefly busy is read again, and any other read error still fails the cell", async () => {
+    const [cell] = cells
+    if (cell === undefined) throw new Error("empty catalog")
+    const flaky = (error: Error): Fixtures => {
+      let calls = 0
+      return {
+        ...fixtures(1),
+        read: async () => {
+          calls += 1
+          if (calls === 1) throw error
+          return 1
+        },
+      }
+    }
+    const run = (ready: Fixtures) =>
+      createLegacyDriver({
+        session,
+        settleMs: 1_000,
+        tool: { ready: fakeTool([]) },
+        fixtures: { ready },
+        observer: { ready: observer },
+      }).runCell(cell)
+    const busy = Object.assign(new Error("resource busy or locked"), { code: "EBUSY" })
+    expect((await run(flaky(busy))).oracle.observed).toBe(1)
+    const denied = Object.assign(new Error("permission denied"), { code: "EACCES" })
+    await expect(run(flaky(denied))).rejects.toThrow("permission denied")
   })
 
   test("an engine refusal is recorded with its code and without a nothingSent claim", async () => {

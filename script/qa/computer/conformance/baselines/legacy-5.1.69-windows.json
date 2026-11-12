@@ -12,7 +12,7 @@
       "oracle": {
         "observed": 1
       },
-      "durationMs": 2921.9564,
+      "durationMs": 912.4856,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -67,7 +67,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 822.1345999999999,
+      "durationMs": 845.1564000000003,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -120,7 +120,7 @@
       "oracle": {
         "observed": 1
       },
-      "durationMs": 871.3473999999997,
+      "durationMs": 905.0590000000002,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -175,7 +175,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 865.5504999999994,
+      "durationMs": 922.2463000000007,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -230,7 +230,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 809.5501000000004,
+      "durationMs": 835.6863000000012,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -285,7 +285,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 814.9748,
+      "durationMs": 830.1796999999988,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -336,9 +336,9 @@
         "kind": "delivered"
       },
       "oracle": {
-        "observed": ""
+        "observed": "conformance"
       },
-      "durationMs": 857.2799000000014,
+      "durationMs": 910.0424000000021,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -393,7 +393,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 838.4059000000016,
+      "durationMs": 909.0666999999994,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -446,7 +446,7 @@
       "oracle": {
         "observed": 3
       },
-      "durationMs": 867.7080999999998,
+      "durationMs": 890.5031000000017,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -501,7 +501,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 836.3822999999975,
+      "durationMs": 920.4407999999967,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -554,7 +554,7 @@
       "oracle": {
         "observed": 3
       },
-      "durationMs": 823.3882000000012,
+      "durationMs": 921.3238999999994,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -609,7 +609,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 952.2286999999997,
+      "durationMs": 895.0859999999993,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -664,7 +664,7 @@
       "oracle": {
         "observed": "a,b,c"
       },
-      "durationMs": 1787.4847000000009,
+      "durationMs": 1731.2986999999994,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -719,7 +719,7 @@
       "oracle": {
         "observed": "a,b,c"
       },
-      "durationMs": 1718.4743999999992,
+      "durationMs": 1727.9545999999973,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -772,7 +772,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 954.8191000000006,
+      "durationMs": 804.6470000000045,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -827,7 +827,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 824.6020999999964,
+      "durationMs": 801.1604000000007,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -875,14 +875,12 @@
     {
       "id": "windows/console/native/ax.setValue/ax/background",
       "observed": {
-        "kind": "refused",
-        "code": "AxFailed",
-        "nothingSent": false
+        "kind": "delivered"
       },
       "oracle": {
-        "observed": ""
+        "observed": "conformance"
       },
-      "durationMs": 901.3121000000028,
+      "durationMs": 810.8452999999936,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -930,14 +928,12 @@
     {
       "id": "windows/console/native/ax.setValue/ax/foreground",
       "observed": {
-        "kind": "refused",
-        "code": "AxFailed",
-        "nothingSent": false
+        "kind": "delivered"
       },
       "oracle": {
-        "observed": ""
+        "observed": "conformance"
       },
-      "durationMs": 844.2165000000023,
+      "durationMs": 807.6388999999981,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -990,7 +986,7 @@
       "oracle": {
         "observed": 1
       },
-      "durationMs": 1375.7828999999983,
+      "durationMs": 808.8559999999998,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1043,7 +1039,7 @@
       "oracle": {
         "observed": 1
       },
-      "durationMs": 886.1346999999951,
+      "durationMs": 837.7356,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1096,7 +1092,7 @@
       "oracle": {
         "observed": "Conformance"
       },
-      "durationMs": 1513.5801999999967,
+      "durationMs": 1097.1345999999976,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1151,7 +1147,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 893.7312999999995,
+      "durationMs": 797.2232000000004,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1200,12 +1196,12 @@
       "id": "windows/console/electron/click/ax/background",
       "observed": {
         "kind": "error",
-        "message": "fixture element \"Press\" not found; the window exposes [\"window:Conformance Document\",\"group:\",\"group:Conformance Document\",\"group:\",\"group:\",\"group:\",\"group:\",\"menubar:\",\"button:File\",\"button:Edit\",\"button:Priority\",\"button:Test\",\"group:\",\"group:\",\"textarea:\",\"group:\",\"group:Chrome Legacy Window\",\"textarea:\",\"group:\"]"
+        "message": "fixture element \"Press\" not found; the window exposes [\"window:Conformance Document\",\"group:\",\"group:Conformance Document\",\"group:\",\"group:\",\"group:\",\"group:\",\"menubar:\",\"button:File\",\"button:Edit\",\"button:Priority\",\"button:Test\",\"group:\",\"group:\",\"textarea:\",\"group:\",\"group:Chrome Legacy Window\",\"textarea:Conformance Document\",\"button:Press\",\"group:\",\"statictext:Value\",\"textfield:Value\",\"group:\",\"statictext:Title\",\"textfield:Title\",\"group:\",\"statictext:Name\",\"textfield:Name\",\"group:\",\"statictext:Email\",\"textfield:Email\",\"group:\",\"statictext:City\",\"textfield:City\",\"group:\",\"checkbox:Archived\",\"statictext:Archived\",\"group:\",\"statictext:Note\",\"textfield:Note\"]"
       },
       "oracle": {
         "observed": 0
       },
-      "durationMs": 1427.4879999999976,
+      "durationMs": 504.8911999999982,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1259,7 +1255,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 492.0182000000059,
+      "durationMs": 477.33340000000317,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1313,7 +1309,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 497.5311999999976,
+      "durationMs": 457.04669999999896,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1367,7 +1363,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 505.9689000000071,
+      "durationMs": 463.61119999999937,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1421,7 +1417,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 498.25969999999506,
+      "durationMs": 449.4835000000021,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1475,7 +1471,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 487.0048999999999,
+      "durationMs": 484.42399999999907,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1529,7 +1525,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 435.229800000001,
+      "durationMs": 475.8258999999962,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1583,7 +1579,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 426.27140000001236,
+      "durationMs": 462.5133999999962,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1637,7 +1633,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 429.0475999999908,
+      "durationMs": 447.30079999999725,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1691,7 +1687,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 426.0301000000036,
+      "durationMs": 462.6960000000108,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1745,7 +1741,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 437.2416999999987,
+      "durationMs": 460.2540000000008,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1799,7 +1795,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 435.0194999999949,
+      "durationMs": 496.5506000000023,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1853,7 +1849,7 @@
       "oracle": {
         "observed": "a,b,c"
       },
-      "durationMs": 449.0720000000001,
+      "durationMs": 464.167300000001,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1907,7 +1903,7 @@
       "oracle": {
         "observed": "a,b,c"
       },
-      "durationMs": 476.24490000000515,
+      "durationMs": 468.63300000000163,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -1961,7 +1957,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 436.41530000000785,
+      "durationMs": 461.3911999999982,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -2015,7 +2011,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 553.1727999999857,
+      "durationMs": 439.89400000000023,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -2069,7 +2065,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 431.7595000000001,
+      "durationMs": 440.85100000000966,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -2123,7 +2119,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 441.6692000000039,
+      "durationMs": 461.0384999999951,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -2177,7 +2173,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 448.9614999999758,
+      "durationMs": 464.482600000003,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -2231,7 +2227,7 @@
       "oracle": {
         "observed": 0
       },
-      "durationMs": 434.1536999999953,
+      "durationMs": 470.08170000000973,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -2285,7 +2281,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 431.77739999999176,
+      "durationMs": 481.55079999999725,
       "journal": {
         "key_focus": {
           "signal": "not_observed",
@@ -2339,7 +2335,7 @@
       "oracle": {
         "observed": ""
       },
-      "durationMs": 419.53840000001946,
+      "durationMs": 456.25100000000384,
       "journal": {
         "key_focus": {
           "signal": "not_observed",

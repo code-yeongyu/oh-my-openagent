@@ -32,13 +32,14 @@ On both runners the released tool reached its own engine with no model and no cr
 
 ## Cells and tasks
 
-Measured on the hosted runners at branch head `0d26faac3b`, release 5.1.69. Per-cell records: `legacy-5.1.69-x11.json`, `legacy-5.1.69-windows.json`.
+Measured on the hosted runners at branch head `dff46ef3e3`, release 5.1.69. Per-cell records: `legacy-5.1.69-x11.json`, `legacy-5.1.69-windows.json`.
 
 | | x11 (Xorg, GTK fixture) | windows (WinForms fixture) |
 | --- | --- | --- |
 | cells | 66 | 66 |
-| met their declared outcome | 3 | 7 |
-| refused by the release | 35 | 13 |
+| met their declared outcome | 5 | 10 |
+| reported delivered | 12 | 11 |
+| refused by the release | 32 | 11 |
 | the release answered an error | 22 | 22 |
 | no fixture app | 0 | 22 (no web-view app on Windows) |
 | disturbed | not measured (no recorder) | not measured (no recorder) |
@@ -49,52 +50,39 @@ Task set, replayed with no model: windows 1 of 12 (choosing a menu item by title
 
 ### What works in the background, verified by the fixture's own state
 
-- **Windows, native:** a click (by accessibility and by pixel), a scroll (both), an accessibility press, and selecting a menu item by title. The fixture recorded the press, the scroll distance and the menu choice.
-- **x11, native:** an accessibility press and selecting a menu item by title.
+- **Windows, native:** a click (by accessibility and by pixel), typing by pixel, a scroll (both), the accessibility value write, an accessibility press, and selecting a menu item by title.
+- **x11, native:** the accessibility value write, an accessibility press, and selecting a menu item by title.
+- **Both, foreground:** the accessibility value write and the accessibility press, which need no foreground grant.
 
-## Findings so far
+## Findings
 
+Each finding below is the release's own answer. Its class says how it was settled: **verified by control** means an independent input path, outside the tool, acted on the same target and the fixture recorded it while the release's own action did not.
+
+- **x11, background pointer and key delivery is reported delivered and is not received. VERIFIED BY CONTROL for the click, the scroll and the key chord; typing by pixel and the pixel drag show the same shape and were not controlled themselves.** Seven background cells: a click (by accessibility and by pixel), typing by pixel, a scroll (both), a pixel drag in the list, and the key chord. Each reports `delivered` while the fixture's state does not change after a 3-second settle. Controls: at the same global point the release used, an independent `xdotool` click raised `pressCount` to 1 and three wheel clicks raised `scrollSteps` to 3, while the release left both at 0 (hosted runs at `86138ba30b`, `da4030732a` and `dff46ef3e3`); with the fixture window holding keyboard focus, an independent `xdotool` `ctrl+k` was recorded while the release's chord left the fixture empty (`dff46ef3e3`). Reported on #9109, which describes this defect and had not reproduced it against a real application.
+- **Windows, the background key chord is reported delivered and is not received. VERIFIED BY CONTROL.** The fixture records no keys. The catalog declares no effect for this cell, so the declared outcome is a refusal and the release instead reports delivery. Control (hosted runs at `2a52285478` and `da4030732a`): with keyboard focus on the Value field, `SendInput` sent all 4 events and the fixture recorded `ctrl+k`.
+- **x11, the release's hit-test returns the window's root filler everywhere.** A finding of its own, separate from delivery. `elementAt` at the centre of the Press button, the Value field, the Scroll target and a list row returns `filler` with no title, before and after the window was raised. Every x11 pointer cell logs `hit_test="filler:null" hit_test_matches_target=false`; on Windows every pointer cell logs `hit_test_matches_target=true`.
+- **Background typing through accessibility is refused `AxUnsupported` on both OSes**, on the resolved text field. This is the release's own answer.
+- **Windows, a background pixel drag in the list is refused `InputFailed`.**
+- **Foreground: every foreground cell except the accessibility value write and press is refused `ControlRequired`** (9 on each OS), which is the shipped answer when no person can approve foreground control.
+- **Electron and web-view content is not reachable.** On x11 every Electron cell is refused `AxFailed`; on Windows the Electron window lists only its frame and a `Chrome Legacy Window`, and the x11 web-view window lists only its menu bar. The web content is absent from the accessibility tree in all three. Whether the fixture apps must turn renderer accessibility on, or the release cannot read it, is open with the fixture apps' owner.
 - The shipped runtime never reports whether input was sent with a refusal, so every refusal is recorded with `nothingSent: false`.
-- **x11, native, VERIFIED BY CONTROL: background pointer delivery is reported delivered and is not received.** Five background cells (click by accessibility, click by pixel, scroll both ways, pixel drag) report delivery while the fixture's state does not change, after a 3-second wait for it to settle. On the same element in the same run, an accessibility press is delivered and the fixture does record it, and on Windows the same click is delivered and recorded. The element, the fixture and the oracle work. The control (hosted run at `86138ba30b`) settles it on two elements of different kinds: at the same global point the release used, an independent `xdotool` click on the Press button raised `pressCount` to 1 and three wheel clicks on the Scroll target raised `scrollSteps` to 3, while the release's own background click and scroll at that point were reported `delivered` and left both at 0. The point and the element bounds are right; the release's background delivery is what was lost. Scope: the independent actions ran after the window was raised, so this verifies the background route, not foreground delivery. Typing by pixel is not in this class: it aimed at the field's caption (see the Value-field entry below).
-- **Windows, native, key chord: VERIFIED BY CONTROL.** The background key chord reports delivery while the fixture records no keys. In the control (hosted run at `2a52285478`) the release's own focus call left keyboard focus on the Value field, `SendInput` then sent all 4 events and the fixture recorded `ctrl+k`; the release's chord, reported `delivered`, left it empty. The focus was right; the release's background key delivery was lost.
-- **Windows, native, typing by pixel: not controlled, and its target is suspect.** It reports delivery while the fixture records no text. The control's own reading shows why it cannot be settled yet: the release aimed at a static text element titled `Value` (the field's label), not at the editable field, and an independent click at that point left the focus on the `Press` button. The cell looks up its element by name alone, and on Windows that finds the label first, so this cell may be a harness finding rather than the release's. It stays unclassified until the cell targets the field itself.
-- **Windows, native:** a background pixel drag in the list is refused with `InputFailed`.
-- **Harness target suspect, re-measured in RUN 8i: every cell that targets the Value field, on both OSes.** Both fixture apps put a caption named `Value` beside the field, and the driver looked elements up by name alone, so it could resolve the caption. Measured on Windows: typing by pixel aimed at `statictext` `Value`, and the window lists both `statictext:Value` and `textfield:Value`. On x11 the GTK fixture has the same caption, and typing by pixel aimed at x=49, a narrow element at the start of the row, while the Press button's centre in the same 640-pixel window is x=321, so it hit the caption too. These cells are not facts about 5.1.69 until re-measured: typing by pixel and through accessibility, the accessibility value write (Windows `AxFailed`; x11 `AxFailed`), background typing through accessibility (`AxUnsupported` on both), and the x11 key chord (`AxFailed`). The Windows key chord is the exception: its control logged the keyboard focus on the field itself before the independent chord, so its verdict stands.
-- **Foreground, both:** every foreground cell except the accessibility press is refused with `ControlRequired` (8 on x11, 9 on Windows), which is the shipped answer when no person can approve foreground control.
-- **Electron and web-view content is not reachable.** On x11 every Electron cell is refused `AxFailed`; on Windows the Electron window lists only its frame and a `Chrome Legacy Window`, and the x11 web-view window lists only its menu bar. The web content is absent from the accessibility tree in all three. Whether the fixture apps must turn renderer accessibility on, or the release cannot read it, is open and is being asked of the fixture apps' owner.
 
-- **x11, its own finding class: the release's hit-test returns the root filler everywhere.** `elementAt` at the centre of the Press button, the Value field, the Scroll target and a list row returns the window's root `filler` with no title, before and after the window was raised (aim check of the hosted run at `bfdec3c9a9`, and every x11 pointer cell since). On X11 the release cannot resolve a point inside the GTK window to the element under it. This is separate from the delivery finding above. Every pointer cell now logs the answer as `hit_test=` and `hit_test_matches_target=`.
-- **How a pixel cell is aimed.** The fixture apps do not report their widgets' screen geometry, so a pixel cell's point is the centre of the element the driver resolved from the tree the release itself returned, and the cell is sent only when that point is inside the window and inside the element's bounds. The release's hit-test answer never stops a cell; it is recorded.
+### Corrected by re-measurement
 
-### Control for the x11 "delivered but not received" class (rule fixed before its run)
+An earlier version of this baseline recorded three findings that were the harness's. Both fixture apps put a caption named `Value` beside the field, and the driver then looked elements up by name alone, so cells aimed at the caption. With the lookup skipping captions (hosted runs from `da4030732a`), the accessibility value write on both OSes (earlier: refused `AxFailed`), the x11 key chord (earlier: refused `AxFailed`) and Windows typing by pixel (earlier: delivered and not received) were measured again; the results above replace them.
 
-Two elements of different kinds, each on a fresh fixture: the Press button (a click) and the Scroll target (a scroll). The release sends its element-routed background action; then `xdotool`, outside the tool, raises the window and acts at the same global point the element's bounds give; the bounds the release reported are logged beside the window geometry `xdotool` reads.
+### How a cell is aimed
 
-- `xdotool`'s action registers in the fixture: the point is right and the release's reported delivery was lost. The class becomes **verified by control**.
-- `xdotool`'s action does not register: the bounds are off. The class stays **unclassified**.
+A cell finds its element in the tree the release itself returns, skipping captions, and logs the resolved role, bounds and candidates. The fixture apps do not report their widgets' screen geometry, so a pixel cell's point is the centre of that resolved element, and the cell is sent only when the point is inside the window and inside the element's bounds. The release's hit-test answer never stops a cell; it is recorded. A typing cell that resolves to a caption is refused by the driver and sends nothing.
 
-Result: **verified by control** (both legs: independent 1 and 3, release 0 and 0). Reported on #9109, which describes this defect and had not reproduced it against a real application.
+### The controls (rules fixed before their runs)
 
-### Control for the Windows "delivered but not received" cells (rule fixed before its run)
+Each leg runs on a fresh fixture. The release sends its background action first; then an input path outside the tool acts on the same target, and the fixture is read after each. The verdict rules were written here before each control's first run:
 
-Two legs, each on a fresh fixture: typing by pixel into the Value field, and the key chord `ctrl+k` to the Value field. The release sends its background action. Then `send-input.ps1`, outside the tool, sends input through `SendInput`: for typing it clicks the point the release aimed at and types `conformance`; for the chord it focuses the Value field by its accessible name and presses `ctrl+k`. The foreground window and the control holding keyboard focus are logged before the release acts and before each independent step, because a typed key goes to the focused control.
+- **x11 click and scroll:** `xdotool` raises the window and acts at the same global point the release used; the window geometry `xdotool` reads is logged beside the bounds the release reported. It registers: the release's delivery was lost (verified by control). It does not: the bounds are off (unclassified).
+- **x11 key chord:** `xdotool` raises the fixture window, logs the window holding keyboard focus, and presses `ctrl+k`. It registers with the fixture's window focused: verified by control. The fixture's window is focused and nothing registers: a harness finding. Otherwise: not controlled.
+- **Windows typing and key chord:** `send-input.ps1` sends input through `SendInput`, logging the foreground window and the focused control before each step. It registers, every event is sent and the focus is the Value field: verified by control. Everything is sent to the Value field and nothing registers: a harness finding. Fewer events sent or a different focus: not controlled.
 
-- The independent input registers in the fixture, `SendInput` reports every event sent, and the focus logged before it is the Value field in the fixture window: the input reached the control the release addressed, and the release's reported delivery was lost. The cell becomes **verified by control**.
-- `SendInput` reports every event sent, the focus is the Value field, and the fixture still records nothing: the fixture does not take this input, so the cell is a **harness** finding, not the release's.
-- `SendInput` sends fewer events than asked, or the focus is not the Value field: the control did not run as designed, and the cell stays **not controlled**.
-
-### Control for the x11 key chord (rule fixed before its run)
-
-One leg on a fresh fixture: the release focuses the Value field and sends its background chord `ctrl+k`. Then `xdotool`, outside the tool, raises the fixture window, logs the window that holds keyboard focus, and presses `ctrl+k`. The GTK fixture records chords at the window, so the input reaches the receiver the release addressed when the focused window is the fixture's.
-
-- The independent chord registers and the focused window is the fixture's: the release's reported delivery was lost. The cell becomes **verified by control**.
-- The focused window is the fixture's and the fixture still records nothing: the fixture does not take this input, a **harness** finding.
-- The focused window is not the fixture's, or `xdotool` fails: the cell stays **not controlled**.
-
-Result: not yet run.
-
-### Windows control result
-
-Result (hosted run at `2a52285478`): key chord **verified by control** (focus on the Value field, `SendInput` 4/4, independent `ctrl+k` recorded, release empty). Typing by pixel **not controlled**: the focus before the independent typing was the `Press` button, because the release's aim point is on the field's label.
+Results: x11 click 1 vs 0 and scroll 3 vs 0, x11 key chord `ctrl+k` vs empty, Windows key chord `ctrl+k` vs empty. The Windows typing leg showed the release's own typing received (`conformance`), so that cell is not a finding. In the run at `dff46ef3e3` the Windows control stopped after its typing leg: reading the fixture's report file failed with `EBUSY` while the fixture was rewriting it, so the Windows key-chord leg did not run there; its verdict rests on the runs at `2a52285478` and `da4030732a`. The driver now reads a busy report again within the same settle budget.
 
 Only the release's own answers about actions it attempted are recorded here. Failures caused by the test harness are not, nor are results that are still being checked.
