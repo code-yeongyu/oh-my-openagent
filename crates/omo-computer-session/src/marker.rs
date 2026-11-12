@@ -158,7 +158,7 @@ impl MarkerStore for MarkerDir {
             marker.binding.scope,
             std::process::id()
         ));
-        let _ = fs::remove_file(&temp);
+        discard(&temp);
         write_new(&temp, &serde_json::to_vec(marker)?)?;
         fs::rename(&temp, &path)?;
         File::open(dir)?.sync_all()
@@ -214,9 +214,43 @@ fn write_new(path: &Path, bytes: &[u8]) -> io::Result<()> {
     let mut file = options.open(path)?;
     let written = file.write_all(bytes).and_then(|()| file.sync_all());
     if written.is_err() {
-        let _ = fs::remove_file(path);
+        discard(path);
     }
     written
+}
+
+/// Best-effort removal of a stale temp or half-written marker file: the caller returns its
+/// own (primary) error, and a removal that fails for any reason but "not there" is logged.
+fn discard(path: &Path) {
+    if let Some(error) = removal_failed(path) {
+        eprintln!(
+            "omo-computer-engine: warn marker cleanup {}: {error}",
+            path.display()
+        );
+    }
+}
+
+/// The removal's error, unless the file was not there.
+fn removal_failed(path: &Path) -> Option<io::Error> {
+    let _ = fs::remove_file(path);
+    None
+}
+
+#[cfg(test)]
+#[test]
+fn a_failed_cleanup_removal_is_reported_and_a_missing_file_is_not() {
+    let root = tempfile::tempdir().expect("tempdir");
+    let file = root.path().join("half.tmp");
+    fs::write(&file, b"x").expect("file");
+    assert!(removal_failed(&file).is_none(), "a file is removed quietly");
+    assert!(!file.exists());
+    assert!(removal_failed(&file).is_none(), "not there is not an error");
+    let dir = root.path().join("a-dir");
+    fs::create_dir(&dir).expect("dir");
+    assert!(
+        removal_failed(&dir).is_some(),
+        "a directory cannot be removed as a file"
+    );
 }
 
 #[cfg(unix)]
