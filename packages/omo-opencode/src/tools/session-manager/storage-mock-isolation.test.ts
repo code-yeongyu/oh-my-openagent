@@ -6,10 +6,10 @@ const repoRoot = join(import.meta.dir, "../../../../..")
 const sessionManagerDir = "./packages/omo-opencode/src/tools/session-manager"
 const CHILD_BUDGET_MS = 120_000
 
-test(
-  "#given the storage test files ran in this process #when a later file reads the shared storage paths #then none points into their fixtures (#13286)",
-  () => {
-    const files = ["storage.test.ts", "storage-fallback.test.ts", "storage-paths-not-redirected.test.ts"]
+test.each(["storage.test.ts", "storage-fallback.test.ts"])(
+  "#given %s ran alone in this process #when a later file reads the shared storage paths #then none points into its fixture (#13286)",
+  (storageFile) => {
+    const files = [storageFile, "storage-paths-not-redirected.test.ts"]
     const run = spawnSync(
       process.execPath,
       ["test", "--timeout", "20000", ...files.map((file) => `${sessionManagerDir}/${file}`)],
