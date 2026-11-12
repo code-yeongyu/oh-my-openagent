@@ -7,6 +7,9 @@ import { tmpdir } from "node:os"
 import { dirname, join, relative, sep } from "node:path"
 import { pathToFileURL } from "node:url"
 
+import { load } from "js-yaml"
+import { z } from "zod"
+
 import { jobSteps, platformWorkflow, publishWorkflow, stepAt } from "./keychain-helper-workflow.test-support"
 import { runBlock } from "./release-workflow-test-steps"
 
@@ -119,5 +122,50 @@ describe("publish-platform builds the generated bundles before compiling the bin
     expect(generate.index).toBeLessThan(binary.index)
     expect(generate.value.if).toBe(binary.value.if)
     expect(generate.value.run?.trim()).toBe(BUILD_GENERATED)
+  })
+})
+
+// Release order (#13192): every runner OS family builds the generated outputs from the release commit, and an omo-ai
+// payload built from them carries every generated module, before any platform or main package reaches npm.
+const PREFLIGHT = "release-build-preflight"
+const PREFLIGHT_OK = `needs.${PREFLIGHT}.result == 'success'`
+const jobSchema = z.object({
+  needs: z.union([z.string(), z.array(z.string())]).optional(),
+  if: z.string().optional(),
+  permissions: z.record(z.string(), z.string()).optional(),
+  strategy: z.object({ matrix: z.object({ os: z.array(z.string()) }) }).optional(),
+  steps: z
+    .array(z.object({ name: z.string().optional(), if: z.string().optional(), run: z.string().optional() }))
+    .optional(),
+})
+const releaseJobs = z.object({ jobs: z.record(z.string(), jobSchema) }).parse(load(publishWorkflow)).jobs
+const needsOf = (job: string): readonly string[] => [releaseJobs[job]?.needs ?? []].flat()
+
+describe("the release build preflight gates every npm publish", () => {
+  const preflight = releaseJobs[PREFLIGHT]
+  const runs = (preflight?.steps ?? []).map((step) => step.run?.trim())
+
+  test("builds the generated outputs on every runner OS family the release uses, read-only", () => {
+    expect(preflight?.strategy?.matrix.os).toEqual(["ubuntu-24.04", "macos-latest", "windows-latest"])
+    expect(preflight?.permissions).toEqual({ contents: "read" })
+    expect(needsOf(PREFLIGHT)).toContain("prepare-release-state")
+    expect(runs).toContain(BUILD_GENERATED)
+  })
+
+  test("builds the omo-ai payload from them and requires every generated module, after the build", () => {
+    const payload = runs.indexOf("bun run build:omo-native")
+    const verify = runs.indexOf("node script/verify-omo-ai-payload.mjs --release-preflight")
+    expect(payload).toBeGreaterThan(runs.indexOf(BUILD_GENERATED))
+    expect(verify).toBeGreaterThan(payload)
+  })
+
+  test.each(["publish-platform", "publish-main"])("%s needs it and runs only after it succeeds", (job) => {
+    expect(needsOf(job)).toContain(PREFLIGHT)
+    expect(releaseJobs[job]?.if).toContain(PREFLIGHT_OK)
+  })
+
+  test("publish-main keeps the LazyCodex-only path, which builds no omo-ai payload", () => {
+    expect(releaseJobs["publish-main"]?.if).toContain(`(inputs.lazycodex_only == true || ${PREFLIGHT_OK})`)
+    expect(preflight?.if).toContain("inputs.lazycodex_only != true")
   })
 })

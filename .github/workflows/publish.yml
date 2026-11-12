@@ -642,6 +642,59 @@ jobs:
           JOB_SUMMARY_NEXT: If this fails, merge the release-state PR or fix its checks before rerunning publish.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
+  # Release order (#13192): every runner OS family the release uses builds the generated outputs from the release commit,
+  # and an omo-ai payload built from them must carry every generated module, before publish-platform or publish-main
+  # puts anything on npm. A failure here stops the release while nothing is published.
+  release-build-preflight:
+    needs: [gate-reuse, preflight-trust, release-metadata, prepare-release-state]
+    if: >-
+      always() &&
+      github.repository == 'code-yeongyu/oh-my-openagent' &&
+      inputs.prepared_release_sha != '' &&
+      inputs.lazycodex_only != true &&
+      needs.gate-reuse.result == 'success' &&
+      needs.preflight-trust.result == 'success' &&
+      needs.release-metadata.result == 'success' &&
+      needs.prepare-release-state.result == 'success'
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare-release-state.outputs.release_sha }}
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Build generated files
+        run: bun script/build-generated.ts
+
+      - name: Build omo-ai payload
+        if: runner.os == 'Linux'
+        run: bun run build:omo-native
+
+      # The keychain helper is built later inside publish-platform, so this mode requires the generated modules only.
+      - name: Verify omo-ai payload carries every generated module
+        if: runner.os == 'Linux'
+        run: node script/verify-omo-ai-payload.mjs --release-preflight
+
   dispatch-provenance-safe-publish:
     # Pin until this release/deploy path is proven on Ubuntu 26.04: #9936.
     runs-on: ubuntu-24.04
@@ -724,7 +777,7 @@ jobs:
     # lazycodex publish decision has to cross the job boundary as an output.
     outputs:
       lazycodex_publish_skipped: ${{ steps.check-lazycodex.outputs.skip }}
-    needs: [gate-reuse, preflight-trust, release-metadata, prepare-release-state, publish-platform]
+    needs: [gate-reuse, preflight-trust, release-metadata, prepare-release-state, release-build-preflight, publish-platform]
     if: >-
       always() &&
       github.repository == 'code-yeongyu/oh-my-openagent' &&
@@ -733,6 +786,7 @@ jobs:
       needs.preflight-trust.result == 'success' &&
       needs.release-metadata.result == 'success' &&
       needs.prepare-release-state.result == 'success' &&
+      (inputs.lazycodex_only == true || needs.release-build-preflight.result == 'success') &&
       (inputs.skip_platform == true || inputs.lazycodex_only == true || needs.publish-platform.result == 'success')
     steps:
       - uses: actions/checkout@v7
@@ -1140,7 +1194,7 @@ jobs:
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   publish-platform:
-    needs: [gate-reuse, preflight-trust, release-metadata, prepare-release-state, verify-release-notes]
+    needs: [gate-reuse, preflight-trust, release-metadata, prepare-release-state, verify-release-notes, release-build-preflight]
     if: >-
       always() &&
       github.repository == 'code-yeongyu/oh-my-openagent' &&
@@ -1150,7 +1204,8 @@ jobs:
       needs.gate-reuse.result == 'success' &&
       needs.preflight-trust.result == 'success' &&
       needs.release-metadata.result == 'success' &&
-      needs.prepare-release-state.result == 'success'
+      needs.prepare-release-state.result == 'success' &&
+      needs.release-build-preflight.result == 'success'
     uses: ./.github/workflows/publish-platform.yml
     with:
       version: ${{ needs.release-metadata.outputs.version }}

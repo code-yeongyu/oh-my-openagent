@@ -197,6 +197,28 @@ describe("omo-ai payload verifier", () => {
     })
   })
 
+  // The release build preflight (#13192) packs before publish-platform builds the macOS keychain helper.
+  describe("#given the release preflight gate (--release-preflight)", () => {
+    const complete = [...PACKED_ARTIFACTS, ...skillPaths(PACKED_SKILL_COUNT), ...RELEASE_GENERATED_ARTIFACTS]
+
+    test("#when bin/lib/service-auth.generated.js was not built and no helper is staged #then it fails naming the module", () => {
+      const run = runVerifierOnPayload(
+        complete.filter((path) => path !== "bin/lib/service-auth.generated.js"),
+        {},
+        { args: ["--release-preflight"] },
+      )
+      expect(run.output).toContain("missing artifact: bin/lib/service-auth.generated.js")
+      expect(run.output).not.toContain(KEYCHAIN_HELPER)
+      expect(run.exitCode).toBe(1)
+    })
+
+    test("#when every generated module is packed and no helper is staged #then it passes", () => {
+      const run = runVerifierOnPayload(complete, {}, { args: ["--release-preflight"] })
+      expect(run.output).not.toContain("missing artifact:")
+      expect(run.exitCode).toBe(0)
+    })
+  })
+
   test("#given a payload missing only the omo daemon task-config runtime #when verified #then it fails naming that artifact", () => {
     const run = runVerifierOnPayload([
       ...PACKED_ARTIFACTS.filter((path) => path !== "plugin/runtime/task-config/index.js"),

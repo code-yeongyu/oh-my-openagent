@@ -46,6 +46,9 @@ const REQUIRED_ARTIFACTS = [
 // only, so its execute bit is read from the file system.
 const RELEASE_EXECUTABLE_ARTIFACTS = ["bin/darwin/omo-keychain"]
 const releaseMode = process.argv.slice(2).includes("--release")
+// The release build preflight packs before publish-platform builds the keychain helper, so it requires the generated
+// modules below without the helper.
+const preflightMode = process.argv.slice(2).includes("--release-preflight")
 
 // Build outputs git does not track (#13192): only a build writes them, so a release that skipped a
 // generator would publish without them. bin/omo.js imports service-auth.generated.js for sync,
@@ -116,7 +119,7 @@ for (const artifact of REQUIRED_ARTIFACTS) {
   }
 }
 
-for (const artifact of releaseMode ? RELEASE_GENERATED_ARTIFACTS : []) {
+for (const artifact of releaseMode || preflightMode ? RELEASE_GENERATED_ARTIFACTS : []) {
   if (!pathSet.has(artifact)) {
     errors.push(`missing artifact: ${artifact}`)
   }
