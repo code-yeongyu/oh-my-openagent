@@ -2150,6 +2150,7 @@
         "script/oxlint/biome-ports.ts",
         "script/patch-node-require-shim.ts",
         "script/print-release-notes.ts",
+        "script/qa/computer/pool/macos-vm.ts",
         "script/qa/computer/pool/xorg-uinput-probe.ts",
         "script/qa/desktop/hyprland.ts",
         "script/qa/desktop/kwin.ts",
