@@ -24,7 +24,7 @@ export class FixtureProcess {
       env,
     })
     const fixture = new FixtureProcess(child, reportPath)
-    await fixture.expect((line) => line.startsWith("READY pid="))
+    await fixture.expect((line) => line.startsWith("READY pid="), "READY pid=<pid>")
     return fixture
   }
 
@@ -39,7 +39,10 @@ export class FixtureProcess {
   async send(line: string): Promise<void> {
     this.child.stdin.write(`${line}\n`)
     this.child.stdin.flush()
-    const answer = await this.expect((received) => received === `OK ${line}` || received.startsWith("ERR "))
+    const answer = await this.expect(
+      (received) => received === `OK ${line}` || received.startsWith("ERR "),
+      `OK ${line}`,
+    )
     if (answer !== `OK ${line}`) throw new Error(`fixture answered ${JSON.stringify(answer)} to ${JSON.stringify(line)}`)
   }
 
@@ -66,7 +69,7 @@ export class FixtureProcess {
       pending += decoder.decode(chunk, { stream: true })
       const parts = pending.split("\n")
       pending = parts.pop() ?? ""
-      this.lines.push(...parts)
+      this.lines.push(...parts.map((part) => part.replace(/\r$/, "")))
       this.wake()
     }
     this.ended = true
@@ -77,14 +80,17 @@ export class FixtureProcess {
     for (const waiter of this.waiters.splice(0)) waiter()
   }
 
-  private async expect(matches: (line: string) => boolean): Promise<string> {
+  private async expect(matches: (line: string) => boolean, wanted: string): Promise<string> {
     const deadline = Date.now() + LINE_DEADLINE_MS
     for (;;) {
       const index = this.lines.findIndex(matches)
       if (index >= 0) return this.lines.splice(0, index + 1)[index] ?? ""
-      if (this.ended) throw new Error("fixture closed its output before the expected line")
+      if (this.ended) throw new Error(`fixture closed its output before ${JSON.stringify(wanted)}`)
       const left = deadline - Date.now()
-      if (left <= 0) throw new Error(`no expected line from the fixture within ${LINE_DEADLINE_MS} ms`)
+      if (left <= 0) {
+        const seen = this.lines.slice(-3).map((seenLine) => JSON.stringify(seenLine)).join(", ")
+        throw new Error(`no ${JSON.stringify(wanted)} from the fixture within ${LINE_DEADLINE_MS} ms (last lines: ${seen || "none"})`)
+      }
       const { promise, resolve } = Promise.withResolvers<void>()
       this.waiters.push(resolve)
       const timer = setTimeout(resolve, left)
