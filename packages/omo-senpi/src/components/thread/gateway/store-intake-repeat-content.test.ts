@@ -34,12 +34,16 @@ function request(h: GatewayHarness, record: Partial<IntakeRecord> = {}): IntakeR
 }
 
 test.each([
-  ["the same content", {}, "deduplicated"],
-  ["another text", { text: "OMO_GATEWAY v=1\nsource=peer_agent\n\nsomething else" }, "conflict"],
-  ["another display text", { displayText: "something else" }, "conflict"],
-  ["another chain count", { chainCount: 2 }, "conflict"],
+  ["the same content, answered deduplicated", {}, "deduplicated"],
+  [
+    "another text, answered idempotency_conflict",
+    { text: "OMO_GATEWAY v=1\nsource=peer_agent\n\nsomething else" },
+    "conflict",
+  ],
+  ["another display text, answered idempotency_conflict", { displayText: "something else" }, "conflict"],
+  ["another chain count, answered idempotency_conflict", { chainCount: 2 }, "conflict"],
 ])(
-  "#given a delivery whose receipt expired #when the same device repeats its id with %s #then the answer is %s and no second row is written",
+  "#given a delivery whose receipt expired #when the same device repeats its id with %s #then no second row is written",
   async (_label, change, expected) => {
     const h = (harness = createGatewayHarness())
     const store = h.store()
@@ -50,7 +54,12 @@ test.each([
     const repeat = await store.intake(request(h, change))
 
     if (expected === "deduplicated")
-      expect(repeat).toMatchObject({ kind: "queued", row_id: first.row_id, ledger_id: first.ledger_id, deduplicated: true })
+      expect(repeat).toMatchObject({
+        kind: "queued",
+        row_id: first.row_id,
+        ledger_id: first.ledger_id,
+        deduplicated: true,
+      })
     else expect(repeat).toMatchObject({ kind: "refused", code: "idempotency_conflict" })
     expect(await store.list({ target_durable_id: "target" })).toHaveLength(1)
   },
