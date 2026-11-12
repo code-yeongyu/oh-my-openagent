@@ -26,3 +26,27 @@ impl LeaseHook for DisplayAwakeLeaseHook {
         self.0.update(super::DisplayAwakeHold::resume);
     }
 }
+
+/// Registers the display-awake rule on the session's lease hook, sharing the session's one
+/// hold handle (R45); `Session::build` builds every session through it.
+fn with_display_awake(mut session: crate::Session) -> crate::Session {
+    let hold = session.display_awake.clone();
+    session.set_lease_hook(Box::new(DisplayAwakeLeaseHook(hold)));
+    session
+}
+
+impl crate::Session {
+    /// Every session is built here, so the lease hooks are installed on its own funnel.
+    pub(crate) fn build(backend: Box<dyn Backend>, guard: omo_computer_safety::Guard, funnel: crate::mutate::Funnel) -> Self {
+        with_display_awake(Self {
+            backend,
+            guard,
+            opened: None,
+            funnel,
+            refs: crate::refs::RefRegistry::default(),
+            frames: crate::frames::FrameStore::default(),
+            trace: crate::trace::Trace::default(),
+            display_awake: crate::intervention::SharedHold::default(),
+        })
+    }
+}
