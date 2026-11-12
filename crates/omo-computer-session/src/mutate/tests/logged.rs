@@ -140,3 +140,23 @@ fn a_marker_that_cannot_be_written_is_logged_and_sends_nothing() {
     );
     assert!(run.sink.is_empty(), "nothing sent");
 }
+
+/// Gate review a6: the in-process grep-zero walk (`Run::everything_written`) must fail on a
+/// file it cannot read, never skip it (a skipped file would read as clean). A dangling
+/// symlink is unreadable without any permission trick (ENOENT), so this holds as root too.
+#[cfg(unix)]
+#[test]
+fn the_grep_zero_walk_fails_on_a_file_it_cannot_read() {
+    let run = Run::new();
+    std::os::unix::fs::symlink(
+        run.dir.path().join("nowhere"),
+        run.dir.path().join("dangling"),
+    )
+    .expect("a dangling symlink");
+    let walked =
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run.everything_written()));
+    assert!(
+        walked.is_err(),
+        "an unreadable file must fail the walk, not be skipped"
+    );
+}
