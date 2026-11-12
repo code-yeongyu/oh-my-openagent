@@ -7,6 +7,7 @@
 mod busy;
 mod feed;
 mod kinds;
+mod predicate;
 mod quiet;
 mod stages;
 
@@ -14,9 +15,10 @@ mod stages;
 mod tests;
 
 pub use busy::{wait_clear, Busy};
+pub(crate) use feed::feed;
 pub use feed::Feed;
-pub(crate) use feed::{feed, BackendFeed};
 pub use kinds::{event_kind, is_navigation, window_state};
+pub use predicate::EventMatch;
 pub use quiet::{quiet_window, Bounds, Picking, Settled};
 pub(crate) use stages::SettleState;
 pub use stages::TARGET_BUSY;
