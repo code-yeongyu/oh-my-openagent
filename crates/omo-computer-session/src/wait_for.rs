@@ -96,7 +96,7 @@ impl Session {
             WaitSpec::Element { reference, state } => {
                 self.wait_observed(&target, timeout_ms, |s, _| s.element_in(&reference, state))?
             }
-            // The session-state sampler is row 22's: the leg is owed there (DEFERRED-LEGS).
+            // The session-state sampler that would feed it is row 22's.
             WaitSpec::Session(_) => WaitOutcome::Unsupported,
         };
         let mut observation = self.observe_now(&target)?;
