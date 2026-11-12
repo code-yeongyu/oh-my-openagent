@@ -209,3 +209,48 @@ describe("every workflow job is classified as a generated-output reader or not",
     expect([...readers, ...Object.keys(READS_NOTHING)].filter((job) => !existing.has(job))).toEqual([])
   })
 })
+
+// Generated outputs are built with node scripts (build-extension.mjs and the other .mjs generators), and the bytes depend
+// on the node major, so every job that builds them pins node before the build at the major the release preflight proves.
+describe("every job that builds the generated outputs pins node first, at the release preflight's major", () => {
+  const nodeMajor = (step: { readonly uses?: string; readonly with?: Record<string, unknown> }): string | undefined =>
+    typeof step.uses === "string" && step.uses.startsWith("actions/setup-node")
+      ? String(step.with?.["node-version"] ?? "").split(".")[0]
+      : undefined
+  const preflightSteps = jobSteps(publishWorkflow, "release-build-preflight")
+  const preflightMajor = preflightSteps.map(nodeMajor).find((major) => major !== undefined)
+
+  type RawStep = { readonly run?: unknown; readonly uses?: string; readonly with?: Record<string, unknown> } & Record<
+    string,
+    unknown
+  >
+  const builders = readdirSync(new URL("../.github/workflows/", import.meta.url))
+    .filter((name) => /\.ya?ml$/.test(name))
+    .flatMap((name) => {
+      const parsed: unknown = load(readWorkflow(name))
+      const jobs: Record<string, { steps?: RawStep[]; defaults?: { run?: Record<string, unknown> } }> =
+        parsed !== null && typeof parsed === "object" && "jobs" in parsed ? Object(parsed.jobs) : {}
+      return Object.entries(jobs).flatMap(([job, definition]) => {
+        const steps = definition.steps ?? []
+        const jobDirectory = definition.defaults?.run?.["working-directory"]
+        const build = steps.findIndex(
+          (step) =>
+            typeof step.run === "string" &&
+            BUILDS.test(step.run) &&
+            (step["working-directory"] ?? jobDirectory) === undefined,
+        )
+        return build < 0 ? [] : [{ name: `${name} ${job}`, steps, build }]
+      })
+    })
+
+  test("the preflight pins a node major", () => {
+    expect(preflightMajor).toBe("24")
+  })
+
+  test.each(builders.map((builder) => [builder.name, builder] as const))("%s", (_name, { steps, build }) => {
+    const pin = steps.findIndex((step) => nodeMajor(step) !== undefined)
+    expect(pin, "no actions/setup-node before the build").toBeGreaterThanOrEqual(0)
+    expect(pin).toBeLessThan(build)
+    expect(nodeMajor(steps[pin] ?? {})).toBe(preflightMajor)
+  })
+})

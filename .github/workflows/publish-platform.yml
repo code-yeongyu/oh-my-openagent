@@ -601,6 +601,11 @@ jobs:
           name: keychain-helper
           path: .omo/keychain-helper
 
+      # Generated outputs are built with node scripts; pin the major the release preflight proves (#13192).
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
       # Generated bundles are not tracked (#13192). The compiled entry imports bin/lib/*.generated.js,
       # so every generator runs before the binary is built. It sits outside the step ranges the workflow tests slice
       # and run as shell (Stage target-specific Rust engine .. Download keychain helper, Stage keychain helper .. Build release binary).

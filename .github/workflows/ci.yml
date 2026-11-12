@@ -1072,6 +1072,11 @@ jobs:
         if: needs.ci-mode.outputs.run_heavy == 'true'
         run: bun install --frozen-lockfile --ignore-scripts
 
+      # Generated outputs are built with node scripts; pin the major the release preflight proves (#13192).
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
       - name: Build
         if: needs.ci-mode.outputs.run_heavy == 'true'
         run: bun run build
@@ -1319,6 +1324,11 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
+
+      # Generated outputs are built with node scripts; pin the major the release preflight proves (#13192).
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
 
       - name: Build
         run: bun run build
