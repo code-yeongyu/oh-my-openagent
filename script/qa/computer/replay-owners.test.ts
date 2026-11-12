@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { classify, type Ledgers, type Outcome } from "./replay-owners"
 
 const DIR = "crates/omo-computer-core/fixtures/conformance"
-const OLD = "crates/senpi-desktop-core/fixtures/conformance"
+const OLD = "fixtures/old-corpus"
 const tsv = (...rows: string[][]) => rows.map((row) => row.join("\t")).join("\n") + "\n"
 
 // Fake ledgers with the column headers of crates/omo-computer-core/parity/*.tsv.

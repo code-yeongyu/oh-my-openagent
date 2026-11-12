@@ -63,7 +63,7 @@ export function parseJson(text: string, what: string): unknown {
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
 const isTransport = (value: unknown): value is Transport => typeof value === "string" && value in TRANSPORT_ARGS
-export const isStrings = (value: unknown): value is string[] =>
+const isStrings = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((item) => typeof item === "string")
 
 function parseStep(raw: unknown, index: number): Step {
