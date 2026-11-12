@@ -72,7 +72,7 @@ describe("Senpi compatibility test script", () => {
     expect(
       senpiNode?.deps,
       "build graph senpi-plugin must wait for every shared runtime and plugin dependency",
-    ).toEqual(["ast-grep-mcp", "lsp-daemon", "codex-plugin"])
+    ).toEqual(["ast-grep-mcp", "lsp-daemon", "codex-plugin", "brand-logo"])
     expect(
       selectBuildNodes(BUILD_NODES, undefined).map((node) => node.id),
       "a default build must still schedule the Senpi plugin stage",
