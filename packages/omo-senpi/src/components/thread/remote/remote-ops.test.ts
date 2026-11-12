@@ -2,17 +2,15 @@ import { describe, expect, test } from "bun:test"
 import { followRemote } from "./remote-ops"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 
-// The relay delivers a new attach's replayed history only after watch() has returned (#13267): the previous turn's
-// records reach the listener as live records. This surface reproduces exactly that — nothing is ever delivered
-// synchronously inside onEvent, everything is delivered once the follow already holds the listener.
+// The adapter drops anything delivered before `live = true`, so records reach the listener only after watch()
+// returns; over the relay the previous turn's replay arrives exactly then, after the send's reply (#13267).
 type RecordListener = (record: JsonObject) => void
 
-function asyncReplaySurface() {
+function followSurface(transcript: JsonObject[]) {
   let listener: RecordListener | undefined
   const deliver = (records: readonly JsonObject[]): void => {
     if (listener !== undefined) for (const record of records) listener(record)
   }
-  // A narrow fake port: only `devices` (the online gate) and `watch` (the records stream) are under test.
   const remote = {
     sessions: {
       devices: async () => [{ device: "b", label: "b", online: true }],
@@ -23,6 +21,7 @@ function asyncReplaySurface() {
           watch: { ended: new Promise<string>(() => {}), stop: () => (listener = undefined) },
         }
       },
+      read: async () => ({ kind: "ok" as const, response: { entries: [...transcript] } }),
     },
     chain: { stamp: (record: JsonObject) => record },
   } as unknown as RemoteThreadSurface
@@ -39,16 +38,21 @@ const ROW: RemoteSessionRow = {
   updated_ms: 0,
 }
 
-const agentStart = (): JsonObject => ({ type: "agent_start" })
-const agentEnd = (): JsonObject => ({ type: "agent_end" })
-const delta = (text: string, contentIndex = 0): JsonObject => ({
-  type: "message_update",
-  assistantMessageEvent: { type: "text_delta", delta: text, contentIndex },
+const message = (id: string, role: string, text: string): JsonObject => ({
+  type: "message",
+  id,
+  parentId: null,
+  timestamp: "2026-11-12T13:00:00.000Z",
+  message: { role, content: [{ type: "text", text }] },
 })
-const settled = (): JsonObject => ({ type: "agent_settled" })
+
+const delta = (text: string): JsonObject => ({
+  type: "message_update",
+  assistantMessageEvent: { type: "text_delta", delta: text, contentIndex: 0 },
+})
 
 const flush = async (): Promise<void> => {
-  for (let i = 0; i < 4; i++) await Promise.resolve()
+  for (let i = 0; i < 6; i++) await Promise.resolve()
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
@@ -67,99 +71,233 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string)
   })
 }
 
-describe("#13267: a follow prints only the turn its own send started", () => {
-  test("#given a follow whose attach replays the previous turn after watch returns #when the send's own turn runs #then only the new turn's text is written and settled waits for the new turn's agent_settled", async () => {
-    const { remote, deliver } = asyncReplaySurface()
+describe("#13267: a follow prints only the answer to its own send's message", () => {
+  test("#given a send queued behind a running turn drained inside the same run #when the run settles #then the send completes and prints only its own answer (senpi's normal path: one agent_start, turn markers, one agent_end)", async () => {
+    const transcript = [
+      message("u1", "user", "count"),
+      message("a1", "assistant", "blocker answer\n"),
+      message("u2", "user", "ping"),
+      message("a2", "assistant", "own answer\n"),
+    ]
+    const { remote, deliver } = followSurface(transcript)
     const printed: string[] = []
-    const follow = await followRemote(remote, ROW, (text) => printed.push(text))
+    const follow = await followRemote(remote, ROW, (text) => printed.push(text), { text: "ping" })
     if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
-    // The attach's replay of the previous turn (turn 6) arrives after watch() returned, as it does over the relay.
-    deliver([agentStart(), delta("pong\n"), agentEnd(), settled()])
+    follow.aim("queued")
     await flush()
     expect(printed).toEqual([])
+    deliver([
+      { type: "agent_start" },
+      delta("blocker answer\n"),
+      { type: "turn_end" },
+      { type: "turn_start" },
+      delta("own answer\n"),
+      { type: "agent_end" },
+      { type: "agent_settled" },
+    ])
+    await withTimeout(follow.settled, 5_000, "a send queued behind a running turn never completed")
+    expect(printed).toEqual(["own answer\n"])
+    follow.stop()
+  })
+
+  test("#given a blocker that errors and auto-retries with a fresh agent_start #when the send is queued behind it #then the blocker's retry answer is never printed as this send's", async () => {
+    const transcript = [
+      message("u1", "user", "count"),
+      message("a1", "assistant", "BLOCKER RETRY ANSWER\n"),
+      message("u2", "user", "ping"),
+      message("a2", "assistant", "own\n"),
+    ]
+    const { remote, deliver } = followSurface(transcript)
+    const printed: string[] = []
+    const follow = await followRemote(remote, ROW, (text) => printed.push(text), { text: "ping" })
+    if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
+    follow.aim("queued")
+    deliver([
+      { type: "agent_start" },
+      delta("failing attempt\n"),
+      { type: "agent_end" },
+      { type: "agent_start" },
+      delta("BLOCKER RETRY ANSWER\n"),
+      { type: "agent_end" },
+      { type: "agent_settled" },
+    ])
+    await withTimeout(follow.settled, 5_000, "a send queued behind a retrying blocker never completed")
+    expect(printed).toEqual(["own\n"])
+    follow.stop()
+  })
+
+  test("#given the run settles with no turn start for the queued send at all #when the transcript already holds its answer #then the send completes at the settle", async () => {
+    const transcript = [
+      message("u1", "user", "count"),
+      message("a1", "assistant", "blocker answer\n"),
+      message("u2", "user", "ping"),
+      message("a2", "assistant", "own answer\n"),
+    ]
+    const { remote, deliver } = followSurface(transcript)
+    const printed: string[] = []
+    const follow = await followRemote(remote, ROW, (text) => printed.push(text), { text: "ping" })
+    if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
+    follow.aim("queued")
+    deliver([{ type: "agent_start" }, delta("blocker answer\n"), { type: "agent_end" }, { type: "agent_settled" }])
+    await withTimeout(follow.settled, 5_000, "a send whose run settled never completed")
+    expect(printed).toEqual(["own answer\n"])
+    follow.stop()
+  })
+
+  test("#given a started send whose run settles without writing any answer #when the settle arrives #then the wait ends cleanly", async () => {
+    const transcript = [message("u1", "user", "ping")]
+    const { remote, deliver } = followSurface(transcript)
+    const printed: string[] = []
+    const follow = await followRemote(remote, ROW, (text) => printed.push(text), { text: "ping" })
+    if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
     follow.aim("started")
-    deliver([agentStart(), delta("ping answer\n"), agentEnd(), settled()])
-    expect(await withTimeout(follow.settled, 5_000, "waited 5s for the send's own agent_settled, never fired")).toBe(
-      "settled",
-    )
+    deliver([{ type: "agent_start" }, { type: "agent_end" }, { type: "agent_settled" }])
+    await withTimeout(follow.settled, 5_000, "an aborted started send never ended its wait")
+    expect(printed).toEqual([])
+    follow.stop()
+  })
+
+  test("#given the previous turn's replay arrives before the send's reply #when the follow is aimed #then the replay is dropped and only the send's own turn streams", async () => {
+    const { remote, deliver } = followSurface([])
+    const printed: string[] = []
+    const follow = await followRemote(remote, ROW, (text) => printed.push(text), { text: "ping" })
+    if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
+    deliver([{ type: "agent_start" }, delta("pong\n"), { type: "agent_end" }, { type: "agent_settled" }])
+    await flush()
+    follow.aim("started")
+    expect(printed).toEqual([])
+    deliver([{ type: "agent_start" }, delta("ping answer\n"), { type: "agent_settled" }])
+    await withTimeout(follow.settled, 5_000, "the send's own turn never settled")
     expect(printed).toEqual(["ping answer\n"])
     follow.stop()
   })
 
-  test("#given the send's own turn outruns its reply #when aim arrives after that turn already started #then its buffered deltas are recovered and nothing before them prints", async () => {
-    const { remote, deliver } = asyncReplaySurface()
+  test("#given an earlier identical message in the transcript #when a queued follow anchors #then the answer printed belongs to this send's entry, never the retry's earlier twin", async () => {
+    const transcript = [
+      message("u1", "user", "ping"),
+      message("a1", "assistant", "old answer\n"),
+      message("u2", "user", "ping"),
+      message("a2", "assistant", "new answer\n"),
+    ]
+    const { remote, deliver } = followSurface(transcript)
     const printed: string[] = []
-    const follow = await followRemote(remote, ROW, (text) => printed.push(text))
+    const follow = await followRemote(remote, ROW, (text) => printed.push(text), { text: "ping" })
     if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
-    deliver([agentStart(), delta("pong\n"), agentEnd(), settled()])
-    await flush()
-    // The send's own turn (turn 7) started before the send's reply came back to aim the follow.
-    deliver([agentStart(), delta("ping")])
+    follow.aim("queued")
+    deliver([{ type: "agent_settled" }])
+    await withTimeout(follow.settled, 5_000, "the send's own answer never completed")
+    expect(printed).toEqual(["new answer\n"])
+    follow.stop()
+  })
+
+  test("#given a later message's turn supersedes the send's #when the follow checks #then the send's answer is final with no settle signal at all", async () => {
+    const transcript = [
+      message("u1", "user", "earlier"),
+      message("u2", "user", "ping"),
+      message("a1", "assistant", "queued answer\n"),
+      message("u3", "user", "the next message"),
+    ]
+    const { remote } = followSurface(transcript)
+    const printed: string[] = []
+    const follow = await followRemote(remote, ROW, (text) => printed.push(text), { text: "ping" })
+    if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
+    follow.aim("queued")
+    await withTimeout(follow.settled, 5_000, "a superseded answer never completed")
+    expect(printed).toEqual(["queued answer\n"])
+    follow.stop()
+  })
+
+  test("#given two queued sends with identical text #when each follow first reads #then each anchors its own entry by the ordinal it first saw", async () => {
+    const transcript = [
+      message("u0", "user", "earlier"),
+      message("a0", "assistant", "earlier answer\n"),
+      message("u1", "user", "again please"),
+      message("a1", "assistant", "first answer\n"),
+    ]
+    const first = followSurface(transcript)
+    const printedFirst: string[] = []
+    const followFirst = await followRemote(first.remote, ROW, (text) => printedFirst.push(text), {
+      text: "again please",
+    })
+    if ("kind" in followFirst) throw new Error(`follow refused: ${JSON.stringify(followFirst)}`)
+    followFirst.aim("queued")
+    transcript.push(message("u2", "user", "again please"), message("a2", "assistant", "second answer\n"))
+    const second = followSurface(transcript)
+    const printedSecond: string[] = []
+    const followSecond = await followRemote(second.remote, ROW, (text) => printedSecond.push(text), {
+      text: "again please",
+    })
+    if ("kind" in followSecond) throw new Error(`follow refused: ${JSON.stringify(followSecond)}`)
+    followSecond.aim("queued")
+    first.deliver([{ type: "agent_settled" }])
+    second.deliver([{ type: "agent_settled" }])
+    await withTimeout(followFirst.settled, 5_000, "the first identical send never completed")
+    await withTimeout(followSecond.settled, 5_000, "the second identical send never completed")
+    expect(printedFirst).toEqual(["first answer\n"])
+    expect(printedSecond).toEqual(["second answer\n"])
+    followFirst.stop()
+    followSecond.stop()
+  })
+
+  test("#given a queued turn that writes no answer at all #when a later message supersedes it #then the wait ends instead of living until the session closes", async () => {
+    const transcript = [message("u1", "user", "ping"), message("u2", "user", "the next message")]
+    const { remote, deliver } = followSurface(transcript)
+    const printed: string[] = []
+    const follow = await followRemote(remote, ROW, (text) => printed.push(text), { text: "ping" })
+    if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
+    follow.aim("queued")
+    deliver([{ type: "agent_settled" }])
+    await withTimeout(follow.settled, 5_000, "a superseded empty turn never ended its wait")
+    expect(printed).toEqual([])
+    follow.stop()
+  })
+
+  test("#given a queued turn with tool results between its messages #when its answer prints #then only the assistant text is written, never tool output", async () => {
+    const transcript = [
+      message("u1", "user", "ping"),
+      {
+        type: "message",
+        id: "t1",
+        parentId: null,
+        timestamp: "2026-11-12T13:00:00.000Z",
+        message: { role: "toolResult", content: [{ type: "text", text: "file contents and bash output" }] },
+      },
+      message("a1", "assistant", "the answer\n"),
+    ]
+    const { remote, deliver } = followSurface(transcript)
+    const printed: string[] = []
+    const follow = await followRemote(remote, ROW, (text) => printed.push(text), { text: "ping" })
+    if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
+    follow.aim("queued")
+    deliver([{ type: "agent_settled" }])
+    await withTimeout(follow.settled, 5_000, "the turn never completed")
+    expect(printed).toEqual(["the answer\n"])
+    follow.stop()
+  })
+
+  test("#given a started turn that finished before the aim on an idle session #when the follow aims with the run's settle already buffered #then its answer prints and the wait ends", async () => {
+    const transcript = [message("u1", "user", "ping"), message("a1", "assistant", "own answer\n")]
+    const { remote, deliver } = followSurface(transcript)
+    const printed: string[] = []
+    const follow = await followRemote(remote, ROW, (text) => printed.push(text), { text: "ping" })
+    if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
+    deliver([{ type: "agent_start" }, delta("own answer\n"), { type: "agent_end" }, { type: "agent_settled" }])
     await flush()
     expect(printed).toEqual([])
     follow.aim("started")
-    expect(printed).toEqual(["ping"])
-    deliver([delta(" answer\n"), settled()])
-    await withTimeout(follow.settled, 5_000, "waited 5s for the send's own agent_settled, never fired")
-    expect(printed).toEqual(["ping", " answer\n"])
-    follow.stop()
-  })
-
-  test("#given a send queued behind a running turn #when that turn ends and the send's own turn runs #then the send completes and only its own answer is written (the engine runs a queued follow-up right after agent_end, with no agent_settled between turns)", async () => {
-    const { remote, deliver } = asyncReplaySurface()
-    const printed: string[] = []
-    const follow = await followRemote(remote, ROW, (text) => printed.push(text))
-    if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
-    deliver([agentStart(), delta("running turn ")])
-    await flush()
-    follow.aim("queued", 1)
-    deliver([delta("rest of running\n"), agentEnd()])
-    deliver([agentStart(), delta("own answer\n"), agentEnd(), settled()])
-    await withTimeout(follow.settled, 5_000, "a send queued behind a running turn never completed")
+    await withTimeout(follow.settled, 5_000, "a turn finished before the aim never ended its wait")
     expect(printed).toEqual(["own answer\n"])
     follow.stop()
   })
 
-  test("#given a send queued behind a running turn after an earlier settled run #when the aim sees the blocker's open turn in the replay #then the blocker's text is never written as the answer", async () => {
-    const { remote, deliver } = asyncReplaySurface()
+  test("#given a steer into an already-running turn #when it is aimed #then it prints stream deltas from the aim and settles with its run", async () => {
+    const { remote, deliver } = followSurface([])
     const printed: string[] = []
     const follow = await followRemote(remote, ROW, (text) => printed.push(text))
     if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
-    deliver([agentStart(), delta("earlier\n"), agentEnd(), settled(), agentStart(), delta("running turn ")])
-    await flush()
-    follow.aim("queued", 1)
-    deliver([delta("rest of running\n"), agentEnd()])
-    deliver([agentStart(), delta("own answer\n"), agentEnd(), settled()])
-    await withTimeout(follow.settled, 5_000, "a send queued behind a running turn never completed")
-    expect(printed).toEqual(["own answer\n"])
-    follow.stop()
-  })
-
-  test("#given a send queued behind two turns #when both run first #then only the send's own answer is written", async () => {
-    const { remote, deliver } = asyncReplaySurface()
-    const printed: string[] = []
-    const follow = await followRemote(remote, ROW, (text) => printed.push(text))
-    if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
-    deliver([agentStart(), delta("running "), agentEnd()])
-    await flush()
-    follow.aim("queued", 2)
-    deliver([agentStart(), delta("first queued\n"), agentEnd()])
-    deliver([agentStart(), delta("own answer\n"), agentEnd(), settled()])
-    await withTimeout(follow.settled, 5_000, "a send queued behind two turns never completed")
-    expect(printed).toEqual(["own answer\n"])
-    follow.stop()
-  })
-
-  test("#given a steer into an already-running turn #when it is aimed #then it prints from the aim, never the replay before it", async () => {
-    const { remote, deliver } = asyncReplaySurface()
-    const printed: string[] = []
-    const follow = await followRemote(remote, ROW, (text) => printed.push(text))
-    if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
-    deliver([agentStart(), delta("before the steer\n"), agentEnd(), settled()])
-    await flush()
     follow.aim("steered")
-    deliver([delta("steered answer\n"), settled()])
-    await withTimeout(follow.settled, 5_000, "waited 5s for the steered turn's agent_settled, never fired")
+    deliver([delta("steered answer\n"), { type: "agent_settled" }])
+    await withTimeout(follow.settled, 5_000, "the steered turn never completed")
     expect(printed).toEqual(["steered answer\n"])
     follow.stop()
   })

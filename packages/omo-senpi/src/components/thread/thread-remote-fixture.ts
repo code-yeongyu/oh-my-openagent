@@ -111,12 +111,17 @@ export function createRemoteThreadFixture() {
     // admissions its user's open draft still holds (held_draft, taken by nothing).
     const admitted = new Set<string>()
     let heldDraft = options.heldDraft ?? 0
-    // The session's records a prompt makes it write, delivered to every watch after the prompt is answered.
+    // The session's records a prompt makes it write, held until the follower first reads after the answer: the
+    // engine's turn records follow its reply out over the wire, and the CLI's read is the first observable hop after
+    // its own bookkeeping for that reply.
     const watchers = new Set<(record: JsonObject) => void>()
-    const writeRecords = () =>
-      queueMicrotask(() => {
-        for (const record of options.records ?? []) for (const listener of [...watchers]) listener(record)
-      })
+    let answeredPrompt = false
+    let recordsOut = false
+    const writeRecords = () => {
+      if (recordsOut) return
+      recordsOut = true
+      for (const record of options.records ?? []) for (const listener of [...watchers]) listener(record)
+    }
     const hops: number[] = []
     const aliases = options.aliases ?? new Map<string, AliasHolder>()
     // The sessions b's engine holds. Its close rules are senpi's (2026.11.5-1): close_session from a connection that never
@@ -312,7 +317,7 @@ export function createRemoteThreadFixture() {
         sessionCommand: async (device, session, rpc) => {
           sent.push({ via: "session", device, session, rpc })
           const outcome = answer(rpc, session)
-          if (rpc["type"] === "prompt" && outcome.kind === "ok") writeRecords()
+          if (rpc["type"] === "prompt" && outcome.kind === "ok") answeredPrompt = true
           return outcome
         },
         watch: async (device, session, listener) => {
@@ -331,6 +336,7 @@ export function createRemoteThreadFixture() {
         },
         read: async (device, session) => {
           sent.push({ via: "read", device, session })
+          if (answeredPrompt) writeRecords()
           return {
             kind: "ok",
             response: {

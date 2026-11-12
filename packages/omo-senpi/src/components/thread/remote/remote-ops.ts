@@ -148,31 +148,74 @@ export function replyData(response: JsonObject): JsonObject {
 type RemoteFollowLane = "started" | "queued" | "steered"
 
 export type RemoteFollow = {
-  /** "settled" once the turn this send started settles (`agent_settled`), "session_closed" when its close cut the run short, else the reason its attach ended first. */
+  /** "settled" once the turn this send started settles, "session_closed" when its close cut the run short, else the reason its attach ended first. */
   readonly settled: Promise<string>
   readonly stop: () => void
   /**
-   * Names how the send's delivery answered, once its reply is known: `started` arms at the turn the send starts
-   * (its records may already sit in the buffer, having outrun the reply), `queued` waits out the running turn and
-   * `queuePosition - 1` further whole turns before arming at the send's own, `steered` prints from the aim, because
-   * the steered turn started before this follow. Until the aim nothing is written and nothing settles: the attach's
-   * replayed history is never this send's answer (#13267).
+   * Names how the send's delivery answered, once its reply is known (#13267): `steered` prints stream deltas from
+   * the aim; `started` and `queued` read the answer from the session's own transcript, anchored on the send's user
+   * entry - the stream's arrival order can never prove which turn a record belongs to (a queued follow-up drains
+   * inside the same run with plain `turn_start`/`turn_end` markers, retries open extra `agent_start` pairs, and a
+   * late replay lands after the aim), so the stream only signals that a run settled and the transcript decides
+   * what prints.
    */
-  readonly aim: (lane: RemoteFollowLane, queuePosition?: number) => void
+  readonly aim: (lane: RemoteFollowLane) => void
 }
 
 const isRecord = (value: unknown): value is JsonObject =>
   typeof value === "object" && value !== null && !Array.isArray(value)
 
+/** How many trailing transcript entries a follow reads to find the send's own turn. */
+const READ_TAIL = 256
+
+/** The joined text of a transcript message entry, or undefined for anything that is not one. */
+const entryTextOf = (entry: JsonObject): string | undefined => {
+  const message = isRecord(entry["message"]) ? entry["message"] : entry["role"] !== undefined ? entry : undefined
+  if (message === undefined) return undefined
+  const content = message["content"]
+  if (typeof content === "string") return content
+  if (!Array.isArray(content)) return undefined
+  const texts: string[] = []
+  for (const part of content)
+    if (isRecord(part) && part["type"] === "text" && typeof part["text"] === "string") texts.push(part["text"])
+  return texts.length > 0 ? texts.join("") : undefined
+}
+
+/** Whether a transcript entry is a user message, in either stored shape. */
+export const isUserEntry = (entry: JsonObject): boolean => {
+  const message = isRecord(entry["message"]) ? entry["message"] : entry
+  return message["role"] === "user"
+}
+
+/** The matches that can anchor a send's turn: its user entries, by exact text first, else entries containing it. */
+export const anchorMatches = (entries: readonly JsonObject[], text: string): number[] => {
+  const exact: number[] = []
+  const contained: number[] = []
+  for (let index = 0; index < entries.length; index++) {
+    const entry = entries[index]
+    if (!isUserEntry(entry)) continue
+    const entryText = entryTextOf(entry)
+    if (entryText === undefined) continue
+    if (entryText === text) exact.push(index)
+    else if (entryText.includes(text)) contained.push(index)
+  }
+  return exact.length > 0 ? exact : contained
+}
+
 /**
- * Follows another device's session from now on: each assistant text delta (`message_update` / `text_delta`) of the
- * turn the send `aim` names goes to `onText` in the order the session wrote it, until that turn's run settles, with a
- * line break between the text of separate messages or content blocks. Start it before the send it follows.
+ * Follows the answer to one send on another device's session. The send's user entry in the session's transcript
+ * anchors the turn: its answer entries print once the turn is final - superseded by a later message's turn, or the
+ * transcript's tail when a run settled - with the record stream as the completion signal. A steer rides an
+ * already-running turn and prints its deltas from the aim on instead, settling with its run.
  */
 export async function followRemote(
   remote: RemoteThreadSurface,
   row: RemoteSessionRow,
   onText: (text: string) => void,
+  options?: {
+    /** The text the send delivered; its user entry in the transcript anchors a queued follow's answer. */
+    readonly text?: string
+  },
 ): Promise<RemoteFollow | Failure> {
   const offline = await deviceOnline(remote, row.device)
   if (offline !== undefined) return offline
@@ -180,52 +223,85 @@ export async function followRemote(
   const settled = new Promise<string>((resolve) => {
     settle = resolve
   })
+  let done = false
+  const end = (reason: string): void => {
+    if (done) return
+    done = true
+    settle(reason)
+  }
+  let mode: "buffer" | "stream" | "transcript" = "buffer"
   let last: { readonly index: unknown; readonly endsLine: boolean } | undefined
   let newMessage = false
-  // Which records reach onText (#13267): `unaimed` buffers everything (an attach's replayed history is never this
-  // send's answer); a send that started its turn arms at its own `agent_start` (`await-turn`); a send queued at a
-  // position drops the running turn's records to its `agent_end` (`skip-running`) and then `position - 1` whole
-  // turns (`skip-starts`) - a queued follow-up runs right after the previous turn's `agent_end`, with no
-  // `agent_settled` between turns, because `agent_settled` ends the run, not each turn; `following` prints the
-  // send's own turn and settles at its `agent_end`.
-  type Gate =
-    | { kind: "unaimed"; buffered: JsonObject[] }
-    | { kind: "await-turn" }
-    | { kind: "skip-running"; readonly skip: number }
-    | { kind: "skip-starts"; left: number }
-    | { kind: "following" }
-  let gate: Gate = { kind: "unaimed", buffered: [] }
-  const arm = (): void => {
-    last = undefined
-    newMessage = false
-    gate = { kind: "following" }
-  }
-  const receive = (record: JsonObject): void => {
-    const type = record["type"]
-    switch (gate.kind) {
-      case "unaimed":
-        gate.buffered.push(record)
-        return
-      case "await-turn":
-        if (type === "agent_start") arm()
-        return
-      case "skip-running":
-        if (type === "agent_end") gate = { kind: "skip-starts", left: gate.skip }
-        return
-      case "skip-starts":
-        if (type !== "agent_start") return
-        if (gate.left > 0) gate = { kind: "skip-starts", left: gate.left - 1 }
-        else arm()
-        return
-      case "following":
-        followRecord(record)
-        return
+  let checking = false
+  let pendingSignal = false
+  // How many entries carried this send's text when a read first saw any: that count is this send's ordinal among
+  // identical-text messages, because its own entry is the newest such entry at its admission (#13272 review).
+  let matchOrdinal: number | undefined
+  const check = async (settleSignal: boolean): Promise<void> => {
+    const text = options?.text
+    if (done || mode !== "transcript" || text === undefined) return
+    if (checking) {
+      if (settleSignal) pendingSignal = true
+      return
+    }
+    checking = true
+    try {
+      const page = await remote.sessions.read(row.device, row.session_id, READ_TAIL)
+      if (done || mode !== "transcript" || page.kind !== "ok") return
+      const raw = page.response["entries"]
+      if (!Array.isArray(raw)) return
+      const entries = raw.filter(isRecord)
+      const matches = anchorMatches(entries, text)
+      if (matches.length === 0) return
+      if (matchOrdinal === undefined) matchOrdinal = matches.length
+      const anchor = matches[Math.min(matchOrdinal, matches.length) - 1]
+      const answer: string[] = []
+      let superseded = false
+      let answerAtTail = false
+      for (let index = anchor + 1; index < entries.length; index++) {
+        const entry = entries[index]
+        const message = isRecord(entry["message"]) ? entry["message"] : entry
+        if (message["role"] === "user") {
+          superseded = true
+          break
+        }
+        if (message["role"] !== "assistant") continue
+        const entryText = entryTextOf(entry)
+        if (entryText !== undefined && entryText !== "") {
+          answer.push(entryText)
+          answerAtTail = true
+        } else answerAtTail = false
+      }
+      // A later message's turn makes this send's turn final whether it wrote text or not: the wait ends instead of
+      // living until the session closes (#13272 review).
+      if (superseded) {
+        for (const [index, entryText] of answer.entries()) {
+          if (index > 0) onText("\n")
+          onText(entryText)
+        }
+        return end("settled")
+      }
+      // A queued send whose run settled without writing any answer keeps waiting: its run may simply not have
+      // started yet, and the attach's own end still ends the wait with a typed reason.
+      if (answer.length === 0) return
+      if (settleSignal && answerAtTail) {
+        for (const [index, entryText] of answer.entries()) {
+          if (index > 0) onText("\n")
+          onText(entryText)
+        }
+        end("settled")
+      }
+    } finally {
+      checking = false
+      if (pendingSignal) {
+        pendingSignal = false
+        void check(true)
+      }
     }
   }
-  const followRecord = (record: JsonObject): void => {
-    // The send's own turn completed (senpi settles a turn the session's close cut short with reason session_closed).
-    if (record["type"] === "agent_end" || record["type"] === "agent_settled")
-      return settle(record["reason"] === "session_closed" ? "session_closed" : "settled")
+  const streamRecord = (record: JsonObject): void => {
+    if (record["type"] === "agent_settled")
+      return end(record["reason"] === "session_closed" ? "session_closed" : "settled")
     if (record["type"] === "message_start" || record["type"] === "message_end") newMessage = true
     const event = record["assistantMessageEvent"]
     if (
@@ -242,60 +318,83 @@ export async function followRemote(
     last = { index: event["contentIndex"], endsLine: delta.endsWith("\n") }
     onText(delta)
   }
-  const aim: RemoteFollow["aim"] = (lane, queuePosition = 1) => {
-    if (gate.kind !== "unaimed") return
-    const buffered = gate.buffered
-    let lastEnd = -1
-    let openTurn = -1
-    let lastSettled = -1
-    const startsOfRun: number[] = []
-    for (const [index, record] of buffered.entries()) {
-      const type = record["type"]
-      if (type === "agent_end") lastEnd = index
-      else if (type === "agent_start") {
-        openTurn = index
-        if (index > lastSettled) startsOfRun.push(index)
-      } else if (type === "agent_settled") {
-        lastSettled = index
-        startsOfRun.length = 0
+  const probe = async (settleSignal: boolean): Promise<void> => {
+    const text = options?.text
+    if (done || text === undefined) return
+    const page = await remote.sessions.read(row.device, row.session_id, READ_TAIL)
+    if (done || page.kind !== "ok") return
+    const raw = page.response["entries"]
+    if (!Array.isArray(raw)) return
+    const entries = raw.filter(isRecord)
+    const matches = anchorMatches(entries, text)
+    if (matches.length === 0) return
+    const anchor = matches[matches.length - 1]
+    const answer: string[] = []
+    let superseded = false
+    let answerAtTail = false
+    for (let index = anchor + 1; index < entries.length; index++) {
+      const entry = entries[index]
+      const message = isRecord(entry["message"]) ? entry["message"] : entry
+      if (message["role"] === "user") {
+        superseded = true
+        break
       }
+      if (message["role"] !== "assistant") continue
+      const entryText = entryTextOf(entry)
+      if (entryText !== undefined && entryText !== "") {
+        answer.push(entryText)
+        answerAtTail = true
+      } else answerAtTail = false
     }
-    if (openTurn <= lastEnd) openTurn = -1
+    // Final once a later message supersedes the turn, or once a run settled (the buffer's own trailing settle
+    // counts: the turn finished before the aim) with this answer as the transcript's tail.
+    if (!(superseded || (settleSignal && answerAtTail)) || answer.length === 0) return
+    for (const [index, entryText] of answer.entries()) {
+      if (index > 0) onText("\n")
+      onText(entryText)
+    }
+    end("settled")
+  }
+  const buffer: JsonObject[] = []
+  const receive = (record: JsonObject): void => {
+    // A run's settle always ends the wait, whatever the mode (senpi settles a turn the session's close cut short
+    // with reason session_closed).
+    if (record["type"] === "agent_settled" && record["reason"] === "session_closed") return end("session_closed")
+    if (mode === "buffer") {
+      // The attach's replayed history is never this send's answer: it arrived before the aim and is dropped (#13267).
+      buffer.push(record)
+      return
+    }
+    if (mode === "stream") return streamRecord(record)
+    // Transcript mode reads the answer from the session; the stream is only a signal - a settle, a run end or a
+    // new user message means the transcript may hold this send's answer - because no event order can attribute a
+    // queued follow-up's records to its turn (#13272 review).
+    const type = record["type"]
+    if (type === "agent_settled") void check(true)
+    else if (type === "agent_end") void check(false)
+    else if (type === "message_start" && isRecord(record["message"]) && record["message"]["role"] === "user")
+      void check(false)
+  }
+  const aim: RemoteFollow["aim"] = (lane) => {
+    if (done || mode !== "buffer") return
     if (lane === "queued") {
-      // The open buffered turn is the running turn the send waits behind; replaying from it through the same machine
-      // lands on the send's own turn wherever the stream already holds it.
-      if (openTurn >= 0) {
-        gate = { kind: "skip-running", skip: queuePosition - 1 }
-        for (const record of buffered.slice(openTurn)) receive(record)
-        return
-      }
-      // No turn is running: within the current run (after its last `agent_settled`) the turn order is the running
-      // turn, then the queued messages ahead of this one, then this one.
-      if (startsOfRun.length >= queuePosition + 1) {
-        const own = startsOfRun[queuePosition] ?? -1
-        arm()
-        if (own >= 0) for (const record of buffered.slice(own + 1)) followRecord(record)
-        return
-      }
-      const ahead = Math.max(0, startsOfRun.length - 1)
-      gate = { kind: "skip-starts", left: queuePosition - 1 - ahead }
+      mode = "transcript"
+      void check(false)
       return
     }
-    if (lane === "steered") {
-      arm()
-      return
+    // A send that started or steered a turn streams its deltas from the aim on. Whatever the attach replayed before
+    // the aim is history and is dropped; the wait ends at the run's settle - retries included (#13267, #13272
+    // review). A started turn may also have already finished before this aim: the probe reads the transcript and
+    // prints a superseded answer at once.
+    mode = "stream"
+    if (lane === "started") {
+      // A run whose settle the buffer already holds ended before this aim: its settle is the probe's signal.
+      const settledAlready = buffer.length > 0 && buffer[buffer.length - 1]?.["type"] === "agent_settled"
+      void probe(settledAlready)
     }
-    // started: a buffered open turn (no agent_end after it) is this send's own turn outrunning its reply; its
-    // records may already sit in the buffer.
-    if (openTurn >= 0) {
-      arm()
-      for (const record of buffered.slice(openTurn + 1)) followRecord(record)
-      return
-    }
-    gate = { kind: "await-turn" }
   }
   const watched = await remote.sessions.watch(row.device, row.session_id, receive)
   if (watched.kind !== "ok") return outcomeFailure(watched, row.device)
-  void watched.watch.ended.then(settle)
+  void watched.watch.ended.then(end)
   return { settled, stop: watched.watch.stop, aim }
 }
