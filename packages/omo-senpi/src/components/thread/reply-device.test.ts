@@ -90,13 +90,24 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
     }
     const logger = { info() {}, error() {}, warn() {} }
     let prompts = 0
+    // Every delivery the gateway takes for a session on this device, by target: a local thread_send's real call.
+    const enqueued: string[] = []
+    const countedStore = new Proxy(store, {
+      get: (target, property, receiver) =>
+        property === "enqueue"
+          ? (request: Parameters<GatewayStore["enqueue"]>[0]) => {
+              enqueued.push(request.target_durable_id)
+              return target.enqueue(request)
+            }
+          : Reflect.get(target, property, receiver),
+    })
     createThreadComponent({
       host: host([LOCAL], () => {
         prompts += 1
       }),
       stateDirectory: join(agentDir, "state"),
       agentDir: () => agentDir,
-      store,
+      store: countedStore,
       remote: account.remote,
     }).register(pi as never, { logger, config: { getFlag: () => undefined } } as never)
     const ctx = { sessionManager: { getSessionId: () => "dur-caller" } }
@@ -133,7 +144,8 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
       account.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message").map((entry) => entry.device)
     // A delivery to a session on this device leaves a marker in its gateway inbox: none means nothing reached it.
     const reachedLocally = (durableId: string) => existsSync(gatewayInboxDirectory(agentDir, durableId))
-    return { reply, admittedOn, prompts: () => prompts, reachedLocally }
+    const enqueuedFor = (durableId: string) => enqueued.filter((target) => target === durableId).length
+    return { reply, admittedOn, prompts: () => prompts, reachedLocally, enqueuedFor }
   }
 
   test("#given b's delivery states a session id that a third device also lists #when the run replies by that id #then the reply goes to b's row and nothing reaches the third device", async () => {
@@ -173,13 +185,15 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
   })
 
   test("#given b's delivery states a name a session on this device carries #when the run replies by that name #then the reply goes to the consumed sender on b, never to the local session", async () => {
-    const { reply, admittedOn, prompts, reachedLocally } = await consumed(
+    const { reply, admittedOn, prompts, reachedLocally, enqueuedFor } = await consumed(
       [{ id: "device:b/d-1", session_id: "dur-on-b", name: "local peer" }],
       [B_ROW],
     )
     expect(await reply("local peer")).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
     expect(admittedOn()).toEqual(["b"])
-    expect({ prompts: prompts(), reached: reachedLocally("dur-local") }).toEqual({ prompts: 0, reached: false })
+    expect(prompts()).toBe(0)
+    expect(enqueuedFor("dur-local")).toBe(0)
+    expect(reachedLocally("dur-local")).toBe(false)
   })
 
   test("#given deliveries from b and from c that state one session id #when the run replies by that id #then it is ambiguous_target and nothing is sent", async () => {

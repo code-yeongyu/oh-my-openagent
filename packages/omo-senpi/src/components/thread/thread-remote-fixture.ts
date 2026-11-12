@@ -493,9 +493,20 @@ export function createRemoteThreadFixture() {
       source_host: null,
     }))
     const caller = extra.caller ?? "dur-caller"
+    // Every delivery the gateway takes for a session on this device, by target: a local thread_send's real call.
+    const enqueued: string[] = []
+    const countedStore = new Proxy(store, {
+      get: (target, property, receiver) =>
+        property === "enqueue"
+          ? (request: Parameters<GatewayStore["enqueue"]>[0]) => {
+              enqueued.push(request.target_durable_id)
+              return target.enqueue(request)
+            }
+          : Reflect.get(target, property, receiver),
+    })
     const tools = createThreadTools({
       host,
-      store,
+      store: countedStore,
       stateDirectory: join(agentDir, "state"),
       diskSessions: () => disk,
       callerSessionId: () => caller,
@@ -533,6 +544,7 @@ export function createRemoteThreadFixture() {
       agentDir,
       listings: () => localListings,
       prompts: () => localPrompts,
+      enqueuedFor: (durableId: string) => enqueued.filter((target) => target === durableId).length,
     }
   }
 
