@@ -3,6 +3,8 @@
 
 import { describe, expect, test } from "bun:test"
 
+import { isGeneratedBundlePath, loadGeneratedBundlePatterns } from "../../../../script/generated-bundles.ts"
+
 const ACTIVE_SURFACE_EXTENSIONS = /\.(?:ts|mts|cts|mjs|js|json|jsonc|md|yaml|yml|toml)$/
 const LEGACY_GPT_MODEL_RE = /gpt-5(?:\.|-)(?:2|3)(?![-\s]codex(?:\b|-|\.|_))(?:\b|-|\.|_)/i
 // POSIX ERE candidate prefilter: `git grep -P` needs a git built with
@@ -15,10 +17,11 @@ const ALLOWED_LEGACY_REFERENCES = new Set([
   "packages/omo-opencode/src/generated/model-capabilities.generated.json",
   // Immutable audit data records upstream module filenames, not active model selections.
   "script/qa/fixtures/dependency-audit/baseline-76e54b0-806f8e0/graph-artifacts/meta.json",
-  // Models LazyCodex once bundled, matched only to move pre-receipt installs off them (#5245); the bundle inlines it.
+  // Models LazyCodex once bundled, matched only to move pre-receipt installs off them (#5245).
   "packages/omo-codex/src/install/managed-agent-model-defaults.ts",
-  "packages/omo-codex/scripts/install-dist/install-local.mjs",
 ])
+// Generated outputs are built from sources this scan already reads, and feature PRs do not commit them (#9903).
+const GENERATED_BUNDLE_PATTERNS = loadGeneratedBundlePatterns()
 
 function isActiveSurface(path: string): boolean {
   if (!ACTIVE_SURFACE_EXTENSIONS.test(path)) return false
@@ -29,6 +32,7 @@ function isActiveSurface(path: string): boolean {
   if (path.endsWith(".test.ts") || path.endsWith(".test.mts") || path.endsWith(".test.mjs")) return false
   if (path.endsWith(".snap")) return false
   if (ALLOWED_LEGACY_REFERENCES.has(path)) return false
+  if (isGeneratedBundlePath(path, GENERATED_BUNDLE_PATTERNS)) return false
   return true
 }
 
