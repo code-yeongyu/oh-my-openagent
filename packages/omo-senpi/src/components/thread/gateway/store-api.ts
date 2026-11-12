@@ -23,6 +23,8 @@ import type {
   ExternalAuthor,
   GatewayStoreEvent,
   GatewayStoreStats,
+  IntakeOutcome,
+  IntakeRequest,
   ProcessIdentity,
   ReconcileOutcome,
   ReconcileRequest,
@@ -54,6 +56,8 @@ export type GatewayStore = ExtensionFacade & {
   readonly now: () => number
   readonly identity: () => Promise<ProcessIdentity>
   readonly enqueue: (request: EnqueueRequest) => Promise<EnqueueOutcome>
+  /** A record another device's service attested, for a session here that is not running (#13037); nothing calls it in production yet. */
+  readonly intake: (request: IntakeRequest) => Promise<IntakeOutcome>
   readonly reconcile: (request: ReconcileRequest) => Promise<ReconcileOutcome>
   readonly claim: (request: ClaimRequest) => Promise<ClaimOutcome>
   readonly recordOutcome: (request: RecordOutcomeRequest) => Promise<ClaimOutcome>

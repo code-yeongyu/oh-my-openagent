@@ -347,6 +347,7 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     now,
     identity: () => track(async () => (await start()).self),
     enqueue: (request) => call("enqueue", request),
+    intake: (request) => call("intake", request),
     reconcile: (request) => call("reconcile", request),
     claim: (request) => call("claim", request),
     recordOutcome: (request) => call("record_outcome", request),

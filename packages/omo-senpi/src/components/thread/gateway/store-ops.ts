@@ -47,6 +47,8 @@ import type {
   EnqueueOutcome,
   EnqueueRequest,
   GatewayStoreConfig,
+  IntakeOutcome,
+  IntakeRequest,
   GatewayStoreEvent,
   GatewayStoreStats,
   LegacyMailboxSkip,
@@ -100,6 +102,9 @@ const DELIVERY_COLUMNS = [
   "binding_id",
   "binding_revision",
   "actor_user_id",
+  "ledger_id",
+  "verbatim_text",
+  "verbatim_display_text",
 ] as const
 
 export const OPEN_STATES = "('queued', 'admitting', 'admitted')"
@@ -144,7 +149,19 @@ function rowFrom(record: SqlRow): DeliveryRow {
     binding_id: record.binding_id === null ? null : String(record.binding_id),
     binding_revision: nullableNumber(record.binding_revision),
     actor_user_id: record.actor_user_id === null ? null : String(record.actor_user_id),
+    ledger_id: nullableString(record.ledger_id),
+    verbatim_text: nullableString(record.verbatim_text),
+    verbatim_display_text: nullableString(record.verbatim_display_text),
   }
+}
+
+function nullableString(value: unknown): string | null {
+  return value === null || value === undefined ? null : String(value)
+}
+
+/** The id the engine's ledger knows a row by: its ledger id when it was taken in from another device, else its row id. */
+function engineKey(row: DeliveryRow): string {
+  return row.ledger_id ?? row.delivery_id
 }
 
 function selectRows(ctx: StoreContext, where: string, params: readonly SqlValue[], orderBy?: string): DeliveryRow[] {
@@ -323,6 +340,9 @@ function insertDelivery(ctx: StoreContext, row: DeliveryRow): void {
       row.binding_id,
       row.binding_revision,
       row.actor_user_id,
+      row.ledger_id ?? null,
+      row.verbatim_text ?? null,
+      row.verbatim_display_text ?? null,
     ],
   )
 }
@@ -481,7 +501,11 @@ type CausalPlacement = {
 
 function placeCausally(ctx: StoreContext, request: EnqueueRequest): CausalPlacement | StoreRefusal {
   let placement: CausalPlacement
-  const cause = request.cause_delivery_id === null ? undefined : selectRow(ctx, request.cause_delivery_id)
+  // The engine names a consumed delivery by its ledger key, so a row taken in from another device is found by that too.
+  const cause =
+    request.cause_delivery_id === null
+      ? undefined
+      : selectRows(ctx, "delivery_id = ? OR ledger_id = ?", [request.cause_delivery_id, request.cause_delivery_id])[0]
   if (cause !== undefined) {
     // The cause is the delivery whose message the sender's model consumed (runtime context, never a
     // model), so a row still `admitting` is one the runtime took but could not record yet (its outcome
@@ -604,7 +628,19 @@ function checkBinding(
   return { expires_at: expiresAt }
 }
 
-export async function enqueue(ctx: StoreContext, request: EnqueueRequest): Promise<EnqueueOutcome> {
+/** What only the intake adds to an enqueue: the row's ledger fields, and the answer its receipt completes with in the same commit. */
+type IntakeFields = {
+  readonly ledger_id: string
+  readonly verbatim_text: string
+  readonly verbatim_display_text: string
+  readonly answer: (row: DeliveryRow, queuePosition: number) => unknown
+}
+
+export async function enqueue(
+  ctx: StoreContext,
+  request: EnqueueRequest,
+  intakeFields?: IntakeFields,
+): Promise<EnqueueOutcome> {
   if (!isProvenance(request.provenance)) return refused("invalid_arguments", "Delivery provenance is required.")
   if (!DURABLE_ID_PATTERN.test(request.target_durable_id) || !DURABLE_ID_PATTERN.test(request.delivery_id)) {
     return refused("invalid_arguments", "The target session id is not a durable session id.")
@@ -699,24 +735,30 @@ export async function enqueue(ctx: StoreContext, request: EnqueueRequest): Promi
       binding_id: request.binding?.binding_id ?? null,
       binding_revision: request.binding?.revision ?? null,
       actor_user_id: "external" in request.origin ? (request.origin.external.author?.user_id ?? null) : null,
+      ledger_id: intakeFields?.ledger_id ?? null,
+      verbatim_text: intakeFields?.verbatim_text ?? null,
+      verbatim_display_text: intakeFields?.verbatim_display_text ?? null,
     }
     insertDelivery(ctx, row)
+    const position = queuePosition(ctx, row)
+    const answer = intakeFields?.answer(row, position)
     write(
       ctx,
-      "INSERT INTO receipts (principal, operation, idempotency_key, args_hash, status, delivery_id, owner_instance, created_at, updated_at, expires_at) VALUES (?, 'deliver', ?, ?, 'prepared', ?, ?, ?, ?, ?)",
+      "INSERT INTO receipts (principal, operation, idempotency_key, args_hash, status, delivery_id, owner_instance, result, created_at, updated_at, expires_at) VALUES (?, 'deliver', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [
         request.sender_principal,
         request.receipt.idempotency_key,
         request.receipt.args_hash,
+        answer === undefined ? "prepared" : "completed",
         row.delivery_id,
         ctx.config.instance_id,
+        answer === undefined ? null : JSON.stringify(answer),
         request.now,
         request.now,
         request.now + GATEWAY_RECEIPT_RETENTION_MS,
       ],
     )
     marker = createMarker(ctx, row.target_durable_id, row.delivery_id, false)
-    const position = queuePosition(ctx, row)
     sweepRetentionIfDue(ctx, request.now, cleared)
     if (ctx.afterCommit === undefined) await ctx.hook("beforeDbCommit")
     ctx.sql.exec(commitSql)
@@ -731,6 +773,112 @@ export async function enqueue(ctx: StoreContext, request: EnqueueRequest): Promi
     }
     throw error
   }
+}
+
+/**
+ * Takes in a record another device's service attested, for a session on this device that is not running (#13037, design
+ * 5.5). Every refusal here happens before the commit; an accepted record is the enqueue transaction's row, receipt, budgets
+ * and inbox marker in one commit, its receipt completed with the answer so a repeat from the same device replays it.
+ */
+export async function intake(ctx: StoreContext, request: IntakeRequest): Promise<IntakeOutcome> {
+  const record = request.record
+  const device = request.attested_device
+  if (
+    !DURABLE_ID_PATTERN.test(device) ||
+    !DURABLE_ID_PATTERN.test(record.deliveryId) ||
+    !DURABLE_ID_PATTERN.test(record.sessionId) ||
+    typeof record.text !== "string" ||
+    typeof record.displayText !== "string" ||
+    !Number.isSafeInteger(record.chainCount) ||
+    record.chainCount < 1
+  ) {
+    return refused("invalid_arguments", "The intake record is malformed.")
+  }
+  const senderSession = record.sender.kind === "agent" ? record.sender.session_id : undefined
+  if (senderSession === undefined || !DURABLE_ID_PATTERN.test(senderSession)) {
+    return refused("unsupported", "Only an agent sender can reach a session that is not running.", {
+      reason: "sender_not_allowed",
+    })
+  }
+  if (record.deliverAs !== "followUp") {
+    return refused("turn_conflict", "A session that is not running has no turn to steer.", {
+      target: record.sessionId,
+    })
+  }
+  if (request.target_session_kind !== "interactive") {
+    return refused("not_resumable", "A child or worker session is not started for a delivery.", {
+      reason: "not_wakeable",
+    })
+  }
+  if (request.chain_count_limit !== undefined && record.chainCount > request.chain_count_limit) {
+    return refused("unsupported", "The delivery's chain is over this machine's chain limit.", {
+      reason: "chain_count_limit",
+      chain_count: record.chainCount,
+      limit: request.chain_count_limit,
+    })
+  }
+  const ledgerId = `device:${device}/${record.deliveryId}`
+  const principal = `device:${device}#session:${senderSession}`
+  const name = record.sender.name?.trim()
+  const outcome = await enqueue(
+    ctx,
+    {
+      provenance: { ...request.provenance, device },
+      now: request.now,
+      delivery_id: randomUUID(),
+      target_durable_id: record.sessionId,
+      sender_principal: principal,
+      rate_principal: `device:${device}`,
+      sender_node: principal,
+      sender_turn: null,
+      cause_delivery_id: null,
+      inbound_hop: record.chainCount - 1,
+      claimed_root_id: null,
+      origin: { session: senderSession },
+      actor: name === undefined || name === "" ? senderSession : name,
+      body: record.text,
+      mode: "follow_up",
+      expected_turn_id: null,
+      binding: null,
+      receipt: {
+        idempotency_key: record.deliveryId,
+        args_hash: argsHash({
+          target: record.sessionId,
+          text: record.text,
+          display_text: record.displayText,
+          sender: record.sender,
+          deliver_as: record.deliverAs,
+          chain_count: record.chainCount,
+        }),
+      },
+      endpoint_kind: null,
+    },
+    {
+      ledger_id: ledgerId,
+      verbatim_text: record.text,
+      verbatim_display_text: record.displayText,
+      answer: (row, position) => ({
+        kind: "queued",
+        delivery_id: record.deliveryId,
+        row_id: row.delivery_id,
+        ledger_id: ledgerId,
+        queue_position: position,
+      }),
+    },
+  )
+  if (outcome.kind === "inserted") {
+    return {
+      kind: "queued",
+      delivery_id: record.deliveryId,
+      row_id: outcome.row.delivery_id,
+      ledger_id: ledgerId,
+      queue_position: outcome.queue_position,
+      deduplicated: false,
+    }
+  }
+  if (outcome.kind === "replay")
+    return { ...(outcome.result as Extract<IntakeOutcome, { kind: "queued" }>), deduplicated: true }
+  return outcome
 }
 
 function transcriptText(sessionPath: string | null, cache: Map<string, string>): string {
@@ -874,10 +1022,16 @@ export async function reconcile(ctx: StoreContext, request: ReconcileRequest): P
     const letGo = dead || releasedByClaimant(row.admitted_by, row.claimed_at, releaseIndex)
     const to = !letGo
       ? "dual"
-      : sessionHasToken(request.session_path, row.delivery_id, transcripts)
+      : sessionHasToken(request.session_path, engineKey(row), transcripts)
         ? "applied"
         : "queued"
     verdicts.set(row.delivery_id, { fingerprint: claimFingerprint(row), to })
+  }
+  // A row taken in from another device may already be in the transcript under its ledger key: the same delivery reached
+  // the session live (design 5.7, A2.15). It is settled applied before any claim, so the drain never admits it twice.
+  const alreadyWritten = new Set<string>()
+  for (const row of selectRows(ctx, "target_durable_id = ? AND state = 'queued' AND ledger_id IS NOT NULL", [target])) {
+    if (sessionHasToken(request.session_path, engineKey(row), transcripts)) alreadyWritten.add(row.delivery_id)
   }
 
   if (ctx.config.test_hooks.announceBarrier === true) ctx.emit({ kind: "barrier", op: "reconcile" })
@@ -889,14 +1043,18 @@ export async function reconcile(ctx: StoreContext, request: ReconcileRequest): P
     for (const row of selectRows(ctx, `target_durable_id = ? AND state IN ${OPEN_STATES}`, [target], "seq")) {
       let to: DeliveryState = row.state
       if (row.state === "queued") {
-        if (row.expires_at <= request.now) {
+        if (row.ledger_id != null && (alreadyWritten.has(row.delivery_id) || emitted.has(row.ledger_id))) {
+          transition(ctx, row, "applied", request.now)
+          transitions.push({ delivery_id: row.delivery_id, from: row.state, to: "applied" })
+        } else if (row.expires_at <= request.now) {
           transition(ctx, row, "refused", request.now, { reason: "expired" })
           transitions.push({ delivery_id: row.delivery_id, from: row.state, to: "refused" })
         }
         continue
       }
       if (row.admitted_by !== null && sameProcess(row.admitted_by, request.self)) {
-        to = emitted.has(row.delivery_id) ? "applied" : pending.has(row.delivery_id) ? "admitted" : "queued"
+        const key = engineKey(row)
+        to = emitted.has(key) ? "applied" : pending.has(key) ? "admitted" : "queued"
       } else if (row.admitted_by === null) {
         to = "queued"
       } else {

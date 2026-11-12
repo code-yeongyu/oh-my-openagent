@@ -31,7 +31,11 @@ function record(overrides: Partial<IntakeRecord> = {}): IntakeRecord {
   }
 }
 
-function request(h: GatewayHarness, overrides: Partial<IntakeRequest> = {}, rec: Partial<IntakeRecord> = {}): IntakeRequest {
+function request(
+  h: GatewayHarness,
+  overrides: Partial<IntakeRequest> = {},
+  rec: Partial<IntakeRecord> = {},
+): IntakeRequest {
   return {
     now: h.clock.now,
     attested_device: "dev-a",
@@ -47,7 +51,12 @@ describe("intake", () => {
     const h = (harness = createGatewayHarness())
     const target = h.session("target")
     const answer = await target.store.intake(request(h, {}, { chainCount: 3 }))
-    expect(answer).toMatchObject({ kind: "queued", delivery_id: "d-1", ledger_id: "device:dev-a/d-1", deduplicated: false })
+    expect(answer).toMatchObject({
+      kind: "queued",
+      delivery_id: "d-1",
+      ledger_id: "device:dev-a/d-1",
+      deduplicated: false,
+    })
     if (answer.kind !== "queued") throw new Error("intake refused")
     expect(answer.row_id).not.toBe("d-1")
 
@@ -93,7 +102,12 @@ describe("intake", () => {
     const again = await target.store.intake(request(h))
     expect(again).toEqual({ ...first, deduplicated: true } as typeof again)
     const other = await target.store.intake(request(h, { attested_device: "dev-b" }))
-    expect(other).toMatchObject({ kind: "queued", delivery_id: "d-1", ledger_id: "device:dev-b/d-1", deduplicated: false })
+    expect(other).toMatchObject({
+      kind: "queued",
+      delivery_id: "d-1",
+      ledger_id: "device:dev-b/d-1",
+      deduplicated: false,
+    })
     const rows = await target.store.list({ target_durable_id: "target" })
     expect(rows.map((row) => row.ledger_id).sort()).toEqual(["device:dev-a/d-1", "device:dev-b/d-1"])
   })
@@ -118,17 +132,40 @@ describe("intake", () => {
 
   test.each([
     ["a steer", {}, { deliverAs: "steer" as const }, { code: "turn_conflict" }],
-    ["a sender that is not an agent", {}, { sender: { kind: "command_line" } }, { code: "unsupported", details: { reason: "sender_not_allowed" } }],
-    ["a child session", { target_session_kind: "child" as const }, {}, { code: "not_resumable", details: { reason: "not_wakeable" } }],
-    ["a worker session", { target_session_kind: "worker" as const }, {}, { code: "not_resumable", details: { reason: "not_wakeable" } }],
-    ["a chain count over the set limit", { chain_count_limit: 3 }, { chainCount: 4 }, { code: "unsupported", details: { reason: "chain_count_limit" } }],
-  ] as const)("#given %s #when it is taken in #then it is refused before the commit and no row exists", async (_name, extra, rec, refusal) => {
-    const h = (harness = createGatewayHarness())
-    const target = h.session("target")
-    const answer = await target.store.intake(request(h, extra, rec))
-    expect(answer).toMatchObject({ kind: "refused", ...refusal })
-    expect(await target.store.list({ target_durable_id: "target" })).toEqual([])
-  })
+    [
+      "a sender that is not an agent",
+      {},
+      { sender: { kind: "command_line" } },
+      { code: "unsupported", details: { reason: "sender_not_allowed" } },
+    ],
+    [
+      "a child session",
+      { target_session_kind: "child" as const },
+      {},
+      { code: "not_resumable", details: { reason: "not_wakeable" } },
+    ],
+    [
+      "a worker session",
+      { target_session_kind: "worker" as const },
+      {},
+      { code: "not_resumable", details: { reason: "not_wakeable" } },
+    ],
+    [
+      "a chain count over the set limit",
+      { chain_count_limit: 3 },
+      { chainCount: 4 },
+      { code: "unsupported", details: { reason: "chain_count_limit" } },
+    ],
+  ] as const)(
+    "#given %s #when it is taken in #then it is refused before the commit and no row exists",
+    async (_name, extra, rec, refusal) => {
+      const h = (harness = createGatewayHarness())
+      const target = h.session("target")
+      const answer = await target.store.intake(request(h, extra, rec))
+      expect(answer).toMatchObject({ kind: "refused", ...refusal })
+      expect(await target.store.list({ target_durable_id: "target" })).toEqual([])
+    },
+  )
 
   test("#given the chain limit #when the count is at the limit, or no limit is set #then the record is taken in", async () => {
     const h = (harness = createGatewayHarness())
@@ -251,7 +288,9 @@ test("#given a store at the previous schema with a delivery #when the new build 
   expect(row).toMatchObject({ delivery_id: "old-1", ledger_id: null, verbatim_text: null, verbatim_display_text: null })
   const check = new Database(path, { readonly: true })
   try {
-    const columns = (check.query("PRAGMA table_info(deliveries)").all() as { name: string }[]).map((column) => column.name)
+    const columns = (check.query("PRAGMA table_info(deliveries)").all() as { name: string }[]).map(
+      (column) => column.name,
+    )
     expect(columns).toEqual(expect.arrayContaining(["ledger_id", "verbatim_text", "verbatim_display_text"]))
   } finally {
     check.close()

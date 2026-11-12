@@ -111,13 +111,20 @@ export function createInboxDrain(options: InboxDrainOptions): InboxDrain {
       })
       if (claimed.kind !== "claimed") continue
       options._test?.afterClaim?.(claimed.row)
+      // A row taken in from another device is admitted under the engine's ledger key with the sender's text as written,
+      // so the engine's own dedupe also covers the same delivery arriving live (#13037, design 5.5).
+      const ledgerId = claimed.row.ledger_id ?? null
+      const engineId = ledgerId ?? row.delivery_id
       let result: ReturnType<SessionRuntimePort["admitExternalMessage"]>
       try {
         result = runtime.admitExternalMessage({
-          delivery_id: row.delivery_id,
-          text: renderDeliveryText(claimed.row),
+          delivery_id: engineId,
+          text: ledgerId === null ? renderDeliveryText(claimed.row) : (claimed.row.verbatim_text ?? claimed.row.body),
           sender: deliverySender(claimed.row),
-          display_text: `${deliveryProvenanceLine(claimed.row.envelope.provenance)}\n${claimed.row.body}`,
+          display_text:
+            ledgerId === null
+              ? `${deliveryProvenanceLine(claimed.row.envelope.provenance)}\n${claimed.row.body}`
+              : (claimed.row.verbatim_display_text ?? claimed.row.body),
           deliverAs: decision.deliverAs,
           ...(decision.expected_turn_id === undefined ? {} : { expected_turn_id: decision.expected_turn_id }),
         })
@@ -156,7 +163,7 @@ export function createInboxDrain(options: InboxDrainOptions): InboxDrain {
         })
       } else {
         const written =
-          result.kind === "already_admitted" && runtime.listAdmittedDeliveries().emitted.includes(row.delivery_id)
+          result.kind === "already_admitted" && runtime.listAdmittedDeliveries().emitted.includes(engineId)
         await options.store.recordOutcome({
           now: now(),
           delivery_id: row.delivery_id,

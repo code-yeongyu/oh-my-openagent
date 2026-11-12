@@ -197,6 +197,8 @@ async function dispatch(op: string, args: unknown): Promise<unknown> {
       return await sessions.recordThreadCreation(ctx, args as Parameters<typeof sessions.recordThreadCreation>[1])
     case "enqueue":
       return await ops.enqueue(ctx, args as Parameters<typeof ops.enqueue>[1])
+    case "intake":
+      return await ops.intake(ctx, args as Parameters<typeof ops.intake>[1])
     case "reconcile":
       return await ops.reconcile(ctx, args as Parameters<typeof ops.reconcile>[1])
     case "claim":
