@@ -19,7 +19,7 @@ import type { Task } from "../taskset/tasks.ts"
 import type { Cell, CellResult } from "../vocabulary.ts"
 import { cellCode, type FixtureTarget } from "./legacy-code.ts"
 import { runControl } from "./legacy-control.ts"
-import { hostFixtures } from "./legacy-fixtures.ts"
+import { hostFixtures, hostScope } from "./legacy-fixtures.ts"
 import { isRecord, loadShippedTool, shippedBundle, type Slot } from "./legacy-release.ts"
 
 type Journal = CellResult["journal"]
@@ -52,6 +52,8 @@ interface LegacyDriverParts {
   readonly tool: Slot<ShippedTool>
   readonly fixtures: Slot<Fixtures>
   readonly observer: Slot<Observer>
+  /** Why this host cannot measure a cell; such a cell is recorded not_run and nothing is sent. */
+  readonly scope?: (cell: Cell) => string | undefined
 }
 
 const NONE = { signal: "none", firstAt: null, count: 0 } as const
@@ -176,6 +178,8 @@ export function createLegacyDriver(parts: LegacyDriverParts): Driver {
 
   return {
     async runCell(cell) {
+      const outOfScope = parts.scope?.(cell)
+      if (outOfScope !== undefined) return notRun(cell, outOfScope)
       const available = ready(parts)
       if (typeof available === "string") return notRun(cell, available)
       const { tool, fixtures, observer } = available
@@ -231,6 +235,7 @@ export const driver: Driver = createLegacyDriver({
   session,
   tool: shippedTool,
   fixtures: hostFixtures(process.platform, process.env, session),
+  scope: hostScope(process.platform, process.env),
   observer: {
     unavailable:
       "no desktop observer is wired for this OS: row 3 builds the macOS observer, rows 27, 30 and 31 the Windows and Linux recorders",
