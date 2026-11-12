@@ -115,3 +115,24 @@ fn host_call_serves_only_its_own_table_methods_with_typed_params() {
     assert_eq!(s.host_call(Method::ControlAcquire, json!({})).expect("served").expect("lease")["active"], json!(true));
     assert!(matches!(s.host_call(Method::ControlAcquire, json!({})), Some(Err(crate::grant::HostCallError::Refused(_)))));
 }
+
+#[test]
+fn every_lease_end_goes_through_one_funnel() {
+    let sink = RecordingSink::default();
+    let mut s = session(&json!({ "object": true }), &sink, None);
+    s.control_grant(params(json!({ "reason": "r" })));
+    capture(&mut s, "1");
+    s.control_acquire().expect("lease");
+    s.control_release();
+    assert!(!s.holds_lease(), "the slot is free");
+    assert!(sink.lines().iter().any(|line| line.contains("presence hide")), "{:?}", sink.lines());
+    let next = s.click(params(json!({ "target": "1", "x": 1, "y": 1 }))).expect("the run continues");
+    let report = serde_json::to_value(&next).expect("report");
+    assert!(report.get("focusRestoration").is_none(), "a session's own release is not user_moved_on: {report}");
+    s.control_grant(params(json!({ "reason": "r" })));
+    s.control_acquire().expect("lease again");
+    s.display_release();
+    let after = s.click(params(json!({ "target": "1", "x": 1, "y": 1 }))).expect("still running");
+    assert_eq!(serde_json::to_value(&after).expect("report")["focusRestoration"], json!("user_moved_on"),
+        "a user-side end still reports");
+}

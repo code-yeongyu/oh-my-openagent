@@ -11,6 +11,8 @@ use omo_computer_safety::gate::verdicts::LeaseRefusal;
 /// Why a lease ended without the session releasing it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LeaseEnd {
+    /// The session released its own lease: the surface goes, the next report says nothing.
+    Release,
     DisplayRelease,
     Lock,
     PresenceLost,
@@ -62,7 +64,9 @@ impl PresenceState {
     pub fn end(&mut self, why: LeaseEnd) {
         if self.shown.is_some() {
             self.release();
-            self.ended = Some(why);
+            if why != LeaseEnd::Release {
+                self.ended = Some(why);
+            }
         }
     }
 

@@ -108,9 +108,7 @@ impl Session {
 
     /// `control.release`: this session's lease ends; the grant stays.
     pub fn control_release(&mut self) {
-        self.funnel.control.presence.release();
-        self.funnel.control.slot.release(&self.funnel.control.token);
-        self.funnel.control.lease_epoch = None;
+        self.end_lease(LeaseEnd::Release);
     }
 
     /// The lease ends under the user (the next report reads `user_moved_on`, no `Suspended`).
