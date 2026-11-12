@@ -91,13 +91,63 @@ impl Settled {
     }
 }
 
-/// Waits on `feed` for `window` to go quiet.
+/// Waits on `feed` for `window` to go quiet. Events of other windows do not restart the quiet
+/// timer; a post-send settle switches to `changed` on the first attributed event and to
+/// `navigation` on a navigation event, and never back.
 pub fn quiet_window(
     feed: &mut dyn Feed,
     window: &str,
     bounds: Bounds,
     picking: Picking,
 ) -> Settled {
-    let _ = (feed.now_ms(), window, picking, is_navigation(""));
-    Settled::unsupported(SettleRegime::Unchanged, bounds.quiet_ms)
+    let start = feed.now_ms();
+    let mut regime = match picking {
+        Picking::Fixed(regime) => regime,
+        Picking::AfterInput => SettleRegime::Unchanged,
+    };
+    let mut bounds = bounds;
+    let mut last_change = start;
+    let mut last_event = None;
+    loop {
+        let now = feed.now_ms();
+        let quiet_end = last_change.saturating_add(bounds.quiet_ms);
+        let deadline = start.saturating_add(bounds.cap_ms);
+        let ended = if now >= quiet_end {
+            Some(SettleOutcome::Settled)
+        } else if now >= deadline {
+            Some(SettleOutcome::Pending)
+        } else {
+            None
+        };
+        // An observer that refuses ends the watch as `unsupported`, with the time it waited.
+        let outcome = match ended {
+            Some(outcome) => outcome,
+            None => match feed.wait_event(quiet_end.min(deadline)) {
+                Err(_) => SettleOutcome::Unsupported,
+                Ok(Some(event)) if event.window == window => {
+                    last_change = feed.now_ms();
+                    if picking == Picking::AfterInput {
+                        regime = if regime == SettleRegime::Navigation || is_navigation(&event.kind)
+                        {
+                            SettleRegime::Navigation
+                        } else {
+                            SettleRegime::Changed
+                        };
+                        bounds = regime.numbers().into();
+                    }
+                    last_event = Some(event.kind);
+                    continue;
+                }
+                Ok(_) => continue,
+            },
+        };
+        return Settled {
+            outcome,
+            regime,
+            quiet_ms: bounds.quiet_ms,
+            waited_ms: feed.now_ms().saturating_sub(start),
+            indicator: None,
+            last_event,
+        };
+    }
 }
