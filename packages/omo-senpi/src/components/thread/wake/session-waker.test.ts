@@ -3,7 +3,7 @@ import { join } from "node:path"
 
 import { createGatewayHarness, type GatewayHarness } from "../gateway/testing/harness"
 import { createLegacyWakeOpen } from "./legacy-open"
-import { createSessionWaker } from "./session-waker"
+import { createSessionWaker, type WakeOutcome } from "./session-waker"
 import { startFakeWakeHost, writeSessionFile, type FakeWakeHost, type WakeHostReply } from "./testing/fake-wake-host"
 
 // The wake primitive, steps 1 to 5 (#13037 design 5.2, amendment A3.3): resolve, refuse a child, take a place in the
@@ -98,7 +98,7 @@ describe("ensureSessionRunning", () => {
     expect(await store.woken.list()).toEqual([])
   })
 
-  test.each([
+  test.each<[string, Record<string, unknown>, "child" | "worker"]>([
     ["a child session", { spawnedBy: { parentSessionId: "p", rootSessionId: "p", taskId: "t1" } }, "child"],
     ["a worker session", { kind: "worker" }, "worker"],
   ])(
@@ -126,7 +126,7 @@ describe("ensureSessionRunning", () => {
     expect((await store.woken.list()).find((row) => row.durable_id === "s1")?.state).toBe("requested")
   })
 
-  test.each([
+  test.each<[string, WakeHostReply, WakeOutcome]>([
     ["session_held", refusal("session_held", { holders: [{ pid: 4242 }] }), { kind: "busy", code: "session_held" }],
     [
       "session_path_in_use",
@@ -162,7 +162,7 @@ describe("ensureSessionRunning", () => {
     writeSessionFile(sessions, "s1")
     await waker.ensureSessionRunning("s1")
     const [row] = await store.woken.list()
-    expect(await waker.ensureSessionRunning("s1")).toEqual({ kind: "not_yet", next_attempt_at: row?.next_attempt_at })
+    expect(await waker.ensureSessionRunning("s1")).toEqual({ kind: "not_yet", next_attempt_at: row?.next_attempt_at ?? -1 })
     expect(fake.frames).toHaveLength(1)
     expect(ensured).toHaveLength(1)
   })

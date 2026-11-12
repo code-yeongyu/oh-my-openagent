@@ -156,7 +156,7 @@ describe("woken session record", () => {
     const successor = h.store()
     expect(await successor.woken.takeOver({ durable_id: "s1" })).toMatchObject({ kind: "taken_over" })
 
-    const lost = { kind: "lost_lease" }
+    const lost = { kind: "lost_lease" } as const
     expect(await owner.woken.renew({ durable_id: "s1", generation: stale })).toEqual(lost)
     expect(await owner.woken.setState({ durable_id: "s1", generation: stale, state: "open" })).toEqual(lost)
     expect(await owner.woken.recordWaiting({ durable_id: "s1", generation: stale })).toEqual(lost)
