@@ -117,7 +117,7 @@ impl Session {
         let mut count: u32 = 0;
         for (index, event) in events.into_iter().enumerate() {
             if index > 0 {
-                if let Some(stop) = boundary_stop(self.backend.as_ref(), watch, window) {
+                if let Some(stop) = self.latched().or_else(|| boundary_stop(self.backend.as_ref(), watch, window)) {
                     return Outcome { count, of, stop: Some(stop) };
                 }
             }
