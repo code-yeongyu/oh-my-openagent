@@ -232,8 +232,9 @@ fn discard(path: &Path) {
 
 /// The removal's error, unless the file was not there.
 fn removal_failed(path: &Path) -> Option<io::Error> {
-    let _ = fs::remove_file(path);
-    None
+    fs::remove_file(path)
+        .err()
+        .filter(|error| error.kind() != io::ErrorKind::NotFound)
 }
 
 #[cfg(test)]
