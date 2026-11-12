@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { join } from "node:path"
 
 import { classifyReflectionLockHolder, getStableLocalHostId, isReflectionHostLocal } from "./stale-holder"
 import { REFLECTION_DIR, SCENARIOS, probeFor } from "./stale-holder.scenarios.test-support"
@@ -54,7 +55,7 @@ describe("reflection lock holder decision (#10377)", () => {
         ...baseScenario.facts,
         files: {
           ...baseScenario.facts.files,
-          [`${REFLECTION_DIR}/active.lock`]: JSON.stringify({
+          [join(REFLECTION_DIR, "active.lock")]: JSON.stringify({
             runId: "reflection-run-64",
             launcherPid: 11096,
             launcherHostname: "remote-mac",
@@ -91,7 +92,7 @@ describe("reflection lock holder decision (#10377)", () => {
         ...baseScenario.facts,
         files: {
           ...baseScenario.facts.files,
-          [`${REFLECTION_DIR}/active.lock`]: JSON.stringify({
+          [join(REFLECTION_DIR, "active.lock")]: JSON.stringify({
             runId: "reflection-run-64",
             launcherPid: 11096,
             launcherHostname: "Mac-765",
@@ -114,13 +115,13 @@ describe("reflection lock holder decision (#10377)", () => {
     test("#given the production comparison and a foreign machine id #when the lock is classified #then it stays stuck", async () => {
       const facts = {
         files: {
-          [`${REFLECTION_DIR}/active.lock`]: JSON.stringify({
+          [join(REFLECTION_DIR, "active.lock")]: JSON.stringify({
             runId: "reflection-run-64",
             launcherPid: 11096,
             launcherHostname: "their-mac",
             launcherHostId: "their-machine",
           }),
-          [`${REFLECTION_DIR}/runs/reflection-run-64/outcome.json`]: JSON.stringify({
+          [join(REFLECTION_DIR, "runs", "reflection-run-64", "outcome.json")]: JSON.stringify({
             version: 1,
             runId: "reflection-run-64",
             attempt: 1,
@@ -167,7 +168,7 @@ describe("reflection lock holder decision (#10377)", () => {
         ...baseScenario.facts,
         files: {
           ...baseScenario.facts.files,
-          [`${REFLECTION_DIR}/active.lock`]: JSON.stringify({
+          [join(REFLECTION_DIR, "active.lock")]: JSON.stringify({
             runId: "reflection-run-64",
             launcherPid: 11096,
             launcherHostname: "MacBook-Pro",
