@@ -85,4 +85,25 @@ describe("memory cleanup link integrity", () => {
       "would repoint a link in reference/broken.md",
     ])
   })
+
+  it.each(["memory/reference/broken.md", "notes/broken.md"])(
+    "#given %s outside the candidates has a header that does not parse but says read_only #when planned and applied #then the finding is held and the file is never rewritten",
+    async (path) => {
+      // given
+      const content = '---\nread_only: "true"\n---\nSee [[reference/old-LIFTED]].\n'
+      const { dir, repo } = await repoWith([OLD, SIBLING, { relativePath: path, content }])
+
+      // when
+      const { plan, applied } = await run(repo)
+
+      // then
+      expect(await read(dir, path)).toBe(content)
+      expect(applied).toStrictEqual({ applied: false, reason: "nothing-to-do" })
+      expect(plan.scanned.skipped).toStrictEqual([
+        { path, reason: "frontmatter: target file frontmatter is missing 'description'" },
+      ])
+      expect(plan.findings).toStrictEqual([])
+      expect(plan.held.map((finding) => finding.held.split(",")[0])).toStrictEqual([`would repoint a link in ${path}`])
+    },
+  )
 })
