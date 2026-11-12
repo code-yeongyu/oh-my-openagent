@@ -1390,8 +1390,6 @@
       "packages/omo-senpi/src/extension/wake-queue-source.ts": ["WAKE_QUEUE_STATE_EVENT"],
       // pre-existing at origin dev 4686e425b5: unused export(s) omoSenpiAdapterPackageName
       "packages/omo-senpi/src/index.ts": ["omoSenpiAdapterPackageName"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) localLauncherCmdPath
-      "packages/omo-senpi/src/install/local-launcher.ts": ["localLauncherCmdPath"],
       // pre-existing at origin dev 4686e425b5: unused export(s) findDirectNativeCaptureViolations
       "packages/omo-senpi/src/omo-native-capture-path.audit.test.ts": ["findDirectNativeCaptureViolations"],
       // pre-existing at origin dev 4686e425b5: unused export(s) startReplyListener, stopReplyListener

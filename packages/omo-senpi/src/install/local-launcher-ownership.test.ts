@@ -26,7 +26,7 @@ import {
   uninstallLocalLauncher,
 } from "./local-launcher"
 
-// #13254: the installer replaces or removes ~/.local/bin/omo only when it wrote that file. The compiled omo binary embeds
+// #13254: the installer replaces or removes the launcher at localLauncherPath() only when it wrote that file. The compiled omo binary embeds
 // the installer's source, so it contains the shim's header text somewhere inside it; ownership must be decided by the
 // header at the start of the file, never by a search. Every case runs in a temporary home passed explicitly.
 const repoRoot = resolve(import.meta.dir, "../../../..")
