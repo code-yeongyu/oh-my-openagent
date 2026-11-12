@@ -51,7 +51,15 @@ function facade(sent: Sent[], refuse?: string) {
     press: record("win.press"),
     menu: { select: record("win.menu.select") },
   }
-  return { window: async () => win }
+  const listed = [{ id: "w1", app: "python3", title: TARGET.title, pid: 42 }]
+  return {
+    windows: async (filter?: { title?: string }) =>
+      filter?.title === undefined ? listed : listed.filter((entry) => entry.title.includes(filter.title ?? "")),
+    window: async (id: string) => {
+      if (id !== "w1") throw new Error(`unknown window ${id}`)
+      return win
+    },
+  }
 }
 
 function fakeTool(sent: Sent[], refuse?: string): ShippedTool & { calls: number } {
@@ -207,6 +215,21 @@ describe("legacy driver against the shipped run facade", () => {
     expect(new Set(Object.values(result.journal).map((summary) => summary.signal))).toEqual(new Set(["not_observed"]))
     const report = buildReport([cell], [result])
     expect([report.delivered, report.unobserved]).toEqual([0, 1])
+  })
+
+  test("a missing fixture window is an error naming the windows the engine listed, and sends nothing", async () => {
+    const [cell] = cells
+    if (cell === undefined) throw new Error("empty catalog")
+    const sent: Sent[] = []
+    const result = await createLegacyDriver({
+      session,
+      tool: { ready: fakeTool(sent) },
+      fixtures: { ready: { ...fixtures(0), target: () => ({ ...TARGET, title: "Missing" }) } },
+      observer: { ready: observer },
+    }).runCell(cell)
+    expect(result.observed.kind).toBe("error")
+    expect(result.observed.kind === "error" && result.observed.message).toContain('"app":"python3"')
+    expect(sent.length).toBe(0)
   })
 
   // run.ts loads drivers/<name>.ts by path and accepts only a module whose `driver` passes isDriver.

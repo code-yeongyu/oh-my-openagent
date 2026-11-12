@@ -73,10 +73,25 @@ function actionLines(cell: Cell, target: FixtureTarget): string[] {
   }
 }
 
+// The shipped runtime matches `app` against the engine's own app name for the window (not the fixture's display
+// name), so the window is found by its exact title; a miss records the windows the engine listed, as evidence.
+function windowLookup(target: FixtureTarget): string[] {
+  const title = JSON.stringify(target.title)
+  return [
+    `const listed = await desktop.windows({ title: ${title} })`,
+    `const record = listed.find((entry) => entry.title === ${title})`,
+    "if (record === undefined) {",
+    `  const seen = (await desktop.windows()).slice(0, 12).map((entry) => ({ app: entry.app, title: entry.title, pid: entry.pid }))`,
+    `  return { kind: "error", message: \`no window titled ${target.title.replaceAll("`", "")}; engine lists \${JSON.stringify(seen)}\` }`,
+    "}",
+    "const win = await desktop.window(record.id)",
+  ]
+}
+
 /** `run` code for one cell. It returns its own outcome, so a refusal is read from the engine's error code. */
 export function cellCode(cell: Cell, target: FixtureTarget): string {
   const body = [
-    `const win = await desktop.window({ app: ${JSON.stringify(target.app)}, title: ${JSON.stringify(target.title)} })`,
+    ...windowLookup(target),
     ...lookup("el", target.element),
     ...CENTRE,
     ...actionLines(cell, target),
