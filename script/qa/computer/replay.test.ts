@@ -7,10 +7,32 @@ const ROOT = resolve(import.meta.dir, "../../..")
 const DRIVER = join(ROOT, "script/qa/computer/replay.ts")
 const EXE = process.platform === "win32" ? ".exe" : ""
 
-// Signature only at the test-first commit: the engine path ignores the cargo target dir.
+// The cargo target dir: CARGO_TARGET_DIR when set, else cargo's own target_directory, else <repo>/target.
+async function targetDir(env: Readonly<Record<string, string | undefined>>): Promise<string> {
+  const configured = env.CARGO_TARGET_DIR
+  if (configured) return resolve(ROOT, configured)
+  try {
+    const proc = Bun.spawn(["cargo", "metadata", "--format-version", "1", "--no-deps"], {
+      cwd: ROOT,
+      stdout: "pipe",
+      stderr: "ignore",
+    })
+    const [text, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited])
+    const meta: unknown = code === 0 ? JSON.parse(text) : undefined
+    if (typeof meta === "object" && meta !== null && "target_directory" in meta) {
+      const found = meta.target_directory
+      if (typeof found === "string") return found
+    }
+  } catch (error) {
+    console.warn(`cargo metadata unavailable, using <repo>/target: ${String(error)}`)
+  }
+  return join(ROOT, "target")
+}
+
+// The debug engine binary the tests build and run.
 const engineIn = async (env: Readonly<Record<string, string | undefined>>) =>
-  env === undefined ? "" : join(ROOT, "target/debug/omo-computer-engine")
-const ENGINE = join(ROOT, "target/debug/omo-computer-engine")
+  join(await targetDir(env), "debug", `omo-computer-engine${EXE}`)
+const ENGINE = await engineIn(process.env)
 const CASE_01 = join(
   ROOT,
   "crates/omo-computer-engine/tests/fixtures/v1-consumers/01-stdio-session-open-no-options.json",
