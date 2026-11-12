@@ -1,6 +1,15 @@
 import { describe, expect, test } from "bun:test"
 
-import { type SentinelEvent, SIGNALS, type Signal, parseEvents, summarize, verdict } from "./summary.ts"
+import {
+  AX_READ_ERRORS,
+  dialogHits,
+  type SentinelEvent,
+  SIGNALS,
+  type Signal,
+  parseEvents,
+  summarize,
+  verdict,
+} from "./summary.ts"
 
 const USER_PID = 100
 const TARGET_PID = 200
@@ -236,11 +245,11 @@ describe("a new window whose attributes could not be read", () => {
           role: "",
           subrole: "",
           layer: 0,
-          axRead: "timeout",
+          axError: "cannotComplete",
         },
       ]),
     )
-    expect(summary.faults).toContain("dialog: new window ax:300#0 of pid 300 was unreadable (AX timeout)")
+    expect(summary.faults).toContain("dialog: new window ax:300#0 of pid 300 was unreadable (AX cannotComplete)")
     expect(verdict(summary)).toBe("invalid")
   })
 
@@ -253,7 +262,7 @@ describe("a new window whose attributes could not be read", () => {
       role: "",
       subrole: "",
       layer: 0,
-      axRead: "timeout",
+      axError: "cannotComplete",
     } as const
     const plain = {
       ...own,
@@ -261,11 +270,101 @@ describe("a new window whose attributes could not be read", () => {
       ownerPid: 300,
       role: "AXWindow",
       subrole: "AXStandardWindow",
-      axRead: "ok",
+      axError: "success",
     } as const
     const summary = summarize(cleanRun([own, plain]))
     expect(summary.faults).toEqual([])
     expect(verdict(summary)).toBe("clean")
+  })
+})
+
+describe("AX read errors of a new window: the table the recorder's raw error names are judged by", () => {
+  const added = (axError: string) =>
+    ({
+      t: 1_500,
+      kind: "window_added",
+      id: "ax:300#4",
+      ownerPid: 300,
+      role: "",
+      subrole: "",
+      layer: 0,
+      axError,
+    }) as const
+  const table: readonly (readonly [string, "ok" | "fault"])[] = [
+    ["success", "ok"],
+    ["noValue", "ok"],
+    ["attributeUnsupported", "ok"],
+    ["cannotComplete", "fault"],
+    ["invalidUIElement", "fault"],
+    ["failure", "fault"],
+    ["apiDisabled", "fault"],
+    ["notImplemented", "fault"],
+    ["someFutureCode", "fault"],
+  ]
+  for (const [code, expected] of table) {
+    test(`${code} -> ${expected}`, () => {
+      const summary = summarize(cleanRun([added(code)]))
+      expect(summary.faults.length > 0 ? "fault" : "ok").toBe(expected)
+      if (expected === "fault") expect(summary.faults[0]).toContain(`(AX ${code})`)
+    })
+  }
+
+  test("the table names exactly the codes that are not faults", () => {
+    expect(
+      Object.entries(AX_READ_ERRORS)
+        .filter(([, v]) => v === "ok")
+        .map(([k]) => k)
+        .sort(),
+    ).toEqual(["attributeUnsupported", "noValue", "success"])
+  })
+
+  test("a sheet the recorder already identified is a dialog even if a read failed", () => {
+    const sheet = { ...added("cannotComplete"), role: "AXSheet" }
+    const summary = summarize(cleanRun([sheet]))
+    expect(summary.faults).toEqual([])
+    expect(summary.signals.dialog.signal).toBe("happened")
+  })
+})
+
+describe("new-window reads still running at stop", () => {
+  test("a stop marker that reports pending reads is a dialog fault, never a clean window", () => {
+    const events = cleanRun().map((event) => (event.kind === "stop" ? { ...event, pendingReads: 2 } : event))
+    const summary = summarize(events)
+    expect(summary.faults).toContain("dialog: 2 new-window reads were still running at stop")
+    expect(verdict(summary)).toBe("invalid")
+  })
+
+  test("a stop marker with no pending reads changes nothing", () => {
+    const events = cleanRun().map((event) => (event.kind === "stop" ? { ...event, pendingReads: 0 } : event))
+    expect(summarize(events).faults).toEqual([])
+  })
+})
+
+describe("which branch of the dialog detector fired", () => {
+  test("an AX-identified sheet at layer 0 is a role hit; a modal-panel layer window is a layer hit", () => {
+    const sheet = {
+      t: 1_500,
+      kind: "window_added",
+      id: "ax:300#4",
+      ownerPid: 300,
+      role: "AXSheet",
+      subrole: "",
+      layer: 0,
+      axError: "success",
+    } as const
+    const panel = {
+      t: 1_600,
+      kind: "window_added",
+      id: "planter#9",
+      ownerPid: 300,
+      role: "",
+      subrole: "",
+      layer: 8,
+    } as const
+    expect(dialogHits(cleanRun([sheet]))).toEqual(["role"])
+    expect(dialogHits(cleanRun([panel]))).toEqual(["layer"])
+    expect(dialogHits(cleanRun([sheet, panel]))).toEqual(["role", "layer"])
+    expect(dialogHits(cleanRun())).toEqual([])
   })
 })
 
