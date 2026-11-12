@@ -10,7 +10,12 @@ import { buildTaskExecute } from "./execute"
 
 function deferred<T>(): { readonly promise: Promise<T>; resolve(value: T): void } {
   let resolve!: (value: T) => void
-  return { promise: new Promise<T>((done) => { resolve = done }), resolve }
+  return {
+    promise: new Promise<T>((done) => {
+      resolve = done
+    }),
+    resolve,
+  }
 }
 
 function text(result: AgentToolResult<TaskToolDetails>): string {
@@ -53,7 +58,12 @@ describe("task description wiring", () => {
   test("#given a background spawn with a description #when the start is acknowledged #then the text leads with the human label", async () => {
     // given
     const manager = createFakeManager({
-      start: async (): Promise<StartResult> => ({ kind: "started", task_id: "st_00000008", status: "running", name: "task-1" }),
+      start: async (): Promise<StartResult> => ({
+        kind: "started",
+        task_id: "st_00000008",
+        status: "running",
+        name: "task-1",
+      }),
     })
 
     // when
@@ -66,28 +76,36 @@ describe("task description wiring", () => {
     )
 
     // then
-    expect(text(ack)).toContain('Started task Audit the waiting line (st_00000008, running)')
+    expect(text(ack)).toContain("Started task Audit the waiting line (st_00000008, running)")
   })
 })
 
 describe("foreground task progress", () => {
-
   test("#given a live child #when it emits task events #then partial updates reflect child state and unsubscribe at completion", async () => {
     const completion = deferred<TaskRecord>()
     let listener: ManagedChildListener | undefined
     const subscribed = deferred<void>()
     let unsubscribed = false
     const manager = createFakeManager({
-      start: async (): Promise<StartResult> => ({ kind: "started", task_id: "st_00000001", status: "running", name: "child" }),
+      start: async (): Promise<StartResult> => ({
+        kind: "started",
+        task_id: "st_00000001",
+        status: "running",
+        name: "child",
+      }),
       subscribeChild: (_taskId, next) => {
         listener = next
         subscribed.resolve()
-        return () => { unsubscribed = true }
+        return () => {
+          unsubscribed = true
+        }
       },
       waitFor: () => completion.promise,
     })
     const updates: AgentToolResult<TaskToolDetails>[] = []
-    const onUpdate: AgentToolUpdateCallback<TaskToolDetails> = (update) => { updates.push(update) }
+    const onUpdate: AgentToolUpdateCallback<TaskToolDetails> = (update) => {
+      updates.push(update)
+    }
     const execution = buildTaskExecute(makeDeps(manager))(
       "call-1",
       { prompt: "inspect", category: "quick" },
@@ -127,12 +145,18 @@ describe("foreground task progress", () => {
     let unsubscribed = false
     const manager = createFakeManager({
       start: async (): Promise<StartResult> => ({
-        kind: "started", task_id: "st_00000002", status: "pending", name: "queued", queue_position: 1,
+        kind: "started",
+        task_id: "st_00000002",
+        status: "pending",
+        name: "queued",
+        queue_position: 1,
       }),
       subscribeChild: (_taskId, listener) => {
         pendingListener = listener
         subscribed.resolve()
-        return () => { unsubscribed = true }
+        return () => {
+          unsubscribed = true
+        }
       },
       waitFor: () => completion.promise,
     })
@@ -141,7 +165,9 @@ describe("foreground task progress", () => {
       "call-2",
       { prompt: "inspect", category: "quick" },
       undefined,
-      (update) => { updates.push(update) },
+      (update) => {
+        updates.push(update)
+      },
       CTX,
     )
 

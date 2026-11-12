@@ -8,7 +8,11 @@ afterEach(cleanup)
 
 function lazySurface(loadAliasRegistry: () => Promise<AliasRegistry>) {
   const a = account()
-  const remote = createLazyRemoteSurface({ version: "0.0.0", loadRuntime: async () => ({ createDeviceServiceSessions: () => a.remote.sessions }), loadAliasRegistry })
+  const remote = createLazyRemoteSurface({
+    version: "0.0.0",
+    loadRuntime: async () => ({ createDeviceServiceSessions: () => a.remote.sessions }),
+    loadAliasRegistry,
+  })
   return { a, remote }
 }
 
@@ -18,9 +22,18 @@ describe("#12833: the default remote surface reaches the account's alias registr
     if (registry === undefined) throw new Error("the fixture account carries a registry")
     const { remote } = lazySurface(async () => registry)
     const { run } = surface(remote)
-    expect(await run("thread_rename", { thread: "dur-local", alias: "build bot" })).toMatchObject({ kind: "ok", alias: "build bot" })
-    expect(await registry.resolve("build bot")).toEqual({ kind: "ok", value: { session_id: "dur-local", device: "here" } })
-    expect(await run("thread_send", { thread: "build bot", message: "hi" })).toMatchObject({ kind: "ok", thread_id: "dur-local" })
+    expect(await run("thread_rename", { thread: "dur-local", alias: "build bot" })).toMatchObject({
+      kind: "ok",
+      alias: "build bot",
+    })
+    expect(await registry.resolve("build bot")).toEqual({
+      kind: "ok",
+      value: { session_id: "dur-local", device: "here" },
+    })
+    expect(await run("thread_send", { thread: "build bot", message: "hi" })).toMatchObject({
+      kind: "ok",
+      thread_id: "dur-local",
+    })
   })
 
   test("#given the registry cannot be loaded yet #when an alias is claimed #then it is a typed host_unavailable with the load named, and the next claim loads it again", async () => {
@@ -33,8 +46,14 @@ describe("#12833: the default remote surface reaches the account's alias registr
       return registry
     })
     const { run } = surface(remote)
-    expect(await run("thread_rename", { thread: "dur-local", alias: "later" })).toMatchObject({ kind: "error", error: { code: "host_unavailable", details: { reason: "registry_unavailable" } } })
-    expect(await run("thread_rename", { thread: "dur-local", alias: "later" })).toMatchObject({ kind: "ok", alias: "later" })
+    expect(await run("thread_rename", { thread: "dur-local", alias: "later" })).toMatchObject({
+      kind: "error",
+      error: { code: "host_unavailable", details: { reason: "registry_unavailable" } },
+    })
+    expect(await run("thread_rename", { thread: "dur-local", alias: "later" })).toMatchObject({
+      kind: "ok",
+      alias: "later",
+    })
     expect(loads).toBe(2)
   })
 })

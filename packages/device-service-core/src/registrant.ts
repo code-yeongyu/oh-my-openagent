@@ -90,7 +90,7 @@ function holdConnection(
 
   want(null)
   service
-    .watchStatus(status => {
+    .watchStatus((status) => {
       const deviceId = status.device?.id ?? null
       emit({ kind: "status", deviceId })
       if (deviceId === null) registeredFor = NONE
@@ -102,7 +102,9 @@ function holdConnection(
 export function startAgentDirRegistrant(options: AgentDirRegistrantOptions): AgentDirRegistrant {
   const endpoint = deviceServiceEndpointPath(options.stateDir)
   const emit = options.onEvent ?? (() => {})
-  const connect = options.connect ?? (() => connectDeviceService({ version: options.version, stateDir: options.stateDir, background: true }))
+  const connect =
+    options.connect ??
+    (() => connectDeviceService({ version: options.version, stateDir: options.stateDir, background: true }))
   const schedule = options.schedule ?? backgroundTimer
   let stopped = false
   let current: DeviceService | undefined
@@ -112,7 +114,7 @@ export function startAgentDirRegistrant(options: AgentDirRegistrantOptions): Age
   const attempt = (retry: number): void => {
     connecting = true
     connect().then(
-      service => {
+      (service) => {
         connecting = false
         if (stopped) {
           service.close()

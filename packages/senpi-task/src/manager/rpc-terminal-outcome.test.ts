@@ -66,7 +66,8 @@ describe("RPC terminal outcomes", () => {
     // then
     expect(record.status).toBe("error")
     expect(record.error_message).toBe("Child prompt failed to start: the prompt was refused (host_refused).")
-    if (result.kind === "start_failed") expect(result.error_message).toBe("Child prompt failed to start: the prompt was refused (host_refused).")
+    if (result.kind === "start_failed")
+      expect(result.error_message).toBe("Child prompt failed to start: the prompt was refused (host_refused).")
     expect(rejections).toEqual([])
   })
 

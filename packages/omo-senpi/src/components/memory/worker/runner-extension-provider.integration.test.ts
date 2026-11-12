@@ -18,8 +18,11 @@ const harnesses: RunnerHarness[] = []
 
 afterEach(async () => {
   resetModelPreflightCacheForTests()
-  await Promise.all(harnesses.splice(0).map((item) =>
-    rmEfaultTolerant(item.root, { recursive: true, force: true, maxRetries: 30, retryDelay: 200 })))
+  await Promise.all(
+    harnesses
+      .splice(0)
+      .map((item) => rmEfaultTolerant(item.root, { recursive: true, force: true, maxRetries: 30, retryDelay: 200 })),
+  )
 })
 
 async function harness(childMode: "extension-provider" | "extension-provider-unreachable"): Promise<RunnerHarness> {
@@ -65,12 +68,18 @@ describe("SenpiSubprocessRunner with an extension-registered provider (#9175)", 
     expect(item.spawnCalls[0]?.args).not.toContain("--no-extensions")
     const park = await readReflectionParkFile(join(item.identity.paths.reflection))
     expect({ streak: park.streak, parked: park.parkedAt !== undefined }).toEqual({ streak: 1, parked: true })
-    const notices = item.api.entries.filter((entry) =>
-      entry.customType === REFLECTION_PARKED_ENTRY_TYPE || entry.customType === REFLECTION_HEALTH_ENTRY_TYPE)
+    const notices = item.api.entries.filter(
+      (entry) => entry.customType === REFLECTION_PARKED_ENTRY_TYPE || entry.customType === REFLECTION_HEALTH_ENTRY_TYPE,
+    )
     expect(notices.map((entry) => entry.customType)).toEqual([REFLECTION_PARKED_ENTRY_TYPE])
     expect(item.notifications).toHaveLength(1)
     const recommendation = (notices[0]?.data as { readonly recommendation?: string } | undefined)?.recommendation
     expect(recommendation).toBe(reflectionRemediation(result.reason, result.detail))
-    expect(recommendation).not.toBe(reflectionRemediation("spawn_failed", "model_not_visible:extension-only/primary; attempted:extension-only/primary"))
+    expect(recommendation).not.toBe(
+      reflectionRemediation(
+        "spawn_failed",
+        "model_not_visible:extension-only/primary; attempted:extension-only/primary",
+      ),
+    )
   })
 })

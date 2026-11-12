@@ -19,12 +19,7 @@ function pressureEpisode(input: {
           kind: "session_unavailable",
           reason: "host_memory_pressure",
           message: "private host detail",
-          cause: new HostSessionOpenError(
-            "host_memory_pressure",
-            "/tmp/session.jsonl",
-            "private host detail",
-            30_000,
-          ),
+          cause: new HostSessionOpenError("host_memory_pressure", "/tmp/session.jsonl", "private host detail", 30_000),
         })
       }
       return {

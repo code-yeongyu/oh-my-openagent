@@ -62,10 +62,6 @@ export function evaluateReloadVeto(manager: ReloadGuardManager, dag?: ReloadGuar
  * pauseRunsForShutdown), so a live DAG run blocks the reload too - otherwise a long DAG silently
  * stops the moment the user reloads.
  */
-export function wireReloadGuard(
-  pi: SenpiExtensionAPI,
-  manager: ReloadGuardManager,
-  dag?: ReloadGuardDagSource,
-): void {
+export function wireReloadGuard(pi: SenpiExtensionAPI, manager: ReloadGuardManager, dag?: ReloadGuardDagSource): void {
   pi.on("session_before_reload", () => evaluateReloadVeto(manager, dag))
 }

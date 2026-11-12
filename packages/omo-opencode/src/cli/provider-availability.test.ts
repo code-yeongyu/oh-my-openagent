@@ -2,10 +2,10 @@ import { describe, expect, test } from "bun:test"
 
 import { ULTIMATE_FALLBACK } from "./model-fallback"
 import {
-	getNoModelProvidersWarning,
-	hasAnyConfiguredProvider,
-	isProviderAvailable,
-	toProviderAvailability,
+  getNoModelProvidersWarning,
+  hasAnyConfiguredProvider,
+  isProviderAvailable,
+  toProviderAvailability,
 } from "./provider-availability"
 import type { InstallConfig } from "./types"
 
@@ -43,9 +43,7 @@ describe("provider availability", () => {
   })
 
   test("installer warning copy uses ultimate fallback constant", () => {
-    expect(getNoModelProvidersWarning()).toBe(
-      `No model providers configured. Using ${ULTIMATE_FALLBACK} as fallback.`,
-    )
+    expect(getNoModelProvidersWarning()).toBe(`No model providers configured. Using ${ULTIMATE_FALLBACK} as fallback.`)
   })
 
   test("hasAnyConfiguredProvider treats Bailian-only config as configured", () => {

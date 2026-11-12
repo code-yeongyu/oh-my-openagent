@@ -48,7 +48,13 @@ export function abortableSessionHistoryFs(fs: SessionHistoryFs, signal: AbortSig
     realPath: (path) => untilAborted(signal, () => fs.realPath(path)),
     readFileString: (path) => untilAborted(signal, () => fs.readFileString(path)),
     open: async (path) =>
-      file(await untilAborted(signal, () => fs.open(path), (late) => void late.close().catch(() => undefined))),
+      file(
+        await untilAborted(
+          signal,
+          () => fs.open(path),
+          (late) => void late.close().catch(() => undefined),
+        ),
+      ),
   }
 }
 
@@ -105,14 +111,24 @@ export async function newestSessionDigests(input: {
     const stats = await statOrNull(fs, transcript.filePath)
     if (stats === null || stats.type !== "File") continue
     reads += 1
-    const snapshot = await readTranscriptRecords(fs, transcriptIdentity(transcript.filePath, stats), recordsRemaining, transcript.source)
+    const snapshot = await readTranscriptRecords(
+      fs,
+      transcriptIdentity(transcript.filePath, stats),
+      recordsRemaining,
+      transcript.source,
+    )
     if (signal.aborted || snapshot === null) continue
     recordsRemaining -= snapshot.recordCount
     const recordedCwd = snapshot.records.map(extractDecodedCwd).find((cwd) => cwd !== null) ?? null
     const cwd = recordedCwd === null ? null : rules.resolveRecordedPath(recordedCwd)
-    if (cwd === null || rules.isExcludedProjectPath(cwd) || rules.isExcludedProjectPath(await realPathOr(fs, cwd))) continue
+    if (cwd === null || rules.isExcludedProjectPath(cwd) || rules.isExcludedProjectPath(await realPathOr(fs, cwd)))
+      continue
     const thread = parseAgentSessionRecords(
-      { source: transcript.source, fallbackSessionId: basename(transcript.filePath, ".jsonl"), lastActiveAtMs: transcript.mtimeMs },
+      {
+        source: transcript.source,
+        fallbackSessionId: basename(transcript.filePath, ".jsonl"),
+        lastActiveAtMs: transcript.mtimeMs,
+      },
       snapshot.records,
     )
     if (thread === null) continue

@@ -84,7 +84,11 @@ export const PARENT_ANSWERS = ["Checking the rollout playbook.", "Noted - drain 
  */
 export const TITLE_REQUEST_MARKER = "Generate a concise title for this coding-agent session."
 export const SESSION_TITLE = "Resident Kibitzer TUI QA"
-export const titleLane = () => ({ name: "title", matches: (body) => requestSystemText(body).includes(TITLE_REQUEST_MARKER), step: () => ({ type: "text", text: `<title>${SESSION_TITLE}</title>` }) })
+export const titleLane = () => ({
+  name: "title",
+  matches: (body) => requestSystemText(body).includes(TITLE_REQUEST_MARKER),
+  step: () => ({ type: "text", text: `<title>${SESSION_TITLE}</title>` }),
+})
 export const READY_TIMEOUT_MS = 60_000
 export const RENDER_TIMEOUT_MS = 60_000
 
@@ -108,7 +112,17 @@ async function signal(name, promise) {
 // ---- arguments -----------------------------------------------------------------------------------------
 
 export function parseArgs(argv) {
-  const options = { pluginRoot: DEFAULT_PLUGIN_ROOT, senpiCli: DEFAULT_SENPI_CLI, commandFile: undefined, evidenceDir: undefined, cols: 120, rows: 40, chromeBin: undefined, keepSandbox: false, selfTest: false }
+  const options = {
+    pluginRoot: DEFAULT_PLUGIN_ROOT,
+    senpiCli: DEFAULT_SENPI_CLI,
+    commandFile: undefined,
+    evidenceDir: undefined,
+    cols: 120,
+    rows: 40,
+    chromeBin: undefined,
+    keepSandbox: false,
+    selfTest: false,
+  }
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
     const take = () => {
@@ -128,7 +142,8 @@ export function parseArgs(argv) {
     else if (arg === "--self-test") options.selfTest = true
     else throw new Error(`unknown argument ${arg}`)
   }
-  if (!options.selfTest && options.evidenceDir === undefined) throw new Error("--evidence-dir <dir> is required (receives terminal.png, terminal.txt, metadata.json)")
+  if (!options.selfTest && options.evidenceDir === undefined)
+    throw new Error("--evidence-dir <dir> is required (receives terminal.png, terminal.txt, metadata.json)")
   return options
 }
 
@@ -140,7 +155,11 @@ function positiveInt(name, value) {
 
 export function resolveChrome(explicit, env = process.env, platform = process.platform) {
   const candidates = [explicit, env.CHROME_BIN, env.GOOGLE_CHROME_BIN]
-  if (platform === "darwin") candidates.push("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/Applications/Chromium.app/Contents/MacOS/Chromium")
+  if (platform === "darwin")
+    candidates.push(
+      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    )
   if (platform === "linux") candidates.push("/usr/bin/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser")
   return candidates.find((candidate) => typeof candidate === "string" && candidate.length > 0 && existsSync(candidate))
 }
@@ -199,7 +218,17 @@ export async function openRenderer({ executablePath, cols, rows }) {
     handleSIGHUP: false,
   })
   const page = await browser.newPage()
-  await page.setContent(buildPageHtml({ xtermJs: asset("@xterm/xterm/lib/xterm.js"), xtermCss: asset("@xterm/xterm/css/xterm.css"), unicodeJs: asset("@xterm/addon-unicode11/lib/addon-unicode11.js"), cols, rows, fontSize: 15 }), { waitUntil: "load" })
+  await page.setContent(
+    buildPageHtml({
+      xtermJs: asset("@xterm/xterm/lib/xterm.js"),
+      xtermCss: asset("@xterm/xterm/css/xterm.css"),
+      unicodeJs: asset("@xterm/addon-unicode11/lib/addon-unicode11.js"),
+      cols,
+      rows,
+      fontSize: 15,
+    }),
+    { waitUntil: "load" },
+  )
   await page.evaluate(() => document.fonts && document.fonts.ready)
 
   const waiters = []
@@ -214,20 +243,30 @@ export async function openRenderer({ executablePath, cols, rows }) {
   const settleWaiters = () => {
     for (const waiter of [...waiters]) {
       let value
-      try { value = waiter.predicate(latest) } catch (error) { value = undefined; waiter.fail(error); continue }
+      try {
+        value = waiter.predicate(latest)
+      } catch (error) {
+        value = undefined
+        waiter.fail(error)
+        continue
+      }
       if (value === undefined || value === false) continue
       waiter.fulfil(value)
     }
   }
   return {
     write(text) {
-      chain = chain.then(async () => {
-        if (closed) return
-        await page.evaluate((chunk) => window.__write(chunk), text)
-        if (waiters.length === 0) return
-        await snapshot()
-        settleWaiters()
-      }).catch((error) => { rendererError = error })
+      chain = chain
+        .then(async () => {
+          if (closed) return
+          await page.evaluate((chunk) => window.__write(chunk), text)
+          if (waiters.length === 0) return
+          await snapshot()
+          settleWaiters()
+        })
+        .catch((error) => {
+          rendererError = error
+        })
       return chain
     },
     async waitForScreen(predicate, { timeoutMs, description }) {
@@ -237,10 +276,28 @@ export async function openRenderer({ executablePath, cols, rows }) {
       if (first !== undefined && first !== false) return first
       return new Promise((resolvePromise, reject) => {
         const waiter = { predicate, fulfil: undefined, fail: undefined, timer: undefined }
-        const remove = () => { clearTimeout(waiter.timer); const index = waiters.indexOf(waiter); if (index >= 0) waiters.splice(index, 1) }
-        waiter.fulfil = (value) => { remove(); resolvePromise(value) }
-        waiter.fail = (error) => { remove(); reject(error) }
-        waiter.timer = setTimeout(() => waiter.fail(new Error(`${description} timed out after ${timeoutMs}ms; screen tail=${JSON.stringify(latest.viewport.split("\n").slice(-8).join("\n"))}`)), timeoutMs)
+        const remove = () => {
+          clearTimeout(waiter.timer)
+          const index = waiters.indexOf(waiter)
+          if (index >= 0) waiters.splice(index, 1)
+        }
+        waiter.fulfil = (value) => {
+          remove()
+          resolvePromise(value)
+        }
+        waiter.fail = (error) => {
+          remove()
+          reject(error)
+        }
+        waiter.timer = setTimeout(
+          () =>
+            waiter.fail(
+              new Error(
+                `${description} timed out after ${timeoutMs}ms; screen tail=${JSON.stringify(latest.viewport.split("\n").slice(-8).join("\n"))}`,
+              ),
+            ),
+          timeoutMs,
+        )
         waiters.push(waiter)
       })
     },
@@ -267,30 +324,52 @@ export async function openRenderer({ executablePath, cols, rows }) {
 /** The real TUI in a Bun-native pseudo-terminal; every chunk is decoded as a stream so a glyph split across reads survives. */
 export function launchTui(command, sandbox, env, { cols, rows }, onData) {
   const decoder = new TextDecoder("utf-8")
-  return Bun.spawn([command.file, ...command.prefix, "--provider", "omo-mock", "--model", "mock-1", "--session-dir", sandbox.sessionsDir], {
-    cwd: sandbox.cwd,
-    env: { ...env, TERM: "xterm-256color", COLORTERM: "truecolor", LANG: env.LANG ?? "en_US.UTF-8" },
-    terminal: {
-      cols,
-      rows,
-      data(_terminal, chunk) { onData(decoder.decode(chunk, { stream: true })) },
+  return Bun.spawn(
+    [
+      command.file,
+      ...command.prefix,
+      "--provider",
+      "omo-mock",
+      "--model",
+      "mock-1",
+      "--session-dir",
+      sandbox.sessionsDir,
+    ],
+    {
+      cwd: sandbox.cwd,
+      env: { ...env, TERM: "xterm-256color", COLORTERM: "truecolor", LANG: env.LANG ?? "en_US.UTF-8" },
+      terminal: {
+        cols,
+        rows,
+        data(_terminal, chunk) {
+          onData(decoder.decode(chunk, { stream: true }))
+        },
+      },
     },
-  })
+  )
 }
 
 function exitedWithin(proc, timeoutMs) {
   if (proc.exitCode !== null || proc.signalCode !== null) return Promise.resolve(true)
   return new Promise((resolvePromise) => {
     const timer = setTimeout(() => resolvePromise(false), timeoutMs)
-    proc.exited.then(() => { clearTimeout(timer); resolvePromise(true) })
+    proc.exited.then(() => {
+      clearTimeout(timer)
+      resolvePromise(true)
+    })
   })
 }
 
 /** `/quit` first (senpi honours it even mid-startup), then SIGTERM, then SIGKILL; the PTY master is closed once the process is gone. */
 export async function quitTui(proc) {
   const receipt = await (async () => {
-    if (proc.exitCode !== null || proc.signalCode !== null) return `pid ${proc.pid} already exited (code=${proc.exitCode} signal=${proc.signalCode})`
-    try { proc.terminal.write("/quit\r") } catch { /* pty already closed */ }
+    if (proc.exitCode !== null || proc.signalCode !== null)
+      return `pid ${proc.pid} already exited (code=${proc.exitCode} signal=${proc.signalCode})`
+    try {
+      proc.terminal.write("/quit\r")
+    } catch {
+      /* pty already closed */
+    }
     if (await exitedWithin(proc, EXIT_TIMEOUT_MS)) return `pid ${proc.pid} exited on /quit`
     proc.kill("SIGTERM")
     if (await exitedWithin(proc, EXIT_TIMEOUT_MS)) return `pid ${proc.pid} exited after SIGTERM`
@@ -298,7 +377,11 @@ export async function quitTui(proc) {
     await exitedWithin(proc, EXIT_TIMEOUT_MS)
     return `pid ${proc.pid} killed`
   })()
-  try { proc.terminal.close() } catch { /* already closed */ }
+  try {
+    proc.terminal.close()
+  } catch {
+    /* already closed */
+  }
   return `${receipt}; pty closed`
 }
 
@@ -328,7 +411,10 @@ export function findNewSession(dir, before) {
 }
 
 export function linesContaining(text, needle) {
-  return text.split("\n").filter((line) => line.includes(needle)).map((line) => line.trimEnd())
+  return text
+    .split("\n")
+    .filter((line) => line.includes(needle))
+    .map((line) => line.trimEnd())
 }
 
 export const recalledLine = (memory) => `${RECALLED_PREFIX}${memory.body}`
@@ -337,19 +423,37 @@ export const recalledLine = (memory) => `${RECALLED_PREFIX}${memory.body}`
  * is parked with "Startup is still in progress"); the memory status footer only appears once the omo
  * extension's session start has run, which is after submission was enabled.
  */
-export const isReady = (screen) => (screen.viewport.includes(EDITOR_PROMPT) && screen.viewport.includes("mock-1") && screen.viewport.includes(MEMORY_STATUS_PREFIX) ? screen : undefined)
-export const isIdleWith = (text) => (screen) => (screen.buffer.includes(text) && !screen.viewport.includes(WORKING_MARKER) ? screen : undefined)
-export const showsNotice = (memory) => (screen) => (screen.buffer.includes(NOTICE_TITLE) && screen.buffer.includes(recalledLine(memory)) && screen.buffer.includes(PARENT_ANSWERS[1]) && !screen.viewport.includes(WORKING_MARKER) ? screen : undefined)
+export const isReady = (screen) =>
+  screen.viewport.includes(EDITOR_PROMPT) &&
+  screen.viewport.includes("mock-1") &&
+  screen.viewport.includes(MEMORY_STATUS_PREFIX)
+    ? screen
+    : undefined
+export const isIdleWith = (text) => (screen) =>
+  screen.buffer.includes(text) && !screen.viewport.includes(WORKING_MARKER) ? screen : undefined
+export const showsNotice = (memory) => (screen) =>
+  screen.buffer.includes(NOTICE_TITLE) &&
+  screen.buffer.includes(recalledLine(memory)) &&
+  screen.buffer.includes(PARENT_ANSWERS[1]) &&
+  !screen.viewport.includes(WORKING_MARKER)
+    ? screen
+    : undefined
 
 // ---- main ----------------------------------------------------------------------------------------------------
 
 async function main() {
   const options = parseArgs(process.argv.slice(2))
-  if (options.selfTest) { runSelfTest(); return }
+  if (options.selfTest) {
+    runSelfTest()
+    return
+  }
   const cleanup = createCleanup()
   installInterruptCleanup(() => [cleanup])
   let interrupted
-  for (const name of ["SIGINT", "SIGTERM"]) process.once(name, () => { interrupted = name })
+  for (const name of ["SIGINT", "SIGTERM"])
+    process.once(name, () => {
+      interrupted = name
+    })
   const router = createRouter({ lanes: [titleLane()] })
   const facts = { pluginRoot: options.pluginRoot, geometry: { cols: options.cols, rows: options.rows } }
   const evidence = options.evidenceDir
@@ -369,14 +473,31 @@ async function main() {
     } catch (error) {
       record(PROBE_LAYER, "command-resolved", false, error instanceof Error ? error.message : String(error))
     }
-    record(PROBE_LAYER, "artifact-present", existsSync(join(options.pluginRoot, "extensions", "omo.js")), `${join(options.pluginRoot, "extensions", "omo.js")}`)
+    record(
+      PROBE_LAYER,
+      "artifact-present",
+      existsSync(join(options.pluginRoot, "extensions", "omo.js")),
+      `${join(options.pluginRoot, "extensions", "omo.js")}`,
+    )
     const chrome = resolveChrome(options.chromeBin)
     facts.chrome = chrome
-    record(PROBE_LAYER, "chrome-resolved", chrome !== undefined, chrome ?? "no Chrome/Chromium found; pass --chrome-bin or set CHROME_BIN")
+    record(
+      PROBE_LAYER,
+      "chrome-resolved",
+      chrome !== undefined,
+      chrome ?? "no Chrome/Chromium found; pass --chrome-bin or set CHROME_BIN",
+    )
     if (checks.some((check) => !check.ok)) return finish()
 
-    const server = startMockCompletionsServer({ steps: router.steps, requestLogPath: writeEvidence(evidence, "tui-mock-requests.jsonl", ""), classifyRequest: router.classify })
-    cleanup.add("mock server", () => { server.close(); return "closed" })
+    const server = startMockCompletionsServer({
+      steps: router.steps,
+      requestLogPath: writeEvidence(evidence, "tui-mock-requests.jsonl", ""),
+      classifyRequest: router.classify,
+    })
+    cleanup.add("mock server", () => {
+      server.close()
+      return "closed"
+    })
     const baseUrl = await server.ready
     const sandbox = prepareSandbox(options.pluginRoot, baseUrl)
     cleanup.add("sandbox", () => removeSandbox(sandbox, options.keepSandbox))
@@ -387,8 +508,23 @@ async function main() {
 
     // ---- host/runtime layer: the corpus is seeded through the real memory tool, recall is switched on ------
     const seed = await seedMemories(command, sandbox, env, router, [MEMORIES.rollout])
-    facts.seed = { sessionId: seed.sessionId, identities: seed.identities, results: seed.results, teardown: seed.teardown }
-    if (!record(RUNTIME_LAYER, "memory-seeded", seed.ok, seed.ok ? `identity=${seed.identities[0]}` : `results=${JSON.stringify(seed.results)} identities=${seed.identities.length} stderr=${seed.stderr?.replace(/\n/g, " | ")}`)) return finish()
+    facts.seed = {
+      sessionId: seed.sessionId,
+      identities: seed.identities,
+      results: seed.results,
+      teardown: seed.teardown,
+    }
+    if (
+      !record(
+        RUNTIME_LAYER,
+        "memory-seeded",
+        seed.ok,
+        seed.ok
+          ? `identity=${seed.identities[0]}`
+          : `results=${JSON.stringify(seed.results)} identities=${seed.identities.length} stderr=${seed.stderr?.replace(/\n/g, " | ")}`,
+      )
+    )
+      return finish()
     identity = seed.identities[0]
     const seedRequests = router.state.parent
     writeOmoConfig(sandbox, { recallEnabled: true })
@@ -399,35 +535,95 @@ async function main() {
     const renderer = await openRenderer({ executablePath: chrome, cols: options.cols, rows: options.rows })
     cleanup.add("browser", () => renderer.close())
     const before = new Set(listSessionFiles(sandbox.sessionsDir))
-    tui = launchTui(command, sandbox, env, options, (text) => { raw += text; void renderer.write(text) })
+    tui = launchTui(command, sandbox, env, options, (text) => {
+      raw += text
+      void renderer.write(text)
+    })
     cleanup.add("tui", () => quitTui(tui))
     facts.pid = tui.pid
-    screen = await signal("tui-ready", renderer.waitForScreen(isReady, { timeoutMs: READY_TIMEOUT_MS, description: "TUI ready (editor glyph, model footer and memory status footer)" }))
+    screen = await signal(
+      "tui-ready",
+      renderer.waitForScreen(isReady, {
+        timeoutMs: READY_TIMEOUT_MS,
+        description: "TUI ready (editor glyph, model footer and memory status footer)",
+      }),
+    )
     record(RUNTIME_LAYER, "tui-ready", true, `pid=${tui.pid} rows=${screen.rows} cols=${screen.cols}`)
 
     // Turn 1: the fresh candidate. The typed text is awaited on screen before Enter, so the editor - not
     // the line discipline - is what received it.
     tui.terminal.write(MEMORIES.rollout.prompt)
-    await signal("prompt-1-echoed", renderer.waitForScreen((current) => (current.viewport.includes(MEMORIES.rollout.prompt) ? current : undefined), { timeoutMs: RENDER_TIMEOUT_MS, description: "first prompt echoed by the editor" }))
+    await signal(
+      "prompt-1-echoed",
+      renderer.waitForScreen((current) => (current.viewport.includes(MEMORIES.rollout.prompt) ? current : undefined), {
+        timeoutMs: RENDER_TIMEOUT_MS,
+        description: "first prompt echoed by the editor",
+      }),
+    )
     tui.terminal.write("\r")
-    state = await signal("parent-session-file", watchUntil(sandbox.sessionsDir, () => findNewSession(sandbox.sessionsDir, before), { timeoutMs: TURN_TIMEOUT_MS, description: "parent session file" }))
+    state = await signal(
+      "parent-session-file",
+      watchUntil(sandbox.sessionsDir, () => findNewSession(sandbox.sessionsDir, before), {
+        timeoutMs: TURN_TIMEOUT_MS,
+        description: "parent session file",
+      }),
+    )
     facts.sessionId = state.sessionId
     facts.sessionFile = state.sessionFile
     record(RUNTIME_LAYER, "session-identified", true, `sessionId=${state.sessionId} file=${state.sessionFile}`)
     const [held] = await Promise.all([
-      signal("wake-accepted", waitForAccepted(identity, state, MEMORIES.rollout, { timeoutMs: WAKE_TIMEOUT_MS, description: "TUI wake 1: accepted nudge" })),
-      signal("parent-answer-1-rendered", renderer.waitForScreen(isIdleWith(PARENT_ANSWERS[0]), { timeoutMs: TURN_TIMEOUT_MS, description: "first parent answer rendered and the turn settled" })),
+      signal(
+        "wake-accepted",
+        waitForAccepted(identity, state, MEMORIES.rollout, {
+          timeoutMs: WAKE_TIMEOUT_MS,
+          description: "TUI wake 1: accepted nudge",
+        }),
+      ),
+      signal(
+        "parent-answer-1-rendered",
+        renderer.waitForScreen(isIdleWith(PARENT_ANSWERS[0]), {
+          timeoutMs: TURN_TIMEOUT_MS,
+          description: "first parent answer rendered and the turn settled",
+        }),
+      ),
     ])
     const lineages = sidecarDirs(identity)
     const transcripts = lineages[0] === undefined ? [] : childTranscripts(lineages[0].dir)
     const seedText = messageText(transcripts[0]?.users[0])
     const nudgeCall = transcripts[0]?.assistants.flatMap(toolCallsOf).find((call) => call.name === "nudge")
     const registry = router.state.sidecarRequests[0]?.toolNames ?? []
-    record(RUNTIME_LAYER, "wake-accepted", held.nudges.length === 1 && held.nudges[0].path === MEMORIES.rollout.path && held.nudges[0].hint === MEMORIES.rollout.body, `via=${held.via} held=${JSON.stringify(held.nudges)}`)
-    record(RUNTIME_LAYER, "one-resident-child", lineages.length === 1 && lineages[0].name === encodeSidecarDirName(state.sessionId) && transcripts.length === 1, `lineages=${lineages.length} generations=${transcripts.length} dir=${lineages[0]?.name}`)
-    record(RUNTIME_LAYER, "seed-envelope", seedText.startsWith("<kibitzer-seed ") && seedText.includes(`<candidate path="${MEMORIES.rollout.path}"`), `head=${JSON.stringify(seedText.slice(0, 100))}`)
-    record(RUNTIME_LAYER, "child-called-nudge", nudgeCall?.arguments?.path === MEMORIES.rollout.path, `nudge=${JSON.stringify(nudgeCall?.arguments ?? null)}`)
-    record(RUNTIME_LAYER, "registry-on-the-wire", router.state.sidecar === 1 && sameNames(registry, SIDECAR_TOOL_NAMES), `sidecarRequests=${router.state.sidecar} tools=[${registry.join(",")}]`)
+    record(
+      RUNTIME_LAYER,
+      "wake-accepted",
+      held.nudges.length === 1 &&
+        held.nudges[0].path === MEMORIES.rollout.path &&
+        held.nudges[0].hint === MEMORIES.rollout.body,
+      `via=${held.via} held=${JSON.stringify(held.nudges)}`,
+    )
+    record(
+      RUNTIME_LAYER,
+      "one-resident-child",
+      lineages.length === 1 && lineages[0].name === encodeSidecarDirName(state.sessionId) && transcripts.length === 1,
+      `lineages=${lineages.length} generations=${transcripts.length} dir=${lineages[0]?.name}`,
+    )
+    record(
+      RUNTIME_LAYER,
+      "seed-envelope",
+      seedText.startsWith("<kibitzer-seed ") && seedText.includes(`<candidate path="${MEMORIES.rollout.path}"`),
+      `head=${JSON.stringify(seedText.slice(0, 100))}`,
+    )
+    record(
+      RUNTIME_LAYER,
+      "child-called-nudge",
+      nudgeCall?.arguments?.path === MEMORIES.rollout.path,
+      `nudge=${JSON.stringify(nudgeCall?.arguments ?? null)}`,
+    )
+    record(
+      RUNTIME_LAYER,
+      "registry-on-the-wire",
+      router.state.sidecar === 1 && sameNames(registry, SIDECAR_TOOL_NAMES),
+      `sidecarRequests=${router.state.sidecar} tools=[${registry.join(",")}]`,
+    )
 
     // Turn 2: the held nudge is drained into the parent as the turn opens and its notice is drawn. A
     // nudge that was already steered into the running first turn needs no second prompt.
@@ -435,20 +631,68 @@ async function main() {
     facts.deliveredDuringFirstTurn = steered
     if (!steered) {
       tui.terminal.write(FOLLOW_UP_PROMPT)
-      await signal("prompt-2-echoed", renderer.waitForScreen((current) => (current.viewport.includes(FOLLOW_UP_PROMPT) ? current : undefined), { timeoutMs: RENDER_TIMEOUT_MS, description: "follow-up prompt echoed by the editor" }))
+      await signal(
+        "prompt-2-echoed",
+        renderer.waitForScreen((current) => (current.viewport.includes(FOLLOW_UP_PROMPT) ? current : undefined), {
+          timeoutMs: RENDER_TIMEOUT_MS,
+          description: "follow-up prompt echoed by the editor",
+        }),
+      )
       tui.terminal.write("\r")
     }
-    screen = await signal("notice-rendered", renderer.waitForScreen(showsNotice(MEMORIES.rollout), { timeoutMs: RENDER_TIMEOUT_MS, description: `Kibitzer notice (${NOTICE_TITLE} + ${recalledLine(MEMORIES.rollout)}) rendered and the turn settled` }))
+    screen = await signal(
+      "notice-rendered",
+      renderer.waitForScreen(showsNotice(MEMORIES.rollout), {
+        timeoutMs: RENDER_TIMEOUT_MS,
+        description: `Kibitzer notice (${NOTICE_TITLE} + ${recalledLine(MEMORIES.rollout)}) rendered and the turn settled`,
+      }),
+    )
     const titleLines = linesContaining(screen.viewport, NOTICE_TITLE)
     const recalledLines = linesContaining(screen.viewport, recalledLine(MEMORIES.rollout))
-    facts.notice = { glyph: NOTICE_GLYPH, title: NOTICE_TITLE, recalledLine: recalledLine(MEMORIES.rollout), titleLines, recalledLines, glyphRendered: titleLines.some((line) => line.includes(`${NOTICE_GLYPH} ${NOTICE_TITLE}`)), pathLine: linesContaining(screen.viewport, MEMORIES.rollout.path) }
-    record(RUNTIME_LAYER, "notice-title-rendered", titleLines.length > 0, `lines=${JSON.stringify(titleLines)} glyph=${facts.notice.glyphRendered}`)
-    record(RUNTIME_LAYER, "recalled-memory-rendered", recalledLines.length > 0, `lines=${JSON.stringify(recalledLines)}`)
-    record(RUNTIME_LAYER, "notice-in-viewport", titleLines.length > 0 && recalledLines.length > 0, `viewportY=${screen.viewportY} rows=${screen.rows} (the PNG frame is the viewport)`)
+    facts.notice = {
+      glyph: NOTICE_GLYPH,
+      title: NOTICE_TITLE,
+      recalledLine: recalledLine(MEMORIES.rollout),
+      titleLines,
+      recalledLines,
+      glyphRendered: titleLines.some((line) => line.includes(`${NOTICE_GLYPH} ${NOTICE_TITLE}`)),
+      pathLine: linesContaining(screen.viewport, MEMORIES.rollout.path),
+    }
+    record(
+      RUNTIME_LAYER,
+      "notice-title-rendered",
+      titleLines.length > 0,
+      `lines=${JSON.stringify(titleLines)} glyph=${facts.notice.glyphRendered}`,
+    )
+    record(
+      RUNTIME_LAYER,
+      "recalled-memory-rendered",
+      recalledLines.length > 0,
+      `lines=${JSON.stringify(recalledLines)}`,
+    )
+    record(
+      RUNTIME_LAYER,
+      "notice-in-viewport",
+      titleLines.length > 0 && recalledLines.length > 0,
+      `viewportY=${screen.viewportY} rows=${screen.rows} (the PNG frame is the viewport)`,
+    )
     const entries = readEntries(state.sessionFile)
     const nudged = entries.filter(isNudged)
-    record(RUNTIME_LAYER, "nudge-reached-parent", nudged.length === 1 && nudgedPaths(entries).join(",") === MEMORIES.rollout.path && entries.filter(isRecall).length === 1 && (entries.filter(isRecall)[0]?.content ?? "").includes(MEMORIES.rollout.body), `nudgedEntries=${nudged.length} via=${nudged[0]?.data?.via} paths=${nudgedPaths(entries).join(",")} recallMessages=${entries.filter(isRecall).length}`)
-    record(RUNTIME_LAYER, "pending-drained", !existsSync(pendingFile(identity, state.sessionId)), `pending=${existsSync(pendingFile(identity, state.sessionId))}`)
+    record(
+      RUNTIME_LAYER,
+      "nudge-reached-parent",
+      nudged.length === 1 &&
+        nudgedPaths(entries).join(",") === MEMORIES.rollout.path &&
+        entries.filter(isRecall).length === 1 &&
+        (entries.filter(isRecall)[0]?.content ?? "").includes(MEMORIES.rollout.body),
+      `nudgedEntries=${nudged.length} via=${nudged[0]?.data?.via} paths=${nudgedPaths(entries).join(",")} recallMessages=${entries.filter(isRecall).length}`,
+    )
+    record(
+      RUNTIME_LAYER,
+      "pending-drained",
+      !existsSync(pendingFile(identity, state.sessionId)),
+      `pending=${existsSync(pendingFile(identity, state.sessionId))}`,
+    )
     record(RUNTIME_LAYER, "lease-released", leaseFiles(identity).length === 0, `leases=${leaseFiles(identity).length}`)
 
     // ---- capture, then shut the TUI down while the sandbox is still observable --------------------------------
@@ -461,12 +705,31 @@ async function main() {
       buffer: writeEvidence(evidence, "terminal-buffer.txt", `${screen.buffer}\n`),
       ansi: writeEvidence(evidence, "terminal-ansi.txt", raw),
     }
-    record(PROBE_LAYER, "evidence-captured", png.length > 0 && existsSync(facts.files.png) && existsSync(facts.files.text), `png=${png.length} bytes text=${screen.viewport.length} chars buffer=${screen.buffer.length} chars`)
+    record(
+      PROBE_LAYER,
+      "evidence-captured",
+      png.length > 0 && existsSync(facts.files.png) && existsSync(facts.files.text),
+      `png=${png.length} bytes text=${screen.viewport.length} chars buffer=${screen.buffer.length} chars`,
+    )
     const exit = await quitTui(tui)
-    record(RUNTIME_LAYER, "shutdown-clean", leaseFiles(identity).length === 0 && !existsSync(pendingFile(identity, state.sessionId)), `teardown=${exit} leases=${leaseFiles(identity).length} pending=${existsSync(pendingFile(identity, state.sessionId))}`)
+    record(
+      RUNTIME_LAYER,
+      "shutdown-clean",
+      leaseFiles(identity).length === 0 && !existsSync(pendingFile(identity, state.sessionId)),
+      `teardown=${exit} leases=${leaseFiles(identity).length} pending=${existsSync(pendingFile(identity, state.sessionId))}`,
+    )
     // Counted after the exit: no request can arrive once the TUI is gone, so these are final.
     const finalTranscripts = childTranscripts(lineages[0].dir)
-    record(RUNTIME_LAYER, "one-wake-one-lineage", router.state.sidecar === 1 && sidecarDirs(identity).length === 1 && finalTranscripts.length === 1 && finalTranscripts[0].users.length === 1 && (router.state.title ?? 0) >= 1, `sidecarRequests=${router.state.sidecar} generations=${finalTranscripts.length} childUserMessages=${finalTranscripts[0]?.users.length} parentRequests=${router.state.parent - seedRequests} titleRequests=${router.state.title ?? 0}`)
+    record(
+      RUNTIME_LAYER,
+      "one-wake-one-lineage",
+      router.state.sidecar === 1 &&
+        sidecarDirs(identity).length === 1 &&
+        finalTranscripts.length === 1 &&
+        finalTranscripts[0].users.length === 1 &&
+        (router.state.title ?? 0) >= 1,
+      `sidecarRequests=${router.state.sidecar} generations=${finalTranscripts.length} childUserMessages=${finalTranscripts[0]?.users.length} parentRequests=${router.state.parent - seedRequests} titleRequests=${router.state.title ?? 0}`,
+    )
     facts.result = {
       resident: sidecarDirs(identity).length === 1,
       childSessions: sidecarDirs(identity).length,
@@ -492,9 +755,12 @@ async function main() {
       if (screen !== undefined) facts.files.text = writeEvidence(evidence, "terminal.txt", `${screen.viewport}\n`)
     }
     if (identity !== undefined) {
-      if (state?.sessionFile !== undefined && existsSync(state.sessionFile)) copyFileSync(state.sessionFile, join(evidence, "tui-parent-session.jsonl"))
+      if (state?.sessionFile !== undefined && existsSync(state.sessionFile))
+        copyFileSync(state.sessionFile, join(evidence, "tui-parent-session.jsonl"))
       for (const lineage of sidecarDirs(identity)) {
-        childTranscripts(lineage.dir).forEach((transcript, index) => copyFileSync(transcript.file, join(evidence, `tui-sidecar-gen${index + 1}.jsonl`)))
+        childTranscripts(lineage.dir).forEach((transcript, index) =>
+          copyFileSync(transcript.file, join(evidence, `tui-sidecar-gen${index + 1}.jsonl`)),
+        )
       }
     }
     facts.cleanup = await cleanup.run()
@@ -510,7 +776,16 @@ async function main() {
       childSessions: facts.result?.childSessions ?? 0,
       nudged: facts.result?.nudged ?? 0,
       via: facts.result?.via ?? null,
-      notice: facts.notice === undefined ? null : { title: facts.notice.title, recalledLine: facts.notice.recalledLine, titleLines: facts.notice.titleLines, recalledLines: facts.notice.recalledLines, glyphRendered: facts.notice.glyphRendered },
+      notice:
+        facts.notice === undefined
+          ? null
+          : {
+              title: facts.notice.title,
+              recalledLine: facts.notice.recalledLine,
+              titleLines: facts.notice.titleLines,
+              recalledLines: facts.notice.recalledLines,
+              glyphRendered: facts.notice.glyphRendered,
+            },
       signals,
       files: facts.files ?? null,
       checks: checks.length,
@@ -523,12 +798,34 @@ async function main() {
       driver: DRIVER,
       connector: "xterm.js in headless Chrome fed by a Bun.spawn terminal (real PTY)",
       colorPath: "xterm.js (true color; not tmux)",
-      source: { kind: "command", command: facts.command ?? null, source: facts.commandSource ?? null, pid: facts.pid ?? null, sessionId: facts.sessionId ?? null },
-      interaction: [MEMORIES.rollout.prompt, "{Enter}", ...(facts.deliveredDuringFirstTurn === true ? [] : [FOLLOW_UP_PROMPT, "{Enter}"])],
+      source: {
+        kind: "command",
+        command: facts.command ?? null,
+        source: facts.commandSource ?? null,
+        pid: facts.pid ?? null,
+        sessionId: facts.sessionId ?? null,
+      },
+      interaction: [
+        MEMORIES.rollout.prompt,
+        "{Enter}",
+        ...(facts.deliveredDuringFirstTurn === true ? [] : [FOLLOW_UP_PROMPT, "{Enter}"]),
+      ],
       dimensions: facts.geometry,
       signals,
-      assertion: facts.notice ?? { title: NOTICE_TITLE, recalledLine: recalledLine(MEMORIES.rollout), titleLines: [], recalledLines: [] },
-      files: { png: facts.files?.png ?? null, text: facts.files?.text ?? null, buffer: facts.files?.buffer ?? null, ansi: facts.files?.ansi ?? null, metadata: join(evidence, "metadata.json"), summary: join(evidence, `${DRIVER}.json`) },
+      assertion: facts.notice ?? {
+        title: NOTICE_TITLE,
+        recalledLine: recalledLine(MEMORIES.rollout),
+        titleLines: [],
+        recalledLines: [],
+      },
+      files: {
+        png: facts.files?.png ?? null,
+        text: facts.files?.text ?? null,
+        buffer: facts.files?.buffer ?? null,
+        ansi: facts.files?.ansi ?? null,
+        metadata: join(evidence, "metadata.json"),
+        summary: join(evidence, `${DRIVER}.json`),
+      },
       sandbox: { root: facts.sandboxRoot ?? null, kept: options.keepSandbox },
       cleanup: facts.cleanup,
       ok: summary.ok,
@@ -544,34 +841,83 @@ async function main() {
 
 function runSelfTest() {
   const options = parseArgs(["--evidence-dir", "/tmp/x", "--cols", "100", "--rows", "30"])
-  if (options.cols !== 100 || options.rows !== 30 || options.evidenceDir !== resolve("/tmp/x")) throw new Error("self-test: argument parsing")
+  if (options.cols !== 100 || options.rows !== 30 || options.evidenceDir !== resolve("/tmp/x"))
+    throw new Error("self-test: argument parsing")
   for (const bad of [[], ["--evidence-dir", "/tmp/x", "--cols", "0"], ["--bogus"]]) {
     let rejected = false
-    try { parseArgs(bad) } catch { rejected = true }
+    try {
+      parseArgs(bad)
+    } catch {
+      rejected = true
+    }
     if (!rejected) throw new Error(`self-test: ${bad.join(" ") || "(no arguments)"} must be rejected`)
   }
-  if (resolveChrome(process.execPath, {}, "none") !== process.execPath) throw new Error("self-test: an explicit executable wins")
-  if (resolveChrome(undefined, { CHROME_BIN: "/definitely/missing" }, "none") !== undefined) throw new Error("self-test: a missing candidate is skipped")
-  const html = buildPageHtml({ xtermJs: "/*xterm*/", xtermCss: "/*css*/", unicodeJs: "/*u11*/", cols: 120, rows: 40, fontSize: 15 })
-  if (!html.includes("cols: 120, rows: 40") || !html.includes("window.__snapshot") || !html.includes("window.__write")) throw new Error("self-test: page hooks")
+  if (resolveChrome(process.execPath, {}, "none") !== process.execPath)
+    throw new Error("self-test: an explicit executable wins")
+  if (resolveChrome(undefined, { CHROME_BIN: "/definitely/missing" }, "none") !== undefined)
+    throw new Error("self-test: a missing candidate is skipped")
+  const html = buildPageHtml({
+    xtermJs: "/*xterm*/",
+    xtermCss: "/*css*/",
+    unicodeJs: "/*u11*/",
+    cols: 120,
+    rows: 40,
+    fontSize: 15,
+  })
+  if (!html.includes("cols: 120, rows: 40") || !html.includes("window.__snapshot") || !html.includes("window.__write"))
+    throw new Error("self-test: page hooks")
   const booting = { viewport: "❯\n… project • 0/200K (0.0%) (auto)       mock-1", buffer: "" }
-  if (isReady(booting) !== undefined) throw new Error("self-test: the editor glyph and model footer alone are not ready - submission is still gated")
-  const busy = { viewport: `❯ ask\n… mock-1 • Working (0s • ${WORKING_MARKER})\n(😺 OmO Native by Q Kim) mem:project-3bf12e4b just now`, buffer: `${PARENT_ANSWERS[0]}\n❯ ask\n… mock-1 • Working (0s • ${WORKING_MARKER})\n(😺 OmO Native by Q Kim) mem:project-3bf12e4b just now` }
-  if (isReady(busy) === undefined || isIdleWith(PARENT_ANSWERS[0])(busy) !== undefined) throw new Error("self-test: a working turn is ready but not idle")
-  const settled = { viewport: `  ${NOTICE_GLYPH} ${NOTICE_TITLE}\n  ${recalledLine(MEMORIES.rollout)}\n  ${MEMORIES.rollout.path}\n ${PARENT_ANSWERS[1]}\n❯\n mock-1`, buffer: "" }
+  if (isReady(booting) !== undefined)
+    throw new Error("self-test: the editor glyph and model footer alone are not ready - submission is still gated")
+  const busy = {
+    viewport: `❯ ask\n… mock-1 • Working (0s • ${WORKING_MARKER})\n(😺 OmO Native by Q Kim) mem:project-3bf12e4b just now`,
+    buffer: `${PARENT_ANSWERS[0]}\n❯ ask\n… mock-1 • Working (0s • ${WORKING_MARKER})\n(😺 OmO Native by Q Kim) mem:project-3bf12e4b just now`,
+  }
+  if (isReady(busy) === undefined || isIdleWith(PARENT_ANSWERS[0])(busy) !== undefined)
+    throw new Error("self-test: a working turn is ready but not idle")
+  const settled = {
+    viewport: `  ${NOTICE_GLYPH} ${NOTICE_TITLE}\n  ${recalledLine(MEMORIES.rollout)}\n  ${MEMORIES.rollout.path}\n ${PARENT_ANSWERS[1]}\n❯\n mock-1`,
+    buffer: "",
+  }
   settled.buffer = settled.viewport
-  if (showsNotice(MEMORIES.rollout)(settled) === undefined || showsNotice(MEMORIES.helm)(settled) !== undefined) throw new Error("self-test: the notice predicate keys on the recalled memory line")
-  if (linesContaining(settled.viewport, NOTICE_TITLE).join() !== `  ${NOTICE_GLYPH} ${NOTICE_TITLE}` || linesContaining(settled.viewport, RECALLED_PREFIX).length !== 1) throw new Error("self-test: line extraction")
-  if (recalledLine(MEMORIES.rollout) !== "recalled memory: Drain nodes before a rollout; never roll during an incident.") throw new Error("self-test: recalled line text")
+  if (showsNotice(MEMORIES.rollout)(settled) === undefined || showsNotice(MEMORIES.helm)(settled) !== undefined)
+    throw new Error("self-test: the notice predicate keys on the recalled memory line")
+  if (
+    linesContaining(settled.viewport, NOTICE_TITLE).join() !== `  ${NOTICE_GLYPH} ${NOTICE_TITLE}` ||
+    linesContaining(settled.viewport, RECALLED_PREFIX).length !== 1
+  )
+    throw new Error("self-test: line extraction")
+  if (
+    recalledLine(MEMORIES.rollout) !== "recalled memory: Drain nodes before a rollout; never roll during an incident."
+  )
+    throw new Error("self-test: recalled line text")
   const lane = titleLane()
-  const titleBody = { messages: [{ role: "system", content: `${TITLE_REQUEST_MARKER}\n\nRules:` }, { role: "user", content: MEMORIES.rollout.prompt }] }
-  if (!lane.matches(titleBody) || lane.matches({ messages: [{ role: "system", content: "# Kibitzer" }] }) || lane.step(titleBody).text !== `<title>${SESSION_TITLE}</title>`) throw new Error("self-test: the title lane keys on the title system prompt")
+  const titleBody = {
+    messages: [
+      { role: "system", content: `${TITLE_REQUEST_MARKER}\n\nRules:` },
+      { role: "user", content: MEMORIES.rollout.prompt },
+    ],
+  }
+  if (
+    !lane.matches(titleBody) ||
+    lane.matches({ messages: [{ role: "system", content: "# Kibitzer" }] }) ||
+    lane.step(titleBody).text !== `<title>${SESSION_TITLE}</title>`
+  )
+    throw new Error("self-test: the title lane keys on the title system prompt")
   const router = createRouter({ lanes: [lane] })
   router.setParentSteps([{ type: "text", text: "p1" }])
   const titled = router.steps(titleBody)
   const parent = router.steps({ messages: [] })
-  if (titled[0]?.text !== `<title>${SESSION_TITLE}</title>` || parent[1]?.text !== "p1" || router.state.title !== 1 || router.state.parent !== 1 || router.classify(titleBody) !== "title") throw new Error("self-test: a title request must not consume the parent script")
-  if (findNewSession("/definitely/missing", new Set()) !== undefined) throw new Error("self-test: no session dir, no session")
+  if (
+    titled[0]?.text !== `<title>${SESSION_TITLE}</title>` ||
+    parent[1]?.text !== "p1" ||
+    router.state.title !== 1 ||
+    router.state.parent !== 1 ||
+    router.classify(titleBody) !== "title"
+  )
+    throw new Error("self-test: a title request must not consume the parent script")
+  if (findNewSession("/definitely/missing", new Set()) !== undefined)
+    throw new Error("self-test: no session dir, no session")
   console.log(JSON.stringify({ ok: true, driver: DRIVER, selfTest: true }))
 }
 

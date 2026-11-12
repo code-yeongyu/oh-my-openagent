@@ -128,7 +128,14 @@ export function removeReplacedLauncher(launcher: string, platform: NodeJS.Platfo
     return
   }
   for (const entry of entries) {
-    if (entry !== prefix && !(entry.startsWith(`${prefix}-`) && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(entry.slice(prefix.length + 1)))) continue
+    if (
+      entry !== prefix &&
+      !(
+        entry.startsWith(`${prefix}-`) &&
+        /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(entry.slice(prefix.length + 1))
+      )
+    )
+      continue
     try {
       rmSync(join(directory, entry), { force: true })
     } catch {

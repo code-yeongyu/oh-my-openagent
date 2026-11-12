@@ -40,10 +40,21 @@ function fakeSignaller(alive: Set<number>, calls: SignalCall[]): ProcessSignalle
 const now = () => 5_000_000
 
 function seedProcessRecord(store: TaskRecordStore, taskId: string, status: TaskStatus = "running"): TaskRecord {
-  const record = seedRecord(store, { task_id: taskId, status, residency_state: "resident", execution_mode: "process", pid: 900, updated_at: new Date(now() - 1_000).toISOString() })
+  const record = seedRecord(store, {
+    task_id: taskId,
+    status,
+    residency_state: "resident",
+    execution_mode: "process",
+    pid: 900,
+    updated_at: new Date(now() - 1_000).toISOString(),
+  })
   const persisted: TaskRecord = {
     ...record,
-    spawn_spec: { cwd: "/tmp/project", extensions: ["/tmp/member-extension.ts"], member_env: { SENPI_TASK_MEMBER: "run-1::alpha" } },
+    spawn_spec: {
+      cwd: "/tmp/project",
+      extensions: ["/tmp/member-extension.ts"],
+      member_env: { SENPI_TASK_MEMBER: "run-1::alpha" },
+    },
   }
   store.replace(persisted)
   return persisted
@@ -61,7 +72,12 @@ function persistSessions(store: TaskRecordStore, taskId: string): string {
   return newest
 }
 
-type RespawnControl = { readonly switchCalls: string[]; settle(): void; readonly terminated: () => number; readonly disposed: () => number }
+type RespawnControl = {
+  readonly switchCalls: string[]
+  settle(): void
+  readonly terminated: () => number
+  readonly disposed: () => number
+}
 
 class FakeRespawnRunner {
   readonly startedSpecs: RpcRunnerSpec[] = []
@@ -79,15 +95,21 @@ class FakeRespawnRunner {
     const switchCalls: string[] = []
     const pid = 1_000 + this.startedSpecs.length
     const handle: RpcChildHandle = {
-      task_id: spec.task_id, sessionId: `resumed-${spec.task_id}`, pid,
+      task_id: spec.task_id,
+      sessionId: `resumed-${spec.task_id}`,
+      pid,
       steer: () => Promise.resolve(),
       followUp: () => Promise.resolve(),
       abort: () => Promise.resolve(),
       subscribe: () => () => {},
       waitForIdle: () => idle,
       lastAssistantText: () => "reattached result",
-      dispose: async () => { disposed += 1 },
-      terminate: async () => { terminated += 1 },
+      dispose: async () => {
+        disposed += 1
+      },
+      terminate: async () => {
+        terminated += 1
+      },
       exitOutcome: () => undefined,
       waitForExit: () => Promise.resolve({ kind: "clean", facts: { pid, code: 0, signal: null, stderrTail: "" } }),
       lastSeen: () => undefined,
@@ -106,7 +128,11 @@ class EffectiveSpawnRunner extends FakeRunner {
     const handle = await super.start(spec)
     return {
       ...handle,
-      spawnSpec: { cwd: spec.cwd, extensions: ["/tmp/inherited-extension.ts"], memberEnv: { SENPI_TASK_MEMBER: "run-1::alpha" } },
+      spawnSpec: {
+        cwd: spec.cwd,
+        extensions: ["/tmp/inherited-extension.ts"],
+        memberEnv: { SENPI_TASK_MEMBER: "run-1::alpha" },
+      },
     }
   }
 }
@@ -132,9 +158,14 @@ function createManager(
 }
 
 type HarnessOptions = {
-  readonly taskId: string; readonly status?: TaskStatus; readonly sessions?: boolean; readonly alive?: boolean
-  readonly config?: Record<string, unknown>; readonly registry?: FakeRegistry
-  readonly concurrency?: number; readonly processRunner?: FakeRunner
+  readonly taskId: string
+  readonly status?: TaskStatus
+  readonly sessions?: boolean
+  readonly alive?: boolean
+  readonly config?: Record<string, unknown>
+  readonly registry?: FakeRegistry
+  readonly concurrency?: number
+  readonly processRunner?: FakeRunner
 }
 
 function createHarness(options: HarnessOptions) {
@@ -145,7 +176,15 @@ function createHarness(options: HarnessOptions) {
   const managed = createManager(store, respawnRunner, options.concurrency, options.processRunner)
   const signals: SignalCall[] = []
   const alive = options.alive === true ? new Set([900]) : new Set<number>()
-  const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: options.registry ?? new FakeRegistry(), config: settings(options.config), now, signaller: fakeSignaller(alive, signals), orphanKillDelayMs: 0 })
+  const lifecycle = createTaskLifecycle({
+    hostEndpoint: NO_HOST_ENDPOINT,
+    store,
+    registry: options.registry ?? new FakeRegistry(),
+    config: settings(options.config),
+    now,
+    signaller: fakeSignaller(alive, signals),
+    orphanKillDelayMs: 0,
+  })
   return { store, sessionPath, respawnRunner, signals, lifecycle, ...managed }
 }
 
@@ -205,12 +244,8 @@ describe("reconcileOnSessionStart reattach", () => {
     // then
     if (sessionPath === undefined) throw new Error("expected a persisted session path")
     expect(result.outcomes[0]?.kind).toBe("resumed")
-    expect(calls).toEqual([
-      `respawn:st_0000000d:${sessionPath}`,
-      "reattach:st_0000000d:injected-session",
-    ])
+    expect(calls).toEqual([`respawn:st_0000000d:${sessionPath}`, "reattach:st_0000000d:injected-session"])
   })
-
 
   test(" w2reattach #given a dead process without a session #when reconciled #then it remains lost without respawn", async () => {
     // given
@@ -244,10 +279,22 @@ describe("reconcileOnSessionStart reattach", () => {
   test(" w2reattach #given an in-process record #when reconciled #then the previous-process task is lost and never respawned", async () => {
     // given
     const store = tempStore()
-    seedRecord(store, { task_id: "st_00000004", status: "running", residency_state: "resident", execution_mode: "in-process" })
+    seedRecord(store, {
+      task_id: "st_00000004",
+      status: "running",
+      residency_state: "resident",
+      execution_mode: "in-process",
+    })
     const respawnRunner = new FakeRespawnRunner()
     createManager(store, respawnRunner)
-    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings(), now, signaller: fakeSignaller(new Set(), []) })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry: new FakeRegistry(),
+      config: settings(),
+      now,
+      signaller: fakeSignaller(new Set(), []),
+    })
 
     // when
     const result = await lifecycle.reconcileOnSessionStart()
@@ -260,7 +307,12 @@ describe("reconcileOnSessionStart reattach", () => {
     // given
     const store = tempStore()
     const handle = fakeHandle("st_00000013", "in-process", [])
-    seedRecord(store, { task_id: "st_00000013", status: "running", residency_state: "resident", execution_mode: "in-process" })
+    seedRecord(store, {
+      task_id: "st_00000013",
+      status: "running",
+      residency_state: "resident",
+      execution_mode: "in-process",
+    })
     const registry = new FakeRegistry()
     registry.add(handle)
     const pointLookupMissRegistry = {
@@ -291,8 +343,21 @@ describe("reconcileOnSessionStart reattach", () => {
   test(" w2reattach #given an in-process record marked lost #when reconciled #then its residency claim is released so the slot is reclaimable", async () => {
     // given
     const store = tempStore()
-    seedRecord(store, { task_id: "st_00000011", status: "running", residency_state: "resident", execution_mode: "in-process" })
-    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings(), now, signaller: fakeSignaller(new Set(), []), orphanKillDelayMs: 0 })
+    seedRecord(store, {
+      task_id: "st_00000011",
+      status: "running",
+      residency_state: "resident",
+      execution_mode: "in-process",
+    })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry: new FakeRegistry(),
+      config: settings(),
+      now,
+      signaller: fakeSignaller(new Set(), []),
+      orphanKillDelayMs: 0,
+    })
 
     // when
     const result = await lifecycle.reconcileOnSessionStart()
@@ -306,8 +371,21 @@ describe("reconcileOnSessionStart reattach", () => {
   test(" w2reattach #given a leaked {lost, resident} record from an earlier session #when reconciled #then it self-heals to disposed", async () => {
     // given
     const store = tempStore()
-    seedRecord(store, { task_id: "st_00000012", status: "lost", residency_state: "resident", execution_mode: "in-process" })
-    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings(), now, signaller: fakeSignaller(new Set(), []), orphanKillDelayMs: 0 })
+    seedRecord(store, {
+      task_id: "st_00000012",
+      status: "lost",
+      residency_state: "resident",
+      execution_mode: "in-process",
+    })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry: new FakeRegistry(),
+      config: settings(),
+      now,
+      signaller: fakeSignaller(new Set(), []),
+      orphanKillDelayMs: 0,
+    })
 
     // when
     const result = await lifecycle.reconcileOnSessionStart()
@@ -322,11 +400,26 @@ describe("reconcileOnSessionStart reattach", () => {
     // lost marking (orphan) is followed by a second one (reattach failure) in the same pass
     const taskId = "st_00000014"
     const store = tempStore()
-    seedRecord(store, { task_id: taskId, status: "running", residency_state: "resident", execution_mode: "process", pid: 901, updated_at: new Date(now() - 1_000).toISOString() })
+    seedRecord(store, {
+      task_id: taskId,
+      status: "running",
+      residency_state: "resident",
+      execution_mode: "process",
+      pid: 901,
+      updated_at: new Date(now() - 1_000).toISOString(),
+    })
     persistSessions(store, taskId)
     const respawnRunner = new FakeRespawnRunner()
     createManager(store, respawnRunner)
-    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings(), now, signaller: fakeSignaller(new Set([901]), []), orphanKillDelayMs: 0 })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry: new FakeRegistry(),
+      config: settings(),
+      now,
+      signaller: fakeSignaller(new Set([901]), []),
+      orphanKillDelayMs: 0,
+    })
 
     // when
     const result = await lifecycle.reconcileOnSessionStart()
@@ -339,7 +432,10 @@ describe("reconcileOnSessionStart reattach", () => {
 
   test(" w2reattach #given reconcile reattach is disabled #when a durable session exists #then v1 lost behavior runs without respawn", async () => {
     // given
-    const { store, respawnRunner, lifecycle } = createHarness({ taskId: "st_00000005", config: { reattach_on_reconcile: false } })
+    const { store, respawnRunner, lifecycle } = createHarness({
+      taskId: "st_00000005",
+      config: { reattach_on_reconcile: false },
+    })
 
     // when
     const result = await lifecycle.reconcileOnSessionStart()
@@ -374,7 +470,11 @@ describe("reconcileOnSessionStart reattach", () => {
     const result = await lifecycle.reconcileOnSessionStart()
 
     // then
-    expect(result.outcomes[0]).toEqual({ task_id: "st_00000007", kind: "resumed", reason: "terminal resident detached" })
+    expect(result.outcomes[0]).toEqual({
+      task_id: "st_00000007",
+      kind: "resumed",
+      reason: "terminal resident detached",
+    })
     expect(respawnRunner.startedSpecs).toHaveLength(0)
     expect(store.load("st_00000007")?.status).toBe("completed")
     expect(store.load("st_00000007")?.residency_state).toBe("rpc_detached")
@@ -384,7 +484,11 @@ describe("reconcileOnSessionStart reattach", () => {
 
   test(" w2reattach #given a completed resident daemon with a live foreign pid #when reconciled #then it is terminated and detached without reattach", async () => {
     // given
-    const { store, respawnRunner, signals, lifecycle } = createHarness({ taskId: "st_0000000a", status: "completed", alive: true })
+    const { store, respawnRunner, signals, lifecycle } = createHarness({
+      taskId: "st_0000000a",
+      status: "completed",
+      alive: true,
+    })
 
     // when
     const result = await lifecycle.reconcileOnSessionStart()
@@ -392,7 +496,11 @@ describe("reconcileOnSessionStart reattach", () => {
     // then
     expect(signals).toEqual([{ pid: 900, signal: "SIGTERM" }])
     expect(respawnRunner.startedSpecs).toHaveLength(0)
-    expect(result.outcomes[0]).toEqual({ task_id: "st_0000000a", kind: "resumed", reason: "terminal resident detached" })
+    expect(result.outcomes[0]).toEqual({
+      task_id: "st_0000000a",
+      kind: "resumed",
+      reason: "terminal resident detached",
+    })
     expect(store.load("st_0000000a")?.status).toBe("completed")
     expect(store.load("st_0000000a")?.residency_state).toBe("rpc_detached")
   })
@@ -406,10 +514,11 @@ describe("reconcileOnSessionStart reattach", () => {
 
     // then
     expect(respawnRunner.startedSpecs).toHaveLength(1)
-    expect(respawnRunner.controls.map((control) => [control.terminated(), control.disposed()]))
-      .toEqual([[0, 0]])
-    expect(results.flatMap((result) => result.outcomes.map((outcome) => outcome.kind)).sort())
-      .toEqual(["foreign_live_owner", "resumed"])
+    expect(respawnRunner.controls.map((control) => [control.terminated(), control.disposed()])).toEqual([[0, 0]])
+    expect(results.flatMap((result) => result.outcomes.map((outcome) => outcome.kind)).sort()).toEqual([
+      "foreign_live_owner",
+      "resumed",
+    ])
     expect(store.load("st_0000000b")?.notification.run_epoch).toBe(1)
     expect(manager.getResidentHandle("st_0000000b")?.pid).toBe(1001)
   })
@@ -420,7 +529,12 @@ describe("reconcileOnSessionStart reattach", () => {
     const { store, manager } = createHarness({ taskId: "st_0000000c", processRunner })
 
     // when
-    const result = await manager.start({ prompt: "bootstrap", parent_session_id: "parent-1", depth: 1, execution_mode: "process" })
+    const result = await manager.start({
+      prompt: "bootstrap",
+      parent_session_id: "parent-1",
+      depth: 1,
+      execution_mode: "process",
+    })
 
     // then the v1 rebuild facts persisted at spawn survive, while the runner-reported extensions
     // and member env (untrusted launch inputs) never reach the record
@@ -536,12 +650,26 @@ describe("reconcileOnSessionStart reattach", () => {
 
   test(" w2reattach #given one concurrency slot and two queued tasks #when a reattached task completes #then only the first queued task starts", async () => {
     // given
-    const { store, respawnRunner, manager, inProcess, lifecycle } = createHarness({ taskId: "st_00000009", concurrency: 1, config: { default_concurrency: 1 } })
+    const { store, respawnRunner, manager, inProcess, lifecycle } = createHarness({
+      taskId: "st_00000009",
+      concurrency: 1,
+      config: { default_concurrency: 1 },
+    })
     await lifecycle.reconcileOnSessionStart()
 
     // when
-    const firstQueued = await manager.start({ prompt: "next", parent_session_id: "parent-1", depth: 1, execution_mode: "in-process" })
-    const secondQueued = await manager.start({ prompt: "later", parent_session_id: "parent-1", depth: 1, execution_mode: "in-process" })
+    const firstQueued = await manager.start({
+      prompt: "next",
+      parent_session_id: "parent-1",
+      depth: 1,
+      execution_mode: "in-process",
+    })
+    const secondQueued = await manager.start({
+      prompt: "later",
+      parent_session_id: "parent-1",
+      depth: 1,
+      execution_mode: "in-process",
+    })
     if (firstQueued.kind !== "started" || secondQueued.kind !== "started") throw new Error("expected queued tasks")
     expect(firstQueued.status).toBe("pending")
     expect(secondQueued.status).toBe("pending")
@@ -558,7 +686,6 @@ describe("reconcileOnSessionStart reattach", () => {
     expect(store.load(secondQueued.task_id)?.status).toBe("running")
   })
 })
-
 
 describe("reconcileOnSessionStart cross-process ownership", () => {
   const foreignPid = 4242
