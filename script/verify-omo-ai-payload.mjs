@@ -66,7 +66,16 @@ const SHIPPED_ROOTS = [
 // ./extensions/omo-task.js), so every target it names must be packed. A list pattern such as extensions/[^/]+ is met
 // by any one file; this requires each sidecar the packed plugin actually imports.
 function pluginImportMapRequirements() {
-  const manifest = JSON.parse(readFileSync(resolve(pkgDir, "plugin", "package.json"), "utf8"))
+  const manifestPath = resolve(pkgDir, "plugin", "package.json")
+  // An absent manifest is already a missing artifact of REQUIRED_ARTIFACTS; an unparsable one is reported here. Neither
+  // ends in a stack trace.
+  if (!existsSync(manifestPath)) return []
+  let manifest
+  try {
+    manifest = JSON.parse(readFileSync(manifestPath, "utf8"))
+  } catch (error) {
+    return [{ label: `plugin/package.json (unreadable: ${error.message})`, met: () => false }]
+  }
   return [...new Set(Object.values(manifest.imports ?? {}).filter((target) => typeof target === "string"))].map(
     (target) => {
       const path = posix.join("plugin", target)

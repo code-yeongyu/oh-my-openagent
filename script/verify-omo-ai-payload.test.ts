@@ -259,6 +259,17 @@ describe("omo-ai payload verifier", () => {
       expect(run.exitCode).toBe(1)
     })
 
+    test("#when plugin/package.json itself is absent #then it fails with a missing-artifact line, not a stack trace", () => {
+      const run = runVerifierOnPayload(
+        payload.filter((path) => path !== "plugin/package.json"),
+        {},
+        { args: ["--release-preflight"] },
+      )
+      expect(run.output).toContain("missing artifact: plugin/package.json")
+      expect(run.output).not.toContain("    at ")
+      expect(run.exitCode).toBe(1)
+    })
+
     test("#when every sidecar it maps is packed #then --release-preflight passes", () => {
       const run = runVerifierOnPayload(
         [...payload, "plugin/extensions/omo-task.js"],
