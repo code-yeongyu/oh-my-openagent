@@ -53,9 +53,13 @@ function report(rows: unknown, ...flags: string[]) {
 function withFailures(): CellResult[] {
   const raiser = fake.findIndex((cell) => "deliver" in cell.expect && cell.mode === "background")
   const refusal = fake.findIndex((cell) => "refuse" in cell.expect)
+  const blind = fake.findIndex((cell, index) => index > raiser && "deliver" in cell.expect)
   const raised = { signal: "happened" as const, firstAt: 80, count: 1 }
+  const unread = { signal: "not_observed" as const, firstAt: null, count: 0 }
   return complete.map((result, index): CellResult => {
     if (index === raiser) return { ...result, journal: { ...quiet, window_raised: raised } }
+    if (index === blind)
+      return { ...result, journal: { ...quiet, clipboard: unread }, observerUnavailable: "no recorder" }
     if (index === refusal) return { ...result, observed: { kind: "refused", code: "InputFailed", nothingSent: true } }
     return result
   })
@@ -81,11 +85,11 @@ describe("report.ts command line", () => {
     expect(report([{ id: "x" }], "--check-schema").exitCode).toBe(1)
   })
 
-  test("--summary prints every count, disturbed cells included", () => {
+  test("--summary prints every count, disturbed and unobserved cells included", () => {
     const summary = report(withFailures(), "--summary")
     const delivered = fake.filter((cell) => "deliver" in cell.expect).length
     expect(summary.stdout.trim()).toBe(
-      `cells=${fake.length} delivered=${delivered - 1} refused=${fake.length - delivered - 1} failed=2 disturbed=1`,
+      `cells=${fake.length} delivered=${delivered - 2} refused=${fake.length - delivered - 1} failed=2 disturbed=1 unobserved=1`,
     )
     expect(summary.exitCode).toBe(0)
   })

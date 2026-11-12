@@ -184,6 +184,25 @@ describe("conformance report, declared-outcome catalog [ADP-1]", () => {
     ])
   })
 
+  test("a cell whose signals no observer read is unobserved: never clean, never passing", () => {
+    const unread: SignalSummary = { signal: "not_observed", firstAt: null, count: 0 }
+    const blind = { ...quiet(), pointer: unread, typing: unread }
+    const result = { ...delivered(deliverCell, blind), observerUnavailable: "no X11 recorder yet" }
+    const report = buildReport(catalog, passingRun(result))
+    expect(report.problems).toEqual([
+      `cell ${cellId(deliverCell)}: observer did not read typing,pointer (no X11 recorder yet)`,
+    ])
+    expect([report.delivered, report.unobserved, report.failed]).toEqual([1, 1, 0])
+    expect(summaryLine(report)).toEndWith("failed=0 skipped=0 unobserved=1")
+  })
+
+  test("a not_observed signal that carries a count or a time contradicts itself", () => {
+    const journal = { ...quiet(), pointer: { signal: "not_observed" as const, firstAt: 50, count: 1 } }
+    expect(buildReport(catalog, passingRun(delivered(deliverCell, journal))).problems).toEqual([
+      `cell ${cellId(deliverCell)}: observer journal contradicts itself: pointer`,
+    ])
+  })
+
   test("a result for a cell the catalog does not declare fails", () => {
     const stray = { ...deliverCell, toolkit: "webview" as const }
     const report = buildReport(catalog, [...passingRun(), delivered(stray)])

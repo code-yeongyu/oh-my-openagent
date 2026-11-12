@@ -12,13 +12,15 @@ interface Report {
   readonly failed: number
   readonly skipped: number
   readonly disturbed: number
+  readonly unobserved: number
   readonly problems: readonly string[]
   /** The run's shape faults: a missing, duplicate, undeclared or contradictory cell, or an empty catalog. */
   readonly structural: readonly string[]
 }
 
 type Judgement =
-  { readonly outcome: "delivered" | "refused" } | { readonly outcome: "failed" | "skipped"; readonly problem: string }
+  | { readonly outcome: "delivered" | "refused" }
+  | { readonly outcome: "failed" | "skipped" | "unobserved"; readonly problem: string }
 
 function changedSignals(result: CellResult, allowed: readonly SignalId[]): SignalId[] {
   return SIGNAL_IDS.filter((id) => result.journal[id].signal === "happened" && !allowed.includes(id))
@@ -30,10 +32,15 @@ function oracleProblem(cell: Cell, result: CellResult): string | undefined {
   return `oracle ${field} == ${JSON.stringify(equals)} does not hold (fixture reads ${JSON.stringify(result.oracle.observed)})`
 }
 
+function unobservedSignals(result: CellResult): SignalId[] {
+  return SIGNAL_IDS.filter((id) => result.journal[id].signal === "not_observed")
+}
+
 function inconsistentSignals(result: CellResult): SignalId[] {
   return SIGNAL_IDS.filter((id) => {
     const { signal, count, firstAt } = result.journal[id]
-    return signal === "happened" ? count === 0 || firstAt === null : count !== 0 || firstAt !== null
+    if (signal === "happened") return count === 0 || firstAt === null
+    return count !== 0 || firstAt !== null
   })
 }
 
@@ -69,6 +76,11 @@ function judge(cell: Cell, id: string, result: CellResult): Judgement {
   }
   const problem = cellProblem(cell, result)
   if (problem !== undefined) return { outcome: "failed", problem: `cell ${id}: ${problem}` }
+  const unread = unobservedSignals(result)
+  if (unread.length > 0) {
+    const why = result.observerUnavailable === undefined ? "" : ` (${result.observerUnavailable})`
+    return { outcome: "unobserved", problem: `cell ${id}: observer did not read ${unread.join(",")}${why}` }
+  }
   return { outcome: "deliver" in cell.expect ? "delivered" : "refused" }
 }
 
@@ -82,7 +94,7 @@ function groupBy<T>(items: readonly T[], key: (item: T) => string): Map<string, 
 export function buildReport(catalog: readonly Cell[], results: readonly CellResult[]): Report {
   const problems: string[] = []
   const structural: string[] = []
-  const counts = { delivered: 0, refused: 0, failed: 0, skipped: 0, disturbed: 0 }
+  const counts = { delivered: 0, refused: 0, failed: 0, skipped: 0, disturbed: 0, unobserved: 0 }
   const declared = groupBy(catalog, cellId)
   const observed = groupBy(results, (result) => result.id)
   if (catalog.length === 0) structural.push("empty catalog")
@@ -125,8 +137,9 @@ export function buildReport(catalog: readonly Cell[], results: readonly CellResu
 }
 
 export function summaryLine(report: Report): string {
-  const { os, session, cells, delivered, refused, failed, skipped } = report
-  return `CATALOG ${os}/${session} cells=${cells} delivered=${delivered} refused=${refused} failed=${failed} skipped=${skipped}`
+  const { os, session, cells, delivered, refused, failed, skipped, unobserved } = report
+  const tail = unobserved > 0 ? ` unobserved=${unobserved}` : ""
+  return `CATALOG ${os}/${session} cells=${cells} delivered=${delivered} refused=${refused} failed=${failed} skipped=${skipped}${tail}`
 }
 
 function readRun(input: string) {
@@ -155,9 +168,11 @@ function main(argv: readonly string[]): number {
   const report = buildReport(catalogFor(run.os, run.session), run.results)
   if (argv.includes("--check-schema") || argv.includes("--summary")) {
     for (const fault of report.structural) console.log(fault)
-    const { cells, delivered, refused, failed, disturbed } = report
+    const { cells, delivered, refused, failed, disturbed, unobserved } = report
     if (argv.includes("--summary")) {
-      console.log(`cells=${cells} delivered=${delivered} refused=${refused} failed=${failed} disturbed=${disturbed}`)
+      console.log(
+        `cells=${cells} delivered=${delivered} refused=${refused} failed=${failed} disturbed=${disturbed} unobserved=${unobserved}`,
+      )
     } else if (report.structural.length === 0) console.log(`SCHEMA ok ${run.os}/${run.session} cells=${cells}`)
     return report.structural.length === 0 ? 0 : 1
   }
