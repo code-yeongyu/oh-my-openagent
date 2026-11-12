@@ -59,6 +59,9 @@ then allow Accessibility and Screen Recording for the QA identity. Every later g
 
 ## Status
 
-Part 1 of this row: the pool tooling, its receipts and its tests. The workflow that targets the
-`computer-live-macos` label and the live scenario set land in part 2, after the lead places the pool host
-and the cu-v3 driver rows land. The row stays open until every acceptance line passes.
+Part 1 of this row: the pool tooling, its receipts and its tests. Every job that targets the
+`computer-live-macos` label is a recorded drop for now: the hosted-runner probe measured that a
+pid-routed click does not reach its target on hosted macOS 15 or 26 (`HOSTED_MACOS_LIVE=no`), and no
+owned Mac or macOS guest exists to run the tier on. Those jobs, and the live scenario set they run, land in
+part 2 once a machine exists and the cu-v3 driver rows land. The row stays open until every acceptance
+line passes.
