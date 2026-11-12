@@ -2,7 +2,6 @@ import { execFileSync } from "node:child_process"
 import { randomUUID } from "node:crypto"
 import { existsSync, rmSync, statSync } from "node:fs"
 import { userInfo } from "node:os"
-import { join } from "node:path"
 
 import {
   loadOmoConfig,
@@ -16,6 +15,8 @@ import { log } from "@oh-my-opencode/utils"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { BUILTIN_MODEL_PROFILES } from "./builtin-profiles"
+import { projectConfigPath } from "./project-config-path"
+import { viewProjectModelProfile } from "./project-model-profile-view"
 
 /**
  * Read and set a folder's `model_profile` (its `.omo/omo.jsonc`) over RPC (#13188), so a client that reaches a
@@ -29,6 +30,12 @@ import { BUILTIN_MODEL_PROFILES } from "./builtin-profiles"
  */
 export const PROJECT_MODEL_PROFILE_GET = "omo.project.model_profile.get"
 export const PROJECT_MODEL_PROFILE_SET = "omo.project.model_profile.set"
+/**
+ * The layers a model-profile picker resolves for this folder, as this machine's engine reads them: the user file, the
+ * folder's own project file (the one `set` writes), and the active `OMO_PROFILE`. A client runs its own resolver on
+ * them, the same one it runs on a local folder, so local and remote show one structure.
+ */
+export const PROJECT_MODEL_PROFILE_VIEW = "omo.project.model_profile.view"
 
 export interface ProjectModelProfileState {
   readonly path: string
@@ -141,13 +148,6 @@ function removeBackup(path: string, deps: ProjectModelProfileDeps): void {
   ;(deps.removeFile ?? ((file: string) => rmSync(file, { force: true })))(path)
 }
 
-function projectConfigPath(cwd: string): string {
-  const jsonc = join(cwd, ".omo", "omo.jsonc")
-  if (existsSync(jsonc)) return jsonc
-  const json = join(cwd, ".omo", "omo.json")
-  return existsSync(json) ? json : jsonc
-}
-
 export function readProjectModelProfile(cwd: string): ProjectModelProfileState & { readonly profileIds: ReadonlySet<string> } {
   const path = projectConfigPath(cwd)
   const loaded = loadOmoConfig({ cwd })
@@ -248,4 +248,5 @@ export function registerProjectModelProfileRpc(
   if (handle === undefined) return
   handle(PROJECT_MODEL_PROFILE_GET, () => getProjectModelProfile(session()))
   handle(PROJECT_MODEL_PROFILE_SET, (data) => setProjectModelProfile(session(), data))
+  handle(PROJECT_MODEL_PROFILE_VIEW, () => viewProjectModelProfile(session()))
 }
