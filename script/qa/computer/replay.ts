@@ -19,10 +19,16 @@
 // file must exist, else `REPLAY_ERROR supersedes_missing` (exit 2, nothing replayed), and an old case
 // in the list is not replayed but prints `SKIPPED <old> superseded by <new>`. The superseding case
 // itself always replays, and the list exits with the worst code of the cases it replayed.
+// Every case runs in a fresh temporary runtime dir (OMO_COMPUTER_RUNTIME_DIR) that is removed
+// afterwards, so no case sees another's leftovers. `${RUNTIME_DIR}` in a case's env values is
+// replaced with that dir, and a case may plant its starting state there before the engine starts:
+// `"runtime": {"plant": [{"path": <relative>, "content": <text>, "mode": "0600"} |
+// {"path": <relative>, "dir": true, "mode": "0500"}]}` (files default to 0600, parents are 0700,
+// directory modes are applied after every file).
 import { constants } from "node:fs"
-import { access, mkdtemp, readdir, readFile, rm } from "node:fs/promises"
+import { access, chmod, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { basename, dirname, join, relative, resolve } from "node:path"
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path"
 
 const ROOT = resolve(import.meta.dir, "../../..")
 const DEFAULT_DELTAS = join(ROOT, "crates/omo-computer-core/parity/ORACLE-DELTAS.tsv")
@@ -30,6 +36,7 @@ const PROVENANCE = join(ROOT, "crates/omo-computer-core/parity/ORACLE-PROVENANCE
 const SINK_PREFIX = "fake-sink-" // the engine's per-process sink file under OMO_COMPUTER_RUNTIME_DIR
 const MESSAGE_TIMEOUT_MS = 10_000
 const EXIT_TIMEOUT_MS = 5_000
+const RUNTIME_PLACEHOLDER = "$" + "{RUNTIME_DIR}"
 const TRANSPORT_ARGS = { stdio: ["--stdio"], mcp: ["--mcp"], oneshot: ["--oneshot"] } as const
 
 type Transport = keyof typeof TRANSPORT_ARGS
@@ -42,10 +49,17 @@ type Step =
       readonly expect: readonly Expectation[]
       readonly sink: number | undefined
     }
+type Plant = {
+  readonly path: string
+  readonly dir: boolean
+  readonly content: string | undefined
+  readonly mode: number | undefined
+}
 type Case = {
   readonly transport: Transport
   readonly scenario: string | undefined
   readonly env: Readonly<Record<string, string>>
+  readonly plant: readonly Plant[]
   readonly steps: readonly Step[]
 }
 type Delta = {
@@ -106,6 +120,47 @@ function parseStep(raw: unknown, index: number): Step {
   return { restart: false, send, expect: expectations, sink }
 }
 
+function parsePlant(runtime: unknown): Plant[] {
+  if (runtime === undefined) return []
+  if (!isRecord(runtime) || !Array.isArray(runtime.plant)) throw new InputError("runtime must be { plant: [...] }")
+  return runtime.plant.map((item: unknown, index): Plant => {
+    const at = `runtime.plant[${index}]`
+    if (!isRecord(item) || typeof item.path !== "string") throw new InputError(`${at} needs a path`)
+    const path = item.path
+    if (path === "" || isAbsolute(path) || path.split("/").includes(".."))
+      throw new InputError(`${at}.path must stay inside the runtime dir`)
+    const dir = item.dir === true
+    const content = typeof item.content === "string" ? item.content : undefined
+    if (dir === (content !== undefined)) throw new InputError(`${at} needs either content or dir: true`)
+    const { mode } = item
+    if (mode !== undefined && !(typeof mode === "string" && /^0?[0-7]{3}$/.test(mode)))
+      throw new InputError(`${at}.mode must be an octal string such as "0600"`)
+    return { path, dir, content, mode: mode === undefined ? undefined : Number.parseInt(mode, 8) }
+  })
+}
+
+// Plants a case's starting state under `runtime`; answers the directories whose mode it narrowed.
+async function plantIn(runtime: string, items: readonly Plant[]): Promise<string[]> {
+  for (const item of items) {
+    const target = join(runtime, item.path)
+    if (item.dir) {
+      await mkdir(target, { recursive: true, mode: 0o700 })
+      continue
+    }
+    await mkdir(dirname(target), { recursive: true, mode: 0o700 })
+    await writeFile(target, item.content ?? "")
+    await chmod(target, item.mode ?? 0o600)
+  }
+  const narrowed: string[] = []
+  for (const item of items) {
+    if (!item.dir || item.mode === undefined) continue
+    const target = join(runtime, item.path)
+    await chmod(target, item.mode)
+    narrowed.push(target)
+  }
+  return narrowed
+}
+
 function parseCase(raw: unknown, name: string, imported: boolean): Case {
   if (!isRecord(raw)) throw new InputError("the case is not an object")
   const { scenario, env = {}, steps } = raw
@@ -120,6 +175,7 @@ function parseCase(raw: unknown, name: string, imported: boolean): Case {
     transport,
     scenario,
     env: Object.fromEntries(Object.entries(env).map(([k, v]) => [k, String(v)])),
+    plant: parsePlant(raw.runtime),
     steps: steps.map(parseStep),
   }
 }
@@ -393,7 +449,7 @@ async function replayCase(opts: Options, casePath: string): Promise<number> {
     ...Object.fromEntries(inherited),
     OMO_COMPUTER_BACKEND: "fake",
     OMO_COMPUTER_RUNTIME_DIR: runtime,
-    ...spec.env,
+    ...Object.fromEntries(Object.entries(spec.env).map(([k, v]) => [k, v.replaceAll(RUNTIME_PLACEHOLDER, runtime)])),
   }
   if (spec.scenario) env.OMO_COMPUTER_FAKE_SCENARIO = resolve(ROOT, spec.scenario)
   const spawn = () => {
@@ -406,7 +462,9 @@ async function replayCase(opts: Options, casePath: string): Promise<number> {
   }
   const persistent = spec.transport !== "oneshot"
   let completed = false
+  let narrowed: string[] = []
   try {
+    narrowed = await plantIn(runtime, spec.plant)
     let peer = persistent ? spawn() : undefined
     for (const [index, step] of spec.steps.entries()) {
       const label = `step=${index + 1}`
@@ -442,6 +500,8 @@ async function replayCase(opts: Options, casePath: string): Promise<number> {
     if (failures.length > 0) console.log(failures.join("\n"))
     else if (completed) console.log(`REPLAY_OK ${name} steps=${spec.steps.length}`)
     const alive = peers.filter((peer) => peer.proc.exitCode === null && peer.proc.signalCode === null).length
+    for (const path of narrowed)
+      await chmod(path, 0o700).catch((error: unknown) => console.log(`TEARDOWN ${path}: ${describe(error)}`))
     await rm(runtime, { recursive: true, force: true })
     console.log(`procs ${alive}\ndir REMOVED ${runtime}`)
   }
