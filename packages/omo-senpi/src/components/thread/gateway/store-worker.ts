@@ -103,7 +103,9 @@ async function intake(ctx: ops.StoreContext, request: IntakeRequest): Promise<In
     })
   }
   const ledgerId = `device:${device}/${record.deliveryId}`
-  const principal = `device:${device}#session:${senderSession}`
+  // The receipt is keyed by the attested device alone, like the ledger id: the session a record claims cannot turn a
+  // repeated delivery id into a second delivery.
+  const principal = `device:${device}`
   const name = record.sender.name?.trim()
   const outcome = await ops.enqueue(
     ctx,
@@ -114,7 +116,7 @@ async function intake(ctx: ops.StoreContext, request: IntakeRequest): Promise<In
       target_durable_id: record.sessionId,
       sender_principal: principal,
       rate_principal: `device:${device}`,
-      sender_node: principal,
+      sender_node: `${principal}#session:${senderSession}`,
       sender_turn: null,
       cause_delivery_id: null,
       inbound_hop: record.chainCount - 1,
@@ -131,7 +133,6 @@ async function intake(ctx: ops.StoreContext, request: IntakeRequest): Promise<In
           target: record.sessionId,
           text: record.text,
           display_text: record.displayText,
-          sender: record.sender,
           deliver_as: record.deliverAs,
           chain_count: record.chainCount,
         }),

@@ -73,7 +73,7 @@ describe("intake", () => {
       state: "queued",
       mode_requested: "follow_up",
       hop: 3,
-      sender: "device:dev-a#session:sender-s",
+      sender: "device:dev-a",
     })
     expect(row.envelope.origin).toEqual({ session: "sender-s" })
     expect(row.envelope.provenance?.device).toBe("dev-a")
