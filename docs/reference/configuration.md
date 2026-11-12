@@ -482,6 +482,7 @@ Control parallel agent execution and concurrency limits. `background_task` (came
 | `sessionGoneTimeoutMs`      | `60000`   | Timeout when a task session disappears (min: 10000)                   |
 | `taskCleanupDelayMs`        | `600000`  | Delay before terminal tasks and completed sync subagent sessions are removed (min: 60000) |
 | `syncPollTimeoutMs`         | -         | Synchronous polling timeout in milliseconds (min: 60000)             |
+| `foregroundHandoffMs`       | `0`       | Hand a foreground `task` child still running after this long to the background: it keeps running under the same task id, the call returns at once, and its completion notice wakes the parent (`0`: never, the parent waits) |
 | `maxToolCalls`              | `4000`    | Maximum tool calls per subagent task (min: 10)                        |
 | `circuitBreaker`            | -         | Circuit-breaker object: `enabled` (default `true`), `maxToolCalls`, `consecutiveThreshold` |
 
