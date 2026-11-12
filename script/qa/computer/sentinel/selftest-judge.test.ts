@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { admitWindow, p99 } from "./latency.ts"
-import { judgeSelfTest, type Trial } from "./selftest-judge.ts"
+import { judgeSelfTest, type Trial, judgeAxSheetTrial } from "./selftest-judge.ts"
 import { SIGNALS, type SentinelSummary, type Signal } from "./summary.ts"
 
 function summaryWith(happened: readonly Signal[], faults: readonly string[] = []): SentinelSummary {
@@ -122,4 +122,28 @@ describe("latency-pinned negative windows", () => {
       reason: "no recorded latency on qa: calibrate before judging negatives",
     })
   })
+})
+
+// The AX-only sheet trial proves the AX attribute read and its retry: exactly one hit, through the role branch, after at
+// least one retried read. Anything else names why the AX path is unproven.
+describe("judging the AX-only sheet trial", () => {
+  const table = [
+    ["a role read that needed a retry", [{ branch: "role", axReads: 2 }], true],
+    ["a role read on the first attempt", [{ branch: "role", axReads: 1 }], false],
+    ["only the sheet notification", [{ branch: "notification", axReads: 20 }], false],
+    ["only the window layer", [{ branch: "layer", axReads: null }], false],
+    [
+      "the role branch and the layer branch",
+      [
+        { branch: "role", axReads: 2 },
+        { branch: "layer", axReads: null },
+      ],
+      false,
+    ],
+    ["nothing", [], false],
+  ] as const
+  for (const [what, hits, proven] of table)
+    test(`${what}: ${proven ? "proven" : "not proven"}`, () => {
+      expect(judgeAxSheetTrial(hits) === undefined).toBe(proven)
+    })
 })
