@@ -35,7 +35,7 @@ import { createDeviceServiceSessions } from "./remote/device-service"
 import { createLazyRemoteSurface } from "./remote/lazy-remote"
 import type { RemoteThreadSurface } from "./remote/ports"
 
-type RpcFrame = {
+export type RpcFrame = {
   readonly success?: boolean
   readonly data?: unknown
   readonly error?: unknown
@@ -110,7 +110,7 @@ type RequestOptions = {
  * 32-byte secret, which is written before the request. The correlation id is written last: no
  * command field can overwrite it.
  */
-async function requestFrame(
+export async function requestFrame(
   socketPath: string,
   command: Record<string, unknown>,
   connect: ThreadSocketConnect,

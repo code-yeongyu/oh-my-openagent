@@ -15,6 +15,7 @@ import { isBusyError, Sql, type SqliteConnection } from "./sql"
 import * as ops from "./store-ops"
 import * as relay from "./store-relay-ops"
 import * as ownership from "./store-ownership"
+import { dispatchWoken, WOKEN_OP_PREFIX } from "./store-woken-dispatch"
 import { StoreExtensions } from "./store-extension-ops"
 import * as sessions from "./store-extension-session-ops"
 import { listSessionOps } from "./extension-registrations"
@@ -158,6 +159,7 @@ async function dispatch(op: string, args: unknown): Promise<unknown> {
     return null
   }
   const ctx = requireContext()
+  if (op.startsWith(WOKEN_OP_PREFIX)) return await dispatchWoken(ctx, op, args)
   switch (op) {
     case "extension_register": {
       const request = args as {

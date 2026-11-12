@@ -13,6 +13,7 @@ import type {
   ToolReceiptBegin,
 } from "./store-relay-ops"
 import type { DeliveryReceipt } from "./store-ops"
+import type { WokenSessionStore } from "./woken-types"
 import type { ClearEndpointRequest, RegisterIncarnationRequest, SessionOwner } from "./store-ownership"
 import type {
   ClaimOutcome,
@@ -58,6 +59,8 @@ export type GatewayStore = ExtensionFacade & {
   readonly enqueue: (request: EnqueueRequest) => Promise<EnqueueOutcome>
   /** A record another device's service attested, for a session here that is not running (#13037); nothing calls it in production yet. */
   readonly intake: (request: IntakeRequest) => Promise<IntakeOutcome>
+  /** The record of woken sessions (#13037 A3.1); nothing calls it in production yet. */
+  readonly woken: WokenSessionStore
   readonly reconcile: (request: ReconcileRequest) => Promise<ReconcileOutcome>
   readonly claim: (request: ClaimRequest) => Promise<ClaimOutcome>
   readonly recordOutcome: (request: RecordOutcomeRequest) => Promise<ClaimOutcome>

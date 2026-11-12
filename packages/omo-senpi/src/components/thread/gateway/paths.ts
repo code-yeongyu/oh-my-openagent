@@ -13,6 +13,11 @@ export function gatewayInboxDirectory(agentDir: string, durableId: string): stri
 }
 
 /** The outbox wake hint: rewritten (temp file + rename) whenever an outbox row is written; a connector re-reads its outbox when it changes. */
+/** The woken-session wake hint: rewritten (temp file + rename) when a wake is requested or a woken session's row ends. */
+export function gatewayWakeMarkerPath(agentDir: string): string {
+  return join(gatewayRootDirectory(agentDir), "wake.marker")
+}
+
 export function gatewayOutboxMarkerPath(agentDir: string): string {
   return join(gatewayRootDirectory(agentDir), "outbox.marker")
 }

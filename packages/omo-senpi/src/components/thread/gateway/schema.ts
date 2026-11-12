@@ -294,6 +294,30 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
     "CREATE INDEX deliveries_ledger ON deliveries (ledger_id) WHERE ledger_id IS NOT NULL",
     "INSERT OR IGNORE INTO extension_objects (type, name, owner) VALUES ('index', 'deliveries_ledger', NULL)",
   ],
+
+  // v13 (#13037): one row per session a wake asked for or opened and that has not ended. A row past `requested` holds one
+  // of the store's places (the cap); `lease_owner` is the carrier's process identity and `generation` fences its writes;
+  // `attempts` and `next_attempt_at` are set when an open failed for a transient reason and the row went back to `requested`.
+  // Idempotent, so a store rewound to v12 re-runs it without touching the rows it holds.
+  [
+    `CREATE TABLE IF NOT EXISTS woken_sessions (
+      durable_id TEXT PRIMARY KEY,
+      session_file TEXT NOT NULL,
+      host_instance TEXT,
+      state TEXT NOT NULL CHECK (state IN ('requested', 'opening', 'open', 'closing')),
+      requested_at INTEGER NOT NULL,
+      opened_at INTEGER,
+      first_waiting_at INTEGER,
+      lease_owner TEXT,
+      lease_expires_at INTEGER,
+      generation INTEGER NOT NULL DEFAULT 0,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      next_attempt_at INTEGER
+    )`,
+    "CREATE INDEX IF NOT EXISTS woken_sessions_state ON woken_sessions (state)",
+    "INSERT OR IGNORE INTO extension_objects (type, name, owner) VALUES ('table', 'woken_sessions', NULL)",
+    "INSERT OR IGNORE INTO extension_objects (type, name, owner) VALUES ('index', 'woken_sessions_state', NULL)",
+  ],
 ]
 
 export const GATEWAY_TABLES = [
@@ -313,4 +337,5 @@ export const GATEWAY_TABLES = [
   "thread_creations",
   "extension_registrations",
   "toolkit_replay_receipts",
+  "woken_sessions",
 ] as const
