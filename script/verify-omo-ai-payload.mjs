@@ -84,7 +84,14 @@ function readPluginRequirements() {
   if (result.error !== undefined)
     throw new Error(`reading REQUIRED_PLUGIN_ARTIFACTS needs bun: ${result.error.message}`)
   if (result.status !== 0) throw new Error(`reading REQUIRED_PLUGIN_ARTIFACTS failed: ${result.stderr.trim()}`)
-  return JSON.parse(result.stdout)
+  const read = JSON.parse(result.stdout)
+  if (read.manifestError !== undefined) return read
+  // A release check with nothing to check must not pass.
+  const nonEmpty = (value) => Array.isArray(value) && value.length > 0
+  if (!nonEmpty(read.pluginOutputs) || !nonEmpty(read.generated)) {
+    throw new Error("the plugin requirement list is empty: refusing to pass a release check with nothing to check")
+  }
+  return read
 }
 
 function releaseRequirements() {

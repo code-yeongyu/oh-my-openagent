@@ -250,7 +250,11 @@ export function createInstallSandbox(): InstallSandbox {
     installLauncher: (options) => installLocalLauncher({ ...options, homeDir: home }),
     uninstallLauncher: () => uninstallLocalLauncher(home),
     spawnSync: (command, args, extra) =>
-      nodeSpawnSync(command, [...args], { encoding: "utf8", env: sandboxSpawnEnv(root, spawnEnv, extra) }),
+      nodeSpawnSync(command, [...args], {
+        encoding: "utf8",
+        windowsHide: true,
+        env: sandboxSpawnEnv(root, spawnEnv, extra),
+      }),
     dispose: () => rm(root, { recursive: true, force: true }),
   }
 }

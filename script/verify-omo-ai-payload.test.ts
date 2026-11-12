@@ -101,6 +101,8 @@ function runVerifierOnPayload(
     readonly requiredPluginArtifacts?: readonly string[]
     readonly runtime?: string
     readonly env?: Readonly<Record<string, string | undefined>>
+    readonly requirementsHelper?: string
+    readonly generatedList?: string
   } = {},
 ): VerifierRun {
   const fakeRepoRoot = mkdtempSync(join(tmpdir(), "omo-ai-payload-guard-"))
@@ -108,14 +110,22 @@ function runVerifierOnPayload(
     mkdirSync(join(fakeRepoRoot, "script"), { recursive: true })
     copyFileSync(verifierSource, join(fakeRepoRoot, "script", "verify-omo-ai-payload.mjs"))
     copyFileSync(npmInvocationSource, join(fakeRepoRoot, "script", "npm-invocation.mjs"))
-    copyFileSync(generatedListSource, join(fakeRepoRoot, "script", "generated-bundles.json"))
-    copyFileSync(requiredOutputsSource, join(fakeRepoRoot, "script", "plugin-required-outputs.ts"))
+    if (options.generatedList === undefined) {
+      copyFileSync(generatedListSource, join(fakeRepoRoot, "script", "generated-bundles.json"))
+    } else {
+      writeFileSync(join(fakeRepoRoot, "script", "generated-bundles.json"), options.generatedList)
+    }
+    if (options.requirementsHelper === undefined) {
+      copyFileSync(requiredOutputsSource, join(fakeRepoRoot, "script", "plugin-required-outputs.ts"))
+    } else {
+      writeFileSync(join(fakeRepoRoot, "script", "plugin-required-outputs.ts"), options.requirementsHelper)
+    }
     // The installer's contract, read by the verifier through bun from the repository it runs in.
     const installDir = join(fakeRepoRoot, "packages", "omo-senpi", "src", "install")
     mkdirSync(installDir, { recursive: true })
     writeFileSync(
       join(installDir, "plugin-artifacts.ts"),
-      `export const REQUIRED_PLUGIN_ARTIFACTS: readonly string[] = ${JSON.stringify(options.requiredPluginArtifacts ?? [])}\n`,
+      `export const REQUIRED_PLUGIN_ARTIFACTS: readonly string[] = ${JSON.stringify(options.requiredPluginArtifacts ?? ["extensions/omo.js"])}\n`,
     )
 
     const packageDir = join(fakeRepoRoot, "packages", "omo-native")
@@ -368,6 +378,45 @@ describe("omo-ai payload verifier", () => {
       } finally {
         rmSync(emptyPath, { recursive: true, force: true })
       }
+    })
+  })
+
+  describe("#given a requirement list that is empty", () => {
+    const payload = [
+      ...new Set([
+        ...PACKED_ARTIFACTS,
+        ...RELEASE_GENERATED_ARTIFACTS,
+        ...skillPaths(PACKED_SKILL_COUNT),
+        KEYCHAIN_HELPER,
+      ]),
+    ]
+
+    test("#when the requirements helper answers with no requirements #then --release fails instead of passing", () => {
+      const run = runVerifierOnPayload(
+        payload,
+        {},
+        {
+          args: ["--release"],
+          modes: { [KEYCHAIN_HELPER]: 0o755 },
+          requirementsHelper: "console.log(JSON.stringify({ pluginOutputs: [], generated: [] }))\n",
+        },
+      )
+      expect(run.output).toContain("the plugin requirement list is empty")
+      expect(run.exitCode).toBe(1)
+    })
+
+    test("#when script/generated-bundles.json has no patterns #then --release fails", () => {
+      const run = runVerifierOnPayload(
+        payload,
+        {},
+        {
+          args: ["--release"],
+          modes: { [KEYCHAIN_HELPER]: 0o755 },
+          generatedList: '{ "dialect": "ecmascript" }\n',
+        },
+      )
+      expect(run.output).toContain("patterns")
+      expect(run.exitCode).toBe(1)
     })
   })
 

@@ -68,8 +68,12 @@ export function generatedOutputRequirements(
 
 export function listPatterns(repoRoot: string): string[] {
   const parsed: unknown = JSON.parse(readFileSync(join(repoRoot, "script", "generated-bundles.json"), "utf8"))
-  const patterns = typeof parsed === "object" && parsed !== null && "patterns" in parsed ? parsed.patterns : []
-  return Array.isArray(patterns) ? patterns.filter((pattern): pattern is string => typeof pattern === "string") : []
+  const patterns = typeof parsed === "object" && parsed !== null && "patterns" in parsed ? parsed.patterns : undefined
+  const strings = Array.isArray(patterns)
+    ? patterns.filter((pattern): pattern is string => typeof pattern === "string")
+    : []
+  if (strings.length === 0) throw new Error('script/generated-bundles.json has no non-empty "patterns" array')
+  return strings
 }
 
 // The node-run payload gate's entry: plugin outputs and the list's per-output requirements as JSON on stdout. An
