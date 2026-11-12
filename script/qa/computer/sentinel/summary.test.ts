@@ -135,7 +135,15 @@ describe("disturbance sentinel summary", () => {
 
   test("dialog: a dialog window not owned by the target happened", () => {
     const events = cleanRun([
-      { t: 1_500, kind: "window_added", id: "alert#12", ownerPid: 300, role: "AXWindow", subrole: "AXDialog", layer: 0 },
+      {
+        t: 1_500,
+        kind: "window_added",
+        id: "alert#12",
+        ownerPid: 300,
+        role: "AXWindow",
+        subrole: "AXDialog",
+        layer: 0,
+      },
     ])
     expect(happened(events)).toEqual(["dialog"])
   })
@@ -199,7 +207,9 @@ describe("a failed read is never a negative", () => {
   })
 
   test("a stalled sampler is a fault", () => {
-    const summary = summarize(cleanRun().filter((event) => !(event.kind === "tick" && event.t > 1_200 && event.t < 1_800)))
+    const summary = summarize(
+      cleanRun().filter((event) => !(event.kind === "tick" && event.t > 1_200 && event.t < 1_800)),
+    )
     expect(summary.faults.some((fault) => fault.startsWith("sampler: no tick for "))).toBe(true)
   })
 

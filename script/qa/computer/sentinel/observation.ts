@@ -1,4 +1,11 @@
-import { relativeOrderChanged, type SentinelEvent, type SentinelSummary, summarize, type Verdict, verdict } from "./summary.ts"
+import {
+  relativeOrderChanged,
+  type SentinelEvent,
+  type SentinelSummary,
+  summarize,
+  type Verdict,
+  verdict,
+} from "./summary.ts"
 
 // The desktop observer a conformance cell attaches: a before and after snapshot of the person's desktop plus the
 // recorder's journal in between. The cell's own test status is carried through untouched and never read here, so a

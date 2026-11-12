@@ -37,8 +37,16 @@ export async function plant(session: MacSession, which: Plant): Promise<PlantOut
   const helper = which === "typing" ? session.typist : session.planter
   if (helper === undefined) return { failed: "session has no planter" }
   const ours = (line: ControlLine): boolean => line.plant === which
-  const outcome = helper.next((line) => ours(line) && (line.ctl === "planted" || line.ctl === "plant_failed"), PLANT_MS, `${which} plant`)
-  const restored = helper.next((line) => ours(line) && line.ctl === "restored", PLANT_MS + RESTORE_MS, `${which} restore`)
+  const outcome = helper.next(
+    (line) => ours(line) && (line.ctl === "planted" || line.ctl === "plant_failed"),
+    PLANT_MS,
+    `${which} plant`,
+  )
+  const restored = helper.next(
+    (line) => ours(line) && line.ctl === "restored",
+    PLANT_MS + RESTORE_MS,
+    `${which} restore`,
+  )
   restored.catch(() => undefined)
   if (which !== "typing")
     await session.nextEvent((event) => event.kind === "typed", 2_500, "a keystroke to plant after")

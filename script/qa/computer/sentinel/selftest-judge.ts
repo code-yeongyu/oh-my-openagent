@@ -65,8 +65,7 @@ export function judgeSelfTest(trials: readonly Trial[], negativeControl: Sentine
     if (problems.length === 0) detected++
   }
 
-  const controlSeen =
-    verdict(negativeControl) !== "invalid" && negativeControl.signals.pointer.signal === "happened"
+  const controlSeen = verdict(negativeControl) !== "invalid" && negativeControl.signals.pointer.signal === "happened"
   lines.push(`SENTINEL_NEGATIVE_CONTROL pointer_warp_50px=${controlSeen ? "detected" : "missed"}`)
   lines.push(`SENTINEL_SELFTEST signals=${SIGNALS.length} detected=${detected} null_false_positives=${falsePositives}`)
   const pass = complete && controlSeen && detected === SIGNALS.length && falsePositives === 0

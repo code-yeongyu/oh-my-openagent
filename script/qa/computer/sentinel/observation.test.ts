@@ -25,7 +25,11 @@ function recording(extra: readonly SentinelEvent[] = []): SentinelEvent[] {
     { t: 540, kind: "field", text: "a", final: false },
   )
   for (let t = 0; t <= 2_000; t += 50) events.push({ t, kind: "tick" })
-  events.push({ t: 100, kind: "start" }, { t: 1_500, kind: "stop" }, { t: 1_600, kind: "field", text: "a", final: true })
+  events.push(
+    { t: 100, kind: "start" },
+    { t: 1_500, kind: "stop" },
+    { t: 1_600, kind: "field", text: "a", final: true },
+  )
   return [...events, ...extra].sort((a, b) => a.t - b.t)
 }
 
@@ -43,12 +47,17 @@ describe("desktop observer", () => {
   })
 
   test("[ADP-2] a raise and a focus steal restored before the after-snapshot are still in the journal", () => {
-    const cell = observe(true, snapshot, snapshot, recording([
-      { t: 600, kind: "order", windows: ["target#2", "typist#1"] },
-      { t: 650, kind: "order", windows: ["typist#1", "target#2"] },
-      { t: 700, kind: "focus", via: "notification", value: "target/button" },
-      { t: 750, kind: "focus", via: "notification", value: "typist/field" },
-    ]))
+    const cell = observe(
+      true,
+      snapshot,
+      snapshot,
+      recording([
+        { t: 600, kind: "order", windows: ["target#2", "typist#1"] },
+        { t: 650, kind: "order", windows: ["typist#1", "target#2"] },
+        { t: 700, kind: "focus", via: "notification", value: "target/button" },
+        { t: 750, kind: "focus", via: "notification", value: "typist/field" },
+      ]),
+    )
     expect(cell.status).toBe(true)
     expect(cell.observed.stackingChanged).toBe(true)
     expect(cell.observed.focusJournal.map((entry) => entry.value)).toEqual(["target/button", "typist/field"])
@@ -70,16 +79,26 @@ describe("desktop observer", () => {
   })
 
   test("[ADP-4] negative control: a 50 px warp-and-return leaves equal snapshots but reads pointer moved", () => {
-    const cell = observe(true, snapshot, snapshot, recording([
-      { t: 900, kind: "pointer", via: "sample", x: 450, y: 300 },
-      { t: 1_050, kind: "pointer", via: "sample", x: 400, y: 300 },
-    ]))
+    const cell = observe(
+      true,
+      snapshot,
+      snapshot,
+      recording([
+        { t: 900, kind: "pointer", via: "sample", x: 450, y: 300 },
+        { t: 1_050, kind: "pointer", via: "sample", x: 400, y: 300 },
+      ]),
+    )
     expect(cell.observed.pointerMoved).toBe(true)
     expect(cell.observed.verdict).toBe("disturbed")
   })
 
   test("a recording with a fault is invalid whatever the snapshots say", () => {
-    const cell = observe(true, snapshot, snapshot, recording([{ t: 800, kind: "fault", signal: "dialog", detail: "observer lost" }]))
+    const cell = observe(
+      true,
+      snapshot,
+      snapshot,
+      recording([{ t: 800, kind: "fault", signal: "dialog", detail: "observer lost" }]),
+    )
     expect(cell.observed.verdict).toBe("invalid")
   })
 })

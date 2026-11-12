@@ -4,7 +4,8 @@ import { hostname } from "node:os"
 import { admitWindow, type LatencyRecord, p99 } from "../latency.ts"
 import { observeCell } from "../observe-cell.ts"
 import { judgeSelfTest, PLANT_NOUN, type Trial } from "../selftest-judge.ts"
-import { SIGNALS, type Signal, summarize } from "../summary.ts"
+import { SIGNALS, type Signal } from "../summary.ts"
+import { withSentinel } from "../with-sentinel.ts"
 import { plant } from "./plants.ts"
 import { type HelperPaths, MacSession } from "./session.ts"
 import { ensureSecondSpace } from "./spaces.ts"
@@ -17,12 +18,17 @@ type SelfTestOptions = {
   readonly drop?: Signal
 }
 
-async function trial(session: MacSession, which: Signal | null, windowMs: number): Promise<Trial & { latency?: number }> {
-  let outcome: Awaited<ReturnType<typeof plant>> | undefined
-  const events = await session.segment(async () => {
-    if (which !== null) outcome = await plant(session, which)
-  }, windowMs)
-  const summary = summarize(events)
+async function trial(
+  session: MacSession,
+  which: Signal | null,
+  windowMs: number,
+): Promise<Trial & { latency?: number }> {
+  const run = await withSentinel(
+    `selftest-${which ?? "null"}`,
+    async () => (which === null ? undefined : plant(session, which)),
+    { session, windowMs },
+  )
+  const { result: outcome, summary } = run
   if (which === null) return { plant: null, summary }
   if (outcome === undefined) return { plant: which, failed: "plant never ran" }
   if ("failed" in outcome) return { plant: which, failed: outcome.failed }
@@ -40,11 +46,15 @@ async function calibrate(session: MacSession, options: SelfTestOptions): Promise
     }
     const noun = PLANT_NOUN[signal]
     if (latencies.length === 0) {
-      console.log(`SENTINEL_CALIBRATION ${signal} missed the planted ${noun} in all ${options.calibrationTrials} trials`)
+      console.log(
+        `SENTINEL_CALIBRATION ${signal} missed the planted ${noun} in all ${options.calibrationTrials} trials`,
+      )
       continue
     }
     p99Ms[noun] = Math.round(p99(latencies))
-    console.log(`SENTINEL_CALIBRATION ${signal} p99_ms=${p99Ms[noun]} detected=${latencies.length}/${options.calibrationTrials}`)
+    console.log(
+      `SENTINEL_CALIBRATION ${signal} p99_ms=${p99Ms[noun]} detected=${latencies.length}/${options.calibrationTrials}`,
+    )
   }
   const record: LatencyRecord = { host: hostname(), os: "macos", trials: options.calibrationTrials, p99Ms }
   writeFileSync(options.latencyFile, `${JSON.stringify(record, null, 2)}\n`)

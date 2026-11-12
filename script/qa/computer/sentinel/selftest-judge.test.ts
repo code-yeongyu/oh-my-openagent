@@ -62,7 +62,9 @@ describe("sentinel self-test judge", () => {
   })
 
   test("a signal reading happened on the null run is a false positive", () => {
-    const trials = perfect.map((trial) => (trial.plant === null ? { plant: null, summary: summaryWith(["pointer"]) } : trial))
+    const trials = perfect.map((trial) =>
+      trial.plant === null ? { plant: null, summary: summaryWith(["pointer"]) } : trial,
+    )
     const result = judgeSelfTest(trials, control)
     expect(result.lines).toContain("SENTINEL_SELFTEST signals=8 detected=8 null_false_positives=1")
     expect(result.exitCode).toBe(1)
@@ -71,7 +73,8 @@ describe("sentinel self-test judge", () => {
   test("an invalid run or a plant that could not be performed never counts as detected", () => {
     const trials: Trial[] = perfect.map((trial) => {
       if (trial.plant === "space") return { plant: "space", failed: "no second Space" }
-      if (trial.plant === "clipboard") return { plant: "clipboard", summary: summaryWith(["clipboard"], ["pointer: tap disabled"]) }
+      if (trial.plant === "clipboard")
+        return { plant: "clipboard", summary: summaryWith(["clipboard"], ["pointer: tap disabled"]) }
       return trial
     })
     const result = judgeSelfTest(trials, control)

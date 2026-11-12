@@ -108,7 +108,11 @@ export class MacSession {
     const reset = typist.next((line) => line.ctl === "reset", MARKER_MS, "typist reset")
     typist.send("reset")
     await reset
-    const firstKey = this.nextEvent((event) => event.kind === "typed" && event.index === 0, KEYSTROKE_MS, "first keystroke")
+    const firstKey = this.nextEvent(
+      (event) => event.kind === "typed" && event.index === 0,
+      KEYSTROKE_MS,
+      "first keystroke",
+    )
     typist.send("type")
     await firstKey
     await Bun.sleep(LANDING_MS)
@@ -146,7 +150,8 @@ export class MacSession {
     const order = line.order
     if (typeof pointer !== "object" || pointer === null || !("x" in pointer) || !("y" in pointer))
       throw new Error(`snapshot has no pointer: ${JSON.stringify(line)}`)
-    if (!Array.isArray(order) || typeof line.focused !== "string") throw new Error(`malformed snapshot: ${JSON.stringify(line)}`)
+    if (!Array.isArray(order) || typeof line.focused !== "string")
+      throw new Error(`malformed snapshot: ${JSON.stringify(line)}`)
     return {
       frontmostPid: numberField(line, "frontmostPid"),
       focused: line.focused,
