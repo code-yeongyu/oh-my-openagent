@@ -1,0 +1,50 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/team-core": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "src/team-state-store/locks.ts",
+        "src/team-state-store/lock-worker.fixture.ts",
+        "src/team-state-store/lock-worker-host.fixture.ts",
+        "src/team-state-store/lock-worker-exit.fixture.ts",
+        "src/team-tasklist/test-support.ts",
+      ],
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) setTeamCoreLogger
+    "packages/team-core/src/logger.ts": ["setTeamCoreLogger"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) MemberValidationError
+    "packages/team-core/src/member-parser.ts": ["MemberValidationError"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) shouldReuseCallerLeadSession
+    "packages/team-core/src/resolve-caller-team-lead.ts": ["shouldReuseCallerLeadSession"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) canVisualize, createTeamLayout, removeTeamLayout
+    "packages/team-core/src/team-layout-tmux/index.ts": ["canVisualize", "createTeamLayout", "removeTeamLayout"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) rebalanceTeamWindow
+    "packages/team-core/src/team-layout-tmux/rebalance-team-window.ts": ["rebalanceTeamWindow"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) TEAM_SESSION_PATTERN
+    "packages/team-core/src/team-layout-tmux/sweep-stale-team-sessions.ts": ["TEAM_SESSION_PATTERN"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) BroadcastNotPermittedError, DuplicateMessageIdError, PayloadTooLargeError, RecipientBackpressureError, pollAndBuildInjection
+    "packages/team-core/src/team-mailbox/index.ts": ["BroadcastNotPermittedError", "DuplicateMessageIdError", "PayloadTooLargeError", "RecipientBackpressureError", "pollAndBuildInjection"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) TeamDeletingError
+    "packages/team-core/src/team-mailbox/send.ts": ["TeamDeletingError"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) TeamPathTraversalError
+    "packages/team-core/src/team-registry/paths.ts": ["TeamPathTraversalError"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) InvalidTransitionError, RuntimeStateError
+    "packages/team-core/src/team-state-store/index.ts": ["InvalidTransitionError", "RuntimeStateError"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) GitUnavailableError, createWorktree, isGitAvailable, validateWorktreeSpec, findOrphanWorktrees, removeWorktree
+    "packages/team-core/src/team-worktree/index.ts": ["GitUnavailableError", "createWorktree", "isGitAvailable", "validateWorktreeSpec", "findOrphanWorktrees", "removeWorktree"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isGitAvailable
+    "packages/team-core/src/team-worktree/manager.ts": ["isGitAvailable"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) MESSAGE_KINDS, MEMBER_KINDS, TASK_STATUSES, RUNTIME_STATUSES, SubagentMemberSchema
+    "packages/team-core/src/types.ts": ["MESSAGE_KINDS", "MEMBER_KINDS", "TASK_STATUSES", "RUNTIME_STATUSES", "SubagentMemberSchema"]
+  }
+}
