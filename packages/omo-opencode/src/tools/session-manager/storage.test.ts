@@ -1,11 +1,13 @@
 import { describe, test, expect, beforeEach, afterEach, afterAll, mock } from "bun:test"
 import { mkdirSync, writeFileSync, rmSync, existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
-import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
+import { processTempDir } from "../../../../../test-support/process-temp-dir"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
-const TEST_DIR = join(tmpdir(), `omo-test-session-manager-${randomUUID()}`)
+// The ./constants mock below redirects the shared storage paths it re-exports for the rest of the process, so
+// later files can write into this root after it is removed: it lives in the process temp dir (#13286).
+const TEST_DIR = join(processTempDir(), `omo-test-session-manager-${randomUUID()}`)
 const TEST_MESSAGE_STORAGE = join(TEST_DIR, "message")
 const TEST_PART_STORAGE = join(TEST_DIR, "part")
 const TEST_SESSION_STORAGE = join(TEST_DIR, "session")
