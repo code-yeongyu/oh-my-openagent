@@ -14,6 +14,7 @@ pub mod marker;
 pub mod mutate;
 pub mod observe;
 pub mod pause;
+pub mod recording;
 pub mod refs;
 pub mod route_ladder;
 pub mod session_state;
