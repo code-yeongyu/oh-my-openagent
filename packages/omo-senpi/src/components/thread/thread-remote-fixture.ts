@@ -32,7 +32,7 @@ export const B_ROW: RemoteSessionRow = {
 }
 
 type Sent = {
-  readonly via: "endpoint" | "session" | "read" | "watch"
+  readonly via: "endpoint" | "session" | "read" | "watch" | "wake"
   readonly device: string
   readonly session?: string
   readonly rpc?: JsonObject
@@ -103,6 +103,18 @@ export function createRemoteThreadFixture() {
       registryDown?: "refused" | "throws" | "signed_out"
       chainCountLimit?: number
       relayKeys?: ReadonlyMap<string, string>
+      /** omo#13037: sessions a device holds on disk but runs nowhere, by device then durable id, with that device's key. */
+      ended?: Readonly<Record<string, Readonly<Record<string, string>>>>
+      /** omo#13037: devices whose single-probe lookup gets no answer within the bound. */
+      silent?: readonly string[]
+      /** omo#13037: this device's service makes no single probe (the lookup is never made). */
+      noLookup?: boolean
+      /** omo#13037: this device's service cannot carry the wake target (no wake is sent; today's path). */
+      noWake?: boolean
+      /** omo#13037: the wake path's answer; default the consumer's queued envelope with `waiting_on: {kind: "wake"}`. */
+      wakeOutcome?: RemoteCommandOutcome
+      /** The `get_state` fields a live session reports beyond the engine defaults (`paused`, `holds`). */
+      liveState?: JsonObject
     } = {},
   ) {
     const engine = options.engine ?? ENGINE
@@ -118,6 +130,9 @@ export function createRemoteThreadFixture() {
         for (const record of options.records ?? []) for (const listener of [...watchers]) listener(record)
       })
     const hops: number[] = []
+    const lookups: Array<{ readonly device: string; readonly durable_id: string }> = []
+    // Account listing reads: `all` asks every device (one round across the account), `device` asks one device.
+    const listings = { all: 0, device: 0 }
     const aliases = options.aliases ?? new Map<string, AliasHolder>()
     // The sessions b's engine holds. Its close rules are senpi's (2026.11.5-1): close_session from a connection that never
     // attached is refused unknown_session (senpi#1782); an attached close releases only that hold, so the session ends
@@ -166,6 +181,7 @@ export function createRemoteThreadFixture() {
           ...(engine.currentTurnId === undefined ? {} : { currentTurnId: engine.currentTurnId }),
           ...(engine.pendingQuestions === undefined ? {} : { pendingQuestions: [...engine.pendingQuestions] }),
           ...(engine.pendingDialogs === undefined ? {} : { pendingDialogs: [...engine.pendingDialogs] }),
+          ...options.liveState,
         })
       if (rpc["type"] === "get_messages") return ok({ messages: [...engine.messages] })
       if (rpc["type"] === "interrupt") return ok(engine.interrupt)
@@ -224,9 +240,12 @@ export function createRemoteThreadFixture() {
       { device: "here", label: "this mac", online: true },
       { device: "b", label: "studio", online: options.online ?? true },
     ]
-    for (const row of options.rows ?? [])
-      if (!devices.some((known) => known.device === row.device))
-        devices.push({ device: row.device, label: row.device, online: true })
+    for (const device of [
+      ...(options.rows ?? []).map((row) => row.device),
+      ...Object.keys(options.ended ?? {}),
+      ...(options.silent ?? []),
+    ])
+      if (!devices.some((known) => known.device === device)) devices.push({ device, label: device, online: true })
     const registryCalls: string[] = []
     const down = <T>(): Promise<AliasResult<T>> =>
       options.registryDown === "throws"
@@ -294,9 +313,12 @@ export function createRemoteThreadFixture() {
         status: async () => ({ state: options.plan ?? "connected" }),
         thisDevice: async () => "here",
         devices: async () => devices,
-        sessions: async () => {
+        sessions: async (filter) => {
+          if (filter?.device === undefined) listings.all += 1
+          else listings.device += 1
           if (options.failSessionsList === true) throw new Error("account list failed")
-          return options.rows ?? [{ ...B_ROW, state: options.rowState ?? B_ROW.state }]
+          const rows = options.rows ?? [{ ...B_ROW, state: options.rowState ?? B_ROW.state }]
+          return filter?.device === undefined ? rows : rows.filter((row) => row.device === filter.device)
         },
         endpointCommand: async (device, rpc) => {
           sent.push({ via: "endpoint", device, rpc })
@@ -329,6 +351,33 @@ export function createRemoteThreadFixture() {
             },
           }
         },
+        lookup: async (device, durableId) => {
+          if (options.noLookup === true) return { kind: "unavailable" }
+          lookups.push({ device, durable_id: durableId })
+          if (options.silent?.includes(device) === true) return { kind: "silent", reason: "host_not_answering" }
+          const key = options.ended?.[device]?.[durableId]
+          return key === undefined ? { kind: "none" } : { kind: "found", key }
+        },
+        canWake: async () => options.noWake !== true,
+        wake: async (device, durableId, rpc) => {
+          if (options.noWake === true) return { kind: "unavailable" }
+          sent.push({ via: "wake", device, session: durableId, rpc })
+          return (
+            options.wakeOutcome ?? {
+              kind: "ok",
+              response: {
+                type: "response",
+                success: true,
+                data: {
+                  kind: "queued",
+                  stored_command_id: "stored-1",
+                  deduplicated: false,
+                  waiting_on: { kind: "wake" },
+                },
+              },
+            }
+          )
+        },
         read: async (device, session) => {
           sent.push({ via: "read", device, session })
           return {
@@ -351,7 +400,7 @@ export function createRemoteThreadFixture() {
         },
       },
     }
-    return { remote, sent, hops, aliases, live, registryCalls }
+    return { remote, sent, hops, aliases, live, registryCalls, lookups, listings }
   }
 
   function surface(
@@ -396,9 +445,14 @@ export function createRemoteThreadFixture() {
     })
     const closed: Array<readonly [string, string | undefined]> = []
     const setSessionName = mock(async (_sessionId: string, _name: string) => {})
+    // How often this device's endpoints were listed (the local enumeration a send can cost).
+    let localListings = 0
     const host: ThreadHost = {
       socket: "/tmp/thread-remote-test.sock",
-      listSessions: async () => sessions,
+      listSessions: async () => {
+        localListings += 1
+        return sessions
+      },
       openSession,
       getMessages: async () => [...engine.messages],
       getState: async () => ({ isStreaming: false }),
@@ -462,7 +516,7 @@ export function createRemoteThreadFixture() {
       if (parse === undefined) throw new Error("thread_send declares no permission parser")
       return parse(args, process.cwd())
     }
-    return { run, permission, openSession, setSessionName, store, closed, agentDir }
+    return { run, permission, openSession, setSessionName, store, closed, agentDir, listings: () => localListings }
   }
 
   return { account, surface, cleanup }
