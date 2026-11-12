@@ -47,6 +47,17 @@ describe("typed task handles", () => {
     for (const transcript of receipt.transcriptMessages) expect(transcript.after).toBe(transcript.before)
   })
 
+  test("#given a fixture that fails after the tool reported while the start is still in flight #when it tears down #then it retires the child that start produced", async () => {
+    // given
+    const retired: string[] = []
+    // when
+    const failed = realSessionHandle({ registerAfterReport: true, failAfterReport: true, retired })
+    // then
+    await expect(failed).rejects.toThrow("the fixture failed after the task tool reported")
+    expect(retired).toHaveLength(1)
+    expect(retired[0]).toMatch(/^st_[0-9a-f]+$/)
+  })
+
   test("#given foreground output containing unrelated ids #when completed #then the body and record identity are preserved", async () => {
     // given
     const { manager, store, inProcess } = makeManager()

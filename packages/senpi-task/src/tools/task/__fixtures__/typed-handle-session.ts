@@ -21,7 +21,16 @@ const HANDLE_WAIT_MS = 4_000
 // return before this runner has registered its handle. `registerAfterReport` makes that order certain
 // instead of a matter of host speed: the runner holds its handle back until the tool has returned.
 // Either way the fixture waits for the start it triggered before it reads from the handle or cleans it up.
-export async function realSessionHandle(options: { readonly registerAfterReport?: boolean } = {}) {
+//
+// `failAfterReport` fails the fixture right after the tool returned, while that start is still in flight;
+// `retired` receives the task id of every child the teardown retires.
+export async function realSessionHandle(
+  options: {
+    readonly registerAfterReport?: boolean
+    readonly failAfterReport?: boolean
+    readonly retired?: string[]
+  } = {},
+) {
   const { ModelRuntime, SessionManager, createAgentSession } = await loadSenpiBarrel()
   const project = tempProject()
   const agentDir = join(project, "isolated-agent")
@@ -105,6 +114,7 @@ export async function realSessionHandle(options: { readonly registerAfterReport?
       { cwd: project, sessionManager: { getSessionId: () => "fixture-parent" } },
     )
     const registeredWhenReported = handles.length > 0
+    if (options.failAfterReport === true) throw new Error("the fixture failed after the task tool reported")
     reported.resolve()
     const waited = await settledWithin(registered.promise, HANDLE_WAIT_MS)
     if (!waited.settled) throw new Error(`the restored runner registered no handle within ${HANDLE_WAIT_MS} ms`)
@@ -133,6 +143,7 @@ export async function realSessionHandle(options: { readonly registerAfterReport?
       manager.forget(handle.task_id, { path: "end" })
       await handle.abort()
       await handle.dispose()
+      options.retired?.push(handle.task_id)
     }
   }
 }
