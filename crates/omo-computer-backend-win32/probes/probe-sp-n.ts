@@ -2349,6 +2349,56 @@ const LOGIC_CHECKS: readonly Check[] = [
     },
   },
   {
+    finding: "MONITORS second-monitor rows on any host with two (hosted run 43220783638)",
+    async run() {
+      const bad: string[] = []
+      const two: Json = {
+        monitors: [
+          { primary: true, w: 3840, h: 2160, x: 0, y: 0, dpi: "96" },
+          { primary: false, w: 1024, h: 768, x: 3840, y: 0, dpi: "96" },
+        ],
+      }
+      const one: Json = { monitors: [{ primary: true, w: 1024, h: 768, x: 0, y: 0, dpi: "96" }] }
+      const ids = ["n-host-second-monitor", "n-affinity-wgc-monitor-secondary"]
+      const has = (host: string, facts: Json) => ids.filter((id) => rowsForHost(host, facts).includes(id))
+      if (has(HOSTED, two).length !== 2) bad.push(`two monitors on ${HOSTED}: rows ${has(HOSTED, two).join(",") || "none"}`)
+      if (has(HOSTED, one).length) bad.push(`one monitor on ${HOSTED}: rows ${has(HOSTED, one).join(",")}`)
+      if (has(H6, one).length !== 2) bad.push("H6 with one monitor lost its second-monitor rows")
+      if (rowsForHost(HOSTED, two).includes("n-host-admin")) bad.push("n-host-admin selected off H6")
+      // the host fact: the count, every monitor's resolution and DPI
+      const ctx = testCtx()
+      ctx.facts = { ...two, inAdministrators: true, elevated: true, sessionId: 1, inputDesktop: "Default" }
+      const host = await hostFacts.run(ctx)
+      const m = host["n-host-second-monitor"]?.measured ?? ""
+      if (!/monitors=2 /.test(m) || !/3840x2160@0,0 dpi=96/.test(m) || !/1024x768@3840,0 dpi=96/.test(m))
+        bad.push(`second-monitor fact lacks count, resolutions or DPI: ${m}`)
+      if (hostFacts.ids.includes("n-affinity-wgc-monitor-secondary"))
+        bad.push("the secondary capture row is still a host fact, not a capture leg")
+      // the capture leg on the second monitor, judged like the primary-monitor affinity row
+      const leg = (magenta: number): Json => ({ wgcMonitor: { magenta, info: {} }, setAffinityOk: true, affinityRead: 17 })
+      const r1 = secondaryResults(arr(one.monitors), undefined, undefined)["n-affinity-wgc-monitor-secondary"]
+      if (r1?.verdict !== "UNMEASURED" || !/^UNMEASURED: skipped: one present monitor/.test(r1.measured))
+        bad.push(`one monitor: ${JSON.stringify(r1)}`)
+      const cases: Array<[Json, Json, Verdict]> = [
+        [leg(1), leg(0), "CONFIRMS"],
+        [leg(1), leg(0.5), "CONTRADICTS"],
+        [leg(0), leg(0), "UNMEASURED"],
+      ]
+      for (const [c, x, want] of cases) {
+        const r = secondaryResults(arr(two.monitors), c, x)["n-affinity-wgc-monitor-secondary"]
+        if (r?.verdict !== want || !/monitor 2 of 2 1024x768@3840,0/.test(r.measured))
+          bad.push(`control ${JSON.stringify(c)} excluded ${JSON.stringify(x)}: ${JSON.stringify(r)}, want ${want}`)
+      }
+      if (!GROUPS.some((g) => g.ids.includes("n-affinity-wgc-monitor-secondary")))
+        bad.push("no group measures n-affinity-wgc-monitor-secondary")
+      const capture = psCode(source("sp-n-legs-capture.ps1")).join("\n")
+      if (!/function Leg-affinity-monitor\(\$a\) \{[\s\S]*?\[SpN\]::Overlay\([\s\S]*?\[SpN\]::Wgc\(\[IntPtr\]::Zero, \$hmon/.test(capture))
+        bad.push("sp-n-legs-capture.ps1 has no WGC monitor leg for a given monitor rectangle")
+      if (!/dpi = \[SpN\]::MonitorDpi\(/.test(source("sp-n.ps1"))) bad.push("HostFacts reads no monitor DPI")
+      return bad.length ? bad.join("; ") : undefined
+    },
+  },
+  {
     finding: "SWALLOW read-state",
     async run() {
       const all = [...LEG_FILES, "sp-n.ps1", "sp-n-target.ps1"].map((f) => [f, source(f)] as const)
@@ -3671,7 +3721,7 @@ const LEDGER_CHECKS: readonly Check[] = [
     async run() {
       const rows = readLedger(join(HERE, "win32-delivery.tsv"))
       const missing = Object.keys(SPEC).filter(
-        (id) => !SPEC[id]?.h6Only && !rows.some((r) => r.id === id && r.host === HOSTED),
+        (id) => !SPEC[id]?.h6Only && !SPEC[id]?.multiMonitor && !rows.some((r) => r.id === id && r.host === HOSTED),
       )
       const bad = rows.filter(
         (r) => !SPEC[r.id] || !["CONFIRMS", "CONTRADICTS", "NEW-EDGE", "UNMEASURED", "INVALID"].includes(r.verdict),
