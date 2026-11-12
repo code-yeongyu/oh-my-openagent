@@ -21,6 +21,14 @@ function New-RunDir {
 	$ErrorActionPreference = 'Continue'
 	& icacls.exe $dir /setintegritylevel '(OI)(CI)low' | Out-Null
 	if ($LASTEXITCODE -ne 0) { throw "icacls could not label $dir low (exit $LASTEXITCODE)" }
+	$ErrorActionPreference = 'Stop'
+	$dll = Join-Path $dir 'omo-hwl-native.dll'
+	# CodeDom writes the library without loading it here, where the same types are already loaded.
+	$options = New-Object CodeDom.Compiler.CompilerParameters
+	$options.OutputAssembly = $dll; $options.GenerateInMemory = $false; [void]$options.ReferencedAssemblies.Add('System.dll')
+	$result = (New-Object Microsoft.CSharp.CSharpCodeProvider).CompileAssemblyFromFile($options, [string[]]$NativeSources)
+	if ($result.Errors.HasErrors) { throw "native library did not compile: $(($result.Errors | ForEach-Object { $_.ToString() }) -join '; ')" }
+	$env:OMO_HWL_NATIVE_DLL = $dll
 	return $dir
 }
 

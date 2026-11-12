@@ -20,7 +20,14 @@ Set-StrictMode -Version Latest
 # Inside a function of a dot-sourced file $PSCommandPath names that file, so children are started from $Entry.
 $Entry = $PSCommandPath
 $Here = Join-Path $PSScriptRoot 'hosted-windows-live'
-Add-Type -Path @((Join-Path $Here 'native-session.cs'), (Join-Path $Here 'native-display.cs'))
+$NativeSources = @((Join-Path $Here 'native-session.cs'), (Join-Path $Here 'native-display.cs'))
+# A Medium child cannot compile (Add-Type fails with 'a required privilege is not held'), so a parent leg compiles the
+# natives once into its run directory and its children load that library instead.
+if ($env:OMO_HWL_NATIVE_DLL -and [IO.File]::Exists($env:OMO_HWL_NATIVE_DLL)) {
+	[void][Reflection.Assembly]::LoadFrom($env:OMO_HWL_NATIVE_DLL)
+} else {
+	Add-Type -Path $NativeSources
+}
 . (Join-Path $Here 'legs-session.ps1')
 . (Join-Path $Here 'legs-integrity.ps1')
 . (Join-Path $Here 'legs-display.ps1')
