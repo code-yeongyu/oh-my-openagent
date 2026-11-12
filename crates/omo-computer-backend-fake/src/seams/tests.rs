@@ -5,7 +5,7 @@ use omo_computer_core::backend::{
 };
 use omo_computer_core::params::Button;
 
-use omo_computer_core::error::EngineCode;
+use omo_computer_core::error::{EngineCode, Reason, UnknownFailure};
 
 use crate::{
     fixtures_dir, FakeBackend, FakeClock, FakeMethod, FakeScenario, Fault, Persona, RecordingSink,
@@ -112,7 +112,8 @@ fn personas_seams_and_frames() {
 #[test]
 fn a_panic_fault_panics_and_the_backend_survives() {
     let mut fake = FakeBackend::from_json("{}").expect("empty");
-    fake.inject(FakeMethod::Displays, Fault::Panic);
+    fake.inject(FakeMethod::Displays, Fault::Panic)
+        .expect("a panic fault needs no row");
     let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| fake.displays()));
     assert!(caught.is_err(), "the scripted panic unwinds");
     assert_eq!(
@@ -120,11 +121,33 @@ fn a_panic_fault_panics_and_the_backend_survives() {
         Ok(Vec::new()),
         "the state survives the poisoned lock"
     );
-    fake.inject(FakeMethod::Click, Fault::RefuseFocus);
+    fake.inject(FakeMethod::Click, Fault::RefuseFocus)
+        .expect("a focus refusal needs no row");
     assert_eq!(
         fake.post_input(&click(), Route::ForegroundHid)
             .map_err(|r| (r.code, r.reason)),
         Err((EngineCode::InputFailed, Some("activation_refused")))
     );
     assert!(fake.sink().is_empty());
+}
+
+#[test]
+fn inject_refuses_a_fail_pair_the_table_has_no_row_for() {
+    let mut fake = FakeBackend::from_json("{}").expect("empty");
+    let off_table = Fault::Fail {
+        code: EngineCode::Closed,
+        reason: Some(Reason::Minimized),
+    };
+    assert!(
+        matches!(
+            fake.inject(FakeMethod::Displays, off_table),
+            Err(UnknownFailure::Pair(_))
+        ),
+        "inject refuses the pair the loader refuses"
+    );
+    assert_eq!(
+        fake.displays().map_err(|r| (r.code, r.reason)),
+        Ok(Vec::new()),
+        "an off-table pair is never queued"
+    );
 }

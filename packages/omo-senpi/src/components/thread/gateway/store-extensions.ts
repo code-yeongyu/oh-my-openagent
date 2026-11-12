@@ -71,13 +71,16 @@ export type StoreExtensionRefusal = {
   readonly message: string
 }
 
-export type StoreExtensionResult<T> =
-  | { readonly kind: "ok"; readonly value: T }
-  | StoreExtensionRefusal
+export type StoreExtensionResult<T> = { readonly kind: "ok"; readonly value: T } | StoreExtensionRefusal
 
 export type StoreExtensionTransaction = {
   /** `orderBy` lists the statement's output columns (`"created_at, id"`); a LIMIT goes in the statement. */
-  readonly all: (columns: readonly string[], sql: string, params?: readonly SqlValue[], orderBy?: string) => readonly SqlRow[]
+  readonly all: (
+    columns: readonly string[],
+    sql: string,
+    params?: readonly SqlValue[],
+    orderBy?: string,
+  ) => readonly SqlRow[]
   readonly one: (columns: readonly string[], sql: string, params?: readonly SqlValue[]) => SqlRow | undefined
   readonly exec: (sql: string, params?: readonly SqlValue[]) => number
   readonly enqueue: GatewayRelay["inbound"]
@@ -100,7 +103,9 @@ export type StoreExtensionTransaction = {
 export type StoreExtensionOperation = (tx: StoreExtensionTransaction, args: unknown) => unknown | Promise<unknown>
 
 export type StoreExtensionApi = {
-  readonly registerStoreExtension: (extension: StoreExtensionRegistration) => Promise<StoreExtensionResult<{ readonly version: number }>>
+  readonly registerStoreExtension: (
+    extension: StoreExtensionRegistration,
+  ) => Promise<StoreExtensionResult<{ readonly version: number }>>
   readonly extensionCall: <T = unknown>(name: string, op: string, args: unknown) => Promise<StoreExtensionResult<T>>
 }
 
@@ -122,5 +127,10 @@ export type StoreExtensionSessionApi = {
   /** Every session op declared in the store that the model calls as a tool (internal ops are not listed); a read that imports no module. */
   readonly sessionCallableOps: () => Promise<readonly DeclaredSessionOp[]>
   /** Runs a declared op as `caller`, then its declared `await` when the result carries `await_request_id`; otherwise the op's own result. */
-  readonly extensionSessionAwait: <T = unknown>(name: string, op: string, args: unknown, caller: SessionCaller) => Promise<StoreExtensionResult<T>>
+  readonly extensionSessionAwait: <T = unknown>(
+    name: string,
+    op: string,
+    args: unknown,
+    caller: SessionCaller,
+  ) => Promise<StoreExtensionResult<T>>
 }

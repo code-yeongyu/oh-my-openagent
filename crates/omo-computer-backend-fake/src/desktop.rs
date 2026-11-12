@@ -168,8 +168,22 @@ impl Backend for FakeBackend {
         self.call(FakeMethod::Capture, |state, _| {
             let (rect, scale) = capture_rect(state, target)?;
             let rect = options.region.unwrap_or(rect);
-            let (width, height) = (pixels(rect.width * scale), pixels(rect.height * scale));
-            if u64::from(width) * u64::from(height) > MAX_COMPOSITE_PIXELS {
+            // A scale that is not positive, or a negative size, refuses before the multiply:
+            // two negatives would otherwise make a positive extent.
+            if scale.is_nan() || scale <= 0.0 || rect.width < 0.0 || rect.height < 0.0 {
+                return Err(Refusal::bare(EngineCode::CaptureFailed));
+            }
+            let (scaled_width, scaled_height) = (rect.width * scale, rect.height * scale);
+            // `pixels` truncates to whole pixels and maps a non-finite length to 0, so a
+            // non-finite extent refuses here and any length under 1 px refuses as 0 below.
+            if !scaled_width.is_finite() || !scaled_height.is_finite() {
+                return Err(Refusal::bare(EngineCode::CaptureFailed));
+            }
+            let (width, height) = (pixels(scaled_width), pixels(scaled_height));
+            if width == 0
+                || height == 0
+                || u64::from(width) * u64::from(height) > MAX_COMPOSITE_PIXELS
+            {
                 return Err(Refusal::bare(EngineCode::CaptureFailed));
             }
             let gray = if state.scenario.legacy_capture {
@@ -236,5 +250,7 @@ impl Backend for FakeBackend {
     }
 }
 
+#[cfg(test)]
+mod extent_tests;
 #[cfg(test)]
 mod tests;

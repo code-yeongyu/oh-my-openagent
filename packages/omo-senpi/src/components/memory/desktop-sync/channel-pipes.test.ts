@@ -13,16 +13,25 @@ import { readFrames, writeFrame } from "./framing"
 // descriptor or handle of its own, no second flag clear, and no child process that could carry the stream.
 function watchHandleAndProcessCreation() {
   const spies = [
-    spyOn(fs, "open"), spyOn(fs, "openSync"),
-    spyOn(childProcess, "spawn"), spyOn(childProcess, "spawnSync"), spyOn(childProcess, "fork"),
-    spyOn(childProcess, "exec"), spyOn(childProcess, "execSync"), spyOn(childProcess, "execFile"), spyOn(childProcess, "execFileSync"),
-    spyOn(Bun, "spawn"), spyOn(Bun, "spawnSync"),
+    spyOn(fs, "open"),
+    spyOn(fs, "openSync"),
+    spyOn(childProcess, "spawn"),
+    spyOn(childProcess, "spawnSync"),
+    spyOn(childProcess, "fork"),
+    spyOn(childProcess, "exec"),
+    spyOn(childProcess, "execSync"),
+    spyOn(childProcess, "execFile"),
+    spyOn(childProcess, "execFileSync"),
+    spyOn(Bun, "spawn"),
+    spyOn(Bun, "spawnSync"),
     // Clearing an inherit flag from JavaScript means SetHandleInformation through FFI.
     spyOn(ffi, "dlopen"),
   ]
   return {
     calls: () => spies.reduce((total, spy) => total + spy.mock.calls.length, 0),
-    restore: () => { for (const spy of spies) spy.mockRestore() },
+    restore: () => {
+      for (const spy of spies) spy.mockRestore()
+    },
   }
 }
 
@@ -32,16 +41,30 @@ test("the receiver bootstraps over the two one-way halves senpi hands it and cre
   const toDesktop = new PassThrough()
   const handed = new Duplex({
     read() {},
-    write(chunk, _encoding, done) { toDesktop.write(chunk, done) },
-    destroy(error, done) { toEngine.destroy(); toDesktop.destroy(); done(error) },
+    write(chunk, _encoding, done) {
+      toDesktop.write(chunk, done)
+    },
+    destroy(error, done) {
+      toEngine.destroy()
+      toDesktop.destroy()
+      done(error)
+    },
   })
   toEngine.on("data", (chunk: Buffer) => handed.push(chunk))
   const frames: unknown[] = []
-  readFrames(toDesktop, (packet) => {
-    frames.push(packet)
-    if (typeof packet !== "object" || packet === null || !("id" in packet) || !("op" in packet)) return
-    writeFrame(toEngine, { id: packet.id, ok: true, value: packet.op === "bootstrap" ? { child: "win-child" } : { accepted: true } })
-  }, () => {})
+  readFrames(
+    toDesktop,
+    (packet) => {
+      frames.push(packet)
+      if (typeof packet !== "object" || packet === null || !("id" in packet) || !("op" in packet)) return
+      writeFrame(toEngine, {
+        id: packet.id,
+        ok: true,
+        value: packet.op === "bootstrap" ? { child: "win-child" } : { accepted: true },
+      })
+    },
+    () => {},
+  )
   const watch = watchHandleAndProcessCreation()
   try {
     // when: the engine attaches and issues one request
@@ -65,7 +88,10 @@ test("the receiver bootstraps over the two one-way halves senpi hands it and cre
 test("a declaration senpi refused (no stream) is unavailable and opens nothing in its place", async () => {
   const watch = watchHandleAndProcessCreation()
   try {
-    expect(await attachDesktopSyncChannel(undefined)).toEqual({ kind: "unavailable", reason: "private_channel_unavailable" })
+    expect(await attachDesktopSyncChannel(undefined)).toEqual({
+      kind: "unavailable",
+      reason: "private_channel_unavailable",
+    })
     expect(watch.calls()).toBe(0)
   } finally {
     watch.restore()

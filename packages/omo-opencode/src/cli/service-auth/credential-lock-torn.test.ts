@@ -8,7 +8,9 @@ import { credentialLockPaths, withCredentialLock } from "./credential-lock"
 
 const API = "https://api.omo.dev"
 const homes: string[] = []
-afterEach(() => { for (const home of homes.splice(0)) rmSync(home, { recursive: true, force: true }) })
+afterEach(() => {
+  for (const home of homes.splice(0)) rmSync(home, { recursive: true, force: true })
+})
 
 describe("withCredentialLock", () => {
   test("#given an empty lock record left by a crash an hour ago #when the lock is taken #then it is reclaimed at once", async () => {

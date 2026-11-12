@@ -118,11 +118,16 @@ function parseFile(bytes: Uint8Array) {
  * Missing canonical paths normally terminate a walk and are not diagnostics.
  */
 export async function selectOpenSslHashDirectory(directory: HashDirectory): Promise<HashDirectorySelection> {
-  if (!process.versions.bun) throw new HashDirectoryRuntimeError("OpenSSL hash-directory selection requires Bun's BoringSSL parser")
-  const hashes = [...new Set((await directory.entries()).flatMap((entry) => {
-    const hash = /^[a-fA-F0-9]{8}/.exec(entry)?.[0]
-    return hash === undefined ? [] : [hash.toLowerCase()]
-  }))].sort()
+  if (!process.versions.bun)
+    throw new HashDirectoryRuntimeError("OpenSSL hash-directory selection requires Bun's BoringSSL parser")
+  const hashes = [
+    ...new Set(
+      (await directory.entries()).flatMap((entry) => {
+        const hash = /^[a-fA-F0-9]{8}/.exec(entry)?.[0]
+        return hash === undefined ? [] : [hash.toLowerCase()]
+      }),
+    ),
+  ].sort()
   // These accumulators are mutable while constructing one immutable selection result.
   const candidates = new Map<string, X509Certificate>()
   const excluded = new Set<string>()

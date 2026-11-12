@@ -19,28 +19,32 @@ type CachedMcpManifest = {
 }
 
 describe("install-codex MCP manifest", () => {
-  test("#given codex installer #when installing omo #then caches research MCPs without ast-grep MCP", async () => {
-    // given
-    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-mcp-"))
-    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-mcp-"))
+  test(
+    "#given codex installer #when installing omo #then caches research MCPs without ast-grep MCP",
+    async () => {
+      // given
+      const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-mcp-"))
+      const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-mcp-"))
 
-    // when
-    const result = await runCodexInstaller({
-      codexHome,
-      binDir,
-      repoRoot: process.cwd(),
-      astGrepInstaller: skipAstGrepInstall,
-      runCommand: async () => undefined,
-    })
+      // when
+      const result = await runCodexInstaller({
+        codexHome,
+        binDir,
+        repoRoot: process.cwd(),
+        astGrepInstaller: skipAstGrepInstall,
+        runCommand: async () => undefined,
+      })
 
-    // then
-    const pluginPath = result.installed[0]?.path ?? ""
-    const manifest = JSON.parse(await readFile(join(pluginPath, ".mcp.json"), "utf8")) as CachedMcpManifest
-    const config = await readFile(result.configPath, "utf8")
-    expect(manifest.mcpServers.grep_app.url).toBe("https://mcp.grep.app")
-    expect(manifest.mcpServers.context7.url).toBe("https://mcp.context7.com/mcp")
-    expect(Object.hasOwn(manifest.mcpServers, "ast_grep")).toBe(false)
-    expect(config).not.toContain("[mcp_servers.context7]")
-    expect(config).not.toContain("@upstash/context7-mcp")
-  }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
+      // then
+      const pluginPath = result.installed[0]?.path ?? ""
+      const manifest = JSON.parse(await readFile(join(pluginPath, ".mcp.json"), "utf8")) as CachedMcpManifest
+      const config = await readFile(result.configPath, "utf8")
+      expect(manifest.mcpServers.grep_app.url).toBe("https://mcp.grep.app")
+      expect(manifest.mcpServers.context7.url).toBe("https://mcp.context7.com/mcp")
+      expect(Object.hasOwn(manifest.mcpServers, "ast_grep")).toBe(false)
+      expect(config).not.toContain("[mcp_servers.context7]")
+      expect(config).not.toContain("@upstash/context7-mcp")
+    },
+    { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS },
+  )
 })

@@ -1,10 +1,5 @@
-import {
-  resolveRegisteredAgentName,
-  updateSessionAgent,
-} from "../../features/claude-code-session-state"
-import {
-  getCompactionAgentConfigCheckpoint,
-} from "../../shared/compaction-agent-config-checkpoint"
+import { resolveRegisteredAgentName, updateSessionAgent } from "../../features/claude-code-session-state"
+import { getCompactionAgentConfigCheckpoint } from "../../shared/compaction-agent-config-checkpoint"
 import {
   createInternalAgentContinuationTextPart,
   withInternalNoReplyMarker,
@@ -13,16 +8,15 @@ import { log } from "../../shared/logger"
 import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
 import { setSessionModel } from "../../shared/session-model-state"
 import { setSessionTools } from "../../shared/session-tools-store"
-import {
-  createExpectedRecoveryPromptConfig,
-  isPromptConfigRecovered,
-} from "./recovery-prompt-config"
+import { createExpectedRecoveryPromptConfig, isPromptConfigRecovered } from "./recovery-prompt-config"
 import { validateCheckpointModel } from "./validated-model"
+import { resolveLatestSessionPromptConfig, resolveSessionPromptConfig } from "./session-prompt-config-resolver"
 import {
-  resolveLatestSessionPromptConfig,
-  resolveSessionPromptConfig,
-} from "./session-prompt-config-resolver"
-import { AGENT_RECOVERY_PROMPT, NO_TEXT_TAIL_THRESHOLD, RECOVERY_COOLDOWN_MS, RECENT_COMPACTION_WINDOW_MS } from "./constants"
+  AGENT_RECOVERY_PROMPT,
+  NO_TEXT_TAIL_THRESHOLD,
+  RECOVERY_COOLDOWN_MS,
+  RECENT_COMPACTION_WINDOW_MS,
+} from "./constants"
 import type { CompactionContextClient } from "./types"
 import type { TailMonitorState } from "./tail-monitor"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
@@ -51,10 +45,7 @@ export function createRecoveryLogic(
     }
 
     const currentPromptConfig = await resolveSessionPromptConfig(ctx, sessionID)
-    const validatedCheckpointModel = validateCheckpointModel(
-      checkpoint.model,
-      currentPromptConfig.model,
-    )
+    const validatedCheckpointModel = validateCheckpointModel(checkpoint.model, currentPromptConfig.model)
     const { model: checkpointModel, ...checkpointWithoutModel } = checkpoint
     const checkpointWithAgent = {
       ...checkpointWithoutModel,
@@ -70,10 +61,7 @@ export function createRecoveryLogic(
       })
     }
 
-    const expectedPromptConfig = createExpectedRecoveryPromptConfig(
-      checkpointWithAgent,
-      currentPromptConfig,
-    )
+    const expectedPromptConfig = createExpectedRecoveryPromptConfig(checkpointWithAgent, currentPromptConfig)
     const launchAgent = resolveRegisteredAgentName(expectedPromptConfig.agent)
     const model = expectedPromptConfig.model
     const tools = expectedPromptConfig.tools
@@ -165,8 +153,7 @@ export function createRecoveryLogic(
     }
 
     const recentlyCompacted =
-      tailState.lastCompactedAt !== undefined &&
-      Date.now() - tailState.lastCompactedAt < RECENT_COMPACTION_WINDOW_MS
+      tailState.lastCompactedAt !== undefined && Date.now() - tailState.lastCompactedAt < RECENT_COMPACTION_WINDOW_MS
 
     log(`[compaction-context-injector] Detected consecutive assistant messages with no text`, {
       sessionID,
