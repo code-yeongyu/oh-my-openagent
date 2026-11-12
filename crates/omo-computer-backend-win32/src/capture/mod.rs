@@ -37,9 +37,8 @@ pub use pixels::{
 use omo_computer_core::backend::{CaptureOptions, Refusal, Target};
 use omo_computer_core::capabilities::CaptureRoute;
 use omo_computer_core::error::{EngineCode, Reason};
-use omo_computer_core::frame::MAX_COMPOSITE_PIXELS;
 
-use crate::displays::{monitor_for, Monitor, PhysRect};
+use crate::displays::{Monitor, PhysRect};
 use crate::ocr::OcrProbe;
 
 /// The pixels of one capture: BGRA rows, and the virtual-screen rectangle they cover.
