@@ -53,6 +53,17 @@ describe("environment preflight (ADP-3)", () => {
     })
   })
 
+  test("a driver is loaded from drivers/<name>.ts, and a missing driver file is named as the missing prerequisite", () => {
+    withDir((dir) => {
+      const out = join(dir, "out")
+      const child = Bun.spawnSync(["bun", runScript, "--os", "fake", "--all", "--driver", "legacy", "--out", out])
+      expect(child.exitCode).toBe(3)
+      expect(child.stdout.toString()).toContain(
+        "ENVIRONMENT_ERROR driver-legacy: script/qa/computer/conformance/drivers/legacy.ts is not present",
+      )
+    })
+  })
+
   test("an engine that answers engine.hello on the fake backend passes the stdio probe", () => {
     withDir((dir) => {
       const engine = join(dir, "engine")

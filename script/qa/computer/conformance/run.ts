@@ -1,30 +1,33 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join, resolve } from "node:path"
+import { join, relative, resolve } from "node:path"
 
 import { catalogFor, SESSIONS } from "./catalog.ts"
+import { type Driver, isDriver } from "./driver.ts"
 import { type Check, executable, fakeStdio, preflight, type Probe } from "./preflight.ts"
 import { buildReport, summaryLine } from "./report.ts"
-import { MAX_REFERENCE_CELLS, type Task, TASKS } from "./taskset/tasks.ts"
-import { type Cell, type CellResult, OS_NAMES, type OsName, RUN_SCHEMA } from "./vocabulary.ts"
+import { MAX_REFERENCE_CELLS, TASKS } from "./taskset/tasks.ts"
+import { type CellResult, OS_NAMES, type OsName, RUN_SCHEMA } from "./vocabulary.ts"
 
 const REPO = resolve(import.meta.dir, "../../../..")
 const SENTINEL = join(REPO, "script/qa/computer/sentinel/sentinel.ts")
 
-interface Driver {
-  runCell(cell: Cell): Promise<CellResult>
-  runTask(task: Task): Promise<{ readonly saved: Readonly<Record<string, unknown>>; readonly cells: number }>
-}
-
 type DriverName = "engine" | "legacy"
 type DriverSlot = { readonly driver: Driver } | { readonly unavailable: string }
 
-const DRIVERS: Readonly<Record<DriverName, DriverSlot>> = {
-  engine: {
-    unavailable:
-      "no cell runner yet: it needs the fake backend's fixture scenarios (cu-v3 row 14), the engine's --stdio session (row 15) and the verbs on the fake (rows 23-25)",
-  },
-  legacy: { unavailable: "the shipped-runtime driver is built by the baseline row (row 8)" },
+const NOT_YET: Readonly<Record<DriverName, string>> = {
+  engine:
+    "it needs the fake backend's fixture scenarios (cu-v3 row 14), the engine's --stdio session (row 15) and the verbs on the fake (rows 23-25)",
+  legacy: "the shipped-runtime driver is built by the baseline row (row 8)",
+}
+
+async function loadDriver(name: DriverName): Promise<DriverSlot> {
+  const file = join(import.meta.dir, "drivers", `${name}.ts`)
+  const shown = relative(REPO, file)
+  if (!existsSync(file)) return { unavailable: `${shown} is not present: ${NOT_YET[name]}` }
+  const loaded: unknown = await import(file)
+  const driver = typeof loaded === "object" && loaded !== null && "driver" in loaded ? loaded.driver : undefined
+  return isDriver(driver) ? { driver } : { unavailable: `${shown} does not export a driver with runCell and runTask` }
 }
 
 interface Options {
@@ -57,8 +60,7 @@ function parse(argv: readonly string[]): Options | string {
   }
 }
 
-function probes(options: Options): Probe[] {
-  const slot = DRIVERS[options.driver]
+function probes(options: Options, slot: DriverSlot): Probe[] {
   const driverCheck: Probe = async () =>
     "driver" in slot
       ? { name: `driver-${options.driver}`, ok: true, detail: "cell runner present" }
@@ -110,9 +112,9 @@ async function main(argv: readonly string[]): Promise<number> {
   }
   mkdirSync(options.out, { recursive: true })
   rmSync(join(options.out, "run.json"), { force: true })
-  const environment = await preflight(options, probes(options))
+  const slot = await loadDriver(options.driver)
+  const environment = await preflight(options, probes(options, slot))
   writeFileSync(join(options.out, "environment.json"), JSON.stringify(environment, null, 2))
-  const slot = DRIVERS[options.driver]
   if (environment.status === "ENVIRONMENT_ERROR" || !("driver" in slot)) {
     for (const check of environment.checks.filter((entry) => !entry.ok)) {
       console.log(`ENVIRONMENT_ERROR ${check.name}: ${check.detail}`)
