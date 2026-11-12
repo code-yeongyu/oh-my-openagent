@@ -62,9 +62,7 @@ impl Session {
     /// pre-input markers and the interaction lock under its RUNTIME root.
     #[must_use]
     pub fn for_roots(backend: Box<dyn Backend>, roots: &Roots) -> Self {
-        let mut session = Self::with_guard(backend, Guard::for_roots(roots));
-        session.funnel = Funnel::for_roots(roots);
-        session
+        Self::build(backend, Guard::for_roots(roots), Funnel::for_roots(roots))
     }
 
     #[must_use]
