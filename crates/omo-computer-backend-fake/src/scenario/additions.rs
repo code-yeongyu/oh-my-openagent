@@ -72,6 +72,9 @@ pub struct TargetExit {
     #[serde(default = "first")]
     pub nth: u32,
     pub window: String,
+    /// The exit code the exited process reports.
+    #[serde(default)]
+    pub exit_code: Option<i32>,
 }
 
 const fn first() -> u32 {

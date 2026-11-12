@@ -91,10 +91,9 @@ impl Session {
                 self.store_receipt(&mut record, stored);
                 let _ = self.funnel.audit().append(record.event);
                 Err(Refused {
-                    refusal,
                     call_id: Some(call_id),
-                    receipt: None,
                     interrupted: Some(Disposition::UNCERTAIN_UNSAFE),
+                    ..Refused::from(refusal)
                 })
             }
             None => {
@@ -113,6 +112,9 @@ impl Session {
                     effect: read_back.effect,
                     warning: appended.is_err().then(|| "write_failed".to_owned()),
                     audit_id: appended.ok(),
+                    paused: Vec::new(),
+                    session: None,
+                    target: None,
                 };
                 let reply =
                     report::reply(report_mode, mutation.method, sent).unwrap_or_else(|rejection| {

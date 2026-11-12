@@ -18,7 +18,9 @@ use omo_computer_core::methods::Method;
 use omo_computer_core::results::{
     CapabilitiesReply, ExecReply, PermissionState, SessionOpened, StopPathStatus,
 };
+use omo_computer_core::intervention::DEFAULT_PAUSE_CEILING_MS;
 use omo_computer_core::session_state::Tristate;
+use omo_computer_core::settings::Intervention;
 use omo_computer_safety::{Call, Guard, HostAdditions, NoHolds, StopPolicy, TargetRef, Transport, VerbKind};
 
 use crate::audit::gc::SweepTrigger;
@@ -37,6 +39,8 @@ pub const POINT_REQUIRED: Refusal = Refusal::bare(EngineCode::InvalidTarget);
 pub(crate) struct Opened {
     pub(crate) report_mode: ReportMode,
     pub(crate) tag: u64,
+    pub(crate) intervention: Intervention,
+    pub(crate) pause_ceiling_ms: u64,
 }
 
 /// The session state of one engine process.
@@ -85,6 +89,12 @@ impl Session {
         self.opened = Some(Opened {
             report_mode: request.report_mode,
             tag: random_u64(),
+            intervention: request.intervention.unwrap_or(Intervention::Pause),
+            pause_ceiling_ms: request
+                .config
+                .as_ref()
+                .and_then(|config| config.timing.pause_ceiling_ms)
+                .unwrap_or(DEFAULT_PAUSE_CEILING_MS),
         });
         let resume_token = format!("{:016x}{:016x}", random_u64(), random_u64());
         self.funnel.set_session_id(resume_token[..16].to_owned());
@@ -120,6 +130,7 @@ impl Session {
     #[must_use]
     pub fn capabilities(&self) -> CapabilitiesReply {
         let mut capabilities = self.backend.capabilities();
+        capabilities.session = crate::session_state::sample(self.backend.as_ref());
         self.guard.describe(&mut capabilities.stop_path);
         match self.opened.as_ref().map(|opened| opened.report_mode) {
             Some(ReportMode::Object) => CapabilitiesReply::Object(Box::new(capabilities)),

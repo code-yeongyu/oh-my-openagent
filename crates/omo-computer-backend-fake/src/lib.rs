@@ -18,11 +18,13 @@ mod persona;
 mod scenario;
 mod scripting;
 mod seams;
+mod session_reads;
 mod sink;
 mod state;
 #[cfg(test)]
 mod time_guard;
 mod timeline;
+mod typing;
 
 pub use ax_tree::{NODES_PER_MS, PAD_ROLE};
 pub use backend::{FakeBackend, StopPathScript};
@@ -32,6 +34,7 @@ pub use desktop::MAX_COMPOSITE_PIXELS;
 pub use faults::Fault;
 pub use method::FakeMethod;
 pub use persona::Persona;
+pub use scenario::SessionMark;
 pub use scenario::{
     field_names, fixtures_dir, AxNotification, BusyMark, ClipboardScript, DelayMs, DisplaysChange,
     EpochEvent, EpochReason, FakeAxNode, FakeDisplay, FakeMenuNode, FakeScenario, FakeWindow,

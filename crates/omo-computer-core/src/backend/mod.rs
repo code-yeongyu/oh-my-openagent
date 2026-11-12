@@ -86,6 +86,40 @@ pub trait Backend: Send {
     fn presence(&mut self) -> Option<Box<dyn Presence>> {
         None
     }
+
+    /// The backend's monotonic clock and its wait; `None` (the default) when it has none,
+    /// which makes an admission that would pause answer at once instead.
+    fn clock(&self) -> Option<&dyn crate::intervention::BackendClock> {
+        None
+    }
+
+    /// The reads the takeover gate, the mid-send watch and target liveness take; `None` (the
+    /// default) when the backend has no foreign-input filter or liveness probe.
+    fn intervention(&self) -> Option<&dyn crate::intervention::InterventionSource> {
+        None
+    }
+
+    /// Types `text` as one stroke that `interrupt` may end between Unicode scalars (asked
+    /// before every scalar after the first). The default cannot be interrupted: it sends the
+    /// whole text as one `post_input`, exactly as a Text event, and reports every scalar.
+    fn post_text(
+        &mut self,
+        text: &str,
+        route: Route,
+        tag: u64,
+        interrupt: &mut dyn FnMut(&dyn Backend) -> bool,
+    ) -> crate::intervention::TextDelivery {
+        let _ = interrupt;
+        let of = crate::intervention::scalars(text);
+        let input = TaggedInput {
+            event: InputEvent::Text(text.to_owned()),
+            tag,
+        };
+        match self.post_input(&input, route) {
+            Ok(_) => crate::intervention::TextDelivery { sent: of, of, refusal: None, interrupted: false },
+            Err(refusal) => crate::intervention::TextDelivery { sent: 0, of, refusal: Some(refusal), interrupted: false },
+        }
+    }
 }
 
 /// The accessibility half of a backend.
