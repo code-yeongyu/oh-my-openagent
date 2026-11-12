@@ -1,10 +1,11 @@
 // The live corpus the cleanup planner reads: every memory content note that parses, with its paragraphs and the
-// repository paths its wikilinks resolve to. ARCHIVE.md, notes/ and unparsable files are never candidates.
+// repository paths its wikilinks and markdown links resolve to. ARCHIVE.md, notes/ and unparsable files are never
+// candidates.
 
 import { readFile, readdir } from "../fs/resilient"
 import { join, posix } from "node:path"
 
-import { withoutFences } from "../audit/audit"
+import { markdownDestination, withoutFences } from "../audit/audit"
 import { memoryExpiresAtMs } from "../memfs/expiry"
 import { FrontmatterError, parseMemoryFile, type MemoryFrontmatter, type ParsedMemoryFile } from "../memfs/frontmatter"
 import { FRONTMATTER_RE, decodeScalarSource } from "../memfs/frontmatter-scalar"
@@ -12,7 +13,7 @@ import { isMemoryContentPath } from "../memfs/paths"
 import { bodyKey, digest, splitParagraphs, type Paragraph } from "./text"
 
 export interface NoteLink {
-  /** Repository path the wikilink resolves to. */
+  /** Repository path the wikilink or markdown link resolves to. */
   readonly target: string
   /** 1-based line in the file. */
   readonly line: number
@@ -82,7 +83,7 @@ export async function scanCleanupCorpus(repoDir: string): Promise<CleanupCorpus>
       bodyKey: bodyKey(body),
       bytes: Buffer.byteLength(content, "utf8"),
       paragraphs: splitParagraphs(body),
-      links: wikilinks(path, content, existing),
+      links: linksOf(path, content, existing),
       expiresAtMs: memoryExpiresAtMs(parsed.frontmatter),
       readOnly: decodeScalarSource(parsed.frontmatter.read_only ?? "") === "true",
     })
@@ -120,15 +121,28 @@ export function scannableLines(content: string): readonly string[] {
   return [...headerLines, ...withoutFences(body).split("\n")]
 }
 
-function wikilinks(path: string, content: string, files: ReadonlySet<string>): NoteLink[] {
+/** Every link apply's repoint can rewrite: wikilinks from the root, markdown links from the note's own folder. */
+function linksOf(path: string, content: string, files: ReadonlySet<string>): NoteLink[] {
   const links: NoteLink[] = []
   scannableLines(content).forEach((line, index) => {
-    for (const found of line.matchAll(/\[\[([^\]\n]+)\]\]/g)) {
-      const target = resolveWikilink(found[1] ?? "", files)
+    const targets = [
+      ...[...line.matchAll(/\[\[([^\]\n]+)\]\]/g)].map((found) => resolveWikilink(found[1] ?? "", files)),
+      ...[...line.matchAll(/(?<!!)\[[^\]\n]*\]\((<?[^)\n]+>?)\)/g)].map((found) =>
+        resolveMarkdownLink(path, found[1] ?? "", files),
+      ),
+    ]
+    for (const target of targets)
       if (target !== undefined && target !== path) links.push({ target, line: index + 1, text: line.trim() })
-    }
   })
   return links
+}
+
+function resolveMarkdownLink(path: string, raw: string, files: ReadonlySet<string>): string | undefined {
+  const destination = markdownDestination(raw).split("#")[0] ?? ""
+  if (destination === "" || /^[a-z][a-z0-9+.-]*:/i.test(destination) || posix.isAbsolute(destination)) return undefined
+  const resolved = posix.normalize(posix.join(posix.dirname(path), destination))
+  if (resolved === ".." || resolved.startsWith("../")) return undefined
+  return files.has(resolved) ? resolved : undefined
 }
 
 async function listFiles(root: string, dir = ""): Promise<string[]> {
