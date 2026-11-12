@@ -69,16 +69,7 @@ impl Session {
 
     #[must_use]
     pub fn with_guard(backend: Box<dyn Backend>, guard: Guard) -> Self {
-        crate::intervention::with_display_awake(Self {
-            backend,
-            guard,
-            opened: None,
-            funnel: Funnel::in_memory(),
-            refs: crate::refs::RefRegistry::default(),
-            frames: crate::frames::FrameStore::default(),
-            trace: crate::trace::Trace::default(),
-            display_awake: crate::intervention::SharedHold::default(),
-        })
+        Self::build(backend, guard, Funnel::in_memory())
     }
 
     /// Opens (or re-opens) the session and answers its capabilities and a fresh resume token.
