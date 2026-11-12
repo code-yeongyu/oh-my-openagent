@@ -9,9 +9,12 @@ export function admission(
   scenario: Scenario,
   session: SessionName,
   startFailure: string | undefined,
+  present: (tool: string) => boolean = (tool) => Bun.which(tool) !== null,
 ): string | undefined {
   if (startFailure !== undefined) return `session ${session} did not start: ${startFailure}`
   if (!scenario.sessions.includes(session)) return `scenario ${scenario.name} does not run under ${session}`
+  const missing = scenario.requires.filter((tool) => !present(tool))
+  if (missing.length > 0) return `this host lacks ${missing.join(", ")} (the QA container has them)`
   return undefined
 }
 

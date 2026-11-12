@@ -15,6 +15,7 @@ export const occluderOracle: Scenario = {
   name: "occluder-oracle",
   admit: "os",
   sessions: ["xvfb"],
+  requires: ["xdotool", "xwd"],
   async run(ctx: Context): Promise<Checked> {
     const { engine, procs, stage } = ctx
     procs.start("under-window", fixtureWindow({ ...TARGET, markers: [] }), stage.env)

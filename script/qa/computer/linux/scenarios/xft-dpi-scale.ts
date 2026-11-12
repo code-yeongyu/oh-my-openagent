@@ -15,6 +15,7 @@ export const xftDpiScale: Scenario = {
   name: "xft-dpi-scale",
   admit: "os",
   sessions: ["xvfb"],
+  requires: ["xdotool", "xrdb", "xwd"],
   async run(ctx: Context): Promise<Checked> {
     const { engine, procs, stage } = ctx
     await writeFile(join(stage.runDir, "resources"), "Xft.dpi: 192\n", "utf8")

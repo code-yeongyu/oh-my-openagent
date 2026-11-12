@@ -6,11 +6,12 @@ import { expect, test } from "bun:test"
 import { verdict, type Scenario } from "./scenario.ts"
 import { admission, type Outcome, setExitCode, setLine } from "./set.ts"
 
-function scenario(name: string, sessions: Scenario["sessions"]): Scenario {
+function scenario(name: string, sessions: Scenario["sessions"], requires: readonly string[] = []): Scenario {
   return {
     name,
     admit: "os",
     sessions,
+    requires,
     run: () => Promise.resolve({ checks: {}, facts: {}, observer: { before: {}, after: {} } }),
   }
 }
@@ -40,4 +41,12 @@ test("a session that did not start blocks every scenario under it", () => {
   const reason = admission(scenario("xft-dpi-scale", ["xorg"]), "xorg", "runs directly on the host")
   expect(reason).toContain("runs directly on the host")
   expect(admission(scenario("xft-dpi-scale", ["xvfb"]), "xvfb", undefined)).toBeUndefined()
+})
+
+test("a scenario whose host tool is missing counts blocked naming the tool, never fail", () => {
+  const needs = scenario("occluder-oracle", ["xvfb"], ["xdotool", "xwd"])
+  const reason = admission(needs, "xvfb", undefined, (tool) => tool === "xwd")
+  expect(reason).toContain("xdotool")
+  expect(reason).not.toContain("xwd")
+  expect(admission(needs, "xvfb", undefined, () => true)).toBeUndefined()
 })

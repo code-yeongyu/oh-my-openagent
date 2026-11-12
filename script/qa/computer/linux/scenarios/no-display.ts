@@ -18,6 +18,7 @@ export const noDisplay: Scenario = {
   name: "no-display",
   admit: "none",
   sessions: ["none"],
+  requires: [],
   async run(ctx: Context): Promise<Checked> {
     const { engine } = ctx
     await engine.open("none")

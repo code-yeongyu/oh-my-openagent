@@ -30,6 +30,8 @@ export interface Scenario {
   readonly admit: Admit
   /** The sessions this scenario runs under; the driver refuses any other. */
   readonly sessions: readonly SessionName[]
+  /** The host executables the scenario runs; a missing one blocks it rather than failing it. */
+  readonly requires: readonly string[]
   run(ctx: Context): Promise<Checked>
 }
 
