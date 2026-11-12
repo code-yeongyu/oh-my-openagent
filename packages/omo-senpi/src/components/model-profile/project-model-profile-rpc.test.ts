@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { chmodSync, mkdirSync, readdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs"
+import { chmodSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, symlinkSync, writeFileSync } from "node:fs"
 import { userInfo } from "node:os"
 
 import { DEFAULT_WRITE_FILE_SYSTEM } from "@oh-my-opencode/omo-config-core"
@@ -209,7 +209,7 @@ describe("project model_profile RPC (#13188)", () => {
     mkdirSync(join(other, ".omo"), { recursive: true })
     writeFileSync(join(other, ".omo", "omo.jsonc"), COMMENTED)
 
-    const reply = setProjectModelProfile(trusted(other), { modelProfile: "a/b" }, { accountHomes: () => [other] })
+    const reply = setProjectModelProfile(trusted(other), { modelProfile: "a/b" }, { homeOfUid: () => other })
 
     expect(reply).toMatchObject({ kind: "refused", code: "home_folder" })
     expect(readFileSync(join(other, ".omo", "omo.jsonc"), "utf8")).toBe(COMMENTED)
@@ -249,7 +249,7 @@ describe("project model_profile RPC (#13188)", () => {
     mkdirSync(home)
     mkdirSync(work)
 
-    const reply = setProjectModelProfile(trusted(work), { modelProfile: "a/b" }, { accountHomes: () => [home] })
+    const reply = setProjectModelProfile(trusted(work), { modelProfile: "a/b" }, { homeOfUid: () => home })
 
     expect(reply).toMatchObject({ kind: "ok", modelProfile: "a/b" })
   })
@@ -262,25 +262,57 @@ describe("project model_profile RPC (#13188)", () => {
     symlinkSync(serviceHome, alias)
 
     for (const cwd of [serviceHome, alias])
-      expect(setProjectModelProfile(trusted(cwd), { modelProfile: "a/b" }, { accountHomes: () => [serviceHome] })).toMatchObject({
+      expect(setProjectModelProfile(trusted(cwd), { modelProfile: "a/b" }, { homeOfUid: () => serviceHome })).toMatchObject({
         kind: "refused",
         code: "home_folder",
       })
     expect(readFileSync(join(serviceHome, ".omo", "omo.jsonc"), "utf8")).toBe(COMMENTED)
   })
 
-  test("#given the system user database #when account homes are read from it #then every listed home is returned", () => {
-    const { homesFromPasswd, homesFromDscl } = projectModelProfileRpc
-    expect(
-      homesFromPasswd(
-        "# comment\nroot:x:0:0:root:/root:/bin/bash\nsvc:x:998:998::/var/lib/svc:/usr/sbin/nologin\nnobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin\nbroken-line\n\n",
-      ),
-    ).toStrictEqual(["/root", "/var/lib/svc", "/nonexistent"])
-    expect(homesFromDscl("_www                    /Library/WebServer\nroot                    /var/root\nq                       /Users/q name\n")).toStrictEqual([
-      "/Library/WebServer",
-      "/var/root",
-      "/Users/q name",
-    ])
+  test("#given a folder #when either verb checks for a home folder #then only its owner's home is looked up, once per call", () => {
+    const cwd = folder(COMMENTED)
+    const asked: number[] = []
+    const deps = {
+      homeOfUid: (uid: number) => {
+        asked.push(uid)
+        return null
+      },
+    }
+
+    expect(getProjectModelProfile(trusted(cwd), deps).kind).toBe("ok")
+    expect(setProjectModelProfile(trusted(cwd), { modelProfile: "a/b" }, deps).kind).toBe("ok")
+
+    const owner = statSync(cwd).uid
+    expect(asked).toStrictEqual([owner, owner])
+  })
+
+  test("#given a passwd entry from getent or macOS id -P #when its home is read #then the home field is returned", () => {
+    const { homeFromPasswdEntry } = projectModelProfileRpc
+    expect(homeFromPasswdEntry("svc:x:998:998::/var/lib/svc:/usr/sbin/nologin\n")).toBe("/var/lib/svc")
+    expect(homeFromPasswdEntry("q:********:501:20::0:0:Q Kim:/Users/q name:/bin/zsh")).toBe("/Users/q name")
+    expect(homeFromPasswdEntry("")).toBeNull()
+    expect(homeFromPasswdEntry("broken:line:relative/home:/bin/sh")).toBeNull()
+  })
+
+  test("#given a failed owner lookup #when it is asked again #then it is retried, while a found home is reused", () => {
+    const { lookupHomeOfUid } = projectModelProfileRpc
+    let failing = 0
+    const failingRun = () => {
+      failing += 1
+      throw new Error("lookup timed out")
+    }
+    expect(lookupHomeOfUid(424242, failingRun)).toBeNull()
+    expect(lookupHomeOfUid(424242, failingRun)).toBeNull()
+    expect(failing).toBe(2)
+
+    let found = 0
+    const foundRun = () => {
+      found += 1
+      return "svc:x:424243:424243::/var/lib/svc:/bin/sh\n"
+    }
+    expect(lookupHomeOfUid(424243, foundRun)).toBe("/var/lib/svc")
+    expect(lookupHomeOfUid(424243, foundRun)).toBe("/var/lib/svc")
+    expect(found).toBe(1)
   })
 
   test("#given no bound session #when either verb runs #then it answers no_session", () => {
