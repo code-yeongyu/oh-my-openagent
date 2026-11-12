@@ -26,3 +26,11 @@ impl LeaseHook for DisplayAwakeLeaseHook {
         self.0.update(super::DisplayAwakeHold::resume);
     }
 }
+
+/// Registers the display-awake rule on the session's lease hook, sharing the session's one
+/// hold handle (R45); `Session::with_guard` builds every session through it.
+pub(crate) fn with_display_awake(mut session: crate::Session) -> crate::Session {
+    let hold = session.display_awake.clone();
+    session.set_lease_hook(Box::new(DisplayAwakeLeaseHook(hold)));
+    session
+}
