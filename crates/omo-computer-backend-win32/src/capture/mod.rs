@@ -12,16 +12,20 @@
 //! `n-capture-*-display-off` (a display-off console still yields frames, so capture proceeds).
 //! Locked-session capture is UNMEASURED.
 
+mod display;
 mod pixels;
+mod window;
 
 #[cfg(windows)]
 mod gdi;
+#[cfg(windows)]
+mod integrity;
 #[cfg(all(test, windows))]
 mod live_tests;
-#[cfg(test)]
-mod tests;
 #[cfg(windows)]
 pub(crate) mod os;
+#[cfg(test)]
+mod tests;
 #[cfg(windows)]
 mod wgc;
 
@@ -56,6 +60,9 @@ pub struct WindowFacts {
     pub cloaked: bool,
     /// `DWMWA_EXTENDED_FRAME_BOUNDS`.
     pub frame_bounds: PhysRect,
+    /// The owning process runs above the engine's integrity level, or refuses
+    /// `PROCESS_QUERY_LIMITED_INFORMATION` (d-windows.md:303).
+    pub elevated: bool,
 }
 
 /// Why an OS capture call produced no frame.
@@ -125,11 +132,18 @@ pub struct FrameRecord {
 pub const SESSION0: Refusal =
     Refusal::new(EngineCode::PermissionDenied, Reason::NotInteractive.wire());
 
-const fn failed(reason: Reason) -> Refusal {
+pub(super) const fn failed(reason: Reason) -> Refusal {
     Refusal::new(EngineCode::CaptureFailed, reason.wire())
 }
 
-const fn unavailable(reason: Reason) -> Refusal {
+/// An elevated window WGC cannot serve: `PrintWindow` into it returns a null frame
+/// (SP-N #13145@e32a295a17:n-elevated-printwindow, CONTRADICTS), so the floor never runs for it.
+pub const ELEVATED: Refusal = Refusal::new(
+    EngineCode::CaptureUnavailable,
+    Reason::ElevatedTarget.wire(),
+);
+
+pub(super) const fn unavailable(reason: Reason) -> Refusal {
     Refusal::new(EngineCode::CaptureUnavailable, reason.wire())
 }
 
@@ -139,7 +153,7 @@ pub fn parse_window_id(id: &str) -> Option<isize> {
     id.parse().ok()
 }
 
-fn from_fault(fault: CaptureFault) -> Refusal {
+pub(super) fn from_fault(fault: CaptureFault) -> Refusal {
     match fault {
         CaptureFault::Timeout => failed(Reason::Timeout),
         CaptureFault::NullFrame | CaptureFault::ItemUnavailable => failed(Reason::NullFrame),
@@ -163,15 +177,15 @@ pub fn capture<O: CaptureOs + ?Sized>(
     }
     let monitors = os.monitors()?;
     let mut record = match target {
-        Target::Window(id) => window(os, wgc, id, options.cursor, &monitors)?,
+        Target::Window(id) => window::capture(os, wgc, id, options.cursor, &monitors)?,
         Target::Display(id) => {
             let monitor = monitors
                 .iter()
                 .find(|monitor| monitor.device_name == *id)
                 .ok_or(Refusal::bare(EngineCode::InvalidTarget))?;
-            displays(os, wgc, std::slice::from_ref(monitor), options.cursor)?
+            display::capture(os, wgc, std::slice::from_ref(monitor), options.cursor)?
         }
-        Target::Desktop => displays(os, wgc, &monitors, options.cursor)?,
+        Target::Desktop => display::capture(os, wgc, &monitors, options.cursor)?,
     };
     if let Some(region) = options.region {
         record = crop_record(record, region)?;
@@ -182,93 +196,7 @@ pub fn capture<O: CaptureOs + ?Sized>(
     Ok(record)
 }
 
-fn window<O: CaptureOs + ?Sized>(
-    os: &mut O,
-    wgc: bool,
-    id: &str,
-    cursor: bool,
-    monitors: &[Monitor],
-) -> Result<FrameRecord, Refusal> {
-    let hwnd = parse_window_id(id).ok_or(Refusal::bare(EngineCode::WindowNotFound))?;
-    let facts = os
-        .window(hwnd)
-        .ok_or(Refusal::bare(EngineCode::WindowNotFound))?;
-    if facts.iconic {
-        return Err(unavailable(Reason::Minimized));
-    }
-    if facts.cloaked {
-        // Until the live tier records WGC frames for another virtual desktop, the user switches.
-        return Err(unavailable(Reason::OtherDesktop));
-    }
-    let scale = monitor_for(monitors, &facts.frame_bounds).map_or(1.0, Monitor::scale);
-    if wgc {
-        match os.wgc_window(hwnd, cursor) {
-            Ok(frame) if !is_blank(&frame.bgra) => {
-                return Ok(record(CaptureRoute::Wgc, frame, scale));
-            }
-            // A blank frame or no item: the floor runs, once.
-            Ok(_) | Err(CaptureFault::ItemUnavailable | CaptureFault::NullFrame) => {}
-            Err(CaptureFault::Timeout) => return Err(failed(Reason::Timeout)),
-        }
-    }
-    let frame = os.print_window(hwnd, cursor).map_err(from_fault)?;
-    let frame = crop(&frame, &facts.frame_bounds.inset(1)).ok_or(failed(Reason::NullFrame))?;
-    if is_near_black(&frame.bgra) {
-        return Err(failed(Reason::BlackFrame));
-    }
-    Ok(record(CaptureRoute::PrintWindow, frame, scale))
-}
-
-fn displays<O: CaptureOs + ?Sized>(
-    os: &mut O,
-    wgc: bool,
-    monitors: &[Monitor],
-    cursor: bool,
-) -> Result<FrameRecord, Refusal> {
-    let mut frames = Vec::with_capacity(monitors.len());
-    let mut dropped = Vec::new();
-    let mut shown: Vec<PhysRect> = Vec::new();
-    let mut route = if wgc {
-        CaptureRoute::Wgc
-    } else {
-        CaptureRoute::BitBlt
-    };
-    for monitor in monitors {
-        let mut next = shown.clone();
-        next.push(monitor.bounds);
-        let bound = PhysRect::bounding(&next);
-        let pixels =
-            u64::try_from(i64::from(bound.width) * i64::from(bound.height)).unwrap_or(u64::MAX);
-        if pixels > MAX_COMPOSITE_PIXELS {
-            dropped.push(monitor.device_name.clone());
-            continue;
-        }
-        let frame = if wgc {
-            match os.wgc_monitor(monitor, cursor) {
-                Ok(frame) => frame,
-                Err(CaptureFault::ItemUnavailable) => {
-                    route = CaptureRoute::BitBlt;
-                    os.bitblt_monitor(monitor, cursor).map_err(from_fault)?
-                }
-                Err(fault) => return Err(from_fault(fault)),
-            }
-        } else {
-            os.bitblt_monitor(monitor, cursor).map_err(from_fault)?
-        };
-        shown = next;
-        frames.push(frame);
-    }
-    let scale = monitors
-        .iter()
-        .find(|monitor| !dropped.contains(&monitor.device_name))
-        .map_or(1.0, Monitor::scale);
-    let frame = composite(&frames).ok_or(failed(Reason::NullFrame))?;
-    let mut record = record(route, frame, scale);
-    record.dropped = dropped;
-    Ok(record)
-}
-
-fn record(route: CaptureRoute, frame: RawFrame, scale: f64) -> FrameRecord {
+pub(super) fn record(route: CaptureRoute, frame: RawFrame, scale: f64) -> FrameRecord {
     FrameRecord {
         route,
         physical: frame.origin,

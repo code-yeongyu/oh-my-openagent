@@ -62,6 +62,8 @@ pub(super) static ROWS: &[ErrorRow] = &[
     e!(CaptureUnavailable, OffscreenUnsupported => CaptureUnavailable, NDS, Yes, INSPECT, "win.observe()"),
     e!(CaptureUnavailable, CaptureUnsupported => CaptureUnavailable, NDS, Yes, INSPECT, "win.observe()"),
     e!(CaptureUnavailable, OtherDesktop => CaptureUnavailable, NDAU, Yes, ASK, "the user switches to the window's virtual desktop"),
+    // Row 55 (item 35, design lane ruling): an elevated window WGC cannot serve; the floor never runs.
+    e!(CaptureUnavailable, ElevatedTarget => CaptureUnavailable, NDAU, Yes, ASK, none),
     e!(CaptureUnavailable, Unmapped => CaptureUnavailable, NDS, Yes, INSPECT, "win.observe()"),
     e!(UserIntervened, _ => UserIntervened, PREFIX, Depends, ASK, "win.observe()"),
     e!(AxUnconfirmed, _ => AxUnconfirmed, DUU, No, None, "win.observe()"),

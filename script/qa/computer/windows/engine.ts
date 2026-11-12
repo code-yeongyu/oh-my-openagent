@@ -46,7 +46,10 @@ function connect(binary: string): { child: Subprocess<"pipe", "pipe", "inherit">
   const call: Engine["call"] = (method, params = {}) => {
     const id = next++
     const reply = new Promise<Reply>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error(`${method} gave no reply in ${REPLY_TIMEOUT_MS} ms`)), REPLY_TIMEOUT_MS)
+      const timer = setTimeout(
+        () => reject(new Error(`${method} gave no reply in ${REPLY_TIMEOUT_MS} ms`)),
+        REPLY_TIMEOUT_MS,
+      )
       pending.set(id, (value) => {
         clearTimeout(timer)
         resolve(value)

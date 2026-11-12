@@ -118,6 +118,7 @@ pub(super) fn window_os(wgc: bool) -> ScriptedOs {
         window: Some(WindowFacts {
             iconic: false,
             cloaked: false,
+            elevated: false,
             frame_bounds: frame,
         }),
         // PrintWindow renders the whole window rect, a little larger than the DWM frame bounds.
