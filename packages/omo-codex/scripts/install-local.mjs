@@ -13,15 +13,38 @@ function resolveDefaultRepoRoot() {
   return resolve(scriptsDir, "..", "..", "..")
 }
 
-function ensureGeneratedInstaller() {
-  if (existsSync(generatedEntrypointPath)) return
+// The bundle's line 2 records a digest of the installer sources it was built from. A checkout rebuilds it when it is
+// absent or older than the sources (git pull does not refresh it, #13192); a published package has no sources and
+// uses the bundle it ships.
+const FRESHNESS_CHECK = `
+import { readFileSync } from "node:fs"
+import { bundledWorkspaceSources, digestCodexInstallerSources, generatedCodexInstallerPath, parseCodexInstallerArtifact } from "./script/build-codex-install.ts"
+const artifact = parseCodexInstallerArtifact(readFileSync(generatedCodexInstallerPath, "utf8"))
+const current = artifact !== undefined && artifact.sourceDigest === (await digestCodexInstallerSources(bundledWorkspaceSources(artifact.body)))
+process.exit(current ? 0 : 3)
+`
 
+function generatedInstallerIsCurrent(repoRoot) {
+  const result = spawnSync("bun", ["-e", FRESHNESS_CHECK], {
+    cwd: repoRoot,
+    stdio: ["ignore", "ignore", "inherit"],
+    shell: false,
+  })
+  if (result.status === 0) return true
+  if (result.status === 3) return false
+  throw new Error(`Codex installer freshness check failed with exit code ${result.status ?? "unknown"}`)
+}
+
+function ensureGeneratedInstaller() {
   const repoRoot = resolveDefaultRepoRoot()
   const sourceEntrypoint = join(repoRoot, "packages", "omo-codex", "src", "install", "install-local-cli.ts")
   const buildScript = join(repoRoot, "script", "build-codex-install.ts")
-  if (!existsSync(sourceEntrypoint) || !existsSync(buildScript)) {
+  const checkout = existsSync(sourceEntrypoint) && existsSync(buildScript)
+  if (!checkout) {
+    if (existsSync(generatedEntrypointPath)) return
     throw new Error(`Missing generated Codex installer bundle: ${generatedEntrypointPath}`)
   }
+  if (existsSync(generatedEntrypointPath) && generatedInstallerIsCurrent(repoRoot)) return
 
   const result = spawnSync("bun", ["run", "build:codex-install"], {
     cwd: repoRoot,

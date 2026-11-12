@@ -118,7 +118,7 @@ export async function ensurePluginArtifacts(context: {
   // Bundles are build outputs, never tracked (#13192): a checkout nobody built has none.
   if (!(await fileExists(join(context.pluginPath, "extensions", "omo.js")))) {
     throw new Error(
-      `omo-senpi plugin is not built at ${context.pluginPath}: extensions/omo.js is missing; run \`bun run build:senpi-plugin\` from the repository root`,
+      `omo-senpi plugin is not built at ${context.pluginPath}: extensions/omo.js is missing. From a repository checkout, run \`bun run build:senpi-plugin\` at the repository root; a packed or published plugin without it is incomplete, so reinstall that package`,
     )
   }
 

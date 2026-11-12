@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test"
+import { existsSync, readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 
-import { isGeneratedBundlePath, loadGeneratedBundlePatterns } from "./generated-bundles.ts"
+import { isGeneratedBundlePath, loadGeneratedBundlePatterns, RELEASE_GENERATORS } from "./generated-bundles.ts"
 
 // The check that every output the full build writes is listed and ignored builds the plugin, so it runs with the Senpi
 // suite after the build: packages/omo-senpi/plugin/scripts/generated-bundles-list.test.mjs.
@@ -56,5 +57,43 @@ describe("generated bundle list", () => {
     // then
     expect(tracked.length).toBeGreaterThan(0)
     expect(trackedOutputs).toEqual([])
+  })
+
+  test("#given the omo-ai payload job #when its steps are read #then it builds the generated outputs before packing omo-native", () => {
+    // given
+    const workflow = Bun.YAML.parse(readFileSync(`${repositoryRoot}.github/workflows/ci.yml`, "utf8")) as {
+      jobs: Record<string, { steps: { run?: string }[] }>
+    }
+    const steps = workflow.jobs["omo-ai-payload-check"]?.steps ?? []
+
+    // when
+    const buildGenerated = steps.findIndex((step) => step.run?.includes("bun script/build-generated.ts") ?? false)
+    const buildNative = steps.findIndex((step) => step.run?.includes("build:omo-native") ?? false)
+
+    // then
+    expect(buildNative).toBeGreaterThan(-1)
+    expect(buildGenerated).toBeGreaterThan(-1)
+    expect(buildGenerated).toBeLessThan(buildNative)
+  })
+
+  // Pinned against what the release workflow runs: each generator in RELEASE_GENERATORS is invoked by publish.yml
+  // directly, through its package.json script, or through script/build-generated.ts, which runs the whole table.
+  test("#given the release generator table #when compared with publish.yml #then the release workflow runs every generator in it", () => {
+    // given
+    const publish = readFileSync(`${repositoryRoot}.github/workflows/publish.yml`, "utf8")
+    const scripts: Record<string, string> = JSON.parse(readFileSync(`${repositoryRoot}package.json`, "utf8")).scripts
+
+    // when
+    const notRun = RELEASE_GENERATORS.filter((generator) => {
+      if (publish.includes("script/build-generated.ts") || publish.includes(generator.script)) return false
+      return !Object.entries(scripts).some(
+        ([name, command]) => command.includes(generator.script) && publish.includes(`bun run ${name}`),
+      )
+    }).map((generator) => generator.script)
+    const missing = RELEASE_GENERATORS.filter((generator) => !existsSync(`${repositoryRoot}${generator.script}`))
+
+    // then
+    expect(RELEASE_GENERATORS.length).toBeGreaterThan(0)
+    expect({ notRun, missing }).toEqual({ notRun: [], missing: [] })
   })
 })

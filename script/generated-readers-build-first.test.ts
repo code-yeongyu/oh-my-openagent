@@ -1,6 +1,9 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
+import { readdirSync } from "node:fs"
+
+import { load } from "js-yaml"
 
 import { jobSteps, publishWorkflow, readWorkflow, stepAt } from "./keychain-helper-workflow.test-support"
 
@@ -49,5 +52,160 @@ describe("codex-compatibility builds the generated files after its --ignore-scri
     expect(generate.value.run?.trim()).toBe(BUILD_GENERATED)
     for (const reader of ["Run full Codex compatibility suite", "Build Codex platform smoke prerequisites"])
       expect(stepAt(steps, reader).index).toBeGreaterThan(generate.index)
+  })
+})
+
+// Every job the static reader inventory (#13192) found reading an untracked output on its own tree, with the step that builds it first and the
+// steps that read it. A job loses its guard when the builder disappears, moves after a reader, or its install gains --ignore-scripts.
+const BUILDS = /bun script\/build-generated\.ts|\bbun run build\b(?![:\w-])|bun install(?![^\n]*--ignore-scripts)/
+const READERS: ReadonlyArray<readonly [workflow: string, job: string, builder: string, readers: readonly string[]]> = [
+  ["ci.yml", "test", "Install dependencies", ["Run tests"]],
+  [
+    "ci.yml",
+    "macos-combined",
+    "Install dependencies",
+    ["Run root test shard 1", "Run root test shard 2", "Run Codex platform smoke", "Run Senpi compatibility tests"],
+  ],
+  [
+    "ci.yml",
+    "codex-compatibility",
+    "Build generated files",
+    ["Run full Codex compatibility suite", "Build Codex platform smoke prerequisites"],
+  ],
+  [
+    "ci.yml",
+    "senpi-compatibility",
+    "Verify generated outputs and committed Senpi files are current",
+    ["Run Senpi compatibility tests"],
+  ],
+  ["ci.yml", "omo-ai-payload-check", "Install dependencies", ["Build omo-native"]],
+  [
+    "ci.yml",
+    "native-binary-parity",
+    "Install dependencies",
+    ["Build the standalone binary and the npm launcher payload"],
+  ],
+  ["publish-platform.yml", "build", "Build generated files", ["Build release binary"]],
+  [
+    "publish.yml",
+    "release-build-preflight",
+    "Build generated files",
+    ["Build omo-ai payload", "Build the release job's CLI bundles"],
+  ],
+  ["publish.yml", "publish-main", "Build generated files", ["Build omo-ai payload"]],
+  ["publish.yml", "release", "Build generated files", ["Sync LazyCodex Codex marketplace"]],
+  ["web-ci.yml", "format-lint-typecheck-build", "Install dependencies", ["Unit tests"]],
+]
+
+describe("every job that reads a generated output builds it first", () => {
+  test.each(READERS)("%s %s: %s runs a build before its readers", (workflow, job, builder, readers) => {
+    const steps = jobSteps(readWorkflow(workflow), job)
+    const build = stepAt(steps, builder)
+    expect(build.value.run ?? "").toMatch(BUILDS)
+    for (const reader of readers) expect(stepAt(steps, reader).index).toBeGreaterThan(build.index)
+  })
+})
+
+// Every job of every workflow is classified, so a job added later that reads a generated output without building it
+// first cannot pass unnoticed: it is either in READERS above, or listed here with the reason it reads none.
+const NO_READER = "the static reader inventory (#13192) found no command in this job that reaches a listed output"
+const READS_NOTHING: Readonly<Record<string, string>> = {
+  "ci.yml lazycodex-published-smoke":
+    "imports install-dist/install-local.mjs from the installed npm package, which ships it",
+  "compiled-worker.yml relocated-worker": "copies three source files into a scratch directory and tests only those",
+  "desktop-engine.yml native-contract":
+    "reaches plugin/scripts/install.mjs only as a path string; passes on an unbuilt tree",
+  "get-worker-ci.yml worker":
+    "packages/get-worker is its own project (own bun.lock, not a root workspace) and imports no output",
+  "bot-merge.yml merge": NO_READER,
+  "changelog-gate.yml changelog-gate": NO_READER,
+  "ci-full-matrix-label.yml full-matrix": NO_READER,
+  "ci.yml lint-ratchet": NO_READER,
+  "ci.yml ci-mode": NO_READER,
+  "ci.yml block-master-pr": NO_READER,
+  "ci.yml macos-test-1-status": NO_READER,
+  "ci.yml macos-test-2-status": NO_READER,
+  "ci.yml macos-codex-status": NO_READER,
+  "ci.yml macos-senpi-status": NO_READER,
+  "ci.yml typecheck": NO_READER,
+  "ci.yml build": NO_READER,
+  "ci.yml auto-commit-schema": NO_READER,
+  "ci.yml draft-release": NO_READER,
+  "cla.yml cla": NO_READER,
+  "cla.yml notice-skipped-signal": NO_READER,
+  "computer-engine.yml native-contract": NO_READER,
+  "cutover-target-deploy.yml deploy": NO_READER,
+  "desktop-linux-qa.yml linux-desktop-qa": NO_READER,
+  "desktop-windows-qa.yml windows-desktop-qa": NO_READER,
+  "engine-trust-helper.yml windows-helper": NO_READER,
+  "get-worker-ci.yml install-unix": NO_READER,
+  "get-worker-ci.yml install-alpine": NO_READER,
+  "get-worker-ci.yml install-windows": NO_READER,
+  "get-worker-deploy.yml deploy": NO_READER,
+  "git-job-helper.yml windows-helper": NO_READER,
+  "installer-mirror.yml mirror": NO_READER,
+  "installer-mirror.yml channel-maintenance": NO_READER,
+  "isolation-linux-fs.yml linux-fs": NO_READER,
+  "lint-workflows.yml actionlint": NO_READER,
+  "linux-trust-containers.yml linux-trust": NO_READER,
+  "macos-signing-canary.yml canary": NO_READER,
+  "memory-takeover-trace.yml trace": NO_READER,
+  "npm-deprecate-version.yml deprecate": NO_READER,
+  "npm-dist-tag-rollback.yml retag": NO_READER,
+  "package-labels.yml resolve-pr": NO_READER,
+  "package-labels.yml ensure-labels": NO_READER,
+  "package-labels.yml label-pull-request": NO_READER,
+  "package-labels.yml label-issue": NO_READER,
+  "package-labels.yml notice-skipped-signal": NO_READER,
+  "pr-automation-signal.yml signal": NO_READER,
+  "publish-platform.yml desktop-engine": NO_READER,
+  "publish-platform.yml keychain-helper": NO_READER,
+  "publish-platform.yml publish": NO_READER,
+  "publish-platform.yml smoke-linux-arm64": NO_READER,
+  "publish.yml gate-reuse": NO_READER,
+  "publish.yml preflight-trust": NO_READER,
+  "publish.yml release-metadata": NO_READER,
+  "publish.yml prepare-release-state": NO_READER,
+  "publish.yml dispatch-provenance-safe-publish": NO_READER,
+  "publish.yml verify-release-notes": NO_READER,
+  "publish.yml publish-platform": NO_READER,
+  "publish.yml release-announce": NO_READER,
+  "publish.yml release-announce-recovery": NO_READER,
+  "publish.yml installer-mirror": NO_READER,
+  "publish.yml installer-mirror-beta": NO_READER,
+  "publish.yml post-publish-verify": NO_READER,
+  "refresh-model-capabilities.yml refresh": NO_READER,
+  "release-announce.yml announce": NO_READER,
+  "review-claims.yml gate": NO_READER,
+  "review-claims.yml reconcile": NO_READER,
+  "review-claims.yml stale-sweep": NO_READER,
+  "review-claims.yml notice-skipped-signal": NO_READER,
+  "sisyphus-agent.yml agent": NO_READER,
+  "stats.yml stats": NO_READER,
+  "trust-mutations.yml mutations": NO_READER,
+  "web-ci.yml e2e": NO_READER,
+  "web-deploy.yml deploy": NO_READER,
+  "windows-flake-soak.yml soak": NO_READER,
+}
+
+describe("every workflow job is classified as a generated-output reader or not", () => {
+  const workflowsDir = new URL("../.github/workflows/", import.meta.url)
+  const jobs = readdirSync(workflowsDir)
+    .filter((name) => /\.ya?ml$/.test(name))
+    .flatMap((name) => {
+      const parsed = load(readWorkflow(name))
+      const jobNames =
+        parsed !== null && typeof parsed === "object" && "jobs" in parsed ? Object.keys(Object(parsed.jobs)) : []
+      return jobNames.map((job) => `${name} ${job}`)
+    })
+  const readers = new Set(READERS.map(([workflow, job]) => `${workflow} ${job}`))
+
+  test("no job is unclassified", () => {
+    expect(jobs.filter((job) => !readers.has(job) && READS_NOTHING[job] === undefined)).toEqual([])
+  })
+
+  test("no classification names a job that no longer exists", () => {
+    const existing = new Set(jobs)
+    expect([...readers, ...Object.keys(READS_NOTHING)].filter((job) => !existing.has(job))).toEqual([])
   })
 })

@@ -25,6 +25,7 @@ import { dirname, join, relative, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 import { z } from "zod"
 import { engineSidecarSources, resolvePackageDir, senpiPackageDir, type SidecarSource } from "./engine-sidecar-sources"
+import { assertBuiltPluginStaged } from "./built-plugin-payload"
 import { CLAUDE_CODE_PIN_REL_PATH, claudeCodePinFor } from "./claude-code-pin"
 import nativeFixture from "./release-binary-native-fixture.json"
 import { senpiWorkerCompileArgs } from "./senpi-worker-compile"
@@ -616,6 +617,7 @@ export function stageSidecarPayload(
     stageSource(source, stageDir, staged)
   }
   stagePluginPayload(stageDir, staged)
+  assertBuiltPluginStaged(staged)
   for (const entry of target.nativePrebuilds) stageNativePrebuild(entry, stageDir, staged)
   return [...staged].sort()
 }

@@ -13,6 +13,9 @@ const pkgDir = resolve(repoRoot, "packages", "omo-native")
 
 const REQUIRED_ARTIFACTS = [
   "bin/omo.js",
+  // bin/omo.js imports it for omo auth, sync, account and remote; it is a generated output (#9903), so a payload
+  // packed without the generated build lacks it.
+  "bin/lib/service-auth.generated.js",
   "plugin/package.json",
   "plugin/CHANGELOG.md",
   "plugin/extensions/omo.js",
@@ -50,15 +53,36 @@ const releaseMode = process.argv.slice(2).includes("--release")
 // modules below without the helper.
 const preflightMode = process.argv.slice(2).includes("--release-preflight")
 
-// Build outputs git does not track (#13192): only a build writes them, so a release that skipped a
-// generator would publish without them. bin/omo.js imports service-auth.generated.js for sync,
-// account and remote; the plugin installer is built by build-install.mjs.
-const RELEASE_GENERATED_ARTIFACTS = [
-  "bin/lib/service-auth.generated.js",
-  "bin/lib/reflection-lock.generated.js",
-  "bin/lib/brand-logo.generated.js",
-  "plugin/scripts/install.mjs",
+// Build outputs git does not track (#13192): only a build writes them, so a release that skipped a generator would
+// publish without them. The required set is derived from script/generated-bundles.json so a newly listed output can
+// never ship unpinned: every listed output under a directory this package ships is required, a literal path exactly,
+// a pattern (or each branch of its alternation) by at least one packed match.
+const SHIPPED_ROOTS = [
+  ["packages/omo-native/", ""],
+  ["packages/omo-senpi/plugin/", "plugin/"],
 ]
+
+function releaseGeneratedRequirements() {
+  const { patterns } = JSON.parse(readFileSync(resolve(repoRoot, "script", "generated-bundles.json"), "utf8"))
+  const requirements = []
+  for (const pattern of patterns) {
+    const root = SHIPPED_ROOTS.find(([source]) => pattern.startsWith(`^${source}`))
+    if (root === undefined) continue
+    const rest = pattern.slice(1 + root[0].length)
+    const group = /^(.*)\(\?:([^()]+)\)(.*)$/.exec(rest)
+    const branches = group ? group[2].split("|").map((branch) => `${group[1]}${branch}${group[3]}`) : [rest]
+    for (const branch of branches) {
+      const literal = branch.replace(/\$$/, "").replaceAll("\\.", ".")
+      const regex = new RegExp(`^${root[1]}${branch}`)
+      requirements.push(
+        /[\\[\](){}*+?|^$]/.test(literal)
+          ? { label: `a path matching ${regex.source}`, met: (paths) => paths.some((path) => regex.test(path)) }
+          : { label: `${root[1]}${literal}`, met: (paths) => paths.includes(`${root[1]}${literal}`) },
+      )
+    }
+  }
+  return requirements
+}
 
 // A bundle that reads `join(dirname(fileURLToPath(import.meta.url)), "<file>")` needs <file> packed
 // next to it; minified bundles keep this shape with renamed helpers, so the helper names are not matched.
@@ -121,9 +145,9 @@ for (const artifact of REQUIRED_ARTIFACTS) {
   }
 }
 
-for (const artifact of releaseMode || preflightMode ? RELEASE_GENERATED_ARTIFACTS : []) {
-  if (!pathSet.has(artifact)) {
-    errors.push(`missing artifact: ${artifact}`)
+for (const requirement of releaseMode || preflightMode ? releaseGeneratedRequirements() : []) {
+  if (!requirement.met(paths)) {
+    errors.push(`missing artifact: ${requirement.label}`)
   }
 }
 

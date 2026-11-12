@@ -2,7 +2,7 @@
 
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -18,12 +18,14 @@ import { fileURLToPath } from "node:url"
  */
 const verifierSource = fileURLToPath(new URL("./verify-omo-ai-payload.mjs", import.meta.url))
 const npmInvocationSource = fileURLToPath(new URL("./npm-invocation.mjs", import.meta.url))
+const generatedListSource = fileURLToPath(new URL("./generated-bundles.json", import.meta.url))
 const guardTimeoutMs = 120_000
 
 setDefaultTimeout(guardTimeoutMs)
 
 const PACKED_ARTIFACTS = [
   "bin/omo.js",
+  "bin/lib/service-auth.generated.js",
   "plugin/package.json",
   "plugin/CHANGELOG.md",
   "plugin/extensions/omo.js",
@@ -60,7 +62,23 @@ const RELEASE_GENERATED_ARTIFACTS = [
   "bin/lib/reflection-lock.generated.js",
   "bin/lib/brand-logo.generated.js",
   "plugin/scripts/install.mjs",
+  "plugin/runtime/rollback-migrate.js",
 ] as const
+
+// Every literal output the list names under a directory omo-ai ships (packages/omo-native -> package root,
+// packages/omo-senpi/plugin -> plugin/). Read from the list itself: a newly listed output joins this table.
+const LISTED_SHIPPED_LITERALS = (
+  JSON.parse(readFileSync(generatedListSource, "utf8")) as { patterns: string[] }
+).patterns
+  .filter((pattern) => !/[[\](){}*+?|]/.test(pattern.slice(1, -1).replaceAll("\\.", "")))
+  .map((pattern) => pattern.slice(1, -1).replaceAll("\\.", "."))
+  .flatMap((path) =>
+    path.startsWith("packages/omo-native/")
+      ? [path.slice("packages/omo-native/".length)]
+      : path.startsWith("packages/omo-senpi/plugin/")
+        ? [`plugin/${path.slice("packages/omo-senpi/plugin/".length)}`]
+        : [],
+  )
 
 interface VerifierRun {
   readonly exitCode: number
@@ -83,6 +101,7 @@ function runVerifierOnPayload(
     mkdirSync(join(fakeRepoRoot, "script"), { recursive: true })
     copyFileSync(verifierSource, join(fakeRepoRoot, "script", "verify-omo-ai-payload.mjs"))
     copyFileSync(npmInvocationSource, join(fakeRepoRoot, "script", "npm-invocation.mjs"))
+    copyFileSync(generatedListSource, join(fakeRepoRoot, "script", "generated-bundles.json"))
 
     const packageDir = join(fakeRepoRoot, "packages", "omo-native")
     mkdirSync(packageDir, { recursive: true })
@@ -127,6 +146,17 @@ describe("omo-ai payload verifier", () => {
     ])
     expect(run.exitCode).toBe(1)
     expect(run.output).toContain("missing artifact: plugin/runtime/agent-toolkit-sdk/sdk.js")
+  })
+
+  // bin/omo.js imports it for omo auth, sync, account and remote; it is a generated output (#9903), so a payload
+  // packed from a checkout that skipped the build must fail here instead of shipping those commands broken.
+  test("#given a payload missing only the generated service-auth module #when verified #then it fails naming that artifact", () => {
+    const run = runVerifierOnPayload([
+      ...PACKED_ARTIFACTS.filter((path) => path !== "bin/lib/service-auth.generated.js"),
+      ...skillPaths(PACKED_SKILL_COUNT),
+    ])
+    expect(run.exitCode).toBe(1)
+    expect(run.output).toContain("missing artifact: bin/lib/service-auth.generated.js")
   })
 
   test("#given a payload missing only the device-account extension #when verified #then it fails naming that artifact", () => {
@@ -182,7 +212,7 @@ describe("omo-ai payload verifier", () => {
 
     test.each(RELEASE_GENERATED_ARTIFACTS)("#when %s was not built #then it fails naming it", (artifact) => {
       const run = runVerifierOnPayload(
-        [...complete, ...RELEASE_GENERATED_ARTIFACTS.filter((path) => path !== artifact)],
+        [...new Set([...complete, ...RELEASE_GENERATED_ARTIFACTS])].filter((path) => path !== artifact),
         {},
         { args: ["--release"], modes: { [KEYCHAIN_HELPER]: 0o755 } },
       )
@@ -198,6 +228,21 @@ describe("omo-ai payload verifier", () => {
   })
 
   // The release build preflight (#13192) packs before publish-platform builds the macOS keychain helper.
+  test.each(LISTED_SHIPPED_LITERALS)(
+    "#given a release payload without the listed generated output %s #when verified with --release-preflight #then it fails naming it",
+    (missing) => {
+      const run = runVerifierOnPayload(
+        [...PACKED_ARTIFACTS, ...RELEASE_GENERATED_ARTIFACTS, ...skillPaths(PACKED_SKILL_COUNT)].filter(
+          (path) => path !== missing,
+        ),
+        {},
+        { args: ["--release-preflight"] },
+      )
+      expect(run.exitCode).toBe(1)
+      expect(run.output).toContain(`missing artifact: ${missing}`)
+    },
+  )
+
   describe("#given the release preflight gate (--release-preflight)", () => {
     const complete = [...PACKED_ARTIFACTS, ...skillPaths(PACKED_SKILL_COUNT), ...RELEASE_GENERATED_ARTIFACTS]
 
