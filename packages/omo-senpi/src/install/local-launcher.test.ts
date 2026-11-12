@@ -158,7 +158,10 @@ describe("local omo launcher", () => {
         mkdirSync(join(pluginPath, "extensions"), { recursive: true })
         mkdirSync(join(pluginPath, "scripts"), { recursive: true })
         mkdirSync(dirname(source), { recursive: true })
-        writeFileSync(join(home, ".gitignore"), "/packages/omo-senpi/plugin/extensions/\n/packages/omo-senpi/plugin/.build-stamp\n")
+        writeFileSync(
+          join(home, ".gitignore"),
+          "/packages/omo-senpi/plugin/extensions/\n/packages/omo-senpi/plugin/.build-stamp\n",
+        )
         writeFileSync(source, "export const a = 1\n")
         writeFileSync(
           join(home, "packages", "omo-senpi", "bundle-inputs.json"),
