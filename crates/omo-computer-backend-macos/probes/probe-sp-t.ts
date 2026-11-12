@@ -1202,6 +1202,11 @@ async function measureRow(
 
 type CleanupStep = [label: string, step: () => Promise<string>]
 
+// pure: the --cleanup exit code from its receipts (RED stub: keeps the old behaviour)
+function cleanupExitCode(_receipts: string[]): number {
+  return 0
+}
+
 // runs every diagnostic step, then every teardown step. A failing step is recorded as a receipt line and never stops
 // the steps after it, so the results dir and the work dir are removed even when a diagnostic read fails.
 async function runCleanupSteps(diagnostics: CleanupStep[], teardown: CleanupStep[]): Promise<string[]> {
@@ -1479,7 +1484,11 @@ async function selfTest(): Promise<number> {
       tapOutcome('{"error":"tap_create_failed"}\n{"tapDone":true}', 0).verdict,
       "UNMEASURED",
     ],
-    ["tap: untagged keyDowns", tapOutcome('{"type":10,"sourcePid":0}\n{"tapDone":true}', 0).verdict, "ROUTE=untagged"],
+    [
+      "tap: untagged keyDowns",
+      tapOutcome('{"tapReady":true}\n{"type":10,"sourcePid":0}\n{"tapDone":true}', 0).verdict,
+      "ROUTE=untagged",
+    ],
     [
       "grant: report with Accessibility",
       verdictOf(
@@ -1508,6 +1517,52 @@ async function selfTest(): Promise<number> {
       ["diag ok", "launchctl list FAILED: launchctl list exited 5: boom", "results dir removed"],
     ],
     ["cleanup: steps ran in order, teardown last", order, ["diag ok", "diag fails", "teardown"]],
+  )
+  // class: a tap file is a valid negative (or route) only when COMPLETE: tapReady and {"tapDone":true}, no tapDisabled,
+  // every line parseable. Every other state is UNMEASURED (NO_LAUNCH after a non-zero launch exit), never NO_EVENT.
+  const ready = '{"tapReady":true}'
+  const done = '{"tapDone":true}'
+  const key0 = '{"type":10,"keycode":0,"sourcePid":0,"sourceStateId":1}'
+  const tapVerdict = (text: string | null, code: number): string => {
+    try {
+      return tapOutcome(text, code).verdict
+    } catch (error) {
+      return `threw: ${error instanceof Error ? error.message : String(error)}`
+    }
+  }
+  const incomplete: Array<[string, string | null]> = [
+    ["missing", null],
+    ["empty", ""],
+    ["whitespace only", "\n\n"],
+    ["tapReady only (slow launch or crash before tapDone)", ready],
+    ["tapReady and keys, no tapDone (wait loop timed out)", `${ready}\n${key0}`],
+    ["tapDone without tapReady", done],
+    ["tapDone false", `${ready}\n{"tapDone":false}`],
+    ["tapDisabled, then tapDone", `${ready}\n{"tapDisabled":1}\n${done}`],
+    ["tapDisabled only", '{"tapDisabled":2}'],
+    ["unparseable line", `${ready}\n{not json\n${done}`],
+    ["unparseable whole file", "garbage"],
+    ["tap creation failed", '{"error":"tap_create_failed"}\n{"tapDone":true}'],
+  ]
+  for (const [state, text] of incomplete) {
+    cases.push([`tap class: ${state}, launch exit 0 -> UNMEASURED`, tapVerdict(text, 0), "UNMEASURED"])
+    cases.push([`tap class: ${state}, launch exit 1 -> NO_LAUNCH`, tapVerdict(text, 1), "NO_LAUNCH"])
+  }
+  const complete = `${ready}\n${key0}\n${done}`
+  cases.push(
+    ["tap class: complete, no keyDown -> NO_EVENT", tapVerdict(`${ready}\n${done}`, 0), "NO_EVENT"],
+    ["tap class: complete with an untagged keyDown -> ROUTE", tapVerdict(complete, 0), "ROUTE=untagged"],
+  )
+  // every proper byte prefix of a complete file is an incomplete file: none may read as a negative or a route
+  const prefixVerdicts = new Set<string>()
+  for (let i = 0; i < complete.length; i++) prefixVerdicts.add(tapVerdict(complete.slice(0, i), 0))
+  cases.push(["tap class: every truncation of a complete file is UNMEASURED", [...prefixVerdicts], ["UNMEASURED"]])
+  // class: --cleanup exits non-zero when any receipt reports a failure, after every step has run
+  cases.push(
+    ["cleanup exit: all receipts clean -> 0", cleanupExitCode(["procs 0", "dir REMOVED /w"]), 0],
+    ["cleanup exit: a FAILED receipt -> 1", cleanupExitCode(["launchctl list FAILED: exited 5", "dir REMOVED /w"]), 1],
+    ["cleanup exit: dir STILL PRESENT -> 1", cleanupExitCode(["procs 0", "dir STILL PRESENT /w"]), 1],
+    ["cleanup exit: the receipts of a run whose diagnostic failed -> 1", cleanupExitCode(cleanupReceipts), 1],
   )
   let failed = 0
   for (const [name, got, want] of cases) {
@@ -1553,8 +1608,9 @@ async function main(argv: string[]): Promise<number> {
     throw error
   }
   if (flag("--cleanup")) {
-    for (const receipt of await cleanup(env)) console.log(receipt)
-    return 0
+    const receipts = await cleanup(env)
+    for (const receipt of receipts) console.log(receipt)
+    return cleanupExitCode(receipts)
   }
   await setup(env)
 
