@@ -109,6 +109,7 @@ EOF
     fds=$(lsof -nP -p "$svc" 2> /dev/null | awk 'NR>1 && $4 ~ /^[0-9]+/' | wc -l | tr -d ' ')
     [ "$fds" -gt 0 ] || missing "lsof cannot see the device service (pid $svc)"
     ver=$(ps -o command= -p "$svc" | sed -n 's#.*/bin/\([^/]*\)/omo-device-service.*#\1#p')
+    [ -n "$ver" ] || ver=unknown
     echo "device_service=running version=$ver target_visible=yes target_fds=$fds"
     pids=$(
       pgrep -P "$svc" | tr '\n' ','

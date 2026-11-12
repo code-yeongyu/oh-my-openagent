@@ -93,8 +93,9 @@ const fieldOkWith = (s: Strictness) => {
     switch (k) {
       case "bool":
         return typeof v === "boolean"
-      case "text":
       case "label":
+        return typeof v === "string"
+      case "text":
         // A bare negative number ("-1") is the usual "not measured" placeholder, never a measured text.
         return typeof v === "string" && !PLACEHOLDERS.has(v.trim().toLowerCase()) && !/^\s*-\d/.test(v)
     }
@@ -104,14 +105,19 @@ const fieldOkWith = (s: Strictness) => {
 const fieldOk = fieldOkWith(STRICT)
 /** The property test's mutations for one kind of field: each must make a record UNMEASURED. */
 const mutationsFor = (k: Kind): readonly (readonly [string, unknown])[] => {
-  const wrong = k === "bool" ? 1 : true
+  if (typeof k === "object" && "opt" in k) return mutationsFor(k.opt)
   const base: (readonly [string, unknown])[] = [
     ["NaN", Number.NaN],
     ["negative", -1],
-    ["placeholder", "?"],
-    ["wrong type", wrong],
+    ["wrong type", k === "bool" ? 1 : true],
   ]
+  // A label is any string by design, so a placeholder string is still a label; every other kind rejects one.
+  if (k !== "label") base.push(["placeholder", "?"])
   if (typeof k === "object" && "list" in k) base.push(["empty list", []], ["list of NaN", [Number.NaN]])
+  if (k === "count" || k === "ms" || k === "code")
+    base.push(["infinite", Number.POSITIVE_INFINITY], ["-infinite", Number.NEGATIVE_INFINITY])
+  if (k === "count") base.push(["fraction", 1.5])
+  if (k === "code") base.push(["fraction", 1000.5], ["above range", 5000], ["below range", 999])
   return base
 }
 /** The first field of a record that its rule's schema does not accept, or null. */
@@ -354,7 +360,7 @@ const RULES: Readonly<Record<string, Rule>> = {
   "L-STATE": {
     schema: {
       device_service: { oneOf: ["running"] },
-      version: "text",
+      version: "label",
       target_visible: { oneOf: ["yes"] },
       control: { oneOf: ["ok"] },
       control_tool: { oneOf: ["nc", "bun"] },
@@ -383,7 +389,7 @@ const RULES: Readonly<Record<string, Rule>> = {
       cores: 14,
     },
     decide: (r, note) => ({
-      measured: `lsof control ok (${str(r, "control_tool")} listeners on loopback and all interfaces: ${num(r, "control_listeners")} seen, ${num(r, "control_off_loopback")} off loopback); device service ${str(r, "version")}; listeners ${num(r, "listeners_total")} (off loopback ${num(r, "listeners_off_loopback")}); unix sockets ${num(r, "unix_sockets")}; discovery sockets ${num(r, "udp_discovery_sockets")}; load ${num(r, "load")}/${num(r, "cores")}`,
+      measured: `lsof control ok (${str(r, "control_tool")} listeners on loopback and all interfaces: ${num(r, "control_listeners")} seen, ${num(r, "control_off_loopback")} off loopback); device service ${str(r, "version") || "unknown"}; listeners ${num(r, "listeners_total")} (off loopback ${num(r, "listeners_off_loopback")}); unix sockets ${num(r, "unix_sockets")}; discovery sockets ${num(r, "udp_discovery_sockets")}; load ${num(r, "load")}/${num(r, "cores")}`,
       verdict:
         num(r, "listeners_off_loopback") === 0 && num(r, "udp_discovery_sockets") === 0 ? "CONTRADICTS" : "NEW-EDGE",
       note,
@@ -419,8 +425,23 @@ const RULES: Readonly<Record<string, Rule>> = {
   },
 }
 /** Static: a row's source reaches the gate and returns its result untouched. */
-const rowReachesGate = (body: string): boolean =>
-  /judge\(|silentRun\(|reproveRun\(|stateRun\(|hostedRun\(|verdict: "UNMEASURED"/.test(body)
+const GATE_CALL = /^(judge|silentRun|reproveRun|stateRun|hostedRun)\(/
+const rowReachesGate = (body: string): boolean => {
+  const callsGate = /\b(judge|silentRun|reproveRun|stateRun|hostedRun)\(/.test(body)
+  const constant = /verdict: "UNMEASURED"/.test(body)
+  // A constant row states UNMEASURED and never calls the gate; any other mention of a verdict is an overwrite.
+  if (/\bverdict\b/.test(body.replace(/verdict: "UNMEASURED"/g, ""))) return false
+  if (constant) return !callsGate
+  // No copy of a gate result (spread), and every way out of the row is the gate's own result.
+  if (!callsGate || body.includes("...")) return false
+  const run = /(?:async )?\(\) =>\s*/.exec(body)
+  if (run === null) return false
+  const first = body.slice(run.index + run[0].length)
+  if (!(GATE_CALL.test(first) || first.startsWith("{"))) return false
+  return [...body.matchAll(/\breturn\s+/g)].every((m) => GATE_CALL.test(body.slice((m.index ?? 0) + m[0].length)))
+}
+/** Every object the gate returned (frozen, so its verdict cannot be changed in place). */
+const GATED = new WeakSet<object>()
 /** The one gate: a rule decides only a record whose every field its schema accepts; anything else is UNMEASURED. */
 const judge = (rule: string, r: Rec, note: string): Run => {
   const found = RULES[rule]
@@ -430,13 +451,20 @@ const judge = (rule: string, r: Rec, note: string): Run => {
     return failedRun(
       `${rule}: measurement field ${bad} is missing or invalid (${bad in r ? String(JSON.stringify(r[bad])) : "missing"})`,
     )
-  return found.decide(r, note)
+  const decided = Object.freeze(found.decide(r, note))
+  GATED.add(decided)
+  return decided
 }
-/** A verdict counts only if it is UNMEASURED or the very object the gate returned. */
-const gateOnly = (r: Run): Run => r
-/** Helper output values are strings; a value that is wholly a number becomes one (anything else stays and fails). */
-const fieldsRecord = (fields: Readonly<Record<string, string>>, _schema: Rule["schema"] = {}): Rec =>
-  Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, /^\d+(\.\d+)?$/.test(v) ? Number(v) : v]))
+/** A verdict counts only if it is UNMEASURED or the very object the gate returned (a copy or a hand-made one is not). */
+const gateOnly = (r: Run): Run =>
+  r.verdict === "UNMEASURED" || GATED.has(r) ? r : failedRun(`a ${r.verdict} verdict that did not come from the gate`)
+/** Helper output values are strings; one becomes a number only where the rule's schema expects a number. */
+const numericKind = (k: Kind | undefined): boolean =>
+  k === "count" || k === "ms" || k === "code" || (typeof k === "object" && "opt" in k && numericKind(k.opt))
+const fieldsRecord = (fields: Readonly<Record<string, string>>, schema: Rule["schema"]): Rec =>
+  Object.fromEntries(
+    Object.entries(fields).map(([k, v]) => [k, numericKind(schema[k]) && /^\d+(\.\d+)?$/.test(v) ? Number(v) : v]),
+  )
 type ReproveQa = Readonly<{
   before: { hibernated: number; reconnectsPerRefresh: number }
   after: { hibernated: number; reconnectsPerRefresh: number; reproveMs: number[] }
@@ -451,7 +479,7 @@ type Silent = Readonly<{ openAt150: boolean; closedAfterS: number | null; closeC
 const silentRun = (m: Silent, row: "R-HIB-5" | "R-LIVE-120-2", note: string): Run => judge(row, m, note)
 /** L-STATE-*: the pair helper's state fields for one host, through the gate. */
 const stateRun = (m: PairOut, note: string): Run =>
-  m.ok ? judge("L-STATE", fieldsRecord(m.fields), note) : failedRun(m.why)
+  m.ok ? judge("L-STATE", fieldsRecord(m.fields, RULES["L-STATE"]?.schema ?? {}), note) : failedRun(m.why)
 /** Waits for a socket to open: an error, a close or ms without an open rejects (the caller's row is UNMEASURED). */
 const awaitOpen = (ws: WebSocket, ms = 10_000): Promise<void> =>
   new Promise<void>((ok, no) => {
@@ -485,8 +513,9 @@ const runOnPair = async (prefix: string, helperB64: string, helperArgs: string, 
 /** R-HOSTED-1-*: the hosted silent unadmitted socket against the relay's hello deadline and the local relay's close. */
 const hostedRun = (m: PairOut, ref: { afterOpenMs: number; code: string }, deadlineMs: number, note: string): Run => {
   if (!m.ok) return failedRun(m.why)
-  const f = fieldsRecord(m.fields)
-  const refCode = fieldsRecord({ c: ref.code })["c"]
+  const schema = RULES["R-HOSTED-1"]?.schema ?? {}
+  const f = fieldsRecord(m.fields, schema)
+  const refCode = fieldsRecord({ ref_code: ref.code }, schema)["ref_code"]
   return judge(
     "R-HOSTED-1",
     {
@@ -828,7 +857,9 @@ const selfTest = async (): Promise<number> => {
     )
   }
   // Finding 2 through stateRun itself: every helper field, deleted or set to a placeholder, is UNMEASURED.
-  for (const field of Object.keys(RULES["L-STATE"]?.schema ?? {})) {
+  // Every field missing is UNMEASURED; a placeholder or "-1" string is UNMEASURED for every kind except a label, which
+  // is any string by design (round 3, nit 1) and so must leave the reading decided.
+  for (const [field, kind] of Object.entries(RULES["L-STATE"]?.schema ?? {})) {
     for (const [m, v] of [
       ["missing", undefined],
       ["placeholder", "?"],
@@ -837,13 +868,16 @@ const selfTest = async (): Promise<number> => {
       const fields: Record<string, string> = { ...base.fields, control: "ok", target_visible: "yes" }
       if (v === undefined) delete fields[field]
       else fields[field] = v
+      const r = stateRun({ ok: true, fields }, "n")
+      const wantDecided = kind === "label" && v !== undefined
       check(
-        `R2 stateRun ${field} ${m} -> UNMEASURED`,
-        failed(stateRun({ ok: true, fields }, "n")),
-        JSON.stringify(stateRun({ ok: true, fields }, "n")),
+        `R2 stateRun ${field} ${m} -> ${wantDecided ? "decided (a label)" : "UNMEASURED"}`,
+        wantDecided ? r.errored !== true && r.verdict === "CONTRADICTS" : failed(r),
+        JSON.stringify(r),
       )
     }
   }
+
   // Static (class): every measured row reaches the gate, and the gate's wrappers call judge().
   const source = readFileSync(join(import.meta.dir, "probe-sp-r.ts"), "utf8")
   // Section headers start a line; the same words inside this test are indented string literals and never match.
