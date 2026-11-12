@@ -1,4 +1,9 @@
-import { loadOmoConfig, type OmoConfigEnv, resolveOmoProfileName } from "@oh-my-opencode/omo-config-core"
+import {
+  loadOmoConfig,
+  normalizeLegacyModelFields,
+  type OmoConfigEnv,
+  resolveOmoProfileName,
+} from "@oh-my-opencode/omo-config-core"
 
 import { projectConfigPath } from "./project-config-path"
 
@@ -42,7 +47,8 @@ function pickStrings(record: Readonly<Record<string, unknown>>, keys: readonly s
 function modelEntry(entry: unknown): unknown {
   if (typeof entry === "string") return entry
   const record = asRecord(entry)
-  return record === null ? null : pickStrings(record, MODEL_ENTRY_KEYS)
+  // A layer is the file as written, so a deprecated `reasoningEffort` / `variant` is folded into `reasoning` the way the schema folds it.
+  return record === null ? null : pickStrings(normalizeLegacyModelFields(record), MODEL_ENTRY_KEYS)
 }
 
 function modelProfiles(value: unknown): Record<string, unknown> | undefined {
