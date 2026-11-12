@@ -65,6 +65,7 @@ function createHarness(
     messages?: FakeMessage[]
     dispatchResults?: InternalPromptDispatchResult[]
     now?: number
+    beforeDispatchReturns?: (call: DispatchCall) => Promise<void>
   } = {},
 ): {
   injector: MonitorOutputInjector
@@ -110,6 +111,7 @@ function createHarness(
         checkStatus: args.checkStatus,
         checkToolState: args.checkToolState,
       })
+      await opts.beforeDispatchReturns?.(calls[calls.length - 1] as DispatchCall)
       return dispatchResults.shift() ?? { status: "dispatched", response: { ok: true } }
     },
     scheduleFlush: () => {},
@@ -197,6 +199,36 @@ describe("MonitorOutputInjector", () => {
 
       // then
       expect(calls.map((call) => call.source)).toEqual(["monitor-output:mon_1:batch-3", "monitor-output:mon_1:batch-4"])
+    })
+  })
+
+  describe("#given a batch arrives while the previous batch is being dispatched", () => {
+    test("#when the dispatch settles #then the new batch stays pending and its flush delivers it", async () => {
+      // given
+      const record = createRecord()
+      const first = createBatch(1)
+      const second = createBatch(2)
+      let injector: MonitorOutputInjector | undefined
+      const harness = createHarness({
+        beforeDispatchReturns: async (call) => {
+          if (call.source === "monitor-output:mon_1:batch-1") {
+            injector?.queueBatch(record, second)
+          }
+        },
+      })
+      injector = harness.injector
+      harness.injector.queueBatch(record, first)
+
+      // when
+      await harness.injector.flushMonitor(record.id)
+
+      // then
+      expect(harness.injector.getPendingBatches(record.id)).toEqual([second])
+      await harness.injector.flushMonitor(record.id)
+      expect(harness.calls.map((call) => call.source)).toEqual([
+        "monitor-output:mon_1:batch-1",
+        "monitor-output:mon_1:batch-2",
+      ])
     })
   })
 
