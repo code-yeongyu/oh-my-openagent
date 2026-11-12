@@ -168,6 +168,21 @@ fn the_battery_waits_for_an_element_that_appears_enabled_after_500_ms() {
 }
 
 #[test]
+fn a_harness_left_on_host_time_measures_ready_after_ms_on_host_time_too() {
+    // Given: a ready_after_ms element in a harness that never asked for fake time.
+    let mut harness = opened(&scene(button(&json!({"ready_after_ms": 50})), &[]), ReportMode::Object);
+    let reference = harness.focused_ref();
+    // When
+    let result = press(&mut harness, reference);
+    // Then: the fake and the battery read the same (host) time, so the wait ends.
+    assert!(
+        result.is_ok(),
+        "a harness without fake time must measure ready_after_ms on host time, as the battery does: {result:?}"
+    );
+    assert_eq!(pressed(&harness), 1);
+}
+
+#[test]
 fn the_battery_waits_until_the_bounds_hold_still_across_two_reads() {
     // Given: the first three reads move the button.
     let mut harness = opened(&scene(button(&json!({"moving_reads": 3})), &[]), ReportMode::Object);
