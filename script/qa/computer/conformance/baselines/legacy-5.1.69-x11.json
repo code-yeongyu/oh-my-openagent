@@ -1,0 +1,3598 @@
+{
+  "schema": "omo-conformance-run/1",
+  "driver": "legacy",
+  "os": "x11",
+  "session": "xorg",
+  "results": [
+    {
+      "id": "x11/xorg/native/click/ax/background",
+      "observed": {
+        "kind": "delivered"
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 201.8276649999998,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/native/click/ax/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "ControlRequired",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 134.71867399999974,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/native/click/px/background",
+      "observed": {
+        "kind": "delivered"
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 175.1810259999993,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/native/click/px/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "ControlRequired",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 142.48905000000013,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/native/typeText/ax/background",
+      "observed": {
+        "kind": "refused",
+        "code": "AxUnsupported",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 131.7983639999984,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/native/typeText/ax/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "ControlRequired",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 136.89936099999977,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/native/typeText/px/background",
+      "observed": {
+        "kind": "delivered"
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 169.78139200000078,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/native/typeText/px/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "ControlRequired",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 146.43117299999722,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/native/scroll/ax/background",
+      "observed": {
+        "kind": "delivered"
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 144.92223999999987,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/native/scroll/ax/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "ControlRequired",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 143.80706999999893,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/native/scroll/px/background",
+      "observed": {
+        "kind": "delivered"
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 143.54838700000255,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/native/scroll/px/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "ControlRequired",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 141.26781199999823,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/native/drag/px/background",
+      "observed": {
+        "kind": "delivered"
+      },
+      "oracle": {
+        "observed": "a,b,c"
+      },
+      "durationMs": 284.11517599999934,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/native/drag/px/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "ControlRequired",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": "a,b,c"
+      },
+      "durationMs": 272.10640400000557,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/native/keyChord/ax/background",
+      "observed": {
+        "kind": "refused",
+        "code": "AxFailed",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 131.3240580000056,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/native/keyChord/ax/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "AxFailed",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 131.78067400000145,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/native/ax.setValue/ax/background",
+      "observed": {
+        "kind": "refused",
+        "code": "AxFailed",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 132.68100799999957,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/native/ax.setValue/ax/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "AxFailed",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 134.8190839999952,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/native/ax.perform/ax/background",
+      "observed": {
+        "kind": "delivered"
+      },
+      "oracle": {
+        "observed": 1
+      },
+      "durationMs": 129.98464100000274,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/native/ax.perform/ax/foreground",
+      "observed": {
+        "kind": "delivered"
+      },
+      "oracle": {
+        "observed": 1
+      },
+      "durationMs": 130.40065600000526,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/native/menu.select/ax/background",
+      "observed": {
+        "kind": "delivered"
+      },
+      "oracle": {
+        "observed": "Conformance"
+      },
+      "durationMs": 155.9294790000058,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/native/menu.select/ax/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "ControlRequired",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 129.118389999996,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/electron/click/ax/background",
+      "observed": {
+        "kind": "refused",
+        "code": "AxFailed",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 4.155883999999787,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/electron/click/ax/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "AxFailed",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 3.5570730000035837,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/electron/click/px/background",
+      "observed": {
+        "kind": "refused",
+        "code": "AxFailed",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 6.6448119999986375,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/electron/click/px/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "AxFailed",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 4.439785000009579,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/electron/typeText/ax/background",
+      "observed": {
+        "kind": "refused",
+        "code": "AxFailed",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 4.291947999998229,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/electron/typeText/ax/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "AxFailed",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 3.959017999994103,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/electron/typeText/px/background",
+      "observed": {
+        "kind": "refused",
+        "code": "AxFailed",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 4.1345020000007935,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/electron/typeText/px/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "AxFailed",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 5.47743499999342,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/electron/scroll/ax/background",
+      "observed": {
+        "kind": "refused",
+        "code": "AxFailed",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 4.248066000000108,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/electron/scroll/ax/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "AxFailed",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 4.4472139999998035,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/electron/scroll/px/background",
+      "observed": {
+        "kind": "refused",
+        "code": "AxFailed",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 4.445016999990912,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/electron/scroll/px/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "AxFailed",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 5.104268000010052,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/electron/drag/px/background",
+      "observed": {
+        "kind": "refused",
+        "code": "AxFailed",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": "a,b,c"
+      },
+      "durationMs": 4.539579999996931,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/electron/drag/px/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "AxFailed",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": "a,b,c"
+      },
+      "durationMs": 4.263462000002619,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/electron/keyChord/ax/background",
+      "observed": {
+        "kind": "refused",
+        "code": "AxFailed",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 4.067402000000584,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/electron/keyChord/ax/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "AxFailed",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 3.765522999994573,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/electron/ax.setValue/ax/background",
+      "observed": {
+        "kind": "refused",
+        "code": "AxFailed",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 5.696639000001596,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/electron/ax.setValue/ax/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "AxFailed",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 4.158634000006714,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/electron/ax.perform/ax/background",
+      "observed": {
+        "kind": "refused",
+        "code": "AxFailed",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 4.371194000006653,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/electron/ax.perform/ax/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "AxFailed",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 4.011937000002945,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/electron/menu.select/ax/background",
+      "observed": {
+        "kind": "refused",
+        "code": "AxFailed",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 4.343494999993709,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/electron/menu.select/ax/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "AxFailed",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 4.343210999999428,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/webview/click/ax/background",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Press\" not found; the window exposes [\"window:Conformance Document\",\"filler:\",\"menubar:\",\"menu:File\",\"menuitem:Save\",\"menuitem:Rename…\",\"menuitem:New Window\",\"menu:Edit\",\"menuitem:Undo\",\"menu:Priority\",\"menuitem:Low\",\"menuitem:Normal\",\"menuitem:High\",\"menu:Test\",\"menuitem:Conformance\"]"
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 32.18956200001412,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/webview/click/ax/foreground",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Press\" not found; the window exposes [\"window:Conformance Document\",\"filler:\",\"menubar:\",\"menu:File\",\"menuitem:Save\",\"menuitem:Rename…\",\"menuitem:New Window\",\"menu:Edit\",\"menuitem:Undo\",\"menu:Priority\",\"menuitem:Low\",\"menuitem:Normal\",\"menuitem:High\",\"menu:Test\",\"menuitem:Conformance\"]"
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 48.228739999991376,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/webview/click/px/background",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Press\" not found; the window exposes [\"window:Conformance Document\",\"filler:\",\"menubar:\",\"menu:File\",\"menuitem:Save\",\"menuitem:Rename…\",\"menuitem:New Window\",\"menu:Edit\",\"menuitem:Undo\",\"menu:Priority\",\"menuitem:Low\",\"menuitem:Normal\",\"menuitem:High\",\"menu:Test\",\"menuitem:Conformance\"]"
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 47.1235100000049,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/webview/click/px/foreground",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Press\" not found; the window exposes [\"window:Conformance Document\",\"filler:\",\"menubar:\",\"menu:File\",\"menuitem:Save\",\"menuitem:Rename…\",\"menuitem:New Window\",\"menu:Edit\",\"menuitem:Undo\",\"menu:Priority\",\"menuitem:Low\",\"menuitem:Normal\",\"menuitem:High\",\"menu:Test\",\"menuitem:Conformance\"]"
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 48.24022700000205,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/webview/typeText/ax/background",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Value\" not found; the window exposes [\"window:Conformance Document\",\"filler:\",\"menubar:\",\"menu:File\",\"menuitem:Save\",\"menuitem:Rename…\",\"menuitem:New Window\",\"menu:Edit\",\"menuitem:Undo\",\"menu:Priority\",\"menuitem:Low\",\"menuitem:Normal\",\"menuitem:High\",\"menu:Test\",\"menuitem:Conformance\"]"
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 42.42204700000002,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/webview/typeText/ax/foreground",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Value\" not found; the window exposes [\"window:Conformance Document\",\"filler:\",\"menubar:\",\"menu:File\",\"menuitem:Save\",\"menuitem:Rename…\",\"menuitem:New Window\",\"menu:Edit\",\"menuitem:Undo\",\"menu:Priority\",\"menuitem:Low\",\"menuitem:Normal\",\"menuitem:High\",\"menu:Test\",\"menuitem:Conformance\"]"
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 47.08669200001168,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/webview/typeText/px/background",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Value\" not found; the window exposes [\"window:Conformance Document\",\"filler:\",\"menubar:\",\"menu:File\",\"menuitem:Save\",\"menuitem:Rename…\",\"menuitem:New Window\",\"menu:Edit\",\"menuitem:Undo\",\"menu:Priority\",\"menuitem:Low\",\"menuitem:Normal\",\"menuitem:High\",\"menu:Test\",\"menuitem:Conformance\"]"
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 45.78744099999312,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/webview/typeText/px/foreground",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Value\" not found; the window exposes [\"window:Conformance Document\",\"filler:\",\"menubar:\",\"menu:File\",\"menuitem:Save\",\"menuitem:Rename…\",\"menuitem:New Window\",\"menu:Edit\",\"menuitem:Undo\",\"menu:Priority\",\"menuitem:Low\",\"menuitem:Normal\",\"menuitem:High\",\"menu:Test\",\"menuitem:Conformance\"]"
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 47.27675399999134,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/webview/scroll/ax/background",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Scroll target\" not found; the window exposes [\"window:Conformance Document\",\"filler:\",\"menubar:\",\"menu:File\",\"menuitem:Save\",\"menuitem:Rename…\",\"menuitem:New Window\",\"menu:Edit\",\"menuitem:Undo\",\"menu:Priority\",\"menuitem:Low\",\"menuitem:Normal\",\"menuitem:High\",\"menu:Test\",\"menuitem:Conformance\"]"
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 43.21432900000946,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/webview/scroll/ax/foreground",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Scroll target\" not found; the window exposes [\"window:Conformance Document\",\"filler:\",\"menubar:\",\"menu:File\",\"menuitem:Save\",\"menuitem:Rename…\",\"menuitem:New Window\",\"menu:Edit\",\"menuitem:Undo\",\"menu:Priority\",\"menuitem:Low\",\"menuitem:Normal\",\"menuitem:High\",\"menu:Test\",\"menuitem:Conformance\"]"
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 49.088071000005584,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/webview/scroll/px/background",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Scroll target\" not found; the window exposes [\"window:Conformance Document\",\"filler:\",\"menubar:\",\"menu:File\",\"menuitem:Save\",\"menuitem:Rename…\",\"menuitem:New Window\",\"menu:Edit\",\"menuitem:Undo\",\"menu:Priority\",\"menuitem:Low\",\"menuitem:Normal\",\"menuitem:High\",\"menu:Test\",\"menuitem:Conformance\"]"
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 49.59407300001476,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/webview/scroll/px/foreground",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Scroll target\" not found; the window exposes [\"window:Conformance Document\",\"filler:\",\"menubar:\",\"menu:File\",\"menuitem:Save\",\"menuitem:Rename…\",\"menuitem:New Window\",\"menu:Edit\",\"menuitem:Undo\",\"menu:Priority\",\"menuitem:Low\",\"menuitem:Normal\",\"menuitem:High\",\"menu:Test\",\"menuitem:Conformance\"]"
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 48.2870240000193,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/webview/drag/px/background",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"b\" not found; the window exposes [\"window:Conformance Document\",\"filler:\",\"menubar:\",\"menu:File\",\"menuitem:Save\",\"menuitem:Rename…\",\"menuitem:New Window\",\"menu:Edit\",\"menuitem:Undo\",\"menu:Priority\",\"menuitem:Low\",\"menuitem:Normal\",\"menuitem:High\",\"menu:Test\",\"menuitem:Conformance\"]"
+      },
+      "oracle": {
+        "observed": "a,b,c"
+      },
+      "durationMs": 47.30046700002276,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/webview/drag/px/foreground",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"b\" not found; the window exposes [\"window:Conformance Document\",\"filler:\",\"menubar:\",\"menu:File\",\"menuitem:Save\",\"menuitem:Rename…\",\"menuitem:New Window\",\"menu:Edit\",\"menuitem:Undo\",\"menu:Priority\",\"menuitem:Low\",\"menuitem:Normal\",\"menuitem:High\",\"menu:Test\",\"menuitem:Conformance\"]"
+      },
+      "oracle": {
+        "observed": "a,b,c"
+      },
+      "durationMs": 43.406852000014624,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/webview/keyChord/ax/background",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Value\" not found; the window exposes [\"window:Conformance Document\",\"filler:\",\"menubar:\",\"menu:File\",\"menuitem:Save\",\"menuitem:Rename…\",\"menuitem:New Window\",\"menu:Edit\",\"menuitem:Undo\",\"menu:Priority\",\"menuitem:Low\",\"menuitem:Normal\",\"menuitem:High\",\"menu:Test\",\"menuitem:Conformance\"]"
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 48.2873059999838,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/webview/keyChord/ax/foreground",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Value\" not found; the window exposes [\"window:Conformance Document\",\"filler:\",\"menubar:\",\"menu:File\",\"menuitem:Save\",\"menuitem:Rename…\",\"menuitem:New Window\",\"menu:Edit\",\"menuitem:Undo\",\"menu:Priority\",\"menuitem:Low\",\"menuitem:Normal\",\"menuitem:High\",\"menu:Test\",\"menuitem:Conformance\"]"
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 48.898119999998016,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/webview/ax.setValue/ax/background",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Value\" not found; the window exposes [\"window:Conformance Document\",\"filler:\",\"menubar:\",\"menu:File\",\"menuitem:Save\",\"menuitem:Rename…\",\"menuitem:New Window\",\"menu:Edit\",\"menuitem:Undo\",\"menu:Priority\",\"menuitem:Low\",\"menuitem:Normal\",\"menuitem:High\",\"menu:Test\",\"menuitem:Conformance\"]"
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 40.28630800000974,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/webview/ax.setValue/ax/foreground",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Value\" not found; the window exposes [\"window:Conformance Document\",\"filler:\",\"menubar:\",\"menu:File\",\"menuitem:Save\",\"menuitem:Rename…\",\"menuitem:New Window\",\"menu:Edit\",\"menuitem:Undo\",\"menu:Priority\",\"menuitem:Low\",\"menuitem:Normal\",\"menuitem:High\",\"menu:Test\",\"menuitem:Conformance\"]"
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 41.079420000023674,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/webview/ax.perform/ax/background",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Press\" not found; the window exposes [\"window:Conformance Document\",\"filler:\",\"menubar:\",\"menu:File\",\"menuitem:Save\",\"menuitem:Rename…\",\"menuitem:New Window\",\"menu:Edit\",\"menuitem:Undo\",\"menu:Priority\",\"menuitem:Low\",\"menuitem:Normal\",\"menuitem:High\",\"menu:Test\",\"menuitem:Conformance\"]"
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 45.70377400002326,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/webview/ax.perform/ax/foreground",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Press\" not found; the window exposes [\"window:Conformance Document\",\"filler:\",\"menubar:\",\"menu:File\",\"menuitem:Save\",\"menuitem:Rename…\",\"menuitem:New Window\",\"menu:Edit\",\"menuitem:Undo\",\"menu:Priority\",\"menuitem:Low\",\"menuitem:Normal\",\"menuitem:High\",\"menu:Test\",\"menuitem:Conformance\"]"
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 41.8848359999829,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/webview/menu.select/ax/background",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Value\" not found; the window exposes [\"window:Conformance Document\",\"filler:\",\"menubar:\",\"menu:File\",\"menuitem:Save\",\"menuitem:Rename…\",\"menuitem:New Window\",\"menu:Edit\",\"menuitem:Undo\",\"menu:Priority\",\"menuitem:Low\",\"menuitem:Normal\",\"menuitem:High\",\"menu:Test\",\"menuitem:Conformance\"]"
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 45.95000199999777,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    },
+    {
+      "id": "x11/xorg/webview/menu.select/ax/foreground",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Value\" not found; the window exposes [\"window:Conformance Document\",\"filler:\",\"menubar:\",\"menu:File\",\"menuitem:Save\",\"menuitem:Rename…\",\"menuitem:New Window\",\"menu:Edit\",\"menuitem:Undo\",\"menu:Priority\",\"menuitem:Low\",\"menuitem:Normal\",\"menuitem:High\",\"menu:Test\",\"menuitem:Conformance\"]"
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 48.74428000001353,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no x11 recorder in the sentinel yet"
+    }
+  ]
+}

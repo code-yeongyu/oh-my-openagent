@@ -1,0 +1,3576 @@
+{
+  "schema": "omo-conformance-run/1",
+  "driver": "legacy",
+  "os": "windows",
+  "session": "console",
+  "results": [
+    {
+      "id": "windows/console/native/click/ax/background",
+      "observed": {
+        "kind": "delivered"
+      },
+      "oracle": {
+        "observed": 1
+      },
+      "durationMs": 2921.9564,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/native/click/ax/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "ControlRequired",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 822.1345999999999,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/native/click/px/background",
+      "observed": {
+        "kind": "delivered"
+      },
+      "oracle": {
+        "observed": 1
+      },
+      "durationMs": 871.3473999999997,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/native/click/px/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "ControlRequired",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 865.5504999999994,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/native/typeText/ax/background",
+      "observed": {
+        "kind": "refused",
+        "code": "AxUnsupported",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 809.5501000000004,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/native/typeText/ax/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "ControlRequired",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 814.9748,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/native/typeText/px/background",
+      "observed": {
+        "kind": "delivered"
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 857.2799000000014,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/native/typeText/px/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "ControlRequired",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 838.4059000000016,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/native/scroll/ax/background",
+      "observed": {
+        "kind": "delivered"
+      },
+      "oracle": {
+        "observed": 3
+      },
+      "durationMs": 867.7080999999998,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/native/scroll/ax/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "ControlRequired",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 836.3822999999975,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/native/scroll/px/background",
+      "observed": {
+        "kind": "delivered"
+      },
+      "oracle": {
+        "observed": 3
+      },
+      "durationMs": 823.3882000000012,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/native/scroll/px/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "ControlRequired",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 952.2286999999997,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/native/drag/px/background",
+      "observed": {
+        "kind": "refused",
+        "code": "InputFailed",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": "a,b,c"
+      },
+      "durationMs": 1787.4847000000009,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/native/drag/px/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "ControlRequired",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": "a,b,c"
+      },
+      "durationMs": 1718.4743999999992,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/native/keyChord/ax/background",
+      "observed": {
+        "kind": "delivered"
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 954.8191000000006,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/native/keyChord/ax/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "ControlRequired",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 824.6020999999964,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/native/ax.setValue/ax/background",
+      "observed": {
+        "kind": "refused",
+        "code": "AxFailed",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 901.3121000000028,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/native/ax.setValue/ax/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "AxFailed",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 844.2165000000023,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/native/ax.perform/ax/background",
+      "observed": {
+        "kind": "delivered"
+      },
+      "oracle": {
+        "observed": 1
+      },
+      "durationMs": 1375.7828999999983,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/native/ax.perform/ax/foreground",
+      "observed": {
+        "kind": "delivered"
+      },
+      "oracle": {
+        "observed": 1
+      },
+      "durationMs": 886.1346999999951,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/native/menu.select/ax/background",
+      "observed": {
+        "kind": "delivered"
+      },
+      "oracle": {
+        "observed": "Conformance"
+      },
+      "durationMs": 1513.5801999999967,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/native/menu.select/ax/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "ControlRequired",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 893.7312999999995,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/electron/click/ax/background",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Press\" not found; the window exposes [\"window:Conformance Document\",\"group:\",\"group:Conformance Document\",\"group:\",\"group:\",\"group:\",\"group:\",\"menubar:\",\"button:File\",\"button:Edit\",\"button:Priority\",\"button:Test\",\"group:\",\"group:\",\"textarea:\",\"group:\",\"group:Chrome Legacy Window\",\"textarea:\",\"group:\"]"
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 1427.4879999999976,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/electron/click/ax/foreground",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Press\" not found; the window exposes [\"window:Conformance Document\",\"group:\",\"group:Conformance Document\",\"group:\",\"group:\",\"group:\",\"group:\",\"menubar:\",\"button:File\",\"button:Edit\",\"button:Priority\",\"button:Test\",\"group:\",\"group:\",\"textarea:\",\"group:\",\"group:Chrome Legacy Window\",\"textarea:Conformance Document\",\"button:Press\",\"group:\",\"statictext:Value\",\"textfield:Value\",\"group:\",\"statictext:Title\",\"textfield:Title\",\"group:\",\"statictext:Name\",\"textfield:Name\",\"group:\",\"statictext:Email\",\"textfield:Email\",\"group:\",\"statictext:City\",\"textfield:City\",\"group:\",\"checkbox:Archived\",\"statictext:Archived\",\"group:\",\"statictext:Note\",\"textfield:Note\"]"
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 492.0182000000059,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/electron/click/px/background",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Press\" not found; the window exposes [\"window:Conformance Document\",\"group:\",\"group:Conformance Document\",\"group:\",\"group:\",\"group:\",\"group:\",\"menubar:\",\"button:File\",\"button:Edit\",\"button:Priority\",\"button:Test\",\"group:\",\"group:\",\"textarea:\",\"group:\",\"group:Chrome Legacy Window\",\"textarea:Conformance Document\",\"button:Press\",\"group:\",\"statictext:Value\",\"textfield:Value\",\"group:\",\"statictext:Title\",\"textfield:Title\",\"group:\",\"statictext:Name\",\"textfield:Name\",\"group:\",\"statictext:Email\",\"textfield:Email\",\"group:\",\"statictext:City\",\"textfield:City\",\"group:\",\"checkbox:Archived\",\"statictext:Archived\",\"group:\",\"statictext:Note\",\"textfield:Note\"]"
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 497.5311999999976,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/electron/click/px/foreground",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Press\" not found; the window exposes [\"window:Conformance Document\",\"group:\",\"group:Conformance Document\",\"group:\",\"group:\",\"group:\",\"group:\",\"menubar:\",\"button:File\",\"button:Edit\",\"button:Priority\",\"button:Test\",\"group:\",\"group:\",\"textarea:\",\"group:\",\"group:Chrome Legacy Window\",\"textarea:Conformance Document\",\"button:Press\",\"group:\",\"statictext:Value\",\"textfield:Value\",\"group:\",\"statictext:Title\",\"textfield:Title\",\"group:\",\"statictext:Name\",\"textfield:Name\",\"group:\",\"statictext:Email\",\"textfield:Email\",\"group:\",\"statictext:City\",\"textfield:City\",\"group:\",\"checkbox:Archived\",\"statictext:Archived\",\"group:\",\"statictext:Note\",\"textfield:Note\"]"
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 505.9689000000071,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/electron/typeText/ax/background",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Value\" not found; the window exposes [\"window:Conformance Document\",\"group:\",\"group:Conformance Document\",\"group:\",\"group:\",\"group:\",\"group:\",\"menubar:\",\"button:File\",\"button:Edit\",\"button:Priority\",\"button:Test\",\"group:\",\"group:\",\"textarea:\",\"group:\",\"group:Chrome Legacy Window\",\"textarea:Conformance Document\",\"button:Press\",\"group:\",\"statictext:Value\",\"textfield:Value\",\"group:\",\"statictext:Title\",\"textfield:Title\",\"group:\",\"statictext:Name\",\"textfield:Name\",\"group:\",\"statictext:Email\",\"textfield:Email\",\"group:\",\"statictext:City\",\"textfield:City\",\"group:\",\"checkbox:Archived\",\"statictext:Archived\",\"group:\",\"statictext:Note\",\"textfield:Note\"]"
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 498.25969999999506,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/electron/typeText/ax/foreground",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Value\" not found; the window exposes [\"window:Conformance Document\",\"group:\",\"group:Conformance Document\",\"group:\",\"group:\",\"group:\",\"group:\",\"menubar:\",\"button:File\",\"button:Edit\",\"button:Priority\",\"button:Test\",\"group:\",\"group:\",\"textarea:\",\"group:\",\"group:Chrome Legacy Window\",\"textarea:Conformance Document\",\"button:Press\",\"group:\",\"statictext:Value\",\"textfield:Value\",\"group:\",\"statictext:Title\",\"textfield:Title\",\"group:\",\"statictext:Name\",\"textfield:Name\",\"group:\",\"statictext:Email\",\"textfield:Email\",\"group:\",\"statictext:City\",\"textfield:City\",\"group:\",\"checkbox:Archived\",\"statictext:Archived\",\"group:\",\"statictext:Note\",\"textfield:Note\"]"
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 487.0048999999999,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/electron/typeText/px/background",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Value\" not found; the window exposes [\"window:Conformance Document\",\"group:\",\"group:Conformance Document\",\"group:\",\"group:\",\"group:\",\"group:\",\"menubar:\",\"button:File\",\"button:Edit\",\"button:Priority\",\"button:Test\",\"group:\",\"group:\",\"textarea:\",\"group:\",\"group:Chrome Legacy Window\",\"textarea:Conformance Document\",\"button:Press\",\"group:\",\"statictext:Value\",\"textfield:Value\",\"group:\",\"statictext:Title\",\"textfield:Title\",\"group:\",\"statictext:Name\",\"textfield:Name\",\"group:\",\"statictext:Email\",\"textfield:Email\",\"group:\",\"statictext:City\",\"textfield:City\",\"group:\",\"checkbox:Archived\",\"statictext:Archived\",\"group:\",\"statictext:Note\",\"textfield:Note\"]"
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 435.229800000001,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/electron/typeText/px/foreground",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Value\" not found; the window exposes [\"window:Conformance Document\",\"group:\",\"group:Conformance Document\",\"group:\",\"group:\",\"group:\",\"group:\",\"menubar:\",\"button:File\",\"button:Edit\",\"button:Priority\",\"button:Test\",\"group:\",\"group:\",\"textarea:\",\"group:\",\"group:Chrome Legacy Window\",\"textarea:Conformance Document\",\"button:Press\",\"group:\",\"statictext:Value\",\"textfield:Value\",\"group:\",\"statictext:Title\",\"textfield:Title\",\"group:\",\"statictext:Name\",\"textfield:Name\",\"group:\",\"statictext:Email\",\"textfield:Email\",\"group:\",\"statictext:City\",\"textfield:City\",\"group:\",\"checkbox:Archived\",\"statictext:Archived\",\"group:\",\"statictext:Note\",\"textfield:Note\"]"
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 426.27140000001236,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/electron/scroll/ax/background",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Scroll target\" not found; the window exposes [\"window:Conformance Document\",\"group:\",\"group:Conformance Document\",\"group:\",\"group:\",\"group:\",\"group:\",\"menubar:\",\"button:File\",\"button:Edit\",\"button:Priority\",\"button:Test\",\"group:\",\"group:\",\"textarea:\",\"group:\",\"group:Chrome Legacy Window\",\"textarea:Conformance Document\",\"button:Press\",\"group:\",\"statictext:Value\",\"textfield:Value\",\"group:\",\"statictext:Title\",\"textfield:Title\",\"group:\",\"statictext:Name\",\"textfield:Name\",\"group:\",\"statictext:Email\",\"textfield:Email\",\"group:\",\"statictext:City\",\"textfield:City\",\"group:\",\"checkbox:Archived\",\"statictext:Archived\",\"group:\",\"statictext:Note\",\"textfield:Note\"]"
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 429.0475999999908,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/electron/scroll/ax/foreground",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Scroll target\" not found; the window exposes [\"window:Conformance Document\",\"group:\",\"group:Conformance Document\",\"group:\",\"group:\",\"group:\",\"group:\",\"menubar:\",\"button:File\",\"button:Edit\",\"button:Priority\",\"button:Test\",\"group:\",\"group:\",\"textarea:\",\"group:\",\"group:Chrome Legacy Window\",\"textarea:Conformance Document\",\"button:Press\",\"group:\",\"statictext:Value\",\"textfield:Value\",\"group:\",\"statictext:Title\",\"textfield:Title\",\"group:\",\"statictext:Name\",\"textfield:Name\",\"group:\",\"statictext:Email\",\"textfield:Email\",\"group:\",\"statictext:City\",\"textfield:City\",\"group:\",\"checkbox:Archived\",\"statictext:Archived\",\"group:\",\"statictext:Note\",\"textfield:Note\"]"
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 426.0301000000036,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/electron/scroll/px/background",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Scroll target\" not found; the window exposes [\"window:Conformance Document\",\"group:\",\"group:Conformance Document\",\"group:\",\"group:\",\"group:\",\"group:\",\"menubar:\",\"button:File\",\"button:Edit\",\"button:Priority\",\"button:Test\",\"group:\",\"group:\",\"textarea:\",\"group:\",\"group:Chrome Legacy Window\",\"textarea:Conformance Document\",\"button:Press\",\"group:\",\"statictext:Value\",\"textfield:Value\",\"group:\",\"statictext:Title\",\"textfield:Title\",\"group:\",\"statictext:Name\",\"textfield:Name\",\"group:\",\"statictext:Email\",\"textfield:Email\",\"group:\",\"statictext:City\",\"textfield:City\",\"group:\",\"checkbox:Archived\",\"statictext:Archived\",\"group:\",\"statictext:Note\",\"textfield:Note\"]"
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 437.2416999999987,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/electron/scroll/px/foreground",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Scroll target\" not found; the window exposes [\"window:Conformance Document\",\"group:\",\"group:Conformance Document\",\"group:\",\"group:\",\"group:\",\"group:\",\"menubar:\",\"button:File\",\"button:Edit\",\"button:Priority\",\"button:Test\",\"group:\",\"group:\",\"textarea:\",\"group:\",\"group:Chrome Legacy Window\",\"textarea:Conformance Document\",\"button:Press\",\"group:\",\"statictext:Value\",\"textfield:Value\",\"group:\",\"statictext:Title\",\"textfield:Title\",\"group:\",\"statictext:Name\",\"textfield:Name\",\"group:\",\"statictext:Email\",\"textfield:Email\",\"group:\",\"statictext:City\",\"textfield:City\",\"group:\",\"checkbox:Archived\",\"statictext:Archived\",\"group:\",\"statictext:Note\",\"textfield:Note\"]"
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 435.0194999999949,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/electron/drag/px/background",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"b\" not found; the window exposes [\"window:Conformance Document\",\"group:\",\"group:Conformance Document\",\"group:\",\"group:\",\"group:\",\"group:\",\"menubar:\",\"button:File\",\"button:Edit\",\"button:Priority\",\"button:Test\",\"group:\",\"group:\",\"textarea:\",\"group:\",\"group:Chrome Legacy Window\",\"textarea:Conformance Document\",\"button:Press\",\"group:\",\"statictext:Value\",\"textfield:Value\",\"group:\",\"statictext:Title\",\"textfield:Title\",\"group:\",\"statictext:Name\",\"textfield:Name\",\"group:\",\"statictext:Email\",\"textfield:Email\",\"group:\",\"statictext:City\",\"textfield:City\",\"group:\",\"checkbox:Archived\",\"statictext:Archived\",\"group:\",\"statictext:Note\",\"textfield:Note\"]"
+      },
+      "oracle": {
+        "observed": "a,b,c"
+      },
+      "durationMs": 449.0720000000001,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/electron/drag/px/foreground",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"b\" not found; the window exposes [\"window:Conformance Document\",\"group:\",\"group:Conformance Document\",\"group:\",\"group:\",\"group:\",\"group:\",\"menubar:\",\"button:File\",\"button:Edit\",\"button:Priority\",\"button:Test\",\"group:\",\"group:\",\"textarea:\",\"group:\",\"group:Chrome Legacy Window\",\"textarea:Conformance Document\",\"button:Press\",\"group:\",\"statictext:Value\",\"textfield:Value\",\"group:\",\"statictext:Title\",\"textfield:Title\",\"group:\",\"statictext:Name\",\"textfield:Name\",\"group:\",\"statictext:Email\",\"textfield:Email\",\"group:\",\"statictext:City\",\"textfield:City\",\"group:\",\"checkbox:Archived\",\"statictext:Archived\",\"group:\",\"statictext:Note\",\"textfield:Note\"]"
+      },
+      "oracle": {
+        "observed": "a,b,c"
+      },
+      "durationMs": 476.24490000000515,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/electron/keyChord/ax/background",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Value\" not found; the window exposes [\"window:Conformance Document\",\"group:\",\"group:Conformance Document\",\"group:\",\"group:\",\"group:\",\"group:\",\"menubar:\",\"button:File\",\"button:Edit\",\"button:Priority\",\"button:Test\",\"group:\",\"group:\",\"textarea:\",\"group:\",\"group:Chrome Legacy Window\",\"textarea:Conformance Document\",\"button:Press\",\"group:\",\"statictext:Value\",\"textfield:Value\",\"group:\",\"statictext:Title\",\"textfield:Title\",\"group:\",\"statictext:Name\",\"textfield:Name\",\"group:\",\"statictext:Email\",\"textfield:Email\",\"group:\",\"statictext:City\",\"textfield:City\",\"group:\",\"checkbox:Archived\",\"statictext:Archived\",\"group:\",\"statictext:Note\",\"textfield:Note\"]"
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 436.41530000000785,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/electron/keyChord/ax/foreground",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Value\" not found; the window exposes [\"window:Conformance Document\",\"group:\",\"group:Conformance Document\",\"group:\",\"group:\",\"group:\",\"group:\",\"menubar:\",\"button:File\",\"button:Edit\",\"button:Priority\",\"button:Test\",\"group:\",\"group:\",\"textarea:\",\"group:\",\"group:Chrome Legacy Window\",\"textarea:Conformance Document\",\"button:Press\",\"group:\",\"statictext:Value\",\"textfield:Value\",\"group:\",\"statictext:Title\",\"textfield:Title\",\"group:\",\"statictext:Name\",\"textfield:Name\",\"group:\",\"statictext:Email\",\"textfield:Email\",\"group:\",\"statictext:City\",\"textfield:City\",\"group:\",\"checkbox:Archived\",\"statictext:Archived\",\"group:\",\"statictext:Note\",\"textfield:Note\"]"
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 553.1727999999857,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/electron/ax.setValue/ax/background",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Value\" not found; the window exposes [\"window:Conformance Document\",\"group:\",\"group:Conformance Document\",\"group:\",\"group:\",\"group:\",\"group:\",\"menubar:\",\"button:File\",\"button:Edit\",\"button:Priority\",\"button:Test\",\"group:\",\"group:\",\"textarea:\",\"group:\",\"group:Chrome Legacy Window\",\"textarea:Conformance Document\",\"button:Press\",\"group:\",\"statictext:Value\",\"textfield:Value\",\"group:\",\"statictext:Title\",\"textfield:Title\",\"group:\",\"statictext:Name\",\"textfield:Name\",\"group:\",\"statictext:Email\",\"textfield:Email\",\"group:\",\"statictext:City\",\"textfield:City\",\"group:\",\"checkbox:Archived\",\"statictext:Archived\",\"group:\",\"statictext:Note\",\"textfield:Note\"]"
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 431.7595000000001,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/electron/ax.setValue/ax/foreground",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Value\" not found; the window exposes [\"window:Conformance Document\",\"group:\",\"group:Conformance Document\",\"group:\",\"group:\",\"group:\",\"group:\",\"menubar:\",\"button:File\",\"button:Edit\",\"button:Priority\",\"button:Test\",\"group:\",\"group:\",\"textarea:\",\"group:\",\"group:Chrome Legacy Window\",\"textarea:Conformance Document\",\"button:Press\",\"group:\",\"statictext:Value\",\"textfield:Value\",\"group:\",\"statictext:Title\",\"textfield:Title\",\"group:\",\"statictext:Name\",\"textfield:Name\",\"group:\",\"statictext:Email\",\"textfield:Email\",\"group:\",\"statictext:City\",\"textfield:City\",\"group:\",\"checkbox:Archived\",\"statictext:Archived\",\"group:\",\"statictext:Note\",\"textfield:Note\"]"
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 441.6692000000039,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/electron/ax.perform/ax/background",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Press\" not found; the window exposes [\"window:Conformance Document\",\"group:\",\"group:Conformance Document\",\"group:\",\"group:\",\"group:\",\"group:\",\"menubar:\",\"button:File\",\"button:Edit\",\"button:Priority\",\"button:Test\",\"group:\",\"group:\",\"textarea:\",\"group:\",\"group:Chrome Legacy Window\",\"textarea:Conformance Document\",\"button:Press\",\"group:\",\"statictext:Value\",\"textfield:Value\",\"group:\",\"statictext:Title\",\"textfield:Title\",\"group:\",\"statictext:Name\",\"textfield:Name\",\"group:\",\"statictext:Email\",\"textfield:Email\",\"group:\",\"statictext:City\",\"textfield:City\",\"group:\",\"checkbox:Archived\",\"statictext:Archived\",\"group:\",\"statictext:Note\",\"textfield:Note\"]"
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 448.9614999999758,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/electron/ax.perform/ax/foreground",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Press\" not found; the window exposes [\"window:Conformance Document\",\"group:\",\"group:Conformance Document\",\"group:\",\"group:\",\"group:\",\"group:\",\"menubar:\",\"button:File\",\"button:Edit\",\"button:Priority\",\"button:Test\",\"group:\",\"group:\",\"textarea:\",\"group:\",\"group:Chrome Legacy Window\",\"textarea:Conformance Document\",\"button:Press\",\"group:\",\"statictext:Value\",\"textfield:Value\",\"group:\",\"statictext:Title\",\"textfield:Title\",\"group:\",\"statictext:Name\",\"textfield:Name\",\"group:\",\"statictext:Email\",\"textfield:Email\",\"group:\",\"statictext:City\",\"textfield:City\",\"group:\",\"checkbox:Archived\",\"statictext:Archived\",\"group:\",\"statictext:Note\",\"textfield:Note\"]"
+      },
+      "oracle": {
+        "observed": 0
+      },
+      "durationMs": 434.1536999999953,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/electron/menu.select/ax/background",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Value\" not found; the window exposes [\"window:Conformance Document\",\"group:\",\"group:Conformance Document\",\"group:\",\"group:\",\"group:\",\"group:\",\"menubar:\",\"button:File\",\"button:Edit\",\"button:Priority\",\"button:Test\",\"group:\",\"group:\",\"textarea:\",\"group:\",\"group:Chrome Legacy Window\",\"textarea:Conformance Document\",\"button:Press\",\"group:\",\"statictext:Value\",\"textfield:Value\",\"group:\",\"statictext:Title\",\"textfield:Title\",\"group:\",\"statictext:Name\",\"textfield:Name\",\"group:\",\"statictext:Email\",\"textfield:Email\",\"group:\",\"statictext:City\",\"textfield:City\",\"group:\",\"checkbox:Archived\",\"statictext:Archived\",\"group:\",\"statictext:Note\",\"textfield:Note\"]"
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 431.77739999999176,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/electron/menu.select/ax/foreground",
+      "observed": {
+        "kind": "error",
+        "message": "fixture element \"Value\" not found; the window exposes [\"window:Conformance Document\",\"group:\",\"group:Conformance Document\",\"group:\",\"group:\",\"group:\",\"group:\",\"menubar:\",\"button:File\",\"button:Edit\",\"button:Priority\",\"button:Test\",\"group:\",\"group:\",\"textarea:\",\"group:\",\"group:Chrome Legacy Window\",\"textarea:Conformance Document\",\"button:Press\",\"group:\",\"statictext:Value\",\"textfield:Value\",\"group:\",\"statictext:Title\",\"textfield:Title\",\"group:\",\"statictext:Name\",\"textfield:Name\",\"group:\",\"statictext:Email\",\"textfield:Email\",\"group:\",\"statictext:City\",\"textfield:City\",\"group:\",\"checkbox:Archived\",\"statictext:Archived\",\"group:\",\"statictext:Note\",\"textfield:Note\"]"
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 419.53840000001946,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/webview/click/ax/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no webview fixture app is ready on win32 yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/webview/click/ax/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no webview fixture app is ready on win32 yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/webview/click/px/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no webview fixture app is ready on win32 yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/webview/click/px/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no webview fixture app is ready on win32 yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/webview/typeText/ax/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no webview fixture app is ready on win32 yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/webview/typeText/ax/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no webview fixture app is ready on win32 yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/webview/typeText/px/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no webview fixture app is ready on win32 yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/webview/typeText/px/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no webview fixture app is ready on win32 yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/webview/scroll/ax/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no webview fixture app is ready on win32 yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/webview/scroll/ax/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no webview fixture app is ready on win32 yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/webview/scroll/px/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no webview fixture app is ready on win32 yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/webview/scroll/px/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no webview fixture app is ready on win32 yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/webview/drag/px/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no webview fixture app is ready on win32 yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/webview/drag/px/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no webview fixture app is ready on win32 yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/webview/keyChord/ax/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no webview fixture app is ready on win32 yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/webview/keyChord/ax/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no webview fixture app is ready on win32 yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/webview/ax.setValue/ax/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no webview fixture app is ready on win32 yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/webview/ax.setValue/ax/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no webview fixture app is ready on win32 yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/webview/ax.perform/ax/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no webview fixture app is ready on win32 yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/webview/ax.perform/ax/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no webview fixture app is ready on win32 yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/webview/menu.select/ax/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no webview fixture app is ready on win32 yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    },
+    {
+      "id": "windows/console/webview/menu.select/ax/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no webview fixture app is ready on win32 yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no windows recorder in the sentinel yet"
+    }
+  ]
+}
