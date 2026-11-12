@@ -80,8 +80,11 @@ describe("generated bundle list", () => {
 
     // when
     const listedNotWritten = [...listed].filter((path) => !written.has(path)).sort()
-    // A written path the patterns do not match is an output nobody listed, tracked or not. A written path the patterns
-    // match but git does not track yet is a new bundle: feature PRs never commit it and the release commit adds it.
+    // The invariant is "written == listed and tracked", asserted as two inclusions so a new bundle can land: every listed
+    // tracked file is written (this catches hand-written source on the list, such as runtime/dag), and every written file
+    // is matched by the patterns, tracked or not (this catches an output nobody listed). A written path the patterns
+    // match but git does not track yet is a new bundle: under the PR gate its PR cannot commit it, and the release
+    // commit adds it, so a strict equality would fail that PR with nothing it could do.
     const writtenNotListed = [...written].filter((path) => !patterns.some((pattern) => pattern.test(path))).sort()
     const runtimeUnaccounted = tracked
       .filter((path) => path.startsWith(`${PLUGIN}/runtime/`))
