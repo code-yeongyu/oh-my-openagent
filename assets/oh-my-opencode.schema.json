@@ -9330,16 +9330,40 @@
           "maximum": 9007199254740991
         },
         "staleTimeoutMs": {
-          "type": "number",
-          "minimum": 60000
+          "anyOf": [
+            {
+              "type": "number",
+              "const": 0
+            },
+            {
+              "type": "number",
+              "minimum": 60000
+            }
+          ]
         },
         "messageStalenessTimeoutMs": {
-          "type": "number",
-          "minimum": 60000
+          "anyOf": [
+            {
+              "type": "number",
+              "const": 0
+            },
+            {
+              "type": "number",
+              "minimum": 60000
+            }
+          ]
         },
         "taskTtlMs": {
-          "type": "number",
-          "minimum": 300000
+          "anyOf": [
+            {
+              "type": "number",
+              "const": 0
+            },
+            {
+              "type": "number",
+              "minimum": 300000
+            }
+          ]
         },
         "sessionGoneTimeoutMs": {
           "type": "number",
@@ -9350,8 +9374,21 @@
           "minimum": 60000
         },
         "syncPollTimeoutMs": {
-          "type": "number",
-          "minimum": 60000
+          "anyOf": [
+            {
+              "type": "number",
+              "const": 0
+            },
+            {
+              "type": "number",
+              "minimum": 60000
+            }
+          ]
+        },
+        "syncMaxAssistantTurns": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "maxToolCalls": {
           "type": "integer",

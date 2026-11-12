@@ -598,7 +598,7 @@ describe("pollSyncSession", () => {
           toastManager: null,
           taskId: undefined,
         },
-        0,
+        1,
       )
 
       // then: returns timeout error

@@ -1,6 +1,6 @@
 import type { ToolContextWithMetadata, OpencodeClient } from "./types"
 import type { SessionMessage } from "./executor-types"
-import { getDefaultSyncPollTimeoutMs, getTimingConfig } from "./timing"
+import { getTimingConfig, resolveSyncPollBudgetMs } from "./timing"
 import { getTerminalSessionError, isSessionComplete } from "./sync-session-turns"
 import { log } from "../../shared/logger"
 import { normalizeSDKResponse } from "../../shared"
@@ -65,6 +65,7 @@ export async function pollSyncSession(
     taskId: string | undefined
     anchorMessageCount?: number
     anchorMessageID?: string
+    /** Assistant turns after which a still-running child is aborted as a runaway loop; 0 means no cap. */
     maxAssistantTurns?: number
     hasActiveChildBackgroundTasks?: (sessionID: string) => boolean
     hasPendingParentWake?: (sessionID: string) => boolean
@@ -73,7 +74,7 @@ export async function pollSyncSession(
   timeoutMs?: number,
 ): Promise<string | null> {
   const syncTiming = getTimingConfig()
-  const maxPollTimeMs = Math.max(timeoutMs ?? getDefaultSyncPollTimeoutMs(), 50)
+  const maxPollTimeMs = Math.max(resolveSyncPollBudgetMs(timeoutMs), 50)
   const maxTurns = input.maxAssistantTurns ?? DEFAULT_MAX_ASSISTANT_TURNS
   const pollStart = Date.now()
   let inactiveStart = pollStart
@@ -271,7 +272,7 @@ export async function pollSyncSession(
     if (lastAssistant?.info?.id && lastAssistant.info.id !== lastSeenAssistantId) {
       lastSeenAssistantId = lastAssistant.info.id
       assistantTurnCount++
-      if (assistantTurnCount >= maxTurns) {
+      if (maxTurns > 0 && assistantTurnCount >= maxTurns) {
         log("[task] Max assistant turns reached, aborting to prevent infinite loop", {
           sessionID: input.sessionID,
           assistantTurnCount,

@@ -119,7 +119,7 @@ describe("executeUnstableAgentTask cleanup", () => {
             messages: async () => ({ data: [] }),
           },
         },
-        syncPollTimeoutMs: 0,
+        syncPollTimeoutMs: 1,
       },
       createParentContext(),
       "test-agent",

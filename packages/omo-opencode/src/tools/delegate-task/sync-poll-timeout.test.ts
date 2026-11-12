@@ -286,6 +286,100 @@ describe("syncPollTimeoutMs threading", () => {
       })
     })
 
+    describe("#when the limits are configured as 0", () => {
+      test("#then timeoutMs 0 never aborts an idle child, however long it stays silent", async () => {
+        const { pollSyncSession } = require("./sync-session-poller")
+        let abortCount = 0
+        let messageCallCount = 0
+        const mockClient = {
+          session: {
+            abort: async () => {
+              abortCount++
+            },
+            messages: async () => {
+              messageCallCount++
+              const finished =
+                messageCallCount > 30
+                  ? [
+                      {
+                        info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "stop" },
+                        parts: [{ type: "text", text: "done" }],
+                      },
+                    ]
+                  : []
+              return { data: [{ info: { id: "msg_001", role: "user", time: { created: 1000 } } }, ...finished] }
+            },
+            status: async () => ({ data: { ses_never: { type: "idle" } } }),
+          },
+        }
+
+        // every clock read advances 10 minutes, so the silence lasts many hours before the child finishes
+        await withMockedDateNow(600_000, async () => {
+          const result = await pollSyncSession(
+            createMockCtx(),
+            mockClient,
+            {
+              sessionID: "ses_never",
+              agentToUse: "test-agent",
+              toastManager: null,
+              taskId: undefined,
+            },
+            0,
+          )
+
+          expect(result).toBeNull()
+          expect(abortCount).toBe(0)
+          expect(messageCallCount).toBeGreaterThan(30)
+        })
+      })
+
+      test("#then maxAssistantTurns 0 lets a child take any number of turns", async () => {
+        const { pollSyncSession } = require("./sync-session-poller")
+        let abortCount = 0
+        let messageCallCount = 0
+        const mockClient = {
+          session: {
+            abort: async () => {
+              abortCount++
+            },
+            messages: async () => {
+              messageCallCount++
+              const done = messageCallCount > 8
+              const turns = Array.from({ length: Math.min(messageCallCount, 8) }, (_, index) => ({
+                info: {
+                  id: `msg_a${String(index + 2).padStart(3, "0")}`,
+                  role: "assistant",
+                  time: { created: 2000 + index },
+                  finish: done && index === 7 ? "stop" : "tool-calls",
+                },
+                parts: [{ type: "text", text: `turn ${index}` }],
+              }))
+              return { data: [{ info: { id: "msg_001", role: "user", time: { created: 1000 } } }, ...turns] }
+            },
+            status: async () => ({ data: { ses_turns: { type: messageCallCount > 8 ? "idle" : "busy" } } }),
+          },
+        }
+
+        await withMockedDateNow(1_000, async () => {
+          const result = await pollSyncSession(
+            createMockCtx(),
+            mockClient,
+            {
+              sessionID: "ses_turns",
+              agentToUse: "oracle",
+              toastManager: null,
+              taskId: undefined,
+              maxAssistantTurns: 0,
+            },
+            120_000,
+          )
+
+          expect(result).toBeNull()
+          expect(abortCount).toBe(0)
+        })
+      })
+    })
+
     describe("#when timeoutMs is omitted", () => {
       test("#then default timeout constant is used", async () => {
         const { pollSyncSession } = require("./sync-session-poller")
@@ -394,7 +488,7 @@ describe("syncPollTimeoutMs threading", () => {
           {
             manager: mockManager,
             client: mockClient,
-            syncPollTimeoutMs: 0,
+            syncPollTimeoutMs: 1,
           },
           {
             sessionID: "parent-session",
@@ -408,8 +502,9 @@ describe("syncPollTimeoutMs threading", () => {
           "gpt-test",
         )
 
-        expect(statusCallCount).toBe(0)
+        expect(statusCallCount).toBeLessThanOrEqual(1)
         expect(result).toContain("SUPERVISED TASK TIMED OUT")
+        expect(result).toContain("Timeout budget: 1ms")
       })
     })
   })
