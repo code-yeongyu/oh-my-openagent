@@ -156,8 +156,8 @@ export async function planMemoryCleanup(
 
   const snapshot: Record<string, string> = {}
   for (const path of findings.flatMap((finding) => finding.touches)) {
-    const note = corpus.notes.get(path)
-    if (note !== undefined) snapshot[path] = note.contentHash
+    const file = corpus.linking.get(path)
+    if (file !== undefined) snapshot[path] = file.contentHash
   }
   return {
     version: 1,

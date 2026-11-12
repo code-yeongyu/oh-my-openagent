@@ -1,11 +1,12 @@
 // The live corpus the cleanup planner reads: every memory content note that parses, with its paragraphs and the
 // repository paths its wikilinks and markdown links resolve to. ARCHIVE.md, notes/ and unparsable files are never
-// candidates.
+// candidates, but every markdown file's links are read so that apply can repoint (or hold for) each one.
 
 import { readFile, readdir } from "../fs/resilient"
 import { join, posix } from "node:path"
 
 import { markdownDestination, withoutFences } from "../audit/audit"
+import { ARCHIVE_PATH } from "../reflection/link-rewrite"
 import { memoryExpiresAtMs } from "../memfs/expiry"
 import { FrontmatterError, parseMemoryFile, type MemoryFrontmatter, type ParsedMemoryFile } from "../memfs/frontmatter"
 import { FRONTMATTER_RE, decodeScalarSource } from "../memfs/frontmatter-scalar"
@@ -21,19 +22,23 @@ export interface NoteLink {
   readonly text: string
 }
 
-export interface CleanupNote {
+/** A markdown file whose links apply may repoint: a candidate note, or a file outside the candidates (notes/, README). */
+export interface LinkingFile {
   readonly path: string
   readonly content: string
-  /** sha256 prefix of `content`; apply refuses a plan whose notes changed since it was written. */
+  /** sha256 prefix of `content`; apply refuses a plan whose files changed since it was written. */
   readonly contentHash: string
+  readonly links: readonly NoteLink[]
+  readonly readOnly: boolean
+}
+
+export interface CleanupNote extends LinkingFile {
   readonly frontmatter: MemoryFrontmatter
   readonly body: string
   readonly bodyKey: string
   readonly bytes: number
   readonly paragraphs: readonly Paragraph[]
-  readonly links: readonly NoteLink[]
   readonly expiresAtMs: number | undefined
-  readonly readOnly: boolean
 }
 
 export interface SkippedFile {
@@ -43,9 +48,11 @@ export interface SkippedFile {
 
 export interface CleanupCorpus {
   readonly notes: ReadonlyMap<string, CleanupNote>
+  /** Every readable markdown file but ARCHIVE.md, the notes included. */
+  readonly linking: ReadonlyMap<string, LinkingFile>
   /** Every file in the repository (content or not), for link resolution. */
   readonly files: ReadonlySet<string>
-  /** Notes linking to each note. */
+  /** Files linking to each note. */
   readonly inbound: ReadonlyMap<string, ReadonlySet<string>>
   readonly skipped: readonly SkippedFile[]
 }
@@ -54,50 +61,55 @@ export async function scanCleanupCorpus(repoDir: string): Promise<CleanupCorpus>
   const files = await listFiles(repoDir)
   const existing = new Set(files)
   const notes = new Map<string, CleanupNote>()
+  const linking = new Map<string, LinkingFile>()
   const skipped: SkippedFile[] = []
   for (const path of files) {
-    if (!isMemoryContentPath(path) || path.startsWith("memory/")) continue
+    if (!path.endsWith(".md") || path === ARCHIVE_PATH) continue
+    const candidate = isMemoryContentPath(path) && !path.startsWith("memory/")
     let content: string
     try {
       content = new TextDecoder("utf-8", { fatal: true }).decode(await readFile(join(repoDir, path)))
     } catch (error) {
       if (!(error instanceof Error)) throw error
-      skipped.push({ path, reason: error instanceof TypeError ? "invalid UTF-8" : "cannot read file" })
+      if (candidate) skipped.push({ path, reason: error instanceof TypeError ? "invalid UTF-8" : "cannot read file" })
       continue
     }
-    let parsed: ParsedMemoryFile
+    let parsed: ParsedMemoryFile | undefined
     try {
       parsed = parseMemoryFile(content)
     } catch (error) {
       if (!(error instanceof FrontmatterError)) throw error
-      skipped.push({ path, reason: error.message })
-      continue
+      if (candidate) skipped.push({ path, reason: error.message })
     }
-    const body = parsed.body
-    notes.set(path, {
+    const file: LinkingFile = {
       path,
       content,
       contentHash: digest(content),
+      links: linksOf(path, content, existing),
+      readOnly: parsed !== undefined && decodeScalarSource(parsed.frontmatter.read_only ?? "") === "true",
+    }
+    linking.set(path, file)
+    if (!candidate || parsed === undefined) continue
+    const body = parsed.body
+    notes.set(path, {
+      ...file,
       frontmatter: parsed.frontmatter,
       body,
       bodyKey: bodyKey(body),
       bytes: Buffer.byteLength(content, "utf8"),
       paragraphs: splitParagraphs(body),
-      links: linksOf(path, content, existing),
       expiresAtMs: memoryExpiresAtMs(parsed.frontmatter),
-      readOnly: decodeScalarSource(parsed.frontmatter.read_only ?? "") === "true",
     })
   }
   const inbound = new Map<string, Set<string>>()
-  for (const note of notes.values()) {
-    for (const link of note.links) {
-      if (link.target === note.path) continue
+  for (const file of linking.values()) {
+    for (const link of file.links) {
       const sources = inbound.get(link.target) ?? new Set<string>()
-      sources.add(note.path)
+      sources.add(file.path)
       inbound.set(link.target, sources)
     }
   }
-  return { notes, files: existing, inbound, skipped }
+  return { notes, linking, files: existing, inbound, skipped }
 }
 
 /** The audit's wikilink resolution: an existing file, the implied `.md`, never a directory or an escaping path. */

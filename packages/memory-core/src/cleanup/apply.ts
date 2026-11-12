@@ -6,9 +6,9 @@ import { parseMemoryFile } from "../memfs/frontmatter"
 import { ARCHIVE_PATH, repointLinks, type Successor } from "../reflection/link-rewrite"
 import { commitMemoryWrite, type MemoryWriteCommit, type MemoryWriteLock } from "../tools/commit-write"
 import type { MemoryToolProvenance } from "../tools/memory"
-import { scanCleanupCorpus, type CleanupCorpus } from "./corpus"
+import { scanCleanupCorpus, type CleanupCorpus, type CleanupNote } from "./corpus"
 import { appendMerge, appendToArchive, archiveSection, withConflictMark } from "./edits"
-import type { MemoryCleanupPlan } from "./types"
+import type { CleanupAction, MemoryCleanupFinding, MemoryCleanupPlan } from "./types"
 
 export interface ApplyMemoryCleanupOptions {
   readonly repo: GitMemoryRepo
@@ -69,7 +69,7 @@ export async function applyMemoryCleanup(options: ApplyMemoryCleanupOptions): Pr
 
 function verifySnapshot(plan: MemoryCleanupPlan, corpus: CleanupCorpus): void {
   const changed = Object.entries(plan.snapshot)
-    .filter(([path, hash]) => corpus.notes.get(path)?.contentHash !== hash)
+    .filter(([path, hash]) => corpus.linking.get(path)?.contentHash !== hash)
     .map(([path]) => path)
   if (changed.length > 0) throw new MemoryCleanupStaleError(changed)
 }
@@ -89,7 +89,11 @@ async function buildChanges(plan: MemoryCleanupPlan, corpus: CleanupCorpus, repo
   }
   const removals = new Set<string>()
   const successors = new Map<string, Successor>()
-  const sections: string[] = []
+  const archived: Array<{
+    readonly note: CleanupNote
+    readonly action: Extract<CleanupAction, { kind: "archive" }>
+    readonly finding: MemoryCleanupFinding
+  }> = []
   for (const finding of plan.findings) {
     for (const action of finding.actions) {
       switch (action.kind) {
@@ -99,7 +103,7 @@ async function buildChanges(plan: MemoryCleanupPlan, corpus: CleanupCorpus, repo
         case "archive": {
           const note = corpus.notes.get(action.path)
           if (note === undefined) throw new Error(`memory cleanup: ${action.path} is not a live note`)
-          sections.push(archiveSection(note, action, finding, now))
+          archived.push({ note, action, finding })
           removals.add(action.path)
           successors.set(
             action.path,
@@ -120,21 +124,25 @@ async function buildChanges(plan: MemoryCleanupPlan, corpus: CleanupCorpus, repo
       }
     }
   }
-  if (sections.length > 0) {
+  const live = new Set([...corpus.files].filter((path) => !removals.has(path)))
+  if (archived.length > 0) live.add(ARCHIVE_PATH)
+  const targets = { live, removed: successors }
+  if (archived.length > 0) {
+    // An archived body moves to the root, so its relative links are re-resolved from the folder it was written in.
+    const sections = archived.map(({ note, action, finding }) =>
+      archiveSection(note, repointLinks(ARCHIVE_PATH, note.body, targets, note.path), action, finding, now),
+    )
     const existing = corpus.files.has(ARCHIVE_PATH) ? await readFile(join(repoDir, ARCHIVE_PATH), "utf8") : undefined
     current.set(ARCHIVE_PATH, appendToArchive(existing, sections))
   }
 
-  const live = new Set([...corpus.files].filter((path) => !removals.has(path)))
-  if (sections.length > 0) live.add(ARCHIVE_PATH)
-  const targets = { live, removed: successors }
   const writes = new Map<string, string>()
-  for (const path of [...corpus.notes.keys(), ...(current.has(ARCHIVE_PATH) ? [ARCHIVE_PATH] : [])]) {
+  for (const path of [...corpus.linking.keys(), ...(current.has(ARCHIVE_PATH) ? [ARCHIVE_PATH] : [])]) {
     if (removals.has(path)) continue
-    const before = current.get(path) ?? corpus.notes.get(path)?.content
+    const before = current.get(path) ?? corpus.linking.get(path)?.content
     if (before === undefined) continue
     const after = repointLinks(path, before, targets)
-    const original = corpus.notes.get(path)?.content
+    const original = corpus.linking.get(path)?.content
     if (after !== original) writes.set(path, after)
   }
   return { writes, removals }

@@ -46,10 +46,11 @@ export function holdReason(
   options: ResolvedCleanupOptions,
 ): string | undefined {
   for (const path of finding.touches) {
-    const note = corpus.notes.get(path)
     const role = ownedBy(finding, path) ? "would write" : "would repoint a link in"
-    if (note?.readOnly === true) return `${role} ${path}, which is read_only`
-    if (!options.includeLoadBearing && LOAD_BEARING_PATHS.has(path))
+    if (corpus.linking.get(path)?.readOnly === true) return `${role} ${path}, which is read_only`
+    const skipped = corpus.skipped.find((file) => file.path === path)
+    if (skipped !== undefined) return `${role} ${path}, which cleanup skipped and never touches (${skipped.reason})`
+    if (!options.includeLoadBearing && LOAD_BEARING_PATHS.has(path.replace(/^memory\//, "")))
       return `${role} ${path} (load-bearing; pass --include-load-bearing)`
   }
   return undefined

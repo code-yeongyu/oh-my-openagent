@@ -54,6 +54,7 @@ export function withConflictMark(note: Pick<CleanupNote, "content" | "frontmatte
 
 export function archiveSection(
   note: CleanupNote,
+  body: string,
   action: ArchiveAction,
   finding: MemoryCleanupFinding,
   now: number,
@@ -69,7 +70,7 @@ export function archiveSection(
     `- Original description: ${note.frontmatter.description}`,
     ...headerExtras(note),
     "",
-    note.body.replace(/\s+$/, ""),
+    body.replace(/\s+$/, ""),
     "",
   ]
   return lines.join("\n")
