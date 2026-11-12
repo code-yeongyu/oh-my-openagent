@@ -14,10 +14,15 @@ const HFS_IGNORABLE = /[\u200c-\u200f\u202a-\u202e\u206a-\u206f\ufeff]/gu
  * `restorePaths`), and none that a disk reads as empty, `.`, `..` or git's own directory. Windows drops
  * trailing dots and spaces, reads `name:stream` as a stream of `name` and `git~1` as the short `.git`.
  */
+/** How a disk reads one name: HFS+ ignorables dropped, `name:stream` cut to `name`, trailing dots and spaces dropped, lowercased. */
+export function foldTreeName(name: string): string {
+  return (name.replace(HFS_IGNORABLE, "").split(":", 1)[0] ?? "").replace(/[. ]+$/, "").toLowerCase()
+}
+
 export function isPlainTreePath(path: string): boolean {
   return path.split("/").every((name) => {
     if (name.includes("\\")) return false
-    const folded = (name.replace(HFS_IGNORABLE, "").split(":", 1)[0] ?? "").replace(/[. ]+$/, "").toLowerCase()
+    const folded = foldTreeName(name)
     return folded !== "" && folded !== ".git" && folded !== "git~1"
   })
 }

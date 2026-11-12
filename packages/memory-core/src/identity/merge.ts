@@ -10,7 +10,7 @@ import { GitMemoryRepo, NoEffectiveChangesError, type GitCommitAuthor, type GitT
 import { readdir, readFile, writeFile } from "../fs/resilient"
 import type { MemoryWriteLock } from "../tools/commit-write"
 import { AGENTS_DIRNAME, buildIdentityPaths, type MemoryIdentityPaths } from "./layout"
-import { createInTarget, isPlainTreePath, removeCreatedDirs } from "./merge-paths"
+import { createInTarget, foldTreeName, isPlainTreePath, removeCreatedDirs } from "./merge-paths"
 import { markIdentityMerged, readIdentityRecord } from "./record"
 import { resolveAutoIdentity } from "./resolve"
 
@@ -243,7 +243,10 @@ export async function planIdentityMerge(
       const existing = targetBlobs.get(entry.path)
       if (existing?.oid === entry.oid) return { path: entry.path, action: "skip" }
       const foldedCollision = existing === undefined && targetFolded.has(entry.path.toLowerCase())
-      if (existing === undefined && !foldedCollision && !entry.path.toLowerCase().startsWith("system/")) {
+      // A disk reads `system.`, `system ` and `system:s` as `system`, so the first name is folded the way isPlainTreePath folds `.git`.
+      const [first = "", ...rest] = entry.path.split("/")
+      const inSystem = rest.length > 0 && foldTreeName(first) === "system"
+      if (existing === undefined && !foldedCollision && !inSystem) {
         return { path: entry.path, action: "add", destination: entry.path }
       }
       return {

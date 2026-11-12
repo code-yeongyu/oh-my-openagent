@@ -437,6 +437,29 @@ describe("identity merge (#10070)", () => {
     ])
   }, 30_000)
 
+  it.each(["system./new.md", "system /new.md", "system:s/new.md", "sys\u200ctem/new.md"])(
+    "#given a source tree entry %j whose first name a disk reads as system #when the merge is planned #then it goes aside like system/ (#12974 review LOW)",
+    async (path) => {
+      const root = await memoryRoot()
+      const target = await identity(root, "project-aaaa1111", { "system/persona.md": note("persona") }, [
+        "/work/project",
+      ])
+      const source = await identity(root, "project-feature-bbbb2222", { "notes/base.md": note("base") }, [
+        "/work/project-feature",
+      ])
+      commitTreePath(source.paths.repo, path, note("carried"))
+
+      const plan = await planIdentityMerge(source.paths, target.paths)
+
+      expect(plan.actions.find((action) => action.path === path)).toEqual({
+        path,
+        action: "keep-aside",
+        destination: "reference/merged/project-feature-bbbb2222/" + path,
+      })
+    },
+    30_000,
+  )
+
   it("#given a merge that commits #when the write lock is released #then the source is already marked merged (#12974 review r6)", async () => {
     const root = await memoryRoot()
     const target = await identity(root, "project-aaaa1111", { "notes/base.md": note("base") }, ["/work/project"])
