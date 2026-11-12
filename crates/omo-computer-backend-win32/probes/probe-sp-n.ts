@@ -11,7 +11,7 @@
 // administrator shell; without one the probe prints one line naming the
 // missing precondition, exits 2 and writes nothing. The questions are the SPEC
 // table; the native calls are in sp-n.ps1 and its fragments beside this file.
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync, readdirSync } from "node:fs"
 import { randomBytes } from "node:crypto"
 import { tmpdir } from "node:os"
 import { basename, join, relative, resolve } from "node:path"
@@ -287,9 +287,56 @@ const at = (j: Json, ...path: string[]): unknown => path.reduce<unknown>((v, k) 
 
 // ------------------------------------------------------------------ helper processes
 
+// Every exit goes through runThroughCleanup: fail() throws a ProbeExit, an unexpected error or rejection is caught
+// there (or by onFatal), and the directories this run created are removed on every one of those paths.
+export class ProbeExit extends Error {
+  constructor(
+    readonly code: number,
+    line: string,
+  ) {
+    super(line)
+  }
+}
 function fail(line: string): never {
-  console.log(line)
-  process.exit(2)
+  throw new ProbeExit(2, line)
+}
+// the directories this run created (never one that existed before it), removed on every exit
+export const EXIT_DIRS = new Set<string>()
+export function cleanDirs(dirs: Set<string>, out: (l: string) => void) {
+  for (const d of dirs) {
+    try {
+      rmSync(d, { recursive: true, force: true })
+    } catch (e) {
+      out(`WARN cleanup ${d}: ${(e as Error).message}`)
+    }
+  }
+  dirs.clear()
+}
+export async function runThroughCleanup(
+  body: () => Promise<number>,
+  dirs: Set<string> = EXIT_DIRS,
+  out: (l: string) => void = (l) => console.log(l),
+): Promise<number> {
+  let code: number
+  try {
+    code = await body()
+  } catch (e) {
+    out(e instanceof ProbeExit ? e.message : `FATAL ${e instanceof Error ? e.message : String(e)}`)
+    code = e instanceof ProbeExit ? e.code : 2
+  }
+  cleanDirs(dirs, out)
+  return code
+}
+// uncaught exceptions and unhandled rejections outside the awaited chain
+export function onFatal(
+  e: unknown,
+  dirs: Set<string> = EXIT_DIRS,
+  out = (l: string) => console.log(l),
+  exit = (c: number): void => process.exit(c),
+) {
+  out(`FATAL ${e instanceof Error ? e.message : String(e)}`)
+  cleanDirs(dirs, out)
+  exit(2)
 }
 
 // The environment of every child: this process's, without PSModulePath (any casing). A Windows PowerShell 5.1
@@ -510,7 +557,7 @@ export function timingVerdict(p95: number, bound: Bound | undefined, measured: s
 // be an oracle that cannot see a wheel.
 type Tally = { readonly delivered: number; readonly runs: number; readonly acquire?: string; readonly notFg?: number }
 export function wheelResults(control: Tally, flush: Tally, delay: Tally): Record<string, Result> {
-  const c = `control delivered ${control.delivered}/${control.runs}`
+  const c = controlText(control.delivered, control.runs)
   const proven = control.runs > 0 && control.delivered === control.runs
   const why = `the settled-foreground ${c}, so the wheel oracle is not proven`
   return {
@@ -642,6 +689,48 @@ const timers: Group = {
   },
 }
 
+// The foreground barrier's runs as verdict records. A run in which the barrier was never exercised (not foreground
+// at the send, or SendInput accepted no event) is left out of the routed / consumed / hang-guard counts and shown as
+// "skipped k/n"; with no exercised run left, both rows are SKIPPED (UNMEASURED with the reason).
+export function fgBarrierObs(fg: Json): { readonly proves: Obs; readonly ms: Obs; readonly oracleSeen: boolean } {
+  if (fg.acquired !== true) {
+    const s: Obs = { kind: "SKIPPED", reason: "the probe could not take the foreground for the target" }
+    return { proves: s, ms: s, oracleSeen: false }
+  }
+  const runs = arr(fg.runs)
+  const why = (r: Json) =>
+    r.notForeground === true ? "not foreground at send" : num(r.sent) > 0 ? undefined : "SendInput accepted no event"
+  const reasons = new Map<string, number>()
+  for (const r of runs) {
+    const w = why(r)
+    if (w) reasons.set(w, (reasons.get(w) ?? 0) + 1)
+  }
+  const ex = runs.filter((r) => !why(r))
+  const k = runs.length - ex.length
+  const skipped = `skipped ${k}/${runs.length}${k ? ` (${[...reasons].map(([w, c]) => `${w} ${c}`).join(", ")})` : ""}`
+  const oracleSeen = count(ex, "within2s") > 0
+  if (!ex.length) {
+    const s: Obs = { kind: "SKIPPED", reason: `the barrier was never exercised: ${skipped}` }
+    return { proves: s, ms: s, oracleSeen }
+  }
+  const n = ex.length
+  const [routed, consumed] = [count(ex, "routed"), count(ex, "consumed")]
+  const held = routed === n && consumed === n
+  const counts = { routed: [routed, n], consumed: [consumed, n], skipped: [k, runs.length] }
+  const text = `sent ${sentRuns(runs)}/${runs.length} routed ${routed}/${n} consumed ${consumed}/${n} effect at barrier return ${count(ex, "atReturn")}/${n} within 2 s ${count(ex, "within2s")}/${n} paint probe ${str(fg.probeClass)} foreground by ${str(fg.acquire)}; ${skipped}; effect at return is data, not a design claim`
+  const fgMs = `${ms(obj(fg.stats))} hang-guard expiries ${n - Math.min(routed, consumed)}; ${skipped}`
+  return {
+    proves: { kind: "MEASURED", data: { outcome: held ? "held" : "broken", text, counts } },
+    ms: held
+      ? toObs(timingVerdict(num(at(fg, "stats", "p95")), undefined, fgMs))
+      : {
+          kind: "MEASURED",
+          data: { outcome: "broken", text: `${fgMs}; a hop hit the hang guard (${BOUNDS.hangGuardMs.cite})`, counts },
+        },
+    oracleSeen,
+  }
+}
+
 const barriers: Group = {
   budgetS: 200,
   ids: FAMILIES.flatMap(([k]) => [
@@ -670,23 +759,10 @@ const barriers: Group = {
       }
       try {
         const fg = await leg(ctx, "fg-barrier", { ...oracle(t), ch: "x", warm: WARM, n: RUNS })
-        const fgDone = count(fg.runs, "routed") === RUNS && count(fg.runs, "consumed") === RUNS
-        const oracleSeen = count(fg.runs, "within2s") > 0
-        if (fg.acquired !== true)
-          Object.assign(out, all(ids.slice(0, 2), UN("the probe could not take the foreground for the target")))
-        else {
-          const measured = `sent ${sentRuns(fg.runs)}/${RUNS} routed ${count(fg.runs, "routed")}/${RUNS} consumed ${count(fg.runs, "consumed")}/${RUNS} effect at barrier return ${count(fg.runs, "atReturn")}/${RUNS} within 2 s ${count(fg.runs, "within2s")}/${RUNS} paint probe ${str(fg.probeClass)} foreground by ${str(fg.acquire)}`
-          // the verdict is the barrier's claim, routed + consumed; the effect counts in measured are data only
-          out[`n-barrier-fg-proves-${key}`] = propertyVerdict(
-            "barrierReceipt",
-            fgDone,
-            `${measured}; effect at return is data, not a design claim`,
-          )
-          const fgMs = `${ms(obj(fg.stats))} hang-guard expiries ${RUNS - Math.min(count(fg.runs, "routed"), count(fg.runs, "consumed"))} not foreground ${count(fg.runs, "notForeground")}/${RUNS}`
-          out[`n-barrier-fg-ms-${key}`] = fgDone
-            ? timingVerdict(num(at(fg, "stats", "p95")), undefined, fgMs)
-            : { measured: `${fgMs}; a hop hit the hang guard (${BOUNDS.hangGuardMs.cite})`, verdict: "CONTRADICTS" }
-        }
+        const f = fgBarrierObs(fg)
+        const oracleSeen = f.oracleSeen
+        out[`n-barrier-fg-proves-${key}`] = rowVerdict(`n-barrier-fg-proves-${key}`, f.proves)
+        out[`n-barrier-fg-ms-${key}`] = rowVerdict(`n-barrier-fg-ms-${key}`, f.ms)
         const po = await leg(ctx, "posted-barrier", { ...oracle(t), ch: "y", warm: WARM, n: RUNS, away })
         const poDone = count(po.runs, "consumed") === RUNS
         const measured = `posted ${count(po.runs, "posted")}/${RUNS} consumed ${count(po.runs, "consumed")}/${RUNS} effect at return ${count(po.runs, "atReturn")}/${RUNS} within 2 s ${count(po.runs, "within2s")}/${RUNS} dst ${str(po.dstClass)} targetForeground=${str(po.foregroundIsTarget)}`
@@ -1006,7 +1082,15 @@ export function worstOfPasses(
 // Count rows ("-proves-") across two passes: the WORSE pass decides (CONFIRMS < NEW-EDGE < CONTRADICTS; on a tie,
 // the pass with fewer hits), and every count that differs is recorded "k/n vs k2/n".
 export const isCountRow = (id: string) => /-proves-|^n-wheel-/.test(id)
-const countRank = (v: Verdict) => (v === "CONFIRMS" ? 0 : v === "CONTRADICTS" ? 2 : 1)
+// The one merge order: CONTRADICTS > UNMEASURED (a pass that failed to measure) > NEW-EDGE > CONFIRMS.
+export const MERGE_RANK: Readonly<Record<Verdict, number>> = {
+  CONFIRMS: 0,
+  "NEW-EDGE": 1,
+  UNMEASURED: 2,
+  INVALID: 2,
+  CONTRADICTS: 3,
+}
+const countRank = (v: Verdict) => MERGE_RANK[v]
 const hits = (m: string) => [...m.matchAll(/(\d+)\/(\d+)/g)].reduce((t, x) => t + Number(x[1]), 0)
 export function worstOfCountPasses(
   id: string,
@@ -1034,21 +1118,30 @@ export function worstOfCountPasses(
 export const CONTROL_GATES: Readonly<Record<string, readonly string[]>> = {
   "n-wheel-control-settled": ["n-wheel-after-raise-dwmflush", "n-wheel-after-raise-5ms"],
 }
-const controlCount = (m: string | undefined) => /control delivered (\d+)\/(\d+)/.exec(m ?? "")
-const controlOk = (m: string | undefined) => {
-  const x = controlCount(m)
-  return !!x && x[1] === x[2] && x[2] !== "0" && !/ vs /.test(m ?? "")
+// ONE control-text format: the writer (wheelResults) prints controlText, the count merge adds " vs b/n", and
+// parseControl reads exactly that, so a committed ledger row round-trips through its own rerun.
+export const controlText = (d: number, n: number) => `control delivered ${d}/${n}`
+export function parseControl(m: string | undefined): Array<readonly [number, number]> | undefined {
+  const x = /control delivered (\d+)\/(\d+)(?: vs (\d+)\/(\d+))?/.exec(m ?? "")
+  if (!x) return undefined
+  return x[3]
+    ? [
+        [Number(x[1]), Number(x[2])],
+        [Number(x[3]), Number(x[4])],
+      ]
+    : [[Number(x[1]), Number(x[2])]]
 }
+const controlOk = (m: string | undefined) => !!parseControl(m)?.every(([d, n]) => n > 0 && d === n)
 export function gatedVerify(ledger: readonly LedgerRow[], results: Record<string, Result>, host: string) {
   const out = new Map<string, { readonly kind: "SAME"; readonly text: string }>()
   for (const [ctl, gated] of Object.entries(CONTROL_GATES)) {
     const row = ledger.find((r) => r.id === ctl && r.host === host)
     const now = results[ctl]
     if (!row || !now || now.skip || (controlOk(row.measured) && controlOk(now.measured))) continue
-    const k = (m: string) => {
-      const x = controlCount(m)
-      return x ? `${x[1]}/${x[2]}` : "?"
-    }
+    const k = (m: string) =>
+      parseControl(m)
+        ?.map(([d, n]) => `${d}/${n}`)
+        .join(" vs ") ?? "?"
     const why = `control failed in a pass: ${k(row.measured)} vs ${k(now.measured)}`
     for (const id of gated)
       out.set(id, {
@@ -1062,7 +1155,17 @@ export function gatedVerify(ledger: readonly LedgerRow[], results: Record<string
 // The two-pass job: pass 1 is the measure pass's ledger, pass 2 this verify pass. Every row is merged worst-of
 // (gated rows with their control, count rows by count, timing rows by p95, any other row by verdict), and the job
 // fails only where the MERGED verdict differs from the COMMITTED ledger's, never on pass-to-pass jitter.
-const verdictRank = (v: Verdict) => (v === "CONFIRMS" ? 0 : v === "CONTRADICTS" ? 2 : 1)
+// Two passes of one row: the worse by MERGE_RANK decides and BOTH passes' texts are kept, so a failed pass never
+// hides. Passes with the same verdict merge by count ("a vs b") or p95 ("first recorded: p95 a / b").
+export function mergeTwo(id: string, a: Result, b: Result): Result {
+  if (a.verdict === b.verdict && a.measured === b.measured) return b
+  if (a.verdict === b.verdict && a.verdict !== "UNMEASURED") {
+    const m = worstOfCountPasses(id, a, b)?.result ?? worstOfPasses(id, a, b)?.result
+    if (m) return m
+  }
+  const [worse, other] = MERGE_RANK[a.verdict] >= MERGE_RANK[b.verdict] ? [a, b] : [b, a]
+  return { measured: `${worse.measured} || other pass ${other.verdict}: ${other.measured}`, verdict: worse.verdict }
+}
 export function mergePasses(
   pass1: readonly LedgerRow[],
   pass2: Record<string, Result>,
@@ -1082,13 +1185,7 @@ export function mergePasses(
       out[id] = UN(g.text.replace(/^SAME \S+ UNMEASURED combined with its control \(([^)]*)\); now: /, "$1; pass 2: "))
       continue
     }
-    const merged = worstOfCountPasses(id, a, b)?.result ?? worstOfPasses(id, a, b)?.result
-    if (merged) out[id] = merged
-    else if (a.verdict === b.verdict) out[id] = b
-    else {
-      const [worse, other] = verdictRank(a.verdict) >= verdictRank(b.verdict) ? [a, b] : [b, a]
-      out[id] = { measured: `${worse.measured} (other pass: ${other.verdict})`, verdict: worse.verdict }
-    }
+    out[id] = mergeTwo(id, a, b)
   }
   return out
 }
@@ -1257,6 +1354,103 @@ const capture: Group = {
   },
 }
 
+// ---------------------------------------------------------------- the one verdict function
+// Every row is decided here from a typed record. Only MEASURED yields CONFIRMS, CONTRADICTS or NEW-EDGE; SKIPPED and
+// ERRORED always yield UNMEASURED with their reason. CONFIRMS / CONTRADICTS need the row's design citation (printed in
+// the row); a row whose design states no claim reads NEW-EDGE. A row id with neither is refused when the table is built.
+export type Outcome = "held" | "broken" | "edge" | "inconclusive"
+export type Obs =
+  | { readonly kind: "MEASURED"; readonly data: unknown; readonly reason?: string }
+  | { readonly kind: "SKIPPED" | "ERRORED"; readonly data?: unknown; readonly reason: string }
+export type Cite = { readonly design: string } | { readonly noClaim: string }
+const D = (line: number, what: string): Cite => ({ design: `design/d-windows.md:${line} (${what})` })
+const fromProperty = (p: string): Cite => {
+  const c = PROPERTIES[p]
+  return c ? { design: c } : { noClaim: `no design line for ${p}` }
+}
+const CITE_RULES: ReadonlyArray<readonly [RegExp, Cite]> = [
+  [/^n-host-/, { noClaim: "a fact about the measuring host, not a design claim" }],
+  [/^n-wgc-issupported-/, D(79, "WGC IsSupported() once per session open")],
+  [/^n-dwmflush-ms$/, { noClaim: "the design states no DwmFlush time bound" }],
+  [/^n-poll-/, D(130, "each hop polls at 1 ms")],
+  [/^n-barrier-fg-/, D(130, "## Input, Barrier: routed hop + consumed hop, 5 s hang guard")],
+  [/^n-barrier-posted-[a-z]+-notepad$/, fromProperty("postedLandsClassic")],
+  [/^n-barrier-posted-[a-z]+-webview2$/, fromProperty("dropMatrixWebView2")],
+  [/^n-barrier-posted-[a-z]+-wpf$/, fromProperty("dropMatrixWpf")],
+  [/^n-(fg|posted)-chord-/, D(132, "chords: VkKeyScanW on SendInput, one WM_CHAR per char posted")],
+  [/^n-wheel-control-/, { noClaim: "no design line states that a settled foreground target receives the wheel" }],
+  [/^n-wheel-after-raise-/, D(128, "DwmFlush before pointer: doc numbers 6/6 lost -> 18/18, re-measured")],
+  [/^n-affinity-/, D(393, "cover-window oracle reads > 0 -> hide_ack")],
+  [/^n-(uipi|elevated)-/, D(151, "windows above the engine's integrity RID: UIPI drops input")],
+  [/^n-capture-/, D(80, "PrintWindow floor and the near-black oracle")],
+]
+export function buildCites(ids: readonly string[], rules = CITE_RULES): Readonly<Record<string, Cite>> {
+  const out: Record<string, Cite> = {}
+  const missing: string[] = []
+  for (const id of ids) {
+    const hit = rules.find(([re]) => re.test(id))
+    if (hit) out[id] = hit[1]
+    else missing.push(id)
+  }
+  if (missing.length)
+    throw new Error(`ROW_CITES: rows with no design citation and no stated absence: ${missing.join(",")}`)
+  return out
+}
+export const ROW_CITES = buildCites(Object.keys(SPEC))
+const isInt = (n: unknown) => typeof n === "number" && Number.isInteger(n) && n >= 0
+function invalidData(d: unknown): string | undefined {
+  if (!d || typeof d !== "object") return "no data"
+  const x = d as Record<string, unknown>
+  if (!["held", "broken", "edge", "inconclusive"].includes(x.outcome as string)) return `outcome ${String(x.outcome)}`
+  if (typeof x.text !== "string" || !x.text) return "no text"
+  if (x.counts === undefined) return undefined
+  if (!x.counts || typeof x.counts !== "object" || Array.isArray(x.counts)) return "counts not an object"
+  for (const [k, v] of Object.entries(x.counts)) {
+    if (!Array.isArray(v) || v.length !== 2 || !v.every(isInt) || v[0] > v[1] || v[1] === 0)
+      return `count ${k}=${String(v)}`
+  }
+  return undefined
+}
+export function rowVerdict(id: string, obs: Obs, cites: Readonly<Record<string, Cite>> = ROW_CITES): Result {
+  const cite = cites[id]
+  if (!cite) throw new Error(`row ${id} has no design citation`)
+  const why = (r: unknown) => (typeof r === "string" && r ? r : "no reason given")
+  if (obs?.kind === "SKIPPED" || obs?.kind === "ERRORED")
+    return UN(`${obs.kind === "SKIPPED" ? "skipped" : "errored"}: ${why(obs.reason)}`)
+  if (obs?.kind !== "MEASURED") return UN(`errored: invalid record kind ${String((obs as { kind?: unknown })?.kind)}`)
+  const bad = invalidData(obs.data)
+  if (bad) return UN(`errored: invalid measurement: ${bad}`)
+  const d = obs.data as { readonly outcome: Outcome; readonly text: string }
+  if (d.outcome === "inconclusive") return UN(d.text)
+  if (d.outcome === "edge") return { measured: d.text, verdict: "NEW-EDGE" }
+  if ("noClaim" in cite) return { measured: `${d.text}; no design claim: ${cite.noClaim}`, verdict: "NEW-EDGE" }
+  const line = cite.design.split(" ")[0] ?? cite.design
+  return {
+    measured: d.text.includes(line) ? d.text : `${d.text}; per ${cite.design}`,
+    verdict: d.outcome === "held" ? "CONFIRMS" : "CONTRADICTS",
+  }
+}
+// A group's result as a record: the groups judge held/broken/edge; the verdict and its citation come only from here.
+export function toObs(r: Result): Obs {
+  if (r.verdict !== "UNMEASURED")
+    return {
+      kind: "MEASURED",
+      data: {
+        outcome: r.verdict === "CONFIRMS" ? "held" : r.verdict === "CONTRADICTS" ? "broken" : "edge",
+        text: r.measured,
+      },
+    }
+  const reason = r.measured.replace(/^UNMEASURED: /, "")
+  if (/^p95 [\d.]+ ms within \d+ % of the /.test(reason))
+    return { kind: "MEASURED", data: { outcome: "inconclusive", text: reason } }
+  const m = /^(skipped|errored): ([\s\S]*)$/.exec(reason)
+  if (m) return { kind: m[1] === "errored" ? "ERRORED" : "SKIPPED", reason: m[2] ?? "" }
+  return { kind: /leg failed|threw|exception|error|timeout/i.test(reason) ? "ERRORED" : "SKIPPED", reason }
+}
+// INVALID is a ledger-only state (a withdrawn reading); measurement never produces it
+export const finalRow = (id: string, r: Result, cites: Readonly<Record<string, Cite>> = ROW_CITES): Result =>
+  r.verdict === "INVALID" ? r : { ...rowVerdict(id, toObs(r), cites), ...(r.skip ? { skip: r.skip } : {}) }
+
 const GROUPS: readonly Group[] = [hostFacts, isSupported, timers, barriers, chords, wheel, affinity, elevated, capture]
 
 // Budget of one probe pass (--measure or --verify): starting the targets, then every group with the time its
@@ -1325,12 +1519,18 @@ export async function withBudget<T>(
 
 // Runs one group within its budget. A group past it writes every row it owns as UNMEASURED "timeout after Ns"
 // (N the seconds it actually ran), followed by its cleanup results: never dropped, never a verdict.
-export async function runGroup(g: Group, ctx: Ctx): Promise<Record<string, Result>> {
+export async function runGroup(g: Group, ctx: Ctx, cites = ROW_CITES): Promise<Record<string, Result>> {
   const r = await withBudget(g.budgetS, g.cleanupS ?? 0, ctx, (own) =>
-    g.run(own).catch((e: Error) => all(g.ids, UN(`leg failed: ${clean(e.message)}`))),
+    g.run(own).catch((e: Error) => all(g.ids, UN(`errored: leg failed: ${clean(e.message)}`))),
   )
-  if (!r.timedOut) return r.value
-  return all(g.ids, UN(`timeout after ${r.elapsedS}s${r.cleanup.length ? `; cleanup ${r.cleanup.join(" ")}` : ""}`))
+  const rows = r.timedOut
+    ? all(
+        g.ids,
+        UN(`errored: timeout after ${r.elapsedS}s${r.cleanup.length ? `; cleanup ${r.cleanup.join(" ")}` : ""}`),
+      )
+    : r.value
+  // every row of every group goes through the one verdict function
+  return Object.fromEntries(Object.entries(rows).map(([id, x]) => [id, finalRow(id, x, cites)]))
 }
 
 // Starts the targets within SETUP_BUDGET_S; a target not ready by then is killed and its rows say why.
@@ -1646,6 +1846,9 @@ export function returnsInLoops(source: string): string[] {
   return hits
 }
 
+const TEST_CITES: Readonly<Record<string, Cite>> = Object.fromEntries(
+  ["t-a", "t-b", "t-c"].map((id) => [id, { noClaim: "test row" }]),
+)
 const LOGIC_CHECKS: readonly Check[] = [
   {
     finding: "HIGH wheel-return-in-loop",
@@ -1722,7 +1925,10 @@ const LOGIC_CHECKS: readonly Check[] = [
     async run() {
       const self = source("probe-sp-n.ts")
       if (/mkdirSync\(ctx\.shared/.test(self)) return "the shared directory is still created with mkdirSync"
-      if (!/freshDir\(ctx\.shared, \(p\) => lockDownWindows\(ctx, p\)\)/.test(self))
+      if (
+        !/freshDir\(ctx\.shared, \(p\) => io\.lockDown\(ctx, p\)\)/.test(self) ||
+        !/lockDown: lockDownWindows,/.test(self)
+      )
         return "the shared directory is not created by freshDir"
       if (!/omo-sp-n-\$\{process\.pid\}-\$\{randomBytes/.test(self))
         return "the shared directory name is not unpredictable"
@@ -1763,10 +1969,10 @@ const LOGIC_CHECKS: readonly Check[] = [
   {
     finding: "MEDIUM timeout-cleanup",
     async run() {
-      const plain = await runGroup({ ids: ["t-a", "t-b"], budgetS: 1, run: never }, testCtx())
+      const plain = await runGroup({ ids: ["t-a", "t-b"], budgetS: 1, run: never }, testCtx(), TEST_CITES)
       for (const id of ["t-a", "t-b"])
-        if (plain[id]?.verdict !== "UNMEASURED" || plain[id]?.measured !== "UNMEASURED: timeout after 1s")
-          return `${id}: want "UNMEASURED: timeout after 1s", got ${JSON.stringify(plain[id])}`
+        if (plain[id]?.verdict !== "UNMEASURED" || plain[id]?.measured !== "UNMEASURED: errored: timeout after 1s")
+          return `${id}: want "UNMEASURED: errored: timeout after 1s", got ${JSON.stringify(plain[id])}`
       let cleaned = false
       const withCleanup = await runGroup(
         {
@@ -1785,10 +1991,11 @@ const LOGIC_CHECKS: readonly Check[] = [
           },
         },
         testCtx(),
+        TEST_CITES,
       )
       if (!cleaned) return "the cleanup did not run before runGroup returned"
       const m = withCleanup["t-c"]?.measured
-      return m === "UNMEASURED: timeout after 1s; cleanup reconnect=active"
+      return m === "UNMEASURED: errored: timeout after 1s; cleanup reconnect=active"
         ? undefined
         : `cleanup result not recorded: ${m}`
     },
@@ -1847,10 +2054,13 @@ const LOGIC_CHECKS: readonly Check[] = [
     finding: "LOW self-test-runs",
     async run() {
       const self = source("probe-sp-n.ts")
-      const main = self.slice(self.search(/^async function main\(\) \{$/m))
+      const main = self.slice(self.search(/^async function main\(\): Promise<number> \{$/m))
       const checks = main.indexOf("await logicChecks()")
-      const platform = main.indexOf('process.platform !== "win32"')
-      return checks >= 0 && checks < platform
+      const prep = self.slice(self.search(/^export async function prepare\(/m))
+      // the checks run in main before prepare(), whose first step is the platform check
+      return checks >= 0 &&
+        checks < main.indexOf("await prepare(") &&
+        /^\S[^\n]*\{\n {2}if \(io\.platform !== "win32"\)/.test(prep)
         ? undefined
         : "--measure and --verify do not run the self-test checks first"
     },
@@ -2069,7 +2279,7 @@ const LOGIC_CHECKS: readonly Check[] = [
           }
         if (bad.length) return bad.slice(0, 6).join("; ") + (bad.length > 6 ? ` (+${bad.length - 6} more)` : "")
         const self = source("probe-sp-n.ts")
-        const main = self.slice(self.search(/^async function main\(\) \{$/m))
+        const main = self.slice(self.search(/^export async function prepare\(/m))
         if (/rmSync\(ctx\.(shared|tmp)/.test(main))
           return "main still removes the run directories with a throwing rmSync"
         return /await runThenClean\(/.test(main) ? undefined : "main does not end the run through runThenClean"
@@ -2148,7 +2358,7 @@ const LOGIC_CHECKS: readonly Check[] = [
       if (!treeFailKilled) return "a child whose tree kill failed was not killed directly"
       if (left.join(",") !== "22") return `children not waited for exit, or a stuck one not reported: ${left.join(",")}`
       const self = source("probe-sp-n.ts")
-      const main = self.slice(self.search(/^async function main\(\) \{$/m))
+      const main = self.slice(self.search(/^export async function prepare\(/m))
       return /endChildren\(/.test(main) && /taskkill\.exe/.test(main)
         ? undefined
         : "main does not wait for the children's trees to exit"
@@ -2541,7 +2751,7 @@ const LOGIC_CHECKS: readonly Check[] = [
       const assigns = [
         ...grp.matchAll(/out\[`n-barrier-(?:fg|posted)-proves-\$\{key\}`\] =\s*([^\n]+)\n\s*([^\n]*)/g),
       ].map((m) => `${m[1]} ${m[2]}`)
-      if (assigns.length !== 2 || assigns.some((a) => !/propertyVerdict\(/.test(a)))
+      if (assigns.length !== 2 || assigns.some((a) => !/propertyVerdict\(|rowVerdict\(/.test(a)))
         bad.push(`count-row verdicts not from the lookup: ${JSON.stringify(assigns)}`)
       if (/pick\(landed|pick\(fgDone/.test(grp)) bad.push("a count row still decides with its own pick")
       return bad.length ? bad.join("; ") : undefined
@@ -2672,13 +2882,15 @@ const LOGIC_CHECKS: readonly Check[] = [
       if (counted.length) bad.push(`count rows outside worst-of: ${[...new Set(counted.map((r) => r.id))].join(",")}`)
       const self = source("probe-sp-n.ts")
       const mp = self.slice(self.indexOf("export function mergePasses("), self.indexOf("export function verifyJob("))
-      const [ci, ti, pi] = [
-        mp.indexOf("worstOfCountPasses("),
-        mp.indexOf("worstOfPasses("),
-        mp.indexOf("a.verdict === b.verdict"),
-      ]
-      if (!(mp.indexOf("gatedVerify(") > 0 && ci > 0 && ti > ci && pi > ti))
-        bad.push("mergePasses compares before the gate and worst-of paths")
+      const mt = self.slice(self.indexOf("export function mergeTwo("), self.indexOf("export function mergePasses("))
+      if (!(mp.indexOf("gatedVerify(") > 0 && mp.indexOf("mergeTwo(") > mp.indexOf("gatedVerify(")))
+        bad.push("mergePasses merges before the control gate")
+      if (!(
+        mt.indexOf("worstOfCountPasses(") > 0 &&
+        mt.indexOf("worstOfPasses(") > mt.indexOf("worstOfCountPasses(") &&
+        mt.indexOf("MERGE_RANK[") > mt.indexOf("worstOfPasses(")
+      ))
+        bad.push("mergeTwo compares before the worst-of paths")
       if (
         (self.match(/verifyJob\(ledger, results, committed/g) ?? []).length !== 1 ||
         /\.verdict !== l\.verdict/.test(self)
@@ -2712,7 +2924,7 @@ const LOGIC_CHECKS: readonly Check[] = [
         const job = verifyJob([row(pass(l1))], { [id]: pass(l2) }, com, "h", () => true)
         const m = job.merged[id]
         const worst = Math.max(l1, l2) < 6 || Math.min(l1, l2) < 6 ? "CONTRADICTS" : "CONFIRMS"
-        if (job.diff !== want || m?.verdict !== worst || (l1 !== l2 && !/ vs /.test(m.measured)))
+        if (job.diff !== want || m?.verdict !== worst || (l1 !== l2 && !/ vs | \|\| other pass /.test(m.measured)))
           bad.push(`${name}: diff=${job.diff} want ${want}, merged ${m?.verdict} ${m?.measured}`)
       }
       const self = source("probe-sp-n.ts")
@@ -2721,6 +2933,327 @@ const LOGIC_CHECKS: readonly Check[] = [
         !/writeFileSync\(opt\.file, `\$\{mergeLedger\(ledger, host, fresh\)/.test(self)
       )
         bad.push("verify does not judge against the committed ledger or does not write the merged ledger")
+      return bad.length ? bad.join("; ") : undefined
+    },
+  },
+  {
+    finding: "BARRIER skipped runs excluded from every guard (review 79871df09c)",
+    async run() {
+      const bad: string[] = []
+      const ok: Json = { sent: 1, routed: true, consumed: true, atReturn: true, within2s: true }
+      const skips: Array<[string, Json]> = [
+        [
+          "not foreground at send",
+          { sent: 0, notForeground: true, routed: false, consumed: false, atReturn: false, within2s: false },
+        ],
+        ["SendInput accepted no event", { sent: 0, routed: false, consumed: false, atReturn: false, within2s: false }],
+        ["SendInput accepted no event", { routed: false, consumed: false }],
+      ]
+      const fg = (runs: Json[]): Json => ({
+        acquired: true,
+        acquire: "plain",
+        probeClass: "Edit",
+        stats: { p50: 4, p95: 5, min: 3, max: 6, n: runs.length },
+        runs,
+      })
+      const rows = (o: ReturnType<typeof fgBarrierObs>) =>
+        [rowVerdict("n-barrier-fg-proves-wpf", o.proves), rowVerdict("n-barrier-fg-ms-wpf", o.ms)] as const
+      for (const [why, sk] of skips)
+        for (const k of [1, 5, RUNS]) {
+          const o = fgBarrierObs(fg([...Array<Json>(k).fill(sk), ...Array<Json>(RUNS - k).fill(ok)]))
+          const [p, m] = rows(o)
+          const tag = `${why} x${k}`
+          if (k === RUNS) {
+            if (
+              p.verdict !== "UNMEASURED" ||
+              m.verdict !== "UNMEASURED" ||
+              !p.measured.includes(`skipped ${RUNS}/${RUNS}`)
+            )
+              bad.push(`${tag}: ${p.verdict}/${m.verdict} ${p.measured}`)
+            continue
+          }
+          const n = RUNS - k
+          if (
+            p.verdict !== "CONFIRMS" ||
+            !p.measured.includes(`routed ${n}/${n} consumed ${n}/${n}`) ||
+            !p.measured.includes(`skipped ${k}/${RUNS} (${why} ${k})`)
+          )
+            bad.push(`${tag} proves: ${p.verdict} ${p.measured}`)
+          if (m.verdict !== "NEW-EDGE" || !m.measured.includes("hang-guard expiries 0;"))
+            bad.push(`${tag} ms: ${m.verdict} ${m.measured}`)
+          if (!o.oracleSeen) bad.push(`${tag}: the oracle counted the skipped runs`)
+        }
+      if (rows(fgBarrierObs({ acquired: false })).some((r) => r.verdict !== "UNMEASURED"))
+        bad.push("no foreground: not UNMEASURED")
+      // a real miss among the exercised runs still contradicts the design
+      const miss = rows(fgBarrierObs(fg([{ ...ok, routed: false }, ...Array<Json>(RUNS - 1).fill(ok)])))
+      if (
+        miss[0].verdict !== "CONTRADICTS" ||
+        miss[1].verdict !== "CONTRADICTS" ||
+        !miss[1].measured.includes("hang-guard expiries 1;")
+      )
+        bad.push(`an exercised miss: ${miss.map((r) => r.verdict).join("/")}`)
+      const self = source("probe-sp-n.ts")
+      const grp = self.slice(self.indexOf("\nconst barriers: Group = {"), self.indexOf("\nconst chords: Group = {"))
+      if (/count\(fg\.runs/.test(grp) || !/fgBarrierObs\(fg\)/.test(grp))
+        bad.push("the barrier group counts runs outside fgBarrierObs")
+      return bad.length ? bad.slice(0, 5).join("; ") : undefined
+    },
+  },
+  {
+    finding: "VERDICT one function, fuzzed over every record shape (review 79871df09c)",
+    async run() {
+      const bad: string[] = []
+      const cites: Record<string, Cite> = {
+        d: { design: "design/d-windows.md:130 (t)" },
+        n: { noClaim: "none stated" },
+      }
+      const datas: Array<[string, unknown, Outcome | undefined]> = [
+        ["held", { outcome: "held", text: "t", counts: { a: [3, 3] } }, "held"],
+        ["broken", { outcome: "broken", text: "t", counts: { a: [2, 3] } }, "broken"],
+        ["edge", { outcome: "edge", text: "t" }, "edge"],
+        ["inconclusive", { outcome: "inconclusive", text: "p95 near" }, "inconclusive"],
+        ["missing", undefined, undefined],
+        ["null", null, undefined],
+        ["wrong type", "held", undefined],
+        ["outcome NaN", { outcome: Number.NaN, text: "t" }, undefined],
+        ["outcome negative", { outcome: -1, text: "t" }, undefined],
+        ["outcome wrong type", { outcome: true, text: "t" }, undefined],
+        ["outcome missing", { text: "t" }, undefined],
+        ["text missing", { outcome: "held" }, undefined],
+        ["text wrong type", { outcome: "held", text: 5 }, undefined],
+        ["count NaN", { outcome: "held", text: "t", counts: { a: [Number.NaN, 3] } }, undefined],
+        ["count negative", { outcome: "held", text: "t", counts: { a: [-1, 3] } }, undefined],
+        ["count over", { outcome: "held", text: "t", counts: { a: [4, 3] } }, undefined],
+        ["count no denominator", { outcome: "held", text: "t", counts: { a: [0, 0] } }, undefined],
+        ["count wrong type", { outcome: "held", text: "t", counts: { a: "3/3" } }, undefined],
+        ["counts wrong type", { outcome: "held", text: "t", counts: 5 }, undefined],
+      ]
+      for (const kind of ["MEASURED", "SKIPPED", "ERRORED", "BOGUS", undefined])
+        for (const [dn, data, outcome] of datas)
+          for (const c of ["d", "n", "absent"] as const)
+            for (const reason of ["why", undefined, 7]) {
+              const obs = { kind, data, reason } as unknown as Obs
+              const tag = `${String(kind)}/${dn}/${c}/${String(reason)}`
+              let r: Result | Error
+              try {
+                r = rowVerdict("row", obs, c === "absent" ? {} : { row: cites[c] as Cite })
+              } catch (e) {
+                r = e as Error
+              }
+              if (c === "absent") {
+                if (!(r instanceof Error)) bad.push(`${tag}: an uncited row was decided`)
+                continue
+              }
+              if (r instanceof Error) {
+                bad.push(`${tag}: threw ${r.message}`)
+                continue
+              }
+              const want: Verdict =
+                kind !== "MEASURED" || !outcome || outcome === "inconclusive"
+                  ? "UNMEASURED"
+                  : outcome === "edge" || c === "n"
+                    ? "NEW-EDGE"
+                    : outcome === "held"
+                      ? "CONFIRMS"
+                      : "CONTRADICTS"
+              if (r.verdict !== want) bad.push(`${tag}: ${r.verdict}, want ${want}`)
+              if (
+                (r.verdict === "CONFIRMS" || r.verdict === "CONTRADICTS") &&
+                !r.measured.includes("design/d-windows.md:130")
+              )
+                bad.push(`${tag}: a verdict without its citation`)
+              if ((kind === "SKIPPED" || kind === "ERRORED") && reason === "why" && !r.measured.includes("why"))
+                bad.push(`${tag}: reason dropped`)
+            }
+      let refused = false
+      try {
+        buildCites(["n-no-such-row"])
+      } catch {
+        refused = true
+      }
+      if (!refused) bad.push("the row table accepted a row with no citation")
+      const self = source("probe-sp-n.ts")
+      const at0 = self.indexOf("export async function runGroup(")
+      if (!/finalRow\(id, x, cites\)/.test(self.slice(at0, self.indexOf("\n}\n", at0))))
+        bad.push("runGroup does not pass every row through finalRow")
+      if (!/ledgerLine\(id, finalRow\(id, results\[id\] \?\? missing\)/.test(self))
+        bad.push("the measure writer bypasses finalRow")
+      return bad.length ? `${bad.length} cases: ${bad.slice(0, 5).join("; ")}` : undefined
+    },
+  },
+  {
+    finding: "MERGE explicit order, both passes kept (review 79871df09c)",
+    async run() {
+      const bad: string[] = []
+      const vs: Verdict[] = ["CONFIRMS", "NEW-EDGE", "UNMEASURED", "CONTRADICTS"]
+      const text = (id: string, v: Verdict, tag: string) =>
+        v === "UNMEASURED"
+          ? `UNMEASURED: errored: leg failed ${tag}`
+          : id.endsWith("-ms")
+            ? `p50=1ms p95=${tag === "pass-one" ? 1.5 : 1.6}ms n=31 ${tag}`
+            : `routed 31/31 consumed ${tag === "pass-one" ? 31 : 30}/31 ${tag}`
+      for (const id of ["n-uipi-sendinput", "n-barrier-fg-proves-wpf", "n-poll-sleep1-ms"])
+        for (const v1 of vs)
+          for (const v2 of vs) {
+            const a: Result = { measured: text(id, v1, "pass-one"), verdict: v1 }
+            const b: Result = { measured: text(id, v2, "pass-two"), verdict: v2 }
+            const m = mergeTwo(id, a, b)
+            const want = MERGE_RANK[v1] >= MERGE_RANK[v2] ? v1 : v2
+            if (m.verdict !== want) bad.push(`${id} ${v1}+${v2}: ${m.verdict}, want ${want}`)
+            if (v1 !== v2 && !(m.measured.includes("pass-one") && m.measured.includes("pass-two")))
+              bad.push(`${id} ${v1}+${v2} hides a pass: ${m.measured}`)
+            const row = Object.fromEntries(
+              HEADER.map((h) => [
+                h,
+                h === "id" ? id : h === "host" ? "h" : h === "verdict" ? v1 : h === "measured" ? a.measured : "x",
+              ]),
+            ) as LedgerRow
+            const job = verifyJob([row], { [id]: b }, [row], "h", () => true)
+            if ((job.diff === 1) !== (want !== v1)) bad.push(`${id} ${v1}+${v2}: job diff ${job.diff}`)
+          }
+      return bad.length ? `${bad.length} cases: ${bad.slice(0, 5).join("; ")}` : undefined
+    },
+  },
+  {
+    finding: "LEDGER round-trip through its rerun (review 79871df09c)",
+    async run() {
+      const bad: string[] = []
+      const committed = readLedger(join(HERE, "win32-delivery.tsv"))
+      for (const host of [...new Set(committed.map((r) => r.host))]) {
+        const mine = committed.filter((r) => r.host === host)
+        // a re-measure reading exactly what the ledger holds, through the same verdict function
+        const again = Object.fromEntries(
+          mine.map((r) => [r.id, finalRow(r.id, { measured: r.measured, verdict: r.verdict as Verdict })]),
+        )
+        for (const r of mine)
+          if (again[r.id]?.measured !== r.measured || again[r.id]?.verdict !== r.verdict)
+            bad.push(
+              `${r.id}@${host} not in writer format: ${again[r.id]?.verdict} ${again[r.id]?.measured.slice(0, 80)}`,
+            )
+        const job = verifyJob(committed, again, committed, host, () => true)
+        const off = job.lines.filter((l) => !l.startsWith("SAME "))
+        if (job.diff || off.length) bad.push(`${host}: ${off.slice(0, 3).join(" | ")}`)
+      }
+      for (const [d, n] of [
+        [0, 6],
+        [6, 6],
+        [3, 18],
+      ] as const) {
+        const p = parseControl(controlText(d, n))
+        if (p?.[0]?.[0] !== d || p[0][1] !== n) bad.push(`controlText ${d}/${n} does not parse back`)
+      }
+      if (JSON.stringify(parseControl("control delivered 0/6 vs 6/6 foreground by plain")) !== "[[0,6],[6,6]]")
+        bad.push("the two-pass control text does not parse")
+      const uncited = committed.filter((r) => {
+        if (!/^(CONFIRMS|CONTRADICTS)$/.test(r.verdict)) return false
+        const c = ROW_CITES[r.id]
+        return !c || !("design" in c) || !r.measured.includes(c.design.split(" ")[0] ?? c.design)
+      })
+      if (uncited.length)
+        bad.push(`verdicts without their citation: ${uncited.map((r) => `${r.id}@${r.host}`).join(",")}`)
+      return bad.length ? bad.slice(0, 6).join("; ") : undefined
+    },
+  },
+  {
+    finding: "CLEANUP every early exit removes the run's directories (review 79871df09c)",
+    async run() {
+      const bad: string[] = []
+      const scratch = join(tmpdir(), `spn-exit-${process.pid}-${randomBytes(4).toString("hex")}`)
+      mkdirSync(scratch, { recursive: true })
+      try {
+        const facts: Json = { elevated: true, github: true, build: "b", displayVersion: "v", arch: "a" }
+        const okLeg = async (_c: Ctx, n: string): Promise<Json> => (n === "precondition" ? { ok: true } : facts)
+        const other = join(scratch, "other.tsv")
+        writeFileSync(
+          other,
+          `${HEADER.join("\t")}\n${ledgerLine("n-poll-sleep1-ms", { measured: "m", verdict: "CONFIRMS" }, "other", "b", "-")}\n`,
+        )
+        const stages: Array<[string, Partial<Io>, Partial<ReturnType<typeof args>>, number]> = [
+          ["not Windows", { platform: "linux" }, {}, 2],
+          ["shared dir refused", { lockDown: async () => "ACL denied" }, {}, 2],
+          [
+            "precondition rejects",
+            { leg: async (_c, n) => (n === "precondition" ? Promise.reject(new Error("no desktop")) : facts) },
+            {},
+            2,
+          ],
+          [
+            "precondition not ok",
+            { leg: async (_c, n) => (n === "precondition" ? { ok: false, reason: "locked" } : facts) },
+            {},
+            2,
+          ],
+          [
+            "facts rejects (uncaught)",
+            { leg: async (_c, n) => (n === "facts" ? Promise.reject(new Error("helper died")) : { ok: true }) },
+            {},
+            2,
+          ],
+          [
+            "not elevated",
+            { leg: async (_c, n) => (n === "precondition" ? { ok: true } : { ...facts, elevated: false }) },
+            {},
+            2,
+          ],
+          ["verify with no ledger rows", {}, { mode: "verify", file: join(scratch, "none.tsv") }, 2],
+          ["no row for the host", {}, { mode: "verify", file: other }, 2],
+          ["after a full prepare", {}, {}, 0],
+        ]
+        for (const [i, [name, over, o, want]] of stages.entries()) {
+          const [pd, tb] = [join(scratch, `pd-${i}`), join(scratch, `tb-${i}`)]
+          mkdirSync(pd)
+          mkdirSync(tb)
+          const dirs = new Set<string>()
+          const io: Io = {
+            platform: "win32",
+            programData: pd,
+            tmpBase: tb,
+            dirs,
+            lockDown: async () => undefined,
+            leg: okLeg,
+            ...over,
+          }
+          const opt = {
+            mode: "measure",
+            file: join(scratch, "m.tsv"),
+            host: undefined,
+            rows: [],
+            allowIrreversible: false,
+            ...o,
+          } as ReturnType<typeof args>
+          const code = await runThroughCleanup(
+            async () => {
+              await prepare(opt, io)
+              return 0
+            },
+            dirs,
+            () => {},
+          )
+          const left = [...readdirSync(pd), ...readdirSync(tb)]
+          if (code !== want || left.length)
+            bad.push(`${name}: exit ${code} (want ${want}), left ${left.join(",") || "nothing"}`)
+        }
+        const d = join(scratch, "fatal")
+        mkdirSync(d)
+        let code = -1
+        onFatal(
+          new Error("unhandled rejection"),
+          new Set([d]),
+          () => {},
+          (c) => {
+            code = c
+          },
+        )
+        if (code !== 2 || existsSync(d)) bad.push(`onFatal: exit ${code}, dir left ${existsSync(d)}`)
+      } finally {
+        rmSync(scratch, { recursive: true, force: true })
+      }
+      // the only process exits: the top-level wrapper and onFatal's default
+      const self = source("probe-sp-n.ts")
+      const exits = self.match(/process\.exit\(/g)?.length ?? 0
+      if (exits !== 2 || !/process\.exit\(await runThroughCleanup\(main\)\)/.test(self))
+        bad.push(`${exits} process.exit calls, not 2 through the wrapper`)
       return bad.length ? bad.join("; ") : undefined
     },
   },
@@ -2862,7 +3395,7 @@ async function runChecks(checks: readonly Check[]): Promise<string[]> {
 }
 const logicChecks = () => runChecks(LOGIC_CHECKS)
 
-async function selfTest(): Promise<never> {
+async function selfTest(): Promise<number> {
   // --only <text>: run just the checks whose finding contains text, alone
   const only = process.argv[process.argv.indexOf("--only") + 1]
   const pick = (cs: readonly Check[]) =>
@@ -2877,25 +3410,27 @@ async function selfTest(): Promise<never> {
       ? `SELF-TEST FAIL ${failures.length} checks`
       : `SELF-TEST PASS ${ran} checks, pass budget ${TOTAL_BUDGET_S} s`,
   )
-  process.exit(failures.length ? 1 : 0)
+  return failures.length ? 1 : 0
 }
 
-async function main() {
-  if (process.argv[2] === "--self-test") await selfTest()
-  const opt = args()
-  const broken = await logicChecks()
-  if (broken.length) fail(`PRECONDITION self-test: ${broken.join("; ")}`)
-  if (process.platform !== "win32")
+// Everything before the groups run: each early exit (fail or a raw rejection) leaves through runThroughCleanup.
+export type Io = {
+  readonly platform: string
+  readonly programData: string
+  readonly tmpBase: string
+  readonly dirs: Set<string>
+  readonly lockDown: (ctx: Ctx, p: string) => Promise<string | undefined>
+  readonly leg: (ctx: Ctx, name: string) => Promise<Json>
+}
+export async function prepare(opt: ReturnType<typeof args>, io: Io) {
+  if (io.platform !== "win32")
     fail(
-      `PRECONDITION windows-interactive-desktop: SP-N measures a Windows interactive desktop; this host is ${process.platform}`,
+      `PRECONDITION windows-interactive-desktop: SP-N measures a Windows interactive desktop; this host is ${io.platform}`,
     )
   const ctx: Ctx = {
-    tmp: join(tmpdir(), `omo-sp-n-${process.pid}`),
+    tmp: join(io.tmpBase, `omo-sp-n-${process.pid}`),
     // a fresh, unpredictable name: freshDir refuses one that already exists
-    shared: join(
-      process.env.ProgramData ?? "C:\\ProgramData",
-      `omo-sp-n-${process.pid}-${randomBytes(6).toString("hex")}`,
-    ),
+    shared: join(io.programData, `omo-sp-n-${process.pid}-${randomBytes(6).toString("hex")}`),
     facts: {},
     targets: new Map(),
     spawned: [],
@@ -2907,15 +3442,18 @@ async function main() {
     allowIrreversible: opt.allowIrreversible,
     session: {},
   }
+  // registered for removal on every exit; only directories this run creates (freshDir refuses an existing one)
+  if (!existsSync(ctx.tmp)) io.dirs.add(ctx.tmp)
   mkdirSync(ctx.tmp, { recursive: true })
-  await freshDir(ctx.shared, (p) => lockDownWindows(ctx, p)).catch((e: Error) =>
+  if (!existsSync(ctx.shared)) io.dirs.add(ctx.shared)
+  await freshDir(ctx.shared, (p) => io.lockDown(ctx, p)).catch((e: Error) =>
     fail(`PRECONDITION shared-dir: ${e.message}`),
   )
-  const pre = await leg(ctx, "precondition").catch((e: Error) =>
-    fail(`PRECONDITION windows-interactive-desktop: ${e.message}`),
-  )
+  const pre = await io
+    .leg(ctx, "precondition")
+    .catch((e: Error) => fail(`PRECONDITION windows-interactive-desktop: ${e.message}`))
   if (pre.ok !== true) fail(`PRECONDITION windows-interactive-desktop: ${str(pre.reason)}`)
-  ctx.facts = await leg(ctx, "facts")
+  ctx.facts = await io.leg(ctx, "facts")
   if (ctx.facts.elevated !== true)
     fail(
       `PRECONDITION elevated-administrator: the probe needs an elevated administrator shell (inAdministrators=${str(ctx.facts.inAdministrators)} integrity=${str(ctx.facts.integrity)})`,
@@ -2935,6 +3473,22 @@ async function main() {
         : Object.keys(SPEC).filter((id) => host === H6 || !SPEC[id]?.h6Only),
   )
   if (want.size === 0) fail(`LEDGER ${opt.file}: no row for host "${host}"`)
+  return { ctx, host, build, ledger, want }
+}
+
+async function main(): Promise<number> {
+  if (process.argv[2] === "--self-test") return await selfTest()
+  const opt = args()
+  const broken = await logicChecks()
+  if (broken.length) fail(`PRECONDITION self-test: ${broken.join("; ")}`)
+  const { ctx, host, build, ledger, want } = await prepare(opt, {
+    platform: process.platform,
+    programData: process.env.ProgramData ?? "C:\\ProgramData",
+    tmpBase: tmpdir(),
+    dirs: EXIT_DIRS,
+    lockDown: lockDownWindows,
+    leg: (c, n) => leg(c, n),
+  })
   const groups = GROUPS.filter((g) => g.ids.some((id) => want.has(id)))
   const results: Record<string, Result> = {}
   const ids = Object.keys(SPEC).filter((id) => want.has(id))
@@ -2957,7 +3511,10 @@ async function main() {
         const before = readLedger(opt.file)
         const notes = new Map(before.filter((r) => r.host === host).map((r) => [r.id, r.notes]))
         const fresh = new Map(
-          ids.map((id) => [id, ledgerLine(id, results[id] ?? missing, host, build, carriedNote(notes.get(id)))]),
+          ids.map((id) => [
+            id,
+            ledgerLine(id, finalRow(id, results[id] ?? missing), host, build, carriedNote(notes.get(id))),
+          ]),
         )
         writeFileSync(opt.file, `${mergeLedger(before, host, fresh).join("\n")}\n`)
         for (const id of ids)
@@ -3007,7 +3564,12 @@ async function main() {
   )
   for (const l of end.lines) console.log(l)
   // Explicit: a child the probe could not end must not keep the run alive (the hosted job hung here once).
-  process.exit(end.exitCode)
+  return end.exitCode
 }
 
-if (import.meta.main) await main()
+if (import.meta.main) {
+  process.on("unhandledRejection", (e) => onFatal(e))
+  process.on("uncaughtException", (e) => onFatal(e))
+  // Explicit exit: a child the probe could not end must not keep the run alive (the hosted job hung here once).
+  process.exit(await runThroughCleanup(main))
+}
