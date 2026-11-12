@@ -153,6 +153,19 @@ describe("conformance report (ADP-1 declared-outcome catalog)", () => {
     ])
   })
 
+  test("a refusal cell that the hand delivered fails", () => {
+    expect(buildReport(catalog, passingRun(undefined, delivered(refuseCell))).problems).toEqual([
+      `cell ${cellId(refuseCell)}: expected refused BackgroundUnavailable, observed delivered`,
+    ])
+  })
+
+  test("a cell whose run ended in an error fails", () => {
+    const broken: CellResult = { ...delivered(deliverCell), observed: { kind: "error", message: "engine exited" } }
+    expect(buildReport(catalog, passingRun(broken)).problems).toEqual([
+      `cell ${cellId(deliverCell)}: error: engine exited`,
+    ])
+  })
+
   test("a delivered cell whose fixture oracle does not hold fails", () => {
     const wrong = { ...delivered(deliverCell), oracle: { held: false, observed: "hell" } }
     expect(buildReport(catalog, passingRun(wrong)).problems).toEqual([
