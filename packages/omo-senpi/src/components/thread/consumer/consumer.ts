@@ -166,6 +166,8 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
   return {
     wakeAllowed: () => wakeAllowed,
     start: async () => {
+      // A start is a new connection: the wake reads off until this start's own acknowledgement names it.
+      wakeAllowed = false
       try {
         await store.identity()
       } catch (error) {

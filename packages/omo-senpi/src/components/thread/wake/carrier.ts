@@ -323,9 +323,13 @@ export function createCarrier(options: CarrierOptions): Carrier {
     const allowance = await openAllowance(durableId)
     if (allowance !== "open") {
       if (allowance === "nothing_queued") {
+        // Only a record that is still `requested` is ended, compared on its generation: another carrier's record that
+        // is being opened or is open keeps its lease, so that carrier still closes the session it carries.
         const record = (await store.woken.list()).find((row) => row.durable_id === durableId)
-        if (record !== undefined) await store.woken.end({ durable_id: durableId, generation: record.generation })
-        return { kind: "nothing_queued" }
+        if (record === undefined) return { kind: "nothing_queued" }
+        if (record.state !== "requested") return { kind: "busy", code: "wake_in_progress" }
+        const ended = await store.woken.end({ durable_id: durableId, generation: record.generation })
+        return ended.kind === "ended" ? { kind: "nothing_queued" } : { kind: "busy", code: "wake_in_progress" }
       }
       await store.woken.request({ durable_id: durableId, session_file: target.session_path })
       return { kind: "switched_off" }
@@ -388,7 +392,8 @@ export function createCarrier(options: CarrierOptions): Carrier {
     const taken = await store.woken.takeOver({ durable_id: durableId })
     if (taken.kind !== "taken_over") return
     const target = resolveWakeTarget(options.sessionsDirectory, durableId)
-    if (target.kind !== "found") {
+    // The same refusals a wake makes: a session that is gone, ambiguous, or no longer interactive is not reopened.
+    if (target.kind !== "found" || target.session_kind !== "interactive") {
       await store.woken.end({ durable_id: durableId, generation: taken.row.generation })
       return
     }
