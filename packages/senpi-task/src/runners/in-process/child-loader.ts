@@ -27,9 +27,17 @@ export function createChildResourceLoader(options: ChildResourceLoaderOptions): 
     noPromptTemplates: true,
     noThemes: true,
     noContextFiles: true,
-    ...(options.onProviderRequest === undefined ? {} : {
-      extensionFactories: [(pi) => { pi.on("before_provider_request", () => { options.onProviderRequest?.() }) }],
-    }),
+    ...(options.onProviderRequest === undefined
+      ? {}
+      : {
+          extensionFactories: [
+            (pi) => {
+              pi.on("before_provider_request", () => {
+                options.onProviderRequest?.()
+              })
+            },
+          ],
+        }),
     ...(options.systemPrompt === undefined ? {} : { systemPrompt: options.systemPrompt }),
     extensionsOverride: (loaded) => {
       // Process children are launched with --no-ask-user. Set the same builtin flag before the

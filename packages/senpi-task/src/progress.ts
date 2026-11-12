@@ -106,10 +106,13 @@ export function createChildProgress(
         // Keep provider/model_id and the applied level: a selector suffix when present, else the level of the
         // fallback switch senpi announced for this same model.
         const parsed = parseModelSelector(event.to, resolvedModel?.source ?? "category")
-        const level = parsed !== undefined && parsed.reasoning === undefined
-          && fallbackSwitch?.provider === parsed.provider && fallbackSwitch.modelId === parsed.model_id
-          ? fallbackSwitch.level
-          : undefined
+        const level =
+          parsed !== undefined &&
+          parsed.reasoning === undefined &&
+          fallbackSwitch?.provider === parsed.provider &&
+          fallbackSwitch.modelId === parsed.model_id
+            ? fallbackSwitch.level
+            : undefined
         fallbackSwitch = undefined
         appliedLevel = parsed?.reasoning ?? level
         if (parsed !== undefined) {
@@ -124,7 +127,8 @@ export function createChildProgress(
       const moved = effectiveModelFromEvent(event)
       if (moved !== undefined) {
         // A bare fallback selector carries no level; keep the one senpi announced on model_changed (#7934).
-        effectiveModel = moved.reasoning === undefined && appliedLevel !== undefined ? { ...moved, reasoning: appliedLevel } : moved
+        effectiveModel =
+          moved.reasoning === undefined && appliedLevel !== undefined ? { ...moved, reasoning: appliedLevel } : moved
         return true
       }
       if (event.type === "retry_fallback_applied" && event.to !== undefined) return true
@@ -268,10 +272,7 @@ function readFallbackSwitch(
 // Parse a "provider/model_id" or "provider/model_id:reasoning" selector into a ResolvedModelRecord.
 // Mirrors runtime-fallback-event.ts parseModelSelector so the live progress tracker preserves
 // the thinking level that the task record store already retains.
-function parseModelSelector(
-  selector: string,
-  source: ResolvedModelRecord["source"],
-): ResolvedModelRecord | undefined {
+function parseModelSelector(selector: string, source: ResolvedModelRecord["source"]): ResolvedModelRecord | undefined {
   const slash = selector.indexOf("/")
   if (slash <= 0 || slash === selector.length - 1) return undefined
   const colon = selector.lastIndexOf(":")
@@ -282,8 +283,6 @@ function parseModelSelector(
     provider: display.slice(0, slash),
     model_id: display.slice(slash + 1),
     display,
-    ...(hasThinking
-      ? { reasoning: selector.slice(colon + 1), reasoning_effort: selector.slice(colon + 1) }
-      : {}),
+    ...(hasThinking ? { reasoning: selector.slice(colon + 1), reasoning_effort: selector.slice(colon + 1) } : {}),
   }
 }

@@ -426,9 +426,7 @@ describe("OpenCode UnknownError scoping (fixes #7706)", () => {
     ]
 
     //#when
-    const results = errors.map((error) =>
-      isRuntimeFallbackRetryableError(error, [401, 429, 500, 502, 503])
-    )
+    const results = errors.map((error) => isRuntimeFallbackRetryableError(error, [401, 429, 500, 502, 503]))
 
     //#then
     expect(results).toEqual([false, false, false])
@@ -464,9 +462,7 @@ describe("OpenCode UnknownError scoping (fixes #7706)", () => {
     ]
 
     //#when
-    const results = errors.map((error) =>
-      isRuntimeFallbackRetryableError(error, [429, 500, 502, 503])
-    )
+    const results = errors.map((error) => isRuntimeFallbackRetryableError(error, [429, 500, 502, 503]))
 
     //#then
     expect(results).toEqual([false, false])
@@ -493,9 +489,7 @@ describe("OpenCode UnknownError scoping (fixes #7706)", () => {
     ]
 
     //#when
-    const results = errors.map((error) =>
-      isRuntimeFallbackRetryableError(error, [401, 429, 500, 502, 503])
-    )
+    const results = errors.map((error) => isRuntimeFallbackRetryableError(error, [401, 429, 500, 502, 503]))
 
     //#then
     expect(results).toEqual([true, true, true])
@@ -517,9 +511,7 @@ describe("OpenCode UnknownError scoping (fixes #7706)", () => {
     ]
 
     //#when
-    const results = errors.map((error) =>
-      isRuntimeFallbackRetryableError(error, [401, 429, 500, 502, 503])
-    )
+    const results = errors.map((error) => isRuntimeFallbackRetryableError(error, [401, 429, 500, 502, 503]))
 
     //#then
     expect(results).toEqual([true, true])
@@ -546,9 +538,7 @@ describe("OpenCode UnknownError scoping (fixes #7706)", () => {
     ]
 
     //#when
-    const results = errors.map((error) =>
-      isRuntimeFallbackRetryableError(error, [401, 429])
-    )
+    const results = errors.map((error) => isRuntimeFallbackRetryableError(error, [401, 429]))
 
     //#then
     expect(results).toEqual([true, true, true])

@@ -11,11 +11,19 @@ const ACCOUNT_LIMIT =
 const PROVIDER_TIMEOUT = "Provider stream start timed out after 300000ms"
 
 function agentEnd(errorMessage: string, willRetry: boolean): unknown {
-  return { type: "agent_end", willRetry, messages: [{ role: "assistant", content: [], stopReason: "error", errorMessage }] }
+  return {
+    type: "agent_end",
+    willRetry,
+    messages: [{ role: "assistant", content: [], stopReason: "error", errorMessage }],
+  }
 }
 
 function completedEnd(): unknown {
-  return { type: "agent_end", willRetry: false, messages: [{ role: "assistant", content: [{ type: "text", text: "done" }], stopReason: "stop" }] }
+  return {
+    type: "agent_end",
+    willRetry: false,
+    messages: [{ role: "assistant", content: [{ type: "text", text: "done" }], stopReason: "stop" }],
+  }
 }
 
 const idle = (): Promise<TurnSettlementProbe> =>
@@ -24,12 +32,18 @@ const idle = (): Promise<TurnSettlementProbe> =>
 function createFixture(options: { readonly monitorLive: boolean }) {
   const wakes = createTurnWakeSources()
   if (options.monitorLive) {
-    wakes.observe({ type: "extension_event", name: "terminal_monitor_state", data: { activeCount: 1, monitors: [{ id: "mon_1" }] } })
+    wakes.observe({
+      type: "extension_event",
+      name: "terminal_monitor_state",
+      data: { activeCount: 1, monitors: [{ id: "mon_1" }] },
+    })
   }
   const scheduler = createManualSettlementScheduler()
   const settled: RunnerOutcome[] = []
   const settlement = createTurnSettlement({
-    settle: (outcome) => { settled.push(outcome) },
+    settle: (outcome) => {
+      settled.push(outcome)
+    },
     abortedByUser: () => false,
     baseline: () => undefined,
     finalText: () => undefined,
@@ -47,7 +61,10 @@ describe("a usage-limit error settles within one confirmation interval (omo#9711
     { type: "agent_end", delayMs: 45_000 },
   ])("an announced delayed retry retains its full backoff and completes: %p", (delayEvent) => {
     const fixture = createFixture({ monitorLive: false })
-    fixture.settlement.observe({ ...agentEnd(ACCOUNT_LIMIT, true) as object, ...(delayEvent.type === "agent_end" ? delayEvent : {}) } as never)
+    fixture.settlement.observe({
+      ...(agentEnd(ACCOUNT_LIMIT, true) as object),
+      ...(delayEvent.type === "agent_end" ? delayEvent : {}),
+    } as never)
     if (delayEvent.type !== "agent_end") fixture.settlement.observe(delayEvent as never)
     expect(fixture.scheduler.nextDelay()).toBe(55_000)
     expect(fixture.settled).toEqual([])
@@ -64,19 +81,24 @@ describe("a usage-limit error settles within one confirmation interval (omo#9711
     expect(fixture.scheduler.nextDelay()).toBe(55_000)
   })
 
-  test.each([false, true])("#given a terminal usage-limit end (monitor live: %p) #when the confirmation fires #then the turn settles failed with the provider's reason", async (monitorLive) => {
-    // given
-    const fixture = createFixture({ monitorLive })
+  test.each([false, true])(
+    "#given a terminal usage-limit end (monitor live: %p) #when the confirmation fires #then the turn settles failed with the provider's reason",
+    async (monitorLive) => {
+      // given
+      const fixture = createFixture({ monitorLive })
 
-    // when
-    fixture.settlement.observe(agentEnd(ACCOUNT_LIMIT, false) as never)
-    fixture.scheduler.runNext()
-    await flushSettlement()
+      // when
+      fixture.settlement.observe(agentEnd(ACCOUNT_LIMIT, false) as never)
+      fixture.scheduler.runNext()
+      await flushSettlement()
 
-    // then
-    expect(fixture.settled).toEqual([{ status: "error", failure: { kind: "child-turn-failed", message: ACCOUNT_LIMIT } }])
-    expect(fixture.scheduler.pending()).toBe(0)
-  })
+      // then
+      expect(fixture.settled).toEqual([
+        { status: "error", failure: { kind: "child-turn-failed", message: ACCOUNT_LIMIT } },
+      ])
+      expect(fixture.scheduler.pending()).toBe(0)
+    },
+  )
 
   test("#given the engine announces a retry on a usage limit #when no run starts before the confirmation #then the turn settles failed", async () => {
     // given
@@ -89,7 +111,9 @@ describe("a usage-limit error settles within one confirmation interval (omo#9711
     await flushSettlement()
 
     // then
-    expect(fixture.settled).toEqual([{ status: "error", failure: { kind: "child-turn-failed", message: ACCOUNT_LIMIT } }])
+    expect(fixture.settled).toEqual([
+      { status: "error", failure: { kind: "child-turn-failed", message: ACCOUNT_LIMIT } },
+    ])
   })
 
   test("#given the engine announces a retry on a usage limit #when the retry run starts and completes #then the completed outcome is the turn's", () => {

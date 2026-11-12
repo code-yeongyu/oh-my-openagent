@@ -81,11 +81,13 @@ export function createUsageLimitMemory(now: () => number): UsageLimitMemory {
  * A new child never starts on a rung whose limit an earlier child already found spent: it starts on the first rung
  * the memory clears, or, when every rung is spent, it is refused with the remembered reason (#11383).
  */
-export function routeAroundSpentLimits<Plan extends {
-  readonly model: string
-  readonly resolved_model?: ResolvedModelRecord
-  readonly fallback_models?: readonly ResolvedModelRecord[]
-}>(plan: Plan, limits: UsageLimitMemory): { readonly plan: Plan } | { readonly spent: string } {
+export function routeAroundSpentLimits<
+  Plan extends {
+    readonly model: string
+    readonly resolved_model?: ResolvedModelRecord
+    readonly fallback_models?: readonly ResolvedModelRecord[]
+  },
+>(plan: Plan, limits: UsageLimitMemory): { readonly plan: Plan } | { readonly spent: string } {
   const primary = plan.resolved_model
   const reason = primary === undefined ? undefined : limits.spentReason(primary.provider, primary.model_id)
   if (reason === undefined) return { plan }

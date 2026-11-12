@@ -5,7 +5,14 @@ import { createTaskRecordStore, type TaskRecordStore } from "../store"
 import type { ResolvedModelRecord, TaskRecord } from "../state"
 import { createTaskManager } from "./manager"
 import { createUsageLimitMemory } from "./usage-limit-memory"
-import { baseSpec, cleanupProjects, type FakeHandle, FakeRunner, settings, tempProject } from "./__fixtures__/manager-fakes"
+import {
+  baseSpec,
+  cleanupProjects,
+  type FakeHandle,
+  FakeRunner,
+  settings,
+  tempProject,
+} from "./__fixtures__/manager-fakes"
 import type { ManagedStartSpec } from "./types"
 import { resolveChildSessionDir } from "../runners/rpc/spawn"
 
@@ -35,12 +42,25 @@ function fixture(fallbacks: readonly ResolvedModelRecord[] = [], now: () => numb
     resume: (spec: ManagedStartSpec, _path: string) => runner.start(spec),
   })
   const manager = createTaskManager({
-    store, usageLimits: memory, cwd: project,
+    store,
+    usageLimits: memory,
+    cwd: project,
     runners: { process: runner, "in-process": runner },
-    planner: () => ({ kind: "resolved", plan: { model: primary.display, resolved_model: primary, fallback_models: fallbacks } }),
+    planner: () => ({
+      kind: "resolved",
+      plan: { model: primary.display, resolved_model: primary, fallback_models: fallbacks },
+    }),
     config: settings({ default_concurrency: 5, max_depth: 1 }),
   })
-  return { manager, memory, runner, backing, intercept: (hook: typeof intercept) => { intercept = hook } }
+  return {
+    manager,
+    memory,
+    runner,
+    backing,
+    intercept: (hook: typeof intercept) => {
+      intercept = hook
+    },
+  }
 }
 
 test("a remembered-limit spawn refusal is machine readable and persisted", async () => {
@@ -52,7 +72,9 @@ test("a remembered-limit spawn refusal is machine readable and persisted", async
     if (result.kind !== "start_failed") throw new Error("expected refusal")
     expect(f.manager.get(result.task_id)?.failure_kind).toBe("usage_limit")
     expect(f.runner.startedSpecs).toHaveLength(0)
-  } finally { f.manager.workpools.dispose() }
+  } finally {
+    f.manager.workpools.dispose()
+  }
 })
 
 test("a resumed task routes around remembered provider limits before launching", async () => {
@@ -67,7 +89,9 @@ test("a resumed task routes around remembered provider limits before launching",
     expect(resumed.ok).toBe(true)
     expect(f.runner.startedSpecs.at(-1)?.model).toBe(other.display)
     expect(f.manager.get(result.task_id)?.resolved_model).toEqual(other)
-  } finally { f.manager.workpools.dispose() }
+  } finally {
+    f.manager.workpools.dispose()
+  }
 })
 
 test("a warm revival refuses a remembered spent chain before delivering a prompt", async () => {
@@ -80,10 +104,14 @@ test("a warm revival refuses a remembered spent chain before delivering a prompt
     fake.settle({ status: "completed", finalResponse: "done" })
     await done
     f.memory.settle("earlier", primary.provider, primary.model_id, "Account usage limit reached")
-    expect(await f.manager.sendToTask({ idOrName: result.task_id, message: "continue" }))
-      .toMatchObject({ kind: "not_continuable", failure_kind: "usage_limit" })
+    expect(await f.manager.sendToTask({ idOrName: result.task_id, message: "continue" })).toMatchObject({
+      kind: "not_continuable",
+      failure_kind: "usage_limit",
+    })
     expect(fake.followUpCalls).toHaveLength(0)
-  } finally { f.manager.workpools.dispose() }
+  } finally {
+    f.manager.workpools.dispose()
+  }
 })
 
 test("a warm revival resumes its transcript on an unspent alternative", async () => {
@@ -99,17 +127,24 @@ test("a warm revival resumes its transcript on an unspent alternative", async ()
     mkdirSync(sessions, { recursive: true })
     writeFileSync(join(sessions, "completed.jsonl"), "")
     f.memory.settle("earlier", primary.provider, primary.model_id, "Account usage limit reached")
-    expect(await f.manager.sendToTask({ idOrName: result.task_id, message: "continue" })).toMatchObject({ kind: "revived" })
+    expect(await f.manager.sendToTask({ idOrName: result.task_id, message: "continue" })).toMatchObject({
+      kind: "revived",
+    })
     expect(f.runner.startedSpecs.at(-1)?.model).toBe(other.display)
     expect(fake.followUpCalls).toHaveLength(0)
     expect(f.runner.handles.get(result.task_id)?.followUpCalls).toEqual(["continue"])
-  } finally { f.manager.workpools.dispose() }
+  } finally {
+    f.manager.workpools.dispose()
+  }
 })
 
 const FABLE_LIMIT = "You've hit your Fable weekly limit for this model · Resets at 2099-10-29T04:27:07Z"
 
 function hopInSession(fake: FakeHandle, from: string, to: string, message: string): void {
-  fake.emit({ type: "message_end", message: { role: "assistant", stopReason: "error", errorMessage: message, content: [] } })
+  fake.emit({
+    type: "message_end",
+    message: { role: "assistant", stopReason: "error", errorMessage: message, content: [] },
+  })
   const hop = { type: "retry_fallback_applied", from, to, chainKey: from, reason: "hard-error" }
   fake.emit(hop)
 }
@@ -135,7 +170,9 @@ test("a usage limit the engine hops past in-session is remembered for a later ta
 
     now = Date.parse("2099-10-29T04:27:07Z")
     expect(f.memory.familySpent(primary.provider, primary.model_id)).toBe(false)
-  } finally { f.manager.workpools.dispose() }
+  } finally {
+    f.manager.workpools.dispose()
+  }
 })
 
 test("an in-session hop off a model outside the designated chain is not remembered", async () => {
@@ -150,7 +187,9 @@ test("an in-session hop off a model outside the designated chain is not remember
     fake.settle({ status: "completed", finalResponse: "done" })
     await done
     expect(f.memory.familySpent("parent", "gpt")).toBe(false)
-  } finally { f.manager.workpools.dispose() }
+  } finally {
+    f.manager.workpools.dispose()
+  }
 })
 
 test("a probe that fails during runner startup has only thirty minutes of sanitized routing memory", async () => {
@@ -162,14 +201,19 @@ test("a probe that fails during runner startup has only thirty minutes of saniti
     const fake = present(f.runner.handles.get(result.task_id))
     f.runner.startError = new Error("private runner exception")
     const done = f.manager.waitFor(result.task_id)
-    fake.settle({ status: "error", failure: { kind: "child-turn-failed", message: "Weekly usage limit reached. Resets at 2099-10-29T04:27:07Z" } })
+    fake.settle({
+      status: "error",
+      failure: { kind: "child-turn-failed", message: "Weekly usage limit reached. Resets at 2099-10-29T04:27:07Z" },
+    })
     await done
     expect(f.memory.accountSpent("test")).toBe(true)
     expect(f.memory.spentReason("test", "first")).not.toContain("private runner exception")
     expect(f.memory.probeOf(result.task_id)).toBeUndefined()
     now += 30 * 60_000
     expect(f.memory.accountSpent("test")).toBe(false)
-  } finally { f.manager.workpools.dispose() }
+  } finally {
+    f.manager.workpools.dispose()
+  }
 })
 
 test.each(["stopped", "moved"] as const)("a %s handoff leaves no probe entry", async (mode) => {
@@ -192,5 +236,7 @@ test.each(["stopped", "moved"] as const)("a %s handoff leaves no probe entry", a
     expect(intercepted).toBe(true)
     expect(f.memory.probeOf(result.task_id)).toBeUndefined()
     expect(f.runner.startedSpecs).toHaveLength(1)
-  } finally { f.manager.workpools.dispose() }
+  } finally {
+    f.manager.workpools.dispose()
+  }
 })

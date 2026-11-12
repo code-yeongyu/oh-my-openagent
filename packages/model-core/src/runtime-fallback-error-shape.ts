@@ -144,7 +144,9 @@ export function getRuntimeFallbackProviderID(error: unknown): string | undefined
   const data = getNestedRecord(error, "data")
   const nestedError = getNestedRecord(error, "error")
   const dataError = getNestedRecord(data, "error")
-  const records = [error, data, nestedError, dataError].filter((value): value is Record<string, unknown> => value !== undefined)
+  const records = [error, data, nestedError, dataError].filter(
+    (value): value is Record<string, unknown> => value !== undefined,
+  )
 
   for (const record of records) {
     const providerID = getRecordValue(record, "providerID")

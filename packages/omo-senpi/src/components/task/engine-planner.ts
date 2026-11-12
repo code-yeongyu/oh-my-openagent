@@ -1,7 +1,12 @@
 import { homedir } from "node:os"
 
 import type { OmoConfig, OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
-import { resolveTaskAgents, type ChildPlanner, type PlanConfigError, type PlanResolution } from "@oh-my-opencode/senpi-task"
+import {
+  resolveTaskAgents,
+  type ChildPlanner,
+  type PlanConfigError,
+  type PlanResolution,
+} from "@oh-my-opencode/senpi-task"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 import type { SenpiConfigDiagnostic } from "../config-resolution"
@@ -33,7 +38,8 @@ export type EnginePlannerInput = {
 // A validation error or a dropped leaf blocks only when it is in a routing field; anything else (task settings,
 // memory, ...) is dropped and warned about by the loader, exactly as before (#11355).
 function blocksRouting(diagnostic: SenpiConfigDiagnostic): boolean {
-  if (diagnostic.kind === "parse" || diagnostic.kind === "read" || diagnostic.kind === "model_catalog_cycle") return true
+  if (diagnostic.kind === "parse" || diagnostic.kind === "read" || diagnostic.kind === "model_catalog_cycle")
+    return true
   if (diagnostic.kind !== "validation" && diagnostic.kind !== "invalid-value") return false
   const paths = diagnostic.issuePaths ?? []
   return paths.length === 0 || paths.some(isRoutingPath)
@@ -74,15 +80,18 @@ function spawnConfigError(loaded: SpawnOmoConfig): PlanConfigError | undefined {
 
 function configErrorMessage(error: PlanConfigError): string {
   if (error.kind === "catalog") {
-    const at = error.issue_paths !== undefined && error.issue_paths.length > 0 ? ` at ${error.issue_paths.join(", ")}` : ""
+    const at =
+      error.issue_paths !== undefined && error.issue_paths.length > 0 ? ` at ${error.issue_paths.join(", ")}` : ""
     return `omo model catalog has a reference cycle${at}. No task was started; fix the model references and spawn again (the task never runs on another config).`
   }
-  const where = error.position !== undefined
-    ? `${error.path}:${error.position.line}:${error.position.column}`
-    : error.issue_paths !== undefined && error.issue_paths.length > 0
-      ? `${error.path} at ${error.issue_paths.join(", ")}`
-      : error.path
-  const what = error.kind === "parse" ? "is not valid JSON" : error.kind === "read" ? "could not be read" : "has an invalid value"
+  const where =
+    error.position !== undefined
+      ? `${error.path}:${error.position.line}:${error.position.column}`
+      : error.issue_paths !== undefined && error.issue_paths.length > 0
+        ? `${error.path} at ${error.issue_paths.join(", ")}`
+        : error.path
+  const what =
+    error.kind === "parse" ? "is not valid JSON" : error.kind === "read" ? "could not be read" : "has an invalid value"
   return `omo config ${where} ${what}. No task was started; fix the file and spawn again (the task never runs on another config).`
 }
 
@@ -100,11 +109,20 @@ export function createEnginePlanner(input: EnginePlannerInput): ChildPlanner {
     const loaded = loadOmoConfig()
     const configFailure = spawnConfigError(loaded)
     if (configFailure !== undefined) {
-      return { kind: "error", error: { code: "config_invalid", message: configErrorMessage(configFailure), config_error: configFailure } }
+      return {
+        kind: "error",
+        error: { code: "config_invalid", message: configErrorMessage(configFailure), config_error: configFailure },
+      }
     }
     const omoConfig = loaded.config
     const resolution = createGenerationObservingPlanner({
-      planner: createTaskChildPlanner(omoConfig, resolveTaskAgents(omoConfig), resolveRegistry, () => runtime.parentServiceTier(), resolveDefaultRoute),
+      planner: createTaskChildPlanner(
+        omoConfig,
+        resolveTaskAgents(omoConfig),
+        resolveRegistry,
+        () => runtime.parentServiceTier(),
+        resolveDefaultRoute,
+      ),
       omoConfig,
       resolveRegistry,
       generations,

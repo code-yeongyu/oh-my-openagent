@@ -34,7 +34,9 @@ export function subscribeChildFacts(input: {
   runStats.set(taskId, createRunStatsTracker(now(), now, currentRunStartEpoch(input.store.load(taskId))))
   const effectiveModel = subscribeEffectiveModel(handle, { store: input.store, taskId, now })
   const refusals = observeModelRefusals({
-    store: input.store, taskId, now,
+    store: input.store,
+    taskId,
+    now,
     ...(input.onUsageLimitHop === undefined ? {} : { onUsageLimitHop: input.onUsageLimitHop }),
   })
   const stats = handle.subscribe((event) => {

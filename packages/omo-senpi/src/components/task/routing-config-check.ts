@@ -11,7 +11,8 @@ import { normalizeLegacyModelFields } from "@oh-my-opencode/omo-config-core"
 // In each location: `categories.<name>` and `agents.<name>` entries (`model`, `models`, `fallback_models`, and the
 // reasoning selectors) and `exclude_models`. Another harness's block (`[codex]`, `[opencode]`) never routes a Senpi child.
 const SENPI_HARNESS_BLOCKS = ["[senpi]", "[native]"] as const
-const ROUTING_PATH = /^(?:profiles\.[^.]+\.)?(?:\[(?:senpi|native)\]\.)?(?:categories|agents|exclude_models|models)(?:\.|$)/
+const ROUTING_PATH =
+  /^(?:profiles\.[^.]+\.)?(?:\[(?:senpi|native)\]\.)?(?:categories|agents|exclude_models|models)(?:\.|$)/
 // "provider/model", or a model catalog name that resolves to one.
 const MODEL_REF = /^[^\s/]+\/\S+$/
 const SELECTOR_FIELDS = ["variant", "reasoningEffort", "provider"] as const
@@ -42,13 +43,15 @@ function routingLocations(layer: unknown): readonly RoutingLocation[] {
     locations.push({ prefix, scope, ...(profile === undefined ? {} : { profile }) })
     for (const block of SENPI_HARNESS_BLOCKS) {
       const value = scope[block]
-      if (isRecord(value)) locations.push({ prefix: `${prefix}${block}.`, scope: value, ...(profile === undefined ? {} : { profile }) })
+      if (isRecord(value))
+        locations.push({ prefix: `${prefix}${block}.`, scope: value, ...(profile === undefined ? {} : { profile }) })
     }
   }
   add("", layer)
   const profiles = layer["profiles"]
   if (isRecord(profiles)) {
-    for (const [name, profile] of Object.entries(profiles)) if (isRecord(profile)) add(`profiles.${name}.`, profile, name)
+    for (const [name, profile] of Object.entries(profiles))
+      if (isRecord(profile)) add(`profiles.${name}.`, profile, name)
   }
   return locations
 }
@@ -100,7 +103,8 @@ function checkEntry(entry: unknown, at: string, check: Check): void {
     return
   }
   if ("model" in entry && !check.isModelRef(entry["model"])) check.issues.push(`${at}.model`)
-  for (const key of CHAIN_FIELDS) if (key in entry) checkChain(entry[key], `${at}.${key}`, check, key === "fallback_models")
+  for (const key of CHAIN_FIELDS)
+    if (key in entry) checkChain(entry[key], `${at}.${key}`, check, key === "fallback_models")
   checkSelectors(entry, at, check)
 }
 

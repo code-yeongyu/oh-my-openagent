@@ -96,17 +96,27 @@ describe("a child runs only on its designated models, never on the parent's mode
 
   test("#given a two-model chain whose first model is not served by its route #when it answers model_not_found #then the second designated model runs and the task completes (#11355)", async () => {
     // given / when
-    const { record, world } = await runCategoryChild({ category: "unspecified-high", chain: [PRIMARY, SECOND], scripts: { [PRIMARY]: ["missing"] } })
+    const { record, world } = await runCategoryChild({
+      category: "unspecified-high",
+      chain: [PRIMARY, SECOND],
+      scripts: { [PRIMARY]: ["missing"] },
+    })
 
     // then
     expect(record.status).toBe("completed")
     expect(world.calls.map((call) => call.model)).toEqual([PRIMARY, SECOND])
-    expect(record.model_refusals?.map((refusal) => [refusal.model, refusal.reason])).toEqual([[PRIMARY, "model_not_found"]])
+    expect(record.model_refusals?.map((refusal) => [refusal.model, refusal.reason])).toEqual([
+      [PRIMARY, "model_not_found"],
+    ])
   }, 30_000)
 
   test("#given a model_not_found that also carries a 401 #when the next designated model is on the same provider #then that sibling still runs, because the answer is about one model (#11355)", async () => {
     // given / when
-    const { record, world } = await runCategoryChild({ category: "quick", chain: [PRIMARY, SIBLING], scripts: { [PRIMARY]: ["missing"] } })
+    const { record, world } = await runCategoryChild({
+      category: "quick",
+      chain: [PRIMARY, SIBLING],
+      scripts: { [PRIMARY]: ["missing"] },
+    })
 
     // then
     expect(record.status).toBe("completed")
@@ -115,7 +125,11 @@ describe("a child runs only on its designated models, never on the parent's mode
 
   test("#given a one-model chain whose model is not served by its route #when it answers model_not_found #then the task fails typed, listing the model with reason model not found, and no other model is called (#11355)", async () => {
     // given / when
-    const { record, world } = await runCategoryChild({ category: "deep-high", chain: [PRIMARY], scripts: { [PRIMARY]: ["missing"] } })
+    const { record, world } = await runCategoryChild({
+      category: "deep-high",
+      chain: [PRIMARY],
+      scripts: { [PRIMARY]: ["missing"] },
+    })
 
     // then
     expect(world.calls.map((call) => call.model)).toEqual([PRIMARY])

@@ -17,7 +17,9 @@ export function createProbeRequestSignal(now: () => number) {
     subscribe: (listener: (at: number) => void) => {
       listeners.add(listener)
       if (first !== undefined) listener(first)
-      return () => { listeners.delete(listener) }
+      return () => {
+        listeners.delete(listener)
+      }
     },
   }
 }
@@ -30,7 +32,9 @@ export function withProbeRequestExtension(spec: RpcRunnerSpec): RpcRunnerSpec {
   if (spec.probeProviderRequest !== true) return spec
   mkdirSync(spec.state_dir, { recursive: true })
   const path = join(mkdtempSync(join(spec.state_dir, "probe-request-")), "request.mjs")
-  writeFileSync(path, `export default function(pi) {
+  writeFileSync(
+    path,
+    `export default function(pi) {
   let started = false
   pi.on("before_provider_request", () => {
     if (started) return
@@ -38,6 +42,8 @@ export function withProbeRequestExtension(spec: RpcRunnerSpec): RpcRunnerSpec {
     pi.rpc.emit("${PROBE_REQUEST_EVENT}", { at: Date.now() })
   })
 }
-`, { mode: 0o600 })
+`,
+    { mode: 0o600 },
+  )
   return { ...spec, extensions: [...(spec.extensions ?? []), path] }
 }

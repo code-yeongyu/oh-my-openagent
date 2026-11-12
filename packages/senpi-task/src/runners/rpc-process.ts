@@ -83,7 +83,8 @@ export class RpcProcessRunner {
     const spec = withProbeRequestExtension(
       specInput.extensions === undefined && this.inheritedExtensions.length > 0
         ? { ...specInput, extensions: this.inheritedExtensions }
-        : specInput)
+        : specInput,
+    )
     await this.modelAdmission(spec)
     const parent = new ChildParentLink(
       spec.task_id,

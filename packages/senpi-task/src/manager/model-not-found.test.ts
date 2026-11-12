@@ -29,19 +29,34 @@ function record(fallbacks: readonly ResolvedModelRecord[]): TaskRecord {
 }
 
 describe("a model its route does not serve (#11355)", () => {
-  test.each(MODEL_NOT_FOUND_ANSWERS)("#given %s #when the refusal is classified #then its reason is model_not_found", (_label, message) => {
-    expect(refusalOf(record([]), message, "2026-11-01T00:00:00.000Z").reason).toBe("model_not_found")
-  })
+  test.each(MODEL_NOT_FOUND_ANSWERS)(
+    "#given %s #when the refusal is classified #then its reason is model_not_found",
+    (_label, message) => {
+      expect(refusalOf(record([]), message, "2026-11-01T00:00:00.000Z").reason).toBe("model_not_found")
+    },
+  )
 
-  test.each(MODEL_NOT_FOUND_ANSWERS)("#given %s #when the candidates are computed #then the rest of the designated chain is walked in order, the same-provider sibling included", (_label, message) => {
-    expect(runtimeFallbackCandidates(record([SIBLING, OTHER]), message)).toEqual({ remaining: [SIBLING, OTHER], skipped: [] })
-  })
+  test.each(MODEL_NOT_FOUND_ANSWERS)(
+    "#given %s #when the candidates are computed #then the rest of the designated chain is walked in order, the same-provider sibling included",
+    (_label, message) => {
+      expect(runtimeFallbackCandidates(record([SIBLING, OTHER]), message)).toEqual({
+        remaining: [SIBLING, OTHER],
+        skipped: [],
+      })
+    },
+  )
 
-  test.each(MODEL_NOT_FOUND_ANSWERS)("#given %s #when the terminal message is built #then it is the provider's answer, not a credential or usage-limit hint", (_label, message) => {
-    expect(terminalFailureMessage(record([]), message)).toBe(message)
-  })
+  test.each(MODEL_NOT_FOUND_ANSWERS)(
+    "#given %s #when the terminal message is built #then it is the provider's answer, not a credential or usage-limit hint",
+    (_label, message) => {
+      expect(terminalFailureMessage(record([]), message)).toBe(message)
+    },
+  )
 
-  test.each(NOT_MODEL_NOT_FOUND_ANSWERS)("#given %s #when the refusal is classified #then it is not model_not_found", (_label, message) => {
-    expect(refusalOf(record([]), message, "2026-11-01T00:00:00.000Z").reason).not.toBe("model_not_found")
-  })
+  test.each(NOT_MODEL_NOT_FOUND_ANSWERS)(
+    "#given %s #when the refusal is classified #then it is not model_not_found",
+    (_label, message) => {
+      expect(refusalOf(record([]), message, "2026-11-01T00:00:00.000Z").reason).not.toBe("model_not_found")
+    },
+  )
 })

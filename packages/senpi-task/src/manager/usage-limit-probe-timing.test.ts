@@ -12,11 +12,17 @@ test("the probe budget excludes spawn and context preparation and starts at the 
     probe: { provider: "test", message: "Weekly usage limit reached", until: 999999 },
     model: "test/sibling",
     timeoutMs: 60_000,
-    onAnswered: () => { answered += 1 },
+    onAnswered: () => {
+      answered += 1
+    },
     scheduleTimeout: (run, delay) => {
       const entry = { run, delay, cancelled: false }
       scheduled.push(entry)
-      return { cancel: () => { entry.cancelled = true } }
+      return {
+        cancel: () => {
+          entry.cancelled = true
+        },
+      }
     },
   })
   expect(scheduled).toHaveLength(0)
@@ -41,8 +47,13 @@ test("a timed-out probe is explicitly non-limit evidence even when the original 
   const outcome = boundedProbeOutcome({
     handle: fake.handle,
     probe: { provider: "test", message: "Weekly usage limit reached. Resets at 2099-10-29T04:27:07Z", until: 999999 },
-    model: "test/sibling", timeoutMs: 60_000, onAnswered: () => {},
-    scheduleTimeout: (run) => { expire = run; return { cancel: () => {} } },
+    model: "test/sibling",
+    timeoutMs: 60_000,
+    onAnswered: () => {},
+    scheduleTimeout: (run) => {
+      expire = run
+      return { cancel: () => {} }
+    },
   })
   fake.emit({ type: "extension_event", name: "omo.task.provider_request_started" } as never)
   expect(expire).toBeDefined()
@@ -60,9 +71,15 @@ test("a request that preceded handle attachment retains its original deadline", 
   const outcome = boundedProbeOutcome({
     handle: fake.handle,
     probe: { provider: "test", message: "Weekly usage limit reached", until: 999999 },
-    model: "test/sibling", timeoutMs: 60_000, onAnswered: () => {},
-    now: () => now, subscribeRequest: request.subscribe,
-    scheduleTimeout: (_run, ms) => { delay = ms; return { cancel: () => {} } },
+    model: "test/sibling",
+    timeoutMs: 60_000,
+    onAnswered: () => {},
+    now: () => now,
+    subscribeRequest: request.subscribe,
+    scheduleTimeout: (_run, ms) => {
+      delay = ms
+      return { cancel: () => {} }
+    },
   })
   expect(delay).toBe(55_000)
   fake.settle({ status: "completed", finalResponse: "done" })

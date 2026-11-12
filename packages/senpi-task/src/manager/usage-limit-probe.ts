@@ -38,26 +38,31 @@ export function boundedProbeOutcome(input: {
       unsubscribe()
       unsubscribeRequest()
     }
-    const schedule = input.scheduleTimeout ?? ((run, delayMs) => {
-      const timeout = setTimeout(run, delayMs)
-      timeout.unref?.()
-      return { cancel: () => clearTimeout(timeout) }
-    })
+    const schedule =
+      input.scheduleTimeout ??
+      ((run, delayMs) => {
+        const timeout = setTimeout(run, delayMs)
+        timeout.unref?.()
+        return { cancel: () => clearTimeout(timeout) }
+      })
     const start = (at?: number): void => {
       if (!stopped && timer === undefined) {
-        timer = schedule(() => {
-          stop()
-          void input.handle.abort().catch((error: unknown) => {
-            log("senpi-task usage-limit probe abort failed", { taskId: input.handle.task_id, error: String(error) })
-          })
-          resolve({
-            status: "error",
-            failure: {
-              kind: "child-unresponsive",
-              message: `${input.probe.message}\n${input.model} gave no answer within ${Math.ceil(input.timeoutMs / 1000)} s after that limit, so the ${input.probe.provider} limit counts as account-wide.`,
-            },
-          })
-        }, Math.max(0, input.timeoutMs - (at === undefined ? 0 : (input.now ?? Date.now)() - at)))
+        timer = schedule(
+          () => {
+            stop()
+            void input.handle.abort().catch((error: unknown) => {
+              log("senpi-task usage-limit probe abort failed", { taskId: input.handle.task_id, error: String(error) })
+            })
+            resolve({
+              status: "error",
+              failure: {
+                kind: "child-unresponsive",
+                message: `${input.probe.message}\n${input.model} gave no answer within ${Math.ceil(input.timeoutMs / 1000)} s after that limit, so the ${input.probe.provider} limit counts as account-wide.`,
+              },
+            })
+          },
+          Math.max(0, input.timeoutMs - (at === undefined ? 0 : (input.now ?? Date.now)() - at)),
+        )
       }
     }
     unsubscribe = input.handle.subscribe((event) => {

@@ -33,7 +33,10 @@ afterEach(async () => {
   cleanupProjects()
 })
 
-async function managerFor(scripts: Readonly<Record<string, readonly Step[]>>, plan: ResolvedChildPlan): Promise<TaskManager> {
+async function managerFor(
+  scripts: Readonly<Record<string, readonly Step[]>>,
+  plan: ResolvedChildPlan,
+): Promise<TaskManager> {
   world = await createModelChainWorld(scripts)
   const project = tempProject()
   const runner = world.runner()
@@ -63,7 +66,10 @@ const calls = (): readonly string[] => world?.calls.map((call) => call.model) ??
 describe("an ambiguous usage limit's same-provider probe (#11383)", () => {
   test("#given one child's probe confirmed its provider's account limit #when a second child hits a limit on that provider #then it is refused without calling the provider again", async () => {
     // given
-    const manager = await managerFor({ [PRIMARY]: ["weekly", "weekly"], [SIBLING]: ["weekly", "weekly"] }, chain(SIBLING))
+    const manager = await managerFor(
+      { [PRIMARY]: ["weekly", "weekly"], [SIBLING]: ["weekly", "weekly"] },
+      chain(SIBLING),
+    )
     try {
       const first = await runChild(manager)
       expect(first.status).toBe("error")

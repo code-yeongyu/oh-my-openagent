@@ -115,7 +115,13 @@ export type SendOutcome =
   | { readonly kind: "queued"; readonly task_id: string; readonly queue_position: number }
   // The child's run is stopped: the message is held in the child and delivered when the run resumes.
   | { readonly kind: "held"; readonly task_id: string; readonly pause_seq: number; readonly entry_id: string }
-  | { readonly kind: "not_continuable"; readonly task_id: string; readonly reason: string; readonly suggestion: string; readonly failure_kind?: "usage_limit" | "session_unavailable" }
+  | {
+      readonly kind: "not_continuable"
+      readonly task_id: string
+      readonly reason: string
+      readonly suggestion: string
+      readonly failure_kind?: "usage_limit" | "session_unavailable"
+    }
   /** The caller named an earlier run (`expectedRunEpoch`) and the task has moved on; nothing was delivered. */
   | { readonly kind: "stale"; readonly task_id: string; readonly run_epoch: number; readonly reason: string }
   // One-shot agents (see agents/interaction-policy.ts) refuse task_send in EVERY state; message is

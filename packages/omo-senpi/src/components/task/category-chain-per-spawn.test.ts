@@ -40,7 +40,6 @@ const BROKEN = `{\n  "categories": {\n${BROKEN_LINE}\n  }\n}\n`
 const BROKEN_AT = { line: 3, column: BROKEN_LINE.indexOf("oops") + 1 }
 const NOT_A_STRING = `${JSON.stringify({ categories: { quick: { model: 42 } } })}\n`
 
-
 function idleHandle(spec: ManagedStartSpec): ManagedChildHandle {
   return {
     task_id: spec.taskId,
@@ -138,42 +137,88 @@ const VALID = { quick: { model: "acme/model-a" }, writing: { model: "acme-b/mode
 const ROUTING_ROWS: readonly (readonly [label: string, config: Record<string, unknown>, issuePath: string])[] = [
   ["category model is a number", { categories: { ...VALID, quick: { model: 42 } } }, "categories.quick.model"],
   ["category model is null", { categories: { ...VALID, quick: { model: null } } }, "categories.quick.model"],
-  ["category model is an array", { categories: { ...VALID, quick: { model: ["acme/model-a"] } } }, "categories.quick.model"],
-  ["category model has no provider", { categories: { ...VALID, quick: { model: "model-a" } } }, "categories.quick.model"],
-  ["category models is a string", { categories: { ...VALID, quick: { models: "acme/model-a" } } }, "categories.quick.models"],
+  [
+    "category model is an array",
+    { categories: { ...VALID, quick: { model: ["acme/model-a"] } } },
+    "categories.quick.model",
+  ],
+  [
+    "category model has no provider",
+    { categories: { ...VALID, quick: { model: "model-a" } } },
+    "categories.quick.model",
+  ],
+  [
+    "category models is a string",
+    { categories: { ...VALID, quick: { models: "acme/model-a" } } },
+    "categories.quick.models",
+  ],
   ["category models holds a number", { categories: { ...VALID, quick: { models: [42] } } }, "categories.quick.models"],
-  ["category models holds a model id with no provider", { categories: { ...VALID, quick: { models: ["model-a"] } } }, "categories.quick.models.0"],
-  ["category fallback_models is a number", { categories: { ...VALID, quick: { model: "acme/model-a", fallback_models: 7 } } }, "categories.quick.fallback_models"],
-  ["category fallback_models is null", { categories: { ...VALID, quick: { model: "acme/model-a", fallback_models: null } } }, "categories.quick.fallback_models"],
-  ["category fallback entry has a numeric model", { categories: { ...VALID, quick: { model: "acme/model-a", fallback_models: [{ model: 5 }] } } }, "categories.quick.fallback_models"],
-  ["category variant is an array", { categories: { ...VALID, quick: { model: "acme/model-a", variant: ["high"] } } }, "categories.quick.variant"],
+  [
+    "category models holds a model id with no provider",
+    { categories: { ...VALID, quick: { models: ["model-a"] } } },
+    "categories.quick.models.0",
+  ],
+  [
+    "category fallback_models is a number",
+    { categories: { ...VALID, quick: { model: "acme/model-a", fallback_models: 7 } } },
+    "categories.quick.fallback_models",
+  ],
+  [
+    "category fallback_models is null",
+    { categories: { ...VALID, quick: { model: "acme/model-a", fallback_models: null } } },
+    "categories.quick.fallback_models",
+  ],
+  [
+    "category fallback entry has a numeric model",
+    { categories: { ...VALID, quick: { model: "acme/model-a", fallback_models: [{ model: 5 }] } } },
+    "categories.quick.fallback_models",
+  ],
+  [
+    "category variant is an array",
+    { categories: { ...VALID, quick: { model: "acme/model-a", variant: ["high"] } } },
+    "categories.quick.variant",
+  ],
   ["category entry is a string", { categories: { ...VALID, quick: "acme/model-a" } }, "categories.quick"],
   ["agent model is a number", { categories: VALID, agents: { scout: { model: 3 } } }, "agents.scout.model"],
   ["agent model is null", { categories: VALID, agents: { scout: { model: null } } }, "agents.scout.model"],
-  ["agent model has no provider", { categories: VALID, agents: { scout: { model: "scout-model" } } }, "agents.scout.model"],
-  ["agent models is a string", { categories: VALID, agents: { scout: { models: "acme/model-a" } } }, "agents.scout.models"],
+  [
+    "agent model has no provider",
+    { categories: VALID, agents: { scout: { model: "scout-model" } } },
+    "agents.scout.model",
+  ],
+  [
+    "agent models is a string",
+    { categories: VALID, agents: { scout: { models: "acme/model-a" } } },
+    "agents.scout.models",
+  ],
   ["exclude_models is a string", { categories: VALID, exclude_models: "acme/model-b" }, "exclude_models"],
   ["exclude_models holds a number", { categories: VALID, exclude_models: [42] }, "exclude_models"],
 ]
 
 describe("task engine routing fields are checked at every spawn (#11355)", () => {
-  test.each(ROUTING_ROWS)("#given %s next to valid keys #when a child is planned #then the spawn fails at that field and no child launches", async (_label, config, issuePath) => {
-    // given
-    const cwd = tempProject()
-    writeOmoJson(cwd, `${JSON.stringify(config)}\n`)
-    const launched: string[] = []
-    const engine = composeCapturing(cwd, launched)
+  test.each(ROUTING_ROWS)(
+    "#given %s next to valid keys #when a child is planned #then the spawn fails at that field and no child launches",
+    async (_label, config, issuePath) => {
+      // given
+      const cwd = tempProject()
+      writeOmoJson(cwd, `${JSON.stringify(config)}\n`)
+      const launched: string[] = []
+      const engine = composeCapturing(cwd, launched)
 
-    // when
-    const result = await spawnQuick(engine)
+      // when
+      const result = await spawnQuick(engine)
 
-    // then
-    if (result.kind !== "plan_unresolved") throw new Error(`expected a config error at ${issuePath}, got ${result.kind}`)
-    expect(result.error.code).toBe("config_invalid")
-    expect(result.error.config_error?.issue_paths?.some((path) => path === issuePath || path.startsWith(`${issuePath}.`))).toBe(true)
-    expect(result.error.message).toContain(issuePath)
-    expect(launched).toEqual([])
-  })
+      // then
+      if (result.kind !== "plan_unresolved")
+        throw new Error(`expected a config error at ${issuePath}, got ${result.kind}`)
+      expect(result.error.code).toBe("config_invalid")
+      expect(
+        result.error.config_error?.issue_paths?.some((path) => path === issuePath || path.startsWith(`${issuePath}.`)),
+      ).toBe(true)
+      expect(result.error.message).toContain(issuePath)
+      expect(launched).toEqual([])
+    },
+  )
 
   test("#given an invalid field that does not route (task.default_concurrency) next to valid keys #when a child is planned #then it spawns on the configured model as before", async () => {
     // given
@@ -194,7 +239,11 @@ describe("task engine routing fields are checked at every spawn (#11355)", () =>
 const BASE = { categories: { quick: { model: "acme/model-a" } } }
 
 // Every routing location, in the project layer and in the user layer: [path to the entry object, field].
-const LOCATIONS: readonly (readonly [label: string, path: readonly string[], field: "model" | "models" | "exclude_models"])[] = [
+const LOCATIONS: readonly (readonly [
+  label: string,
+  path: readonly string[],
+  field: "model" | "models" | "exclude_models",
+])[] = [
   ["base category", ["categories", "writing"], "model"],
   ["base category chain", ["categories", "writing"], "models"],
   ["base agent", ["agents", "scout"], "model"],
@@ -206,10 +255,27 @@ const LOCATIONS: readonly (readonly [label: string, path: readonly string[], fie
   ["inactive profile category", ["profiles", "q", "categories", "writing"], "model"],
   ["inactive profile [native] category chain", ["profiles", "q", "[native]", "categories", "writing"], "models"],
 ]
-const VALUES: Readonly<Record<"model" | "models" | "exclude_models", readonly (readonly [kind: string, value: unknown])[]>> = {
-  model: [["wrong type", 42], ["unknown model shape", "model-a"], ["null", null], ["empty", ""]],
-  models: [["wrong type", "acme/model-a"], ["unknown model shape", ["model-a"]], ["null", null], ["empty", []]],
-  exclude_models: [["wrong type", "acme/model-b"], ["unknown model shape", [7]], ["null", null], ["empty", [""]]],
+const VALUES: Readonly<
+  Record<"model" | "models" | "exclude_models", readonly (readonly [kind: string, value: unknown])[]>
+> = {
+  model: [
+    ["wrong type", 42],
+    ["unknown model shape", "model-a"],
+    ["null", null],
+    ["empty", ""],
+  ],
+  models: [
+    ["wrong type", "acme/model-a"],
+    ["unknown model shape", ["model-a"]],
+    ["null", null],
+    ["empty", []],
+  ],
+  exclude_models: [
+    ["wrong type", "acme/model-b"],
+    ["unknown model shape", [7]],
+    ["null", null],
+    ["empty", [""]],
+  ],
 }
 
 function withValue(path: readonly string[], field: string, value: unknown): Record<string, unknown> {
@@ -247,49 +313,67 @@ function writeUserOmoJson(home: string, config: Record<string, unknown>): void {
 const STILL_SPAWNS: readonly (readonly [label: string, config: Record<string, unknown>, launched: string])[] = [
   ["the legacy 'model (high)' suffix", { categories: { quick: { model: "acme/model-a (high)" } } }, "acme/model-a"],
   ["the legacy 'model high' suffix", { categories: { quick: { model: "acme/model-a high" } } }, "acme/model-a"],
-  ["a catalog name defined in [native]", { "[native]": { models: { fast: { model: "acme-b/model-b" } } }, categories: { quick: { model: "fast" } } }, "acme-b/model-b"],
-  ["a catalog name defined in the active profile", { profiles: { p: { models: { fast: { model: "acme-b/model-b" } }, categories: { quick: { model: "fast" } } } } }, "acme-b/model-b"],
+  [
+    "a catalog name defined in [native]",
+    { "[native]": { models: { fast: { model: "acme-b/model-b" } } }, categories: { quick: { model: "fast" } } },
+    "acme-b/model-b",
+  ],
+  [
+    "a catalog name defined in the active profile",
+    { profiles: { p: { models: { fast: { model: "acme-b/model-b" } }, categories: { quick: { model: "fast" } } } } },
+    "acme-b/model-b",
+  ],
   ["a bad field in the [codex] block", { ...BASE, "[codex]": { agents: { explorer: { model: 5 } } } }, "acme/model-a"],
 ]
 
 describe("task engine routing locations (#11355)", () => {
-  test.each(MATRIX.map((row) => [row.name, row] as const))("#given %s next to valid keys #when a child is planned with profile p active #then the spawn fails at that field and no child launches", async (_name, row) => {
-    // given
-    const cwd = tempProject()
-    const home = tempProject()
-    if (row.layer === "user") {
-      writeUserOmoJson(home, row.config)
-      writeOmoJson(cwd, `${JSON.stringify(BASE)}\n`)
-    } else {
-      writeOmoJson(cwd, `${JSON.stringify(row.config)}\n`)
-    }
-    const launched: string[] = []
-    const engine = composeCapturing(cwd, launched, { HOME: home, OMO_PROFILE: "p" })
+  test.each(MATRIX.map((row) => [row.name, row] as const))(
+    "#given %s next to valid keys #when a child is planned with profile p active #then the spawn fails at that field and no child launches",
+    async (_name, row) => {
+      // given
+      const cwd = tempProject()
+      const home = tempProject()
+      if (row.layer === "user") {
+        writeUserOmoJson(home, row.config)
+        writeOmoJson(cwd, `${JSON.stringify(BASE)}\n`)
+      } else {
+        writeOmoJson(cwd, `${JSON.stringify(row.config)}\n`)
+      }
+      const launched: string[] = []
+      const engine = composeCapturing(cwd, launched, { HOME: home, OMO_PROFILE: "p" })
 
-    // when
-    const result = await spawnQuick(engine)
+      // when
+      const result = await spawnQuick(engine)
 
-    // then
-    if (result.kind !== "plan_unresolved") throw new Error(`expected a config error at ${row.issuePath}, got ${result.kind} on ${launched.join(",")}`)
-    expect(result.error.code).toBe("config_invalid")
-    expect(row.issuePaths.some((path) => result.error.message.includes(path))).toBe(true)
-    expect(launched).toEqual([])
-  })
+      // then
+      if (result.kind !== "plan_unresolved")
+        throw new Error(`expected a config error at ${row.issuePath}, got ${result.kind} on ${launched.join(",")}`)
+      expect(result.error.code).toBe("config_invalid")
+      expect(row.issuePaths.some((path) => result.error.message.includes(path))).toBe(true)
+      expect(launched).toEqual([])
+    },
+  )
 
-  test.each(STILL_SPAWNS)("#given %s #when a child is planned with profile p active #then it spawns on the model it names", async (_label, config, model) => {
-    // given
-    const cwd = tempProject()
-    writeOmoJson(cwd, `${JSON.stringify(config)}\n`)
-    const launched: string[] = []
-    const engine = composeCapturing(cwd, launched, { HOME: tempProject(), OMO_PROFILE: "p" })
+  test.each(STILL_SPAWNS)(
+    "#given %s #when a child is planned with profile p active #then it spawns on the model it names",
+    async (_label, config, model) => {
+      // given
+      const cwd = tempProject()
+      writeOmoJson(cwd, `${JSON.stringify(config)}\n`)
+      const launched: string[] = []
+      const engine = composeCapturing(cwd, launched, { HOME: tempProject(), OMO_PROFILE: "p" })
 
-    // when
-    const result = await spawnQuick(engine)
+      // when
+      const result = await spawnQuick(engine)
 
-    // then
-    if (result.kind !== "started") throw new Error(`expected a spawn, got ${result.kind}: ${result.kind === "plan_unresolved" ? result.error.message : ""}`)
-    expect(launched).toEqual([model])
-  })
+      // then
+      if (result.kind !== "started")
+        throw new Error(
+          `expected a spawn, got ${result.kind}: ${result.kind === "plan_unresolved" ? result.error.message : ""}`,
+        )
+      expect(launched).toEqual([model])
+    },
+  )
 
   test("#given a requested profile that does not exist #when a child is planned #then it spawns on the base config as before", async () => {
     // given
@@ -355,7 +439,9 @@ describe("task component omo config wiring (#11355)", () => {
     expect(loads - afterFirst).toBe(1)
     for (const result of [first, second]) {
       expect(result.details.status).toBe("plan_error")
-      expect(result.content.map((part) => part.text).join("")).toContain(`${join(".omo", "omo.json")}:${BROKEN_AT.line}:${BROKEN_AT.column}`)
+      expect(result.content.map((part) => part.text).join("")).toContain(
+        `${join(".omo", "omo.json")}:${BROKEN_AT.line}:${BROKEN_AT.column}`,
+      )
     }
   })
 })
@@ -366,7 +452,10 @@ describe("omo config error path display (#11355)", () => {
     ["a Windows home", "C:\\Users\\dev", "C:\\Users\\dev\\project\\.omo\\omo.json", "~\\project\\.omo\\omo.json"],
     ["a path outside the home", "/home/dev", "/srv/project/.omo/omo.json", "/srv/project/.omo/omo.json"],
     ["a sibling that only shares the prefix", "/home/dev", "/home/devops/.omo/omo.json", "/home/devops/.omo/omo.json"],
-  ])("#given %s #when the error names the file #then the home directory is never shown", (_label, home, path, shown) => {
-    expect(displayConfigPath(path, home)).toBe(shown)
-  })
+  ])(
+    "#given %s #when the error names the file #then the home directory is never shown",
+    (_label, home, path, shown) => {
+      expect(displayConfigPath(path, home)).toBe(shown)
+    },
+  )
 })

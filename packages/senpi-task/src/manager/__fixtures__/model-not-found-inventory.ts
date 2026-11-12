@@ -33,6 +33,9 @@ export const NOT_MODEL_NOT_FOUND_ANSWERS: readonly (readonly [label: string, mes
     "Anthropic not_found_error for a file",
     '404 {"type":"error","error":{"type":"not_found_error","message":"File not found: file_fixture01"},"request_id":"req_fixture02"}',
   ],
-  ["Google NOT_FOUND for a cached content", '404 {"error":{"code":404,"message":"cachedContents/fixture01 not found","status":"NOT_FOUND"}}'],
+  [
+    "Google NOT_FOUND for a cached content",
+    '404 {"error":{"code":404,"message":"cachedContents/fixture01 not found","status":"NOT_FOUND"}}',
+  ],
   ["a generic 404", "404 Not Found"],
 ]

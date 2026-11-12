@@ -60,7 +60,9 @@ export function categoryUnavailableText(
 }
 
 /** Warn about a dead-chain plan error, judged against the omo config the plan itself was made from. */
-export function createCategoryUnavailableWarner(deps: CategoryUnavailableWarnerDeps): (resolution: PlanResolution, omoConfig: OmoConfig) => void {
+export function createCategoryUnavailableWarner(
+  deps: CategoryUnavailableWarnerDeps,
+): (resolution: PlanResolution, omoConfig: OmoConfig) => void {
   const warned = createOncePerSessionGuard()
   return (resolution, omoConfig) => {
     const error = asDeadChainError(resolution)

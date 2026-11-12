@@ -132,8 +132,10 @@ export type RuntimeFallbackCandidates = {
 function previousRungOnProvider(record: TaskRecord, provider: string, limits?: UsageLimitMemory): boolean {
   const attempts = record.fallback_attempts ?? []
   const previous = attempts[attempts.length - 2]
-  return limits?.probeOf(record.task_id)?.provider === provider
-    || (previous?.provider === provider && limits?.familySpent(provider, previous.model_id) === true)
+  return (
+    limits?.probeOf(record.task_id)?.provider === provider ||
+    (previous?.provider === provider && limits?.familySpent(provider, previous.model_id) === true)
+  )
 }
 
 /**
@@ -143,7 +145,11 @@ function previousRungOnProvider(record: TaskRecord, provider: string, limits?: U
  * A rung whose account or family limit is already remembered spent is skipped. Only the record's own chain is ever
  * walked: every candidate comes from `record.fallback_models`.
  */
-export function runtimeFallbackCandidates(record: TaskRecord, failureMessage: string, limits?: UsageLimitMemory): RuntimeFallbackCandidates {
+export function runtimeFallbackCandidates(
+  record: TaskRecord,
+  failureMessage: string,
+  limits?: UsageLimitMemory,
+): RuntimeFallbackCandidates {
   const all = record.fallback_models ?? []
   const known = all.filter((model) => limits?.familySpent(model.provider, model.model_id) === true)
   const fallbacks = all.filter((model) => !known.includes(model))
@@ -158,8 +164,10 @@ export function runtimeFallbackCandidates(record: TaskRecord, failureMessage: st
   const limit = usageLimitScope(failureMessage)
   const accountSpent = provider !== undefined && limits?.accountSpent(provider) === true
   if (limit === undefined && !accountSpent) return { remaining: fallbacks, skipped: known }
-  if (limit === "model" || provider === undefined) return { remaining: fallbacks, skipped: known, ...(limit === undefined ? {} : { limit }) }
-  if (limit === "ambiguous" && !accountSpent && !previousRungOnProvider(record, provider, limits)) return { remaining: fallbacks, skipped: known, limit }
+  if (limit === "model" || provider === undefined)
+    return { remaining: fallbacks, skipped: known, ...(limit === undefined ? {} : { limit }) }
+  if (limit === "ambiguous" && !accountSpent && !previousRungOnProvider(record, provider, limits))
+    return { remaining: fallbacks, skipped: known, limit }
   return {
     remaining: fallbacks.filter((model) => model.provider !== provider),
     skipped: [...known, ...fallbacks.filter((model) => model.provider === provider)],

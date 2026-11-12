@@ -10,10 +10,20 @@ const T0 = Date.parse("2026-10-26T05:00:00Z")
 
 function clock() {
   let now = T0
-  return { now: () => now, at: (ms: number) => { now = ms } }
+  return {
+    now: () => now,
+    at: (ms: number) => {
+      now = ms
+    },
+  }
 }
 
-const rung = (provider: string, modelId: string): ResolvedModelRecord => ({ source: "category", provider, model_id: modelId, display: `${provider}/${modelId}` })
+const rung = (provider: string, modelId: string): ResolvedModelRecord => ({
+  source: "category",
+  provider,
+  model_id: modelId,
+  display: `${provider}/${modelId}`,
+})
 
 describe("createUsageLimitMemory (#11383)", () => {
   test("an expired stated reset never creates a new memory window", () => {
@@ -22,17 +32,20 @@ describe("createUsageLimitMemory (#11383)", () => {
     expect(memory.accountSpent("anthropic")).toBe(false)
   })
 
-  test.each(["500: upstream overloaded", "socket hang up", "request timed out"])("a failed probe has exactly thirty minutes of routing memory: %s", (message) => {
-    expect(LIMIT_PROBE_FAILURE_MEMORY_MS).toBe(30 * 60_000)
-    const time = clock()
-    const memory = createUsageLimitMemory(time.now)
-    memory.beginProbe("failed", "anthropic", WEEKLY("2026-10-29T04:27:07Z"))
-    memory.settle("failed", "anthropic", "opus", message)
-    time.at(T0 + 30 * 60_000 - 1)
-    expect(memory.accountSpent("anthropic")).toBe(true)
-    time.at(T0 + 30 * 60_000)
-    expect(memory.accountSpent("anthropic")).toBe(false)
-  })
+  test.each(["500: upstream overloaded", "socket hang up", "request timed out"])(
+    "a failed probe has exactly thirty minutes of routing memory: %s",
+    (message) => {
+      expect(LIMIT_PROBE_FAILURE_MEMORY_MS).toBe(30 * 60_000)
+      const time = clock()
+      const memory = createUsageLimitMemory(time.now)
+      memory.beginProbe("failed", "anthropic", WEEKLY("2026-10-29T04:27:07Z"))
+      memory.settle("failed", "anthropic", "opus", message)
+      time.at(T0 + 30 * 60_000 - 1)
+      expect(memory.accountSpent("anthropic")).toBe(true)
+      time.at(T0 + 30 * 60_000)
+      expect(memory.accountSpent("anthropic")).toBe(false)
+    },
+  )
 
   test("a synthetic timeout does not inherit the original limit reset embedded in its message", () => {
     const time = clock()
@@ -76,17 +89,20 @@ describe("createUsageLimitMemory (#11383)", () => {
   test.each([
     ["an ordinary provider error", "500: upstream overloaded"],
     ["a dropped connection", "socket hang up"],
-  ])("#given a probe rung that fails with %s #when it settles #then the provider's account counts as spent", (_label, failure) => {
-    // given
-    const memory = createUsageLimitMemory(clock().now)
-    memory.beginProbe("t1", "anthropic", WEEKLY("2026-10-29T04:27:07Z"))
+  ])(
+    "#given a probe rung that fails with %s #when it settles #then the provider's account counts as spent",
+    (_label, failure) => {
+      // given
+      const memory = createUsageLimitMemory(clock().now)
+      memory.beginProbe("t1", "anthropic", WEEKLY("2026-10-29T04:27:07Z"))
 
-    // when
-    memory.settle("t1", "anthropic", "claude-opus-5-5", failure)
+      // when
+      memory.settle("t1", "anthropic", "claude-opus-5-5", failure)
 
-    // then
-    expect(memory.accountSpent("anthropic")).toBe(true)
-  })
+      // then
+      expect(memory.accountSpent("anthropic")).toBe(true)
+    },
+  )
 
   test("#given one family's ambiguous limit #when a later child's walk reaches the same family #then that rung is skipped and the provider's other family stays", () => {
     // given
@@ -100,7 +116,11 @@ describe("createUsageLimitMemory (#11383)", () => {
       notify_on_terminal: false,
       model: "anthropic/claude-sonnet-5-5",
       resolved_model: rung("anthropic", "claude-sonnet-5-5"),
-      fallback_models: [rung("anthropic", "claude-fable-5"), rung("anthropic", "claude-opus-5-5"), rung("zai", "glm-5.3")],
+      fallback_models: [
+        rung("anthropic", "claude-fable-5"),
+        rung("anthropic", "claude-opus-5-5"),
+        rung("zai", "glm-5.3"),
+      ],
     })
 
     // when

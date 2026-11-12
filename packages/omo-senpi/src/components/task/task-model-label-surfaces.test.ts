@@ -161,8 +161,7 @@ async function surfaces(row: Row): Promise<Record<string, string>> {
     "live progress line": liveProgressLine(row),
     "task_output header": taskOutputModelText(buildTaskSnapshot(finished, "/state", 0)),
     "completion notice": completionMessageLines([buildCompletionDetails(finished)]).join("\n"),
-    "omo.task.updated snapshot":
-      taskSnapshot(running, undefined, undefined).effective_model?.display ?? "",
+    "omo.task.updated snapshot": taskSnapshot(running, undefined, undefined).effective_model?.display ?? "",
     "dag node badge": await dagNodeLine(running),
   }
 }
@@ -172,8 +171,7 @@ describe("#11359 task model labels after a model change", () => {
     it(`#given ${row.name} #then every label surface names ${row.running}`, async () => {
       const labels = await surfaces(row)
       const wrong = Object.entries(labels).filter(
-        ([, text]) =>
-          !text.includes(row.running) || row.notRunning.some((stale) => text.includes(stale)),
+        ([, text]) => !text.includes(row.running) || row.notRunning.some((stale) => text.includes(stale)),
       )
       expect(wrong).toEqual([])
     })

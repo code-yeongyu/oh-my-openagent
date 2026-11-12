@@ -23,12 +23,18 @@ test("a probe-only RPC extension announces the actual request once, including wi
         expect(event).toBe("before_provider_request")
         request = handler
       },
-      rpc: { emit: (name: string) => { emitted.push(name) } },
+      rpc: {
+        emit: (name: string) => {
+          emitted.push(name)
+        },
+      },
     })
     expect(emitted).toEqual([])
     expect(request).toBeDefined()
     request?.()
     request?.()
     expect(emitted).toEqual([PROBE_REQUEST_EVENT])
-  } finally { rmSync(stateDir, { recursive: true, force: true }) }
+  } finally {
+    rmSync(stateDir, { recursive: true, force: true })
+  }
 })
