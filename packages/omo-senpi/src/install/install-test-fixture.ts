@@ -1,7 +1,18 @@
+import { type SpawnSyncReturns, spawnSync as nodeSpawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
-import { chmod, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
+import { mkdirSync, mkdtempSync } from "node:fs"
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { dirname, join } from "node:path"
+import { dirname, isAbsolute, join, relative, resolve } from "node:path"
+
+import { resolveAgentHome } from "../components/agent-home/resolve-agent-home"
+import { runSenpiInstaller, runSenpiUninstaller, type SenpiInstallOptions } from "./install-senpi"
+import {
+  installLocalLauncher,
+  type LocalLauncherOptions,
+  localLauncherPath,
+  uninstallLocalLauncher,
+} from "./local-launcher"
 
 const REQUIRED_SKILL_NAMES = [
   "ast-grep",
@@ -127,4 +138,119 @@ export async function createPluginFixture(
 export async function writeFixtureFile(path: string, content: string): Promise<void> {
   await mkdir(dirname(path), { recursive: true })
   await writeFile(path, content, "utf8")
+}
+
+// Every install, launcher write and launcher spawn a test runs goes through this sandbox (#13192, #13253): the installer
+// writes the omo launcher under the resolved home and the settings under the resolved agent dir, and the launcher reads
+// its engine, plugin and agent dir from the environment, so a test that forgot HOME once replaced the real launcher.
+// The sandbox owns one temp root holding home, XDG dirs and the agent dir; it refuses, before any write or spawn, a
+// launcher, settings, agent-dir, CLI or plugin path that resolves outside that root.
+export interface InstallSandbox {
+  readonly root: string
+  readonly home: string
+  readonly agentDir: string
+  readonly env: Readonly<Record<string, string>>
+  readonly tempDir: (prefix: string) => Promise<string>
+  readonly tempDirSync: (prefix: string) => string
+  readonly install: (options?: SenpiInstallOptions) => ReturnType<typeof runSenpiInstaller>
+  readonly uninstall: (options?: SenpiInstallOptions) => ReturnType<typeof runSenpiUninstaller>
+  readonly installLauncher: (options: Omit<LocalLauncherOptions, "homeDir">) => string | undefined
+  readonly uninstallLauncher: () => boolean
+  readonly spawnSync: (
+    command: string,
+    args: readonly string[],
+    env?: Readonly<Record<string, string>>,
+  ) => SpawnSyncReturns<string>
+  readonly dispose: () => Promise<void>
+}
+
+const AGENT_DIR_VARIABLES = ["OMO_CODING_AGENT_DIR", "SENPI_CODING_AGENT_DIR", "PI_CODING_AGENT_DIR"] as const
+const SPAWN_PATH_VARIABLES = [
+  "OMO_SENPI_CLI_PATH",
+  "OMO_PLUGIN_ROOT",
+  ...AGENT_DIR_VARIABLES,
+  "HOME",
+  "USERPROFILE",
+] as const
+
+function insideRoot(root: string, path: string): boolean {
+  const offset = relative(root, resolve(path))
+  return offset === "" || (!offset.startsWith("..") && !isAbsolute(offset))
+}
+
+export function assertInsideSandbox(root: string, options: SenpiInstallOptions): void {
+  const env = options.env ?? {}
+  const homeDir = options.homeDir ?? env.HOME
+  if (homeDir === undefined)
+    throw new Error("install sandbox: no home; the installer would use the real home directory")
+  const agentDir = resolve(options.agentDir ?? resolveAgentHome({ env, homeDir }))
+  for (const [what, path] of [
+    ["launcher", localLauncherPath(homeDir)],
+    ["settings", join(agentDir, "settings.json")],
+  ] as const) {
+    if (!insideRoot(root, path)) throw new Error(`install sandbox: ${what} path ${path} is outside ${root}`)
+  }
+}
+
+/** The explicit environment of a launcher spawn: nothing the launcher resolves paths from is inherited. */
+export function sandboxSpawnEnv(
+  root: string,
+  base: Readonly<Record<string, string>>,
+  extra: Readonly<Record<string, string>> = {},
+): Record<string, string> {
+  const passthrough: Record<string, string> = {}
+  for (const name of ["PATH", "Path", "SystemRoot", "SYSTEMROOT", "ComSpec"]) {
+    const value = process.env[name]
+    if (value !== undefined) passthrough[name] = value
+  }
+  const env: Record<string, string> = { ...passthrough, TMPDIR: root, TEMP: root, TMP: root, ...base, ...extra }
+  for (const name of SPAWN_PATH_VARIABLES) {
+    const value = env[name]
+    if (value !== undefined && !insideRoot(root, value)) {
+      throw new Error(`install sandbox: spawn ${name}=${value} is outside ${root}`)
+    }
+  }
+  return env
+}
+
+export function createInstallSandbox(): InstallSandbox {
+  const root = mkdtempSync(join(tmpdir(), "omo-senpi-install-sandbox-"))
+  const home = join(root, "home")
+  const agentDir = join(root, "agent")
+  const env: Record<string, string> = {
+    HOME: home,
+    USERPROFILE: home,
+    XDG_CONFIG_HOME: join(root, "xdg-config"),
+    XDG_DATA_HOME: join(root, "xdg-data"),
+    XDG_STATE_HOME: join(root, "xdg-state"),
+    XDG_BIN_HOME: join(root, "xdg-bin"),
+  }
+  // Installs take SENPI_CODING_AGENT_DIR (a case may give its own scratch one); OMO_ and PI_ outrank it, so they are set
+  // only in the explicit environment of a spawn.
+  env.SENPI_CODING_AGENT_DIR = agentDir
+  const spawnEnv: Record<string, string> = { ...env }
+  for (const name of AGENT_DIR_VARIABLES) spawnEnv[name] = agentDir
+  for (const dir of [home, agentDir]) mkdirSync(dir, { recursive: true })
+  const scoped = (options: SenpiInstallOptions = {}): SenpiInstallOptions => {
+    const mergedEnv = { ...env, ...options.env }
+    // options.homeDir wins over env.HOME in the installer (install-senpi.ts), so it is always set here.
+    const merged = { ...options, homeDir: options.homeDir ?? mergedEnv.HOME, env: mergedEnv }
+    assertInsideSandbox(root, merged)
+    return merged
+  }
+  return {
+    root,
+    home,
+    agentDir,
+    env,
+    tempDir: (prefix) => mkdtemp(join(root, prefix)),
+    tempDirSync: (prefix) => mkdtempSync(join(root, prefix)),
+    install: (options) => runSenpiInstaller(scoped(options)),
+    uninstall: (options) => runSenpiUninstaller(scoped(options)),
+    installLauncher: (options) => installLocalLauncher({ ...options, homeDir: home }),
+    uninstallLauncher: () => uninstallLocalLauncher(home),
+    spawnSync: (command, args, extra) =>
+      nodeSpawnSync(command, [...args], { encoding: "utf8", env: sandboxSpawnEnv(root, spawnEnv, extra) }),
+    dispose: () => rm(root, { recursive: true, force: true }),
+  }
 }

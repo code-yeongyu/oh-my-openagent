@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs"
 import { createHash } from "node:crypto"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { runSenpiInstaller } from "../packages/omo-senpi/src/install/install-senpi"
+import { createInstallSandbox } from "../packages/omo-senpi/src/install/install-test-fixture"
 import { BUILD_NODES, selectBuildNodes } from "./build-nodes"
 
 const packageManifestPath = new URL("../package.json", import.meta.url)
@@ -86,7 +86,9 @@ describe("Senpi compatibility test script", () => {
   test("#given a packed-layout root with only senpi plugin artifacts #when installer runs #then settings points at that shipped plugin tree", async () => {
     // #given
     const tempRoot = await mkdtemp(join(tmpdir(), "omo-senpi-packed-root-"))
-    const agentDir = await mkdtemp(join(tmpdir(), "omo-senpi-packed-agent-"))
+    // The install runs in a sandbox (#13253): home and agent dir live under its root, never the real home.
+    const sandbox = await createInstallSandbox()
+    const agentDir = await sandbox.tempDir("omo-senpi-packed-agent-")
     try {
       const pluginRoot = join(tempRoot, "packages", "omo-senpi", "plugin")
       await mkdir(join(pluginRoot, "extensions"), { recursive: true })
@@ -128,6 +130,9 @@ describe("Senpi compatibility test script", () => {
       await writeFile(join(pluginRoot, "extensions", "omo-task.js"), "export const createTaskComponent = () => ({})\n")
       await writeFile(join(pluginRoot, "extensions", "omo-member.js"), "export const runMember = () => undefined\n")
       await writeFile(join(pluginRoot, "extensions", "omo-computer-use.js"), "export {}\n")
+      for (const sidecar of ["omo-side-panel.js", "omo-onboarding-scan.js", "omo-init-deep-advisor.js"]) {
+        await writeFile(join(pluginRoot, "extensions", sidecar), "export {}\n")
+      }
       await writeFile(join(pluginRoot, "extensions", "omo-memory-doctor.js"), "export {}\n")
       await writeFile(join(pluginRoot, "extensions", "omo-memory-memfs.js"), "export {}\n")
       await writeFile(join(pluginRoot, "extensions", "omo-memory-palace.js"), "export {}\n")
@@ -209,7 +214,7 @@ describe("Senpi compatibility test script", () => {
       const commands: string[] = []
 
       // #when
-      const result = await runSenpiInstaller({
+      const result = await sandbox.install({
         repoRoot: tempRoot,
         agentDir,
         pluginPath: pluginRoot,
@@ -226,10 +231,7 @@ describe("Senpi compatibility test script", () => {
         [],
       )
     } finally {
-      await Promise.all([
-        rm(tempRoot, { recursive: true, force: true }),
-        rm(agentDir, { recursive: true, force: true }),
-      ])
+      await Promise.all([rm(tempRoot, { recursive: true, force: true }), sandbox.dispose()])
     }
   })
 

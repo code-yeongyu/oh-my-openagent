@@ -142,7 +142,21 @@ function runVerifierOnPayload(
     const result = spawnSync(
       options.runtime ?? process.execPath,
       [join(fakeRepoRoot, "script", "verify-omo-ai-payload.mjs"), ...(options.args ?? [])],
-      { cwd: fakeRepoRoot, encoding: "utf8", timeout: guardTimeoutMs, env: { ...process.env, ...options.env } },
+      {
+        cwd: fakeRepoRoot,
+        encoding: "utf8",
+        timeout: guardTimeoutMs,
+        // npm pack reads the user's npmrc and writes logs under the home (#13253): give it a scratch home, cache and
+        // userconfig inside the fixture root. The packed file list does not depend on them.
+        env: {
+          ...process.env,
+          HOME: join(fakeRepoRoot, "home"),
+          USERPROFILE: join(fakeRepoRoot, "home"),
+          npm_config_cache: join(fakeRepoRoot, "npm-cache"),
+          npm_config_userconfig: join(fakeRepoRoot, "npmrc"),
+          ...options.env,
+        },
+      },
     )
     return {
       exitCode: result.status ?? 1,

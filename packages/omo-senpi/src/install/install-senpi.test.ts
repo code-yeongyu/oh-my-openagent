@@ -1,20 +1,47 @@
 /// <reference types="bun-types" />
 
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
 import { chmod, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
+import { tmpdir, userInfo } from "node:os"
 import { join, relative, resolve } from "node:path"
-import { runSenpiInstaller, runSenpiUninstaller } from "./install-senpi"
-import { createPluginFixture, writeFixtureFile } from "./install-test-fixture"
+import { existsSync, statSync } from "node:fs"
+import {
+  assertInsideSandbox,
+  createInstallSandbox,
+  createPluginFixture,
+  type InstallSandbox,
+  writeFixtureFile,
+} from "./install-test-fixture"
+import { localLauncherPath } from "./local-launcher"
 
 const repoRoot = resolve(import.meta.dir, "../../../..")
 const tempDirs: string[] = []
 
+// Every install below runs in a sandbox (#13192, #13253): home, XDG dirs and agent dirs live under its temp root, and it
+// refuses an install whose launcher or settings path would land outside. The user's own launcher (passwd home, not
+// HOME) must be byte-for-byte where it was after the last case.
+let sandbox: InstallSandbox
+const realLauncher = localLauncherPath(userInfo().homedir)
+const launcherStamp = (): string =>
+  existsSync(realLauncher) ? `${statSync(realLauncher).size}:${statSync(realLauncher).mtimeMs}` : "absent"
+let launcherBefore = ""
+
+beforeAll(() => {
+  launcherBefore = launcherStamp()
+})
+afterAll(() => {
+  expect(launcherStamp(), `the real launcher at ${realLauncher} changed`).toBe(launcherBefore)
+})
+beforeEach(async () => {
+  sandbox = await createInstallSandbox()
+})
+afterEach(async () => {
+  await sandbox.dispose()
+})
+
 async function makeAgentDir(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "omo-senpi-install-test-"))
-  tempDirs.push(dir)
-  return dir
+  return sandbox.tempDir("omo-senpi-install-test-")
 }
 
 async function readSettings(agentDir: string): Promise<Record<string, unknown>> {
@@ -35,6 +62,28 @@ afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
 })
 
+describe("install sandbox", () => {
+  test("#given a context whose home is outside the sandbox #when installing #then it refuses before any write", async () => {
+    const outside = await mkdtemp(join(tmpdir(), "omo-senpi-outside-home-"))
+    tempDirs.push(outside)
+    const pluginPath = await makePluginFixture()
+    expect(() => sandbox.install({ homeDir: outside, repoRoot, pluginPath })).toThrow("outside")
+    expect(existsSync(localLauncherPath(outside))).toBe(false)
+  })
+
+  test("#given a context with no home at all #when checked #then it refuses (the installer would fall back to the real home)", () => {
+    expect(() => assertInsideSandbox(sandbox.root, { env: { SENPI_CODING_AGENT_DIR: sandbox.agentDir } })).toThrow(
+      "no home",
+    )
+  })
+
+  test("#given a context whose agent dir is outside the sandbox #when checked #then it refuses", () => {
+    expect(() =>
+      assertInsideSandbox(sandbox.root, { homeDir: sandbox.home, env: { SENPI_CODING_AGENT_DIR: tmpdir() } }),
+    ).toThrow("settings path")
+  })
+})
+
 describe("runSenpiInstaller", () => {
   test("#given temp SENPI_CODING_AGENT_DIR #when installing twice #then it writes one absolute plugin package entry and creates backups", async () => {
     // given
@@ -44,8 +93,8 @@ describe("runSenpiInstaller", () => {
     const env = { HOME: homeDir, SENPI_CODING_AGENT_DIR: agentDir }
 
     // when
-    const first = await runSenpiInstaller({ env, repoRoot, pluginPath })
-    const second = await runSenpiInstaller({ env, repoRoot, pluginPath })
+    const first = await sandbox.install({ env, repoRoot, pluginPath })
+    const second = await sandbox.install({ env, repoRoot, pluginPath })
 
     // then
     const settings = await readSettings(agentDir)
@@ -70,7 +119,7 @@ describe("runSenpiInstaller", () => {
     )
 
     // when
-    await runSenpiInstaller({ env: { HOME: homeDir, SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+    await sandbox.install({ env: { HOME: homeDir, SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
 
     // then
     const settings = await readSettings(agentDir)
@@ -94,7 +143,7 @@ describe("runSenpiInstaller", () => {
     )
 
     // when
-    await runSenpiInstaller({
+    await sandbox.install({
       env: { HOME: await makeAgentDir(), SENPI_CODING_AGENT_DIR: agentDir },
       repoRoot,
       pluginPath,
@@ -113,7 +162,7 @@ describe("runSenpiInstaller", () => {
     await chmod(runtimeEntry, 0o700)
 
     // when
-    const result = await runSenpiInstaller({
+    const result = await sandbox.install({
       env: { HOME: await makeAgentDir(), SENPI_CODING_AGENT_DIR: agentDir },
       repoRoot,
       pluginPath,
@@ -133,7 +182,7 @@ describe("runSenpiInstaller", () => {
     await chmod(runtimeEntry, 0o700)
 
     // when
-    const install = runSenpiInstaller({
+    const install = sandbox.install({
       env: { SENPI_CODING_AGENT_DIR: agentDir },
       repoRoot,
       pluginPath,
@@ -168,7 +217,7 @@ describe("runSenpiInstaller", () => {
     await writeFile(join(agentDir, "settings.json"), JSON.stringify({ packages: ["keep-me"] }), "utf8")
 
     // when
-    const install = runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+    const install = sandbox.install({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
 
     // then
     await expect(install).rejects.toThrow("ast-grep MCP runtime integrity error")
@@ -185,7 +234,7 @@ describe("runSenpiInstaller", () => {
     await writeFile(join(agentDir, "settings.json"), JSON.stringify({ packages: ["keep-me"] }), "utf8")
 
     // when
-    const install = runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+    const install = sandbox.install({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
 
     // then
     await expect(install).rejects.toThrow("ast-grep MCP runtime integrity error")
@@ -202,7 +251,7 @@ describe("runSenpiInstaller", () => {
     await writeFile(join(agentDir, "settings.json"), JSON.stringify({ packages: ["keep-me"] }), "utf8")
 
     // when
-    const install = runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+    const install = sandbox.install({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
 
     // then
     await expect(install).rejects.toThrow("missing required runtime artifacts")
@@ -223,7 +272,7 @@ describe("runSenpiInstaller", () => {
       await writeFile(join(agentDir, "settings.json"), JSON.stringify({ packages: ["keep-me"] }), "utf8")
 
       // when
-      const install = runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+      const install = sandbox.install({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
 
       // then
       await expect(install).rejects.toThrow(join("extensions", sidecar))
@@ -240,7 +289,7 @@ describe("runSenpiInstaller", () => {
     await writeFile(join(agentDir, "settings.json"), JSON.stringify({ packages: ["keep-me"] }), "utf8")
 
     // when
-    const install = runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+    const install = sandbox.install({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
 
     // then
     await expect(install).rejects.toThrow("run `bun run build:senpi-plugin`")
@@ -257,7 +306,7 @@ describe("runSenpiInstaller", () => {
     await writeFile(join(agentDir, "settings.json"), JSON.stringify({ packages: ["keep-me"] }), "utf8")
 
     // when
-    const install = runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+    const install = sandbox.install({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
 
     // then
     await expect(install).rejects.toThrow("missing required runtime artifacts")
@@ -275,7 +324,7 @@ describe("runSenpiInstaller", () => {
     await writeFile(join(agentDir, "settings.json"), JSON.stringify({ packages: ["keep-me"] }), "utf8")
 
     // when
-    const install = runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+    const install = sandbox.install({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
 
     // then
     await expect(install).rejects.toThrow("missing required runtime artifacts")
@@ -291,7 +340,7 @@ describe("runSenpiInstaller", () => {
     await writeFile(join(agentDir, "settings.json"), JSON.stringify({ packages: ["keep-me"] }), "utf8")
 
     // when
-    const install = runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+    const install = sandbox.install({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
 
     // then
     await expect(install).rejects.toThrow("missing required runtime artifacts")
@@ -304,7 +353,7 @@ describe("runSenpiInstaller", () => {
     const pluginPath = await makePluginFixture()
     await rm(join(pluginPath, "extensions", "omo-task.js"))
 
-    const install = runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+    const install = sandbox.install({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
 
     await expect(install).rejects.toThrow("missing required runtime artifacts")
     await expect(readFile(join(agentDir, "settings.json"), "utf8")).rejects.toThrow()
@@ -317,7 +366,7 @@ describe("runSenpiInstaller", () => {
     const pluginPath = await makePluginFixture()
     await rm(join(pluginPath, "skills-conditional", "x-search", "SKILL.md"))
 
-    const install = runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+    const install = sandbox.install({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
 
     await expect(install).rejects.toThrow("missing required runtime artifacts")
     await expect(readFile(join(agentDir, "settings.json"), "utf8")).rejects.toThrow()
@@ -330,7 +379,7 @@ describe("runSenpiInstaller", () => {
     const pluginPath = await makePluginFixture()
     await rm(join(pluginPath, "skills", "browser", "SKILL.md"))
 
-    const install = runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+    const install = sandbox.install({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
 
     await expect(install).rejects.toThrow("missing required runtime artifacts")
     await expect(readFile(join(agentDir, "settings.json"), "utf8")).rejects.toThrow()
@@ -351,7 +400,7 @@ describe("runSenpiUninstaller", () => {
     )
 
     // when
-    const result = await runSenpiUninstaller({
+    const result = await sandbox.uninstall({
       env: { HOME: await makeAgentDir(), SENPI_CODING_AGENT_DIR: agentDir },
       repoRoot,
       pluginPath,
