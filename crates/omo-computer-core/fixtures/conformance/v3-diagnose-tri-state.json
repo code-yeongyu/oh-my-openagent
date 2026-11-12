@@ -1,7 +1,7 @@
 {
   "description": "Row 27 (AC-57, AC-82): diagnose answers through the engine with every permission tri-state (capture Granted, input Denied, accessibility Unknown), ok:false for the denial, the session block with the live SessionState and the lockPolicy string, and sends nothing: no dialog, no input.",
   "transport": "stdio",
-  "scenario": "crates/omo-computer-backend-fake/fixtures/diagnose-denied.json",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/v3-diagnose-denied.json",
   "env": {
     "OMO_COMPUTER_FAKE_STOP_PATH": "live"
   },
