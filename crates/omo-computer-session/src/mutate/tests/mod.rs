@@ -2,6 +2,7 @@
 
 mod batch;
 mod marker;
+mod poison;
 mod recovery;
 mod secure;
 

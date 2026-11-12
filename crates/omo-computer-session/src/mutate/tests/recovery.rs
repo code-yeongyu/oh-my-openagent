@@ -8,7 +8,7 @@ use super::{click, open, wire, Probe, Run};
 use crate::Session;
 
 /// A session whose engine dies after its last input event and before it replies.
-fn die_after_input(run: &Run, call_id: &str, generation: u64) {
+pub(super) fn die_after_input(run: &Run, call_id: &str, generation: u64) {
     let sink = run.sink.clone();
     let backend = Probe::new(
         run.fake(),
