@@ -57,6 +57,345 @@ const parsePairOut = (side: "A" | "B", code: number, out: string): PairOut => {
 /** The shell command that runs the pair helper on one host through its exec prefix (the prefix must keep argv). */
 const pairCommand = (prefix: string, helperB64: string, helperArgs: string): string =>
   `${prefix} sh -c "echo ${helperB64} | base64 -d | sh -s -- ${helperArgs}"`
+// ---- one gate: a verdict requires a fully valid measurement record ------------------------------------------------
+// Every measured row is decided by a rule below, and every rule is reached through judge(): a record with a missing,
+// non-finite, negative, sentinel or wrongly typed field is UNMEASURED before its rule ever sees it.
+type Kind =
+  | "count" // integer >= 0
+  | "ms" // finite number >= 0
+  | "code" // WebSocket close code, 1000..4999
+  | "bool"
+  | "text" // a non-empty string that is not a placeholder
+  | Readonly<{ oneOf: readonly string[] }>
+  | Readonly<{ opt: Kind }> // null is a measured "did not happen"; a missing field is still invalid
+  | Readonly<{ list: Kind }> // non-empty
+type Rec = Readonly<Record<string, unknown>>
+type Rule = Readonly<{ schema: Readonly<Record<string, Kind>>; sample: Rec; decide: (r: Rec, note: string) => Run }>
+const PLACEHOLDERS = new Set(["", "?", "-", "timeout", "open", "open_at_90s", "nan", "undefined", "null", "none"])
+const fieldOk = (k: Kind, v: unknown): boolean => {
+  if (typeof k === "object") {
+    if ("opt" in k) return v === null || fieldOk(k.opt, v)
+    if ("list" in k) return Array.isArray(v) && v.length > 0 && v.every((x: unknown) => fieldOk(k.list, x))
+    return typeof v === "string" && k.oneOf.includes(v)
+  }
+  switch (k) {
+    case "count":
+      return typeof v === "number" && Number.isInteger(v) && v >= 0
+    case "ms":
+      return typeof v === "number" && Number.isFinite(v) && v >= 0
+    case "code":
+      return typeof v === "number" && Number.isInteger(v) && v >= 1000 && v <= 4999
+    case "bool":
+      return typeof v === "boolean"
+    case "text":
+      return typeof v === "string" && !PLACEHOLDERS.has(v.trim().toLowerCase())
+  }
+}
+/** The first field of a record that its rule's schema does not accept, or null. */
+const invalidField = (rule: Rule, r: Rec): string | null => {
+  for (const [field, kind] of Object.entries(rule.schema)) if (!(field in r) || !fieldOk(kind, r[field])) return field
+  return null
+}
+const num = (r: Rec, k: string): number => r[k] as number
+const optNum = (r: Rec, k: string): number | null => r[k] as number | null
+const flag = (r: Rec, k: string): boolean => r[k] as boolean
+const str = (r: Rec, k: string): string => r[k] as string
+const msText = (x: number | null): string => (x === null ? "timeout" : `${Math.round(x)} ms`)
+const overText = (o: string): string =>
+  o === "codec"
+    ? "refused by the shared relay codec before send"
+    : o === "refused"
+      ? "refused by the relay, channel stays open"
+      : o
+/** The relay's close code when its dead window ends a silent channel. */
+const DEAD_WINDOW_CLOSE = 4000
+const EXPIRY = { afterExpS: { opt: "ms" }, code: { opt: "code" }, evicted: "bool" } as const
+const WAKE = { warm: { opt: "ms" }, wake: { opt: "ms" }, open: "bool", dataDelivered: "bool", evicted: "bool" } as const
+const KEEPALIVE = { openAt150: "bool", delivered: "bool", evicted: "bool" } as const
+const SILENT = {
+  openAt150: "bool",
+  closedAfterS: { opt: "count" },
+  closeCode: { opt: "code" },
+  evicted: "bool",
+} as const
+const SIZE = { max: "count", over: { oneOf: ["ok", "refused", "closed", "codec"] }, stable: "bool" } as const
+const CADENCE = { lost: "count", p95: { opt: "ms" }, maxGap: { opt: "ms" }, evicted: "bool" } as const
+const wakeSample = { warm: 120, wake: 180, open: true, dataDelivered: true, evicted: true }
+const silentRule = (row: "R-HIB-5" | "R-LIVE-120-2"): Rule => ({
+  schema: SILENT,
+  sample: { openAt150: false, closedAfterS: 60, closeCode: 4000, evicted: true },
+  decide: (r, note) => {
+    if (flag(r, "openAt150"))
+      return { measured: "open at 150 s", verdict: row === "R-HIB-5" ? "CONTRADICTS" : "CONFIRMS", note }
+    const after = optNum(r, "closedAfterS")
+    const code = optNum(r, "closeCode")
+    if (after === null || code !== DEAD_WINDOW_CLOSE)
+      return failedRun(
+        `closed after ${after ?? "?"} s with code ${code ?? "none"}, not the relay's dead-window close (${DEAD_WINDOW_CLOSE})`,
+      )
+    const short = after < 120
+    if (row === "R-HIB-5")
+      return {
+        measured: `closed after ${after} s, code ${code}, hub evicted ${flag(r, "evicted")}`,
+        verdict: short ? "NEW-EDGE" : "CONTRADICTS",
+        note,
+      }
+    return { measured: `closed after ${after} s, code ${code}`, verdict: short ? "CONTRADICTS" : "CONFIRMS", note }
+  },
+})
+const sizeRule: Rule = {
+  schema: SIZE,
+  sample: { max: 65536, over: "codec", stable: true },
+  decide: (r, note) => ({
+    measured: `max ${num(r, "max")} B sealed; ${num(r, "max") + 1} B ${overText(str(r, "over"))}; max re-admitted ${flag(r, "stable")}`,
+    verdict: num(r, "max") > 0 && flag(r, "stable") ? "NEW-EDGE" : "CONTRADICTS",
+    note,
+  }),
+}
+const RULES: Readonly<Record<string, Rule>> = {
+  "R-AUTH-1": {
+    schema: EXPIRY,
+    sample: { afterExpS: 0.1, code: 4003, evicted: false },
+    decide: (r, note) => {
+      const after = optNum(r, "afterExpS")
+      return {
+        measured: `closed ${after ?? "never (60 s)"} s after exp, code ${optNum(r, "code") ?? "-"}, hub evicted ${flag(r, "evicted")}`,
+        verdict: after !== null && after <= 5 && !flag(r, "evicted") ? "CONFIRMS" : "CONTRADICTS",
+        note,
+      }
+    },
+  },
+  "R-AUTH-2": {
+    schema: EXPIRY,
+    sample: { afterExpS: 0.1, code: 4003, evicted: true },
+    decide: (r, note) => {
+      const after = optNum(r, "afterExpS")
+      return {
+        measured: `closed ${after ?? "never (60 s)"} s after exp, code ${optNum(r, "code") ?? "-"}, hub evicted ${flag(r, "evicted")}`,
+        verdict: after !== null && after <= 5 ? "CONFIRMS" : "CONTRADICTS",
+        note,
+      }
+    },
+  },
+  "R-AUTH-3": {
+    schema: { admitted: "bool", outcome: "text" },
+    sample: { admitted: false, outcome: "closed before admission: 4003 entitlement" },
+    decide: (r, note) => ({
+      measured: flag(r, "admitted")
+        ? "admitted"
+        : `refused before admission (${str(r, "outcome").replace(/\s+/g, " ")})`,
+      verdict: flag(r, "admitted") ? "CONTRADICTS" : "CONFIRMS",
+      note,
+    }),
+  },
+  "R-AUTH-4": {
+    schema: { hibernated: "count", reconnectsPerRefresh: "count", reproveMs: { list: "ms" } },
+    sample: { hibernated: 1, reconnectsPerRefresh: 0, reproveMs: [137] },
+    decide: (r, note) => ({
+      measured: `hub evicted ${num(r, "hibernated")}/1, reconnects per refresh ${num(r, "reconnectsPerRefresh")}, re-proof ${(r["reproveMs"] as number[]).join("/")} ms`,
+      verdict: num(r, "hibernated") === 1 && num(r, "reconnectsPerRefresh") === 0 ? "CONFIRMS" : "CONTRADICTS",
+      note,
+    }),
+  },
+  "R-AUTH-5": {
+    schema: { hibernated: "count", reconnectsPerRefresh: "count" },
+    sample: { hibernated: 1, reconnectsPerRefresh: 1 },
+    decide: (r, note) => ({
+      measured: `hub evicted ${num(r, "hibernated")}/1, reconnects per refresh ${num(r, "reconnectsPerRefresh")} (drained)`,
+      verdict: num(r, "hibernated") === 1 && num(r, "reconnectsPerRefresh") === 1 ? "NEW-EDGE" : "CONTRADICTS",
+      note,
+    }),
+  },
+  "R-HIB-1": {
+    schema: { sweep: "text", firstEvicted: { opt: "count" }, allOpen: "bool" },
+    sample: { sweep: "5s:resident 10s:evicted", firstEvicted: 10, allOpen: true },
+    decide: (r, note) => ({
+      measured: `${str(r, "sweep")}; channels open ${flag(r, "allOpen")}`,
+      verdict: optNum(r, "firstEvicted") !== null && flag(r, "allOpen") ? "CONFIRMS" : "CONTRADICTS",
+      note,
+    }),
+  },
+  "R-HIB-2": {
+    schema: WAKE,
+    sample: wakeSample,
+    decide: (r, note) => ({
+      measured: `hub evicted ${flag(r, "evicted")}, sockets open ${flag(r, "open")}, round trip warm ${msText(optNum(r, "warm"))} / first after wake ${msText(optNum(r, "wake"))}`,
+      verdict: flag(r, "evicted") && flag(r, "open") && optNum(r, "wake") !== null ? "CONFIRMS" : "CONTRADICTS",
+      note,
+    }),
+  },
+  "R-HIB-3": {
+    schema: WAKE,
+    sample: wakeSample,
+    decide: (r, note) => ({
+      measured: `hub evicted ${flag(r, "evicted")}, command delivered ${flag(r, "dataDelivered")}`,
+      verdict: flag(r, "evicted") && flag(r, "dataDelivered") ? "CONFIRMS" : "CONTRADICTS",
+      note,
+    }),
+  },
+  "R-HIB-4": {
+    schema: KEEPALIVE,
+    sample: { openAt150: true, delivered: true, evicted: true },
+    decide: (r, note) => ({
+      measured: `open at 150 s ${flag(r, "openAt150")}, heartbeat after ${flag(r, "delivered")}, hub evicted ${flag(r, "evicted")}`,
+      verdict: flag(r, "openAt150") && flag(r, "delivered") ? "CONFIRMS" : "CONTRADICTS",
+      note,
+    }),
+  },
+  "R-HIB-5": silentRule("R-HIB-5"),
+  "R-SIZE-1": sizeRule,
+  "R-SIZE-2": sizeRule,
+  "R-SIZE-3": {
+    schema: { cap: { opt: "count" }, overCode: { opt: "code" } },
+    sample: { cap: 33554432, overCode: 1009 },
+    decide: (r, note) => {
+      const cap = optNum(r, "cap")
+      const over = optNum(r, "overCode")
+      return {
+        measured:
+          cap === null
+            ? `no transport refusal up to 64 MiB (largest tried); a 64 MiB message got ${over === null ? "no close in 20 s" : `close ${over}`}`
+            : `max ${cap} B per WebSocket message; one byte more ends the socket (close ${over ?? "none"}, message too large)`,
+        verdict: "NEW-EDGE",
+        note,
+      }
+    },
+  },
+  "R-LIVE-5-1": {
+    schema: CADENCE,
+    sample: { lost: 0, p95: 180, maxGap: 5100, evicted: false },
+    decide: (r, note) => {
+      const p95 = optNum(r, "p95")
+      return {
+        measured: `lost ${num(r, "lost")}/12, p95 round trip ${p95 === null ? "-" : Math.round(p95)} ms, hub evicted ${flag(r, "evicted")}`,
+        verdict:
+          num(r, "lost") === 0 && p95 !== null && p95 < 5_000 && !flag(r, "evicted") ? "CONFIRMS" : "CONTRADICTS",
+        note,
+      }
+    },
+  },
+  "R-LIVE-5-2": {
+    schema: WAKE,
+    sample: wakeSample,
+    decide: (r, note) => {
+      const wake = optNum(r, "wake")
+      return {
+        measured: `hub evicted ${flag(r, "evicted")}, first round trip after wake ${msText(wake)}`,
+        verdict: flag(r, "evicted") && wake !== null && wake < 5_000 ? "CONFIRMS" : "CONTRADICTS",
+        note,
+      }
+    },
+  },
+  "R-LIVE-15-1": {
+    schema: WAKE,
+    sample: wakeSample,
+    decide: (r, note) => {
+      const wake = optNum(r, "wake")
+      return {
+        measured: `hub evicted ${flag(r, "evicted")}, worst beat gap 5000 + ${msText(wake)}`,
+        verdict: flag(r, "evicted") && wake !== null && 5_000 + wake < 15_000 ? "CONFIRMS" : "CONTRADICTS",
+        note,
+      }
+    },
+  },
+  "R-LIVE-15-2": {
+    schema: CADENCE,
+    sample: { lost: 0, p95: 180, maxGap: 5100, evicted: false },
+    decide: (r, note) => {
+      const gap = optNum(r, "maxGap")
+      return {
+        measured: `lost ${num(r, "lost")}/12, largest gap ${gap ?? "-"} ms`,
+        verdict: num(r, "lost") === 0 && gap !== null && gap < 15_000 ? "CONFIRMS" : "CONTRADICTS",
+        note,
+      }
+    },
+  },
+  "R-LIVE-120-1": {
+    schema: KEEPALIVE,
+    sample: { openAt150: true, delivered: true, evicted: true },
+    decide: (r, note) => ({
+      measured: `open at 150 s ${flag(r, "openAt150")}, hub evicted ${flag(r, "evicted")}`,
+      verdict: flag(r, "openAt150") && flag(r, "delivered") ? "CONFIRMS" : "CONTRADICTS",
+      note,
+    }),
+  },
+  "R-LIVE-120-2": silentRule("R-LIVE-120-2"),
+  "L-STATE": {
+    schema: {
+      device_service: { oneOf: ["running"] },
+      version: "text",
+      target_visible: { oneOf: ["yes"] },
+      control: { oneOf: ["ok"] },
+      control_tool: { oneOf: ["nc", "bun"] },
+      control_listeners: "count",
+      control_off_loopback: "count",
+      listeners_total: "count",
+      listeners_off_loopback: "count",
+      unix_sockets: "count",
+      udp_discovery_sockets: "count",
+      load: "ms",
+      cores: "count",
+    },
+    sample: {
+      device_service: "running",
+      version: "0.1.0",
+      target_visible: "yes",
+      control: "ok",
+      control_tool: "nc",
+      control_listeners: 2,
+      control_off_loopback: 1,
+      listeners_total: 0,
+      listeners_off_loopback: 0,
+      unix_sockets: 23,
+      udp_discovery_sockets: 0,
+      load: 7.03,
+      cores: 14,
+    },
+    decide: (r, note) => ({
+      measured: `lsof control ok (${str(r, "control_tool")} listeners on loopback and all interfaces: ${num(r, "control_listeners")} seen, ${num(r, "control_off_loopback")} off loopback); device service ${str(r, "version")}; listeners ${num(r, "listeners_total")} (off loopback ${num(r, "listeners_off_loopback")}); unix sockets ${num(r, "unix_sockets")}; discovery sockets ${num(r, "udp_discovery_sockets")}; load ${num(r, "load")}/${num(r, "cores")}`,
+      verdict:
+        num(r, "listeners_off_loopback") === 0 && num(r, "udp_discovery_sockets") === 0 ? "CONTRADICTS" : "NEW-EDGE",
+      note,
+    }),
+  },
+  "R-HOSTED-1": {
+    schema: {
+      opened_ms: "ms",
+      closed_after_open_ms: "ms",
+      code: "code",
+      ref_after_open_ms: "ms",
+      ref_code: "code",
+      deadline_ms: "ms",
+    },
+    sample: {
+      opened_ms: 300,
+      closed_after_open_ms: 9952,
+      code: 4004,
+      ref_after_open_ms: 10_050,
+      ref_code: 4004,
+      deadline_ms: 10_000,
+    },
+    decide: (r, note) => {
+      const ms = num(r, "closed_after_open_ms")
+      const deadline = num(r, "deadline_ms")
+      const ok = ms >= deadline - 500 && ms <= deadline + 2_000 && num(r, "code") === num(r, "ref_code")
+      return {
+        measured: `hosted closed ${ms} ms after open, code ${num(r, "code")}; hello deadline ${deadline} ms; local relay (this run, loaded build host) closed ${num(r, "ref_after_open_ms")} ms after open, code ${num(r, "ref_code")}`,
+        verdict: ok ? "CONFIRMS" : "CONTRADICTS",
+        note,
+      }
+    },
+  },
+}
+/** The one gate: a rule decides only a record whose every field its schema accepts; anything else is UNMEASURED. */
+const judge = (rule: string, r: Rec, note: string): Run => {
+  const found = RULES[rule]
+  if (found === undefined) return failedRun(`no verdict rule named ${rule}`)
+  return found.decide(r, note)
+}
+/** Helper output values are strings; a value that is wholly a number becomes one (anything else stays and fails). */
+const fieldsRecord = (fields: Readonly<Record<string, string>>): Rec =>
+  Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, /^\d+(\.\d+)?$/.test(v) ? Number(v) : v]))
 type ReproveQa = Readonly<{
   before: { hibernated: number; reconnectsPerRefresh: number }
   after: { hibernated: number; reconnectsPerRefresh: number; reproveMs: number[] }
@@ -64,57 +403,14 @@ type ReproveQa = Readonly<{
 /** R-AUTH-4 (re-proof client) and R-AUTH-5 (client without re-proof) from the relay's own re-proof QA. */
 const reproveRun = (m: ReproveQa | null, client: "reprove" | "legacy", note: string): Run => {
   if (m === null) return failedRun("the relay checkout's re-proof QA reported nothing")
-  if (client === "reprove")
-    return {
-      measured: `hub evicted ${m.after.hibernated}/1, reconnects per refresh ${m.after.reconnectsPerRefresh}, re-proof ${m.after.reproveMs.join("/")} ms`,
-      verdict: m.after.hibernated === 1 && m.after.reconnectsPerRefresh === 0 ? "CONFIRMS" : "CONTRADICTS",
-      note,
-    }
-  return {
-    measured: `hub evicted ${m.before.hibernated}/1, reconnects per refresh ${m.before.reconnectsPerRefresh} (drained)`,
-    verdict: m.before.hibernated === 1 && m.before.reconnectsPerRefresh === 1 ? "NEW-EDGE" : "CONTRADICTS",
-    note,
-  }
+  return client === "reprove" ? judge("R-AUTH-4", { ...m.after }, note) : judge("R-AUTH-5", { ...m.before }, note)
 }
-/** The close code the relay sends when its dead window ends a silent channel. */
-const DEAD_WINDOW_CLOSE = 4000
 type Silent = Readonly<{ openAt150: boolean; closedAfterS: number | null; closeCode: number | null; evicted: boolean }>
 /** R-HIB-5 (how long a silent channel lives) and R-LIVE-120-2 (does it outlive 120 s): only the dead-window close counts. */
-const silentRun = (m: Silent, row: "R-HIB-5" | "R-LIVE-120-2", note: string): Run => {
-  if (m.openAt150) return { measured: "open at 150 s", verdict: row === "R-HIB-5" ? "CONTRADICTS" : "CONFIRMS", note }
-  if (m.closedAfterS === null || m.closeCode !== DEAD_WINDOW_CLOSE)
-    return failedRun(
-      `closed after ${m.closedAfterS ?? "?"} s with code ${m.closeCode ?? "none"}, not the relay's dead-window close (${DEAD_WINDOW_CLOSE})`,
-    )
-  const short = m.closedAfterS < 120
-  if (row === "R-HIB-5")
-    return {
-      measured: `closed after ${m.closedAfterS} s, code ${m.closeCode}, hub evicted ${m.evicted}`,
-      verdict: short ? "NEW-EDGE" : "CONTRADICTS",
-      note,
-    }
-  return {
-    measured: `closed after ${m.closedAfterS} s, code ${m.closeCode}`,
-    verdict: short ? "CONTRADICTS" : "CONFIRMS",
-    note,
-  }
-}
-/** L-STATE-*: a zero is trusted only after the helper's positive lsof control passed and the target was visible. */
-const stateRun = (m: PairOut, note: string): Run => {
-  if (!m.ok) return failedRun(m.why)
-  const f = m.fields
-  if (f["device_service"] !== "running") return failedRun("no device service running on the host")
-  if (f["control"] !== "ok" || f["target_visible"] !== "yes")
-    return failedRun(
-      `lsof positive control did not pass (control=${f["control"] ?? "none"}, target_visible=${f["target_visible"] ?? "none"})`,
-    )
-  const off = f["listeners_off_loopback"] === "0" && f["udp_discovery_sockets"] === "0"
-  return {
-    measured: `lsof control ok (${f["control_tool"] ?? "?"} listeners on loopback and all interfaces: ${f["control_listeners"] ?? "?"} seen, ${f["control_off_loopback"] ?? "?"} off loopback); device service ${f["version"] ?? ""}; listeners ${f["listeners_total"] ?? "?"} (off loopback ${f["listeners_off_loopback"] ?? "?"}); unix sockets ${f["unix_sockets"] ?? "?"}; discovery sockets ${f["udp_discovery_sockets"] ?? "?"}; load ${f["load"] ?? "?"}/${f["cores"] ?? "?"}`,
-    verdict: off ? "CONTRADICTS" : "NEW-EDGE",
-    note,
-  }
-}
+const silentRun = (m: Silent, row: "R-HIB-5" | "R-LIVE-120-2", note: string): Run => judge(row, m, note)
+/** L-STATE-*: the pair helper's state fields for one host, through the gate. */
+const stateRun = (m: PairOut, note: string): Run =>
+  m.ok ? judge("L-STATE", fieldsRecord(m.fields), note) : failedRun(m.why)
 /** Waits for a socket to open: an error, a close or ms without an open rejects (the caller's row is UNMEASURED). */
 const awaitOpen = (ws: WebSocket, ms = 10_000): Promise<void> =>
   new Promise<void>((ok, no) => {
@@ -145,22 +441,23 @@ const runOnPair = async (prefix: string, helperB64: string, helperArgs: string, 
   const r = await run(pairCommand(prefix, helperB64, helperArgs))
   return parsePairOut("A", r.code, r.out)
 }
-/** R-HOSTED-1-*: the hosted silent unadmitted socket against the relay's hello deadline and the local close code. */
+/** R-HOSTED-1-*: the hosted silent unadmitted socket against the relay's hello deadline and the local relay's close. */
 const hostedRun = (m: PairOut, ref: { afterOpenMs: number; code: string }, deadlineMs: number, note: string): Run => {
   if (!m.ok) return failedRun(m.why)
-  const opened = Number(m.fields["opened_ms"] ?? "NaN")
-  const ms = Number(m.fields["closed_after_open_ms"] ?? "NaN")
-  const code = m.fields["code"] ?? ""
-  if (!(opened >= 0) || !(ms >= 0) || !/^\d+$/.test(code))
-    return failedRun(
-      `hosted socket gave no close result (opened_ms=${m.fields["opened_ms"] ?? "none"}, code=${code || "none"})`,
-    )
-  const ok = ms >= deadlineMs - 500 && ms <= deadlineMs + 2_000 && code === ref.code
-  return {
-    measured: `hosted closed ${ms} ms after open, code ${code}; hello deadline ${deadlineMs} ms; local relay (this run, loaded build host) closed ${ref.afterOpenMs} ms after open, code ${ref.code}`,
-    verdict: ok ? "CONFIRMS" : "CONTRADICTS",
+  const f = fieldsRecord(m.fields)
+  const refCode = fieldsRecord({ c: ref.code })["c"]
+  return judge(
+    "R-HOSTED-1",
+    {
+      opened_ms: f["opened_ms"],
+      closed_after_open_ms: f["closed_after_open_ms"],
+      code: f["code"],
+      ref_after_open_ms: ref.afterOpenMs,
+      ref_code: refCode,
+      deadline_ms: deadlineMs,
+    },
     note,
-  }
+  )
 }
 /** Rows whose rerun needs the same-network pair and the hosted relay configured. */
 const PAIR_IDS = new Set(["L-STATE-A", "L-STATE-B", "R-HOSTED-1-A", "R-HOSTED-1-B"])
@@ -245,17 +542,14 @@ const selfTest = async (): Promise<number> => {
     rmSync(work, { recursive: true, force: true })
   }
   // M1 (probe side): a zero is trusted only with the helper's positive control and a visible target.
+  // The complete helper record, minus the two control fields each case sets (or leaves out) itself.
   const base = {
     ok: true,
-    fields: {
-      device_service: "running",
-      version: "1",
-      listeners_total: "0",
-      listeners_off_loopback: "0",
-      udp_discovery_sockets: "0",
-      load: "1",
-      cores: "8",
-    },
+    fields: Object.fromEntries(
+      Object.entries(RULES["L-STATE"]?.sample ?? {})
+        .filter(([k]) => k !== "control" && k !== "target_visible")
+        .map(([k, v]) => [k, String(v)]),
+    ),
   } as const
   const stateCases: readonly (readonly [string, Record<string, string>, Verdict | "failed"])[] = [
     ["no control fields", {}, "failed"],
@@ -421,6 +715,133 @@ const selfTest = async (): Promise<number> => {
     LAN_REASON === "disabled by the relay daemon owner's ruling of 2026-11-11",
     LAN_REASON,
   )
+  // Round 2, finding 1-2 (class): ONE gate. Every rule's valid sample decides; every mutation of every field of every
+  // record (missing, NaN, negative, placeholder string, wrong type; empty list for lists) is UNMEASURED naming the field.
+  const wrongType = (k: Kind): unknown => (k === "bool" ? 1 : true)
+  // A rule that throws on a bad record is the defect this gate exists for; count it as a failure, never a crash.
+  const tryJudge = (name: string, rec: Rec): Run => {
+    try {
+      return judge(name, rec, "n")
+    } catch (e) {
+      return { measured: `threw: ${e instanceof Error ? e.message : String(e)}`, verdict: "CONTRADICTS", note: "" }
+    }
+  }
+  for (const [name, rule] of Object.entries(RULES)) {
+    const ok = judge(name, rule.sample, "n")
+    check(
+      `R2 ${name}: its valid sample is decided`,
+      ok.errored !== true && ok.verdict !== "UNMEASURED",
+      JSON.stringify(ok),
+    )
+    for (const [field, kind] of Object.entries(rule.schema)) {
+      const mutations: (readonly [string, unknown])[] = [
+        ["NaN", Number.NaN],
+        ["negative", -1],
+        ["placeholder", "?"],
+        ["wrong type", wrongType(kind)],
+      ]
+      if (typeof kind === "object" && "list" in kind) mutations.push(["empty list", []], ["list of NaN", [Number.NaN]])
+      const missing = { ...rule.sample }
+      delete (missing as Record<string, unknown>)[field]
+      const cases: (readonly [string, Rec])[] = [
+        ["missing", missing],
+        ...mutations.map(([m, v]) => [m, { ...rule.sample, [field]: v }] as const),
+      ]
+      for (const [m, rec] of cases) {
+        const r = tryJudge(name, rec)
+        check(`R2 ${name}.${field} ${m} -> UNMEASURED`, failed(r) && r.note.includes(field), JSON.stringify(r))
+      }
+    }
+  }
+  check("R2 an unknown rule name is UNMEASURED", failed(judge("R-NOPE", {}, "n")))
+  // Finding 1 through hostedRun itself: the local reference and the deadline are part of the record.
+  const goodPair: PairOut = {
+    ok: true,
+    fields: { load: "1", opened_ms: "300", closed_after_open_ms: "9952", code: "4004" },
+  }
+  const refs: readonly (readonly [string, { afterOpenMs: number; code: string }, number])[] = [
+    ["local reference timed out (review case)", { afterOpenMs: -1, code: "open_at_90s" }, 10_000],
+    ["hello deadline missing from the checkout (review case)", { afterOpenMs: 10_050, code: "4004" }, Number.NaN],
+    ["local code not a number", { afterOpenMs: 10_050, code: "closed" }, 10_000],
+    ["local time NaN", { afterOpenMs: Number.NaN, code: "4004" }, 10_000],
+    ["deadline negative", { afterOpenMs: 10_050, code: "4004" }, -1],
+    ["deadline infinite", { afterOpenMs: 10_050, code: "4004" }, Number.POSITIVE_INFINITY],
+  ]
+  for (const [name, ref, deadline] of refs)
+    check(
+      `R2 hostedRun ${name} -> UNMEASURED`,
+      failed(hostedRun(goodPair, ref, deadline, "n")),
+      JSON.stringify(hostedRun(goodPair, ref, deadline, "n")),
+    )
+  check(
+    "R2 hostedRun valid record -> CONFIRMS",
+    hostedRun(goodPair, { afterOpenMs: 10_050, code: "4004" }, 10_000, "n").verdict === "CONFIRMS",
+  )
+  for (const field of ["opened_ms", "closed_after_open_ms", "code"]) {
+    const fields: Record<string, string> = { ...goodPair.fields }
+    delete fields[field]
+    check(
+      `R2 hostedRun helper field ${field} missing -> UNMEASURED`,
+      failed(hostedRun({ ok: true, fields }, { afterOpenMs: 10_050, code: "4004" }, 10_000, "n")),
+    )
+  }
+  // Finding 2 through stateRun itself: every helper field, deleted or set to a placeholder, is UNMEASURED.
+  for (const field of Object.keys(RULES["L-STATE"]?.schema ?? {})) {
+    for (const [m, v] of [
+      ["missing", undefined],
+      ["placeholder", "?"],
+      ["negative", "-1"],
+    ] as const) {
+      const fields: Record<string, string> = { ...base.fields, control: "ok", target_visible: "yes" }
+      if (v === undefined) delete fields[field]
+      else fields[field] = v
+      check(
+        `R2 stateRun ${field} ${m} -> UNMEASURED`,
+        failed(stateRun({ ok: true, fields }, "n")),
+        JSON.stringify(stateRun({ ok: true, fields }, "n")),
+      )
+    }
+  }
+  // Static (class): every measured row reaches the gate, and the gate's wrappers call judge().
+  const source = readFileSync(join(import.meta.dir, "probe-sp-r.ts"), "utf8")
+  // Section headers start a line; the same words inside this test are indented string literals and never match.
+  const header = (name: string): number => source.search(new RegExp(`^// ---- ${name}`, "m"))
+  const rowsSrc = source.slice(header("the rows"), header("run"))
+  const rowBodies = rowsSrc.split(/\n  row\(|\nconst stateSpec|\nconst silentSpec|\n  \{\n    id: /).slice(1)
+  // 20 relay rows, the two pair-row factories and R-HOSTED-2 are built in that section (the same-network rows are
+  // constants from one map); a scan that finds fewer proves nothing.
+  check("R2 row scan found every row", rowBodies.length >= 23, `found ${rowBodies.length}`)
+  for (const body of rowBodies) {
+    const id = /"([A-Z]-[A-Z0-9-]+)"/.exec(body)?.[1] ?? (body.startsWith(" = ") ? "spec" : body.slice(0, 30))
+    check(
+      `R2 row ${id} reaches the gate`,
+      /judge\(|silentRun\(|reproveRun\(|stateRun\(|hostedRun\(|verdict: "UNMEASURED"/.test(body),
+      body.slice(0, 120),
+    )
+  }
+  for (const w of ["reproveRun", "silentRun", "stateRun", "hostedRun"]) {
+    const at = source.indexOf(`const ${w} = `)
+    const body = source.slice(at, source.indexOf("\n}", at) + 2)
+    check(`R2 ${w} decides through judge()`, at >= 0 && body.includes("judge("), body.slice(0, 120))
+  }
+  // Finding 4 static (class): every socket open or peer connect in the measurement code sits in a bounded wait.
+  const measureFrom = header("the relay harness")
+  const lines = source.slice(measureFrom).split("\n")
+  const base0 = source.slice(0, measureFrom).split("\n").length
+  let opens = 0
+  lines.forEach((line, i) => {
+    if (
+      !/openSocket\(|new WebSocket\(|\.connect\(\)/.test(line) ||
+      /^\s*(\/\/|\*)/.test(line) ||
+      /=> PeerT|connect\(\): Promise/.test(line)
+    )
+      return
+    opens += 1
+    const near = lines.slice(i, i + 3).join("\n")
+    check(`R2 bounded open at line ${base0 + i}`, /within\(/.test(line) || /awaitOpen\(/.test(near), line.trim())
+  })
+  // Four socket opens and two peer-connect sites exist in the measurement code; a scan that finds fewer proves nothing.
+  check("R2 bounded-open scan found every open and connect", opens >= 6, `found ${opens}`)
   // M1 (helper side): the pair helper's own class checks.
   const helperTest = join(import.meta.dir, "probe-sp-r-pair-selftest.sh")
   if (!existsSync(helperTest)) check("M1 pair helper self-test exists", false, helperTest)
@@ -580,7 +1001,7 @@ const pairOn = async (base: string): Promise<{ account: string; brain: PeerT; ha
   }
   return { account, brain, hand }
 }
-const roundTrip = (p: { brain: PeerT }, n: number, timeoutMs = 15_000): Promise<number | "timeout"> => {
+const roundTrip = async (p: { brain: PeerT }, n: number, timeoutMs = 15_000): Promise<number | null> => {
   const sent = performance.now()
   const back = new Promise<number>((done) => {
     const prev = p.brain.onDeliver
@@ -592,7 +1013,8 @@ const roundTrip = (p: { brain: PeerT }, n: number, timeoutMs = 15_000): Promise<
     }
   })
   void p.brain.send(p.brain.envelope("hand", "stream", `ping-${n}`))
-  return within(timeoutMs, back)
+  const r = await within(timeoutMs, back)
+  return r === "timeout" ? null : r
 }
 const closeAll = (...peers: PeerT[]): void => {
   for (const p of peers) p.ws?.close()
@@ -681,7 +1103,7 @@ const mCadence = (rewake: boolean) =>
       const tick = sleep(5_000)
       if (rewake && i === 6) await h.rewakeDoor(base, p.account)
       const r = await roundTrip(p, 100 + i)
-      if (r === "timeout") lost += 1
+      if (r === null) lost += 1
       else {
         rtts.push(r)
         arrivals.push(Date.now())
@@ -694,8 +1116,8 @@ const mCadence = (rewake: boolean) =>
     const sorted = [...rtts].sort((a, b) => a - b)
     return {
       lost,
-      p95: sorted[Math.max(0, Math.ceil(0.95 * sorted.length) - 1)] ?? Number.NaN,
-      maxGap: Math.max(...gaps),
+      p95: sorted.length === 0 ? null : (sorted[Math.max(0, Math.ceil(0.95 * sorted.length) - 1)] ?? null),
+      maxGap: gaps.length === 0 ? null : Math.max(...gaps),
       evicted,
     }
   })
@@ -713,7 +1135,7 @@ const mSurvive = (silent: boolean) =>
     const stop = silent ? () => undefined : keepalive([p.brain.ws, p.hand.ws])
     const end = await within(150_000, closed)
     stop()
-    const delivered = end === "timeout" ? (await roundTrip(p, 2)) !== "timeout" : false
+    const delivered = end === "timeout" ? (await roundTrip(p, 2)) !== null : false
     const evicted = (await instanceOf(base, p.account)) !== before
     closeAll(p.brain, p.hand)
     return {
@@ -761,7 +1183,7 @@ const mSize = (cls: "stream" | "data") =>
 const mTransport = () =>
   once("transport", async () => {
     const base = (await relayPrivate()).base
-    const closeFor = async (n: number): Promise<number | "open"> => {
+    const closeFor = async (n: number): Promise<number | null> => {
       const ws = h.openSocket(socketUrl(base, uid("sp-r-raw"), "hand"))
       await awaitOpen(ws)
       const closed = new Promise<{ at: number; code: number }>((done) => {
@@ -770,7 +1192,7 @@ const mTransport = () =>
       ws.send(new Uint8Array(n))
       const end = await within(20_000, closed)
       if (end === "timeout") ws.close()
-      return end === "timeout" ? "open" : end.code
+      return end === "timeout" ? null : end.code
     }
     let lo = 64 * 1024
     let hi = 64 * 1024 * 1024
@@ -892,280 +1314,142 @@ type Spec = Readonly<{
   question: string
   run: () => Promise<Run>
 }>
-const ms = (x: number | "timeout"): string => (x === "timeout" ? "timeout" : `${Math.round(x)} ms`)
-const overText = (o: string): string =>
-  o === "codec"
-    ? "refused by the shared relay codec before send"
-    : o === "refused"
-      ? "refused by the relay, channel stays open"
-      : o
 const relayNote = "local relay (workerd via wrangler dev --local), test credentials minted by the probe"
 
+const row = (id: string, question: string, run: () => Promise<Run>): Spec => ({ id, pipe: "relay", question, run })
 const relay: Spec[] = [
-  {
-    id: "R-AUTH-1",
-    pipe: "relay",
-    question:
-      "auth lifetime, awake hub: an admitted channel whose token is never refreshed closes at token expiry (no channel outlives its auth)",
-    run: async () => {
-      const m = await mExpiry(false)
-      const ok = m.afterExpS !== null && m.afterExpS >= 0 && m.afterExpS <= 5 && !m.evicted
-      return {
-        measured: `closed ${m.afterExpS ?? "never (60 s)"} s after exp, code ${m.code ?? "-"}, hub evicted ${m.evicted}`,
-        verdict: ok ? "CONFIRMS" : "CONTRADICTS",
-        note: relayNote,
-      }
-    },
-  },
-  {
-    id: "R-AUTH-2",
-    pipe: "relay",
-    question:
-      "auth lifetime across one hub hibernation: the expiry still closes the channel when the hub was evicted before it",
-    run: async () => {
-      const m = await mExpiry(true)
-      const ok = m.afterExpS !== null && m.afterExpS >= 0 && m.afterExpS <= 5
-      return {
-        measured: `closed ${m.afterExpS ?? "never (60 s)"} s after exp, code ${m.code ?? "-"}, hub evicted ${m.evicted}`,
-        verdict: ok ? "CONFIRMS" : "CONTRADICTS",
-        note: `${relayNote}; condition holds only when hub evicted is true`,
-      }
-    },
-  },
-  {
-    id: "R-AUTH-3",
-    pipe: "relay",
-    question: "auth lifetime at dial: a token already expired is refused before the channel is admitted",
-    run: async () => {
-      const m = await mExpiredHello()
-      return {
-        measured: m.admitted ? "admitted" : `refused before admission (${m.outcome.replace(/\s+/g, " ")})`,
-        verdict: m.admitted ? "CONTRADICTS" : "CONFIRMS",
-        note: relayNote,
-      }
-    },
-  },
-  {
-    id: "R-AUTH-4",
-    pipe: "relay",
-    question:
-      "unattended refresh after one hub hibernation, client advertising in-band re-proof: the channel stays up (0 reconnects)",
-    run: async () =>
+  row(
+    "R-AUTH-1",
+    "auth lifetime, awake hub: an admitted channel whose token is never refreshed closes at token expiry (no channel outlives its auth)",
+    async () => judge("R-AUTH-1", await mExpiry(false), relayNote),
+  ),
+  row(
+    "R-AUTH-2",
+    "auth lifetime across one hub hibernation: the expiry still closes the channel when the hub was evicted before it",
+    async () => judge("R-AUTH-2", await mExpiry(true), `${relayNote}; condition holds only when hub evicted is true`),
+  ),
+  row(
+    "R-AUTH-3",
+    "auth lifetime at dial: a token already expired is refused before the channel is admitted",
+    async () => judge("R-AUTH-3", await mExpiredHello(), relayNote),
+  ),
+  row(
+    "R-AUTH-4",
+    "unattended refresh after one hub hibernation, client advertising in-band re-proof: the channel stays up (0 reconnects)",
+    async () =>
       reproveRun(
         await mRefresh(),
         "reprove",
         `${relayNote}; measured by the relay checkout's own hibernation re-proof QA, 1 run`,
       ),
-  },
-  {
-    id: "R-AUTH-5",
-    pipe: "relay",
-    question: "refresh after one hub hibernation, client without in-band re-proof: what the relay does",
-    run: async () =>
-      reproveRun(
-        await mRefresh(),
-        "legacy",
-        `${relayNote}; the hand's relay client must advertise re-proof or reconnect once per refresh after a hibernation`,
-      ),
-  },
-  {
-    id: "R-AUTH-6",
-    pipe: "relay",
-    question: "token lifetime the account service issues, and the relay's cap on one token's window",
-    run: () =>
-      Promise.resolve({
-        measured: "-",
-        verdict: "UNMEASURED",
-        note: "needs a test account",
-      }),
-  },
-  {
-    id: "R-HIB-1",
-    pipe: "relay",
-    question:
-      "hub hibernation onset: idle time after which the hub is evicted while both channels stay open (5 s transport keepalive)",
-    run: async () => {
+  ),
+  row("R-AUTH-5", "refresh after one hub hibernation, client without in-band re-proof: what the relay does", async () =>
+    reproveRun(
+      await mRefresh(),
+      "legacy",
+      `${relayNote}; the hand's relay client must advertise re-proof or reconnect once per refresh after a hibernation`,
+    ),
+  ),
+  row("R-AUTH-6", "token lifetime the account service issues, and the relay's cap on one token's window", () =>
+    Promise.resolve({ measured: "-", verdict: "UNMEASURED", note: "needs a test account" }),
+  ),
+  row(
+    "R-HIB-1",
+    "hub hibernation onset: idle time after which the hub is evicted while both channels stay open (5 s transport keepalive)",
+    async () => {
       const m = await mEvict()
-      const list = m.res.map((r) => `${r.s}s:${r.evicted ? "evicted" : "resident"}`).join(" ")
-      return {
-        measured: `${list}; channels open ${m.allOpen}`,
-        verdict: m.firstEvicted !== null && m.allOpen ? "CONFIRMS" : "CONTRADICTS",
-        note: `${relayNote}; hub keeps no process state across hibernation and the channels survive it; onset is the local runtime's, not the hosted one's`,
-      }
+      return judge(
+        "R-HIB-1",
+        {
+          sweep: m.res.map((r) => `${r.s}s:${r.evicted ? "evicted" : "resident"}`).join(" "),
+          firstEvicted: m.firstEvicted,
+          allOpen: m.allOpen,
+        },
+        `${relayNote}; hub keeps no process state across hibernation and the channels survive it; onset is the local runtime's, not the hosted one's`,
+      )
     },
-  },
-  {
-    id: "R-HIB-2",
-    pipe: "relay",
-    question: "does the durable channel survive one hub hibernation: same sockets, heartbeat round trip after the wake",
-    run: async () => {
-      const m = await mWake()
-      const ok = m.evicted && m.open && m.wake !== "timeout"
-      return {
-        measured: `hub evicted ${m.evicted}, sockets open ${m.open}, round trip warm ${ms(m.warm)} / first after wake ${ms(m.wake)}`,
-        verdict: ok ? "CONFIRMS" : "CONTRADICTS",
-        note: relayNote,
-      }
-    },
-  },
-  {
-    id: "R-HIB-3",
-    pipe: "relay",
-    question: "a command sent right after one hub hibernation is delivered (nothing lost across the wake)",
-    run: async () => {
-      const m = await mWake()
-      return {
-        measured: `hub evicted ${m.evicted}, command delivered ${m.dataDelivered}`,
-        verdict: m.evicted && m.dataDelivered ? "CONFIRMS" : "CONTRADICTS",
-        note: relayNote,
-      }
-    },
-  },
-  {
-    id: "R-HIB-4",
-    pipe: "relay",
-    question: "for how long a hibernated channel lives with the 5 s transport keepalive (observed to 150 s)",
-    run: async () => {
-      const m = await mSurvive(false)
-      return {
-        measured: `open at 150 s ${m.openAt150}, heartbeat after ${m.delivered}, hub evicted ${m.evicted}`,
-        verdict: m.openAt150 && m.delivered ? "CONFIRMS" : "CONTRADICTS",
-        note: relayNote,
-      }
-    },
-  },
-  {
-    id: "R-HIB-5",
-    pipe: "relay",
-    question: "for how long a hibernated channel lives with no traffic at all (silent peer)",
-    run: async () =>
-      silentRun(await mSurvive(true), "R-HIB-5", `${relayNote}; relay dead window left at its shipped 60,000 ms`),
-  },
-  {
-    id: "R-SIZE-1",
-    pipe: "relay",
-    question: "message-size limit, stream class: largest sealed payload admitted, and the refusal one byte over",
-    run: async () => {
-      const m = await mSize("stream")
-      return {
-        measured: `max ${m.max} B sealed; ${m.max + 1} B ${overText(m.over)}; max re-admitted ${m.stable}`,
-        verdict: m.max > 0 && m.stable ? "NEW-EDGE" : "CONTRADICTS",
-        note: `${relayNote}; frames above the cap need an off-channel artifact path`,
-      }
-    },
-  },
-  {
-    id: "R-SIZE-3",
-    pipe: "relay",
-    question:
-      "message-size limit at the transport: largest single WebSocket message the relay runtime accepts before parsing it",
-    run: async () => {
-      const m = await mTransport()
-      return {
-        measured:
-          m.cap === null
-            ? `no transport refusal up to 64 MiB (largest tried); a 64 MiB message got ${m.overCode === "open" ? "no close in 20 s" : `close ${m.overCode}`}`
-            : `max ${m.cap} B per WebSocket message; one byte more ends the socket (close ${m.overCode}, message too large)`,
-        verdict: "NEW-EDGE",
-        note: `${relayNote}; unadmitted socket, raw bytes; local runtime only, the hosted runtime message cap is not measured here; every relayed message is held to the codec cap of R-SIZE-1/2`,
-      }
-    },
-  },
-  {
-    id: "R-SIZE-2",
-    pipe: "relay",
-    question:
-      "message-size limit, data (stored command) class: largest sealed payload admitted, and the refusal one byte over",
-    run: async () => {
-      const m = await mSize("data")
-      return {
-        measured: `max ${m.max} B sealed; ${m.max + 1} B ${overText(m.over)}; max re-admitted ${m.stable}`,
-        verdict: m.max > 0 && m.stable ? "NEW-EDGE" : "CONTRADICTS",
-        note: relayNote,
-      }
-    },
-  },
-  {
-    id: "R-LIVE-5-1",
-    pipe: "relay",
-    question: "5 s heartbeat, no hibernation in reach: 12 beats at 5 s all answered within 5 s, hub never evicted",
-    run: async () => {
-      const m = await mCadence(false)
-      const ok = m.lost === 0 && m.p95 < 5_000 && !m.evicted
-      return {
-        measured: `lost ${m.lost}/12, p95 round trip ${Math.round(m.p95)} ms, hub evicted ${m.evicted}`,
-        verdict: ok ? "CONFIRMS" : "CONTRADICTS",
-        note: `${relayNote}; a 5 s heartbeat keeps the hub resident (see R-HIB-1 onset)`,
-      }
-    },
-  },
-  {
-    id: "R-LIVE-5-2",
-    pipe: "relay",
-    question: "5 s window across one hibernation: the first heartbeat after a wake is answered within 5 s",
-    run: async () => {
-      const m = await mWake()
-      const ok = m.evicted && m.wake !== "timeout" && m.wake < 5_000
-      return {
-        measured: `hub evicted ${m.evicted}, first round trip after wake ${ms(m.wake)}`,
-        verdict: ok ? "CONFIRMS" : "CONTRADICTS",
-        note: relayNote,
-      }
-    },
-  },
-  {
-    id: "R-LIVE-15-1",
-    pipe: "relay",
-    question: "15 s window across one hibernation: 5 s cadence plus the wake round trip stays under 15 s",
-    run: async () => {
-      const m = await mWake()
-      const ok = m.evicted && m.wake !== "timeout" && 5_000 + m.wake < 15_000
-      return {
-        measured: `hub evicted ${m.evicted}, worst beat gap 5000 + ${ms(m.wake)}`,
-        verdict: ok ? "CONFIRMS" : "CONTRADICTS",
-        note: relayNote,
-      }
-    },
-  },
-  {
-    id: "R-LIVE-15-2",
-    pipe: "relay",
-    question:
-      "15 s window with a hibernation wake (state loss) injected mid-run under the 5 s cadence: largest gap between answered beats",
-    run: async () => {
-      const m = await mCadence(true)
-      const ok = m.lost === 0 && m.maxGap < 15_000
-      return {
-        measured: `lost ${m.lost}/12, largest gap ${m.maxGap} ms`,
-        verdict: ok ? "CONFIRMS" : "CONTRADICTS",
-        note: `${relayNote}; the wake is the relay's own test hook (hibernation-wake memory, sockets kept)`,
-      }
-    },
-  },
-  {
-    id: "R-LIVE-120-1",
-    pipe: "relay",
-    question: "120 s window across hibernation with the 5 s transport keepalive: the channel outlives 120 s",
-    run: async () => {
-      const m = await mSurvive(false)
-      return {
-        measured: `open at 150 s ${m.openAt150}, hub evicted ${m.evicted}`,
-        verdict: m.openAt150 && m.delivered ? "CONFIRMS" : "CONTRADICTS",
-        note: relayNote,
-      }
-    },
-  },
-  {
-    id: "R-LIVE-120-2",
-    pipe: "relay",
-    question: "120 s window across hibernation with a silent peer: the channel outlives 120 s",
-    run: async () =>
-      silentRun(
-        await mSurvive(true),
-        "R-LIVE-120-2",
-        `${relayNote}; design question for the lead, see the row's finding R-LIVE-120-2 in the task evidence; R4's 120 s deadline is unchanged until the lead rules`,
+  ),
+  row(
+    "R-HIB-2",
+    "does the durable channel survive one hub hibernation: same sockets, heartbeat round trip after the wake",
+    async () => judge("R-HIB-2", await mWake(), relayNote),
+  ),
+  row(
+    "R-HIB-3",
+    "a command sent right after one hub hibernation is delivered (nothing lost across the wake)",
+    async () => judge("R-HIB-3", await mWake(), relayNote),
+  ),
+  row(
+    "R-HIB-4",
+    "for how long a hibernated channel lives with the 5 s transport keepalive (observed to 150 s)",
+    async () => judge("R-HIB-4", await mSurvive(false), relayNote),
+  ),
+  row("R-HIB-5", "for how long a hibernated channel lives with no traffic at all (silent peer)", async () =>
+    silentRun(await mSurvive(true), "R-HIB-5", `${relayNote}; relay dead window left at its shipped 60,000 ms`),
+  ),
+  row(
+    "R-SIZE-1",
+    "message-size limit, stream class: largest sealed payload admitted, and the refusal one byte over",
+    async () =>
+      judge("R-SIZE-1", await mSize("stream"), `${relayNote}; frames above the cap need an off-channel artifact path`),
+  ),
+  row(
+    "R-SIZE-3",
+    "message-size limit at the transport: largest single WebSocket message the relay runtime accepts before parsing it",
+    async () =>
+      judge(
+        "R-SIZE-3",
+        await mTransport(),
+        `${relayNote}; unadmitted socket, raw bytes; local runtime only, the hosted runtime message cap is not measured here; every relayed message is held to the codec cap of R-SIZE-1/2`,
       ),
-  },
+  ),
+  row(
+    "R-SIZE-2",
+    "message-size limit, data (stored command) class: largest sealed payload admitted, and the refusal one byte over",
+    async () => judge("R-SIZE-2", await mSize("data"), relayNote),
+  ),
+  row(
+    "R-LIVE-5-1",
+    "5 s heartbeat, no hibernation in reach: 12 beats at 5 s all answered within 5 s, hub never evicted",
+    async () =>
+      judge(
+        "R-LIVE-5-1",
+        await mCadence(false),
+        `${relayNote}; a 5 s heartbeat keeps the hub resident (see R-HIB-1 onset)`,
+      ),
+  ),
+  row(
+    "R-LIVE-5-2",
+    "5 s window across one hibernation: the first heartbeat after a wake is answered within 5 s",
+    async () => judge("R-LIVE-5-2", await mWake(), relayNote),
+  ),
+  row(
+    "R-LIVE-15-1",
+    "15 s window across one hibernation: 5 s cadence plus the wake round trip stays under 15 s",
+    async () => judge("R-LIVE-15-1", await mWake(), relayNote),
+  ),
+  row(
+    "R-LIVE-15-2",
+    "15 s window with a hibernation wake (state loss) injected mid-run under the 5 s cadence: largest gap between answered beats",
+    async () =>
+      judge(
+        "R-LIVE-15-2",
+        await mCadence(true),
+        `${relayNote}; the wake is the relay's own test hook (hibernation-wake memory, sockets kept)`,
+      ),
+  ),
+  row(
+    "R-LIVE-120-1",
+    "120 s window across hibernation with the 5 s transport keepalive: the channel outlives 120 s",
+    async () => judge("R-LIVE-120-1", await mSurvive(false), relayNote),
+  ),
+  row("R-LIVE-120-2", "120 s window across hibernation with a silent peer: the channel outlives 120 s", async () =>
+    silentRun(
+      await mSurvive(true),
+      "R-LIVE-120-2",
+      `${relayNote}; design question for the lead, see the row's finding R-LIVE-120-2 in the task evidence; R4's 120 s deadline is unchanged until the lead rules`,
+    ),
+  ),
 ]
 
 const lanQuestions: readonly (readonly [string, string])[] = [

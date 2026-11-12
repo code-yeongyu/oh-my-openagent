@@ -96,6 +96,33 @@ sed "s/TARGETPID/-p $svc/" "$work/blind/lsof.in" > "$work/blind/lsof" && chmod +
 run_helper "$work/blind" state
 check "lsof blind to the device service -> exit 2" "$([ $rc -eq 2 ] && ! grep -q 'listeners_total=' "$work/out" && echo 0 || echo 1)" "exit $rc: $(cat "$work/out")"
 
+# 4b. lsof that answers for the device service only with rows that carry no numeric FD (round 2): what Linux lsof
+# prints for another user's process ("Permission denied" cwd/rtd/txt rows, a NOFD row). That is not visibility: exit 2.
+# The control variant adds one numeric-FD row and must pass the visibility check.
+mkdir -p "$work/denied"
+cat > "$work/denied/rows.denied" << 'EOF'
+COMMAND     PID USER   FD      TYPE DEVICE SIZE/OFF NODE NAME
+omo-devic SVCPID root  cwd   unknown                      /proc/SVCPID/cwd (readlink: Permission denied)
+omo-devic SVCPID root  rtd   unknown                      /proc/SVCPID/root (readlink: Permission denied)
+omo-devic SVCPID root  txt   unknown                      /proc/SVCPID/exe (readlink: Permission denied)
+omo-devic SVCPID root NOFD                                /proc/SVCPID/fd (opendir: Permission denied)
+EOF
+printf '%s\n' 'COMMAND     PID USER   FD      TYPE DEVICE SIZE/OFF NODE NAME' 'omo-devic SVCPID root NOFD                                /proc/SVCPID/fd (opendir: Permission denied)' > "$work/denied/rows.nofd"
+{ cat "$work/denied/rows.denied"; echo 'omo-devic SVCPID me      3u  IPv4  12345      0t0  TCP 127.0.0.1:5000 (LISTEN)'; } > "$work/denied/rows.numeric"
+for variant in denied nofd numeric; do
+  start_svc any
+  sed "s/SVCPID/$svc/g" "$work/denied/rows.$variant" > "$work/denied/rows"
+  # Only the visibility call (-p <service> with no -i/-U) is faked; every other lsof call is the real one.
+  printf '#!/bin/sh\ncase " $* " in *" -i"*|*" -U"*) exec %s "$@" ;; esac\ncase " $* " in *"-p %s "*) cat %s; exit 0 ;; esac\nexec %s "$@"\n' "$reallsof" "$svc" "$work/denied/rows" "$reallsof" > "$work/denied/lsof"
+  chmod +x "$work/denied/lsof"
+  run_helper "$work/denied" state
+  if [ "$variant" = numeric ]; then
+    check "lsof rows with one numeric FD -> target visible" "$([ $rc -eq 0 ] && [ "$(field target_visible)" = yes ] && echo 0 || echo 1)" "exit $rc: $(cat "$work/out")"
+  else
+    check "lsof rows only $variant (no numeric FD) -> exit 2, no zero reported" "$([ $rc -eq 2 ] && ! grep -q 'listeners_total=' "$work/out" && echo 0 || echo 1)" "exit $rc: $(cat "$work/out")"
+  fi
+done
+
 # 5-7. real lsof: the control comes first and passes, then the reading is trusted.
 tools="bun"
 nc -h 2>&1 | grep -q -i -E 'openbsd|apple|usage: nc' && tools="bun nc"
