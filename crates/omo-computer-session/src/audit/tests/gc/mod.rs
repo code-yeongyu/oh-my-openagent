@@ -2,6 +2,7 @@
 
 mod age;
 mod cap;
+mod errors;
 
 use std::fs::{self, File};
 use std::path::Path;
