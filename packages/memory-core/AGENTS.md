@@ -23,6 +23,7 @@ The public API is the barrel at `src/index.ts`.
 | `src/agreements/` | The working-agreement ledger at `system/agreements.md` (#10780): one line per agreement with `id`/`by`/`n`/`since`/`last`/`status` in a trailing comment, id = sha256 of the normalized text (first 10 hex). `mutate.ts` counts repeat corrections, flags `needs-human` at the threshold, and at the cap evicts only the oldest never-reaffirmed, unflagged agent item (reported as an `AgreementEvent`, named in the facts commit as `Omo-Agreement-Evicted`) or refuses the new one - it never merges distinct rules; `guard.ts` refuses automation edits to `by: human` items; `render.ts` builds the compiled `<agreements>` section; `notice-watermark.ts` announces each newly flagged item once per identity. |
 | `src/reflection/` | Trigger evaluation, run reservation, worktree execution, completion validation, merge outcomes, the orphan sweep that reclaims worktrees/branches no live run owns, and the park policy that stops automatic reflection after repeated failures (one half-open probe per interval). |
 | `src/compile/` | Compile committed memory revisions into marked system-prompt blocks and cache them by template hash. |
+| `src/cleanup/` | The memory cleanup pass (`planMemoryCleanup` / `applyMemoryCleanup` / `renderMemoryCleanupReport`): a dry-run planner over the live content notes (the legacy `memory/` layout is counted and reported as not scanned, never called clean) that classifies duplicates (identical or paragraph-Jaccard >= 0.9), superseded notes (an explicit `supersedes [[old]]` / `superseded by [[new]]` wikilink declaration, or a dated series whose newer version carries >= 90% of the older's paragraphs), stale notes (the note's own `expires` instant passed, or a `-LIFTED`/`-EXPIRED`/`-RETIRED`/`-SUPERSEDED` file name; age alone is never evidence) and conflicts (`contradicts`/`conflicts with` declarations, or mutual supersession), plus the `system/` token delta against `compile_warn_tokens`. Apply never deletes: an archived note becomes a provenance section in root `ARCHIVE.md` (reason, successor, evidence, original header, the body with its relative links re-resolved for the root), a duplicate's distinctive paragraphs are appended verbatim to the canonical, conflicts are kept and marked with a `conflicts_with` header key, inbound wikilinks and markdown links in every markdown file (`notes/`, `README.md` and the legacy `memory/` layout included) are repointed through `reflection/link-rewrite.ts`, and the whole set lands as one `commitMemoryWrite` (`writer: "human-command"`). `system/persona.md`, `system/human.md`, `system/identity.md` and `system/agreements.md` are held unless `includeLoadBearing`; `read_only` notes and files the scan skipped as unparsable are always held, including when the only write would be a repointed link; the plan carries a content-hash snapshot and apply refuses a repository that moved under it; a second run plans nothing. |
 | `src/search/` | Query parsing, transcript providers, and ranked memory/session search. |
 | `src/sync/` | Remote mirror synchronization and secret redaction. |
 | `src/reminders/` | Reflection and memory-maintenance reminder generation. |
@@ -93,6 +94,12 @@ The public API is the barrel at `src/index.ts`.
   `completeTransition()` form the pure reflection state machine.
 - `compileMemoryBlock()` and `compileMemoryBlockAtRevision()` render the
   committed memory projection injected into a harness prompt.
+- `planMemoryCleanup()`, `applyMemoryCleanup()` and `renderMemoryCleanupReport()`
+  form the cleanup pass (`src/cleanup/`, package export `./cleanup`, not the
+  root barrel): plan is read-only, apply archives into `ARCHIVE.md` and never
+  deletes, the report is what a person reads before `--apply`. The root barrel
+  does not re-export it, so an eager harness bundle that imports the barrel
+  does not trace `reflection/link-rewrite.ts`.
 - `FactsQueue`, `applyFactsBatch()`, `planFactsMutation()`, and
   `consumeSoulNoticeDelta()` drive the facts/soul lifecycle from
   `src/facts/` and `src/soul/`.

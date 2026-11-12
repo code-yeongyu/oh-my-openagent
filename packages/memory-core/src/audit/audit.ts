@@ -141,7 +141,7 @@ function danglingLinks(path: string, body: string, existing: ReadonlySet<string>
 }
 
 /** The destination of a markdown link: `<a b.md>` keeps its spaces, otherwise a space ends it (a title follows). */
-function markdownDestination(raw: string): string {
+export function markdownDestination(raw: string): string {
   const trimmed = raw.trim()
   if (trimmed.startsWith("<")) return trimmed.slice(1, trimmed.indexOf(">") === -1 ? undefined : trimmed.indexOf(">"))
   return trimmed.split(/\s+/)[0] ?? ""
@@ -153,7 +153,8 @@ function isDirectory(resolved: string, existing: ReadonlySet<string>): boolean {
   return false
 }
 
-function withoutFences(body: string): string {
+/** The body with fenced blocks and inline code blanked, line count preserved, so quoted link syntax is not a link. */
+export function withoutFences(body: string): string {
   let fence: { readonly char: string; readonly length: number } | undefined
   return body
     .split("\n")

@@ -7,6 +7,7 @@
 import { parseMemoryFile, type GitMemoryRepo } from "@oh-my-opencode/memory-core"
 
 import { parseCommandArgs } from "./args"
+import { MEMORY_CLEANUP_BOOLEAN_FLAGS, runMemoryCleanup } from "./memory-cleanup"
 import { runMemoryUnlock } from "./memory-unlock"
 import { hasGitRepo, openRepo, shortSha } from "./repo"
 import { requireIdentity, respond, type MemoryCommandContext, type MemoryCommandDeps } from "./types"
@@ -54,14 +55,15 @@ export function registerMemoryCommand(pi: MemoryCommandPort, deps: MemoryCommand
       const identity = requireIdentity(deps, ctx)
       if (typeof identity === "string") return respond(ctx, identity, "error")
 
-      const parsed = parseCommandArgs(args, { booleans: ["force"] })
+      const parsed = parseCommandArgs(args, { booleans: ["force", ...MEMORY_CLEANUP_BOOLEAN_FLAGS] })
       if (parsed.positionals[0] === "unlock") {
         return runMemoryUnlock(ctx, identity, parsed.positionals.slice(1).join(" "), parsed.flags.get("force") === true)
       }
+      if (parsed.positionals[0] === "cleanup") return runMemoryCleanup(deps, ctx, identity, parsed)
       if (parsed.positionals.length > 0) {
         return respond(
           ctx,
-          `unknown /memory subcommand "${parsed.positionals[0]}"; use /memory or /memory unlock <lock path>`,
+          `unknown /memory subcommand "${parsed.positionals[0]}"; use /memory, /memory cleanup [--apply], or /memory unlock <lock path>`,
           "error",
         )
       }

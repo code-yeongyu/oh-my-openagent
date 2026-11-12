@@ -1,0 +1,88 @@
+import { describe, expect, it } from "bun:test"
+import { auditMemoryRepo } from "../audit/audit"
+import { memory, repoWith } from "../compile/compile.test-support"
+import { NOW, read, run } from "./cleanup.test-support"
+import { planMemoryCleanup } from "./plan"
+
+const OLD = {
+  relativePath: "reference/old-LIFTED.md",
+  content: memory("Old", "The hold was lifted; [the sibling rule](sibling.md) replaced it."),
+}
+const SIBLING = { relativePath: "reference/sibling.md", content: memory("Sibling", "The rule for every placement.") }
+
+async function danglingLinks(dir: string): Promise<string[][]> {
+  const report = await auditMemoryRepo(dir)
+  return report.issues.filter((issue) => issue.code === "link_dangling").map((issue) => [issue.path, issue.detail])
+}
+
+describe("memory cleanup link integrity", () => {
+  it("#given an archived note with a relative link and linkers outside the corpus #when applied #then no link dangles", async () => {
+    // given
+    const { dir, repo } = await repoWith([
+      OLD,
+      SIBLING,
+      {
+        relativePath: "notes/log.md",
+        content: "Read [[reference/old-LIFTED]] and [it](../reference/old-LIFTED.md).\n",
+      },
+      { relativePath: "memory/reference/legacy.md", content: memory("Legacy", "Legacy: [[reference/old-LIFTED]].") },
+      { relativePath: "README.md", content: "Start at [the old hold](reference/old-LIFTED.md).\n" },
+    ])
+    const before = await danglingLinks(dir)
+
+    // when
+    const { plan, applied } = await run(repo)
+
+    // then
+    expect(before).toStrictEqual([])
+    expect(applied.applied).toBe(true)
+    expect(await danglingLinks(dir)).toStrictEqual([])
+    expect(plan.findings.map((finding) => finding.touches)).toStrictEqual([
+      ["ARCHIVE.md", "README.md", "memory/reference/legacy.md", "notes/log.md", "reference/old-LIFTED.md"],
+    ])
+    expect(await read(dir, "ARCHIVE.md")).toContain("[the sibling rule](reference/sibling.md)")
+    expect(await read(dir, "notes/log.md")).toBe(
+      "Read [[ARCHIVE.md|reference/old-LIFTED (archived)]] and [it](../ARCHIVE.md).\n",
+    )
+  })
+
+  it("#given a legacy memory/system/persona.md links an archived note #when planned #then the finding is held as load-bearing", async () => {
+    // given
+    const { dir } = await repoWith([
+      OLD,
+      SIBLING,
+      { relativePath: "memory/system/persona.md", content: memory("Persona", "See [[reference/old-LIFTED]].") },
+    ])
+
+    // when
+    const plan = await planMemoryCleanup(dir, { now: NOW })
+
+    // then
+    expect(plan.findings).toStrictEqual([])
+    expect(plan.held.map((finding) => finding.held)).toStrictEqual([
+      "would repoint a link in memory/system/persona.md (load-bearing; pass --include-load-bearing)",
+    ])
+  })
+
+  it("#given a note cleanup skipped as unparsable links an archived note #when planned #then the finding is held, since a skipped file is never touched", async () => {
+    // given
+    const { dir } = await repoWith([
+      OLD,
+      SIBLING,
+      {
+        relativePath: "reference/broken.md",
+        content: "---\ntitle: no description\n---\nSee [[reference/old-LIFTED]].\n",
+      },
+    ])
+
+    // when
+    const plan = await planMemoryCleanup(dir, { now: NOW })
+
+    // then
+    expect(plan.scanned.skipped.map((file) => file.path)).toStrictEqual(["reference/broken.md"])
+    expect(plan.findings).toStrictEqual([])
+    expect(plan.held.map((finding) => finding.held.split(",")[0])).toStrictEqual([
+      "would repoint a link in reference/broken.md",
+    ])
+  })
+})
