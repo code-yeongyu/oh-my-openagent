@@ -114,9 +114,12 @@ pub(super) fn truncated(event: &AuditEvent) -> AuditEvent {
     }
 }
 
-pub(super) fn last_line_hash(path: &Path) -> Option<String> {
-    let file = File::open(path).ok()?;
-    BufReader::new(file)
+/// The last `lineHash` of the audit file at `path`: the previous segment's chain link.
+pub(super) fn last_line_hash(path: &Path) -> io::Result<Option<String>> {
+    let Ok(file) = File::open(path) else {
+        return Ok(None);
+    };
+    Ok(BufReader::new(file)
         .lines()
         .map_while(Result::ok)
         .filter_map(|text| serde_json::from_str::<Value>(&text).ok())
@@ -125,7 +128,12 @@ pub(super) fn last_line_hash(path: &Path) -> Option<String> {
                 .and_then(Value::as_str)
                 .map(str::to_owned)
         })
-        .last()
+        .last())
+}
+
+/// The chain link a new segment starts from.
+pub(super) fn chain_link(path: &Path) -> Option<String> {
+    last_line_hash(path).unwrap_or(None)
 }
 
 #[cfg(unix)]
