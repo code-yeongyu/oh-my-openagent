@@ -2165,6 +2165,7 @@
         "script/qa/computer/conformance/report.ts",
         "script/qa/computer/conformance/run.ts",
         "script/qa/computer/pool/xorg-uinput-probe.ts",
+        "script/qa/computer/probes/hosted-macos-live.ts",
         "script/qa/computer/sentinel/sentinel.ts",
         "script/qa/desktop/hyprland.ts",
         "script/qa/desktop/kwin.ts",
