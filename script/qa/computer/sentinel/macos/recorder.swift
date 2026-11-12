@@ -137,7 +137,7 @@ final class Recorder: NSObject {
     case kAXFocusedUIElementChangedNotification, kAXFocusedWindowChangedNotification:
       send("key_focus", ["kind": "focus", "via": "notification", "value": focusIdentity(of: userPid) ?? "unreadable"])
     case kAXValueChangedNotification:
-      if let text = fieldText() { send("typing", ["kind": "field", "text": text, "final": false]) }
+      if let text = fieldText(), text != Recorder.busy { send("typing", ["kind": "field", "text": text, "final": false]) }
     case kAXWindowCreatedNotification, kAXSheetCreatedNotification:
       windowAdded(element)
     default:
@@ -176,7 +176,11 @@ final class Recorder: NSObject {
       recording = false
       emit(["kind": "stop"])
     case "final":
-      if let text = fieldText() { emit(["kind": "field", "text": text, "final": true]) } else { fault("typing", "final field read failed") }
+      if let text = fieldText(), text != Recorder.busy {
+        emit(["kind": "field", "text": text, "final": true])
+      } else {
+        fault("typing", "final field read failed")
+      }
     case "snapshot":
       emitSnapshot()
     case "quit":

@@ -13,6 +13,7 @@ final class Planter: NSObject {
 
   func setUp() {
     background.title = "Sentinel Background"
+    background.collectionBehavior = [.canJoinAllSpaces]
     background.orderFrontRegardless()
     emit(["ctl": "hello", "role": "planter", "pid": Int(getpid()), "window": background.windowNumber, "trusted": AXIsProcessTrusted()])
   }
@@ -39,6 +40,14 @@ final class Planter: NSObject {
       event?.flags = flags
       event?.post(tap: .cghidEventTap)
     }
+  }
+
+  // Polls the active Space every 50 ms until it differs from `from` or the deadline passes; a switch that lands late is
+  // still reported (and so still restored) instead of leaving the desktop on another Space.
+  func waitForSpaceChange(from: UInt64, deadline: Double, _ done: @escaping (Bool) -> Void) {
+    if let now = activeSpaceId(), now != from { return done(true) }
+    if uptimeMs() >= deadline { return done(false) }
+    after(0.05) { self.waitForSpaceChange(from: from, deadline: deadline, done) }
   }
 
   func setFocus(pid: pid_t, identifier: String) -> Bool {
@@ -89,11 +98,13 @@ final class Planter: NSObject {
       guard (managedSpaceCount() ?? 0) >= 2 else { return failed("space", "fewer than two Spaces exist") }
       let postedAt = uptimeMs()
       postControlChord(124)
-      after(0.45) {
-        guard activeSpaceId() != before else { return self.failed("space", "Control-Right did not change the active Space") }
+      waitForSpaceChange(from: before, deadline: uptimeMs() + 2_000) { switched in
+        guard switched else { return self.failed("space", "Control-Right did not change the active Space within 2 s") }
         self.planted("space", at: postedAt)
         self.postControlChord(123)
-        self.restored("space")
+        self.waitForSpaceChange(from: activeSpaceId() ?? before, deadline: uptimeMs() + 2_000) { _ in
+          self.restored("space")
+        }
       }
     case "alert":
       let panel = NSPanel(

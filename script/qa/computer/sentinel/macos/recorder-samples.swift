@@ -16,23 +16,34 @@ extension Recorder {
     return last[key] != value
   }
 
+  // A read of an app that is busy (being activated, for one) can block the caller for seconds and stall the 20 Hz
+  // sampler. Reads time out after 50 ms; a timed-out sample is skipped and retried on the next tick, while the
+  // notification path keeps watching the signal. Any other failed read is a fault.
   func focusIdentity(of pid: pid_t) -> String? {
-    let (error, value) = axValue(AXUIElementCreateApplication(pid), kAXFocusedUIElementAttribute)
+    let app = AXUIElementCreateApplication(pid)
+    AXUIElementSetMessagingTimeout(app, 0.05)
+    let (error, value) = axValue(app, kAXFocusedUIElementAttribute)
     if error == .noValue { return "none" }
+    if error == .cannotComplete { return Recorder.busy }
     guard error == .success, let value, CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
     return axIdentity(unsafeBitCast(value, to: AXUIElement.self))
   }
 
+  static let busy = "\u{0}busy"
+
   func fieldText() -> String? {
     guard let field else { return nil }
-    return axString(field, kAXValueAttribute)
+    AXUIElementSetMessagingTimeout(field, 0.05)
+    let (error, value) = axValue(field, kAXValueAttribute)
+    if error == .cannotComplete { return Recorder.busy }
+    return value as? String
   }
 
   func sample() {
     emit(["kind": "tick"])
 
     if let focus = focusIdentity(of: userPid) {
-      if changed("focus", focus) { send("key_focus", ["kind": "focus", "via": "sample", "value": focus]) }
+      if focus != Recorder.busy, changed("focus", focus) { send("key_focus", ["kind": "focus", "via": "sample", "value": focus]) }
     } else {
       fault("key_focus", "focused element read failed")
     }
@@ -53,7 +64,7 @@ extension Recorder {
 
     if field != nil {
       if let text = fieldText() {
-        if changed("field", text) { send("typing", ["kind": "field", "text": text, "final": false]) }
+        if text != Recorder.busy, changed("field", text) { send("typing", ["kind": "field", "text": text, "final": false]) }
       } else {
         fault("typing", "field read failed")
       }
