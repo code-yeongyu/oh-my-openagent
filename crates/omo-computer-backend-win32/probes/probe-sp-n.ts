@@ -14,7 +14,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { randomBytes } from "node:crypto"
 import { tmpdir } from "node:os"
-import { basename, join, relative } from "node:path"
+import { basename, join, relative, resolve } from "node:path"
 
 const HERE = import.meta.dir
 const HELPER = join(HERE, "sp-n.ps1")
@@ -1057,6 +1057,60 @@ export function gatedVerify(ledger: readonly LedgerRow[], results: Record<string
       })
   }
   return out
+}
+
+// The two-pass job: pass 1 is the measure pass's ledger, pass 2 this verify pass. Every row is merged worst-of
+// (gated rows with their control, count rows by count, timing rows by p95, any other row by verdict), and the job
+// fails only where the MERGED verdict differs from the COMMITTED ledger's, never on pass-to-pass jitter.
+const verdictRank = (v: Verdict) => (v === "CONFIRMS" ? 0 : v === "CONTRADICTS" ? 2 : 1)
+export function mergePasses(
+  pass1: readonly LedgerRow[],
+  pass2: Record<string, Result>,
+  host: string,
+): Record<string, Result> {
+  const out: Record<string, Result> = {}
+  const gated = gatedVerify(pass1, pass2, host)
+  for (const [id, b] of Object.entries(pass2)) {
+    const r = pass1.find((x) => x.id === id && x.host === host)
+    if (!r || b.skip) {
+      out[id] = b
+      continue
+    }
+    const a: Result = { measured: r.measured, verdict: r.verdict as Verdict }
+    const g = gated.get(id)
+    if (g) {
+      out[id] = UN(g.text.replace(/^SAME \S+ UNMEASURED combined with its control \(([^)]*)\); now: /, "$1; pass 2: "))
+      continue
+    }
+    const merged = worstOfCountPasses(id, a, b)?.result ?? worstOfPasses(id, a, b)?.result
+    if (merged) out[id] = merged
+    else if (a.verdict === b.verdict) out[id] = b
+    else {
+      const [worse, other] = verdictRank(a.verdict) >= verdictRank(b.verdict) ? [a, b] : [b, a]
+      out[id] = { measured: `${worse.measured} (other pass: ${other.verdict})`, verdict: worse.verdict }
+    }
+  }
+  return out
+}
+export function verifyJob(
+  pass1: readonly LedgerRow[],
+  pass2: Record<string, Result>,
+  committed: readonly LedgerRow[],
+  host: string,
+  want: (id: string) => boolean,
+) {
+  const merged = mergePasses(pass1, pass2, host)
+  const lines: string[] = []
+  let diff = 0
+  for (const [id, m] of Object.entries(merged).filter(([k]) => want(k))) {
+    const c = committed.find((x) => x.id === id && x.host === host)
+    if (m.skip) lines.push(`SKIP ${id}: not re-measured by this pass: ${m.skip}`)
+    else if (!c || c.verdict !== m.verdict) {
+      diff++
+      lines.push(`DIFF ${id} committed=${c?.verdict ?? "missing"} merged=${m.verdict} ${clean(m.measured)}`)
+    } else lines.push(`SAME ${id} ${m.verdict} ${clean(m.measured)}`)
+  }
+  return { merged, lines, diff }
 }
 
 // One --verify comparison: rows of other hosts and rows this pass did not re-measure are skipped with the reason;
@@ -2617,22 +2671,56 @@ const LOGIC_CHECKS: readonly Check[] = [
       )
       if (counted.length) bad.push(`count rows outside worst-of: ${[...new Set(counted.map((r) => r.id))].join(",")}`)
       const self = source("probe-sp-n.ts")
-      const vl = self.slice(
-        self.indexOf("export function verifyLine("),
-        self.indexOf("\n}\n", self.indexOf("export function verifyLine(")),
-      )
-      const [ci, ti, di] = [
-        vl.indexOf("worstOfCountPasses("),
-        vl.indexOf("worstOfPasses("),
-        vl.lastIndexOf('kind: "DIFF"'),
+      const mp = self.slice(self.indexOf("export function mergePasses("), self.indexOf("export function verifyJob("))
+      const [ci, ti, pi] = [
+        mp.indexOf("worstOfCountPasses("),
+        mp.indexOf("worstOfPasses("),
+        mp.indexOf("a.verdict === b.verdict"),
       ]
-      if (!(ci > 0 && ti > ci && di > ti)) bad.push("verifyLine compares before the worst-of paths")
+      if (!(mp.indexOf("gatedVerify(") > 0 && ci > 0 && ti > ci && pi > ti))
+        bad.push("mergePasses compares before the gate and worst-of paths")
       if (
-        !/gatedRows\.get\(l\.id\) \?\? verifyLine\(/.test(self) ||
-        (self.match(/verifyLine\(l, results\[/g) ?? []).length !== 1 ||
+        (self.match(/verifyJob\(ledger, results, committed/g) ?? []).length !== 1 ||
         /\.verdict !== l\.verdict/.test(self)
       )
-        bad.push("a verify path bypasses verifyLine")
+        bad.push("a verify path bypasses the merged worst-of job")
+      return bad.length ? bad.join("; ") : undefined
+    },
+  },
+  {
+    finding: "JOB two-pass verify against the committed ledger (hosted run 43156630522)",
+    async run() {
+      const id = "n-wheel-after-raise-5ms"
+      const t = (d: number, n = 6): Tally => ({ delivered: d, runs: n, acquire: "plain", notFg: 0 })
+      const pass = (lost: number) => wheelResults(t(6), t(18, 18), t(6 - lost))[id] as Result
+      const row = (r: Result): LedgerRow =>
+        Object.fromEntries(
+          HEADER.map((h) => [
+            h,
+            h === "id" ? id : h === "host" ? "h" : h === "verdict" ? r.verdict : h === "measured" ? r.measured : "x",
+          ]),
+        ) as LedgerRow
+      const committed = [row({ measured: "lost 3/6 vs 6/6", verdict: "CONTRADICTS" })]
+      const bad: string[] = []
+      const cases: Array<[string, number, number, LedgerRow[], number]> = [
+        ["pass 2 worse", 6, 3, committed, 0],
+        ["pass 2 better", 3, 6, committed, 0],
+        ["equal", 3, 3, committed, 0],
+        ["real change", 6, 6, committed, 1],
+      ]
+      for (const [name, l1, l2, com, want] of cases) {
+        const job = verifyJob([row(pass(l1))], { [id]: pass(l2) }, com, "h", () => true)
+        const m = job.merged[id]
+        const worst = Math.max(l1, l2) < 6 || Math.min(l1, l2) < 6 ? "CONTRADICTS" : "CONFIRMS"
+        if (job.diff !== want || m?.verdict !== worst || (l1 !== l2 && !/ vs /.test(m.measured)))
+          bad.push(`${name}: diff=${job.diff} want ${want}, merged ${m?.verdict} ${m?.measured}`)
+      }
+      const self = source("probe-sp-n.ts")
+      if (
+        !/const committed = readLedger\(LEDGER\)/.test(self) ||
+        !/writeFileSync\(opt\.file, `\$\{mergeLedger\(ledger, host, fresh\)/.test(self)
+      )
+        bad.push("verify does not judge against the committed ledger or does not write the merged ledger")
       return bad.length ? bad.join("; ") : undefined
     },
   },
@@ -2879,14 +2967,23 @@ async function main() {
         console.log(`SP-N measured ${ids.length} rows on ${host} (${build}) -> ${relative(process.cwd(), opt.file)}`)
         return 0
       }
-      let diff = 0
-      const gatedRows = gatedVerify(ledger, results, host)
-      for (const l of ledger.filter((r) => want.has(r.id))) {
-        const v = gatedRows.get(l.id) ?? verifyLine(l, results[l.id], host)
-        if (v.kind === "DIFF") diff++
-        console.log(v.text)
+      // pass 1 (opt.file) merged worst-of with this pass, judged against the committed ledger; the merged ledger
+      // replaces pass 1 in opt.file (the uploaded artifact), never the committed file itself
+      const committed = readLedger(LEDGER)
+      const job = verifyJob(ledger, results, committed, host, (id) => want.has(id))
+      for (const line of job.lines) console.log(line)
+      if (resolve(opt.file) !== resolve(LEDGER)) {
+        const notes = new Map(ledger.filter((r) => r.host === host).map((r) => [r.id, r.notes]))
+        const fresh = new Map(
+          Object.entries(job.merged).map(([id, m]) => [id, ledgerLine(id, m, host, build, carriedNote(notes.get(id)))]),
+        )
+        writeFileSync(opt.file, `${mergeLedger(ledger, host, fresh).join("\n")}\n`)
+        console.log(`SP-N merged worst-of-both-passes ledger -> ${relative(process.cwd(), opt.file)}`)
       }
-      console.log(`SP-N verify on ${host} (${build}): ${Object.keys(results).length} measured, ${diff} differing`)
+      const diff = job.diff
+      console.log(
+        `SP-N verify on ${host} (${build}): ${Object.keys(results).length} measured, merged worst-of with pass 1, ${diff} differing from the committed ledger`,
+      )
       return diff === 0 ? 0 : 1
     },
     async () => {
