@@ -6,7 +6,10 @@ import { join, resolve } from "node:path"
 const ROOT = resolve(import.meta.dir, "../../..")
 const DRIVER = join(ROOT, "script/qa/computer/replay.ts")
 const ENGINE = join(ROOT, "target/debug/omo-computer-engine")
-const CASE_01 = join(ROOT, "crates/omo-computer-engine/tests/fixtures/v1-consumers/01-stdio-session-open-no-options.json")
+const CASE_01 = join(
+  ROOT,
+  "crates/omo-computer-engine/tests/fixtures/v1-consumers/01-stdio-session-open-no-options.json",
+)
 const DELTAS_HEADER = "file\tpointer\tkind\tsource\trow\timported value\tv3 value"
 const PROVENANCE = join(ROOT, "crates/omo-computer-core/parity/ORACLE-PROVENANCE.tsv")
 
@@ -90,13 +93,19 @@ async function caseFile(path: string): Promise<CaseFile | undefined> {
 
 // The imported oracle cases: every replay case the provenance manifest lists.
 async function importedCases(): Promise<CaseFile[]> {
-  const listed = (await readFile(PROVENANCE, "utf8")).trim().split("\n").slice(1).map((row) => join(ROOT, row.split("\t")[0] ?? ""))
+  const listed = (await readFile(PROVENANCE, "utf8"))
+    .trim()
+    .split("\n")
+    .slice(1)
+    .map((row) => join(ROOT, row.split("\t")[0] ?? ""))
   const cases = await Promise.all(listed.map(caseFile))
   return cases.filter((item): item is CaseFile => item !== undefined)
 }
 
 async function v3Cases(): Promise<CaseFile[]> {
-  const paths = await Array.fromAsync(new Bun.Glob("crates/**/fixtures/**/v3-*.json").scan({ cwd: ROOT, absolute: true }))
+  const paths = await Array.fromAsync(
+    new Bun.Glob("crates/**/fixtures/**/v3-*.json").scan({ cwd: ROOT, absolute: true }),
+  )
   const cases = await Promise.all(paths.map(caseFile))
   return cases.filter((item): item is CaseFile => item !== undefined)
 }
@@ -107,7 +116,14 @@ async function probe(casePath: string): Promise<{ run: Run; argv: unknown[] }> {
   const log = join(dir, `argv-${counter}.log`)
   const run = await replay(["--engine", probeEngine, "--case", casePath], { PROBE_ARGV_LOG: log })
   const text = (await Bun.file(log).exists()) ? await readFile(log, "utf8") : ""
-  return { run, argv: text.trim().split("\n").filter((line) => line !== "").map((line) => JSON.parse(line)) }
+  return {
+    run,
+    argv: text
+      .trim()
+      .split("\n")
+      .filter((line) => line !== "")
+      .map((line) => JSON.parse(line)),
+  }
 }
 
 beforeAll(async () => {
@@ -133,7 +149,9 @@ afterAll(async () => {
 describe("replay driver", () => {
   test("v1 corpus case 01-stdio-session-open-no-options replays", async () => {
     const run = await replay(["--engine", ENGINE, "--case", CASE_01])
-    expect(run.stdout).toContain("REPLAY_OK crates/omo-computer-engine/tests/fixtures/v1-consumers/01-stdio-session-open-no-options.json steps=2")
+    expect(run.stdout).toContain(
+      "REPLAY_OK crates/omo-computer-engine/tests/fixtures/v1-consumers/01-stdio-session-open-no-options.json steps=2",
+    )
     expect(run.stdout).toContain("procs 0")
     expect(run.stdout).toContain("dir REMOVED ")
     expect(run.code).toBe(0)
@@ -178,7 +196,10 @@ describe("replay driver", () => {
   test("replay_never_relaxes_a_member_the_imported_expectation_lists", async () => {
     const steps = [{ send: request(1), expect: [expectation(reply(1, { a: 1, b: "x" }))] }]
     const plan = [{ replies: [reply(1, { a: 2, b: "x" })] }]
-    const relaxed = await scriptedCase(steps, plan, ["<case>\t/result/a\tadditive\ttest\t15\t\t", "*\t/result/*\tadditive\ttest\t15\t\t"])
+    const relaxed = await scriptedCase(steps, plan, [
+      "<case>\t/result/a\tadditive\ttest\t15\t\t",
+      "*\t/result/*\tadditive\ttest\t15\t\t",
+    ])
     const run = await replay(relaxed.args, relaxed.env)
     expect(run.stdout).toContain("/result/a")
     expect(run.code).toBe(1)
@@ -210,7 +231,14 @@ describe("replay driver", () => {
     expect(accepted.stdout).toContain("steps=2")
     expect(accepted.code).toBe(0)
 
-    const leaky = await scriptedCase(steps, [{ replies: [reply(1, null)], sink: 1 }, { replies: [reply(2, null)], sink: 1 }], [])
+    const leaky = await scriptedCase(
+      steps,
+      [
+        { replies: [reply(1, null)], sink: 1 },
+        { replies: [reply(2, null)], sink: 1 },
+      ],
+      [],
+    )
     const refused = await replay(leaky.args, leaky.env)
     expect(refused.stdout).toContain("sink")
     expect(refused.stdout).toContain("step=2")
@@ -219,7 +247,11 @@ describe("replay driver", () => {
 
   test("a leftover message fails the case", async () => {
     const steps = [{ send: request(1), expect: [expectation(reply(1, {}))] }]
-    const extra = await scriptedCase(steps, [{ replies: [reply(1, {}), { jsonrpc: "2.0", method: "audit", params: {} }] }], [])
+    const extra = await scriptedCase(
+      steps,
+      [{ replies: [reply(1, {}), { jsonrpc: "2.0", method: "audit", params: {} }] }],
+      [],
+    )
     const run = await replay(extra.args, extra.env)
     expect(run.stdout).toContain("LEFTOVER")
     expect(run.code).toBe(1)
@@ -238,7 +270,11 @@ describe("replay driver", () => {
       "missing --engine": await replay(["--case", CASE_01]),
     }
     for (const [what, run] of Object.entries(runs)) {
-      expect({ what, code: run.code, error: run.stdout.includes("REPLAY_ERROR") }).toEqual({ what, code: 2, error: true })
+      expect({ what, code: run.code, error: run.stdout.includes("REPLAY_ERROR") }).toEqual({
+        what,
+        code: 2,
+        error: true,
+      })
     }
   }, 60_000)
 
@@ -247,14 +283,21 @@ describe("replay driver", () => {
     expect(cases.length).toBeGreaterThan(0)
     for (const item of cases) {
       const { run, argv } = await probe(item.path)
-      expect({ case: item.path, code: run.code, first: argv[0] }).toEqual({ case: item.path, code: 1, first: ["--stdio"] })
+      expect({ case: item.path, code: run.code, first: argv[0] }).toEqual({
+        case: item.path,
+        code: 1,
+        first: ["--stdio"],
+      })
     }
   }, 120_000)
 
   test("every v3- case without a transport is refused with transport_missing and spawns nothing", async () => {
     const synthetic = join(dir, "v3-no-transport.json")
     await writeFile(synthetic, JSON.stringify({ steps: [{ send: request(1), expect: [] }] }))
-    const cases = [...(await v3Cases()).filter((item) => item.transport === undefined).map((item) => item.path), synthetic]
+    const cases = [
+      ...(await v3Cases()).filter((item) => item.transport === undefined).map((item) => item.path),
+      synthetic,
+    ]
     for (const path of cases) {
       const { run, argv } = await probe(path)
       const typed = run.stdout.includes("REPLAY_ERROR transport_missing")
