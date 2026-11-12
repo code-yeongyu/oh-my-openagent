@@ -34,6 +34,14 @@ describe("guest plan", () => {
     expect(plan.kind).toBe("refused")
   })
 
+  test("a host where any person is signed in at the console is refused, not only the pool user", () => {
+    const plan = planGuest({ ...host, consoleUser: "someone" }, "15", "1")
+    expect(plan).toEqual({
+      kind: "refused",
+      reason: "someone is signed in at the console; guests run only on a host nobody is using",
+    })
+  })
+
   test("Linux, an Intel Mac and a host without a hypervisor are refused", () => {
     expect(planGuest({ ...host, platform: "linux" }, "15", "1").kind).toBe("refused")
     expect(planGuest({ ...host, arch: "x64" }, "15", "1").kind).toBe("refused")
