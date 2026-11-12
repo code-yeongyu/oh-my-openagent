@@ -52,7 +52,7 @@ export async function refuseSecondMachineDevice(
     // before machine binding), so neither case registers another device.
     if (error instanceof CredentialStoreError) {
       throw new MachineCredentialUnreadable(
-        `omo could not read this computer's OmO sign-in (${terminalText(error.message)}), so it did not register another device. Unlock the credential store, then run omo login again.`,
+        `omo could not read this computer's OmO sign-in (${terminalText(error.message)}), so it did not register another device. Unlock the credential store, then sign in again.`,
       )
     }
     // An unreadable item's recovery depends on whether the device service holds the device (#13265 design gate A2).
@@ -94,7 +94,7 @@ export async function refuseSecondMachineDevice(
   }
   if (held.kind === "unknown") {
     throw new MachineAlreadySignedIn(
-      `This computer's OmO device service is installed but did not answer (${terminalText(held.reason)}), so omo did not register another device. Start the device service (opening the OmO desktop app starts it), then run omo login again.${held.endpoint === undefined ? "" : ` If the device service was removed, delete its leftover file ${terminalText(held.endpoint)} first.`}`,
+      `This computer's OmO device service is installed but did not answer (${terminalText(held.reason)}), so omo did not register another device. Start the device service (opening the OmO desktop app starts it), then sign in again.${held.endpoint === undefined ? "" : ` If the device service was removed, delete its leftover file ${terminalText(held.endpoint)} first.`}`,
     )
   }
 }

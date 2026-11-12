@@ -76,8 +76,11 @@ describe("omo login reuses this machine's device instead of registering another"
   test("an uncertain refresh gives the destructive steps only when no device service holds the device", async () => {
     const session = await sessionWith({ ...stored, refreshState: "uncertain" })
     const absentRefusal = refuseSecondMachineDevice(session, service(absent))
-    await expect(absentRefusal).rejects.toBeInstanceOf(MachineAlreadySignedIn)
-    await expect(absentRefusal).rejects.toThrow("then run omo account forget")
+    await expect(absentRefusal).rejects.toMatchObject({
+      constructor: MachineAlreadySignedIn,
+      message:
+        "This computer's OmO sign-in has a refresh whose outcome is unknown, so omo cannot use it again, and it did not register another device. To start over, remove this computer's device on the Devices page if it is still listed, then run omo account forget, then sign in again. omo account forget ends this computer's local sign-in and has its device service forget the device, without signing the device out on the OmO service.",
+    })
     const heldRefusal = refuseSecondMachineDevice(
       session,
       service({ kind: "held", device: { id: "dev-desktop", name: "OmO Desktop on Studio" } }),
@@ -117,7 +120,7 @@ describe("omo login reuses this machine's device instead of registering another"
     })
     const refused = refuseSecondMachineDevice(session, service(absent))
     await expect(refused).rejects.toBeInstanceOf(MachineCredentialUnreadable)
-    await expect(refused).rejects.toThrow("Unlock the credential store, then run omo login again.")
+    await expect(refused).rejects.toThrow("Unlock the credential store, then sign in again.")
     await expect(refused).rejects.not.toThrow("--new-device")
   })
 
