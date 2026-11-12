@@ -18,7 +18,7 @@ import type { Driver } from "../driver.ts"
 import type { Task } from "../taskset/tasks.ts"
 import type { Cell, CellResult } from "../vocabulary.ts"
 import { cellCode, type FixtureTarget } from "./legacy-code.ts"
-import { linuxFixtures } from "./legacy-fixtures.ts"
+import { hostFixtures } from "./legacy-fixtures.ts"
 import { isRecord, loadShippedTool, shippedBundle, type Slot } from "./legacy-release.ts"
 
 type Journal = CellResult["journal"]
@@ -164,10 +164,7 @@ const session = (): string => (sessionDir ??= mkdtempSync(join(tmpdir(), "confor
 export const driver: Driver = createLegacyDriver({
   session,
   tool: shippedTool,
-  fixtures:
-    process.platform === "linux"
-      ? { ready: linuxFixtures(session) }
-      : { unavailable: `no fixture apps of row 4 are ready on ${process.platform} yet` },
+  fixtures: hostFixtures(process.platform, process.env, session),
   observer: {
     unavailable:
       "no desktop observer is wired for this OS: row 3 builds the macOS observer, rows 27, 30 and 31 the Windows and Linux recorders",

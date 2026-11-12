@@ -9,9 +9,19 @@ import type { Fixtures } from "./legacy.ts"
 const FIXTURES = resolve(import.meta.dir, "../fixtures")
 const APP = { app: "Conformance Fixture", title: "Document" }
 
-const LINUX_APPS: Partial<Record<Toolkit, readonly string[]>> = {
+type Apps = Partial<Record<Toolkit, readonly string[]>>
+
+const LINUX_APPS: Apps = {
   native: ["python3", join(FIXTURES, "native-linux/fixture.py")],
   webview: ["python3", join(FIXTURES, "webview/fixture.py")],
+}
+
+// The Windows app is compiled on the runner (fixtures/native-windows/build.ps1); the workflow names the built exe.
+function appsFor(platform: string, env: Readonly<Record<string, string | undefined>>): Apps | string {
+  if (platform === "linux") return LINUX_APPS
+  if (platform !== "win32") return `no fixture apps of row 4 are ready on ${platform} yet`
+  const exe = env.OMO_CONFORMANCE_FIXTURE_EXE?.trim()
+  return exe ? { native: [exe] } : "OMO_CONFORMANCE_FIXTURE_EXE does not name the built Windows fixture app"
 }
 
 // The fixture's accessible names are unique in its window, so elements are found by name alone: a guessed role
@@ -27,15 +37,25 @@ const TARGETS: Readonly<Record<Action, FixtureTarget>> = {
   "menu.select": { ...APP, element: { title: "Value" }, menuPath: ["Test", "Conformance"] },
 }
 
-/** The Linux fixture apps of row 4: one fresh fixture process per cell or task, so no cell starts from another's state. */
-export function linuxFixtures(session: () => string): Fixtures {
+/** The fixture apps of row 4 on this host: one fresh fixture process per cell or task, so no cell starts from another's state. */
+export function hostFixtures(
+  platform: string,
+  env: Readonly<Record<string, string | undefined>>,
+  session: () => string,
+): { readonly ready: Fixtures } | { readonly unavailable: string } {
+  const apps = appsFor(platform, env)
+  if (typeof apps === "string") return { unavailable: apps }
+  return { ready: fixturesOf(apps, platform, session) }
+}
+
+function fixturesOf(apps: Apps, platform: string, session: () => string): Fixtures {
   let running: FixtureProcess | undefined
   let reports = 0
   const restart = async (toolkit: Toolkit): Promise<FixtureProcess> => {
     await running?.stop()
     running = undefined
-    const command = LINUX_APPS[toolkit]
-    if (command === undefined) throw new Error(`no Linux ${toolkit} fixture`)
+    const command = apps[toolkit]
+    if (command === undefined) throw new Error(`no ${toolkit} fixture on ${platform}`)
     running = await FixtureProcess.start(command, join(session(), `fixture-${++reports}.json`), "")
     return running
   }
@@ -45,8 +65,8 @@ export function linuxFixtures(session: () => string): Fixtures {
   }
   return {
     target: (cell: Cell) =>
-      LINUX_APPS[cell.toolkit] === undefined
-        ? { unavailable: `no ${cell.toolkit} fixture app is ready on Linux yet (row 4)` }
+      apps[cell.toolkit] === undefined
+        ? { unavailable: `no ${cell.toolkit} fixture app is ready on ${platform} yet (row 4)` }
         : TARGETS[cell.action],
     reset: async (cell) => {
       await restart(cell.toolkit)
