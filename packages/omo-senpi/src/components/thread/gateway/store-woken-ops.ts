@@ -205,10 +205,7 @@ export async function recordWaiting(
 }
 
 /** A transient open failure (A3.1.5): back to `requested` with the next attempt's time, or deleted at the last attempt. */
-export async function retryWakeLater(
-  ctx: StoreContext,
-  request: Timed<WokenSessionFence>,
-): Promise<WakeRetryOutcome> {
+export async function retryWakeLater(ctx: StoreContext, request: Timed<WokenSessionFence>): Promise<WakeRetryOutcome> {
   return await transaction(ctx, "woken_retry_later", (): WakeRetryOutcome => {
     const row = selectRow(ctx, request.durable_id)
     if (row === undefined || row.generation !== request.generation) return LOST

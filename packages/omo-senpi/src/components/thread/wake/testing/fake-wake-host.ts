@@ -71,7 +71,13 @@ export function writeSessionFile(
   const directory = join(sessionsDirectory, projectDirectory)
   mkdirSync(directory, { recursive: true })
   const path = join(directory, `2026-11-12T00-00-00-000Z_${durableId}.jsonl`)
-  const line = { type: "session", version: 3, id: durableId, timestamp: "2026-11-12T00:00:00.000Z", cwd: "/work/project" }
+  const line = {
+    type: "session",
+    version: 3,
+    id: durableId,
+    timestamp: "2026-11-12T00:00:00.000Z",
+    cwd: "/work/project",
+  }
   writeFileSync(path, `${JSON.stringify({ ...line, ...header })}\n`)
   return path
 }

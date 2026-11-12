@@ -16,7 +16,9 @@ afterEach(async () => {
   harness = undefined
 })
 
-const WOKEN_STEP = GATEWAY_MIGRATIONS.findIndex((step) => step.some((statement) => statement.includes("woken_sessions")))
+const WOKEN_STEP = GATEWAY_MIGRATIONS.findIndex((step) =>
+  step.some((statement) => statement.includes("woken_sessions")),
+)
 
 function tableColumns(db: Database, table: string): string[] {
   return (db.query(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((column) => column.name)

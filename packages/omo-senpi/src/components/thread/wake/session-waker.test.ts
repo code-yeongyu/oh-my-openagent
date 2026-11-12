@@ -162,7 +162,10 @@ describe("ensureSessionRunning", () => {
     writeSessionFile(sessions, "s1")
     await waker.ensureSessionRunning("s1")
     const [row] = await store.woken.list()
-    expect(await waker.ensureSessionRunning("s1")).toEqual({ kind: "not_yet", next_attempt_at: row?.next_attempt_at ?? -1 })
+    expect(await waker.ensureSessionRunning("s1")).toEqual({
+      kind: "not_yet",
+      next_attempt_at: row?.next_attempt_at ?? -1,
+    })
     expect(fake.frames).toHaveLength(1)
     expect(ensured).toHaveLength(1)
   })

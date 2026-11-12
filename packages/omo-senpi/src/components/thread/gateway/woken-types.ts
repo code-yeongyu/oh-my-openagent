@@ -23,7 +23,11 @@ export type WokenSessionKey = { readonly durable_id: string }
 export type WokenSessionFence = WokenSessionKey & { readonly generation: number }
 export type LostLease = { readonly kind: "lost_lease" }
 
-export type WakeRequestOutcome = { readonly kind: "requested"; readonly row: WokenSessionRow; readonly created: boolean }
+export type WakeRequestOutcome = {
+  readonly kind: "requested"
+  readonly row: WokenSessionRow
+  readonly created: boolean
+}
 
 export type WakeStartOutcome =
   | { readonly kind: "started"; readonly row: WokenSessionRow }
