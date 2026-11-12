@@ -59,7 +59,29 @@
             "jsonrpc": "2.0",
             "id": 2,
             "result": {
-              "capabilities": {},
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "cursorOverlay": false,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "denied",
+                "axPermission": "unknown",
+                "displayCount": 0,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": "no-global-listener",
+                "integrityLevel": null,
+                "screenLocked": false,
+                "displayAsleep": false
+              },
               "resumeToken": "per-process-random"
             }
           },
