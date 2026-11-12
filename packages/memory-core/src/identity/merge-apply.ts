@@ -5,8 +5,22 @@ import { GitMemoryRepo, NoEffectiveChangesError, type GitCommitAuthor } from "..
 import { readdir, writeFile } from "../fs/resilient"
 import type { MemoryWriteLock } from "../tools/commit-write"
 import type { MemoryIdentityPaths } from "./layout"
-import { assertMergePathConfined, attachLeftoverDirs, createInTarget, removeCreatedDirs } from "./merge-paths"
-import { identityIdOf, leavesNothingOut, planIdentityMerge, type MergeAction, type MergePlan } from "./merge-plan"
+import {
+  assertMergePathConfined,
+  attachLeftoverDirs,
+  createInTarget,
+  removeCreatedDirs,
+  type LeftoverDir,
+  type UnplaceableReason,
+} from "./merge-paths"
+import {
+  identityIdOf,
+  leaveOut,
+  leavesNothingOut,
+  planIdentityMerge,
+  type MergeAction,
+  type MergePlan,
+} from "./merge-plan"
 import { markIdentityMerged, readIdentityRecord } from "./record"
 
 const MERGED_FROM_TRAILER = "Omo-Merged-From"
@@ -88,39 +102,50 @@ export async function applyIdentityMerge(options: ApplyIdentityMergeOptions): Pr
         throw new Error(`memory merge: ${action.path} in ${plan.sourceId} is not UTF-8 text; nothing was merged`)
       }
     }
-    const destinations = writes.map((action) => action.destination)
     // Only files this merge created are rolled back; a path it refused may hold the user's own bytes.
     const written: string[] = []
     const createdDirs: string[] = []
+    // A destination found taken on disk leaves its entry out, with nothing written for it; the rest still merges.
+    const leftOut = new Map<string, UnplaceableReason>()
+    const leftover: LeftoverDir[] = []
     try {
       for (const action of writes) {
         const content = contents.get(requiredOid(oids, action.path))
         if (content === undefined)
           throw new Error(`memory merge: blob for ${action.path} could not be read from ${plan.sourceId}`)
         assertMergePathConfined(action.destination)
-        const handle = await createInTarget(target.repo, action.destination, createdDirs)
+        const ownDirsFrom = createdDirs.length
+        const creation = await createInTarget(target.repo, action.destination, createdDirs)
+        if (creation.kind === "unplaceable") {
+          leftOut.set(action.path, creation.reason)
+          leftover.push(...(await removeCreatedDirs(target.repo, createdDirs.splice(ownDirsFrom))))
+          continue
+        }
         written.push(action.destination)
         try {
-          await writeFile(handle, content, "utf8")
+          await writeFile(creation.handle, content, "utf8")
         } finally {
-          await handle.close()
+          await creation.handle.close()
         }
       }
+      const applied = leaveOut(plan, leftOut)
+      if (written.length === 0) return { plan: applied, leftoverDirs: leftover.map((dir) => dir.path) }
       const message = [
         `chore(memory): merge memories from ${plan.sourceId}`,
         "",
         `${MERGED_FROM_TRAILER}: ${plan.sourceId}`,
         `${MERGED_HEAD_TRAILER}: ${plan.sourceHead}`,
       ].join("\n")
-      const sha = (await targetRepo.commitWrite(destinations, message, author)).sha
+      const sha = (await targetRepo.commitWrite(written, message, author)).sha
       // Marked before the lock is released: a crash between the commit and the mark would make a rerun plan
       // from scratch and write a second set of aside copies. A store with an entry left out stays unmarked.
-      if (leavesNothingOut(plan)) await markIdentityMerged(source.root, plan.sourceId, targetId, plan.sourceHead)
-      return { plan, sha }
+      if (leavesNothingOut(applied)) await markIdentityMerged(source.root, plan.sourceId, targetId, plan.sourceHead)
+      return { plan: applied, sha, leftoverDirs: leftover.map((dir) => dir.path) }
     } catch (error) {
       await targetRepo.restorePaths(written)
-      const leftover = await removeCreatedDirs(target.repo, createdDirs)
-      if (error instanceof NoEffectiveChangesError) return { plan, leftoverDirs: leftover.map((dir) => dir.path) }
+      leftover.push(...(await removeCreatedDirs(target.repo, createdDirs)))
+      if (error instanceof NoEffectiveChangesError)
+        return { plan: leaveOut(plan, leftOut), leftoverDirs: leftover.map((dir) => dir.path) }
       attachLeftoverDirs(error, leftover)
       throw error
     }

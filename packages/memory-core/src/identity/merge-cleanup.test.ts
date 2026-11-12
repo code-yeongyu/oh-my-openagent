@@ -44,6 +44,22 @@ async function stores() {
 }
 
 describe("identity merge cleanup (#10070)", () => {
+  it("#given a merge that creates new directories and is then refused at commit #when it rolls back #then the original refusal surfaces and the directories it created are gone (#12974 security review)", async () => {
+    const { target, source } = await stores()
+    const refusal = new Error("commit refused")
+    failCommitIn(target.paths.repo, refusal)
+
+    const outcome = await applyIdentityMerge({
+      source: source.paths,
+      target: target.paths,
+      lock,
+      author: AUTHOR,
+    }).catch((error: unknown) => error)
+
+    expect(outcome).toBe(refusal)
+    expect(existsSync(join(target.paths.repo, "fresh"))).toBe(false)
+  }, 30_000)
+
   it("#given a merge refused at commit whose created directories cannot be removed #when it rolls back #then the original refusal surfaces with the cleanup failure attached", async () => {
     const { target, source } = await stores()
     const refusal = new Error("commit refused")

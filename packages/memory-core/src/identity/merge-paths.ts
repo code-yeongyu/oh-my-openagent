@@ -31,8 +31,16 @@ export function isPlainTreePath(path: string): boolean {
  * Creates `destination` under `repo` as a new file. No directory on the way may be a link or a file, and
  * nothing may be on disk at the leaf: a link there (tracked or git-ignored) would carry the write outside
  * the repository, and an ignored file or the other Unicode spelling of a tracked one is the user's data.
+ * Either way nothing is created at the leaf and the destination is reported unplaceable.
  */
-export async function createInTarget(repo: string, destination: string, created: string[] = []): Promise<FileHandle> {
+export async function createInTarget(
+  repo: string,
+  destination: string,
+  created: string[] = [],
+): Promise<
+  | { readonly kind: "created"; readonly handle: FileHandle }
+  | { readonly kind: "unplaceable"; readonly reason: Exclude<UnplaceableReason, "not-a-plain-path"> }
+> {
   let dir = repo
   for (const name of destination.split("/").slice(0, -1)) {
     dir = join(dir, name)
@@ -44,17 +52,14 @@ export async function createInTarget(repo: string, destination: string, created:
     if (found === undefined) {
       await mkdir(dir)
       created.push(dir)
-    } else if (!found.isDirectory())
-      throw new Error(
-        `memory merge: ${destination} would be written through a link or file in the target; nothing was merged`,
-      )
+    } else if (!found.isDirectory()) return { kind: "unplaceable", reason: "through-a-link-or-file" }
   }
   try {
     // `wx` is O_CREAT|O_EXCL: it fails on anything at the leaf, a dangling link included, and never follows one.
-    return await open(join(repo, destination), "wx")
+    return { kind: "created", handle: await open(join(repo, destination), "wx") }
   } catch (error) {
     if (fsErrorCode(error) !== "EEXIST") throw error
-    throw new Error(`memory merge: ${destination} is already on the target disk outside git; nothing was merged`)
+    return { kind: "unplaceable", reason: "already-on-disk" }
   }
 }
 
@@ -80,8 +85,11 @@ export function assertMergePathConfined(path: string): void {
     throw new Error(`memory merge: ${path} is outside the memory repository; nothing was merged`)
 }
 
-/** Why a source entry was left out of a merge: its name is not a plain path on every disk. */
-export type UnplaceableReason = "not-a-plain-path"
+/**
+ * Why a source entry was left out of a merge: its name is not a plain path on every disk, its destination is
+ * already on the target disk outside git, or a directory on the way there is a link or a file.
+ */
+export type UnplaceableReason = "not-a-plain-path" | "already-on-disk" | "through-a-link-or-file"
 
 export interface LeftoverDir {
   /** Relative to the repository, `/`-separated. */

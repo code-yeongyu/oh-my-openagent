@@ -82,6 +82,16 @@ export function leavesNothingOut(plan: MergePlan): boolean {
   return plan.actions.every((action) => action.action !== "unplaceable")
 }
 
+/** `plan` with each entry in `leftOut` (keyed by source path) turned into an `unplaceable` action. */
+export function leaveOut(plan: MergePlan, leftOut: ReadonlyMap<string, UnplaceableReason>): MergePlan {
+  if (leftOut.size === 0) return plan
+  const actions = plan.actions.map((action): MergeAction => {
+    const reason = leftOut.get(action.path)
+    return reason === undefined ? action : { path: action.path, action: "unplaceable", reason }
+  })
+  return { ...plan, actions }
+}
+
 export function identityIdOf(paths: MemoryIdentityPaths): string {
   return (
     paths.root
