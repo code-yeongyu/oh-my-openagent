@@ -85,11 +85,20 @@ describe("report.ts command line", () => {
     expect(report([{ id: "x" }], "--check-schema").exitCode).toBe(1)
   })
 
+  test("--summary says how many cells the hand reported delivered, so delivered=0 cannot read as 'nothing was delivered'", () => {
+    const blind = { signal: "not_observed" as const, firstAt: null, count: 0 }
+    const unread = complete.map((result): CellResult => ({ ...result, journal: { ...quiet, clipboard: blind } }))
+    const summary = report(unread, "--summary")
+    const delivered = fake.filter((cell) => "deliver" in cell.expect).length
+    expect(summary.stdout).toContain("delivered=0 ")
+    expect(summary.stdout.trim()).toEndWith(`unobserved=${fake.length} observed_delivered=${delivered}`)
+  })
+
   test("--summary prints every count, disturbed and unobserved cells included", () => {
     const summary = report(withFailures(), "--summary")
     const delivered = fake.filter((cell) => "deliver" in cell.expect).length
     expect(summary.stdout.trim()).toBe(
-      `cells=${fake.length} delivered=${delivered - 2} refused=${fake.length - delivered - 1} failed=2 disturbed=1 unobserved=1`,
+      `cells=${fake.length} delivered=${delivered - 2} refused=${fake.length - delivered - 1} failed=2 disturbed=1 unobserved=1 observed_delivered=${delivered}`,
     )
     expect(summary.exitCode).toBe(0)
   })
