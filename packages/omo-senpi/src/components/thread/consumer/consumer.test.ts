@@ -273,6 +273,7 @@ describe("the hand-over mark", () => {
     expect(service.calls.filter((call) => call.type === "delivery.drained")).toEqual([])
 
     await target.drain.drain({ reason: "command" })
+    target.runtime.endTurn()
     await h.quiesce()
     await consumer.reportDrained()
     expect(service.calls.filter((call) => call.type === "delivery.drained")).toEqual([

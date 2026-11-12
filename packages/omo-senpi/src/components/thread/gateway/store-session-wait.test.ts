@@ -84,6 +84,7 @@ describe("intake marks (delivery.pending / delivery.drained)", () => {
     ])
 
     await target.drain.drain({ reason: "command" })
+    target.runtime.endTurn()
     await h.quiesce()
     expect(await target.store.intakeMarks.pending()).toEqual([])
     expect(await target.store.intakeMarks.drained({ sender_device: "dev-a", session_id: "t" })).toEqual({

@@ -6,7 +6,19 @@ import type {
 } from "../port"
 
 /** `delivery.answer`'s reply as the service reads it: the engine's RPC response envelope (A5 addendum 2). */
-export type AnswerEnvelope = { readonly type: string; readonly success: boolean; readonly data: Record<string, any> }
+export type AnswerEnvelope = {
+  readonly type: string
+  readonly success: boolean
+  readonly data: {
+    readonly kind?: string
+    readonly reason?: string
+    readonly delivery_id?: string
+    readonly stored_command_id?: string
+    readonly queue_position?: number
+    readonly deduplicated?: boolean
+    readonly waiting_on?: { readonly kind: string }
+  }
+}
 
 export type FakeServiceCall =
   | { readonly type: "deliveries.serve"; readonly agent_dir: string; readonly v: number }
