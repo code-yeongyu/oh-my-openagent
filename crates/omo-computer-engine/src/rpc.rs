@@ -92,9 +92,42 @@ fn dispatch(session: &mut Session, name: &str, params: Value) -> Result<Value, F
         }
         Method::Click => json!(session.click(parse(params)?).map_err(|r| refused_call(&r))?),
         Method::TypeText => json!(session.type_text(parse(params)?).map_err(|r| refused_call(&r))?),
-        _ => return Err(not_found()),
+        _ => return grant_dispatch(session, method, params).unwrap_or_else(|| Err(not_found())),
     };
     Ok(value)
+}
+
+// --- Row 21: the host-only grant, lease, display and preview verbs. ---
+
+fn grant_dispatch(session: &mut Session, method: Method, params: Value) -> Option<Result<Value, Failure>> {
+    let empty = |params: Value| parse::<omo_computer_core::params::EmptyParams>(params).map(drop);
+    let outcome = match method {
+        Method::ControlGrant => parse(params).map(|p| json!(session.control_grant(p))),
+        Method::ControlAcquire => empty(params)
+            .and_then(|()| session.control_acquire().map(|s| json!(s)).map_err(|r| refused_call(&r))),
+        Method::ControlRevoke => empty(params).map(|()| {
+            session.control_revoke();
+            Value::Null
+        }),
+        Method::ControlRelease => empty(params).map(|()| {
+            session.control_release();
+            Value::Null
+        }),
+        Method::DisplayRelease => empty(params).map(|()| {
+            session.display_release();
+            Value::Null
+        }),
+        Method::DisplayResume => empty(params).map(|()| {
+            session.display_resume();
+            Value::Null
+        }),
+        Method::PreviewSubscribe => empty(params).map(|()| {
+            session.preview_subscribe();
+            Value::Null
+        }),
+        _ => return None,
+    };
+    Some(outcome)
 }
 
 /// A refusal on the wire: the closed engine code's number and name, `data.code` as v1 wrote
@@ -127,6 +160,11 @@ fn refused_call(refused: &Refused) -> Failure {
         }
         if let Some(disposition) = refused.interrupted {
             data["disposition"] = json!(disposition);
+        }
+        if let (Some(Value::Object(detail)), Some(data)) = (refused.detail.as_deref(), data.as_object_mut()) {
+            for (key, value) in detail {
+                data.entry(key.clone()).or_insert_with(|| value.clone());
+            }
         }
     }
     failure
@@ -210,6 +248,7 @@ mod tests {
             call_id: Some("k-1".to_owned()),
             receipt: None,
             interrupted: Some(omo_computer_core::report::Disposition::UNCERTAIN_UNSAFE),
+            detail: None,
         };
         let Failure { data, .. } = refused_call(&interrupted);
         let data = data.expect("data");

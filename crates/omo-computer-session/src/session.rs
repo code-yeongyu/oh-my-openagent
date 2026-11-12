@@ -19,7 +19,7 @@ use omo_computer_core::results::{
     CapabilitiesReply, ExecReply, PermissionState, SessionOpened, StopPathStatus,
 };
 use omo_computer_core::session_state::Tristate;
-use omo_computer_safety::{Call, Guard, HostAdditions, NoHolds, StopPolicy, TargetRef, Transport, VerbKind};
+use omo_computer_safety::{Call, Guard, HostAdditions, StopPolicy, TargetRef, Transport, VerbKind};
 
 use crate::audit::gc::SweepTrigger;
 use crate::mutate::{Funnel, Mutation, Refused};
@@ -87,7 +87,7 @@ impl Session {
             tag: random_u64(),
         });
         let resume_token = format!("{:016x}{:016x}", random_u64(), random_u64());
-        self.funnel.set_session_id(resume_token[..16].to_owned());
+        self.open_control(&resume_token[..16])?;
         self.funnel.sweep(SweepTrigger::Open);
         Ok(SessionOpened {
             capabilities: self.capabilities(),
@@ -103,7 +103,7 @@ impl Session {
 
     /// `stopPath.stop{source}`: latches and commits the stop.
     pub fn stop_path_stop(&mut self, params: StopPathStopParams) -> StopPathStatus {
-        self.guard.stop(params.source.as_deref(), &mut NoHolds).1
+        self.stop_control(params.source.as_deref())
     }
 
     /// `stopPath.heartbeat` from the session's host.
@@ -131,6 +131,7 @@ impl Session {
     }
 
     pub fn close(&mut self) {
+        self.close_control();
         if self.opened.take().is_some() {
             self.funnel.sweep(SweepTrigger::IdleExit);
         }

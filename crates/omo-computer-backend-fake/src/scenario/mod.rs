@@ -90,6 +90,8 @@ pub struct FakeScenario {
     pub code_identity: BTreeMap<u32, CodeIdentity>,
     /// The hand identity the fleet harness reads.
     pub hand: Option<HandIdentity>,
+    // --- Row 21: the fake host's consent view handed to the engine at `session.open`. ---
+    pub consent: Option<serde_json::Value>,
 }
 
 impl FakeScenario {

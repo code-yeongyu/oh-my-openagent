@@ -15,6 +15,7 @@ use super::{Mutation, Refused, MARKER_UNAVAILABLE, TRANSACTION_FAILED};
 use crate::budget::PermitKind;
 use crate::marker::Receipt;
 use crate::{Session, NOT_OPEN};
+use omo_computer_safety::Gate;
 
 impl Session {
     /// Runs one mutating call through the funnel.
@@ -31,14 +32,44 @@ impl Session {
         let call_id = mutation.call_id.clone().unwrap_or_else(mint_call_id);
         let target = target_id(&mutation.call.target);
         let secure = self.funnel.secure.secure(self.backend.as_ref(), target);
-        let mut record = Record::new(&self.funnel, &mutation, &call_id, secure);
-        if let Err(refused) = self.guard.admit_on(self.backend.as_mut(), &mutation.call) {
-            return Err(self.refuse(
-                record,
-                Some(format!("{:?}", refused.gate)),
-                refused.refusal.into(),
-            ));
+        let record = Record::new(&self.funnel, &mutation, &call_id, secure);
+        let epoch = self.guard.supervisor().stop_epoch();
+        let call = (mutation.method, &mutation.call.target, mutation.route);
+        let plan = self.funnel.control.plan(self.backend.as_mut(), call, epoch);
+        if let Err(refused) =
+            self.guard
+                .admit_on_with(self.backend.as_mut(), &mutation.call, plan.stages)
+        {
+            let detail = match refused.gate {
+                Gate::Consent => plan.consent_detail.clone(),
+                Gate::Lease => plan.lease_detail.clone(),
+                _ => None,
+            };
+            let out = Refused {
+                detail: detail.map(Box::new),
+                ..refused.refusal.into()
+            };
+            return Err(self.refuse(record, Some(format!("{:?}", refused.gate)), out));
         }
+        if let Err((refusal, detail)) = self.funnel.control.commit(self.backend.as_mut(), &plan, epoch) {
+            let out = Refused {
+                detail: detail.map(Box::new),
+                ..refusal.refusal().into()
+            };
+            return Err(self.refuse(record, Some("Lease".to_owned()), out));
+        }
+        let result = self.admitted(mutation, record, (call_id, report_mode, tag));
+        self.funnel.control.reported(&plan);
+        result
+    }
+
+    /// The stages after the gate admitted the call and its lease and reservations are taken.
+    fn admitted(
+        &mut self,
+        mutation: Mutation<'_>,
+        mut record: Record,
+        (call_id, report_mode, tag): (String, omo_computer_core::params::ReportMode, u64),
+    ) -> Result<ExecReply, Refused> {
         let _permit = self.funnel.permits.try_take(PermitKind::Exec);
         match self.funnel.recover(&call_id) {
             Err(refused) => return Err(self.refuse(record, Some("Marker".to_owned()), refused)),
@@ -95,6 +126,7 @@ impl Session {
                     call_id: Some(call_id),
                     receipt: None,
                     interrupted: Some(Disposition::UNCERTAIN_UNSAFE),
+                    detail: None,
                 })
             }
             None => {
@@ -111,6 +143,7 @@ impl Session {
                     count,
                     of,
                     effect: read_back.effect,
+                    user_moved_on: self.funnel.control.presence.take_ended().is_some(),
                     warning: appended.is_err().then(|| "write_failed".to_owned()),
                     audit_id: appended.ok(),
                 };
