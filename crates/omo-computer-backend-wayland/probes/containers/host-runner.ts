@@ -1,7 +1,7 @@
 // SP-W host runner: builds and runs one probe container at a time, behind a load gate. Runs on the HOST.
 import { readFileSync } from "node:fs"
 import type { Compositor } from "./common/session-kit.ts"
-import { reconcileRows } from "./run-plan.ts"
+import { containerOutcome } from "./run-plan.ts"
 
 export type Row = {
   id: string
@@ -92,20 +92,24 @@ export async function runContainer(c: Compositor, ids: string[]): Promise<Row[]>
   log(`CONTAINER_START ${name} image=${image}`)
   try {
     const r = await sh(args, { inherit: true })
-    const rows = r.out
-      .split("\n")
-      .filter((l) => l.startsWith("SPW_ROW "))
-      .map((l): Row => JSON.parse(l.slice(8)))
-    if (r.code !== 0 && rows.length === 0) throw new Error(`container ${name} exited ${r.code}: ${r.out.slice(-400)}`)
     const requested = ids.map((q) => `SPW-${c}-${q}`)
-    const { rows: all, missing } = reconcileRows(requested, rows, r.code)
+    // a container that reported nothing (or only some rows) yields those rows UNMEASURED with its exit code
+    const { rows, missing } = containerOutcome(requested, r.out, r.code)
     if (missing.length) log(`ROWS_MISSING ${name} exit=${r.code}: ${missing.join(" ")} (recorded UNMEASURED)`)
-    const pkgs = rows[0]?.pkgs ?? "-"
-    return all.map((row): Row =>
-      "compositor" in row
-        ? { ...row, pkgs: `${row.pkgs}|${image}` }
-        : { ...row, compositor: c, qid: row.id.replace(`SPW-${c}-`, ""), observed: "-", pkgs: `${pkgs}|${image}` },
-    )
+    const reportedPkgs = rows.map((x) => ("pkgs" in x && typeof x.pkgs === "string" ? x.pkgs : "")).find(Boolean) ?? "-"
+    return rows.map((row): Row => {
+      const f: Record<string, unknown> = row
+      return {
+        id: row.id,
+        compositor: c,
+        qid: row.id.replace(`SPW-${c}-`, ""),
+        answer: row.answer === true || row.answer === false ? row.answer : null,
+        observed: typeof f.observed === "string" ? f.observed : "-",
+        ...(typeof f.reason === "string" ? { reason: f.reason } : {}),
+        ...(typeof f.precondition === "string" ? { precondition: f.precondition } : {}),
+        pkgs: `${typeof f.pkgs === "string" ? f.pkgs : reportedPkgs}|${image}`,
+      }
+    })
   } finally {
     await sh(["docker", "rm", "-f", name])
     const left = (await sh(["docker", "ps", "-a", "-q", "--filter", `name=${name}`])).out.trim()

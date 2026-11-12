@@ -110,3 +110,72 @@ export function releaseVerdict(
     return { answer: null, state: "unproven", reason: "the kill leg produced no key at the reader within 2 s" }
   return kill ? { answer: false, state: "contradicted" } : { answer: true, state: "proven" }
 }
+
+// ---- readers that can see nothing ----
+
+export type HelperEvent = {
+  event?: string
+  abs?: number
+  kbd?: number
+  regions?: { x: number; y: number; w: number; h: number }[]
+}
+const bucket8 = (n: number) => Math.round(n / 8) * 8
+const regionKey = (r: { x: number; y: number; w: number; h: number }) =>
+  `${bucket8(r.x)},${bucket8(r.y)},${bucket8(r.w)}x${bucket8(r.h)}`
+
+// A libei helper's devices, only when it connected, announced at least one device, was not dropped, and ran its whole
+// window (its closing "timeout" event); anything less is no reading.
+export function eisDevices(events: readonly HelperEvent[]): HelperEvent[] | null {
+  const kinds = events.map((e) => e.event)
+  if (!kinds.includes("connect") || !kinds.includes("timeout") || kinds.includes("disconnect")) return null
+  const devices = events.filter((e) => e.event === "device")
+  return devices.length ? devices : null
+}
+
+// outKeys: the outputs' xdg-output rectangles in the same 8 px buckets as the regions.
+export function regionsAnswer(
+  withStream: boolean,
+  outKeys: readonly string[],
+  devices: readonly HelperEvent[] | null,
+): boolean | null {
+  if (devices === null || outKeys.length === 0) return null
+  const regions = devices.filter((d) => d.abs).flatMap((d) => d.regions ?? [])
+  if (!withStream) return regions.length > 0
+  const keys = new Set(regions.map(regionKey))
+  return outKeys.every((k) => keys.has(k))
+}
+
+// first, second: portal.py's "ok" or "error:<text>" for each ConnectToEIS; report: the second socket's helper events.
+export function secondConnectAnswer(first: unknown, second: unknown, report: readonly HelperEvent[]): boolean | null {
+  if (first !== "ok") return null
+  if (typeof second === "string" && second.startsWith("error:")) return false
+  if (second !== "ok") return null
+  const kinds = report.map((e) => e.event)
+  if (kinds.includes("connect") && kinds.includes("disconnect")) return false
+  if (kinds.includes("connect") && kinds.includes("timeout")) return true
+  return null
+}
+
+// rec: kde-pwm.py's record; firstPid: the older window (the target), secondPid: the newer, active one.
+export function activateAnswer(rec: Record<string, unknown>, firstPid: number, secondPid: number): boolean | null {
+  if (!firstPid || !secondPid || rec.bound !== true || rec.target_found !== true) return null
+  if (rec.active_before !== secondPid || typeof rec.active_after !== "number") return null
+  return rec.active_after === firstPid
+}
+
+// names: the last successful AT-SPI listing (null = none succeeded); appAlive: the app still ran when the window ended.
+export function registryAnswer(
+  names: readonly string[] | null,
+  wanted: readonly string[],
+  appAlive: boolean,
+): boolean | null {
+  if (names === null) return null
+  if (names.some((n) => wanted.includes(n))) return true
+  return appAlive ? false : null
+}
+
+// globals: wayland-info's list (null = no reading); cacheBuilt: the service cache that carries a desktop file built.
+export function pwmAnswer(globals: readonly string[] | null, name: string, cacheBuilt: boolean): boolean | null {
+  if (globals === null || !cacheBuilt) return null
+  return globals.includes(name)
+}

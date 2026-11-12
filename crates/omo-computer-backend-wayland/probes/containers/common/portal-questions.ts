@@ -10,7 +10,15 @@ import {
   rectKey,
   restartSession,
 } from "./session-kit.ts"
-import { gsAnswer, presence, restoreAnswer } from "./verdicts.ts"
+import {
+  type HelperEvent,
+  eisDevices,
+  gsAnswer,
+  presence,
+  regionsAnswer,
+  restoreAnswer,
+  secondConnectAnswer,
+} from "./verdicts.ts"
 
 const SWAY = "/probes/containers/sway"
 
@@ -146,19 +154,18 @@ export async function globalShortcuts(c: Compositor): Promise<Answer> {
   return gsAnswer((await portal(c, ["iface", "GlobalShortcuts"], false)).rec)
 }
 
-type Device = { event?: string; abs?: number; kbd?: number; regions?: { x: number; y: number; w: number; h: number }[] }
-function helperEvents(raw: string): string[] {
+// every event the libei helper printed (portal.py wraps each line as {"helper": {...}})
+function helperLines(raw: string): HelperEvent[] {
   return raw
     .split("\n")
     .filter((l) => l.includes('"helper"'))
-    .map((l) => String(JSON.parse(l).helper?.event ?? ""))
-}
-function helperDevices(raw: string): Device[] {
-  return raw
-    .split("\n")
-    .filter((l) => l.includes('"helper"'))
-    .map((l) => JSON.parse(l).helper)
-    .filter((d: Device) => d.event === "device")
+    .flatMap((l) => {
+      try {
+        return [JSON.parse(l).helper ?? {}]
+      } catch {
+        return []
+      }
+    })
 }
 
 export async function eiRegions(c: Compositor, withStream: boolean): Promise<Answer> {
@@ -183,21 +190,20 @@ export async function eiRegions(c: Compositor, withStream: boolean): Promise<Ans
       observed: `ConnectToEIS: ${String(r.rec.eis_connect_1)}`,
       reason: "ConnectToEIS failed, so no region could be read",
     }
-  if (!helperEvents(r.raw).includes("connect"))
-    return {
-      answer: null,
-      observed: "the libei helper never connected",
-      reason: "no libei connection, so no region could be read",
-    }
-  const abs = helperDevices(r.raw).filter((d) => d.abs)
-  const regions = abs.flatMap((d) => d.regions ?? [])
+  const devices = eisDevices(helperLines(r.raw))
   const outKeys = outs.map(rectKey)
-  if (!outKeys.length)
-    return { answer: null, observed: "xdg-output listed no output", reason: "no output rectangles to compare with" }
-  const regionKeys = new Set(regions.map(rectKey))
-  const seen = `outputs=[${outKeys.join(" ")}] abs_devices=${abs.length} regions=[${[...regionKeys].join(" ")}] (8px buckets)`
-  if (withStream) return { answer: outKeys.every((k) => regionKeys.has(k)), observed: seen }
-  return { answer: regions.length > 0, observed: seen }
+  const absDevices = (devices ?? []).filter((d) => d.abs)
+  const regionKeys = new Set(absDevices.flatMap((d) => d.regions ?? []).map(rectKey))
+  const seen = `outputs=[${outKeys.join(" ")}] devices=${devices?.length ?? "none"} abs_devices=${absDevices.length} regions=[${[...regionKeys].join(" ")}] (8px buckets)`
+  const answer = regionsAnswer(withStream, outKeys, devices)
+  if (answer === null)
+    return {
+      answer,
+      observed: seen,
+      reason:
+        "the libei helper read nothing complete (no connect, no device, dropped, or cut short), or xdg-output listed no output",
+    }
+  return { answer, observed: seen }
 }
 
 export async function secondConnect(c: Compositor): Promise<Answer> {
@@ -209,18 +215,16 @@ export async function secondConnect(c: Compositor): Promise<Answer> {
   )
   const fail = firstGrantFailed(r.rec, r.approverLog)
   if (fail) return fail
-  const report = (r.rec.eis_2_report ?? []) as { event?: string }[]
-  const connected = report.some((e) => e.event === "connect") && !report.some((e) => e.event === "disconnect")
-  if (r.rec.eis_connect_1 !== "ok")
+  const report: HelperEvent[] = Array.isArray(r.rec.eis_2_report) ? r.rec.eis_2_report : []
+  const observed = `first=${String(r.rec.eis_connect_1)} second=${String(r.rec.eis_connect_2)} second_events=[${report.map((e) => e.event).join(",")}] (first socket still open)`
+  const answer = secondConnectAnswer(r.rec.eis_connect_1, r.rec.eis_connect_2, report)
+  if (answer === null)
     return {
-      answer: null,
-      observed: `first=${String(r.rec.eis_connect_1)}`,
-      reason: "the first ConnectToEIS failed, so the second one proves nothing",
+      answer,
+      observed,
+      reason: "the first connect failed, or the second call returned ok but its helper reported nothing complete",
     }
-  return {
-    answer: r.rec.eis_connect_2 === "ok" && connected,
-    observed: `first=${r.rec.eis_connect_1} second=${r.rec.eis_connect_2} second_events=[${report.map((e) => e.event).join(",")}] (first socket still open)`,
-  }
+  return { answer, observed }
 }
 
 export async function clipboardGrant(c: Compositor): Promise<Answer> {

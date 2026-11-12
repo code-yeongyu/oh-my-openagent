@@ -45,7 +45,7 @@ describe("container outcome", () => {
       ["a", null],
       ["b", null],
     ])
-    expect(o.rows.every((r) => "reason" in r && r.reason.includes("exit 3"))).toBe(true)
+    expect(o.rows.every((r) => "reason" in r && String(r.reason).includes("exit 3"))).toBe(true)
     expect(o.missing).toEqual(["a", "b"])
   })
   test("an unparseable row line is a row that never arrived, not a crash", () => {

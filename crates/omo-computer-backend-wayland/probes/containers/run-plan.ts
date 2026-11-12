@@ -36,3 +36,22 @@ export function reconcileRows<R extends Reported>(
     missing,
   }
 }
+
+// A container's stdout and exit code -> the requested rows. A row line that does not parse counts as a row that never
+// arrived, and a container that reported nothing yields every requested row UNMEASURED with its exit code.
+export type Parsed = Reported & Record<string, unknown>
+
+export function containerOutcome(requested: readonly string[], stdout: string, exitCode: number) {
+  const rows: Parsed[] = []
+  for (const l of stdout.split("\n")) {
+    if (!l.startsWith("SPW_ROW ")) continue
+    try {
+      const r: unknown = JSON.parse(l.slice(8))
+      if (r && typeof r === "object" && "id" in r && typeof r.id === "string")
+        rows.push({ answer: null, ...r, id: r.id })
+    } catch {
+      // a truncated line: the row is reconciled as missing below
+    }
+  }
+  return reconcileRows(requested, rows, exitCode)
+}

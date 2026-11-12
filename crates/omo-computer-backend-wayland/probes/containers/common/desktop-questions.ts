@@ -10,7 +10,7 @@ import {
   restartSession,
   run,
 } from "./session-kit.ts"
-import { appsFrom, gsettingsBool } from "./verdicts.ts"
+import { activateAnswer, appsFrom, gsettingsBool, pwmAnswer, registryAnswer } from "./verdicts.ts"
 
 const UUID = "spw-readonly@sisyphuslabs.ai"
 const BUS_NAME = "ai.sisyphuslabs.SenpiShell"
@@ -158,6 +158,7 @@ export async function a11yRegistry(c: Compositor, app: keyof typeof APPS): Promi
   const proc = Bun.spawn(spec.cmd, { stdout: "ignore", stderr: "pipe" })
   // a listing counts only if it named some application (the shell at least); "not in the registry" needs one
   let names: string[] | null = null
+  let appAlive = false
   try {
     for (let i = 0; i < 40; i++) {
       const r = await run(["python3", `${COMMON}/atspi.py`, "list"])
@@ -166,12 +167,18 @@ export async function a11yRegistry(c: Compositor, app: keyof typeof APPS): Promi
       await Bun.sleep(500)
     }
   } finally {
+    appAlive = proc.exitCode === null
     proc.kill(9)
   }
   const observed = `${wrote}; started ${app} after the write, no other step; registry apps within 20 s: [${(names ?? []).join(", ")}]`
-  if (names === null)
-    return { answer: null, observed, reason: "no AT-SPI listing succeeded, so the registry was not read" }
-  return { answer: names.some((n) => spec.names.includes(n)), observed }
+  const answer = registryAnswer(names, spec.names, appAlive)
+  if (answer === null)
+    return {
+      answer,
+      observed: `${observed}; app alive at the end=${appAlive}`,
+      reason: "no AT-SPI listing succeeded, or the app exited before it could be listed",
+    }
+  return { answer, observed }
 }
 
 const PWM = "org_kde_plasma_window_management"
@@ -185,12 +192,17 @@ export async function kdePwmBind(c: Compositor, launch: "plain" | "desktop-file"
       `[Desktop Entry]\nType=Application\nName=spw wayland-info\nExec=/usr/bin/wayland-info\nNoDisplay=true\nX-KDE-Wayland-Interfaces=${PWM}\n`,
     )
   })
-  if (launch === "desktop-file") await run(["kbuildsycoca6"], 60_000)
+  const cacheBuilt = launch === "plain" || (await run(["kbuildsycoca6"], 60_000)).code === 0
   const g = await globals()
-  if (!g)
-    return { answer: null, observed: "wayland-info failed or listed no global", reason: "the registry was not read" }
+  const answer = pwmAnswer(g, PWM, cacheBuilt)
+  if (answer === null || g === null)
+    return {
+      answer: null,
+      observed: `wayland-info read=${g !== null}; service cache built=${cacheBuilt}`,
+      reason: "wayland-info read nothing, or the service cache carrying the desktop file did not build",
+    }
   return {
-    answer: g.includes(PWM),
+    answer,
     observed: `${PWM} advertised to /usr/bin/wayland-info (${launch === "plain" ? "plain child process, no desktop file" : "desktop file with X-KDE-Wayland-Interfaces"}): ${g.includes(PWM)}; globals=${g.length}`,
   }
 }
@@ -222,7 +234,7 @@ export async function kdeActivate(c: Compositor): Promise<Answer> {
       `[Desktop Entry]\nType=Application\nName=spw pwm probe\nExec=${py}\nNoDisplay=true\nX-KDE-Wayland-Interfaces=${PWM}\n`,
     )
   })
-  await run(["kbuildsycoca6"], 60_000)
+  const cacheBuilt = (await run(["kbuildsycoca6"], 60_000)).code === 0
   const first = Bun.spawn(["timeout", "-s", "KILL", "60", "wev"], { stdout: "ignore", stderr: "ignore" })
   await Bun.sleep(1500)
   const second = Bun.spawn(["timeout", "-s", "KILL", "60", "wev"], { stdout: "ignore", stderr: "ignore" })
@@ -243,16 +255,18 @@ export async function kdeActivate(c: Compositor): Promise<Answer> {
     if (rec.bound !== true)
       return {
         answer: null,
-        observed: seen,
+        observed: `${seen}; service cache built=${cacheBuilt}`,
         reason: `${PWM} did not bind even for the desktop-file-authorised helper, so no activation request could be sent`,
       }
-    if (rec.active_before !== secondPid)
+    const answer = activateAnswer(rec, firstPid, secondPid)
+    if (answer === null)
       return {
-        answer: null,
+        answer,
         observed: seen,
-        reason: "the newer window was not active before the request, so an activation could not be told apart",
+        reason:
+          "a window pid was unknown, the target window was never found, the newer window was not active first, or no active window was read after the request",
       }
-    return { answer: rec.active_after === firstPid, observed: seen }
+    return { answer, observed: seen }
   } finally {
     first.kill(9)
     second.kill(9)
