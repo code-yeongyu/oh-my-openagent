@@ -340,9 +340,11 @@ function wokenRowFrom(record: SqlRow): WokenSessionRow {
 }
 
 function selectWokenRow(ctx: ops.StoreContext, durableId: string): WokenSessionRow | undefined {
-  const found = ctx.sql.one(WOKEN_COLUMNS, `SELECT ${WOKEN_COLUMNS.join(", ")} FROM woken_sessions WHERE durable_id = ?`, [
-    durableId,
-  ])
+  const found = ctx.sql.one(
+    WOKEN_COLUMNS,
+    `SELECT ${WOKEN_COLUMNS.join(", ")} FROM woken_sessions WHERE durable_id = ?`,
+    [durableId],
+  )
   return found === undefined ? undefined : wokenRowFrom(found)
 }
 
@@ -447,7 +449,11 @@ async function takeOverWake(ctx: ops.StoreContext, request: Timed<WokenSessionKe
       JSON.stringify(ctx.self),
       request.now + WAKE_LEASE_MS,
     ])
-    return { kind: "taken_over", row: requireWokenRow(ctx, request.durable_id), previous_owner_alive: previousOwnerAlive }
+    return {
+      kind: "taken_over",
+      row: requireWokenRow(ctx, request.durable_id),
+      previous_owner_alive: previousOwnerAlive,
+    }
   })
 }
 
