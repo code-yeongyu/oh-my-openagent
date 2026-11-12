@@ -16,7 +16,11 @@ const START_OVER =
   "To start over, remove this computer's device on the Devices page if it is still listed, then run omo account forget, then sign in again. omo account forget ends this computer's local sign-in and has its device service forget the device, without signing the device out on the OmO service."
 
 const UNCERTAIN_REFRESH =
-  "This computer's OmO sign-in has a refresh whose outcome is unknown, so omo cannot use it again, and it did not register another device."
+  "This computer's OmO sign-in has a refresh whose outcome is unknown. omo kept its credential and keys and did not register another device."
+
+/** What the start-over steps also end when the device service holds the device: forget has it forget the device too. */
+const heldCost = (name: string): string =>
+  ` This computer's OmO device service holds that device, ${terminalText(name)}, so these steps also sign out the device service, and the OmO desktop app if it is installed, on this computer.`
 
 /**
  * The refusal for an unreadable stored sign-in (#13265 design gate, A2 corrected). It states the reason in its own words:
@@ -24,10 +28,7 @@ const UNCERTAIN_REFRESH =
  * service that holds the device adds what the steps cost, because forgetting also ends that device here.
  */
 function unreadableRefusal(heldDeviceName: string | undefined): MachineCredentialUnreadable {
-  const cost =
-    heldDeviceName === undefined
-      ? ""
-      : ` This computer's OmO device service holds that device, ${terminalText(heldDeviceName)}, so these steps also sign out the device service, and the OmO desktop app if it is installed, on this computer.`
+  const cost = heldDeviceName === undefined ? "" : heldCost(heldDeviceName)
   return new MachineCredentialUnreadable(
     `omo could not read this computer's stored OmO sign-in, so it did not register another device. ${START_OVER}${cost}`,
   )
@@ -61,8 +62,8 @@ export async function refuseSecondMachineDevice(
       return DAMAGED
     }
     if (!(error instanceof SessionEnded)) throw error
-    // An uncertain refresh keeps its credential and keys: held, not absent (#12948 recovery). omo can never use it
-    // again, but the device service may hold a WORKING device, so its recovery waits for that state.
+    // An uncertain refresh keeps its credential and keys: held, not absent (#12948 recovery). Its recovery waits for the
+    // device-service state, because forget would also end a device the device service holds.
     if (error.code === "refresh_recovery_expired") {
       damaged = "uncertain"
       return DAMAGED
@@ -78,10 +79,12 @@ export async function refuseSecondMachineDevice(
   if (damaged === "unreadable" && held.kind !== "unknown") {
     throw unreadableRefusal(held.kind === "held" ? held.device.name : undefined)
   }
-  // Forgetting would also end the device service's working device, so a held device never gets the destructive steps.
+  // The share from the desktop app comes first: forget would also end the device the device service holds. The share
+  // replaces an uncertain item of the same device only; for another device the desktop keeps the stored item
+  // (#13265 design gate), so the start-over steps follow as the fallback, with their cost.
   if (damaged === "uncertain" && held.kind === "held") {
     throw new MachineAlreadySignedIn(
-      `${UNCERTAIN_REFRESH} This computer's OmO device service holds its device, ${terminalText(held.device.name)}, and that sign-in works: sign in from the OmO desktop app to share it with omo.`,
+      `${UNCERTAIN_REFRESH} This computer's OmO device service holds its device, ${terminalText(held.device.name)}: sign in from the OmO desktop app to share it with omo. If this refusal still appears afterwards, ${START_OVER.charAt(0).toLowerCase()}${START_OVER.slice(1)}${heldCost(held.device.name)}`,
     )
   }
   if (damaged === "uncertain" && held.kind === "absent") {

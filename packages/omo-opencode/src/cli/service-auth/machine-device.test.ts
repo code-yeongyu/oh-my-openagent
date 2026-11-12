@@ -79,15 +79,21 @@ describe("omo login reuses this machine's device instead of registering another"
     await expect(absentRefusal).rejects.toMatchObject({
       constructor: MachineAlreadySignedIn,
       message:
-        "This computer's OmO sign-in has a refresh whose outcome is unknown, so omo cannot use it again, and it did not register another device. To start over, remove this computer's device on the Devices page if it is still listed, then run omo account forget, then sign in again. omo account forget ends this computer's local sign-in and has its device service forget the device, without signing the device out on the OmO service.",
+        "This computer's OmO sign-in has a refresh whose outcome is unknown. omo kept its credential and keys and did not register another device. To start over, remove this computer's device on the Devices page if it is still listed, then run omo account forget, then sign in again. omo account forget ends this computer's local sign-in and has its device service forget the device, without signing the device out on the OmO service.",
     })
     const heldRefusal = refuseSecondMachineDevice(
       session,
       service({ kind: "held", device: { id: "dev-desktop", name: "OmO Desktop on Studio" } }),
     )
-    await expect(heldRefusal).rejects.toBeInstanceOf(MachineAlreadySignedIn)
-    await expect(heldRefusal).rejects.toThrow("OmO Desktop on Studio")
-    await expect(heldRefusal).rejects.not.toThrow("forget")
+    // The non-destructive share leads; the start-over steps are only its fallback, with what they also end.
+    const heldMessage = await heldRefusal.then(
+      () => "",
+      (error: unknown) => (error instanceof MachineAlreadySignedIn ? error.message : ""),
+    )
+    expect(heldMessage).toContain("OmO Desktop on Studio")
+    expect(heldMessage.indexOf("share it with omo")).toBeGreaterThan(-1)
+    expect(heldMessage.indexOf("share it with omo")).toBeLessThan(heldMessage.indexOf("omo account forget"))
+    expect(heldMessage).toContain("so these steps also sign out the device service")
     const unknownRefusal = refuseSecondMachineDevice(session, service({ kind: "unknown", reason: "timed_out" }))
     await expect(unknownRefusal).rejects.toThrow("is installed but did not answer (timed_out)")
     await expect(unknownRefusal).rejects.not.toThrow("forget")
