@@ -126,13 +126,22 @@ impl ArtifactStore {
     }
 
     /// `artifact.release(digest)`: deletes the artifact; a second release is a no-op.
+    /// A removal that fails for any reason but "not there" is logged and reads as not
+    /// released, never as a quiet second release.
     pub fn release(&mut self, digest: &str) -> bool {
-        SUFFIXES
-            .iter()
-            .map(|suffix| self.dir.join(format!("{ARTIFACT_PREFIX}{digest}{suffix}")))
-            .filter(|path| fs::remove_file(path).is_ok())
-            .count()
-            > 0
+        let mut released = false;
+        for suffix in SUFFIXES {
+            let path = self.dir.join(format!("{ARTIFACT_PREFIX}{digest}{suffix}"));
+            match fs::remove_file(&path) {
+                Ok(()) => released = true,
+                Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                Err(error) => eprintln!(
+                    "omo-computer-engine: warn artifact release {}: {error}",
+                    path.display()
+                ),
+            }
+        }
+        released
     }
 
     /// The timer sweep, once per [`SWEEP_INTERVAL_MS`] from the first tick.
@@ -207,7 +216,7 @@ impl ArtifactStore {
         }
         for session in list(&self.dir.join(SESSIONS_DIR), warnings) {
             if session.is_dir() {
-                entries.push(dir_entry(session));
+                entries.push(dir_entry(session, warnings));
             }
         }
         entries

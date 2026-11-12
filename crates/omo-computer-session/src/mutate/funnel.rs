@@ -81,7 +81,8 @@ impl Session {
                 ));
             }
         };
-        if self.funnel.markers.create(&record.marker).is_err() {
+        if let Err(error) = self.funnel.markers.create(&record.marker) {
+            self.funnel.warn(format!("marker not written: {error}"));
             return Err(self.refuse(record, Some("Marker".to_owned()), MARKER_UNAVAILABLE.into()));
         }
         let of = u32::try_from(mutation.events.len()).unwrap_or(u32::MAX);
