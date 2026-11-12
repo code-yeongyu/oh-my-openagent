@@ -101,6 +101,10 @@ describe("identity merge (#10070)", () => {
     // Under the aside root but not plain: classified before the aside-copy skip, so each stays pending.
     ["reference/merged/x/../../y.md", note("carried")],
     ["reference/merged/x/.git/config", "[core]\n\tbare = false\n"],
+    // A dot name at any depth configures the subtree it sits in (eol, working-tree-encoding) or hides itself.
+    ["notes/.gitattributes", "*.md -diff\n"],
+    ["notes/.gitignore", "local/\n"],
+    ["a/b/.hidden.md", note("carried")],
   ])(
     "#given a source tree entry named %j #when the merge is planned and applied #then both name it unplaceable and nothing in or beside the target changes beyond what the store without it merges (#12974 security)",
     async (path, content) => {

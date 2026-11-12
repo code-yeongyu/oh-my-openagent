@@ -60,10 +60,12 @@ export async function planIdentityMerge(
     .sort((left, right) => left.path.localeCompare(right.path))
     .map((entry): MergeAction => {
       // A source tree is data: plumbing or another tool can name an entry `..`, `.git` or `a\b`, and a name
-      // starting with `.` configures the repository (`.gitignore`, `.gitattributes`) or climbs out of it. None
-      // may become a target path (#12974 security): it is left out and named, and the rest still merges.
-      // This runs before every other rule, so no such entry is ever reported as anything but left out.
-      if (entry.path.startsWith(".") || !isMergePathConfined(entry.path) || !isPlainTreePath(entry.path))
+      // starting with `.` at any depth configures the repository or the subtree it sits in (`.gitignore`,
+      // `.gitattributes` set ignore, eol and working-tree-encoding rules) or climbs out of it. None may become a
+      // target path (#12974 security): it is left out and named, and the rest still merges. This runs before
+      // every other rule, so no such entry is ever reported as anything but left out.
+      const hasDotName = entry.path.split("/").some((name) => name.startsWith("."))
+      if (hasDotName || !isMergePathConfined(entry.path) || !isPlainTreePath(entry.path))
         return { path: entry.path, action: "unplaceable", reason: "not-a-plain-path" }
       if (entry.path.startsWith(`${MERGED_ASIDE_ROOT}/`))
         return { path: entry.path, action: "skip", reason: "earlier-aside-copy" }
