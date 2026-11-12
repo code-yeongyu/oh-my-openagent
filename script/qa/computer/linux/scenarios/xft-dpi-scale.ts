@@ -12,8 +12,10 @@ const WINDOW_AT = { x: 40, y: 30 } as const
 const TITLE = "r47-scale-marker"
 
 export const xftDpiScale: Scenario = {
+  name: "xft-dpi-scale",
   admit: "os",
   sessions: ["xvfb"],
+  requires: ["xdotool", "xrdb", "xwd"],
   async run(ctx: Context): Promise<Checked> {
     const { engine, procs, stage } = ctx
     await writeFile(join(stage.runDir, "resources"), "Xft.dpi: 192\n", "utf8")

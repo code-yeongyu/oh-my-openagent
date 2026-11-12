@@ -2,12 +2,17 @@
 // The Linux live driver: one scenario against a session the driver itself started.
 //
 //   bun script/qa/computer/linux.ts --session xvfb --scenario xft-dpi-scale --json
+//   bun script/qa/computer/linux.ts --session xvfb --all
+//
+// --all runs every registered scenario and ends with ONE line 'SET linux/<session> pass=<n>
+// fail=<n> blocked=<n>': a scenario the session cannot admit (or a session that did not start)
+// counts blocked with its reason printed, never pass; exit non-zero iff fail > 0.
 //
 // Every session (xvfb, xvfb-nobus, none, xorg) is one file under sessions/ and every
-// scenario declares how its session is admitted; a scenario file that declares no
-// admission is refused. One JSON line per scenario, then the cleanup receipts
-// (`procs 0`, `dir REMOVED <path>`); exit 0 iff every scenario passed. The driver
-// never connects to a display it did not start.
+// scenario declares how its session is admitted; a scenario that declares no admission is
+// refused, and the driver never connects to a display it did not start. One JSON line per
+// scenario, then the cleanup receipts (`procs 0`, `dir REMOVED <path>`); exit 0 iff every
+// scenario passed.
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -16,32 +21,24 @@ import { parseArgs } from "node:util"
 import { engineBinary } from "./linux/lib/engine-bin.ts"
 import { Engine } from "./linux/lib/engine.ts"
 import { Processes } from "./linux/lib/procs.ts"
-import {
-  failed,
-  isAdmit,
-  isSession,
-  verdict,
-  type Result,
-  type Scenario,
-  type SessionName,
-  type Stage,
-} from "./linux/lib/scenario.ts"
+import { failed, isAdmit, verdict, type Scenario, type SessionName, type Stage } from "./linux/lib/scenario.ts"
+import { admission, setExitCode, setLine, type Outcome } from "./linux/lib/set.ts"
 import { noDisplay } from "./linux/scenarios/no-display.ts"
 import { occluderOracle } from "./linux/scenarios/occluder-oracle.ts"
 import { xftDpiScale } from "./linux/scenarios/xft-dpi-scale.ts"
-import * as noneSession from "./linux/sessions/none.ts"
-import * as xorgSession from "./linux/sessions/xorg.ts"
-import * as xvfbNoBus from "./linux/sessions/xvfb-nobus.ts"
-import * as xvfb from "./linux/sessions/xvfb.ts"
+import { start as startNone } from "./linux/sessions/none.ts"
+import { start as startXorg } from "./linux/sessions/xorg.ts"
+import { start as startXvfbNoBus } from "./linux/sessions/xvfb-nobus.ts"
+import { start as startXvfb } from "./linux/sessions/xvfb.ts"
 
 type SessionModule = { start(procs: Processes, runDir: string): Promise<Stage> }
 
 // sway, weston, gnome and kde are owed by rows 52, 53 (DEFERRED-LEGS).
 const SESSIONS: Partial<Record<SessionName, SessionModule>> = {
-  none: noneSession,
-  xvfb,
-  "xvfb-nobus": xvfbNoBus,
-  xorg: xorgSession,
+  none: { start: startNone },
+  xvfb: { start: startXvfb },
+  "xvfb-nobus": { start: startXvfbNoBus },
+  xorg: { start: startXorg },
 }
 
 const SCENARIOS: Record<string, Scenario> = {
@@ -55,6 +52,7 @@ const { values } = parseArgs({
     session: { type: "string" },
     scenario: { type: "string", multiple: true, default: [] },
     json: { type: "boolean", default: false },
+    all: { type: "boolean", default: false },
     engine: { type: "string" },
     workdir: { type: "string" },
   },
@@ -66,47 +64,66 @@ function usage(message: string): never {
 }
 
 const sessionName = values.session ?? usage("pass --session <name>")
-if (!isSession(sessionName)) usage(`unknown session ${sessionName}`)
-const sessionModule = SESSIONS[sessionName] ?? usage(`session ${sessionName} is not built yet`)
-const names =
-  values.scenario.length > 0
-    ? values.scenario
-    : Object.keys(SCENARIOS).filter((name) => SCENARIOS[name]?.sessions.includes(sessionName))
+const session = SESSIONS[sessionName as SessionName] ?? usage(`session ${sessionName} is not built yet`)
+if (values.all && values.scenario.length > 0) usage("--all runs every scenario; drop --scenario")
+const names = values.scenario.length > 0 ? values.scenario : Object.keys(SCENARIOS)
 const unknown = names.filter((name) => SCENARIOS[name] === undefined)
 if (unknown.length > 0) usage(`unknown scenario(s): ${unknown.join(", ")}`)
 
 const binary = engineBinary(values.engine)
 const runRoot = values.workdir ?? tmpdir()
 const runId = `r47-${Date.now().toString(36)}-${process.pid}`
-const runDir = mkdtempSync(join(runRoot, `omo-computer-qa-`))
+const runDir = mkdtempSync(join(runRoot, "omo-computer-qa-"))
 const procs = new Processes(runId, process.env)
-const results: Result[] = []
+const outcomes: Outcome[] = []
+
+function report(outcome: Outcome): void {
+  if (outcome.kind === "blocked") {
+    process.stdout.write(`BLOCKED ${outcome.scenario} ${outcome.reason}\n`)
+    return
+  }
+  const last = outcome.result
+  process.stdout.write(`${values.json ? JSON.stringify(last) : `${last.scenario} ${last.session} ${last.verdict}`}\n`)
+}
+
+async function startSession(): Promise<{ stage: Stage | undefined; startFailure: string | undefined }> {
+  if (!values.all) return { stage: await session.start(procs, runDir), startFailure: undefined }
+  try {
+    return { stage: await session.start(procs, runDir), startFailure: undefined }
+  } catch (error) {
+    return { stage: undefined, startFailure: error instanceof Error ? error.message : String(error) }
+  }
+}
 
 try {
-  const stage = await sessionModule.start(procs, runDir)
+  const { stage, startFailure } = await startSession()
   for (const name of names) {
-    const scenario = SCENARIOS[name]
-    if (scenario === undefined) usage(`unknown scenario ${name}`)
+    const scenario = SCENARIOS[name] ?? usage(`unknown scenario ${name}`)
     if (!isAdmit(scenario.admit)) usage(`scenario ${name} declares no admission`)
-    if (!scenario.sessions.includes(sessionName)) {
-      results.push(failed(name, sessionName, new Error(`scenario ${name} does not run under ${sessionName}`)))
+    if (scenario.name !== name) usage(`scenario ${name} is registered as ${scenario.name}`)
+    const refused = admission(scenario, stage?.session ?? (sessionName as SessionName), startFailure)
+    if (stage === undefined || refused !== undefined) {
+      const reason = refused ?? `session ${sessionName} gave no stage`
+      const outcome: Outcome = values.all
+        ? { kind: "blocked", scenario: name, reason }
+        : { kind: "ran", result: failed(name, stage?.session ?? (sessionName as SessionName), new Error(reason)) }
+      outcomes.push(outcome)
+      report(outcome)
       continue
     }
-    const runtime = mkdtempSync(join(runDir, "runtime-"))
-    const engine = new Engine(binary, {
-      ...stage.env,
-      OMO_COMPUTER_BACKEND: "x11",
-      OMO_COMPUTER_RUNTIME_DIR: runtime,
-    })
+    // OMO_COMPUTER_RUNTIME_DIR is a fake-backend seam: the engine refuses it with a real
+    // backend, so a live session passes only the stage's own environment.
+    const engine = new Engine(binary, { ...stage.env, OMO_COMPUTER_BACKEND: "x11" })
+    let outcome: Outcome
     try {
-      results.push(verdict(name, sessionName, await scenario.run({ procs, stage, engine })))
+      outcome = { kind: "ran", result: verdict(name, stage.session, await scenario.run({ procs, stage, engine })) }
     } catch (error) {
-      results.push(failed(name, sessionName, error))
+      outcome = { kind: "ran", result: failed(name, stage.session, error) }
     } finally {
       await engine.close()
     }
-    const last = results[results.length - 1] ?? usage(`scenario ${name} produced no result`)
-    process.stdout.write(`${values.json ? JSON.stringify(last) : `${last.scenario} ${last.session} ${last.verdict}`}\n`)
+    outcomes.push(outcome)
+    report(outcome)
   }
 } finally {
   for (const receipt of await procs.stopAll()) {
@@ -117,4 +134,8 @@ try {
   process.stdout.write(`dir REMOVED ${runDir}\n`)
 }
 
-process.exit(results.every((result) => result.verdict === "PASS") ? 0 : 1)
+if (values.all) {
+  process.stdout.write(`${setLine(sessionName as SessionName, outcomes)}\n`)
+  process.exit(setExitCode(outcomes))
+}
+process.exit(outcomes.every((outcome) => outcome.kind === "ran" && outcome.result.verdict === "PASS") ? 0 : 1)

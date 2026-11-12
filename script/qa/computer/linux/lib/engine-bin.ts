@@ -5,7 +5,7 @@ import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
-export const REPO_ROOT = fileURLToPath(new URL("../../../../..", import.meta.url))
+const REPO_ROOT = fileURLToPath(new URL("../../../../..", import.meta.url))
 
 function targetDir(): string {
   const fromEnv = process.env.CARGO_TARGET_DIR

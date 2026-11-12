@@ -30,6 +30,9 @@ fn parts(disposition: Disposition, effect: Effect, evidence: Vec<Evidence>) -> R
         timings: None,
         evidence,
         observation: UntrustedText,
+        paused: Vec::new(),
+        session: None,
+        target: None,
     }
 }
 

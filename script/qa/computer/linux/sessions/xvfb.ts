@@ -5,7 +5,7 @@
 import { mkdirSync } from "node:fs"
 import { join } from "node:path"
 import { until, type Processes } from "../lib/procs.ts"
-import type { SessionName, Stage } from "../lib/scenario.ts"
+import type { Stage } from "../lib/scenario.ts"
 
 const DISPLAY = ":137"
 const SCREEN = "1280x800x24"
@@ -50,8 +50,6 @@ export async function startXvfb(procs: Processes, runDir: string, nobus: boolean
   procs.start("xcompmgr", ["xcompmgr", "-d", DISPLAY], env)
   return { session: nobus ? "xvfb-nobus" : "xvfb", display: DISPLAY, env, runDir }
 }
-
-export const SESSION: SessionName = "xvfb"
 
 export function start(procs: Processes, runDir: string): Promise<Stage> {
   return startXvfb(procs, runDir, false)

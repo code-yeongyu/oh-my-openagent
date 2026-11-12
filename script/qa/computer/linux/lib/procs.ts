@@ -1,10 +1,10 @@
 // Every process the driver starts carries `OMO_COMPUTER_QA_RUN=<run id>`, so teardown stops
 // what it started and then counts, from /proc, anything (grandchildren included) still alive.
 import { type ChildProcess, spawn } from "node:child_process"
-import { readdirSync, readFileSync, statSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 
-export const RUN_MARKER = "OMO_COMPUTER_QA_RUN"
-export const HANG_GUARD_MS = 30_000
+const RUN_MARKER = "OMO_COMPUTER_QA_RUN"
+const HANG_GUARD_MS = 30_000
 const POLL_MS = 50
 const KILL_ESCALATION_MS = 5_000
 
@@ -30,15 +30,6 @@ export async function until(ready: () => boolean | Promise<boolean>, label: stri
   while (!(await ready())) {
     if (Date.now() > deadline) throw new Error(`hang guard: ${label}`)
     await Bun.sleep(POLL_MS)
-  }
-}
-
-export function exists(path: string): boolean {
-  try {
-    statSync(path)
-    return true
-  } catch {
-    return false
   }
 }
 
