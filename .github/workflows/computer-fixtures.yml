@@ -1,10 +1,6 @@
 name: Computer conformance fixtures
 
 on:
-  push:
-    paths:
-      - "script/qa/computer/conformance/fixtures/**"
-      - ".github/workflows/computer-fixtures.yml"
   pull_request:
     branches: [master, dev]
     paths:
