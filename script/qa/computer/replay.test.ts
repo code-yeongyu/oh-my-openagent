@@ -1,11 +1,38 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 
 const ROOT = resolve(import.meta.dir, "../../..")
 const DRIVER = join(ROOT, "script/qa/computer/replay.ts")
-const ENGINE = join(ROOT, "target/debug/omo-computer-engine")
+const EXE = process.platform === "win32" ? ".exe" : ""
+
+// The cargo target dir: CARGO_TARGET_DIR when set, else cargo's own target_directory, else <repo>/target.
+async function targetDir(env: Readonly<Record<string, string | undefined>>): Promise<string> {
+  const configured = env.CARGO_TARGET_DIR
+  if (configured) return resolve(ROOT, configured)
+  try {
+    const proc = Bun.spawn(["cargo", "metadata", "--format-version", "1", "--no-deps"], {
+      cwd: ROOT,
+      stdout: "pipe",
+      stderr: "ignore",
+    })
+    const [text, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited])
+    const meta: unknown = code === 0 ? JSON.parse(text) : undefined
+    if (typeof meta === "object" && meta !== null && "target_directory" in meta) {
+      const found = meta.target_directory
+      if (typeof found === "string") return found
+    }
+  } catch (error) {
+    console.warn(`cargo metadata unavailable, using <repo>/target: ${String(error)}`)
+  }
+  return join(ROOT, "target")
+}
+
+// The debug engine binary the tests build and run.
+const engineIn = async (env: Readonly<Record<string, string | undefined>>) =>
+  join(await targetDir(env), "debug", `omo-computer-engine${EXE}`)
+const ENGINE = await engineIn(process.env)
 const CASE_01 = join(
   ROOT,
   "crates/omo-computer-engine/tests/fixtures/v1-consumers/01-stdio-session-open-no-options.json",
@@ -35,11 +62,33 @@ for await (const line of console) {
 }
 `
 
+// A stand-in engine that reports its runtime dir and the state planted there: at start it logs
+// the dir, then answers every request with what it saw before it read any request.
+const PLANT_ENGINE = `#!/usr/bin/env bun
+import { appendFileSync, existsSync, readFileSync, statSync } from "node:fs"
+import { join } from "node:path"
+const runtime = process.env.OMO_COMPUTER_RUNTIME_DIR ?? ""
+const look = (rel) => {
+  const path = join(runtime, rel)
+  if (!existsSync(path)) return null
+  const stat = statSync(path)
+  return { mode: (stat.mode & 0o777).toString(8), content: stat.isDirectory() ? null : readFileSync(path, "utf8") }
+}
+const seen = { same: process.env.PROBE_RUNTIME === runtime, seed: look("seed/state.json"), locked: look("locked") }
+appendFileSync(process.env.PROBE_ARGV_LOG, runtime + "\\n")
+for await (const line of console) {
+  if (line.trim() === "") continue
+  const { id } = JSON.parse(line)
+  process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id, result: seen }) + "\\n")
+}
+`
+
 type Run = { code: number; stdout: string; stderr: string }
 
 let dir = ""
 let scripted = ""
 let probeEngine = ""
+let plantEngine = ""
 
 async function replay(args: string[], env: Record<string, string> = {}): Promise<Run> {
   const proc = Bun.spawn(["bun", DRIVER, ...args], {
@@ -134,6 +183,9 @@ beforeAll(async () => {
   probeEngine = join(dir, "probe-engine.ts")
   await writeFile(probeEngine, PROBE_ENGINE)
   await chmod(probeEngine, 0o755)
+  plantEngine = join(dir, "plant-engine.ts")
+  await writeFile(plantEngine, PLANT_ENGINE)
+  await chmod(plantEngine, 0o755)
   const build = Bun.spawn(["cargo", "build", "-p", "omo-computer-engine", "--locked"], {
     cwd: ROOT,
     stdout: "inherit",
@@ -316,6 +368,156 @@ describe("replay driver", () => {
       expect({ case: item.path, first: argv[0] }).toEqual({ case: item.path, first: [`--${String(item.transport)}`] })
     }
   }, 120_000)
+
+  test("replay_skips_an_old_case_its_superseding_case_names_in_a_list_or_directory", async () => {
+    counter += 1
+    const cases = join(dir, `supersedes-${counter}`)
+    await mkdir(cases)
+    const steps = [{ send: request(1), expect: [expectation(reply(1, { a: 1 }))] }]
+    const plan = join(dir, `supersedes-plan-${counter}.json`)
+    await writeFile(plan, JSON.stringify([{ replies: [reply(1, { a: 1 })] }]))
+    const failing = [{ send: request(1), expect: [expectation(reply(1, { a: 2 }))] }]
+    await writeFile(join(cases, "old.json"), JSON.stringify({ transport: "stdio", steps: failing }))
+    await writeFile(join(cases, "new.json"), JSON.stringify({ transport: "stdio", supersedes: ["old.json"], steps }))
+    const env = { SCRIPTED_ENGINE_PLAN: plan }
+    const listed = await replay(
+      ["--engine", scripted, "--case", join(cases, "new.json"), "--case", join(cases, "old.json")],
+      env,
+    )
+    const whole = await replay(["--engine", scripted, "--dir", cases], env)
+    for (const run of [listed, whole]) {
+      expect(run.stdout).toContain("SKIPPED old.json superseded by new.json")
+      expect(run.stdout).toContain("steps=1")
+      expect(run.stdout).not.toContain("MISMATCH")
+      expect(run.code).toBe(0)
+    }
+  }, 60_000)
+
+  test("replay_fails_when_a_superseding_case_names_a_missing_old_case", async () => {
+    counter += 1
+    const cases = join(dir, `supersedes-missing-${counter}`)
+    await mkdir(cases)
+    const steps = [{ send: request(1), expect: [] }]
+    await writeFile(join(cases, "new.json"), JSON.stringify({ transport: "stdio", supersedes: ["absent.json"], steps }))
+    const log = join(dir, `argv-supersedes-missing-${counter}.log`)
+    const run = await replay(["--engine", probeEngine, "--case", join(cases, "new.json")], { PROBE_ARGV_LOG: log })
+    expect(run.stdout).toContain("REPLAY_ERROR supersedes_missing")
+    expect(run.stdout).toContain("absent.json")
+    expect(run.code).toBe(2)
+    expect(await Bun.file(log).exists()).toBe(false)
+  }, 60_000)
+
+  test("replay_fails_the_list_when_the_superseding_case_fails", async () => {
+    counter += 1
+    const cases = join(dir, `supersedes-failing-${counter}`)
+    await mkdir(cases)
+    const plan = join(dir, `supersedes-failing-plan-${counter}.json`)
+    await writeFile(plan, JSON.stringify([{ replies: [reply(1, { a: 1 })] }]))
+    const steps = [{ send: request(1), expect: [expectation(reply(1, { a: 1 }))] }]
+    const failing = [{ send: request(1), expect: [expectation(reply(1, { a: 2 }))] }]
+    await writeFile(join(cases, "old.json"), JSON.stringify({ transport: "stdio", steps }))
+    await writeFile(
+      join(cases, "new.json"),
+      JSON.stringify({ transport: "stdio", supersedes: ["old.json"], steps: failing }),
+    )
+    const run = await replay(
+      ["--engine", scripted, "--case", join(cases, "new.json"), "--case", join(cases, "old.json")],
+      { SCRIPTED_ENGINE_PLAN: plan },
+    )
+    expect(run.stdout).toContain("SKIPPED old.json superseded by new.json")
+    expect(run.stdout).toContain("MISMATCH")
+    expect(run.code).toBe(1)
+  }, 60_000)
+
+  test("the engine path follows CARGO_TARGET_DIR", async () => {
+    const target = join(dir, "private-target")
+    expect(await engineIn({ CARGO_TARGET_DIR: target })).toBe(join(target, "debug", `omo-computer-engine${EXE}`))
+  })
+
+  test("replay_runs_each_case_in_a_fresh_runtime_dir_with_its_planted_state", async () => {
+    counter += 1
+    const cases = join(dir, `plant-${counter}`)
+    await mkdir(cases)
+    const seen = { same: true, seed: { mode: "600", content: "hello" }, locked: { mode: "500", content: null } }
+    const planted = {
+      transport: "stdio",
+      env: { PROBE_RUNTIME: "$" + "{RUNTIME_DIR}" },
+      runtime: {
+        plant: [
+          { path: "seed/state.json", content: "hello", mode: "0600" },
+          { path: "locked", dir: true, mode: "0500" },
+        ],
+      },
+      steps: [{ send: request(1), expect: [expectation(reply(1, seen))] }],
+    }
+    await writeFile(join(cases, "a.json"), JSON.stringify(planted))
+    await writeFile(join(cases, "b.json"), JSON.stringify(planted))
+    const log = join(dir, `plant-runtime-${counter}.log`)
+    const run = await replay(["--engine", plantEngine, "--dir", cases], { PROBE_ARGV_LOG: log })
+    expect(run.stdout).not.toContain("MISMATCH")
+    expect(run.stdout.match(/steps=1/g)?.length).toBe(2)
+    expect(run.code).toBe(0)
+    const dirs = (await readFile(log, "utf8")).trim().split("\n")
+    expect(dirs.length).toBe(2)
+    expect(new Set(dirs).size).toBe(2)
+    for (const used of dirs) expect(await Bun.file(join(used, "seed/state.json")).exists()).toBe(false)
+  }, 60_000)
+
+  test("replay_never_hands_a_case_another_cases_leftovers", async () => {
+    counter += 1
+    const cases = join(dir, `leftover-${counter}`)
+    await mkdir(cases)
+    const seen = { same: true, seed: { mode: "600", content: "hello" }, locked: null }
+    const steps = [{ send: request(1), expect: [expectation(reply(1, seen))] }]
+    const env = { PROBE_RUNTIME: "$" + "{RUNTIME_DIR}" }
+    const plant = [{ path: "seed/state.json", content: "hello", mode: "0600" }]
+    await writeFile(
+      join(cases, "1-plants.json"),
+      JSON.stringify({ transport: "stdio", env, runtime: { plant }, steps }),
+    )
+    await writeFile(join(cases, "2-relies.json"), JSON.stringify({ transport: "stdio", env, steps }))
+    const log = join(dir, `leftover-runtime-${counter}.log`)
+    const run = await replay(["--engine", plantEngine, "--dir", cases], { PROBE_ARGV_LOG: log })
+    expect(run.stdout).toContain("steps=1")
+    expect(run.stdout).toContain("MISMATCH")
+    expect(run.stdout).toContain("2-relies.json")
+    expect(run.stdout).not.toMatch(/MISMATCH \S*1-plants\.json/)
+    expect(run.code).toBe(1)
+  }, 60_000)
+
+  test("replay_follows_a_supersedes_chain_and_fails_on_a_missing_link", async () => {
+    counter += 1
+    const cases = join(dir, `chain-${counter}`)
+    await mkdir(cases)
+    const plan = join(dir, `chain-plan-${counter}.json`)
+    await writeFile(plan, JSON.stringify([{ replies: [reply(1, { a: 1 })] }]))
+    const passing = [{ send: request(1), expect: [expectation(reply(1, { a: 1 }))] }]
+    const failing = [{ send: request(1), expect: [expectation(reply(1, { a: 2 }))] }]
+    await writeFile(join(cases, "a.json"), JSON.stringify({ transport: "stdio", steps: failing }))
+    await writeFile(
+      join(cases, "b.json"),
+      JSON.stringify({ transport: "stdio", supersedes: ["a.json"], steps: failing }),
+    )
+    await writeFile(
+      join(cases, "c.json"),
+      JSON.stringify({ transport: "stdio", supersedes: ["b.json"], steps: passing }),
+    )
+    const run = await replay(["--engine", scripted, "--dir", cases], { SCRIPTED_ENGINE_PLAN: plan })
+    expect(run.stdout).toContain("SKIPPED a.json superseded by b.json")
+    expect(run.stdout).toContain("SKIPPED b.json superseded by c.json")
+    expect(run.stdout.match(/steps=1/g)?.length).toBe(1)
+    expect(run.code).toBe(0)
+
+    const broken = join(dir, `chain-broken-${counter}`)
+    await mkdir(broken)
+    await writeFile(
+      join(broken, "c.json"),
+      JSON.stringify({ transport: "stdio", supersedes: ["b.json"], steps: passing }),
+    )
+    const missing = await replay(["--engine", scripted, "--dir", broken], { SCRIPTED_ENGINE_PLAN: plan })
+    expect(missing.stdout).toContain("REPLAY_ERROR supersedes_missing")
+    expect(missing.code).toBe(2)
+  }, 60_000)
 
   test("--assert-sink-empty fails when the sink holds an entry", async () => {
     const steps = [{ send: request(1, "click"), expect: [expectation(reply(1, null))] }]
