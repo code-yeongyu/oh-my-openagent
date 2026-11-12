@@ -73,6 +73,8 @@ function releaseGeneratedRequirements() {
     const branches = group ? group[2].split("|").map((branch) => `${group[1]}${branch}${group[3]}`) : [rest]
     for (const branch of branches) {
       const literal = branch.replace(/\$$/, "").replaceAll("\\.", ".")
+      // A listed output that must never ship (the checkout build stamp, #13232) is never required.
+      if (FORBIDDEN_RULES.some((rule) => rule.matches(`${root[1]}${literal}`))) continue
       const regex = new RegExp(`^${root[1]}${branch}`)
       requirements.push(
         /[\\[\](){}*+?|^$]/.test(literal)
