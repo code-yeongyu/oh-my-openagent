@@ -179,6 +179,7 @@ jobs:
           bun script/qa/computer/pool/windows-full.ts --ledger "${RUNNER_TEMP}/facts/host.jsonl" "${RUNNER_TEMP}/facts/session.jsonl" "${RUNNER_TEMP}/facts/lock.jsonl" \
             --out "$out/hosted-windows-live.tsv" --host "hosted windows-latest (${{ needs.host.outputs.image || 'image unknown' }})"
           bun script/qa/computer/pool/windows-full.ts --validate "$out/hosted-windows-live.tsv"
+          bun script/qa/computer/pool/windows-full.ts --compare crates/omo-computer-backend-win32/probes/hosted-windows-live.tsv "$out/hosted-windows-live.tsv"
 
       - name: Plan the legs (no guest runner in part 1)
         shell: bash
