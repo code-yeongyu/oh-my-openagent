@@ -65,6 +65,9 @@ fn secret(case: &Value) -> String {
 /// What one engine process left behind.
 struct Left {
     root: tempfile::TempDir,
+    /// `<root>/fake-sink-<engine pid>.log`: the one file the engine's fake backend records
+    /// its delivered input to (engine `route.rs`, `SINK_FILE_PREFIX` + the process id).
+    sink_path: PathBuf,
     typed_reply: Value,
 }
 
@@ -81,11 +84,17 @@ impl Left {
         self.read("markers/local/default.json")
     }
 
-    /// Every file under the root but the audit and the marker: the trace and anything else.
+    /// Every file under the root but the audit and the marker (read on their own): the trace,
+    /// any other engine state, and anything new that appears. Exactly ONE file is excluded, by
+    /// its exact path: `sink_path`, the fake backend's SIMULATED KEYBOARD, which records each
+    /// delivered event (`text "<typed>"`, fake `desktop.rs`) and so must hold the typed text:
+    /// typing a secret into a secure field still delivers it. `sink()` reads it, and each test
+    /// asserts the delivery there, so the exclusion cannot hide a missing one.
     fn rest(&self) -> String {
         let skip = [
             self.root.path().join("audit/computer/local/audit.jsonl"),
             self.root.path().join("markers/local/default.json"),
+            self.sink_path.clone(),
         ];
         let mut text = String::new();
         let mut stack = vec![self.root.path().to_owned()];
@@ -102,6 +111,11 @@ impl Left {
             }
         }
         text
+    }
+
+    /// The fake backend's recording sink: what the simulated keyboard received.
+    fn sink(&self) -> String {
+        fs::read_to_string(&self.sink_path).expect("the engine's fake sink file")
     }
 
     fn typed_line(&self) -> Value {
@@ -135,6 +149,7 @@ fn run_engine(case: &Value, scenario: &str) -> Left {
         command.env(name, value.as_str().expect("an env string"));
     }
     let mut child = command.spawn().expect("the engine spawns");
+    let sink_path = root.path().join(format!("fake-sink-{}.log", child.id()));
     let mut stdin = child.stdin.take().expect("stdin");
     let stdout = child.stdout.take().expect("stdout");
     let (lines, replies) = mpsc::channel();
@@ -164,7 +179,11 @@ fn run_engine(case: &Value, scenario: &str) -> Left {
         status.success(),
         "the engine exits 0 at stdin close: {status}"
     );
-    Left { root, typed_reply }
+    Left {
+        root,
+        sink_path,
+        typed_reply,
+    }
 }
 
 fn delivered(left: &Left) {
@@ -203,6 +222,10 @@ fn assert_length_only(case: &Value, scenario: &str) {
         everything.matches(&secret).count(),
         0,
         "the secret is on disk"
+    );
+    assert!(
+        left.sink().contains(&secret),
+        "the simulated keyboard received the secret: the exclusion hides no missing delivery"
     );
     assert_eq!(
         typed["text"],
@@ -248,5 +271,9 @@ fn engine_process_plain_type_keeps_the_digest_the_grep_looks_for() {
             .count(),
         0,
         "the plain text itself is never on disk"
+    );
+    assert!(
+        left.sink().contains(&secret),
+        "the simulated keyboard received the text"
     );
 }
