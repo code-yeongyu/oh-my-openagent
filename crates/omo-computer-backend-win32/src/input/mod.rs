@@ -8,6 +8,7 @@ pub mod focus_child;
 pub mod ledger;
 pub mod partial;
 pub mod text;
+pub mod vk;
 
 #[cfg(windows)]
 #[allow(dead_code, reason = "post_input calls these once row 23's verbs carry the target window and row 57's lease exists")]

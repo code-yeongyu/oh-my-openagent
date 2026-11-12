@@ -65,7 +65,9 @@ impl Session {
                     _ => None,
                 };
                 let mut refused = self.stamp(blocked.refused, object);
-                refused.detail = detail.map(Box::new);
+                if let Some(detail) = detail {
+                    refused.detail = Some(Box::new(detail));
+                }
                 return Err(self.refuse(record, Some(blocked.stage), refused));
             }
         };
@@ -192,7 +194,8 @@ impl Session {
                     route: mutation.route,
                     count,
                     of,
-                    effect: read_back.effect,
+                    // A route that delivered fewer units than were asked reports it (R48c).
+                    effect: if count < of { omo_computer_core::report::Effect::Partial } else { read_back.effect },
                     user_moved_on: self.funnel.control.presence.take_ended().is_some(),
                     warning: appended.is_err().then(|| "write_failed".to_owned()),
                     audit_id: appended.ok(),

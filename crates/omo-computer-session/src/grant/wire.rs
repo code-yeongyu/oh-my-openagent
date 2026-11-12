@@ -51,7 +51,7 @@ impl Session {
                 self.preview_subscribe();
                 Value::Null
             }),
-            _ => return None,
+            _ => return self.row23_call(method, params),
         };
         Some(outcome)
     }

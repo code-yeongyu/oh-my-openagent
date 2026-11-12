@@ -35,6 +35,10 @@ pub struct FakeState {
     pub epochs: VecDeque<EpochChange>,
     pub cursor: Option<Point>,
     pub held: BTreeSet<String>,
+    /// Wheel steps since the last non-wheel input: one scroll's steps, for the route cap.
+    pub scroll_run: u32,
+    /// Input posts so far, for `stop_chord_after_posts`.
+    pub posts: u32,
     pub clipboard: Option<String>,
     pub focus_read_pos: BTreeMap<String, usize>,
     pub focus_record_pos: BTreeMap<FocusRecordKind, usize>,
@@ -82,6 +86,8 @@ impl FakeState {
             epochs: VecDeque::new(),
             cursor: scenario.cursor,
             held: BTreeSet::new(),
+            scroll_run: 0,
+            posts: 0,
             clipboard: scenario.clipboard.as_ref().and_then(|c| c.text.clone()),
             focus_read_pos: BTreeMap::new(),
             focus_record_pos: BTreeMap::new(),

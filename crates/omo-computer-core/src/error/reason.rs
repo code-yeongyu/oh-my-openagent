@@ -6,7 +6,7 @@
 
 closed_names! {
     /// Every `data.reason` any stage, gate, backend default or layer emits.
-    Reason [144] {
+    Reason [146] {
         NotInteractive = "not_interactive",
         PromptPending = "prompt_pending",
         Revoked = "revoked",
@@ -81,6 +81,8 @@ closed_names! {
         LaunchNeedsUser = "launch_needs_user",
         AuditUnavailable = "audit_unavailable",
         RequestTooLarge = "request_too_large",
+        HoldDuration = "hold_duration",
+        ScrollSteps = "scroll_steps",
         Deaf = "deaf",
         HostRelayNotAllowed = "host_relay_not_allowed",
         HeartbeatStale = "heartbeat_stale",

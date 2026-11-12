@@ -80,3 +80,26 @@ pub(super) fn reply(
     };
     ActionReport::new(ReportContext::new(verb, None), parts).map(|report| ExecReply(Some(report)))
 }
+
+/// The reply of an `up` whose hold the ledger already released at the 100 s bound (row 23,
+/// R49): effect `partial`, `delivered{count: 0, of: 1}`, nothing sent.
+///
+/// # Errors
+/// `Internal` if the report breaks a wire rule (a defect of this module).
+pub(crate) fn released_reply(mode: ReportMode, method: Method) -> Result<ExecReply, super::Refused> {
+    let sent = Sent {
+        route: Route::ForegroundHid,
+        count: 0,
+        of: 1,
+        effect: Effect::Partial,
+        audit_id: None,
+        warning: None,
+        paused: Vec::new(),
+        session: None,
+        target: None,
+        user_moved_on: false,
+    };
+    reply(mode, method, sent).map_err(|_| {
+        super::Refused::from(omo_computer_core::backend::Refusal::bare(omo_computer_core::error::EngineCode::Internal))
+    })
+}
