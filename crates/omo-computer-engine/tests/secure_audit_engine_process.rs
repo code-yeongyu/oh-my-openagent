@@ -1,15 +1,16 @@
 //! Planner ruling R38: the no-digest audit of a secure-focused type is proved through the REAL
-//! engine process, not in process. Each test spawns the built `omo-computer-engine --stdio`
-//! (`$CARGO_TARGET_DIR/debug`, else `<repo>/target/debug`; build it first with
-//! `cargo build -p omo-computer-engine`) over a fresh runtime root, sends the steps of
-//! `v3-secure-field-type-audit-length-only-no-hash.json`, closes stdin, waits for the exit and
-//! then reads the hand's `audit.jsonl`, its pre-input marker and every other file the engine
-//! left under the root (the trace included, once a trace writer writes one there).
+//! engine process, not in process. Each test spawns this crate's own binary (cargo builds it
+//! for integration tests: `CARGO_BIN_EXE_omo-computer-engine`) with `--stdio` over a fresh
+//! runtime root, sends the steps of `v3-secure-field-type-audit-length-only-no-hash.json`,
+//! closes stdin, waits for the exit and then reads the hand's `audit.jsonl`, its pre-input
+//! marker and every other file the engine left under the root (the trace included, once a
+//! trace writer writes one there).
 //!
 //! The needle is `sha256_16(secret)`: the first 16 lowercase hex digits of SHA-256 over the
 //! secret's UTF-8 bytes, computed here independently of the engine's own helper. The secure
-//! leg counts 0 of it; the positive control types the same text into a NON-secure field and
-//! finds it in the audit, so the grep is shown able to see a digest when one is there.
+//! legs (a focused secure field, and OS-wide Secure Input) count 0 of it; the positive
+//! control types the same text into a NON-secure field and finds it in the audit, so the grep
+//! is shown able to see a digest when one is there.
 
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
@@ -32,21 +33,9 @@ fn repo() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
-/// The engine binary the replay driver of row 15 runs.
+/// The engine binary cargo built for this integration test.
 fn engine() -> PathBuf {
-    let target = std::env::var_os("CARGO_TARGET_DIR")
-        .filter(|dir| !dir.is_empty())
-        .map_or_else(|| repo().join("target"), PathBuf::from);
-    let path = target.join("debug").join(format!(
-        "omo-computer-engine{}",
-        std::env::consts::EXE_SUFFIX
-    ));
-    assert!(
-        path.is_file(),
-        "no engine at {} - run `cargo build -p omo-computer-engine` first",
-        path.display()
-    );
-    path
+    PathBuf::from(env!("CARGO_BIN_EXE_omo-computer-engine"))
 }
 
 fn sha256_16(text: &str) -> String {
