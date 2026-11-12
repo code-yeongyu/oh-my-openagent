@@ -82,8 +82,17 @@ impl Funnel {
                 if marker.binding.generation != self.generation {
                     warnings.push(Warning::QuarantinedReply);
                 }
-                // The marker may go only once the callId stays refused without it.
-                let clear = self.poisoned.insert(&issuer, &scope, call_id).is_ok();
+                // The marker may go only once the callId stays refused without it; when the
+                // record fails the marker stays (fail-closed) and the log says why.
+                let clear = match self.poisoned.insert(&issuer, &scope, call_id) {
+                    Ok(()) => true,
+                    Err(error) => {
+                        self.warn(format!(
+                            "crashed callId {call_id} not poison-recorded, marker kept: {error}"
+                        ));
+                        false
+                    }
+                };
                 Verdict::Refuse {
                     refused: uncertain(call_id),
                     clear,
