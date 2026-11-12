@@ -1,7 +1,16 @@
-import type { ComputerSessionSnapshot } from "@oh-my-opencode/senpi-desktop-protocol"
+import {
+  type ComputerSessionSnapshot,
+  DESKTOP_METHODS,
+  DISPLAY_METHODS,
+  ELEMENT_METHODS,
+  WINDOW_METHODS,
+} from "@oh-my-opencode/senpi-desktop-protocol"
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { ComputerRunError } from "../src/run/context"
-import { type ExecuteTool, runComputerCode } from "../src/run/runtime"
+import { ComputerRunError, RunOutput } from "../src/run/context"
+import { type ComputerRunSandbox, type ExecuteTool, runComputerCode } from "../src/run/runtime"
+import { createComputerBridge } from "../src/run/sandbox/bridge"
+import { SANDBOX_MAX_CALLS, SANDBOX_RESULT_BYTES } from "../src/run/sandbox/limits"
+import { BridgedJson, runQuickJsCode, type SandboxBridgedCall } from "../src/run/sandbox/quickjs"
 import { DesktopEngineRpcError } from "../src/service/rpc-client"
 import { DesktopService } from "../src/service/service"
 import { fakeEngineFactory, rejectionOf, type SpawnLog } from "./harness"
@@ -32,7 +41,12 @@ async function openDesktop(
   return { service, log }
 }
 
+// Every body runs under both sandboxes, except the vm-only ones of the threat model's compatibility matrix
+// (docs/reference/computer-run-sandbox-threat-model.md section 7).
+const SANDBOXES: readonly ComputerRunSandbox[] = ["vm", "quickjs"]
+
 interface RunOptions {
+  readonly sandbox?: ComputerRunSandbox
   readonly readOnly?: boolean
   readonly timeoutMs?: number
   readonly signal?: AbortSignal
@@ -55,10 +69,11 @@ function snapshot(readOnly: boolean): ComputerSessionSnapshot {
 
 const noTools: ExecuteTool = (name) => Promise.reject(new Error(`unexpected tool ${name}`))
 
-function run(service: DesktopService, code: string, options: RunOptions = {}) {
+function runCode(service: DesktopService, code: string, options: RunOptions = {}) {
   return runComputerCode(
     {
       code,
+      sandbox: options.sandbox ?? "vm",
       snapshot: snapshot(options.readOnly ?? false),
       timeoutMs: options.timeoutMs ?? RUN_TIMEOUT_MS,
       ...(options.signal === undefined ? {} : { signal: options.signal }),
@@ -71,7 +86,10 @@ function methods(log: SpawnLog): readonly string[] {
   return log.requests.map((request) => request.method)
 }
 
-describe("runComputerCode", HANG_GUARD, () => {
+describe.each(SANDBOXES)("runComputerCode under %s", HANG_GUARD, (sandbox) => {
+  const run = (service: DesktopService, code: string, options: RunOptions = {}) =>
+    runCode(service, code, { ...options, sandbox })
+
   it("settles a run that returns without awaiting any host call", async () => {
     // Given
     const { service } = await openDesktop()
@@ -156,6 +174,49 @@ describe("runComputerCode", HANG_GUARD, () => {
 
     // Then
     expect(error).toMatchObject({ message: "thrown before any await" })
+  })
+
+  it("resolves a call whose result is undefined as undefined in the body", async () => {
+    // Given
+    const { service } = await openDesktop()
+    const code = `
+			const value = await (await desktop.ref("e1")).value();
+			await desktop.screenshot({ silent: true });
+			const clicked = await desktop.click(1, 1);
+			return [value === undefined, clicked === undefined];
+		`
+
+    // When
+    const result = await run(service, code)
+
+    // Then
+    expect(result.returnValue).toEqual([true, true])
+  })
+
+  it("treats an undefined screenshot argument as an absent one", async () => {
+    // Given
+    const { service } = await openDesktop()
+    const shape = (shot: string) => `const shot = await ${shot}; return [Object.keys(shot).sort(), shot.width];`
+
+    // When
+    const bare = await run(service, shape("desktop.screenshot()"))
+    const explicit = await run(service, shape("desktop.screenshot(undefined)"))
+
+    // Then
+    expect(bare.returnValue).toEqual([expect.arrayContaining(["frameId", "width"]), 1280])
+    expect(explicit.returnValue).toEqual(bare.returnValue)
+  })
+
+  it("sends no opts for w.ax(undefined)", async () => {
+    // Given
+    const { service, log } = await openDesktop()
+
+    // When
+    await run(service, `const w = await desktop.window({ app: "Code" }); return await w.ax(undefined);`)
+
+    // Then
+    const params = log.requests.find((request) => request.method === "ax.snapshot")?.params
+    expect(params).toEqual({ target: "101" })
   })
 
   it("rejects click in a read-only run before it reaches the engine", async () => {
@@ -274,6 +335,34 @@ describe("runComputerCode", HANG_GUARD, () => {
     expect(error).toHaveProperty("data.code", "InvalidCoordinateFrame")
   })
 
+  it("lets the body read the method of a caught engine error", async () => {
+    // Given
+    const { service } = await openDesktop()
+
+    // When
+    const result = await run(
+      service,
+      `try { await desktop.click(5, 5); } catch (error) { return [error.name, error.method]; }`,
+    )
+
+    // Then
+    expect(result.returnValue).toEqual(["DesktopEngineRpcError", "click"])
+  })
+
+  it("lets the body read the code and engineRestarted of a caught service error", async () => {
+    // Given: the engine answers clipboard.write with a reply that is not an exec result
+    const { service } = await openDesktop({ FAKE_ENGINE_EXEC_REPLY: "42" })
+
+    // When
+    const result = await run(
+      service,
+      `try { await desktop.clipboard.write("x"); } catch (error) { return [error.name, error.code, error.engineRestarted]; }`,
+    )
+
+    // Then
+    expect(result.returnValue).toEqual(["DesktopServiceError", "Internal", false])
+  })
+
   it("drives a window handle by its id and reports the engine's audit events for the run", async () => {
     // Given
     const { service, log } = await openDesktop()
@@ -292,25 +381,6 @@ describe("runComputerCode", HANG_GUARD, () => {
     expect(result.audit).toEqual([
       expect.objectContaining({ sessionId: "session-1", action: "click", target: "101", status: "success" }),
     ])
-  })
-
-  it("reaches the host executeTool from tool.<name> inside the run", async () => {
-    // Given
-    const { service } = await openDesktop()
-    const executeTool = vi.fn<ExecuteTool>(async () => ({ content: [{ type: "text", text: "file body" }] }))
-
-    // When
-    const result = await run(service, `return (await tool.read({ path: "notes.txt" })).content[0].text;`, {
-      executeTool,
-    })
-
-    // Then
-    expect(result.returnValue).toBe("file body")
-    expect(executeTool).toHaveBeenCalledExactlyOnceWith(
-      "read",
-      { path: "notes.txt" },
-      { signal: expect.any(AbortSignal) },
-    )
   })
 
   it("rejects an aborted run and sends $/cancel for its in-flight engine call", async () => {
@@ -363,5 +433,363 @@ describe("runComputerCode", HANG_GUARD, () => {
     // Then
     expect(error).toBeInstanceOf(ComputerRunError)
     expect(error).toHaveProperty("reason", "timeout")
+  })
+})
+
+// Compatibility matrix M1: `tool` stays vm-only; under quickjs the same body throws ReferenceError.
+describe("runComputerCode vm-only bodies", HANG_GUARD, () => {
+  it("reaches the host executeTool from tool.<name> inside the run", async () => {
+    // Given
+    const { service } = await openDesktop()
+    const executeTool = vi.fn<ExecuteTool>(async () => ({ content: [{ type: "text", text: "file body" }] }))
+
+    // When
+    const result = await runCode(service, `return (await tool.read({ path: "notes.txt" })).content[0].text;`, {
+      executeTool,
+    })
+
+    // Then
+    expect(result.returnValue).toBe("file body")
+    expect(executeTool).toHaveBeenCalledExactlyOnceWith(
+      "read",
+      { path: "notes.txt" },
+      { signal: expect.any(AbortSignal) },
+    )
+  })
+
+  it("throws ReferenceError for the same tool.<name> body under quickjs and never reaches executeTool", async () => {
+    // Given
+    const { service } = await openDesktop()
+    const executeTool = vi.fn<ExecuteTool>(async () => ({ content: [{ type: "text", text: "file body" }] }))
+
+    // When
+    const error = await rejectionOf(
+      runCode(service, `return (await tool.read({ path: "notes.txt" })).content[0].text;`, {
+        sandbox: "quickjs",
+        executeTool,
+      }),
+    )
+
+    // Then
+    expect(error).toBeInstanceOf(ReferenceError)
+    expect(error).toHaveProperty("message", "tool is not defined")
+    expect(executeTool).not.toHaveBeenCalled()
+  })
+
+  // Compatibility matrix M5: the call `computer.run(fn)` generates (senpi-desktop-prelude/src/prelude.js) names `wait`,
+  // so under quickjs every function-form run throws until the prelude stops naming it; this pins that gap.
+  const M5_BODY = "return await ((({ desktop }, n) => n + 1))({ desktop, wait, assert }, 41);"
+
+  it("runs the generated computer.run(fn) shape under vm", async () => {
+    // Given
+    const { service } = await openDesktop()
+
+    // When
+    const result = await runCode(service, M5_BODY)
+
+    // Then
+    expect(result.returnValue).toBe(42)
+  })
+
+  it("throws ReferenceError for the generated computer.run(fn) shape under quickjs while it names wait", async () => {
+    // Given
+    const { service } = await openDesktop()
+
+    // When
+    const error = await rejectionOf(runCode(service, M5_BODY, { sandbox: "quickjs" }))
+
+    // Then
+    expect(error).toBeInstanceOf(ReferenceError)
+    expect(error).toHaveProperty("message", "wait is not defined")
+  })
+})
+
+describe("the computer bridge in the QuickJS run cell", HANG_GUARD, () => {
+  const quickjs = (service: DesktopService, code: string, options: RunOptions = {}) =>
+    runCode(service, code, { ...options, sandbox: "quickjs" })
+
+  it("bridges computer as the same object as desktop and returns a window screenshot's width", async () => {
+    // Given
+    const { service } = await openDesktop()
+
+    // When
+    const result = await quickjs(
+      service,
+      `const w = await computer.window({ app: "Code" }); return [computer === desktop, (await w.screenshot()).width];`,
+    )
+
+    // Then
+    expect(result.returnValue).toEqual([true, 1200])
+    expect(result.sandbox).toBe("quickjs")
+  })
+
+  it("generates the stubs from all four method tables, dotted names as nested namespaces", async () => {
+    // Given
+    const { service } = await openDesktop()
+    const code = `
+			const names = (node, prefix = "") => Object.keys(node).flatMap((key) =>
+				typeof node[key] === "function" ? [prefix + key] :
+				node[key] !== null && typeof node[key] === "object" ? names(node[key], prefix + key + ".") : []);
+			const w = await computer.window({ app: "Code" });
+			const el = await computer.ref("e1");
+			const d = await computer.display("all");
+			return { desktop: names(computer), window: names(w), element: names(el), display: names(d) };
+		`
+
+    // When
+    const result = await quickjs(service, code)
+
+    // Then
+    const sorted = (keys: readonly string[]) => [...keys].sort()
+    const value = result.returnValue as Record<string, string[]>
+    expect({
+      desktop: sorted(value.desktop ?? []),
+      window: sorted(value.window ?? []),
+      element: sorted(value.element ?? []),
+      display: sorted(value.display ?? []),
+    }).toEqual({
+      desktop: sorted(Object.keys(DESKTOP_METHODS)),
+      window: sorted(Object.keys(WINDOW_METHODS)),
+      element: sorted(Object.keys(ELEMENT_METHODS)),
+      display: sorted(Object.keys(DISPLAY_METHODS)),
+    })
+  })
+
+  it("screenshots desktop.display('all') and sends display input with the display target", async () => {
+    // Given
+    const { service, log } = await openDesktop()
+    const code = `
+			const all = await desktop.display("all");
+			const width = (await all.screenshot({ silent: true })).width;
+			const one = await desktop.display("1");
+			await one.screenshot({ silent: true });
+			await one.click(20, 10);
+			return [all.id, width];
+		`
+
+    // When
+    const result = await quickjs(service, code)
+
+    // Then
+    expect(result.returnValue).toEqual(["all", 1280])
+    const click = log.requests.find((request) => request.method === "click")
+    expect(click?.params).toMatchObject({ target: "display:1", x: 20, y: 10 })
+  })
+
+  it("reads window and element snapshot fields without another engine call", async () => {
+    // Given
+    const { service, log } = await openDesktop()
+    const code = `
+			const w = await desktop.window({ app: "Code" });
+			const el = await desktop.ref("e1");
+			return [w.id, w.title, w.app, w.pid, w.bounds, w.focused, el.ref, el.role, el.title, el.enabled];
+		`
+
+    // When
+    const result = await quickjs(service, code)
+
+    // Then
+    expect(result.returnValue).toEqual([
+      "101",
+      "main.ts",
+      "Code",
+      42,
+      { x: 0, y: 25, width: 1200, height: 800 },
+      true,
+      "e1",
+      "button",
+      "Run",
+      true,
+    ])
+    expect(methods(log).filter((method) => method === "windows" || method.startsWith("ax."))).toEqual([
+      "windows",
+      "ax.node",
+    ])
+  })
+
+  it("passes arguments as data: a __proto__ key reaches the engine as an own key and leaves host Object.prototype alone", async () => {
+    // Given
+    const { service, log } = await openDesktop()
+    const code = `
+			const w = await desktop.window({ app: "Code" });
+			return await w.ax(JSON.parse('{"__proto__": {"polluted": true}, "maxDepth": 2}'));
+		`
+
+    // When
+    const result = await quickjs(service, code)
+
+    // Then
+    expect(result.returnValue).toBe("button Run [ref=e1]")
+    expect(Object.prototype).not.toHaveProperty("polluted")
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined()
+    const opts = (log.requests.find((request) => request.method === "ax.snapshot")?.params as { opts: object }).opts
+    expect(Object.hasOwn(opts, "__proto__")).toBe(true)
+    expect(opts).toHaveProperty("maxDepth", 2)
+  })
+
+  it("rejects an over-cap result with resultSize inside the body, which recovers and keeps calling", async () => {
+    // Given
+    const { service } = await openDesktop({ FAKE_ENGINE_CLIPBOARD_BYTES: String(SANDBOX_RESULT_BYTES + 1) })
+    const code = `
+			let refused;
+			try { await computer.clipboard.read(); } catch (error) { refused = [error.name, error.reason]; }
+			return [refused, (await computer.windows()).length];
+		`
+
+    // When
+    const result = await quickjs(service, code)
+
+    // Then
+    expect(result.returnValue).toEqual([["ComputerRunError", "resultSize"], 2])
+  })
+
+  it("lets the body catch an engine error with its data, and an escaped one is the host's own error", async () => {
+    // Given
+    const { service } = await openDesktop()
+
+    // When
+    const caught = await quickjs(
+      service,
+      `try { await desktop.click(5, 5); } catch (error) { return [error.name, error.rpcCode, error.data.code]; }`,
+    )
+    const escaped = await rejectionOf(
+      quickjs(service, `try { await desktop.click(5, 5); } catch (error) { throw error; }`),
+    )
+
+    // Then
+    expect(caught.returnValue).toEqual(["DesktopEngineRpcError", -32007, "InvalidCoordinateFrame"])
+    expect(escaped).toBeInstanceOf(DesktopEngineRpcError)
+  })
+
+  it("drops an undefined snapshot field as JSON does and refuses a non-JSON argument before any engine request", async () => {
+    // Given: the fake button has no description, so its handle's snapshot field is undefined
+    const { service, log } = await openDesktop()
+    const code = `
+			const el = await computer.ref("e1");
+			let refused;
+			try { await computer.windows(() => true); } catch (error) { refused = error.name; }
+			try { await computer.click(Number.NaN, 1); } catch (error) { refused += " " + error.name; }
+			return [Object.hasOwn(el, "description"), el.description === undefined, refused];
+		`
+
+    // When
+    const result = await quickjs(service, code)
+
+    // Then
+    expect(result.returnValue).toEqual([false, true, "TypeError TypeError"])
+    expect(methods(log)).not.toContain("windows")
+    expect(methods(log)).not.toContain("click")
+  })
+
+  it("keeps the call limit across bridged calls and leaves tool and wait absent", HANG_GUARD, async () => {
+    // Given
+    const { service } = await openDesktop()
+
+    // When
+    const absent = await quickjs(service, "return [typeof tool, typeof wait, typeof computer.clipboard.read];")
+    const flood = await rejectionOf(quickjs(service, "for (;;) await computer.capabilities();", { timeoutMs: 60_000 }))
+
+    // Then
+    expect(absent.returnValue).toEqual(["undefined", "undefined", "function"])
+    expect(flood).toBeInstanceOf(ComputerRunError)
+    expect(flood).toHaveProperty("reason", "calls")
+  })
+
+  it("fails with calls past the cap and sends $/cancel for the call still in flight", async () => {
+    // Given: the first call stalls in the engine, every later one queues behind it
+    const { service, log } = await openDesktop({ FAKE_ENGINE_STALL: "windows" })
+    const code = `
+			const stuck = computer.windows();
+			for (let i = 0; i < ${SANDBOX_MAX_CALLS}; i++) computer.capabilities().catch(() => {});
+			await stuck;
+		`
+
+    // When
+    const running = rejectionOf(quickjs(service, code))
+    const sent = await log.nthRequest("windows", 1)
+    const error = await running
+
+    // Then
+    expect(error).toBeInstanceOf(ComputerRunError)
+    expect(error).toHaveProperty("reason", "calls")
+    expect((await log.nthRequest("$/cancel", 1)).params).toEqual({ id: sent.id })
+  })
+
+  it("drops trailing undefined arguments before they cross, for a bridged global and a facade method", async () => {
+    // Given: a recorder in front of a probe global and of the computer bridge itself
+    const { service } = await openDesktop()
+    const output = new RunOutput()
+    const { bridge, setup } = createComputerBridge({
+      snapshot: snapshot(false),
+      deadline: Date.now() + RUN_TIMEOUT_MS,
+      output,
+      screenshots: [],
+      call: (method, params, signal) => service.call(method, params, { signal }),
+    })
+    const forward = bridge.computer
+    if (forward === undefined) throw new Error("no computer bridge")
+    const received: unknown[] = []
+    const recorded: Record<string, SandboxBridgedCall> = {
+      probe: async (args) => {
+        received.push(args)
+        return args.length
+      },
+      computer: (args, signal) => {
+        received.push(args)
+        return forward(args, signal)
+      },
+    }
+    const code = `
+			const lengths = [await probe(1, undefined), await probe(undefined, 2)];
+			await desktop.windows(undefined);
+			await desktop.screenshot({ silent: true }, undefined);
+			return lengths;
+		`
+
+    // When
+    const result = await runQuickJsCode(
+      { code, snapshot: snapshot(false), timeoutMs: RUN_TIMEOUT_MS },
+      { service },
+      { bridge: recorded, setup, output },
+    )
+
+    // Then: a non-trailing undefined still crosses as null (JSON)
+    expect(result.returnValue).toEqual([1, 2])
+    expect(received).toEqual([[1], [null, 2], [0, "windows", []], [0, "screenshot", [{ silent: true }]]])
+  })
+
+  it("keeps handles per run: a handle index from one run is an unknown handle in the next", async () => {
+    // Given: a body can only reach a handle through the stubs its own run revived, so the host's per-run handle
+    // table is where a handle from another run would have to be refused; two runs' bridges over one session
+    const { service } = await openDesktop()
+    const bridgeOf = () =>
+      createComputerBridge({
+        snapshot: snapshot(false),
+        deadline: Date.now() + RUN_TIMEOUT_MS,
+        output: new RunOutput(),
+        screenshots: [],
+        call: (method, params, signal) => service.call(method, params, { signal }),
+      })
+    const first = bridgeOf()
+    const second = bridgeOf()
+    const signal = new AbortController().signal
+    const callFirst = first.bridge.computer
+    const callSecond = second.bridge.computer
+    if (callFirst === undefined || callSecond === undefined) throw new Error("no computer bridge")
+    const found = await callFirst([0, "window", [{ app: "Code" }]], signal)
+    if (!(found instanceof BridgedJson)) throw new Error("window result is not bridged JSON")
+    const { marker } = JSON.parse(first.setup.data) as { marker: string }
+    const { handle } = (JSON.parse(found.json) as Record<string, { handle: number }>)[marker] ?? { handle: -1 }
+
+    // When
+    const inFirst = await callFirst([handle, "raise", []], signal)
+    const inSecond = await rejectionOf(callSecond([handle, "raise", []], signal))
+
+    // Then
+    expect(handle).toBe(1)
+    expect(inFirst).toBeUndefined()
+    expect(inSecond).toBeInstanceOf(TypeError)
+    expect(inSecond).toHaveProperty("message", `computer run: unknown handle ${handle}`)
+    expect((JSON.parse(second.setup.data) as { marker: string }).marker).not.toBe(marker)
   })
 })

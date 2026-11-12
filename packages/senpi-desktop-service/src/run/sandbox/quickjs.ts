@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url"
 import { Worker } from "node:worker_threads"
 import type { ComputerDisplay, ComputerRunOk, ComputerSessionSnapshot } from "@oh-my-opencode/senpi-desktop-protocol"
 import type { DesktopService } from "../../service/service"
-import { ComputerRunError, type ComputerRunErrorReason } from "../context"
+import { ComputerRunError, type ComputerRunErrorReason, type RunOutput } from "../context"
 import {
   SANDBOX_ARGS_BYTES,
   SANDBOX_MAX_CALLS,
@@ -13,9 +13,27 @@ import {
   SANDBOX_RESULT_BYTES,
   SANDBOX_RETURN_BYTES,
 } from "./limits"
-import type { HostToWorkerMessage, SandboxErrorPayload, SandboxWorkerData, WorkerToHostMessage } from "./protocol"
+import type {
+  HostToWorkerMessage,
+  SandboxErrorPayload,
+  SandboxSetup,
+  SandboxWorkerData,
+  WorkerToHostMessage,
+} from "./protocol"
 
-/** A host function bridged into the VM under its name; its arguments and result cross as JSON. */
+/** A bridged result its bridge serialized itself (with its own replacer); copied into the VM as this JSON text. */
+export class BridgedJson {
+  readonly json: string
+
+  constructor(json: string) {
+    this.json = json
+  }
+}
+
+/**
+ * A host function bridged into the VM under its name; its arguments and result cross as JSON. A rejection is
+ * catchable in the body; when the body lets it escape, the run rejects with the host's own error object.
+ */
 export type SandboxBridgedCall = (args: readonly unknown[], signal: AbortSignal) => Promise<unknown>
 
 export interface QuickJsRunRequest {
@@ -31,8 +49,12 @@ export interface QuickJsRunHost {
 }
 
 export interface QuickJsRunOptions {
-  /** VM globals that call the host. The shipped cell bridges none; the `computer` bridge is a later row. */
+  /** VM globals that call the host (`run/sandbox/bridge.ts` bridges `computer`). */
   readonly bridge?: Readonly<Record<string, SandboxBridgedCall>>
+  /** VM-side setup run before the body, given the bridged-call function (the `computer` stubs). */
+  readonly setup?: SandboxSetup
+  /** Where console output goes, shared with bridged calls that display (screenshots); the run's displays are its entries. */
+  readonly output?: RunOutput
   /** The worker entry; defaults to the shipped one. */
   readonly workerPath?: string
 }
@@ -59,6 +81,7 @@ function sandboxFiles(moduleUrl: string): { readonly worker: string; readonly wa
 const VM_REASONS: ReadonlySet<string> = new Set<ComputerRunErrorReason>([
   "assertion",
   "payloadSize",
+  "resultSize",
   "stalled",
   "readOnly",
   "window",
@@ -75,8 +98,12 @@ const HOST_ERRORS: Readonly<Record<string, new (message: string) => Error>> = {
   URIError,
 }
 
-/** Rebuilds an error that left the VM as a host value with the same name and message. */
-function hostError(payload: SandboxErrorPayload): unknown {
+/**
+ * Rebuilds an error that left the VM as a host value with the same name and message; a bridged call's error the
+ * body let escape is the host's own error object again.
+ */
+function hostError(payload: SandboxErrorPayload, hostErrors: ReadonlyMap<string, unknown>): unknown {
+  if (payload.hostError !== undefined && hostErrors.has(payload.hostError)) return hostErrors.get(payload.hostError)
   if (payload.thrown !== undefined) return JSON.parse(payload.thrown)
   const { name, message } = payload
   if (name === "ComputerRunError" && payload.reason !== undefined && VM_REASONS.has(payload.reason)) {
@@ -95,9 +122,41 @@ function hostError(payload: SandboxErrorPayload): unknown {
   return error
 }
 
-function bridgedFailure(error: unknown): SandboxErrorPayload {
-  if (error instanceof ComputerRunError) return { name: error.name, message: error.message, reason: error.reason }
-  throw error
+/** JSON of a value, or undefined when it has none (a cycle, a bigint). */
+function jsonOrUndefined(value: unknown): unknown {
+  try {
+    const json = JSON.stringify(value)
+    return json === undefined ? undefined : JSON.parse(json)
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * A bridged call's failure as the VM sees it: name, message, and the whitelisted fields a vm body can read on the
+ * host error (`reason`, `data`, `rpcCode`, `DesktopServiceError.code`/`.engineRestarted`,
+ * `DesktopEngineRpcError.method`); no other field crosses.
+ */
+function bridgedFailure(error: unknown, token: string): SandboxErrorPayload {
+  if (!(error instanceof Error)) return { name: "Error", message: String(error), hostError: token }
+  const fields: Record<string, unknown> = { ...error }
+  const reason = typeof fields.reason === "string" ? fields.reason : undefined
+  const data = fields.data === undefined || fields.data === null ? undefined : jsonOrUndefined(fields.data)
+  const rpcCode = typeof fields.rpcCode === "number" ? fields.rpcCode : undefined
+  const code = typeof fields.code === "string" ? fields.code : undefined
+  const engineRestarted = typeof fields.engineRestarted === "boolean" ? fields.engineRestarted : undefined
+  const method = typeof fields.method === "string" ? fields.method : undefined
+  return {
+    name: error.name,
+    message: error.message,
+    hostError: token,
+    ...(reason === undefined ? {} : { reason }),
+    ...(data === undefined ? {} : { data }),
+    ...(rpcCode === undefined ? {} : { rpcCode }),
+    ...(code === undefined ? {} : { code }),
+    ...(engineRestarted === undefined ? {} : { engineRestarted }),
+    ...(method === undefined ? {} : { method }),
+  }
 }
 
 // One live worker per desktop session: a run waits FIFO for the session's previous run to settle.
@@ -117,8 +176,8 @@ function untilSignal(promise: Promise<void>, signal: AbortSignal): Promise<void>
 
 /**
  * Runs `code` (an async function body) in a fresh QuickJS VM on a worker thread. Inside the VM only
- * `assert` and `console` exist besides the language itself (plus `options.bridge`); everything crosses
- * as JSON. A failed run revokes the control grant, as a failed vm run does.
+ * `assert` and `console` exist besides the language itself (plus `options.bridge` and what `options.setup`
+ * defines over it); everything crosses as JSON. A failed run revokes the control grant, as a failed vm run does.
  */
 export async function runQuickJsCode(
   request: QuickJsRunRequest,
@@ -182,6 +241,7 @@ function runInWorker(code: string, signal: AbortSignal, options: QuickJsRunOptio
     wasmPath,
     interrupt,
     bridge: Object.keys(bridge),
+    ...(options.setup === undefined ? {} : { setup: options.setup }),
     limits: {
       memoryBytes: SANDBOX_MEMORY_BYTES,
       outputBytes: SANDBOX_OUTPUT_BYTES,
@@ -194,6 +254,9 @@ function runInWorker(code: string, signal: AbortSignal, options: QuickJsRunOptio
     signal.throwIfAborted()
     const worker = new Worker(workerPath, { workerData: data })
     const displays: ComputerDisplay[] = []
+    const { output } = options
+    // Errors of bridged calls, by the token the VM error carries, so one the body lets escape is rethrown as is.
+    const hostErrors = new Map<string, unknown>()
     let settled = false
     let calls = 0
     let queue = Promise.resolve()
@@ -222,16 +285,18 @@ function runInWorker(code: string, signal: AbortSignal, options: QuickJsRunOptio
       try {
         const args: unknown = JSON.parse(argsJson)
         const value = await call(Array.isArray(args) ? args : [], signal)
-        payload = value === undefined ? undefined : JSON.stringify(value)
+        payload = value instanceof BridgedJson ? value.json : value === undefined ? undefined : JSON.stringify(value)
       } catch (error) {
-        answer({ type: "settle", id, ok: false, payload: JSON.stringify(bridgedFailure(error)) })
+        const token = String(hostErrors.size + 1)
+        hostErrors.set(token, error)
+        answer({ type: "settle", id, ok: false, payload: JSON.stringify(bridgedFailure(error, token)) })
         return
       }
       const size = payload === undefined ? 0 : Buffer.byteLength(payload)
       if (size > SANDBOX_RESULT_BYTES) {
         const failure = {
           name: "ComputerRunError",
-          reason: "payloadSize",
+          reason: "resultSize",
           message: `computer run: the result is ${size} bytes, over the ${SANDBOX_RESULT_BYTES}-byte cap`,
         }
         answer({ type: "settle", id, ok: false, payload: JSON.stringify(failure) })
@@ -244,7 +309,8 @@ function runInWorker(code: string, signal: AbortSignal, options: QuickJsRunOptio
       if (settled) return
       switch (message.type) {
         case "output":
-          displays.push({ type: "text", text: message.text })
+          if (output === undefined) displays.push({ type: "text", text: message.text })
+          else output.text(message.text)
           return
         case "call": {
           calls++
@@ -266,9 +332,10 @@ function runInWorker(code: string, signal: AbortSignal, options: QuickJsRunOptio
         case "done":
           if (message.ok) {
             const returnValue: unknown = message.value === undefined ? undefined : JSON.parse(message.value)
-            settle(() => resolve({ displays, returnValue, screenshots: [], audit: [] }))
+            const shown = output === undefined ? displays : output.finish()
+            settle(() => resolve({ displays: shown, returnValue, screenshots: [], audit: [] }))
           } else {
-            fail(hostError(message.error))
+            fail(hostError(message.error, hostErrors))
           }
           return
       }
