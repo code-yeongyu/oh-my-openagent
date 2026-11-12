@@ -90,5 +90,4 @@ describe("buildTaskExecute spawn validation", () => {
     const text = result.content[0]?.type === "text" ? result.content[0].text : ""
     expect(text).toContain("omo.json")
   })
-
 })

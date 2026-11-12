@@ -16,6 +16,8 @@ export async function claimMemorySyncAtBoot(args: string[]): Promise<void> {
     claim(takeInheritedPrivateChannel)
   } catch (error) {
     // The memory component's registration still selects once when the first session opens.
-    process.stderr.write(`omo: memory sync could not start at boot: ${error instanceof Error ? error.message : String(error)}\n`)
+    process.stderr.write(
+      `omo: memory sync could not start at boot: ${error instanceof Error ? error.message : String(error)}\n`,
+    )
   }
 }

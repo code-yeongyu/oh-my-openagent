@@ -40,7 +40,10 @@ export class FakeItemStore implements ItemStore {
   async load(): Promise<void> {
     const saved = await readJson<Persisted>(this.file, { items: {}, materialized: {} })
     this.items = new Map(
-      Object.entries(saved.items).map(([k, v]) => [k, { adds: new Map(Object.entries(v.adds)), killed: new Set(v.killed) }]),
+      Object.entries(saved.items).map(([k, v]) => [
+        k,
+        { adds: new Map(Object.entries(v.adds)), killed: new Set(v.killed) },
+      ]),
     )
     this.materialized = new Map(Object.entries(saved.materialized))
   }
@@ -124,10 +127,18 @@ export class FakeItemStore implements ItemStore {
       return "refused"
     }
     const item = this.items.get(key)
-    if (item !== undefined && Object.keys(parsed.adds).every((id) => item.adds.has(id)) && parsed.kills.every((id) => item.killed.has(id))) return "held"
+    if (
+      item !== undefined &&
+      Object.keys(parsed.adds).every((id) => item.adds.has(id)) &&
+      parsed.kills.every((id) => item.killed.has(id))
+    )
+      return "held"
     const killed = new Set(parsed.kills.map((id) => item?.adds.get(id)).filter((line) => line !== undefined))
     await this.apply(key, ops)
-    const lines = [...linesOf(this.materialized.get(key) ?? null).filter((line) => !killed.has(line)), ...Object.values(parsed.adds)]
+    const lines = [
+      ...linesOf(this.materialized.get(key) ?? null).filter((line) => !killed.has(line)),
+      ...Object.values(parsed.adds),
+    ]
     this.materialized.set(key, lines.length === 0 ? null : `${lines.join("\n")}\n`)
     return "imported"
   }
@@ -147,7 +158,9 @@ export class FakeItemStore implements ItemStore {
     return {
       items: [...this.items].map(([key, v]) => ({
         key,
-        ops: encoder.encode(JSON.stringify({ adds: Object.fromEntries(v.adds), kills: [...v.killed] } satisfies ItemOps)),
+        ops: encoder.encode(
+          JSON.stringify({ adds: Object.fromEntries(v.adds), kills: [...v.killed] } satisfies ItemOps),
+        ),
       })),
     }
   }

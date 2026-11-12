@@ -65,7 +65,8 @@ function matcher(patterns: readonly string[]): Matcher {
 
 const isLegacyNameExcluded = matcher(nameMap.legacyNameExclusions)
 const isUnderNewDirectory = matcher(nameMap.newDirectories)
-const isUnderOldDirectory: Matcher = (path) => nameMap.oldDirectories.some((directory) => path === directory || path.startsWith(`${directory}/`))
+const isUnderOldDirectory: Matcher = (path) =>
+  nameMap.oldDirectories.some((directory) => path === directory || path.startsWith(`${directory}/`))
 const newDirectoryPathspecs = nameMap.newDirectories.map((directory) => directory.replace(/\/$/, ""))
 
 /** The patterns of a plan row's `Write scope:` line; notes and entries outside this repository are dropped. */
@@ -93,10 +94,15 @@ export function parseWriteScope(line: string): readonly string[] {
   return entries
     .map((entry) => entry.trim())
     .map((entry) => {
-      if (entry.length < 2 || !entry.startsWith("`") || !entry.endsWith("`")) throw new GuardInputError(`Write scope entry is not backtick-quoted: ${entry}`)
+      if (entry.length < 2 || !entry.startsWith("`") || !entry.endsWith("`"))
+        throw new GuardInputError(`Write scope entry is not backtick-quoted: ${entry}`)
       return entry.slice(1, -1)
     })
-    .filter((entry) => !outsideRepositoryPrefixes.some((prefix) => entry.startsWith(prefix)) && !entry.includes(outsideRepositoryInfix))
+    .filter(
+      (entry) =>
+        !outsideRepositoryPrefixes.some((prefix) => entry.startsWith(prefix)) &&
+        !entry.includes(outsideRepositoryInfix),
+    )
     .map((entry) => (entry.includes(" (") ? entry.slice(0, entry.indexOf(" (")) : entry))
 }
 
@@ -108,8 +114,14 @@ type Git = (args: readonly string[], allowedExitCodes?: readonly number[], keepE
 
 function gitIn(cwd: string, env: Readonly<Record<string, string | undefined>>): Git {
   return (args, allowedExitCodes = [0], keepEmpty = false) => {
-    const result = Bun.spawnSync(["git", "-c", "core.quotePath=false", ...args], { cwd, env: { ...env }, stdout: "pipe", stderr: "pipe" })
-    if (!allowedExitCodes.includes(result.exitCode)) throw new GuardInputError(`git ${args.join(" ")} failed (${result.exitCode}): ${result.stderr.toString().trim()}`)
+    const result = Bun.spawnSync(["git", "-c", "core.quotePath=false", ...args], {
+      cwd,
+      env: { ...env },
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+    if (!allowedExitCodes.includes(result.exitCode))
+      throw new GuardInputError(`git ${args.join(" ")} failed (${result.exitCode}): ${result.stderr.toString().trim()}`)
     const lines = result.stdout.toString().split("\n")
     if (lines.at(-1) === "") lines.pop()
     return keepEmpty ? lines : lines.filter((line) => line.length > 0)
@@ -117,10 +129,13 @@ function gitIn(cwd: string, env: Readonly<Record<string, string | undefined>>): 
 }
 
 /** Tracked and untracked-not-ignored files under the pathspecs. */
-const listFiles = (git: Git, pathspecs: readonly string[]): string[] => git(["ls-files", "--cached", "--others", "--exclude-standard", "--", ...pathspecs])
+const listFiles = (git: Git, pathspecs: readonly string[]): string[] =>
+  git(["ls-files", "--cached", "--others", "--exclude-standard", "--", ...pathspecs])
 
 const grepOldName = (git: Git, pathspecs: readonly string[]): string[] =>
-  git(["grep", "-n", "-I", "-i", "--untracked", "-E", nameMap.oldNamePattern, "--", ...pathspecs], [0, 1]).filter((line) => !isLegacyNameExcluded(line.slice(0, line.indexOf(":"))))
+  git(["grep", "-n", "-I", "-i", "--untracked", "-E", nameMap.oldNamePattern, "--", ...pathspecs], [0, 1]).filter(
+    (line) => !isLegacyNameExcluded(line.slice(0, line.indexOf(":"))),
+  )
 
 /** `<status>\t<path>` per changed path of `<ref>...HEAD`; a rename counts as a deletion plus an addition. */
 const changedPaths = (git: Git, ref: string): { readonly status: string; readonly path: string }[] =>
@@ -135,7 +150,9 @@ function readInput(absolute: string, label: string): string | undefined {
   try {
     return readFileSync(absolute, "utf8")
   } catch (error) {
-    throw new GuardInputError(`${label} cannot be read (${error instanceof Error ? error.message.split("\n")[0] : String(error)})`)
+    throw new GuardInputError(
+      `${label} cannot be read (${error instanceof Error ? error.message.split("\n")[0] : String(error)})`,
+    )
   }
 }
 
@@ -156,19 +173,23 @@ function residue(git: Git, cwd: string): string[] {
   const oldName = new RegExp(nameMap.oldNamePattern, "i")
   const isRemaining = (path: string): boolean => remaining.some((root) => path === root || path.startsWith(`${root}/`))
   for (const path of new Set(git(["ls-files", "--cached", "--others"]))) {
-    if (oldName.test(path) && !isLegacyNameExcluded(path) && !isRemaining(path)) findings.push(`residue: path ${path} names the old family`)
+    if (oldName.test(path) && !isLegacyNameExcluded(path) && !isRemaining(path))
+      findings.push(`residue: path ${path} names the old family`)
   }
   return findings
 }
 
 function noLegacyEdge(git: Git, cwd: string): string[] {
   const findings = grepOldName(git, newDirectoryPathspecs).map((line) => `no-legacy-edge: ${line}`)
-  const manifests = listFiles(git, newDirectoryPathspecs).filter((path) => ["Cargo.toml", "package.json"].includes(posix.basename(path)))
+  const manifests = listFiles(git, newDirectoryPathspecs).filter((path) =>
+    ["Cargo.toml", "package.json"].includes(posix.basename(path)),
+  )
   for (const file of manifests) {
     const content = readText(cwd, file) ?? ""
     for (const match of content.matchAll(/(?:path\s*=\s*"|"(?:file|link):)([^"]+)"/g)) {
       const target = posix.normalize(posix.join(posix.dirname(file), match[1]))
-      if (isUnderOldDirectory(target)) findings.push(`no-legacy-edge: ${file} points at ${match[1]} (${target}, an old directory)`)
+      if (isUnderOldDirectory(target))
+        findings.push(`no-legacy-edge: ${file} points at ${match[1]} (${target}, an old directory)`)
     }
   }
   return findings
@@ -179,21 +200,41 @@ function copy(git: Git, ref: string): string[] {
   const { similarity, sourceExtensions, dataDirectories, skipSuffixes, minLines } = nameMap.copy
   const isData = matcher(dataDirectories.map((directory) => `**/${directory}/`))
   const diff = git([
-    "diff", "-l0", `-M${similarity}%`, `-C${similarity}%`, "--find-copies-harder", "--diff-filter=RC", "--name-status", mergeBase, "HEAD", "--",
-    ...nameMap.oldDirectories, ...newDirectoryPathspecs,
+    "diff",
+    "-l0",
+    `-M${similarity}%`,
+    `-C${similarity}%`,
+    "--find-copies-harder",
+    "--diff-filter=RC",
+    "--name-status",
+    mergeBase,
+    "HEAD",
+    "--",
+    ...nameMap.oldDirectories,
+    ...newDirectoryPathspecs,
   ])
   const findings: string[] = []
   for (const line of diff) {
     const [status, source, destination] = line.split("\t")
     if (!isUnderOldDirectory(source) || !isUnderNewDirectory(destination)) continue
-    if (!sourceExtensions.includes(posix.extname(destination)) || skipSuffixes.some((suffix) => destination.endsWith(suffix)) || isData(destination)) continue
+    if (
+      !sourceExtensions.includes(posix.extname(destination)) ||
+      skipSuffixes.some((suffix) => destination.endsWith(suffix)) ||
+      isData(destination)
+    )
+      continue
     if (git(["show", `HEAD:${destination}`], [0], true).length < minLines) continue
-    findings.push(`copy: ${destination} is a ${status.startsWith("R") ? "rename" : "copy"} (${status.slice(1)}%) of ${source}`)
+    findings.push(
+      `copy: ${destination} is a ${status.startsWith("R") ? "rename" : "copy"} (${status.slice(1)}%) of ${source}`,
+    )
   }
   return findings
 }
 
-const oldFrozen = (git: Git, ref: string): string[] => changedPaths(git, ref).filter(({ path }) => isUnderOldDirectory(path)).map(({ path }) => `old-frozen: ${path}`)
+const oldFrozen = (git: Git, ref: string): string[] =>
+  changedPaths(git, ref)
+    .filter(({ path }) => isUnderOldDirectory(path))
+    .map(({ path }) => `old-frozen: ${path}`)
 
 /**
  * The top-level comma-separated items inside the parentheses that open at `open`, read across lines with balanced
@@ -226,7 +267,8 @@ function cfgAttrIgnores(text: string): { readonly line: number; readonly problem
     const line = text.slice(0, match.index).split("\n").length
     const items = parenthesizedItems(text, match.index + match[0].length - 1)
     if (items === undefined) found.push({ line, problem: "unterminated cfg_attr" })
-    else if (items.slice(1).some((item) => /^ignore\b/.test(item.trim()))) found.push({ line, problem: nameMap.stubs.cfgAttrIgnore })
+    else if (items.slice(1).some((item) => /^ignore\b/.test(item.trim())))
+      found.push({ line, problem: nameMap.stubs.cfgAttrIgnore })
   }
   return found
 }
@@ -238,7 +280,8 @@ function stubs(git: Git, cwd: string): string[] {
   for (const file of listFiles(git, newDirectoryPathspecs)) {
     const text = readText(cwd, file) ?? ""
     text.split("\n").forEach((line, index) => {
-      for (const { name, regexp } of patterns) if (regexp.test(line)) findings.push(`stubs: ${file}:${index + 1}: ${name}`)
+      for (const { name, regexp } of patterns)
+        if (regexp.test(line)) findings.push(`stubs: ${file}:${index + 1}: ${name}`)
     })
     findings.push(...cfgAttrIgnores(text).map(({ line, problem }) => `stubs: ${file}:${line}: ${problem}`))
   }
@@ -251,7 +294,10 @@ function stubs(git: Git, cwd: string): string[] {
 type PlanRow = { readonly scope: readonly string[]; readonly blockedBy: readonly string[] }
 
 function planRow(lines: readonly string[], row: string): PlanRow {
-  const start = lines.findIndex((line) => line.startsWith(`- [ ] ${row}. `) || line.startsWith(`- [x] ${row}. `) || line.startsWith(`- [~] ${row}. `))
+  const start = lines.findIndex(
+    (line) =>
+      line.startsWith(`- [ ] ${row}. `) || line.startsWith(`- [x] ${row}. `) || line.startsWith(`- [~] ${row}. `),
+  )
   if (start < 0) throw new GuardInputError(`the plan has no row ${row}`)
   let scopeLine: string | undefined
   let blockedLine: string | undefined
@@ -261,11 +307,17 @@ function planRow(lines: readonly string[], row: string): PlanRow {
   }
   if (scopeLine === undefined) throw new GuardInputError(`row ${row} has no 'Write scope:' line`)
   const blocked = /\| Blocked by: ([^|]*?) \|/.exec(blockedLine ?? "")
-  if (!blocked || !/^(?:-|\d+(?:, \d+)*)$/.test(blocked[1])) throw new GuardInputError(`row ${row} has no well-formed 'Blocked by:' list`)
+  if (!blocked || !/^(?:-|\d+(?:, \d+)*)$/.test(blocked[1]))
+    throw new GuardInputError(`row ${row} has no well-formed 'Blocked by:' list`)
   const removal = nameMap.removal
   const scope = parseWriteScope(scopeLine).flatMap((entry) =>
     entry === nameMap.scope.removalInventoryEntry
-      ? [...removal.classA.map((path) => `${path}/`), ...removal.classB.flatMap(({ path }) => [path, `${path}/`]), ...removal.classC, ...removal.classD]
+      ? [
+          ...removal.classA.map((path) => `${path}/`),
+          ...removal.classB.flatMap(({ path }) => [path, `${path}/`]),
+          ...removal.classC,
+          ...removal.classD,
+        ]
       : [entry],
   )
   return { scope, blockedBy: blocked[1] === "-" ? [] : blocked[1].split(", ") }
@@ -292,7 +344,8 @@ function unitFiles(scope: readonly string[]): string[] {
   for (const root of roots) {
     files.push(...wiringFiles.map((file) => `${root}${file}`))
     if (root.startsWith("crates/")) files.push(...crateWiringFiles)
-    for (const [unit, paths] of Object.entries(callPathFiles)) if (globToRegExp(unit).test(root)) files.push(...paths.map((file) => `${root}${file}`))
+    for (const [unit, paths] of Object.entries(callPathFiles))
+      if (globToRegExp(unit).test(root)) files.push(...paths.map((file) => `${root}${file}`))
   }
   return files
 }
@@ -305,7 +358,10 @@ function blockerEdits(planFile: string, row: string): Set<string> {
   content.split("\n").forEach((line, index) => {
     if (line.trim().length === 0) return
     const [path, reason] = line.split("\t")
-    if (!path || /\s/.test(path) || !reason?.trim()) throw new GuardInputError(`${posix.basename(file)} line ${index + 1} is malformed (expected <path><TAB><sentence>)`)
+    if (!path || /\s/.test(path) || !reason?.trim())
+      throw new GuardInputError(
+        `${posix.basename(file)} line ${index + 1} is malformed (expected <path><TAB><sentence>)`,
+      )
     listed.add(path)
   })
   return listed
@@ -347,7 +403,8 @@ function tsvRows(cwd: string, path: string, columns: readonly string[], label: s
   const content = readText(cwd, path)
   const header = `"${columns.join(", ")}" (tab-separated)`
   if (content === undefined) return { missing: true, problems: [`${label}: ${path} is missing`], rows: [] }
-  if (content.trim().length === 0) return { missing: false, problems: [`${label}: ${path} is empty (expected the header ${header})`], rows: [] }
+  if (content.trim().length === 0)
+    return { missing: false, problems: [`${label}: ${path} is empty (expected the header ${header})`], rows: [] }
   const lines = content.split("\n")
   const problems = lines[0] === columns.join("\t") ? [] : [`${label}: ${path} line 1 is not the header ${header}`]
   const rows = lines
@@ -366,7 +423,10 @@ function parity(cwd: string, final: boolean): string[] {
   const findings: string[] = [...read.problems]
   for (const { line, cells } of read.rows) {
     const [, , testId, status] = cells
-    if (cells.length === 0) findings.push(`parity: ${manifest} line ${line} is malformed (expected ${manifestColumns.length} tab-separated columns)`)
+    if (cells.length === 0)
+      findings.push(
+        `parity: ${manifest} line ${line} is malformed (expected ${manifestColumns.length} tab-separated columns)`,
+      )
     else if (!PARITY_STATUS.test(status)) findings.push(`parity: ${testId} has status "${status}" (line ${line})`)
     else if (final && status === "pending") findings.push(`parity: ${testId} is still pending (line ${line})`)
   }
@@ -375,7 +435,12 @@ function parity(cwd: string, final: boolean): string[] {
   findings.push(...legs.problems)
   for (const { line, cells } of legs.rows) {
     const [designRow, , recordedBy, owedTo, status] = cells
-    if (cells.length === 0 || !/^\d+$/.test(recordedBy) || !/^\d+$/.test(owedTo) || !/^(?:owed|passed:\S+)$/.test(status)) {
+    if (
+      cells.length === 0 ||
+      !/^\d+$/.test(recordedBy) ||
+      !/^\d+$/.test(owedTo) ||
+      !/^(?:owed|passed:\S+)$/.test(status)
+    ) {
       findings.push(`parity: DEFERRED-LEGS line ${line} is malformed`)
     } else if (status === "owed" && Number(owedTo) <= finalGateRow) {
       findings.push(`parity: DEFERRED-LEGS ${designRow} is still owed to row ${owedTo}`)
@@ -390,13 +455,26 @@ function parity(cwd: string, final: boolean): string[] {
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json }
 
 /** Every member pointer of a JSON value with the value found there. */
-function members(value: Json, prefix: readonly string[] = []): { readonly segments: readonly string[]; readonly value: Json }[] {
-  const children: [string, Json][] = Array.isArray(value) ? value.map((item, index) => [String(index), item]) : value !== null && typeof value === "object" ? Object.entries(value) : []
-  return children.flatMap(([key, child]) => [{ segments: [...prefix, key], value: child }, ...members(child, [...prefix, key])])
+function members(
+  value: Json,
+  prefix: readonly string[] = [],
+): { readonly segments: readonly string[]; readonly value: Json }[] {
+  const children: [string, Json][] = Array.isArray(value)
+    ? value.map((item, index) => [String(index), item])
+    : value !== null && typeof value === "object"
+      ? Object.entries(value)
+      : []
+  return children.flatMap(([key, child]) => [
+    { segments: [...prefix, key], value: child },
+    ...members(child, [...prefix, key]),
+  ])
 }
 
 function pointerMatches(pattern: string, segments: readonly string[]): boolean {
-  const parts = pattern.split("/").slice(1).map((part) => part.replace(/~1/g, "/").replace(/~0/g, "~"))
+  const parts = pattern
+    .split("/")
+    .slice(1)
+    .map((part) => part.replace(/~1/g, "/").replace(/~0/g, "~"))
   const anyPrefix = parts[0] === "**"
   const tail = anyPrefix ? parts.slice(1) : parts
   if (anyPrefix ? segments.length < tail.length : segments.length !== tail.length) return false
@@ -404,18 +482,33 @@ function pointerMatches(pattern: string, segments: readonly string[]): boolean {
   return tail.every((part, index) => part === "*" || part === candidate[index])
 }
 
-const toPointer = (segments: readonly string[]): string => `/${segments.map((segment) => segment.replace(/~/g, "~0").replace(/\//g, "~1")).join("/")}`
+const toPointer = (segments: readonly string[]): string =>
+  `/${segments.map((segment) => segment.replace(/~/g, "~0").replace(/\//g, "~1")).join("/")}`
 
 /** The expected messages of an imported case: `steps[].expect[].message`. */
 function expectations(document: Json): Json[] {
-  if (document === null || typeof document !== "object" || Array.isArray(document) || !Array.isArray(document.steps)) return []
-  return document.steps.flatMap((step) => (step !== null && typeof step === "object" && !Array.isArray(step) && Array.isArray(step.expect) ? step.expect : []))
-    .flatMap((expected) => (expected !== null && typeof expected === "object" && !Array.isArray(expected) && "message" in expected ? [expected.message] : []))
+  if (document === null || typeof document !== "object" || Array.isArray(document) || !Array.isArray(document.steps))
+    return []
+  return document.steps
+    .flatMap((step) =>
+      step !== null && typeof step === "object" && !Array.isArray(step) && Array.isArray(step.expect)
+        ? step.expect
+        : [],
+    )
+    .flatMap((expected) =>
+      expected !== null && typeof expected === "object" && !Array.isArray(expected) && "message" in expected
+        ? [expected.message]
+        : [],
+    )
 }
 
 function opensObjectReportMode(document: Json): boolean {
-  if (document === null || typeof document !== "object" || Array.isArray(document) || !Array.isArray(document.steps)) return false
-  return document.steps.some((step) => JSON.stringify(step).includes('"method":"session.open"') && /"reportMode":"object"/.test(JSON.stringify(step)))
+  if (document === null || typeof document !== "object" || Array.isArray(document) || !Array.isArray(document.steps))
+    return false
+  return document.steps.some(
+    (step) =>
+      JSON.stringify(step).includes('"method":"session.open"') && /"reportMode":"object"/.test(JSON.stringify(step)),
+  )
 }
 
 function parseJson(text: string): Json | undefined {
@@ -430,29 +523,50 @@ function checkDelta(cells: readonly string[], imported: ReadonlyMap<string, Json
   const [file, pointer, kind, source, row, importedValue, v3Value] = cells
   const { parametersFixture, nullModeCases } = nameMap.oracle
   if (file !== "*" && !imported.has(file)) return `file ${file} is neither "*" nor a file of the provenance manifest`
-  if (!pointer.startsWith("/") || pointer.split("/").slice(2).some((part) => part.includes("**"))) return `pointer ${pointer} is not a pointer pattern`
+  if (
+    !pointer.startsWith("/") ||
+    pointer
+      .split("/")
+      .slice(2)
+      .some((part) => part.includes("**"))
+  )
+    return `pointer ${pointer} is not a pointer pattern`
   if (!source.trim() || !/^[1-9]\d*$/.test(row)) return "needs a source and a row number"
   const cases = file === "*" ? [...imported.values()] : [imported.get(file) ?? null]
-  const listedMembers = cases.flatMap(expectations).flatMap((message) => members(message)).filter(({ segments }) => pointerMatches(pointer, segments))
+  const listedMembers = cases
+    .flatMap(expectations)
+    .flatMap((message) => members(message))
+    .filter(({ segments }) => pointerMatches(pointer, segments))
   if (kind === "additive") {
     if (importedValue || v3Value) return "an additive line carries no values"
-    return listedMembers.length > 0 ? `additive pointer ${pointer} matches ${toPointer(listedMembers[0].segments)}, which an imported expectation lists` : undefined
+    return listedMembers.length > 0
+      ? `additive pointer ${pointer} matches ${toPointer(listedMembers[0].segments)}, which an imported expectation lists`
+      : undefined
   }
   if (kind === "reworded") {
     if (importedValue || v3Value) return "a reworded line carries no values"
-    const described = members(imported.get(parametersFixture) ?? null).filter(({ segments }) => pointerMatches(pointer, segments))
-    const ok = file === parametersFixture && described.length > 0 && described.every(({ segments, value }) => segments.at(-1) === "description" && typeof value === "string")
+    const described = members(imported.get(parametersFixture) ?? null).filter(({ segments }) =>
+      pointerMatches(pointer, segments),
+    )
+    const ok =
+      file === parametersFixture &&
+      described.length > 0 &&
+      described.every(({ segments, value }) => segments.at(-1) === "description" && typeof value === "string")
     return ok ? undefined : `reworded pointer ${pointer} is not a description string of ${parametersFixture}`
   }
   if (kind !== "replaced") return `kind ${kind} is not additive, reworded or replaced`
-  if (file === "*" || matcher(nullModeCases)(file) || !opensObjectReportMode(imported.get(file) ?? null)) return `replaced line in ${file}, which does not open reportMode:"object"`
+  if (file === "*" || matcher(nullModeCases)(file) || !opensObjectReportMode(imported.get(file) ?? null))
+    return `replaced line in ${file}, which does not open reportMode:"object"`
   if (!/\bAC-\d+\b/.test(source)) return `replaced line cites ${source}, not a contract criterion (AC-<n>)`
   const [was, now] = [parseJson(importedValue ?? ""), parseJson(v3Value ?? "")]
   if (was === undefined || now === undefined) return "replaced line needs a JSON imported value and a JSON v3 value"
   if (JSON.stringify(was) === JSON.stringify(now)) return "replaced line keeps the imported value"
-  if (listedMembers.length === 0) return `replaced pointer ${pointer} is not listed by an imported expectation of ${file}`
+  if (listedMembers.length === 0)
+    return `replaced pointer ${pointer} is not listed by an imported expectation of ${file}`
   const wrong = listedMembers.find(({ value }) => JSON.stringify(value) !== JSON.stringify(was))
-  return wrong ? `replaced line names ${importedValue}, but ${file} lists ${JSON.stringify(wrong.value)} at ${toPointer(wrong.segments)}` : undefined
+  return wrong
+    ? `replaced line names ${importedValue}, but ${file} lists ${JSON.stringify(wrong.value)} at ${toPointer(wrong.segments)}`
+    : undefined
 }
 
 function oracle(git: Git, cwd: string): string[] {
@@ -473,16 +587,23 @@ function oracle(git: Git, cwd: string): string[] {
       continue
     }
     const actualSha = new Bun.CryptoHasher("sha256").update(content).digest("hex")
-    if (actualSha !== expectedSha) findings.push(`oracle: ${path} differs from its provenance row (${actualSha} != ${expectedSha})`)
+    if (actualSha !== expectedSha)
+      findings.push(`oracle: ${path} differs from its provenance row (${actualSha} != ${expectedSha})`)
     imported.set(path, parseJson(content) ?? null)
   }
-  for (const file of listFiles(git, [...new Set([...directories, ...[...imported.keys()].map((path) => `${posix.dirname(path)}/`)])])) {
-    if (!imported.has(file) && !posix.basename(file).startsWith(newCasePrefix)) findings.push(`oracle: ${file} is not in the provenance manifest and its name does not start with ${newCasePrefix}`)
+  for (const file of listFiles(git, [
+    ...new Set([...directories, ...[...imported.keys()].map((path) => `${posix.dirname(path)}/`)]),
+  ])) {
+    if (!imported.has(file) && !posix.basename(file).startsWith(newCasePrefix))
+      findings.push(
+        `oracle: ${file} is not in the provenance manifest and its name does not start with ${newCasePrefix}`,
+      )
   }
   const deltaRead = tsvRows(cwd, deltas, deltasColumns, "oracle")
   findings.push(...deltaRead.problems)
   for (const { line, cells } of deltaRead.rows) {
-    const problem = cells.length === 0 ? `expected ${deltasColumns.length} tab-separated columns` : checkDelta(cells, imported)
+    const problem =
+      cells.length === 0 ? `expected ${deltasColumns.length} tab-separated columns` : checkDelta(cells, imported)
     if (problem) findings.push(`oracle: ORACLE-DELTAS line ${line}: ${problem}`)
   }
   return findings
@@ -505,9 +626,11 @@ function dispatch(args: readonly string[], cwd: string, git: Git): (() => string
   if (command === "--old-frozen" && one) return () => oldFrozen(git, one)
   if (command === "--oracle" && rest.length === 0) return () => oracle(git, cwd)
   if (command === "--stubs" && rest.length === 0) return () => stubs(git, cwd)
-  if (command === "--parity" && (rest.length === 0 || (rest.length === 1 && rest[0] === "--final"))) return () => parity(cwd, rest[0] === "--final")
+  if (command === "--parity" && (rest.length === 0 || (rest.length === 1 && rest[0] === "--final")))
+    return () => parity(cwd, rest[0] === "--final")
   const [row, ref, planFlag, planFile] = rest
-  if (command === "--scope" && rest.length === 4 && /^\d+$/.test(row) && planFlag === "--plan") return () => scope(git, row, ref, resolve(cwd, planFile))
+  if (command === "--scope" && rest.length === 4 && /^\d+$/.test(row) && planFlag === "--plan")
+    return () => scope(git, row, ref, resolve(cwd, planFile))
   return undefined
 }
 

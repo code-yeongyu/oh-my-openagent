@@ -39,9 +39,14 @@ function isLoopback(url: string): boolean {
 }
 
 function origin(): string {
-  const frames = (new Error().stack ?? "").split("\n").slice(1).map((line) => line.trim())
+  const frames = (new Error().stack ?? "")
+    .split("\n")
+    .slice(1)
+    .map((line) => line.trim())
   const testFrame = frames.find((line) => /\.test\.[cm]?[jt]sx?/.test(line))
-  const callers = frames.filter((line) => line.startsWith("at ") && !line.includes("node_modules") && !line.includes("posthog-test-guard"))
+  const callers = frames.filter(
+    (line) => line.startsWith("at ") && !line.includes("node_modules") && !line.includes("posthog-test-guard"),
+  )
   return testFrame ?? (callers.slice(0, 4).join(" < ") || "an unknown caller")
 }
 
@@ -49,7 +54,10 @@ export function createPostHogTestGuard(prototype: GuardedPrototype): PostHogTest
   const realFetch = prototype.fetch
   const realCapture = prototype.capture
   const realShutdown = prototype.shutdown
-  const owners = new WeakMap<object, { readonly test: number; readonly origin: string; readonly outsideTest: boolean }>()
+  const owners = new WeakMap<
+    object,
+    { readonly test: number; readonly origin: string; readonly outsideTest: boolean }
+  >()
   const silenced = new WeakSet<object>()
   let live = new Set<GuardedClient>()
   let violations: string[] = []
@@ -65,7 +73,9 @@ export function createPostHogTestGuard(prototype: GuardedPrototype): PostHogTest
       live.add(client)
       return
     }
-    outsideTestViolations.push(`a PostHog client was used outside a test (${owner.origin}); create and shut down each client inside the test that uses it`)
+    outsideTestViolations.push(
+      `a PostHog client was used outside a test (${owner.origin}); create and shut down each client inside the test that uses it`,
+    )
   }
 
   prototype.capture = function (this: GuardedClient, ...args: unknown[]) {
@@ -86,7 +96,9 @@ export function createPostHogTestGuard(prototype: GuardedPrototype): PostHogTest
       return Promise.reject(new Error("PostHog test guard: client used outside a test"))
     }
     if (silenced.has(this) || owner?.test !== test) {
-      violations.push(`a PostHog client created at ${owner?.origin ?? "an unknown test"} sent ${url} after its test ended`)
+      violations.push(
+        `a PostHog client created at ${owner?.origin ?? "an unknown test"} sent ${url} after its test ended`,
+      )
       return Promise.reject(new Error("PostHog test guard: client outlived its test"))
     }
     if (!isLoopback(url)) {
@@ -150,6 +162,7 @@ export function installPostHogTestGuard(): void {
   })
   afterAll(() => {
     const violations = guard.endRun()
-    if (violations.length > 0) throw new Error(`PostHog test guard (#10394), after the last test:\n${violations.join("\n")}`)
+    if (violations.length > 0)
+      throw new Error(`PostHog test guard (#10394), after the last test:\n${violations.join("\n")}`)
   })
 }

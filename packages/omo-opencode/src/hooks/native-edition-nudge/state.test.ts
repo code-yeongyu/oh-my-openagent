@@ -110,29 +110,35 @@ describe("writability is probed rather than assumed", () => {
   })
 
   // POSIX mode bits do not make a directory unwritable on Windows (Node chmod only toggles the file read-only attribute).
-  test.skipIf(process.platform === "win32")("#given a read-only directory #when probed #then it reports unwritable instead of throwing", () => {
-    // given
-    const locked = join(dir, "locked")
-    mkdirSync(locked, { recursive: true })
-    chmodSync(locked, 0o500)
+  test.skipIf(process.platform === "win32")(
+    "#given a read-only directory #when probed #then it reports unwritable instead of throwing",
+    () => {
+      // given
+      const locked = join(dir, "locked")
+      mkdirSync(locked, { recursive: true })
+      chmodSync(locked, 0o500)
 
-    // when
-    const writable = createNudgeStateStore(locked).probeWritable()
+      // when
+      const writable = createNudgeStateStore(locked).probeWritable()
 
-    // then
-    expect(writable).toBe(false)
-  })
+      // then
+      expect(writable).toBe(false)
+    },
+  )
 
   // POSIX mode bits do not make a directory unwritable on Windows (Node chmod only toggles the file read-only attribute).
-  test.skipIf(process.platform === "win32")("#given a read-only directory #when a write is attempted #then it returns false rather than throwing", () => {
-    // given
-    const locked = join(dir, "locked-write")
-    mkdirSync(locked, { recursive: true })
-    chmodSync(locked, 0o500)
+  test.skipIf(process.platform === "win32")(
+    "#given a read-only directory #when a write is attempted #then it returns false rather than throwing",
+    () => {
+      // given
+      const locked = join(dir, "locked-write")
+      mkdirSync(locked, { recursive: true })
+      chmodSync(locked, 0o500)
 
-    // when / then
-    expect(createNudgeStateStore(locked).write(sample())).toBe(false)
-  })
+      // when / then
+      expect(createNudgeStateStore(locked).write(sample())).toBe(false)
+    },
+  )
 })
 
 describe("the state file is written where the hook looks for it", () => {
@@ -149,10 +155,7 @@ describe("the state file is written where the hook looks for it", () => {
 
   test("#given a file written by a future version #when read #then unknown fields do not make it corrupt", () => {
     // given
-    writeFileSync(
-      join(dir, NUDGE_STATE_FILE),
-      JSON.stringify({ ...sample(), somethingNew: true, schemaVersion: 99 }),
-    )
+    writeFileSync(join(dir, NUDGE_STATE_FILE), JSON.stringify({ ...sample(), somethingNew: true, schemaVersion: 99 }))
 
     // when
     const parsed = createNudgeStateStore(dir).read()

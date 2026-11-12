@@ -3,6 +3,7 @@
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use omo_computer_core::backend::BackendResult;
+use omo_computer_core::error::UnknownFailure;
 
 use crate::clock::FakeClock;
 use crate::faults::Fault;
@@ -91,9 +92,15 @@ impl FakeBackend {
         self.shared.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// Queues `fault` for the next call of `method`, behind any already queued.
-    pub fn inject(&mut self, method: FakeMethod, fault: Fault) {
+    /// Queues `fault` for the next call of `method`, behind any already queued. A `Fail`
+    /// goes through the same error-table check as the scenario's `fail_next`.
+    ///
+    /// # Errors
+    /// The `Fail` pair has no row in the COMPUTER_* table; nothing is queued.
+    pub fn inject(&mut self, method: FakeMethod, fault: Fault) -> Result<(), UnknownFailure> {
+        fault.check()?;
         self.lock().faults.push(method, fault);
+        Ok(())
     }
 
     /// How often `method` ran.

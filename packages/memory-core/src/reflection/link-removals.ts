@@ -15,20 +15,28 @@ export interface Removals {
 
 export async function listTree(run: Run, revision: string): Promise<TreeEntry[]> {
   const out = await must(run, ["ls-tree", "-r", "-z", "--full-tree", revision])
-  return out.split("\0").filter(Boolean).map((line) => {
-    const tab = line.indexOf("\t")
-    const [mode = ""] = line.slice(0, tab).split(" ")
-    return { path: line.slice(tab + 1), regular: mode === "100644" || mode === "100755" }
-  })
+  return out
+    .split("\0")
+    .filter(Boolean)
+    .map((line) => {
+      const tab = line.indexOf("\t")
+      const [mode = ""] = line.slice(0, tab).split(" ")
+      return { path: line.slice(tab + 1), regular: mode === "100644" || mode === "100755" }
+    })
 }
 
 /** Every path `base..tip` removed, with where its links go: the rename destination, the archive, or nowhere. */
-export async function removedPaths(run: Run, baseSha: string, tipSha: string, live: ReadonlySet<string>): Promise<Removals> {
+export async function removedPaths(
+  run: Run,
+  baseSha: string,
+  tipSha: string,
+  live: ReadonlySet<string>,
+): Promise<Removals> {
   const parts = (await must(run, ["diff", "--name-status", "-M", "-z", `${baseSha}..${tipSha}`, "--"])).split("\0")
   const deleted: string[] = []
   const removed = new Map<string, Successor>()
   const movedFrom = new Map<string, string>()
-  for (let index = 0; index < parts.length; ) {
+  for (let index = 0; index < parts.length;) {
     const status = parts[index] ?? ""
     if (status === "") break
     if (status.startsWith("R") || status.startsWith("C")) {
@@ -57,7 +65,10 @@ export async function removedPaths(run: Run, baseSha: string, tipSha: string, li
 
 async function archiveAdditions(run: Run, baseSha: string, tipSha: string): Promise<string> {
   const out = await must(run, ["diff", "-U0", "--no-color", baseSha, tipSha, "--", ARCHIVE_PATH])
-  return out.split("\n").filter((line) => line.startsWith("+") && !line.startsWith("+++")).join("\n")
+  return out
+    .split("\n")
+    .filter((line) => line.startsWith("+") && !line.startsWith("+++"))
+    .join("\n")
 }
 
 /**
@@ -71,7 +82,9 @@ function recordedIn(archived: string, path: string, uniqueName: boolean): boolea
   const start = "(^|[^\\w./-])"
   const stem = escape(path.replace(/\.md$/, ""))
   if (new RegExp(`${start}${stem}(\\.md)?${end}`).test(archived)) return true
-  return uniqueName && path.endsWith(".md") && new RegExp(`${start}${escape(posix.basename(path))}${end}`).test(archived)
+  return (
+    uniqueName && path.endsWith(".md") && new RegExp(`${start}${escape(posix.basename(path))}${end}`).test(archived)
+  )
 }
 
 export async function must(run: Run, argv: readonly string[]): Promise<string> {

@@ -213,5 +213,10 @@ export function rankRecallDocumentsBm25(
   if (fullMatches.length === 0) return ranked
   // Lifted by the best score an expansion reached, so the returned scores still descend.
   const lift = ranked[0]?.score ?? 0
-  return [...fullMatches.sort(byScore).map(({ document, score }) => ({ document, score: score + lift, fullMatch: true as const })), ...ranked]
+  return [
+    ...fullMatches
+      .sort(byScore)
+      .map(({ document, score }) => ({ document, score: score + lift, fullMatch: true as const })),
+    ...ranked,
+  ]
 }

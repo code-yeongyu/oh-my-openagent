@@ -23,5 +23,7 @@ const sidecarAnchor = pathToFileURL(join(dirname(fileURLToPath(import.meta.url))
 const sidecarPresent = existsSync(fileURLToPath(new URL(`./${GATEWAY_STORE_WORKER_BUNDLE_NAME}`, sidecarAnchor)))
 
 export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
-  return createSdk(options.workerModuleUrl !== undefined || !sidecarPresent ? options : { ...options, workerModuleUrl: sidecarAnchor })
+  return createSdk(
+    options.workerModuleUrl !== undefined || !sidecarPresent ? options : { ...options, workerModuleUrl: sidecarAnchor },
+  )
 }

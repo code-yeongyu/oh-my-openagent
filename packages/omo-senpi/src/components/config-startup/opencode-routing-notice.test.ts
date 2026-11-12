@@ -47,14 +47,17 @@ describe("OpenCode edition model settings at Native startup", () => {
     // given
     const home = tempHome()
     mkdirSync(join(home, ".config", "opencode"), { recursive: true })
-    writeFileSync(join(home, ".config", "opencode", "oh-my-openagent.json"), JSON.stringify({
-      agents: {
-        metis: { model: "zai-coding-plan/glm-5.2" },
-        momus: { model: "kimi-for-coding/k3", variant: "high" },
-        oracle: { model: "openai/gpt-5.5" },
-      },
-      categories: { quick: { model: "kimi-for-coding/k3" } },
-    }))
+    writeFileSync(
+      join(home, ".config", "opencode", "oh-my-openagent.json"),
+      JSON.stringify({
+        agents: {
+          metis: { model: "zai-coding-plan/glm-5.2" },
+          momus: { model: "kimi-for-coding/k3", variant: "high" },
+          oracle: { model: "openai/gpt-5.5" },
+        },
+        categories: { quick: { model: "kimi-for-coding/k3" } },
+      }),
+    )
 
     // when
     const first = start(home)
@@ -64,7 +67,18 @@ describe("OpenCode edition model settings at Native startup", () => {
     // then
     const reports = first.notices.filter((message) => message.includes("metis"))
     expect(reports).toHaveLength(1)
-    for (const token of ["plan-consultant", "zai/glm-5.2", "momus", "plan-reviewer", "kimi-coding/k3", "\"reasoning\": \"high\"", "oracle", "openai/gpt-5.5", "quick", "omo setup"]) {
+    for (const token of [
+      "plan-consultant",
+      "zai/glm-5.2",
+      "momus",
+      "plan-reviewer",
+      "kimi-coding/k3",
+      '"reasoning": "high"',
+      "oracle",
+      "openai/gpt-5.5",
+      "quick",
+      "omo setup",
+    ]) {
       expect(reports[0]).toContain(token)
     }
     const config = parse(afterFirst)
@@ -77,7 +91,9 @@ describe("OpenCode edition model settings at Native startup", () => {
 
   test("#given a Native plan-consultant already configured #when Native starts #then metis is not reported and the config keeps its values and comments", () => {
     // given
-    const home = tempHome('{\n  // mine\n  "[native]": { "agents": { "plan-consultant": { "model": "anthropic/claude-opus-5-5" } } },\n  "[opencode]": { "agents": { "metis": { "model": "zai-coding-plan/glm-5.2" }, "momus": { "model": "zai-coding-plan/glm-5.2" } } }\n}\n')
+    const home = tempHome(
+      '{\n  // mine\n  "[native]": { "agents": { "plan-consultant": { "model": "anthropic/claude-opus-5-5" } } },\n  "[opencode]": { "agents": { "metis": { "model": "zai-coding-plan/glm-5.2" }, "momus": { "model": "zai-coding-plan/glm-5.2" } } }\n}\n',
+    )
 
     // when
     const { notices } = start(home)
@@ -87,14 +103,20 @@ describe("OpenCode edition model settings at Native startup", () => {
     expect(text).toContain("plan-reviewer")
     expect(text).not.toContain("metis")
     expect(omoText(home)).toContain("// mine")
-    expect(parse(omoText(home))["[native]"]).toEqual({ agents: { "plan-consultant": { model: "anthropic/claude-opus-5-5" } } })
+    expect(parse(omoText(home))["[native]"]).toEqual({
+      agents: { "plan-consultant": { model: "anthropic/claude-opus-5-5" } },
+    })
   })
 
   test("#given the OpenCode block sets both metis and plan-consultant #when Native starts #then the Native name's setting is the one reported", () => {
     // given
-    const home = tempHome(JSON.stringify({
-      "[opencode]": { agents: { metis: { model: "zai-coding-plan/glm-5.2" }, "plan-consultant": { model: "kimi-for-coding/k3" } } },
-    }))
+    const home = tempHome(
+      JSON.stringify({
+        "[opencode]": {
+          agents: { metis: { model: "zai-coding-plan/glm-5.2" }, "plan-consultant": { model: "kimi-for-coding/k3" } },
+        },
+      }),
+    )
 
     // when
     const text = start(home).notices.join("\n")
@@ -119,7 +141,8 @@ describe("OpenCode edition model settings at Native startup", () => {
 
   test("#given no OpenCode edition history #when Native starts #then omo.jsonc stays byte-identical and nothing is reported", () => {
     // given
-    const original = '{\n  "_migrations": ["2026-08-reasoning-unification"],\n  "[native]": { "model_profile": "daily-normal" }\n}\n'
+    const original =
+      '{\n  "_migrations": ["2026-08-reasoning-unification"],\n  "[native]": { "model_profile": "daily-normal" }\n}\n'
     const home = tempHome(original)
 
     // when
