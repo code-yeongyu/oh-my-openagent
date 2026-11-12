@@ -291,7 +291,7 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
     "ALTER TABLE deliveries ADD COLUMN ledger_id TEXT",
     "ALTER TABLE deliveries ADD COLUMN verbatim_text TEXT",
     "ALTER TABLE deliveries ADD COLUMN verbatim_display_text TEXT",
-    "CREATE INDEX deliveries_ledger ON deliveries (ledger_id) WHERE ledger_id IS NOT NULL",
+    "CREATE UNIQUE INDEX deliveries_ledger ON deliveries (ledger_id) WHERE ledger_id IS NOT NULL",
     "INSERT OR IGNORE INTO extension_objects (type, name, owner) VALUES ('index', 'deliveries_ledger', NULL)",
   ],
 
