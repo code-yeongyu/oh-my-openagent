@@ -62,6 +62,9 @@ pub struct Refused {
     pub call_id: Option<String>,
     pub receipt: Option<Box<Value>>,
     pub interrupted: Option<Disposition>,
+    /// The members a consent or lease refusal carries on the wire (`app`, `identity`,
+    /// `window`, `holder`, `retryAfterMs`).
+    pub detail: Option<Box<Value>>,
 }
 
 impl From<Refusal> for Refused {
@@ -71,6 +74,7 @@ impl From<Refusal> for Refused {
             call_id: None,
             receipt: None,
             interrupted: None,
+            detail: None,
         }
     }
 }
@@ -93,6 +97,7 @@ pub(crate) struct Funnel {
     permits: Permits,
     artifacts: Option<ArtifactStore>,
     secure: Box<dyn SecureProbe>,
+    pub(crate) control: crate::grant::Control,
 }
 
 impl Funnel {
@@ -109,7 +114,7 @@ impl Funnel {
     /// STATE root.
     pub(crate) fn for_roots(roots: &Roots) -> Self {
         let artifacts = ArtifactStore::new(roots.state.join("artifacts"), GcLimits::default());
-        Self::with(
+        let mut funnel = Self::with(
             (
                 Box::new(MarkerDir::under(&roots.runtime)),
                 Poisoned::under(&roots.runtime),
@@ -117,7 +122,9 @@ impl Funnel {
             AuditSpec::Dir(roots.state.join("audit")),
             Some(InteractionLock::under(&roots.runtime)),
             Some(artifacts),
-        )
+        );
+        funnel.control.runtime = Some(roots.runtime.clone());
+        funnel
     }
 
     fn with(
@@ -138,6 +145,7 @@ impl Funnel {
             permits: Permits::default(),
             artifacts,
             secure: Box::new(SecureInputProbe),
+            control: crate::grant::Control::default(),
         }
     }
 
@@ -196,6 +204,10 @@ impl Session {
     pub fn with_binding(mut self, binding: Binding) -> Self {
         self.funnel.binding = binding;
         self
+    }
+
+    pub(crate) fn funnel_issuer(&self) -> String {
+        self.funnel.binding.issuer.clone()
     }
 
     /// The per-hand audit file, once the first exec opened it.

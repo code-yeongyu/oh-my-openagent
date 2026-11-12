@@ -3,15 +3,21 @@
 pub mod audit;
 pub mod batch;
 pub mod budget;
+pub mod consent;
 pub mod diff;
 mod displays;
 pub mod epoch;
 pub mod frames;
+pub mod grant;
+pub mod lease;
 pub mod lock;
 pub mod marker;
 pub mod mutate;
 pub mod observe;
+pub mod presence;
+pub mod preview;
 pub mod refs;
+pub mod reservation;
 mod session;
 pub mod trace;
 
