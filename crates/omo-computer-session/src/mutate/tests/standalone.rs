@@ -69,9 +69,20 @@ fn restore_resets_narrowed_modes_when_the_replay_panics() {
     assert_eq!(mode & 0o777, 0o700, "the narrowed mode is restored");
 }
 
+/// Whether the tests run as root, which ignores a read-only directory mode.
+#[cfg(unix)]
+fn is_root() -> bool {
+    crate::marker::euid() == 0
+}
+
+#[cfg(not(unix))]
+const fn is_root() -> bool {
+    false
+}
+
 /// Plants the case's `runtime.plant` under `root`, directory modes last; answers the
 /// directories whose mode was narrowed.
-fn plant(root: &Path, case: &Value) -> Vec<PathBuf> {
+fn plant(root: &Path, case: &Value, _as_root: bool) -> Vec<PathBuf> {
     let items = case["runtime"]["plant"]
         .as_array()
         .cloned()
@@ -184,7 +195,7 @@ fn v3_r17_marker_cases_replay_standalone_in_a_fresh_runtime_root() {
             "{name} names no fixed runtime dir"
         );
         let root = tempfile::tempdir().expect("tempdir");
-        let _restore = Restore(plant(root.path(), &case));
+        let _restore = Restore(plant(root.path(), &case, is_root()));
         replay(name, &case, root.path());
         if name == "v3-r17-marker-written-before-input.json" {
             let marker = fs::read_to_string(root.path().join("markers/local/default.json"))
@@ -195,4 +206,25 @@ fn v3_r17_marker_cases_replay_standalone_in_a_fresh_runtime_root() {
             );
         }
     }
+}
+
+/// Root ignores a 0500 mode, so as root the read-only `markers` dir that
+/// `v3-r17-marker-unavailable.json` plants is laid down as a plain file at that path, which
+/// refuses the marker write for root too (same `marker_unavailable`, nothing sent). Forced
+/// here so the root path is exercised on every runner, root or not.
+#[test]
+fn the_marker_unavailable_case_still_refuses_when_planted_as_root() {
+    let name = "v3-r17-marker-unavailable.json";
+    let path = repo()
+        .join("crates/omo-computer-core/fixtures/conformance")
+        .join(name);
+    let case: Value =
+        serde_json::from_str(&fs::read_to_string(&path).expect("case text")).expect("case JSON");
+    let root = tempfile::tempdir().expect("tempdir");
+    let _restore = Restore(plant(root.path(), &case, true));
+    assert!(
+        root.path().join("markers").is_file(),
+        "as root the read-only markers dir is planted as a plain file"
+    );
+    replay(name, &case, root.path());
 }
