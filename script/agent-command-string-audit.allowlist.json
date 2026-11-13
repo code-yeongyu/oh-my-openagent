@@ -129,7 +129,7 @@
     "packages/omo-senpi/src/components/memory/commands/doctor-reservation.ts: omo doctor x2",
     "packages/memory-core/src/retention/host-step.ts: omo doctor",
     "packages/omo-native/test/doctor-retention-fix.test.ts: omo doctor x2",
-    "knip.jsonc: omo doctor",
+    "packages/omo-native/knip.workspace.jsonc: omo doctor",
     "packages/memory-core/src/retention/cap.ts: omo doctor",
     "packages/memory-core/src/retention/pass.ts: omo doctor",
     "packages/memory-core/src/retention/size.ts: omo doctor"
