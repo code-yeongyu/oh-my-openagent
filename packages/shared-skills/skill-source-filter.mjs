@@ -15,7 +15,13 @@ export const ignoredSkillSourceDirNames = Object.freeze([
   ".ruff_cache",
   "__pycache__",
 ])
-export const ignoredSkillSourceFileNames = Object.freeze([".gitignore", ".npmignore", "pyrightconfig.json"])
+// knip.workspace.jsonc: the repository's knip config fragment for a skill directory (script/knip-config.ts), dev-only.
+export const ignoredSkillSourceFileNames = Object.freeze([
+  ".gitignore",
+  ".npmignore",
+  "pyrightconfig.json",
+  "knip.workspace.jsonc",
+])
 const sourceTestFilePattern = /\.test\.ts$/
 const testDirNamePattern = /^(?:tests?|__tests__|.+_test)$/
 const shippedTopLevelTestDirNames = new Set(["test", "tests"])

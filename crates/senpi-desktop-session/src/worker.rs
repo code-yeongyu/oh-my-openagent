@@ -57,6 +57,8 @@ pub(crate) struct Worker {
     pub(crate) report_extras: Rc<Cell<Option<crate::report::ReportExtras>>>,
     /// The coordinate epoch; moves supersede frames and expire refs.
     pub(crate) epochs: crate::epoch::Epochs,
+    /// The time the actionability battery waits on.
+    pub(crate) battery_clock: Box<dyn crate::actionability::BatteryClock>,
 }
 
 /// A mutating request's reply and the audit event it emitted.
@@ -98,6 +100,7 @@ impl Worker {
             intervention: crate::intervention::Intervention::new(),
             report_extras: Rc::default(),
             epochs: crate::epoch::Epochs::default(),
+            battery_clock: Box::new(crate::actionability::HostClock::new()),
         };
         worker.install_screen_probe();
         worker.refresh_capabilities();

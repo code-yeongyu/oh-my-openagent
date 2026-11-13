@@ -136,6 +136,48 @@ describe("the omo CLI device service hand-off", () => {
     expect(s.owner.state.log).toEqual(["device.forget"])
   })
 
+  // #6503: the machine's device service holds its one account device; omo login reads it instead of minting another.
+  test("machineDevice names the device a running service holds, parked included, and absent when no service runs", async () => {
+    const s = await runningService()
+    const handoff = cliDeviceServiceHandoff({
+      api: "http://127.0.0.1:9",
+      stateDir: s.stateDir,
+      connect: s.connect,
+      fetch: me,
+      log: () => {},
+    })
+    expect(await handoff.machineDevice?.()).toEqual({ kind: "held", device: { id: "dev-self", name: "This Mac" } })
+    s.owner.state.status = { ...s.owner.state.status, state: "sign_in_required" }
+    expect(await handoff.machineDevice?.()).toEqual({ kind: "held", device: { id: "dev-self", name: "This Mac" } })
+    const none = cliDeviceServiceHandoff({
+      api: "http://127.0.0.1:9",
+      stateDir: join(temp(), "ds"),
+      fetch: me,
+      log: () => {},
+    })
+    expect(await none.machineDevice?.()).toEqual({ kind: "absent" })
+  })
+
+  test("#given an endpoint file nothing answers #when machineDevice reads it #then it is not-responding, not absent", async () => {
+    const stateDir = join(temp(), "ds")
+    mkdirSync(stateDir, { recursive: true, mode: 0o700 })
+    await Bun.write(deviceServiceEndpointPath(stateDir), "")
+    const lines: string[] = []
+    const handoff = cliDeviceServiceHandoff({
+      api: "http://127.0.0.1:9",
+      stateDir,
+      fetch: me,
+      log: (line) => lines.push(line),
+      connect: async () => {
+        throw Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" })
+      },
+    })
+    const state = await handoff.machineDevice?.()
+    expect(state?.kind).toBe("unknown")
+    expect(state && state.kind === "unknown" ? state.reason : "").toContain("dead_endpoint")
+    expect(lines.some((line) => line.includes("dead_endpoint"))).toBe(true)
+  })
+
   test("a failure is reported on the log and never fails the sign-in or sign-out", async () => {
     const stateDir = join(temp(), "ds")
     mkdirSync(stateDir, { recursive: true, mode: 0o700 })

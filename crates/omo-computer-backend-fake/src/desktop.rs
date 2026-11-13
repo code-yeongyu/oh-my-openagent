@@ -169,7 +169,9 @@ impl Backend for FakeBackend {
             let (rect, scale) = capture_rect(state, target)?;
             let rect = options.region.unwrap_or(rect);
             // A scale that is not positive, or a negative size, refuses before the multiply:
-            // two negatives would otherwise make a positive extent.
+            // two negatives would otherwise make a positive extent. The scale half and the size
+            // half each suffice alone (a NaN product refuses as non-finite, a product of zero or
+            // below as 0 px); the refusal depends on keeping at least one of the two.
             if scale.is_nan() || scale <= 0.0 || rect.width < 0.0 || rect.height < 0.0 {
                 return Err(Refusal::bare(EngineCode::CaptureFailed));
             }
