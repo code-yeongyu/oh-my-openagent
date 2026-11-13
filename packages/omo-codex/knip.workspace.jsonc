@@ -1,0 +1,82 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/omo-codex": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "scripts/install-local.mjs",
+        "scripts/install-dist/install-local.mjs",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+      ],
+      "ignoreFiles": [
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/check-model-catalog-parity.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/install/agents.d.mts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/install/bin-dir.d.mts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/install/bin-links.d.mts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/install/config.d.mts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/install/git-bash-mcp-env.d.mts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/install/git-bash.d.mts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/install/hook-trust.d.mts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/install/permissions.d.mts",
+      ],
+      "ignoreDependencies": [
+        // pre-existing at origin dev 4686e425b5: a declared dependency nothing imports
+        "@oh-my-opencode/shared-skills",
+      ],
+      // pre-existing at origin dev 4686e425b5: executables this package runs that it does not declare
+      "ignoreBinaries": ["where"],
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) PASSTHROUGH_COMMANDS, buildDelegatedOmoInvocation, formatLazyCodexInstallHelp, installMarketplaceLocally, parseLazyCodexInstallCliArgs, resolveCodexInstallerBinDir, resolveDefaultRepoRoot, resolveDefaultRepoRootForEntrypoint, runDelegatedOmoCommand, runLazyCodexInstallLocalCli
+    "packages/omo-codex/scripts/install-dist/install-local.mjs": ["PASSTHROUGH_COMMANDS", "buildDelegatedOmoInvocation", "formatLazyCodexInstallHelp", "installMarketplaceLocally", "parseLazyCodexInstallCliArgs", "resolveCodexInstallerBinDir", "resolveDefaultRepoRoot", "resolveDefaultRepoRootForEntrypoint", "runDelegatedOmoCommand", "runLazyCodexInstallLocalCli"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) writePlugin
+    "packages/omo-codex/scripts/install-test-fixtures.mjs": ["writePlugin"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) installedMarketplaceRoot
+    "packages/omo-codex/src/install/codex-marketplace-snapshot.ts": ["installedMarketplaceRoot"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) readCodexReasoningProfile
+    "packages/omo-codex/src/install/codex-model-catalog.ts": ["readCodexReasoningProfile"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) repairProjectLocalCodexConfigText
+    "packages/omo-codex/src/install/codex-project-local-cleanup.ts": ["repairProjectLocalCodexConfigText"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) resolveCodexInstallerBinDir, installCachedPlugin, linkCachedPluginBins, linkRootRuntimeBin, updateCodexConfig, readCodexModelCatalog, stampGitBashMcpEnv, assertHookCommandTargets, findMissingHookCommandTargets, repairNearestProjectLocalCodexArtifacts and 9 more
+    "packages/omo-codex/src/install/install-local-cli.ts": ["resolveCodexInstallerBinDir", "installCachedPlugin", "linkCachedPluginBins", "linkRootRuntimeBin", "updateCodexConfig", "readCodexModelCatalog", "stampGitBashMcpEnv", "assertHookCommandTargets", "findMissingHookCommandTargets", "repairNearestProjectLocalCodexArtifacts", "PASSTHROUGH_COMMANDS", "formatLazyCodexInstallHelp", "parseLazyCodexInstallCliArgs", "buildDelegatedOmoInvocation", "runDelegatedOmoCommand", "installMarketplaceLocally", "resolveDefaultRepoRootForEntrypoint", "resolveDefaultRepoRoot", "runLazyCodexInstallLocalCli"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) PASSTHROUGH_COMMANDS
+    "packages/omo-codex/src/install/lazycodex-cli-args.ts": ["PASSTHROUGH_COMMANDS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) buildDelegatedOmoInvocation
+    "packages/omo-codex/src/install/lazycodex-delegated-command.ts": ["buildDelegatedOmoInvocation"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) versionDirFor
+    "packages/omo-codex/src/install/lsp-daemon-reaper.test-support.ts": ["versionDirFor"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) extractTopLevelStringSetting
+    "packages/omo-codex/src/install/preserved-agent-settings.ts": ["extractTopLevelStringSetting"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) hasTomlSetting
+    "packages/omo-codex/src/install/toml-setting-reader.ts": ["hasTomlSetting"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) getOsProvider
+    "packages/omo-codex/src/telemetry/data-path.ts": ["getOsProvider"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) getPostHogApiKey, hasPostHogApiKey, getPostHogHost
+    "packages/omo-codex/src/telemetry/env-flags.ts": ["getPostHogApiKey", "hasPostHogApiKey", "getPostHogHost"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) __resetActivityStateProviderForTesting, __resetOsProviderForTesting, __setActivityStateProviderForTesting, __setOsProviderForTesting, createCliPostHog, createPluginPostHog
+    "packages/omo-codex/src/telemetry/index.ts": ["__resetActivityStateProviderForTesting", "__resetOsProviderForTesting", "__setActivityStateProviderForTesting", "__setOsProviderForTesting", "createCliPostHog", "createPluginPostHog"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) getPostHogActivityStateFilePath
+    "packages/omo-codex/src/telemetry/posthog-activity-state.ts": ["getPostHogActivityStateFilePath"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_POSTHOG_API_KEY, DEFAULT_POSTHOG_HOST, createCliPostHog, createPluginPostHog, __createPostHogForTesting
+    // #11572 (origin dev 4c87d16a73) removed the six __set/__reset provider, activity-state and transport-factory testing exports; their rows are gone with them.
+    "packages/omo-codex/src/telemetry/posthog.ts": ["DEFAULT_POSTHOG_API_KEY", "DEFAULT_POSTHOG_HOST", "createCliPostHog", "createPluginPostHog", "__createPostHogForTesting"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) PRODUCT_NAME, PACKAGE_NAME, EVENT_NAME, LEGACY_PARENT_PACKAGE, PRODUCT_ENV_PREFIX
+    "packages/omo-codex/src/telemetry/product-identity.ts": ["PRODUCT_NAME", "PACKAGE_NAME", "EVENT_NAME", "LEGACY_PARENT_PACKAGE", "PRODUCT_ENV_PREFIX"]
+  }
+}
