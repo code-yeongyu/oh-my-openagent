@@ -77,7 +77,7 @@ export async function openDesktopSyncAccount(wire: DesktopSyncEngineWire, home?:
   const signal = AbortSignal.any([wire.signal, retired.signal])
   signal.addEventListener("abort", stopListening, { once: true })
   try {
-    return await openAccount(wire, signal, home)
+    return await openAccount(wire, signal, home, () => retired.abort())
   } catch (error) {
     retired.abort()
     throw error
@@ -88,6 +88,7 @@ async function openAccount(
   wire: DesktopSyncEngineWire,
   signal: AbortSignal,
   home: string | undefined,
+  end: () => void,
 ): Promise<DesktopSyncAccount> {
   const descriptor: DesktopSyncDescriptor = SyncDescriptor.parse(await wire.request({ op: "descriptor" }))
   const boundary = desktopSyncBoundary(descriptor, signal, home)
@@ -210,11 +211,17 @@ async function openAccount(
     async isCurrent() {
       if (signal.aborted) return false
       const current = SyncDescriptor.parse(await wire.request({ op: "descriptor" }))
-      if (signal.aborted || !sameDescriptor(current, descriptor)) return false
-      return boundary(() => true).then(
-        () => true,
-        () => false,
-      )
+      const live =
+        !signal.aborted &&
+        sameDescriptor(current, descriptor) &&
+        (await boundary(() => true).then(
+          () => true,
+          () => false,
+        ))
+      // Callers replace an account that is not current (the account source opens main's next one), so it ends here:
+      // its `retired` listener leaves the channel and sessions on it end, with or without a `retired` event.
+      if (!live) end()
+      return live
     },
   }
 }
