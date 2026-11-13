@@ -24,7 +24,8 @@ pub struct Admission {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Blocked {
     pub stage: String,
-    pub refused: Refused,
+    /// Boxed so the admission's error stays small (clippy result_large_err).
+    pub refused: Box<Refused>,
 }
 
 const fn window_of<'a>(target: &TargetRef<'a>) -> Option<&'a str> {
@@ -73,7 +74,7 @@ impl Session {
                 Err(ended) => {
                     return Err(Blocked {
                         stage: "Pause".to_owned(),
-                        refused: Refused::from(ended.refusal).with_paused(ended.paused),
+                        refused: Box::new(Refused::from(ended.refusal).with_paused(ended.paused)),
                     })
                 }
             }
@@ -97,13 +98,13 @@ impl Session {
             });
             return Err(Blocked {
                 stage: format!("{:?}", refused.gate),
-                refused: out,
+                refused: Box::new(out),
             });
         }
         if let Some(refusal) = route_refusal(&sample(self.backend.as_ref()), route) {
             return Err(Blocked {
                 stage: "Route".to_owned(),
-                refused: Refused::from(refusal).with_paused(paused),
+                refused: Box::new(Refused::from(refusal).with_paused(paused)),
             });
         }
         if let Some((refusal, target)) = unresponsive(self.backend.as_ref(), window) {
@@ -111,7 +112,7 @@ impl Session {
             refused.stamps.target = Some(target);
             return Err(Blocked {
                 stage: "Liveness".to_owned(),
-                refused,
+                refused: Box::new(refused),
             });
         }
         if pid.is_none() {
