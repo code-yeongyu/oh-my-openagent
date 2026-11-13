@@ -1,7 +1,6 @@
 import { expect, test } from "bun:test"
 import * as shared from "../../shared"
 import * as messageDir from "../../shared/opencode-message-dir"
-import * as storageDetection from "../../shared/opencode-storage-detection"
 import * as storagePaths from "../../shared/opencode-storage-paths"
 import * as constants from "./constants"
 import * as sessionManager from "./index"
@@ -23,11 +22,11 @@ test("later file: no storage path or helper still points into a session-manager 
   }
   expect(Object.entries(pointers).filter(([, path]) => path?.includes("omo-test-session-manager-"))).toEqual([])
   // The storage files tag their fixture functions; a leaked mock is caught by its tag, not by what it returns,
-  // because a fixture getMessageDir returns null once its directory is gone, exactly like the real one.
+  // because a fixture getMessageDir returns null once its directory is gone, exactly like the real one. Only a
+  // re-exporter (the shared barrel) can keep a stale binding: the preload restores every module a file mocks
+  // directly after each test, so the barrel's getMessageDir is the one helper this can catch.
   const helpers: Record<string, unknown> = {
     "shared.getMessageDir": shared.getMessageDir,
-    "messageDir.getMessageDir": messageDir.getMessageDir,
-    "storageDetection.isSqliteBackend": storageDetection.isSqliteBackend,
   }
   expect(
     Object.entries(helpers).filter(([, helper]) => Reflect.get(Object(helper), "__sessionManagerFixture") === true),
