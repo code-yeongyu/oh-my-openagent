@@ -109,7 +109,7 @@ const readRecoveryKey = (value: JsonObject): RecoveryKey | null => {
   if (credentialId === null || rpId === null || nonce === null || sealing === null || signing === null) return null
   const kind = recoveryKindOf(value["survivable"], rpId, credentialId)
   if (kind === null) return null
-  const ordered = (rp_id: string) => ({
+  const ordered = <RpId extends string>(rp_id: RpId) => ({
     credential_id: credentialId,
     rp_id,
     enrollment_nonce: nonce,
@@ -117,7 +117,7 @@ const readRecoveryKey = (value: JsonObject): RecoveryKey | null => {
     signing_public_key: signing,
   })
   return kind === "phrase"
-    ? { ...ordered(PHRASE_RECOVERY_RP_ID), rp_id: PHRASE_RECOVERY_RP_ID, survivable: kind }
+    ? { ...ordered(PHRASE_RECOVERY_RP_ID), survivable: kind }
     : { ...ordered(rpId), survivable: kind }
 }
 
