@@ -14,13 +14,12 @@
       ],
       "reason": "upstream now imports ../vendored/strict-ed25519.ts, outside the vendored set; memory-core keeps crypto/strict-ed25519"
     },
-    "pending_upstream": {
-      "commit": "b376b5ad072f01bcef4889f073cd9dd418dc6484",
-      "pr": "sisyphuslabs/omo-service#1068",
+    "files_at": {
+      "commit": "45f13ee1e361b6f7a385ef85cb011a6dceddd691",
       "files": [
         "fixtures/sync-v1/phrase-chain.json"
       ],
-      "reason": "phrase vectors (A3 M6); re-pin to the merge commit once #1068 merges"
+      "reason": "phrase vectors (A3 M6), vendored from main at the merge of #1068"
     }
   },
   "files": {

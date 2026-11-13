@@ -45,6 +45,17 @@ const main = () => fixture.main.map(record)
 const forked = () => [...main(), ...fixture.branches.fork.map(record)]
 
 describe("omo-service phrase vectors (#1068) read by the engine", () => {
+  // Supply-chain contract: vendored vectors come from a MERGED service commit, never an open PR head.
+  test("the vendored phrase vectors are pinned to omo-service main after #1068 merged, not to the PR head", () => {
+    const manifest = JSON.parse(readFileSync(resolve(FIXTURES, "../../manifest.json"), "utf8"))
+    expect(manifest.source.pending_upstream).toBeUndefined()
+    expect(manifest.source.files_at).toEqual({
+      commit: "45f13ee1e361b6f7a385ef85cb011a6dceddd691",
+      files: ["fixtures/sync-v1/phrase-chain.json"],
+      reason: "phrase vectors (A3 M6), vendored from main at the merge of #1068",
+    })
+  })
+
   test("the vendored file is the pinned service file, byte for byte", () => {
     expect(createHash("sha256").update(bytes).digest("hex")).toBe(PHRASE_CHAIN_SHA256)
   })
