@@ -24,11 +24,26 @@ const drive = async (type: ReadonlyArray<string>, env: Record<string, string | u
   dirs.push(dir)
   const [out, err, pty] = ["stdout.txt", "stderr.txt", "pty.txt"].map((name) => join(dir, name))
   const child = Bun.spawn(
-    ["python3", join(import.meta.dir, "fixtures/pty-drive-recover.py"), join(import.meta.dir, "fixtures/sync-recover-phrase-pty.fixture.ts"), out ?? "", err ?? "", pty ?? ""],
+    [
+      "python3",
+      join(import.meta.dir, "fixtures/pty-drive-recover.py"),
+      join(import.meta.dir, "fixtures/sync-recover-phrase-pty.fixture.ts"),
+      out ?? "",
+      err ?? "",
+      pty ?? "",
+    ],
     {
       stdout: "pipe",
       stderr: "pipe",
-      env: { ...process.env, TMPDIR: dir, PI_CODING_AGENT: undefined, AI_AGENT: undefined, CI: undefined, PTY_TYPE: type.join("|"), ...env },
+      env: {
+        ...process.env,
+        TMPDIR: dir,
+        PI_CODING_AGENT: undefined,
+        AI_AGENT: undefined,
+        CI: undefined,
+        PTY_TYPE: type.join("|"),
+        ...env,
+      },
     },
   )
   const exit = await child.exited
@@ -40,43 +55,59 @@ const drive = async (type: ReadonlyArray<string>, env: Record<string, string | u
 // redirected to files, no typed word reaches either, on success and on every refusal path.
 const posix = test.skipIf(process.platform === "win32")
 
-posix("#given the enrolled phrase typed on a real pty #when omo sync recover runs #then it recovers and no typed word reaches stdout or stderr", async () => {
-  const r = await drive([ENROLLED.join(" ")])
-  expect(r.exit).toBe(0)
-  expect(r.stdout).toContain("recovered")
-  const written = tokens(`${r.stdout}\n${r.stderr}`)
-  expect(ENROLLED.filter((word) => written.has(word))).toEqual([])
-  // Echo stays off while the phrase is typed (review LOW, #13338): no typed word appears on the terminal either.
-  const screen = tokens(r.screen)
-  expect(ENROLLED.filter((word) => screen.has(word))).toEqual([])
-}, 60_000)
+posix(
+  "#given the enrolled phrase typed on a real pty #when omo sync recover runs #then it recovers and no typed word reaches stdout or stderr",
+  async () => {
+    const r = await drive([ENROLLED.join(" ")])
+    expect(r.exit).toBe(0)
+    expect(r.stdout).toContain("recovered")
+    const written = tokens(`${r.stdout}\n${r.stderr}`)
+    expect(ENROLLED.filter((word) => written.has(word))).toEqual([])
+    // Echo stays off while the phrase is typed (review LOW, #13338): no typed word appears on the terminal either.
+    const screen = tokens(r.screen)
+    expect(ENROLLED.filter((word) => screen.has(word))).toEqual([])
+  },
+  60_000,
+)
 
-posix("#given a mistyped phrase twice then Ctrl+C #when omo sync recover runs #then the typo reason is shown on the terminal only and nothing is recovered", async () => {
-  const typo = [...ENROLLED.slice(0, 23), ENROLLED[23] === "zoo" ? "abandon" : "zoo"].join(" ")
-  const r = await drive([typo, typo])
-  expect(r.exit).toBe(1)
-  expect(r.screen).toContain("check for a typo")
-  expect(r.stderr).toContain("cancelled")
-  const written = tokens(`${r.stdout}\n${r.stderr}`)
-  expect(ENROLLED.filter((word) => written.has(word))).toEqual([])
-}, 60_000)
+posix(
+  "#given a mistyped phrase twice then Ctrl+C #when omo sync recover runs #then the typo reason is shown on the terminal only and nothing is recovered",
+  async () => {
+    const typo = [...ENROLLED.slice(0, 23), ENROLLED[23] === "zoo" ? "abandon" : "zoo"].join(" ")
+    const r = await drive([typo, typo])
+    expect(r.exit).toBe(1)
+    expect(r.screen).toContain("check for a typo")
+    expect(r.stderr).toContain("cancelled")
+    const written = tokens(`${r.stdout}\n${r.stderr}`)
+    expect(ENROLLED.filter((word) => written.has(word))).toEqual([])
+  },
+  60_000,
+)
 
-posix("#given a valid phrase that this account never enrolled #when omo sync recover runs #then it refuses as history-incomplete and none of its words reach stdout or stderr", async () => {
-  const other = words(99)
-  const r = await drive([other.join(" ")])
-  expect(r.exit).toBe(1)
-  expect(r.stderr).toContain("history looks incomplete")
-  const written = tokens(`${r.stdout}\n${r.stderr}`)
-  expect(other.filter((word) => written.has(word))).toEqual([])
-}, 60_000)
+posix(
+  "#given a valid phrase that this account never enrolled #when omo sync recover runs #then it refuses as history-incomplete and none of its words reach stdout or stderr",
+  async () => {
+    const other = words(99)
+    const r = await drive([other.join(" ")])
+    expect(r.exit).toBe(1)
+    expect(r.stderr).toContain("history looks incomplete")
+    const written = tokens(`${r.stdout}\n${r.stderr}`)
+    expect(other.filter((word) => written.has(word))).toEqual([])
+  },
+  60_000,
+)
 
 for (const marker of ["PI_CODING_AGENT", "AI_AGENT", "CI"] as const) {
-  posix(`#given ${marker} set in the environment #when omo sync recover runs on a real pty #then it refuses with exit 2 and never asks for the phrase`, async () => {
-    const r = await drive([ENROLLED.join(" ")], { [marker]: "1" })
-    expect(r.exit).toBe(2)
-    expect(r.stderr).toContain("Run `omo sync recover` yourself in a terminal.")
-    expect(r.screen).not.toContain("Type your 24-word recovery phrase")
-  }, 60_000)
+  posix(
+    `#given ${marker} set in the environment #when omo sync recover runs on a real pty #then it refuses with exit 2 and never asks for the phrase`,
+    async () => {
+      const r = await drive([ENROLLED.join(" ")], { [marker]: "1" })
+      expect(r.exit).toBe(2)
+      expect(r.stderr).toContain("Run `omo sync recover` yourself in a terminal.")
+      expect(r.screen).not.toContain("Type your 24-word recovery phrase")
+    },
+    60_000,
+  )
 }
 
 // Detaches from any controlling terminal with Python's os.setsid (macOS ships no `setsid` binary; review MEDIUM,
@@ -104,43 +135,58 @@ const DETACH = [
   "sys.exit(os.waitstatus_to_exitcode(status))",
 ].join("\n")
 
-posix("#given no controlling terminal (new session, the phrase piped on stdin) #when omo sync recover runs #then it refuses with exit 2 before asking for a phrase and no piped word reaches its output", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "omo-recover-notty-"))
-  dirs.push(dir)
-  const child = Bun.spawn(["python3", "-c", DETACH, "bun", join(import.meta.dir, "fixtures/sync-recover-phrase-pty.fixture.ts")], {
-    stdin: new TextEncoder().encode(`${ENROLLED.join(" ")}\n`),
-    stdout: "pipe",
-    stderr: "pipe",
-    // Its own kill deadline (review LOW, #13338), so a hang never outlives the test.
-    timeout: 30_000,
-    killSignal: "SIGTERM",
-    env: { ...process.env, TMPDIR: dir, PI_CODING_AGENT: undefined, AI_AGENT: undefined, CI: undefined },
-  })
-  const [exit, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
-  expect(exit).toBe(2)
-  expect(stderr).toContain("Run `omo sync recover` yourself in a terminal.")
-  expect(ENROLLED.filter((word) => tokens(`${stdout}\n${stderr}`).has(word))).toEqual([])
-}, 60_000)
+posix(
+  "#given no controlling terminal (new session, the phrase piped on stdin) #when omo sync recover runs #then it refuses with exit 2 before asking for a phrase and no piped word reaches its output",
+  async () => {
+    const dir = await mkdtemp(join(tmpdir(), "omo-recover-notty-"))
+    dirs.push(dir)
+    const child = Bun.spawn(
+      ["python3", "-c", DETACH, "bun", join(import.meta.dir, "fixtures/sync-recover-phrase-pty.fixture.ts")],
+      {
+        stdin: new TextEncoder().encode(`${ENROLLED.join(" ")}\n`),
+        stdout: "pipe",
+        stderr: "pipe",
+        // Its own kill deadline (review LOW, #13338), so a hang never outlives the test.
+        timeout: 30_000,
+        killSignal: "SIGTERM",
+        env: { ...process.env, TMPDIR: dir, PI_CODING_AGENT: undefined, AI_AGENT: undefined, CI: undefined },
+      },
+    )
+    const [exit, stdout, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ])
+    expect(exit).toBe(2)
+    expect(stderr).toContain("Run `omo sync recover` yourself in a terminal.")
+    expect(ENROLLED.filter((word) => tokens(`${stdout}\n${stderr}`).has(word))).toEqual([])
+  },
+  60_000,
+)
 
-posix("#given a detached child that hangs #when the spawn deadline fires #then the wrapper ends the child's whole session, so nothing outlives the test", async () => {
-  const child = Bun.spawn(["python3", "-c", DETACH, "sh", "-c", "echo $$; exec sleep 30"], {
-    stdout: "pipe",
-    stderr: "pipe",
-    timeout: 1_000,
-    killSignal: "SIGTERM",
-  })
-  const reader = child.stdout.getReader()
-  const first = await reader.read()
-  const pid = Number(new TextDecoder().decode(first.value).trim())
-  expect(Number.isSafeInteger(pid) && pid > 1).toBe(true)
-  await child.exited
-  const alive = (() => {
-    try {
-      process.kill(pid, 0)
-      return true
-    } catch {
-      return false
-    }
-  })()
-  expect(alive).toBe(false)
-}, 20_000)
+posix(
+  "#given a detached child that hangs #when the spawn deadline fires #then the wrapper ends the child's whole session, so nothing outlives the test",
+  async () => {
+    const child = Bun.spawn(["python3", "-c", DETACH, "sh", "-c", "echo $$; exec sleep 30"], {
+      stdout: "pipe",
+      stderr: "pipe",
+      timeout: 1_000,
+      killSignal: "SIGTERM",
+    })
+    const reader = child.stdout.getReader()
+    const first = await reader.read()
+    const pid = Number(new TextDecoder().decode(first.value).trim())
+    expect(Number.isSafeInteger(pid) && pid > 1).toBe(true)
+    await child.exited
+    const alive = (() => {
+      try {
+        process.kill(pid, 0)
+        return true
+      } catch {
+        return false
+      }
+    })()
+    expect(alive).toBe(false)
+  },
+  20_000,
+)
