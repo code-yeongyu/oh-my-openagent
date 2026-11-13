@@ -14,6 +14,10 @@ mod xi2;
 #[cfg(test)]
 pub(crate) mod fake;
 #[cfg(test)]
+mod overlay_tests;
+#[cfg(test)]
+mod self_set_tests;
+#[cfg(test)]
 mod tests;
 
 use std::sync::atomic::{AtomicU64, Ordering};
