@@ -1,0 +1,6 @@
+# SP-W sway config: two headless outputs side by side, nothing else.
+output HEADLESS-1 resolution 1280x800 position 0 0
+output HEADLESS-2 resolution 1024x768 position 1280 0
+default_border none
+focus_follows_mouse no
+xwayland disable
