@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { copyRepo, isObject, knipConfig, REPO_ROOT, repoFiles, runKnip, unusedExports } from "./knip-run.ts"
 
 // Coverage never shrinks: every file whose exports knip checks under the baseline config must still
-// have them checked under knip.jsonc.
+// have them checked under the composed config (knip.ts).
 //
 // Baseline: the committed copy script/knip-coverage-baseline.jsonc (origin/dev had no knip config, so it
 // is this check's first knip.jsonc, commit 65be072d06), read at test time. It is a floor; lowering it is a
@@ -14,7 +14,7 @@ import { copyRepo, isObject, knipConfig, REPO_ROOT, repoFiles, runKnip, unusedEx
 // every source file knip can see (.ts/.tsx/.mts/.cts/.js/.jsx/.mjs/.cjs, minus .d.*), knip runs once per
 // config with `--reporter json`, and a file is checked when its probe is reported.
 //
-// Pre-existing unused exports are named per symbol in knip.jsonc `preprocessorOptions.preExistingExports` and dropped by
+// Pre-existing unused exports are named per symbol in each directory's knip.workspace.jsonc `preExistingExports` and dropped by
 // script/knip-preexisting-exports.ts, shared byte for byte with sisyphuslabs/omo-relay-daemon (scripts/ there; its header
 // comment names that repo's test path). The sha256 pin below keeps the copies equal; update both repos together.
 
@@ -69,7 +69,7 @@ describe("knip coverage never shrinks", () => {
   })
 
   test(
-    "every file export-checked by the baseline config is export-checked by knip.jsonc",
+    "every file export-checked by the baseline config is export-checked by the composed config",
     async () => {
       const files = repoFiles().filter((file) => SOURCE.test(file) && !DECLARATION.test(file))
       expect(files.length).toBeGreaterThan(0)
@@ -89,10 +89,12 @@ describe("knip coverage never shrinks", () => {
         const head = new Set(await checked([]))
         const lost = base.filter((file) => !head.has(file))
         console.log(
-          `knip-coverage: ${files.length} files probed, baseline checks ${base.length}, knip.jsonc checks ${head.size}, lost ${lost.length}, gained ${head.size - (base.length - lost.length)}`,
+          `knip-coverage: ${files.length} files probed, baseline checks ${base.length}, composed config checks ${head.size}, lost ${lost.length}, gained ${head.size - (base.length - lost.length)}`,
         )
         expect(base.length).toBeGreaterThan(0)
-        expect(lost.map((file) => `${file} (export-checked by the baseline config, not by knip.jsonc)`)).toEqual([])
+        expect(
+          lost.map((file) => `${file} (export-checked by the baseline config, not by the composed config)`),
+        ).toEqual([])
       })
     },
     KNIP_TIMEOUT_MS,
