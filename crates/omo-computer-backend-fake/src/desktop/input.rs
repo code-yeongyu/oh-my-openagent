@@ -15,6 +15,7 @@ fn event_line(event: &InputEvent) -> String {
         InputEvent::Key { key, down } => format!("key {} down={down}", quoted(key)),
         InputEvent::Scroll { dx, dy } => format!("scroll dx={dx} dy={dy}"),
         InputEvent::Text(text) => format!("text {}", quoted(text)),
+        row25 => super::shell::event_line(row25),
     }
 }
 

@@ -45,7 +45,7 @@ impl Backend for FakeBackend {
     }
 
     fn probe_permissions(&self) -> PermissionProbe {
-        session::granted_permissions()
+        self.scripted_permissions()
     }
 
     fn epoch_source(&mut self) -> Box<dyn EpochSource> {
@@ -134,10 +134,17 @@ impl Backend for FakeBackend {
     fn host_consent(&self) -> Option<serde_json::Value> {
         self.scripted_host_consent()
     }
+
+    // --- Row 25: menus, apps, system surfaces and the focused web area's URL. ---
+
+    fn shell_reader(&mut self) -> Option<&mut dyn omo_computer_core::surface::ShellReader> {
+        Some(self)
+    }
 }
 
 
 mod posts;
+mod shell;
 
 #[cfg(test)]
 mod extent_tests;

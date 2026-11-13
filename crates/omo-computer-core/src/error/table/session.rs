@@ -15,6 +15,7 @@ pub(super) static ROWS: &[ErrorRow] = &[
     e!(Internal, _ => Internal, UNK, No, None, "win.observe()"),
     e!(Internal, WaylandNoPointerRead => Unavailable, NDS, Yes, INSPECT, "win.move(x, y)"),
     e!(Internal, SurfaceUnsupported => Unavailable, NDS, Yes, INSPECT, "computer.window(sel)"),
+    e!(Internal, RouteTableInvalid => Unavailable, NDAU, Yes, INSPECT, "computer.diagnose({ hand })"),
     e!(Internal, NoNotificationSurface => Unavailable, NDS, Yes, INSPECT, "computer.capabilities()"),
     e!(Internal, LaunchNeedsUser => Unavailable, NDAU, Yes, ASK, "computer.diagnose()"),
     e!(Internal, RequestTooLarge => InvalidArguments, NDS, Yes, INSPECT, "the same call with a smaller request"),

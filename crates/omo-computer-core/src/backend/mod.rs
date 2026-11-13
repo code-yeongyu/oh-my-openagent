@@ -12,7 +12,7 @@ pub use refusal::{BackendResult, Refusal};
 pub use refusing::{refusing_capabilities, unknown_session_state};
 pub use sources::{AxEventSource, EpochSource, NoAxEvents, NoEpochSource, Presence, StopListener};
 pub use types::{
-    AxEvent, AxSnapshot, CaptureOptions, Delivered, EpochChange, FrameBytes, InputEvent,
+    AxEvent, AxSnapshot, BackendProbes, CaptureOptions, Delivered, EpochChange, FrameBytes, InputEvent,
     PermissionProbe, Ref, Resolved, Route, Semantic, SnapshotRequest, TaggedInput, Target,
     WindowFilter, WindowList,
 };
@@ -69,6 +69,11 @@ pub trait Backend: Send {
     }
 
     /// The tri-state permission read; never prompts. Unknown by default, which is never granted.
+    /// R62: the backend's own doctor checks; `None` (the default) adds nothing to `diagnose`.
+    fn diagnose(&self) -> Option<BackendProbes> {
+        None
+    }
+
     fn probe_permissions(&self) -> PermissionProbe {
         PermissionProbe {
             capture: PermissionState::Unknown,
@@ -211,6 +216,13 @@ pub trait Backend: Send {
     /// wrote it (`design/d-safety.md` '## Approval and consent'). `None`: no host view, and the
     /// session keeps its default view.
     fn host_consent(&self) -> Option<serde_json::Value> {
+        None
+    }
+
+    // --- Row 25: menus, apps, system surfaces and the focused web area's URL. ---
+
+    /// The shell reads; `None` reads `AxUnsupported`.
+    fn shell_reader(&mut self) -> Option<&mut dyn crate::surface::ShellReader> {
         None
     }
 }

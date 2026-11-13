@@ -43,6 +43,8 @@ pub(super) struct Sent {
     pub(super) user_moved_on: bool,
     /// Row 24: a value verb's read-back verdict (disposition, evidence, next call).
     pub(super) read_back: Option<crate::value_verbs::ReadBack>,
+    /// Row 25: the browser window's URL could not be read under a non-empty `url_policy`.
+    pub(super) url_unknown: bool,
 }
 
 /// # Errors
@@ -77,6 +79,9 @@ pub(super) fn reply(
         audit_ids: sent.audit_id.into_iter().collect(),
         timings: None,
         evidence: sent.read_back.map(|r| r.evidence).unwrap_or_default(),
+        url_policy: sent
+            .url_unknown
+            .then_some(omo_computer_core::url_policy::UrlPolicyStamp::Unknown),
         observation: UntrustedText,
         paused: sent.paused,
         session: sent.session,

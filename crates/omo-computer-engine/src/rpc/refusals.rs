@@ -25,11 +25,7 @@ pub(super) fn refused(refusal: &Refusal) -> Failure {
     if let Err(unknown) = refusal.row() {
         eprintln!("omo-computer-engine: {unknown}");
     }
-    let mut data = json!({ "code": refusal.code.wire(), "hint": null });
-    if let Some(reason) = refusal.reason {
-        data["reason"] = json!(reason);
-    }
-    failure(refusal.code.number(), refusal.code.wire(), Some(data))
+    failure(refusal.code.number(), refusal.code.wire(), Some(refusal.wire_data()))
 }
 
 /// R60c: a refusal whose row reads its disposition from the inner stage (a gated drag point)
