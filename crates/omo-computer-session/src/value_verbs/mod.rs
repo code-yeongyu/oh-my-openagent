@@ -20,6 +20,8 @@ pub enum Write {
     Focus { reference: String },
     /// `ax.typeText` by AX insertion into a native text field.
     Insert { reference: String, text: String },
+    /// `ax.selectText`: a range in UTF-16 units.
+    Select { reference: String, range: omo_computer_core::text_range::Utf16Range },
     /// `ax.perform`: a named action; never `confirmed` from a read-back (an observer event or a
     /// read can only make it `observed`).
     Perform { reference: String, action: String },
@@ -107,6 +109,7 @@ impl Session {
             }
             Write::Focus { reference } => ax.focus(&Ref(reference.clone())),
             Write::Insert { reference, text } => ax.insert_text(&Ref(reference.clone()), text),
+            Write::Select { reference, range } => ax.select_range(&Ref(reference.clone()), *range),
             Write::Perform { reference, action } => ax.perform(&Ref(reference.clone()), &Semantic(action.clone())),
             Write::SetFrame { .. } | Write::Minimized { .. } | Write::Clipboard { .. } | Write::Paste { .. } => {
                 unreachable!("non-AX writes return above")
@@ -187,6 +190,7 @@ fn outcome_of(sent: Result<omo_computer_core::backend::Delivered, Refusal>) -> O
 
 mod dispatch;
 mod keys;
+mod select;
 mod verbs;
 
 #[cfg(test)]

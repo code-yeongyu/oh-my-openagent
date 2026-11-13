@@ -41,7 +41,7 @@ impl Session {
     }
 
     /// The window an element ref lives in.
-    fn ref_window(&mut self, reference: &str) -> Result<String, Refused> {
+    pub(crate) fn ref_window(&mut self, reference: &str) -> Result<String, Refused> {
         let ax = self
             .backend
             .ax()

@@ -37,6 +37,7 @@ impl Session {
             Method::AxTypeText => serde_json::from_value::<omo_computer_core::params::AxTypeTextParams>(params)
                 .map_err(HostCallError::Params)
                 .and_then(|p| self.ax_type_text(p).map(|r| json!(r)).map_err(HostCallError::Refused)),
+            Method::AxSelectText => exec::<omo_computer_core::params::SelectTextParams>(self, params, Self::ax_select_text),
             Method::AxSnapshot => serde_json::from_value(params)
                 .map_err(HostCallError::Params)
                 .and_then(|p| self.ax_snapshot(p).map(|s| json!(s)).map_err(HostCallError::Refused)),

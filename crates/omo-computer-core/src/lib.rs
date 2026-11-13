@@ -4,6 +4,7 @@ pub mod ax;
 pub mod backend;
 pub mod capabilities;
 pub mod clipboard;
+pub mod text_range;
 pub mod doc;
 pub mod env;
 pub mod error;

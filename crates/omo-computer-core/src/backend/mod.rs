@@ -263,6 +263,14 @@ pub trait AxBackend {
         Err(Refusal::new(EngineCode::AxUnsupported, crate::error::Reason::PerformUnsupported.wire()))
     }
 
+    /// Row 24: selects `range` (UTF-16 units) inside the element's value (`ax.selectText`).
+    ///
+    /// # Errors
+    /// `AxUnsupported{perform_unsupported}` by default, with nothing sent.
+    fn select_range(&mut self, _reference: &Ref, _range: crate::text_range::Utf16Range) -> BackendResult<Delivered> {
+        Err(Refusal::new(EngineCode::AxUnsupported, crate::error::Reason::PerformUnsupported.wire()))
+    }
+
     /// Row 24: focuses the element (`ax.focus`).
     ///
     /// # Errors

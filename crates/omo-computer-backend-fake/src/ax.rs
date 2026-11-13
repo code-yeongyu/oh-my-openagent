@@ -174,6 +174,17 @@ impl AxBackend for FakeBackend {
         })
     }
 
+    fn select_range(&mut self, reference: &Ref, range: omo_computer_core::text_range::Utf16Range) -> BackendResult<Delivered> {
+        self.call(FakeMethod::AxPerform, |state, outcome| {
+            lookup(state, reference)?;
+            self.sink.record(format!("ax_select ref={} start={} length={}", reference.0, range.start, range.length));
+            if outcome == CallOutcome::CannotComplete {
+                return Err(Refusal::bare(EngineCode::AxUnconfirmed));
+            }
+            Ok(Delivered { count: 1, of: 1 })
+        })
+    }
+
     fn focus(&mut self, reference: &Ref) -> BackendResult<Delivered> {
         self.call(FakeMethod::AxFocus, |state, outcome| {
             lookup(state, reference)?;
