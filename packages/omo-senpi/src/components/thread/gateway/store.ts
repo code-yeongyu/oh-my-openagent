@@ -364,6 +364,7 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     toolReceiptBegin: (request) => call("tool_receipt_begin", request),
     toolReceiptSettle: (request) => call("tool_receipt_settle", request),
     toolReceiptRevise: (request) => call("tool_receipt_revise", request),
+    toolReceiptRelease: (request) => call("tool_receipt_release", request),
     bind: (request) => call("bind", request),
     unbind: (request) => call("unbind", request),
     rebind: (request) => call("rebind", request),

@@ -87,6 +87,7 @@ export function createRemoteThreadFixture() {
       promptOutcome?: RemoteCommandOutcome
       admitRefuse?: string
       admitOutcome?: RemoteCommandOutcome
+      stateOutcomes?: readonly RemoteCommandOutcome[]
       heldDraft?: number
       openData?: JsonObject
       failSessionsList?: boolean
@@ -113,6 +114,8 @@ export function createRemoteThreadFixture() {
     // admissions its user's open draft still holds (held_draft, taken by nothing).
     const admitted = new Set<string>()
     let heldDraft = options.heldDraft ?? 0
+    // How b's next get_state calls end before its engine answers them (a lost reply, a restarted hand), one per call.
+    const stateOutcomes = [...(options.stateOutcomes ?? [])]
     // The session's records a prompt makes it write, delivered to every watch after the prompt is answered.
     const watchers = new Set<(record: JsonObject) => void>()
     const writeRecords = () =>
@@ -161,6 +164,7 @@ export function createRemoteThreadFixture() {
         live.add(opened)
         return ok(options.openData ?? { sessionId: "rpc-9", state: { durableSessionId: opened } })
       }
+      if (rpc["type"] === "get_state" && stateOutcomes.length > 0) return stateOutcomes.shift() as RemoteCommandOutcome
       if (rpc["type"] === "get_state")
         return ok({
           isStreaming: engine.streaming,

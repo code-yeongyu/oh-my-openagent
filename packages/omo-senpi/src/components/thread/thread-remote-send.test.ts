@@ -256,6 +256,54 @@ describe("remote == local, round 2: send modes, handoff and the unknown caller",
     expect(String(record["text"])).toContain(" requested=steer effective=steer ")
   })
 
+  test("#given b's get_state ends uncertain #when a steer probes b #then nothing was written, so it is host_unavailable with no admit record, and a retry under the same key probes again and steers", async () => {
+    const a = account({
+      engine: { ...ENGINE, streaming: true, pending: 0, currentTurnId: "3" },
+      stateOutcomes: [{ kind: "uncertain", reason: "unconfirmed" }],
+    })
+    const { run } = surface(a.remote)
+    const args = {
+      thread: "dur-on-b",
+      message: "x",
+      delivery: "steer",
+      expected_turn_id: "3",
+      idempotency_key: "k-probe",
+    } as const
+    expect(await run("thread_send", args)).toMatchObject({
+      kind: "error",
+      error: { code: "host_unavailable", details: { device: "b", reason: "unconfirmed" } },
+    })
+    expect(commands(a.sent)).toEqual(["get_state"])
+    expect(await run("thread_send", args)).toMatchObject({
+      kind: "ok",
+      device: "b",
+      deduplicated: false,
+      delivery: { kind: "steered", turn_id: "3" },
+    })
+    expect(commands(a.sent)).toEqual(["get_state", "get_state", ADMIT])
+  })
+
+  test("#given b's get_state ends uncertain #when a default-mode send probes b #then nothing was written, so it is host_unavailable with no admit record, and a retry under the same key probes again and sends", async () => {
+    const a = account({
+      engine: { ...ENGINE, streaming: true, pending: 0, currentTurnId: "3" },
+      stateOutcomes: [{ kind: "uncertain", reason: "unconfirmed" }],
+    })
+    const { run } = surface(a.remote)
+    const args = { thread: "dur-on-b", message: "x", idempotency_key: "k-probe-auto" } as const
+    expect(await run("thread_send", args)).toMatchObject({
+      kind: "error",
+      error: { code: "host_unavailable", details: { device: "b", reason: "unconfirmed" } },
+    })
+    expect(commands(a.sent)).toEqual(["get_state"])
+    expect(await run("thread_send", args)).toMatchObject({
+      kind: "ok",
+      device: "b",
+      deduplicated: false,
+      delivery: { kind: "steered", turn_id: "3" },
+    })
+    expect(commands(a.sent)).toEqual(["get_state", "get_state", ADMIT])
+  })
+
   test("#given b is mid-turn on another turn #when a steer names an older turn #then it is turn_conflict and nothing is admitted", async () => {
     const a = account({ engine: { ...ENGINE, streaming: true, pending: 0, currentTurnId: "4" } })
     const { run } = surface(a.remote)

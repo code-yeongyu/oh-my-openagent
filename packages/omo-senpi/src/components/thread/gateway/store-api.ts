@@ -105,6 +105,8 @@ export type GatewayStore = ExtensionFacade & {
   readonly toolReceiptRevise: (
     request: ReceiptScope & { readonly now: number; readonly result: unknown },
   ) => Promise<boolean>
+  /** Drops this instance's `prepared` receipt for a call that wrote nothing, so the same key runs again; true when one was dropped. */
+  readonly toolReceiptRelease: (request: ReceiptScope) => Promise<boolean>
   readonly bind: (request: BindOpRequest) => Promise<RelayOutcome<{ readonly binding: BindingRecord } & Deduplicated>>
   readonly unbind: (request: CasRequest) => Promise<
     RelayOutcome<

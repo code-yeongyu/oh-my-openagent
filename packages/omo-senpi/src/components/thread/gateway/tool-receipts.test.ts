@@ -65,6 +65,21 @@ describe("tool receipts in the gateway store (replay, conflict, in_progress, unc
     expect(await b.toolReceiptBegin({ ...scope("k-3"), now, args_hash: "h-1" })).toEqual(expected)
   })
 
+  test("#given a call that wrote nothing #when its owner releases the receipt #then the key is accepted as a new call, while another instance's receipt and a settled one are never dropped", async () => {
+    const { a, b } = twoInstances()
+    const now = Date.now()
+    expect(await a.toolReceiptBegin({ ...scope("k-5"), now, args_hash: "h-1" })).toEqual({ kind: "accepted" })
+    expect(await b.toolReceiptRelease(scope("k-5"))).toBe(false)
+    expect(await a.toolReceiptRelease(scope("k-5"))).toBe(true)
+    expect(await b.toolReceiptBegin({ ...scope("k-5"), now, args_hash: "h-1" })).toEqual({ kind: "accepted" })
+    expect(await b.toolReceiptSettle({ ...scope("k-5"), now, result: { ok: true } })).toBe(true)
+    expect(await b.toolReceiptRelease(scope("k-5"))).toBe(false)
+    expect(await a.toolReceiptBegin({ ...scope("k-5"), now, args_hash: "h-1" })).toEqual({
+      kind: "replay",
+      result: { ok: true },
+    })
+  })
+
   test("#given receipts are kept thirty days #when a completed receipt is older than that #then the key is accepted as a new call", async () => {
     let clock = Date.now()
     const { a } = twoInstances(() => clock)
