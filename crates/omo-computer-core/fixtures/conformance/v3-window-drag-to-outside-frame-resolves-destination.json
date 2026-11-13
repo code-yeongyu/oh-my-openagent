@@ -1,5 +1,5 @@
 {
-  "description": "Row 23: a window-target drag whose destination leaves the window's frame resolves that point as a desktop verb does (here onto a denied app), so the whole drag is refused InvalidTarget{drag_destination} with the point, nothing sent.",
+  "description": "Row 23: a window-target drag whose destination leaves the window's frame resolves that point as a desktop verb does (here onto a denied app), so the whole drag is refused InvalidTarget{drag_destination} with the point, nothing sent. The refused point carries the stage pair (stageCode + stageReason, R60b) and that pair's own disposition and nextCall (R60c).",
   "transport": "stdio",
   "scenario": "crates/omo-computer-backend-fake/fixtures/v3-drag-destinations.json",
   "env": {
@@ -96,11 +96,11 @@
                   "stale": false
                 }
               },
-              "resumeToken": "d57d495a75aebfa33d4604268f102b5b"
+              "resumeToken": "1914fe808cc76974a2da80b73af7d683"
             }
           },
           "variable": [
-            "/result"
+            "/result/resumeToken"
           ]
         }
       ],
@@ -127,9 +127,7 @@
               "reason": null
             }
           },
-          "variable": [
-            "/result"
-          ]
+          "variable": []
         }
       ],
       "sink": 0
@@ -154,9 +152,7 @@
               "grantedAt": null
             }
           },
-          "variable": [
-            "/result"
-          ]
+          "variable": []
         }
       ],
       "sink": 0
@@ -176,7 +172,7 @@
             "jsonrpc": "2.0",
             "id": 4,
             "result": {
-              "frameId": "frame-f7552e1219c0db2a-1",
+              "frameId": "frame-bdc4335027c82e15-1",
               "target": "101",
               "width": 800,
               "height": 600,
@@ -203,7 +199,7 @@
             }
           },
           "variable": [
-            "/result"
+            "/result/frameId"
           ]
         }
       ],
@@ -251,17 +247,21 @@
                   "pauseReasons": [],
                   "sampledAt": 0
                 },
+                "disposition": {
+                  "delivery": "not_delivered",
+                  "retry": "after_user"
+                },
+                "nextCall": "another app or stop",
                 "point": {
                   "x": 1000,
                   "y": 80
                 },
-                "stageCode": "ControlRequired"
+                "stageCode": "ControlRequired",
+                "stageReason": "denied_app"
               }
             }
           },
-          "variable": [
-            "/error/data/session"
-          ]
+          "variable": []
         }
       ],
       "sink": 0

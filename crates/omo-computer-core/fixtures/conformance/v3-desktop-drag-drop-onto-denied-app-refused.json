@@ -1,5 +1,5 @@
 {
-  "description": "Row 23 (design k-safety B1, d-safety.md:242): a desktop drag whose drop point lands on a denied app (1password) is refused before the button-down, InvalidTarget{drag_destination} with the refused point and the refusing stage's code (stageCode, R55), and nothing is sent.",
+  "description": "Row 23 (design k-safety B1, d-safety.md:242): a desktop drag whose drop point lands on a denied app (1password) is refused before the button-down, InvalidTarget{drag_destination} with the refused point and the refusing stage's code (stageCode, R55), and nothing is sent. The refused point carries the stage pair (stageCode + stageReason, R60b) and that pair's own disposition and nextCall (R60c).",
   "transport": "stdio",
   "scenario": "crates/omo-computer-backend-fake/fixtures/v3-drag-destinations.json",
   "env": {
@@ -96,11 +96,11 @@
                   "stale": false
                 }
               },
-              "resumeToken": "e8782a601df1dd531d5b6c630260dc34"
+              "resumeToken": "87628efc9c8bb025e62cf562f55ce099"
             }
           },
           "variable": [
-            "/result"
+            "/result/resumeToken"
           ]
         }
       ],
@@ -127,9 +127,7 @@
               "reason": null
             }
           },
-          "variable": [
-            "/result"
-          ]
+          "variable": []
         }
       ],
       "sink": 0
@@ -154,9 +152,7 @@
               "grantedAt": null
             }
           },
-          "variable": [
-            "/result"
-          ]
+          "variable": []
         }
       ],
       "sink": 0
@@ -176,7 +172,7 @@
             "jsonrpc": "2.0",
             "id": 4,
             "result": {
-              "frameId": "frame-8aa2c77365728045-1",
+              "frameId": "frame-15e26601cd4b7c65-1",
               "target": "desktop",
               "width": 1920,
               "height": 1080,
@@ -203,7 +199,7 @@
             }
           },
           "variable": [
-            "/result"
+            "/result/frameId"
           ]
         }
       ],
@@ -251,17 +247,21 @@
                   "pauseReasons": [],
                   "sampledAt": 0
                 },
+                "disposition": {
+                  "delivery": "not_delivered",
+                  "retry": "after_user"
+                },
+                "nextCall": "another app or stop",
                 "point": {
                   "x": 1100,
                   "y": 200
                 },
-                "stageCode": "ControlRequired"
+                "stageCode": "ControlRequired",
+                "stageReason": "denied_app"
               }
             }
           },
-          "variable": [
-            "/error/data/session"
-          ]
+          "variable": []
         }
       ],
       "sink": 0
