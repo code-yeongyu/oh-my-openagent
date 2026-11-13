@@ -65,6 +65,8 @@ Each finding below is the release's own answer. Its class says how it was settle
 - **Windows, a background pixel drag in the list is refused `InputFailed`.**
 - **Foreground: every foreground cell except the accessibility value write and press is refused `ControlRequired`** (9 on each OS), which is the shipped answer when no person can approve foreground control.
 - **Electron and web-view content is not reachable.** On x11 every Electron cell is refused `AxFailed`; on Windows the Electron window lists only its frame and a `Chrome Legacy Window`, and the x11 web-view window lists only its menu bar. The web content is absent from the accessibility tree in all three. Whether the fixture apps must turn renderer accessibility on, or the release cannot read it, is open with the fixture apps' owner.
+- **Pending re-record: the 22 x11 Electron cells.** Their committed value (`AxFailed`) predates the x11 job setting `ACCESSIBILITY_ENABLED=1`. With it set, the same cells find the window but no page content (run 43358622643). They are re-recorded once the fixture app exposes its page.
+- **Run 43358622643's Windows job is not a finding.** It failed in this harness's own step that builds the Windows web-view fixture, before the release was installed; that step now runs only once the fixture app is in the tree.
 - The shipped runtime never reports whether input was sent with a refusal, so every refusal is recorded with `nothingSent: false`.
 
 ### Corrected by re-measurement
