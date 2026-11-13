@@ -202,7 +202,7 @@ describe("q3 pid-routed click against the default checkbox (three-leg instrument
     expect(answer.evidence).toContain("did not post")
   }, 30_000)
 
-  test("pid-routed events arrive and toggle nothing while the AX press control toggles: no is proven against that control", async () => {
+  test("pid-routed events arrive and toggle nothing, no global click toggled, the AX press toggles: unmeasured, since only the state oracle is proven", async () => {
     const { probe } = fakeProbe({
       doubleToggles: false,
       activatedToggles: false,
@@ -215,8 +215,7 @@ describe("q3 pid-routed click against the default checkbox (three-leg instrument
       axPressToggles: true,
     })
     const answer = await askPidClick(probe)
-    expect(answer.verdict).toBe("CONTRADICTS")
-    expect(answer.evidence).toContain("AX press control toggled")
+    expect(answer.verdict).toBe("UNMEASURED")
   }, 30_000)
 
   test("nothing toggles under any click and the AX press control fails too: the toggle oracle is unproven", async () => {
