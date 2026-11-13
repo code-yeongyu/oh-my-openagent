@@ -150,3 +150,24 @@ fn action_report_confirmed_requires_receipt() {
         "a Windows click with its barrier receipt: {barrier:?}"
     );
 }
+
+/// Review L2 (#13370): each `Timings` field states its own unit in the schema, and the type
+/// does not claim one unit for every field.
+#[test]
+fn every_timings_field_names_its_one_unit() {
+    let schema = serde_json::to_value(schemars::schema_for!(super::Timings)).expect("schema");
+    let described = schema["description"].as_str().unwrap_or_default();
+    assert!(
+        !described.contains("microseconds") && !described.contains("milliseconds"),
+        "the type names no single unit: {described}"
+    );
+    let properties = schema["properties"].as_object().expect("properties");
+    for (name, property) in properties {
+        let text = property["description"].as_str().unwrap_or_default();
+        let units = ["microseconds", "milliseconds"]
+            .iter()
+            .filter(|unit| text.to_lowercase().contains(*unit))
+            .count();
+        assert_eq!(units, 1, "{name} names exactly one unit: {text:?}");
+    }
+}
