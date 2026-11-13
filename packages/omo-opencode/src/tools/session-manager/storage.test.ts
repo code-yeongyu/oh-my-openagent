@@ -5,6 +5,9 @@ import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
+const storagePathsSnapshot = { ...(await import("../../shared/opencode-storage-paths")) }
+const constantsSnapshot = { ...(await import("./constants")) }
+
 const TEST_DIR = join(tmpdir(), `omo-test-session-manager-${randomUUID()}`)
 const TEST_MESSAGE_STORAGE = join(TEST_DIR, "message")
 const TEST_PART_STORAGE = join(TEST_DIR, "part")
@@ -63,6 +66,8 @@ mock.module("../../shared/opencode-message-dir", () => ({
 }))
 
 afterAll(() => {
+  mock.module("./constants", () => constantsSnapshot)
+  mock.module("../../shared/opencode-storage-paths", () => storagePathsSnapshot)
   mock.restore()
 })
 
