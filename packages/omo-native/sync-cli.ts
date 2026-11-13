@@ -77,7 +77,10 @@ const ROOT_CHANGED_CREATED = "This device started a new memory history for this 
 
 type PhraseSetup = { readonly refused: boolean; readonly gate: PhraseGate }
 
-const phraseSetup = (dependencies: SyncCommandDependencies, env: Readonly<Record<string, string | undefined>>): PhraseSetup => ({
+const phraseSetup = (
+  dependencies: SyncCommandDependencies,
+  env: Readonly<Record<string, string | undefined>>,
+): PhraseSetup => ({
   // Checked before any secret exists: an agent harness, CI, or no controlling terminal never sees words (sec 7).
   refused: agentMarkerSet(env) || !(dependencies.terminalAvailable ?? controllingTerminalAvailable)(),
   gate: {
@@ -99,7 +102,8 @@ async function deliverVoidNotice(
   notice: PhraseVoidNotice,
   refused: boolean,
 ): Promise<boolean> {
-  const text = notice.purpose === "rotate" ? `${PHRASE_VOID} Your old recovery phrase still works.` : PHRASE_VOID
+  // Enable only ever yields a genesis notice and the CLI has no rotate verb (contract 11.5), so one wording serves.
+  const text = PHRASE_VOID
   if (refused) {
     dependencies.error(text)
     return false
@@ -126,7 +130,9 @@ async function deliverVoidNotice(
 async function enable(dependencies: SyncCommandDependencies, context: SyncContext): Promise<number> {
   const env = dependencies.env ?? process.env
   const setup = phraseSetup(dependencies, env)
-  const surface = setup.refused ? null : lazyTerminalSurface(dependencies.terminal ?? openControllingTerminal, context.account)
+  const surface = setup.refused
+    ? null
+    : lazyTerminalSurface(dependencies.terminal ?? openControllingTerminal, context.account)
   const run = () =>
     enableSync({
       ...context,
@@ -143,7 +149,7 @@ async function enable(dependencies: SyncCommandDependencies, context: SyncContex
             },
           }),
     })
-  let outcome
+  let outcome: Awaited<ReturnType<typeof enableSync>>
   try {
     outcome = await run()
     if (outcome.kind === "acknowledge_required") {
@@ -216,13 +222,19 @@ const RECOVERED = "Your memory is recovered on this device and memory sync is on
 const RECOVERED_READ_ONLY =
   "This device can read your recovered memory, but another step is still pending before it can write. Run `omo sync recover` again later."
 
-async function recover(dependencies: SyncCommandDependencies, context: SyncContext): Promise<number> {
+/**
+ * Checker LOW (#13337 @ e6ac0bca): recover refuses under an agent harness, CI or without a controlling terminal
+ * BEFORE the signed-in context (credentials, session, device keyring) is loaded.
+ */
+const recoverRefused = (dependencies: SyncCommandDependencies): boolean => {
   const env = dependencies.env ?? process.env
-  if (agentMarkerSet(env) || !(dependencies.terminalAvailable ?? controllingTerminalAvailable)()) {
-    dependencies.error(RECOVER_YOURSELF)
-    dependencies.error(RECOVER_ELSEWHERE)
-    return EXIT_UNSUPPORTED_HERE
-  }
+  if (!agentMarkerSet(env) && (dependencies.terminalAvailable ?? controllingTerminalAvailable)()) return false
+  dependencies.error(RECOVER_YOURSELF)
+  dependencies.error(RECOVER_ELSEWHERE)
+  return true
+}
+
+async function recover(dependencies: SyncCommandDependencies, context: SyncContext): Promise<number> {
   const surface = lazyTerminalSurface(dependencies.terminal ?? openControllingTerminal, context.account)
   try {
     const outcome = await recoverOnFreshDevice({
@@ -341,7 +353,13 @@ export function configureSyncCommands(
   sync
     .command("recover")
     .description("Recover memory after losing every device")
-    .action(() => run(dependencies, (context) => recover(dependencies, context)))
+    .action(async () => {
+      if (recoverRefused(dependencies)) {
+        process.exitCode = EXIT_UNSUPPORTED_HERE
+        return
+      }
+      await run(dependencies, (context) => recover(dependencies, context))
+    })
 }
 
 export async function runSyncCommand(args: readonly string[]): Promise<void> {

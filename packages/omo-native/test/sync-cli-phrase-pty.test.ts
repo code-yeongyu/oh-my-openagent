@@ -12,7 +12,9 @@ afterEach(async () => {
 })
 
 const shownIn = (screen: string): ReadonlyArray<string> =>
-  [...screen.matchAll(/^ ?[0-9]{1,2}\. ([a-z]+)\r*$/gmu)].map((match) => match[1] ?? "").filter((word) => WORDS.has(word))
+  [...screen.matchAll(/^ ?[0-9]{1,2}\. ([a-z]+)\r*$/gmu)]
+    .map((match) => match[1] ?? "")
+    .filter((word) => WORDS.has(word))
 const tokensOf = (text: string): ReadonlySet<string> => new Set(text.toLowerCase().split(/[^a-z]+/u))
 
 // Contract sec 7 / review F5: on a real controlling terminal with stdout and stderr redirected to files, the phrase
@@ -33,7 +35,11 @@ test.skipIf(process.platform === "win32")(
         transcript ?? "",
       ],
       // The child's temp dirs live in this test's own dir, removed in afterEach even if the child is killed.
-      { stdout: "pipe", stderr: "pipe", env: { ...process.env, TMPDIR: dir, PI_CODING_AGENT: undefined, AI_AGENT: undefined, CI: undefined } },
+      {
+        stdout: "pipe",
+        stderr: "pipe",
+        env: { ...process.env, TMPDIR: dir, PI_CODING_AGENT: undefined, AI_AGENT: undefined, CI: undefined },
+      },
     )
     expect(await child.exited).toBe(0)
     const stdout = await readFile(out ?? "", "utf8")
