@@ -92,6 +92,20 @@ describe.skipIf(process.platform === "win32")("omo remote attach: a dialog raise
     expect(ownerState().commands).toEqual([{ ...secretAnswer, sessionId: SESSION_ID }])
   })
 
+  test("#given an answer naming a dialog this attach was never shown #when it is forwarded #then it carries no uiRequestId", async () => {
+    const tui = await watcherOf([pending(confirm)])
+    const stray = { type: "extension_ui_response", id: "dlg-never-shown", sessionId: LOCAL_SESSION_ID, confirmed: true }
+    await tui.answer(stray)
+    expect(ownerState().commands).toEqual([{ ...stray, sessionId: SESSION_ID }])
+  })
+
+  test("#given a mirrored dialog that has already settled #when the TUI answers it late #then the answer carries no uiRequestId", async () => {
+    const tui = await watcherOf([pending(confirm), settled("dlg-1", "answered")])
+    const late = { type: "extension_ui_response", id: "dlg-1", sessionId: LOCAL_SESSION_ID, confirmed: true }
+    await tui.answer(late)
+    expect(ownerState().commands).toEqual([{ ...late, sessionId: SESSION_ID }])
+  })
+
   test("#given the dialog settles elsewhere #when the mirror says so #then the TUI gets the resolution it dismisses a dialog on", async () => {
     const tui = await watcherOf([pending(confirm), settled("dlg-1", "answered")])
     expect(tui.records.filter((line) => line.type === "question_resolved")).toEqual([
