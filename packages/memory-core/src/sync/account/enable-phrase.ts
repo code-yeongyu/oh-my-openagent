@@ -33,12 +33,15 @@ export const commitIntent = async (captured: Captured, intent: GenesisIntent): P
   const result = await completeGenesis(captured, intent)
   checkSyncOperation(captured)
   if (result === "phrase_refused") {
-    // The switches went on for this ceremony's append and the service refused it. This device's switch goes back off;
-    // the account-wide one only when the chain is positively still empty (review LOW, #13335 @ 04991201): another
-    // device may have created a passkey genesis meanwhile, and that account must keep syncing.
-    await captured.pairing.setDeviceSync(captured.serviceDeviceId, false)
-    const state = await captured.chain.state().catch(() => null)
-    if (state !== null && state.head.seq === 0) await captured.pairing.setAccountSync(false)
+    // The service refused this ceremony's append. Only this device's own switch is withdrawn. The account-wide switch
+    // is shared consent that another device's ceremony turns on before its genesis lands, so no read of the chain can
+    // make switching it off race-free (review LOW, #13335 @ 9b1f3c9f); it stays as it is.
+    try {
+      await captured.pairing.setDeviceSync(captured.serviceDeviceId, false)
+    } catch {
+      // Review LOW (#13337 @ 6e726034): the refusal stays the answer; a failed withdrawal is reported, not thrown.
+      return { kind: "phrase_unavailable", reason: "service-floor-off", deviceSyncLeftOn: true }
+    }
     return { kind: "phrase_unavailable", reason: "service-floor-off" }
   }
   if (result !== "created")

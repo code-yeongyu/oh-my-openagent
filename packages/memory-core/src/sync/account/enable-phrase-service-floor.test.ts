@@ -20,11 +20,6 @@ afterEach(async () => {
 // A1.1-M1/M4.4: the service is the enforcement. A phrase append it refuses (`phrase_keys_not_accepted`,
 // its flag off) maps to phrase_unavailable{service-floor-off}; the intent is retired and the shown phrase
 // reads void, never created. A1.1-L3: with the client flag off, an existing phrase chain still joins.
-const OFF_AGAIN = [
-  '/v1/devices/service-first/sync {"enabled":false}',
-  '/v1/account/sync {"enabled":false}',
-]
-
 const phraseSetup = async () => {
   const f = await fixture()
   cleanups.push(f.close)
@@ -50,8 +45,8 @@ test("#given the service refuses phrase keys #when a fresh phrase genesis append
   s.f.server.phrase.accept = false
   expect(await enableSync(s.input)).toEqual({ kind: "phrase_unavailable", reason: "service-floor-off" })
   expect(s.f.entries).toEqual([])
-  expect(s.f.server.switches.slice(-2)).toEqual(OFF_AGAIN)
-  expect(s.f.server.switches.at(-1)).toBe('/v1/account/sync {"enabled":false}')
+  expect(s.f.server.switches.at(-1)).toBe('/v1/devices/service-first/sync {"enabled":false}')
+  expect(s.f.server.switches).not.toContain('/v1/account/sync {"enabled":false}')
   expect(await s.intentExists()).toBe(false)
   expect(await phraseNoticeStatus(s.place)).toEqual({ phraseVoid: { purpose: "genesis" } })
 })
@@ -157,4 +152,20 @@ test("#given another device's genesis landed while the service refused this phra
   expect(result).toEqual({ kind: "phrase_unavailable", reason: "service-floor-off" })
   expect(s.f.server.switches.at(-1)).toBe('/v1/devices/service-first/sync {"enabled":false}')
   expect(s.f.server.switches.filter((row) => row === '/v1/account/sync {"enabled":false}')).toEqual([])
+})
+
+test("#given the service refuses the phrase append and withdrawing this device's switch fails #when enable answers #then it still answers service-floor-off and reports the switch left on", async () => {
+  const s = await phraseSetup()
+  s.f.server.phrase.accept = false
+  const result = await enableSync({
+    ...s.input,
+    pairing: {
+      ...s.input.pairing,
+      setDeviceSync: async (id: string, enabled: boolean) => {
+        if (!enabled) throw new Error("synthetic switch failure")
+        return s.input.pairing.setDeviceSync(id, enabled)
+      },
+    },
+  })
+  expect(result).toEqual({ kind: "phrase_unavailable", reason: "service-floor-off", deviceSyncLeftOn: true })
 })
