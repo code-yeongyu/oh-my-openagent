@@ -58,12 +58,29 @@ The app never judges itself. A driver copies the reported field into `oracle.obs
 
 `self-test.ts` starts an app and drives it through its stdin control lines (`poke <action>`, `set <label> <text>`,
 `menu <A>/<B>`, `quit`), which apply each change through the toolkit itself and need no engine. Each catalog action must
-change exactly its own field, File > Save must record the document, and two identical runs must write the same report.
-With `--sabotage <field>` the app pins that field to its initial value, and the self-test passes only if it turns red on
-that field's checks and nowhere else.
+change exactly its own field, File > Save must record the document, two identical runs must write the same report, and
+the app must report the windows it opened and the app key given by `--app-key`.
+
+The web-hosting apps (Electron and the web views) also get `--a11y <probe command with {pid}>`, which adds two legs:
+
+- `a11y:controls-visible` runs the probe against the app's pid and fails when the page's controls are missing from the
+  OS accessibility tree.
+- `hermetic:no-profile-data-left` runs last. It fails when any leg of the run left fixture or Electron data in a user
+  profile or temp location (`.config`, `.local/share`, `.cache`, `~/Library/{Application Support,WebKit,Caches,
+  HTTPStorages,Saved Application State,Preferences}`, `%APPDATA%`, `%LOCALAPPDATA%`, the temp directory), counted
+  against a snapshot taken before the first leg, so a folder with the same name on every run is caught too.
+
+The driver passes `CONFORMANCE_FIXTURE_DATA_DIR`, a directory inside the run's own folder that it removes with the run;
+the Electron app keeps its profile there. Without it the Electron app makes its own temporary profile and removes it on
+quit.
+
+With `--sabotage <target>` the self-test passes only if it turns red on that target's checks and nowhere else. A
+report field as the target makes the app pin that field to its initial value; the target `a11y` makes the page hide its
+controls from assistive technology, so the probe must go red. The hermetic leg does not run under a sabotage.
 
 ```sh
-bun script/qa/computer/conformance/fixtures/self-test.ts --fixture <name> [--sabotage <field>] -- <app command>
+bun script/qa/computer/conformance/fixtures/self-test.ts --fixture <name> --app-key <key> [--sabotage <target>] \
+  [--a11y <probe command with {pid}>] -- <app command>
 ```
 
 GUI code runs only on hosted runners or owned guests, never in a person's session.
