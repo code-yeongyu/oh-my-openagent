@@ -302,14 +302,16 @@ export async function followRemote(
         } else {
           // senpi stores a queued send's entry only when the queue drains, so a send that carries an id and finds no
           // entry with it has not been stored yet: every user entry carrying its text that its first read sees is an
-          // earlier send. Its own is the first one after those, exact or wrapped, keyed by entry identity so older
+          // earlier send. Its own is the first exact one after those, else the first wrapped one (another message that merely
+          // contains the text must not win over the send's own exact entry), keyed by entry identity so older
           // entries scrolling out of the read window cannot shift it (#13272 review). It waits for that entry rather
           // than print an older answer.
           const carrying = textCarryingUserEntries(entries, text)
           if (earlierEntries === undefined)
             earlierEntries = new Set(carrying.map((index) => entryKeyOf(entries[index])))
           const seen = earlierEntries
-          const fresh = carrying.find((index) => !seen.has(entryKeyOf(entries[index])))
+          const unseen = carrying.filter((index) => !seen.has(entryKeyOf(entries[index])))
+          const fresh = unseen.find((index) => entryTextOf(entries[index]) === text) ?? unseen[0]
           if (fresh === undefined) return
           anchor = fresh
         }

@@ -461,6 +461,30 @@ describe("#13272 review: the anchor survives a rewritten send and never takes an
     follow.stop()
   })
 
+  test("#given an engine that stores no id #when a different message wrapping the send's text lands before the send's own exact entry #then the own exact entry anchors, never the wrapper", async () => {
+    const transcript: JsonObject[] = []
+    const { remote, deliver } = followSurface(transcript)
+    const printed: string[] = []
+    const follow = await followRemote(remote, ROW, (text) => printed.push(text), {
+      text: "yes",
+      clientMessageId: "cm-new",
+    })
+    if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
+    follow.aim("queued")
+    await flush()
+    expect(printed).toEqual([])
+    transcript.push(
+      message("u1", "user", "agent note: yes, merged"),
+      message("a1", "assistant", "foreign answer\n"),
+      message("u2", "user", "yes"),
+      message("a2", "assistant", "own answer\n"),
+    )
+    deliver([{ type: "agent_settled" }])
+    await withTimeout(follow.settled, 5_000, "the send's own exact entry never anchored")
+    expect(printed).toEqual(["own answer\n"])
+    follow.stop()
+  })
+
   test("#given entries with no client message id #when the anchor is chosen #then an exact entry wins over a longer one containing the text, and a wrapped entry anchors only when no exact one exists", () => {
     const wrapped = message("u1", "user", "<context>\nping")
     const exact = message("u2", "user", "ping")
