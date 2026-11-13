@@ -5,9 +5,9 @@
 
 use std::time::{Duration, Instant};
 
-use omo_computer_core::backend::{EpochSource, StopListener};
+use omo_computer_core::backend::{Backend, CaptureOptions, EpochSource, StopListener, Target};
 use x11rb::connection::Connection;
-use x11rb::protocol::xproto::{KEY_PRESS_EVENT, KEY_RELEASE_EVENT};
+use x11rb::protocol::xproto::{ConnectionExt as _, ImageFormat, KEY_PRESS_EVENT, KEY_RELEASE_EVENT};
 use x11rb::protocol::xtest::ConnectionExt as _;
 use x11rb::wrapper::ConnectionExt as _;
 
@@ -15,7 +15,9 @@ use super::{
     arm, Armed, LeaseEndSignal, Live, RawKeyServer, X11StopListener, Xi2Server, DEFAULT_STOP_CHORD,
 };
 use crate::capture::X11Connection;
+use crate::backend::X11Backend;
 use crate::epoch::X11EpochSource;
+use crate::overlay::OVERLAY_RGB;
 
 const HANG_GUARD: Duration = Duration::from_secs(5);
 
@@ -120,4 +122,41 @@ fn randr_epoch_source_reports_no_change_on_an_unchanged_server() {
     let connection = X11Connection::connect(&display()).expect("a capture connection");
     let mut epochs = X11EpochSource::new(connection);
     assert_eq!(epochs.next_change().ok(), Some(None));
+}
+
+fn overlay_rgb() -> [u8; 3] {
+    let [_, r, g, b] = OVERLAY_RGB.to_be_bytes();
+    [r, g, b]
+}
+
+fn top_row_shows_overlay(display: &str) -> bool {
+    let (conn, screen) = x11rb::connect(Some(display)).expect("an oracle connection");
+    let root = &conn.setup().roots[screen];
+    assert_eq!(root.root_depth, 24, "run the live legs on a 24-bit screen (xvfb-run -s '-screen 0 1280x800x24')");
+    let row = conn
+        .get_image(ImageFormat::Z_PIXMAP, root.root, 0, 0, root.width_in_pixels, 1, u32::MAX)
+        .expect("XGetImage request")
+        .reply()
+        .expect("XGetImage reply");
+    let [r, g, b] = overlay_rgb();
+    row.data.as_chunks::<4>().0.iter().all(|[blue, green, red, _]| *red == r && *green == g && *blue == b)
+}
+
+#[test]
+#[ignore = "needs a live X server: run under xvfb-run"]
+fn overlay_is_on_screen_and_never_in_a_desktop_capture() {
+    let display = display();
+    let mut backend = X11Backend::from_env(Some(&display), None);
+    let mut presence = backend.presence().expect("the overlay connects to the live server");
+    presence.show().expect("the overlay shows");
+    assert!(top_row_shows_overlay(&display), "the oracle sees the border before the capture");
+    let frame = backend
+        .capture(&Target::Desktop, &CaptureOptions { cursor: false, crosshair: None, region: None })
+        .expect("a desktop capture");
+    let pixels = image::load_from_memory(&frame.bytes).expect("the frame decodes").to_rgb8();
+    let overlay = overlay_rgb();
+    let seen = pixels.pixels().filter(|px| px.0 == overlay).count();
+    assert_eq!(seen, 0, "the capture contains overlay-coloured pixels");
+    assert!(top_row_shows_overlay(&display), "the border is mapped back after the read");
+    presence.hide().expect("the overlay hides");
 }
