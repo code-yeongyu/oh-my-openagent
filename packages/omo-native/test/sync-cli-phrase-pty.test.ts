@@ -41,7 +41,13 @@ test.skipIf(process.platform === "win32")(
     expect(stdout).toContain("Memory sync is on for this device.")
     const shown = shownIn(await readFile(transcript ?? "", "utf8"))
     expect(shown.length).toBe(24)
-    const written = tokensOf(`${stdout}\n${stderr}`)
+    // The success line is CLI copy that holds BIP39 words ("memory", "device"); only other lines can leak.
+    const written = tokensOf(
+      `${stdout}\n${stderr}`
+        .split("\n")
+        .filter((line) => line !== "Memory sync is on for this device.")
+        .join("\n"),
+    )
     expect(shown.filter((word) => written.has(word))).toEqual([])
   },
   60_000,

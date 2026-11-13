@@ -3,6 +3,7 @@ import { Command } from "commander"
 
 import { ACCOUNT, fixture } from "../../memory-core/src/sync/account/testing/genesis-enable.test-support"
 import { BIP39_ENGLISH_ROWS } from "../../memory-core/src/sync/recovery/bip39/english"
+import { writePhraseGenesisMarker } from "../../memory-core/src/sync/genesis/phrase-marker"
 import { configureSyncCommands, EXIT_UNSUPPORTED_HERE, PHRASE_GENESIS_FLAG, type SyncCommandDependencies } from "../sync-cli"
 import type { SyncContext } from "../sync-context"
 import type { PhraseTerminal } from "../sync-phrase-tty"
@@ -35,14 +36,17 @@ const scriptedTerminal = () => {
   return { open, written, opened: () => opened }
 }
 
-const shownWords = (terminal: ReadonlyArray<string>): ReadonlyArray<string> =>
-  [...terminal.join("").matchAll(/^ ?[0-9]{1,2}\. ([a-z]+)\r*$/gmu)].map((match) => match[1] ?? "")
-// The CLI's own copy uses ordinary words that are also in the BIP39 list ("memory", "device"); a leak is a word that
-// was actually shown on the terminal and then appears in stdout or stderr.
-const leaked = (shown: ReadonlyArray<string>, lines: ReadonlyArray<string>): ReadonlyArray<string> => {
-  const tokens = new Set(lines.flatMap((line) => line.toLowerCase().split(/[^a-z]+/u)))
+// Review LOW (#13337 @ c11d6cfd): the CLI's own fixed copy ("Memory sync is on for this device.") holds BIP39 words,
+// so a random phrase containing "memory" or "device" failed ~2.3% of runs. Fixed copy lines are removed first; a
+// leak is a shown word in any other output line.
+const CLI_COPY = new Set(["Memory sync is on for this device.", "Your memory is recovered on this device and memory sync is on."])
+const leakedWords = (shown: ReadonlyArray<string>, lines: ReadonlyArray<string>): ReadonlyArray<string> => {
+  const tokens = new Set(lines.filter((line) => !CLI_COPY.has(line)).flatMap((line) => line.toLowerCase().split(/[^a-z]+/u)))
   return shown.filter((word) => WORDS.has(word) && tokens.has(word))
 }
+
+const shownWords = (terminal: ReadonlyArray<string>): ReadonlyArray<string> =>
+  [...terminal.join("").matchAll(/^ ?[0-9]{1,2}\. ([a-z]+)\r*$/gmu)].map((match) => match[1] ?? "")
 
 const runEnable = async (dependencies: Partial<SyncCommandDependencies>) => {
   const f = await fixture()
@@ -79,7 +83,7 @@ for (const marker of ["PI_CODING_AGENT", "AI_AGENT", "CI"] as const) {
   })
 }
 
-test("#given no controlling terminal (stdin piped, no tty) #when enable must create a phrase #then it refuses and never reads stdin", async () => {
+test("#given the terminal check reports no controlling terminal #when enable must create a phrase #then it refuses before opening any terminal and writes nothing", async () => {
   const terminal = scriptedTerminal()
   const r = await runEnable({ env: { [PHRASE_GENESIS_FLAG]: "1" }, terminal: terminal.open, terminalAvailable: () => false })
   expect(r.exit).toBe(EXIT_UNSUPPORTED_HERE)
@@ -103,7 +107,45 @@ test("#given a person at the terminal #when enable creates a phrase genesis #the
   expect(r.out).toContain("Memory sync is on for this device.")
   const shown = shownWords(terminal.written)
   expect(shown.length).toBe(24)
-  expect(leaked(shown, [...r.out, ...r.err])).toEqual([])
+  expect(leakedWords(shown, [...r.out, ...r.err])).toEqual([])
   expect(terminal.written.join("")).toContain(`Save your recovery phrase for ${ACCOUNT}`)
   expect(terminal.written.at(-1)).toContain("\u001b[?1049l")
+})
+
+test("#given a shown phrase that contains memory and device #when the only output is the CLI's success line #then no leak is reported (no random false failure)", () => {
+  expect(leakedWords(["memory", "device", "abandon"], ["Memory sync is on for this device."])).toEqual([])
+  expect(leakedWords(["memory", "device", "abandon"], ["debug: abandon"])).toEqual(["abandon"])
+})
+
+test("#given a void notice on the terminal #when the person cancels it instead of pressing Enter #then stderr says nothing changed and the notice is not acknowledged", async () => {
+  const terminal = { opened: 0 }
+  const open = (): PhraseTerminal => {
+    terminal.opened += 1
+    return { write: () => undefined, readLine: async () => null, close: () => undefined }
+  }
+  const f = await fixture()
+  cleanups.push(f.close)
+  await writePhraseGenesisMarker({ pinDir: f.input.pinDir, account: ACCOUNT, principalId: f.keyring.principal().id }, {
+    version: 1,
+    account: ACCOUNT,
+    startedAt: 0,
+  })
+  const { genesis: _genesis, method: _method, rpId: _rp, userName: _user, roaming: _roaming, ...base } = f.input
+  const err: string[] = []
+  const program = new Command("omo").exitOverride()
+  configureSyncCommands(program, {
+    context: async () => ({ ...base, authority: { signal: new AbortController().signal, admit: (dispatch) => dispatch() } }),
+    clock: { now: () => 0, sleep: async () => undefined },
+    output: () => undefined,
+    error: (line) => void err.push(line),
+    confirm: async () => false,
+    interactive: true,
+    env: { [PHRASE_GENESIS_FLAG]: "1" },
+    terminal: open,
+    terminalAvailable: () => true,
+    phraseFloor: async () => "on",
+  })
+  await program.parseAsync(["sync", "enable"], { from: "user" })
+  expect(err.join("\n")).toContain("nothing changed")
+  expect(terminal.opened).toBe(1)
 })
