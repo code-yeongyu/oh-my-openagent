@@ -2,10 +2,7 @@ import { describe, expect, mock, test } from "bun:test"
 import { unsafeTestValue } from "../../../../test-support/unsafe-test-value"
 
 import { handleGoalMessage } from "./chat-message/loop-commands"
-import {
-  consumeNativeGoalCommandMarker,
-  createCommandExecuteBeforeHandler,
-} from "./command-execute-before"
+import { consumeNativeGoalCommandMarker, createCommandExecuteBeforeHandler } from "./command-execute-before"
 
 function createMockGoal() {
   return {
@@ -26,18 +23,20 @@ describe("createCommandExecuteBeforeHandler", () => {
     const clear = mock(() => {})
     const isStopped = mock(() => true)
     const ulwExecuteHook = mock(async () => {})
-    const handler = createCommandExecuteBeforeHandler(unsafeTestValue({
-      directory: process.cwd(),
-      hooks: {
-        ulwExecute: {
-          "command.execute.before": ulwExecuteHook,
+    const handler = createCommandExecuteBeforeHandler(
+      unsafeTestValue({
+        directory: process.cwd(),
+        hooks: {
+          ulwExecute: {
+            "command.execute.before": ulwExecuteHook,
+          },
+          stopContinuationGuard: {
+            isStopped,
+            clear,
+          },
         },
-        stopContinuationGuard: {
-          isStopped,
-          clear,
-        },
-      },
-    }))
+      }),
+    )
 
     // when
     await handler(
@@ -64,24 +63,26 @@ describe("createCommandExecuteBeforeHandler", () => {
     const isStopped = mock(() => true)
     const setGoal = mock(() => createMockGoal())
     const resumeGoal = mock(() => createMockGoal())
-    const handler = createCommandExecuteBeforeHandler(unsafeTestValue({
-      directory: process.cwd(),
-      hooks: {
-        goal: {
-          setGoal,
-          getGoal: mock(() => null),
-          pauseGoal: mock(() => null),
-          resumeGoal,
-          clearGoal: mock(() => true),
-          markComplete: mock(() => null),
-          event: mock(async () => {}),
+    const handler = createCommandExecuteBeforeHandler(
+      unsafeTestValue({
+        directory: process.cwd(),
+        hooks: {
+          goal: {
+            setGoal,
+            getGoal: mock(() => null),
+            pauseGoal: mock(() => null),
+            resumeGoal,
+            clearGoal: mock(() => true),
+            markComplete: mock(() => null),
+            event: mock(async () => {}),
+          },
+          stopContinuationGuard: {
+            isStopped,
+            clear,
+          },
         },
-        stopContinuationGuard: {
-          isStopped,
-          clear,
-        },
-      },
-    }))
+      }),
+    )
 
     // when
     await handler(
@@ -108,24 +109,26 @@ describe("createCommandExecuteBeforeHandler", () => {
     const isStopped = mock(() => false)
     const setGoal = mock(() => createMockGoal())
     const resumeGoal = mock(() => createMockGoal())
-    const handler = createCommandExecuteBeforeHandler(unsafeTestValue({
-      directory: process.cwd(),
-      hooks: {
-        goal: {
-          setGoal,
-          getGoal: mock(() => null),
-          pauseGoal: mock(() => null),
-          resumeGoal,
-          clearGoal: mock(() => true),
-          markComplete: mock(() => null),
-          event: mock(async () => {}),
+    const handler = createCommandExecuteBeforeHandler(
+      unsafeTestValue({
+        directory: process.cwd(),
+        hooks: {
+          goal: {
+            setGoal,
+            getGoal: mock(() => null),
+            pauseGoal: mock(() => null),
+            resumeGoal,
+            clearGoal: mock(() => true),
+            markComplete: mock(() => null),
+            event: mock(async () => {}),
+          },
+          stopContinuationGuard: {
+            isStopped,
+            clear,
+          },
         },
-        stopContinuationGuard: {
-          isStopped,
-          clear,
-        },
-      },
-    }))
+      }),
+    )
 
     // when
     await handler(
@@ -150,20 +153,22 @@ describe("createCommandExecuteBeforeHandler", () => {
     // given
     const setGoal = mock(() => createMockGoal())
     const resumeGoal = mock(() => createMockGoal())
-    const handler = createCommandExecuteBeforeHandler(unsafeTestValue({
-      directory: process.cwd(),
-      hooks: {
-        goal: {
-          setGoal,
-          getGoal: mock(() => createMockGoal()),
-          pauseGoal: mock(() => null),
-          resumeGoal,
-          clearGoal: mock(() => true),
-          markComplete: mock(() => null),
-          event: mock(async () => {}),
+    const handler = createCommandExecuteBeforeHandler(
+      unsafeTestValue({
+        directory: process.cwd(),
+        hooks: {
+          goal: {
+            setGoal,
+            getGoal: mock(() => createMockGoal()),
+            pauseGoal: mock(() => null),
+            resumeGoal,
+            clearGoal: mock(() => true),
+            markComplete: mock(() => null),
+            event: mock(async () => {}),
+          },
         },
-      },
-    }))
+      }),
+    )
 
     // when
     await handler(
@@ -215,14 +220,16 @@ describe("createCommandExecuteBeforeHandler", () => {
       output,
     )
     const nativeGoalCommand = consumeNativeGoalCommandMarker(output.parts)
-    handleGoalMessage(unsafeTestValue({
-      hooks,
-      input: { sessionID: "ses-goal" },
-      output,
-      isFirstMessage: false,
-      pluginConfig: {},
-      nativeGoalCommand,
-    }))
+    handleGoalMessage(
+      unsafeTestValue({
+        hooks,
+        input: { sessionID: "ses-goal" },
+        output,
+        isFirstMessage: false,
+        pluginConfig: {},
+        nativeGoalCommand,
+      }),
+    )
 
     // then
     expect(setGoal).toHaveBeenCalledTimes(1)

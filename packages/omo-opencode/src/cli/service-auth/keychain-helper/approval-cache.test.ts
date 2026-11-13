@@ -10,7 +10,7 @@ function fakeClock(start: number) {
   const slept: number[] = []
   const clock: ApprovalClock = {
     nowSeconds: () => now,
-    sleepMs: async ms => {
+    sleepMs: async (ms) => {
       slept.push(ms)
       now += ms / 1_000
     },
@@ -18,7 +18,11 @@ function fakeClock(start: number) {
   return { clock, slept, set: (value: number) => (now = value) }
 }
 
-const approved = (value: string, cdat: number, mdat: number): ApprovalAnswer => ({ kind: "approved", value, attributes: { cdat, mdat } })
+const approved = (value: string, cdat: number, mdat: number): ApprovalAnswer => ({
+  kind: "approved",
+  value,
+  attributes: { cdat, mdat },
+})
 
 describe("approval cache validity (#11262 design 3.5)", () => {
   const entry = { value: "v", cdat: 100, mdat: 200, readStartedAt: 300.5 }
@@ -45,7 +49,7 @@ describe("process approval cache (#11262 3.2 steps 3-4, addendum rows 12, 13, 22
     let answer!: (value: ApprovalAnswer) => void
     const run = () => {
       runs++
-      return new Promise<ApprovalAnswer>(resolve => {
+      return new Promise<ApprovalAnswer>((resolve) => {
         answer = resolve
       })
     }
@@ -61,7 +65,7 @@ describe("process approval cache (#11262 3.2 steps 3-4, addendum rows 12, 13, 22
     const { clock } = fakeClock(1_000)
     const cache = createApprovalCache(clock)
     let answer!: (value: ApprovalAnswer) => void
-    const abandoned = cache.approve(() => new Promise<ApprovalAnswer>(resolve => (answer = resolve)))
+    const abandoned = cache.approve(() => new Promise<ApprovalAnswer>((resolve) => (answer = resolve)))
     answer(approved("late", 10, 20))
     await abandoned
     let runs = 0
@@ -100,21 +104,33 @@ describe("the default clock outside Bun (#11586 review LOW: service-auth.generat
   test("#given the default clock under Node #when an own write must wait out its second #then it waits and re-stamps instead of throwing", async () => {
     // Under Node, a Bun-only sleep threw ReferenceError here once afterOwnWrite had to wait for the next second.
     const script = [
-      'const { createApprovalCache } = await import(process.argv[1]);',
-      'const cache = createApprovalCache();',
-      'const second = Math.floor(Date.now() / 1000);',
+      "const { createApprovalCache } = await import(process.argv[1]);",
+      "const cache = createApprovalCache();",
+      "const second = Math.floor(Date.now() / 1000);",
       'await cache.approve(async () => ({ kind: "approved", value: "v", attributes: { cdat: 1, mdat: second - 5 } }));',
       'await cache.afterOwnWrite("own", async () => ({ cdat: 1, mdat: second }));',
-      'process.stdout.write(String(Math.floor(Date.now() / 1000) > second));',
+      "process.stdout.write(String(Math.floor(Date.now() / 1000) > second));",
     ].join("\n")
     const outdir = mkdtempSync(join(tmpdir(), "approval-cache-node-"))
     try {
-      const built = await Bun.build({ entrypoints: [fileURLToPath(new URL("./approval-cache.ts", import.meta.url))], outdir, target: "node", format: "esm" })
+      const built = await Bun.build({
+        entrypoints: [fileURLToPath(new URL("./approval-cache.ts", import.meta.url))],
+        outdir,
+        target: "node",
+        format: "esm",
+      })
       expect(built.success).toBe(true)
       const output = built.outputs[0]
       if (!output) throw new Error("no build output")
-      const node = Bun.spawn(["node", "--input-type=module", "-e", script, pathToFileURL(output.path).href], { stdout: "pipe", stderr: "pipe" })
-      const [out, err, code] = await Promise.all([new Response(node.stdout).text(), new Response(node.stderr).text(), node.exited])
+      const node = Bun.spawn(["node", "--input-type=module", "-e", script, pathToFileURL(output.path).href], {
+        stdout: "pipe",
+        stderr: "pipe",
+      })
+      const [out, err, code] = await Promise.all([
+        new Response(node.stdout).text(),
+        new Response(node.stderr).text(),
+        node.exited,
+      ])
       expect({ code, out, err }).toEqual({ code: 0, out: "true", err: "" })
     } finally {
       rmSync(outdir, { recursive: true, force: true })

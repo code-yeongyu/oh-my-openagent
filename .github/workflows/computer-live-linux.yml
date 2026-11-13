@@ -1,0 +1,80 @@
+name: Computer live Linux
+
+# The per-pull-request Linux live tier of the computer-use engine, part 1: the hosted runner is probed for real Xorg
+# with the dummy video driver, libinput and a writable /dev/uinput carrying XI2 raw events (a graded ledger over three
+# runs). The live driver's scenario step and the GNOME, KDE and sway session jobs join this workflow with the driver and
+# the session containers. Every job ends with teardown receipts.
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/computer-live-linux.yml"
+      - "crates/omo-computer-backend-x11/**"
+      - "crates/omo-computer-backend-atspi/**"
+      - "crates/omo-computer-backend-wayland/**"
+      - "script/qa/computer/linux.ts"
+      - "script/qa/computer/linux/**"
+      - "script/qa/computer/pool/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  xorg-uinput:
+    name: computer live (xorg-uinput)
+    runs-on: ubuntu-26.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Install Xorg, the dummy video driver and libinput
+        run: |
+          sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get update
+          sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y --no-install-recommends \
+            xserver-xorg-core xserver-xorg-video-dummy xserver-xorg-input-libinput xinput x11-utils xdotool acl
+
+      - name: Probe the runner (Xorg dummy, libinput, writable uinput, XI2 raw events)
+        shell: bash
+        run: |
+          set -euo pipefail
+          qa="${RUNNER_TEMP}/computer-live-linux"
+          mkdir -p "$qa"
+          bun script/qa/computer/pool/xorg-uinput-probe.ts --runs 3 --ledger "$qa/xorg-uinput-ledger.tsv" \
+            --workdir "$RUNNER_TEMP" | tee "$qa/xorg-uinput-probe.log"
+
+      - name: Teardown receipts
+        if: always()
+        run: bun script/qa/computer/pool/xorg-uinput-probe.ts --teardown-check
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: computer-live-linux-xorg-uinput
+          path: ${{ runner.temp }}/computer-live-linux
+          if-no-files-found: warn
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Computer live Linux (xorg-uinput)
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Probe, three runs: uinput module, uinput writable by the job user, real Xorg with the dummy driver, libinput hotplug of a uinput keyboard, XI 2.1+, XI2 raw key events from that keyboard (XTEST positive control).
+            - Graded ledger: every row must read CONFIRMS on every run.
+            - Teardown: Xorg processes, uinput devices, X sockets and the uinput ACL grant removed.
+          JOB_SUMMARY_NEXT: Open the computer-live-linux-xorg-uinput artifact for the ledger TSV and the probe log.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

@@ -65,7 +65,13 @@ async function release(sdk, thread, request) {
   const second = await sdk.release(thread, {})
   if (second.success) return { reply: second, dropped: dropped(first, second) }
   if (second.error === "unknown_session" && thread.session_path !== null) {
-    return { reply: { success: true, data: { released: true, session_path: thread.session_path, attachments: 0, dropped: dropped(first) } }, dropped: dropped(first) }
+    return {
+      reply: {
+        success: true,
+        data: { released: true, session_path: thread.session_path, attachments: 0, dropped: dropped(first) },
+      },
+      dropped: dropped(first),
+    }
   }
   return { reply: first, dropped: dropped(first, second) }
 }
@@ -92,7 +98,10 @@ export async function runAdoptCommand(args, { sdk, stdout, stderr }) {
   const located = await sdk.locate({ thread: parsed.positionals[0], all_scope: true })
   if (located.kind !== "ok") {
     stderr.write(`omo daemon adopt: ${located.error.code}: ${located.error.message}\n`)
-    return outcome({ kind: "refused", error: located.error.code }, located.error.code === "ambiguous_target" ? DAEMON_EXIT.usage : DAEMON_EXIT.notRunning)
+    return outcome(
+      { kind: "refused", error: located.error.code },
+      located.error.code === "ambiguous_target" ? DAEMON_EXIT.usage : DAEMON_EXIT.notRunning,
+    )
   }
   const thread = located.thread
   if (thread.surface === "tui" || thread.endpoint?.kind === "tui") {
@@ -100,7 +109,9 @@ export async function runAdoptCommand(args, { sdk, stdout, stderr }) {
     return outcome({ kind: "refused", error: "already_terminal", thread_id: thread.thread_id }, DAEMON_EXIT.unsupported)
   }
   if (!thread.alive || thread.endpoint === null) {
-    stderr.write(`omo daemon adopt: no running host holds ${thread.thread_id}; resume it with omo --session ${thread.session_path ?? thread.thread_id}\n`)
+    stderr.write(
+      `omo daemon adopt: no running host holds ${thread.thread_id}; resume it with omo --session ${thread.session_path ?? thread.thread_id}\n`,
+    )
     return outcome({ kind: "refused", error: "not_running", thread_id: thread.thread_id }, DAEMON_EXIT.notRunning)
   }
 
@@ -108,18 +119,38 @@ export async function runAdoptCommand(args, { sdk, stdout, stderr }) {
   const { reply, dropped: taken } = await release(sdk, thread, request)
   if (!reply.success) {
     stderr.write(`omo daemon adopt: ${refusalMessage(reply.error, reply.errorData, interrupt)}\n`)
-    for (const message of taken.user_messages) stderr.write(`  queued message taken out by --interrupt, not delivered: ${message}\n`)
-    return outcome({ kind: "refused", error: reply.error, thread_id: thread.thread_id, dropped: taken }, refusalExit(reply.error))
+    for (const message of taken.user_messages)
+      stderr.write(`  queued message taken out by --interrupt, not delivered: ${message}\n`)
+    return outcome(
+      { kind: "refused", error: reply.error, thread_id: thread.thread_id, dropped: taken },
+      refusalExit(reply.error),
+    )
   }
 
   // senpi reads a leading `@` as a file argument even after `--`, so such a message is shown, not replayed.
   const replayable = taken.user_messages.filter((message) => !message.startsWith("@"))
-  for (const message of taken.user_messages.filter((entry) => entry.startsWith("@"))) stderr.write(`  queued message not replayed (starts with @), send it again: ${message}\n`)
+  for (const message of taken.user_messages.filter((entry) => entry.startsWith("@")))
+    stderr.write(`  queued message not replayed (starts with @), send it again: ${message}\n`)
   const path = reply.data.session_path
-  stderr.write(`omo daemon adopt: ${thread.thread_id} released from ${thread.endpoint.socket}; resuming it here${replayable.length > 0 ? ` with ${replayable.length} queued message(s)` : ""}\n`)
+  stderr.write(
+    `omo daemon adopt: ${thread.thread_id} released from ${thread.endpoint.socket}; resuming it here${replayable.length > 0 ? ` with ${replayable.length} queued message(s)` : ""}\n`,
+  )
   // The relaunch carries them as argv, so they are also printed: a launch that fails after the release still leaves them on screen.
-  for (const message of replayable) stderr.write(`  queued message taken out by --interrupt, replayed as a prompt: ${message}\n`)
-  if (taken.deliveries.length > 0) stderr.write(`  ${taken.deliveries.length} gateway deliver${taken.deliveries.length === 1 ? "y returns" : "ies return"} to the session's inbox\n`)
-  outcome({ kind: "released", thread_id: thread.thread_id, session_path: path, attachments: reply.data.attachments, dropped: taken }, DAEMON_EXIT.ok)
+  for (const message of replayable)
+    stderr.write(`  queued message taken out by --interrupt, replayed as a prompt: ${message}\n`)
+  if (taken.deliveries.length > 0)
+    stderr.write(
+      `  ${taken.deliveries.length} gateway deliver${taken.deliveries.length === 1 ? "y returns" : "ies return"} to the session's inbox\n`,
+    )
+  outcome(
+    {
+      kind: "released",
+      thread_id: thread.thread_id,
+      session_path: path,
+      attachments: reply.data.attachments,
+      dropped: taken,
+    },
+    DAEMON_EXIT.ok,
+  )
   return { launch: ["--session", path, ...(replayable.length > 0 ? ["--", ...replayable] : [])], cwd: thread.cwd }
 }

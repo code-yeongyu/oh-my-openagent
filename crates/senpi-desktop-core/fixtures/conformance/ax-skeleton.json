@@ -1,0 +1,255 @@
+{
+  "description": "computer-use v2 P9b, reportMode object: on the dense web scenario (a browser page nesting its controls under 12 anonymous wrapper groups), ax.snapshot with skeleton true clamps logical depth to 3 without counting the wrappers: the navigation links are present, every clamped container is a cut carrying its childCount and renders [... N more], generation 1 has no parent, and the text stays under 2,000 tokens (char/4 proxy); ax.node on a cut ref reports subtreeTruncated.",
+  "scenario": "crates/senpi-desktop-backend-fake/fixtures/v2-ax-web.json",
+  "env": {},
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session.open",
+        "params": {
+          "reportMode": "object"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "cursorOverlay": false,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "granted",
+                "axPermission": "granted",
+                "displayCount": 1,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": "no-global-listener",
+                "integrityLevel": null,
+                "screenLocked": false,
+                "displayAsleep": false
+              },
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "ax.snapshot",
+        "params": {
+          "target": "101",
+          "opts": {
+            "skeleton": true
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "text": "- window \"Docs - Browser\" [ref=e1] app=Browser (focused)\n  - toolbar [ref=e2]\n    - button \"Back\" [ref=e3]\n    - button \"Forward\" [ref=e4]\n    - button \"Reload\" [ref=e5]\n  - webarea \"Docs\" [ref=e6]\n    - group [ref=e7]\n      - group \"Navigation\" [ref=e8]\n        - link \"Nav 1\" [ref=e9]\n        - link \"Nav 2\" [ref=e10]\n        - link \"Nav 3\" [ref=e11]\n        - link \"Nav 4\" [ref=e12]\n        - link \"Nav 5\" [ref=e13]\n        - link \"Nav 6\" [ref=e14]\n        - link \"Nav 7\" [ref=e15]\n        - link \"Nav 8\" [ref=e16]\n        - link \"Nav 9\" [ref=e17]\n        - link \"Nav 10\" [ref=e18]\n        - link \"Nav 11\" [ref=e19]\n        - link \"Nav 12\" [ref=e20]\n        - link \"Nav 13\" [ref=e21]\n        - link \"Nav 14\" [ref=e22]\n        - link \"Nav 15\" [ref=e23]\n        - link \"Nav 16\" [ref=e24]\n        - link \"Nav 17\" [ref=e25]\n        - link \"Nav 18\" [ref=e26]\n        - link \"Nav 19\" [ref=e27]\n        - link \"Nav 20\" [ref=e28]\n        - link \"Nav 21\" [ref=e29]\n        - link \"Nav 22\" [ref=e30]\n        - link \"Nav 23\" [ref=e31]\n        - link \"Nav 24\" [ref=e32]\n        - link \"Nav 25\" [ref=e33]\n        - link \"Nav 26\" [ref=e34]\n        - link \"Nav 27\" [ref=e35]\n        - link \"Nav 28\" [ref=e36]\n        - link \"Nav 29\" [ref=e37]\n        - link \"Nav 30\" [ref=e38]\n        - link \"Nav 31\" [ref=e39]\n        - link \"Nav 32\" [ref=e40]\n        - link \"Nav 33\" [ref=e41]\n        - link \"Nav 34\" [ref=e42]\n        - link \"Nav 35\" [ref=e43]\n        - link \"Nav 36\" [ref=e44]\n        - link \"Nav 37\" [ref=e45]\n        - link \"Nav 38\" [ref=e46]\n        - link \"Nav 39\" [ref=e47]\n        - link \"Nav 40\" [ref=e48]\n      - group \"Main\" [ref=e49]\n        - group \"Article 1\" [ref=e50] [... 1 more]\n        - group \"Article 2\" [ref=e51] [... 1 more]\n        - group \"Article 3\" [ref=e52] [... 1 more]\n        - group \"Article 4\" [ref=e53] [... 1 more]\n        - group \"Article 5\" [ref=e54] [... 1 more]\n        - group \"Article 6\" [ref=e55] [... 1 more]\n        - group \"Article 7\" [ref=e56] [... 1 more]\n        - group \"Article 8\" [ref=e57] [... 1 more]\n        - group \"Article 9\" [ref=e58] [... 1 more]\n        - group \"Article 10\" [ref=e59] [... 1 more]\n        - group \"Article 11\" [ref=e60] [... 1 more]\n        - group \"Article 12\" [ref=e61] [... 1 more]\n        - group \"Article 13\" [ref=e62] [... 1 more]\n        - group \"Article 14\" [ref=e63] [... 1 more]\n        - group \"Article 15\" [ref=e64] [... 1 more]\n        - group \"Article 16\" [ref=e65] [... 1 more]\n        - group \"Article 17\" [ref=e66] [... 1 more]\n        - group \"Article 18\" [ref=e67] [... 1 more]\n        - group \"Article 19\" [ref=e68] [... 1 more]\n        - group \"Article 20\" [ref=e69] [... 1 more]\n        - group \"Article 21\" [ref=e70] [... 1 more]\n        - group \"Article 22\" [ref=e71] [... 1 more]\n        - group \"Article 23\" [ref=e72] [... 1 more]\n        - group \"Article 24\" [ref=e73] [... 1 more]\n        - group \"Article 25\" [ref=e74] [... 1 more]\n        - group \"Article 26\" [ref=e75] [... 1 more]\n        - group \"Article 27\" [ref=e76] [... 1 more]\n        - group \"Article 28\" [ref=e77] [... 1 more]\n        - group \"Article 29\" [ref=e78] [... 1 more]\n        - group \"Article 30\" [ref=e79] [... 1 more]\n      - group \"Footer\" [ref=e80] [... 20 more]\n… truncated (92 nodes)",
+              "nodeCount": 80,
+              "truncated": true,
+              "generation": 1,
+              "complete": false,
+              "nodesObserved": 92,
+              "cuts": [
+                {
+                  "ref": "e50",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e51",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e52",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e53",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e54",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e55",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e56",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e57",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e58",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e59",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e60",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e61",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e62",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e63",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e64",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e65",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e66",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e67",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e68",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e69",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e70",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e71",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e72",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e73",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e74",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e75",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e76",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e77",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e78",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e79",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e80",
+                  "childCount": 20
+                }
+              ]
+            }
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "ax.node",
+        "params": {
+          "ref": "e50"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "result": {
+              "ref": "e50",
+              "role": "group",
+              "nativeRole": "AXGroup",
+              "title": "Article 1",
+              "value": null,
+              "description": null,
+              "enabled": true,
+              "focused": false,
+              "x": null,
+              "y": null,
+              "width": null,
+              "height": null,
+              "actions": null,
+              "childCount": 1,
+              "evidence": {
+                "title": "known",
+                "value": "absent",
+                "description": "absent",
+                "enabled": "known",
+                "focused": "known",
+                "bounds": "absent"
+              },
+              "subtreeTruncated": true
+            }
+          },
+          "variable": []
+        }
+      ]
+    }
+  ]
+}

@@ -72,7 +72,9 @@ describe("planCuratedReadonlyCommand", () => {
       program: "curl",
       args: ["--disable", "--silent", "https://example.com/docs"],
     })
-    expect(planCuratedReadonlyCommand({ program: "gh", args: ["search", "code", "createTaskEngine", "--limit", "5"] })).toEqual({
+    expect(
+      planCuratedReadonlyCommand({ program: "gh", args: ["search", "code", "createTaskEngine", "--limit", "5"] }),
+    ).toEqual({
       program: "gh",
       args: ["search", "code", "createTaskEngine", "--limit", "5"],
     })

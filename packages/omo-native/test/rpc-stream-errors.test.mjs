@@ -18,7 +18,9 @@ if (!rpcSource.includes(serialization) || rpcSource.includes(guardedSerializatio
 const { toJsonEvent } = await import(new URL("./modes/json-event.js", engineEntry).href)
 const patchScript = fileURLToPath(new URL("../bin/senpi-patch.mjs", import.meta.url))
 const roots = []
-afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
+afterEach(() => {
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
+})
 
 // Upstream has declared the RPC shutdown entry two ways; the patch only needs a `shutdown(exitCode)` callable in scope.
 const shutdownShapes = {
@@ -72,8 +74,14 @@ function engineFixture(source = rpcSource) {
 }
 
 function patch(root) {
-  writeFileSync(join(root, "dist", "main.js"), "created.session.setSessionThinkingLevel(created.session.thinkingLevel);\n")
-  const result = spawnSync("node", [patchScript], { env: { ...process.env, OMO_SENPI_PATCH_ROOT: root }, encoding: "utf8" })
+  writeFileSync(
+    join(root, "dist", "main.js"),
+    "created.session.setSessionThinkingLevel(created.session.thinkingLevel);\n",
+  )
+  const result = spawnSync("node", [patchScript], {
+    env: { ...process.env, OMO_SENPI_PATCH_ROOT: root },
+    encoding: "utf8",
+  })
   if (result.status !== 0) throw new Error(result.stderr)
 }
 
@@ -83,8 +91,20 @@ function sinkFrom(source) {
   const output = []
   const shutdowns = []
   const shutdown = Promise.withResolvers()
-  const sink = new Function("toJsonEvent", "writeRawStdout", "waitForRawStdoutBackpressure", "shutdown", `${sinkSource}\nreturn sink;`)(
-    toJsonEvent, (line) => output.push(JSON.parse(line)), () => Promise.resolve(), (code) => { shutdowns.push(code); shutdown.resolve() },
+  const sink = new Function(
+    "toJsonEvent",
+    "writeRawStdout",
+    "waitForRawStdoutBackpressure",
+    "shutdown",
+    `${sinkSource}\nreturn sink;`,
+  )(
+    toJsonEvent,
+    (line) => output.push(JSON.parse(line)),
+    () => Promise.resolve(),
+    (code) => {
+      shutdowns.push(code)
+      shutdown.resolve()
+    },
   )
   return { sink, output, shutdowns, closed: shutdown.promise }
 }
@@ -93,7 +113,11 @@ const assistant = { role: "assistant", content: [], usage: { totalTokens: 20 } }
 
 describe("installed RPC stream serializer", () => {
   for (const event of [
-    { type: "message_update", message: assistant, assistantMessageEvent: { type: "toolcall_start", contentIndex: 0, partial: assistant } },
+    {
+      type: "message_update",
+      message: assistant,
+      assistantMessageEvent: { type: "toolcall_start", contentIndex: 0, partial: assistant },
+    },
     { type: "message_update", message: { role: "user", content: "bad" } },
   ]) {
     test(`#given malformed ${event.message.role} stream data #when stdio serializes it #then RPC rejects it and shuts down`, async () => {
@@ -102,7 +126,12 @@ describe("installed RPC stream serializer", () => {
       const runtime = sinkFrom(readFileSync(fixture.rpcPath, "utf8"))
       runtime.sink.writeRaw(`${JSON.stringify(event)}\n`)
       await runtime.closed
-      expect(runtime.output[0]).toMatchObject({ type: "response", command: "prompt", success: false, errorCode: "invalid_stream_event" })
+      expect(runtime.output[0]).toMatchObject({
+        type: "response",
+        command: "prompt",
+        success: false,
+        errorCode: "invalid_stream_event",
+      })
       expect(runtime.output[0].error.length).toBeGreaterThan(0)
       expect(runtime.shutdowns).toEqual([1])
     })
@@ -130,9 +159,16 @@ describe("installed RPC stream serializer", () => {
       const prepared = readFileSync(fixture.rpcPath, "utf8")
       expect(prepared).toContain('errorCode: "invalid_stream_event"')
       const runtime = sinkFrom(prepared)
-      runtime.sink.writeRaw(`${JSON.stringify({ type: "message_update", message: { role: "user", content: "bad" } })}\n`)
+      runtime.sink.writeRaw(
+        `${JSON.stringify({ type: "message_update", message: { role: "user", content: "bad" } })}\n`,
+      )
       await runtime.closed
-      expect(runtime.output[0]).toMatchObject({ type: "response", command: "prompt", success: false, errorCode: "invalid_stream_event" })
+      expect(runtime.output[0]).toMatchObject({
+        type: "response",
+        command: "prompt",
+        success: false,
+        errorCode: "invalid_stream_event",
+      })
       expect(runtime.shutdowns).toEqual([1])
     })
 
@@ -158,8 +194,15 @@ describe("installed RPC stream serializer", () => {
     patch(fixture.root)
     const runtime = sinkFrom(readFileSync(fixture.rpcPath, "utf8"))
     const message = { ...assistant, content: [{ type: "toolCall", id: "call-7", name: "read", arguments: {} }] }
-    runtime.sink.writeRaw(`${JSON.stringify({ type: "message_update", message, assistantMessageEvent: { type: "toolcall_start", contentIndex: 0, partial: message } })}\n`)
-    expect(runtime.output[0].assistantMessageEvent).toEqual({ type: "toolcall_start", contentIndex: 0, id: "call-7", toolName: "read" })
+    runtime.sink.writeRaw(
+      `${JSON.stringify({ type: "message_update", message, assistantMessageEvent: { type: "toolcall_start", contentIndex: 0, partial: message } })}\n`,
+    )
+    expect(runtime.output[0].assistantMessageEvent).toEqual({
+      type: "toolcall_start",
+      contentIndex: 0,
+      id: "call-7",
+      toolName: "read",
+    })
     expect(runtime.shutdowns).toEqual([])
   })
 

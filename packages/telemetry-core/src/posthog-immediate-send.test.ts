@@ -36,7 +36,12 @@ describe("#given the real PostHog transport against a fake HTTP server", () => {
       ...extra,
     })
     try {
-      await transport.captureImmediate?.({ distinctId: "machine-hash", event: "session_summary", properties: { turns: 1 }, uuid: "0b6c5d3e-2f1a-4c8b-9d7e-6a5b4c3d2e1f" })
+      await transport.captureImmediate?.({
+        distinctId: "machine-hash",
+        event: "session_summary",
+        properties: { turns: 1 },
+        uuid: "0b6c5d3e-2f1a-4c8b-9d7e-6a5b4c3d2e1f",
+      })
       return "accepted"
     } catch (error) {
       return error instanceof TelemetryDeliveryError ? { permanent: error.permanent } : "other-error"

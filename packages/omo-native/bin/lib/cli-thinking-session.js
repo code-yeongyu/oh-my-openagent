@@ -3,7 +3,8 @@ import { join } from "node:path"
 
 // Startup re-applies a CLI override after model selection. Only that application is session-only;
 // RPC and interactive setters still save preferences (oh-my-openagent#8116).
-const startupApply = /\bcreated\.session\.(?:setThinkingLevel|setSessionThinkingLevel)\(\s*(?:selection\?\.requested\s*\?\?\s*)?created\.session\.thinkingLevel\s*\)/g
+const startupApply =
+  /\bcreated\.session\.(?:setThinkingLevel|setSessionThinkingLevel)\(\s*(?:selection\?\.requested\s*\?\?\s*)?created\.session\.thinkingLevel\s*\)/g
 
 function prepareTargets(senpiRoot, relatives, label) {
   let applications = 0

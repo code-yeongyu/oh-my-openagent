@@ -25,9 +25,10 @@ export type DagExecutionModeSources = {
 export function resolveDagNodeExecutionMode(sources: DagExecutionModeSources): ExecutionMode | undefined {
   const agentName = sources.route.kind === "agent" ? sources.route.agent : undefined
   const definition = agentName === undefined ? undefined : sources.agents[agentName]
-  const agentMode = agentName !== undefined && CURATED_READONLY_AGENT_NAMES.has(agentName)
-    ? "in-process" as const
-    : toExecutionMode(definition?.executionMode)
+  const agentMode =
+    agentName !== undefined && CURATED_READONLY_AGENT_NAMES.has(agentName)
+      ? ("in-process" as const)
+      : toExecutionMode(definition?.executionMode)
   const configMode = sources.config.task?.default_execution_mode
   const autoMode = sources.autoMode?.()
   if (configMode === "auto" && agentMode === undefined && autoMode === undefined) return undefined
