@@ -19,6 +19,7 @@ export interface ControlParts {
   readonly fixtures: Slot<Fixtures>
   readonly context: () => Readonly<Record<string, unknown>>
   readonly settle: (read: () => Promise<unknown>, expected: unknown) => Promise<unknown>
+  readonly windowWaitMs: number
 }
 
 interface Point {
@@ -136,7 +137,7 @@ export async function runControl(parts: ControlParts): Promise<number> {
       if (os === "windows") say(`probe before release ${await sendInput("-Do", "probe")}`)
       const outcome = await tool.execute(
         `conformance-control-${leg.action}`,
-        { action: "run", code: cellCode(cell, target) },
+        { action: "run", code: cellCode(cell, target, parts.windowWaitMs) },
         parts.context(),
       )
       const value = isRecord(outcome) && isRecord(outcome.details) ? outcome.details.value : outcome

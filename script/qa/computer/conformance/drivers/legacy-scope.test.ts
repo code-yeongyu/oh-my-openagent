@@ -9,6 +9,24 @@ import { createLegacyDriver } from "./legacy.ts"
 import { fakeTool, fixtures, observer, type Sent } from "./legacy-facade.ts"
 import { hostFixtures, hostScope } from "./legacy-fixtures.ts"
 
+test("a fixture window that appears after a few reads is waited for within the settle budget, and not past it", async () => {
+  const [cell] = cells
+  if (cell === undefined) throw new Error("empty catalog")
+  const run = (settleMs: number, sent: Sent[]) =>
+    createLegacyDriver({
+      session,
+      settleMs,
+      tool: { ready: fakeTool(sent, undefined, undefined, undefined, 3) },
+      fixtures: { ready: fixtures(1) },
+      observer: { ready: observer },
+    }).runCell(cell)
+  const waited: Sent[] = []
+  expect((await run(2_000, waited)).observed.kind).toBe("delivered")
+  expect(waited.length > 0).toBe(true)
+  const impatient: Sent[] = []
+  expect([(await run(0, impatient)).observed.kind, impatient]).toEqual(["error", []])
+})
+
 test("a Windows web-view cell runs only when the workflow names the built web-view fixture", () => {
   const webviewCell = catalogFor("windows", "console").find((c) => c.toolkit === "webview")
   if (webviewCell === undefined) throw new Error("the Windows catalog has no web-view cell")

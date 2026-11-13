@@ -123,11 +123,21 @@ function actionLines(cell: Cell, target: FixtureTarget): string[] {
 
 // The shipped runtime matches `app` against the engine's own app name for the window (not the fixture's display
 // name), so the window is found by its exact title; a miss records the windows the engine listed, as evidence.
-function windowLookup(target: FixtureTarget): string[] {
+// A fixture process reports itself ready before the window server lists its window on every OS (measured on hosted
+// macOS: the first cell found it, the next cells, each on a fresh fixture, did not), so the lookup waits for it within
+// a bound before it records the miss.
+const WINDOW_POLL_MS = 100
+
+function windowLookup(target: FixtureTarget, waitMs: number): string[] {
   const title = JSON.stringify(target.title)
   return [
-    `const listed = await desktop.windows({ title: ${title} })`,
-    `const record = listed.find((entry) => entry.title === ${title})`,
+    `const lookUp = async () => (await desktop.windows({ title: ${title} })).find((entry) => entry.title === ${title})`,
+    `const waitUntil = Date.now() + ${waitMs}`,
+    "let record = await lookUp()",
+    "while (record === undefined && Date.now() < waitUntil) {",
+    `  await new Promise((done) => setTimeout(done, ${WINDOW_POLL_MS}))`,
+    "  record = await lookUp()",
+    "}",
     "if (record === undefined) {",
     `  const seen = (await desktop.windows()).slice(0, 12).map((entry) => ({ app: entry.app, title: entry.title, pid: entry.pid }))`,
     `  return { kind: "error", message: \`no window titled ${target.title.replaceAll("`", "")}; engine lists \${JSON.stringify(seen)}\` }`,
@@ -137,9 +147,9 @@ function windowLookup(target: FixtureTarget): string[] {
 }
 
 /** `run` code for one cell. It returns its own outcome, so a refusal is read from the engine's error code. */
-export function cellCode(cell: Cell, target: FixtureTarget): string {
+export function cellCode(cell: Cell, target: FixtureTarget, windowWaitMs = 0): string {
   const body = [
-    ...windowLookup(target),
+    ...windowLookup(target, windowWaitMs),
     ...lookup("el", target.element),
     ...labelCheck(cell),
     ...CENTRE,
