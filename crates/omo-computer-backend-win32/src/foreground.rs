@@ -45,11 +45,15 @@ pub struct UserModifierHeld {
     pub keys: Vec<&'static str>,
 }
 
-const MODIFIERS: [(u16, &str); 4] = [
+/// `VK_RWIN`: a held right Win key is a modifier too (review L3 of #13350).
+const VK_RWIN: u16 = 0x5C;
+
+const MODIFIERS: [(u16, &str); 5] = [
     (VK_SHIFT, "shift"),
     (VK_CONTROL, "ctrl"),
     (VK_MENU, "alt"),
     (VK_LWIN, "win"),
+    (VK_RWIN, "win"),
 ];
 
 /// Admits a leased `SendInput` batch: a Shift, Ctrl, Alt or Win key the user holds physically, and
@@ -59,11 +63,12 @@ const MODIFIERS: [(u16, &str); 4] = [
 /// [`UserModifierHeld`] naming the held modifiers.
 pub fn admit_leased(physical: &PhysicalChord, engine_held: &[u16]) -> Result<(), UserModifierHeld> {
     let held = physical.held();
-    let keys: Vec<&'static str> = MODIFIERS
+    let mut keys: Vec<&'static str> = MODIFIERS
         .iter()
         .filter(|(vk, _)| held.contains(vk) && !engine_held.contains(vk))
         .map(|(_, name)| *name)
         .collect();
+    keys.dedup();
     if keys.is_empty() {
         Ok(())
     } else {
@@ -86,7 +91,6 @@ pub fn foreground_chord(
     chord: &Chord,
     vk_for: &dyn Fn(char) -> Option<u16>,
 ) -> Result<Vec<KeyUnit>, Refusal> {
-    let _ = vk_for;
     let mods: Vec<u16> = [
         (chord.mods.shift, VK_SHIFT),
         (chord.mods.ctrl, VK_CONTROL),
@@ -97,22 +101,54 @@ pub fn foreground_chord(
     .filter(|(on, _)| *on)
     .map(|(_, vk)| *vk)
     .collect();
-    let (down, up) = match chord.key {
-        Key::Named(vk) => (
+    let accelerator = chord.mods.ctrl || chord.mods.alt || chord.mods.win;
+    let key: Vec<KeyUnit> = match chord.key {
+        Key::Named(vk) => vec![
             KeyUnit::scan_coded(vk, true),
             KeyUnit::scan_coded(vk, false),
-        ),
+        ],
+        // VK_PACKET with Ctrl, Alt or Win down triggers no accelerator: send the layout's key.
+        Key::Char(c) if accelerator => {
+            let vk = vk_for(c).ok_or(Refusal::new(
+                EngineCode::InvalidKey,
+                Reason::UnknownKey.wire(),
+            ))?;
+            vec![
+                KeyUnit::virtual_key(vk, true),
+                KeyUnit::virtual_key(vk, false),
+            ]
+        }
+        // One down/up per UTF-16 unit, so a character outside the BMP is both surrogate halves.
         Key::Char(c) => {
-            let unit = u16::try_from(u32::from(c)).unwrap_or(0);
-            (KeyUnit::unicode(unit, true), KeyUnit::unicode(unit, false))
+            let mut units = [0u16; 2];
+            c.encode_utf16(&mut units)
+                .iter()
+                .flat_map(|unit| {
+                    [
+                        KeyUnit::unicode(*unit, true),
+                        KeyUnit::unicode(*unit, false),
+                    ]
+                })
+                .collect()
         }
     };
     let mut batch: Vec<KeyUnit> = mods
         .iter()
         .map(|vk| KeyUnit::virtual_key(*vk, true))
         .collect();
-    batch.push(down);
-    batch.push(up);
+    batch.extend(key);
     batch.extend(mods.iter().rev().map(|vk| KeyUnit::virtual_key(*vk, false)));
     Ok(batch)
+}
+
+/// The keyboard layout's virtual key for `c` (`VkKeyScanW`), when typing it needs no modifier
+/// of its own; `None` otherwise, so a chord never guesses a key.
+#[cfg(windows)]
+#[must_use]
+pub fn layout_vk(c: char) -> Option<u16> {
+    let unit = u16::try_from(u32::from(c)).ok()?;
+    // SAFETY: a pure lookup in the calling thread's keyboard layout.
+    let scan = unsafe { windows::Win32::UI::Input::KeyboardAndMouse::VkKeyScanW(unit) };
+    let bits = u16::from_ne_bytes(scan.to_ne_bytes());
+    (scan != -1 && bits >> 8 == 0).then_some(bits & 0xFF)
 }
