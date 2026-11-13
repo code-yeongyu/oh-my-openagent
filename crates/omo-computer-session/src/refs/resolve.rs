@@ -120,10 +120,12 @@ impl RefRegistry {
                         }
                     }
                 }
-                Err(Unresolved {
-                    refusal: Refusal::bare(EngineCode::AmbiguousTarget),
-                    candidates: candidates.iter().map(|c| self.describe(&window, c, token)).collect(),
-                })
+                let candidates = candidates.iter().map(|c| self.describe(&window, c, token)).collect();
+                // The fresh tokens identify; they do not license an act. The error marks the
+                // window needs_observe, and the sub-generation minted above, a drill, does not
+                // lift it: only a new full observation does.
+                self.after_error(&window);
+                Err(Unresolved { refusal: Refusal::bare(EngineCode::AmbiguousTarget), candidates })
             }
         }
     }
