@@ -1,0 +1,40 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/omo-codex/plugin/components/bootstrap": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "scripts/build.mjs",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+      ],
+      "ignoreFiles": [
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/generate-manifests.mjs",
+      ],
+      "ignoreIssues": {
+        // pre-existing at origin dev 4686e425b5: imports that do not resolve src/cli.ts
+        "scripts/build.mjs": ["unresolved"],
+      },
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) bootstrapLocks, detectInstallFlow, detectInstallFlowDetailed, detectInstallFlowForTest, detectInstallFlowFromEnvironment, INSTALL_SNAPSHOT_FILENAME, resolveBootstrapLockPath, resolveBootstrapStatePath, resolveCodexHome, BOOTSTRAP_RESTART_NOTICE and 19 more
+    "packages/omo-codex/plugin/components/bootstrap/src/cli.ts": ["bootstrapLocks", "detectInstallFlow", "detectInstallFlowDetailed", "detectInstallFlowForTest", "detectInstallFlowFromEnvironment", "INSTALL_SNAPSHOT_FILENAME", "resolveBootstrapLockPath", "resolveBootstrapStatePath", "resolveCodexHome", "BOOTSTRAP_RESTART_NOTICE", "executeSessionStartHook", "runSessionStartHook", "runSgProvision", "SG_FORCE_PROVISION_ENV_KEY", "SG_PROVISION_COMPONENT", "sgProvisionDestination", "GIT_BASH_INSTALL_HINT", "runWorkerSetup", "SETUP_MARKETPLACE_NAME", "SETUP_PLUGIN_NAME", "appendBootstrapLog", "BOOTSTRAP_DOCTOR_HINT", "defaultWorkerSteps", "parseBootstrapState", "parseWorkerFlags", "readBootstrapState", "readPluginVersion", "resolvePluginDataRoot", "runBootstrapWorker"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) resolveDefaultManifestsDir, parseAssetManifest
+    "packages/omo-codex/plugin/components/bootstrap/src/download.ts": ["resolveDefaultManifestsDir", "parseAssetManifest"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) INSTALL_SNAPSHOT_FILENAME, detectInstallFlowDetailed
+    "packages/omo-codex/plugin/components/bootstrap/src/environment.ts": ["INSTALL_SNAPSHOT_FILENAME", "detectInstallFlowDetailed"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) BOOTSTRAP_RESTART_NOTICE, executeSessionStartHook
+    "packages/omo-codex/plugin/components/bootstrap/src/hook.ts": ["BOOTSTRAP_RESTART_NOTICE", "executeSessionStartHook"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) SETUP_MARKETPLACE_NAME, SETUP_PLUGIN_NAME, GIT_BASH_INSTALL_HINT
+    "packages/omo-codex/plugin/components/bootstrap/src/setup.ts": ["SETUP_MARKETPLACE_NAME", "SETUP_PLUGIN_NAME", "GIT_BASH_INSTALL_HINT"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) parseWorkerFlags, resolvePluginDataRoot, parseBootstrapState
+    "packages/omo-codex/plugin/components/bootstrap/src/worker.ts": ["parseWorkerFlags", "resolvePluginDataRoot", "parseBootstrapState"]
+  }
+}
