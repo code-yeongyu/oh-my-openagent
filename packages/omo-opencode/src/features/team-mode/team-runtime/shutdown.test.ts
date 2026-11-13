@@ -271,11 +271,13 @@ describe("team-runtime shutdown", () => {
     temporaryDirectories.push(fixture.baseDir)
     const transitionedStatuses: string[] = []
     const originalTransitionRuntimeState = runtimeStateStore.transitionRuntimeState
-    spyOn(runtimeStateStore, "transitionRuntimeState").mockImplementation(async (teamRunId, transition, config) => {
-      const currentRuntimeState = await runtimeStateStore.loadRuntimeState(teamRunId, config)
-      transitionedStatuses.push(transition(currentRuntimeState).status)
-      return await originalTransitionRuntimeState(teamRunId, transition, config)
-    })
+    spyOn(runtimeStateStore, "transitionRuntimeState").mockImplementation(
+      async (teamRunId, transition, config, options) => {
+        const currentRuntimeState = await runtimeStateStore.loadRuntimeState(teamRunId, config)
+        transitionedStatuses.push(transition(currentRuntimeState).status)
+        return await originalTransitionRuntimeState(teamRunId, transition, config, options)
+      },
+    )
     await updateMemberStatuses(fixture.teamRunId, fixture.config, {
       "member-a": "pending",
       "member-b": "pending",
@@ -301,11 +303,13 @@ describe("team-runtime shutdown", () => {
     temporaryDirectories.push(fixture.baseDir)
     const transitionedStatuses: string[] = []
     const originalTransitionRuntimeState = runtimeStateStore.transitionRuntimeState
-    spyOn(runtimeStateStore, "transitionRuntimeState").mockImplementation(async (teamRunId, transition, config) => {
-      const currentRuntimeState = await runtimeStateStore.loadRuntimeState(teamRunId, config)
-      transitionedStatuses.push(transition(currentRuntimeState).status)
-      return await originalTransitionRuntimeState(teamRunId, transition, config)
-    })
+    spyOn(runtimeStateStore, "transitionRuntimeState").mockImplementation(
+      async (teamRunId, transition, config, options) => {
+        const currentRuntimeState = await runtimeStateStore.loadRuntimeState(teamRunId, config)
+        transitionedStatuses.push(transition(currentRuntimeState).status)
+        return await originalTransitionRuntimeState(teamRunId, transition, config, options)
+      },
+    )
     await updateMemberStatuses(fixture.teamRunId, fixture.config, {
       "member-a": "running",
       "member-b": "running",
@@ -370,11 +374,13 @@ describe("team-runtime shutdown", () => {
     temporaryDirectories.push(fixture.baseDir)
     const transitionedStatuses: string[] = []
     const originalTransitionRuntimeState = runtimeStateStore.transitionRuntimeState
-    spyOn(runtimeStateStore, "transitionRuntimeState").mockImplementation(async (teamRunId, transition, config) => {
-      const currentRuntimeState = await runtimeStateStore.loadRuntimeState(teamRunId, config)
-      transitionedStatuses.push(transition(currentRuntimeState).status)
-      return await originalTransitionRuntimeState(teamRunId, transition, config)
-    })
+    spyOn(runtimeStateStore, "transitionRuntimeState").mockImplementation(
+      async (teamRunId, transition, config, options) => {
+        const currentRuntimeState = await runtimeStateStore.loadRuntimeState(teamRunId, config)
+        transitionedStatuses.push(transition(currentRuntimeState).status)
+        return await originalTransitionRuntimeState(teamRunId, transition, config, options)
+      },
+    )
     const logMock = mock(() => {})
     const deps = {
       canVisualize: () => true,

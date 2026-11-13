@@ -6,7 +6,7 @@ import { canVisualize, removeTeamLayout } from "../team-layout-tmux/layout"
 import { sweepStaleTeamSessions } from "../team-layout-tmux/sweep-stale-team-sessions"
 import { getRuntimeStateDir, resolveBaseDir } from "../team-registry/paths"
 import { unregisterTeamSessionsByTeam } from "../team-session-registry"
-import { listActiveTeams, loadRuntimeState, saveRuntimeState, transitionRuntimeState } from "../team-state-store/store"
+import { listActiveTeams, loadRuntimeState, transitionRuntimeState } from "../team-state-store/store"
 import type { RuntimeState } from "../types"
 import { DELETABLE_MEMBER_STATUSES, removeWorktrees } from "./shutdown-helpers"
 import { unregisterTeamRunForSessionCleanup } from "./session-team-run-registry"
@@ -38,8 +38,6 @@ const FORCE_COMPLETABLE_MEMBER_STATUSES = new Set<RuntimeState["members"][number
   "running",
   "idle",
 ])
-
-const FORCE_BYPASS_DELETING_STATUSES = new Set<RuntimeState["status"]>(["creating", "orphaned"])
 
 const ACTIVE_BACKGROUND_TASK_STATUSES = new Set(["pending", "running"])
 function ignoreStaleTeamSessionSweepFailure(error: unknown): void {
@@ -135,11 +133,16 @@ async function deleteTeamResources(
   }
 
   if (runtimeState.status !== "deleting" && runtimeState.status !== "deleted") {
-    if (options?.force === true && FORCE_BYPASS_DELETING_STATUSES.has(runtimeState.status)) {
-      const currentRuntimeState = await loadRuntimeState(teamRunId, config)
-      if (currentRuntimeState.status !== "deleting" && currentRuntimeState.status !== "deleted") {
-        await saveRuntimeState({ ...currentRuntimeState, status: "deleting" }, config)
-      }
+    if (options?.force === true) {
+      await transitionRuntimeState(
+        teamRunId,
+        (currentRuntimeState) =>
+          currentRuntimeState.status === "deleting" || currentRuntimeState.status === "deleted"
+            ? currentRuntimeState
+            : { ...currentRuntimeState, status: "deleting" },
+        config,
+        { force: true },
+      )
     } else {
       await transitionRuntimeState(
         teamRunId,
@@ -182,11 +185,13 @@ async function deleteTeamResources(
   const removedWorktrees = await removeWorktrees(runtimeState.members.map((member) => member.worktreePath))
 
   if (runtimeState.status !== "deleted") {
+    // under force the status may have raced to orphaned (no FSM edge to deleted) after the worktrees were already removed
     await transitionRuntimeState(
       teamRunId,
       (currentRuntimeState) =>
         currentRuntimeState.status === "deleted" ? currentRuntimeState : { ...currentRuntimeState, status: "deleted" },
       config,
+      options?.force === true ? { force: true } : undefined,
     )
   }
 
