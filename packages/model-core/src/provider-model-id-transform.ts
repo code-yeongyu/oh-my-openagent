@@ -1,13 +1,13 @@
 function inferSubProvider(model: string): string | undefined {
-	if (model.startsWith("claude-")) return "anthropic"
-	if (model.startsWith("gpt-")) return "openai"
-	if (model.startsWith("gemini-")) return "google"
-	if (model.startsWith("grok-")) return "xai"
-	if (model.startsWith("minimax-")) return "minimax"
-	if (model.startsWith("kimi-")) return "moonshotai"
-	if (model.startsWith("k3")) return "moonshotai"
-	if (model.startsWith("glm-")) return "zai"
-	return undefined
+  if (model.startsWith("claude-")) return "anthropic"
+  if (model.startsWith("gpt-")) return "openai"
+  if (model.startsWith("gemini-")) return "google"
+  if (model.startsWith("grok-")) return "xai"
+  if (model.startsWith("minimax-")) return "minimax"
+  if (model.startsWith("kimi-")) return "moonshotai"
+  if (model.startsWith("k3")) return "moonshotai"
+  if (model.startsWith("glm-")) return "zai"
+  return undefined
 }
 
 const CLAUDE_VERSION_DOT = /claude-(\w+)-(\d+)-(\d+)/g
@@ -15,62 +15,53 @@ const GEMINI_31_PRO_PREVIEW = /(?<!antigravity-)gemini-3\.1-pro(?!-)/g
 const GEMINI_3_FLASH_PREVIEW = /(?<!antigravity-)gemini-3-flash(?!-)/g
 
 function claudeVersionDot(model: string): string {
-	return model.replace(CLAUDE_VERSION_DOT, "claude-$1-$2.$3")
+  return model.replace(CLAUDE_VERSION_DOT, "claude-$1-$2.$3")
 }
 
 function applyGatewayTransforms(model: string): string {
-	return claudeVersionDot(model).replace(
-		GEMINI_31_PRO_PREVIEW,
-		"gemini-3.1-pro-preview",
-	)
+  return claudeVersionDot(model).replace(GEMINI_31_PRO_PREVIEW, "gemini-3.1-pro-preview")
 }
 
-function transformModelForProviderUsingAnthropicBehavior(
-	provider: string,
-	model: string,
-): string {
-	if (provider === "vercel") {
-		const slashIndex = model.indexOf("/")
-		if (slashIndex !== -1) {
-			const subProvider = model.substring(0, slashIndex)
-			const subModel = model.substring(slashIndex + 1)
-			return `${subProvider}/${applyGatewayTransforms(subModel)}`
-		}
-		const subProvider = inferSubProvider(model)
-		if (subProvider) {
-			return `${subProvider}/${applyGatewayTransforms(model)}`
-		}
-		return model
-	}
-	if (provider === "github-copilot") {
-		return claudeVersionDot(model)
-			.replace(GEMINI_31_PRO_PREVIEW, "gemini-3.1-pro-preview")
-			.replace(GEMINI_3_FLASH_PREVIEW, "gemini-3-flash-preview")
-	}
-	if (provider === "google") {
-		return model
-			.replace(GEMINI_31_PRO_PREVIEW, "gemini-3.1-pro-preview")
-			.replace(GEMINI_3_FLASH_PREVIEW, "gemini-3-flash-preview")
-	}
-	if (provider === "anthropic") {
-		return model
-	}
-	if (provider === "kimi-coding" || provider === "kimi-for-coding") {
-		if (model === "kimi-k3") return "k3"
-		if (model === "kimi-k3-256k") return "k3-256k"
-		if (model === "kimi-k3.1-pro") return "k3.1-pro"
-		if (model === "kimi-k3.1-pro-highspeed") return "k3.1-pro-highspeed"
-	}
-	return model
+function transformModelForProviderUsingAnthropicBehavior(provider: string, model: string): string {
+  if (provider === "vercel") {
+    const slashIndex = model.indexOf("/")
+    if (slashIndex !== -1) {
+      const subProvider = model.substring(0, slashIndex)
+      const subModel = model.substring(slashIndex + 1)
+      return `${subProvider}/${applyGatewayTransforms(subModel)}`
+    }
+    const subProvider = inferSubProvider(model)
+    if (subProvider) {
+      return `${subProvider}/${applyGatewayTransforms(model)}`
+    }
+    return model
+  }
+  if (provider === "github-copilot") {
+    return claudeVersionDot(model)
+      .replace(GEMINI_31_PRO_PREVIEW, "gemini-3.1-pro-preview")
+      .replace(GEMINI_3_FLASH_PREVIEW, "gemini-3-flash-preview")
+  }
+  if (provider === "google") {
+    return model
+      .replace(GEMINI_31_PRO_PREVIEW, "gemini-3.1-pro-preview")
+      .replace(GEMINI_3_FLASH_PREVIEW, "gemini-3-flash-preview")
+  }
+  if (provider === "anthropic") {
+    return model
+  }
+  if (provider === "kimi-coding" || provider === "kimi-for-coding") {
+    if (model === "kimi-k3") return "k3"
+    if (model === "kimi-k3-256k") return "k3-256k"
+    if (model === "kimi-k3.1-pro") return "k3.1-pro"
+    if (model === "kimi-k3.1-pro-highspeed") return "k3.1-pro-highspeed"
+  }
+  return model
 }
 
 export function transformModelForProvider(provider: string, model: string): string {
-	return transformModelForProviderUsingAnthropicBehavior(provider, model)
+  return transformModelForProviderUsingAnthropicBehavior(provider, model)
 }
 
-export function transformModelForProviderDisplay(
-	provider: string,
-	model: string,
-): string {
-	return transformModelForProviderUsingAnthropicBehavior(provider, model)
+export function transformModelForProviderDisplay(provider: string, model: string): string {
+  return transformModelForProviderUsingAnthropicBehavior(provider, model)
 }

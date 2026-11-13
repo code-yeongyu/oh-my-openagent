@@ -1,11 +1,5 @@
-import {
-  isReplyListenerDaemonProcess,
-  isReplyListenerProcessRunning,
-} from "./reply-listener-process"
-import {
-  readReplyListenerPid,
-  removeReplyListenerPid,
-} from "./reply-listener-state"
+import { isReplyListenerDaemonProcess, isReplyListenerProcessRunning } from "./reply-listener-process"
+import { readReplyListenerPid, removeReplyListenerPid } from "./reply-listener-state"
 import { sleep } from "./reply-listener-sleep"
 
 export async function terminateReplyListenerProcess(pid: number): Promise<void> {

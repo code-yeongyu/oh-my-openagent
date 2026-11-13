@@ -14,7 +14,8 @@ import { TRANSIENT_DIRNAME } from "./transient-identity"
 const roots: string[] = []
 
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0))
+    rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
 function fixture(): { readonly cwd: string; readonly memoryHome: string } {
@@ -42,9 +43,7 @@ function fakeRuntime(): MemoryIdentityRuntime {
   } as unknown as MemoryIdentityRuntime
 }
 
-async function bind(options: {
-  readonly hasUI: boolean
-}): Promise<{
+async function bind(options: { readonly hasUI: boolean }): Promise<{
   readonly pi: MemoryFakeExtensionAPI
   readonly context: MemoryIdentityContext
   readonly memoryHome: string
@@ -128,5 +127,69 @@ describe("transient one-shot memory runs", () => {
     await started
 
     expect(swept).toEqual([memoryHome])
+  })
+
+  test("#given one engine process #when it opens many sessions on one memory root #then the transient sweep runs once, and never inside an open", async () => {
+    // given
+    const { cwd, memoryHome } = fixture()
+    let sweeps = 0
+    let firstSweep: () => void = () => undefined
+    const swept = new Promise<void>((resolve) => {
+      firstSweep = resolve
+    })
+    const open = (): number => {
+      createMemoryComponent({
+        env: { OMO_MEMORY_HOME: memoryHome },
+        loadConfig: () => loadedMemoryConfig(memorySettings()),
+        resolveCwd: () => cwd,
+        transientSweepDeferMs: 0,
+        sweepTransientRuns: () => {
+          sweeps += 1
+          firstSweep()
+          return Promise.resolve({ removedRuns: 0, removedIdentities: 0, promoted: 0, stranded: 0, kept: 0 })
+        },
+      }).register(new MemoryFakeExtensionAPI(), componentContext())
+      return sweeps
+    }
+
+    // when
+    const sweepsSeenByEachOpen = Array.from({ length: 5 }, open)
+    await swept
+    open()
+
+    // then
+    expect(sweepsSeenByEachOpen).toEqual([0, 0, 0, 0, 0])
+    expect(sweeps).toBe(1)
+  })
+
+  test("#given a session that shuts down before its deferred sweep started #when the process opens another session #then that session still sweeps", async () => {
+    // given
+    const { cwd, memoryHome } = fixture()
+    const roots: string[] = []
+    const component = (deferMs: number, onSweep: () => void) =>
+      createMemoryComponent({
+        env: { OMO_MEMORY_HOME: memoryHome },
+        loadConfig: () => loadedMemoryConfig(memorySettings()),
+        resolveCwd: () => cwd,
+        createRuntime: () => fakeRuntime(),
+        transientSweepDeferMs: deferMs,
+        sweepTransientRuns: (input) => {
+          roots.push(input.memoryRoot)
+          onSweep()
+          return Promise.resolve({ removedRuns: 0, removedIdentities: 0, promoted: 0, stranded: 0, kept: 0 })
+        },
+      })
+    const first = new MemoryFakeExtensionAPI()
+    component(60_000, () => undefined).register(first, componentContext())
+    await first.dispatch("session_shutdown", { type: "session_shutdown", reason: "quit" }, sessionEventContext(false))
+
+    // when
+    const swept = new Promise<void>((resolve) => {
+      component(0, resolve).register(new MemoryFakeExtensionAPI(), componentContext())
+    })
+    await swept
+
+    // then
+    expect(roots).toEqual([memoryHome])
   })
 })

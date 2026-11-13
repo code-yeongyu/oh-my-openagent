@@ -69,7 +69,8 @@ describe("project memory grant Windows canonical paths", () => {
     await grantProjectMemoryRead(own, "/memory/project-a/repo", { realPath: async (path) => path })
 
     const granted = isGrantedProjectMemoryRead(own, "/memory/PROJECT-A/repo/reference/deploy.md", {
-      realpath: (path) => path, platform: "linux",
+      realpath: (path) => path,
+      platform: "linux",
     })
 
     expect(granted).toBe(false)

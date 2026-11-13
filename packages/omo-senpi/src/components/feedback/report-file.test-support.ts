@@ -16,7 +16,9 @@ export interface WindowsAclEntry {
  * rather than Get-Acl and passes no PSModulePath: a parent PowerShell 7 exports a PSModulePath that Windows PowerShell
  * 5.1 cannot load its own modules from, which breaks every module cmdlet in the child.
  */
-export const readWindowsAcl = (path: string): { readonly user: string; readonly entries: readonly WindowsAclEntry[] } => {
+export const readWindowsAcl = (
+  path: string,
+): { readonly user: string; readonly entries: readonly WindowsAclEntry[] } => {
   const script = [
     "$ErrorActionPreference = 'Stop'",
     "'user=' + [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value",
@@ -31,7 +33,8 @@ export const readWindowsAcl = (path: string): { readonly user: string; readonly 
   if (result.status !== 0) throw new Error(`reading the ACL failed for ${path}: ${result.stderr}`)
   const lines = result.stdout.split(/\r?\n/)
   const user = lines.find((line) => line.startsWith("user="))?.slice("user=".length)
-  if (user === undefined || user === "") throw new Error(`no current-user SID in the ACL output for ${path}: ${result.stdout}`)
+  if (user === undefined || user === "")
+    throw new Error(`no current-user SID in the ACL output for ${path}: ${result.stdout}`)
   const entries = lines.flatMap((line): WindowsAclEntry[] => {
     if (!line.startsWith("rule=")) return []
     const [sid, type] = line.slice("rule=".length).split("|")

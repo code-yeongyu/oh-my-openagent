@@ -1965,6 +1965,94 @@ dependencies = [
 ]
 
 [[package]]
+name = "omo-computer-backend-atspi"
+version = "0.0.0"
+dependencies = [
+ "omo-computer-core",
+]
+
+[[package]]
+name = "omo-computer-backend-fake"
+version = "0.0.0"
+dependencies = [
+ "omo-computer-core",
+]
+
+[[package]]
+name = "omo-computer-backend-macos"
+version = "0.0.0"
+dependencies = [
+ "omo-computer-core",
+ "omo-computer-safety",
+]
+
+[[package]]
+name = "omo-computer-backend-wayland"
+version = "0.0.0"
+dependencies = [
+ "omo-computer-backend-atspi",
+ "omo-computer-core",
+ "omo-computer-safety",
+]
+
+[[package]]
+name = "omo-computer-backend-win32"
+version = "0.0.0"
+dependencies = [
+ "omo-computer-core",
+ "omo-computer-safety",
+]
+
+[[package]]
+name = "omo-computer-backend-x11"
+version = "0.0.0"
+dependencies = [
+ "omo-computer-backend-atspi",
+ "omo-computer-core",
+ "omo-computer-safety",
+]
+
+[[package]]
+name = "omo-computer-core"
+version = "0.0.0"
+dependencies = [
+ "schemars",
+ "serde",
+ "serde_json",
+ "sha2",
+ "syn 2.0.118",
+]
+
+[[package]]
+name = "omo-computer-engine"
+version = "0.0.0"
+dependencies = [
+ "omo-computer-backend-atspi",
+ "omo-computer-backend-fake",
+ "omo-computer-backend-macos",
+ "omo-computer-backend-wayland",
+ "omo-computer-backend-win32",
+ "omo-computer-backend-x11",
+ "omo-computer-session",
+]
+
+[[package]]
+name = "omo-computer-safety"
+version = "0.0.0"
+dependencies = [
+ "omo-computer-core",
+]
+
+[[package]]
+name = "omo-computer-session"
+version = "0.0.0"
+dependencies = [
+ "omo-computer-backend-fake",
+ "omo-computer-core",
+ "omo-computer-safety",
+]
+
+[[package]]
 name = "omo-engine-trust-helper"
 version = "0.0.0"
 dependencies = [
@@ -2514,6 +2602,8 @@ dependencies = [
  "senpi-desktop-backend-atspi",
  "senpi-desktop-core",
  "senpi-desktop-safety",
+ "serde",
+ "serde_json",
  "tempfile",
  "tokio",
  "xkeysym",
@@ -2610,6 +2700,7 @@ version = "0.0.0"
 dependencies = [
  "flume",
  "image",
+ "libc",
  "parking_lot",
  "senpi-desktop-backend-fake",
  "senpi-desktop-backend-macos",
@@ -2625,6 +2716,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "ulid",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

@@ -48,10 +48,8 @@ function readLockSnapshot(): LockSnapshot | null {
 
     try {
       const parsed = JSON.parse(trimmed)
-      const pid =
-        typeof parsed.pid === "number" && Number.isFinite(parsed.pid) ? parsed.pid : null
-      const token =
-        typeof parsed.token === "string" && parsed.token.length > 0 ? parsed.token : null
+      const pid = typeof parsed.pid === "number" && Number.isFinite(parsed.pid) ? parsed.pid : null
+      const token = typeof parsed.token === "string" && parsed.token.length > 0 ? parsed.token : null
       return { raw, pid, token }
     } catch (error) {
       if (!(error instanceof SyntaxError)) return null
@@ -172,10 +170,7 @@ function releaseRegistryLock(lock: LockHandle): void {
   removeLockIfUnchanged(snapshot)
 }
 
-export function withRegistryLockOrWait<T>(
-  onLocked: () => T,
-  onLockUnavailable: () => T,
-): T {
+export function withRegistryLockOrWait<T>(onLocked: () => T, onLockUnavailable: () => T): T {
   const lock = acquireRegistryLockOrWait()
   if (lock === null) return onLockUnavailable()
   try {

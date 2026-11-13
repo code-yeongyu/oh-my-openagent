@@ -54,7 +54,8 @@ export function getTerminalSessionError(messages: readonly SessionMessage[]): st
   if (lastRelevantUser?.info?.id && lastAssistant?.info?.id && lastAssistant.info.id <= lastRelevantUser.info.id) {
     return null
   }
-  if (!lastAssistant?.info || !("error" in lastAssistant.info)) {
+  // The messages API reports a running assistant turn with `error: null`; only a set error ends the session.
+  if (lastAssistant?.info?.error === undefined || lastAssistant.info.error === null) {
     return null
   }
 

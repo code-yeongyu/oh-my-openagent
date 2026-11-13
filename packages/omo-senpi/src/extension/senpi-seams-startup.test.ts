@@ -18,11 +18,22 @@ import type { ComponentLogger } from "./types"
 
 function recordingLogger(): { readonly logger: ComponentLogger; readonly warnings: string[] } {
   const warnings: string[] = []
-  return { warnings, logger: { info() {}, error() {}, warn: (message, details) => { warnings.push(details === undefined ? message : `${message} ${JSON.stringify(details)}`) } } }
+  return {
+    warnings,
+    logger: {
+      info() {},
+      error() {},
+      warn: (message, details) => {
+        warnings.push(details === undefined ? message : `${message} ${JSON.stringify(details)}`)
+      },
+    },
+  }
 }
 
 const roots: string[] = []
-afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
+afterEach(() => {
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
+})
 
 async function loadComposed(edit: SeamEdit, logger: ComponentLogger): Promise<void> {
   const root = mkdtempSync(join(tmpdir(), "omo-senpi-seams-"))
@@ -58,30 +69,56 @@ describe("absent-seam startup line", () => {
 })
 
 describe("monitor open on a remote session target", () => {
-  async function preflightMonitor(edit: SeamEdit, target: string): Promise<{ readonly block?: boolean; readonly reason?: string } | undefined> {
+  async function preflightMonitor(
+    edit: SeamEdit,
+    target: string,
+  ): Promise<{ readonly block?: boolean; readonly reason?: string } | undefined> {
     const root = mkdtempSync(join(tmpdir(), "omo-senpi-remote-wake-"))
     roots.push(root)
     const agentDir = join(root, "agent")
     mkdirSync(agentDir)
-    const settingsManager = SettingsManager.inMemory({ defaultProjectTrust: "always", enabledBuiltinExtensions: ["terminal"] })
+    const settingsManager = SettingsManager.inMemory({
+      defaultProjectTrust: "always",
+      enabledBuiltinExtensions: ["terminal"],
+    })
     const registry = new ModelRegistry(ModelRuntime.createSync({ modelsPath: null }))
-    const extension = composeOmoSenpiExtension([], { logger: recordingLogger().logger, scheduleStartupWork: () => () => undefined })
+    const extension = composeOmoSenpiExtension([], {
+      logger: recordingLogger().logger,
+      scheduleStartupWork: () => () => undefined,
+    })
     const loader = new DefaultResourceLoader({
-      cwd: root, agentDir, settingsManager, noExtensions: true, noSkills: true, noPromptTemplates: true, noThemes: true, noContextFiles: true,
+      cwd: root,
+      agentDir,
+      settingsManager,
+      noExtensions: true,
+      noSkills: true,
+      noPromptTemplates: true,
+      noThemes: true,
+      noContextFiles: true,
       extensionFactories: [(pi) => extension(withSeamEdit(pi, edit))],
     })
     await loader.reload()
     expect(loader.getExtensions().errors).toEqual([])
     const { session } = await createAgentSession({
-      cwd: root, agentDir, settingsManager, modelRegistry: registry, resourceLoader: loader,
-      sessionManager: SessionManager.inMemory(root), autoTitleSessions: false,
+      cwd: root,
+      agentDir,
+      settingsManager,
+      modelRegistry: registry,
+      resourceLoader: loader,
+      sessionManager: SessionManager.inMemory(root),
+      autoTitleSessions: false,
     })
     try {
       await session.bindExtensions({ mode: "print" })
       const args = { type: "rpc", target, description: "peer session", events: "all" }
-      return await session.preflightToolCall({ type: "toolCall", id: "monitor-1", name: "monitor", arguments: args }, args)
+      return await session.preflightToolCall(
+        { type: "toolCall", id: "monitor-1", name: "monitor", arguments: args },
+        args,
+      )
     } finally {
       session.dispose()
+      // senpi's fallback logger finishes its first-start removal asynchronously; removing the agent dir before it settles leaks it (#9766).
+      await session.whenToolChildClosed()
     }
   }
 
@@ -102,7 +139,20 @@ describe("monitor open on a remote session target", () => {
     const edit = { hide: [REMOTE_WAKE_SEAM] }
 
     // when
-    const targets = ["all", "children", "st_0123", "sessions/run.jsonl", "sessions/run.JSONL", "C:/x", "/abs/session", "./x", "../x", "~/x", ".omo/x", "s-0123"]
+    const targets = [
+      "all",
+      "children",
+      "st_0123",
+      "sessions/run.jsonl",
+      "sessions/run.JSONL",
+      "C:/x",
+      "/abs/session",
+      "./x",
+      "../x",
+      "~/x",
+      ".omo/x",
+      "s-0123",
+    ]
     const results = await Promise.all(targets.map((target) => preflightMonitor(edit, target)))
 
     // then

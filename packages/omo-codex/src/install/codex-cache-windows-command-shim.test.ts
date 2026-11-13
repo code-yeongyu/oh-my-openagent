@@ -23,20 +23,26 @@ for (const config of ["quoted-node-path", "without-node-path", "missing-config"]
       await writeFile(join(repoRoot, "dist", "cli", "index.js"), target)
       await writeFile(join(repoRoot, "dist", "cli-node", "index.js"), target)
       await writeFile(join(pluginRoot, "target.cjs"), target)
-      await writeFile(join(pluginRoot, "package.json"), JSON.stringify({
-        name: "windows-shim-fixture",
-        bin: {
-          "omo-ulw-loop": "target.cjs",
-          ulw: "target.cjs",
-          "omo-git-bash-hook": "target.cjs",
-        },
-      }))
+      await writeFile(
+        join(pluginRoot, "package.json"),
+        JSON.stringify({
+          name: "windows-shim-fixture",
+          bin: {
+            "omo-ulw-loop": "target.cjs",
+            ulw: "target.cjs",
+            "omo-git-bash-hook": "target.cjs",
+          },
+        }),
+      )
       const node = Bun.which("node")
       if (node === null) throw new Error("Windows shim proof requires node on PATH")
       if (config !== "missing-config") {
-        await writeFile(join(codexHome, "config.toml"), config === "quoted-node-path"
-          ? `NODE_REPL_NODE_PATH = ${JSON.stringify(node.replaceAll("\\", "/"))}\n`
-          : 'model = "synthetic-test-model"\n')
+        await writeFile(
+          join(codexHome, "config.toml"),
+          config === "quoted-node-path"
+            ? `NODE_REPL_NODE_PATH = ${JSON.stringify(node.replaceAll("\\", "/"))}\n`
+            : 'model = "synthetic-test-model"\n',
+        )
       }
       const runtime = await linkRootRuntimeBin({ repoRoot, binDir, codexHome, platform: "win32" })
       if (runtime === null) throw new Error("expected generated runtime wrapper")
@@ -59,7 +65,9 @@ for (const config of ["quoted-node-path", "without-node-path", "missing-config"]
           new Response(child.stderr).text(),
           child.exited,
         ])
-        console.log(`#7473 ${config} ${shim.name}: exit=${exitCode} stdout=${JSON.stringify(stdout.trim())} stderr=${JSON.stringify(stderr.trim())}`)
+        console.log(
+          `#7473 ${config} ${shim.name}: exit=${exitCode} stdout=${JSON.stringify(stdout.trim())} stderr=${JSON.stringify(stderr.trim())}`,
+        )
         expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: "" })
         expect(stdout.trim()).toBe(sentinel)
       }

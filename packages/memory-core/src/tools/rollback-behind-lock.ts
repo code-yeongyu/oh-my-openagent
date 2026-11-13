@@ -23,7 +23,11 @@ async function hasStagedChange(repo: GitMemoryRepo, paths: readonly string[]): P
   return lines.some((line) => line[0] !== " " && line[0] !== "?")
 }
 
-export async function undoBehindKeptLock(repo: GitMemoryRepo, paths: readonly string[], kept: StrandedGitLockError): Promise<never> {
+export async function undoBehindKeptLock(
+  repo: GitMemoryRepo,
+  paths: readonly string[],
+  kept: StrandedGitLockError,
+): Promise<never> {
   let stillStaged = false
   try {
     if (!(await hasStagedChange(repo, paths))) {

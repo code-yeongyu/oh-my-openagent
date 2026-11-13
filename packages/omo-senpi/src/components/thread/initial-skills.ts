@@ -54,10 +54,14 @@ function safeJson(text: string): unknown {
 }
 
 function persistedNames(eventCtx: unknown): readonly string[] | undefined {
-  const manager = (eventCtx as { readonly sessionManager?: { readonly getEntries?: () => readonly unknown[] } } | undefined)?.sessionManager
+  const manager = (
+    eventCtx as { readonly sessionManager?: { readonly getEntries?: () => readonly unknown[] } } | undefined
+  )?.sessionManager
   const entries = typeof manager?.getEntries === "function" ? manager.getEntries() : []
   for (let index = entries.length - 1; index >= 0; index -= 1) {
-    const entry = entries[index] as { readonly type?: unknown; readonly customType?: unknown; readonly data?: { readonly names?: unknown } } | undefined
+    const entry = entries[index] as
+      | { readonly type?: unknown; readonly customType?: unknown; readonly data?: { readonly names?: unknown } }
+      | undefined
     if (entry?.type === "custom" && entry.customType === INITIAL_SKILLS_ENTRY) return namesFrom(entry.data?.names)
   }
   return undefined
@@ -77,41 +81,53 @@ export function registerInitialSkills(pi: SenpiExtensionAPI, ctx: ComponentConte
   const warned = new Set<string>()
   pi.on("session_start", (_event, eventCtx) => {
     const persisted = persistedNames(eventCtx)
-    const fromContext = namesFrom((pi.sessionContext as Readonly<Record<string, unknown>> | undefined)?.[INITIAL_SKILLS_CONTEXT_KEY])
+    const fromContext = namesFrom(
+      (pi.sessionContext as Readonly<Record<string, unknown>> | undefined)?.[INITIAL_SKILLS_CONTEXT_KEY],
+    )
     names = persisted ?? fromContext
-    if (persisted === undefined && fromContext !== undefined) pi.appendEntry?.(INITIAL_SKILLS_ENTRY, { names: fromContext })
+    if (persisted === undefined && fromContext !== undefined)
+      pi.appendEntry?.(INITIAL_SKILLS_ENTRY, { names: fromContext })
   })
-  pi.on("before_agent_start", (payload: unknown) => {
-    if (names === undefined) return undefined
-    const event = payload as { readonly systemPrompt?: unknown; readonly systemPromptOptions?: { readonly skills?: readonly RegistrySkill[] } }
-    if (typeof event.systemPrompt !== "string") return undefined
-    const registry = event.systemPromptOptions?.skills ?? []
-    const blocks: string[] = []
-    for (const name of names) {
-      const skill = registry.find((candidate) => candidate.name === name)
-      if (skill === undefined || typeof skill.filePath !== "string") {
-        if (!warned.has(name)) {
-          warned.add(name)
-          ctx.logger.warn(`thread: initial skill ${name} is not in this session's skills; it is not applied`)
-        }
-        continue
+  pi.on(
+    "before_agent_start",
+    (payload: unknown) => {
+      if (names === undefined) return undefined
+      const event = payload as {
+        readonly systemPrompt?: unknown
+        readonly systemPromptOptions?: { readonly skills?: readonly RegistrySkill[] }
       }
-      let body = bodies.get(name)
-      if (body === undefined) {
-        try {
-          body = skillBodyWithoutFrontmatter(skill.filePath)
-        } catch (error) {
+      if (typeof event.systemPrompt !== "string") return undefined
+      const registry = event.systemPromptOptions?.skills ?? []
+      const blocks: string[] = []
+      for (const name of names) {
+        const skill = registry.find((candidate) => candidate.name === name)
+        if (skill === undefined || typeof skill.filePath !== "string") {
           if (!warned.has(name)) {
             warned.add(name)
-            ctx.logger.warn(`thread: initial skill ${name} could not be read: ${error instanceof Error ? error.message : String(error)}`)
+            ctx.logger.warn(`thread: initial skill ${name} is not in this session's skills; it is not applied`)
           }
           continue
         }
-        bodies.set(name, body)
+        let body = bodies.get(name)
+        if (body === undefined) {
+          try {
+            body = skillBodyWithoutFrontmatter(skill.filePath)
+          } catch (error) {
+            if (!warned.has(name)) {
+              warned.add(name)
+              ctx.logger.warn(
+                `thread: initial skill ${name} could not be read: ${error instanceof Error ? error.message : String(error)}`,
+              )
+            }
+            continue
+          }
+          bodies.set(name, body)
+        }
+        blocks.push(`<initial_skill name="${name}">\n${body}\n</initial_skill>`)
       }
-      blocks.push(`<initial_skill name="${name}">\n${body}\n</initial_skill>`)
-    }
-    if (blocks.length === 0) return undefined
-    return { systemPrompt: `${event.systemPrompt}\n\n${blocks.join("\n\n")}` }
-  }, { previewSafe: true })
+      if (blocks.length === 0) return undefined
+      return { systemPrompt: `${event.systemPrompt}\n\n${blocks.join("\n\n")}` }
+    },
+    { previewSafe: true },
+  )
 }

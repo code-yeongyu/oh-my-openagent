@@ -31,9 +31,10 @@ export function createDeviceServiceComponent(options: DeviceServiceComponentOpti
         const mode = Reflect.get(Object(eventCtx), "mode")
         if (mode !== "tui" && mode !== "rpc") return undefined
         deferUntilAfterFirstPaint(ctx, "device service start", () =>
-          (options.loadRuntime ?? (() => import("#omo-device-service-runtime")))().then(runtime =>
+          (options.loadRuntime ?? (() => import("#omo-device-service-runtime")))().then((runtime) =>
             runtime.startAtSession(eventCtx, ctx.logger, { scope: processScope, ...options }),
-          ))
+          ),
+        )
         return undefined
       })
     },
