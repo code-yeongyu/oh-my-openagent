@@ -27,9 +27,13 @@ describe("shared skills package manifest", () => {
           types: "./index.d.ts",
           import: "./index.mjs",
         },
+        "./skill-source-filter": {
+          types: "./skill-source-filter.d.ts",
+          import: "./skill-source-filter.mjs",
+        },
       },
       types: "./index.d.ts",
-      files: ["index.d.ts", "index.mjs", "skills"],
+      files: ["index.d.ts", "index.mjs", "skills", "skill-source-filter.d.ts", "skill-source-filter.mjs"],
     })
   })
 
@@ -81,8 +85,14 @@ describe("shared skills package manifest", () => {
         "scripts/tests/",
       ]),
     )
-    expect((await stat("packages/shared-skills/skills/coding-agent-sessions/scripts/find-agent-sessions.py")).isFile()).toBe(true)
-    expect((await stat("packages/shared-skills/skills/coding-agent-sessions/scripts/agent_sessions/cli.py")).isFile()).toBe(true)
-    expect((await stat("packages/shared-skills/skills/coding-agent-sessions/references/all-platforms.md")).isFile()).toBe(true)
+    expect(
+      (await stat("packages/shared-skills/skills/coding-agent-sessions/scripts/find-agent-sessions.py")).isFile(),
+    ).toBe(true)
+    expect(
+      (await stat("packages/shared-skills/skills/coding-agent-sessions/scripts/agent_sessions/cli.py")).isFile(),
+    ).toBe(true)
+    expect(
+      (await stat("packages/shared-skills/skills/coding-agent-sessions/references/all-platforms.md")).isFile(),
+    ).toBe(true)
   })
 })

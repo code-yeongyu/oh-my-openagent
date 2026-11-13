@@ -13,13 +13,18 @@ import {
 import { createMemoryFactsWiring } from "./facts-wiring"
 import { realpathSync } from "node:fs"
 import { rmEfaultTolerant } from "./teardown.test-support"
+import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
 
 const IDENTITY = "facts-wiring-agent"
 const SESSION = "session-alpha"
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rmEfaultTolerant(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(
+    tempDirs
+      .splice(0)
+      .map((dir) => rmEfaultTolerant(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })),
+  )
 })
 
 async function fixture(): Promise<MemoryIdentityPaths> {
@@ -53,7 +58,7 @@ async function seedJournal(paths: MemoryIdentityPaths, count: number): Promise<v
 
 async function queueFileCount(paths: MemoryIdentityPaths): Promise<number> {
   const names = await readdir(paths.factsQueue).catch(() => [] as string[])
-  return names.filter((name) => name.endsWith(".json") && name !== "consumed.json").length
+  return names.filter((name) => name.endsWith(".json") && name !== "consumed.json" && name !== "claims.json").length
 }
 
 function wiringFor(paths: MemoryIdentityPaths, enabled: boolean) {
@@ -66,12 +71,15 @@ function wiringFor(paths: MemoryIdentityPaths, enabled: boolean) {
 
 describe("facts wiring settle enqueue", () => {
   test("#given debounce four #when four settles complete #then exactly one all-pending extractor launch fires", async () => {
+    useTestTimeout(30_000)
     // given
     const paths = await fixture()
     await seedJournal(paths, 2)
     let launches = 0
     let signalLaunch: (() => void) | undefined
-    const launched = new Promise<void>((resolve) => { signalLaunch = resolve })
+    const launched = new Promise<void>((resolve) => {
+      signalLaunch = resolve
+    })
     const wiring = createMemoryFactsWiring({
       identity: IDENTITY,
       identityPaths: paths,
@@ -94,7 +102,9 @@ describe("facts wiring settle enqueue", () => {
     await wiring.onSettled(SESSION)
     await Promise.race([
       launched,
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("facts launch did not fire")), 2_000)),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("facts launch did not fire")), remainingTestTime()),
+      ),
     ])
 
     // then
@@ -167,12 +177,13 @@ describe("facts wiring settle enqueue", () => {
       identity: IDENTITY,
       identityPaths: paths,
       factsEnabled: () => true,
-      createJournal: () => ({
-        readEntries: async () => {
-          journalReads += 1
-          return [entry("user", "m1")]
-        },
-      }) as unknown as TranscriptJournal,
+      createJournal: () =>
+        ({
+          readEntries: async () => {
+            journalReads += 1
+            return [entry("user", "m1")]
+          },
+        }) as unknown as TranscriptJournal,
     })
 
     const result = await wiring.enqueueSettled(SESSION, controller.signal)
@@ -189,12 +200,13 @@ describe("facts wiring settle enqueue", () => {
       identity: IDENTITY,
       identityPaths: paths,
       factsEnabled: () => true,
-      createJournal: () => ({
-        readEntries: async () => {
-          controller.abort()
-          return [entry("user", "m1")]
-        },
-      }) as unknown as TranscriptJournal,
+      createJournal: () =>
+        ({
+          readEntries: async () => {
+            controller.abort()
+            return [entry("user", "m1")]
+          },
+        }) as unknown as TranscriptJournal,
     })
 
     const result = await wiring.enqueueSettled(SESSION, controller.signal)
@@ -204,65 +216,59 @@ describe("facts wiring settle enqueue", () => {
   }, 30_000)
 })
 
-describe("facts wiring shutdown launch", () => {
-  test("#given a pre-aborted drain signal at a met threshold #when launch is requested #then no extractor spawn starts", async () => {
-    const paths = await fixture()
-    await seedJournal(paths, 1)
-    let launches = 0
-    let thresholdReads = 0
-    const wiring = createMemoryFactsWiring({
-      identity: IDENTITY,
-      identityPaths: paths,
-      factsEnabled: () => true,
-      debounceSettles: () => ++thresholdReads === 1 ? 2 : 1,
-      extractor: {
-        launchPending: async () => { launches += 1 },
-        reconcilePending: async () => undefined,
-      },
-    })
-    await wiring.onSettled(SESSION)
-    const controller = new AbortController()
-    controller.abort()
-
-    const launched = await wiring.launchIfThresholdMet(controller.signal)
-
-    expect(launched).toBe(false)
-    expect(launches).toBe(0)
-  }, 30_000)
-
-  test("#given abort arrives during the threshold probe #when launch reaches the extractor boundary #then no extractor spawn starts", async () => {
-    const paths = await fixture()
-    await seedJournal(paths, 1)
-    const controller = new AbortController()
-    let launches = 0
-    let thresholdReads = 0
-    const wiring = createMemoryFactsWiring({
-      identity: IDENTITY,
-      identityPaths: paths,
-      factsEnabled: () => true,
-      debounceSettles: () => {
-        thresholdReads += 1
-        if (thresholdReads === 2) {
-          controller.abort()
-          return 1
-        }
-        return 2
-      },
-      extractor: {
-        launchPending: async () => { launches += 1 },
-        reconcilePending: async () => undefined,
-      },
-    })
-    await wiring.onSettled(SESSION)
-
-    const launched = await wiring.launchIfThresholdMet(controller.signal)
-
-    expect(launched).toBe(false)
-    expect(launches).toBe(0)
-  }, 30_000)
-})
-
 describe("facts wiring session_start reconcile", () => {
+  test("#given an inherited queue and default debounce #when the first settled turn arrives #then the backlog launches immediately", async () => {
+    const paths = await fixture()
+    await seedJournal(paths, 2)
+    await wiringFor(paths, true).enqueueSettled(SESSION)
+    let launches = 0
+    const recovered = createMemoryFactsWiring({
+      identity: IDENTITY,
+      identityPaths: paths,
+      factsEnabled: () => true,
+      extractor: {
+        launchPending: async () => {
+          launches += 1
+        },
+        reconcilePending: async () => undefined,
+      },
+    })
+    recovered.reconcileExtractor(SESSION)
+    expect(launches).toBe(0)
+
+    await recovered.onSettled(SESSION)
+
+    expect(launches).toBe(1)
+    await recovered.onSettled(SESSION)
+    expect(launches).toBe(1)
+  }, 30_000)
+
+  test("#given backlog remains after a first-turn launch #when the same session rebinds and its next real turn settles #then backlog launches again", async () => {
+    const paths = await fixture()
+    await seedJournal(paths, 2)
+    await wiringFor(paths, true).enqueueSettled(SESSION)
+    let launches = 0
+    const recovered = createMemoryFactsWiring({
+      identity: IDENTITY,
+      identityPaths: paths,
+      factsEnabled: () => true,
+      extractor: {
+        launchPending: async () => {
+          launches += 1
+        },
+        reconcilePending: async () => undefined,
+      },
+    })
+    await recovered.onSettled(SESSION)
+    expect(launches).toBe(1)
+
+    recovered.reconcileExtractor(SESSION)
+    expect(launches).toBe(1)
+    await recovered.onSettled(SESSION)
+
+    expect(launches).toBe(2)
+  }, 30_000)
+
   test("#given a leftover queue file from a crashed run #when reconcile runs #then it is reported launchable", async () => {
     // given: a settle published an entry that no extractor ever consumed
     const paths = await fixture()

@@ -2,7 +2,8 @@
 
 import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { mkdtempSync, rmSync } from "node:fs"
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { delimiter } from "node:path"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -10,6 +11,12 @@ import { fileURLToPath } from "node:url"
 const postinstallPath = fileURLToPath(new URL("./postinstall.mjs", import.meta.url))
 const RENAME_NOTICE =
   "oh-my-openagent: the 'omo' command is now 'omo-agent-toolkit' (the old name was removed in this major release)."
+const PACKAGE_VERSION: string = JSON.parse(
+  readFileSync(fileURLToPath(new URL("./package.json", import.meta.url)), "utf8"),
+).version
+const NATIVE_NOTICE = `oh-my-openagent: OmO Native is the same omo as one 'omo' command, with no OpenCode host: bun add -g ${PACKAGE_VERSION.includes("-") ? "omo-ai@beta" : "omo-ai"}`
+const SUBPROCESS_TEST_TIMEOUT_MS = 30_000
+const HANGING_OPENCODE_MS = 60_000
 
 type PostinstallRun = {
   status: number | null
@@ -17,14 +24,18 @@ type PostinstallRun = {
   stderr: string
 }
 
-function runPostinstallInFixtureEnv(): PostinstallRun {
+function runPostinstallInFixtureEnv(
+  options: { readonly pathPrefix?: string; readonly timeoutMs?: number } = {},
+): PostinstallRun {
   const fixtureHome = mkdtempSync(join(tmpdir(), "omo-postinstall-fixture-"))
+  const inheritedPath = process.env.PATH ?? ""
   try {
     const result = spawnSync(process.execPath, [postinstallPath], {
       encoding: "utf8",
+      timeout: options.timeoutMs,
       env: {
         ...inheritedPlatformEnv(),
-        PATH: process.env.PATH ?? "",
+        PATH: options.pathPrefix === undefined ? inheritedPath : `${options.pathPrefix}${delimiter}${inheritedPath}`,
         HOME: fixtureHome,
         USERPROFILE: fixtureHome,
         XDG_CACHE_HOME: join(fixtureHome, "cache"),
@@ -34,6 +45,15 @@ function runPostinstallInFixtureEnv(): PostinstallRun {
   } finally {
     rmSync(fixtureHome, { recursive: true, force: true })
   }
+}
+
+function writeHangingOpencodeShim(): string {
+  const binDir = mkdtempSync(join(tmpdir(), "omo-postinstall-hanging-opencode-"))
+  const hang = `${JSON.stringify(process.execPath)} -e "setTimeout(() => {}, ${HANGING_OPENCODE_MS})"`
+  writeFileSync(join(binDir, "opencode"), `#!/bin/sh\nexec ${hang}\n`)
+  chmodSync(join(binDir, "opencode"), 0o755)
+  writeFileSync(join(binDir, "opencode.cmd"), `@${hang}\r\n`)
+  return binDir
 }
 
 function inheritedPlatformEnv(): Record<string, string> {
@@ -49,38 +69,84 @@ function countNoticeLines(output: string): number {
   return output.split("\n").filter((line) => line.trim() === RENAME_NOTICE).length
 }
 
+function countNativeNotices(output: string): number {
+  return output.split("\n").filter((line) => line.trim() === NATIVE_NOTICE).length
+}
+
 describe("postinstall rename notice", () => {
-  test("announces the omo-agent-toolkit rename exactly once", () => {
-    // #given
-    // a fixture environment isolated from the real HOME and OpenCode plugin cache
-
-    // #when
-    const run = runPostinstallInFixtureEnv()
-
-    // #then
-    expect(countNoticeLines(run.stdout)).toBe(1)
+  test("names the install line of the package's own channel", async () => {
+    const { nativeNotice } = await import("./postinstall.mjs")
+    expect(nativeNotice("5.0.0")).toEndWith("bun add -g omo-ai")
+    expect(nativeNotice("5.0.0-beta.90")).toEndWith("bun add -g omo-ai@beta")
   })
 
-  test("never fails the install regardless of platform binary resolution", () => {
-    // #given
-    // a fixture environment isolated from the real HOME and OpenCode plugin cache
+  test(
+    "announces the omo-agent-toolkit rename exactly once",
+    () => {
+      // #given
+      // a fixture environment isolated from the real HOME and OpenCode plugin cache
 
-    // #when
-    const run = runPostinstallInFixtureEnv()
+      // #when
+      const run = runPostinstallInFixtureEnv()
 
-    // #then
-    expect(run.status).toBe(0)
-  })
+      // #then
+      expect(countNoticeLines(run.stdout)).toBe(1)
+      expect(countNativeNotices(run.stdout)).toBe(1)
+    },
+    SUBPROCESS_TEST_TIMEOUT_MS,
+  )
 
-  test("stays idempotent across repeated runs", () => {
-    // #given
-    const firstRun = runPostinstallInFixtureEnv()
+  test(
+    "never fails the install regardless of platform binary resolution",
+    () => {
+      // #given
+      // a fixture environment isolated from the real HOME and OpenCode plugin cache
 
-    // #when
-    const secondRun = runPostinstallInFixtureEnv()
+      // #when
+      const run = runPostinstallInFixtureEnv()
 
-    // #then
-    expect(countNoticeLines(firstRun.stdout)).toBe(1)
-    expect(countNoticeLines(secondRun.stdout)).toBe(1)
-  })
+      // #then
+      expect(run.status).toBe(0)
+    },
+    SUBPROCESS_TEST_TIMEOUT_MS,
+  )
+
+  test(
+    "finishes when the opencode version probe never returns",
+    () => {
+      // #given
+      const hangingBinDir = writeHangingOpencodeShim()
+
+      try {
+        // #when
+        const startedAt = Date.now()
+        const run = runPostinstallInFixtureEnv({ pathPrefix: hangingBinDir, timeoutMs: HANGING_OPENCODE_MS * 2 })
+
+        // #then
+        expect(run.status).toBe(0)
+        expect(Date.now() - startedAt).toBeLessThan(HANGING_OPENCODE_MS)
+      } finally {
+        rmSync(hangingBinDir, { recursive: true, force: true })
+      }
+    },
+    SUBPROCESS_TEST_TIMEOUT_MS,
+  )
+
+  test(
+    "stays idempotent across repeated runs",
+    () => {
+      // #given
+      const firstRun = runPostinstallInFixtureEnv()
+
+      // #when
+      const secondRun = runPostinstallInFixtureEnv()
+
+      // #then
+      expect(countNoticeLines(firstRun.stdout)).toBe(1)
+      expect(countNoticeLines(secondRun.stdout)).toBe(1)
+      expect(countNativeNotices(firstRun.stdout)).toBe(1)
+      expect(countNativeNotices(secondRun.stdout)).toBe(1)
+    },
+    SUBPROCESS_TEST_TIMEOUT_MS,
+  )
 })

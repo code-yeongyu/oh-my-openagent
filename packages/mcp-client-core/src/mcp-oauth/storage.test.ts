@@ -3,14 +3,7 @@ import { createHash } from "node:crypto"
 import { existsSync, mkdirSync, mkdtempSync, rmSync, readFileSync, statSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import {
-  deleteToken,
-  getMcpOauthStoragePath,
-  listAllTokens,
-  listTokensByHost,
-  loadToken,
-  saveToken,
-} from "./storage"
+import { deleteToken, getMcpOauthStoragePath, listAllTokens, listTokensByHost, loadToken, saveToken } from "./storage"
 import type { OAuthTokenData } from "./storage"
 
 function expectedServerHash(serverHost: string, resource: string): string {
@@ -27,10 +20,10 @@ describe("mcp-oauth storage", () => {
 
   beforeEach(() => {
     originalConfigDir = process.env.OPENCODE_CONFIG_DIR
+    // Create this test's dir before pointing the env at it: pointing it at the previous test's
+    // removed dir made the first token write recreate that dir, which no teardown owned (#9766).
+    TEST_CONFIG_DIR = mkdtempSync(join(tmpdir(), "mcp-oauth-test-"))
     process.env.OPENCODE_CONFIG_DIR = TEST_CONFIG_DIR
-    if (!existsSync(TEST_CONFIG_DIR)) {
-      TEST_CONFIG_DIR = mkdtempSync(join(tmpdir(), "mcp-oauth-test-"))
-    }
   })
 
   afterEach(() => {
@@ -108,10 +101,7 @@ describe("mcp-oauth storage", () => {
     const entries = listTokensByHost("api.example.com:5555")
 
     // then
-    expect(Object.keys(entries).sort()).toEqual([
-      "api.example.com/resource-a",
-      "api.example.com/resource-b",
-    ])
+    expect(Object.keys(entries).sort()).toEqual(["api.example.com/resource-a", "api.example.com/resource-b"])
     expect(entries["api.example.com/resource-a"].accessToken).toBe("access-a")
   })
 

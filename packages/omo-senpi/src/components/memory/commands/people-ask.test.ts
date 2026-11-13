@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -10,11 +10,12 @@ import { fakeCommandContext, fakeDeps, invoke } from "./commands.test-support"
 import { registerPeopleCommand } from "./people"
 import { createPeopleAskRunner, hasNoEvidence, type PeopleAskEvidence, type PeopleAskRequest } from "./people-ask"
 import { peopleFixture } from "./people.test-support"
+import { removeTreeSync } from "../../../../../../test-support/remove-tree"
 
 const roots: string[] = []
 
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0)) removeTreeSync(root, { maxRetries: 10, retryDelay: 200 })
 })
 
 describe("/people --ask", () => {
@@ -92,8 +93,7 @@ describe("/people --ask", () => {
       config: { categories: { quick: { model: "omo-mock/mock-1" } } },
       registry: {
         getAvailable: () => [model],
-        find: (provider, modelId) =>
-          provider === model.provider && modelId === model.id ? model : undefined,
+        find: (provider, modelId) => (provider === model.provider && modelId === model.id ? model : undefined),
       },
       senpiCommand: process.execPath,
       senpiPrefixArgs: [printer, "PEOPLE-PREFIX-MARKER"],

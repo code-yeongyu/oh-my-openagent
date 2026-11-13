@@ -26,14 +26,11 @@ describe("buildBackgroundTaskNotificationText", () => {
       expect(notification).toContain("[BACKGROUND TASK RESULT READY]")
       expect(notification).toContain("You WILL be notified when ALL complete.")
     })
-
   })
 
-  describe("#given one task still running after a failed task notification", () => {
-  })
+  describe("#given one task still running after a failed task notification", () => {})
 
-  describe("#given all sibling tasks completed with mixed outcomes", () => {
-  })
+  describe("#given all sibling tasks completed with mixed outcomes", () => {})
 
   describe("#given all tasks completed with undefined descriptions", () => {
     test("#when building the final notification #then it uses task ID as fallback instead of 'undefined'", () => {
@@ -177,9 +174,9 @@ describe("buildBackgroundTaskNotificationText", () => {
       expect(notification).toContain("[ALL BACKGROUND TASKS COMPLETE]")
       expect(notification).toContain("- `task-3`: Fallback task")
       expect(notification).toContain("Background task attempts:")
-      expect(notification).toContain("  - Attempt 1 — ERROR — genai-proxy-openai/gpt-5.6-luna-fast — ses-primary")
+      expect(notification).toContain("  - Attempt 1: ERROR - genai-proxy-openai/gpt-5.6-luna-fast - ses-primary")
       expect(notification).toContain("    Error: Forbidden: Selected provider is forbidden")
-      expect(notification).toContain("  - Attempt 2 — COMPLETED — anthropic/claude-haiku-4.5 — ses-fallback")
+      expect(notification).toContain("  - Attempt 2: COMPLETED - anthropic/claude-haiku-4.5 - ses-fallback")
     })
   })
 

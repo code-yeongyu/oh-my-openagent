@@ -1,4 +1,10 @@
 export const TOOL_ARGS_TRUNCATE_LIMIT = 300
+/**
+ * Tool results are the dominant term in transcript growth: a single `read` of a large file used
+ * to enter the journal verbatim and then replay in every reflection payload. Capture keeps a
+ * head+tail window so both the invocation shape and the outcome survive.
+ */
+export const TOOL_RESULT_TRUNCATE_LIMIT = 4096
 export const REDACTED_REASONING_TEXT = "[REDACTED REASONING]"
 
 export type TextTranscriptEntry = {
@@ -59,51 +65,33 @@ function textRow(
   }
 }
 
-export function projectTranscriptEntries(
-  message: TranscriptProjection,
-  capturedAt: string,
-): TranscriptEntry[] {
+export function truncateToolResult(text: string, limit = TOOL_RESULT_TRUNCATE_LIMIT): string {
+  if (text.length <= limit) return text
+  const headLength = Math.ceil((limit * 3) / 4)
+  const tailLength = limit - headLength
+  const dropped = text.length - limit
+  const tail = tailLength > 0 ? text.slice(text.length - tailLength) : ""
+  return `${text.slice(0, headLength)}\n…[truncated ${dropped} chars]…\n${tail}`
+}
+
+export function projectTranscriptEntries(message: TranscriptProjection, capturedAt: string): TranscriptEntry[] {
   if (message.kind === "user" || message.kind === "error") {
-    if (message.text.trim().length === 0) return []
-    return [
-      textRow(
-        message.kind,
-        message.text,
-        capturedAt,
-        `${message.messageId}:${message.kind}`,
-        message.messageId,
-      ),
-    ]
+    // An image-only user message is still a user turn: it is kept as an empty, non-canonical row so consent binding
+    // (#10488) sees that it broke the adjacency between a proposal and the next reply. An empty error is dropped.
+    if (message.kind === "error" && message.text.trim().length === 0) return []
+    return [textRow(message.kind, message.text, capturedAt, `${message.messageId}:${message.kind}`, message.messageId)]
   }
 
   const entries: TranscriptEntry[] = []
-  const assistantText = (message.textBlocks ?? [])
-    .filter((text) => text.trim().length > 0)
-    .join("\n")
+  const assistantText = (message.textBlocks ?? []).filter((text) => text.trim().length > 0).join("\n")
   if (assistantText.length > 0) {
-    entries.push(
-      textRow(
-        "assistant",
-        assistantText,
-        capturedAt,
-        `${message.messageId}:assistant`,
-        message.messageId,
-      ),
-    )
+    entries.push(textRow("assistant", assistantText, capturedAt, `${message.messageId}:assistant`, message.messageId))
   }
 
   for (const [index, reasoning] of (message.reasoningBlocks ?? []).entries()) {
     const text = typeof reasoning === "string" ? reasoning : REDACTED_REASONING_TEXT
     if (text.trim().length === 0) continue
-    entries.push(
-      textRow(
-        "reasoning",
-        text,
-        capturedAt,
-        `${message.messageId}:reasoning:${index}`,
-        message.messageId,
-      ),
-    )
+    entries.push(textRow("reasoning", text, capturedAt, `${message.messageId}:reasoning:${index}`, message.messageId))
   }
 
   for (const toolCall of message.toolCalls ?? []) {
@@ -111,7 +99,7 @@ export function projectTranscriptEntries(
       kind: "tool_call",
       name: toolCall.name,
       argsText: toolCall.argsText?.slice(0, TOOL_ARGS_TRUNCATE_LIMIT),
-      resultText: toolCall.resultText,
+      resultText: toolCall.resultText === undefined ? undefined : truncateToolResult(toolCall.resultText),
       resultOk: toolCall.resultOk,
       captured_at: capturedAt,
       source_line_id: `${message.messageId}:tool:${toolCall.callId}`,

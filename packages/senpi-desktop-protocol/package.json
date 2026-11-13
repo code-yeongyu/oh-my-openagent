@@ -1,0 +1,23 @@
+{
+	"name": "@oh-my-opencode/senpi-desktop-protocol",
+	"version": "0.1.0",
+	"type": "module",
+	"private": true,
+	"description": "Engine JSON-RPC types, session snapshot, error codes, and computer-call approval tiers",
+	"exports": {
+		".": {
+			"types": "./src/index.ts",
+			"import": "./src/index.ts"
+		}
+	},
+	"types": "./src/index.ts",
+	"scripts": {
+		"typecheck": "tsgo --noEmit -p tsconfig.json",
+		"test": "vitest --run test",
+		"generate": "bun scripts/generate-engine-schema.ts && biome format --write src/engine-schema.generated.ts"
+	},
+	"devDependencies": {
+		"@types/node": "26.6.2",
+		"vitest": "5.0.1"
+	}
+}

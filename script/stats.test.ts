@@ -28,7 +28,9 @@ describe("download stats automation", () => {
         source: "github_release",
       },
     })
-    expect(events.filter((event) => event.properties.source === "npm")).toHaveLength(3)
+    expect(
+      events.filter((event) => event.properties.source === "npm").map((event) => event.properties.package_name),
+    ).toEqual(["oh-my-opencode", "oh-my-openagent", "omo-ai", "lazycodex-ai"])
   })
 
   test("#given slurped GitHub release pages #when collected #then stats aggregate every page", async () => {

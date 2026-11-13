@@ -6,10 +6,7 @@ import type { ClassificationInput, WorktreeClassification, WorktreeRecord } from
  * Externally-owned worktree roots. These are managed by other applications, so
  * sweeping them would delete state we do not own.
  */
-export const DEFAULT_EXCLUDE_PREFIXES: readonly string[] = [
-  "~/.codex/worktrees",
-  "~/.codex-gui-cli-remote/worktrees",
-]
+export const DEFAULT_EXCLUDE_PREFIXES: readonly string[] = ["~/.codex/worktrees", "~/.codex-gui-cli-remote/worktrees"]
 
 export function expandHome(value: string, home: string): string {
   if (value === "~") return home
@@ -17,11 +14,7 @@ export function expandHome(value: string, home: string): string {
   return value
 }
 
-export function isExcludedPath(
-  worktreePath: string,
-  prefixes: readonly string[],
-  home: string,
-): boolean {
+export function isExcludedPath(worktreePath: string, prefixes: readonly string[], home: string): boolean {
   const target = path.resolve(expandHome(worktreePath, home))
   return prefixes.some((prefix) => {
     const resolved = path.resolve(expandHome(prefix, home))
@@ -45,6 +38,7 @@ export function classifyWorktree(input: ClassificationInput): WorktreeClassifica
 
   if (record.locked) return { path: record.path, ref, decision: "KEEP", reason: "locked" }
   if (!input.pathExists) return { path: record.path, ref, decision: "PRUNE" }
+  if (input.current) return { path: record.path, ref, decision: "KEEP", reason: "current" }
   if (input.external) return { path: record.path, ref, decision: "KEEP", reason: "external" }
   if (!input.merged && !input.agedOut) {
     return { path: record.path, ref, decision: "KEEP", reason: "unmerged" }

@@ -1,16 +1,15 @@
 /// <reference types="bun-types" />
 
 import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test"
+import { restoreEnvironment } from "../../../../../test-support/environment-integrity"
 import { fileURLToPath } from "node:url"
 import type { HookHttp } from "./types"
 import * as sharedModule from "../../shared"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
-const mockFetch = mock(() =>
-  Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
-)
+const mockFetch = mock(() => Promise.resolve(new Response(JSON.stringify({}), { status: 200 })))
 const originalFetch = globalThis.fetch
-const originalEnv = process.env
+const originalEnv = { ...process.env }
 
 async function importFreshExecuteHttpHook() {
   const modulePath = `${fileURLToPath(new URL("./execute-http-hook.ts", import.meta.url))}?t=${Date.now()}-${Math.random()}`
@@ -35,22 +34,20 @@ describe("executeHttpHook TLS security", () => {
   beforeEach(() => {
     globalThis.fetch = unsafeTestValue<typeof fetch>(mockFetch)
     mockFetch.mockReset()
-    mockFetch.mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
-    )
+    mockFetch.mockImplementation(() => Promise.resolve(new Response(JSON.stringify({}), { status: 200 })))
     logCalls = []
   })
 
   afterEach(() => {
     globalThis.fetch = originalFetch
-    process.env = { ...originalEnv }
+    restoreEnvironment(originalEnv)
     mockFetch.mockReset()
     mock.restore()
   })
 
   describe("#given production mode", () => {
     beforeEach(() => {
-      process.env = { ...originalEnv, NODE_ENV: "production" }
+      restoreEnvironment({ ...originalEnv, NODE_ENV: "production" })
     })
 
     it("#when hook uses remote http:// URL #then rejects with exit code 1", async () => {
@@ -111,8 +108,10 @@ describe("executeHttpHook TLS security", () => {
 
       // then
       const matchingCalls = logCalls.filter(({ message, data }) => {
-        return message === "HTTP hook URL uses insecure protocol"
-          && JSON.stringify(data) === JSON.stringify({ url: hook.url })
+        return (
+          message === "HTTP hook URL uses insecure protocol" &&
+          JSON.stringify(data) === JSON.stringify({ url: hook.url })
+        )
       })
 
       expect(result.exitCode).toBe(0)
@@ -142,7 +141,7 @@ describe("executeHttpHook TLS security", () => {
 
   describe("#given non-production mode", () => {
     beforeEach(() => {
-      process.env = { ...originalEnv, NODE_ENV: "development" }
+      restoreEnvironment({ ...originalEnv, NODE_ENV: "development" })
     })
 
     it("#when hook uses remote http:// URL #then rejects with exit code 1", async () => {
@@ -204,7 +203,7 @@ describe("executeHttpHook TLS security", () => {
 
   describe("#given NODE_ENV is unset", () => {
     beforeEach(() => {
-      process.env = { ...originalEnv }
+      restoreEnvironment(originalEnv)
       delete process.env.NODE_ENV
     })
 
@@ -222,12 +221,12 @@ describe("executeHttpHook TLS security", () => {
 
   describe("#given redirect downgrade protection", () => {
     beforeEach(() => {
-      process.env = { ...originalEnv, NODE_ENV: "production" }
+      restoreEnvironment({ ...originalEnv, NODE_ENV: "production" })
     })
 
     it("#when hook uses https:// URL #then fetch rejects redirects manually", async () => {
       mockFetch.mockImplementation(() =>
-        Promise.resolve(new Response("redirect", { status: 302, statusText: "Found" }))
+        Promise.resolve(new Response("redirect", { status: 302, statusText: "Found" })),
       )
       const { executeHttpHook } = await import("./execute-http-hook")
       const hook: HookHttp = { type: "http", url: "https://example.com/hooks" }
@@ -240,14 +239,14 @@ describe("executeHttpHook TLS security", () => {
         "https://example.com/hooks",
         expect.objectContaining({
           redirect: "manual",
-        })
+        }),
       )
     })
   })
 
   describe("#given invalid URL handling is preserved", () => {
     it("#when URL is invalid #then rejects with exit code 1", async () => {
-      process.env = { ...originalEnv, NODE_ENV: "production" }
+      restoreEnvironment({ ...originalEnv, NODE_ENV: "production" })
       const { executeHttpHook } = await import("./execute-http-hook")
       const hook: HookHttp = { type: "http", url: "not-a-valid-url" }
 
@@ -258,7 +257,7 @@ describe("executeHttpHook TLS security", () => {
     })
 
     it("#when URL uses disallowed scheme #then rejects with exit code 1", async () => {
-      process.env = { ...originalEnv, NODE_ENV: "production" }
+      restoreEnvironment({ ...originalEnv, NODE_ENV: "production" })
       const { executeHttpHook } = await import("./execute-http-hook")
       const hook: HookHttp = { type: "http", url: "file:///etc/passwd" }
 

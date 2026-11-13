@@ -15,6 +15,14 @@ Two test types every Rust project should have alongside unit tests. Proptest hun
 
 Use all three. They cover different bug classes.
 
+## Where tests live
+
+- **Unit tests of private behavior**: `#[cfg(test)] mod tests { use super::*; ... }` at the bottom of the module they test.
+- **Public-API behavior**: `tests/*.rs`. Each file is a separate crate that sees only `pub` items, so it fails when the public contract breaks, not when an internal changes.
+- **Examples in rustdoc**: doctests. They compile and run, so a documented example that drifts from the API fails the build. `cargo nextest run` skips them; the gate runs `cargo test --doc` too. Write examples with `?` and hide setup behind `# ` lines ([api-design.md](api-design.md#rustdoc-sections)).
+- **Panics**: `#[should_panic(expected = "...")]` only when panicking is the documented contract (an out-of-bounds index on a slice-like type). An invalid input that returns `Err` is asserted as that `Err` value.
+- **Environment and globals**: `std::env::set_var` is `unsafe` in the 2024 edition because another thread may read the environment at the same moment, and tests run in parallel threads. Inject configuration as a parameter instead of mutating process state; a test that must touch the real environment runs in its own process (`tests/` binary, or nextest's process-per-test).
+
 ## Proptest — setup
 
 `Cargo.toml`:

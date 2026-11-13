@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { canonicalAgentDir } from "./agent-dir.js"
+import { readRow, readRows } from "./sqlite-rows.js"
 
 export const KNOWN_AUTH_SCHEMA_VERSIONS = new Set([4, 7])
 
@@ -32,9 +33,8 @@ function readAuthJson(id, path) {
     }
     for (const [provider, entry] of Object.entries(parsed)) {
       result.providers.push(provider)
-      const type = entry !== null && typeof entry === "object" && typeof entry.type === "string"
-        ? entry.type
-        : "unknown"
+      const type =
+        entry !== null && typeof entry === "object" && typeof entry.type === "string" ? entry.type : "unknown"
       result.credentialTypes.push(type)
       if (id === "opencode" && type === "api") result.importableCount += 1
     }
@@ -104,20 +104,22 @@ function inspectSqlite(id, path, DatabaseSync, modelHint) {
   let database
   try {
     database = new DatabaseSync(path, { readOnly: true })
-    const schema = database.prepare("SELECT version FROM auth_schema_version").get()
+    const schema = readRow(database, ["version"], "SELECT version FROM auth_schema_version")
     const version = schema?.version
     if (!KNOWN_AUTH_SCHEMA_VERSIONS.has(version)) {
       result.notices.push(`auth schema version ${String(version)} is unknown; credentials not inspected`)
       return result
     }
-    const rows = database.prepare(
+    const rows = readRows(
+      database,
+      ["provider", "credential_type", "disabled_cause"],
       "SELECT provider, credential_type, disabled_cause FROM auth_credentials",
-    ).all()
+    )
     result.providers = sorted(rows.map((row) => row.provider))
     result.credentialTypes = sorted(rows.map((row) => row.credential_type))
     result.entryCount = rows.length
-    result.importableCount = rows.filter((row) =>
-      row.disabled_cause === null && row.credential_type === "api_key",
+    result.importableCount = rows.filter(
+      (row) => row.disabled_cause === null && row.credential_type === "api_key",
     ).length
   } catch (error) {
     result.notices.push(`could not inspect agent.db: ${error.message}`)

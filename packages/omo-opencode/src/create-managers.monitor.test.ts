@@ -1,11 +1,18 @@
 /// <reference types="bun-types" />
 
-import { beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
 
 import { OhMyOpenCodeConfigSchema } from "./config/schema/oh-my-opencode-config"
 import { createManagers } from "./create-managers"
-import type { MonitorManager, MonitorManagerEvent, MonitorOutputQuery, MonitorOutputResult, MonitorRecord, MonitorStartOpts } from "./features/monitor"
+import type {
+  MonitorManager,
+  MonitorManagerEvent,
+  MonitorOutputQuery,
+  MonitorOutputResult,
+  MonitorRecord,
+  MonitorStartOpts,
+} from "./features/monitor"
 import type { createMonitorManager } from "./features/monitor"
 import { createModelCacheState } from "./plugin-state"
 
@@ -164,6 +171,12 @@ describe("createManagers monitor", () => {
     createMonitorManagerOptions = undefined
     createMonitorManagerFn.mockClear()
     monitorShutdown.mockClear()
+  })
+
+  afterEach(async () => {
+    for (const manager of registeredCleanupManagers.splice(0)) {
+      await manager.shutdown()
+    }
   })
 
   it("#given monitor is enabled #when managers are created #then it returns a monitor manager", () => {

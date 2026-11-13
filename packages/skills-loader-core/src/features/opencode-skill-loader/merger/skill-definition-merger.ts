@@ -1,15 +1,17 @@
 import type { LoadedSkill } from "../types"
 import type { SkillDefinition } from "../../../types"
 import { deepMerge } from "@oh-my-opencode/utils"
+import { parseAllowedTools } from "../allowed-tools-parser"
 
 export function mergeSkillDefinitions(base: LoadedSkill, patch: SkillDefinition): LoadedSkill {
-  const mergedMetadata = base.metadata || patch.metadata
-    ? deepMerge(base.metadata || {}, (patch.metadata as Record<string, string>) || {})
-    : undefined
+  const mergedMetadata =
+    base.metadata || patch.metadata
+      ? deepMerge(base.metadata || {}, (patch.metadata as Record<string, string>) || {})
+      : undefined
 
-  const mergedTools = base.allowedTools || patch["allowed-tools"]
-    ? [...(base.allowedTools || []), ...(patch["allowed-tools"] || [])]
-    : undefined
+  const patchAllowedTools = parseAllowedTools(patch["allowed-tools"])
+  const mergedTools =
+    base.allowedTools || patchAllowedTools ? [...(base.allowedTools || []), ...(patchAllowedTools || [])] : undefined
 
   const description = patch.description || base.definition.description?.replace(/^\([^)]+\) /, "")
 

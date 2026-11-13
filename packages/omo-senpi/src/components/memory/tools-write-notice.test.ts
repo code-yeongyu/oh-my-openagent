@@ -19,11 +19,7 @@ async function writeJournalState(fixture: BoundFixture, body: string): Promise<v
 async function writeMergedCompletion(fixture: BoundFixture, finishedAt: string): Promise<void> {
   const dir = join(fixture.context.identityPaths.reflection, "completions")
   await mkdir(dir, { recursive: true })
-  await writeFile(
-    join(dir, "run-1.json"),
-    JSON.stringify({ runId: "run-1", outcome: "merged", finishedAt }),
-    "utf8",
-  )
+  await writeFile(join(dir, "run-1.json"), JSON.stringify({ runId: "run-1", outcome: "merged", finishedAt }), "utf8")
 }
 
 function toolsFor(fixture: BoundFixture) {
@@ -99,11 +95,15 @@ describe("memory write notice gathering", () => {
       description: "First.",
       file_text: "body",
     })
-    const single = await gatherMemoryWriteNotice(fixture.context, {
-      sha: await git(fixture.repo, ["rev-parse", "HEAD"]),
-      subject: "First entry",
-      affectedPaths: ["knowledge/first.md"],
-    }, { sessionId: SESSION_ID, buildSnapshot: async () => ({ repo: {}, reflection: {}, journal: {} }) as never })
+    const single = await gatherMemoryWriteNotice(
+      fixture.context,
+      {
+        sha: await git(fixture.repo, ["rev-parse", "HEAD"]),
+        subject: "First entry",
+        affectedPaths: ["knowledge/first.md"],
+      },
+      { sessionId: SESSION_ID, buildSnapshot: async () => ({ repo: {}, reflection: {}, journal: {} }) as never },
+    )
 
     // then
     expect(result.isError).toBeUndefined()
@@ -159,11 +159,15 @@ describe("memory write notice gathering", () => {
     const fixture = await boundFixture()
 
     // when
-    const notice = await gatherMemoryWriteNotice(fixture.context, {
-      sha: "0".repeat(40),
-      subject: "Unreachable commit",
-      affectedPaths: ["knowledge/ghost.md"],
-    }, { sessionId: SESSION_ID })
+    const notice = await gatherMemoryWriteNotice(
+      fixture.context,
+      {
+        sha: "0".repeat(40),
+        subject: "Unreachable commit",
+        affectedPaths: ["knowledge/ghost.md"],
+      },
+      { sessionId: SESSION_ID },
+    )
 
     // then
     expect(notice.affected).toEqual([])
@@ -176,16 +180,20 @@ describe("memory write notice gathering", () => {
     const fixture = await boundFixture()
 
     // when
-    const notice = await gatherMemoryWriteNotice(fixture.context, {
-      sha: "0".repeat(40),
-      subject: "Broken snapshot",
-      affectedPaths: [],
-    }, {
-      sessionId: SESSION_ID,
-      buildSnapshot: async () => {
-        throw new Error("snapshot exploded")
+    const notice = await gatherMemoryWriteNotice(
+      fixture.context,
+      {
+        sha: "0".repeat(40),
+        subject: "Broken snapshot",
+        affectedPaths: [],
       },
-    })
+      {
+        sessionId: SESSION_ID,
+        buildSnapshot: async () => {
+          throw new Error("snapshot exploded")
+        },
+      },
+    )
 
     // then
     expect(notice.size).toBeUndefined()
@@ -213,13 +221,14 @@ describe("memory write notice gathering", () => {
     expect(result.details.writeNotice).toBeUndefined()
   }, 60_000)
 
-  test("#given memory_apply_patch commits #when the result is built #then it carries the same notice payload shape", async () => {
+  test("#given memory apply_patch commits #when the result is built #then it carries the same notice payload shape", async () => {
     // given
     const fixture = await boundFixture()
-    const [, applyPatchTool] = toolsFor(fixture)
+    const [applyPatchTool] = toolsFor(fixture)
 
     // when
     const result = await applyPatchTool.execute("call-1", {
+      command: "apply_patch",
       reason: "Patch a new block",
       input: [
         "*** Begin Patch",
@@ -263,24 +272,35 @@ describe("memory tool result rendering", () => {
     })
     const renderResult = memoryTool.renderResult
     if (renderResult === undefined) throw new Error("memory renderResult is missing")
-    const collapsed = (Reflect.apply(renderResult, undefined, [
-      created,
-      { expanded: false, isPartial: false },
-      { fg: (_color: string, text: string) => text, bg: (_color: string, text: string) => text },
-      { isError: false },
-    ]) as { render(width: number): string[] }).render(200)
-    const expanded = (Reflect.apply(renderResult, undefined, [
-      created,
-      { expanded: true, isPartial: false },
-      { fg: (_color: string, text: string) => text, bg: (_color: string, text: string) => text },
-      { isError: false },
-    ]) as { render(width: number): string[] }).render(200)
+    const theme = {
+      fg: (_color: string, text: string) => text,
+      bg: (_color: string, text: string) => text,
+      bold: (text: string) => text,
+    }
+    const context = {
+      args: { command: "create", file_path: "knowledge/render.md" },
+      state: {},
+      lastComponent: undefined,
+      isError: false,
+      hasResult: true,
+    }
+    const collapsed = (
+      Reflect.apply(renderResult, undefined, [created, { expanded: false, isPartial: false }, theme, context]) as {
+        render(width: number): string[]
+      }
+    ).render(200)
+    const expanded = (
+      Reflect.apply(renderResult, undefined, [created, { expanded: true, isPartial: false }, theme, context]) as {
+        render(width: number): string[]
+      }
+    ).render(200)
 
     // then
-    const collapsedText = collapsed.join("\n")
-    expect(collapsedText).toContain("Memory updated")
+    expect(collapsed[1]).toContain("● Remembered")
+    const collapsedText = collapsed.slice(1, -1).join("\n")
+    expect(collapsedText).toMatch(/Added \d+ lines? to knowledge\/render\.md\./u)
     expect(collapsedText).not.toContain("committed locally")
-    expect(collapsedText).not.toContain("create")
+    expect(collapsedText).not.toContain("memory create")
     expect(expanded.join("\n")).toContain(created.details.writeNotice?.sha.slice(0, 7) ?? "MISSING")
   }, 60_000)
 })

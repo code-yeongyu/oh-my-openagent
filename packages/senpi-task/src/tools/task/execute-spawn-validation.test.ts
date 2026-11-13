@@ -79,7 +79,7 @@ describe("buildTaskExecute spawn validation", () => {
 
     const result = await execute(
       "c",
-      { prompt: "p", category: "architect", model: "openai-codex/gpt-5.6-luna-fast" },
+      { prompt: "p", category: "architect", model: "chatgpt-subscription/gpt-5.6-luna-fast" },
       undefined,
       undefined,
       CTX,
@@ -90,5 +90,4 @@ describe("buildTaskExecute spawn validation", () => {
     const text = result.content[0]?.type === "text" ? result.content[0].text : ""
     expect(text).toContain("omo.json")
   })
-
 })

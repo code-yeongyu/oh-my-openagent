@@ -80,6 +80,7 @@ def scan_aider(extra_roots: tuple[Path, ...], workers: int) -> list[Session]:
 def _droid_session(path: Path) -> Session:
     sid = path.stem
     cwd = model = first_user = last_user = None
+    prompts: list[str] = []
     created = updated = None
     settings = as_map(read_json(path.with_suffix(".settings.json"))) or {}
     for data in iter_jsonl(path):
@@ -94,7 +95,8 @@ def _droid_session(path: Path) -> Session:
             if prompt:
                 first_user = first_user or prompt
                 last_user = prompt
-    return Session("droid", sid, str(path), cwd, created or file_time(path), updated or created or file_time(path), None, text(settings.get("model")) or model, first_user or "", _usage(settings), last_user_message=last_user or "")
+                prompts.append(prompt)
+    return Session("droid", sid, str(path), cwd, created or file_time(path), updated or created or file_time(path), None, text(settings.get("model")) or model, first_user or "", _usage(settings), last_user_message=last_user or "", user_messages=tuple(prompts))
 
 
 def _amp_sessions(path: Path) -> list[Session]:
@@ -136,6 +138,7 @@ def _gemini_sessions(path: Path) -> list[Session]:
 
 def _kimi_session(path: Path) -> Session:
     first_user = last_user = ""
+    prompts: list[str] = []
     created = updated = None
     for data in iter_jsonl(path):
         stamp = data.get("timestamp")
@@ -146,7 +149,8 @@ def _kimi_session(path: Path) -> Session:
         if prompt:
             first_user = first_user or prompt
             last_user = prompt
-    return Session("kimi", path.parent.name, str(path), None, created or file_time(path), updated or file_time(path), "moonshot", None, first_user, {}, last_user_message=last_user)
+            prompts.append(prompt)
+    return Session("kimi", path.parent.name, str(path), None, created or file_time(path), updated or file_time(path), "moonshot", None, first_user, {}, last_user_message=last_user, user_messages=tuple(prompts))
 
 
 def _codebuff_sessions(path: Path) -> list[Session]:

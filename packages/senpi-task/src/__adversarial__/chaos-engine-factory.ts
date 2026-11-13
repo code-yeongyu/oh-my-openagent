@@ -8,6 +8,7 @@ import type { DestructionPort } from "../steering"
 import type { TaskRecordStore } from "../store"
 import { ChaosProcessTable, ChaosRpcRespawnRunner, ChaosRunner } from "./chaos-engine"
 import type { LifecycleChaosObservations } from "./chaos-engine"
+import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
 
 export type ChaosEngine = {
   readonly id: string
@@ -20,21 +21,28 @@ export type ChaosEngine = {
 }
 
 function managerRegistry(getManager: () => TaskManager): ResidencyRegistry {
-  const adapt = (handle: ManagedChildHandle | undefined): ResidentHandle | undefined => handle === undefined ? undefined : {
-    task_id: handle.task_id,
-    kind: handle.pid === undefined ? "in-process" : "rpc",
-    pid: handle.pid,
-    abort: () => handle.abort(),
-    terminate: () => handle.terminate?.() ?? Promise.resolve(),
-    dispose: () => {
-      const dispose = handle.dispose
-      return dispose()
-    },
-  }
+  const adapt = (handle: ManagedChildHandle | undefined): ResidentHandle | undefined =>
+    handle === undefined
+      ? undefined
+      : {
+          task_id: handle.task_id,
+          kind: handle.pid === undefined ? "in-process" : "rpc",
+          pid: handle.pid,
+          abort: () => handle.abort(),
+          terminate: () => handle.terminate?.() ?? Promise.resolve(),
+          dispose: () => {
+            const dispose = handle.dispose
+            return dispose()
+          },
+        }
   return {
     get: (taskId) => adapt(getManager().getResidentHandle(taskId)),
-    entries: () => getManager().residentTaskIds().map((id) => adapt(getManager().getResidentHandle(id))).filter((handle): handle is ResidentHandle => handle !== undefined),
-    forget: (taskId) => getManager().forget(taskId),
+    entries: () =>
+      getManager()
+        .residentTaskIds()
+        .map((id) => adapt(getManager().getResidentHandle(id)))
+        .filter((handle): handle is ResidentHandle => handle !== undefined),
+    forget: (taskId, options) => getManager().forget(taskId, options),
     hasPendingSends: () => false,
   }
 }
@@ -64,16 +72,28 @@ export function buildChaosEngines(input: {
     }
     const registry = managerRegistry(getManager)
     const inProcessRunner = new ChaosRunner({
-      engineId: id, mode: "in-process", store: input.store,
-      processes: input.processes, observations: input.observations,
+      engineId: id,
+      mode: "in-process",
+      store: input.store,
+      processes: input.processes,
+      observations: input.observations,
     })
     const processRunner = new ChaosRunner({
-      engineId: id, mode: "process", store: input.store,
-      processes: input.processes, observations: input.observations,
+      engineId: id,
+      mode: "process",
+      store: input.store,
+      processes: input.processes,
+      observations: input.observations,
     })
     const lifecycle = createTaskLifecycle({
-      store: input.store, registry, config: input.config, now: input.clock,
-      signaller: input.processes, hostPid, orphanKillDelayMs: 0,
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store: input.store,
+      registry,
+      config: input.config,
+      now: input.clock,
+      signaller: input.processes,
+      hostPid,
+      orphanKillDelayMs: 0,
       respawn: (record, sessionPath) => getManager().respawn(record, sessionPath),
       reattach: (record, handle) => getManager().reattach(record, handle),
     })
@@ -83,8 +103,11 @@ export function buildChaosEngines(input: {
     managerRef = createTaskManager({
       store: input.store,
       runners: { "in-process": inProcessRunner, process: processRunner },
-      planner: singleModelPlanner(input.model), config: input.config, cwd: input.project,
-      now: input.clock, destruction,
+      planner: singleModelPlanner(input.model),
+      config: input.config,
+      cwd: input.project,
+      now: input.clock,
+      destruction,
       admit: async (parentSessionId) => {
         const result = await lifecycle.admitResident(parentSessionId)
         return result.kind === "rejected" ? { kind: "rejected", message: result.error.message } : result

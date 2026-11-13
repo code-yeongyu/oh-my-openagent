@@ -37,9 +37,13 @@ export interface CappedFactsBatch {
   readonly envelopeOversized: boolean
 }
 
-/** THE serializer. Both the payload writer and the cap measurement call exactly this. */
+/**
+ * THE serializer. Both the payload writer and the cap measurement call exactly this. A queue entry's `lead` (the
+ * previous, already-extracted turn kept only for consent binding) never reaches the facts model.
+ */
 export function serializeFactsPayload(payload: FactsPayload): string {
-  return `${JSON.stringify(payload, null, 2)}\n`
+  const entries = payload.entries.map(({ lead: _lead, ...entry }) => entry)
+  return `${JSON.stringify({ ...payload, entries }, null, 2)}\n`
 }
 
 /** Bytes the payload occupies on disk, measured on the serializer's own output. */
@@ -51,9 +55,7 @@ function ascending(left: FactsQueueEntry, right: FactsQueueEntry): number {
   return left.range.end_snapshot_line - right.range.end_snapshot_line
 }
 
-function groupByConversation(
-  entries: readonly FactsQueueEntry[],
-): Map<string, FactsQueueEntry[]> {
+function groupByConversation(entries: readonly FactsQueueEntry[]): Map<string, FactsQueueEntry[]> {
   const groups = new Map<string, FactsQueueEntry[]>()
   for (const entry of entries) {
     const bucket = groups.get(entry.conversationId)

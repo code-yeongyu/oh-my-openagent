@@ -6,22 +6,7 @@ export {
   splitCommandTokens,
   tokenLooksExecutable,
 } from "./command-match"
-export {
-  selectZombieCodegraphProcesses,
-  type CodegraphProcessInfo,
-  type CodegraphProcessMatchKind,
-  type CodegraphZombieProcess,
-  type SelectZombieCodegraphProcessesOptions,
-} from "./codegraph-family"
-export {
-  createDefaultCodegraphProcessKiller,
-  createDefaultProcessKiller,
-  defaultIsProcessAlive,
-  enumerateCodegraphProcesses,
-  enumerateProcesses,
-  type CodegraphProcessKiller,
-  type ProcessKiller,
-} from "./exec"
+export { createDefaultProcessKiller, defaultIsProcessAlive, enumerateProcesses, type ProcessKiller } from "./exec"
 export {
   attestLspDaemonCliProcess,
   listLspDaemonVersionDirs,
@@ -44,24 +29,15 @@ export {
   type LspDaemonProxyProcess,
   type SelectOrphanedLspDaemonProxiesOptions,
 } from "./lsp-proxy-family"
+export { isOrphaned, parsePosixProcessTable, parseWindowsProcessTable, type ProcessInfo } from "./process-table"
+export { discoverOmoOwnedRoots, type OmoOwnedRootsOptions } from "./roots"
 export {
-  isOrphaned,
-  parsePosixProcessTable,
-  parseWindowsProcessTable,
-  type ProcessInfo,
-} from "./process-table"
-export { discoverCodegraphOwnedRoots, discoverOmoOwnedRoots, type CodegraphOwnedRootsOptions } from "./roots"
-export {
-  sweepCodegraphZombies,
   sweepOrphanedLspDaemonProxies,
   sweepStaleLspDaemonVersions,
-  type CodegraphSweepAction,
   type LspDaemonVersionSweepAction,
   type ProcessFamilySweepOptions,
   type ProcessFamilySweepResult,
   type ProcessSweepAction,
-  type SweepCodegraphZombiesOptions,
-  type SweepCodegraphZombiesResult,
   type SweepOrphanedLspDaemonProxiesOptions,
   type SweepOrphanedLspDaemonProxiesResult,
   type SweepStaleLspDaemonVersionsOptions,

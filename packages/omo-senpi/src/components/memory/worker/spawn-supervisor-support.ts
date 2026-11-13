@@ -13,11 +13,45 @@ export function defaultSupervisorPath(): string {
   return fileURLToPath(new URL("./memory-run-supervisor.ts", import.meta.url))
 }
 
+// The memory hooks run the staged-commit checker through the engine's own runtime and the bundled
+// supervisor entry (`--memory-hook`), the same way the supervisor itself is spawned.
+export function memoryHookChecker(): { readonly execPath: string; readonly script: string } {
+  return { execPath: process.execPath, script: defaultSupervisorPath() }
+}
+
 const NODE_SIGNALS = new Set<NodeJS.Signals>([
-  "SIGABRT", "SIGALRM", "SIGBUS", "SIGCHLD", "SIGCONT", "SIGFPE", "SIGHUP", "SIGILL",
-  "SIGINT", "SIGIO", "SIGIOT", "SIGKILL", "SIGPIPE", "SIGPOLL", "SIGPROF", "SIGPWR",
-  "SIGQUIT", "SIGSEGV", "SIGSTKFLT", "SIGSTOP", "SIGSYS", "SIGTERM", "SIGTRAP", "SIGTSTP",
-  "SIGTTIN", "SIGTTOU", "SIGURG", "SIGUSR1", "SIGUSR2", "SIGVTALRM", "SIGWINCH", "SIGXCPU",
+  "SIGABRT",
+  "SIGALRM",
+  "SIGBUS",
+  "SIGCHLD",
+  "SIGCONT",
+  "SIGFPE",
+  "SIGHUP",
+  "SIGILL",
+  "SIGINT",
+  "SIGIO",
+  "SIGIOT",
+  "SIGKILL",
+  "SIGPIPE",
+  "SIGPOLL",
+  "SIGPROF",
+  "SIGPWR",
+  "SIGQUIT",
+  "SIGSEGV",
+  "SIGSTKFLT",
+  "SIGSTOP",
+  "SIGSYS",
+  "SIGTERM",
+  "SIGTRAP",
+  "SIGTSTP",
+  "SIGTTIN",
+  "SIGTTOU",
+  "SIGURG",
+  "SIGUSR1",
+  "SIGUSR2",
+  "SIGVTALRM",
+  "SIGWINCH",
+  "SIGXCPU",
   "SIGXFSZ",
 ])
 

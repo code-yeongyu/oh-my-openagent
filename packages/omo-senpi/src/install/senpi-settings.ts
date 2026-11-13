@@ -1,15 +1,14 @@
 import { constants } from "node:fs"
 import { access, copyFile, mkdir, readFile, rename, writeFile } from "node:fs/promises"
-import { dirname, join, resolve } from "node:path"
+import { basename, dirname, join, resolve } from "node:path"
 
 export type SettingsRecord = Record<string, unknown>
 
 const OMO_SENPI_PACKAGE_NAME = "@code-yeongyu/omo-senpi"
+const GENERATED_PLUGIN_BASENAME = /^omo-senpi-cli-plugin-[A-Za-z0-9]{6}$/
 
-const LEGACY_BUILTIN_SHADOW_PACKAGES = [
-  join("packages", "pi-goal"),
-  join("packages", "pi-webfetch"),
-] as const
+// Keep removing stale installed copies; these workspaces are gone.
+const LEGACY_BUILTIN_SHADOW_PACKAGES = [join("packages", "pi-goal"), join("packages", "pi-webfetch")] as const
 
 export async function readSettings(settingsPath: string): Promise<SettingsRecord> {
   let raw: string
@@ -38,11 +37,7 @@ export function dedupePackages(packages: readonly string[]): string[] {
   return [...new Set(packages)]
 }
 
-export function removeLegacyBuiltinShadows(
-  packages: readonly string[],
-  repoRoot: string,
-  agentDir: string,
-): string[] {
+export function removeLegacyBuiltinShadows(packages: readonly string[], repoRoot: string, agentDir: string): string[] {
   const shadowPaths = new Set(LEGACY_BUILTIN_SHADOW_PACKAGES.map((path) => resolve(repoRoot, path)))
   return packages.filter((entry) => !shadowPaths.has(resolve(agentDir, entry)))
 }
@@ -57,16 +52,15 @@ export async function removeSupersededOmoPackages(
     packages.map(async (entry) => {
       const packagePath = resolve(agentDir, entry)
       if (packagePath === currentPath) return currentPath
-      return (await readPackageName(packagePath)) === OMO_SENPI_PACKAGE_NAME ? undefined : entry
+      if ((await readPackageName(packagePath)) === OMO_SENPI_PACKAGE_NAME) return undefined
+      if (GENERATED_PLUGIN_BASENAME.test(basename(entry)) && !(await fileExists(packagePath))) return undefined
+      return entry
     }),
   )
   return entries.filter((entry): entry is string => entry !== undefined)
 }
 
-export async function writeSettingsAtomically(
-  settingsPath: string,
-  settings: SettingsRecord,
-): Promise<string> {
+export async function writeSettingsAtomically(settingsPath: string, settings: SettingsRecord): Promise<string> {
   await mkdir(dirname(settingsPath), { recursive: true })
   const backupPath = await nextBackupPath(settingsPath)
   if (await fileExists(settingsPath)) {
@@ -106,7 +100,13 @@ async function readPackageName(packagePath: string): Promise<string | undefined>
     if (isErrno(error, "ENOENT") || isErrno(error, "ENOTDIR")) return undefined
     throw error
   }
-  const parsed: unknown = JSON.parse(raw)
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch (error) {
+    if (error instanceof SyntaxError) return undefined
+    throw error
+  }
   return isRecord(parsed) && typeof parsed.name === "string" ? parsed.name : undefined
 }
 

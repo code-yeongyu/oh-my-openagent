@@ -112,10 +112,7 @@ describe("preemptive-compaction", () => {
     })
 
     const output = { title: "", output: "test", metadata: null }
-    await hook["tool.execute.after"](
-      { tool: "bash", sessionID, callID: "call_1" },
-      output
-    )
+    await hook["tool.execute.after"]({ tool: "bash", sessionID, callID: "call_1" }, output)
 
     expect(ctx.client.session.messages).not.toHaveBeenCalled()
   })
@@ -127,10 +124,7 @@ describe("preemptive-compaction", () => {
     const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
 
     const output = { title: "", output: "test", metadata: null }
-    await hook["tool.execute.after"](
-      { tool: "bash", sessionID: "ses_none", callID: "call_1" },
-      output
-    )
+    await hook["tool.execute.after"]({ tool: "bash", sessionID: "ses_none", callID: "call_1" }, output)
 
     expect(ctx.client.session.messages).not.toHaveBeenCalled()
   })
@@ -165,10 +159,7 @@ describe("preemptive-compaction", () => {
     })
 
     const output = { title: "", output: "test", metadata: null }
-    await hook["tool.execute.after"](
-      { tool: "bash", sessionID, callID: "call_1" },
-      output
-    )
+    await hook["tool.execute.after"]({ tool: "bash", sessionID, callID: "call_1" }, output)
 
     expect(ctx.client.session.messages).not.toHaveBeenCalled()
     expect(ctx.client.session.summarize).toHaveBeenCalled()
@@ -202,10 +193,7 @@ describe("preemptive-compaction", () => {
 
     //#when tool.execute.after runs
     const output = { title: "", output: "test", metadata: null }
-    await hook["tool.execute.after"](
-      { tool: "bash", sessionID, callID: "call_1" },
-      output
-    )
+    await hook["tool.execute.after"]({ tool: "bash", sessionID, callID: "call_1" }, output)
 
     //#then summarize should be triggered
     expect(ctx.client.session.summarize).toHaveBeenCalled()
@@ -241,10 +229,7 @@ describe("preemptive-compaction", () => {
     })
 
     const output = { title: "", output: "test", metadata: null }
-    await hook["tool.execute.after"](
-      { tool: "bash", sessionID, callID: "call_1" },
-      output
-    )
+    await hook["tool.execute.after"]({ tool: "bash", sessionID, callID: "call_1" }, output)
 
     expect(ctx.client.session.summarize).not.toHaveBeenCalled()
   })
@@ -280,7 +265,7 @@ describe("preemptive-compaction", () => {
     //#when
     await hook["tool.execute.after"](
       { tool: "bash", sessionID, callID: "call_log" },
-      { title: "", output: "test", metadata: null }
+      { title: "", output: "test", metadata: null },
     )
 
     //#then
@@ -369,7 +354,7 @@ describe("preemptive-compaction", () => {
 
     await hook["tool.execute.after"](
       { tool: "bash", sessionID, callID: "call_fail" },
-      { title: "", output: "test", metadata: null }
+      { title: "", output: "test", metadata: null },
     )
 
     expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
@@ -398,7 +383,7 @@ describe("preemptive-compaction", () => {
 
     await hook["tool.execute.after"](
       { tool: "bash", sessionID, callID: "call_fail_2" },
-      { title: "", output: "test", metadata: null }
+      { title: "", output: "test", metadata: null },
     )
 
     //#then - should NOT have retried
@@ -407,9 +392,13 @@ describe("preemptive-compaction", () => {
 
   it("should use 1M limit when model cache flag is enabled", async () => {
     //#given
-    const hook = createPreemptiveCompactionHook(ctx as never, {}, {
-      anthropicContext1MEnabled: true,
-    })
+    const hook = createPreemptiveCompactionHook(
+      ctx as never,
+      {},
+      {
+        anthropicContext1MEnabled: true,
+      },
+    )
     const sessionID = "ses_1m_flag"
 
     await hook.event({
@@ -436,7 +425,7 @@ describe("preemptive-compaction", () => {
     //#when
     await hook["tool.execute.after"](
       { tool: "bash", sessionID, callID: "call_1" },
-      { title: "", output: "test", metadata: null }
+      { title: "", output: "test", metadata: null },
     )
 
     //#then
@@ -446,9 +435,13 @@ describe("preemptive-compaction", () => {
   it("should keep env var fallback when model cache flag is disabled", async () => {
     //#given
     process.env[ANTHROPIC_CONTEXT_ENV_KEY] = "true"
-    const hook = createPreemptiveCompactionHook(ctx as never, {}, {
-      anthropicContext1MEnabled: false,
-    })
+    const hook = createPreemptiveCompactionHook(
+      ctx as never,
+      {},
+      {
+        anthropicContext1MEnabled: false,
+      },
+    )
     const sessionID = "ses_env_fallback"
 
     await hook.event({
@@ -475,11 +468,88 @@ describe("preemptive-compaction", () => {
     //#when
     await hook["tool.execute.after"](
       { tool: "bash", sessionID, callID: "call_1" },
-      { title: "", output: "test", metadata: null }
+      { title: "", output: "test", metadata: null },
     )
 
     //#then
     expect(ctx.client.session.summarize).not.toHaveBeenCalled()
+  })
+
+  it("should not admit a second compaction while the timed-out summarize is still pending", async () => {
+    //#given a summarize request that remains pending after its timeout
+    const restoreTimeouts = setupImmediateTimeouts()
+    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const sessionID = "ses_timeout_overlap"
+    let resolvePendingSummarize: () => void = () => undefined
+    const pendingSummarize = new Promise<void>((resolve) => {
+      resolvePendingSummarize = resolve
+    })
+    ctx.client.session.summarize.mockImplementationOnce(() => pendingSummarize).mockResolvedValueOnce({})
+
+    try {
+      await hook.event({
+        event: {
+          type: "message.updated",
+          properties: {
+            info: {
+              role: "assistant",
+              sessionID,
+              providerID: "anthropic",
+              modelID: "claude-sonnet-4-6",
+              finish: true,
+              tokens: {
+                input: 800000,
+                output: 0,
+                reasoning: 0,
+                cache: { read: 10000, write: 0 },
+              },
+            },
+          },
+        },
+      })
+
+      //#when the timeout expires and another compaction is requested after cooldown
+      await hook["tool.execute.after"](
+        { tool: "bash", sessionID, callID: "call_timeout_overlap_1" },
+        { title: "", output: "test", metadata: null },
+      )
+      const originalNow = Date.now
+      Date.now = () => originalNow() + 61_000
+      try {
+        await hook.event({
+          event: {
+            type: "message.updated",
+            properties: {
+              info: {
+                role: "assistant",
+                sessionID,
+                providerID: "anthropic",
+                modelID: "claude-sonnet-4-6",
+                finish: true,
+                tokens: {
+                  input: 800000,
+                  output: 0,
+                  reasoning: 0,
+                  cache: { read: 10000, write: 0 },
+                },
+              },
+            },
+          },
+        })
+        await hook["tool.execute.after"](
+          { tool: "bash", sessionID, callID: "call_timeout_overlap_2" },
+          { title: "", output: "test", metadata: null },
+        )
+
+        //#then the pending summarize still owns admission for the session
+        expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
+        resolvePendingSummarize()
+      } finally {
+        Date.now = originalNow
+      }
+    } finally {
+      restoreTimeouts()
+    }
   })
 
   it("should clear in-progress lock when summarize times out", async () => {
@@ -487,10 +557,12 @@ describe("preemptive-compaction", () => {
     const restoreTimeouts = setupImmediateTimeouts()
     const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
     const sessionID = "ses_timeout"
+    let resolvePendingSummarize: () => void = () => undefined
+    const pendingSummarize = new Promise<void>((resolve) => {
+      resolvePendingSummarize = resolve
+    })
 
-    ctx.client.session.summarize
-      .mockImplementationOnce(() => new Promise(() => {}))
-      .mockResolvedValueOnce({})
+    ctx.client.session.summarize.mockImplementationOnce(() => pendingSummarize).mockResolvedValueOnce({})
 
     try {
       await hook.event({
@@ -522,6 +594,7 @@ describe("preemptive-compaction", () => {
 
       //#then - first call timed out
       expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
+      resolvePendingSummarize()
       expect(logMock).toHaveBeenCalledWith("[preemptive-compaction] Compaction failed", {
         sessionID,
         providerID: "anthropic",
@@ -600,7 +673,7 @@ describe("preemptive-compaction", () => {
 
     await hook["tool.execute.after"](
       { tool: "bash", sessionID, callID: "call_1" },
-      { title: "", output: "test", metadata: null }
+      { title: "", output: "test", metadata: null },
     )
 
     expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
@@ -631,7 +704,7 @@ describe("preemptive-compaction", () => {
 
     await hook["tool.execute.after"](
       { tool: "bash", sessionID, callID: "call_2" },
-      { title: "", output: "test", metadata: null }
+      { title: "", output: "test", metadata: null },
     )
 
     // then - summarize should fire again
@@ -669,7 +742,7 @@ describe("preemptive-compaction", () => {
 
     await hook["tool.execute.after"](
       { tool: "bash", sessionID, callID: "call_1" },
-      { title: "", output: "test", metadata: null }
+      { title: "", output: "test", metadata: null },
     )
 
     expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
@@ -702,7 +775,7 @@ describe("preemptive-compaction", () => {
 
       await hook["tool.execute.after"](
         { tool: "bash", sessionID, callID: "call_2" },
-        { title: "", output: "test", metadata: null }
+        { title: "", output: "test", metadata: null },
       )
 
       expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
@@ -748,7 +821,7 @@ describe("preemptive-compaction", () => {
 
     await hook["tool.execute.after"](
       { tool: "bash", sessionID, callID: "call_1" },
-      { title: "", output: "test", metadata: null }
+      { title: "", output: "test", metadata: null },
     )
 
     expect(ctx.client.session.summarize).not.toHaveBeenCalled()
@@ -791,7 +864,7 @@ describe("preemptive-compaction", () => {
 
     await hook["tool.execute.after"](
       { tool: "bash", sessionID, callID: "call_1" },
-      { title: "", output: "test", metadata: null }
+      { title: "", output: "test", metadata: null },
     )
 
     expect(ctx.client.session.summarize).toHaveBeenCalled()
@@ -830,7 +903,7 @@ describe("preemptive-compaction", () => {
 
     await hook["tool.execute.after"](
       { tool: "bash", sessionID, callID: "call_1" },
-      { title: "", output: "test", metadata: null }
+      { title: "", output: "test", metadata: null },
     )
 
     expect(ctx.client.session.summarize).toHaveBeenCalled()

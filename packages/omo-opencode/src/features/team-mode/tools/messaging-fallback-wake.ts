@@ -1,8 +1,5 @@
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
-import {
-  dispatchInternalPrompt,
-  isInternalPromptDispatchAccepted,
-} from "../../../hooks/shared/prompt-async-gate"
+import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../../hooks/shared/prompt-async-gate"
 import { isPreSendConnectionFailure } from "../../../shared/live-server-route"
 import { log } from "../../../shared/logger"
 import { buildMemberPromptBody } from "../member-session-routing"
@@ -10,6 +7,7 @@ import { readUnreadMessageById } from "@oh-my-opencode/team-core/team-mailbox/in
 import { loadRuntimeState } from "@oh-my-opencode/team-core/team-state-store/store"
 import type { RuntimeState } from "@oh-my-opencode/team-core/types"
 import type { LiveDeliveryClient } from "./messaging-live-delivery-client"
+import type { TeamSendMessageDispatchTiming } from "./messaging-runtime"
 
 type RuntimeMember = RuntimeState["members"][number]
 
@@ -22,6 +20,7 @@ export async function enqueueFallbackMailboxWake(input: {
   readonly recipientName: string
   readonly messageId: string
   readonly config: TeamModeConfig
+  readonly dispatchTiming?: TeamSendMessageDispatchTiming
 }): Promise<void> {
   const promptResult = await dispatchInternalPrompt({
     mode: "async",
@@ -31,6 +30,9 @@ export async function enqueueFallbackMailboxWake(input: {
     dedupeKey: `team-live-delivery-fallback:${input.messageId}`,
     queueBehavior: "enqueue",
     durableRetry: true,
+    settleMs: input.dispatchTiming?.fallbackWakeSettleMs,
+    postDispatchHoldMs: input.dispatchTiming?.postDispatchHoldMs,
+    queueRetryMs: input.dispatchTiming?.queueRetryMs,
     shouldDispatch: () => shouldDispatchFallbackMailboxWake(input),
     retryDispatchFailure: isPreSendConnectionFailure,
     input: {
@@ -61,11 +63,7 @@ async function shouldDispatchFallbackMailboxWake(input: {
     const runtimeState = await loadRuntimeState(input.teamRunId, input.config)
     const recipient = runtimeState.members.find((member) => member.name === input.recipientName)
     const recipientIsActive = recipient?.status === "running" || recipient?.status === "idle"
-    if (
-      runtimeState.status !== "active"
-      || recipient?.sessionId !== input.recipientSessionId
-      || !recipientIsActive
-    ) {
+    if (runtimeState.status !== "active" || recipient?.sessionId !== input.recipientSessionId || !recipientIsActive) {
       return false
     }
 
@@ -73,20 +71,10 @@ async function shouldDispatchFallbackMailboxWake(input: {
       return false
     }
 
-    const unread = await readUnreadMessageById(
-      input.teamRunId,
-      input.recipientName,
-      input.messageId,
-      input.config,
-    )
+    const unread = await readUnreadMessageById(input.teamRunId, input.recipientName, input.messageId, input.config)
     return unread !== undefined
   } catch (error) {
-    if (
-      typeof error === "object"
-      && error !== null
-      && "code" in error
-      && error.code === "ENOENT"
-    ) {
+    if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT") {
       log("[team-mailbox] fallback mailbox wake cancelled because team state no longer exists", {
         teamRunId: input.teamRunId,
         recipient: input.recipientName,

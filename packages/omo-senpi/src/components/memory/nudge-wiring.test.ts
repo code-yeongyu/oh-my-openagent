@@ -53,7 +53,11 @@ function disposition(inputId: string, value: "handled" | "queued" | "started" | 
 }
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(
+    roots
+      .splice(0)
+      .map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })),
+  )
 })
 
 describe("createMemoryNudgeWiring", () => {
@@ -126,11 +130,13 @@ describe("createMemoryNudgeWiring", () => {
       resolveSettings: () => ({ enabled: true, everyUserTurns: 2 }),
     })
     wiring.register(pi)
-    const ctx = eventContext("session-order", [{
-      type: "custom",
-      customType: ACCEPTED_TURNS_ENTRY_TYPE,
-      data: { version: 1, sessionId: "session-order", priorUserTurns: 1, sessionBaselineTurns: 0 },
-    }])
+    const ctx = eventContext("session-order", [
+      {
+        type: "custom",
+        customType: ACCEPTED_TURNS_ENTRY_TYPE,
+        data: { version: 1, sessionId: "session-order", priorUserTurns: 1, sessionBaselineTurns: 0 },
+      },
+    ])
     await pi.dispatch("session_start", {}, ctx)
     await pi.dispatch("input", input("second-before-started"), ctx)
 
@@ -144,7 +150,12 @@ describe("createMemoryNudgeWiring", () => {
   test("#given a threshold on an identity with no repository yet #when nudge state resolves #then the fresh-session baseline is used without requiring git history", async () => {
     // given
     const { context } = await fixture()
-    await rmEfaultTolerant(context.identityPaths.repo, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+    await rmEfaultTolerant(context.identityPaths.repo, {
+      recursive: true,
+      force: true,
+      maxRetries: 10,
+      retryDelay: 200,
+    })
     const repo = new GitMemoryRepo({ dir: context.identityPaths.repo, agentId: context.identity })
     const pi = new MemoryFakeExtensionAPI()
     const wiring = createMemoryNudgeWiring({
@@ -152,11 +163,17 @@ describe("createMemoryNudgeWiring", () => {
       resolveSettings: () => ({ enabled: true, everyUserTurns: 2 }),
     })
     wiring.register(pi)
-    await pi.dispatch("session_start", {}, eventContext("session-no-repo", [{
-      type: "custom",
-      customType: ACCEPTED_TURNS_ENTRY_TYPE,
-      data: { version: 1, sessionId: "session-no-repo", priorUserTurns: 2, sessionBaselineTurns: 0 },
-    }]))
+    await pi.dispatch(
+      "session_start",
+      {},
+      eventContext("session-no-repo", [
+        {
+          type: "custom",
+          customType: ACCEPTED_TURNS_ENTRY_TYPE,
+          data: { version: 1, sessionId: "session-no-repo", priorUserTurns: 2, sessionBaselineTurns: 0 },
+        },
+      ]),
+    )
 
     // when
     const turns = wiring.nudgeTurns(repo, "session-no-repo", context.identity)
@@ -175,11 +192,13 @@ describe("createMemoryNudgeWiring", () => {
       resolveSettings: () => ({ enabled, everyUserTurns: 2 }),
     })
     wiring.register(pi)
-    const ctx = eventContext("session-clear", [{
-      type: "custom",
-      customType: ACCEPTED_TURNS_ENTRY_TYPE,
-      data: { version: 1, sessionId: "session-clear", priorUserTurns: 2, sessionBaselineTurns: 0 },
-    }])
+    const ctx = eventContext("session-clear", [
+      {
+        type: "custom",
+        customType: ACCEPTED_TURNS_ENTRY_TYPE,
+        data: { version: 1, sessionId: "session-clear", priorUserTurns: 2, sessionBaselineTurns: 0 },
+      },
+    ])
     await pi.dispatch("session_start", {}, ctx)
     expect(await wiring.nudgeTurns(repo, "session-clear", context.identity)).toBe(2)
 
@@ -198,6 +217,117 @@ describe("createMemoryNudgeWiring", () => {
     expect(await wiring.nudgeTurns(repo, "session-clear", context.identity)).toBeUndefined()
   }, 30_000)
 
+  test("#given a resumed session that saved memory in an earlier run #when its prompt checks the nudge #then the earlier save still resets the count", async () => {
+    // given
+    const { context, repo } = await fixture()
+    await writeFile(join(repo.dir, "earlier.md"), "earlier\n")
+    await repo.commitWrite(
+      ["earlier.md"],
+      "save memory\n\nOmo-Writer: memory-tool\nOmo-Session: session-resumed\nOmo-Turn: 3",
+      { agentId: context.identity, authorName: context.identity },
+    )
+    const pi = new MemoryFakeExtensionAPI()
+    const wiring = createMemoryNudgeWiring({
+      resolveContext: () => context,
+      resolveSettings: () => ({ enabled: true, everyUserTurns: 2 }),
+    })
+    wiring.register(pi)
+    const startedEarlier = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+
+    // when
+    await pi.dispatch(
+      "session_start",
+      {},
+      eventContext("session-resumed", [
+        { type: "message", timestamp: startedEarlier, data: { role: "user" } },
+        {
+          type: "custom",
+          customType: ACCEPTED_TURNS_ENTRY_TYPE,
+          data: { version: 1, sessionId: "session-resumed", priorUserTurns: 4, sessionBaselineTurns: 0 },
+        },
+      ]),
+    )
+
+    // then: 4 accepted turns, saved at turn 3 -> 1 since the save, under the threshold of 2
+    expect(await wiring.nudgeTurns(repo, "session-resumed", context.identity)).toBeUndefined()
+  }, 30_000)
+
+  test("#given other sessions keep committing between prompts #when this session saves among their commits #then the next check sees the save", async () => {
+    // given
+    const { context, repo } = await fixture()
+    const pi = new MemoryFakeExtensionAPI()
+    const wiring = createMemoryNudgeWiring({
+      resolveContext: () => context,
+      resolveSettings: () => ({ enabled: true, everyUserTurns: 2 }),
+    })
+    wiring.register(pi)
+    await pi.dispatch(
+      "session_start",
+      {},
+      eventContext("session-busy", [
+        {
+          type: "custom",
+          customType: ACCEPTED_TURNS_ENTRY_TYPE,
+          data: { version: 1, sessionId: "session-busy", priorUserTurns: 2, sessionBaselineTurns: 0 },
+        },
+      ]),
+    )
+    expect(await wiring.nudgeTurns(repo, "session-busy", context.identity)).toBe(2)
+    const commit = async (file: string, session: string, turn: number) => {
+      await writeFile(join(repo.dir, file), `${file}\n`)
+      await repo.commitWrite(
+        [file],
+        `save memory\n\nOmo-Writer: memory-tool\nOmo-Session: ${session}\nOmo-Turn: ${turn}`,
+        { agentId: context.identity, authorName: context.identity },
+      )
+    }
+
+    // when
+    for (let index = 0; index < 25; index += 1) await commit(`other-${index}.md`, "session-other", index)
+    await commit("mine.md", "session-busy", 2)
+    for (let index = 25; index < 50; index += 1) await commit(`other-${index}.md`, "session-other", index)
+
+    // then
+    expect(await wiring.nudgeTurns(repo, "session-busy", context.identity)).toBeUndefined()
+  }, 60_000)
+
+  test("#given another session whose id starts with this one's saved later #when this session checks #then only this session's own save counts", async () => {
+    // given
+    const { context, repo } = await fixture()
+    const pi = new MemoryFakeExtensionAPI()
+    const wiring = createMemoryNudgeWiring({
+      resolveContext: () => context,
+      resolveSettings: () => ({ enabled: true, everyUserTurns: 2 }),
+    })
+    wiring.register(pi)
+    await pi.dispatch(
+      "session_start",
+      {},
+      eventContext("x", [
+        {
+          type: "custom",
+          customType: ACCEPTED_TURNS_ENTRY_TYPE,
+          data: { version: 1, sessionId: "x", priorUserTurns: 10, sessionBaselineTurns: 0 },
+        },
+      ]),
+    )
+    const save = async (file: string, session: string, turn: number) => {
+      await writeFile(join(repo.dir, file), `${file}\n`)
+      await repo.commitWrite(
+        [file],
+        `save memory\n\nOmo-Writer: memory-tool\nOmo-Session: ${session}\nOmo-Turn: ${turn}`,
+        { agentId: context.identity, authorName: context.identity },
+      )
+    }
+
+    // when: "x" saved at turn 1; "x2" (whose trailer also contains "Omo-Session: x") saved at turn 9
+    await save("x.md", "x", 1)
+    await save("x2.md", "x2", 9)
+
+    // then: 10 accepted turns - saved at 1 = 9 since the save, so the nudge fires
+    expect(await wiring.nudgeTurns(repo, "x", context.identity)).toBe(9)
+  }, 30_000)
+
   test("#given a bound non-auto identity #when a memory MCP tool call starts #then unforgeable identity and accepted-turn provenance are injected in place", async () => {
     // given
     const { context } = await fixture()
@@ -207,11 +337,13 @@ describe("createMemoryNudgeWiring", () => {
       resolveSettings: () => ({ enabled: true, everyUserTurns: 2 }),
     })
     wiring.register(pi)
-    const ctx = eventContext("session-tool", [{
-      type: "custom",
-      customType: ACCEPTED_TURNS_ENTRY_TYPE,
-      data: { version: 1, sessionId: "session-tool", priorUserTurns: 5, sessionBaselineTurns: 1 },
-    }])
+    const ctx = eventContext("session-tool", [
+      {
+        type: "custom",
+        customType: ACCEPTED_TURNS_ENTRY_TYPE,
+        data: { version: 1, sessionId: "session-tool", priorUserTurns: 5, sessionBaselineTurns: 1 },
+      },
+    ])
     await pi.dispatch("session_start", {}, ctx)
     const call: {
       type: string
@@ -232,6 +364,7 @@ describe("createMemoryNudgeWiring", () => {
         identityId: context.identity,
         repoPath: context.identityPaths.repo,
         toolCallId: "call-1",
+        claim: { source: "inferred" },
       },
     })
   }, 30_000)
@@ -245,18 +378,20 @@ describe("createMemoryNudgeWiring", () => {
       resolveSettings: () => ({ enabled: true, everyUserTurns: 2 }),
     })
     wiring.register(pi)
-    const ctx = eventContext("session-mcp-call", [{
-      type: "custom",
-      customType: ACCEPTED_TURNS_ENTRY_TYPE,
-      data: { version: 1, sessionId: "session-mcp-call", priorUserTurns: 4, sessionBaselineTurns: 1 },
-    }])
+    const ctx = eventContext("session-mcp-call", [
+      {
+        type: "custom",
+        customType: ACCEPTED_TURNS_ENTRY_TYPE,
+        data: { version: 1, sessionId: "session-mcp-call", priorUserTurns: 4, sessionBaselineTurns: 1 },
+      },
+    ])
     await pi.dispatch("session_start", {}, ctx)
     const call: {
       type: string
       toolCallId: string
       toolName: string
       input: Record<string, unknown>
-    } = { type: "tool_call", toolCallId: "call-mcp-1", toolName: "mcp_omo-memory_memory_apply_patch", input: { reason: "save" } }
+    } = { type: "tool_call", toolCallId: "call-memory-1", toolName: "memory", input: { reason: "save" } }
 
     // when
     await pi.dispatch("tool_call", call, ctx)
@@ -267,7 +402,8 @@ describe("createMemoryNudgeWiring", () => {
       userTurns: 4,
       identityId: context.identity,
       repoPath: context.identityPaths.repo,
-      toolCallId: "call-mcp-1",
+      toolCallId: "call-memory-1",
+      claim: { source: "inferred" },
     })
   }, 30_000)
 })
@@ -284,7 +420,10 @@ const PLAIN_THEME = {
 }
 
 function recordingTheme(): {
-  readonly theme: { fg: (color: ThemeColor, text: string) => string; bg: (color: "customMessageBg", text: string) => string }
+  readonly theme: {
+    fg: (color: ThemeColor, text: string) => string
+    bg: (color: "customMessageBg", text: string) => string
+  }
   readonly colors: ThemeColor[]
 } {
   const colors: ThemeColor[] = []
@@ -373,7 +512,9 @@ describe("renderAcceptedTurnsEntry", () => {
     const recorder = recordingTheme()
 
     // when
-    renderAcceptedTurnsEntry({ data: acceptedTurns() } as never, { expanded: true }, recorder.theme as never)!.render(120)
+    renderAcceptedTurnsEntry({ data: acceptedTurns() } as never, { expanded: true }, recorder.theme as never)!.render(
+      120,
+    )
 
     // then
     expect(recorder.colors).toEqual(["dim", "dim", "dim", "dim"])

@@ -24,9 +24,7 @@ describe("OpenClaw Dispatcher", () => {
   test("interpolateInstruction replaces variables", () => {
     const template = "Hello {{name}}, welcome to {{place}}!"
     const variables = { name: "World", place: "Bun" }
-    expect(interpolateInstruction(template, variables)).toBe(
-      "Hello World, welcome to Bun!",
-    )
+    expect(interpolateInstruction(template, variables)).toBe("Hello World, welcome to Bun!")
   })
 
   test("interpolateInstruction handles missing variables", () => {
@@ -53,7 +51,7 @@ describe("OpenClaw Dispatcher", () => {
 
       expect(result.success).toBe(true)
       expect(fetchSpy).toHaveBeenCalled()
-      const call = fetchSpy.mock.calls.find(c => c[0] === "https://example.com")
+      const call = fetchSpy.mock.calls.find((c) => c[0] === "https://example.com")
       expect(call).toBeDefined()
       if (!call) {
         throw new Error("Expected fetch call for https://example.com")
@@ -165,7 +163,11 @@ describe("OpenClaw Dispatcher", () => {
   })
 
   test("wakeGateway fails on invalid URL", async () => {
-    const result = await wakeGateway("test", { url: "http://example.com", method: "POST", timeout: 1000, type: "http" }, {})
+    const result = await wakeGateway(
+      "test",
+      { url: "http://example.com", method: "POST", timeout: 1000, type: "http" },
+      {},
+    )
     expect(result.success).toBe(false)
     expect(result.error).toContain("Invalid URL")
   })
@@ -181,6 +183,15 @@ describe("OpenClaw Dispatcher", () => {
       if (original === undefined) delete process.env.OMO_OPENCLAW_COMMAND_TIMEOUT_MS
       else process.env.OMO_OPENCLAW_COMMAND_TIMEOUT_MS = original
     }
+  })
+
+  test("resolveCommandTimeoutMs clamps explicit and env timeout values", () => {
+    expect(resolveCommandTimeoutMs(99)).toBe(100)
+    expect(resolveCommandTimeoutMs(300_001)).toBe(300_000)
+    expect(resolveCommandTimeoutMs(1500.9)).toBe(1500)
+    expect(resolveCommandTimeoutMs(undefined, "not-a-number")).toBe(5_000)
+    expect(resolveCommandTimeoutMs(undefined, "50")).toBe(100)
+    expect(resolveCommandTimeoutMs(undefined, "400000")).toBe(300_000)
   })
 
   test("terminateCommandProcess kills process group on unix when pid exists", () => {
@@ -236,7 +247,7 @@ describe("OpenClaw Dispatcher", () => {
       {
         type: "command",
         method: "POST",
-        command: "printf '%s' '{\"messageId\":\"55\",\"platform\":\"telegram\",\"threadId\":\"thr\"}'",
+        command: 'printf \'%s\' \'{"messageId":"55","platform":"telegram","threadId":"thr"}\'',
         timeout: commandGatewayTestTimeoutMs,
       },
       {},

@@ -1,28 +1,52 @@
 export {
+  AWAITING_INPUT_REASONS,
   BACKGROUND_MODES,
   COST_REPORT_STATUSES,
   DURATION_SOURCE_STATUSES,
   isSpawnSpecV1,
+  MODEL_REFUSAL_REASONS,
   RESIDENCY_STATES,
   RESOLVED_MODEL_SOURCES,
+  EFFECTIVE_MODEL_SOURCES,
+  EFFECTIVE_MODEL_CHANGE_KINDS,
+  RUNNER_KINDS,
+  SUSPENSION_REASONS,
   TASK_STATUSES,
   TOKEN_COVERAGE_STATUSES,
 } from "./types"
 export type {
+  IsolationBackendKind,
+  IsolationMergeResult,
+  IsolationRecord,
+  TaskIsolationSpec,
+  AwaitingInputReason,
   BackgroundMode,
   CostReportStatus,
   DurationSourceStatus,
+  HostSessionIdentity,
   LegacyProcessSpawnSpec,
   Messageability,
+  ModelRefusal,
+  ModelRefusalReason,
   PendingSteeringEntry,
   ResidencyState,
+  EffectiveModelRecord,
+  EffectiveModelSource,
+  EffectiveModelChange,
+  EffectiveModelChangeKind,
   ResolvedModelRecord,
   ResolvedModelSource,
+  RunnerKind,
   SpawnSpecV1,
+  StartQueued,
+  SuspensionReason,
+  TaskAwaitingInput,
   TaskNotification,
+  CancelRequest,
   TaskRecord,
   TaskRecordInput,
   TaskRunStats,
+  LiveRunStats,
   TaskSpawnSpec,
   TaskStatus,
   TaskTransition,
@@ -34,4 +58,21 @@ export { createTaskRecord } from "./record"
 export { bumpTaskId, createTaskId, parseTaskId, syncTaskIdFloor } from "./id"
 export type { TaskId } from "./id"
 export { messageability } from "./messageability"
+export { isTransportLostMessage, TRANSPORT_LOST_REASON } from "./transport-loss"
 export { markRecordLostForReconciliation, transitionTaskRecord } from "./transitions"
+export { currentRunStartEpoch, fenceRun, LEGACY_RUN_START_EPOCH, nextRunEpoch, type RunFence } from "./run-fence"
+export {
+  TASK_START_FAILURE_KINDS,
+  TASK_START_FAILURE_REASONS,
+  MODEL_START_FAILURE_REASONS,
+  HOST_START_FAILURE_REASONS,
+  SESSION_START_FAILURE_REASONS,
+  isTaskStartFailureKind,
+  isTaskStartFailureReason,
+} from "./start-failure"
+export type {
+  TaskStartFailureKind,
+  TaskStartFailureReason,
+  TaskStartFailureRecordFields,
+  TaskStartFailureTransition,
+} from "./start-failure"

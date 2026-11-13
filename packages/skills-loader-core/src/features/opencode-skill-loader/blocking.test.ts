@@ -1,24 +1,26 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test"
-import { mkdirSync, writeFileSync, rmSync } from "fs"
+import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "fs"
 import { join } from "path"
 import { tmpdir } from "os"
 import { discoverAllSkillsBlocking } from "./blocking"
 import type { SkillScope } from "./types"
 
-const TEST_DIR = join(tmpdir(), `blocking-test-${Date.now()}`)
+// Use a unique root for each test: Date.now()-derived paths can collide when Bun
+// runs sibling suites concurrently, allowing one teardown to remove another's fixture.
+let testDir = ""
 
 beforeEach(() => {
-  mkdirSync(TEST_DIR, { recursive: true })
+  testDir = mkdtempSync(join(tmpdir(), "blocking-test-"))
 })
 
 afterEach(() => {
-  rmSync(TEST_DIR, { recursive: true, force: true })
+  rmSync(testDir, { recursive: true, force: true })
 })
 
 describe("discoverAllSkillsBlocking", () => {
   it("returns skills synchronously from valid directories", () => {
     // given valid skill directory
-    const skillDir = join(TEST_DIR, "skills")
+    const skillDir = join(testDir, "skills")
     mkdirSync(skillDir, { recursive: true })
 
     const skillMdPath = join(skillDir, "test-skill.md")
@@ -28,7 +30,7 @@ describe("discoverAllSkillsBlocking", () => {
 name: test-skill
 description: A test skill
 ---
-This is test skill content.`
+This is test skill content.`,
     )
 
     const dirs = [skillDir]
@@ -46,7 +48,7 @@ This is test skill content.`
 
   it("returns empty array for empty directories", () => {
     // given empty directory
-    const emptyDir = join(TEST_DIR, "empty")
+    const emptyDir = join(testDir, "empty")
     mkdirSync(emptyDir, { recursive: true })
 
     const dirs = [emptyDir]
@@ -62,7 +64,7 @@ This is test skill content.`
 
   it("returns empty array for non-existent directories", () => {
     // given non-existent directory
-    const nonExistentDir = join(TEST_DIR, "does-not-exist")
+    const nonExistentDir = join(testDir, "does-not-exist")
 
     const dirs = [nonExistentDir]
     const scopes: SkillScope[] = ["opencode-project"]
@@ -77,8 +79,8 @@ This is test skill content.`
 
   it("handles multiple directories with mixed content", () => {
     // given multiple directories with valid and invalid skills
-    const dir1 = join(TEST_DIR, "dir1")
-    const dir2 = join(TEST_DIR, "dir2")
+    const dir1 = join(testDir, "dir1")
+    const dir2 = join(testDir, "dir2")
     mkdirSync(dir1, { recursive: true })
     mkdirSync(dir2, { recursive: true })
 
@@ -88,7 +90,7 @@ This is test skill content.`
 name: skill1
 description: First skill
 ---
-Skill 1 content.`
+Skill 1 content.`,
     )
 
     writeFileSync(
@@ -97,7 +99,7 @@ Skill 1 content.`
 name: skill2
 description: Second skill
 ---
-Skill 2 content.`
+Skill 2 content.`,
     )
 
     const dirs = [dir1, dir2]
@@ -110,13 +112,13 @@ Skill 2 content.`
     expect(skills).toBeArray()
     expect(skills.length).toBe(2)
 
-    const skillNames = skills.map(s => s.name).sort()
+    const skillNames = skills.map((s) => s.name).sort()
     expect(skillNames).toEqual(["skill1", "skill2"])
   })
 
   it("skips invalid YAML files", () => {
     // given directory with invalid YAML
-    const skillDir = join(TEST_DIR, "skills")
+    const skillDir = join(testDir, "skills")
     mkdirSync(skillDir, { recursive: true })
 
     const validSkillPath = join(skillDir, "valid.md")
@@ -126,7 +128,7 @@ Skill 2 content.`
 name: valid-skill
 description: Valid skill
 ---
-Valid skill content.`
+Valid skill content.`,
     )
 
     const invalidSkillPath = join(skillDir, "invalid.md")
@@ -136,7 +138,7 @@ Valid skill content.`
 name: invalid skill
 description: [ invalid yaml
 ---
-Invalid content.`
+Invalid content.`,
     )
 
     const dirs = [skillDir]
@@ -153,7 +155,7 @@ Invalid content.`
 
   it("handles directory-based skills with SKILL.md", () => {
     // given directory-based skill structure
-    const skillsDir = join(TEST_DIR, "skills")
+    const skillsDir = join(testDir, "skills")
     const mySkillDir = join(skillsDir, "my-skill")
     mkdirSync(mySkillDir, { recursive: true })
 
@@ -164,7 +166,7 @@ Invalid content.`
 name: my-skill
 description: Directory-based skill
 ---
-This is a directory-based skill.`
+This is a directory-based skill.`,
     )
 
     const dirs = [skillsDir]
@@ -181,7 +183,7 @@ This is a directory-based skill.`
 
   it("processes large skill sets without timeout", () => {
     // given directory with many skills (20+)
-    const skillDir = join(TEST_DIR, "many-skills")
+    const skillDir = join(testDir, "many-skills")
     mkdirSync(skillDir, { recursive: true })
 
     const skillCount = 25
@@ -193,7 +195,7 @@ This is a directory-based skill.`
 name: skill-${i}
 description: Skill number ${i}
 ---
-Content for skill ${i}.`
+Content for skill ${i}.`,
       )
     }
 

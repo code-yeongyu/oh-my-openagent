@@ -1,8 +1,13 @@
-import { MemoryBlockCache } from "@oh-my-opencode/memory-core"
+import { homedir } from "node:os"
+
+import { InFlightReads, MemoryBlockCache } from "@oh-my-opencode/memory-core"
 
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
-import { createDreamTriggerWiring, resolveDreamTriggerSettings } from "./dream-trigger"
+import { buildDreamTriggerWiring } from "./dream-runtime-wiring"
 import { resolveMemorySettings } from "./identity-runtime"
+import { createMemoryMaintenance } from "./memory-maintenance"
+import { resolveAgentReflectionSettings } from "./reflection-settings"
+import { encodeKibitzerSessionId } from "./kibitzer/observe-paths"
 import { createMemoryNudgeWiring } from "./nudge-wiring"
 import type { PalacePeopleOptions } from "./palace/people"
 import { registerMemoryFilesystemPolicy } from "./policy-guard"
@@ -10,38 +15,114 @@ import { createShutdownDrain, type ShutdownDrainInput, type ShutdownEvaluator } 
 import { type SkillsUsageTracker } from "./skills-usage"
 import { type MemoryUsageTracker } from "./memory-usage"
 import { createMemoryNoticeWiring } from "./memory-notice-wiring"
-import { createMemorianGateWiring, type MemorianGateWiring } from "./memorian-wiring"
-import { resolveMemoryModelRegistry } from "./model-registry-resolver"
-import { createMemoryRecallWiring } from "./recall-wiring"
-import { branchEntryCount } from "./wiring-context"
-import {
-  createMemoryReflectionLiveWiring,
-  createReflectionCompletionApi,
-} from "./wiring-reflection-live"
-import { createMemoryRuntimeWiring, type MemoryRuntimeWiring } from "./wiring-runtime"
+import { createConfiguredFactsApplier, publishSessionFactsApplier } from "./facts-apply-rpc"
+import { createKibitzerComposition, type KibitzerComposition } from "./kibitzer"
+import { createPressureDreamAdmission } from "./pressure-dream-admission"
+import { createMemoryRecallWiring, createSharedRecallCorpusCache } from "./recall-wiring"
+import { loadRecallStoreRuntime } from "./recall-store-runtime-loader"
+import { memoryBlockBuild } from "./memory-block-build"
+import type { MemoryIdentityContext } from "./context"
+import { createProjectMemoryScope } from "./project-memory-nudge"
+import { readUi, branchEntryCount, sessionIdFrom } from "./wiring-context"
+import { createMemoryUserActivity } from "./user-activity"
+import { logBindReconcileFailure } from "./bind-reconcile-log"
+import { createMemoryReflectionLiveWiring, createReflectionCompletionApi } from "./wiring-reflection-live"
+import { createMemoryRuntimeWiring } from "./wiring-runtime"
 import { registerMemoryStatic } from "./wiring-static"
+import { reconcileThroughStaleLockReaper, recoverStaleReflectionHolder } from "./reflection-stale-active"
+import { runMemorySessionShutdown } from "./wiring-shutdown"
 import type { MemoryCommandSettings } from "./commands/types"
 import type { MemoryWiring, MemoryWiringOptions } from "./wiring-types"
 
 export type { MemorySessionStateLike, MemoryWiring, MemoryWiringOptions } from "./wiring-types"
 
+const PER_TURN_SETTLE_BUDGET_MS = 10_000
+
+function boundedTurnSignal(signal: AbortSignal | undefined): AbortSignal {
+  const budget = AbortSignal.timeout(PER_TURN_SETTLE_BUDGET_MS)
+  return signal === undefined ? budget : AbortSignal.any([signal, budget])
+}
+
 export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
-  const promptCache = new MemoryBlockCache()
+  // Persisted compiled blocks: a relaunch reads the block of a commit an earlier process compiled (the store ships
+  // in the lazily loaded recall-store sidecar). Keyed by the build, so an upgrade never reads an older build's bytes.
+  const blockBuild = memoryBlockBuild()
+  const promptCache = new MemoryBlockCache(
+    blockBuild === undefined
+      ? {}
+      : {
+          store: loadRecallStoreRuntime,
+          build: blockBuild,
+          onStoreError: (error) =>
+            options.logger?.warn("omo-senpi persisted memory block unavailable; compiling instead", {
+              error: error instanceof Error ? error.message : String(error),
+            }),
+          onDegraded: ({ revision, reasons }) =>
+            options.logger?.warn(
+              "omo-senpi memory block compiled from incomplete git reads; used for this turn only, not persisted",
+              {
+                revision,
+                reasons,
+              },
+            ),
+        },
+  )
+  const promptPrebuild: { current?: (context: MemoryIdentityContext) => Promise<void> } = {}
+  const work = options.work ?? new InFlightReads()
   const lastEventCtx: { current?: unknown } = {}
   const activeSession: { current?: string } = {}
+  const userActivity = createMemoryUserActivity(options.env)
   const skillsUsageTrackersRef: { current: Map<string, SkillsUsageTracker> } = { current: new Map() }
   const memoryUsageTrackersRef: { current: Map<string, MemoryUsageTracker> } = { current: new Map() }
   const reflectionLive = createMemoryReflectionLiveWiring(options, activeSession, lastEventCtx)
-  const runtimeWiring = createMemoryRuntimeWiring(
-    options,
-    lastEventCtx,
-    reflectionLive.currentSession,
-    {
-      onLaunch: reflectionLive.onReflectionLaunched,
-      onLiveCompletion: reflectionLive.onLiveReflectionCompleted,
-    },
-  )
-  const { resolveContext, journalWiringFor, factsWiringFor, memorianRunnerFor, runtimeFor } = runtimeWiring
+  const staleLockNoticesShown = new Set<string>()
+  const staleHolderReconciles = new Set<string>()
+  // Session-start reconciliation runs once per session, so a holder that died after it would keep
+  // the reflection lock for good (#10377). Each later turn settles a provably dead holder, and shows
+  // a holder whose liveness cannot be proven once per session and run.
+  const recoverStaleHolderAfterTurn = async (
+    sessionId: string,
+    identity: MemoryIdentityContext,
+    eventCtx: unknown,
+    signal?: AbortSignal,
+  ): Promise<void> => {
+    if (!userActivity.has(sessionId) || !userActivity.hasReconciled(sessionId)) return
+    let attemptedKey: string | undefined
+    try {
+      const recovery = await recoverStaleReflectionHolder({
+        reflectionDir: identity.identityPaths.reflection,
+        // Per turn: no deadline waits (DESIGN.r3 c.15); the 10 s bound is only an outer guard.
+        reconcile: () => runtimeFor(identity).reconcile(boundedTurnSignal(signal), { waitPolicy: "none" }),
+        // A holder that one reconciliation could not release is reported, not reconciled every turn.
+        shouldReconcile: (runId) => {
+          signal?.throwIfAborted()
+          const key = `${sessionId}:${runId}`
+          if (staleHolderReconciles.has(key)) return false
+          attemptedKey = key
+          return true
+        },
+        ...(options.reflectionHolderSeams === undefined ? {} : { seams: options.reflectionHolderSeams }),
+      })
+      signal?.throwIfAborted()
+      if (resolveContext(sessionId) !== identity) return
+      if (attemptedKey !== undefined) staleHolderReconciles.add(attemptedKey)
+      if (recovery.notice === undefined || recovery.verdict.state === "none") return
+      const key = `${sessionId}:${recovery.verdict.runId}`
+      if (staleLockNoticesShown.has(key)) return
+      staleLockNoticesShown.add(key)
+      readUi(eventCtx)?.notify(recovery.notice, "warning")
+    } catch (error) {
+      signal?.throwIfAborted()
+      options.logger?.warn("omo-senpi memory could not check the reflection lock holder", {
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+  const runtimeWiring = createMemoryRuntimeWiring(options, lastEventCtx, reflectionLive.currentSession, {
+    onLaunch: reflectionLive.onReflectionLaunched,
+    onLiveCompletion: reflectionLive.onLiveReflectionCompleted,
+  })
+  const { resolveContext, journalWiringFor, factsWiringFor, runtimeFor } = runtimeWiring
 
   const nudgeWiring = createMemoryNudgeWiring({
     resolveContext,
@@ -61,44 +142,49 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       const override = settings.agents[identity]?.soul
       return override?.edit_notice ?? settings.soul.edit_notice
     },
-    resolveWriteNotice: (identity) => {
-      // Presentation must never depend on config health, matching the direct surface's gate:
-      // an unreadable config keeps the default on.
-      try {
-        const settings = resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory)
-        const override = settings.agents[identity]?.write_notice
-        return override?.enabled ?? settings.write_notice.enabled
-      } catch {
-        return true
-      }
-    },
   })
 
-  // Late-bound because the two wirings are mutually dependent by design: recall's drain needs the
-  // gate's epoch to reject a superseded payload, and the gate needs recall's collection to launch.
-  // The gate wiring is constructed immediately below, so every call through this ref lands after it.
-  const gateWiringRef: { current?: MemorianGateWiring } = {}
+  // Late-bound because the two wirings are mutually dependent by design: recall's drain injects the
+  // nudges the Kibitzer composition holds, and the composition wakes its sidecars from recall's
+  // collection. The composition is built in registerStatic, before any hook can fire.
+  const deliveryRef: { current?: KibitzerComposition["delivery"] } = {}
+  // One corpus cache for both: the sidecar's read-only memory tool reads the corpus the candidates came from.
+  const corpusCache = (options.createCorpusCache ?? createSharedRecallCorpusCache)(options.logger)
+
+  const projectScope = createProjectMemoryScope({
+    resolveContext,
+    switches: () => resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory).project_scope,
+    fallbackCwd: options.cwd,
+    env: options.env,
+    corpusCache,
+    ...(options.logger === undefined ? {} : { logger: options.logger }),
+  })
 
   const recallWiring = createMemoryRecallWiring({
     resolveContext,
     resolveSettings: () => resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory),
     env: options.env,
-    currentCompactionEpoch: (sessionId) => gateWiringRef.current?.currentCompactionEpoch(sessionId) ?? 0,
+    corpusCache,
+    projectCorpora: projectScope.recallCorpora,
+    projectSource: projectScope.sourceFor,
+    drainQueued: (sessionId, context) => deliveryRef.current?.drainForPrompt(sessionId, context) ?? [],
     ...(options.logger === undefined ? {} : { logger: options.logger }),
   })
-  // The settle half of the recall channel: collection feeds the gate child, and the gate's pending
-  // nudges are what recallWiring's before_agent_start handler injects on the NEXT turn.
-  const memorianGateWiring = createMemorianGateWiring({
-    // The gate launch is fire-and-forget, so every ctx read must happen synchronously inside the
-    // settle handler: the host disposes the ctx the moment that handler returns.
-    snapshotSession: (eventCtx) => recallWiring.snapshotSession(eventCtx),
-    collectCandidatesFromSnapshot: (snapshot) => recallWiring.collectCandidatesFromSnapshot(snapshot),
-    resolveModelRegistry: (eventCtx) => resolveMemoryModelRegistry(eventCtx),
-    resolveContext,
-    runnerFor: memorianRunnerFor,
+  const kibitzerRef: { current?: KibitzerComposition } = {}
+  const maintenance = (options.createMaintenance ?? createMemoryMaintenance)({
+    isLiveSession: (sessionId) => options.sessions.has(sessionId),
+    memorySettings: () => resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory),
+    reflectionEnabled: (context) =>
+      resolveAgentReflectionSettings(options.loadConfig({ cwd: options.cwd() }).config.memory, context.identity)
+        .enabled,
+    ownedSidecars: () => new Set([...options.sessions.keys()].map(encodeKibitzerSessionId)),
+    // Driver 2 never runs under CI or in a task child; foreign identities use the global layer only.
+    hostSweep: () =>
+      process.env.CI !== undefined || process.env.OMO_SENPI_TASK_RPC_CHILD === "1"
+        ? undefined
+        : { settings: resolveMemorySettings(options.loadConfig({ cwd: homedir() }).config.memory) },
     ...(options.logger === undefined ? {} : { logger: options.logger }),
   })
-  gateWiringRef.current = memorianGateWiring
 
   async function flushSkillsUsageTrackers(signal?: AbortSignal): Promise<void> {
     for (const tracker of skillsUsageTrackersRef.current.values()) {
@@ -128,15 +214,15 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
         if (signal.aborted) return
         await flushSkillsUsageTrackers(signal)
       },
-      launchFacts: async (sessionId, signal) => {
-        const identity = resolveContext(sessionId)
-        if (identity === undefined || signal.aborted) return
-        await factsWiringFor(identity).launchIfThresholdMet(signal)
-      },
     },
   })
 
-  const dreamTriggerWiring = buildDreamTriggerWiring(options, runtimeWiring, activeSession)
+  const dreamTriggerWiring = buildDreamTriggerWiring(options, runtimeWiring, activeSession, userActivity.has, work)
+  const pressureDreamAdmission = createPressureDreamAdmission({
+    request: (sessionId) => dreamTriggerWiring.requestPressureDream(sessionId),
+    work,
+    ...(options.logger === undefined ? {} : { logger: options.logger }),
+  })
   shutdownDrain.registerEvaluator(dreamTriggerWiring.shutdownEvaluator())
 
   function resolvePalacePeople(): PalacePeopleOptions | undefined {
@@ -154,102 +240,156 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
 
   return {
     registerStatic(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
-      reflectionLive.registerRpc(pi, resolveContext)
+      userActivity.register(pi)
+      projectScope.register(pi)
+      const applyFacts = createConfiguredFactsApplier(options, (sessionId) =>
+        resolveContext(sessionId ?? activeSession.current ?? ""),
+      )
+      reflectionLive.registerRpc(pi, resolveContext, applyFacts)
+      publishSessionFactsApplier(applyFacts)
+      const kibitzer = createKibitzerComposition({
+        env: options.env,
+        cwd: options.cwd,
+        loadConfig: options.loadConfig,
+        resolveContext: (sessionId) => (userActivity.hasInput(sessionId) ? resolveContext(sessionId) : undefined),
+        recall: recallWiring,
+        corpusCache,
+        projectScope,
+        ...(ctx.idleCoordinator === undefined ? {} : { coordinator: ctx.idleCoordinator }),
+        sendMessage: (message, sendOptions) => pi.sendMessage(message, sendOptions),
+        appendEntry: (customType, data) => pi.appendEntry?.(customType, data),
+        ...(options.kibitzerChildStarter === undefined ? {} : { childStarter: options.kibitzerChildStarter }),
+        ...(options.logger === undefined ? {} : { logger: options.logger }),
+      })
+      kibitzerRef.current = kibitzer
+      deliveryRef.current = kibitzer.delivery
       registerMemoryStatic({
         pi,
         ctx,
         options,
         promptCache,
+        promptPrebuild,
         nudgeWiring,
         noticeWiring,
         recallWiring,
-        memorianGateWiring,
+        kibitzer,
         dreamTriggerWiring,
         completionApi: createReflectionCompletionApi,
         resolveContext,
         journalWiringFor,
         factsWiringFor,
         runtimeFor,
-        triggerSessionFor: runtimeWiring.triggerSessionFor,
+        triggerSessionFor: (eventCtx) => {
+          const sessionId = sessionIdFrom(eventCtx)
+          return sessionId !== undefined && userActivity.has(sessionId)
+            ? runtimeWiring.triggerSessionFor(eventCtx)
+            : undefined
+        },
         resolvePalacePeople,
         loadCommandSettings,
         lastEventCtx,
         activeSession,
         skillsUsageTrackersRef,
         memoryUsageTrackersRef,
+        hasUserActivity: userActivity.has,
         onReflectionLaunch: reflectionLive.onReflectionLaunched,
-        onSettled: reflectionLive.onSettled,
+        onJournalSettled: reflectionLive.syncJournal,
+        onSettled: async (sessionId, eventCtx, observer) => {
+          const identity = resolveContext(sessionId)
+          if (identity !== undefined) {
+            observer?.phase("onSettled.reflection.staleHolder")
+            await recoverStaleHolderAfterTurn(sessionId, identity, eventCtx, observer?.signal)
+            observer?.phase("onSettled.reflection.reconcile")
+            await userActivity.reconcileOnce(sessionId, async () => {
+              try {
+                await reconcileThroughStaleLockReaper({
+                  runtimeDir: identity.identityPaths.runtime,
+                  reconcile: () => runtimeFor(identity).reconcile(observer?.signal),
+                  onLoadFailure: (error) => {
+                    if (options.logger !== undefined) logBindReconcileFailure(options.logger, error)
+                  },
+                  ...(options.reflectionHolderSeams === undefined ? {} : { probe: options.reflectionHolderSeams }),
+                })
+                observer?.signal.throwIfAborted()
+              } catch (error) {
+                observer?.signal.throwIfAborted()
+                if (options.logger !== undefined) logBindReconcileFailure(options.logger, error)
+              }
+              if (resolveContext(sessionId) !== identity) return
+              pressureDreamAdmission.requestDeferred(sessionId)
+            })
+          }
+          observer?.phase("onSettled.status.sync")
+          if (resolveContext(sessionId) !== identity) return
+          await reflectionLive.onSettled(sessionId, eventCtx, observer?.signal)
+        },
         onMemoryWrite: reflectionLive.syncRpc,
       })
     },
 
     async afterBind(pi, sessionId, identity, eventCtx): Promise<void> {
+      // Off the prompt path: a NEW session's first prompt shares this compile of HEAD, or reads what it persisted.
+      // A resumed session is pinned to its recorded revision, which may not be HEAD; it gets no prebuild.
+      if (branchEntryCount(eventCtx) === 0)
+        void promptPrebuild.current?.(identity).catch((error: unknown) => {
+          options.logger?.warn("omo-senpi memory block prebuild failed; the first prompt compiles it", {
+            error: error instanceof Error ? error.message : String(error),
+          })
+        })
       activeSession.current = sessionId
+      userActivity.reset(sessionId)
+      pressureDreamAdmission.reset(sessionId)
       lastEventCtx.current = eventCtx
       reflectionLive.attach(sessionId)
       registerMemoryFilesystemPolicy(pi, identity)
-      await runtimeFor(identity).reconcile()
+      maintenance.schedule(identity)
       if (branchEntryCount(eventCtx) > 0) {
         await journalWiringFor(identity).reconcileSession(eventCtx)
       }
-      factsWiringFor(identity).reconcileExtractor()
-      const dreamSession = runtimeWiring.dreamSessionById(sessionId)
-      if (dreamSession !== undefined) {
-        void dreamTriggerWiring.reconcileSessionStart(dreamSession).catch((error: unknown) => {
-          options.logger?.warn("omo-senpi memory dream session_start reconcile failed", { error: describe(error) })
-        })
-      }
-      await reflectionLive.bind(
-        pi,
-        sessionId,
-        identity,
-        eventCtx,
-        () => {
-          void dreamTriggerWiring.requestPressureDream(sessionId).catch((error: unknown) => {
-            options.logger?.warn("omo-senpi memory pressure dream trigger failed", { error: describe(error) })
-          })
-        },
-      )
+      factsWiringFor(identity).reconcileExtractor(sessionId)
+      await reflectionLive.bind(pi, sessionId, identity, eventCtx, () => {
+        pressureDreamAdmission.deferOrRequest(sessionId, userActivity.has(sessionId))
+      })
     },
 
     async flushSkillsUsage(): Promise<void> {
       await flushSkillsUsageTrackers()
     },
 
-    async onSessionShutdown(input: ShutdownDrainInput): Promise<void> {
-      reflectionLive.shutdown(options.sessions.get(input.sessionId)?.context?.identity)
-      await shutdownDrain.run(input)
+    onSessionShutdown(input: ShutdownDrainInput): Promise<void> {
+      const resetSession = (sessionId: string): void => {
+        pressureDreamAdmission.reset(sessionId)
+        userActivity.reset(sessionId)
+      }
+      const parts = {
+        shutdownDrain,
+        maintenance,
+        reflectionLive,
+        corpusCache,
+        promptCache,
+        kibitzerRef,
+        resolveContext,
+        factsWiringFor,
+      }
+      return runMemorySessionShutdown(
+        { ...parts, sessions: options.sessions, launches: runtimeWiring, work, resetSession },
+        input,
+      )
     },
 
     registerShutdownEvaluator(evaluator: ShutdownEvaluator): void {
       shutdownDrain.registerEvaluator(evaluator)
     },
 
-    clearStatus(eventCtx: unknown): void {
-      reflectionLive.clearStatus(eventCtx)
+    clearStatus: reflectionLive.clearStatus,
+    onSyncStatusChanged: reflectionLive.onSyncStatusChanged,
+
+    async whenIdle(): Promise<void> {
+      await kibitzerRef.current?.whenIdle()
     },
   }
 }
 
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
-}
-
-function buildDreamTriggerWiring(
-  options: MemoryWiringOptions,
-  runtimeWiring: MemoryRuntimeWiring,
-  activeSession: { current?: string },
-) {
-  return createDreamTriggerWiring({
-    resolveSession: (eventCtx) => runtimeWiring.dreamSessionFor(eventCtx),
-    resolveActiveSession: () => activeSession.current === undefined
-      ? undefined
-      : runtimeWiring.dreamSessionById(activeSession.current),
-    resolveSessionById: runtimeWiring.dreamSessionById,
-    resolveSettings: (identity) => {
-      const settings = resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory)
-      return resolveDreamTriggerSettings(settings, identity)
-    },
-    ...(options.logger === undefined ? {} : { logger: options.logger }),
-  })
 }

@@ -1,7 +1,7 @@
 import type { OmoCategoryConfig, OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import type { AgentDefinition } from "../../agents"
-import { CATEGORY_DESCRIPTIONS, DEFAULT_CATEGORIES, categoryGateModel } from "../../category"
+import { CATEGORY_DESCRIPTIONS, DEFAULT_CATEGORIES, categoryGateModels } from "../../category"
 import type { TaskAgentInfo, TaskCategoryInfo } from "./types"
 
 function ownValue<TValue>(record: Readonly<Record<string, TValue>>, key: string): TValue | undefined {
@@ -27,9 +27,9 @@ export function listTaskCategories(config: OmoConfig): readonly TaskCategoryInfo
 // A builtin-only gated category stays listed with its required model, because the live registry is
 // not available when the task tool description is built; the spawn-time resolver owns the real gate.
 function withGateAnnotation(name: string, description: string | undefined): string | undefined {
-  const gateModel = categoryGateModel(name)
-  if (gateModel === undefined) return description
-  const annotation = `(requires ${gateModel})`
+  const gateModels = categoryGateModels(name)
+  if (gateModels === undefined) return description
+  const annotation = `(requires ${gateModels.join(" or ")})`
   return description === undefined ? annotation : `${description} ${annotation}`
 }
 
@@ -39,5 +39,7 @@ export function listTaskAgents(agents: Readonly<Record<string, AgentDefinition>>
     .sort()
     .map((name) => ownValue(agents, name))
     .filter((agent): agent is AgentDefinition => agent !== undefined && agent.disable !== true)
-    .map((agent) => (agent.description !== undefined ? { name: agent.name, description: agent.description } : { name: agent.name }))
+    .map((agent) =>
+      agent.description !== undefined ? { name: agent.name, description: agent.description } : { name: agent.name },
+    )
 }

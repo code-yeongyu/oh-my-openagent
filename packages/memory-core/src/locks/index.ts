@@ -1,19 +1,14 @@
-export {
-  LockContentionError,
-  acquireLock,
-  isHeld,
-  releaseLock,
-  withLock,
-  setLockCandidateFsForTests,
-} from "./acquire"
+export { LockContentionError, acquireLock, isHeld, releaseLock, withLock, setLockCandidateFsForTests } from "./acquire"
 export type { AcquireLockOptions } from "./acquire"
 export {
   LOCK_DOMAINS,
   factsQueueLockPath,
   factsRunsLockPath,
+  memoryMaintenanceLockPath,
   memoryWriterLockPath,
   memoryUsageLockPath,
   noticeLockPath,
+  receiptsLockPath,
   reflectionSchedulerLockPath,
   runFinalizationLockPath,
   skillsUsageLockPath,
@@ -22,5 +17,17 @@ export {
 export type { LockDomain } from "./domains"
 export { createLockRecord, parseLockRecord } from "./lock-record"
 export type { CreateLockRecordOptions, LockRecord } from "./lock-record"
-export { getPidLiveness, getProcessStartIdentity } from "./process-identity"
+export { getPidLiveness, getProcessStartIdentity, startIdentitiesComparable } from "./process-identity"
 export type { ProcessLiveness } from "./process-identity"
+export {
+  RECALL_WAKE_DEFAULT_SLOTS,
+  RecallWakeBusyError,
+  acquireRecallWakeLease,
+  recallWakeLockPath,
+  recallWakeTicketDirectory,
+  withRecallWakeLease,
+} from "./recall-wake-domain"
+export type { RecallWakeLease, RecallWakeLeaseOptions } from "./recall-wake-domain"
+export { acquireReflectionRunLease } from "./reflection-run-domain"
+export { sweepDeadOwnerLocks } from "./dead-owner-sweep"
+export type { DeadOwnerSweepOptions } from "./dead-owner-sweep"

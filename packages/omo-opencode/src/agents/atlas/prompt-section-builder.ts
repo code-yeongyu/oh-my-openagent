@@ -15,16 +15,16 @@ export const getCategoryDescription = (name: string, userCategories?: Record<str
   userCategories?.[name]?.description ?? CATEGORY_DESCRIPTIONS[name] ?? "General tasks"
 
 export function buildAgentSelectionSection(agents: AvailableAgent[]): string {
-   if (agents.length === 0) {
-     return `##### Option B: Use AGENT directly (for specialized experts)
+  if (agents.length === 0) {
+    return `##### Option B: Use AGENT directly (for specialized experts)
 
  No agents available.`
-   }
+  }
 
-   const rows = agents.map((a) => {
-     const shortDesc = truncateDescription(a.description)
-     return `- **\`${a.name}\`** - ${shortDesc}`
-   })
+  const rows = agents.map((a) => {
+    const shortDesc = truncateDescription(a.description)
+    return `- **\`${a.name}\`** - ${shortDesc}`
+  })
 
   return `##### Option B: Use AGENT directly (for specialized experts)
 
@@ -46,7 +46,7 @@ Categories spawn \`Sisyphus-Junior-{category}\` with optimized settings:
 ${categoryRows.join("\n")}
 
 \`\`\`typescript
-task(category="[category-name]", load_skills=[...], run_in_background=false, prompt="...")
+task(category="[category-name]", load_skills=[...], run_in_background=true, prompt="...")
 \`\`\``
 }
 
@@ -73,7 +73,7 @@ Read each skill's description in the section below and ask: "Does this skill's d
 
 **Usage:**
 \`\`\`typescript
-task(category="[category]", load_skills=["skill-1", "skill-2"], run_in_background=false, prompt="...")
+task(category="[category]", load_skills=["skill-1", "skill-2"], run_in_background=true, prompt="...")
 \`\`\`
 
 **IMPORTANT:**
@@ -90,10 +90,10 @@ export function buildDecisionMatrix(agents: AvailableAgent[], userCategories?: R
     return `- **${desc}**: \`category="${name}", load_skills=[...]\``
   })
 
-   const agentRows = agents.map((a) => {
-     const shortDesc = truncateDescription(a.description)
-     return `- **${shortDesc}**: \`agent="${a.name}"\``
-   })
+  const agentRows = agents.map((a) => {
+    const shortDesc = truncateDescription(a.description)
+    return `- **${shortDesc}**: \`agent="${a.name}"\``
+  })
 
   return `##### Decision Matrix
 

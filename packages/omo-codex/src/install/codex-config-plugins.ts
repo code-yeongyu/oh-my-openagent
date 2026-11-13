@@ -9,19 +9,19 @@ export function ensurePluginEnabled(config: string, pluginKey: string): string {
   return replaceOrInsertSetting(config, section, "enabled", "true")
 }
 
-export function ensureOmoBuiltinMcpPolicies(config: string, input: {
-  readonly marketplaceName: string
-  readonly pluginNames: readonly string[]
-  readonly platform?: CodexInstallPlatform
-  readonly codegraphMcpEnabled?: boolean
-  readonly gitBashEnabled?: boolean
-}): string {
+export function ensureOmoBuiltinMcpPolicies(
+  config: string,
+  input: {
+    readonly marketplaceName: string
+    readonly pluginNames: readonly string[]
+    readonly platform?: CodexInstallPlatform
+    readonly gitBashEnabled?: boolean
+  },
+): string {
   if (input.marketplaceName !== "sisyphuslabs" || !input.pluginNames.includes("omo")) return config
-  const codegraphEnabled = input.codegraphMcpEnabled ?? true
   const gitBashEnabled = (input.platform ?? process.platform) === "win32" && input.gitBashEnabled === true
   let nextConfig = removeStaleContext7PlaceholderMcp(config)
   nextConfig = ensurePluginMcpEnabled(nextConfig, "omo@sisyphuslabs", "context7", true)
-  nextConfig = ensurePluginMcpEnabled(nextConfig, "omo@sisyphuslabs", "codegraph", codegraphEnabled)
   nextConfig = ensurePluginMcpEnabled(nextConfig, "omo@sisyphuslabs", "git_bash", gitBashEnabled)
   return nextConfig
 }
@@ -92,7 +92,10 @@ function parseTomlStringArray(value: string): readonly string[] | null {
   return items
 }
 
-function parseTomlString(input: string, startIndex: number): { readonly value: string; readonly nextIndex: number } | null {
+function parseTomlString(
+  input: string,
+  startIndex: number,
+): { readonly value: string; readonly nextIndex: number } | null {
   const quote = input[startIndex]
   let value = ""
   let index = startIndex + 1

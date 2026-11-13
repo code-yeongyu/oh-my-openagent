@@ -1,5 +1,5 @@
 export function normalizeModelFormat(
-  model: string | { providerID: string; modelID: string } | null | undefined
+  model: string | { providerID: string; modelID: string } | null | undefined,
 ): { providerID: string; modelID: string } | undefined {
   if (!model) {
     return undefined
@@ -12,7 +12,11 @@ export function normalizeModelFormat(
   if (typeof model === "string") {
     const parts = model.split("/")
     if (parts.length >= 2) {
-      return { providerID: parts[0], modelID: parts.slice(1).join("/") }
+      const providerID = parts[0]
+      const modelID = parts.slice(1).join("/")
+      if (providerID.trim() && modelID.trim()) {
+        return { providerID, modelID }
+      }
     }
   }
 

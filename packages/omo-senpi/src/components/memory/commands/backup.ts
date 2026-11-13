@@ -7,6 +7,8 @@ import { existsSync } from "@oh-my-opencode/memory-core/fs"
 import { cp, readdir, rm } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
+import { withRecallTermSavesExcluded } from "@oh-my-opencode/memory-core/recall-store"
+
 import type { MemoryCommandDeps, MemoryCommandIdentity } from "./types"
 
 export const BACKUP_PREFIX = "memory-backup-"
@@ -21,10 +23,7 @@ function backupRoot(identity: MemoryCommandIdentity): string {
 }
 
 /** Copies the repository to a fresh sibling directory; never clobbers an existing backup. */
-export async function createRepoBackup(
-  deps: MemoryCommandDeps,
-  identity: MemoryCommandIdentity,
-): Promise<string> {
+export async function createRepoBackup(deps: MemoryCommandDeps, identity: MemoryCommandIdentity): Promise<string> {
   const stamp = backupTimestamp((deps.now ?? Date.now)())
   const root = backupRoot(identity)
   let candidate = join(root, `${BACKUP_PREFIX}${stamp}`)
@@ -59,8 +58,12 @@ export async function restoreRepoBackup(
 ): Promise<RestoreResult> {
   const source = join(backupRoot(identity), name)
   const repoDir = identity.identityPaths.repo
-  const safetyBackup = existsSync(repoDir) ? await createRepoBackup(deps, identity) : undefined
-  await rm(repoDir, { recursive: true, force: true })
-  await cp(source, repoDir, { recursive: true })
-  return { restored: name, safetyBackup }
+  // A recall ranking saves its term store into `.git` in the background: no save may start or land while
+  // the tree is backed up, removed and copied back, or it would write into a half-restored repository.
+  return withRecallTermSavesExcluded(repoDir, async () => {
+    const safetyBackup = existsSync(repoDir) ? await createRepoBackup(deps, identity) : undefined
+    await rm(repoDir, { recursive: true, force: true })
+    await cp(source, repoDir, { recursive: true })
+    return { restored: name, safetyBackup }
+  })
 }

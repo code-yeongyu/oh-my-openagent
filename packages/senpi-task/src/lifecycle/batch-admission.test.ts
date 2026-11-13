@@ -5,13 +5,8 @@ import type { TaskRecordStore } from "../store"
 import { acquireSessionAdmissionLease, type SessionAdmissionLease } from "./admission-lease"
 import { resolveContext, type LifecycleContext } from "./context"
 import { admitSuspendedBatch, reclaimOrphanedResident } from "./residency"
-import {
-  cleanupProjects,
-  FakeRegistry,
-  seedRecord,
-  settings,
-  tempStore,
-} from "./__fixtures__/lifecycle-fakes"
+import { cleanupProjects, FakeRegistry, seedRecord, settings, tempStore } from "./__fixtures__/lifecycle-fakes"
+import { NO_HOST_ENDPOINT } from "./host-session"
 
 afterEach(cleanupProjects)
 
@@ -20,7 +15,12 @@ function iso(offsetMs: number): string {
 }
 
 function contextFor(store: TaskRecordStore, cap: number | "unlimited"): LifecycleContext {
-  return resolveContext({ store, registry: new FakeRegistry(), config: settings({ residency_max_children: cap }) })
+  return resolveContext({
+    hostEndpoint: NO_HOST_ENDPOINT,
+    store,
+    registry: new FakeRegistry(),
+    config: settings({ residency_max_children: cap }),
+  })
 }
 
 describe("admitSuspendedBatch (capacity-aware batch admission)", () => {
@@ -38,11 +38,11 @@ describe("admitSuspendedBatch (capacity-aware batch admission)", () => {
     const result = await admitSuspendedBatch(context, "parent-1")
 
     // then
-    expect(result.outcomes).toHaveLength(3)
+    expect(result.outcomes).toHaveLength(1)
     expect(result.outcomes.every((outcome) => outcome.kind === "claimed")).toBe(true)
     expect(store.load("st_000000d2")?.residency_state).toBe("resident")
-    expect(store.load("st_000000d3")?.residency_state).toBe("resident")
-    expect(store.load("st_000000d4")?.residency_state).toBe("resident")
+    expect(store.load("st_000000d3")?.residency_state).toBe("rpc_detached")
+    expect(store.load("st_000000d4")?.residency_state).toBe("persisted_only")
   })
 
   test("#given 10 suspended (3 running, 7 completed) and 2 residents under cap 8 #when the batch admits #then 3 running + 3 MRU completed are claimed and 4 defer capacity", async () => {
@@ -51,47 +51,87 @@ describe("admitSuspendedBatch (capacity-aware batch admission)", () => {
     seedRecord(store, { task_id: "st_000000e8", status: "running", residency_state: "resident", host_pid: process.pid })
     seedRecord(store, { task_id: "st_000000e9", status: "completed", residency_state: "resident", host_pid: 424_242 })
     // and 3 non-terminal suspended records, deliberately OLDER than the completed MRU set
-    seedRecord(store, { task_id: "st_00000010", status: "running", residency_state: "persisted_only", updated_at: iso(5) })
-    seedRecord(store, { task_id: "st_00000011", status: "running", residency_state: "rpc_detached", updated_at: iso(15) })
-    seedRecord(store, { task_id: "st_00000012", status: "pending", residency_state: "persisted_only", updated_at: iso(25) })
+    seedRecord(store, {
+      task_id: "st_00000010",
+      status: "running",
+      residency_state: "persisted_only",
+      updated_at: iso(5),
+    })
+    seedRecord(store, {
+      task_id: "st_00000011",
+      status: "running",
+      residency_state: "rpc_detached",
+      updated_at: iso(15),
+    })
+    seedRecord(store, {
+      task_id: "st_00000012",
+      status: "pending",
+      residency_state: "persisted_only",
+      updated_at: iso(25),
+    })
     // and 7 terminal suspended records, the two most recent sharing a timestamp (tie-break task_id ASC)
-    seedRecord(store, { task_id: "st_00000020", status: "completed", residency_state: "persisted_only", updated_at: iso(0) })
-    seedRecord(store, { task_id: "st_00000021", status: "completed", residency_state: "rpc_detached", updated_at: iso(10) })
-    seedRecord(store, { task_id: "st_00000022", status: "error", residency_state: "persisted_only", updated_at: iso(20) })
-    seedRecord(store, { task_id: "st_00000023", status: "interrupted", residency_state: "persisted_only", updated_at: iso(30) })
-    seedRecord(store, { task_id: "st_00000024", status: "completed", residency_state: "rpc_detached", updated_at: iso(40) })
-    seedRecord(store, { task_id: "st_00000025", status: "completed", residency_state: "persisted_only", updated_at: iso(50) })
-    seedRecord(store, { task_id: "st_00000026", status: "completed", residency_state: "persisted_only", updated_at: iso(50) })
+    seedRecord(store, {
+      task_id: "st_00000020",
+      status: "completed",
+      residency_state: "persisted_only",
+      updated_at: iso(0),
+    })
+    seedRecord(store, {
+      task_id: "st_00000021",
+      status: "completed",
+      residency_state: "rpc_detached",
+      updated_at: iso(10),
+    })
+    seedRecord(store, {
+      task_id: "st_00000022",
+      status: "error",
+      residency_state: "persisted_only",
+      updated_at: iso(20),
+    })
+    seedRecord(store, {
+      task_id: "st_00000023",
+      status: "interrupted",
+      residency_state: "persisted_only",
+      updated_at: iso(30),
+    })
+    seedRecord(store, {
+      task_id: "st_00000024",
+      status: "completed",
+      residency_state: "rpc_detached",
+      updated_at: iso(40),
+    })
+    seedRecord(store, {
+      task_id: "st_00000025",
+      status: "completed",
+      residency_state: "persisted_only",
+      updated_at: iso(50),
+    })
+    seedRecord(store, {
+      task_id: "st_00000026",
+      status: "completed",
+      residency_state: "persisted_only",
+      updated_at: iso(50),
+    })
     const context = contextFor(store, 8)
 
     // when
     const result = await admitSuspendedBatch(context, "parent-1")
 
     // then: available = 8 - 2 = 6; non-terminal first (recency cannot jump the class boundary),
-    // then terminal MRU with the iso(50) tie broken by task_id ASC
+    // then the interrupted terminal; completed and error records stay suspended for lazy send revival
     expect(result.lease).toBe("acquired")
     expect(result.outcomes.map((outcome) => outcome.task_id)).toEqual([
       "st_00000012",
       "st_00000011",
       "st_00000010",
-      "st_00000025",
-      "st_00000026",
-      "st_00000024",
       "st_00000023",
-      "st_00000022",
-      "st_00000021",
-      "st_00000020",
     ])
-    for (const outcome of result.outcomes.slice(0, 6)) expect(outcome.kind).toBe("claimed")
-    for (const outcome of result.outcomes.slice(6)) {
-      expect(outcome.kind).toBe("deferred")
-      if (outcome.kind === "deferred") expect(outcome.reason).toBe("capacity")
-    }
+    for (const outcome of result.outcomes) expect(outcome.kind).toBe("claimed")
     // and the claims are stamped with THIS host while overflow stays suspended (never lost, never evicted)
     expect(store.load("st_00000012")?.residency_state).toBe("resident")
     expect(store.load("st_00000012")?.host_pid).toBe(process.pid)
-    expect(store.load("st_00000025")?.residency_state).toBe("resident")
-    expect(store.load("st_00000023")?.residency_state).toBe("persisted_only")
+    expect(store.load("st_00000025")?.residency_state).toBe("persisted_only")
+    expect(store.load("st_00000023")?.residency_state).toBe("resident")
     expect(store.load("st_00000020")?.residency_state).toBe("persisted_only")
     // and the pre-existing residents were never touched (no LRU eviction to make room)
     expect(store.load("st_000000e8")?.residency_state).toBe("resident")
@@ -112,13 +152,9 @@ describe("admitSuspendedBatch (capacity-aware batch admission)", () => {
     // when
     const result = await admitSuspendedBatch(context, "parent-1")
 
-    // then: zero revived, all overflow deferred, no destruction of the owned residents
+    // then: the running child is over capacity while the terminal child stays suspended
     expect(result.lease).toBe("acquired")
-    expect(result.outcomes).toHaveLength(2)
-    for (const outcome of result.outcomes) {
-      expect(outcome.kind).toBe("deferred")
-      if (outcome.kind === "deferred") expect(outcome.reason).toBe("capacity")
-    }
+    expect(result.outcomes).toEqual([{ task_id: "st_00000030", kind: "deferred", reason: "capacity" }])
     expect(store.load("st_00000030")?.residency_state).toBe("persisted_only")
     expect(store.load("st_00000031")?.residency_state).toBe("rpc_detached")
     expect(store.load("st_000000e0")?.residency_state).toBe("resident")
@@ -130,7 +166,12 @@ describe("admitSuspendedBatch (capacity-aware batch admission)", () => {
   test("#given another session's, cancelled, and killed suspended records #when the batch admits #then only this session's revivable records are claimed", async () => {
     // given
     const store = tempStore()
-    seedRecord(store, { task_id: "st_00000040", parent_session_id: "other", status: "running", residency_state: "persisted_only" })
+    seedRecord(store, {
+      task_id: "st_00000040",
+      parent_session_id: "other",
+      status: "running",
+      residency_state: "persisted_only",
+    })
     seedRecord(store, { task_id: "st_00000041", status: "cancelled", residency_state: "persisted_only" })
     seedRecord(store, { task_id: "st_00000042", status: "running", residency_state: "persisted_only", killed: true })
     seedRecord(store, { task_id: "st_00000043", status: "running", residency_state: "persisted_only" })
@@ -164,21 +205,32 @@ describe("admitSuspendedBatch (capacity-aware batch admission)", () => {
     // then: a typed deferral for the whole batch - never a throw aborting session start
     expect(acquireCalls).toBe(1)
     expect(result.lease).toBe("lock_contended")
-    expect(result.outcomes).toHaveLength(2)
-    for (const outcome of result.outcomes) {
-      expect(outcome.kind).toBe("deferred")
-      if (outcome.kind === "deferred") expect(outcome.reason).toBe("lock_contended")
-    }
+    expect(result.outcomes).toEqual([{ task_id: "st_00000050", kind: "deferred", reason: "lock_contended" }])
     expect(store.load("st_00000050")?.residency_state).toBe("persisted_only")
     expect(store.load("st_00000051")?.residency_state).toBe("rpc_detached")
   })
 
   test("#given the lease is displaced mid-batch #when the holder re-reads it before each mutation #then it aborts the remaining claims", async () => {
-    // given: three candidates and a lease whose ownership flips after the first fencing check
+    // given: three non-terminal candidates and a lease whose ownership flips after the first fencing check
     const store = tempStore()
-    seedRecord(store, { task_id: "st_00000060", status: "completed", residency_state: "persisted_only", updated_at: iso(0) })
-    seedRecord(store, { task_id: "st_00000061", status: "completed", residency_state: "persisted_only", updated_at: iso(10) })
-    seedRecord(store, { task_id: "st_00000062", status: "completed", residency_state: "persisted_only", updated_at: iso(20) })
+    seedRecord(store, {
+      task_id: "st_00000060",
+      status: "running",
+      residency_state: "persisted_only",
+      updated_at: iso(0),
+    })
+    seedRecord(store, {
+      task_id: "st_00000061",
+      status: "running",
+      residency_state: "persisted_only",
+      updated_at: iso(10),
+    })
+    seedRecord(store, {
+      task_id: "st_00000062",
+      status: "running",
+      residency_state: "persisted_only",
+      updated_at: iso(20),
+    })
     const context = contextFor(store, 8)
     let ownershipChecks = 0
     let released = false
@@ -198,8 +250,7 @@ describe("admitSuspendedBatch (capacity-aware batch admission)", () => {
     // when
     const result = await admitSuspendedBatch(context, "parent-1", { acquireLease })
 
-    // then: exactly one claim (the MRU head) landed before the fencing check tripped; the
-    // displaced holder aborted instead of writing under a lost lease
+    // then: the first candidate is claimed, and the displaced lease fences the remaining mutations
     expect(result.lease).toBe("lease_lost")
     expect(result.outcomes).toEqual([
       { task_id: "st_00000062", kind: "claimed" },
@@ -219,7 +270,12 @@ describe("reclaimOrphanedResident (reclamation bypasses admission)", () => {
     const store = tempStore()
     seedRecord(store, { task_id: "st_00000070", status: "running", residency_state: "resident", host_pid: process.pid })
     seedRecord(store, { task_id: "st_00000071", status: "running", residency_state: "resident", host_pid: process.pid })
-    const orphan = seedRecord(store, { task_id: "st_00000072", status: "completed", residency_state: "resident", host_pid: 999_999 })
+    const orphan = seedRecord(store, {
+      task_id: "st_00000072",
+      status: "completed",
+      residency_state: "resident",
+      host_pid: 999_999,
+    })
     const context = contextFor(store, 2)
 
     // when
@@ -236,7 +292,12 @@ describe("reclaimOrphanedResident (reclamation bypasses admission)", () => {
   test("#given a reclaim raced and lost the expected-owner CAS #when retrying with the stale observation #then it reports not_claimable and touches nothing", () => {
     // given
     const store = tempStore()
-    const orphan = seedRecord(store, { task_id: "st_00000080", status: "completed", residency_state: "resident", host_pid: 999_999 })
+    const orphan = seedRecord(store, {
+      task_id: "st_00000080",
+      status: "completed",
+      residency_state: "resident",
+      host_pid: 999_999,
+    })
     const context = contextFor(store, 2)
 
     // when: a winner claims first, then the loser retries with its stale observation

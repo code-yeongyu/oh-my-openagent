@@ -2,7 +2,12 @@ import { describe, expect, test } from "bun:test"
 import { Value } from "typebox/value"
 
 import { SenpiTeamRuntimeError, SenpiTeamSpecError } from "../../team"
-import { createFakeTeamService, fakeCreateResult, fakeCreatedMember, fakeDeleteResult } from "./__fixtures__/team-tool-fakes"
+import {
+  createFakeTeamService,
+  fakeCreateResult,
+  fakeCreatedMember,
+  fakeDeleteResult,
+} from "./__fixtures__/team-tool-fakes"
 import { TeamCreateParams, createTeamCreateTool, createTeamDeleteTool, runTeamCreate, runTeamDelete } from "./lifecycle"
 
 describe("team_create tool", () => {
@@ -20,9 +25,13 @@ describe("team_create tool", () => {
 
     // then
     expect(result.details).toMatchObject({ kind: "created", team_name: "demo" })
+    expect(result.isError).toBeUndefined()
     if (result.details.kind !== "created") throw new Error("expected created")
     expect(result.details.members.map((member) => member.name).sort()).toEqual(["alpha", "beta"])
-    expect(service.calls[0]).toMatchObject({ method: "createTeam", args: [{ inlineSpec: { name: "demo", members: [] } }] })
+    expect(service.calls[0]).toMatchObject({
+      method: "createTeam",
+      args: [{ inlineSpec: { name: "demo", members: [] } }],
+    })
   })
 
   test("#given members with roles, models, and prompts #when team_create runs #then the text lists every member informatively and keeps the first line stable", async () => {
@@ -44,7 +53,12 @@ describe("team_create tool", () => {
               },
               promptExcerpt: "Refactor the auth module",
             }),
-            fakeCreatedMember({ name: "beta", status: "idle", taskId: "st_b", role: { kind: "subagent_type", subagentType: "sisyphus" } }),
+            fakeCreatedMember({
+              name: "beta",
+              status: "idle",
+              taskId: "st_b",
+              role: { kind: "subagent_type", subagentType: "sisyphus" },
+            }),
           ],
         }),
     })
@@ -102,7 +116,10 @@ describe("team_create tool", () => {
 
     // then
     if (result.details.kind !== "created") throw new Error("expected created")
-    expect(result.details.members[0]).toMatchObject({ name: "alpha", task_summary: "Refactor the auth module boundary" })
+    expect(result.details.members[0]).toMatchObject({
+      name: "alpha",
+      task_summary: "Refactor the auth module boundary",
+    })
   })
 
   test("#given member model metadata variants and reasoning efforts #when team_create runs #then reasoning is labeled and reasoning effort wins over variant", async () => {
@@ -155,6 +172,7 @@ describe("team_create tool", () => {
     const service = createFakeTeamService()
     const result = await runTeamCreate(service, {})
     expect(result.details.kind).toBe("invalid_arguments")
+    expect(result.isError).toBe(true)
   })
 
   test("#given a spec error #when team_create runs #then it surfaces spec_error with the code", async () => {
@@ -170,6 +188,7 @@ describe("team_create tool", () => {
 
     // then
     expect(result.details).toMatchObject({ kind: "spec_error", code: "UNKNOWN_SUBAGENT_TYPE" })
+    expect(result.isError).toBe(true)
   })
 
   test("#given a bounds runtime error #when team_create runs #then it surfaces runtime_error with the code", async () => {
@@ -180,6 +199,28 @@ describe("team_create tool", () => {
     })
     const result = await runTeamCreate(service, { team_name: "demo" })
     expect(result.details).toMatchObject({ kind: "runtime_error", code: "bounds_exceeded" })
+    expect(result.isError).toBe(true)
+  })
+
+  test("#given a member start rejection #when team_create runs #then the result is a tool error carrying the runtime code and reason", async () => {
+    // given
+    const reason =
+      "member 'bench-landscape' failed to start: No available model for category \"deep\" (attempted mock/model)"
+    const service = createFakeTeamService({
+      createTeam: async () => {
+        throw new SenpiTeamRuntimeError(reason, "member_start_rejected", "demo")
+      },
+    })
+
+    // when
+    const result = await runTeamCreate(service, {
+      inline_spec: { name: "bench", members: [{ name: "bench-landscape", category: "deep" }] },
+    })
+
+    // then
+    expect(result.isError).toBe(true)
+    expect(result.details).toEqual({ kind: "runtime_error", code: "member_start_rejected", reason })
+    expect(result.content[0]).toEqual({ type: "text", text: reason })
   })
 
   test("#given the factory #when built #then it names the tool team_create", () => {
@@ -198,12 +239,15 @@ describe("team_delete tool", () => {
 
     // then
     expect(result.details).toMatchObject({ kind: "deleted", cancelled_task_ids: ["st_a"] })
+    expect(result.isError).toBeUndefined()
     expect(service.calls[0]).toMatchObject({ method: "deleteTeam", args: [{ teamRunId: "run-1", force: undefined }] })
   })
 
   test("#given cancelled member tasks #when team_delete runs #then the text names the cancelled task ids", async () => {
     // given
-    const service = createFakeTeamService({ deleteTeam: async () => fakeDeleteResult({ cancelledTaskIds: ["st_a", "st_b"] }) })
+    const service = createFakeTeamService({
+      deleteTeam: async () => fakeDeleteResult({ cancelledTaskIds: ["st_a", "st_b"] }),
+    })
 
     // when
     const result = await runTeamDelete(service, { team_run_id: "run-1" })
@@ -229,6 +273,7 @@ describe("team_delete tool", () => {
     })
     const result = await runTeamDelete(service, { team_run_id: "run-1" })
     expect(result.details).toMatchObject({ kind: "invalid_state", team_run_id: "run-1" })
+    expect(result.isError).toBe(true)
   })
 
   test("#given the factory #when built #then it names the tool team_delete", () => {

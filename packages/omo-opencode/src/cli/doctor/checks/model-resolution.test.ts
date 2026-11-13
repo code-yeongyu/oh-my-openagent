@@ -65,7 +65,7 @@ describe("model-resolution check", () => {
         info.agents.find((a) => a.name === "sisyphus"),
         "sisyphus agent resolution",
       )
-      expect(sisyphus.requirement.fallbackChain[0]?.model).toBe("claude-opus-5")
+      expect(sisyphus.requirement.fallbackChain[0]?.model).toBe("claude-opus-5-5")
       expect(sisyphus.requirement.fallbackChain[0]?.providers).toContain("anthropic")
     })
 
@@ -79,8 +79,8 @@ describe("model-resolution check", () => {
         info.categories.find((c) => c.name === "visual-engineering"),
         "visual-engineering category resolution",
       )
-      expect(visual.requirement.fallbackChain[0]?.model).toBe("claude-opus-5")
-      expect(visual.requirement.fallbackChain[0]?.providers).toContain("anthropic")
+      expect(visual.requirement.fallbackChain[0]?.model).toBe("gemini-4-argon")
+      expect(visual.requirement.fallbackChain[0]?.providers).toContain("google")
     })
   })
 
@@ -102,7 +102,10 @@ describe("model-resolution check", () => {
       const info = getModelResolutionInfoWithOverrides(mockConfig)
 
       // then: Oracle should show the override
-      const oracle = expectDefined(info.agents.find((a) => a.name === "oracle"), "oracle agent resolution")
+      const oracle = expectDefined(
+        info.agents.find((a) => a.name === "oracle"),
+        "oracle agent resolution",
+      )
       expect(oracle.userOverride).toBe("anthropic/claude-opus-4-7")
       expect(oracle.effectiveResolution).toBe("User override: anthropic/claude-opus-4-7")
     })
@@ -160,7 +163,10 @@ describe("model-resolution check", () => {
       const info = getModelResolutionInfoWithOverrides(mockConfig)
 
       //#then Oracle should have userVariant set
-      const oracle = expectDefined(info.agents.find((a) => a.name === "oracle"), "oracle agent resolution")
+      const oracle = expectDefined(
+        info.agents.find((a) => a.name === "oracle"),
+        "oracle agent resolution",
+      )
       expect(oracle.userOverride).toBe("openai/gpt-5.4")
       expect(oracle.userVariant).toBe("xhigh")
     })
@@ -234,7 +240,10 @@ describe("model-resolution check", () => {
         },
       })
 
-      const oracle = expectDefined(info.agents.find((agent) => agent.name === "oracle"), "oracle agent resolution")
+      const oracle = expectDefined(
+        info.agents.find((agent) => agent.name === "oracle"),
+        "oracle agent resolution",
+      )
       expect(oracle.effectiveModel).toBe("anthropic/claude-opus-4-7-thinking")
       expect(oracle.capabilityDiagnostics).toMatchObject({
         resolutionMode: "alias-backed",
@@ -281,7 +290,8 @@ describe("model-resolution check", () => {
     })
 
     it("collects warnings when configured models rely on compatibility fallback", async () => {
-      const { collectCapabilityResolutionIssues, getModelResolutionInfoWithOverrides } = await import("./model-resolution")
+      const { collectCapabilityResolutionIssues, getModelResolutionInfoWithOverrides } =
+        await import("./model-resolution")
 
       const info = getModelResolutionInfoWithOverrides({
         agents: {
@@ -297,7 +307,8 @@ describe("model-resolution check", () => {
     })
 
     it("does not warn for known provider aliases used by current recommended models", async () => {
-      const { collectCapabilityResolutionIssues, getModelResolutionInfoWithOverrides } = await import("./model-resolution")
+      const { collectCapabilityResolutionIssues, getModelResolutionInfoWithOverrides } =
+        await import("./model-resolution")
 
       // #given current recommended provider aliases from user configuration
       const info = getModelResolutionInfoWithOverrides({
@@ -319,7 +330,8 @@ describe("model-resolution check", () => {
     })
 
     it("does not warn for OpenCode Go Qwen Max overrides with snapshot-backed diagnostics from refreshed models.dev", async () => {
-      const { collectCapabilityResolutionIssues, getModelResolutionInfoWithOverrides } = await import("./model-resolution")
+      const { collectCapabilityResolutionIssues, getModelResolutionInfoWithOverrides } =
+        await import("./model-resolution")
 
       // #given Qwen Max is configured for planner agents with the refreshed snapshot
       const info = getModelResolutionInfoWithOverrides({
@@ -334,9 +346,11 @@ describe("model-resolution check", () => {
 
       // #then Qwen Max uses snapshot-backed diagnostics (models.dev now includes Qwen data)
       expect(issues).toHaveLength(0)
-      const atlas = expectDefined(info.agents.find((agent) => agent.name === "atlas"), "atlas agent resolution")
+      const atlas = expectDefined(
+        info.agents.find((agent) => agent.name === "atlas"),
+        "atlas agent resolution",
+      )
       expect(atlas.capabilityDiagnostics?.resolutionMode).toBe("snapshot-backed")
     })
   })
-
 })

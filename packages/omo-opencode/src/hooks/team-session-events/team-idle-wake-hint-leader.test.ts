@@ -1,8 +1,11 @@
 /// <reference types="bun-types" />
 
-import { afterEach, describe, expect, mock, test } from "bun:test"
+import { afterEach, describe, expect, mock, setDefaultTimeout, test } from "bun:test"
 import { randomUUID } from "node:crypto"
 import { mkdtemp, mkdir, rm } from "node:fs/promises"
+
+// Windows CI runners can exceed the 5 s Bun default on fs-heavy team-mode tests.
+setDefaultTimeout(process.platform === "win32" ? 30_000 : 10_000)
 import { tmpdir } from "node:os"
 import path from "node:path"
 
@@ -12,10 +15,7 @@ import { listUnreadMessages } from "../../features/team-mode/team-mailbox/inbox"
 import { sendMessage } from "../../features/team-mode/team-mailbox/send"
 import { saveRuntimeState } from "../../features/team-mode/team-state-store/store"
 import type { RuntimeState } from "../../features/team-mode/types"
-import {
-  releaseAllPromptAsyncReservationsForTesting,
-  releasePromptAsyncReservation,
-} from "../shared/prompt-async-gate"
+import { releaseAllPromptAsyncReservationsForTesting, releasePromptAsyncReservation } from "../shared/prompt-async-gate"
 import { createTeamIdleWakeHint } from "./team-idle-wake-hint"
 
 type WakeHintPromptInput = {
@@ -84,23 +84,35 @@ async function seedRuntimeState(runtimeState: RuntimeState, config: TeamModeConf
   await saveRuntimeState(runtimeState, config)
 }
 
-async function sendCompletionToLead(teamRunId: string, config: TeamModeConfig, body: string, timestamp: number): Promise<void> {
-  await sendMessage({
-    version: 1,
-    messageId: randomUUID(),
-    from: "worker",
-    to: "lead",
-    kind: "message",
-    body,
-    timestamp,
-  }, teamRunId, config, { isLead: false, activeMembers: ["lead"] })
+async function sendCompletionToLead(
+  teamRunId: string,
+  config: TeamModeConfig,
+  body: string,
+  timestamp: number,
+): Promise<void> {
+  await sendMessage(
+    {
+      version: 1,
+      messageId: randomUUID(),
+      from: "worker",
+      to: "lead",
+      kind: "message",
+      body,
+      timestamp,
+    },
+    teamRunId,
+    config,
+    { isLead: false, activeMembers: ["lead"] },
+  )
 }
 
 afterEach(async () => {
   releaseAllPromptAsyncReservationsForTesting()
-  await Promise.all(temporaryDirectories.splice(0).map(async (directoryPath) => {
-    await rm(directoryPath, { recursive: true, force: true })
-  }))
+  await Promise.all(
+    temporaryDirectories.splice(0).map(async (directoryPath) => {
+      await rm(directoryPath, { recursive: true, force: true })
+    }),
+  )
 })
 
 describe("createTeamIdleWakeHint leader delivery", () => {
@@ -116,16 +128,17 @@ describe("createTeamIdleWakeHint leader delivery", () => {
       promptInputs.push(input)
       return {}
     })
-    const handler = createTeamIdleWakeHint({
-      directory: "/tmp/project",
-      client: { session: { promptAsync: promptAsyncSpy } },
-    }, config, immediatePromptGateOptions)
+    const handler = createTeamIdleWakeHint(
+      {
+        directory: "/tmp/project",
+        client: { session: { promptAsync: promptAsyncSpy } },
+      },
+      config,
+      immediatePromptGateOptions,
+    )
 
     // when
-    const completionBodies = Array.from(
-      { length: COMPLETION_CYCLE_COUNT },
-      (_, index) => `completion ${index + 1}`,
-    )
+    const completionBodies = Array.from({ length: COMPLETION_CYCLE_COUNT }, (_, index) => `completion ${index + 1}`)
     for (const [index, body] of completionBodies.entries()) {
       await sendCompletionToLead(teamRunId, config, body, 100 + index)
       await handler({ event: { type: "session.idle", properties: { sessionID: "lead-session" } } })

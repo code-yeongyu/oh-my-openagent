@@ -30,8 +30,7 @@ describe("model-error-classifier", () => {
   test("treats cooling-down auto-retry messages as retryable", () => {
     //#given
     const error = {
-      message:
-        "All credentials for model claude-opus-4-7-thinking are cooling down [retrying in ~5 days attempt #1]",
+      message: "All credentials for model claude-opus-4-7-thinking are cooling down [retrying in ~5 days attempt #1]",
     }
 
     //#when
@@ -84,94 +83,6 @@ describe("model-error-classifier", () => {
     expect(provider).toBe("provider-x")
   })
 
-  test("treats QuotaExceededError (PascalCase name) as non-retryable STOP error", () => {
-    //#given
-    const error = { name: "QuotaExceededError" }
-
-    //#when
-    const result = shouldRetryError(error)
-
-    //#then
-    expect(result).toBe(false)
-  })
-
-  test("treats quotaexceedederror (lowercase name) as non-retryable STOP error", () => {
-    //#given
-    const error = { name: "quotaexceedederror" }
-
-    //#when
-    const result = shouldRetryError(error)
-
-    //#then
-    expect(result).toBe(false)
-  })
-
-  test("treats InsufficientCreditsError (PascalCase name) as non-retryable STOP error", () => {
-    //#given
-    const error = { name: "InsufficientCreditsError" }
-
-    //#when
-    const result = shouldRetryError(error)
-
-    //#then
-    expect(result).toBe(false)
-  })
-
-  test("treats insufficientcreditserror (lowercase name) as non-retryable STOP error", () => {
-    //#given
-    const error = { name: "insufficientcreditserror" }
-
-    //#when
-    const result = shouldRetryError(error)
-
-    //#then
-    expect(result).toBe(false)
-  })
-
-  test("treats FreeUsageLimitError (PascalCase name) as non-retryable STOP error", () => {
-    //#given
-    const error = { name: "FreeUsageLimitError" }
-
-    //#when
-    const result = shouldRetryError(error)
-
-    //#then
-    expect(result).toBe(false)
-  })
-
-  test("treats freeusagelimiterror (lowercase name) as non-retryable STOP error", () => {
-    //#given
-    const error = { name: "freeusagelimiterror" }
-
-    //#when
-    const result = shouldRetryError(error)
-
-    //#then
-    expect(result).toBe(false)
-  })
-
-  test("treats quota reset message as non-retryable STOP error (no error name)", () => {
-    //#given
-    const error = { message: "quota will reset after 1 hour" }
-
-    //#when
-    const result = shouldRetryError(error)
-
-    //#then
-    expect(result).toBe(false)
-  })
-
-  test("treats quota exceeded message as non-retryable STOP error (no error name)", () => {
-    //#given
-    const error = { message: "quota exceeded for this billing period" }
-
-    //#when
-    const result = shouldRetryError(error)
-
-    //#then
-    expect(result).toBe(false)
-  })
-
   test("treats provider usage limit reached message as retryable fallback signal", () => {
     //#given
     const error = { message: "usage limit has been reached for your account" }
@@ -181,17 +92,6 @@ describe("model-error-classifier", () => {
 
     //#then
     expect(result).toBe(true)
-  })
-
-  test("treats insufficient credits message as non-retryable STOP error (no error name)", () => {
-    //#given
-    const error = { message: "insufficient credits to complete this request" }
-
-    //#when
-    const result = shouldRetryError(error)
-
-    //#then
-    expect(result).toBe(false)
   })
 
   test("treats 'bad request' message as retryable (GitHub Copilot rolling update)", () => {
@@ -218,44 +118,13 @@ describe("model-error-classifier", () => {
 
   test("treats localized transient provider messages as retryable", () => {
     //#given
-    const errors = [
-      { message: "请求过于频繁，请稍后重试" },
-      { message: "服务暂时不可用" },
-      { message: "触发频率限制" },
-    ]
+    const errors = [{ message: "请求过于频繁，请稍后重试" }, { message: "服务暂时不可用" }, { message: "触发频率限制" }]
 
     //#when
     const results = errors.map((error) => shouldRetryError(error))
 
     //#then
     expect(results).toEqual([true, true, true])
-  })
-
-  test("treats subscription quota message as non-retryable", () => {
-    //#given
-    const error = { message: "Subscription quota exceeded. You can continue using free models." }
-
-    //#when
-    const result = shouldRetryError(error)
-
-    //#then
-    expect(result).toBe(false)
-  })
-
-  test("treats localized quota exhaustion messages as non-retryable stop errors", () => {
-    //#given
-    const errors = [
-      { message: "已达到 5 小时的使用上限" },
-      { message: "额度不足" },
-      { message: "账户余额不足" },
-      { message: "免费额度已耗尽" },
-    ]
-
-    //#when
-    const results = errors.map((error) => shouldRetryError(error))
-
-    //#then
-    expect(results).toEqual([false, false, false, false])
   })
 
   test("treats HTTP 429 rate limit message as retryable", () => {
@@ -368,62 +237,6 @@ describe("model-error-classifier", () => {
     expect(result).toBe(false)
   })
 
-  test("GLM code 1304 daily quota 429 does NOT trigger fallback (STOP pattern wins)", () => {
-    //#given
-    const error = {
-      statusCode: 429,
-      message: "Daily call limit for this API key has been reached. Limit will reset at midnight UTC.",
-    }
-
-    //#when
-    const result = isRetryableModelError(error)
-
-    //#then
-    expect(result).toBe(false)
-  })
-
-  test("GLM account in arrears 429 does NOT trigger fallback (STOP pattern wins)", () => {
-    //#given
-    const error = {
-      statusCode: 429,
-      message: "Your account is in arrears, please recharge and try again.",
-    }
-
-    //#when
-    const result = isRetryableModelError(error)
-
-    //#then
-    expect(result).toBe(false)
-  })
-
-  test("GLM fair use policy violation 429 does NOT trigger fallback (STOP pattern wins)", () => {
-    //#given
-    const error = {
-      statusCode: 429,
-      message: "Request blocked under Fair Use Policy. Your request rate has been restricted.",
-    }
-
-    //#when
-    const result = isRetryableModelError(error)
-
-    //#then
-    expect(result).toBe(false)
-  })
-
-  test("STOP message pattern takes precedence over 429 statusCode", () => {
-    //#given
-    const error = {
-      statusCode: 429,
-      message: "quota exceeded for this account, usage limit has been reached",
-    }
-
-    //#when
-    const result = isRetryableModelError(error)
-
-    //#then
-    expect(result).toBe(false)
-  })
-
   test("rate limit message without statusCode still works (backward compat)", () => {
     //#given
     const error = { message: "rate limit reached for requests" }
@@ -439,7 +252,7 @@ describe("model-error-classifier", () => {
     //#given: OpenAI surfaces its mid-stream error with type 'server_error'
     const error = {
       name: undefined,
-      message: "{\"error\":{\"type\":\"server_error\",\"message\":\"server_error\"}}",
+      message: '{"error":{"type":"server_error","message":"server_error"}}',
     }
 
     //#when

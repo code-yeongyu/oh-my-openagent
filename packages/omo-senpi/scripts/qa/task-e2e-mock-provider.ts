@@ -43,8 +43,15 @@ interface MockStepUsage {
 }
 
 type MockStep =
-  | { type: "text"; text: string; usage?: MockStepUsage }
-  | { type: "tool_call"; name: string; arguments: Record<string, unknown>; id?: string; usage?: MockStepUsage }
+  | { type: "text"; text: string; usage?: MockStepUsage; delayMs?: number }
+  | {
+      type: "tool_call"
+      name: string
+      arguments: Record<string, unknown>
+      id?: string
+      usage?: MockStepUsage
+      delayMs?: number
+    }
 
 interface MockScript {
   parentSteps: MockStep[]
@@ -74,6 +81,7 @@ interface Message {
 interface Context {
   cwd?: string
   messages?: Message[]
+  tools?: Array<{ name?: string; description?: string }>
 }
 
 interface SimpleStreamOptions {
@@ -81,8 +89,7 @@ interface SimpleStreamOptions {
 }
 
 type AssistantContent =
-  | { type: "text"; text: string }
-  | { type: "toolCall"; id: string; name: string; arguments: Record<string, unknown> }
+  { type: "text"; text: string } | { type: "toolCall"; id: string; name: string; arguments: Record<string, unknown> }
 
 interface AssistantMessage {
   role: "assistant"
@@ -200,11 +207,7 @@ export function messagesContainChild(context: Context): boolean {
   return false
 }
 
-export function stepToAssistantMessage(
-  step: MockStep,
-  callCount: number,
-  modelId = "mock-1",
-): AssistantMessage {
+export function stepToAssistantMessage(step: MockStep, callCount: number, modelId = "mock-1"): AssistantMessage {
   const content: AssistantContent[] =
     step.type === "text"
       ? [{ type: "text", text: step.text }]
@@ -237,11 +240,7 @@ function streamMockResponse(streamModel: Model<Api>, context: Context, options?:
       return stream
     }
     const failure: AssistantMessage = {
-      ...stepToAssistantMessage(
-        { type: "text", text: "" },
-        1,
-        streamModel.id,
-      ),
+      ...stepToAssistantMessage({ type: "text", text: "" }, 1, streamModel.id),
       stopReason: "error",
       errorMessage: "mock provider capacity exhausted",
     }
@@ -258,6 +257,14 @@ function streamMockResponse(streamModel: Model<Api>, context: Context, options?:
     const rendered = typeof systemPrompt === "string" ? systemPrompt : JSON.stringify(systemPrompt ?? null)
     appendFileSync(dumpTarget, `\n=== model=${streamModel.id} cwd=${context.cwd ?? process.cwd()} ===\n${rendered}\n`)
   }
+  // Tool descriptions exist only on the model request, so a driver that asserts on wording
+  // (plan-gated-agents-e2e.mjs `description` scenario) reads them from this dump: one JSON array
+  // of {name, description} per parent turn.
+  const toolsDumpTarget = env.MOCK_DUMP_TOOLS
+  if (typeof toolsDumpTarget === "string" && toolsDumpTarget.length > 0 && !isChild) {
+    const tools = (context.tools ?? []).map((tool) => ({ name: tool.name, description: tool.description }))
+    appendFileSync(toolsDumpTarget, `${JSON.stringify(tools)}\n`)
+  }
   const steps = isChild ? script.childSteps : script.parentSteps
   const index = isChild ? childCallCount : parentCallCount
   const step = steps[Math.min(index, steps.length - 1)]
@@ -265,7 +272,11 @@ function streamMockResponse(streamModel: Model<Api>, context: Context, options?:
   else parentCallCount += 1
   const message = stepToAssistantMessage(step, index + 1, streamModel.id)
 
-  queueMicrotask(() => {
+  // A step may hold the turn open for a while before answering, the way a real model call
+  // does: it is how a child stays BUSY without depending on any tool existing in the child.
+  // The wait is abort-aware so a parent's teardown still ends the child promptly.
+  const delayMs = typeof step.delayMs === "number" && step.delayMs > 0 ? step.delayMs : 0
+  const emit = () => {
     if (options?.signal?.aborted) {
       const aborted = { ...message, stopReason: "aborted" as const }
       stream.push({ type: "error", reason: "aborted", error: aborted })
@@ -286,7 +297,19 @@ function streamMockResponse(streamModel: Model<Api>, context: Context, options?:
     }
     stream.push({ type: "done", reason: message.stopReason, message })
     stream.end(message)
-  })
+  }
+  if (delayMs === 0) queueMicrotask(emit)
+  else {
+    const timer = setTimeout(emit, delayMs)
+    options?.signal?.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer)
+        emit()
+      },
+      { once: true },
+    )
+  }
 
   return stream
 }

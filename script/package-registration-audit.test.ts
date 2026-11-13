@@ -4,28 +4,9 @@ import { readdir, readFile } from "node:fs/promises"
 import { join, relative } from "node:path"
 import { describe, expect, test } from "bun:test"
 
-const corePackagePaths: readonly string[] = [
-  "packages/utils",
-  "packages/model-core",
-  "packages/omo-config-core",
-  "packages/delegate-core",
-  "packages/prompts-core",
-  "packages/rules-engine",
-  "packages/agents-md-core",
-  "packages/lsp-core",
-  "packages/mcp-stdio-core",
-  "packages/mcp-client-core",
-  "packages/comment-checker-core",
-  "packages/hashline-core",
-  "packages/tmux-core",
-  "packages/team-core",
-  "packages/openclaw-core",
-  "packages/boulder-state",
-  "packages/memory-core",
-  "packages/telemetry-core",
-  "packages/claude-code-compat-core",
-  "packages/skills-loader-core",
-] as const
+import { corePackagePaths as sharedCorePackagePaths } from "./core-package-paths"
+
+const corePackagePaths: readonly string[] = sharedCorePackagePaths
 
 const mcpPackagePaths: readonly string[] = [
   "packages/ast-grep-mcp",
@@ -37,9 +18,20 @@ const adapterPackagePaths: readonly string[] = [
   "packages/omo-codex",
   "packages/omo-senpi",
   "packages/senpi-task",
+  "packages/senpi-desktop-engine",
+  "packages/senpi-desktop-prelude",
+  "packages/senpi-desktop-protocol",
+  "packages/senpi-desktop-sdk",
+  "packages/senpi-desktop-service",
+  "packages/senpi-desktop-tool",
+  "packages/omo-computer-protocol",
+  "packages/omo-computer-sdk",
+  "packages/omo-computer-engine",
+  "packages/omo-computer-hand",
+  "packages/omo-computer-carriers",
+  "packages/omo-computer-tool",
+  "packages/omo-computer-prelude",
   "packages/omo-opencode",
-  "packages/pi-goal",
-  "packages/pi-webfetch",
   "packages/omo-native",
 ] as const
 const skillPackagePaths: readonly string[] = ["packages/shared-skills"] as const
@@ -143,7 +135,10 @@ async function collectFiles(root: string, predicate: (path: string) => boolean):
   return files
 }
 
-async function collectTrackedFiles(roots: readonly string[], predicate: (path: string) => boolean): Promise<readonly string[]> {
+async function collectTrackedFiles(
+  roots: readonly string[],
+  predicate: (path: string) => boolean,
+): Promise<readonly string[]> {
   return (await Promise.all(roots.map((root) => collectFiles(root, predicate)))).flat().toSorted()
 }
 
@@ -200,21 +195,10 @@ function packageLayer(path: string): keyof typeof layerRanks | undefined {
 }
 
 function extractTypecheckPackagePaths(command: string): readonly string[] {
-  return [...command.matchAll(/tsgo --noEmit -p (packages\/[^ ]+\/tsconfig\.json)/g)]
+  return [...command.matchAll(/bun check --no-script --all -p (packages\/[^ ]+\/tsconfig\.json)/g)]
     .map((match) => match[1])
     .filter((path): path is string => path !== undefined)
     .map((path) => path.slice(0, -"/tsconfig.json".length))
-    .toSorted()
-}
-
-function extractSharedCoreGuardPackagePaths(source: string): readonly string[] {
-  const match = /const corePackages = \[([\s\S]*?)\] as const/.exec(source)
-  const body = match?.[1]
-  if (body === undefined) throw new Error("Could not find corePackages in shared-core-extraction-guard.test.ts")
-
-  return [...body.matchAll(/"([^"]+)"/g)]
-    .map((entry) => entry[1])
-    .filter((path): path is string => path !== undefined)
     .toSorted()
 }
 
@@ -223,7 +207,9 @@ describe("package registration audit", () => {
     // given
     const root = await readRootManifest()
     const managedPackagePaths = (await discoverPackagePaths()).filter(isManagedWorkspacePackage)
-    const managedWorkspacePaths = managedPackagePaths.filter((path) => !mcpPackagePaths.includes(path) || root.workspaces.includes(path))
+    const managedWorkspacePaths = managedPackagePaths.filter(
+      (path) => !mcpPackagePaths.includes(path) || root.workspaces.includes(path),
+    )
     const expectedTypecheckPaths = managedWorkspacePaths.filter((path) => existsSync(join(path, "tsconfig.json")))
     const expectedDevDependencyNames = (
       await Promise.all(
@@ -262,17 +248,6 @@ describe("package registration audit", () => {
 
     // then
     expect(unknownWorkspacePaths).toEqual(["packages/zz-qa-unregistered-probe"])
-  })
-
-  test("#given shared extraction guard #when audited #then every core package is covered", async () => {
-    // given
-    const guardSource = await readFile("script/shared-core-extraction-guard.test.ts", "utf8")
-
-    // when
-    const guardPackagePaths = extractSharedCoreGuardPackagePaths(guardSource)
-
-    // then
-    expect(guardPackagePaths).toEqual([...corePackagePaths].toSorted())
   })
 
   test("#given package test scripts #when nested tests exist #then recursive globs are registered", async () => {
@@ -325,24 +300,28 @@ describe("package registration audit", () => {
     expect(reverseEdges).toEqual([])
   })
 
-  test("#given exact re-export shim scan #when inventory docs are checked #then total targets and every path are present", async () => {
-    // given
-    const docPath = "docs/reference/re-export-shim-inventory.md"
-    const [doc, shims] = await Promise.all([readFile(docPath, "utf8"), collectReExportShims()])
+  test(
+    "#given exact re-export shim scan #when inventory docs are checked #then total targets and every path are present",
+    async () => {
+      // given
+      const docPath = "docs/reference/re-export-shim-inventory.md"
+      const [doc, shims] = await Promise.all([readFile(docPath, "utf8"), collectReExportShims()])
 
-    // when
-    const totalMatch = /Total shim exports found: (\d+)\./.exec(doc)
-    if (totalMatch?.[1] === undefined) throw new Error(`${docPath} is missing the total shim count`)
+      // when
+      const totalMatch = /Total shim exports found: (\d+)\./.exec(doc)
+      if (totalMatch?.[1] === undefined) throw new Error(`${docPath} is missing the total shim count`)
 
-    const documentedTotal = Number.parseInt(totalMatch[1], 10)
-    const targetPackages = [...new Set(shims.map((shim) => shim.targetPackage))].toSorted()
-    const missingTargetPackages = targetPackages.filter((targetPackage) => !doc.includes(`\`${targetPackage}\``))
-    const missingPaths = shims.map((shim) => shim.path).filter((path) => !doc.includes(`\`${path}\``))
+      const documentedTotal = Number.parseInt(totalMatch[1], 10)
+      const targetPackages = [...new Set(shims.map((shim) => shim.targetPackage))].toSorted()
+      const missingTargetPackages = targetPackages.filter((targetPackage) => !doc.includes(`\`${targetPackage}\``))
+      const missingPaths = shims.map((shim) => shim.path).filter((path) => !doc.includes(`\`${path}\``))
 
-    // then
-    expect(doc).toContain("Re-export Shim Inventory")
-    expect(documentedTotal).toBe(shims.length)
-    expect(missingTargetPackages).toEqual([])
-    expect(missingPaths).toEqual([])
-  }, { timeout: 20_000 })
+      // then
+      expect(doc).toContain("Re-export Shim Inventory")
+      expect(documentedTotal).toBe(shims.length)
+      expect(missingTargetPackages).toEqual([])
+      expect(missingPaths).toEqual([])
+    },
+    { timeout: 20_000 },
+  )
 })

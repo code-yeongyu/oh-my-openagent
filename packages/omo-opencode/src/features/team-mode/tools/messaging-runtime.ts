@@ -10,9 +10,20 @@ export type TeamRuntimeDetails = {
   activeMembers: string[]
 }
 
+// Prompt-gate timing for a team message's live delivery and its fallback mailbox
+// wake. Every field falls back to the gate default when omitted, so production
+// callers never set this; tests inject it to observe a retrying wake through its
+// event instead of the durable-retry backoff wall clock.
+export type TeamSendMessageDispatchTiming = {
+  readonly postDispatchHoldMs?: number
+  readonly queueRetryMs?: number
+  readonly fallbackWakeSettleMs?: number
+}
+
 export type TeamSendMessageToolDeps = {
   loadRuntimeState: typeof loadRuntimeState
   liveDeliverySettleMs?: number
+  dispatchTiming?: TeamSendMessageDispatchTiming
 }
 
 export const defaultTeamSendMessageToolDeps: TeamSendMessageToolDeps = {
@@ -52,9 +63,7 @@ export async function resolveTeamRuntimeDetails(
   try {
     const runtimeState = await deps.loadRuntimeState(teamRunId, config)
     const isLead = runtimeState.leadSessionId === sessionID
-    const leadMember = isLead
-      ? runtimeState.members.find((member) => member.agentType === "leader")
-      : undefined
+    const leadMember = isLead ? runtimeState.members.find((member) => member.agentType === "leader") : undefined
     const member = runtimeState.members.find((entry) => entry.sessionId === sessionID)
     const senderName = leadMember?.name ?? member?.name ?? "unknown"
 
@@ -62,9 +71,7 @@ export async function resolveTeamRuntimeDetails(
       teamRunId: runtimeState.teamRunId,
       isLead,
       senderName,
-      activeMembers: runtimeState.members
-        .map((entry) => entry.name)
-        .filter((name) => name !== senderName),
+      activeMembers: runtimeState.members.map((entry) => entry.name).filter((name) => name !== senderName),
     }
   } catch (error) {
     error instanceof Error

@@ -1,6 +1,6 @@
 ---
 name: dag-library
-description: "Store a dag definition once and re-run it in one or two lines, instead of pasting the full definition JSON into every eval cell. MUST USE whenever the user wants to save a DAG for reuse, run a previously saved/named DAG, schedule the same graph repeatedly (nightly/weekly audits, recurring multi-agent pipelines), or asks where to put a dag definition file. Triggers: dag library, save this dag, reuse a dag, run the saved dag, stored dag definition, recurring dag, nightly dag, dag 정의 저장, 저장된 dag 실행, dag 반복 실행, DAG 만들어두고 여러 번."
+description: "Stores a DAG definition once and re-runs it by name, instead of pasting the definition into every run. Use when the user wants to save a DAG, run a saved one, or schedule the same multi-agent graph repeatedly."
 metadata:
   short-description: Store and re-run named dag definitions
 ---
@@ -22,13 +22,13 @@ A stored definition is a plain dag definition JSON file named `<name>.json` in o
   "key": "nightly-audit",
   "name": "Nightly audit",
   "nodes": [
-    { "id": "audit", "category": "unspecified-low", "prompt": "Audit docs/ for stale claims; write findings to /tmp/audit-{{key}}.md." },
-    { "id": "verify", "category": "quick", "prompt": "Verify each finding in /tmp/audit-{{key}}.md against src/.", "dependsOn": ["audit"] }
+    { "id": "audit", "category": "unspecified-low", "prompt": "TASK: Audit docs/ for stale claims. DELIVERABLE: /tmp/audit-{{key}}.md listing each stale claim with its file and line. SCOPE: read docs/ and src/; write only /tmp/audit-{{key}}.md. VERIFY: test -s /tmp/audit-{{key}}.md. STOP WHEN: the findings file is written." },
+    { "id": "verify", "category": "quick", "prompt": "TASK: Verify each finding in /tmp/audit-{{key}}.md against src/. DELIVERABLE: one CONFIRMED or REFUTED line per finding, citing the src/ file and line. SCOPE: read /tmp/audit-{{key}}.md and src/; write nothing. VERIFY: every finding in the file has exactly one verdict line; a missing file is FAIL. STOP WHEN: every finding has a verdict.", "dependsOn": ["audit"] }
   ]
 }
 ```
 
-String values may carry placeholders, filled at load time: `{{key}}` (the final rotated key — use it in file paths so reruns never clobber each other), `{{date}}` (UTC YYYYMMDD), `{{datetime}}` (UTC YYYYMMDD-HHmmss). Node prompts must still stand alone: `dependsOn` is ordering only, so pass data between nodes through files, exactly as in mass-ulw.
+String values may carry placeholders, filled at load time: `{{key}}` (the final rotated key — use it in file paths so reruns never clobber each other), `{{date}}` (UTC YYYYMMDD), `{{datetime}}` (UTC YYYYMMDD-HHmmss). Node prompts must still stand alone: `dependsOn` is ordering only, so pass data between nodes through files, exactly as in mass-ulw. A stored prompt follows mass-ulw's node prompt contract (`TASK:`, `DELIVERABLE:`, `SCOPE:`, `VERIFY:`, `STOP WHEN:`), because the `workflow` `start` behind `lib.start` returns advisory `warnings` for a prompt missing its `TASK:`/`STOP WHEN` markers.
 
 ## Running it — JS eval cell, two lines
 
@@ -52,12 +52,12 @@ The dag engine keys idempotency on `key` + graph fingerprint: re-starting the sa
 
 ## Python cells
 
-Python cannot import the ESM library. Reproduce the same semantics with plain dicts — read the file, rotate the key, fill placeholders, call `tool.workflow`:
+Python cannot import the ESM library. Reproduce the same semantics with plain dicts — resolve the definition through the same lookup order (a path you pass, then `$PWD/.omo/dags`, then `$HOME/.omo/dags`), rotate the key, fill placeholders, call `tool.workflow`:
 
 ```python
 import json
 from datetime import datetime, timezone
-defn = json.loads(read(f"{env('HOME')}/.omo/dags/nightly-audit.json"))
+defn = json.loads(read(f"{env('PWD')}/.omo/dags/nightly-audit.json"))  # or an absolute path you pass; $HOME/.omo/dags is the last fallback
 stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
 defn["key"] = f"{defn['key']}-{stamp}"
 text = json.dumps(defn).replace("{{key}}", defn["key"]).replace("{{date}}", stamp[:8]).replace("{{datetime}}", stamp)

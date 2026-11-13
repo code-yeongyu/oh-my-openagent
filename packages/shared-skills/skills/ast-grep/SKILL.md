@@ -1,6 +1,6 @@
 ---
 name: ast-grep
-description: "Use ast-grep (sg) for AST-aware code search and rewrite across 25 languages. Trigger for structural code matching or deterministic codemods: find every function/call/class/import shaped like X, rewrite console.log to logger.info, strip `as any`, migrate require() to import, find empty catch blocks or missing await, and scan/apply YAML rules. Prefer this over rg/grep when the target is syntax shape rather than text; use rg for string contents, comments, filenames, or regex-style byte searches."
+description: "Searches and rewrites code by AST shape across 25 languages. Use when the target is a syntax pattern (every call/class/import shaped like X, a codemod, a YAML rule) rather than literal text; for plain strings, comments, or filenames, use rg."
 ---
 
 # ast-grep
@@ -8,6 +8,18 @@ description: "Use ast-grep (sg) for AST-aware code search and rewrite across 25 
 `sg` (also installed as `ast-grep`) is an **AST-aware search and rewrite tool** across 25 languages. It treats your pattern as code, parses it the same way it parses your project, and matches structurally. It is the right tool whenever your question depends on **code shape** rather than text bytes.
 
 This skill ships a Python wrapper at `scripts/ast_grep_helper.py` and platform install scripts at `install.sh` (POSIX) and `install.ps1` (Windows). The helper adds offline pattern validation, the two-pass write trick, and binary auto-resolution. Use it as your default entry point.
+
+---
+
+## OmO native: the ast-grep MCP tools (fastest path, no CLI needed)
+
+OmO native also registers a bundled ast-grep MCP server. Its three tools are **deferred**: they are absent from the resident tool list and activate automatically the first time you call them by name — no `tool_search` round trip needed.
+
+- `mcp__ast_grep_search({ pattern, language, paths })` — AST-shape search, the MCP equivalent of `sg run -p`. Prefer this over shelling out to `sg` for one-off lookups: no install, no PATH issues.
+- `mcp__ast_grep_rewrite({ pattern, rewrite, language, paths, apply })` — preview matches (`apply: false`, the default) or apply the rewrite (`apply: true`). Same two-pass discipline as `sg run -r`: preview first, then apply.
+- `mcp__ast_grep_scan({ ruleFile | inlineRules, paths, apply })` — run exactly one explicit YAML rule source (a rule file or inline rules), the MCP equivalent of `sg scan --rule` / `--inline-rules`. It never discovers `sgconfig.yml`; to run a project's whole rule set, use `sg scan` (or the helper's `scan`) from the shell.
+
+Same pattern language as the CLI: `$VAR` matches one AST node, `$$$VAR` matches zero or more, and the pattern is code, not regex. `paths` accepts a file or directory list; `language` is always required by `mcp__ast_grep_search` and `mcp__ast_grep_rewrite`.
 
 ---
 
@@ -67,7 +79,7 @@ A single-file Python 3 stdlib wrapper. Same on every OS. The agent's default ent
 ### `search` — find all matches of a pattern
 
 ```bash
-python3 scripts/ast_grep_helper.py search 'console.log($MSG)' --lang ts src/
+python3 scripts/ast_grep_helper.py search 'console.log($MSG)' src/ --lang ts
 ```
 
 Validates the pattern offline first. If the pattern looks like regex (`\w`, `.*`, `|`, etc.) the helper exits with a hint and never calls `sg` — saves a round-trip. Pass `--force` to skip validation.
@@ -82,10 +94,10 @@ Flags:
 
 ```bash
 # Dry-run preview (default — no files mutated)
-python3 scripts/ast_grep_helper.py replace 'console.log($MSG)' 'logger.info($MSG)' --lang ts src/
+python3 scripts/ast_grep_helper.py replace 'console.log($MSG)' 'logger.info($MSG)' src/ --lang ts
 
 # Actually apply
-python3 scripts/ast_grep_helper.py replace 'console.log($MSG)' 'logger.info($MSG)' --lang ts src/ --apply
+python3 scripts/ast_grep_helper.py replace 'console.log($MSG)' 'logger.info($MSG)' src/ --lang ts --apply
 ```
 
 The helper:
@@ -105,9 +117,11 @@ python3 scripts/ast_grep_helper.py scan -r rules/no-console.yml src/
 # Apply auto-fixes
 python3 scripts/ast_grep_helper.py scan -U src/
 
-# CI-friendly GitHub annotations
+# Compact one-line-per-finding report
 python3 scripts/ast_grep_helper.py scan --report-style short src/
 ```
+
+The helper has no `--format` flag; for CI-friendly GitHub annotations call `sg scan --format github src/` directly (see `references/cli.md`).
 
 ### `validate` — offline pattern check (no `sg` call)
 
@@ -214,7 +228,7 @@ In priority order:
 1. **Run `helper validate '<pattern>' --lang <lang>`** — catches regex misuse, missing function bodies, Python trailing colons.
 2. **Check `--lang`** — `sg` infers from extension; if you pass a `.tsx` file with `--lang ts` (not `tsx`), JSX won't parse.
 3. **Inspect the parsed pattern**: `sg run -p '<pattern>' --lang <lang> --debug-query=ast --stdin <<< '<sample>'`. If it shows `ERROR` nodes, the pattern is malformed.
-4. **Check the AST of the target file**: `sg run -p '$_' --lang <lang> --debug-query=cst path/to/file | head -40` — find the `kind` you're trying to match.
+4. **Check the AST of the target code**: paste a snippet of the target file as the pattern, `sg run -p '<snippet>' --lang <lang> --debug-query=cst path/to/file 2>&1 >/dev/null | head -40` — the dump goes to stderr and shows the pattern's tree; find the `kind` you're trying to match.
 5. **Try the playground**: <https://ast-grep.github.io/playground.html> — paste code + pattern, see what's happening.
 
 Do not blindly retry with variations. Each failure has a reason; surface it.
@@ -243,7 +257,7 @@ The full YAML rule schema is in `references/yaml-rules.md`. Project setup (`sgco
 - `sg run --json=compact` produces an array of match objects: `{ file, range: {start, end}, text, replacement?, lines, language, ... }`. Pipe through `jq` for further processing.
 - Without `--json`, `sg` produces human-readable colored output suitable for terminals.
 - The helper's default output is human-readable (file:line:column + match preview). Pass `--json-out` for raw JSON.
-- The helper's `replace` always summarizes: number of matches, number of files, per-location preview.
+- The helper's `replace` dry-run prints the number of matches, the number of files, and a per-location preview; `--apply` prints only the totals (`APPLIED: rewrote N match(es) across M file(s).`).
 
 When summarizing for the user, **always include the count of files affected**, not just the count of matches. Users care about blast radius.
 

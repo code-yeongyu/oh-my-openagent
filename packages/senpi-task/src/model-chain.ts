@@ -26,15 +26,14 @@ export function buildRuntimeModelChain(options: BuildModelChainOptions): Runtime
   if (requestedModel === undefined) return {}
 
   const selectedIndex = candidates.findIndex((candidate) => candidate.model === options.selectedModel)
-  const fallbackModels = selectedIndex === -1
-    ? []
-    : candidates
-      .slice(selectedIndex + 1)
-      .filter((candidate) =>
-        options.availableModels === undefined || options.availableModels.has(candidate.model)
-      )
-      .map((candidate) => toResolvedModelRecord(candidate, options.source))
-      .filter((candidate): candidate is ResolvedModelRecord => candidate !== undefined)
+  const fallbackModels =
+    selectedIndex === -1
+      ? []
+      : candidates
+          .slice(selectedIndex + 1)
+          .filter((candidate) => options.availableModels === undefined || options.availableModels.has(candidate.model))
+          .map((candidate) => toResolvedModelRecord(candidate, options.source))
+          .filter((candidate): candidate is ResolvedModelRecord => candidate !== undefined)
 
   return {
     requested_model: requestedModel,
@@ -58,22 +57,34 @@ export function chainRungCandidates(options: ChainRungCandidateOptions): readonl
   const selectedIndex = locateSelectedRung(options)
   if (selectedIndex === -1) return []
 
-  const rungs: ModelChainCandidate[] = [{ model: options.selectedModel }]
-  for (const entry of options.chain.slice(selectedIndex + 1)) {
+  return [
+    { model: options.selectedModel },
+    ...availableChainCandidates(options.chain.slice(selectedIndex + 1), options.availableModels),
+  ]
+}
+
+/**
+ * Every rung of `chain`, in chain order, resolved to its first available provider with the
+ * provider-specific model-id transform applied. Rungs with no available provider are skipped.
+ */
+export function availableChainCandidates(
+  chain: readonly DelegateFallbackEntry[],
+  availableModels: ReadonlySet<string>,
+): readonly ModelChainCandidate[] {
+  return chain.flatMap((entry): readonly ModelChainCandidate[] => {
     for (const provider of entry.providers) {
-      const modelID = entry.model.startsWith(`${provider}/`)
-        ? entry.model.slice(provider.length + 1)
-        : entry.model
+      const modelID = entry.model.startsWith(`${provider}/`) ? entry.model.slice(provider.length + 1) : entry.model
       const concrete = `${provider}/${transformModelForProvider(provider, modelID)}`
-      if (!options.availableModels.has(concrete)) continue
-      rungs.push({
-        model: concrete,
-        ...(entry.variant !== undefined ? { variant: entry.variant } : {}),
-      })
-      break
+      if (!availableModels.has(concrete)) continue
+      return [
+        {
+          model: concrete,
+          ...(entry.variant !== undefined ? { variant: entry.variant } : {}),
+        },
+      ]
     }
-  }
-  return rungs
+    return []
+  })
 }
 
 function locateSelectedRung(options: ChainRungCandidateOptions): number {
@@ -81,23 +92,20 @@ function locateSelectedRung(options: ChainRungCandidateOptions): number {
   if (selectedRungEntry !== undefined) {
     const byIdentity = chain.indexOf(selectedRungEntry)
     if (byIdentity !== -1) return byIdentity
-    const byShape = chain.findIndex((entry) =>
-      entry.model === selectedRungEntry.model
-      && entry.variant === selectedRungEntry.variant
-      && entry.providers.length === selectedRungEntry.providers.length
-      && entry.providers.every((provider, index) => provider === selectedRungEntry.providers[index])
+    const byShape = chain.findIndex(
+      (entry) =>
+        entry.model === selectedRungEntry.model &&
+        entry.variant === selectedRungEntry.variant &&
+        entry.providers.length === selectedRungEntry.providers.length &&
+        entry.providers.every((provider, index) => provider === selectedRungEntry.providers[index]),
     )
     if (byShape !== -1) return byShape
   }
   return chain.findIndex((entry) =>
-    entry.providers.some(
-      (provider) => {
-        const modelID = entry.model.startsWith(`${provider}/`)
-          ? entry.model.slice(provider.length + 1)
-          : entry.model
-        return `${provider}/${transformModelForProvider(provider, modelID)}` === selectedModel
-      },
-    )
+    entry.providers.some((provider) => {
+      const modelID = entry.model.startsWith(`${provider}/`) ? entry.model.slice(provider.length + 1) : entry.model
+      return `${provider}/${transformModelForProvider(provider, modelID)}` === selectedModel
+    }),
   )
 }
 
@@ -126,8 +134,6 @@ function toResolvedModelRecord(
     model_id: modelId,
     display: `${provider}/${modelId}`,
     ...(candidate.variant !== undefined ? { variant: candidate.variant } : {}),
-    ...(candidate.reasoningEffort !== undefined
-      ? { reasoning_effort: candidate.reasoningEffort }
-      : {}),
+    ...(candidate.reasoningEffort !== undefined ? { reasoning_effort: candidate.reasoningEffort } : {}),
   }
 }

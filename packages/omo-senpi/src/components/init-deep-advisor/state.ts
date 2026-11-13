@@ -1,18 +1,10 @@
-import { execFileSync } from "node:child_process"
 import { createHash, randomUUID } from "node:crypto"
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  realpathSync,
-  renameSync,
-  unlinkSync,
-  writeFileSync,
-} from "node:fs"
-import { join, resolve } from "node:path"
+import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
 
 import { getOmoNativeStateDir } from "../telemetry/product-identity"
 import { COOLDOWN_DAYS, MS_PER_DAY } from "./constants"
+import { gitCommonDirRealpath } from "./git-helpers"
 
 export interface InitDeepSnapshotV1 {
   commitSha: string
@@ -23,9 +15,7 @@ export interface InitDeepSnapshotV1 {
 }
 
 export type SnapshotReadResult =
-  | { kind: "missing" }
-  | { kind: "invalid" }
-  | { kind: "valid"; snapshot: InitDeepSnapshotV1 }
+  { kind: "missing" } | { kind: "invalid" } | { kind: "valid"; snapshot: InitDeepSnapshotV1 }
 
 const ADVISOR_STATE_DIR = "init-deep-advisor-state"
 const GLOBAL_DECLINE_FILE = "init-deep-advisor-declined-global"
@@ -39,11 +29,7 @@ export function getAdvisorStateDir(env?: Parameters<typeof getOmoNativeStateDir>
 }
 
 export function repoHash(root: string): string {
-  const commonDir = execFileSync("git", ["rev-parse", "--git-common-dir"], {
-    cwd: root,
-    encoding: "utf8",
-  }).trim()
-  return createHash("sha256").update(realpathSync(resolve(root, commonDir))).digest("hex")
+  return createHash("sha256").update(gitCommonDirRealpath(root)).digest("hex")
 }
 
 export function writeGlobalDecline(stateDir: string): void {
@@ -94,10 +80,7 @@ export function isCoolingDown(stateDir: string, repoHash: string, now: number): 
 export function writeLastProposedHead(stateDir: string, repoHash: string, head: string): void {
   const dir = join(stateDir, PROPOSAL_DIR)
   mkdirSync(dir, { recursive: true })
-  writeAtomic(
-    join(dir, repoHash),
-    JSON.stringify({ lastProposedHead: head, lastProposedAt: Date.now() }),
-  )
+  writeAtomic(join(dir, repoHash), JSON.stringify({ lastProposedHead: head, lastProposedAt: Date.now() }))
 }
 
 export function readLastProposedHead(stateDir: string, repoHash: string): string | null {

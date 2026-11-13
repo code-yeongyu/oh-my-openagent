@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import signal
 import subprocess
 import tempfile
 import time
@@ -32,6 +33,10 @@ from .result_schema import Attempt
 
 
 TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "templates")
+# Chrome removes its per-launch state (the macOS code-sign clone, the temp
+# profile) only on a clean quit, so a timed-out template's process group gets
+# SIGTERM and this long to let `ctx.close()` run before SIGKILL (omo#12067).
+TERM_GRACE_S = 5
 
 
 def _node_available() -> bool:
@@ -70,19 +75,65 @@ def _run_node_template(template: str, args: dict, timeout: int = 90) -> tuple[in
     if not os.path.isfile(path):
         return 127, "", f"template not found: {path}"
     try:
-        proc = subprocess.run(
+        proc = subprocess.Popen(
             ["node", path],
-            input=json.dumps(args),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             cwd=TEMPLATES_DIR,
-            capture_output=True,
             text=True,
-            timeout=timeout,
+            start_new_session=True,
         )
-        return proc.returncode, proc.stdout, proc.stderr
-    except subprocess.TimeoutExpired:
-        return 124, "", f"timeout after {timeout}s"
     except Exception as e:
         return 1, "", f"{type(e).__name__}:{e}"
+    try:
+        stdout, stderr = proc.communicate(input=json.dumps(args), timeout=timeout)
+        return proc.returncode, stdout, stderr
+    except subprocess.TimeoutExpired:
+        _terminate_template_group(proc)
+        return 124, "", f"timeout after {timeout}s"
+    except Exception as e:
+        _terminate_template_group(proc)
+        return 1, "", f"{type(e).__name__}:{e}"
+    except BaseException:
+        # Cancellation (KeyboardInterrupt, SystemExit): start_new_session keeps a
+        # terminal Ctrl-C from reaching the template's group, so quit it here.
+        _terminate_template_group(proc)
+        raise
+
+
+def _signal_group(pgid: int, sig: int) -> bool:
+    try:
+        os.killpg(pgid, sig)
+    except ProcessLookupError:
+        return False
+    return True
+
+
+def _terminate_template_group(proc: subprocess.Popen[str]) -> None:
+    """SIGTERM the template's whole group (node and the Chrome it launched), wait up to TERM_GRACE_S, then SIGKILL."""
+    if os.name == "nt":
+        proc.terminate()
+        try:
+            proc.wait(timeout=TERM_GRACE_S)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+    else:
+        pgid = proc.pid
+        if _signal_group(pgid, signal.SIGTERM):
+            deadline = time.monotonic() + TERM_GRACE_S
+            while time.monotonic() < deadline:
+                proc.poll()
+                if not _signal_group(pgid, 0):
+                    break
+                time.sleep(0.05)
+            else:
+                _signal_group(pgid, signal.SIGKILL)
+    try:
+        proc.communicate(timeout=TERM_GRACE_S)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.communicate()
 
 
 class _FakeResp:

@@ -37,16 +37,21 @@ describe("dream persona asset", () => {
 })
 
 describe("reflection persona asset", () => {
-  it("#given the source asset #when loaded through assets.ts #then it equals the real source", () => {
+  it("#given the source asset and the packaged plugin copy #when loaded and read #then all copies are identical", () => {
     // given
     const here = dirname(fileURLToPath(import.meta.url))
     const source = readFileSync(join(here, "reflection-persona.md"), "utf8")
 
     // when
     const loaded = loadReflectionPersona().markdown
+    const packaged = readFileSync(
+      join(here, "..", "..", "..", "..", "omo-senpi", "plugin", "extensions", "reflection-persona.md"),
+      "utf8",
+    )
 
     // then
     expect(loaded).toBe(source)
+    expect(packaged).toBe(source)
   })
 
   it("#given the reflection persona asset #when trailer keys are parsed #then the runtime keys are present", () => {

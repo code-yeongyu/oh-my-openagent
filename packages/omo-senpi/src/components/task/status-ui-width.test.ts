@@ -1,11 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
-import {
-  rendererVisibleWidth,
-  type ListedTask,
-  type TaskRecord,
-  type TaskRunStats,
-} from "@oh-my-opencode/senpi-task"
+import { rendererVisibleWidth, type ListedTask, type TaskRecord, type TaskRunStats } from "@oh-my-opencode/senpi-task"
 
 import type { CapturedUi } from "./runtime-context"
 import { createTaskStatusUi, type StatusUiManager } from "./status-ui"
@@ -17,13 +12,13 @@ const task: TaskRecord = {
   root_session_id: "session-a",
   depth: 0,
   execution_mode: "in-process",
-  model: "anthropic/claude-opus-5",
+  model: "anthropic/claude-opus-5-5",
   status: "running",
   category: "unspecified-high",
   resolved_model: {
     provider: "anthropic",
-    model_id: "claude-opus-5",
-    display: "anthropic/claude-opus-5",
+    model_id: "claude-opus-5-5",
+    display: "anthropic/claude-opus-5-5",
     reasoning_effort: "xhigh",
     source: "category",
   },

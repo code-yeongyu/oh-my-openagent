@@ -86,12 +86,7 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
       ],
       userMessageInProgressWindowMs: 2_000,
     })
-    notifier.queuePendingParentWake(
-      "parent-boundary",
-      "task complete",
-      { agent: "sisyphus" },
-      true,
-    )
+    notifier.queuePendingParentWake("parent-boundary", "task complete", { agent: "sisyphus" }, true)
 
     try {
       // when
@@ -123,12 +118,7 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
       ],
       userMessageInProgressWindowMs: 2_000,
     })
-    notifier.queuePendingParentWake(
-      "parent-boundary-open",
-      "task complete",
-      { agent: "sisyphus" },
-      true,
-    )
+    notifier.queuePendingParentWake("parent-boundary-open", "task complete", { agent: "sisyphus" }, true)
 
     try {
       // when
@@ -157,12 +147,7 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
         },
       ],
     })
-    notifier.queuePendingParentWake(
-      "parent-concurrent",
-      "task complete",
-      { agent: "sisyphus" },
-      true,
-    )
+    notifier.queuePendingParentWake("parent-concurrent", "task complete", { agent: "sisyphus" }, true)
 
     // when
     await Promise.all([
@@ -192,18 +177,8 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
         },
       ],
     })
-    notifier.queuePendingParentWake(
-      "parent-burst",
-      "task one complete",
-      { agent: "sisyphus" },
-      false,
-    )
-    notifier.queuePendingParentWake(
-      "parent-burst",
-      "task two complete",
-      { agent: "sisyphus" },
-      true,
-    )
+    notifier.queuePendingParentWake("parent-burst", "task one complete", { agent: "sisyphus" }, false)
+    notifier.queuePendingParentWake("parent-burst", "task two complete", { agent: "sisyphus" }, true)
 
     // when
     await Promise.all([
@@ -288,12 +263,7 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
         },
       ],
     })
-    notifier.queuePendingParentWake(
-      "parent-1",
-      "task complete",
-      { agent: "sisyphus" },
-      true,
-    )
+    notifier.queuePendingParentWake("parent-1", "task complete", { agent: "sisyphus" }, true)
 
     // when
     await notifier.flushPendingParentWake("parent-1")
@@ -326,12 +296,7 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
         },
       ],
     })
-    notifier.queuePendingParentWake(
-      "parent-2",
-      "task complete",
-      { agent: "sisyphus" },
-      true,
-    )
+    notifier.queuePendingParentWake("parent-2", "task complete", { agent: "sisyphus" }, true)
 
     // when
     await notifier.flushPendingParentWake("parent-2")
@@ -400,12 +365,7 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
       ],
       userMessageInProgressWindowMs: 2_000,
     })
-    notifier.queuePendingParentWake(
-      "parent-3",
-      "task complete",
-      { agent: "sisyphus" },
-      true,
-    )
+    notifier.queuePendingParentWake("parent-3", "task complete", { agent: "sisyphus" }, true)
 
     // when
     await notifier.flushPendingParentWake("parent-3")
@@ -430,12 +390,7 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
       ],
       userMessageInProgressWindowMs: 0,
     })
-    notifier.queuePendingParentWake(
-      "parent-4",
-      "task complete",
-      { agent: "sisyphus" },
-      true,
-    )
+    notifier.queuePendingParentWake("parent-4", "task complete", { agent: "sisyphus" }, true)
 
     // when
     await notifier.flushPendingParentWake("parent-4")
@@ -564,12 +519,7 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
         },
       ],
     })
-    notifier.queuePendingParentWake(
-      "parent-internal-tail-tools",
-      "task complete",
-      { agent: "sisyphus" },
-      true,
-    )
+    notifier.queuePendingParentWake("parent-internal-tail-tools", "task complete", { agent: "sisyphus" }, true)
 
     try {
       // when
@@ -608,12 +558,7 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
         },
       ],
     })
-    notifier.queuePendingParentWake(
-      "parent-internal-tail-user-race",
-      "task complete",
-      { agent: "sisyphus" },
-      true,
-    )
+    notifier.queuePendingParentWake("parent-internal-tail-user-race", "task complete", { agent: "sisyphus" }, true)
 
     try {
       // when
@@ -655,12 +600,7 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
         },
       ],
     })
-    notifier.queuePendingParentWake(
-      "parent-mixed-user-race",
-      "task complete",
-      { agent: "sisyphus" },
-      true,
-    )
+    notifier.queuePendingParentWake("parent-mixed-user-race", "task complete", { agent: "sisyphus" }, true)
 
     try {
       // when
@@ -724,20 +664,12 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
         userMessageInProgressWindowMs: 0,
       },
     )
-    notifier.queuePendingParentWake(
-      "parent-accepted-before-return",
-      "task complete",
-      { agent: "sisyphus" },
-      true,
-    )
+    notifier.queuePendingParentWake("parent-accepted-before-return", "task complete", { agent: "sisyphus" }, true)
 
     try {
       // when
       await notifier.flushPendingParentWake("parent-accepted-before-return")
-      const requeued = await notifier.requeueDispatchedParentWake(
-        "parent-accepted-before-return",
-        "late session.error",
-      )
+      const requeued = await notifier.requeueDispatchedParentWake("parent-accepted-before-return", "late session.error")
 
       // then
       expect(requeued).toBe(true)
@@ -801,12 +733,7 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
         userMessageInProgressWindowMs: 0,
       },
     )
-    notifier.queuePendingParentWake(
-      "parent-eof-before-return",
-      "task complete",
-      { agent: "sisyphus" },
-      true,
-    )
+    notifier.queuePendingParentWake("parent-eof-before-return", "task complete", { agent: "sisyphus" }, true)
 
     try {
       // when
@@ -874,20 +801,12 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
         userMessageInProgressWindowMs: 0,
       },
     )
-    notifier.queuePendingParentWake(
-      "parent-tool-call-output",
-      "task complete",
-      { agent: "sisyphus" },
-      true,
-    )
+    notifier.queuePendingParentWake("parent-tool-call-output", "task complete", { agent: "sisyphus" }, true)
 
     try {
       // when
       await notifier.flushPendingParentWake("parent-tool-call-output")
-      const requeued = await notifier.requeueDispatchedParentWake(
-        "parent-tool-call-output",
-        "late session.error",
-      )
+      const requeued = await notifier.requeueDispatchedParentWake("parent-tool-call-output", "late session.error")
 
       // then
       expect(requeued).toBe(false)

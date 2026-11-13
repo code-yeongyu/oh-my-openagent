@@ -77,7 +77,7 @@ describe("omo-native category config capture", () => {
     expect(Object.keys(props ?? {}).sort()).toEqual([...OMO_NATIVE_PROPERTY_ALLOWLISTS.category_config].sort())
   })
 
-  test("#given a disabled category and an unresolvable one #when encoded #then the values are exactly \"disabled\" and \"unavailable\" and every value is at most 64 characters", () => {
+  test('#given a disabled category and an unresolvable one #when encoded #then the values are exactly "disabled" and "unavailable" and every value is at most 64 characters', () => {
     // given: writing disabled outright, and an empty registry so nothing resolves
     const config: OmoConfig = { categories: { writing: { disable: true } } }
 
@@ -88,7 +88,7 @@ describe("omo-native category config capture", () => {
     // then
     const props = captured[0]
     expect(props?.cat_writing).toBe("disabled")
-    expect(props?.cat_deep).toBe("unavailable")
+    expect(props?.cat_deep_low).toBe("unavailable")
     for (const [key, value] of Object.entries(props ?? {})) {
       if (typeof value === "string") expect(value.length, key).toBeLessThanOrEqual(64)
     }
@@ -109,8 +109,11 @@ describe("omo-native category config capture", () => {
   test("#given an unchanged effective map #when observed twice #then only one row ships with a reused generation, and a changed map ships a new generation", () => {
     // given
     const config: OmoConfig = { categories: {} }
-    const models: SenpiModelPort[] = [...FULL_REGISTRY.getAvailable() as readonly SenpiModelPort[]]
-    const { captured, observe } = harness(config, registry2(() => models))
+    const models: SenpiModelPort[] = [...(FULL_REGISTRY.getAvailable() as readonly SenpiModelPort[])]
+    const { captured, observe } = harness(
+      config,
+      registry2(() => models),
+    )
 
     // when
     observe("startup")
@@ -136,7 +139,7 @@ describe("omo-native category config capture", () => {
 
     // when / then
     expect(() => observe("startup")).not.toThrow()
-    expect(captured.map(({ cat_deep }) => cat_deep)).toEqual(["unavailable"])
+    expect(captured.map(({ cat_deep_low }) => cat_deep_low)).toEqual(["unavailable"])
   })
 })
 

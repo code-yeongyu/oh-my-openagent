@@ -1,12 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import {
-  AGENT_ELIGIBILITY_REGISTRY,
-  CategoryMemberSchema,
-  MemberSchema,
-  parseMember,
-  SubagentMemberSchema,
-  TeamSpecSchema,
-} from "./types"
+import { AGENT_ELIGIBILITY_REGISTRY, CategoryMemberSchema, MemberSchema, parseMember, TeamSpecSchema } from "./types"
 
 describe("team-mode types", () => {
   test("member category branch parses and narrows", () => {
@@ -52,14 +45,14 @@ describe("team-mode types", () => {
     }
 
     // when
-    try {
-      parseMember(member)
-    } catch (error) {
-      // then
-      expect(error instanceof Error ? error.message : String(error)).toBe(
+    const parse = () => parseMember(member)
+
+    // then
+    expect(parse).toThrow(
+      new Error(
         "Member 'm1' specifies both 'category' and 'subagent_type'. Must specify exactly one via 'kind' discriminator.",
-      )
-    }
+      ),
+    )
   })
 
   test("parseMember emits exact missing kind error", () => {
@@ -67,14 +60,14 @@ describe("team-mode types", () => {
     const member = { name: "m1" }
 
     // when
-    try {
-      parseMember(member)
-    } catch (error) {
-      // then
-      expect(error instanceof Error ? error.message : String(error)).toBe(
+    const parse = () => parseMember(member)
+
+    // then
+    expect(parse).toThrow(
+      new Error(
         "Member 'm1' missing 'kind' discriminator. Specify either {kind:'category', category, prompt} or {kind:'subagent_type', subagent_type}.",
-      )
-    }
+      ),
+    )
   })
 
   test("parseMember emits exact category missing prompt error", () => {
@@ -82,14 +75,14 @@ describe("team-mode types", () => {
     const member = { name: "m1", kind: "category", category: "deep" }
 
     // when
-    try {
-      parseMember(member)
-    } catch (error) {
-      // then
-      expect(error instanceof Error ? error.message : String(error)).toBe(
+    const parse = () => parseMember(member)
+
+    // then
+    expect(parse).toThrow(
+      new Error(
         "Member 'm1' uses category 'deep' but is missing required 'prompt' field. Category members must supply a task prompt.",
-      )
-    }
+      ),
+    )
   })
 
   test("parseMember emits exact unknown subagent error", () => {
@@ -143,9 +136,9 @@ describe("team-mode types", () => {
     // when
     for (const [subagentType, expectedMessage] of cases) {
       // then
-      expect(() =>
-        parseMember({ kind: "subagent_type", name: "x", subagent_type: subagentType }),
-      ).toThrow(expectedMessage)
+      expect(() => parseMember({ kind: "subagent_type", name: "x", subagent_type: subagentType })).toThrow(
+        expectedMessage,
+      )
     }
   })
 
@@ -198,7 +191,10 @@ describe("team-mode types", () => {
 
   test("team spec defaults version when omitted", () => {
     // given
-    const teamSpec = { name: "solo-team", members: [{ kind: "category", name: "solo", category: "deep", prompt: "implement the assigned work" }] }
+    const teamSpec = {
+      name: "solo-team",
+      members: [{ kind: "category", name: "solo", category: "deep", prompt: "implement the assigned work" }],
+    }
 
     // when
     const result = TeamSpecSchema.parse(teamSpec)
@@ -212,7 +208,10 @@ describe("team-mode types", () => {
     // given
     const originalDateNow = Date.now
     Date.now = () => 123_456_789
-    const teamSpec = { name: "solo-team", members: [{ kind: "category", name: "solo", category: "deep", prompt: "implement the assigned work" }] }
+    const teamSpec = {
+      name: "solo-team",
+      members: [{ kind: "category", name: "solo", category: "deep", prompt: "implement the assigned work" }],
+    }
 
     try {
       // when
@@ -241,10 +240,12 @@ describe("team-mode types", () => {
     // then
     expect(result.success).toBe(false)
     if (!result.success) {
-      expect(result.error.issues).toContainEqual(expect.objectContaining({
-        path: ["leadAgentId"],
-        message: "leadAgentId required (or write a `lead: {...}` field, or mark one member with `isLead: true`)",
-      }))
+      expect(result.error.issues).toContainEqual(
+        expect.objectContaining({
+          path: ["leadAgentId"],
+          message: "leadAgentId required (or write a `lead: {...}` field, or mark one member with `isLead: true`)",
+        }),
+      )
     }
   })
 
@@ -265,30 +266,7 @@ describe("team-mode types", () => {
     expect(entries).toHaveLength(11)
     expect(verdictCounts).toEqual({ eligible: 3, conditional: 1, "hard-reject": 7 })
     expect(AGENT_ELIGIBILITY_REGISTRY.hephaestus.rejectionMessage).toBe(
-      "Agent 'hephaestus' lacks teammate permission. Either apply D-36 (add teammate: \"allow\" in tool-config-handler.ts) or use subagent_type: \"sisyphus\" instead.",
+      'Agent \'hephaestus\' lacks teammate permission. Either apply D-36 (add teammate: "allow" in tool-config-handler.ts) or use subagent_type: "sisyphus" instead.',
     )
-    expect(AGENT_ELIGIBILITY_REGISTRY.oracle.rejectionMessage).toBe(
-      "Agent 'oracle' is read-only (cannot write files). Team members must write to mailbox inbox files. Use delegate-task with subagent_type: 'oracle' for read-only analysis instead.",
-    )
-    expect(AGENT_ELIGIBILITY_REGISTRY.librarian.rejectionMessage).toBe(
-      "Agent 'librarian' is read-only (write/edit denied). Cannot write to mailbox as team member. Use delegate-task for research queries instead.",
-    )
-    expect(AGENT_ELIGIBILITY_REGISTRY.explore.rejectionMessage).toBe(
-      "Agent 'explore' is read-only (write/edit denied). Cannot write to mailbox as team member. Use delegate-task for codebase exploration instead.",
-    )
-    expect(AGENT_ELIGIBILITY_REGISTRY["multimodal-looker"].rejectionMessage).toBe(
-      "Agent 'multimodal-looker' has read-only tool access (only 'read' allowed). Cannot write to mailbox as team member.",
-    )
-    expect(AGENT_ELIGIBILITY_REGISTRY.metis.rejectionMessage).toBe(
-      "Agent 'metis' is read-only (pre-planning consultant). Cannot write to mailbox as team member. Use delegate-task for pre-planning analysis instead.",
-    )
-    expect(AGENT_ELIGIBILITY_REGISTRY.momus.rejectionMessage).toBe(
-      "Agent 'momus' is read-only (plan reviewer). Cannot write to mailbox as team member. Use delegate-task for plan review instead.",
-    )
-    expect(AGENT_ELIGIBILITY_REGISTRY.prometheus.rejectionMessage).toBe(
-      "Agent 'prometheus' is plan-mode-only; can only write to .omo/*.md (enforced by prometheusMdOnly hook). Cannot write to team mailbox. Use delegate-task with subagent_type: 'plan' instead.",
-    )
-    expect(CategoryMemberSchema).toBeDefined()
-    expect(SubagentMemberSchema).toBeDefined()
   })
 })

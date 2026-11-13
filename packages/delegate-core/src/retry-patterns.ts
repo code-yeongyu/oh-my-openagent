@@ -9,7 +9,7 @@ export const DELEGATE_TASK_ERROR_PATTERNS: readonly DelegateTaskErrorPattern[] =
     pattern: "run_in_background",
     errorType: "missing_run_in_background",
     fixHint:
-      "Add run_in_background=false (for delegation) or run_in_background=true (for parallel exploration)",
+      "Add run_in_background=true (the standard spawn) or run_in_background=false for a short child whose result gates your very next call",
   },
   {
     pattern: "load_skills",
@@ -20,8 +20,7 @@ export const DELEGATE_TASK_ERROR_PATTERNS: readonly DelegateTaskErrorPattern[] =
   {
     pattern: "category OR subagent_type",
     errorType: "mutual_exclusion",
-    fixHint:
-      "Provide ONLY one of: category (e.g., 'general', 'quick') OR subagent_type (e.g., 'oracle', 'explore')",
+    fixHint: "Provide ONLY one of: category (e.g., 'general', 'quick') OR subagent_type (e.g., 'oracle', 'explore')",
   },
   {
     pattern: "Must provide either category or subagent_type",
@@ -46,8 +45,7 @@ export const DELEGATE_TASK_ERROR_PATTERNS: readonly DelegateTaskErrorPattern[] =
   {
     pattern: "Cannot call primary agent",
     errorType: "primary_agent",
-    fixHint:
-      "Primary agents cannot be called via task. Use a subagent like 'explore', 'oracle', or 'librarian'",
+    fixHint: "Primary agents cannot be called via task. Use a subagent like 'explore', 'oracle', or 'librarian'",
   },
   {
     pattern: "Skills not found",

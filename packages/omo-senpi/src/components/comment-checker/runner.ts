@@ -4,6 +4,7 @@ import { Readable } from "node:stream"
 
 import {
   runCommentChecker,
+  sendAndCloseStdin,
   type CheckResult,
   type RunCommentCheckerInput,
   type SpawnProcess,
@@ -25,18 +26,13 @@ function spawnCommentChecker(args: readonly string[]): SpawnProcess {
     stdio: ["pipe", "pipe", "pipe"],
     windowsHide: true,
   })
-  const exited = new Promise<number>((resolve) => {
-    subprocess.on("error", () => resolve(1))
+  const exited = new Promise<number>((resolve, reject) => {
+    subprocess.on("error", reject)
     subprocess.on("close", (code) => resolve(code ?? 1))
   })
   return {
     stdin: {
-      write(input: string) {
-        subprocess.stdin.write(input)
-      },
-      end() {
-        subprocess.stdin.end()
-      },
+      send: (input: string) => sendAndCloseStdin(subprocess.stdin, input),
     },
     stdout: Readable.toWeb(subprocess.stdout),
     stderr: Readable.toWeb(subprocess.stderr),

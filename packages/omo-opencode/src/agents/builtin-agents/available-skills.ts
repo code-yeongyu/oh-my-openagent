@@ -18,7 +18,6 @@ export function buildAvailableSkills(
   agentName?: string,
 ): AvailableSkill[] {
   const builtinSkills = createBuiltinSkills({ browserProvider, disabledSkills, teamModeEnabled })
-  const builtinSkillNames = new Set(builtinSkills.map(s => s.name))
 
   const builtinAvailable: AvailableSkill[] = builtinSkills.map((skill) => ({
     name: skill.name,
@@ -27,7 +26,7 @@ export function buildAvailableSkills(
   }))
 
   const discoveredAvailable: AvailableSkill[] = discoveredSkills
-    .filter(s => {
+    .filter((s) => {
       if (disabledSkills && isDisabledSkillAlias(s, disabledSkills)) return false
       // If the skill declares an agent restriction and we know the current agent,
       // exclude skills that don't belong to this agent.
@@ -41,7 +40,7 @@ export function buildAvailableSkills(
     }))
 
   const skillMap = new Map<string, AvailableSkill>()
-  builtinAvailable.forEach(skill => skillMap.set(skill.name, skill))
-  discoveredAvailable.forEach(skill => skillMap.set(skill.name, skill))
+  builtinAvailable.forEach((skill) => skillMap.set(skill.name, skill))
+  discoveredAvailable.forEach((skill) => skillMap.set(skill.name, skill))
   return Array.from(skillMap.values())
 }

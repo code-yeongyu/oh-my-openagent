@@ -14,10 +14,15 @@ type ExpectedNormalTransition = {
   readonly expectedAudit: TaskTransitionResult["audit"]["type"]
 }
 
-const expectedNormalTransitionTable: Record<
-  TaskStatus,
-  Record<NormalTransitionEvent, ExpectedNormalTransition>
-> = {
+const expectedNormalTransitionTable: Record<TaskStatus, Record<NormalTransitionEvent, ExpectedNormalTransition>> = {
+  paused: {
+    start: { expectedApplied: false, expectedStatus: "paused", expectedAudit: "invalid_transition_ignored" },
+    complete: { expectedApplied: false, expectedStatus: "paused", expectedAudit: "invalid_transition_ignored" },
+    fail: { expectedApplied: false, expectedStatus: "paused", expectedAudit: "invalid_transition_ignored" },
+    cancel: { expectedApplied: true, expectedStatus: "cancelled", expectedAudit: "transition_applied" },
+    interrupt: { expectedApplied: false, expectedStatus: "paused", expectedAudit: "invalid_transition_ignored" },
+    lose: { expectedApplied: false, expectedStatus: "paused", expectedAudit: "invalid_transition_ignored" },
+  },
   pending: {
     start: { expectedApplied: true, expectedStatus: "running", expectedAudit: "transition_applied" },
     complete: { expectedApplied: false, expectedStatus: "pending", expectedAudit: "invalid_transition_ignored" },
@@ -81,9 +86,7 @@ describe("transitionTaskRecord exhaustive lifecycle table", () => {
   })
 })
 
-function terminalExpectations(
-  status: TaskStatus,
-): Record<NormalTransitionEvent, ExpectedNormalTransition> {
+function terminalExpectations(status: TaskStatus): Record<NormalTransitionEvent, ExpectedNormalTransition> {
   return {
     start: { expectedApplied: false, expectedStatus: status, expectedAudit: "late_transition_ignored" },
     complete: { expectedApplied: false, expectedStatus: status, expectedAudit: "late_transition_ignored" },

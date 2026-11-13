@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test"
+import { locales } from "../i18n/config"
 
 const VIEWPORTS = [
   { name: "iphone-se", width: 375, height: 667 },
@@ -9,7 +10,7 @@ const VIEWPORTS = [
   { name: "desktop-1920", width: 1920, height: 1080 },
 ] as const
 
-const LOCALES = ["en", "ko", "ja", "zh"] as const
+const LOCALES = locales
 
 async function assertNoHorizontalOverflow(page: Page) {
   const result = await page.evaluate(() => {
@@ -70,6 +71,41 @@ test.describe("Responsive QA matrix — landing", () => {
         await page.setViewportSize({ width: viewport.width, height: viewport.height })
         await page.goto(`${localePrefix}/manifesto`, { waitUntil: "domcontentloaded" })
         await assertNoHorizontalOverflow(page)
+      })
+    }
+  }
+
+  // #12892: the floating nav pill insets its last control (Install, or the menu button where Install hides)
+  // as far from the right edge as the brand mark sits from the left edge, in every locale. A control pushed past
+  // the edge reads as a negative right inset, so the widths beside the section-link breakpoint are swept too.
+  const NAV_WIDTHS = [
+    ...new Set([...VIEWPORTS.map((viewport) => viewport.width), 860, 900, 960, 999, 1000]),
+  ].sort((a, b) => a - b)
+  for (const width of NAV_WIDTHS) {
+    for (const locale of LOCALES) {
+      const localePrefix = locale === "en" ? "" : `/${locale}`
+      test(`${width}px ${locale} nav pill insets both ends equally`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 800 })
+        await page.goto(`${localePrefix}/`, { waitUntil: "domcontentloaded" })
+        const insets = await page.evaluate(async () => {
+          await document.fonts.ready
+          const inner = document.querySelector(".nav__inner")
+          const brand = inner?.querySelector(".brand")
+          const controls = Array.from(inner?.querySelectorAll(".nav__end > *") ?? []).filter(
+            (el) => getComputedStyle(el).display !== "none",
+          )
+          const last = controls.at(-1)
+          if (!inner || !brand || !last) return null
+          const box = inner.getBoundingClientRect()
+          return {
+            left: brand.getBoundingClientRect().left - box.left,
+            right: box.right - last.getBoundingClientRect().right,
+            last: last.className,
+          }
+        })
+        expect(insets, "nav pill, brand or last control missing").not.toBeNull()
+        if (!insets) return
+        expect(Math.abs(insets.right - insets.left), JSON.stringify(insets)).toBeLessThanOrEqual(1)
       })
     }
   }

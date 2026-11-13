@@ -27,7 +27,7 @@ function record(overrides: Partial<TaskRecord> = {}): TaskRecord {
     notification: { run_epoch: 0, notified_epoch: -1 },
     task_seq: 3,
     background_mode: "foreground",
-    category: "deep",
+    category: "deep-low",
     config_generation: 2,
     spawn_spec: { version: 1, cwd: "/repo", prompt: "do the work" },
     resolved_model: {
@@ -110,7 +110,7 @@ describe("delegation_completed projection", () => {
       run_epoch: 0,
       status: "completed",
       start_reason: "initial_spawn",
-      category: "deep",
+      category: "deep-low",
       agent_type: "none",
       owner_kind: "plain_child",
       background_mode: "foreground",
@@ -139,7 +139,7 @@ describe("delegation_completed projection", () => {
     })
   })
 
-  test("#given a publicly known model on an unknown provider #when projected #then the provider is \"custom\" while the model id survives", () => {
+  test('#given a publicly known model on an unknown provider #when projected #then the provider is "custom" while the model id survives', () => {
     // given / when: a shipped model routed through a user-named gateway
     const props = project({
       record: {
@@ -159,7 +159,7 @@ describe("delegation_completed projection", () => {
     expect(props.model_source).toBe("explicit")
   })
 
-  test("#given a privately named model on an unknown provider #when projected #then provider and model_id are both \"custom\"", () => {
+  test('#given a privately named model on an unknown provider #when projected #then provider and model_id are both "custom"', () => {
     // given / when: a fine-tune the user named themselves
     const props = project({
       record: {
@@ -179,7 +179,7 @@ describe("delegation_completed projection", () => {
     expect(props.model_source).toBe("explicit")
   })
 
-  test("#given a record whose run_stats has no cost #when projected #then cost_usd is absent and cost_status is \"unavailable\", and #given a reported zero cost #then cost_usd is 0 with cost_status \"reported\"", () => {
+  test('#given a record whose run_stats has no cost #when projected #then cost_usd is absent and cost_status is "unavailable", and #given a reported zero cost #then cost_usd is 0 with cost_status "reported"', () => {
     // given: usage without any provider-reported cost
     const withoutCost: TaskRunStats = {
       runtime_ms: 10,

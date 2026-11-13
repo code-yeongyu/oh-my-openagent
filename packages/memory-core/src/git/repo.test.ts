@@ -1,15 +1,12 @@
 import { afterEach, describe, expect, it } from "bun:test"
 import { existsSync, realpathSync } from "node:fs"
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { GitExec, GitExecOptions, GitExecResult } from "./index"
-import {
-  DirtyRepoError,
-  GitMemoryRepo,
-  NoEffectiveChangesError,
-  createNodeGitExec,
-} from "./index"
+import { DirtyRepoError, GitMemoryRepo, NoEffectiveChangesError, createNodeGitExec } from "./index"
+import { removeTree } from "../../../../test-support/remove-tree"
+import { disableFixtureAutoMaintenance } from "./test-repo-config.test-support"
 
 const tempDirs: string[] = []
 
@@ -21,7 +18,7 @@ async function createRepo(agentId = "agent-one") {
 
 afterEach(async () => {
   for (const dir of tempDirs.splice(0)) {
-    await rm(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 }).catch(() => undefined)
+    await removeTree(dir, { maxRetries: 20, retryDelay: 250 }).catch(() => undefined)
   }
 })
 
@@ -32,6 +29,7 @@ describe("GitMemoryRepo", () => {
     await repo.init({ seedFiles: [{ relativePath: "system/persona.md", content: "initial\n" }] })
     const committedAt = "2026-08-10T00:00:00.000Z"
     const exec = createNodeGitExec()
+    disableFixtureAutoMaintenance(dir)
     await exec.run(["commit", "--amend", "--no-edit"], {
       cwd: dir,
       timeoutMs: 30_000,
@@ -138,10 +136,22 @@ describe("GitMemoryRepo", () => {
     const { dir } = await createRepo()
     const exec = createNodeGitExec()
     await exec.run(["init"], { cwd: dir, timeoutMs: 30_000 })
-    await exec.run([
-      "-c", "user.name=Bootstrap", "-c", "user.email=bootstrap@example.com",
-      "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-m", "bootstrap",
-    ], { cwd: dir, timeoutMs: 30_000 })
+    disableFixtureAutoMaintenance(dir)
+    await exec.run(
+      [
+        "-c",
+        "user.name=Bootstrap",
+        "-c",
+        "user.email=bootstrap@example.com",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "--allow-empty",
+        "-m",
+        "bootstrap",
+      ],
+      { cwd: dir, timeoutMs: 30_000 },
+    )
     await exec.run(["config", "--local", "commit.gpgsign", "true"], { cwd: dir, timeoutMs: 30_000 })
     const repo = new GitMemoryRepo({ dir, agentId: "agent-one" })
 
@@ -196,14 +206,16 @@ describe("GitMemoryRepo", () => {
 
     // then
     expect(history.map((commit) => commit.sha)).toEqual([second.sha, first.sha])
-    expect(history[0]).toEqual(expect.objectContaining({
-      subject: "remember note",
-      authorName: "Memory Agent",
-      authorEmail: "memory@example.test",
-      committedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
-      trailers: { "Omo-Writer": "memory-tool", "Omo-Session": "session-2", "Omo-Turn": "4" },
-      paths: ["notes.md"],
-    }))
+    expect(history[0]).toEqual(
+      expect.objectContaining({
+        subject: "remember note",
+        authorName: "Memory Agent",
+        authorEmail: "memory@example.test",
+        committedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+        trailers: { "Omo-Writer": "memory-tool", "Omo-Session": "session-2", "Omo-Turn": "4" },
+        paths: ["notes.md"],
+      }),
+    )
     expect(history[1]?.body).toContain("Context: durable")
     expect(history[1]?.trailers).toEqual({
       Context: "durable",
@@ -214,6 +226,35 @@ describe("GitMemoryRepo", () => {
     expect(history[1]?.paths).toEqual(["system/persona.md"])
     expect(filtered.map((commit) => commit.sha)).toEqual([first.sha])
     expect(filtered[0]?.paths).toBeUndefined()
+  })
+
+  it("#given trailers on two commits #when log runs with grep #then only commits whose message carries every string come back", async () => {
+    // given
+    const { dir, repo } = await createRepo()
+    await repo.init({ seedFiles: [{ relativePath: "system/persona.md", content: "---\ndescription: Persona\n---\n" }] })
+    await writeFile(join(dir, "system/persona.md"), "---\ndescription: Persona\n---\nfirst\n")
+    const first = await repo.commitWrite(
+      ["system/persona.md"],
+      "persona\n\nOmo-Writer: memory-tool\nOmo-Session: session-1\nOmo-Turn: 2",
+      { agentId: "agent-one", authorName: "Memory Agent" },
+    )
+    await writeFile(join(dir, "notes.md"), "note\n")
+    const second = await repo.commitWrite(
+      ["notes.md"],
+      "remember note\n\nOmo-Writer: memory-tool\nOmo-Session: session-2\nOmo-Turn: 4",
+      { agentId: "agent-one", authorName: "Memory Agent" },
+    )
+
+    // when
+    const sessionOne = await repo.log({ grep: ["Omo-Writer: memory-tool", "Omo-Session: session-1"] })
+    const nobody = await repo.log({ grep: ["Omo-Writer: memory-tool", "Omo-Session: session-9"] })
+    const both = await repo.log({ grep: ["Omo-Writer: memory-tool"] })
+
+    // then: every string must match (all-match), fixed strings, newest first
+    expect(sessionOne.map((commit) => commit.sha)).toEqual([first.sha])
+    expect(nobody).toEqual([])
+    expect(both.map((commit) => commit.sha)).toEqual([second.sha, first.sha])
+    expect(sessionOne[0]?.paths).toBeUndefined()
   }, 30_000)
 
   it("#given a reflection worktree commit #when it is merged no-ff #then the parent exposes the content and removes the worktree", async () => {
@@ -281,13 +322,9 @@ describe("GitMemoryRepo", () => {
     )
 
     // then - no writer may be lost to a transient lock, and every commit is distinct
-    const rejections = results.flatMap((result) =>
-      result.status === "rejected" ? [String(result.reason)] : [],
-    )
+    const rejections = results.flatMap((result) => (result.status === "rejected" ? [String(result.reason)] : []))
     expect(rejections).toEqual([])
-    const shas = results.flatMap((result) =>
-      result.status === "fulfilled" ? [result.value.sha] : [],
-    )
+    const shas = results.flatMap((result) => (result.status === "fulfilled" ? [result.value.sha] : []))
     expect(new Set(shas).size).toBe(writers)
   }, 30_000)
 
@@ -304,9 +341,7 @@ describe("GitMemoryRepo", () => {
         const shouldFail = (verb === "symbolic-ref" || verb === "commit") && !failedOnce.has(verb)
         if (shouldFail) {
           failedOnce.add(verb)
-          throw new Error(
-            `fatal: cannot lock ref 'HEAD': Unable to create '${dir}/.git/HEAD.lock': File exists.`,
-          )
+          throw new Error(`fatal: cannot lock ref 'HEAD': Unable to create '${dir}/.git/HEAD.lock': File exists.`)
         }
         return inner.run(argv, options)
       }
@@ -321,7 +356,6 @@ describe("GitMemoryRepo", () => {
     expect(head).toMatch(/^[0-9a-f]{7,}$/)
     expect(failedOnce.has("symbolic-ref")).toBe(true)
   }, 30_000)
-
 })
 
 async function rejectedError(operation: Promise<unknown>): Promise<Error> {

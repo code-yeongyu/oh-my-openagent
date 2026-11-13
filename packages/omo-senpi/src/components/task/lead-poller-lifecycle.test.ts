@@ -44,20 +44,32 @@ function harness(options: { readonly withCoordinator?: boolean } = {}) {
       sendUserMessage: (content: unknown) => userMessages.push(String(content)),
     } as never,
     logger: { info: () => undefined, warn: () => undefined, error: () => undefined },
-    coordinator: options.withCoordinator === false
-      ? undefined
-      : {
-          enqueue: (injection) => injected.push(injection),
-          scheduleFlush: () => { scheduled += 1 },
-          flushSoon: () => { soon += 1 },
-        },
+    coordinator:
+      options.withCoordinator === false
+        ? undefined
+        : {
+            enqueue: (injection) => {
+              injected.push(injection)
+              return true
+            },
+            scheduleFlush: () => {
+              scheduled += 1
+            },
+            flushSoon: () => {
+              soon += 1
+            },
+          },
     createPoller: (input) => {
       const poller: FakePoller = {
         teamRunId: input.teamRunId,
         polls: 0,
         shutdowns: 0,
-        pollOnce: async () => { poller.polls += 1 },
-        shutdown: () => { poller.shutdowns += 1 },
+        pollOnce: async () => {
+          poller.polls += 1
+        },
+        shutdown: () => {
+          poller.shutdowns += 1
+        },
       }
       created.push({ input, poller })
       return poller
@@ -68,7 +80,9 @@ function harness(options: { readonly withCoordinator?: boolean } = {}) {
     },
     scheduleInterval: (tick, ms) => {
       intervals.push({ tick, ms })
-      return () => { intervalDisposals += 1 }
+      return () => {
+        intervalDisposals += 1
+      }
     },
   })
 
@@ -81,13 +95,27 @@ function harness(options: { readonly withCoordinator?: boolean } = {}) {
     journal,
     userMessages,
     sentMessages,
-    get scheduled() { return scheduled },
-    get soon() { return soon },
-    get intervalDisposals() { return intervalDisposals },
-    setSessionId: (value: string | undefined) => { sessionId = value },
-    setState: (value: ReturnType<TaskRuntimeContext["parentState"]>) => { state = value },
-    setSessionFile: (value: string | undefined) => { sessionFile = value },
-    setTeams: (value: typeof teams) => { teams = value },
+    get scheduled() {
+      return scheduled
+    },
+    get soon() {
+      return soon
+    },
+    get intervalDisposals() {
+      return intervalDisposals
+    },
+    setSessionId: (value: string | undefined) => {
+      sessionId = value
+    },
+    setState: (value: ReturnType<TaskRuntimeContext["parentState"]>) => {
+      state = value
+    },
+    setSessionFile: (value: string | undefined) => {
+      sessionFile = value
+    },
+    setTeams: (value: typeof teams) => {
+      teams = value
+    },
   }
 }
 
@@ -111,6 +139,7 @@ describe("lead poller lifecycle", () => {
       {
         message: {
           customType: "senpi-task:team-message",
+          details: { runRef: { kind: "team", id: "run-owned" } },
           content: '<peer_message from="worker" to="lead" messageId="m1">ready</peer_message>',
           display: false,
         },
@@ -314,10 +343,43 @@ describe("lead poller lifecycle", () => {
     expect(h.intervalDisposals).toBe(1)
     expect(h.created[0]?.poller.shutdowns).toBe(1)
   })
+
+  test("#given no owned teams #when the sync runs #then the poll stands down until kick re-arms it", async () => {
+    // given
+    const h = harness()
+    h.setTeams([])
+
+    // when
+    await h.lifecycle.tick()
+
+    // then: the 1 Hz interval is disposed and further syncs stay in standby
+    expect(h.intervalDisposals).toBe(1)
+    const armed = h.intervals.length
+    await h.lifecycle.tick()
+    expect(h.intervals.length).toBe(armed)
+
+    // when: a team appears and the tool layer kicks
+    h.setTeams([ownedTeam("run-new")])
+    h.lifecycle.kick()
+
+    // then: the poll re-arms and the new team is picked up
+    expect(h.intervals.length).toBe(armed + 1)
+    await h.lifecycle.tick()
+    expect(h.created.some((entry) => entry.input.teamRunId === "run-new")).toBe(true)
+    h.lifecycle.shutdown()
+  })
 })
 
 function messageFrom(from: string): Message {
-  return { version: 1, messageId: "11111111-1111-4111-8111-111111111111", from, to: "lead", kind: "message", body: "done", timestamp: 1 }
+  return {
+    version: 1,
+    messageId: "11111111-1111-4111-8111-111111111111",
+    from,
+    to: "lead",
+    kind: "message",
+    body: "done",
+    timestamp: 1,
+  }
 }
 
 function injection(key: string): LeadInjection {

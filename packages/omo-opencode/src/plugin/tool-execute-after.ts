@@ -1,14 +1,9 @@
 import { recoverToolMetadata } from "../features/tool-metadata-store"
-import { buildCodegraphInitGuidanceForToolResult } from "@oh-my-opencode/utils"
 import type { CreatedHooks } from "../create-hooks"
 import { log as defaultLog } from "../shared/logger"
 import type { PluginContext } from "./types"
 
-const METADATA_LINKED_TOOLS = new Set([
-  "background_output",
-  "edit",
-  "task",
-])
+const METADATA_LINKED_TOOLS = new Set(["background_output", "edit", "task"])
 
 type ToolExecuteAfterInput = {
   readonly tool: string
@@ -36,53 +31,23 @@ function getMetadataString(metadata: Record<string, unknown> | undefined, keys: 
   return undefined
 }
 
-function getPluginDirectory(ctx: PluginContext): string | null {
-  if (typeof ctx === "object" && ctx !== null && "directory" in ctx && typeof ctx.directory === "string") {
-    return ctx.directory
-  }
-
-  return null
-}
-
 function expectsRecoverableMetadata(tool: string): boolean {
   return METADATA_LINKED_TOOLS.has(tool)
-}
-
-function appendCodegraphInitGuidance(
-  input: ToolExecuteAfterInput,
-  output: ToolExecuteAfterOutput,
-  cwd: string | null,
-): void {
-  const guidance = buildCodegraphInitGuidanceForToolResult({
-    cwd: cwd ?? undefined,
-    toolName: input.tool,
-    toolOutput: output.output,
-  })
-  if (guidance === null || output.output.includes(guidance)) return
-  output.output = `${output.output}\n\n${guidance}`
 }
 
 export function createToolExecuteAfterHandler(args: {
   ctx: PluginContext
   hooks: CreatedHooks
   log?: typeof defaultLog
-}): (
-  input: ToolExecuteAfterInput,
-  output: ToolExecuteAfterOutput | undefined,
-) => Promise<void> {
-  const { ctx, hooks } = args
+}): (input: ToolExecuteAfterInput, output: ToolExecuteAfterOutput | undefined) => Promise<void> {
+  const { hooks } = args
   const log = args.log ?? defaultLog
 
   // OpenCode injects tool call ids into execute() context and after-hook input via undocumented runtime fields.
   // We must treat their identity as a best-effort correlation key, not a guaranteed public contract.
 
-  return async (
-    input: ToolExecuteAfterInput,
-    output: ToolExecuteAfterOutput | undefined,
-  ): Promise<void> => {
+  return async (input: ToolExecuteAfterInput, output: ToolExecuteAfterOutput | undefined): Promise<void> => {
     if (!output) return
-
-    appendCodegraphInitGuidance(input, output, getPluginDirectory(ctx))
 
     const hookInput = {
       tool: input.tool,
@@ -99,12 +64,15 @@ export function createToolExecuteAfterHandler(args: {
       }
       if (stored.metadata) {
         if (nativeSessionId) {
-          log("[tool-execute-after] Native output metadata already includes session linkage; preserving native metadata precedence", {
-            tool: input.tool,
-            sessionID: input.sessionID,
-            callID: input.callID ?? input.callId ?? input.call_id,
-            nativeSessionId,
-          })
+          log(
+            "[tool-execute-after] Native output metadata already includes session linkage; preserving native metadata precedence",
+            {
+              tool: input.tool,
+              sessionID: input.sessionID,
+              callID: input.callID ?? input.callId ?? input.call_id,
+              nativeSessionId,
+            },
+          )
           output.metadata = { ...stored.metadata, ...output.metadata }
         } else {
           output.metadata = { ...output.metadata, ...stored.metadata }
@@ -127,6 +95,7 @@ export function createToolExecuteAfterHandler(args: {
       await hooks.directoryReadmeInjector?.["tool.execute.after"]?.(hookInput, output)
       await hooks.rulesInjector?.["tool.execute.after"]?.(hookInput, output)
       await hooks.emptyTaskResponseDetector?.["tool.execute.after"]?.(hookInput, output)
+      await hooks.momusReviewPersistence?.["tool.execute.after"]?.(hookInput, output)
       await hooks.agentUsageReminder?.["tool.execute.after"]?.(hookInput, output)
       await hooks.categorySkillReminder?.["tool.execute.after"]?.(hookInput, output)
       await hooks.interactiveBashSession?.["tool.execute.after"]?.(hookInput, output)

@@ -1,0 +1,38 @@
+{
+  "categories": {
+    "unspecified-low": {
+      "models": [
+        "chatgpt-subscription/gpt-5.6-luna-fast",
+        "anthropic/claude-opus-5"
+      ]
+    },
+    "my-custom-lane": {
+      "models": [
+        "anthropic-subscription/claude-opus-5",
+        "openai/gpt-6-astra"
+      ]
+    }
+  },
+  "default_model": "anthropic-subscription/claude-opus-5",
+  "disabled_providers": [
+    "chatgpt-subscription"
+  ],
+  "retry": {
+    "fallback_chains": {
+      "anthropic-subscription/claude-opus-5": [
+        "anthropic-subscription/claude-opus-5",
+        "anthropic/claude-opus-4"
+      ]
+    }
+  },
+  "some_unrelated_key": {
+    "keep": "me",
+    "nested": [
+      1,
+      2,
+      {
+        "untouched": true
+      }
+    ]
+  }
+}

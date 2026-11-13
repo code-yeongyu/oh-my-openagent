@@ -1,0 +1,38 @@
+{
+  "categories": {
+    "unspecified-low": {
+      "models": [
+        "openai-codex/gpt-5.6-luna-fast",
+        "anthropic/claude-opus-5"
+      ]
+    },
+    "my-custom-lane": {
+      "models": [
+        "claude-sdk-oauth/claude-opus-5",
+        "openai/gpt-6-astra"
+      ]
+    }
+  },
+  "default_model": "claude-sdk-oauth/claude-opus-5",
+  "disabled_providers": [
+    "openai-codex"
+  ],
+  "retry": {
+    "fallback_chains": {
+      "claude-sdk-oauth/claude-opus-5": [
+        "claude-sdk-oauth/claude-opus-5",
+        "anthropic/claude-opus-4"
+      ]
+    }
+  },
+  "some_unrelated_key": {
+    "keep": "me",
+    "nested": [
+      1,
+      2,
+      {
+        "untouched": true
+      }
+    ]
+  }
+}

@@ -43,7 +43,13 @@ function matchesShape(schema: Schema, value: unknown): boolean {
   if (def.type === "object" || def.type === "record") return isPlainRecord(value)
   if (def.type === "array" || def.type === "tuple") return Array.isArray(value)
   if (def.type === "union") return def.options?.some((option) => matchesShape(option, value)) ?? false
-  if (def.type === "intersection") return def.left !== undefined && def.right !== undefined && matchesShape(def.left, value) && matchesShape(def.right, value)
+  if (def.type === "intersection")
+    return (
+      def.left !== undefined &&
+      def.right !== undefined &&
+      matchesShape(def.left, value) &&
+      matchesShape(def.right, value)
+    )
   if (def.type === "string") return typeof value === "string"
   if (def.type === "number") return typeof value === "number"
   if (def.type === "boolean") return typeof value === "boolean"
@@ -57,7 +63,7 @@ function unknownPaths(schema: Schema, value: unknown, path: UnknownKeyPath): rea
   if (def.type === "object" && isPlainRecord(value) && def.shape !== undefined) {
     const catchall = def.catchall !== undefined && definition(def.catchall).type !== "never" ? def.catchall : undefined
     return Object.entries(value).flatMap(([key, entry]) => {
-      const propertySchema = def.shape?.[key]
+      const propertySchema = def.shape !== undefined && Object.hasOwn(def.shape, key) ? def.shape[key] : undefined
       if (propertySchema !== undefined) return unknownPaths(propertySchema, entry, [...path, key])
       if (catchall !== undefined) return unknownPaths(catchall, entry, [...path, key])
       return [[...path, key]]
@@ -87,9 +93,12 @@ function unknownPaths(schema: Schema, value: unknown, path: UnknownKeyPath): rea
     const candidates = (def.options ?? [])
       .filter((option) => matchesShape(option, value))
       .map((option) => unknownPaths(option, value, path))
-    return candidates.reduce<readonly UnknownKeyPath[] | undefined>((best, candidate) => (
-      best === undefined || candidate.length < best.length ? candidate : best
-    ), undefined) ?? []
+    return (
+      candidates.reduce<readonly UnknownKeyPath[] | undefined>(
+        (best, candidate) => (best === undefined || candidate.length < best.length ? candidate : best),
+        undefined,
+      ) ?? []
+    )
   }
 
   if (def.type === "intersection" && def.left !== undefined && def.right !== undefined) {

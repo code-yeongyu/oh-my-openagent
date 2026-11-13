@@ -10,7 +10,9 @@ describe("star-request", () => {
     const command = formatGitHubStarCommand(repository)
 
     // then
-    expect(command).toBe("gh api --silent --method PUT /user/starred/code-yeongyu/oh-my-openagent >/dev/null 2>&1 || true")
+    expect(command).toBe(
+      "gh api --silent --method PUT /user/starred/code-yeongyu/oh-my-openagent >/dev/null 2>&1 || true",
+    )
   })
 
   test("stars only the OpenCode repository for opencode platform", async () => {
@@ -58,12 +60,12 @@ describe("star-request", () => {
     expect(results).toEqual(STAR_REPOSITORIES.map((repository) => ({ repository, ok: true })))
   })
 
-  test("stars the default repositories for senpi platform without adding a new repo", async () => {
+  test("stars the default repositories for the native-dev platform without adding a new repo", async () => {
     // given
     const starred: string[] = []
 
     // when
-    const results = await starGitHubRepositories("senpi", async (repository) => {
+    const results = await starGitHubRepositories("native-dev", async (repository) => {
       starred.push(repository)
     })
 

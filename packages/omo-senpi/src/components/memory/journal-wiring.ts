@@ -31,14 +31,18 @@ export interface MemoryJournalWiringOptions {
 export interface MemoryJournalWiring {
   register(pi: SenpiExtensionAPI): void
   journalFor(sessionId: string): TranscriptJournal
-  reconcileSession(eventCtx: unknown): Promise<AppendResult>
+  reconcileSession(eventCtx: unknown, signal?: AbortSignal): Promise<AppendResult>
 }
 
 const NOOP_APPEND: AppendResult = { appended: 0, skipped: 0 }
 
-// Memory-owned hidden custom-message channels (memorian recall hints, memory notices). Any other
+// Memory-owned hidden custom-message channels (kibitzer recall hints, memory notices). Any other
 // custom message belongs to a foreign extension and is admitted like any other entry.
-const EXCLUDED_CUSTOM_TYPES: ReadonlySet<string> = new Set([RECALL_CUSTOM_TYPE, MEMORY_NOTICE_CUSTOM_TYPE])
+const EXCLUDED_CUSTOM_TYPES: ReadonlySet<string> = new Set([
+  RECALL_CUSTOM_TYPE,
+  "omo-memorian:recall",
+  MEMORY_NOTICE_CUSTOM_TYPE,
+])
 
 function isJournalLockFailure(error: unknown): boolean {
   if (error instanceof JournalLockTimeoutError) return true
@@ -48,7 +52,12 @@ function isJournalLockFailure(error: unknown): boolean {
 
 export function createMemoryJournalWiring(options: MemoryJournalWiringOptions): MemoryJournalWiring {
   const createJournal =
-    options.createJournal ?? ((journalDir: string) => new TranscriptJournal({ journalDir }))
+    options.createJournal ??
+    ((journalDir: string) =>
+      new TranscriptJournal({
+        journalDir,
+        warn: (message, fields) => options.logger?.warn(message, { ...fields }),
+      }))
   const journals = new Map<string, TranscriptJournal>()
 
   function journalFor(sessionId: string): TranscriptJournal {
@@ -59,11 +68,11 @@ export function createMemoryJournalWiring(options: MemoryJournalWiringOptions): 
     return journal
   }
 
-  async function reconcileSession(eventCtx: unknown): Promise<AppendResult> {
+  async function reconcileSession(eventCtx: unknown, signal?: AbortSignal): Promise<AppendResult> {
     const surface = readBranchSurface(eventCtx)
     if (surface === undefined) return NOOP_APPEND
     try {
-      return await journalFor(surface.sessionId).reconcile(projectSessionEntries(surface.entries))
+      return await journalFor(surface.sessionId).reconcile(projectSessionEntries(surface.entries), signal)
     } catch (error: unknown) {
       // A contended journal lock is best-effort bookkeeping: the next settle or session_start
       // reconcile is idempotent (keyed by source_line_id), so degrade instead of surfacing an
@@ -94,7 +103,7 @@ interface BranchSurface {
   readonly entries: readonly unknown[]
 }
 
-function readBranchSurface(eventCtx: unknown): BranchSurface | undefined {
+export function readBranchSurface(eventCtx: unknown): BranchSurface | undefined {
   if (!isRecord(eventCtx)) return undefined
   const manager = eventCtx.sessionManager
   if (!isRecord(manager)) return undefined
@@ -155,7 +164,7 @@ function sessionMessageOf(entry: unknown): SessionMessage | undefined {
   const role = stringOf(body.role)
   if (role === undefined) return undefined
   // Memory-owned hidden channels, never conversation. The journal feeds BOTH the facts queue
-  // payload and the reflection/dream snapshot, so a role-custom memorian recall hint must never
+  // payload and the reflection/dream snapshot, so a role-custom kibitzer recall hint must never
   // be extracted back into memory as if the session had said it. Senpi writes these as
   // `custom_message` entries (already dropped by the type gate); this covers the role-custom
   // `message` shape forks and older writers can leave behind. Foreign custom messages are not
@@ -170,9 +179,8 @@ function assistantProjection(
   toolResults: ReadonlyMap<string, { readonly resultText: string; readonly resultOk: boolean }>,
 ): TranscriptProjection {
   const content = body.content
-  const textBlocks: string[] = typeof content === "string" && content.trim().length > 0
-    ? [content]
-    : textBlocksOf(content)
+  const textBlocks: string[] =
+    typeof content === "string" && content.trim().length > 0 ? [content] : textBlocksOf(content)
   const reasoningBlocks: ProjectedReasoning[] = []
   const toolCalls: ProjectedToolCall[] = []
   if (Array.isArray(content)) {
@@ -197,9 +205,7 @@ function assistantProjection(
         callId,
         ...(name === undefined ? {} : { name }),
         ...(argsText === undefined ? {} : { argsText }),
-        ...(result === undefined
-          ? {}
-          : { resultText: result.resultText, resultOk: result.resultOk }),
+        ...(result === undefined ? {} : { resultText: result.resultText, resultOk: result.resultOk }),
       })
     }
   }

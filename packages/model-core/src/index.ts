@@ -1,4 +1,5 @@
 export * from "./model-requirements"
+export * from "./latest-models"
 export * from "./model-family-detectors"
 export * from "./model-capability-aliases"
 export * from "./model-capability-heuristics"
@@ -10,11 +11,7 @@ export type {
   ModelResolutionProvenance,
   ModelResolutionResult,
 } from "./model-resolution-types"
-export type {
-  ModelResolutionInput,
-  ModelSource,
-  ExtendedModelResolutionInput,
-} from "./model-resolver"
+export type { ModelResolutionInput, ModelSource, ExtendedModelResolutionInput } from "./model-resolver"
 export {
   resolveModel,
   resolveModelWithFallback,
@@ -26,19 +23,10 @@ export * from "./model-normalization"
 export * from "./reasoning-level"
 export * from "./model-string-parser"
 export * from "./model-sanitizer"
-export {
-	fuzzyMatchModel,
-	isModelAvailable,
-} from "./model-availability"
-export {
-	transformModelForProvider,
-	transformModelForProviderDisplay,
-} from "./provider-model-id-transform"
+export { fuzzyMatchModel, isModelAvailable } from "./model-availability"
+export { transformModelForProvider, transformModelForProviderDisplay } from "./provider-model-id-transform"
 export * from "./fallback-chain-from-models"
-export {
-  _setModelResolutionLogImplementationForTesting,
-  resolveModelPipeline,
-} from "./model-resolution-pipeline"
+export { _setModelResolutionLogImplementationForTesting, resolveModelPipeline } from "./model-resolution-pipeline"
 export type {
   ModelResolutionRequest as PipelineModelResolutionRequest,
   ModelResolutionProvenance as PipelineModelResolutionProvenance,
@@ -52,5 +40,6 @@ export * from "./provider-exhaustion-fallback-policy"
 export * from "./runtime-fallback-model"
 export * from "./model-capabilities"
 export * from "./context-limit-resolver"
+export * from "./context-overflow"
 export * from "./model-capabilities-snapshot"
 export * from "./parse-model-suggestion"

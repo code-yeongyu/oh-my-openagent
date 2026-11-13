@@ -4,9 +4,8 @@ import { isAbsolute, relative, sep } from "node:path"
 
 import { validateMemoryPath } from "@oh-my-opencode/memory-core"
 
-import type { SenpiExtensionAPI } from "../../../extension/types"
 import { selectRecentDreamConversations } from "../dream-selector"
-import { resolveDreamTriggerSettings } from "../dream-trigger"
+import { resolveDreamTriggerSettings } from "../dream-trigger-gates"
 import { parseCommandArgs } from "./args"
 import { stageDreamTranscript } from "./dream-staging"
 import {
@@ -16,13 +15,13 @@ import {
   type MemoryCommandContext,
   type MemoryCommandDeps,
 } from "./types"
+import { LAZY_MEMORY_COMMANDS, type MemoryCommandPort } from "./metadata"
 
 const MODE_FLAGS = ["auto", "recent", "conversation", "from"] as const
 
-export function registerDreamCommand(pi: SenpiExtensionAPI, deps: MemoryCommandDeps): void {
+export function registerDreamCommand(pi: MemoryCommandPort, deps: MemoryCommandDeps): void {
   pi.registerCommand("dream", {
-    description: "Request a manual multi-conversation memory dream run.",
-    argumentHint: "[--auto | --recent N | --conversation <ids> | --from transcript:<path>] [--to <doc>] [focus]",
+    ...LAZY_MEMORY_COMMANDS.dream,
     handler: async (args: string, ctx: MemoryCommandContext): Promise<string> => {
       const identity = requireIdentity(deps, ctx)
       if (typeof identity === "string") return respond(ctx, identity, "error")
@@ -49,13 +48,17 @@ export function registerDreamCommand(pi: SenpiExtensionAPI, deps: MemoryCommandD
         if (parsed.flags.has("recent")) {
           const recentN = positiveInteger(parsed.flags.get("recent"), "--recent")
           const settings = resolveDreamTriggerSettings(deps.loadSettings().settings, identity.identity)
-          const selected = await selectRecentDreamConversations({
-            transcriptsDir: identity.identityPaths.transcripts,
-            currentConversationId: ctx.sessionManager?.getSessionId(),
-            autoSelectMax: settings.autoSelectMax,
-            autoSelectMaxBytes: settings.autoSelectMaxChars,
-            now: () => new Date(deps.now?.() ?? Date.now()),
-          }, recentN, { ...(focus.length === 0 ? {} : { focus }) })
+          const selected = await selectRecentDreamConversations(
+            {
+              transcriptsDir: identity.identityPaths.transcripts,
+              currentConversationId: ctx.sessionManager?.getSessionId(),
+              autoSelectMax: settings.autoSelectMax,
+              autoSelectMaxBytes: settings.autoSelectMaxChars,
+              now: () => new Date(deps.now?.() ?? Date.now()),
+            },
+            recentN,
+            { ...(focus.length === 0 ? {} : { focus }) },
+          )
           if (selected.conversationIds.length === 0) throw new TypeError("--recent found no unreflected conversations")
           conversationIds = selected.conversationIds
         } else if (parsed.flags.has("conversation")) {
@@ -118,7 +121,10 @@ function positiveInteger(value: string | true | undefined, flag: string): number
 }
 
 function conversationList(value: string | true | undefined): string[] {
-  const ids = requiredValue(value, "--conversation").split(",").map((id) => id.trim()).filter(Boolean)
+  const ids = requiredValue(value, "--conversation")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean)
   if (ids.length === 0) throw new TypeError("--conversation expects one or more comma-separated ids")
   return [...new Set(ids)]
 }
@@ -131,6 +137,8 @@ function requiredValue(value: string | true | undefined, flag: string): string {
 function dreamRejection(rejection: string): string {
   if (rejection === "no_unreflected_content") return "dream found no unreflected content to process"
   if (rejection === "no_session") return "dreaming is not available without a bound memory session"
+  if (rejection === "parked")
+    return "automatic memory reflection is paused after repeated failures; run /reflect to retry now"
   return `dream request was not started: ${rejection}`
 }
 

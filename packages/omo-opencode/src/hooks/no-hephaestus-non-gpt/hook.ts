@@ -1,10 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { isGptModel } from "../../agents/types"
-import {
-  getSessionAgent,
-  resolveRegisteredAgentName,
-  updateSessionAgent,
-} from "../../features/claude-code-session-state"
+import { getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 
@@ -18,34 +14,44 @@ type NoHephaestusNonGptHookOptions = {
   allowNonGptModel?: boolean
 }
 
-function showToast(ctx: PluginInput, sessionID: string, variant: "error" | "warning"): void {
-  ctx.client.tui.showToast({
-    body: {
-      title: TOAST_TITLE,
-      message: TOAST_MESSAGE,
-      variant,
-      duration: 10000,
-    },
-  }).catch((error) => {
-    log("[no-hephaestus-non-gpt] Failed to show toast", {
-      sessionID,
-      error,
-    })
-  })
+export class HephaestusRequiresGptError extends Error {
+  override readonly name = "HephaestusRequiresGptError"
+
+  constructor(modelID: string) {
+    super(`Hephaestus requires a GPT-family model (got ${modelID}). Use Sisyphus for non-GPT models.`)
+  }
 }
 
-export function createNoHephaestusNonGptHook(
-  ctx: PluginInput,
-  options?: NoHephaestusNonGptHookOptions,
-) {
+function showToast(ctx: PluginInput, sessionID: string, variant: "error" | "warning"): void {
+  ctx.client.tui
+    .showToast({
+      body: {
+        title: TOAST_TITLE,
+        message: TOAST_MESSAGE,
+        variant,
+        duration: 10000,
+      },
+    })
+    .catch((error) => {
+      log("[no-hephaestus-non-gpt] Failed to show toast", {
+        sessionID,
+        error,
+      })
+    })
+}
+
+export function createNoHephaestusNonGptHook(ctx: PluginInput, options?: NoHephaestusNonGptHookOptions) {
   return {
-    "chat.message": async (input: {
-      sessionID: string
-      agent?: string
-      model?: { providerID: string; modelID: string }
-    }, output?: {
-      message?: { agent?: string; [key: string]: unknown }
-    }): Promise<void> => {
+    "chat.message": async (
+      input: {
+        sessionID: string
+        agent?: string
+        model?: { providerID: string; modelID: string }
+      },
+      output?: {
+        message?: { agent?: string; [key: string]: unknown }
+      },
+    ): Promise<void> => {
       const rawAgent = input.agent ?? getSessionAgent(input.sessionID) ?? ""
       const agentKey = getAgentConfigKey(rawAgent)
       const modelID = input.model?.modelID
@@ -56,11 +62,13 @@ export function createNoHephaestusNonGptHook(
         if (allowNonGptModel) {
           return
         }
-        input.agent = resolveRegisteredAgentName("sisyphus") ?? "sisyphus"
-        if (output?.message) {
-          output.message.agent = resolveRegisteredAgentName("sisyphus") ?? "sisyphus"
-        }
-        updateSessionAgent(input.sessionID, "sisyphus")
+        const error = new HephaestusRequiresGptError(modelID)
+        log("[no-hephaestus-non-gpt] Refusing non-GPT Hephaestus primary", {
+          sessionID: input.sessionID,
+          modelID,
+          error: error.message,
+        })
+        throw error
       }
     },
   }

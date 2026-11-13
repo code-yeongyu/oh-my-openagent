@@ -10,8 +10,8 @@ The `task` tool implementation delegates work to subagents via background or syn
 
 | Mode | Flow | Use Case |
 |------|------|----------|
-| **Background** (`run_in_background=true`) | Launch → BackgroundManager → poll → notify parent | Explore, librarian, parallel work |
-| **Sync** (`run_in_background=false`) | Create session → send prompt → poll until idle → return result | Sequential tasks needing immediate result |
+| **Background** (`run_in_background=true`) | Launch → BackgroundManager → poll → notify parent | The standard spawn for every target (explore, librarian, categories); the parent keeps working or ends its response and the completion notification wakes it |
+| **Sync** (`run_in_background=false`) | Create session → send prompt → poll until idle → return result | A short child whose result gates the parent's very next call |
 
 ## KEY FILES
 

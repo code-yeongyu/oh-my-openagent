@@ -79,7 +79,7 @@ export class AtlasLifecycleStore {
   cleanupSession(sessionID: string): void {
     const state = this.sessions.get(sessionID)
     if (state) state.lifecycleActive = false
-    if (state?.pendingRetryTimer) clearTimeout(state.pendingRetryTimer)
+    state?.pendingRetryTimer?.cancel()
     this.sessions.delete(sessionID)
     this.lastAccessedAt.delete(sessionID)
     for (const callID of this.sessionCallIDs.get(sessionID) ?? []) this.clearPendingCall(callID)
@@ -99,8 +99,18 @@ export class AtlasLifecycleStore {
     this.sessionCallIDs.clear()
   }
 
-  get sizes(): { readonly sessions: number; readonly pendingCalls: number; readonly sessionIndexes: number; readonly hasPruneInterval: boolean } {
-    return { sessions: this.sessions.size, pendingCalls: this.pendingCalls.size, sessionIndexes: this.sessionCallIDs.size, hasPruneInterval: this.pruneInterval !== undefined }
+  get sizes(): {
+    readonly sessions: number
+    readonly pendingCalls: number
+    readonly sessionIndexes: number
+    readonly hasPruneInterval: boolean
+  } {
+    return {
+      sessions: this.sessions.size,
+      pendingCalls: this.pendingCalls.size,
+      sessionIndexes: this.sessionCallIDs.size,
+      hasPruneInterval: this.pruneInterval !== undefined,
+    }
   }
 
   private replaceCall(callID: string, call: PendingAtlasCall): void {
@@ -129,7 +139,8 @@ export class AtlasLifecycleStore {
     const now = Date.now()
     for (const sessionID of this.sessions.keys()) {
       const lastAccessedAt = this.lastAccessedAt.get(sessionID)
-      if (lastAccessedAt !== undefined && now - lastAccessedAt > ATLAS_SESSION_STATE_TTL_MS) this.cleanupSession(sessionID)
+      if (lastAccessedAt !== undefined && now - lastAccessedAt > ATLAS_SESSION_STATE_TTL_MS)
+        this.cleanupSession(sessionID)
     }
   }
 }

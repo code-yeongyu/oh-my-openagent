@@ -134,11 +134,16 @@ describe("buildTaskExecute spawn", () => {
           categories: {},
           agents: {},
           task: {
+            isolation: { enabled: false, backend: "auto", apply: true, merge: "patch", commits: "generic" },
             default_execution_mode: "process",
+            process_runner: "host",
+            host_engine_policy: "upgrade",
+            host_shard_prewarm: "off",
             default_concurrency: 5,
             global_concurrency: 8,
             max_depth: 1,
             residency_max_children: 8,
+            resident_idle_timeout_ms: 900000,
             ttl_ms: 86400000,
             resume_children: true,
             wait: { min_ms: 5000, default_ms: 60000, max_ms: 600000 },
@@ -179,7 +184,7 @@ describe("buildTaskExecute spawn", () => {
       }),
     )
 
-    const result = await execute("c", { prompt: "p", subagent_type: "momus" }, undefined, undefined, CTX)
+    const result = await execute("c", { prompt: "p", subagent_type: "plan-reviewer" }, undefined, undefined, CTX)
 
     expect(waitForId).toBe("st_00000004")
     const text = result.content[0]?.type === "text" ? result.content[0].text : ""
@@ -219,12 +224,17 @@ describe("buildTaskExecute spawn", () => {
     const execute = buildTaskExecute(makeDeps(manager))
 
     // when
-    const result = await execute("call-resolved-fg", { prompt: "finish", category: "ultrabrain" }, undefined, undefined, CTX)
+    const result = await execute(
+      "call-resolved-fg",
+      { prompt: "finish", category: "ultrabrain" },
+      undefined,
+      undefined,
+      CTX,
+    )
 
     // then
     expect(result.details.resolved_model).toEqual(resolvedModel)
     expect(result.details.model).toBe("openai/gpt-5.6-sol")
     expect(result.details.run_in_background).toBe(false)
   })
-
 })

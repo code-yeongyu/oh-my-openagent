@@ -1,20 +1,11 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test"
-import {
-  isInsideTmux,
-  isServerRunning,
-  resetServerCheck,
-  markServerRunningInProcess,
-  spawnTmuxPane,
-  closeTmuxPane,
-  applyLayout,
-} from "./tmux-utils"
-import {
-  isInsideTmuxEnvironment,
-  isTmuxPaneCompatibleEnvironment,
-} from "./tmux-utils/environment"
+import { isServerRunning, resetServerCheck, markServerRunningInProcess } from "./tmux-utils"
+import { isInsideTmuxEnvironment, isTmuxPaneCompatibleEnvironment } from "./tmux-utils/environment"
 import { createServerHealthStateForTesting } from "./tmux-utils/server-health"
 
-function createFetchRecorder(responseFactory: () => Promise<Response>): typeof fetch & { calls: Array<[RequestInfo | URL, RequestInit | undefined]> } {
+function createFetchRecorder(
+  responseFactory: () => Promise<Response>,
+): typeof fetch & { calls: Array<[RequestInfo | URL, RequestInit | undefined]> } {
   const calls: Array<[RequestInfo | URL, RequestInit | undefined]> = []
   const fetchRecorder = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     calls.push([input, init])
@@ -26,7 +17,6 @@ function createFetchRecorder(responseFactory: () => Promise<Response>): typeof f
     preconnect,
   }) as typeof fetch & { calls: Array<[RequestInfo | URL, RequestInit | undefined]> }
 }
-
 
 describe("isInsideTmux", () => {
   test("returns true when TMUX env is set", () => {
@@ -86,14 +76,6 @@ describe("isInsideTmux", () => {
     // then
     expect(result).toBe(false)
   })
-
-  test("is exported as a function", () => {
-    // given, #when
-    const result = typeof isInsideTmux
-
-    // then
-    expect(result).toBe("function")
-  })
 })
 
 describe("isServerRunning", () => {
@@ -137,6 +119,20 @@ describe("isServerRunning", () => {
 
     // then
     expect(result).toBe(false)
+  })
+
+  test("counts a password-protected server (401/403) as running (omo#11367)", async () => {
+    for (const status of [401, 403]) {
+      // given: omo run gives its server a per-run password the probing process does not hold
+      const state = createServerHealthStateForTesting()
+      const fetchMock = createFetchRecorder(async () => new Response(null, { status }))
+
+      // when
+      const result = await isServerRunning("http://localhost:4096", { fetchImplementation: fetchMock, state })
+
+      // then: alive, so the stale-pane sweep keeps its panes
+      expect(result).toBe(true)
+    }
   })
 
   test("caches successful result", async () => {
@@ -200,7 +196,6 @@ describe("resetServerCheck", () => {
 
     // then - should call fetch twice after reset
     expect(fetchMock.calls.length).toBe(2)
-
   })
 })
 
@@ -239,31 +234,5 @@ describe("markServerRunningInProcess", () => {
 
     // then
     expect(flag).toBe(true)
-  })
-})
-
-describe("tmux pane functions", () => {
-  test("spawnTmuxPane is exported as function", async () => {
-    // given, #when
-    const result = typeof spawnTmuxPane
-
-    // then
-    expect(result).toBe("function")
-  })
-
-  test("closeTmuxPane is exported as function", async () => {
-    // given, #when
-    const result = typeof closeTmuxPane
-
-    // then
-    expect(result).toBe("function")
-  })
-
-  test("applyLayout is exported as function", async () => {
-    // given, #when
-    const result = typeof applyLayout
-
-    // then
-    expect(result).toBe("function")
   })
 })

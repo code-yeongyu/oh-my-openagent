@@ -75,7 +75,8 @@ const listed = store.list()
 if (listed.records.some((entry) => entry.task_id === "st_c0ffee00")) throw new Error("Corrupt task was loaded")
 const corruptDiagnostic = listed.diagnostics.find((entry) => entry.path === corruptPath)
 if (corruptDiagnostic?.type !== "parse_error") throw new Error("Corrupt task diagnostic missing")
-if (listed.records.some((entry) => entry.task_id === "st_bad00004")) throw new Error("Malformed optional task was loaded")
+if (listed.records.some((entry) => entry.task_id === "st_bad00004"))
+  throw new Error("Malformed optional task was loaded")
 const malformedOptionalDiagnostic = listed.diagnostics.find((entry) => entry.message === "pid is not a number")
 if (malformedOptionalDiagnostic === undefined) {
   throw new Error("Malformed optional diagnostic missing")
@@ -88,7 +89,7 @@ const rejected = store.transition(completed.task_id, {
 })
 if (rejected.applied) throw new Error("Illegal completed to running transition applied")
 if (store.load(completed.task_id)?.status !== "completed") throw new Error("Completed status changed")
-if (messageability(completed.status, completed.residency_state) !== "revive") {
+if (messageability(completed.status, completed.residency_state, completed.execution_mode) !== "revive") {
   throw new Error("Completed resident task was not revivable")
 }
 const evictedCompleted = transitionTaskRecord(completed, {
@@ -97,7 +98,13 @@ const evictedCompleted = transitionTaskRecord(completed, {
 })
 if (!evictedCompleted.applied) throw new Error("Completed resident eviction was rejected")
 if (evictedCompleted.record.status !== "completed") throw new Error("Completed eviction changed lifecycle status")
-if (messageability(evictedCompleted.record.status, evictedCompleted.record.residency_state) !== "not-continuable") {
+if (
+  messageability(
+    evictedCompleted.record.status,
+    evictedCompleted.record.residency_state,
+    evictedCompleted.record.execution_mode,
+  ) !== "not-continuable"
+) {
   throw new Error("Evicted completed task remained continuable")
 }
 const normalLost = transitionTaskRecord(running, {
@@ -140,12 +147,17 @@ const summary = {
   corruptDiagnostic,
   malformedOptionalDiagnostic,
   illegalTransitionApplied: rejected.applied,
-  completedResidentMessageability: messageability(completed.status, completed.residency_state),
+  completedResidentMessageability: messageability(
+    completed.status,
+    completed.residency_state,
+    completed.execution_mode,
+  ),
   evictedCompletedApplied: evictedCompleted.applied,
   evictedCompletedStatus: evictedCompleted.record.status,
   evictedCompletedMessageability: messageability(
     evictedCompleted.record.status,
     evictedCompleted.record.residency_state,
+    evictedCompleted.record.execution_mode,
   ),
   normalLostApplied: normalLost.applied,
   normalLostStatus: normalLost.record.status,

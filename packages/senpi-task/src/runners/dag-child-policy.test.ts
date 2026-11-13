@@ -30,8 +30,8 @@ function makeSession(): ChildSession {
   return {
     sessionId: "dag-policy-session",
     prompt: () => Promise.resolve(),
-    steer: () => Promise.resolve(),
-    followUp: () => Promise.resolve(),
+    steer: () => Promise.resolve("handled"),
+    followUp: () => Promise.resolve("handled"),
     abort: () => Promise.resolve(),
     subscribe: () => () => {},
     getLastAssistantText: () => "done",
@@ -54,12 +54,15 @@ function childSpec(overrides: Partial<ChildSpec> = {}): ChildSpec {
 
 function writeSessionTranscript(): string {
   const path = join(makeTempDir(), "session.jsonl")
-  writeFileSync(path, `${JSON.stringify({
-    type: "session",
-    id: "dag-policy-session",
-    timestamp: "2026-08-14T00:00:00.000Z",
-    cwd: process.cwd(),
-  })}\n`)
+  writeFileSync(
+    path,
+    `${JSON.stringify({
+      type: "session",
+      id: "dag-policy-session",
+      timestamp: "2026-08-14T00:00:00.000Z",
+      cwd: process.cwd(),
+    })}\n`,
+  )
   return path
 }
 
@@ -131,11 +134,13 @@ describe("DAG child in-process tool policy", () => {
 
     // when
     const plain = await runner.start(childSpec({ taskId: "st_plain" }))
-    const member = await runner.start(childSpec({
-      taskId: "st_member",
-      memberScopedTools: [taskSend],
-      memberScopedToolNames: ["task_send"],
-    }))
+    const member = await runner.start(
+      childSpec({
+        taskId: "st_member",
+        memberScopedTools: [taskSend],
+        memberScopedToolNames: ["task_send"],
+      }),
+    )
     await Promise.all([plain.waitForIdle(), member.waitForIdle()])
 
     // then

@@ -52,7 +52,7 @@ Next-generation HTTP client under Pydantic stewardship. Sync and async in one li
 
 **Install**: `httpx2[http2,brotli,zstd]` — always include all three extras, no exceptions.
 
-**A bare `httpx2.AsyncClient()` / `httpx2.Client()` is a bug.** Always use the factory pattern from `references/httpx2-optimization.md` with ALL optimizations enabled by default:
+**A bare `httpx2.AsyncClient()` / `httpx2.Client()` is a bug.** Always use the factory pattern from `references/python/httpx2-optimization.md` with ALL optimizations enabled by default:
 
 ```python
 import socket
@@ -78,7 +78,7 @@ with httpx2.Client(transport=transport, timeout=_TIMEOUT, follow_redirects=True)
     users = response.json()
 ```
 
-See `references/httpx2-optimization.md` for the full factory functions (`create_client()` / `create_async_client()`), event hooks, and the rationale behind every setting. **Load that reference whenever you write ANY network code.**
+See `references/python/httpx2-optimization.md` for the full factory functions (`create_client()` / `create_async_client()`), event hooks, and the rationale behind every setting. **Load that reference whenever you write ANY network code.**
 
 ## JSON — stdlib `json` (default) or `orjson` (hot paths)
 
@@ -98,7 +98,7 @@ raw: bytes = orjson.dumps(
 
 For FastAPI: `app = FastAPI(default_response_class=ORJSONResponse)`. Pydantic-typed responses bypass it (and that's correct — Pydantic's path is faster). Raw `dict`/`list` returns go through orjson.
 
-See `references/orjson-stack.md` for the full decision tree, option flag reference, FastAPI integration, Redis/queue/logging patterns, and the `model_dump_json()` vs orjson benchmark.
+See `references/python/orjson-stack.md` for the full decision tree, option flag reference, FastAPI integration, Redis/queue/logging patterns, and the `model_dump_json()` vs orjson benchmark.
 
 ## Validation — pydantic v2
 

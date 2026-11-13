@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -6,8 +6,10 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import type { DagNodeId, DagRunId } from "../dag/types"
 import { DAG_VERIFICATION_DIRECTIVE } from "./dag-verification-directive"
-import { buildCompletionDetails, buildCompletionMessage } from "./notification"
+import { buildCompletionDetails, buildCompletionMessage, completionMessageLines } from "./notification"
 import type { TaskRecord } from "../state"
+import { endDroppedSteering, withDroppedSteeringNotice } from "../state/queued-steering"
+import { recoveryFailureNotice } from "./recovery-failure-notice"
 
 const tempDirs: string[] = []
 
@@ -111,6 +113,21 @@ describe("buildCompletionDetails", () => {
     expect(details.continuation_hint).not.toContain("prompt:")
   })
 
+  test("#given killed terminal error process record #when details built #then no continuation hint is emitted", () => {
+    const details = buildCompletionDetails(
+      completedRecord({
+        status: "error",
+        execution_mode: "process",
+        residency_state: "rpc_detached",
+        killed: true,
+        final_response: undefined,
+        error_message: "child killed",
+      }),
+    )
+
+    expect(details.continuation_hint).toBe("")
+  })
+
   test("#given error record #when details built #then error message feeds the full result", () => {
     // given
     const record = completedRecord({
@@ -140,6 +157,67 @@ describe("buildCompletionDetails", () => {
 })
 
 describe("buildCompletionMessage", () => {
+  test("finished work with dropped steering preserves the resend notice and final answer", () => {
+    // given: the real terminal-queue path, not an interrupted recovery
+    const finished = completedRecord({ description: "Summarize logs" })
+    // when
+    const detail = buildCompletionDetails(endDroppedSteering(finished, finished.updated_at, 2))
+    const message = buildCompletionMessage([detail])
+    // then: final output and the owner-authored cause survive the completion boundary
+    expect(detail.final_response).toMatch(/finished/i)
+    expect(detail.final_response).toMatch(/2 queued messages.*not delivered/i)
+    expect(detail.final_response).toMatch(/resend/i)
+    expect(detail.final_response).not.toMatch(/retry|interrupted|automatic retries/i)
+    expect(message.content).toContain(detail.task_id)
+    expect(message.content).toContain(finished.final_response ?? "")
+  })
+
+  test("recovery output beyond 32k retains its spill pointer, transcript tail, and width handling", () => {
+    // given
+    const stateDir = tempStateDir()
+    const record = completedRecord({
+      status: "error",
+      killed: true,
+      failure_kind: "suspended_unresumable",
+      description: "Recover logs",
+      final_response: "partial".repeat(6_000),
+      error_message: "The saved session is unavailable. Retry the task.",
+    })
+    mkdirSync(join(stateDir, "logs"))
+    const tail = "last-observed-tool-result"
+    writeFileSync(
+      join(stateDir, "logs", `${record.task_id}.jsonl`),
+      JSON.stringify({ type: "assistant_message", payload: { text: tail } }) + "\n",
+    )
+    // when
+    const detail = buildCompletionDetails(record, { stateDir })
+    const message = buildCompletionMessage([detail])
+    // then
+    expect(detail.final_response_file).toBeDefined()
+    expect(message.content).toContain(`result_file:${detail.final_response_file}`)
+    expect(message.content).toContain(tail)
+    expect(message.content).toContain(`id:${record.task_id}`)
+    expect(message.content).toContain("status:error")
+    const full = readFileSync(detail.final_response_file?.slice("local://".length) ?? "", "utf8")
+    expect(full).toContain(record.final_response ?? "")
+    expect(full).toContain(tail)
+    for (const line of completionMessageLines([detail], 100)) {
+      expect(line).not.toContain("\n")
+      expect(Bun.stringWidth(line)).toBeLessThanOrEqual(100)
+    }
+  })
+
+  test("late close confirmation preserves the stored notice and dropped-message action", () => {
+    // given: closure was unconfirmed when the terminal message was written
+    const record = completedRecord({ description: "Recover logs", failure_kind: "suspended_unresumable" })
+    const notice = withDroppedSteeringNotice(recoveryFailureNotice(record, false), 2)
+    // when: the late confirmation has removed fallback_closing_child
+    const detail = buildCompletionDetails({ ...record, error_message: notice })
+    // then: projection does not regenerate prose from mutable closure state
+    expect(detail.final_response).toStartWith(notice)
+    expect(detail.final_response).toContain(record.final_response ?? "")
+  })
+
   test("#given a complete result #when notification built #then the body contains it without a follow-up task_output instruction", () => {
     // given
     const fullResult = "child final text ".repeat(100)
@@ -165,10 +243,9 @@ describe("buildCompletionMessage", () => {
 
   test("#given a spilled result #when notification built #then the body names its local file", () => {
     // given
-    const details = buildCompletionDetails(
-      completedRecord({ final_response: "x".repeat(32_001) }),
-      { stateDir: tempStateDir() },
-    )
+    const details = buildCompletionDetails(completedRecord({ final_response: "x".repeat(32_001) }), {
+      stateDir: tempStateDir(),
+    })
 
     // when
     const message = buildCompletionMessage([details])
@@ -220,9 +297,11 @@ describe("dag-owned completions", () => {
 
   test("#given a dag-owned detail #when message built #then the verification directive is appended once", () => {
     // given
-    const details = buildCompletionDetails(completedRecord({
-      owner: { kind: "dag", runId: "dag_run_1" as DagRunId, nodeId: "build" as DagNodeId, fingerprint: "fp-1" },
-    }))
+    const details = buildCompletionDetails(
+      completedRecord({
+        owner: { kind: "dag", runId: "dag_run_1" as DagRunId, nodeId: "build" as DagNodeId, fingerprint: "fp-1" },
+      }),
+    )
 
     // when
     const message = buildCompletionMessage([details])
@@ -249,16 +328,20 @@ describe("dag-owned completions", () => {
   test("#given one plain and two dag details #when message built #then the directive appears exactly once", () => {
     // given
     const plain = buildCompletionDetails(completedRecord({ task_id: "st_plain", name: "plain" }))
-    const firstDag = buildCompletionDetails(completedRecord({
-      task_id: "st_dag1",
-      name: "dag-one",
-      owner: { kind: "dag", runId: "dag_run_1" as DagRunId, nodeId: "build" as DagNodeId, fingerprint: "fp-1" },
-    }))
-    const secondDag = buildCompletionDetails(completedRecord({
-      task_id: "st_dag2",
-      name: "dag-two",
-      owner: { kind: "dag", runId: "dag_run_1" as DagRunId, nodeId: "test" as DagNodeId, fingerprint: "fp-2" },
-    }))
+    const firstDag = buildCompletionDetails(
+      completedRecord({
+        task_id: "st_dag1",
+        name: "dag-one",
+        owner: { kind: "dag", runId: "dag_run_1" as DagRunId, nodeId: "build" as DagNodeId, fingerprint: "fp-1" },
+      }),
+    )
+    const secondDag = buildCompletionDetails(
+      completedRecord({
+        task_id: "st_dag2",
+        name: "dag-two",
+        owner: { kind: "dag", runId: "dag_run_1" as DagRunId, nodeId: "test" as DagNodeId, fingerprint: "fp-2" },
+      }),
+    )
 
     // when
     const message = buildCompletionMessage([plain, firstDag, secondDag])

@@ -7,17 +7,11 @@ import {
 } from "@oh-my-opencode/model-core"
 import type { ModelCapabilitiesSnapshot } from "./model-capabilities"
 
-export {
-  MODELS_DEV_SOURCE_URL,
-  buildModelCapabilitiesSnapshotFromModelsDev,
-  fetchModelCapabilitiesSnapshot,
-}
+export { MODELS_DEV_SOURCE_URL, buildModelCapabilitiesSnapshotFromModelsDev, fetchModelCapabilitiesSnapshot }
 
 const MODEL_CAPABILITIES_CACHE_FILE = "model-capabilities.json"
 
-export function createModelCapabilitiesCacheStore(
-  getCacheDir: () => string = dataPath.getOmoOpenCodeCacheDir,
-) {
+export function createModelCapabilitiesCacheStore(getCacheDir: () => string = dataPath.getOmoOpenCodeCacheDir) {
   const snapshotCacheStore = createJsonFileCacheStore<ModelCapabilitiesSnapshot>({
     getCacheDir,
     filename: MODEL_CAPABILITIES_CACHE_FILE,
@@ -28,6 +22,8 @@ export function createModelCapabilitiesCacheStore(
       generatedAt: snapshot.generatedAt,
     }),
     serialize: (snapshot) => `${JSON.stringify(snapshot, null, 2)}\n`,
+    // generatedAt is stamped on every fetch; only the catalog itself decides a rewrite.
+    comparable: ({ generatedAt: _generatedAt, ...catalog }) => catalog,
   })
 
   function readModelCapabilitiesCache(): ModelCapabilitiesSnapshot | null {
@@ -42,12 +38,17 @@ export function createModelCapabilitiesCacheStore(
     snapshotCacheStore.write(snapshot)
   }
 
-  async function refreshModelCapabilitiesCache(args: {
-    sourceUrl?: string
-    fetchImpl?: (input: string) => Promise<Response>
-  } = {}): Promise<ModelCapabilitiesSnapshot> {
+  async function refreshModelCapabilitiesCache(
+    args: {
+      sourceUrl?: string
+      fetchImpl?: (input: string) => Promise<Response>
+    } = {},
+  ): Promise<ModelCapabilitiesSnapshot> {
     const snapshot = await fetchModelCapabilitiesSnapshot(args)
-    writeModelCapabilitiesCache(snapshot)
+    // The startup check refreshes on every start; rewrite the file only when
+    // the catalog changed. The comparison ignores generatedAt, which differs
+    // on every fetch.
+    snapshotCacheStore.writeIfChanged(snapshot)
     return snapshot
   }
 
@@ -59,9 +60,7 @@ export function createModelCapabilitiesCacheStore(
   }
 }
 
-const defaultModelCapabilitiesCacheStore = createModelCapabilitiesCacheStore(
-  () => dataPath.getOmoOpenCodeCacheDir(),
-)
+const defaultModelCapabilitiesCacheStore = createModelCapabilitiesCacheStore(() => dataPath.getOmoOpenCodeCacheDir())
 
 export const {
   readModelCapabilitiesCache,

@@ -1,0 +1,75 @@
+{
+  "description": "Bounded hold methods are known on ABI senpi-desktop/1 and refuse Closed before session.open instead of returning method-not-found.",
+  "scenario": "crates/senpi-desktop-backend-fake/fixtures/two-displays-one-window.json",
+  "env": {},
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "holdKeys",
+        "params": {
+          "target": "desktop",
+          "keys": [
+            "shift",
+            "a"
+          ],
+          "duration": 0
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "error": {
+              "code": -32012,
+              "message": "Closed",
+              "data": {
+                "code": "Closed",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message",
+            "/error/data/hint"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "holdMouse",
+        "params": {
+          "target": "desktop",
+          "x": 10,
+          "y": 20,
+          "duration": 0
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "error": {
+              "code": -32012,
+              "message": "Closed",
+              "data": {
+                "code": "Closed",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message",
+            "/error/data/hint"
+          ]
+        }
+      ]
+    }
+  ]
+}

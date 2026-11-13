@@ -19,6 +19,7 @@ export function projectMemberStatus(status: TaskStatus): RuntimeMemberStatus {
     case "running":
       return "running"
     case "interrupted":
+    case "paused":
       return "idle"
     case "completed":
       return "completed"
@@ -65,7 +66,8 @@ export async function refreshTeamMemberStatuses(
         if (taskId === undefined) return member
         const record = deps.manager.get(taskId)
         if (record === undefined) return member
-        const sessionId = deps.manager.getResidentHandle(taskId)?.sessionId ?? record.child_session_id ?? member.sessionId
+        const sessionId =
+          deps.manager.getResidentHandle(taskId)?.sessionId ?? record.child_session_id ?? member.sessionId
         return {
           ...member,
           status: projectMemberStatus(record.status),

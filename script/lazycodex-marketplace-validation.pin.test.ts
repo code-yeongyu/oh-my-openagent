@@ -146,13 +146,13 @@ describe("lazycodex marketplace validation guards", () => {
 
   test("#given a plugin-local MCP runtime path is missing #when validating the plugin bundle #then the target is rejected", async () => {
     // given
-    const pluginRoot = await mkdtemp(join(tmpdir(), "omo-marketplace-codegraph-runtime-"))
+    const pluginRoot = await mkdtemp(join(tmpdir(), "omo-marketplace-lsp-runtime-"))
     await writeRootCliRuntime(pluginRoot)
     await writePluginMcpManifest(pluginRoot, {
       mcpServers: {
-        codegraph: {
+        lsp: {
           command: "node",
-          args: ["components/codegraph/dist/serve.js"],
+          args: ["components/lsp/dist/cli.js"],
           cwd: ".",
         },
       },
@@ -163,7 +163,7 @@ describe("lazycodex marketplace validation guards", () => {
       const validated = validateLazycodexPluginBundle(pluginRoot)
 
       // then
-      await expect(validated).rejects.toThrow("missing MCP runtime path for codegraph: components/codegraph/dist/serve.js")
+      await expect(validated).rejects.toThrow("missing MCP runtime path for lsp: components/lsp/dist/cli.js")
     } finally {
       await rm(pluginRoot, { recursive: true, force: true })
     }
@@ -213,7 +213,10 @@ describe("lazycodex marketplace validation guards", () => {
         2,
       )}\n`,
     )
-    await writeFile(join(pluginRoot, "components", "ulw-execute-continuation", "dist", "cli.js"), "#!/usr/bin/env node\n")
+    await writeFile(
+      join(pluginRoot, "components", "ulw-execute-continuation", "dist", "cli.js"),
+      "#!/usr/bin/env node\n",
+    )
 
     try {
       // when

@@ -9,11 +9,11 @@ import { readSteeringLedgerEntries, readUlwLoopPlan, writePlan } from "../src/pl
 import { steerUlwLoopBatch } from "../src/steering-batch.js";
 import type { UlwLoopItem, UlwLoopPlan, UlwLoopSteeringProposal } from "../src/types.js";
 
-const appendFileCalls = vi.hoisted(() => vi.fn());
-vi.mock("node:fs/promises", async (importOriginal) => {
-	const actual = await importOriginal<typeof import("node:fs/promises")>();
-	appendFileCalls.mockImplementation(actual.appendFile);
-	return { ...actual, appendFile: appendFileCalls };
+const publishCalls = vi.hoisted(() => vi.fn());
+vi.mock("node:fs", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("node:fs")>();
+	publishCalls.mockImplementation(actual.linkSync);
+	return { ...actual, linkSync: publishCalls };
 });
 
 const NOW = "2026-05-23T00:00:00.000Z";
@@ -78,12 +78,12 @@ describe("steerUlwLoopBatch", () => {
 
 	it("#given rejected proposals #when applied as a batch #then one rejection audit lists every rejected index", async () => {
 		const repo = await repoWithPlan();
-		const before = JSON.stringify(await readUlwLoopPlan(repo));
+		const before = await readUlwLoopPlan(repo);
 
 		const result = await steerUlwLoopBatch(repo, [proposal({ idempotencyKey: "ok" }), proposal({ kind: "reorder_pending", pendingOrder: ["missing"] }), proposal({ evidence: "" })]);
 
 		expect(result.accepted).toBe(false);
-		expect(JSON.stringify(await readUlwLoopPlan(repo))).toBe(before);
+		expect(await readUlwLoopPlan(repo)).toEqual({ ...before, revision: (before.revision ?? 0) + 1 });
 		expect((await readUlwLoopPlan(repo)).goals).toHaveLength(2);
 		const entries = await readSteeringLedgerEntries(repo);
 		expect(entries.filter((entry) => entry.kind === "steering_accepted")).toHaveLength(0);
@@ -120,13 +120,13 @@ describe("steerUlwLoopBatch", () => {
 		expect((await readUlwLoopPlan(repo)).goals).toHaveLength(4);
 	});
 
-	it("#given mixed fresh and deduped proposals #when accepted and replayed #then one append records all fresh audits and replay records none", async () => {
+	it("#given mixed fresh and deduped proposals #when accepted and replayed #then one publication records all fresh audits and replay records none", async () => {
 		const repo = await repoWithPlan();
 		const seeded = await readUlwLoopPlan(repo);
 		seeded.goals[0]?.successCriteria.push({ id: "C001", scenario: "old", expectedEvidence: "proof", userModel: "edge", status: "pending", capturedEvidence: null });
 		await writePlan(repo, { ...seeded, validationBatches: [{ batchId: "VB001", memberIds: ["G001", "G002"], finalGoalId: "G002" }] });
 		await steerUlwLoopBatch(repo, [proposal({ idempotencyKey: "dedupe-me" })]);
-		appendFileCalls.mockClear();
+		publishCalls.mockClear();
 
 		const revise = { ...proposal({ kind: "revise_criterion", targetGoalId: "G001", criterionId: "C001", idempotencyKey: "revise-c1" }), scenario: "new" } satisfies CliSteeringProposal;
 		const batch = [
@@ -138,15 +138,15 @@ describe("steerUlwLoopBatch", () => {
 
 		expect(result.accepted).toBe(true);
 		expect(result.results.map((item) => item.deduped)).toEqual([true, false, false]);
-		expect(appendFileCalls).toHaveBeenCalledTimes(1);
+		expect(publishCalls).toHaveBeenCalledTimes(1);
 		expect((await readSteeringLedgerEntries(repo)).map((entry) => entry.kind).slice(-3)).toEqual(["criteria_revised", "steering_accepted", "batch_updated"]);
 		const after = JSON.stringify(await readUlwLoopPlan(repo));
-		appendFileCalls.mockClear();
+		publishCalls.mockClear();
 
 		const replay = await steerUlwLoopBatch(repo, batch);
 
 		expect(replay.results.map((item) => item.deduped)).toEqual([true, true, true]);
 		expect(JSON.stringify(await readUlwLoopPlan(repo))).toBe(after);
-		expect(appendFileCalls).not.toHaveBeenCalled();
+		expect(publishCalls).not.toHaveBeenCalled();
 	});
 });

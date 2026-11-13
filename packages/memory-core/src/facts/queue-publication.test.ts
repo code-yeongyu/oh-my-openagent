@@ -1,23 +1,20 @@
 import { describe, expect, test, afterEach } from "bun:test"
-import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, readFile, readdir, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { realpathSync } from "node:fs"
 
 import { buildIdentityPaths, type MemoryIdentityPaths } from "../identity"
 import type { TranscriptEntry } from "../journal"
-import {
-  FactsQueue,
-  factsQueuePaths,
-  type FactsEnqueueRequest,
-} from "./queue"
+import { FactsQueue, factsQueuePaths, type FactsEnqueueRequest } from "./queue"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const IDENTITY = "facts-queue-agent"
 const CONVERSATION = "conversation-alpha"
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })))
 })
 
 async function identityFixture(): Promise<MemoryIdentityPaths> {
@@ -65,7 +62,7 @@ function clockFrom(start: number): () => Date {
 }
 
 async function queueFileNames(paths: MemoryIdentityPaths): Promise<string[]> {
-  const names = await readdir(paths.factsQueue).catch(() => [] as string[])
+  const names = await readdir(paths.factsQueue).catch(() => [])
   return names.filter((name) => name.endsWith(".json") && name !== "consumed.json").sort()
 }
 
@@ -109,10 +106,7 @@ describe("facts queue concurrency", () => {
     const second = new FactsQueue({ identityPaths: paths, now: clockFrom(50_000) })
 
     // when
-    const results = await Promise.all([
-      first.enqueue(request(entries)),
-      second.enqueue(request(entries)),
-    ])
+    const results = await Promise.all([first.enqueue(request(entries)), second.enqueue(request(entries))])
 
     // then
     expect(results.filter((result) => result.enqueued)).toHaveLength(1)

@@ -4,12 +4,17 @@ import { realpathSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
+import { lspInstallDecisionsPath, userLspConfigPath } from "./config-paths"
 import { callPackagedDaemonTool } from "./daemon-tool-client"
 import { resolveSenpiDaemonRuntime, resolveSenpiPackagedDaemonRuntime } from "./daemon-runtime"
 
 const tempDirs: string[] = []
 
-async function makePackagedExtensionFixture(): Promise<{ readonly extensionPath: string; readonly cliPath: string; readonly distPath: string }> {
+async function makePackagedExtensionFixture(): Promise<{
+  readonly extensionPath: string
+  readonly cliPath: string
+  readonly distPath: string
+}> {
   const pluginRoot = await mkdtemp(join(tmpdir(), "omo-senpi-packaged-runtime-"))
   tempDirs.push(pluginRoot)
   const extensionPath = join(pluginRoot, "extensions", "omo.js")
@@ -43,7 +48,7 @@ describe("Senpi packaged daemon runtime resolver", () => {
     expect(runtime).toEqual({ cliPath: fixture.cliPath, version: "0.1.0" })
   })
 
-  test("#given a shipped daemon client #when an LSP tool executes #then canonical alias, signal, and Senpi .pi context are forwarded", async () => {
+  test("#given a shipped daemon client #when an LSP tool executes #then canonical alias, signal, and Senpi .omo-first context are forwarded", async () => {
     // given
     const fixture = await makePackagedExtensionFixture()
     await writeFile(
@@ -68,19 +73,22 @@ describe("Senpi packaged daemon runtime resolver", () => {
 
     // then
     expect(result?.content[0]?.text).toBe(
-        JSON.stringify({
-          name: "goto_definition",
-          args: { filePath: "x.ts", line: 1, character: 0 },
-          context: {
-            cwd: realpathSync(resolve(projectDir)),
-            projectConfigPaths: [join(realpathSync(resolve(projectDir)), ".pi", "lsp-client.json")],
-            userConfigPath: join(resolve(homeDir), ".pi", "lsp-client.json"),
-            installDecisionsPath: join(resolve(homeDir), ".pi", "lsp-install-decisions.json"),
-            capabilities: { installDecisionTool: false },
-          },
-          signalAborted: true,
-          signalReason: "test-abort",
-        }),
+      JSON.stringify({
+        name: "goto_definition",
+        args: { filePath: "x.ts", line: 1, character: 0 },
+        context: {
+          cwd: realpathSync(resolve(projectDir)),
+          projectConfigPaths: [
+            join(realpathSync(resolve(projectDir)), ".omo", "lsp-client.json"),
+            join(realpathSync(resolve(projectDir)), ".pi", "lsp-client.json"),
+          ],
+          userConfigPath: join(resolve(homeDir), ".omo", "lsp-client.json"),
+          installDecisionsPath: join(resolve(homeDir), ".omo", "lsp-install-decisions.json"),
+          capabilities: { installDecisionTool: false },
+        },
+        signalAborted: true,
+        signalReason: "test-abort",
+      }),
     )
   })
 
@@ -101,9 +109,12 @@ describe("Senpi packaged daemon runtime resolver", () => {
       pathToFileURL(fixture.extensionPath).href,
     )
 
-    const context = JSON.parse(result.content[0]?.text ?? "null") as { userConfigPath: string; installDecisionsPath: string }
-    expect(context.userConfigPath).toBe(join(homedir(), ".pi", "lsp-client.json"))
-    expect(context.installDecisionsPath).toBe(join(homedir(), ".pi", "lsp-install-decisions.json"))
+    const context = JSON.parse(result.content[0]?.text ?? "null") as {
+      userConfigPath: string
+      installDecisionsPath: string
+    }
+    expect(context.userConfigPath).toBe(userLspConfigPath(homedir()))
+    expect(context.installDecisionsPath).toBe(lspInstallDecisionsPath(homedir()))
   })
 
   test("#given all six Senpi LSP names #when executing through the packaged client #then canonical Core tool names are used", async () => {
@@ -139,25 +150,49 @@ describe("Senpi packaged daemon runtime resolver", () => {
     const overrideCli = join(fixture.distPath, "override-cli.js")
     await writeFile(overrideCli, "export {}\n", "utf8")
 
-    expect(resolveSenpiDaemonRuntime({
-      OMO_LSP_DAEMON_CLI: overrideCli,
-      OMO_LSP_DAEMON_VERSION: "9.8.7",
-    }, packagedRuntime)).toEqual({ cliPath: overrideCli, version: "9.8.7" })
-    expect(() => resolveSenpiDaemonRuntime({
-      OMO_LSP_DAEMON_CLI: overrideCli,
-    }, packagedRuntime)).toThrow("must be set together")
-    expect(() => resolveSenpiDaemonRuntime({
-      OMO_LSP_DAEMON_CLI: "relative-cli.js",
-      OMO_LSP_DAEMON_VERSION: "9.8.7",
-    }, packagedRuntime)).toThrow("absolute path")
-    expect(() => resolveSenpiDaemonRuntime({
-      OMO_LSP_DAEMON_CLI: fixture.distPath,
-      OMO_LSP_DAEMON_VERSION: "9.8.7",
-    }, packagedRuntime)).toThrow("regular file")
-    expect(() => resolveSenpiDaemonRuntime({
-      OMO_LSP_DAEMON_CLI: overrideCli,
-      OMO_LSP_DAEMON_VERSION: "invalid version",
-    }, packagedRuntime)).toThrow("must match")
+    expect(
+      resolveSenpiDaemonRuntime(
+        {
+          OMO_LSP_DAEMON_CLI: overrideCli,
+          OMO_LSP_DAEMON_VERSION: "9.8.7",
+        },
+        packagedRuntime,
+      ),
+    ).toEqual({ cliPath: overrideCli, version: "9.8.7" })
+    expect(() =>
+      resolveSenpiDaemonRuntime(
+        {
+          OMO_LSP_DAEMON_CLI: overrideCli,
+        },
+        packagedRuntime,
+      ),
+    ).toThrow("must be set together")
+    expect(() =>
+      resolveSenpiDaemonRuntime(
+        {
+          OMO_LSP_DAEMON_CLI: "relative-cli.js",
+          OMO_LSP_DAEMON_VERSION: "9.8.7",
+        },
+        packagedRuntime,
+      ),
+    ).toThrow("absolute path")
+    expect(() =>
+      resolveSenpiDaemonRuntime(
+        {
+          OMO_LSP_DAEMON_CLI: fixture.distPath,
+          OMO_LSP_DAEMON_VERSION: "9.8.7",
+        },
+        packagedRuntime,
+      ),
+    ).toThrow("regular file")
+    expect(() =>
+      resolveSenpiDaemonRuntime(
+        {
+          OMO_LSP_DAEMON_CLI: overrideCli,
+          OMO_LSP_DAEMON_VERSION: "invalid version",
+        },
+        packagedRuntime,
+      ),
+    ).toThrow("must match")
   })
-
 })

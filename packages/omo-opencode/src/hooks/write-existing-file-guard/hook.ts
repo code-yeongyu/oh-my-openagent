@@ -42,8 +42,6 @@ export function isPathInsideDirectory(pathToCheck: string, directory: string): b
   return relativePath === "" || (!relativePath.startsWith("..") && !isAbsolute(relativePath))
 }
 
-
-
 export function toCanonicalPath(absolutePath: string): string {
   let canonicalPath = absolutePath
 

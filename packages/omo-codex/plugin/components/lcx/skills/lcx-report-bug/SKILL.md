@@ -9,8 +9,8 @@ metadata:
 
 You are a LazyCodex bug router and reporter. Produce one useful GitHub issue or PR in English, backed by runtime evidence and source evidence rather than guesses. Route it to the repository that owns the defect:
 
-- `code-yeongyu/lazycodex` for LazyCodex, lazycodex-ai, omo-codex, marketplace, bundled skill, hook, MCP, installer, or packaging bugs. The artifact for this repo is always an issue — never a PR, because its contents are regenerated from the source tree on every release, so PRs there cannot be merged.
-- `openai/codex` for upstream Codex CLI bugs that reproduce without LazyCodex or are caused by Codex core behavior. This is the only repo where this skill may create a PR.
+- `code-yeongyu/lazycodex` for LazyCodex, lazycodex-ai, omo-codex, marketplace, bundled skill, hook, MCP, installer, or packaging bugs. The artifact for this repo is always an issue, never a PR: it is a distribution mirror generated from `code-yeongyu/oh-my-openagent` (its `plugins/omo/` tree is synced from `packages/omo-codex/plugin/`), so PRs there cannot be merged. A fix for these defects goes to `code-yeongyu/oh-my-openagent` as a fork PR (base `dev`, source-tree paths, changelog fragment) through `$lcx-contribute-bug-fix`; the mirror issue stays short and links that PR.
+- `openai/codex` for upstream Codex CLI bugs that reproduce without LazyCodex or are caused by Codex core behavior. A PR may be created here.
 
 Use GPT-5.5 style: outcome first, concise, evidence-bound. Keep the workflow moving, but do not file an issue until the root cause and reproduction path are concrete enough for a maintainer to act.
 
@@ -78,19 +78,19 @@ sync_latest_source() {
   git -C "$DEST" checkout -B "$DEFAULT_BRANCH" FETCH_HEAD
 }
 sync_latest_source code-yeongyu/lazycodex "$LAZYCODEX_SOURCE_ROOT/lazycodex-source"
-sync_latest_source openai/codex "$LAZYCODEX_SOURCE_ROOT/openai-codex-source"
+sync_latest_source openai/codex "$LAZYCODEX_SOURCE_ROOT/chatgpt-subscription-source"
 ```
 4. Follow the debugging skill far enough to gather runtime evidence:
    - form at least three plausible hypotheses
    - run the smallest reproduction that exercises the real surface
    - confirm the root cause by observing the failing state
    - identify the minimal fix path or maintainer action
-5. Compare runtime evidence with both `$LAZYCODEX_SOURCE_ROOT/lazycodex-source` and `$LAZYCODEX_SOURCE_ROOT/openai-codex-source` before choosing the target repo. Cite exact files, commands, logs, or source paths that support the routing decision.
+5. Compare runtime evidence with both `$LAZYCODEX_SOURCE_ROOT/lazycodex-source` and `$LAZYCODEX_SOURCE_ROOT/chatgpt-subscription-source` before choosing the target repo. Cite exact files, commands, logs, or source paths that support the routing decision.
 6. Choose the target repo:
    - Use `code-yeongyu/lazycodex` when the bug is in LazyCodex integration, distribution, bundled plugin code, skills, hooks, MCP wiring, installer behavior, aliases, marketplace sync, docs, or any behavior that disappears in clean upstream Codex.
    - Use `openai/codex` when the bug reproduces in clean upstream Codex without LazyCodex, or the failing behavior comes from Codex CLI core, plugin API contracts, sandboxing, approvals, config loading, or built-in tool behavior.
    - If ownership remains ambiguous after evidence gathering, do not guess. Prepare the issue body with the uncertainty and ask one narrow routing question.
-7. Search for an existing issue in the selected repo before creating a new one. Search the other repo too when the ownership boundary is close:
+7. Search for an existing issue or lead PR before creating anything new. Search your own open PRs across all repos first (`gh search prs --author @me --state open "<symbol or error text>"`), then the selected repo, and the other repo too when the ownership boundary is close:
 
 ```bash
 TARGET_REPO="code-yeongyu/lazycodex" # or openai/codex
@@ -111,7 +111,7 @@ fi
 
 If the selected repo is `openai/codex` and label management is not available, still include the footer tag in the body and continue without claiming label creation succeeded.
 10. If no matching issue exists, create the issue with `gh` and apply the `lazycodex-generated` label.
-11. Create a PR only when the target repo is `openai/codex` AND the user asked for a PR, the fix is already implemented on a branch, or the smallest correct fix can be safely made there. Never create a PR or push a branch against `code-yeongyu/lazycodex` — always file an issue there, embedding the verified patch in the Proposed Fix section when one exists. Apply the `lazycodex-generated` label to every PR created by this skill. Otherwise create an issue with fix guidance.
+11. Create a PR only when the target repo is `openai/codex` or `code-yeongyu/oh-my-openagent` (the source of the LazyCodex mirror, base `dev`) AND the user asked for a PR, the fix is already implemented on a branch, or the smallest correct fix can be safely made there; use `$lcx-contribute-bug-fix` for the fix workflow. Never create a PR or push a branch against `code-yeongyu/lazycodex`: file a short issue there (symptom and failing input) that links the oh-my-openagent PR, with no patch. Apply the `lazycodex-generated` label to every PR created by this skill. Otherwise create an issue with fix guidance.
 
 ## Required Label And Footer
 
@@ -142,7 +142,7 @@ Write the issue body in English and keep it direct:
 - Target repository:
 - Why this belongs there:
 - LazyCodex evidence (runtime + `$LAZYCODEX_SOURCE_ROOT/lazycodex-source`):
-- Upstream Codex source evidence from `$LAZYCODEX_SOURCE_ROOT/openai-codex-source`:
+- Upstream Codex source evidence from `$LAZYCODEX_SOURCE_ROOT/chatgpt-subscription-source`:
 
 ## Reproduction
 1. [Exact command or UI action]
@@ -176,7 +176,7 @@ Tag: lazycodex-generated
 
 ## PR Body Template
 
-Use this only when a PR is the right artifact, which is only ever for `openai/codex`:
+Use this only when a PR is the right artifact, which is only ever for `openai/codex` or `code-yeongyu/oh-my-openagent`:
 
 ```markdown
 ## Summary
@@ -186,7 +186,7 @@ Use this only when a PR is the right artifact, which is only ever for `openai/co
 - Target repository:
 - Why this belongs there:
 - LazyCodex evidence (runtime + `$LAZYCODEX_SOURCE_ROOT/lazycodex-source`):
-- Upstream Codex source evidence from `$LAZYCODEX_SOURCE_ROOT/openai-codex-source`:
+- Upstream Codex source evidence from `$LAZYCODEX_SOURCE_ROOT/chatgpt-subscription-source`:
 
 ## Root Cause
 [Confirmed cause. Cite runtime evidence and source paths.]
@@ -226,7 +226,7 @@ if [ "${#LABEL_ARGS[@]}" -gt 0 ]; then
 fi
 ```
 
-For a PR from a branch pushed to a fork — `openai/codex` only, never `code-yeongyu/lazycodex`:
+For a PR from a branch pushed to a fork, against `openai/codex` or `code-yeongyu/oh-my-openagent` (never `code-yeongyu/lazycodex`):
 
 ```bash
 PR_BODY="${TMPDIR:-/tmp}/lcx-report-bug-pr-$(date +%Y%m%d-%H%M%S).md"
@@ -259,10 +259,10 @@ Stop and ask one narrow question only when the missing fact changes the issue ma
 
 Do not file:
 
-- a PR or pushed branch targeting `code-yeongyu/lazycodex` — file the issue instead, always
+- a PR or pushed branch targeting `code-yeongyu/lazycodex` — send a fix PR to `code-yeongyu/oh-my-openagent` and keep any mirror issue short, always
 - a vague issue without reproduction steps
 - an issue that claims a root cause not supported by runtime evidence
 - a duplicate when commenting on an existing issue is enough
-- an issue without checking the latest `$LAZYCODEX_SOURCE_ROOT/lazycodex-source` and `$LAZYCODEX_SOURCE_ROOT/openai-codex-source` checkouts
+- an issue without checking the latest `$LAZYCODEX_SOURCE_ROOT/lazycodex-source` and `$LAZYCODEX_SOURCE_ROOT/chatgpt-subscription-source` checkouts
 - a LazyCodex issue when the bug is proven to reproduce in clean upstream Codex
 - a fix PR without a concrete branch, implemented fix, and verification result

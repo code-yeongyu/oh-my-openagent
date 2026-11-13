@@ -11,16 +11,18 @@ interface OpencodeConfigWithSkills {
 export interface HostSkillConfigShape {
   paths?: string[]
   urls?: string[]
+  userPaths?: string[]
+  projectPaths?: string[]
 }
 
-function getConfigPaths(directory: string): string[] {
+function getConfigPaths(directory: string): { path: string; user: boolean }[] {
   const globalConfigDirs = getOpenCodeConfigDirs({ binary: "opencode" })
   return [
-    path.join(directory, ".opencode", "opencode.json"),
-    path.join(directory, ".opencode", "opencode.jsonc"),
+    { path: path.join(directory, ".opencode", "opencode.json"), user: false },
+    { path: path.join(directory, ".opencode", "opencode.jsonc"), user: false },
     ...globalConfigDirs.flatMap((dir) => [
-      path.join(dir, "opencode.json"),
-      path.join(dir, "opencode.jsonc"),
+      { path: path.join(dir, "opencode.json"), user: true },
+      { path: path.join(dir, "opencode.jsonc"), user: true },
     ]),
   ]
 }
@@ -36,8 +38,10 @@ function toStringArray(value: unknown): string[] {
 export function readOpencodeConfigSkills(directory: string): HostSkillConfigShape | undefined {
   const paths: string[] = []
   const urls: string[] = []
+  const userPaths: string[] = []
+  const projectPaths: string[] = []
 
-  for (const configPath of getConfigPaths(directory)) {
+  for (const { path: configPath, user } of getConfigPaths(directory)) {
     try {
       if (!fs.existsSync(configPath)) continue
       const content = fs.readFileSync(configPath, "utf-8")
@@ -46,6 +50,8 @@ export function readOpencodeConfigSkills(directory: string): HostSkillConfigShap
 
       for (const p of toStringArray(parseResult.data.skills.paths)) {
         if (!paths.includes(p)) paths.push(p)
+        if (user && !userPaths.includes(p)) userPaths.push(p)
+        if (!user && !projectPaths.includes(p)) projectPaths.push(p)
       }
       for (const u of toStringArray(parseResult.data.skills.urls)) {
         if (!urls.includes(u)) urls.push(u)
@@ -59,5 +65,5 @@ export function readOpencodeConfigSkills(directory: string): HostSkillConfigShap
   }
 
   if (paths.length === 0 && urls.length === 0) return undefined
-  return { paths, urls }
+  return { paths, urls, userPaths, projectPaths }
 }

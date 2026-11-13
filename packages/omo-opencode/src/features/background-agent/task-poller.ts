@@ -20,22 +20,24 @@ import { isActiveSessionStatus } from "./session-status-classifier"
 import { getSessionActivityFromClient, type SessionActivityResolver } from "./session-activity"
 import { refreshTaskActivityFromSession } from "./task-activity-refresh"
 
-const TERMINAL_TASK_STATUSES = new Set<BackgroundTask["status"]>([
-  "completed",
-  "error",
-  "cancelled",
-  "interrupt",
-])
+const TERMINAL_TASK_STATUSES = new Set<BackgroundTask["status"]>(["completed", "error", "cancelled", "interrupt"])
 
 export function pruneStaleTasksAndNotifications(args: {
   tasks: Map<string, BackgroundTask>
   notifications: Map<string, BackgroundTask[]>
   onTaskPruned: (taskId: string, task: BackgroundTask, errorMessage: string) => void
   taskTtlMs?: number
+  taskCleanupDelayMs?: number
   sessionStatuses?: SessionStatusMap
+  hasPendingRemovalTimer?: (taskId: string) => boolean
+  hasAttachedSyncSession?: (sessionID: string) => boolean
 }): void {
   const { tasks, notifications, onTaskPruned } = args
   const effectiveTtl = args.taskTtlMs ?? TASK_TTL_MS
+  // Never prune earlier than the terminal TTL floor; shorter configured delays
+  // are owned by scheduleTaskRemoval, which also handles sync attachments,
+  // sibling deferral, archiving, and child session deletion.
+  const terminalTtl = Math.max(TERMINAL_TASK_TTL_MS, args.taskCleanupDelayMs ?? 0)
   const now = Date.now()
   const tasksWithPendingNotifications = new Set<string>()
 
@@ -48,12 +50,17 @@ export function pruneStaleTasksAndNotifications(args: {
   for (const [taskId, task] of tasks.entries()) {
     if (TERMINAL_TASK_STATUSES.has(task.status)) {
       if (tasksWithPendingNotifications.has(taskId)) continue
+      // scheduleTaskRemoval owns records it still tracks; pruning them here
+      // would bypass its sync-continuation guard, sibling deferral, archive,
+      // registry, and child session cleanup.
+      if (args.hasPendingRemovalTimer?.(taskId)) continue
+      if (task.sessionId && args.hasAttachedSyncSession?.(task.sessionId)) continue
 
       const completedAt = task.completedAt?.getTime()
       if (!completedAt) continue
 
       const age = now - completedAt
-      if (age <= TERMINAL_TASK_TTL_MS) continue
+      if (age <= terminalTtl) continue
 
       removeTaskToastTracking(taskId)
       tasks.delete(taskId)
@@ -69,12 +76,9 @@ export function pruneStaleTasksAndNotifications(args: {
       continue
     }
 
-    const lastActivity = task.status === "running" && task.progress?.lastUpdate
-      ? task.progress.lastUpdate.getTime()
-      : undefined
-    const timestamp = task.status === "pending"
-      ? task.queuedAt?.getTime()
-      : (lastActivity ?? task.startedAt?.getTime())
+    const lastActivity =
+      task.status === "running" && task.progress?.lastUpdate ? task.progress.lastUpdate.getTime() : undefined
+    const timestamp = task.status === "pending" ? task.queuedAt?.getTime() : (lastActivity ?? task.startedAt?.getTime())
 
     if (!timestamp) continue
 
@@ -82,9 +86,10 @@ export function pruneStaleTasksAndNotifications(args: {
     if (age <= effectiveTtl) continue
 
     const ttlMinutes = Math.round(effectiveTtl / 60000)
-    const errorMessage = task.status === "pending"
-      ? `Task timed out while queued (${ttlMinutes} minutes)`
-      : `Task timed out after ${ttlMinutes} minutes of inactivity`
+    const errorMessage =
+      task.status === "pending"
+        ? `Task timed out while queued (${ttlMinutes} minutes)`
+        : `Task timed out after ${ttlMinutes} minutes of inactivity`
 
     onTaskPruned(taskId, task, errorMessage)
   }
@@ -114,6 +119,7 @@ export type SessionStatusMap = Record<string, { type: string }>
 async function interruptStaleTask(args: {
   task: BackgroundTask
   client: OpencodeClient
+  directory?: string
   concurrencyManager: ConcurrencyManager
   notifyParentSession: (task: BackgroundTask) => Promise<void>
   onTaskInterrupted: (task: BackgroundTask) => void
@@ -127,6 +133,7 @@ async function interruptStaleTask(args: {
   const {
     task,
     client,
+    directory,
     concurrencyManager,
     notifyParentSession,
     onTaskInterrupted,
@@ -140,12 +147,20 @@ async function interruptStaleTask(args: {
 
   const aborted = await abortWithTimeout(client, sessionID)
   if (!aborted) {
-    log("[background-agent] Task stale interruption skipped because session abort failed:", {
+    const existence = await checkSessionExistence(client, sessionID, directory)
+    if (existence !== "missing") {
+      log("[background-agent] Task stale interruption skipped because session abort failed:", {
+        taskId: task.id,
+        sessionID,
+        reason,
+      })
+      return
+    }
+    log("[background-agent] Session is gone and cannot be aborted; finalizing the stale task:", {
       taskId: task.id,
       sessionID,
       reason,
     })
-    return
   }
 
   if (task.status !== "running" || task.sessionId !== sessionID) return
@@ -195,8 +210,8 @@ export async function checkAndInterruptStaleTasks(args: {
   const now = Date.now()
 
   const messageStalenessMs = config?.messageStalenessTimeoutMs ?? DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS
-  const getSessionActivity = args.getSessionActivity
-    ?? ((id: string) => getSessionActivityFromClient(client, id, directory))
+  const getSessionActivity =
+    args.getSessionActivity ?? ((id: string) => getSessionActivityFromClient(client, id, directory))
   const staleInterruptions: Array<Promise<void>> = []
 
   for (const task of tasks) {
@@ -218,9 +233,8 @@ export async function checkAndInterruptStaleTasks(args: {
 
     const sessionGone = sessionMissing && (task.consecutiveMissedPolls ?? 0) >= MIN_SESSION_GONE_POLLS
     const shouldSkipInactivityTimeout = task.teamRunId !== undefined && !sessionGone
-    const shouldRefreshFromSessionActivity = !sessionGone
-      && sessionStatus !== undefined
-      && isActiveSessionStatus(sessionStatus)
+    const shouldRefreshFromSessionActivity =
+      !sessionGone && sessionStatus !== undefined && isActiveSessionStatus(sessionStatus)
 
     if (!task.progress?.lastUpdate) {
       if (shouldSkipInactivityTimeout) continue
@@ -249,6 +263,7 @@ export async function checkAndInterruptStaleTasks(args: {
         interruptStaleTask({
           task,
           client,
+          directory,
           concurrencyManager,
           notifyParentSession,
           onTaskInterrupted,
@@ -274,8 +289,9 @@ export async function checkAndInterruptStaleTasks(args: {
     if (shouldRefreshFromSessionActivity) {
       const activityRefresh = await refreshTaskActivityFromSession(task, getSessionActivity)
       if (activityRefresh.type === "unavailable") continue
-      const refreshedLastUpdate = task.progress?.lastUpdate.getTime()
-        ?? (activityRefresh.type === "activity" ? activityRefresh.activityTime : undefined)
+      const refreshedLastUpdate =
+        task.progress?.lastUpdate.getTime() ??
+        (activityRefresh.type === "activity" ? activityRefresh.activityTime : undefined)
       if (refreshedLastUpdate !== undefined && now - refreshedLastUpdate <= effectiveStaleTimeout) continue
       if (refreshedLastUpdate !== undefined) {
         timeSinceLastUpdate = now - refreshedLastUpdate
@@ -299,6 +315,7 @@ export async function checkAndInterruptStaleTasks(args: {
       interruptStaleTask({
         task,
         client,
+        directory,
         concurrencyManager,
         notifyParentSession,
         onTaskInterrupted,

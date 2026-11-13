@@ -1,0 +1,47 @@
+{
+  "request": {
+    "record": {
+      "kind": "genesis",
+      "account": "genesis-vector-account",
+      "epoch": 1,
+      "bootstrap": {
+        "account": "genesis-vector-account",
+        "custody_nonce": "BQUFBQUFBQUFBQUFBQUFBQ",
+        "first_device": {
+          "kind": "device",
+          "id": "HcahOcBrYYAu1Uf5BVu8YQ",
+          "sealing_public_key": "zo060cy2M-x7cMF4FKXHbs0CloUFDTRHRboFhw5YfVk",
+          "signing_public_key": "iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w"
+        },
+        "recovery_key": {
+          "credential_id": "BgYGBgYGBgYGBgYGBgYGBg",
+          "rp_id": "recovery.omo.dev",
+          "enrollment_nonce": "BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ",
+          "sealing_public_key": "b3TgMGIJzxVF9_OcQ6z8Rrin9K88x8lojCQxzF6VDko",
+          "signing_public_key": "DDOA7fW1DqB4eUL0fG7F1C1yM7f-6KH3M9kc44eiEMM",
+          "survivable": "synced"
+        }
+      },
+      "custody_root": "bs91HcScETY1es8LJPAilYCEo8pEQT5Z7vGhWHUnsH8",
+      "countersign": "kRtLbhvXrJFjr-WrUAF9hOB43eSb6L7kIBU7MHl3Uhf3nywcxsYiXDZtk_VLLuIfg-DcO3DHub_LdhCb4DAjCA",
+      "wraps_digest": "dAfOtSv-aa4QBc5ZZTHtfb3kuJ8PJfTWGVobiYq8RDs"
+    },
+    "base_seq": 0,
+    "link": "oGNPNwLv7oxTjndfKGCKYHcFOM72sbTWGGsN0ASzvtI",
+    "keyring_link": "oGNPNwLv7oxTjndfKGCKYHcFOM72sbTWGGsN0ASzvtI",
+    "record_sig": "f_nJDUqCtZPTY4i4hTXm7cJa6eNw1PuxmpOlOOoQq5xDlIW590X38gLX624SrYopEoVDMvoixvO7PrUywnttCw",
+    "wraps": [
+      {
+        "epoch": 1,
+        "id": "device:HcahOcBrYYAu1Uf5BVu8YQ",
+        "wrap": "vOBZv1sqt6kfPoY6zwyE0-u-BMqEkAlLBStbFa-rF0Pb4w-RANFb8WZJZ9tPfDbcsTcM_25kLgomTVUeaJlSi3DuYwyZRqcGW4FXJAJu8ymtJGjsAcYdutdKRnZPOhdF5lsJohnqUxPmcUyUKADWSI_zsItZwnAvBOXGsFTgX5TfH091WmxftxbB5Vyf-ZniXmNAgJ9ciudTANpjirql_HfqnjZ9_kGEz6byRvSprlyna-34ojN3RwmF4BUim8K7D7CkoEJxwpLrqMiEJ2VwCW8VUOaM5LuZpvBM3dyb2yO9bmJjcpOq3x_lLdVDW9YLsfI6_yv2ApsRcJemq56yd6xpHcD8ZVCgNUbkFnPwjwZn0qGE5YKbLQjse-yWKEysAxLQUc3Y_uBLcJmhcfbYIjTRtMHEGK8"
+      },
+      {
+        "epoch": 1,
+        "id": "recovery:BgYGBgYGBgYGBgYGBgYGBg",
+        "wrap": "f0QvtOzJ3WzeRjWIH74rtDO2ewBJNcQzDSHjb2gaDhKXxmfX_7cHwK3JrEP_sx150KStIlAxLIplDPrgHPHIToF8Jib1P2aZHcIRafOdz3ECiqHT5gCNyaX0dpVDY6Lf0jbh3BTZjvWbNjZQ6ssa9T7za4pBCL2qp6Oe-t-WjLIrKzDLVokBt7LzMISJiBWFV6PFFAHGxnEGjorseaP9vy661q2CPiZF_cAuvv9ZPRYXS39Q91StI853M6BF8neA79F4sL6jFsrX_dpIZShtpuS9K8FNc6UL9GXZJXcLS10m0p9GfdaHg8YzocUMfJ5kYZCcL0Yte8NuiKCLybjXIYhbj-S9PnspEpg1ji08saoKVsjoukhvkYUhRNpBENnoggAuVmegZAMrSlcG4pafe8PhoF1ALsQxmQ"
+      }
+    ]
+  },
+  "digest": "roUJzYWqMEiGLSi4Pz1HYboQpseROSSL0tSmvZBI-Mc"
+}

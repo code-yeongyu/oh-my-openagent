@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -21,8 +21,7 @@ function tempStateDir(): string {
 }
 
 afterAll(() => {
-  // best-effort cleanup handled by the OS temp reaper; dirs recorded for traceability.
-  void dirs
+  for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
 })
 
 describe("readEventLogTranscript", () => {

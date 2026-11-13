@@ -2,7 +2,6 @@ import type { BuiltinSkill } from "./types"
 import type { BrowserAutomationProvider } from "../../types"
 
 import {
-  agentBrowserSkill,
   createPlaywrightSkill,
   playwrightSkill,
   playwrightCliSkill,
@@ -15,6 +14,7 @@ import {
   reviewWorkSkill,
   securityResearchSkill,
   securityReviewSkill,
+  hyperplanSkill,
   visualQaSkill,
   teamModeSkill,
 } from "./skills/index"
@@ -34,38 +34,27 @@ export interface CreateBuiltinSkillsOptions {
 }
 
 export function createBuiltinSkills(options: CreateBuiltinSkillsOptions = {}): BuiltinSkill[] {
-  const {
-    browserProvider = "playwright",
-    disabledSkills,
-    teamModeEnabled = false,
-    playwrightMcpArgs,
-  } = options
+  const { browserProvider = "playwright", disabledSkills, teamModeEnabled = false, playwrightMcpArgs } = options
 
-  let browserSkill: BuiltinSkill
-	if (browserProvider === "agent-browser") {
-		browserSkill = agentBrowserSkill
-	} else if (browserProvider === "dev-browser") {
-		browserSkill = devBrowserSkill
-	} else if (browserProvider === "playwright-cli") {
-		browserSkill = playwrightCliSkill
-	} else {
-		browserSkill = playwrightMcpArgs?.length
-			? createPlaywrightSkill({ mcp_args: playwrightMcpArgs })
-			: playwrightSkill
-	}
+  const browserSkills = {
+    "dev-browser": devBrowserSkill,
+    "playwright-cli": playwrightCliSkill,
+    playwright: playwrightMcpArgs?.length ? createPlaywrightSkill({ mcp_args: playwrightMcpArgs }) : playwrightSkill,
+  } satisfies Record<BrowserAutomationProvider, BuiltinSkill>
 
-	const skills = [
-		browserSkill,
-		frontendSkill,
-		gitMasterSkill,
-		reviewWorkSkill,
-		removeAiSlopsSkill,
-		initDeepSkill,
-		debuggingSkill,
-		securityResearchSkill,
-		securityReviewSkill,
-		visualQaSkill,
-	]
+  const skills = [
+    browserSkills[browserProvider],
+    frontendSkill,
+    gitMasterSkill,
+    reviewWorkSkill,
+    removeAiSlopsSkill,
+    initDeepSkill,
+    debuggingSkill,
+    securityResearchSkill,
+    securityReviewSkill,
+    hyperplanSkill,
+    visualQaSkill,
+  ]
 
   if (teamModeEnabled && !disabledSkills?.has("team-mode")) {
     skills.push(teamModeSkill)

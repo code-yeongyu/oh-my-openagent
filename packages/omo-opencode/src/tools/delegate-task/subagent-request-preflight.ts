@@ -6,9 +6,10 @@ import { sanitizeSubagentType } from "./subagent-discovery"
 import type { ResolveSubagentExecutionOptions, SubagentRequestPreflight } from "./subagent-resolution-types"
 
 function buildSisyphusJuniorError(categoryExamples: string): string {
-  const exampleHint = categoryExamples.trim() !== ""
-    ? `Use category parameter instead (e.g., ${categoryExamples}).`
-    : `Use the category parameter instead (pick one of: quick, deep, ultrabrain, visual-engineering, artistry, writing).`
+  const exampleHint =
+    categoryExamples.trim() !== ""
+      ? `Use category parameter instead (e.g., ${categoryExamples}).`
+      : `Use the category parameter instead (pick one of: quick, deep, ultrabrain, visual-engineering, artistry, writing).`
 
   return `Cannot use subagent_type="${SISYPHUS_JUNIOR_AGENT}" directly. ${exampleHint}
 
@@ -61,7 +62,7 @@ Create the work plan directly - that's your job as the planning agent.`,
       result: {
         agentToUse: "",
         categoryModel: undefined,
-        error: `Cannot delegate to coordinator agent "${agentName}" via task(). Coordinator agents (${COORDINATOR_AGENT_NAMES.join(", ")}) own the orchestration loop and must not be used as subagent targets — doing so creates duplicate coordinators and conflicting team state. Select a worker agent (e.g., sisyphus-junior via category, hephaestus, oracle) instead.`,
+        error: `Cannot delegate to coordinator agent "${agentName}" via task(). Coordinator agents (${COORDINATOR_AGENT_NAMES.join(", ")}) own the orchestration loop and must not be used as subagent targets: doing so creates duplicate coordinators and conflicting team state. Select a worker agent (e.g., sisyphus-junior via category, hephaestus, oracle) instead.`,
       },
     }
   }

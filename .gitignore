@@ -10,12 +10,16 @@ node_modules/
 
 # Build output
 dist/
+.vitest/
 packages/omo-codex/plugin/skills/
 
 # Platform binaries (built, not committed)
 packages/*/bin/oh-my-opencode
 packages/*/bin/oh-my-opencode.exe
 packages/*/bin/*.map
+# The keychain helper is built and signed by the release lane (#11262), never committed.
+packages/*/bin/omo-keychain
+packages/omo-native/bin/darwin/
 
 # IDE
 .idea/
@@ -45,12 +49,16 @@ test-injection/
 notepad.md
 oauth-success.html
 *.bun-build
-.dori-sync/
-.dori/
 .playwright-mcp/
 
 # Debugging / session artifacts (skill workspace residue)
 .debugging
+local-ignore/
+.local-ignore/
+# QA evidence stays local and is summarized in the PR body, never committed (#8703).
+# .omo/evidence/ is covered by `.omo/*` above; these catch hand-typed capture roots.
+.qa-evidence/
+qa-evidence/
 .debug-journal*.md
 session-ses_*.md
 pr-*.md
@@ -61,3 +69,12 @@ plans/
 !.claude/commands
 !.claude/settings.json
 .dys/
+
+# Committed omo state. Everything else under .omo/ (evidence, plans, drafts, ...) is per-session
+# and stays ignored; these negations come last so they also win over the artifact patterns above.
+!.omo/fixtures/
+!.omo/fixtures/**
+!.omo/init-deep.json
+
+# Rust workspace (crates/senpi-desktop-*)
+/target

@@ -1,11 +1,9 @@
-import { execFileSync } from "node:child_process"
-
 import type { ExtensionContext } from "@code-yeongyu/senpi"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { getBuiltinSkillsRoot } from "../telemetry/product-identity"
 import { computeEligibility } from "./eligibility"
-import { gitHead } from "./git-helpers"
+import { gitHead, run } from "./git-helpers"
 import { buildProposedData } from "./proposed-data"
 import type { EligibilityResult, SuggestedMode } from "./proposed-data"
 import {
@@ -20,12 +18,7 @@ import {
   writeProjectDecline,
 } from "./state"
 
-const CHOICES = [
-  "Run now",
-  "Skip this time",
-  "Never in this project",
-  "Never anywhere",
-] as const
+const CHOICES = ["Run now", "Skip this time", "Never in this project", "Never anywhere"] as const
 
 export interface AdvisorPreflight {
   readonly root: string
@@ -44,12 +37,7 @@ export async function runAdvisorAfterPreflight(
   const cooldownUntil = readCooldownUntil(stateDir, repo)
   if (Date.now() < cooldownUntil) return
   const currentHead = gitHead(root)
-  const eligibility = computeEligibility(
-    root,
-    currentHead,
-    readLastProposedHead(stateDir, repo),
-    cooldownUntil,
-  )
+  const eligibility = computeEligibility(root, currentHead, readLastProposedHead(stateDir, repo), cooldownUntil)
   if (eligibility === null) return
   writeLastProposedHead(stateDir, repo, currentHead)
   await new Promise<void>((resolve) => setTimeout(resolve, 0))
@@ -75,10 +63,7 @@ function handleChoice(
       },
       { triggerTurn: true, deliverAs: "followUp" },
     )
-    pi.appendEntry?.(
-      "omo-init-deep-advisor:proposed",
-      buildProposedData(repo, eligibility, suggestedMode(root)),
-    )
+    pi.appendEntry?.("omo-init-deep-advisor:proposed", buildProposedData(repo, eligibility, suggestedMode(root)))
     return
   }
   if (choice === "Skip this time" || choice === undefined) {
@@ -94,11 +79,7 @@ function handleChoice(
 
 function suggestedMode(root: string): SuggestedMode {
   try {
-    execFileSync("git", ["ls-files", "--error-unmatch", "AGENTS.md"], {
-      cwd: root,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    })
+    run(root, ["ls-files", "--error-unmatch", "AGENTS.md"])
     return "committed"
   } catch {
     return "local"

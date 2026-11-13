@@ -13,7 +13,10 @@ const PLAIN_THEME = {
 function render(data: MemoryRecallRecord | undefined): string[] {
   const component = renderRecallEntry({ data } as never, { expanded: false }, PLAIN_THEME as never)
   expect(component).toBeDefined()
-  return component!.render(120).slice(1, -1).map((line) => line.slice(1).trimEnd())
+  return component!
+    .render(120)
+    .slice(1, -1)
+    .map((line) => line.slice(1).trimEnd())
 }
 
 describe("renderRecallEntry", () => {
@@ -41,6 +44,6 @@ describe("renderRecallEntry", () => {
 
   test("#given the renderer channel #when its custom type is read #then it matches the injected recall message", () => {
     // given / when / then
-    expect(RECALL_CUSTOM_TYPE).toBe("omo-memorian:recall")
+    expect(RECALL_CUSTOM_TYPE).toBe("omo-kibitzer:recall")
   })
 })

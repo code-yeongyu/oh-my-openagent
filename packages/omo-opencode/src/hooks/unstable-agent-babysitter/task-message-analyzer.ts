@@ -10,6 +10,7 @@ type MessageInfo = {
   model?: { providerID: string; modelID: string; variant?: string }
   providerID?: string
   modelID?: string
+  variant?: string
   tools?: Record<string, boolean | "allow" | "deny" | "ask">
 }
 
@@ -23,37 +24,29 @@ function hasData(value: unknown): value is { data?: unknown } {
   return typeof value === "object" && value !== null && "data" in value
 }
 
-
-
 export function getMessageInfo(value: unknown): MessageInfo | undefined {
   if (!isRecord(value)) return undefined
   if (!isRecord(value.info)) return undefined
   const info = value.info
-  const modelValue = isRecord(info.model)
-    ? info.model
-    : undefined
-  const model = modelValue && typeof modelValue.providerID === "string" && typeof modelValue.modelID === "string"
-    ? {
-        providerID: modelValue.providerID,
-        modelID: modelValue.modelID,
-        ...(typeof modelValue.variant === "string" ? { variant: modelValue.variant } : {}),
-      }
-    : undefined
+  const modelValue = isRecord(info.model) ? info.model : undefined
+  const model =
+    modelValue && typeof modelValue.providerID === "string" && typeof modelValue.modelID === "string"
+      ? {
+          providerID: modelValue.providerID,
+          modelID: modelValue.modelID,
+          ...(typeof modelValue.variant === "string" ? { variant: modelValue.variant } : {}),
+        }
+      : undefined
   return {
     role: typeof info.role === "string" ? info.role : undefined,
     agent: typeof info.agent === "string" ? info.agent : undefined,
     model,
     providerID: typeof info.providerID === "string" ? info.providerID : undefined,
     modelID: typeof info.modelID === "string" ? info.modelID : undefined,
+    variant: typeof info.variant === "string" ? info.variant : undefined,
     tools: isRecord(info.tools)
       ? Object.entries(info.tools).reduce<Record<string, boolean | "allow" | "deny" | "ask">>((acc, [key, value]) => {
-          if (
-            value === true ||
-            value === false ||
-            value === "allow" ||
-            value === "deny" ||
-            value === "ask"
-          ) {
+          if (value === true || value === false || value === "allow" || value === "deny" || value === "ask") {
             acc[key] = value
           }
           return acc

@@ -31,14 +31,49 @@ describe("config check", () => {
       expect(Array.isArray(result.issues)).toBe(true)
     })
 
-    it("uses the OPENCODE_CONFIG_DIR profiles tail after module import", async () => {
-      const originalConfigDir = process.env.OPENCODE_CONFIG_DIR
+    it("#given a user config with one invalid value #when running the config check #then it warns once, naming the file and the dotted key", async () => {
       const originalHome = process.env.HOME
       const originalCwd = process.cwd()
       const testRootDir = join(
         tmpdir(),
-        `omo-doctor-config-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        `omo-doctor-config-invalid-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       )
+      const projectDir = join(testRootDir, "project")
+
+      try {
+        //#given a user omo.jsonc whose task.host_engine_policy is not an allowed value
+        mkdirSync(projectDir, { recursive: true })
+        mkdirSync(join(testRootDir, ".omo"), { recursive: true })
+        writeFileSync(
+          join(testRootDir, ".omo", "omo.jsonc"),
+          JSON.stringify({ task: { host_engine_policy: "sometimes", default_concurrency: 3 } }),
+          "utf-8",
+        )
+        process.env.HOME = testRootDir
+        process.chdir(projectDir)
+
+        //#when running the consolidated config check
+        const result = await config.checkConfig()
+
+        //#then the file still counts as loaded and the ignored key is one warning
+        expect(result.status).toBe("warn")
+        const ignored = result.issues.filter((issue) => issue.affects?.includes("configuration"))
+        expect(ignored.map((issue) => [issue.severity, issue.title])).toEqual([
+          ["warning", "config: ~/.omo/omo.jsonc: task.host_engine_policy ignored (invalid value)"],
+        ])
+      } finally {
+        process.chdir(originalCwd)
+        rmSync(testRootDir, { recursive: true, force: true })
+        if (originalHome === undefined) delete process.env.HOME
+        else process.env.HOME = originalHome
+      }
+    })
+
+    it("uses the OPENCODE_CONFIG_DIR profiles tail after module import", async () => {
+      const originalConfigDir = process.env.OPENCODE_CONFIG_DIR
+      const originalHome = process.env.HOME
+      const originalCwd = process.cwd()
+      const testRootDir = join(tmpdir(), `omo-doctor-config-${Date.now()}-${Math.random().toString(36).slice(2)}`)
       const projectDir = join(testRootDir, "project")
       const userConfigPath = join(testRootDir, ".omo", "omo.jsonc")
 
@@ -50,15 +85,19 @@ describe("config check", () => {
         process.env.OPENCODE_CONFIG_DIR = join(testRootDir, "opencode", "profiles", "focused")
         writeFileSync(
           userConfigPath,
-          JSON.stringify({
-            profiles: {
-              focused: {
-                "[opencode]": {
-                  categories: { deep: { model: "profile-only-model" } },
+          JSON.stringify(
+            {
+              profiles: {
+                focused: {
+                  "[opencode]": {
+                    categories: { deep: { model: "profile-only-model" } },
+                  },
                 },
               },
             },
-          }, null, 2) + "\n",
+            null,
+            2,
+          ) + "\n",
           "utf-8",
         )
         process.chdir(projectDir)
@@ -68,7 +107,7 @@ describe("config check", () => {
 
         //#then the profile overlay is active and the unified user layer is reported
         expect(result.status).toBe("warn")
-        expect(result.issues.some((issue) => issue.title === "Invalid category override: deep")).toBe(true)
+        expect(result.issues.some((issue) => issue.title === "Invalid category override: deep-low")).toBe(true)
         expect(normalizePathForAssertion(result.details?.[0] ?? "")).toContain(
           normalizePathForAssertion(userConfigPath),
         )
@@ -157,30 +196,34 @@ describe("config check", () => {
 
         writeFileSync(
           join(testRootDir, ".omo", "omo.jsonc"),
+          JSON.stringify({ "[opencode]": { agents: { sisyphus: { model: "kiro/claude-opus-4-6" } } } }, null, 2) + "\n",
+          "utf-8",
+        )
+        writeFileSync(
+          join(xdgConfigDir, "opencode", "opencode.json"),
           JSON.stringify(
-            { "[opencode]": { agents: { sisyphus: { model: "kiro/claude-opus-4-6" } } } },
+            {
+              provider: {
+                kiro: {
+                  npm: "@ai-sdk/openai-compatible",
+                  models: { "claude-opus-4-6": {} },
+                },
+              },
+            },
             null,
             2,
           ) + "\n",
           "utf-8",
         )
         writeFileSync(
-          join(xdgConfigDir, "opencode", "opencode.json"),
-          JSON.stringify({
-            provider: {
-              kiro: {
-                npm: "@ai-sdk/openai-compatible",
-                models: { "claude-opus-4-6": {} },
-              },
-            },
-          }, null, 2) + "\n",
-          "utf-8",
-        )
-        writeFileSync(
           join(xdgCacheDir, "opencode", "models.json"),
-          JSON.stringify({
-            openai: { models: { "gpt-5.4": {} } },
-          }, null, 2) + "\n",
+          JSON.stringify(
+            {
+              openai: { models: { "gpt-5.4": {} } },
+            },
+            null,
+            2,
+          ) + "\n",
           "utf-8",
         )
 
@@ -233,13 +276,17 @@ describe("config check", () => {
         delete process.env.OPENCODE_CONFIG_DIR
         writeFileSync(
           join(testRootDir, ".omo", "omo.jsonc"),
-          JSON.stringify({
-            "[opencode]": {
-              agents: {
-                sisyphus: { reasoningEffort: "max" },
+          JSON.stringify(
+            {
+              "[opencode]": {
+                agents: {
+                  sisyphus: { reasoningEffort: "max" },
+                },
               },
             },
-          }, null, 2) + "\n",
+            null,
+            2,
+          ) + "\n",
           "utf-8",
         )
         process.chdir(projectDir)

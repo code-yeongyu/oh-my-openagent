@@ -10,15 +10,16 @@ import {
 import { log } from "../../shared/logger"
 import { injectBoulderContinuation } from "./boulder-continuation-injector"
 import { HOOK_NAME } from "./hook-name"
-import {
-  CONTINUATION_COOLDOWN_MS,
-  MAX_CONSECUTIVE_PROMPT_FAILURES,
-  RETRY_DELAY_MS,
-} from "./idle-constants"
+import { CONTINUATION_COOLDOWN_MS, MAX_CONSECUTIVE_PROMPT_FAILURES, RETRY_DELAY_MS } from "./idle-constants"
 import { canContinueTrackedBoulderSession } from "./idle-session-eligibility"
-import type { AtlasHookOptions, SessionState } from "./types"
+import type { AtlasHookOptions, AtlasRetryScheduler, SessionState } from "./types"
 
 const ACTIVE_BACKGROUND_TASK_STATUSES = new Set(["pending", "running"])
+
+export const scheduleRetryWithTimer: AtlasRetryScheduler = (callback, delayMs) => {
+  const timer = setTimeout(callback, delayMs)
+  return { cancel: () => clearTimeout(timer) }
+}
 
 export function hasRunningBackgroundTasks(sessionID: string, options?: AtlasHookOptions): boolean {
   const backgroundManager = options?.backgroundManager
@@ -57,16 +58,9 @@ export async function injectContinuation(input: {
   try {
     const currentBoulder = readBoulderState(input.ctx.directory)
     const normalizedSessionID = normalizeSessionId(input.sessionID)
-    const currentPlanPath = currentBoulder
-      ? resolveBoulderPlanPath(input.ctx.directory, currentBoulder)
-      : null
-    const currentTask = currentBoulder
-      && currentPlanPath
-      ? readCurrentTopLevelTask(currentPlanPath)
-      : null
-    const preferredTaskSession = currentTask
-      ? getTaskSessionState(input.ctx.directory, currentTask.key)
-      : null
+    const currentPlanPath = currentBoulder ? resolveBoulderPlanPath(input.ctx.directory, currentBoulder) : null
+    const currentTask = currentBoulder && currentPlanPath ? readCurrentTopLevelTask(currentPlanPath) : null
+    const preferredTaskSession = currentTask ? getTaskSessionState(input.ctx.directory, currentTask.key) : null
 
     if (!currentBoulder) {
       return
@@ -104,7 +98,7 @@ export async function injectContinuation(input: {
 
     if (result === "injected") {
       if (input.sessionState.pendingRetryTimer) {
-        clearTimeout(input.sessionState.pendingRetryTimer)
+        input.sessionState.pendingRetryTimer.cancel()
         input.sessionState.pendingRetryTimer = undefined
       }
       input.sessionState.lastContinuationInjectedAt = Date.now()
@@ -167,7 +161,8 @@ export function scheduleRetry(input: {
     return
   }
 
-  sessionState.pendingRetryTimer = setTimeout(async () => {
+  const schedule = options?.retryScheduler ?? scheduleRetryWithTimer
+  sessionState.pendingRetryTimer = schedule(async () => {
     try {
       sessionState.pendingRetryTimer = undefined
 
@@ -179,8 +174,8 @@ export function scheduleRetry(input: {
 
       const now = Date.now()
       if (
-        sessionState.lastContinuationInjectedAt
-        && now - sessionState.lastContinuationInjectedAt < CONTINUATION_COOLDOWN_MS
+        sessionState.lastContinuationInjectedAt &&
+        now - sessionState.lastContinuationInjectedAt < CONTINUATION_COOLDOWN_MS
       ) {
         return
       }
@@ -191,7 +186,7 @@ export function scheduleRetry(input: {
       if (!currentBoulder.session_ids?.includes(normalizedSessionID)) return
 
       const currentProgress = getPlanProgress(resolveBoulderPlanPath(ctx.directory, currentBoulder))
-      if (currentProgress.isComplete) return
+      if (currentProgress.isComplete || currentProgress.total === 0) return
       if (options?.isContinuationStopped?.(sessionID)) return
       const canContinueSession = await canContinueTrackedBoulderSession({
         client: ctx.client,

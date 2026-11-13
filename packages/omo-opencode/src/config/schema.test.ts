@@ -122,13 +122,7 @@ describe("disabled_mcps schema", () => {
   test("should accept MCP names with various naming patterns", () => {
     // given
     const config = {
-      disabled_mcps: [
-        "my-custom-mcp",
-        "my_custom_mcp",
-        "myCustomMcp",
-        "my.custom.mcp",
-        "my-custom-mcp-123",
-      ],
+      disabled_mcps: ["my-custom-mcp", "my_custom_mcp", "myCustomMcp", "my.custom.mcp", "my-custom-mcp-123"],
     }
 
     // when
@@ -314,9 +308,9 @@ describe("AgentOverrideConfigSchema", () => {
 
     test("accepts both model and category (deprecated usage)", () => {
       // given - category should take precedence at runtime, but both should validate
-      const config = { 
+      const config = {
         model: "openai/gpt-5.4",
-        category: "ultrabrain"
+        category: "ultrabrain",
       }
 
       // when
@@ -334,9 +328,9 @@ describe("AgentOverrideConfigSchema", () => {
   describe("combined fields", () => {
     test("accepts category with skills", () => {
       // given
-      const config = { 
+      const config = {
         category: "visual-engineering",
-        skills: ["frontend"]
+        skills: ["frontend"],
       }
 
       // when
@@ -352,11 +346,11 @@ describe("AgentOverrideConfigSchema", () => {
 
     test("accepts category with skills and other fields", () => {
       // given
-      const config = { 
+      const config = {
         category: "ultrabrain",
         skills: ["code-reviewer"],
         temperature: 0.3,
-        prompt_append: "Extra instructions"
+        prompt_append: "Extra instructions",
       }
 
       // when
@@ -473,7 +467,11 @@ describe("CategoryConfigSchema", () => {
     const schemas = [
       { name: "Category", schema: CategoryConfigSchema, build: (v: string) => ({ reasoningEffort: v }) },
       { name: "AgentOverride", schema: AgentOverrideConfigSchema, build: (v: string) => ({ reasoningEffort: v }) },
-      { name: "FallbackModel", schema: FallbackModelObjectSchema, build: (v: string) => ({ model: "openai/gpt-5", reasoningEffort: v }) },
+      {
+        name: "FallbackModel",
+        schema: FallbackModelObjectSchema,
+        build: (v: string) => ({ model: "openai/gpt-5", reasoningEffort: v }),
+      },
     ]
 
     // when / then: every schema accepts every value — guards against drift
@@ -500,7 +498,15 @@ describe("CategoryConfigSchema", () => {
 describe("BuiltinCategoryNameSchema", () => {
   test("accepts all builtin category names", () => {
     // given
-    const categories = ["visual-engineering", "ultrabrain", "artistry", "quick", "unspecified-low", "unspecified-high", "writing"]
+    const categories = [
+      "visual-engineering",
+      "ultrabrain",
+      "artistry",
+      "quick",
+      "unspecified-low",
+      "unspecified-high",
+      "writing",
+    ]
 
     // when / #then
     for (const cat of categories) {
@@ -511,9 +517,9 @@ describe("BuiltinCategoryNameSchema", () => {
 })
 
 describe("HookNameSchema", () => {
-  test("accepts codegraph bootstrap hook name", () => {
+  test("accepts ast-grep sg provision hook name", () => {
     //#given
-    const input = "codegraph-bootstrap"
+    const input = "ast-grep-sg-provision"
 
     //#when
     const result = HookNameSchema.safeParse(input)
@@ -618,9 +624,7 @@ describe("Sisyphus-Junior agent override", () => {
     // then
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.agents?.["sisyphus-junior"]?.prompt_append).toBe(
-        "Additional instructions for sisyphus-junior"
-      )
+      expect(result.data.agents?.["sisyphus-junior"]?.prompt_append).toBe("Additional instructions for sisyphus-junior")
     }
   })
 
@@ -716,16 +720,16 @@ describe("BrowserAutomationProviderSchema", () => {
     expect(result.data).toBe("playwright")
   })
 
-  test("accepts 'agent-browser' as valid provider", () => {
+  test("accepts 'dev-browser' as valid provider", () => {
     // given
-    const input = "agent-browser"
+    const input = "dev-browser"
 
     // when
     const result = BrowserAutomationProviderSchema.safeParse(input)
 
     // then
     expect(result.success).toBe(true)
-    expect(result.data).toBe("agent-browser")
+    expect(result.data).toBe("dev-browser")
   })
 
   test("rejects invalid provider", () => {
@@ -764,15 +768,15 @@ describe("BrowserAutomationConfigSchema", () => {
     expect(result.provider).toBe("playwright")
   })
 
-  test("accepts agent-browser provider", () => {
+  test("accepts dev-browser provider", () => {
     // given
-    const input = { provider: "agent-browser" }
+    const input = { provider: "dev-browser" }
 
     // when
     const result = BrowserAutomationConfigSchema.parse(input)
 
     // then
-    expect(result.provider).toBe("agent-browser")
+    expect(result.provider).toBe("dev-browser")
   })
 
   test("accepts playwright-cli provider in config", () => {
@@ -817,7 +821,7 @@ describe("OhMyOpenCodeConfigSchema - browser_automation_engine", () => {
     // given
     const input = {
       browser_automation_engine: {
-        provider: "agent-browser",
+        provider: "dev-browser",
       },
     }
 
@@ -826,7 +830,7 @@ describe("OhMyOpenCodeConfigSchema - browser_automation_engine", () => {
 
     // then
     expect(result.success).toBe(true)
-    expect(result.data?.browser_automation_engine?.provider).toBe("agent-browser")
+    expect(result.data?.browser_automation_engine?.provider).toBe("dev-browser")
   })
 
   test("accepts config without browser_automation_engine", () => {
@@ -1063,7 +1067,6 @@ describe("ExperimentalConfigSchema feature flags", () => {
     //#then
     expect(result.success).toBe(false)
   })
-
 })
 
 describe("GitMasterConfigSchema", () => {
@@ -1109,7 +1112,7 @@ describe("GitMasterConfigSchema", () => {
     }
   })
 
-  test("defaults commit_footer to true when not provided", () => {
+  test("defaults commit_footer to false when not provided", () => {
     //#given
     const config = {}
 
@@ -1119,7 +1122,7 @@ describe("GitMasterConfigSchema", () => {
     //#then
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.commit_footer).toBe(true)
+      expect(result.data.commit_footer).toBe(false)
     }
   })
 
@@ -1166,7 +1169,7 @@ describe("OhMyOpenCodeConfigSchema - git_master defaults (#2040)", () => {
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.git_master).toBeDefined()
-      expect(result.data.git_master.commit_footer).toBe(true)
+      expect(result.data.git_master.commit_footer).toBe(false)
       expect(result.data.git_master.include_co_authored_by).toBe(true)
       expect(result.data.git_master.git_env_prefix).toBe("GIT_MASTER=1")
     }

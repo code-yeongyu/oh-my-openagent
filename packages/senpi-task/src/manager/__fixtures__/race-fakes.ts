@@ -25,8 +25,8 @@ function oneIdleSession(): ChildSession {
   return {
     sessionId: "sess-race",
     prompt: () => idle,
-    steer: async () => {},
-    followUp: async () => {},
+    steer: async () => "handled",
+    followUp: async () => "handled",
     abort: async () => {
       fireIdle()
       await idle
@@ -75,7 +75,9 @@ class RaceRunner implements ManagedRunner {
   start(spec: ManagedStartSpec): Promise<ManagedChildHandle> {
     const handle =
       this.#flavor === "in-process"
-        ? adaptInProcessHandle(createChildHandle({ taskId: spec.taskId, session: oneIdleSession(), promptText: spec.prompt }))
+        ? adaptInProcessHandle(
+            createChildHandle({ taskId: spec.taskId, session: oneIdleSession(), promptText: spec.prompt }),
+          )
         : adaptRpcHandle(oneIdleRpc(spec.taskId))
     return Promise.resolve(handle)
   }

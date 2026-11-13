@@ -1,0 +1,65 @@
+{
+  "description": "a scripted CaptureUnavailable failure reaches the wire as -32023 with data.captureUnavailable.reason pinned (B9: minimized).",
+  "scenario": "crates/senpi-desktop-backend-fake/fixtures/capture-unavailable.json",
+  "env": {},
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session.open",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "capabilities": {"backend":"fake","displayServer":null,"capture":true,"input":true,"ax":true,"backgroundWindowInput":true,"cursorOverlay":false,"deliveryModes":["background","foreground"],"capturePermission":"granted","inputPermission":"granted","axPermission":"granted","displayCount":2,"focusGuard":true,"stopPath":"none","stopReason":null,"integrityLevel":null,"screenLocked":false},
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "capture",
+        "params": {
+          "target": "1",
+          "caps": null,
+          "excludeWindowTitles": ["OmO HUD"]
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "error": {
+              "code": -32023,
+              "message": "injected Capture failure",
+              "data": {
+                "code": "CaptureUnavailable",
+                "hint": null,
+                "captureUnavailable": {
+                  "reason": "minimized"
+                }
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    }
+  ]
+}

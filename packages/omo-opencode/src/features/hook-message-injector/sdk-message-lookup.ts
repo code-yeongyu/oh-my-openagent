@@ -20,6 +20,7 @@ export interface SDKMessage {
     }
     readonly providerID?: string
     readonly modelID?: string
+    readonly variant?: string
     readonly tools?: Record<string, ToolPermission>
     readonly time?: {
       readonly created?: number
@@ -38,7 +39,7 @@ function convertSDKMessageToStoredMessage(msg: SDKMessage): StoredMessage | null
 
   const providerID = info.model?.providerID ?? info.providerID
   const modelID = info.model?.modelID ?? info.modelID
-  const variant = info.model?.variant
+  const variant = info.model?.variant ?? info.variant
 
   if (!info.agent && !providerID && !modelID) {
     return null
@@ -46,9 +47,7 @@ function convertSDKMessageToStoredMessage(msg: SDKMessage): StoredMessage | null
 
   return {
     agent: info.agent,
-    model: providerID && modelID
-      ? { providerID, modelID, ...(variant ? { variant } : {}) }
-      : undefined,
+    model: providerID && modelID ? { providerID, modelID, ...(variant ? { variant } : {}) } : undefined,
     tools: info.tools,
   }
 }
@@ -117,7 +116,7 @@ export function findFirstMessageWithAgentFromMessages(messages: readonly SDKMess
 
 export async function findNearestMessageWithFieldsFromSDK(
   client: OpencodeClient,
-  sessionID: string
+  sessionID: string,
 ): Promise<StoredMessage | null> {
   const messages = await fetchSDKMessages(client, sessionID)
   return messages ? findNearestMessageWithFieldsFromMessages(messages) : null
@@ -125,7 +124,7 @@ export async function findNearestMessageWithFieldsFromSDK(
 
 export async function findFirstMessageWithAgentFromSDK(
   client: OpencodeClient,
-  sessionID: string
+  sessionID: string,
 ): Promise<string | null> {
   const messages = await fetchSDKMessages(client, sessionID)
   return messages ? findFirstMessageWithAgentFromMessages(messages) : null

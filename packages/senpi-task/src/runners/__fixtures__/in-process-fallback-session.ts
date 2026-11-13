@@ -8,13 +8,21 @@ import { loadSenpiBarrel } from "../../lazy/senpi-barrel"
 import { createMinimalSenpiResourceLoader } from "../../senpi/minimal-resource-loader"
 import { createRuntimeFallbackSettings } from "../in-process/runtime-fallback-settings"
 
-type StopReason = "stop" | "error"
+type StopReason = "stop" | "error" | "toolUse"
 
 type AssistantMessage = {
   readonly role: "assistant"
-  readonly content: readonly { readonly type: "text"; readonly text: string }[]
+  readonly content: readonly (
+    | { readonly type: "text"; readonly text: string }
+    | {
+        readonly type: "toolCall"
+        readonly id: string
+        readonly name: string
+        readonly arguments: Readonly<Record<string, unknown>>
+      }
+  )[]
   readonly api: "openai-completions"
-  readonly provider: "runtime-fallback-test"
+  readonly provider: string
   readonly model: string
   readonly usage: {
     readonly input: number
@@ -42,46 +50,52 @@ export type FallbackSessionHarness = {
   dispose(): void
 }
 
+export const FALLBACK_PROVIDER = "runtime-fallback-test-alt"
+
 export async function createFallbackSessionHarness(errorMessage: string): Promise<FallbackSessionHarness> {
-  const {
-    createAgentSession,
-    ModelRegistry,
-    ModelRuntime,
-    SessionManager,
-    createExtensionRuntime,
-  } = await loadSenpiBarrel()
+  const { createAgentSession, ModelRegistry, ModelRuntime, SessionManager, createExtensionRuntime } =
+    await loadSenpiBarrel()
   const root = mkdtempSync(join(tmpdir(), "senpi-task-access-terminated-"))
   const modelRuntime = ModelRuntime.createSync()
   const modelRegistry = new ModelRegistry(modelRuntime)
   const calls: string[] = []
-  const provider = {
+  // The fallback lives on a second account: senpi 2026.10.12 (#3131) skips every model on a provider
+  // whose account hit its usage limit, so an account-wide error can only fall back across providers.
+  const providerFor = (name: string, modelId: string) => ({
     api: "openai-completions",
-    baseUrl: "file://runtime-fallback-test",
+    baseUrl: `file://${name}`,
     apiKey: "test-key",
-    models: [
-      testModel("dead-primary"),
-      testModel("healthy-fallback"),
-    ],
+    models: [testModel(modelId)],
     streamSimple(model: { readonly id: string }) {
       calls.push(model.id)
       return streamMessage(
         model.id === "dead-primary"
-          ? assistant(model.id, "error", "", errorMessage)
-          : assistant(model.id, "stop", "fallback completed"),
+          ? assistant(model.id, "error", "", errorMessage, name)
+          : assistant(model.id, "stop", "fallback completed", undefined, name),
       )
     },
-  }
-  Reflect.apply(modelRegistry.registerProvider, modelRegistry, ["runtime-fallback-test", provider])
+  })
+  Reflect.apply(modelRegistry.registerProvider, modelRegistry, [
+    "runtime-fallback-test",
+    providerFor("runtime-fallback-test", "dead-primary"),
+  ])
+  Reflect.apply(modelRegistry.registerProvider, modelRegistry, [
+    FALLBACK_PROVIDER,
+    providerFor(FALLBACK_PROVIDER, "healthy-fallback"),
+  ])
   const primary = modelRegistry.find("runtime-fallback-test", "dead-primary")
   if (primary === undefined) throw new Error("primary model missing")
   const settingsManager = createRuntimeFallbackSettings(
+    { cwd: root, agentDir: join(root, "agent"), projectTrusted: false },
     "runtime-fallback-test/dead-primary",
-    [{
-      source: "category",
-      provider: "runtime-fallback-test",
-      model_id: "healthy-fallback",
-      display: "runtime-fallback-test/healthy-fallback",
-    }],
+    [
+      {
+        source: "category",
+        provider: FALLBACK_PROVIDER,
+        model_id: "healthy-fallback",
+        display: `${FALLBACK_PROVIDER}/healthy-fallback`,
+      },
+    ],
   )
   if (settingsManager === undefined) throw new Error("fallback settings missing")
   const { session } = await createAgentSession({
@@ -126,17 +140,18 @@ function testModel(id: string) {
   }
 }
 
-function assistant(
+export function assistant(
   model: string,
   stopReason: StopReason,
   text: string,
   errorMessage?: string,
+  provider = "runtime-fallback-test",
 ): AssistantMessage {
   return {
     role: "assistant",
     content: text === "" ? [] : [{ type: "text", text }],
     api: "openai-completions",
-    provider: "runtime-fallback-test",
+    provider,
     model,
     usage: {
       input: 0,
@@ -152,7 +167,7 @@ function assistant(
   }
 }
 
-function streamMessage(message: AssistantMessage): EventStream {
+export function streamMessage(message: AssistantMessage): EventStream {
   const queue: unknown[] = []
   const waiters: Array<(value: IteratorResult<unknown>) => void> = []
   let done = false
@@ -185,9 +200,10 @@ function streamMessage(message: AssistantMessage): EventStream {
     },
   }
   queueMicrotask(() => {
-    const event = message.stopReason === "error"
-      ? { type: "error", reason: "error", error: message }
-      : { type: "done", reason: "stop", message }
+    const event =
+      message.stopReason === "error"
+        ? { type: "error", reason: "error", error: message }
+        : { type: "done", reason: "stop", message }
     stream.push(event)
     stream.end(message)
   })

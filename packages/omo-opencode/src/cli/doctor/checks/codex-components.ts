@@ -2,7 +2,13 @@ import type { Dirent } from "node:fs"
 import { readdir, readFile, stat } from "node:fs/promises"
 import { homedir } from "node:os"
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
-import { findSgBinarySync, runtimeSlug, SG_PATH_ENV_KEY, sgBinaryName, type SgResolverOptions } from "@oh-my-opencode/utils"
+import {
+  findSgBinarySync,
+  runtimeSlug,
+  SG_PATH_ENV_KEY,
+  sgBinaryName,
+  type SgResolverOptions,
+} from "@oh-my-opencode/utils"
 import type { CheckResult, DoctorIssue } from "../framework/types"
 import { gatherCodexSummary, type CodexDoctorDeps } from "./codex"
 
@@ -10,7 +16,7 @@ export const CODEX_COMPONENTS_CHECK_ID = "codex-components"
 export const CODEX_COMPONENTS_CHECK_NAME = "codex-components"
 
 const PLUGIN_DATA_DIR_NAME = "omo-sisyphuslabs"
-const BOOTSTRAP_PENDING_MESSAGE = "bootstrap pending — start a Codex session"
+const BOOTSTRAP_PENDING_MESSAGE = "bootstrap pending: start a Codex session"
 const REINSTALL_FIX = "Reinstall: npx lazycodex-ai install (or upgrade: codex plugin marketplace upgrade sisyphuslabs)"
 
 export interface CodexComponentsDoctorDeps extends CodexDoctorDeps {
@@ -54,7 +60,7 @@ export async function checkCodexComponents(deps: CodexComponentsDoctorDeps = {})
     return {
       name: CODEX_COMPONENTS_CHECK_NAME,
       status: "skip",
-      message: "OMO Codex plugin is not installed — skipping component checks",
+      message: "OMO Codex plugin is not installed: skipping component checks",
       details: [`plugin root: not installed under ${codexHome}`],
       issues: [],
     }
@@ -169,7 +175,8 @@ function recordBrokenTarget(
 ): void {
   if (classified === null) return
   const entry: BundleTargetIssue = { ...classified, referencedBy: origin.referencedBy }
-  if (broken.some((existing) => existing.relativePath === entry.relativePath && existing.reason === entry.reason)) return
+  if (broken.some((existing) => existing.relativePath === entry.relativePath && existing.reason === entry.reason))
+    return
   broken.push(entry)
 }
 
@@ -250,7 +257,8 @@ function isPluginRuntimePathArg(arg: string): boolean {
     (normalized.startsWith("./") ||
       normalized.startsWith("../") ||
       normalized.startsWith("components/") ||
-      normalized.startsWith("/") || isAbsolute(arg))
+      normalized.startsWith("/") ||
+      isAbsolute(arg))
   )
 }
 
@@ -304,7 +312,9 @@ function bootstrapDetails(state: BootstrapStateSummary | null, installedVersion:
   }
   const completed = state.completedForVersion
   if (completed === null || completed !== installedVersion) {
-    const lines = [`${BOOTSTRAP_PENDING_MESSAGE} (installed ${installedLabel}, state ${completed ?? "none"}, lastStatus=${state.lastStatus})`]
+    const lines = [
+      `${BOOTSTRAP_PENDING_MESSAGE} (installed ${installedLabel}, state ${completed ?? "none"}, lastStatus=${state.lastStatus})`,
+    ]
     lines.push(...degradedDetailLines(state.degraded))
     return lines
   }
@@ -316,7 +326,8 @@ function bootstrapDetails(state: BootstrapStateSummary | null, installedVersion:
 
 function degradedDetailLines(entries: readonly BootstrapDegradedEntry[]): string[] {
   return entries.map(
-    (entry) => `degraded component=${entry.component} reason=${entry.reason}${entry.hint === undefined ? "" : ` hint=${entry.hint}`}`,
+    (entry) =>
+      `degraded component=${entry.component} reason=${entry.reason}${entry.hint === undefined ? "" : ` hint=${entry.hint}`}`,
   )
 }
 

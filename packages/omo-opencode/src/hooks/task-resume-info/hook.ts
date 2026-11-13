@@ -5,7 +5,7 @@ const TARGET_TOOLS = ["task", "Task", "task_tool", "call_omo_agent"]
 export function createTaskResumeInfoHook() {
   const toolExecuteAfter = async (
     input: { tool: string; sessionID: string; callID: string },
-    output: { title: string; output: string; metadata: unknown }
+    output: { title: string; output: string; metadata: unknown },
   ) => {
     if (!TARGET_TOOLS.includes(input.tool)) return
     const outputText = output.output ?? ""
@@ -18,7 +18,7 @@ export function createTaskResumeInfoHook() {
 
     output.output =
       outputText.trimEnd() +
-      `\n\nto continue: task(task_id="${taskId}", load_skills=[], run_in_background=false, prompt="...")`
+      `\n\nto continue: task(task_id="${taskId}", load_skills=[], run_in_background=true, prompt="...")`
   }
 
   return {

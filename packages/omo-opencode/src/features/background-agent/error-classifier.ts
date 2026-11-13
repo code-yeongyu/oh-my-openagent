@@ -6,6 +6,24 @@ export function isAbortedSessionError(error: unknown): boolean {
   return message.toLowerCase().includes("aborted")
 }
 
+const TRANSPORT_UNREACHABLE_PATTERNS: readonly RegExp[] = [
+  /unable to connect/i,
+  /econnrefused/i,
+  /econnreset/i,
+  /enotfound/i,
+  /socket hang up/i,
+  /fetch failed/i,
+  /network(?:\s|_)?error/i,
+  /not connected/i,
+  /connection (?:closed|refused|reset)/i,
+]
+
+export function isTransportUnreachableError(error: unknown): boolean {
+  const text = extractErrorMessage(error) ?? getErrorText(error)
+  if (!text) return false
+  return TRANSPORT_UNREACHABLE_PATTERNS.some((pattern) => pattern.test(text))
+}
+
 export function getErrorText(error: unknown): string {
   if (!error) return ""
   if (typeof error === "string") return error
@@ -45,11 +63,7 @@ export function extractErrorMessage(error: unknown): string | undefined {
 
     for (const candidate of candidates) {
       if (typeof candidate === "string" && candidate.length > 0) return candidate
-      if (
-        isRecord(candidate) &&
-        typeof candidate["message"] === "string" &&
-        candidate["message"].length > 0
-      ) {
+      if (isRecord(candidate) && typeof candidate["message"] === "string" && candidate["message"].length > 0) {
         return candidate["message"]
       }
     }
@@ -146,13 +160,8 @@ const TERMINAL_SESSION_ERROR_PATTERNS: readonly RegExp[] = [
   /all providers (?:are )?(?:unavailable|disconnected|exhausted)/i,
 ]
 
-export function isTerminalSessionError(
-  errorInfo: { name?: string; message?: string; statusCode?: number },
-): boolean {
-  const text = [
-    errorInfo?.name,
-    errorInfo?.message,
-  ]
+export function isTerminalSessionError(errorInfo: { name?: string; message?: string; statusCode?: number }): boolean {
+  const text = [errorInfo?.name, errorInfo?.message]
     .filter((value): value is string => typeof value === "string" && value.length > 0)
     .join(" ")
   if (text.length === 0) return false

@@ -1,0 +1,49 @@
+declare const s: string;
+declare const t: string | undefined;
+export const a1 = s.toUpperCase() === "abc";
+export const a2 = s.toUpperCase() === "ABC";
+export const a3 = s.toUpperCase() == "abc";
+export const a4 = s.toUpperCase() !== "abc";
+export const a5 = s.toUpperCase() != "abc";
+export const b1 = "Abc" === s.toLowerCase();
+export const b2 = "abc" == s.toUpperCase();
+export const b3 = "Abc" !== s.toLowerCase();
+export const c1 = s.toUpperCase() === `abc`;
+export const c2 = `abc` === s.toUpperCase();
+export const c3 = s.toUpperCase() === `ABC`;
+export const d1 = t?.toUpperCase() === "abc";
+export const d2 = s["toUpperCase"]() === "abc";
+export const e1 = (s.toUpperCase()) === "abc";
+export const e2 = s.toUpperCase() === ("abc");
+export const f1 = s.toLowerCase() === "ǅ";
+export const f2 = s.toUpperCase() === "1-2";
+export const f3 = s.toLowerCase() === "ß";
+switch (s.toLowerCase()) { case "Abc": break; case "abc": break; case `XY`: break; }
+switch ((s.toLowerCase())) { case "Abc": break; }
+switch (s.toUpperCase()) { case ("abc"): break; }
+switch (s) { case "Abc": break; }
+export const g1 = s.toUpperCase() /* ( */ === "abc";
+switch (s.toLowerCase()) { case /* ( */ "Abc": break; }
+switch /* ( */ (s.toLowerCase()) { case "Abc": break; }
+export const h1 = s.toLowerCase() === "\u0041";
+export const h2 = s.toLowerCase() === "a\x41";
+export const h3 = s.toLowerCase() === `\u{41}`;
+switch (s.toLowerCase()) { case "\u0041": break; }
+export const h4 = s.toUpperCase() === "\u0061";
+export const h5 = s.toUpperCase() === "a\tb";
+export const h6 = s.toUpperCase() === "\tb";
+export const h7 = s.toUpperCase() === "\u0041b";
+export const h8 = s.toUpperCase() === "\u0041bc";
+export const h9 = s.toUpperCase() === "\x41b";
+export const h10 = s.toUpperCase() === "\x41bc";
+export const h11 = s.toUpperCase() === "\u{61}b";
+export const h12 = s.toUpperCase() === `\nab`;
+export const h13 = s.toUpperCase() === "AB\\c";
+export const i1 = s.toUpperCase() === null;
+export const i2 = s.toUpperCase() === undefined;
+export const i3 = s.toUpperCase() === true;
+export const i4 = s.toUpperCase() === 1e5;
+export const i5 = s.toLowerCase() === 0xFF;
+export const i6 = s.toUpperCase() === 10n;
+export const j1 = s.toUpperCase(1 as never) === "abc";
+export const j2 = s.toLocaleUpperCase() === "abc";

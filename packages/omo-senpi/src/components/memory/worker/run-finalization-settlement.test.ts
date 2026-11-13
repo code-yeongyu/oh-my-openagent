@@ -58,11 +58,16 @@ describe("run finalization settlement", () => {
     }
 
     // when
-    const result = await settleReservationRun({
-      identity,
-      reservation,
-      now: () => Date.parse("2026-08-11T10:01:00.000Z"),
-    }, runDir, ledger(), { outcome: "merged" })
+    const result = await settleReservationRun(
+      {
+        identity,
+        reservation,
+        now: () => Date.parse("2026-08-11T10:01:00.000Z"),
+      },
+      runDir,
+      ledger(),
+      { outcome: "merged" },
+    )
 
     // then
     expect(result.outcome).toBe("merged")
@@ -71,13 +76,65 @@ describe("run finalization settlement", () => {
       runId: "run-1",
       outcome: "merged",
     })
-    expect(JSON.parse(await readFile(
-      join(identity.paths.reflection, "completions", "run-1.json"),
-      "utf8",
-    ))).toMatchObject({
+    expect(
+      JSON.parse(await readFile(join(identity.paths.reflection, "completions", "run-1.json"), "utf8")),
+    ).toMatchObject({
       category: "deep",
       conversationIds: ["conversation-a"],
       outcome: "merged",
+    })
+  })
+
+  test("#given a durable completion that no longer rebuilds byte-identically #when the run dir is settled #then the durable record is adopted and the dir turns terminal (#8437)", async () => {
+    // given: a completions record already exists with launch-dependent fields that differ from a rebuild.
+    const root = await mkdtemp(join(tmpdir(), "run-finalization-settlement-"))
+    roots.push(root)
+    const identity: MemoryIdentity = {
+      id: "agent-test",
+      safeSlug: "agent-test",
+      paths: buildIdentityPaths(root, "agent-test"),
+    }
+    const runDir = join(identity.paths.reflection, "runs", "run-1")
+    await mkdir(runDir, { recursive: true })
+    await writeRunJsonAtomic(join(runDir, "ledger.json"), ledger())
+    const completionsDir = join(identity.paths.reflection, "completions")
+    await mkdir(completionsDir, { recursive: true })
+    await writeRunJsonAtomic(join(completionsDir, "run-1.json"), {
+      schemaVersion: 1,
+      runId: "run-1",
+      identity: "agent-test",
+      category: "deep",
+      conversationIds: ["conversation-a"],
+      trigger: "step-count",
+      outcome: "failed",
+      reason: "child_exit",
+      startedAt: "2026-08-11T10:00:00.000Z",
+      finishedAt: "2026-08-11T10:00:30.000Z",
+      durationMs: 30_000,
+      consecutiveFailures: 3,
+      delivery: { status: "consumed" },
+    })
+    const reservation = {
+      readState: async () => ({}),
+      complete: async () => {
+        throw new Error("must not complete")
+      },
+    }
+    const context = { identity, reservation, now: () => Date.parse("2026-08-11T12:00:00.000Z") }
+
+    // when: settlement runs twice, as two launches would.
+    const first = await settleReservationRun(context, runDir, ledger(), { outcome: "failed", reason: "child_exit" })
+    const second = await settleReservationRun(context, runDir, ledger(), { outcome: "failed", reason: "child_exit" })
+
+    // then: the durable record wins, final.json exists, and nothing throws on replay.
+    expect(first.completion).toMatchObject({ finishedAt: "2026-08-11T10:00:30.000Z", consecutiveFailures: 3 })
+    expect(second.completion).toEqual(first.completion)
+    expect(JSON.parse(await readFile(join(runDir, "final.json"), "utf8"))).toMatchObject({
+      runId: "run-1",
+      outcome: "failed",
+    })
+    expect(JSON.parse(await readFile(join(completionsDir, "run-1.json"), "utf8"))).toMatchObject({
+      consecutiveFailures: 3,
     })
   })
 
@@ -139,14 +196,21 @@ describe("run finalization settlement", () => {
     await writeRunJsonAtomic(join(runDir, "ledger.json"), legacy)
 
     // when
-    const settlement = settleReservationRun({
-      identity,
-      reservation: {
-        readState: async () => ({}),
-        complete: async () => { throw new Error("inactive") },
+    const settlement = settleReservationRun(
+      {
+        identity,
+        reservation: {
+          readState: async () => ({}),
+          complete: async () => {
+            throw new Error("inactive")
+          },
+        },
+        now: () => Date.parse("2026-08-11T10:01:00.000Z"),
       },
-      now: () => Date.parse("2026-08-11T10:01:00.000Z"),
-    }, runDir, legacy, { outcome: "merged" })
+      runDir,
+      legacy,
+      { outcome: "merged" },
+    )
 
     // then
     await expect(settlement).rejects.toThrow("completion identity")

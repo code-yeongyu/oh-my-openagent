@@ -80,9 +80,7 @@ describe("TaskManager start failure security", () => {
     expect(persisted?.task_id).toBe(capturedStart.task_id)
 
     const eventLog = readFileSync(join(store.stateDir, "logs", `${capturedStart.task_id}.jsonl`), "utf8")
-    expect(eventLog).toContain(
-      `{"type":"task_start_failed","payload":{"error_message":"${GENERIC_START_FAILURE}"}}`,
-    )
+    expect(eventLog).toContain(`{"type":"task_start_failed","payload":{"error_message":"${GENERIC_START_FAILURE}"}}`)
 
     const content = result.content[0]?.type === "text" ? result.content[0].text : ""
     expect(content).toBe(GENERIC_START_FAILURE)
@@ -136,10 +134,13 @@ describe("TaskManager start failure security", () => {
 
   test.each([
     ["plain object", { name: "RunnerError", failure: { kind: "depth-exceeded", message: ADVERSARIAL_ERROR } }],
-    ["ordinary Error", Object.assign(new Error(ADVERSARIAL_ERROR), {
-      name: "RunnerError",
-      failure: { kind: "depth-exceeded", message: ADVERSARIAL_ERROR },
-    })],
+    [
+      "ordinary Error",
+      Object.assign(new Error(ADVERSARIAL_ERROR), {
+        name: "RunnerError",
+        failure: { kind: "depth-exceeded", message: ADVERSARIAL_ERROR },
+      }),
+    ],
   ])(
     "#given a spoofed RunnerError %s #when the task starts #then it receives the generic unknown-error classification",
     async (_shape, spoofedError) => {
@@ -254,6 +255,9 @@ describe("TaskManager start failure security", () => {
         resolved_model: resolvedModel,
         run_in_background: false,
         error_message: publicMessage,
+        // The closed RunnerFailure enum travels with the sanitized message so a caller can classify
+        // the refusal (a denied parent kernel-tool grant vs a generic failure) without parsing it.
+        failure_kind: kind,
       })
       expect(JSON.stringify(result)).not.toContain(ADVERSARIAL_ERROR)
     },

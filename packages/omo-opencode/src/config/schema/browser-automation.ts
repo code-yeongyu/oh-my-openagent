@@ -1,17 +1,14 @@
 import { z } from "zod"
 
-export const BrowserAutomationProviderSchema = z.enum([
-  "playwright",
-  "agent-browser",
-  "dev-browser",
-  "playwright-cli",
-])
+export const BrowserAutomationProviderSchema = z.enum(["playwright", "dev-browser", "playwright-cli"], {
+  error: (issue) =>
+    `Browser provider ${JSON.stringify(issue.input)} is no longer supported; use the built-in browser path: Bun.WebView / playwright-core scripts`,
+})
 
 export const BrowserAutomationConfigSchema = z.object({
   /**
    * Browser automation provider to use for the "playwright" skill.
    * - "playwright": Uses Playwright MCP server (@playwright/mcp) - default
-   * - "agent-browser": Uses Vercel's agent-browser CLI (requires: bun add -g agent-browser)
    * - "dev-browser": Uses dev-browser skill with persistent browser state
    * - "playwright-cli": Uses Playwright CLI (@playwright/cli) - token-efficient CLI alternative
    */
@@ -38,7 +35,5 @@ export const BrowserAutomationConfigSchema = z.object({
   playwright_mcp_args: z.array(z.string()).optional(),
 })
 
-export type BrowserAutomationProvider = z.infer<
-  typeof BrowserAutomationProviderSchema
->
+export type BrowserAutomationProvider = z.infer<typeof BrowserAutomationProviderSchema>
 export type BrowserAutomationConfig = z.infer<typeof BrowserAutomationConfigSchema>

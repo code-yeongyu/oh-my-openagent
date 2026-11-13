@@ -1,9 +1,11 @@
 // biome-ignore-all format: compact steering module must stay below the 240 pure-LOC budget
 import { isUlwLoopDone } from "./goal-status.js";
 import type { UlwLoopScope } from "./paths.js";
-import { appendLedger, findAcceptedSteeringLedgerEntry, readUlwLoopPlan, withUlwLoopMutationLock, writePlan } from "./plan-io.js";
+import { commit } from "./plan-commit.js";
+import { findAcceptedSteeringLedgerEntry, readUlwLoopPlan, withUlwLoopMutationLock } from "./plan-io.js";
 import { makeGoal, reviseCriterion, reviseWording, splitOrBlock } from "./steering-mutations.js";
 import { buildSteeringPlanSnapshot, changedGoalIdsBetween } from "./steering-snapshot.js";
+import type { UlwLoopToolkitSurface } from "./surface.js";
 import type {
 	SteerUlwLoopResult,
 	UlwLoopItem,
@@ -20,7 +22,7 @@ import { iso, ULW_LOOP_STEERING_MUTATION_KINDS, ULW_LOOP_SUCCESS_CRITERION_USER_
 import { batchUpdateLedgerEntry } from "./validation-batch.js";
 
 const SOURCES = ["user_prompt_submit", "finding", "cli"] as const satisfies readonly UlwLoopSteeringSource[];
-const PROTECTED = new Set(["aggregateCompletion", "codexObjective", "codexObjectiveAliases", "originalConstraints", "qualityGate", "status", "completedAt", "completionStatus"]);
+const PROTECTED = new Set(["aggregateCompletion", "codexObjective", "codexObjectiveAliases", "acknowledgedDriverObjectives", "originalConstraints", "qualityGate", "status", "completedAt", "completionStatus"]);
 const isObject = (value: unknown): value is object => typeof value === "object" && value !== null; const isPlain = (value: unknown): value is object => isObject(value) && !Array.isArray(value);
 const read = (value: object, key: string): unknown => Object.entries(value).find(([name]) => name === key)?.[1];
 const isText = (value: unknown): value is string => typeof value === "string" && value.trim().length > 0;
@@ -155,17 +157,17 @@ function validateCriterion(plan: UlwLoopPlan, proposal: object, reasons: string[
 	if (model !== undefined && !isModel(model)) reasons.push("invalid userModel");
 }
 
-export function applySteeringMutation(plan: UlwLoopPlan, proposal: UlwLoopSteeringProposal, audit: UlwLoopSteeringAudit): UlwLoopPlan {
+export function applySteeringMutation(plan: UlwLoopPlan, proposal: UlwLoopSteeringProposal, audit: UlwLoopSteeringAudit, surface: UlwLoopToolkitSurface = "lazycodex"): UlwLoopPlan {
 	const next = structuredClone(plan);
 	if (!audit.invariant.accepted) return next;
 	const now = proposal.now?.toISOString() ?? iso();
-	if (proposal.kind === "add_subgoal") next.goals.push(makeGoal(next, { title: proposal.title ?? "", objective: proposal.objective ?? "" }, proposal.evidence, now, 1));
+	if (proposal.kind === "add_subgoal") next.goals.push(makeGoal(next, { title: proposal.title ?? "", objective: proposal.objective ?? "" }, proposal.evidence, now, 1, surface));
 	if (proposal.kind === "reorder_pending") {
 		const order = pendingOrder(proposal);
 		next.goals = [...order.map((id) => goal(next, id)).filter((item): item is UlwLoopItem => item !== undefined), ...next.goals.filter((item) => !order.includes(item.id))];
 	}
 	if (proposal.kind === "revise_pending_wording") reviseWording(next, proposal, now);
-	if (proposal.kind === "split_subgoal" || proposal.kind === "mark_blocked_superseded") splitOrBlock(next, proposal, now);
+	if (proposal.kind === "split_subgoal" || proposal.kind === "mark_blocked_superseded") splitOrBlock(next, proposal, now, surface);
 	if (proposal.kind === "revise_criterion") reviseCriterion(next, proposal, now);
 	if (proposal.kind !== "annotate_ledger") next.updatedAt = now;
 	return next;
@@ -187,7 +189,7 @@ export function parseUlwLoopSteeringDirective(text: string): UlwLoopSteeringProp
 	}
 }
 
-export async function steerUlwLoop(repoRoot: string, proposal: UlwLoopSteeringProposal, scope?: UlwLoopScope): Promise<SteerUlwLoopResult> {
+export async function steerUlwLoop(repoRoot: string, proposal: UlwLoopSteeringProposal, scope?: UlwLoopScope, surface: UlwLoopToolkitSurface = "lazycodex"): Promise<SteerUlwLoopResult> {
 	return withUlwLoopMutationLock(repoRoot, scope, async () => {
 		const plan = await readUlwLoopPlan(repoRoot, scope);
 		const key = proposal.idempotencyKey ?? proposal.promptSignature;
@@ -200,7 +202,7 @@ export async function steerUlwLoop(repoRoot: string, proposal: UlwLoopSteeringPr
 		}
 		const audit = validateUlwLoopSteeringProposal(plan, proposal);
 		const accepted = audit.invariant.accepted;
-		const next = accepted ? applySteeringMutation(plan, proposal, audit) : plan;
+		const next = accepted ? applySteeringMutation(plan, proposal, audit, surface) : plan;
 		const finalAudit: UlwLoopSteeringAudit = { ...audit };
 		if (accepted) {
 			const changed = changedGoalIdsBetween(plan, next);
@@ -209,9 +211,9 @@ export async function steerUlwLoop(repoRoot: string, proposal: UlwLoopSteeringPr
 		}
 		const at = proposal.now?.toISOString() ?? iso();
 		const batchEntry = accepted ? batchUpdateLedgerEntry(plan, next, at) : null;
-		if (accepted) await writePlan(repoRoot, next, scope);
-		await appendLedger(repoRoot, ledgerEntry(proposal, finalAudit, at), scope);
-		if (batchEntry !== null) await appendLedger(repoRoot, batchEntry, scope);
+		const entries = [ledgerEntry(proposal, finalAudit, at)];
+		if (batchEntry !== null) entries.push(batchEntry);
+		await commit(repoRoot, scope, { plan: next, entries });
 		return { plan: next, accepted, audit: finalAudit, rejectedReasons: audit.invariant.rejectedReasons, deduped: false };
 	});
 }

@@ -1,4 +1,4 @@
-import { afterEach } from "bun:test"
+import { onTestFinished } from "bun:test"
 import { execFile } from "node:child_process"
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -17,15 +17,12 @@ import {
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createMemoryBinding } from "./binding"
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
-import {
-  type MemoryToolExecutionResult,
-} from "./tools"
+import { type MemoryToolExecutionResult } from "./tools"
 
 const exec = promisify(execFile)
 export const IDENTITY = "agent-memory-tools-test"
 const AUTHOR: GitCommitAuthor = { agentId: IDENTITY, authorName: "Memory Tools Test Agent" }
 
-export const roots: string[] = []
 const WINDOWS_CLEANUP_RACE_CODES = new Set(["EBUSY", "ENOTEMPTY", "EPERM"])
 
 // Every fixture is a real Git repo, so cleanup races the git children this suite just ran. Windows
@@ -38,19 +35,23 @@ async function removeRoot(root: string): Promise<void> {
     // A lingering Windows handle can outlast the bounded retry window. Ignore only that platform's
     // known cleanup races; every other cleanup defect still fails loudly.
     if (
-      process.platform === "win32"
-      && error instanceof Error
-      && "code" in error
-      && typeof error.code === "string"
-      && WINDOWS_CLEANUP_RACE_CODES.has(error.code)
-    ) return
+      process.platform === "win32" &&
+      error instanceof Error &&
+      "code" in error &&
+      typeof error.code === "string" &&
+      WINDOWS_CLEANUP_RACE_CODES.has(error.code)
+    )
+      return
     throw error
   }
 }
 
-afterEach(async () => {
-  await Promise.all(roots.splice(0).map(removeRoot))
-})
+/** A fresh temp root, removed (with the Windows-race tolerance above) when the calling test finishes. */
+export async function testRoot(prefix: string): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), prefix))
+  onTestFinished(() => removeRoot(root))
+  return root
+}
 
 export interface BoundFixture {
   readonly context: MemoryIdentityContext
@@ -60,7 +61,7 @@ export interface BoundFixture {
 
 export async function boundFixture(): Promise<BoundFixture> {
   const root = await mkdtemp(join(tmpdir(), "omo-senpi-memory-tools-"))
-  roots.push(root)
+  onTestFinished(() => removeRoot(root))
   const identityPaths = buildIdentityPaths(root, IDENTITY)
   const repo = new GitMemoryRepo({ dir: identityPaths.repo, agentId: IDENTITY })
   await repo.init({ authorName: AUTHOR.authorName })

@@ -123,16 +123,22 @@ describe("findNearestMessageExcludingCompaction", () => {
       // given
       const compactionMessageID = "msg_test_background_compaction_marker"
       const partDir = getCompactionPartStorageDir(compactionMessageID)
-      writeFileSync(join(tempDir, "002.json"), JSON.stringify({
-        id: compactionMessageID,
-        agent: "atlas",
-        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
-      }))
-      writeFileSync(join(tempDir, "001.json"), JSON.stringify({
-        id: "msg_001",
-        agent: "sisyphus",
-        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
-      }))
+      writeFileSync(
+        join(tempDir, "002.json"),
+        JSON.stringify({
+          id: compactionMessageID,
+          agent: "atlas",
+          model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+        }),
+      )
+      writeFileSync(
+        join(tempDir, "001.json"),
+        JSON.stringify({
+          id: "msg_001",
+          agent: "sisyphus",
+          model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+        }),
+      )
       mkdirSync(partDir, { recursive: true })
       writeFileSync(join(partDir, "prt_0001.json"), JSON.stringify({ type: "compaction" }))
 
@@ -261,6 +267,25 @@ describe("findNearestMessageExcludingCompaction", () => {
         tools: { bash: true },
       })
     })
+
+    test("#given a compaction checkpoint with a variant #when the model comes from the checkpoint #then the variant is kept", () => {
+      // given
+      setCompactionAgentConfigCheckpoint("ses_checkpoint", {
+        agent: "sisyphus",
+        model: { providerID: "openai", modelID: "gpt-5", variant: "max" },
+      })
+      writeFileSync(join(tempDir, "001.json"), JSON.stringify({ tools: { bash: true } }))
+
+      // when
+      const result = findNearestMessageExcludingCompaction(tempDir, "ses_checkpoint")
+
+      // then
+      expect(result).toEqual({
+        agent: "sisyphus",
+        model: { providerID: "openai", modelID: "gpt-5", variant: "max" },
+        tools: { bash: true },
+      })
+    })
   })
 })
 
@@ -305,6 +330,29 @@ describe("resolvePromptContextFromSessionMessages", () => {
       agent: "sisyphus",
       model: { providerID: "anthropic", modelID: "claude-opus-4-1" },
       tools: { bash: true },
+    })
+  })
+
+  test("#given session message info with a flat variant #when converted #then the stored message keeps the variant", () => {
+    // given
+    const messages = [
+      {
+        info: {
+          agent: "sisyphus",
+          providerID: "openai",
+          modelID: "gpt-5.5",
+          variant: "max",
+        },
+      },
+    ]
+
+    // when
+    const result = resolvePromptContextFromSessionMessages(messages)
+
+    // then
+    expect(result).toEqual({
+      agent: "sisyphus",
+      model: { providerID: "openai", modelID: "gpt-5.5", variant: "max" },
     })
   })
 })

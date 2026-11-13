@@ -72,6 +72,8 @@ export interface DoctorResult {
   exitCode: number
   target?: DoctorTarget
   codex?: CodexDoctorSummary
+  /** Latest published version on the installed channel; null when the registry lookup failed. */
+  latestVersion: string | null
 }
 
 export interface CodexConfigSummary {
@@ -102,13 +104,7 @@ export interface CodexDoctorSummary {
   readonly agents: readonly string[]
 }
 
-export type CheckCategory =
-  | "installation"
-  | "configuration"
-  | "authentication"
-  | "dependencies"
-  | "tools"
-  | "updates"
+export type CheckCategory = "installation" | "configuration" | "authentication" | "dependencies" | "tools" | "updates"
 
 export interface OpenCodeInfo {
   installed: boolean

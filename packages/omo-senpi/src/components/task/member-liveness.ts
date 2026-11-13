@@ -6,7 +6,7 @@ import {
   type TaskStatus,
 } from "@oh-my-opencode/senpi-task"
 
-import type { IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
+import { IdleInjectionRetiredError, type IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
 import type { SenpiExtensionAPI } from "../../extension/types"
 
 export const TEAM_MEMBER_LIVENESS_MESSAGE_TYPE = "senpi-task.team-member-liveness"
@@ -44,14 +44,11 @@ const DELIVERY_KEY_PREFIX = "team-member-liveness:"
 const WAKE_MESSAGE_TYPE = "omo-senpi:wake"
 const DEFAULT_MAX_RETRIES = 3
 
-export function createTeamMemberLivenessNotifier(
-  deps: TeamMemberLivenessNotifierDeps,
-): TeamMemberLivenessNotifier {
+export function createTeamMemberLivenessNotifier(deps: TeamMemberLivenessNotifierDeps): TeamMemberLivenessNotifier {
   const delivered = new Set<string>()
   const pendingAcknowledgement = new Map<string, TaskRecord>()
   const deliveryRetries = new Map<string, number>()
-  const markerIndex = deps.markerIndex
-    ?? createIncrementalSessionMarkerIndex(livenessDeliveryKeysFromSessionText)
+  const markerIndex = deps.markerIndex ?? createIncrementalSessionMarkerIndex(livenessDeliveryKeysFromSessionText)
   const scheduleRetry = deps.scheduleRetry ?? defaultScheduleRetry
   const maxDeliveryRetries = deps.maxDeliveryRetries ?? DEFAULT_MAX_RETRIES
   const maxPersistenceRetries = deps.maxPersistenceRetries ?? DEFAULT_MAX_RETRIES
@@ -82,6 +79,8 @@ export function createTeamMemberLivenessNotifier(
   }
 
   const notifyTerminal = (record: TaskRecord): void => {
+    const identity = parseTeamMemberTaskIdentity(record)
+    if (identity === undefined) return
     const details = livenessDetails(record)
     if (details === undefined || deps.wasDelivered?.(record) === true) return
     const key = `${DELIVERY_KEY_PREFIX}${record.task_id}:${record.notification.run_epoch}`
@@ -92,6 +91,7 @@ export function createTeamMemberLivenessNotifier(
     const injection = {
       key,
       source: "team-liveness" as const,
+      runRef: { kind: "team" as const, id: record.team_run_id ?? identity.teamRunId },
       customType: TEAM_MEMBER_LIVENESS_MESSAGE_TYPE,
       content: livenessContent(details),
       display: false,
@@ -100,7 +100,12 @@ export function createTeamMemberLivenessNotifier(
     }
     if (deps.coordinator !== undefined) {
       try {
-        deps.coordinator.enqueue(injection)
+        // A refused enqueue (coordinator retired with the session) is not queued and gets no receipt,
+        // so the retry has to be driven from here; an accepted one reports through onDeliveryFailed.
+        if (deps.coordinator.enqueue(injection) === false) {
+          failDelivery(key, record, new IdleInjectionRetiredError())
+          return
+        }
         if (deps.isStreaming()) deps.coordinator.scheduleFlush()
         else deps.coordinator.flushSoon()
       } catch (error) {
@@ -109,12 +114,15 @@ export function createTeamMemberLivenessNotifier(
       return
     }
     try {
-      const result = deps.pi.sendMessage({
-        customType: injection.customType,
-        content: injection.content,
-        display: injection.display,
-        details: injection.details,
-      }, { triggerTurn: true, deliverAs: "steer" })
+      const result = deps.pi.sendMessage(
+        {
+          customType: injection.customType,
+          content: injection.content,
+          display: injection.display,
+          details: injection.details,
+        },
+        { triggerTurn: true, deliverAs: "steer" },
+      )
       if (isPromiseLike(result)) void result.catch((error: unknown) => failDelivery(key, record, error))
     } catch (error) {
       failDelivery(key, record, error)
@@ -172,10 +180,7 @@ export function livenessDeliveryKeysFromSessionText(text: string): readonly stri
 
 export function livenessDetails(record: TaskRecord): TeamMemberLivenessDetails | undefined {
   const memberName = parseTeamMemberTaskIdentity(record)?.memberName
-  if (
-    memberName === undefined
-    || (record.status !== "error" && record.status !== "lost" && record.killed !== true)
-  ) {
+  if (memberName === undefined || (record.status !== "error" && record.status !== "lost" && record.killed !== true)) {
     return undefined
   }
   // A suspended record (persisted_only/rpc_detached) sits between shutdown and revival: the member

@@ -1,11 +1,11 @@
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
-import { createNativeBadgeStatus } from "./footer-badge"
+import { createNativeBadgeStatus, resolveNativeBadgeText } from "./footer-badge"
 
-export function createNativeBadgeComponent(): OmoSenpiComponent {
+export function createNativeBadgeComponent(options: { env?: NodeJS.ProcessEnv } = {}): OmoSenpiComponent {
   return {
     name: "native-badge",
     register(pi: SenpiExtensionAPI, _ctx: ComponentContext): void {
-      const badge = createNativeBadgeStatus()
+      const badge = createNativeBadgeStatus(resolveNativeBadgeText(options.env ?? process.env))
       const publish = (_payload: unknown, eventCtx: unknown): undefined => {
         badge.publish(eventCtx)
         return undefined
@@ -16,4 +16,10 @@ export function createNativeBadgeComponent(): OmoSenpiComponent {
   }
 }
 
-export { NATIVE_BADGE_STATUS_KEY, NATIVE_BADGE_TEXT, createNativeBadgeStatus } from "./footer-badge"
+export {
+  NATIVE_BADGE_DEV_BUILD_TEXT,
+  NATIVE_BADGE_STATUS_KEY,
+  NATIVE_BADGE_TEXT,
+  createNativeBadgeStatus,
+  resolveNativeBadgeText,
+} from "./footer-badge"

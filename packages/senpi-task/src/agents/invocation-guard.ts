@@ -13,8 +13,8 @@ export type AgentInvocationCondition = {
 }
 
 export const AGENT_INVOCATION_CONDITIONS = {
-  metis: { requiresSkills: ["ulw-plan"], requiresPlanArtifact: true, forbidsSkills: ["ulw-execute"] },
-  momus: { requiresSkills: ["ulw-plan"], requiresPlanArtifact: true, forbidsSkills: ["ulw-execute"] },
+  "plan-consultant": { requiresSkills: ["ulw-plan"], requiresPlanArtifact: true, forbidsSkills: ["ulw-execute"] },
+  "plan-reviewer": { requiresSkills: ["ulw-plan"], requiresPlanArtifact: true, forbidsSkills: ["ulw-execute"] },
 } as const satisfies Readonly<Record<string, AgentInvocationCondition>>
 
 const CONDITIONS: Readonly<Record<string, AgentInvocationCondition>> = AGENT_INVOCATION_CONDITIONS
@@ -49,9 +49,7 @@ export const EMPTY_SKILL_INVOCATIONS: SkillInvocationState = {
   planArtifactReferences: () => [],
 }
 
-export type InvocationGuardVerdict =
-  | { readonly kind: "allow" }
-  | { readonly kind: "deny"; readonly message: string }
+export type InvocationGuardVerdict = { readonly kind: "allow" } | { readonly kind: "deny"; readonly message: string }
 
 export function invocationConditionForAgent(agentName: string): AgentInvocationCondition | undefined {
   return CONDITIONS[agentName]

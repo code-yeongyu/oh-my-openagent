@@ -13,9 +13,9 @@ export function sessionIdFrom(input: { readonly session_id?: unknown }): string 
 }
 
 export function readLspPostEditCache(sessionId: string | undefined): PostEditNotConfiguredCache {
-	if (sessionId === undefined) return { notConfiguredExtensions: new Set() };
+	if (sessionId === undefined) return { notConfiguredExtensions: new Set(), notInstalledServers: new Set() };
 	const state = readSessionState(sessionStatePath(sessionId));
-	return { notConfiguredExtensions: new Set(state.notConfiguredExtensions) };
+	return { notConfiguredExtensions: new Set(state.notConfiguredExtensions), notInstalledServers: new Set() };
 }
 
 export function writeLspPostEditCache(sessionId: string | undefined, cache: PostEditNotConfiguredCache): void {

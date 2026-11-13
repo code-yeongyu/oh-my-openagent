@@ -35,7 +35,9 @@ describe("dag definition lint", () => {
 
   test("#given a node missing STOP WHEN #when linted #then the warning names the node and the stop condition", () => {
     // given
-    const nodes = [{ id: "build", prompt: "TASK: build it. DELIVERABLE: dist/. SCOPE: dist only. VERIFY: bun run build." }]
+    const nodes = [
+      { id: "build", prompt: "TASK: build it. DELIVERABLE: dist/. SCOPE: dist only. VERIFY: bun run build." },
+    ]
 
     // when
     const warnings = lintDagDefinitionNodes(nodes)
@@ -80,6 +82,31 @@ describe("dag definition lint", () => {
   test("#given a single-node run without verification shape #when linted #then no run-level warning", () => {
     // given
     const nodes = [{ id: "plan", prompt: CONTRACT_PROMPT }]
+
+    // when
+    const warnings = lintDagDefinitionNodes(nodes)
+
+    // then
+    expect(warnings).toEqual([])
+  })
+
+  test("#given a node targeting a retired curated agent id #when linted #then no deprecation warning fires", () => {
+    // given: the read alias is gone, so a retired id is just an agent name the run must define
+    const nodes = [
+      { id: "plan-review", prompt: CONTRACT_PROMPT, subagent_type: "momus" },
+      { id: "gap-analysis", prompt: CONTRACT_PROMPT, subagent_type: "metis" },
+    ]
+
+    // when
+    const warnings = lintDagDefinitionNodes(nodes)
+
+    // then
+    expect(warnings).toEqual([])
+  })
+
+  test("#given a node targeting the canonical agent id #when linted #then no deprecation warning fires", () => {
+    // given
+    const nodes = [{ id: "plan-review", prompt: CONTRACT_PROMPT, subagent_type: "plan-reviewer" }]
 
     // when
     const warnings = lintDagDefinitionNodes(nodes)

@@ -12,7 +12,7 @@ export async function executeBackgroundContinuation(
   ctx: ToolContextWithMetadata,
   executorCtx: ExecutorContext,
   parentContext: ParentContext,
-  systemContent?: string
+  systemContent?: string,
 ): Promise<string> {
   const { manager } = executorCtx
   const taskID = getTaskID(args)
@@ -22,9 +22,7 @@ export async function executeBackgroundContinuation(
       throw new Error("task_id is required to continue a background task")
     }
 
-    const effectivePrompt = systemContent
-      ? `${systemContent}\n\n${args.prompt}`
-      : args.prompt
+    const effectivePrompt = systemContent ? `${systemContent}\n\n${args.prompt}` : args.prompt
 
     const task = await manager.resume({
       sessionId: taskID,
@@ -45,7 +43,9 @@ export async function executeBackgroundContinuation(
         prompt: args.prompt,
         agent: task.agent,
         ...(task.category !== undefined ? { category: task.category } : {}),
-        ...(args.requested_subagent_type !== undefined ? { requested_subagent_type: args.requested_subagent_type } : {}),
+        ...(args.requested_subagent_type !== undefined
+          ? { requested_subagent_type: args.requested_subagent_type }
+          : {}),
         load_skills: args.load_skills,
         description: args.description,
         run_in_background: args.run_in_background,
@@ -69,11 +69,11 @@ Agent continues with full previous context preserved.
 Do NOT call background_output now. Wait for <system-reminder> notification first. The system will deliver the result when the task completes; you do not need to poll for it.
 
 ${buildTaskMetadataBlock({
-      sessionId,
-      backgroundTaskId,
-      agent: task.agent,
-      category: task.category,
-    })}`
+  sessionId,
+  backgroundTaskId,
+  agent: task.agent,
+  category: task.category,
+})}`
   } catch (error) {
     return formatDetailedError(error, {
       operation: "Continue background task",

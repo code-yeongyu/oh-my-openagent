@@ -15,8 +15,12 @@ async function fixture(seedFiles: Array<{ relativePath: string; content: string 
   return { dir, repo }
 }
 
-async function git(dir: string, argv: readonly string[]) {
-  const result = await createNodeGitExec().run(argv, { cwd: dir, timeoutMs: 30_000 })
+async function git(dir: string, argv: readonly string[], stdin?: string) {
+  const result = await createNodeGitExec().run(argv, {
+    cwd: dir,
+    timeoutMs: 30_000,
+    ...(stdin === undefined ? {} : { stdin }),
+  })
   if (result.code !== 0) throw new Error(result.stderr || result.stdout)
   return result.stdout.trim()
 }
@@ -32,12 +36,16 @@ async function rejectedError(operation: Promise<unknown>): Promise<Error> {
 }
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, {
-    recursive: true,
-    force: true,
-    maxRetries: 10,
-    retryDelay: 200,
-  })))
+  await Promise.all(
+    tempDirs.splice(0).map((dir) =>
+      rm(dir, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 200,
+      }),
+    ),
+  )
 })
 
 describe("GitPathStateStore", () => {
@@ -63,6 +71,22 @@ describe("GitPathStateStore", () => {
     expect(bothDirty.worktree).not.toEqual(worktreeDirty.worktree)
   })
 
+  for (const variable of ["GIT_GLOB_PATHSPECS", "GIT_ICASE_PATHSPECS"] as const) {
+    it(`#given inherited ${variable} #when capturing a tracked path #then literal lookup still succeeds`, async () => {
+      const { repo } = await fixture([{ relativePath: "tracked.md", content: "base\n" }])
+      const expected = await repo.pathState.capture("tracked.md")
+      const saved = process.env[variable]
+      try {
+        process.env[variable] = "1"
+        expect(await repo.pathState.capture("tracked.md")).toEqual(expected)
+        expect(process.env[variable]).toBe("1")
+      } finally {
+        if (saved === undefined) delete process.env[variable]
+        else process.env[variable] = saved
+      }
+    })
+  }
+
   // Windows has no POSIX executable bit and git reports core.filemode=false there, so a chmod-only
   // change is not a diff at all: the commit correctly raises NoEffectiveChangesError. The behaviour
   // under test is real but POSIX-only, matching the repo's existing skipIf convention for
@@ -87,10 +111,14 @@ describe("GitPathStateStore", () => {
     const content = "unique-filtered-content\r\n"
 
     const rawUnwritten = await repo.pathState.hashWorktreeBlob(content)
-    expect((await createNodeGitExec().run(["cat-file", "-e", rawUnwritten], {
-      cwd: dir,
-      timeoutMs: 30_000,
-    })).code).not.toBe(0)
+    expect(
+      (
+        await createNodeGitExec().run(["cat-file", "-e", rawUnwritten], {
+          cwd: dir,
+          timeoutMs: 30_000,
+        })
+      ).code,
+    ).not.toBe(0)
 
     const raw = await repo.pathState.hashWorktreeBlob(content, true)
     const filtered = await repo.pathState.hashIndexBlob("filtered.txt", content, true)
@@ -157,16 +185,21 @@ describe("GitPathStateStore", () => {
 
   it("rejects unmerged entries", async () => {
     const { dir, repo } = await fixture([{ relativePath: "conflict.md", content: "base\n" }])
-    await git(dir, ["checkout", "-b", "other"])
-    await writeFile(join(dir, "conflict.md"), "other\n")
-    await git(dir, ["add", "--", "conflict.md"])
-    await git(dir, ["-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "other"])
-    await git(dir, ["checkout", "main"])
-    await writeFile(join(dir, "conflict.md"), "main\n")
-    await git(dir, ["add", "--", "conflict.md"])
-    await git(dir, ["-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "main"])
-    const merge = await createNodeGitExec().run(["merge", "other"], { cwd: dir, timeoutMs: 30_000 })
-    expect(merge.code).not.toBe(0)
+    const base = await repo.pathState.capture("conflict.md")
+    if (base.index === null) throw new Error("expected base index entry")
+
+    const other = await repo.pathState.hashWorktreeBlob("other\n", true)
+    const main = await repo.pathState.hashWorktreeBlob("main\n", true)
+    await git(
+      dir,
+      ["update-index", "--index-info"],
+      [
+        `100644 ${base.index.oid} 1\tconflict.md`,
+        `100644 ${main} 2\tconflict.md`,
+        `100644 ${other} 3\tconflict.md`,
+        "",
+      ].join("\n"),
+    )
 
     const error = await rejectedError(repo.pathState.capture("conflict.md"))
     expect(error).toBeInstanceOf(GitPathStateError)

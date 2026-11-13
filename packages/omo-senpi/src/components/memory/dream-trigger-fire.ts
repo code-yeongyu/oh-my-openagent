@@ -1,6 +1,7 @@
 import type { CapturedConversation, DreamOrigin } from "@oh-my-opencode/memory-core"
 
-import { computeUnreflectedVolumeFast, loadConversations as defaultLoadConversations, selectLoadedConversations, type LoadedConversation } from "./dream-selector"
+import type { LoadedConversation } from "./dream-selector"
+import { loadMemoryCommandsRuntime } from "./commands/runtime-loader"
 import { evaluateDreamGates, readLastDreamAtMs, type DreamTriggerSettings } from "./dream-trigger-gates"
 import type { DreamFireOutcome, DreamTriggerSession, ManualDreamRequest } from "./dream-trigger"
 
@@ -15,25 +16,28 @@ export async function fireDream(input: {
   readonly now: () => number
   readonly warnLaunchFailure: (error: unknown) => void
   readonly loadConversations?: (transcriptsDir: string) => Promise<readonly LoadedConversation[]>
+  /** The dream selection; it ships in the memory commands sidecar and loads only when a fire needs it. */
+  readonly loadSelection?: typeof loadMemoryCommandsRuntime
 }): Promise<DreamFireOutcome> {
   const { session, origin, settings, request, now } = input
   const shouldLoadConversations = origin !== "pressure" && request.conversationIds === undefined
-  const loadConversations = input.loadConversations ?? ((transcriptsDir: string) =>
-    defaultLoadConversations(transcriptsDir, Math.max(settings.autoSelectMax * 4, 8)))
+  const loadSelection = input.loadSelection ?? loadMemoryCommandsRuntime
+  const loadConversations =
+    input.loadConversations ??
+    (async (transcriptsDir: string) =>
+      (await loadSelection()).loadConversations(transcriptsDir, Math.max(settings.autoSelectMax * 4, 8)))
   let loadedConversations: readonly LoadedConversation[] | undefined
   const getLoadedConversations = async (): Promise<readonly LoadedConversation[]> => {
     loadedConversations ??= await loadConversations(session.identityPaths.transcripts)
     return loadedConversations
   }
-  const stopped = () =>
-    isAborted(request.signal)
-    || (request.deadlineAt !== undefined && now() >= request.deadlineAt)
+  const stopped = () => isAborted(request.signal) || (request.deadlineAt !== undefined && now() >= request.deadlineAt)
   const decision = await evaluateDreamGates(origin, settings, {
     nowMs: now(),
     lastDreamAtMs: () => readLastDreamAtMs(session.identityPaths.runtime),
     unreflectedBytes: async () => {
       if (!shouldLoadConversations) return 0
-      return computeUnreflectedVolumeFast({
+      return (await loadSelection()).computeUnreflectedVolumeFast({
         transcriptsDir: session.identityPaths.transcripts,
         currentConversationId: session.conversationId,
         autoSelectMax: settings.autoSelectMax,
@@ -44,17 +48,22 @@ export async function fireDream(input: {
   })
   if (!decision.allowed) return { fired: false, rejection: decision.rejection }
   if (stopped()) return { fired: false, rejection: "aborted" }
-  const selected = origin === "pressure"
-    ? []
-    : request.conversationIds === undefined
-      ? selectLoadedConversations(await getLoadedConversations(), {
-          transcriptsDir: session.identityPaths.transcripts,
-          currentConversationId: session.conversationId,
-          autoSelectMax: settings.autoSelectMax,
-          autoSelectMaxBytes: settings.autoSelectMaxChars,
-          now: () => new Date(now()),
-        }, { ...(request.focus === undefined ? {} : { focus: request.focus }) }).conversationIds
-      : request.conversationIds
+  const selected =
+    origin === "pressure"
+      ? []
+      : request.conversationIds === undefined
+        ? (await loadSelection()).selectLoadedConversations(
+            await getLoadedConversations(),
+            {
+              transcriptsDir: session.identityPaths.transcripts,
+              currentConversationId: session.conversationId,
+              autoSelectMax: settings.autoSelectMax,
+              autoSelectMaxBytes: settings.autoSelectMaxChars,
+              now: () => new Date(now()),
+            },
+            { ...(request.focus === undefined ? {} : { focus: request.focus }) },
+          ).conversationIds
+        : request.conversationIds
   if (stopped()) return { fired: false, rejection: "aborted" }
   const conversationIds: string[] = []
   const snapshots: CapturedConversation[] = []
@@ -72,23 +81,28 @@ export async function fireDream(input: {
     conversationIds.push(conversationId)
     snapshots.push({ conversationId, snapshot })
   }
-  if (origin !== "pressure" && conversationIds.length === 0) return { fired: false, rejection: "no_unreflected_content" }
+  if (origin !== "pressure" && conversationIds.length === 0)
+    return { fired: false, rejection: "no_unreflected_content" }
   if (stopped()) return { fired: false, rejection: "aborted" }
   let result
   try {
-    result = await session.store.tryReserve({
-      trigger: "dream",
-      origin,
-      conversationIds,
-      snapshots,
-      ...(request.focus === undefined ? {} : { focus: request.focus }),
-      ...(request.targetDoc === undefined ? {} : { targetDoc: request.targetDoc }),
-    }, request.signal)
+    result = await session.store.tryReserve(
+      {
+        trigger: "dream",
+        origin,
+        conversationIds,
+        snapshots,
+        ...(request.focus === undefined ? {} : { focus: request.focus }),
+        ...(request.targetDoc === undefined ? {} : { targetDoc: request.targetDoc }),
+      },
+      request.signal,
+    )
   } catch (error) {
     if (stopped()) return { fired: false, rejection: "aborted" }
     throw error
   }
   if (stopped()) return { fired: false, rejection: "aborted" }
+  if (result.status === "parked") return { fired: false, rejection: "parked" }
   if (result.status === "active") {
     if (stopped()) return { fired: false, rejection: "aborted" }
     try {

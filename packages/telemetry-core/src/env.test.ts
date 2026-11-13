@@ -1,27 +1,33 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-  UNCONFIGURED_POSTHOG_API_KEY,
-  hasTelemetryApiKey,
-  shouldDisableTelemetry,
-} from "./index"
+import { UNCONFIGURED_POSTHOG_API_KEY, hasTelemetryApiKey, shouldDisableTelemetry } from "./index"
 
 const OPT_OUT_CASES = [
   ["unset env enables telemetry", {}, false],
   ["global disable 1", { OMO_DISABLE_POSTHOG: "1" }, true],
   ["global disable true", { OMO_DISABLE_POSTHOG: "true" }, true],
   ["global disable yes", { OMO_DISABLE_POSTHOG: "yes" }, true],
+  ["global disable trims and lowercases", { OMO_DISABLE_POSTHOG: " TRUE " }, true],
   ["global send 0", { OMO_SEND_ANONYMOUS_TELEMETRY: "0" }, true],
   ["global send false", { OMO_SEND_ANONYMOUS_TELEMETRY: "false" }, true],
   ["global send no", { OMO_SEND_ANONYMOUS_TELEMETRY: "no" }, true],
+  ["global send trims and lowercases", { OMO_SEND_ANONYMOUS_TELEMETRY: " No " }, true],
   ["codex disable 1", { OMO_CODEX_DISABLE_POSTHOG: "1" }, true],
   ["codex disable true", { OMO_CODEX_DISABLE_POSTHOG: "true" }, true],
   ["codex disable yes", { OMO_CODEX_DISABLE_POSTHOG: "yes" }, true],
+  ["codex disable trims and lowercases", { OMO_CODEX_DISABLE_POSTHOG: " YES " }, true],
   ["codex send 0", { OMO_CODEX_SEND_ANONYMOUS_TELEMETRY: "0" }, true],
   ["codex send false", { OMO_CODEX_SEND_ANONYMOUS_TELEMETRY: "false" }, true],
   ["codex send no", { OMO_CODEX_SEND_ANONYMOUS_TELEMETRY: "no" }, true],
+  ["codex send trims and lowercases", { OMO_CODEX_SEND_ANONYMOUS_TELEMETRY: " FALSE " }, true],
   ["approved codex send yes convergence", { OMO_CODEX_SEND_ANONYMOUS_TELEMETRY: "yes" }, true],
   ["invalid disable value", { OMO_CODEX_DISABLE_POSTHOG: "maybe" }, false],
+  ["global telemetry disable 1", { OMO_DISABLE_TELEMETRY: "1" }, true],
+  ["global telemetry disable true", { OMO_DISABLE_TELEMETRY: "true" }, true],
+  ["global telemetry disable yes", { OMO_DISABLE_TELEMETRY: "yes" }, true],
+  ["global telemetry disable trims and lowercases", { OMO_DISABLE_TELEMETRY: " Yes " }, true],
+  ["global telemetry disable 0 keeps telemetry on", { OMO_DISABLE_TELEMETRY: "0" }, false],
+  ["global telemetry disable empty keeps telemetry on", { OMO_DISABLE_TELEMETRY: "" }, false],
 ] as const
 
 describe("telemetry API key configuration", () => {
@@ -30,25 +36,25 @@ describe("telemetry API key configuration", () => {
     ["whitespace-only", "   ", false],
     ["exact unconfigured placeholder", UNCONFIGURED_POSTHOG_API_KEY, false],
     ["longer key containing the placeholder", `${UNCONFIGURED_POSTHOG_API_KEY}_configured`, true],
-  ] as const)("#given %s input #when key availability is checked #then the expected result is returned", (_name, apiKey, expected) => {
-    expect(hasTelemetryApiKey({ POSTHOG_API_KEY: apiKey })).toBe(expected)
-  })
+  ] as const)(
+    "#given %s input #when key availability is checked #then the expected result is returned",
+    (_name, apiKey, expected) => {
+      expect(hasTelemetryApiKey({ POSTHOG_API_KEY: apiKey })).toBe(expected)
+    },
+  )
 })
 
 describe("opt-out telemetry env matrix", () => {
-  test.each(OPT_OUT_CASES)(
-    "#given %s #when evaluated #then disabled=%p",
-    (_name, env, expected) => {
-      // given
-      const productPrefix = "OMO_CODEX"
+  test.each(OPT_OUT_CASES)("#given %s #when evaluated #then disabled=%p", (_name, env, expected) => {
+    // given
+    const productPrefix = "OMO_CODEX"
 
-      // when
-      const result = shouldDisableTelemetry({ env, productEnvPrefix: productPrefix })
+    // when
+    const result = shouldDisableTelemetry({ env, productEnvPrefix: productPrefix })
 
-      // then
-      expect(result).toBe(expected)
-    },
-  )
+    // then
+    expect(result).toBe(expected)
+  })
 })
 
 describe("DO_NOT_TRACK global opt-out", () => {

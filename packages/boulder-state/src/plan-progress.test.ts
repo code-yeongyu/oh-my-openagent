@@ -26,20 +26,22 @@ function writePlan(markdown: string): string {
 describe("getPlanProgress", () => {
   test("#given structured plan sections #when progress is read #then only labeled top-level TODO and final wave tasks count", () => {
     // given
-    const planPath = writePlan([
-      "# Plan",
-      "- [ ] Preamble checkbox",
-      "## TODOs",
-      "- [x] 1. Completed task",
-      "  - [ ] 1.1 Nested task",
-      "- [ ] Missing numeric label",
-      "- [ ] 2. Remaining task",
-      "## Acceptance Criteria",
-      "- [ ] Ignored checkbox",
-      "## Final Verification Wave",
-      "- [X] F1. Verified task",
-      "- [ ] F2. Remaining verification",
-    ].join("\n"))
+    const planPath = writePlan(
+      [
+        "# Plan",
+        "- [ ] Preamble checkbox",
+        "## TODOs",
+        "- [x] 1. Completed task",
+        "  - [ ] 1.1 Nested task",
+        "- [ ] Missing numeric label",
+        "- [ ] 2. Remaining task",
+        "## Acceptance Criteria",
+        "- [ ] Ignored checkbox",
+        "## Final Verification Wave",
+        "- [X] F1. Verified task",
+        "- [ ] F2. Remaining verification",
+      ].join("\n"),
+    )
 
     // when
     const progress = getPlanProgress(planPath)
@@ -50,17 +52,25 @@ describe("getPlanProgress", () => {
 
   test("#given simple plan without structured headings #when progress is read #then all top-level checkboxes count", () => {
     // given
-    const planPath = writePlan([
-      "# Plan",
-      "- [x] Completed",
-      "- [ ] Remaining",
-      "  - [ ] Nested ignored by simple fallback",
-    ].join("\n"))
+    const planPath = writePlan(
+      ["# Plan", "- [x] Completed", "- [ ] Remaining", "  - [ ] Nested ignored by simple fallback"].join("\n"),
+    )
 
     // when
     const progress = getPlanProgress(planPath)
 
     // then
     expect(progress).toEqual({ total: 2, completed: 1, isComplete: false })
+  })
+
+  test("#given every open task is blocked with [~] #when progress is read #then the plan is complete without claiming the blocked task done", () => {
+    // given
+    const planPath = writePlan(["## TODOs", "- [x] 1. Build", "- [~] 2. Push, blocked on the user"].join("\n"))
+
+    // when
+    const progress = getPlanProgress(planPath)
+
+    // then
+    expect(progress).toEqual({ total: 2, completed: 1, isComplete: true })
   })
 })

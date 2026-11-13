@@ -8,11 +8,6 @@ export interface ProcessKiller {
   readonly terminate: (pid: number) => Promise<void>
 }
 
-/** Backward-compatible aliases: the codegraph family was the first consumer. */
-export type CodegraphProcessKiller = ProcessKiller
-export const enumerateCodegraphProcesses = enumerateProcesses
-export const createDefaultCodegraphProcessKiller = createDefaultProcessKiller
-
 export function enumerateProcesses(platform: NodeJS.Platform = process.platform): Promise<ProcessInfo[]> {
   return platform === "win32" ? enumerateWindowsProcesses() : enumeratePosixProcesses()
 }
@@ -68,13 +63,18 @@ function createWindowsKiller(): ProcessKiller {
 
 function execFileText(command: string, args: readonly string[]): Promise<string> {
   return new Promise((resolvePromise, reject) => {
-    execFile(command, [...args], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024, windowsHide: true }, (error, stdout) => {
-      if (error !== null) {
-        reject(error)
-        return
-      }
-      resolvePromise(stdout)
-    })
+    execFile(
+      command,
+      [...args],
+      { encoding: "utf8", maxBuffer: 16 * 1024 * 1024, windowsHide: true },
+      (error, stdout) => {
+        if (error !== null) {
+          reject(error)
+          return
+        }
+        resolvePromise(stdout)
+      },
+    )
   })
 }
 

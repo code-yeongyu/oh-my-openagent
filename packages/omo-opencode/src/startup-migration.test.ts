@@ -39,7 +39,10 @@ function createFileSystem(): CrossDeviceBackupFileSystem {
   return fileSystem
 }
 
-function run(fileSystem: MemoryMigrationFileSystem, options: { readonly onBoundary?: (boundary: MigrationBoundary) => void } = {}) {
+function run(
+  fileSystem: MemoryMigrationFileSystem,
+  options: { readonly onBoundary?: (boundary: MigrationBoundary) => void } = {},
+) {
   return runOpenCodeStartupMigration({
     backupTimestamp: "2026-07-27T12-34-56-789Z",
     clock: { now: () => 1 },
@@ -66,7 +69,7 @@ describe("runOpenCodeStartupMigration", () => {
     // given
     const fileSystem = createFileSystem()
     fileSystem.files.set(rootSourcePath, JSON.stringify({ agents: { oracle: { model: "anthropic/legacy" } } }))
-    fileSystem.files.set(configJsoncPath, JSON.stringify({ codegraph: { excluded_roots: ["/generated"] } }))
+    fileSystem.files.set(configJsoncPath, JSON.stringify({ "[codex]": { telemetry: { enabled: false } } }))
 
     // when
     const result = run(fileSystem)
@@ -75,12 +78,20 @@ describe("runOpenCodeStartupMigration", () => {
     expect(result.reloadRequired).toBe(true)
     expect(result.migratedFrom).toEqual([rootSourcePath, configJsoncPath])
     expect(parseFile(fileSystem, targetPath)).toMatchObject({
-      codegraph: { excluded_roots: ["/generated"] },
+      "[codex]": { telemetry: { enabled: false } },
     })
     expect(fileSystem.existsSync(rootSourcePath)).toBe(false)
     expect(fileSystem.existsSync(configJsoncPath)).toBe(false)
-    expect(fileSystem.existsSync(`${homeDir}/.omo/migration-backup-2026-07-27T12-34-56-789Z-opencode-config/.config/opencode/oh-my-openagent.json`)).toBe(true)
-    expect(fileSystem.existsSync(`${homeDir}/.omo/migration-backup-2026-07-27T12-34-56-789Z-opencode-config/.omo/config.jsonc`)).toBe(true)
+    expect(
+      fileSystem.existsSync(
+        `${homeDir}/.omo/migration-backup-2026-07-27T12-34-56-789Z-opencode-config/.config/opencode/oh-my-openagent.json`,
+      ),
+    ).toBe(true)
+    expect(
+      fileSystem.existsSync(
+        `${homeDir}/.omo/migration-backup-2026-07-27T12-34-56-789Z-opencode-config/.omo/config.jsonc`,
+      ),
+    ).toBe(true)
   })
 
   test("#given a legacy source on another filesystem #when its backup rename throws EXDEV #then startup copies and removes the source", () => {
@@ -96,7 +107,11 @@ describe("runOpenCodeStartupMigration", () => {
     expect(result.error).toBeUndefined()
     expect(result.migratedFrom).toEqual([rootSourcePath])
     expect(fileSystem.existsSync(rootSourcePath)).toBe(false)
-    expect(fileSystem.existsSync(`${homeDir}/.omo/migration-backup-2026-07-27T12-34-56-789Z-opencode-config/.config/opencode/oh-my-openagent.json`)).toBe(true)
+    expect(
+      fileSystem.existsSync(
+        `${homeDir}/.omo/migration-backup-2026-07-27T12-34-56-789Z-opencode-config/.config/opencode/oh-my-openagent.json`,
+      ),
+    ).toBe(true)
     expect(fileSystem.existsSync(`${homeDir}/.omo/.migration-journal.json`)).toBe(false)
   })
 
@@ -112,7 +127,11 @@ describe("runOpenCodeStartupMigration", () => {
     // then
     expect(result.error).toContain("EACCES")
     expect(fileSystem.existsSync(rootSourcePath)).toBe(true)
-    expect(fileSystem.existsSync(`${homeDir}/.omo/migration-backup-2026-07-27T12-34-56-789Z-opencode-config/.config/opencode/oh-my-openagent.json`)).toBe(false)
+    expect(
+      fileSystem.existsSync(
+        `${homeDir}/.omo/migration-backup-2026-07-27T12-34-56-789Z-opencode-config/.config/opencode/oh-my-openagent.json`,
+      ),
+    ).toBe(false)
   })
 
   test("#given no legacy source #when startup migration runs #then it does not create a target or backups", () => {
@@ -132,7 +151,7 @@ describe("runOpenCodeStartupMigration", () => {
   test("#given an invalid transformed document #when startup migration runs #then validation aborts before target and source changes", () => {
     // given
     const fileSystem = createFileSystem()
-    fileSystem.files.set(configJsoncPath, JSON.stringify({ codegraph: { excluded_roots: [42] } }))
+    fileSystem.files.set(configJsoncPath, JSON.stringify({ "[codex]": { telemetry: { enabled: "yes" } } }))
 
     // when
     const result = run(fileSystem)

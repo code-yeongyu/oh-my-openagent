@@ -6,7 +6,6 @@ export const FACTS_FAILURES_VERSION = 1 as const
 
 export const FACTS_FAILURE_REASONS = [
   "quick_category_unavailable",
-  "sandbox_unavailable",
   "child_exit",
   "deadline_exceeded",
   "invalid_extraction",
@@ -15,6 +14,7 @@ export const FACTS_FAILURE_REASONS = [
   "unknown_liveness",
   "payload_envelope_oversize",
   "payload_entry_oversize",
+  "secret_like_content",
   "other",
 ] as const
 
@@ -111,8 +111,7 @@ function requireState(value: unknown): FactsFailureState {
 function parseRecord(value: unknown): FactsFailureRecord {
   if (!isRecord(value)) throw new FactsFailuresCorruptError("entries must contain objects")
   const state = requireState(value.state)
-  const nextEligibleAt =
-    value.nextEligibleAt === null ? null : requireInstant(value.nextEligibleAt, "nextEligibleAt")
+  const nextEligibleAt = value.nextEligibleAt === null ? null : requireInstant(value.nextEligibleAt, "nextEligibleAt")
   const parkedAt = value.parkedAt === undefined ? undefined : requireInstant(value.parkedAt, "parkedAt")
   // The two states are structurally distinct; accepting a half-parked record would let a
   // parked entry silently become eligible again.

@@ -17,12 +17,16 @@ describe("taskIdentityLabel", () => {
 
   test("#given a blank task summary #when labelled #then it falls back to the description", () => {
     // given / when / then
-    expect(taskIdentityLabel({ taskId: "st_00000001", description: "Audit renderers", taskSummary: "  " })).toBe("Audit renderers")
+    expect(taskIdentityLabel({ taskId: "st_00000001", description: "Audit renderers", taskSummary: "  " })).toBe(
+      "Audit renderers",
+    )
   })
 
   test("#given a description #when labelled #then the human description wins over name and id", () => {
     // given / when / then
-    expect(taskIdentityLabel({ taskId: "st_00000001", name: "task-1", description: "Audit renderers" })).toBe("Audit renderers")
+    expect(taskIdentityLabel({ taskId: "st_00000001", name: "task-1", description: "Audit renderers" })).toBe(
+      "Audit renderers",
+    )
   })
 
   test("#given no description #when labelled #then the stable name is used", () => {
@@ -57,26 +61,26 @@ describe("formatStatusTarget", () => {
       formatStatusTarget({
         category: "quick",
         resolvedModel: {
-          provider: "openai-codex",
+          provider: "chatgpt-subscription",
           model_id: "gpt-5.6-luna-fast",
           display: "gpt-5.6-luna-fast",
           reasoning_effort: "high",
           source: "category",
         },
       }),
-    ).toBe("category:quick(openai-codex/gpt-5.6-luna-fast:high)")
+    ).toBe("category:quick(chatgpt-subscription/gpt-5.6-luna-fast:high)")
   })
 
   test("#given only an agent type #when formatted #then the agent target shares the category grammar", () => {
     // given / when / then
-    expect(formatStatusTarget({ agentType: "momus" })).toBe("agent:momus")
+    expect(formatStatusTarget({ agentType: "plan-reviewer" })).toBe("agent:plan-reviewer")
   })
 
   test("#given an agent type and resolved model #when formatted #then model metadata qualifies the agent exactly like a category", () => {
     // given / when / then
     expect(
       formatStatusTarget({
-        agentType: "momus",
+        agentType: "plan-reviewer",
         resolvedModel: {
           provider: "openai",
           model_id: "gpt-5.6-sol-fast",
@@ -85,7 +89,7 @@ describe("formatStatusTarget", () => {
           source: "agent",
         },
       }),
-    ).toBe("agent:momus(openai/gpt-5.6-sol-fast:high)")
+    ).toBe("agent:plan-reviewer(openai/gpt-5.6-sol-fast:high)")
   })
 
   test("#given an agent type with only a raw model #when formatted #then the raw model qualifies the agent target", () => {
@@ -95,6 +99,32 @@ describe("formatStatusTarget", () => {
     )
   })
 
+  // A record carrying BOTH identities is a task whose caller wrote a subagent_type that a category
+  // ended up resolving (#8348). The category must never silently erase the name the caller wrote:
+  // the model and the target that selected it have to travel together in the same view.
+  test("#given a record carrying both the asked-for agent and the resolving category #when formatted #then both targets ride the model", () => {
+    // given / when / then
+    expect(
+      formatStatusTarget({
+        category: "architect",
+        agentType: "architect",
+        resolvedModel: {
+          provider: "anthropic",
+          model_id: "claude-fable-5-1",
+          display: "claude-fable-5-1",
+          reasoning: "xhigh",
+          source: "category",
+        },
+      }),
+    ).toBe("agent:architect\u2192category:architect(anthropic/claude-fable-5-1:xhigh)")
+  })
+
+  test("#given a record whose asked-for agent differs from the resolving category #when formatted #then the asked-for name is kept", () => {
+    // given / when / then
+    expect(formatStatusTarget({ category: "visual-engineering", agentType: "frontend-worker" })).toBe(
+      "agent:frontend-worker\u2192category:visual-engineering",
+    )
+  })
 
   test("#given resolved model metadata with effort and variant #when formatted #then reasoning effort wins in the status target", () => {
     // given / when / then
@@ -202,7 +232,9 @@ describe("composeStatusLine", () => {
     })
 
     // then
-    expect(line).toBe("Audit renderers · quick (kimi-coding/kimi-k3:max) · turn 3 (7 tools) · running read src/foo.ts · 62 tok/s")
+    expect(line).toBe(
+      "Audit renderers · quick (kimi-coding/kimi-k3:max) · turn 3 (7 tools) · running read src/foo.ts · 62 tok/s",
+    )
   })
 
   test("#given cost and cache facts #when composed #then only cost sits immediately before tps", () => {
@@ -233,7 +265,14 @@ describe("composeStatusLine", () => {
     expect(
       composeStatusLine({
         identity: "t",
-        stats: { runtime_ms: 0, turns: 1, tool_calls: 0, tokens_per_second: 8, cache_hit_rate_last: 0.5, cache_hit_rate_run: 0.1 },
+        stats: {
+          runtime_ms: 0,
+          turns: 1,
+          tool_calls: 0,
+          tokens_per_second: 8,
+          cache_hit_rate_last: 0.5,
+          cache_hit_rate_run: 0.1,
+        },
       }),
     ).toBe("t · turn 1 · 8 tok/s")
   })
@@ -248,5 +287,67 @@ describe("composeStatusLine", () => {
   test("#given no stats #when composed #then only known tokens are emitted", () => {
     // given / when / then
     expect(composeStatusLine({ identity: "t", verb: "waiting (running)" })).toBe("t · waiting (running)")
+  })
+})
+
+describe("composeStatusLine not-yet-started grammar", () => {
+  test("#given zero stats #when composed #then the row reads starting with no turn or cost token", () => {
+    // given / when
+    const line = composeStatusLine({
+      identity: "Audit renderers",
+      target: "category:deep-low(provider/model:medium)",
+      stats: { runtime_ms: 41_000, turns: 0, tool_calls: 0, failed_turns: 0 },
+      verb: "starting",
+    })
+
+    // then — a run that has not landed a turn claims neither motion nor spend
+    expect(line).toBe("Audit renderers · category:deep-low(provider/model:medium) · starting")
+  })
+
+  test("#given failed attempts without a successful turn #when composed #then the failed counter replaces the turn and cost tokens", () => {
+    // given / when
+    const line = composeStatusLine({
+      identity: "Audit renderers",
+      target: "category:deep-low(provider/model:medium)",
+      stats: { runtime_ms: 41_000, turns: 0, tool_calls: 0, failed_turns: 2 },
+      verb: "retrying",
+    })
+
+    // then
+    expect(line).toBe("Audit renderers · category:deep-low(provider/model:medium) · failed 2 · retrying")
+  })
+
+  test("#given a normal run #when composed #then the turn, tool, cost and tps tokens render exactly as today", () => {
+    // given / when
+    const line = composeStatusLine({
+      identity: "Audit renderers",
+      stats: { runtime_ms: 65_000, turns: 3, tool_calls: 5, cost_usd: 0.12, tokens_per_second: 42 },
+      verb: "running",
+    })
+
+    // then
+    expect(line).toBe("Audit renderers · turn 3 (5 tools) · running · $0.1200 · 42 tok/s")
+  })
+
+  test("#given a successful turn with a genuine zero cost #when composed #then the cost token still reports the zero", () => {
+    // given / when / then
+    expect(
+      composeStatusLine({
+        identity: "t",
+        stats: { runtime_ms: 0, turns: 1, tool_calls: 0, cost_usd: 0 },
+        verb: "running",
+      }),
+    ).toBe("t · turn 1 · running · $0.0000")
+  })
+
+  test("#given a mix of successful and failed turns #when composed #then both counters ride the row", () => {
+    // given / when / then
+    expect(
+      composeStatusLine({
+        identity: "t",
+        stats: { runtime_ms: 0, turns: 2, tool_calls: 4, failed_turns: 1, cost_usd: 0.12 },
+        verb: "running",
+      }),
+    ).toBe("t · turn 2 (4 tools) · failed 1 · running · $0.1200")
   })
 })

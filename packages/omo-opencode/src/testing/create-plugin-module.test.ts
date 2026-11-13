@@ -27,6 +27,7 @@ const mockRunOpenCodeStartupMigration = mock(() => ({
   reloadRequired: false,
   results: [],
   skippedConflictCount: 0,
+  targetBackupPaths: [] as string[],
 }))
 const mockLoadPluginConfig = mock(() => ({}))
 const mockLoadConfigChain = mock((directory: string) => ({
@@ -85,7 +86,9 @@ const mockCreateFirstMessageVariantGate = mock(() => ({
   clear: () => {},
 }))
 
-function createTestPluginModule(overrides: Parameters<typeof createPluginModule>[0] = {}): ReturnType<typeof createPluginModule> {
+function createTestPluginModule(
+  overrides: Parameters<typeof createPluginModule>[0] = {},
+): ReturnType<typeof createPluginModule> {
   return createPluginModule({
     initConfigContext: mockInitConfigContext,
     detectExternalSkillPlugin: mockDetectExternalSkillPlugin,
@@ -137,6 +140,7 @@ describe("createPluginModule()", () => {
       reloadRequired: false,
       results: [],
       skippedConflictCount: 0,
+      targetBackupPaths: [] as string[],
     })
     mockDetectDuplicateOmoPlugin.mockReturnValue({
       detected: false,
@@ -241,10 +245,7 @@ describe("createPluginModule()", () => {
 
       // then
       const sourceArgs = mockCreateRuntimeSkillSourceServer.mock.calls.at(0)?.[0]
-      expect(sourceArgs?.skills.map((skill) => skill.name)).toEqual([
-        "security-research",
-        "security-review",
-      ])
+      expect(sourceArgs?.skills.map((skill) => skill.name)).toEqual(["security-research", "security-review"])
       expect(mockCreateManagers.mock.calls.at(0)?.[0]).toMatchObject({
         runtimeSkillSourceUrl: "http://127.0.0.1:49152/security-research,security-review",
       })
@@ -316,6 +317,23 @@ describe("createPluginModule()", () => {
     })
   })
 
+  describe("#given startup completes", () => {
+    it("#then both compaction hooks are registered", async () => {
+      // given
+      const pluginModule = createTestPluginModule()
+
+      // when
+      const hooks: Record<string, unknown> = await pluginModule.server({
+        directory: "/tmp/project",
+        client: {},
+      } as Parameters<typeof pluginModule.server>[0])
+
+      // then
+      expect(typeof hooks["experimental.session.compacting"]).toBe("function")
+      expect(typeof hooks["experimental.compaction.autocontinue"]).toBe("function")
+    })
+  })
+
   describe("#given security-research is disabled", () => {
     it("#then startup still exposes security-review through the runtime skill source", async () => {
       // given
@@ -343,10 +361,7 @@ describe("createPluginModule()", () => {
     it("#then startup warns and returns no prompt-producing hooks", async () => {
       // given
       const pluginModule = createTestPluginModule()
-      const duplicatePlugins = [
-        sourcePlugin,
-        "oh-my-openagent@latest",
-      ]
+      const duplicatePlugins = [sourcePlugin, "oh-my-openagent@latest"]
       mockDetectDuplicateOmoPlugin.mockReturnValue({
         detected: true,
         pluginName: "oh-my-openagent",
@@ -388,6 +403,7 @@ describe("createPluginModule()", () => {
         reloadRequired: true,
         results: [],
         skippedConflictCount: 2,
+        targetBackupPaths: [] as string[],
       }))
       const showToast = mock(async () => ({}))
       const pluginModule = createTestPluginModule({ runOpenCodeStartupMigration })
@@ -411,6 +427,62 @@ describe("createPluginModule()", () => {
       })
       expect(mockLoadPluginConfig).toHaveBeenCalledTimes(1)
     })
+
+    it("#then a failed migration's toast still names the backup it kept (#8187)", async () => {
+      // given
+      const runOpenCodeStartupMigration = mock(() => ({
+        error: "Migration backup path already exists",
+        journalResumed: true,
+        migratedFrom: [],
+        reloadRequired: false,
+        results: [],
+        skippedConflictCount: 0,
+        targetBackupPaths: ["/home/alice/.omo/omo.jsonc.bak.kept"],
+      }))
+      const showToast = mock(async () => ({}))
+      const pluginModule = createTestPluginModule({ runOpenCodeStartupMigration })
+      mockLoadPluginConfig.mockReturnValue({})
+
+      // when
+      await pluginModule.server({
+        directory: "/tmp/project",
+        client: { tui: { showToast } },
+      } as Parameters<typeof pluginModule.server>[0])
+
+      // then
+      expect(showToast.mock.calls[0]?.[0]).toMatchObject({
+        body: {
+          title: "Configuration migration failed",
+          message: expect.stringContaining("/home/alice/.omo/omo.jsonc.bak.kept"),
+        },
+      })
+    })
+
+    it("#then the toast names the backup of a rewritten config (#8187)", async () => {
+      // given
+      const runOpenCodeStartupMigration = mock(() => ({
+        journalResumed: false,
+        migratedFrom: ["/home/alice/.config/opencode/omo.json"],
+        reloadRequired: true,
+        results: [],
+        skippedConflictCount: 0,
+        targetBackupPaths: ["/home/alice/.omo/omo.jsonc.bak.2026-10-15T09-00-00-000Z"],
+      }))
+      const showToast = mock(async () => ({}))
+      const pluginModule = createTestPluginModule({ runOpenCodeStartupMigration })
+      mockLoadPluginConfig.mockReturnValue({})
+
+      // when
+      await pluginModule.server({
+        directory: "/tmp/project",
+        client: { tui: { showToast } },
+      } as Parameters<typeof pluginModule.server>[0])
+
+      // then
+      expect(showToast.mock.calls[0]?.[0]).toMatchObject({
+        body: { message: expect.stringContaining("/home/alice/.omo/omo.jsonc.bak.2026-10-15T09-00-00-000Z") },
+      })
+    })
   })
 
   describe("#given serverPlugin is initialized twice in one process", () => {
@@ -422,6 +494,7 @@ describe("createPluginModule()", () => {
         reloadRequired: false,
         results: [],
         skippedConflictCount: 0,
+        targetBackupPaths: [] as string[],
       }))
       const pluginModule = createTestPluginModule({ runOpenCodeStartupMigration })
       const input = { directory: "/tmp/project", client: {} } as Parameters<typeof pluginModule.server>[0]
@@ -445,6 +518,7 @@ describe("createPluginModule()", () => {
         reloadRequired: false,
         results: [],
         skippedConflictCount: 0,
+        targetBackupPaths: [] as string[],
       }))
       const loadConfigChain = mock(() => ({ config: {}, messages: ["invalid config"], path: null, valid: false }))
       const showToast = mock(async () => ({}))
@@ -462,7 +536,9 @@ describe("createPluginModule()", () => {
 
         // then
         expect(hooks).toBeDefined()
-        expect(consoleWarn).toHaveBeenCalledWith(expect.stringContaining("legacy configuration changes were not applied"))
+        expect(consoleWarn).toHaveBeenCalledWith(
+          expect.stringContaining("legacy configuration changes were not applied"),
+        )
         expect(showToast).toHaveBeenCalledTimes(1)
         expect(showToast.mock.calls[0]?.[0]).toMatchObject({
           body: { title: "Configuration migration failed", variant: "error" },

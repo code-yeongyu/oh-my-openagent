@@ -1,11 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-  applyFailure,
-  clearForRetry,
-  clearOnSuccess,
-  type FactsFailureRecord,
-} from "./failures-backoff"
+import { applyFailure, clearForRetry, clearOnSuccess, type FactsFailureRecord } from "./failures-backoff"
 
 const CONVERSATION = "conversation-alpha"
 const T0 = new Date("2026-08-16T00:00:00.000Z")
@@ -62,6 +57,18 @@ describe("facts failure backoff curve", () => {
       expect(record?.state).toBe("backoff")
       expect(record?.nextEligibleAt).toBe(new Date(failedAt + (offsets[index] ?? 0)).toISOString())
     }
+  })
+
+  test("#given a first secret_like_content failure #when applyFailure runs #then the entry parks immediately instead of backing off", () => {
+    // given / when
+    const entries = streak(1, "secret_like_content")
+
+    // then: a secret cannot heal by waiting, so one failure parks the endpoint
+    const record = entries[0]
+    expect(record?.streak).toBe(1)
+    expect(record?.state).toBe("parked")
+    expect(record?.nextEligibleAt).toBeNull()
+    expect(record?.parkedAt).toBe(T0.toISOString())
   })
 
   test("#given a fifth consecutive failure #when applyFailure runs #then the entry parks with no eligibility", () => {

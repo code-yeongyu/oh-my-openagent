@@ -7,6 +7,7 @@ import { createTaskRecordStore } from "../../store"
 import { resolveContext } from "../context"
 import { admitSuspendedBatch } from "../residency"
 import { FakeRegistry } from "./lifecycle-fakes"
+import { NO_HOST_ENDPOINT } from "../host-session"
 
 // Child process for the two-OS-process batch admission race: builds its OWN store + context over
 // the shared state dir, signals readiness, waits for the shared barrier file, then runs one batch
@@ -32,6 +33,7 @@ if (!Number.isSafeInteger(cap) || cap <= 0) {
 
 const store = createTaskRecordStore({ project_dir: stateDir, task: { state_dir: stateDir } })
 const context = resolveContext({
+  hostEndpoint: NO_HOST_ENDPOINT,
   store,
   registry: new FakeRegistry(),
   config: OmoTaskSettingsSchema.parse({ residency_max_children: cap }),

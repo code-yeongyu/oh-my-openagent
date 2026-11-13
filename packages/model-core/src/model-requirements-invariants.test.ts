@@ -13,15 +13,13 @@ const expectedAgents = [
   "momus",
   "atlas",
   "sisyphus-junior",
-  "omo-senpi-code-reviewer",
-  "omo-senpi-qa-executor",
-  "omo-senpi-gate-reviewer",
 ] as const
 
 const expectedCategories = [
   "visual-engineering",
   "ultrabrain",
-  "deep",
+  "deep-low",
+  "deep-high",
   "artistry",
   "quick",
   "unspecified-low",
@@ -72,10 +70,7 @@ describe("model requirement global invariants", () => {
 
   test("fallback chain model ids do not include provider prefixes", () => {
     // given
-    const allRequirements = [
-      ...Object.values(AGENT_MODEL_REQUIREMENTS),
-      ...Object.values(CATEGORY_MODEL_REQUIREMENTS),
-    ]
+    const allRequirements = [...Object.values(AGENT_MODEL_REQUIREMENTS), ...Object.values(CATEGORY_MODEL_REQUIREMENTS)]
 
     // when / then
     for (const requirement of allRequirements) {
@@ -93,9 +88,7 @@ describe("model requirement global invariants", () => {
     ].flatMap((requirement) => requirement.fallbackChain)
 
     // when
-    const retiredKimiEntries = allEntries.filter((entry) =>
-      ["k2p5", "kimi-k2.5", "kimi-k2.6"].includes(entry.model),
-    )
+    const retiredKimiEntries = allEntries.filter((entry) => ["k2p5", "kimi-k2.5", "kimi-k2.6"].includes(entry.model))
     const kimiEntries = allEntries.filter((entry) => entry.model === "kimi-k3")
 
     // then

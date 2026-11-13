@@ -9,6 +9,10 @@ import { GitMemoryRepo, buildIdentityPaths } from "@oh-my-opencode/memory-core"
 import { createMemoryIdentityContext } from "./context"
 import {
   MEMORY_STATUS_KEY,
+  SYNC_BLOCKED_SEGMENT,
+  SYNC_HELD_SEGMENT,
+  estimateSystemTokens,
+  estimateSystemTokensCached,
   refreshMemoryStatus,
   type GitRepoForStatus,
   type MemoryStatusUi,
@@ -16,7 +20,8 @@ import {
 
 const roots: string[] = []
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0))
+    rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
 interface RecordingUi {
@@ -58,10 +63,7 @@ async function createFixtureRepo(
 }
 
 function contextFor(repoPath: string, identity = "agent-test-id") {
-  const paths = buildIdentityPaths(
-    join(repoPath, "..", "..", ".."),
-    identity,
-  )
+  const paths = buildIdentityPaths(join(repoPath, "..", "..", ".."), identity)
   return createMemoryIdentityContext({
     identity,
     identityPaths: { ...paths, repo: repoPath },
@@ -85,11 +87,30 @@ function segmentContext(input: {
   readonly sessionId?: string
   readonly backlogSteps?: number
   readonly failures?: number
+  readonly parked?: boolean
 }) {
   const identity = input.identity ?? "fake-agent"
   const root = mkdtempSync(join(tmpdir(), "omo-memory-segments-"))
   roots.push(root)
   const paths = buildIdentityPaths(root, identity)
+  if (input.parked === true) {
+    mkdirSync(paths.reflection, { recursive: true })
+    writeFileSync(
+      join(paths.reflection, "park.json"),
+      JSON.stringify({
+        version: 1,
+        streak: 3,
+        parkedAt: new Date(SEGMENT_NOW - 60_000).toISOString(),
+        lastFailure: {
+          runId: "run-2",
+          at: new Date(SEGMENT_NOW - 60_000).toISOString(),
+          fingerprint: "spawn_failed:Model not found",
+          retryable: false,
+          reason: "spawn_failed",
+        },
+      }),
+    )
+  }
   if (input.sessionId !== undefined && input.backlogSteps !== undefined) {
     const stateDir = join(paths.transcripts, input.sessionId)
     mkdirSync(stateDir, { recursive: true })
@@ -143,9 +164,7 @@ describe("refreshMemoryStatus segments", () => {
       checkAdvisory: false,
     })
 
-    expect(recorder.statusCalls).toEqual([
-      { key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago*" },
-    ])
+    expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago*" }])
   }, 30_000)
 
   test("#given a clean worktree with a backlog of fourteen steps #when refresh runs #then the backlog segment renders", async () => {
@@ -163,9 +182,7 @@ describe("refreshMemoryStatus segments", () => {
       sessionId: "session-a",
     })
 
-    expect(recorder.statusCalls).toEqual([
-      { key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago (+14)" },
-    ])
+    expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago (+14)" }])
   }, 30_000)
 
   test("#given a zero backlog #when refresh runs #then no backlog segment renders", async () => {
@@ -183,9 +200,7 @@ describe("refreshMemoryStatus segments", () => {
       sessionId: "session-a",
     })
 
-    expect(recorder.statusCalls).toEqual([
-      { key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago" },
-    ])
+    expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago" }])
   }, 30_000)
 
   test("#given three consecutive reflection failures #when refresh runs #then the streak badge renders", async () => {
@@ -202,9 +217,24 @@ describe("refreshMemoryStatus segments", () => {
       checkAdvisory: false,
     })
 
-    expect(recorder.statusCalls).toEqual([
-      { key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago !3" },
-    ])
+    expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago !3" }])
+  }, 30_000)
+
+  test("#given automatic reflection is parked #when refresh runs #then the footer says paused after the streak badge", async () => {
+    const context = segmentContext({ failures: 3, parked: true })
+    const recorder = recordingUi()
+
+    await refreshMemoryStatus({
+      context,
+      ui: recorder.ui,
+      compileWarnTokens: 30_000,
+      alreadyNotified: false,
+      gitRepo: segmentRepo(),
+      now: () => SEGMENT_NOW,
+      checkAdvisory: false,
+    })
+
+    expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago !3 paused" }])
   }, 30_000)
 
   test("#given only two consecutive failures #when refresh runs #then no streak badge renders", async () => {
@@ -221,9 +251,7 @@ describe("refreshMemoryStatus segments", () => {
       checkAdvisory: false,
     })
 
-    expect(recorder.statusCalls).toEqual([
-      { key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago" },
-    ])
+    expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago" }])
   }, 30_000)
 
   test("#given dirty, backlog, and streak all present #when refresh runs #then segments render in fixed order", async () => {
@@ -246,9 +274,7 @@ describe("refreshMemoryStatus segments", () => {
       sessionId: "session-a",
     })
 
-    expect(recorder.statusCalls).toEqual([
-      { key: MEMORY_STATUS_KEY, text: "mem:agent 1m ago* (+7) !3" },
-    ])
+    expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:agent 1m ago* (+7) !3" }])
   }, 30_000)
 
   test("#given an assembled line over sixty characters #when refresh runs #then segments drop right to left until it fits", async () => {
@@ -268,9 +294,7 @@ describe("refreshMemoryStatus segments", () => {
     })
 
     // base `mem:<45 chars> 1m ago` is 56; `*` fits at 57, `* (+7)` would be 62.
-    expect(recorder.statusCalls).toEqual([
-      { key: MEMORY_STATUS_KEY, text: `mem:${identity} 1m ago*` },
-    ])
+    expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: `mem:${identity} 1m ago*` }])
     expect(recorder.statusCalls[0]?.text?.length).toBeLessThanOrEqual(60)
   }, 30_000)
 
@@ -290,9 +314,103 @@ describe("refreshMemoryStatus segments", () => {
       sessionId: "session-a",
     })
 
+    expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: `mem:${identity} 1m ago` }])
+  }, 30_000)
+
+  test("#given memory sync failing #when refresh runs #then the footer says sync blocked, kept even when other segments drop (omo #10637)", async () => {
+    const identity = "a".repeat(32)
+    const context = segmentContext({ identity, sessionId: "session-a", backlogSteps: 7, failures: 3 })
+    const recorder = recordingUi()
+    const repos: string[] = []
+    const failing = {
+      kind: "failing",
+      since: 0,
+      attempts: 1,
+      failure: { kind: "offline", reason: "r", action: "a" },
+    } as const
+
+    await refreshMemoryStatus({
+      context,
+      ui: recorder.ui,
+      compileWarnTokens: 30_000,
+      alreadyNotified: false,
+      gitRepo: segmentRepo({ status: async () => "?? scratch.md\n" }),
+      now: () => SEGMENT_NOW,
+      checkAdvisory: false,
+      sessionId: "session-a",
+      syncStatus: async (repo) => {
+        repos.push(repo)
+        return failing
+      },
+    })
+
+    expect(repos).toEqual([context.identityPaths.repo])
     expect(recorder.statusCalls).toEqual([
-      { key: MEMORY_STATUS_KEY, text: `mem:${identity} 1m ago` },
+      { key: MEMORY_STATUS_KEY, text: `mem:${identity} 1m ago*${SYNC_BLOCKED_SEGMENT}` },
     ])
+    expect(recorder.statusCalls[0]?.text?.length).toBeLessThanOrEqual(60)
+  }, 30_000)
+
+  const heldFailure = {
+    kind: "oversized_item",
+    keys: ["big.md"],
+    stuck: [],
+    limitBytes: 8388608,
+    reason: "r",
+    action: "a",
+  } as const
+  test.each([
+    ["failing on held files", { kind: "failing", since: 0, attempts: 1, failure: heldFailure } as const],
+    [
+      "paused at a refused entry while holding files",
+      { kind: "paused", seq: 1, code: "signature", held: { since: 0, attempts: 1, failure: heldFailure } } as const,
+    ],
+  ])(
+    "#given memory sync %s #when refresh runs #then the footer says sync held, never sync blocked (#12284)",
+    async (_name, status) => {
+      const identity = "a".repeat(32)
+      const context = segmentContext({ identity, sessionId: "session-a" })
+      const recorder = recordingUi()
+      await refreshMemoryStatus({
+        context,
+        ui: recorder.ui,
+        compileWarnTokens: 30_000,
+        alreadyNotified: false,
+        gitRepo: segmentRepo({}),
+        now: () => SEGMENT_NOW,
+        checkAdvisory: false,
+        sessionId: "session-a",
+        syncStatus: async () => status,
+      })
+      expect(recorder.statusCalls).toEqual([
+        { key: MEMORY_STATUS_KEY, text: `mem:${identity} 1m ago${SYNC_HELD_SEGMENT}` },
+      ])
+    },
+    30_000,
+  )
+
+  test("#given memory sync synced, idle, or a reader that throws #when refresh runs #then no sync segment renders (omo #10637)", async () => {
+    const context = segmentContext({})
+    for (const syncStatus of [
+      async () => ({ kind: "synced", at: 1, updatedWhileOffline: 0 }) as const,
+      async () => null,
+      async () => {
+        throw new Error("runner gone")
+      },
+    ]) {
+      const recorder = recordingUi()
+      await refreshMemoryStatus({
+        context,
+        ui: recorder.ui,
+        compileWarnTokens: 30_000,
+        alreadyNotified: false,
+        gitRepo: segmentRepo(),
+        now: () => SEGMENT_NOW,
+        checkAdvisory: false,
+        syncStatus,
+      })
+      expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago" }])
+    }
   }, 30_000)
 
   test("#given a repo with no HEAD #when refresh runs #then no git status work happens", async () => {
@@ -384,9 +502,7 @@ describe("refreshMemoryStatus segments", () => {
       checkAdvisory: false,
     })
 
-    expect(recorder.statusCalls).toEqual([
-      { key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago" },
-    ])
+    expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago" }])
   }, 30_000)
 })
 
@@ -415,9 +531,7 @@ describe("refreshMemoryStatus", () => {
       now: () => Date.parse("2026-08-10T00:01:30.000Z"),
     })
 
-    expect(recorder.statusCalls).toEqual([
-      { key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago" },
-    ])
+    expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago" }])
   }, 30_000)
 
   test("#given committed HEAD ages across display buckets #when refresh runs #then compact labels follow the system clock", async () => {
@@ -450,9 +564,7 @@ describe("refreshMemoryStatus", () => {
         now: () => now,
       })
 
-      expect(recorder.statusCalls).toEqual([
-        { key: MEMORY_STATUS_KEY, text: `mem:fake-agent ${expected}` },
-      ])
+      expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: `mem:fake-agent ${expected}` }])
     }
   }, 30_000)
 
@@ -478,7 +590,9 @@ describe("refreshMemoryStatus", () => {
       compileWarnTokens: 100,
       alreadyNotified: false,
       gitRepo: fakeRepo,
-      requestPressureDream: async () => { pressureRequests.push(1) },
+      requestPressureDream: async () => {
+        pressureRequests.push(1)
+      },
     })
 
     expect(pressureRequests).toHaveLength(1)
@@ -506,7 +620,9 @@ describe("refreshMemoryStatus", () => {
       compileWarnTokens: 100,
       alreadyNotified: false,
       gitRepo: fakeRepo,
-      requestPressureDream: async () => { pressureRequests.push(1) },
+      requestPressureDream: async () => {
+        pressureRequests.push(1)
+      },
     })
 
     expect(pressureRequests).toEqual([])
@@ -517,7 +633,10 @@ describe("refreshMemoryStatus", () => {
     const fakeRepo: GitRepoForStatus = {
       head: async () => "abcdef1234567890",
       headCommitTimestamp: async () => null,
-      lsTree: async () => { calls.tree += 1; return ["system/persona.md"] },
+      lsTree: async () => {
+        calls.tree += 1
+        return ["system/persona.md"]
+      },
       show: async () => "P".repeat(400),
       status: async () => "",
     }
@@ -533,7 +652,9 @@ describe("refreshMemoryStatus", () => {
       compileWarnTokens: 100,
       alreadyNotified: true,
       gitRepo: fakeRepo,
-      requestPressureDream: async () => { calls.pressure += 1 },
+      requestPressureDream: async () => {
+        calls.pressure += 1
+      },
     })
 
     expect(calls).toEqual({ tree: 0, pressure: 0 })
@@ -637,17 +758,13 @@ describe("refreshMemoryStatus", () => {
       checkAdvisory: false,
     })
 
-    expect(recorder.statusCalls).toEqual([
-      { key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago" },
-    ])
+    expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago" }])
     expect(recorder.notifications).toEqual([])
   }, 30_000)
 
   test("#given an already-notified session #when refresh runs again over threshold #then no second notify fires", async () => {
     const bigContent = "B".repeat(120_000)
-    const { repoPath } = await createFixtureRepo([
-      { relativePath: "system/persona.md", content: bigContent },
-    ])
+    const { repoPath } = await createFixtureRepo([{ relativePath: "system/persona.md", content: bigContent }])
     const context = contextFor(repoPath)
     const recorder = recordingUi()
 
@@ -763,4 +880,89 @@ describe("refreshMemoryStatus", () => {
     expect(estimate).toBeGreaterThanOrEqual(30_000)
     expect(estimate).toBeLessThanOrEqual(50_001)
   }, 30_000)
+})
+
+describe("estimateSystemTokensCached", () => {
+  function countingRepo(overrides: Partial<GitRepoForStatus> = {}): GitRepoForStatus & { calls: number } {
+    const repo = {
+      calls: 0,
+      async lsTree(): Promise<string[]> {
+        repo.calls += 1
+        return ["system/persona.md", "system/notes.txt", "docs/readme.md"]
+      },
+      async show(_revision: string, path: string): Promise<string> {
+        repo.calls += 1
+        return path === "system/persona.md" ? "x".repeat(400) : ""
+      },
+      ...overrides,
+    } as GitRepoForStatus & { calls: number }
+    return repo
+  }
+
+  test("#given the same commit twice #when the estimate is requested #then the second answer is the first one and nothing is re-read", async () => {
+    // given - a commit is immutable, so re-reading it can only produce the number already known
+    const repo = countingRepo()
+    const cache = new Map<string, number>()
+
+    // when
+    const first = await estimateSystemTokensCached(repo, "head-1", cache)
+    const callsAfterFirst = repo.calls
+    const second = await estimateSystemTokensCached(repo, "head-1", cache)
+
+    // then
+    expect(second).toBe(first)
+    expect(first).toBe(await estimateSystemTokens(countingRepo(), "head-1"))
+    expect(repo.calls).toBe(callsAfterFirst)
+  })
+
+  test("#given a different commit #when the estimate is requested #then it is computed again rather than served from the other commit", async () => {
+    // given
+    const repo = countingRepo()
+    const cache = new Map<string, number>()
+
+    // when
+    await estimateSystemTokensCached(repo, "head-1", cache)
+    const callsAfterFirst = repo.calls
+    await estimateSystemTokensCached(repo, "head-2", cache)
+
+    // then
+    expect(repo.calls).toBeGreaterThan(callsAfterFirst)
+  })
+
+  test("#given the tree cannot be read #when the estimate is requested #then the failure surfaces and is never cached as zero", async () => {
+    // given - answering 0 would report "no pressure" for a repository whose pressure is unknown,
+    // silencing the advisory exactly when it cannot be trusted
+    let attempts = 0
+    const repo = countingRepo({
+      async lsTree(): Promise<string[]> {
+        attempts += 1
+        throw new Error("tree unreadable")
+      },
+    })
+    const cache = new Map<string, number>()
+
+    // when / then
+    await expect(estimateSystemTokensCached(repo, "head-1", cache)).rejects.toThrow("tree unreadable")
+    expect(cache.has("head-1")).toBe(false)
+    await expect(estimateSystemTokensCached(repo, "head-1", cache)).rejects.toThrow("tree unreadable")
+    expect(attempts).toBe(2)
+  })
+
+  test("#given a system file holding invalid UTF-8 #when the estimate is requested #then it counts the decoded text the model is shown", async () => {
+    // given - three invalid bytes decode to three U+FFFD, nine bytes, not the three git stored
+    const repo = countingRepo({
+      async lsTree(): Promise<string[]> {
+        return ["system/raw.md"]
+      },
+      async show(): Promise<string> {
+        return new TextDecoder().decode(new Uint8Array([0xff, 0xfe, 0x80]))
+      },
+    })
+
+    // when
+    const estimate = await estimateSystemTokensCached(repo, "head-1", new Map())
+
+    // then
+    expect(estimate).toBe(Math.floor(9 / 4))
+  })
 })

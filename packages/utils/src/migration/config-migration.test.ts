@@ -8,7 +8,7 @@ import { migrateConfigFile } from "./config-migration"
 import { getSidecarPath } from "./migrations-sidecar"
 
 const createdDirectories: string[] = []
-const MIGRATION_KEY = "model-version:anthropic/claude-opus-4-4->anthropic/claude-opus-4-8"
+const MIGRATION_KEY = "model-version:anthropic/claude-opus-4-4->anthropic/claude-opus-5-5"
 
 function createWorkdir(): string {
   const workdir = mkdtempSync(join(tmpdir(), "omo-config-migration-"))
@@ -46,13 +46,13 @@ describe("migrateConfigFile sidecar write ordering", () => {
     expect(needsWrite).toBe(true)
     expect(rawConfig._migrations).toBeUndefined()
     expect((rawConfig.agents as Record<string, Record<string, unknown>>).prometheus.model).toBe(
-      "anthropic/claude-opus-4-8",
+      "anthropic/claude-opus-5-5",
     )
 
     const persistedConfig = JSON.parse(readFileSync(configPath, "utf-8")) as Record<string, unknown>
     expect(persistedConfig._migrations).toBeUndefined()
     expect((persistedConfig.agents as Record<string, Record<string, unknown>>).prometheus.model).toBe(
-      "anthropic/claude-opus-4-8",
+      "anthropic/claude-opus-5-5",
     )
 
     const sidecar = JSON.parse(readFileSync(getSidecarPath(configPath), "utf-8")) as {
@@ -87,7 +87,7 @@ describe("migrateConfigFile sidecar write ordering", () => {
     expect(retriedNeedsWrite).toBe(true)
     expect(retriedConfig._migrations).toBeUndefined()
     expect((retriedConfig.agents as Record<string, Record<string, unknown>>).prometheus.model).toBe(
-      "anthropic/claude-opus-4-8",
+      "anthropic/claude-opus-5-5",
     )
     expect(existsSync(getSidecarPath(configPath))).toBe(true)
   })
@@ -108,13 +108,13 @@ describe("migrateConfigFile sidecar write ordering", () => {
     expect(needsWrite).toBe(true)
     expect(rawConfig._migrations).toEqual([MIGRATION_KEY])
     expect((rawConfig.agents as Record<string, Record<string, unknown>>).prometheus.model).toBe(
-      "anthropic/claude-opus-4-8",
+      "anthropic/claude-opus-5-5",
     )
 
     const persistedConfig = JSON.parse(readFileSync(configPath, "utf-8")) as Record<string, unknown>
     expect(persistedConfig._migrations).toEqual([MIGRATION_KEY])
     expect((persistedConfig.agents as Record<string, Record<string, unknown>>).prometheus.model).toBe(
-      "anthropic/claude-opus-4-8",
+      "anthropic/claude-opus-5-5",
     )
     expect(statSync(getSidecarPath(configPath)).isDirectory()).toBe(true)
   })
@@ -138,16 +138,12 @@ describe("migrateConfigFile sidecar write ordering", () => {
     // then
     expect(needsWrite).toBe(true)
     expect(rawConfig.appliedMigrations).toBeUndefined()
-    expect((rawConfig.agents as Record<string, Record<string, unknown>>).oracle.model).toBe(
-      "anthropic/claude-opus-4-6",
-    )
+    expect((rawConfig.agents as Record<string, Record<string, unknown>>).oracle.model).toBe("anthropic/claude-opus-4-6")
 
     const sidecar = JSON.parse(readFileSync(getSidecarPath(configPath), "utf-8")) as {
       appliedMigrations: string[]
     }
-    expect(sidecar.appliedMigrations).toEqual([
-      "model-version:anthropic/claude-opus-4-6->anthropic/claude-opus-4-7",
-    ])
+    expect(sidecar.appliedMigrations).toEqual(["model-version:anthropic/claude-opus-4-6->anthropic/claude-opus-4-7"])
   })
 })
 

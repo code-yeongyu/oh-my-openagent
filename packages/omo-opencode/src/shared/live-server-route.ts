@@ -3,9 +3,6 @@ import { subagentSessions } from "../features/claude-code-session-state/state"
 import { getServerBasicAuthHeader, injectServerAuthIntoClient } from "./opencode-server-auth"
 import { log } from "./logger"
 
-export const LIVE_ROUTE_DISPATCH_LOG = "[live-server-route] dispatch via live listener"
-export const LIVE_ROUTE_UNAVAILABLE_LOG = "[live-server-route] route unavailable; using in-process client"
-
 const PROBE_TTL_MS = 60_000
 const PROBE_ABORT_MS = 1_500
 const AFFINITY_TTL_MS = 60_000
@@ -107,15 +104,12 @@ async function probe(registration: RouteRegistration): Promise<boolean> {
   try {
     const controller = new AbortController()
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("probe timeout")), PROBE_ABORT_MS)
+      setTimeout(() => reject(new Error("probe timeout")), PROBE_ABORT_MS),
     )
     const timeoutId = setTimeout(() => controller.abort(), PROBE_ABORT_MS)
     let response: Response
     try {
-      response = await Promise.race([
-        getFetch()(probeUrl, { headers, signal: controller.signal }),
-        timeoutPromise,
-      ])
+      response = await Promise.race([getFetch()(probeUrl, { headers, signal: controller.signal }), timeoutPromise])
     } finally {
       clearTimeout(timeoutId)
     }
@@ -199,7 +193,10 @@ function getFreshSessionAffinity(registration: RouteRegistration, sessionID: str
   return entry.owned
 }
 
-async function resolveSessionAffinity(registration: RouteRegistration, sessionID: string): Promise<boolean | undefined> {
+async function resolveSessionAffinity(
+  registration: RouteRegistration,
+  sessionID: string,
+): Promise<boolean | undefined> {
   const cached = getFreshSessionAffinity(registration, sessionID)
   if (cached !== undefined) {
     return cached

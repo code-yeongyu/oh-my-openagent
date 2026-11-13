@@ -3,18 +3,51 @@ import { constants } from "node:fs"
 import { access, readFile, stat } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
+import { PERSONA_ASSET_FILES } from "@oh-my-opencode/memory-core/personas"
+
 import { isRecord } from "./senpi-settings"
 
-const REQUIRED_PLUGIN_ARTIFACTS = [
+export const REQUIRED_PLUGIN_ARTIFACTS: readonly string[] = [
   join("extensions", "omo.js"),
   join("extensions", "omo-task.js"),
+  join("extensions", "omo-computer-use.js"),
+  join("extensions", "omo-memory-doctor.js"),
+  join("extensions", "omo-memory-memfs.js"),
+  join("extensions", "omo-memory-palace.js"),
+  join("extensions", "omo-device-account.js"),
+  join("extensions", "omo-memory-commands.js"),
+  join("extensions", "omo-session-history.js"),
+  join("extensions", "omo-recall-store.js"),
+  join("extensions", "omo-device-service.js"),
+  join("extensions", "omo-telemetry-posthog.js"),
+  join("extensions", "omo-telemetry-otlp.js"),
+  // The sync engine sidecar and the Loro wasm it loads from beside itself.
+  join("extensions", "omo-memory-sync.js"),
+  join("extensions", "loro_wasm_bg.wasm"),
+  join("extensions", "CaseFolding.txt"),
+  join("extensions", "omo-thread-client.js"),
+  join("extensions", "omo-telemetry-recovery.js"),
+  join("extensions", "omo-feedback.js"),
+  join("extensions", "omo-desktop-toolkit.js"),
+  join("extensions", "omo-claim-receipt.js"),
+  join("extensions", "assets.generated.json"),
   join("extensions", "omo-member.js"),
   join("extensions", "memory-run-supervisor.mjs"),
-  join("extensions", "reflection-persona.md"),
-  join("extensions", "dream-persona.md"),
-  join("extensions", "facts-persona.md"),
-  join("extensions", "memorian-persona.md"),
+  // The thread gateway store worker: the inbox drain cannot open its store without it.
+  join("extensions", "gateway-store-worker.mjs"),
+  // The computer.run QuickJS cell worker and the wasm it loads, beside omo-computer-use.js.
+  join("extensions", "omo-computer-run-worker.mjs"),
+  join("extensions", "quickjs.wasm"),
+  ...PERSONA_ASSET_FILES.map((filename) => join("extensions", filename)),
   join("skills", "ast-grep", "SKILL.md"),
+  join("skills", "browser", "SKILL.md"),
+  // The bundled omowright runtime the browser skill loads at runtime (issue #9661): staged by
+  // build:materialize-frontend and gitignored, so it must be required explicitly or a payload
+  // without it ships a browser skill whose loadOmowright() always fails.
+  join("skills", "browser", "runtime", "omowright", "index.js"),
+  // index.js reads page-bundle.js from beside itself when it is imported, so a payload with only
+  // index.js fails the same way (#9661).
+  join("skills", "browser", "runtime", "omowright", "page-bundle.js"),
   join("skills", "coding-agent-sessions", "SKILL.md"),
   join("skills", "debugging", "SKILL.md"),
   join("skills", "frontend", "SKILL.md"),
@@ -32,11 +65,11 @@ const REQUIRED_PLUGIN_ARTIFACTS = [
   join("skills", "ulw-plan", "SKILL.md"),
   join("skills", "ulw-research", "SKILL.md"),
   join("skills", "visual-qa", "SKILL.md"),
+  join("skills-conditional", "x-search", "SKILL.md"),
+  join("runtime", "agent-toolkit-sdk", "sdk.js"),
+  join("runtime", "bunshin-ts", "sdk.js"),
+  join("runtime", "thread-sdk", "sdk.js"),
   join("runtime", "ast-grep-mcp", "cli.js"),
-  join("runtime", "agent-toolkit", "cli.js"),
-  join("runtime", "agent-toolkit", "ulw-loop", "cli.js"),
-  join("runtime", "agent-toolkit", "omo-agent-toolkit"),
-  join("runtime", "agent-toolkit", "omo-agent-toolkit.cmd"),
   join("runtime", "lsp-daemon", "dist", "cli.js"),
   join("runtime", "lsp-daemon", "dist", "index.js"),
   join("runtime", "lsp-daemon", "dist", "index.d.ts"),
@@ -45,7 +78,9 @@ const REQUIRED_PLUGIN_ARTIFACTS = [
   join("runtime", "lsp-daemon", "dist", "package.json"),
   join("runtime", "lsp-daemon", "dist", ".omo-runtime-manifest.json"),
   join("scripts", "install.mjs"),
-] as const
+  // The task daemon's launch spec: without it `omo daemon run` fails closed on every install.
+  "daemon-launch-spec.json",
+]
 
 export async function ensurePluginArtifacts(context: {
   readonly allowBuild: boolean
@@ -55,13 +90,29 @@ export async function ensurePluginArtifacts(context: {
   readonly platform: NodeJS.Platform
 }): Promise<void> {
   if (context.allowBuild) {
-    await context.runCommand("node", [join(context.pluginPath, "scripts", "build-extension.mjs")], { cwd: context.repoRoot })
-    await context.runCommand("node", [join("packages", "omo-codex", "plugin", "scripts", "materialize-shared-upstreams.mjs")], { cwd: context.repoRoot })
-    await context.runCommand("node", [join(context.pluginPath, "scripts", "sync-skills.mjs")], { cwd: context.repoRoot })
-    await context.runCommand("node", [join(context.pluginPath, "scripts", "build-install.mjs")], { cwd: context.repoRoot })
-    await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-lsp-daemon-runtime.mjs")], { cwd: context.repoRoot })
-    await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-ast-grep-mcp-runtime.mjs")], { cwd: context.repoRoot })
-    await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-agent-toolkit.mjs")], { cwd: context.repoRoot })
+    await context.runCommand("node", [join(context.pluginPath, "scripts", "build-extension.mjs")], {
+      cwd: context.repoRoot,
+    })
+    await context.runCommand(
+      "node",
+      [join("packages", "omo-codex", "plugin", "scripts", "materialize-shared-upstreams.mjs")],
+      { cwd: context.repoRoot },
+    )
+    await context.runCommand("node", [join(context.pluginPath, "scripts", "sync-skills.mjs")], {
+      cwd: context.repoRoot,
+    })
+    await context.runCommand("node", [join(context.pluginPath, "scripts", "build-install.mjs")], {
+      cwd: context.repoRoot,
+    })
+    await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-lsp-daemon-runtime.mjs")], {
+      cwd: context.repoRoot,
+    })
+    await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-ast-grep-mcp-runtime.mjs")], {
+      cwd: context.repoRoot,
+    })
+    await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-x-search-skill.mjs")], {
+      cwd: context.repoRoot,
+    })
   }
 
   if (await hasMissingPluginArtifact(context.pluginPath)) {
@@ -106,7 +157,9 @@ async function verifyAstGrepRuntimeIntegrity(pluginPath: string, platform: NodeJ
 
   let actualSha256: string
   try {
-    actualSha256 = createHash("sha256").update(await readFile(runtimeEntry)).digest("hex")
+    actualSha256 = createHash("sha256")
+      .update(await readFile(runtimeEntry))
+      .digest("hex")
   } catch (error) {
     throw astGrepIntegrityError(runtimeEntry, `runtime hash could not be computed: ${messageOf(error)}`)
   }
@@ -120,14 +173,18 @@ async function verifyAstGrepRuntimeIntegrity(pluginPath: string, platform: NodeJ
   }
 }
 
-function isAstGrepRuntimeManifest(value: unknown): value is { readonly sha256: string; readonly mode: number; readonly stagedAtUtc: string } {
+function isAstGrepRuntimeManifest(
+  value: unknown,
+): value is { readonly sha256: string; readonly mode: number; readonly stagedAtUtc: string } {
   if (!isRecord(value)) return false
-  return typeof value.sha256 === "string"
-    && /^[a-f0-9]{64}$/.test(value.sha256)
-    && typeof value.mode === "number"
-    && Number.isInteger(value.mode)
-    && typeof value.stagedAtUtc === "string"
-    && !Number.isNaN(Date.parse(value.stagedAtUtc))
+  return (
+    typeof value.sha256 === "string" &&
+    /^[a-f0-9]{64}$/.test(value.sha256) &&
+    typeof value.mode === "number" &&
+    Number.isInteger(value.mode) &&
+    typeof value.stagedAtUtc === "string" &&
+    !Number.isNaN(Date.parse(value.stagedAtUtc))
+  )
 }
 
 function astGrepIntegrityError(runtimeEntry: string, reason: string): Error {

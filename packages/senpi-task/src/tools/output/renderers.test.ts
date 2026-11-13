@@ -4,7 +4,7 @@ import type { ThemeColor } from "@code-yeongyu/senpi"
 
 import { rendererVisibleWidth } from "../task/renderers"
 import { toolResult } from "../control"
-import { renderTaskOutputCall, renderTaskOutputResult, type OutputRenderTheme } from "./renderers"
+import { renderTaskOutputCall, renderTaskOutputResult, taskOutputModelText, type OutputRenderTheme } from "./renderers"
 import type { TaskOutputDetails, TaskSnapshot } from "./types"
 
 const TEST_THEME: OutputRenderTheme = {
@@ -39,6 +39,66 @@ function snapshot(overrides: Partial<TaskSnapshot> = {}): TaskSnapshot {
     ...overrides,
   }
 }
+
+describe("task_output model text (#9722)", () => {
+  test("#given an honoured pin whose resolved display carries the suffix #when rendered #then it shows one model, never a false mismatch", () => {
+    // given: the plan's display is the raw pin; the child's effective model is its canonical base
+    const snap = snapshot({
+      resolved_model: {
+        provider: "vendor-a",
+        model_id: "pinned",
+        display: "vendor-a/pinned:medium",
+        reasoning: "medium",
+        source: "explicit",
+      },
+      effective_model: {
+        provider: "vendor-a",
+        model_id: "pinned",
+        display: "vendor-a/pinned",
+        source: "explicit",
+      },
+    })
+
+    // when / then
+    expect(taskOutputModelText(snap)).toBe("model vendor-a/pinned:medium (reasoning medium)")
+  })
+
+  test("#given a child whose effective model differs from the plan #when rendered #then it names the effective route and the plan (#9722)", () => {
+    // given
+    const snap = snapshot({
+      resolved_model: {
+        provider: "vendor-a",
+        model_id: "planned-model",
+        display: "vendor-a/planned-model",
+        source: "explicit",
+      },
+      effective_model: {
+        provider: "vendor-b",
+        model_id: "actual-model",
+        display: "vendor-b/actual-model",
+        source: "explicit",
+      },
+    })
+
+    // when / then
+    expect(taskOutputModelText(snap)).toBe("model vendor-b/actual-model (planned vendor-a/planned-model)")
+  })
+
+  test("#given no effective model #when rendered #then it shows the plan as before", () => {
+    // given
+    const snap = snapshot({
+      resolved_model: {
+        provider: "vendor-a",
+        model_id: "planned-model",
+        display: "vendor-a/planned-model",
+        source: "explicit",
+      },
+    })
+
+    // when / then
+    expect(taskOutputModelText(snap)).toBe("model vendor-a/planned-model")
+  })
+})
 
 describe("task_output renderers", () => {
   test("#given task_output arguments #when rendering calls #then rows show target mode peek and only relevant tail lines", () => {
@@ -85,10 +145,7 @@ describe("task_output renderers", () => {
 
   test("#given a width smaller than the fixed call tokens #when rendering task_output #then the complete ANSI row is clamped", () => {
     // given / when
-    const line = firstLine(
-      renderTaskOutputCall({ name: "abcdef", mode: "status" }, ANSI_THEME),
-      20,
-    )
+    const line = firstLine(renderTaskOutputCall({ name: "abcdef", mode: "status" }, ANSI_THEME), 20)
 
     // then
     expect(line).toContain("...")
@@ -112,7 +169,9 @@ describe("task_output renderers", () => {
     ]
 
     // when
-    const lines = details.map((detail) => firstLine(renderTaskOutputResult(toolResult("ignored", detail), RESULT_OPTIONS, TEST_THEME), 120))
+    const lines = details.map((detail) =>
+      firstLine(renderTaskOutputResult(toolResult("ignored", detail), RESULT_OPTIONS, TEST_THEME), 120),
+    )
 
     // then
     expect(lines).toHaveLength(details.length)
@@ -148,7 +207,10 @@ describe("task_output renderers", () => {
     // given / when
     const line = firstLine(
       renderTaskOutputResult(
-        toolResult("ignored", { kind: "status", snapshot: snapshot({ name: "task-1", description: "Audit the waiting line" }) }),
+        toolResult("ignored", {
+          kind: "status",
+          snapshot: snapshot({ name: "task-1", description: "Audit the waiting line" }),
+        }),
         RESULT_OPTIONS,
         TEST_THEME,
       ),
@@ -334,13 +396,31 @@ describe("task_output run stats rendering", () => {
   test("#given a snapshot without run stats #when the status row renders #then no runtime tokens appear", () => {
     // when
     const line = firstLine(
-      renderTaskOutputResult(toolResult("ignored", { kind: "status", snapshot: snapshot() }), RESULT_OPTIONS, TEST_THEME),
+      renderTaskOutputResult(
+        toolResult("ignored", { kind: "status", snapshot: snapshot() }),
+        RESULT_OPTIONS,
+        TEST_THEME,
+      ),
       200,
     )
 
     // then
     expect(line).not.toContain("ran ")
     expect(line).not.toContain("tok/s")
+  })
+
+  test("#given no-progress output without a pending notification #when the row renders #then it shows the factual reason", () => {
+    const detail: TaskOutputDetails = {
+      kind: "no_progress",
+      task_id: "st_done",
+      status: "completed",
+      reason: "Task st_done is completed. It will not send a completion notification.",
+    }
+
+    const line = firstLine(renderTaskOutputResult(toolResult("ignored", detail), RESULT_OPTIONS, TEST_THEME), 200)
+
+    expect(line).toContain("It will not send a completion notification.")
+    expect(line).not.toContain("await notification")
   })
 })
 
@@ -349,7 +429,11 @@ describe("task_output suspended residency rendering", () => {
     // given
     const detail: TaskOutputDetails = {
       kind: "status",
-      snapshot: snapshot({ status: "running", residency_state: "persisted_only", suspended: { explanation: "suspended (resumes with session)" } }),
+      snapshot: snapshot({
+        status: "running",
+        residency_state: "persisted_only",
+        suspended: { explanation: "suspended (resumes with session)" },
+      }),
     }
 
     // when
@@ -364,7 +448,11 @@ describe("task_output suspended residency rendering", () => {
     // given
     const detail: TaskOutputDetails = {
       kind: "status",
-      snapshot: snapshot({ status: "running", residency_state: "rpc_detached", suspended: { explanation: "suspended (resumes with session)" } }),
+      snapshot: snapshot({
+        status: "running",
+        residency_state: "rpc_detached",
+        suspended: { explanation: "suspended (resumes with session)" },
+      }),
     }
 
     // when

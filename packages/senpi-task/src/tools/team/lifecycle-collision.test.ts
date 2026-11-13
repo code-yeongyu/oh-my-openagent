@@ -1,8 +1,14 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import type { ExtensionContext } from "@code-yeongyu/senpi"
+import type { ExtensionToolContext } from "@code-yeongyu/senpi"
 
 import { collisionStore } from "../../manager/__fixtures__/collision-store"
-import { FakeRunner, categoryPlanner, cleanupProjects, settings, tempProject } from "../../manager/__fixtures__/manager-fakes"
+import {
+  FakeRunner,
+  categoryPlanner,
+  cleanupProjects,
+  settings,
+  tempProject,
+} from "../../manager/__fixtures__/manager-fakes"
 import { createTaskManager } from "../../manager"
 import { createTeam, normalizeSenpiTeamSpec } from "../../team"
 import { stateDirConfig, taskSettings } from "../../team/__fixtures__/runtime-fakes"
@@ -41,12 +47,17 @@ describe("team_create collision handling", () => {
       },
     })
     const tool = createTeamCreateTool({ service })
-    const context = {} as unknown as ExtensionContext
+    const context = {} as unknown as ExtensionToolContext
 
     // when
     const result = await tool.execute(
       "collision-team-create",
-      { inline_spec: { name: "collision-team", members: [{ name: "alpha", kind: "category", category: "quick", prompt: "work" }] } },
+      {
+        inline_spec: {
+          name: "collision-team",
+          members: [{ name: "alpha", kind: "category", category: "quick", prompt: "work" }],
+        },
+      },
       undefined,
       undefined,
       context,

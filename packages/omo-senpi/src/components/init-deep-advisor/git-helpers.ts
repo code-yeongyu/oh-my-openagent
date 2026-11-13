@@ -4,14 +4,18 @@ import { extname, join, resolve } from "node:path"
 
 import { SOURCE_EXTENSIONS } from "./constants"
 
-const DRIFT_EXCLUDES = [
-  ":(exclude)AGENTS.md",
-  ":(exclude,glob)**/AGENTS.md",
-  ":(exclude).omo/init-deep.json",
-]
+const DRIFT_EXCLUDES = [":(exclude)AGENTS.md", ":(exclude,glob)**/AGENTS.md", ":(exclude).omo/init-deep.json"]
 
-function run(root: string, args: readonly string[]): string {
-  return execFileSync("git", [...args], { cwd: root, encoding: "utf8" })
+export function run(root: string, args: readonly string[]): string {
+  return execFileSync("git", [...args], {
+    cwd: root,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+    timeout: 5000,
+    // git.exe is console-subsystem: without this each advisor probe flashes a console window
+    // that Windows foregrounds, stealing the user's focus (#8501).
+    windowsHide: true,
+  })
 }
 
 function countNul(output: string): number {
@@ -31,6 +35,16 @@ export function gitIsRepo(root: string): boolean {
   }
 }
 
+export function gitToplevel(cwd: string): string | null {
+  try {
+    const output = run(cwd, ["rev-parse", "--show-toplevel"]).trim()
+    // git prints forward slashes even on Windows; callers join and compare with node:path.
+    return output.length === 0 ? null : resolve(output)
+  } catch {
+    return null
+  }
+}
+
 export function gitHead(root: string): string {
   return run(root, ["rev-parse", "HEAD"]).trim()
 }
@@ -44,32 +58,12 @@ export function gitTrackedFileCount(root: string): number {
 }
 
 export function gitTouchedFilesSince(root: string, sha: string): string[] {
-  const output = run(root, [
-    "diff",
-    "--name-only",
-    "-z",
-    "--find-renames",
-    sha,
-    "HEAD",
-    "--",
-    ".",
-    ...DRIFT_EXCLUDES,
-  ])
+  const output = run(root, ["diff", "--name-only", "-z", "--find-renames", sha, "HEAD", "--", ".", ...DRIFT_EXCLUDES])
   return output.split("\0").filter((entry) => entry.length > 0)
 }
 
 export function gitChurnLoc(root: string, sha: string): number {
-  const output = run(root, [
-    "diff",
-    "--numstat",
-    "-z",
-    "--find-renames",
-    sha,
-    "HEAD",
-    "--",
-    ".",
-    ...DRIFT_EXCLUDES,
-  ])
+  const output = run(root, ["diff", "--numstat", "-z", "--find-renames", sha, "HEAD", "--", ".", ...DRIFT_EXCLUDES])
   const tokens = output.split("\0")
   let churn = 0
   for (let index = 0; index < tokens.length; index += 1) {

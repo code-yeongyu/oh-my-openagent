@@ -77,10 +77,8 @@ describe("build-omo-schema-document", () => {
           default_concurrency: 3,
         },
       },
-      "[codex]": {
-        codegraph: {
-          daemon: false,
-        },
+      telemetry: {
+        enabled: false,
       },
       profiles: {
         kimi: {
@@ -99,10 +97,8 @@ describe("build-omo-schema-document", () => {
               default_concurrency: 2,
             },
           },
-          "[codex]": {
-            codegraph: {
-              enabled: false,
-            },
+          telemetry: {
+            enabled: false,
           },
         },
       },
@@ -113,9 +109,7 @@ describe("build-omo-schema-document", () => {
         },
       },
     }
-    const validator = z.fromJSONSchema(
-      schema as Parameters<typeof z.fromJSONSchema>[0],
-    )
+    const validator = z.fromJSONSchema(schema as Parameters<typeof z.fromJSONSchema>[0])
 
     // when
     const result = validator.safeParse(goldenMigratedDocument)
@@ -153,9 +147,7 @@ describe("build-omo-schema-document", () => {
         },
       },
     }
-    const validator = z.fromJSONSchema(
-      schema as Parameters<typeof z.fromJSONSchema>[0],
-    )
+    const validator = z.fromJSONSchema(schema as Parameters<typeof z.fromJSONSchema>[0])
 
     // when
     const rootResult = validator.safeParse(invalidRootDocument)
@@ -172,9 +164,7 @@ describe("build-omo-schema-document", () => {
     const invalidDocument = {
       unexpected: true,
     }
-    const validator = z.fromJSONSchema(
-      schema as Parameters<typeof z.fromJSONSchema>[0],
-    )
+    const validator = z.fromJSONSchema(schema as Parameters<typeof z.fromJSONSchema>[0])
 
     // when
     const result = validator.safeParse(invalidDocument)

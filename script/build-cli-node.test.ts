@@ -7,6 +7,7 @@ import { cp, mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { BUILD_NODES, selectBuildNodes } from "./build-nodes"
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url))
 const rootPackageJsonPath = fileURLToPath(new URL("../package.json", import.meta.url))
@@ -57,7 +58,10 @@ describe("node-target CLI build (lazycodex#47)", () => {
     expect(build.status, `build:cli-node failed:\n${build.stderr}`).toBe(0)
 
     // #when
-    const doctor = spawnSync("node", ["dist/cli-node/index.js", "doctor", "--json"], { cwd: repoRoot, encoding: "utf8" })
+    const doctor = spawnSync("node", ["dist/cli-node/index.js", "doctor", "--json"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    })
 
     // #then
     expect(doctor.stderr).not.toContain("Bun is not defined")
@@ -71,11 +75,16 @@ describe("node-target CLI build (lazycodex#47)", () => {
 
   test("the main build chain and the lazycodex-ai payload carry the node CLI", () => {
     // #given
-    const buildOrchestrator = readFileSync(new URL("./build.ts", import.meta.url), "utf8")
     const workflow = readFileSync(publishWorkflowPath, "utf8")
 
+    // #when
+    const cliNodeNode = BUILD_NODES.find((node) => node.id === "cli-node")
+
     // #then
-    expect(buildOrchestrator, "the build orchestrator must produce dist/cli-node").toContain("build:cli-node")
+    expect(cliNodeNode?.args, "the build orchestrator must produce dist/cli-node").toEqual(["run", "build:cli-node"])
+    expect(selectBuildNodes(BUILD_NODES, undefined), "a default build must still run every node").toEqual([
+      ...BUILD_NODES,
+    ])
     expect(workflow, "lazycodex-ai files list must ship dist/cli-node").toContain('"dist/cli-node"')
   })
 })

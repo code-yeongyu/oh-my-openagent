@@ -21,10 +21,7 @@ import {
   seedResumeProject,
   startResumeRun,
 } from "./resume-e2e-runtime.mjs"
-import {
-  MIDTURN_CONTINUED_TOKEN,
-  resumeOmoConfig,
-} from "./task-resume-e2e-scenarios.mjs"
+import { MIDTURN_CONTINUED_TOKEN, resumeOmoConfig } from "./task-resume-e2e-scenarios.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(scriptDir, "../../../..")
@@ -51,17 +48,14 @@ function crashRunScript(sentinel) {
 
 function replacementRunScript(sentinel) {
   return {
-    parentSteps: [
-      bash(waitForFileEventCommand(sentinel)),
-      text("replacement parent settled"),
-    ],
+    parentSteps: [bash(waitForFileEventCommand(sentinel)), text("replacement parent settled")],
   }
 }
 
-function recordOutcome(cwd) {
-  const record = findTaskByName(cwd, "restartchild")
+function recordOutcome(sandbox) {
+  const record = findTaskByName(sandbox, "restartchild")
   if (record === undefined) return undefined
-  const sessionText = childSessionText(cwd, record.task_id)
+  const sessionText = childSessionText(sandbox, record.task_id)
   if (sessionText.includes(MIDTURN_CONTINUED_TOKEN)) return { kind: "continued", record }
   if (record.status === "lost") return { kind: "lost", record }
   return undefined
@@ -88,7 +82,7 @@ async function runScenario(options) {
   try {
     seedResumeProject(sandbox, resumeOmoConfig())
     if (options.pluginPath === undefined) {
-      await runSenpiInstaller({ agentDir: sandbox.agentDir, repoRoot })
+      await runSenpiInstaller({ agentDir: sandbox.agentDir, homeDir: sandbox.homeDir, repoRoot })
     } else {
       const settingsPath = join(sandbox.agentDir, "settings.json")
       const settings = JSON.parse(readFileSync(settingsPath, "utf8"))
@@ -99,8 +93,9 @@ async function runScenario(options) {
     const senpiBin = findCommand("senpi")
     const initialRecordPromise = waitForState(
       sandbox.root,
-      () => findTaskByName(sandbox.cwd, "restartchild"),
-      (record) => record !== undefined && record.status === "running" && childSessionHasAssistant(sandbox.cwd, record.task_id),
+      () => findTaskByName(sandbox, "restartchild"),
+      (record) =>
+        record !== undefined && record.status === "running" && childSessionHasAssistant(sandbox, record.task_id),
       DEFAULT_TIMEOUT_MS,
       stateAbort.signal,
     )
@@ -121,7 +116,7 @@ async function runScenario(options) {
 
     const outcomePromise = waitForState(
       sandbox.root,
-      () => recordOutcome(sandbox.cwd),
+      () => recordOutcome(sandbox),
       (value) => value !== undefined,
       DEFAULT_TIMEOUT_MS,
       stateAbort.signal,
@@ -155,7 +150,7 @@ async function runScenario(options) {
       "REPLACEMENT PARENT STDERR",
       secondResult.stderr,
       "FINAL CHILD SESSION",
-      childSessionText(sandbox.cwd, initialRecord.task_id),
+      childSessionText(sandbox, initialRecord.task_id),
     ].join("\n")
     writeArtifact(join(options.evidenceDir, "parent-restart-transcript.txt"), transcript)
 

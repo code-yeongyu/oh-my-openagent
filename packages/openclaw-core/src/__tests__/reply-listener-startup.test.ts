@@ -38,8 +38,7 @@ const daemonPids = new Set<number>()
 
 let spawnImplementation: SpawnImplementation = () => ({
   pid: 0,
-  unref() {
-  },
+  unref() {},
 })
 
 let replyListenerModule: typeof import("../reply-listener")
@@ -131,6 +130,9 @@ afterAll(() => {
 
 describe("startReplyListener", () => {
   test("returns the child's ready state only after detached startup reaches the poll loop", async () => {
+    // The success path returns as soon as the child reports ready, so the budget is only an upper
+    // bound here. A loaded runner can delay the fake child's ready write past the 500 ms default.
+    process.env.OMO_OPENCLAW_REPLY_LISTENER_STARTUP_TIMEOUT_MS = "30000"
     const killSpy = spyOn(process, "kill").mockImplementation((pid: number | string) => {
       if (pid === 4321) {
         return true
@@ -167,8 +169,7 @@ describe("startReplyListener", () => {
 
       return {
         pid: 4321,
-        unref() {
-        },
+        unref() {},
       }
     }
 
@@ -197,8 +198,7 @@ describe("startReplyListener", () => {
   test("does not report success or leave stale running state when detached child never becomes ready", async () => {
     spawnImplementation = () => ({
       pid: 9876,
-      unref() {
-      },
+      unref() {},
     })
 
     const result = await replyListenerModule.startReplyListener(createConfig())
@@ -223,15 +223,21 @@ describe("startReplyListener", () => {
       stateFilePath,
       JSON.stringify({ isRunning: true, pid: existingPid, startupToken: "existing", errors: 0 }, null, 2),
     )
-    writeFileSync(configFilePath, JSON.stringify({ ...createConfig(), replyListener: { ...createConfig().replyListener, pollIntervalMs: 500 } }, null, 2))
+    writeFileSync(
+      configFilePath,
+      JSON.stringify(
+        { ...createConfig(), replyListener: { ...createConfig().replyListener, pollIntervalMs: 500 } },
+        null,
+        2,
+      ),
+    )
 
     let spawnCalls = 0
     spawnImplementation = () => {
       spawnCalls += 1
       return {
         pid: 9999,
-        unref() {
-        },
+        unref() {},
       }
     }
 
@@ -248,5 +254,4 @@ describe("startReplyListener", () => {
       killSpy.mockRestore()
     }
   })
-
 })

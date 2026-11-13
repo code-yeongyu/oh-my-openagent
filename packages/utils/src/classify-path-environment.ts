@@ -1,12 +1,7 @@
 import { homedir } from "node:os"
 import path from "node:path"
 
-export type PathClassification =
-  | "icloud"
-  | "onedrive"
-  | "desktop-sync"
-  | "network-drive"
-  | "unknown"
+export type PathClassification = "icloud" | "onedrive" | "desktop-sync" | "network-drive" | "unknown"
 
 function normalizeInputPath(absolutePath: string): string {
   return absolutePath.replaceAll("\\", "/")
@@ -16,12 +11,16 @@ function isUnderPath(normalizedPath: string, normalizedParentPath: string): bool
   return normalizedPath === normalizedParentPath || normalizedPath.startsWith(`${normalizedParentPath}/`)
 }
 
+function isOneDriveSegment(segment: string): boolean {
+  const lowercaseSegment = segment.toLowerCase()
+  return lowercaseSegment === "onedrive" || lowercaseSegment.startsWith("onedrive - ")
+}
+
 export function classifyPathEnvironment(absolutePath: string): PathClassification {
   if (absolutePath.length === 0) return "unknown"
 
   const normalizedPath = normalizeInputPath(absolutePath)
-  const lowercasePath = normalizedPath.toLowerCase()
-  if (lowercasePath.includes("/onedrive") || lowercasePath.includes("/onedrive/")) {
+  if (normalizedPath.split("/").some(isOneDriveSegment)) {
     return "onedrive"
   }
 
@@ -34,9 +33,11 @@ export function classifyPathEnvironment(absolutePath: string): PathClassificatio
   }
 
   if (
-    normalizedPath.startsWith("/Users/")
-    && (normalizedPath.includes("/Desktop/") || normalizedPath.endsWith("/Desktop")
-      || normalizedPath.includes("/Documents/") || normalizedPath.endsWith("/Documents"))
+    normalizedPath.startsWith("/Users/") &&
+    (normalizedPath.includes("/Desktop/") ||
+      normalizedPath.endsWith("/Desktop") ||
+      normalizedPath.includes("/Documents/") ||
+      normalizedPath.endsWith("/Documents"))
   ) {
     return "desktop-sync"
   }

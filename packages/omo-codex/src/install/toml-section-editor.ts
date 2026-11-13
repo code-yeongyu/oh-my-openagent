@@ -93,6 +93,15 @@ export function replaceOrInsertRootSetting(config: string, key: string, value: s
   return `${replacement.trimEnd()}\n\n${suffix.trimStart()}`
 }
 
+export function removeRootSetting(config: string, key: string): string {
+  const sectionStart = findFirstTableStart(config)
+  const root = config.slice(0, sectionStart)
+  const suffix = config.slice(sectionStart)
+  const linePattern = new RegExp(`^[ \\t]*${escapeRegExp(key)}[ \\t]*=.*(?:\\n|$)`, "m")
+  if (!linePattern.test(root)) return config
+  return root.replace(linePattern, "") + suffix
+}
+
 export function replaceOrInsertRootDottedSetting(config: string, keyPath: string, value: string): string {
   const targetPath = parseTomlDottedKey(keyPath)
   if (!targetPath) return config
@@ -188,10 +197,7 @@ export function isTomlTableHeaderLine(line: string): boolean {
   return normalizedLine.startsWith("[") && normalizedLine.endsWith("]")
 }
 
-export function scanTomlMultilineLine(
-  line: string,
-  currentQuote: TomlMultilineQuote | null,
-): TomlMultilineLineScan {
+export function scanTomlMultilineLine(line: string, currentQuote: TomlMultilineQuote | null): TomlMultilineLineScan {
   if (currentQuote) {
     return {
       wasInside: true,
@@ -359,7 +365,10 @@ export function parseTomlDottedKey(input: string): readonly string[] | null {
   return parts.length > 0 ? parts : null
 }
 
-function parseTomlKeyPart(input: string, startIndex: number): { readonly value: string; readonly nextIndex: number } | null {
+function parseTomlKeyPart(
+  input: string,
+  startIndex: number,
+): { readonly value: string; readonly nextIndex: number } | null {
   const quote = input[startIndex]
   if (quote === "'") return parseLiteralTomlString(input, startIndex)
   if (quote === '"') return parseBasicTomlString(input, startIndex)
@@ -433,7 +442,10 @@ function parseUnicodeEscape(
   return { value: String.fromCodePoint(codePoint), nextIndex: digitsStart + digitCount }
 }
 
-function parseBareTomlKey(input: string, startIndex: number): { readonly value: string; readonly nextIndex: number } | null {
+function parseBareTomlKey(
+  input: string,
+  startIndex: number,
+): { readonly value: string; readonly nextIndex: number } | null {
   let index = startIndex
   while (index < input.length && /[A-Za-z0-9_-]/.test(input[index])) index += 1
   if (index === startIndex) return null

@@ -6,13 +6,8 @@ import type { ManagedChildHandle } from "../manager/child-handle"
 import { resolveChildSessionDir } from "../runners/rpc/spawn"
 import type { TaskRecord } from "../state"
 import { createTaskLifecycle } from "./create"
-import {
-  cleanupProjects,
-  FakeRegistry,
-  seedRecord,
-  settings,
-  tempStore,
-} from "./__fixtures__/lifecycle-fakes"
+import { cleanupProjects, FakeRegistry, seedRecord, settings, tempStore } from "./__fixtures__/lifecycle-fakes"
+import { NO_HOST_ENDPOINT } from "./host-session"
 
 const parentSessionId = "session-capacity"
 
@@ -33,23 +28,26 @@ function handle(taskId: string): ManagedChildHandle {
 
 function harness(options: { readonly reservationOk: boolean; readonly legacy: boolean }) {
   const store = tempStore()
-  const record = seedRecord(store, options.legacy
-    ? {
-        task_id: "st_20000001",
-        parent_session_id: "legacy-session",
-        status: "completed",
-        residency_state: "resident",
-        execution_mode: "process",
-        pid: 900,
-        host_pid: 999,
-      }
-    : {
-        task_id: "st_20000002",
-        parent_session_id: parentSessionId,
-        status: "running",
-        residency_state: "persisted_only",
-        execution_mode: "in-process",
-      })
+  const record = seedRecord(
+    store,
+    options.legacy
+      ? {
+          task_id: "st_20000001",
+          parent_session_id: "legacy-session",
+          status: "completed",
+          residency_state: "resident",
+          execution_mode: "process",
+          pid: 900,
+          host_pid: 999,
+        }
+      : {
+          task_id: "st_20000002",
+          parent_session_id: parentSessionId,
+          status: "running",
+          residency_state: "persisted_only",
+          execution_mode: "in-process",
+        },
+  )
   if (options.legacy) {
     const directory = resolveChildSessionDir(join(store.stateDir, "children", record.task_id), record.task_id)
     mkdirSync(directory, { recursive: true })
@@ -63,6 +61,7 @@ function harness(options: { readonly reservationOk: boolean; readonly legacy: bo
   }
   const calls: string[] = []
   const lifecycle = createTaskLifecycle({
+    hostEndpoint: NO_HOST_ENDPOINT,
     store,
     registry: new FakeRegistry(),
     config: settings(),
@@ -89,13 +88,17 @@ function harness(options: { readonly reservationOk: boolean; readonly legacy: bo
 afterEach(cleanupProjects)
 
 describe("reconcile capacity reservations", () => {
-  test("#given legacy reconcile is at cap #when reattach is considered #then it defers without respawn", async () => {
+  test("#given a terminal legacy resident at cap #when reconciled #then it detaches without consulting reattach capacity", async () => {
     const { lifecycle, record, calls } = harness({ reservationOk: false, legacy: true })
 
     const result = await lifecycle.reconcileOnSessionStart()
 
-    expect(result.outcomes).toContainEqual({ task_id: record.task_id, kind: "deferred", reason: "capacity" })
-    expect(calls).toEqual([`reserve:${record.task_id}`])
+    expect(result.outcomes).toContainEqual({
+      task_id: record.task_id,
+      kind: "resumed",
+      reason: "terminal resident detached",
+    })
+    expect(calls).toEqual([])
   })
 
   test("#given reclamation reconcile is at cap #when revival is considered #then it rolls back and defers without respawn", async () => {

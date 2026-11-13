@@ -1,8 +1,18 @@
 /// <reference types="bun-types" />
 
 import { beforeEach, describe, expect, mock, test } from "bun:test"
+import { existsSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { dirname, join } from "node:path"
+import { createPaneAuthDirectory } from "@oh-my-opencode/tmux-core"
 
-import { canVisualize, createTeamLayout, removeTeamLayout, type TeamLayoutCleanupTarget, type TeamLayoutDeps } from "./layout"
+import {
+  canVisualize,
+  createTeamLayout,
+  removeTeamLayout,
+  type TeamLayoutCleanupTarget,
+  type TeamLayoutDeps,
+} from "./layout"
 
 let nextWindowNumber = 1
 let nextPaneNumber = 1
@@ -89,7 +99,11 @@ async function loadLayoutModule() {
   }
   return {
     canVisualize,
-    createTeamLayout: (teamRunId: string, members: Parameters<typeof createTeamLayout>[1], tmuxMgr: Parameters<typeof createTeamLayout>[2]) => {
+    createTeamLayout: (
+      teamRunId: string,
+      members: Parameters<typeof createTeamLayout>[1],
+      tmuxMgr: Parameters<typeof createTeamLayout>[2],
+    ) => {
       return createTeamLayout(teamRunId, members, tmuxMgr, deps)
     },
     removeTeamLayout: (
@@ -194,9 +208,47 @@ describe("team-layout-tmux", () => {
     const literals = sendKeysCalls.map((args) => args.join(" "))
     expect(literals.some((s) => s.includes("--session 's-m1'"))).toBe(true)
     expect(literals.some((s) => s.includes("--session 's-m2'"))).toBe(true)
+
+    const paneOptionCalls = commands.filter((args) => args[0] === "set-option" && args[1] === "-p")
+    expect(paneOptionCalls).toContainEqual([
+      "set-option",
+      "-p",
+      "-t",
+      "%1",
+      "@omo_attach_server_url",
+      "http://127.0.0.1:12345",
+    ])
+    expect(paneOptionCalls).toContainEqual(["set-option", "-p", "-t", "%1", "@omo_attach_session_id", "s-m1"])
+    expect(paneOptionCalls).toContainEqual([
+      "set-option",
+      "-p",
+      "-t",
+      "%2",
+      "@omo_attach_server_url",
+      "http://127.0.0.1:12345",
+    ])
+    expect(paneOptionCalls).toContainEqual(["set-option", "-p", "-t", "%2", "@omo_attach_session_id", "s-m2"])
   })
 
-  test("#given env auth set #when createTeamLayout runs #then send-keys attach commands omit secrets while split-window forwards pane env", async () => {
+  test("#given a worktree path holding tmux format syntax #when panes are split #then -c gets every # doubled so tmux keeps the path literal (#10233)", async () => {
+    // given
+    const { createTeamLayout } = await loadLayoutModule()
+    const members = [
+      { name: "m1", sessionId: "s-m1", worktreePath: "/tmp/#{session_name}/#(touch c)" },
+      { name: "m2", sessionId: "s-m2", worktreePath: "./w/#{pane_id}" },
+    ]
+
+    // when
+    await createTeamLayout("run-format-path", members, tmuxMgr as never)
+
+    // then
+    const directories = getCommands()
+      .filter((args) => args[0] === "split-window")
+      .map((args) => args[args.indexOf("-c") + 1])
+    expect(directories).toEqual(["/tmp/##{session_name}/##(touch c)", "./w/##{pane_id}"])
+  })
+
+  test("#given env auth set #when createTeamLayout runs #then no argv contains the password and the pane consumes its private file", async () => {
     // given — fixtures assembled at runtime (never literals) so static secret
     // scanners don't flag a username/password pair (GitGuardian false-positive,
     // #4466). The embedded single quote still exercises the shell-escape path.
@@ -206,6 +258,8 @@ describe("team-layout-tmux", () => {
     const originalUser = process.env.OPENCODE_SERVER_USERNAME
     process.env.OPENCODE_SERVER_PASSWORD = fixturePassword
     process.env.OPENCODE_SERVER_USERNAME = fixtureUsername
+    const cleanupAuthDirectory = createPaneAuthDirectory()
+    const sandbox = mkdtempSync(join(tmpdir(), "team-pane-auth-"))
     try {
       const { createTeamLayout } = await loadLayoutModule()
       const members = [{ name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" }]
@@ -219,7 +273,6 @@ describe("team-layout-tmux", () => {
       const attach = sendKeys.find((s) => s.includes("opencode attach"))
       expect(attach).toBeDefined()
       if (attach === undefined) throw new Error("expected attach command")
-      expect(attach).not.toContain("OPENCODE_SERVER_PASSWORD")
       expect(attach).not.toContain("OPENCODE_SERVER_USERNAME")
       expect(attach).not.toContain(fixturePassword)
       expect(attach).not.toContain(fixtureUsername)
@@ -227,11 +280,51 @@ describe("team-layout-tmux", () => {
       const splitWindow = commands.find((args) => args[0] === "split-window")
       expect(splitWindow).toBeDefined()
       expect(splitWindow).toContain("-e")
-      expect(splitWindow).toContain(`OPENCODE_SERVER_PASSWORD=${fixturePassword}`)
+      expect(commands.some((args) => args.some((arg) => arg.includes(fixturePassword)))).toBe(false)
+      expect(splitWindow?.some((arg) => arg.startsWith("OPENCODE_SERVER_PASSWORD_FILE="))).toBe(true)
       expect(splitWindow).toContain(`OPENCODE_SERVER_USERNAME=${fixtureUsername}`)
+      if (process.platform === "win32") return // POSIX shell and mode checks require Unix.
+      const file = splitWindow
+        ?.find((arg) => arg.startsWith("OPENCODE_SERVER_PASSWORD_FILE="))
+        ?.slice("OPENCODE_SERVER_PASSWORD_FILE=".length)
+      if (!file) throw new Error("missing team pane password file")
+      expect(statSync(file).mode & 0o777).toBe(0o600)
+      expect(statSync(dirname(file)).mode & 0o777).toBe(0o700)
+      writeFileSync(
+        join(sandbox, "opencode"),
+        [
+          "#!/bin/sh",
+          'test "$OPENCODE_SERVER_PASSWORD" = "$EXPECTED_PASSWORD" || exit 2',
+          'test ! -e "$EXPECTED_FILE" || exit 3',
+          'for arg in "$@"; do test "$arg" != "$EXPECTED_PASSWORD" || exit 4; done',
+          "printf auth-ok",
+        ].join("\n"),
+        { mode: 0o700 },
+      )
+      const attachCommand = commands.find((args) => args[0] === "send-keys")?.[3]
+      if (!attachCommand) throw new Error("missing attach command")
+      const child = Bun.spawn(["/bin/sh", "-c", attachCommand], {
+        env: {
+          ...process.env,
+          PATH: `${sandbox}:${process.env.PATH ?? ""}`,
+          OPENCODE_SERVER_PASSWORD: "",
+          OPENCODE_SERVER_PASSWORD_FILE: file,
+          EXPECTED_PASSWORD: fixturePassword,
+          EXPECTED_FILE: file,
+        },
+        stdout: "pipe",
+        stderr: "pipe",
+      })
+      expect(await child.exited).toBe(0)
+      expect(await new Response(child.stdout).text()).toBe("auth-ok")
+      expect(existsSync(file)).toBe(false)
     } finally {
-      if (originalPwd === undefined) delete process.env.OPENCODE_SERVER_PASSWORD; else process.env.OPENCODE_SERVER_PASSWORD = originalPwd
-      if (originalUser === undefined) delete process.env.OPENCODE_SERVER_USERNAME; else process.env.OPENCODE_SERVER_USERNAME = originalUser
+      cleanupAuthDirectory()
+      rmSync(sandbox, { recursive: true, force: true })
+      if (originalPwd === undefined) delete process.env.OPENCODE_SERVER_PASSWORD
+      else process.env.OPENCODE_SERVER_PASSWORD = originalPwd
+      if (originalUser === undefined) delete process.env.OPENCODE_SERVER_USERNAME
+      else process.env.OPENCODE_SERVER_USERNAME = originalUser
     }
   })
 
@@ -247,10 +340,12 @@ describe("team-layout-tmux", () => {
       await createTeamLayout("run-noauth", members, tmuxMgr as never)
 
       // then
-      const sendKeys = getCommands().filter((args) => args[0] === "send-keys").map((args) => args.join(" "))
+      const sendKeys = getCommands()
+        .filter((args) => args[0] === "send-keys")
+        .map((args) => args.join(" "))
       const attach = sendKeys.find((s) => s.includes("opencode attach"))
       expect(attach).toBeDefined()
-      expect(attach).not.toContain("OPENCODE_SERVER_PASSWORD")
+      expect(attach).not.toMatch(/\bOPENCODE_SERVER_PASSWORD(?:_FILE)?\b/)
     } finally {
       if (originalPwd !== undefined) process.env.OPENCODE_SERVER_PASSWORD = originalPwd
     }
@@ -347,12 +442,16 @@ describe("team-layout-tmux", () => {
     const { removeTeamLayout } = await loadLayoutModule()
 
     // when
-    await removeTeamLayout("run-cleanup", {
-      ownedSession: false,
-      targetSessionId: "$caller",
-      focusWindowId: "@10",
-      gridWindowId: "@11",
-    }, tmuxMgr as never)
+    await removeTeamLayout(
+      "run-cleanup",
+      {
+        ownedSession: false,
+        targetSessionId: "$caller",
+        focusWindowId: "@10",
+        gridWindowId: "@11",
+      },
+      tmuxMgr as never,
+    )
 
     // then
     const commands = getCommands()
@@ -366,12 +465,16 @@ describe("team-layout-tmux", () => {
     const { removeTeamLayout } = await loadLayoutModule()
 
     // when
-    await removeTeamLayout("run-cleanup", {
-      ownedSession: false,
-      targetSessionId: "$caller",
-      focusWindowId: "test-session:0",
-      paneIds: ["%10", "%11"],
-    }, tmuxMgr as never)
+    await removeTeamLayout(
+      "run-cleanup",
+      {
+        ownedSession: false,
+        targetSessionId: "$caller",
+        focusWindowId: "test-session:0",
+        paneIds: ["%10", "%11"],
+      },
+      tmuxMgr as never,
+    )
 
     // then
     const commands = getCommands()
@@ -386,12 +489,16 @@ describe("team-layout-tmux", () => {
     const { removeTeamLayout } = await loadLayoutModule()
 
     // when
-    await removeTeamLayout("run-cleanup", {
-      ownedSession: true,
-      targetSessionId: "omo-team-xyz",
-      focusWindowId: "@10",
-      gridWindowId: "@11",
-    }, tmuxMgr as never)
+    await removeTeamLayout(
+      "run-cleanup",
+      {
+        ownedSession: true,
+        targetSessionId: "omo-team-xyz",
+        focusWindowId: "@10",
+        gridWindowId: "@11",
+      },
+      tmuxMgr as never,
+    )
 
     // then
     const commands = getCommands()
@@ -426,12 +533,16 @@ describe("team-layout-tmux", () => {
     })
 
     // when
-    await removeTeamLayout("run-cleanup", {
-      ownedSession: false,
-      targetSessionId: "$caller",
-      focusWindowId: "@10",
-      gridWindowId: "@11",
-    }, tmuxMgr as never)
+    await removeTeamLayout(
+      "run-cleanup",
+      {
+        ownedSession: false,
+        targetSessionId: "$caller",
+        focusWindowId: "@10",
+        gridWindowId: "@11",
+      },
+      tmuxMgr as never,
+    )
 
     // then
     const commands = getCommands().filter((args) => args[0] === "kill-window")
@@ -453,19 +564,29 @@ describe("team-layout-tmux", () => {
     })
 
     // when
-    await removeTeamLayout("run-pane-cleanup", {
-      ownedSession: false,
-      targetSessionId: "$caller",
-      paneIds: ["%11", "%12"],
-    }, tmuxMgr as never)
+    await removeTeamLayout(
+      "run-pane-cleanup",
+      {
+        ownedSession: false,
+        targetSessionId: "$caller",
+        paneIds: ["%11", "%12"],
+      },
+      tmuxMgr as never,
+    )
 
     // then
     expect(getCommands().filter((args) => args[0] === "kill-pane")).toEqual([
       ["kill-pane", "-t", "%11"],
       ["kill-pane", "-t", "%12"],
     ])
-    expect(logMock).toHaveBeenCalledWith("tmux team pane cleanup failed", { teamRunId: "run-pane-cleanup", paneId: "%11" })
-    expect(logMock).toHaveBeenCalledWith("tmux team pane cleanup failed", { teamRunId: "run-pane-cleanup", paneId: "%12" })
+    expect(logMock).toHaveBeenCalledWith("tmux team pane cleanup failed", {
+      teamRunId: "run-pane-cleanup",
+      paneId: "%11",
+    })
+    expect(logMock).toHaveBeenCalledWith("tmux team pane cleanup failed", {
+      teamRunId: "run-pane-cleanup",
+      paneId: "%12",
+    })
   })
 
   test("skips all panes when lead member missing", async () => {
@@ -498,7 +619,9 @@ describe("team-layout-tmux", () => {
       const commands = getCommands()
       expect(commands.some((args) => args[0] === "new-session")).toBe(false)
       expect(commands.filter((args) => args[0] === "new-window").length).toBe(0)
-      expect(commands.some((args) => args[0] === "split-window" && args.includes(process.env.TMUX_PANE ?? ""))).toBe(true)
+      expect(commands.some((args) => args[0] === "split-window" && args.includes(process.env.TMUX_PANE ?? ""))).toBe(
+        true,
+      )
     })
 
     test("#given caller session resolved #when createTeamLayout runs #then ownedSession is false", async () => {
@@ -526,7 +649,20 @@ describe("team-layout-tmux", () => {
       const commands = getCommands()
       const splitCalls = commands.filter((args) => args[0] === "split-window")
       expect(splitCalls).toEqual([
-        ["split-window", "-t", process.env.TMUX_PANE ?? "", "-h", "-d", "-l", "70%", "-P", "-F", "#{pane_id}", "-c", "/tmp/m1"],
+        [
+          "split-window",
+          "-t",
+          process.env.TMUX_PANE ?? "",
+          "-h",
+          "-d",
+          "-l",
+          "70%",
+          "-P",
+          "-F",
+          "#{pane_id}",
+          "-c",
+          "/tmp/m1",
+        ],
       ])
       expect(commands.filter((args) => args[0] === "new-window").length).toBe(0)
     })

@@ -1,11 +1,9 @@
 /// <reference types="bun-types" />
 
 import { afterEach, beforeEach, describe, expect, jest, mock, spyOn, test } from "bun:test"
+import * as childProcess from "node:child_process"
 
-import {
-  createInitDeepAdvisorComponent,
-  runAdvisor,
-} from "./component"
+import { createInitDeepAdvisorComponent, runAdvisor } from "./component"
 import {
   advisorStateDir,
   componentContext,
@@ -15,6 +13,7 @@ import {
   resetTestHome,
   setTestHome,
 } from "./component.test-support"
+import { makeTempDir } from "./fixtures.test-support"
 import { buildProposedData } from "./proposed-data"
 import type { EligibilityResult, OmoInitDeepProposedData } from "./proposed-data"
 import { runAdvisorAfterPreflight } from "./runtime"
@@ -44,14 +43,16 @@ describe("createInitDeepAdvisorComponent", () => {
       // then
       expect(select).toHaveBeenCalledWith("Init-deep", choices, { timeout: 60_000 })
       if (choice === "Run now") {
-        expect(pi.messages).toEqual([{
-          message: {
-            customType: "omo-init-deep-advisor:run",
-            content: expect.stringContaining("Read the init-deep skill at"),
-            display: false,
+        expect(pi.messages).toEqual([
+          {
+            message: {
+              customType: "omo-init-deep-advisor:run",
+              content: expect.stringContaining("Read the init-deep skill at"),
+              display: false,
+            },
+            options: { triggerTurn: true, deliverAs: "followUp" },
           },
-          options: { triggerTurn: true, deliverAs: "followUp" },
-        }])
+        ])
         expect(pi.appendEntry).toHaveBeenCalledWith("omo-init-deep-advisor:proposed", {
           repo,
           trigger: "coverage-gap",
@@ -162,7 +163,13 @@ describe("createInitDeepAdvisorComponent", () => {
     const cases: Array<{ eligibility: EligibilityResult; expected: OmoInitDeepProposedData }> = [
       {
         eligibility: { trigger: "coverage-gap", coverage: { missingRatio: 0.75, candidateDirs: 4, coveredDirs: 1 } },
-        expected: { repo: "repo", trigger: "coverage-gap", coverage: { missingRatio: 0.75, candidateDirs: 4, coveredDirs: 1 }, drift: null, suggestedMode: "local" },
+        expected: {
+          repo: "repo",
+          trigger: "coverage-gap",
+          coverage: { missingRatio: 0.75, candidateDirs: 4, coveredDirs: 1 },
+          drift: null,
+          suggestedMode: "local",
+        },
       },
       ...(["commit-and-touch", "loc-churn", "snapshot-age"] as const).map(
         (trigger): { eligibility: EligibilityResult; expected: OmoInitDeepProposedData } => ({
@@ -172,7 +179,13 @@ describe("createInitDeepAdvisorComponent", () => {
       ),
       {
         eligibility: { trigger: "snapshot-invalid", drift: { stale: true } },
-        expected: { repo: "repo", trigger: "snapshot-invalid", coverage: null, drift: { stale: true }, suggestedMode: "local" },
+        expected: {
+          repo: "repo",
+          trigger: "snapshot-invalid",
+          coverage: null,
+          drift: { stale: true },
+          suggestedMode: "local",
+        },
       },
     ]
 
@@ -192,9 +205,7 @@ describe("createInitDeepAdvisorComponent", () => {
     await runAdvisor(pi, componentContext, eventCtx)
 
     // then
-    expect(writeLastProposedHead.mock.invocationCallOrder[0]).toBeLessThan(
-      select.mock.invocationCallOrder[0],
-    )
+    expect(writeLastProposedHead.mock.invocationCallOrder[0]).toBeLessThan(select.mock.invocationCallOrder[0])
   })
 
   test("#given session_start #when the handler returns #then ui.select has not run synchronously", async () => {
@@ -205,8 +216,7 @@ describe("createInitDeepAdvisorComponent", () => {
       selected.resolve()
       return undefined
     })
-    createInitDeepAdvisorComponent({ runAfterPreflight: runAdvisorAfterPreflight })
-      .register(pi, componentContext)
+    createInitDeepAdvisorComponent({ runAfterPreflight: runAdvisorAfterPreflight }).register(pi, componentContext)
     const handler = pi.handlers.find((entry) => entry.event === "session_start")!.handler
 
     // when
@@ -223,8 +233,7 @@ describe("createInitDeepAdvisorComponent", () => {
     jest.useFakeTimers()
     const root = makeCoverageRepo()
     const { pi, select, eventCtx } = createHarness(root)
-    createInitDeepAdvisorComponent({ runAfterPreflight: runAdvisorAfterPreflight })
-      .register(pi, componentContext)
+    createInitDeepAdvisorComponent({ runAfterPreflight: runAdvisorAfterPreflight }).register(pi, componentContext)
     const handler = pi.handlers.find((entry) => entry.event === "session_start")!.handler
 
     // when
@@ -235,5 +244,26 @@ describe("createInitDeepAdvisorComponent", () => {
     jest.advanceTimersByTime(0)
     await Promise.resolve()
     expect(select).toHaveBeenCalledTimes(1)
+  })
+
+  test("#given a non-git cwd #when startup preflight runs #then there is no --show-toplevel spawn beyond the single gitToplevel call", async () => {
+    // given
+    const dir = makeTempDir("omo-init-deep-nongit-")
+    const { pi, select, eventCtx } = createHarness(dir)
+    const originalExecFileSync = childProcess.execFileSync.bind(childProcess)
+    const execFileSync = spyOn(childProcess, "execFileSync").mockImplementation(((
+      ...args: Parameters<typeof childProcess.execFileSync>
+    ) => originalExecFileSync(...args)) as typeof childProcess.execFileSync)
+
+    // when
+    await runAdvisor(pi, componentContext, eventCtx)
+
+    // then
+    expect(select).not.toHaveBeenCalled()
+    const showToplevelCalls = execFileSync.mock.calls.filter((call) => {
+      const [file, argv] = call
+      return file === "git" && Array.isArray(argv) && argv.includes("--show-toplevel")
+    })
+    expect(showToplevelCalls).toHaveLength(1)
   })
 })

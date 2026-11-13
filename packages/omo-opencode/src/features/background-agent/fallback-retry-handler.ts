@@ -13,6 +13,7 @@ import {
 import { transformModelForProvider } from "../../shared/provider-model-id-transform"
 import { abortWithTimeout } from "./abort-with-timeout"
 import { ensureCurrentAttempt, scheduleRetryAttempt } from "./attempt-lifecycle"
+import { filterProvidersServingModel } from "./fallback-provider-model-filter"
 
 export class TeamModeFallbackError extends Error {
   constructor(message: string) {
@@ -68,7 +69,17 @@ export async function tryFallbackRetry(args: {
   }) => void
   deps?: Partial<FallbackRetryHandlerDeps>
 }): Promise<boolean> {
-  const { task, errorInfo, source, concurrencyManager, client, idleDeferralTimers, queuesByKey, processKey, onRetrying } = args
+  const {
+    task,
+    errorInfo,
+    source,
+    concurrencyManager,
+    client,
+    idleDeferralTimers,
+    queuesByKey,
+    processKey,
+    onRetrying,
+  } = args
   const deps = { ...defaultFallbackRetryHandlerDeps, ...args.deps }
   const fallbackChain = task.fallbackChain
   const canUseProviderExhaustionFallback = deps.isProviderExhaustionFallbackEligible(errorInfo)
@@ -83,7 +94,7 @@ export async function tryFallbackRetry(args: {
   const attemptCount = task.attemptCount ?? 0
   const providerModelsCache = deps.readProviderModelsCache()
   const connectedProviders = providerModelsCache?.connected ?? deps.readConnectedProvidersCache()
-  const connectedSet = connectedProviders ? new Set(connectedProviders.map(p => p.toLowerCase())) : null
+  const connectedSet = connectedProviders ? new Set(connectedProviders.map((p) => p.toLowerCase())) : null
 
   const isReachable = (entry: FallbackEntry): boolean => {
     if (!connectedSet) return true
@@ -106,10 +117,23 @@ export async function tryFallbackRetry(args: {
       })
       continue
     }
-    const candidateProviderID = deps.selectFallbackProvider(
-      candidate.providers,
-      task.model?.providerID,
-    )
+    const servingProviders = filterProvidersServingModel({
+      providers: candidate.providers,
+      model: candidate.model,
+      connectedSet,
+      modelsByProvider: providerModelsCache?.models,
+      transformModelForProvider: deps.transformModelForProvider,
+    })
+    if (!isReachable({ ...candidate, providers: servingProviders })) {
+      deps.log("[background-agent] Skipping fallback no connected provider serves:", {
+        taskId: task.id,
+        source,
+        model: candidate.model,
+        providers: candidate.providers,
+      })
+      continue
+    }
+    const candidateProviderID = deps.selectFallbackProvider(servingProviders, task.model?.providerID)
     const candidateModelID = deps.transformModelForProvider(candidateProviderID, candidate.model)
     const isNoOpFallback =
       !!task.model &&
@@ -130,10 +154,7 @@ export async function tryFallbackRetry(args: {
   }
   if (!nextFallback) return false
 
-  const providerID = nextProviderID ?? deps.selectFallbackProvider(
-    nextFallback.providers,
-    task.model?.providerID,
-  )
+  const providerID = nextProviderID ?? deps.selectFallbackProvider(nextFallback.providers, task.model?.providerID)
 
   deps.log("[background-agent] Retryable error, attempting fallback:", {
     taskId: task.id,
@@ -196,10 +217,13 @@ export async function tryFallbackRetry(args: {
   // every subsequent team tool call would throw "not in team". Fail with a bounded
   // structured error instead of silently entering that confusing runtime state.
   if (task.teamRunId && !task.onSessionCreated) {
-    deps.log("[background-agent] team-mode fallback denied: task has teamRunId but no onSessionCreated; cannot preserve team membership", {
-      taskId: task.id,
-      teamRunId: task.teamRunId,
-    })
+    deps.log(
+      "[background-agent] team-mode fallback denied: task has teamRunId but no onSessionCreated; cannot preserve team membership",
+      {
+        taskId: task.id,
+        teamRunId: task.teamRunId,
+      },
+    )
     throw new TeamModeFallbackError(
       `team-mode fallback denied: cannot preserve team context for task ${task.id} (teamRunId=${task.teamRunId})`,
     )
@@ -208,9 +232,16 @@ export async function tryFallbackRetry(args: {
   const rawKey = task.model ? `${task.model.providerID}/${task.model.modelID}` : task.agent
   const key = concurrencyManager.getConcurrencyKey(rawKey)
   const queue = queuesByKey.get(key) ?? []
+  const hasContinuation = !!task.originalPrompt && task.originalPrompt !== task.prompt
+  const retryPrompt = hasContinuation
+    ? `${task.originalPrompt}\n\n[Latest continuation instruction]\n${task.prompt}`
+    : task.prompt
+  const retryNote = hasContinuation
+    ? "\n\n[Note: this is a retry in a new session after the previous session failed; the earlier session's context is not available. Work from the original task and latest continuation instruction above.]"
+    : ""
   const retryInput: LaunchInput = {
     description: task.description,
-    prompt: task.prompt,
+    prompt: `${retryPrompt}${retryNote}`,
     agent: task.agent,
     parentSessionId: task.parentSessionId,
     parentMessageId: task.parentMessageId,
@@ -224,6 +255,7 @@ export async function tryFallbackRetry(args: {
     sessionPermission: task.sessionPermission,
     category: task.category,
     isUnstableAgent: task.isUnstableAgent,
+    cwd: task.cwd,
     onSessionCreated: task.onSessionCreated,
   }
 

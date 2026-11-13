@@ -7,8 +7,9 @@ import type { TaskToolDeps } from "./types"
 // may proceed. A missing resolver fails CLOSED - without session state there is no proof the
 // required skill was invoked.
 export function invocationGateDenial(deps: TaskToolDeps, subagentType: string, sessionId: string): string | undefined {
-  if (invocationConditionForAgent(subagentType) === undefined) return undefined
+  const name = subagentType.trim()
+  if (invocationConditionForAgent(name) === undefined) return undefined
   const state = deps.resolveSkillInvocations?.(sessionId) ?? EMPTY_SKILL_INVOCATIONS
-  const verdict = evaluateInvocationGuard(subagentType, state)
+  const verdict = evaluateInvocationGuard(name, state)
   return verdict.kind === "deny" ? verdict.message : undefined
 }

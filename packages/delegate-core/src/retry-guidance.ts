@@ -6,9 +6,7 @@ function extractAvailableList(output: string): string | null {
 }
 
 export function buildRetryGuidance(errorInfo: DetectedError): string {
-  const pattern = DELEGATE_TASK_ERROR_PATTERNS.find(
-    (entry) => entry.errorType === errorInfo.errorType
-  )
+  const pattern = DELEGATE_TASK_ERROR_PATTERNS.find((entry) => entry.errorType === errorInfo.errorType)
 
   if (!pattern) {
     return `[task ERROR] Fix the error and retry with correct parameters.`
@@ -35,7 +33,7 @@ export function buildRetryGuidance(errorInfo: DetectedError): string {
    description="Task description",
    prompt="Detailed prompt...",
    category="unspecified-low",  // OR subagent_type="explore"
-   run_in_background=false,
+   run_in_background=true,
    load_skills=[]
  )
  \`\`\`

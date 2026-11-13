@@ -29,10 +29,7 @@ export type SessionModelOverride = { readonly providerID: string; readonly model
 export type WorkStartingCommand = "ulw-execute" | "ralph-loop" | "ulw-loop"
 
 type ChatMessageHook = {
-  "chat.message"?: (
-    input: ChatMessageInput,
-    output: ChatMessageHandlerOutput,
-  ) => Promise<void>
+  "chat.message"?: (input: ChatMessageInput, output: ChatMessageHandlerOutput) => Promise<void>
 }
 
 type StopContinuationGuard = {
@@ -60,7 +57,7 @@ export type ChatMessageHooks = {
   stopContinuationGuard?: StopContinuationGuard | null
   backgroundNotificationHook?: ChatMessageHook | null
   runtimeFallback?: ChatMessageHook | null
-  keywordDetector?: ChatMessageHook | null
+  keywordDetector?: (ChatMessageHook & { clearSession?: (sessionID: string) => void }) | null
   thinkMode?: ChatMessageHook | null
   claudeCodeHooks?: ChatMessageHook | null
   autoSlashCommand?: ChatMessageHook | null
