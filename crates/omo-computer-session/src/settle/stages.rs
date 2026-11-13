@@ -87,20 +87,21 @@ impl Session {
         Some(settled)
     }
 
-    /// The busy wait before a send to `window`, up to the cap of the regime in force.
+    /// The busy wait before a send to `window`, up to the cap of the regime in force: the
+    /// milliseconds it waited (0 when the target was not busy).
     ///
     /// # Errors
     /// [`TARGET_BUSY`] with its [`BusyDetail`] when the target is still busy at the cap.
-    pub(crate) fn busy_before_send(&mut self, window: Option<&str>) -> Result<(), Refused> {
+    pub(crate) fn busy_before_send(&mut self, window: Option<&str>) -> Result<u64, Refused> {
         let Some(window) = window else {
-            return Ok(());
+            return Ok(0);
         };
         let cap_ms = self.settle.regime.numbers().cap_ms;
         let Some(mut feed) = feed(self.backend.as_mut()) else {
-            return Ok(());
+            return Ok(0);
         };
         match wait_clear(&mut feed, window, cap_ms) {
-            Busy::Clear { .. } => Ok(()),
+            Busy::Clear { waited_ms } => Ok(waited_ms),
             Busy::Timeout {
                 indicator,
                 waited_ms,

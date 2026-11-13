@@ -43,8 +43,21 @@ impl Session {
         if let Some(frame) = mutation.frame_refusal {
             return Err(self.refuse(record, Some("Frame".to_owned()), frame.refusal().into()));
         }
-        if let Err(busy) = self.busy_before_send(target) {
-            return Err(self.refuse(record, Some("Busy".to_owned()), busy));
+        let waited_ms = match self.busy_before_send(target) {
+            Ok(waited_ms) => waited_ms,
+            Err(busy) => return Err(self.refuse(record, Some("Busy".to_owned()), busy)),
+        };
+        // The busy wait let time pass after the gate: a stop, a lock or a lost permission
+        // during it must still refuse, so a wait that took time is admitted again before
+        // anything is taken or sent. A target that was not busy keeps the single gate pass.
+        if waited_ms > 0 {
+            if let Err(refused) = self.guard.admit_on(self.backend.as_mut(), &mutation.call) {
+                return Err(self.refuse(
+                    record,
+                    Some(format!("{:?}", refused.gate)),
+                    refused.refusal.into(),
+                ));
+            }
         }
         // `&mut Session` serialises a session's calls, so no exec permit free means one leaked:
         // refused with nothing sent, never sent without one.
