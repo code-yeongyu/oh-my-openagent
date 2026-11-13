@@ -52,16 +52,22 @@ fn read_bounds(regime: SettleRegime, spec: Option<SettleSpec>) -> Bounds {
 }
 
 impl Session {
-    /// The settle before a read of `window`: the busy wait, then the quiet window. `None` for
-    /// the explicit no-wait `{quietMs:0}`. A busy target never refuses a read: at the cap the
+    /// The settle before a read of `window`: the busy wait, then the quiet window, together
+    /// never longer than one cap (the regime's, the call's `settle.timeoutMs`, or a `waitFor`'s
+    /// `timeout`, the smallest). `None` for the explicit no-wait `{quietMs:0}`. A busy target never refuses a read: at the cap the
     /// settle reads `timeout` with the indicator named.
     pub(crate) fn settle_before_read(
         &mut self,
         window: &str,
         spec: Option<SettleSpec>,
+        timeout_ms: Option<u64>,
     ) -> Option<Settled> {
         let regime = self.settle.regime;
-        let bounds = read_bounds(regime, spec);
+        let mut bounds = read_bounds(regime, spec);
+        // A `waitFor`'s `timeout` bounds its settle too.
+        if let Some(timeout_ms) = timeout_ms {
+            bounds.cap_ms = bounds.cap_ms.min(timeout_ms);
+        }
         if bounds.quiet_ms == 0 {
             return None;
         }
@@ -82,7 +88,12 @@ impl Session {
             }
             Busy::Clear { waited_ms } => waited_ms,
         };
-        let mut settled = quiet_window(&mut feed, window, bounds, Picking::Fixed(regime));
+        // The busy wait and the quiet window share one cap: the quiet window gets what is left.
+        let left = Bounds {
+            cap_ms: bounds.cap_ms.saturating_sub(busy_ms),
+            ..bounds
+        };
+        let mut settled = quiet_window(&mut feed, window, left, Picking::Fixed(regime));
         settled.waited_ms = settled.waited_ms.saturating_add(busy_ms);
         Some(settled)
     }

@@ -69,7 +69,7 @@ impl Session {
         let mut notification = None;
         let outcome = match predicate {
             WaitSpec::Settle(spec) => {
-                settled = self.settle_before_read(&target, Some(spec));
+                settled = self.settle_before_read(&target, Some(spec), Some(timeout_ms));
                 settled
                     .as_ref()
                     .map_or(WaitOutcome::Settled, |s| settle_outcome(s.outcome))

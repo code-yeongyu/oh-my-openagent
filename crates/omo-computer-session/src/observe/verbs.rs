@@ -52,7 +52,7 @@ impl Session {
             return Err(NO_CAPTURE.into());
         }
         let request = Request::read(params);
-        let settled = self.settle_before_read(&request.target, request.settle);
+        let settled = self.settle_before_read(&request.target, request.settle, None);
         let reader = self.backend.ax_reader().ok_or(NO_READER)?;
         let mut packet = observe(&mut self.refs, reader, &request)?;
         packet.settle = settled.as_ref().map(crate::settle::Settled::wire);

@@ -10,7 +10,7 @@ use super::{expected, params, Rig};
 fn loading_indicator_clears_before_observe_returns() {
     let mut rig = Rig::new(json!({"busy_timeline": [
         {"t_ms": 0, "window": "101", "busy": true, "indicator": "AXProgressIndicator"},
-        {"t_ms": 800, "window": "101", "busy": false}
+        {"t_ms": 300, "window": "101", "busy": false}
     ]}));
     let observation = rig
         .session
@@ -22,11 +22,30 @@ fn loading_indicator_clears_before_observe_returns() {
             SettleOutcome::Settled,
             SettleRegime::Unchanged,
             500,
-            1_300
+            800
         )),
-        "800 ms until the indicator cleared, then 500 ms of quiet"
+        "300 ms until the indicator cleared, then 500 ms of quiet"
     );
-    assert!(rig.clock.now_ms() >= 1_300 && observation.tree.is_some());
+    assert!(rig.clock.now_ms() >= 800 && observation.tree.is_some());
+    // Cleared at 800 ms: the quiet window gets the 200 ms left of the one 1,000 ms cap.
+    let mut late = Rig::new(json!({"busy_timeline": [
+        {"t_ms": 0, "window": "101", "busy": true, "indicator": "AXProgressIndicator"},
+        {"t_ms": 800, "window": "101", "busy": false}
+    ]}));
+    let observation = late
+        .session
+        .observe(params(json!({"target": "101"})))
+        .expect("observe");
+    assert_eq!(
+        observation.settle,
+        Some(expected(
+            SettleOutcome::Pending,
+            SettleRegime::Unchanged,
+            500,
+            1_000
+        )),
+        "never past the cap"
+    );
 }
 
 #[test]
