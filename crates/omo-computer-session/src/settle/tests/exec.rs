@@ -101,3 +101,28 @@ fn busy_refusal_carries_indicator_waited_and_retry_after() {
         "the wire's data.indicator, data.waitedMs and data.retryAfterMs"
     );
 }
+
+/// Review H1 (#13370): the busy wait lets time pass between the gate and the send, so a stop
+/// pressed during it must refuse with nothing sent; the same wait with no stop still sends.
+#[test]
+fn a_stop_pressed_during_the_busy_wait_refuses_and_sends_nothing() {
+    let busy = json!([
+        {"t_ms": 0, "window": "101", "busy": true, "indicator": "spinner"},
+        {"t_ms": 400, "window": "101", "busy": false}
+    ]);
+    let mut stopped = Rig::new(json!({ "busy_timeline": busy, "stop_timeline": [{"t_ms": 200}] }));
+    let refused = stopped
+        .click()
+        .expect_err("the stop pressed during the wait refuses the click");
+    assert_eq!(refused.refusal.code, EngineCode::Suspended);
+    assert!(
+        stopped.sink.is_empty(),
+        "nothing sent: {:?}",
+        stopped.sink.lines()
+    );
+    let mut control = Rig::new(json!({ "busy_timeline": busy }));
+    control
+        .click()
+        .expect("with no stop the click is sent after the wait");
+    assert_eq!(control.sink.len(), 3, "move, down, up: {:?}", control.sink.lines());
+}
