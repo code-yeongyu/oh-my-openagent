@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test"
 
 import { admitWindow, p99 } from "./latency.ts"
-import { judgeSelfTest, type Trial, judgeAxSheetTrial } from "./selftest-judge.ts"
-import { SIGNALS, type SentinelSummary, type Signal } from "./summary.ts"
+import { judgeSelfTest, type Trial, judgeAxSheetTrial, observerFailureLines } from "./selftest-judge.ts"
+import { parseEvents, SIGNALS, type SentinelSummary, type Signal } from "./summary.ts"
 
 function summaryWith(happened: readonly Signal[], faults: readonly string[] = []): SentinelSummary {
   const signals = Object.fromEntries(
@@ -146,4 +146,45 @@ describe("judging the AX-only sheet trial", () => {
     test(`${what}: ${proven ? "proven" : "not proven"}`, () => {
       expect(judgeAxSheetTrial(hits) === undefined).toBe(proven)
     })
+})
+
+// The self-test prints one line per app whose window observer never registered, so the claim that such apps are all
+// background agents is read from the run, not deduced from its verdict.
+describe("observer registration failures are listed per app", () => {
+  const failed = (pid: number, app: string, policy: string) =>
+    ({
+      t: 10,
+      kind: "observer_failed",
+      pid,
+      app,
+      policy,
+      axError: "cannotComplete",
+      attempts: 1,
+      regular: policy === "regular",
+      since: 5,
+    }) as const
+
+  test("each failure is one line naming the pid, the app, its activation policy, attempts and AX error", () => {
+    expect(
+      observerFailureLines([failed(41, "com.apple.WindowServer", "accessory"), failed(57, "Finder", "regular")]),
+    ).toEqual([
+      "SENTINEL_OBSERVER_FAILED pid=41 app=com.apple.WindowServer policy=accessory attempts=1 ax=cannotComplete",
+      "SENTINEL_OBSERVER_FAILED pid=57 app=Finder policy=regular attempts=1 ax=cannotComplete",
+    ])
+    expect(observerFailureLines([])).toEqual([])
+  })
+
+  test("a failure that does not say which app or which policy is not an event", () => {
+    const line = JSON.stringify({
+      t: 1,
+      kind: "observer_failed",
+      pid: 9,
+      axError: "failure",
+      attempts: 1,
+      regular: false,
+      since: 0,
+    })
+    expect(parseEvents(line).events).toEqual([])
+    expect(parseEvents(line).faults).toHaveLength(1)
+  })
 })
