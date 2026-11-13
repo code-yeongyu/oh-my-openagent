@@ -1,7 +1,7 @@
-//! The fake's geometry reads: display info, which display holds a window, a window filter, and
-//! the rect a capture covers.
+//! Scripted desktop geometry: display bounds, which display holds a window, and the rect a
+//! capture target covers.
 
-use omo_computer_core::backend::{BackendResult, Refusal, Target, WindowFilter};
+use omo_computer_core::backend::{BackendResult, Refusal, Target};
 use omo_computer_core::error::{EngineCode, Reason};
 use omo_computer_core::listing::Rect;
 use omo_computer_core::results::DisplayInfo;
@@ -37,15 +37,6 @@ pub(super) fn display_of<'a>(state: &'a FakeState, window: &FakeWindow) -> Optio
         .iter()
         .find(|display| contains(display, window.x, window.y))
         .or_else(|| state.displays.first())
-}
-
-pub(super) fn matches(filter: &WindowFilter, window: &FakeWindow) -> bool {
-    filter.app.as_ref().is_none_or(|app| &window.app == app)
-        && filter
-            .title
-            .as_ref()
-            .is_none_or(|title| window.title.contains(title.as_str()))
-        && filter.pid.is_none_or(|pid| window.pid == pid)
 }
 
 pub(super) fn capture_rect(state: &FakeState, target: &Target) -> BackendResult<(Rect, f64)> {

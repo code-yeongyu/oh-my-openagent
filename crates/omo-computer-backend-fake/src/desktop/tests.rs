@@ -200,4 +200,3 @@ fn focus_record_sink_keeps_the_window_id_case() {
         ["focus_record kind=short window=Main outcome=tookeffect"]
     );
 }
-

@@ -5,10 +5,12 @@
 
 use omo_computer_core::backend::Refusal;
 use omo_computer_core::methods::Method;
-use omo_computer_session::grant::HostCallError;
-use omo_computer_session::{Refused, Session, Unresolved};
+use omo_computer_session::Session;
 use serde::de::DeserializeOwned;
 use serde_json::{json, Map, Value};
+
+mod refusals;
+use refusals::{host_failure, refused, refused_call, unresolved};
 
 pub const PARSE_ERROR: i64 = -32_700;
 pub const INVALID_REQUEST: i64 = -32_600;
@@ -111,73 +113,6 @@ fn dispatch(session: &mut Session, name: &str, params: Value) -> Result<Value, F
 
 // --- Rows 21-27: the session's host calls (R31); row 28 moves this into the engine router. ---
 
-fn host_failure(error: HostCallError) -> Failure {
-    match error {
-        HostCallError::Params(error) => {
-            failure(INVALID_PARAMS, "Invalid params", Some(json!({ "detail": error.to_string() })))
-        }
-        HostCallError::Refused(refused) => refused_call(&refused),
-    }
-}
-
-/// A refusal on the wire: the closed engine code's number and name, `data.code` as v1 wrote
-/// it, and `data.reason` when the refusal carries one. Every refusal resolves to its row of
-/// the one error table (a bare refusal to its code's bare row); a pair with no row is a
-/// backend defect, reported on stderr, and still answered with the refusal's own code.
-fn refused(refusal: &Refusal) -> Failure {
-    if let Err(unknown) = refusal.row() {
-        eprintln!("omo-computer-engine: {unknown}");
-    }
-    failure(refusal.code.number(), refusal.code.wire(), Some(refusal.wire_data()))
-}
-
-/// A funnel refusal: the refusal's members plus the `callId` it concerns, for a replay the
-/// stored `receipt` (`TransactionFailed{reason:"replayed", callId, receipt}`), and for a call
-/// whose send was interrupted its `disposition` (`delivery_uncertain/unsafe`): without it
-/// the code's own row would read `not_delivered/safe` and invite a resend.
-fn refused_call(refused: &Refused) -> Failure {
-    let mut failure = self::refused(&refused.refusal);
-    if let Some(data) = failure.data.as_mut() {
-        if let Some(call_id) = &refused.call_id {
-            data["callId"] = json!(call_id);
-        }
-        if let Some(receipt) = &refused.receipt {
-            data["receipt"] = (**receipt).clone();
-        }
-        if let Some(disposition) = refused.interrupted {
-            data["disposition"] = json!(disposition);
-        }
-        let stamps = &refused.stamps;
-        if let Some(delivered) = stamps.delivered {
-            data["delivered"] = json!({ "count": delivered.count, "of": delivered.of });
-        }
-        if !stamps.paused.is_empty() {
-            data["paused"] = json!(stamps.paused);
-        }
-        if let Some(session) = &stamps.session {
-            data["session"] = json!(session);
-        }
-        if let Some(target) = stamps.target {
-            data["target"] = json!(target);
-        }
-        if let (Some(Value::Object(detail)), Some(data)) = (refused.detail.as_deref(), data.as_object_mut()) {
-            for (key, value) in detail {
-                data.entry(key.clone()).or_insert_with(|| value.clone());
-            }
-        }
-    }
-    failure
-}
-
-/// A ref that did not resolve: the refusal, and on `AmbiguousTarget` the `candidates`.
-fn unresolved(unresolved: &Unresolved) -> Failure {
-    let mut failure = refused(&unresolved.refusal);
-    if let Some(data) = failure.data.as_mut().filter(|_| !unresolved.candidates.is_empty()) {
-        data["candidates"] = json!(unresolved.candidates);
-    }
-    failure
-}
-
 fn reply(id: &Value, outcome: Result<Value, Failure>) -> String {
     let message = match outcome {
         Ok(result) => json!({ "jsonrpc": "2.0", "id": id, "result": result }),
@@ -254,10 +189,12 @@ mod tests {
         let interrupted = omo_computer_session::Refused {
             call_id: Some("k-1".to_owned()),
             interrupted: Some(omo_computer_core::report::Disposition::UNCERTAIN_UNSAFE),
+            warning: Some("write_failed".to_owned()),
             ..Refusal::new(EngineCode::TransactionFailed, "recovery_required").into()
         };
         let Failure { data, .. } = refused_call(&interrupted);
         let data = data.expect("data");
+        assert_eq!(data["warning"], json!("write_failed"), "an unwritten audit line is surfaced");
         assert_eq!(data["callId"], json!("k-1"));
         assert_eq!(data["disposition"], json!({ "delivery": "delivery_uncertain", "retry": "unsafe" }));
         let plain = refused_call(&Refusal::new(EngineCode::TransactionFailed, "marker_unavailable").into());
