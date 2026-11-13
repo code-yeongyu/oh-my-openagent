@@ -38,7 +38,6 @@ impl Session {
                 .map_err(HostCallError::Params)
                 .and_then(|p| self.ax_type_text(p).map(|r| json!(r)).map_err(HostCallError::Refused)),
             Method::AxSelectText => exec::<omo_computer_core::params::SelectTextParams>(self, params, Self::ax_select_text),
-            Method::AppsQuit => exec::<omo_computer_core::params::AppsQuitParams>(self, params, Self::apps_quit),
             Method::AxSnapshot => serde_json::from_value(params)
                 .map_err(HostCallError::Params)
                 .and_then(|p| self.ax_snapshot(p).map(|s| json!(s)).map_err(HostCallError::Refused)),

@@ -109,6 +109,27 @@ pub struct FakeScenario {
     pub typing_unit_ms: Option<u64>,
     // --- Row 21: the fake host's consent view handed to the engine at `session.open`. ---
     pub consent: Option<serde_json::Value>,
+    // --- Row 25: apps, system surfaces and the browser windows' focused URLs. ---
+    pub apps: Vec<FakeApp>,
+    /// Surface kind (`dock`, `start_menu`, ...) -> its element tree.
+    pub surfaces: BTreeMap<String, FakeAxNode>,
+    /// Window id -> the focused web area's URL; `null` scripts an unreadable one.
+    pub browser_urls: BTreeMap<String, Option<String>>,
+}
+
+/// One scripted `apps.list()` entry; its identity is the pid's scripted code identity.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FakeApp {
+    pub app_key: String,
+    pub name: String,
+    #[serde(default)]
+    pub pid: Option<u32>,
+    #[serde(default)]
+    pub running: bool,
+    pub source: omo_computer_core::listing::AppSource,
+    #[serde(default)]
+    pub path: Option<String>,
 }
 
 impl FakeScenario {

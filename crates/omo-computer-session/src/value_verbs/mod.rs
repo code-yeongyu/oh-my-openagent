@@ -21,7 +21,7 @@ pub enum Write {
     /// `ax.typeText` by AX insertion into a native text field.
     Insert { reference: String, text: String },
     /// `apps.quit`: the app's windows are read back as exited.
-    Quit { app: String },
+    Quit { app_key: String, pid: Option<u32>, force: bool },
     /// `ax.selectText`: a range in UTF-16 units.
     Select { reference: String, range: omo_computer_core::text_range::Utf16Range },
     /// `ax.perform`: a named action; never `confirmed` from a read-back (an observer event or a
@@ -83,22 +83,21 @@ impl Session {
     /// Sends `write` through the backend's accessibility half and, for a value write, reads the
     /// value back. An unanswered write (`AxUnconfirmed`) went out: one unit sent, the stroke
     /// ended uncertain.
-    pub(crate) fn send_write(&mut self, write: &Write) -> (Outcome, Option<ReadBack>) {
+    pub(crate) fn send_write(&mut self, write: &Write, tag: u64) -> (Outcome, Option<ReadBack>) {
         match write {
             Write::SetFrame { window, asked } => return self.send_frame(window, *asked),
             Write::Clipboard { text } => return (outcome_of(self.backend.clipboard_write(text).map(|()| omo_computer_core::backend::Delivered { count: 1, of: 1 })), None),
             Write::Paste { text, chord, restore } => return self.send_paste(text, chord, restore),
-            Write::Quit { app } => {
-                if let Err(refusal) = self.backend.quit_app(app) {
+            Write::Quit { app_key, pid, force } => {
+                let input = omo_computer_core::backend::TaggedInput {
+                    event: omo_computer_core::backend::InputEvent::AppQuit { app_key: app_key.clone(), force: *force },
+                    tag,
+                };
+                if let Err(refusal) = self.backend.post_input(&input, omo_computer_core::backend::Route::BackgroundPid) {
                     return (outcome_of(Err(refusal)), None);
                 }
-                let running = self
-                    .backend
-                    .windows(&omo_computer_core::backend::WindowFilter::default())
-                    .map(|list| list.windows.iter().any(|w| &w.app == app))
-                    .unwrap_or(true);
-                let read = Some(if running { "running" } else { "exited" }.to_owned());
-                return (Outcome { count: 1, of: 1, stop: None }, Some(ReadBack::judge("exited", read, Some("running".to_owned()))));
+                let _ = pid;
+                return (Outcome { count: 1, of: 1, stop: None }, None);
             }
             Write::Minimized { window, minimize } => {
                 let sent = self.backend.set_minimized(window, *minimize).map(|()| omo_computer_core::backend::Delivered { count: 1, of: 1 });
@@ -204,7 +203,6 @@ fn outcome_of(sent: Result<omo_computer_core::backend::Delivered, Refusal>) -> O
 
 mod dispatch;
 mod keys;
-mod quit;
 mod select;
 mod verbs;
 

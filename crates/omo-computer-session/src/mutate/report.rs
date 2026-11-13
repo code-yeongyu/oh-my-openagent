@@ -43,6 +43,8 @@ pub(super) struct Sent {
     pub(super) user_moved_on: bool,
     /// Row 24: a value verb's read-back verdict (disposition, evidence, next call).
     pub(super) read_back: Option<crate::value_verbs::ReadBack>,
+    /// Row 25: the browser window's URL could not be read under a non-empty `url_policy`.
+    pub(super) url_unknown: bool,
 }
 
 /// # Errors
@@ -77,6 +79,9 @@ pub(super) fn reply(
         audit_ids: sent.audit_id.into_iter().collect(),
         timings: None,
         evidence: sent.read_back.map(|r| r.evidence).unwrap_or_default(),
+        url_policy: sent
+            .url_unknown
+            .then_some(omo_computer_core::url_policy::UrlPolicyStamp::Unknown),
         observation: UntrustedText,
         paused: sent.paused,
         session: sent.session,
@@ -103,6 +108,7 @@ pub(crate) fn released_reply(mode: ReportMode, method: Method) -> Result<ExecRep
         target: None,
         user_moved_on: false,
         read_back: None,
+        url_unknown: false,
     };
     reply(mode, method, sent).map_err(|_| {
         super::Refused::from(omo_computer_core::backend::Refusal::bare(omo_computer_core::error::EngineCode::Internal))
@@ -123,6 +129,7 @@ pub(crate) fn refused_reply(method: Method, reason: omo_computer_core::report::R
         route: Route::BackgroundWindow.into(),
         hit: None,
         focus_restoration: None,
+        url_policy: None,
         opened_surfaces: Vec::new(),
         next_call: None,
         note: None,

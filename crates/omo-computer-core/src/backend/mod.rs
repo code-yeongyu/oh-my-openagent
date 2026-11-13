@@ -153,15 +153,6 @@ pub trait Backend: Send {
         None
     }
 
-    /// Row 24: quits the app (`apps.quit`); the gate has already refused the self set and the
-    /// protected table.
-    ///
-    /// # Errors
-    /// `AxUnsupported{perform_unsupported}` by default, with nothing sent.
-    fn quit_app(&mut self, _app: &str) -> BackendResult<Delivered> {
-        Err(Refusal::new(EngineCode::AxUnsupported, crate::error::Reason::PerformUnsupported.wire()))
-    }
-
     /// Row 24: `window.minimize` (`minimize: true`) or `window.restore` (`false`).
     ///
     /// # Errors
@@ -211,6 +202,13 @@ pub trait Backend: Send {
     /// wrote it (`design/d-safety.md` '## Approval and consent'). `None`: no host view, and the
     /// session keeps its default view.
     fn host_consent(&self) -> Option<serde_json::Value> {
+        None
+    }
+
+    // --- Row 25: menus, apps, system surfaces and the focused web area's URL. ---
+
+    /// The shell reads; `None` reads `AxUnsupported`.
+    fn shell_reader(&mut self) -> Option<&mut dyn crate::surface::ShellReader> {
         None
     }
 }

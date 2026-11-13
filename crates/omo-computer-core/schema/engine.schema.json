@@ -1212,6 +1212,18 @@
             "$ref": "#/$defs/Evidence"
           }
         },
+        "urlPolicy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UrlPolicyStamp"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Row 25: `\"unknown\"` when a browser window's URL could not be read under a non-empty\n`computer.url_policy` (the send was delivered, fail-open).",
+          "default": null
+        },
         "observation": {
           "$ref": "#/$defs/UntrustedText",
           "description": "Required on the wire: a report without `{untrustedText: true}` does not parse."
@@ -4415,6 +4427,48 @@
       ],
       "description": "`mcp`: the `--mcp` shim's consent view."
     },
+    "MenuItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "checked": {
+          "type": "boolean"
+        },
+        "accelerator": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "submenu": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "observation": {
+          "$ref": "#/$defs/UntrustedText"
+        }
+      },
+      "required": [
+        "label",
+        "enabled",
+        "checked",
+        "submenu",
+        "path",
+        "observation"
+      ],
+      "description": "One `menu.items()` record."
+    },
     "MenuItems": {
       "type": "object",
       "additionalProperties": false,
@@ -4422,7 +4476,7 @@
         "items": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/ElementInfo"
+            "$ref": "#/$defs/MenuItem"
           }
         },
         "truncated": {
@@ -7012,6 +7066,13 @@
         "untrustedText"
       ],
       "additionalProperties": false
+    },
+    "UrlPolicyStamp": {
+      "type": "string",
+      "enum": [
+        "unknown"
+      ],
+      "description": "The `urlPolicy` member of an `ActionReport`."
     },
     "UserActive": {
       "type": "object",

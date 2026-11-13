@@ -52,6 +52,10 @@ pub struct ReportParts {
     #[serde(default)]
     pub timings: Option<Timings>,
     pub evidence: Vec<Evidence>,
+    /// Row 25: `"unknown"` when a browser window's URL could not be read under a non-empty
+    /// `computer.url_policy` (the send was delivered, fail-open).
+    #[serde(default)]
+    pub url_policy: Option<crate::url_policy::UrlPolicyStamp>,
     /// Required on the wire: a report without `{untrustedText: true}` does not parse.
     pub observation: UntrustedText,
     /// What the admission waited for before the send.
@@ -94,6 +98,8 @@ pub struct ActionReport {
     #[serde(skip_serializing_if = "Option::is_none")]
     timings: Option<Timings>,
     evidence: Vec<Evidence>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    url_policy: Option<crate::url_policy::UrlPolicyStamp>,
     observation: UntrustedText,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     paused: Vec<Pause>,
@@ -197,6 +203,7 @@ impl ActionReport {
             audit_ids: parts.audit_ids,
             timings: parts.timings,
             evidence: parts.evidence,
+            url_policy: parts.url_policy,
             observation: parts.observation,
             paused: parts.paused,
             session: parts.session,

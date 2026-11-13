@@ -14,6 +14,7 @@ mod record;
 mod recovery;
 mod report;
 mod route;
+mod url;
 
 #[cfg(test)]
 mod tests;
@@ -131,6 +132,9 @@ pub(crate) struct Funnel {
     artifacts: Option<ArtifactStore>,
     secure: Box<dyn SecureProbe>,
     pub(crate) control: crate::grant::Control,
+    // Row 25: the hand's `computer.url_policy` and the last call's unknown-URL stamp.
+    pub(crate) url_policy: omo_computer_core::url_policy::UrlPolicy,
+    pub(crate) url_unknown: bool,
     #[cfg(test)]
     warned: Vec<String>,
 }
@@ -181,6 +185,8 @@ impl Funnel {
             artifacts,
             secure: Box::new(SecureInputProbe),
             control: crate::grant::Control::default(),
+            url_policy: omo_computer_core::url_policy::UrlPolicy::default(),
+            url_unknown: false,
             #[cfg(test)]
             warned: Vec::new(),
         }
@@ -219,6 +225,12 @@ impl Funnel {
                 )))
             }
         }
+    }
+
+    /// Row 25: `computer.url_policy` from the session's settings (absent is the empty table).
+    pub(crate) fn set_url_policy(&mut self, request: &omo_computer_core::requests::SessionOpenRequest) {
+        let hosts = request.config.as_ref().and_then(|config| config.consent.url_policy.clone());
+        self.url_policy = omo_computer_core::url_policy::UrlPolicy::new(hosts.unwrap_or_default());
     }
 
     pub(crate) fn set_session_id(&mut self, id: String) {
