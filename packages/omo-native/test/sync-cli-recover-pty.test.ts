@@ -46,6 +46,9 @@ posix("#given the enrolled phrase typed on a real pty #when omo sync recover run
   expect(r.stdout).toContain("recovered")
   const written = tokens(`${r.stdout}\n${r.stderr}`)
   expect(ENROLLED.filter((word) => written.has(word))).toEqual([])
+  // Echo stays off while the phrase is typed (review LOW, #13338): no typed word appears on the terminal either.
+  const screen = tokens(r.screen)
+  expect(ENROLLED.filter((word) => screen.has(word))).toEqual([])
 }, 60_000)
 
 posix("#given a mistyped phrase twice then Ctrl+C #when omo sync recover runs #then the typo reason is shown on the terminal only and nothing is recovered", async () => {
@@ -76,13 +79,20 @@ for (const marker of ["PI_CODING_AGENT", "AI_AGENT", "CI"] as const) {
   }, 60_000)
 }
 
-posix("#given no controlling terminal (setsid, stdin piped with the phrase) #when omo sync recover runs #then it refuses with exit 2 and never reads stdin", async () => {
+// Detaches from any controlling terminal with Python's os.setsid (macOS ships no `setsid` binary; review MEDIUM,
+// #13338): fork so the child is never a group leader, start a new session, then exec the fixture.
+const DETACH = "import os, sys\nif os.fork():\n    _, status = os.wait()\n    sys.exit(os.waitstatus_to_exitcode(status))\nos.setsid()\nos.execvp(sys.argv[1], sys.argv[1:])"
+
+posix("#given no controlling terminal (new session, the phrase piped on stdin) #when omo sync recover runs #then it refuses with exit 2 before asking for a phrase and no piped word reaches its output", async () => {
   const dir = await mkdtemp(join(tmpdir(), "omo-recover-notty-"))
   dirs.push(dir)
-  const child = Bun.spawn(["setsid", "-w", "bun", join(import.meta.dir, "fixtures/sync-recover-phrase-pty.fixture.ts")], {
+  const child = Bun.spawn(["python3", "-c", DETACH, "bun", join(import.meta.dir, "fixtures/sync-recover-phrase-pty.fixture.ts")], {
     stdin: new TextEncoder().encode(`${ENROLLED.join(" ")}\n`),
     stdout: "pipe",
     stderr: "pipe",
+    // Its own kill deadline (review LOW, #13338), so a hang never outlives the test.
+    timeout: 30_000,
+    killSignal: "SIGKILL",
     env: { ...process.env, TMPDIR: dir, PI_CODING_AGENT: undefined, AI_AGENT: undefined, CI: undefined },
   })
   const [exit, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
