@@ -98,8 +98,10 @@ export function fakeTool(
     calls: 0,
     async execute(_id: string, input: Readonly<Record<string, unknown>>) {
       tool.calls += 1
-      const value: unknown = await new AsyncFunction("desktop", String(input.code))(
+      const value: unknown = await new AsyncFunction("desktop", "setTimeout", "setInterval", String(input.code))(
         facade(sent, refuse, listing, hit, windowAfter),
+        undefined,
+        undefined,
       )
       return { details: { value } }
     },

@@ -123,11 +123,8 @@ function actionLines(cell: Cell, target: FixtureTarget): string[] {
 
 // The shipped runtime matches `app` against the engine's own app name for the window (not the fixture's display
 // name), so the window is found by its exact title; a miss records the windows the engine listed, as evidence.
-// A fixture process reports itself ready before the window server lists its window on every OS (measured on hosted
-// macOS: the first cell found it, the next cells, each on a fresh fixture, did not), so the lookup waits for it within
-// a bound before it records the miss.
-const WINDOW_POLL_MS = 100
-
+// A fixture process reports itself ready before the window server lists its window (measured on hosted macOS), so the
+// lookup asks again until a bound. The release's run sandbox has no timers, so each engine call paces the loop.
 function windowLookup(target: FixtureTarget, waitMs: number): string[] {
   const title = JSON.stringify(target.title)
   return [
@@ -136,7 +133,6 @@ function windowLookup(target: FixtureTarget, waitMs: number): string[] {
     `const waitUntil = waitStarted + ${waitMs}`,
     "let record = await lookUp()",
     "while (record === undefined && Date.now() < waitUntil) {",
-    `  await new Promise((done) => setTimeout(done, ${WINDOW_POLL_MS}))`,
     "  record = await lookUp()",
     "}",
     "resolved.windowWaitMs = Date.now() - waitStarted",
