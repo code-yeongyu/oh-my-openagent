@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test"
-import { classify, type Ledgers, type Outcome } from "./replay-owners"
+import { join, relative } from "node:path"
+import { casesIn, ROOT } from "./replay-case"
+import { classify, type Ledgers, type Outcome, readLedgers } from "./replay-owners"
 
 const DIR = "crates/omo-computer-core/fixtures/conformance"
+const V1 = "crates/omo-computer-engine/tests/fixtures/v1-consumers"
 const OLD = "fixtures/old-corpus"
 const tsv = (...rows: string[][]) => rows.map((row) => row.join("\t")).join("\n") + "\n"
 
@@ -37,6 +40,8 @@ const LEDGERS: Ledgers = {
     ["C6", "`v3-later.json` is owed", "16", "40", "owed"],
     ["C7", "`leg-23.json` replays", "20", "23", "owed"],
     ["C7", "`leg-17.json` replays", "16", "17", "owed"],
+    ["T1", `replay of the imported case \`${V1}/02-owned.json\` exits 0`, "20", "28", "owed"],
+    ["T1", "replay of `crates/other/fixtures/03-elsewhere.json` exits 0", "20", "28", "owed"],
   ),
 }
 
@@ -112,6 +117,22 @@ describe("R57 replay-all classification", () => {
     expect(verdict("orphan.json")).toBe(`FAIL ${DIR}/orphan.json unowned`)
     expect(verdict("pending.json")).toBe(`FAIL ${DIR}/pending.json unowned`)
     expect(verdict("never-imported.json")).toBe(`FAIL ${DIR}/never-imported.json unowned`)
+  })
+
+  test("(b) a leg owns a case outside the conformance dir by its path, not by a same-named file elsewhere", () => {
+    const v1 = (file: string) => classify(20, [{ name: `${V1}/${file}`, status: "failed" }], LEDGERS, PLAN).lines[0]
+    expect(v1("02-owned.json")).toBe(`owed ${V1}/02-owned.json row 28`)
+    expect(v1("03-elsewhere.json")).toBe(`FAIL ${V1}/03-elsewhere.json unowned`)
+    expect(v1("04-unowned.json")).toBe(`FAIL ${V1}/04-unowned.json unowned`)
+  })
+
+  test("(c) the parity ledgers owe every v1-consumers case to a later row at row 20", async () => {
+    const ledgers = await readLedgers(join(ROOT, "crates/omo-computer-core/parity"))
+    const cases = (await casesIn(join(ROOT, V1))).map((path) => relative(ROOT, path))
+    expect(cases.length).toBeGreaterThan(0)
+    const outcomes = cases.map((name): Outcome => ({ name, status: "failed" }))
+    const { lines } = classify(20, outcomes, ledgers, PLAN)
+    for (const [i, name] of cases.entries()) expect(lines[i]).toStartWith(`owed ${name} row `)
   })
 
   test("the summary counts every outcome and only the failing set fails the run", () => {
