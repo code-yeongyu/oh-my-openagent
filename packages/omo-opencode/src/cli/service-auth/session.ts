@@ -73,7 +73,7 @@ export type BeforeKeysDiscarded = ((discarded: DiscardedCredential) => Promise<v
 export type MachineDeviceState =
   | { readonly kind: "absent" }
   | { readonly kind: "held"; readonly device: { readonly id: string; readonly name: string } }
-  | { readonly kind: "unknown"; readonly reason: string }
+  | { readonly kind: "unknown"; readonly reason: string; readonly endpoint?: string }
 
 export type DeviceServiceHandoff = {
   readonly adopt: (credentials: Credentials) => Promise<void>

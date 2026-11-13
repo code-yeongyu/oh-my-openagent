@@ -15,7 +15,6 @@ export function withClosedDeviceLoginOptions(command: Command): Command {
     .option("--device")
     .option("--no-browser")
     .option("--api <url>")
-    .option("--new-device")
 }
 
 /** The device flow runs only for `--device` or `--no-browser` with nothing else left over (no operand, no unknown option). */
