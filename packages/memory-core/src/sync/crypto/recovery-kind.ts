@@ -19,7 +19,8 @@ export type RecoveryKey = PasskeyRecoveryKey | PhraseRecoveryKey
 
 export const isPhraseKey = (key: RecoveryKey): key is PhraseRecoveryKey => key.survivable === "phrase"
 
-const RESERVED_RP_PREFIX = "omo-sync/"
+/** The rp_id namespace reserved for OmO-defined recovery kinds; no passkey and no PRF salt may use it. */
+export const RESERVED_RP_PREFIX = "omo-sync/"
 const PHRASE_CREDENTIAL_BYTES = 16
 
 const decodesTo = (text: string, length: number): boolean => {

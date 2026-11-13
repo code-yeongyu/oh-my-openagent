@@ -1,3 +1,4 @@
+import { RESERVED_RP_PREFIX } from "../crypto/recovery-kind.ts"
 import type { RecoverySaltInput, RecoveryTransport } from "./ports.ts"
 
 /**
@@ -20,7 +21,7 @@ type ServedKey = { readonly salt: RecoverySaltInput; readonly prf: boolean }
 const prfCapable = (value: unknown): boolean => {
   const rpId: unknown = Reflect.get(Object(value), "rp_id")
   return (
-    Reflect.get(Object(value), "survivable") !== "phrase" && !(typeof rpId === "string" && rpId.startsWith("omo-sync/"))
+    Reflect.get(Object(value), "survivable") !== "phrase" && !(typeof rpId === "string" && rpId.startsWith(RESERVED_RP_PREFIX))
   )
 }
 

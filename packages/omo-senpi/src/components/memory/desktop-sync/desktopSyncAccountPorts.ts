@@ -23,7 +23,7 @@ const stateReply = z.object({
   head: z.object({ seq: SyncInteger, link: z.string(), keyring_link: z.string() }),
   current_epoch: SyncInteger,
   rotation_pending: z.boolean(),
-  phrase_client_floor: z.boolean().optional(),
+  accepts_phrase_keys: z.boolean().optional(),
 })
 
 type AppendRequest = Parameters<AccountHttp["appendKeys"]>[0]
@@ -68,7 +68,7 @@ export function desktopSyncAccountPorts(
           head: state.head,
           currentEpoch: state.current_epoch,
           rotationPending: state.rotation_pending,
-          phraseClientFloor: state.phrase_client_floor === true,
+          acceptsPhraseKeys: state.accepts_phrase_keys === true,
         }
       },
       appendKeys: (request) => append("appendKeys", request),
