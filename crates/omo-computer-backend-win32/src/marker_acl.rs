@@ -1,7 +1,8 @@
 //! The stop marker and resume token are owner-only (d-windows.md '## Identity and permissions',
 //! Per-user resources; acceptance 29): a PROTECTED DACL (no inherited ACE) granting full access to
-//! the user's SID and SYSTEM and nobody else, read back after every write. The daemon starts
-//! STOPPED when the marker cannot be read back owner-only.
+//! the user's SID and SYSTEM and nobody else, read back after every write. This row builds the
+//! apply and read-back; starting the daemon STOPPED when the read-back is not owner-only is owed to
+//! row 60 (the Windows daemon), recorded in DEFERRED-LEGS.tsv.
 
 /// The SDDL of the owner-only DACL for `user_sid`.
 #[must_use]
