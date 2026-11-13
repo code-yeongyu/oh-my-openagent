@@ -2,7 +2,7 @@
 // Replays one corpus case against an engine binary the way a consumer drives it.
 //
 //   bun script/qa/computer/replay.ts --engine <binary> --case <file> [--case <file> ...] [--dir <dir> ...]
-//                                    [--assert-sink-empty] [--deltas <tsv>]
+//                                    [--assert-sink-empty] [--deltas <tsv>] [--row <N> --plan <plan.md>]
 //
 // Every reply is deep-compared with the case's expected messages modulo the case's `variable`
 // JSON pointers and the lines of ORACLE-DELTAS.tsv (row 3's rule: an `additive` line accepts an
@@ -19,8 +19,9 @@
 // file must exist, else `REPLAY_ERROR supersedes_missing` (exit 2, nothing replayed), and an old case
 // in the list is not replayed but prints `SKIPPED <old> superseded by <new>`. The superseding case
 // itself always replays, and the list exits with the worst code of the cases it replayed.
-// With `--row <N>` (a `--dir` run) the list then classifies every case that did not replay clean
-// by ruling R57 (replay-owners.ts) and prints `FAIL <case> <reason>` or `owed <case> row <M>` per
+// With `--row <N> --plan <plan.md>` (a `--dir` run) the list then classifies every case that did not
+// replay clean by ruling R57 (replay-owners.ts; due-ness follows the plan's `Blocked by:` ancestry of
+// row N, ruling R57e) and prints `FAIL <case> <reason>` or `owed <case> row <M>` per
 // case and the summary `replay-all R57 row=<N>: ok=.. skipped=.. failing=.. owed=..`; it exits 1
 // when any case fails, else 0.
 // Every case runs in a fresh temporary runtime dir (OMO_COMPUTER_RUNTIME_DIR) that is removed
@@ -66,7 +67,7 @@ type Options = {
   readonly dirs: readonly string[]
   readonly deltas: string
   readonly assertSinkEmpty: boolean
-  readonly row: number | undefined
+  readonly row: { readonly n: number; readonly plan: string } | undefined
 }
 
 function args(argv: readonly string[]): Options {
@@ -81,14 +82,16 @@ function args(argv: readonly string[]): Options {
   const dirs = values("--dir")
   if (!engine || (cases.length === 0 && dirs.length === 0))
     throw new InputError(
-      "usage: replay.ts --engine <binary> --case <file> [--case <file> ...] [--dir <dir> ...] [--assert-sink-empty] [--deltas <tsv>] [--row <N>]",
+      "usage: replay.ts --engine <binary> --case <file> [--case <file> ...] [--dir <dir> ...] [--assert-sink-empty] [--deltas <tsv>] [--row <N> --plan <plan.md>]",
     )
   const rowArg = value("--row")
-  const row = rowArg === undefined ? undefined : Number(rowArg)
-  if (row !== undefined && !(Number.isInteger(row) && row > 0 && dirs.length > 0))
-    throw new InputError("--row needs a row number and a --dir")
+  const n = rowArg === undefined ? undefined : Number(rowArg)
+  const plan = value("--plan")
+  if (n !== undefined && !(Number.isInteger(n) && n > 0 && dirs.length > 0 && plan))
+    throw new InputError("--row needs a row number, a --dir and a --plan")
+  if (n === undefined && plan !== undefined) throw new InputError("--plan is used only with --row")
   return {
-    row,
+    row: n === undefined || plan === undefined ? undefined : { n, plan: resolve(plan) },
     engine: resolve(engine),
     cases: cases.map((file) => resolve(file)),
     dirs: dirs.map((dir) => resolve(dir)),
@@ -122,7 +125,8 @@ async function replay(argv: readonly string[]): Promise<number> {
     outcomes.push({ name: caseName(casePath), status: caseCode === 0 ? "ok" : "failed" })
   }
   if (opts.row === undefined) return code
-  const verdict = classify(opts.row, outcomes, await readLedgers(join(ROOT, "crates/omo-computer-core/parity")))
+  const ledgers = await readLedgers(join(ROOT, "crates/omo-computer-core/parity"))
+  const verdict = classify(opts.row.n, outcomes, ledgers, await readText(opts.row.plan, "plan file"))
   console.log(verdict.lines.join("\n"))
   return verdict.failing > 0 ? 1 : 0
 }
