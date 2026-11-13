@@ -63,8 +63,10 @@ namespace ConformanceFixture
             body.Controls.Add(Drag);
             longList.Width = 600;
             for (int row = 1; row <= LongRows; row++) longList.Items.Add("Row " + row);
-            body.Controls.Add(longList);
+            // Mark done sits above the long list: the 640x720 client scrolls, and everything a pixel
+            // driver aims at must be inside the client rect without scrolling (the geometry leg checks it).
             AddButton("Mark done", OnMarkDone);
+            body.Controls.Add(longList);
             Saved = DocumentState();
         }
 
