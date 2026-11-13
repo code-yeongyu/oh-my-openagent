@@ -7,7 +7,18 @@ import { catalogFor } from "../catalog.ts"
 import type { Cell } from "../vocabulary.ts"
 import { createLegacyDriver } from "./legacy.ts"
 import { fakeTool, fixtures, observer, type Sent } from "./legacy-facade.ts"
-import { hostScope } from "./legacy-fixtures.ts"
+import { hostFixtures, hostScope } from "./legacy-fixtures.ts"
+
+test("a Windows web-view cell runs only when the workflow names the built web-view fixture", () => {
+  const webviewCell = catalogFor("windows", "console").find((c) => c.toolkit === "webview")
+  if (webviewCell === undefined) throw new Error("the Windows catalog has no web-view cell")
+  const env = { OMO_CONFORMANCE_FIXTURE_EXE: "fixture.exe" }
+  const without = hostFixtures("win32", env, () => sessionDir)
+  const named = hostFixtures("win32", { ...env, OMO_CONFORMANCE_WEBVIEW_EXE: "web.exe" }, () => sessionDir)
+  if (!("ready" in without) || !("ready" in named)) throw new Error("the Windows fixtures did not load")
+  expect("unavailable" in without.ready.target(webviewCell)).toBe(true)
+  expect("unavailable" in named.ready.target(webviewCell)).toBe(false)
+})
 
 const cells = catalogFor("x11", "xorg")
 const sessionDir = mkdtempSync(join(tmpdir(), "legacy-scope-test-"))
