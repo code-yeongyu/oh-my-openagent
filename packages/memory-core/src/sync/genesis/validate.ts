@@ -1,4 +1,4 @@
-import { parseBody, parsePrincipal } from "../crypto/parse.ts"
+import { parseBody, parsePrincipal, recoveryKindOf } from "../crypto/parse.ts"
 import { decodeB64, deviceIdOf, isStrongKeyText, taggedHash, verifyTagged } from "../crypto/signatures.ts"
 import { jcsBytes, sha256B64 } from "../crypto/vendor/sync-format/jcs.ts"
 import { GenesisBuildError, type GenesisBootstrap, type GenesisPrepared } from "./types.ts"
@@ -34,7 +34,7 @@ export const validateBootstrap = async (bootstrap: GenesisBootstrap): Promise<vo
     decodeB64(recovery.enrollment_nonce, 32) === null ||
     decodeB64(recovery.sealing_public_key, 32) === null ||
     !isStrongKeyText(recovery.signing_public_key) ||
-    (recovery.survivable !== "synced" && recovery.survivable !== "roaming") ||
+    recoveryKindOf(recovery.survivable, recovery.rp_id, recovery.credential_id) === null ||
     (await deviceIdOf(first.signing_public_key)) !== first.id
   ) {
     throw new GenesisBuildError("bad_bootstrap")

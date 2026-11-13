@@ -64,8 +64,8 @@ const forkRefusal = (
   if (common === undefined || common.digest !== evidence.common.digest) {
     return "fork_common_unknown";
   }
-  // A resolution re-folds the chain through its common ancestor once per branch: its cost is the
-  // fork's, never paid by the entries around it.
+  // A resolution re-folds the chain through its common ancestor for each branch, and its proof
+  // (receive.ts) once per evidence record: that cost is the fork's, never paid by other entries.
   const ancestry = doneThrough(state, common.seq);
   // A branch record the receiver would refuse is not skipped: it refuses the whole evidence.
   for (const branch of evidence.branches) {

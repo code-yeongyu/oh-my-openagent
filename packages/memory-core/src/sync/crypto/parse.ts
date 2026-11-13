@@ -1,20 +1,21 @@
 import type { KeyringBody } from "./entry.ts"
+import { PHRASE_RECOVERY_RP_ID, type RecoveryKey, recoveryKindOf } from "./recovery-kind.ts"
 import type { JsonValue } from "./vendor/sync-format/jcs.ts"
+
+export {
+  isPhraseKey,
+  type PasskeyRecoveryKey,
+  PHRASE_RECOVERY_RP_ID,
+  type PhraseRecoveryKey,
+  type RecoveryKey,
+  recoveryKindOf,
+} from "./recovery-kind.ts"
 
 export type Principal = {
   readonly kind: "device"
   readonly id: string
   readonly sealing_public_key: string
   readonly signing_public_key: string
-}
-
-export type RecoveryKey = {
-  readonly credential_id: string
-  readonly rp_id: string
-  readonly enrollment_nonce: string
-  readonly sealing_public_key: string
-  readonly signing_public_key: string
-  readonly survivable: "synced" | "roaming"
 }
 
 export type ParsedBody =
@@ -100,19 +101,24 @@ export const parsePrincipal = (value: JsonValue | undefined): Principal | null =
 }
 
 const readRecoveryKey = (value: JsonObject): RecoveryKey | null => {
-  const survivable = value["survivable"]
-  if (survivable !== "synced" && survivable !== "roaming") return null
-  const fields = RECOVERY_KEYS.slice(0, 5).map((key) => text(value, key))
-  const [credentialId, rpId, nonce, sealing, signing] = fields
-  if (fields.some((field) => field === null)) return null
-  return {
-    credential_id: credentialId ?? "",
-    rp_id: rpId ?? "",
-    enrollment_nonce: nonce ?? "",
-    sealing_public_key: sealing ?? "",
-    signing_public_key: signing ?? "",
-    survivable,
-  }
+  const credentialId = text(value, "credential_id")
+  const rpId = text(value, "rp_id")
+  const nonce = text(value, "enrollment_nonce")
+  const sealing = text(value, "sealing_public_key")
+  const signing = text(value, "signing_public_key")
+  if (credentialId === null || rpId === null || nonce === null || sealing === null || signing === null) return null
+  const kind = recoveryKindOf(value["survivable"], rpId, credentialId)
+  if (kind === null) return null
+  const ordered = (rp_id: string) => ({
+    credential_id: credentialId,
+    rp_id,
+    enrollment_nonce: nonce,
+    sealing_public_key: sealing,
+    signing_public_key: signing,
+  })
+  return kind === "phrase"
+    ? { ...ordered(PHRASE_RECOVERY_RP_ID), rp_id: PHRASE_RECOVERY_RP_ID, survivable: kind }
+    : { ...ordered(rpId), survivable: kind }
 }
 
 const parseGenesis = (body: JsonObject): ParsedBody | null => {

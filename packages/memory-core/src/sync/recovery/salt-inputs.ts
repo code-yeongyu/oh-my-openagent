@@ -14,15 +14,25 @@ export type ServedSalts =
       readonly reason: "unavailable" | "too-many-recovery-keys"
     }
 
-const saltOf = (value: unknown): RecoverySaltInput | null => {
+type ServedKey = { readonly salt: RecoverySaltInput; readonly prf: boolean }
+
+/** A phrase key, or anything in the reserved `omo-sync/` rp namespace, is never a PRF salt input (contract F12). */
+const prfCapable = (value: unknown): boolean => {
+  const rpId: unknown = Reflect.get(Object(value), "rp_id")
+  return (
+    Reflect.get(Object(value), "survivable") !== "phrase" && !(typeof rpId === "string" && rpId.startsWith("omo-sync/"))
+  )
+}
+
+const saltOf = (value: unknown): ServedKey | null => {
   const credentialId: unknown = Reflect.get(Object(value), "credential_id")
   const enrollmentNonce: unknown = Reflect.get(Object(value), "enrollment_nonce")
   return typeof credentialId === "string" && typeof enrollmentNonce === "string"
-    ? { credentialId, enrollmentNonce }
+    ? { salt: { credentialId, enrollmentNonce }, prf: prfCapable(value) }
     : null
 }
 
-const saltFromRow = (row: unknown): RecoverySaltInput | null => {
+const saltFromRow = (row: unknown): ServedKey | null => {
   const body: unknown = Reflect.get(Object(row), "body")
   const kind: unknown = Reflect.get(Object(body), "kind")
   if (kind === "genesis") return saltOf(Reflect.get(Object(Reflect.get(Object(body), "bootstrap")), "recovery_key"))
@@ -47,15 +57,15 @@ const removedCredential = (row: unknown): string | null => {
 export const servedSaltInputs = async (transport: RecoveryTransport): Promise<ServedSalts> => {
   const keys: unknown = await transport.listKeys()
   if (!Array.isArray(keys)) return { ok: false, reason: "unavailable" }
-  const found = new Map<string, RecoverySaltInput>()
+  const found = new Map<string, ServedKey>()
   const removed = new Set<string>()
   for (const row of keys) {
     const removal = removedCredential(row)
     if (removal !== null) removed.add(removal)
-    const salt = saltFromRow(row)
-    if (salt !== null && !found.has(salt.credentialId)) found.set(salt.credentialId, salt)
+    const served = saltFromRow(row)
+    if (served !== null && !found.has(served.salt.credentialId)) found.set(served.salt.credentialId, served)
   }
   for (const credentialId of removed) found.delete(credentialId)
   if (found.size > MAX_RECOVERY_KEYS) return { ok: false, reason: "too-many-recovery-keys" }
-  return { ok: true, salts: [...found.values()] }
+  return { ok: true, salts: [...found.values()].filter((served) => served.prf).map((served) => served.salt) }
 }

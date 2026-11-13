@@ -1,6 +1,7 @@
 import { z } from "zod"
 import { creatorAnchor } from "../crypto/anchor.ts"
 import { appendEntries, emptyChain } from "../crypto/chain.ts"
+import { PHRASE_RECOVERY_RP_ID, recoveryKindOf } from "../crypto/parse.ts"
 import type { KeyringEntry } from "../crypto/entry.ts"
 import { envelopeRefusal } from "../crypto/envelope.ts"
 import { nextLink } from "../crypto/links.ts"
@@ -21,14 +22,18 @@ const principal = z.strictObject({
   sealing_public_key: z.string(),
   signing_public_key: z.string(),
 })
-const recovery = z.strictObject({
+const keyFields = {
   credential_id: z.string(),
-  rp_id: z.string(),
   enrollment_nonce: z.string(),
   sealing_public_key: z.string(),
   signing_public_key: z.string(),
-  survivable: z.enum(["synced", "roaming"]),
-})
+}
+const recovery = z
+  .union([
+    z.strictObject({ ...keyFields, rp_id: z.string(), survivable: z.enum(["synced", "roaming"]) }),
+    z.strictObject({ ...keyFields, rp_id: z.literal(PHRASE_RECOVERY_RP_ID), survivable: z.literal("phrase") }),
+  ])
+  .refine((key) => recoveryKindOf(key.survivable, key.rp_id, key.credential_id) !== null)
 const wrap = z.strictObject({ epoch: z.literal(1), id: z.string(), wrap: z.string() })
 const request = z.strictObject({
   record: z.strictObject({
