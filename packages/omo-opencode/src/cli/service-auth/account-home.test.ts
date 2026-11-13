@@ -11,6 +11,7 @@ import {
   lockDirectoryIn,
   type PlatformFacts,
   systemAccountFacts,
+  systemPlatformFacts,
   TEST_LOCK_HOME_ENV,
   testLockHome,
   useAccountFacts,
@@ -146,6 +147,20 @@ describe("userRecordHome reads the OS user record, never the environment", () =>
   test("a platform without a user record lookup names none", () => {
     expect(userRecordHome(platform({ platform: "freebsd" }))).toBeUndefined()
   })
+
+  // The Windows lookup below is proven only with injected facts; this test runs the real
+  // whoami.exe / reg.exe lookup on the Windows runner (#12995). It stays skipped elsewhere.
+  test.skipIf(process.platform !== "win32")(
+    "win32: the real lookup reads the registry profile path on the Windows runner",
+    () => {
+      // given: the real System32 tools and registry on this host, no injected facts
+      // when
+      const home = userRecordHome(systemPlatformFacts)
+      // then
+      expect(home).toMatch(/^[A-Za-z]:[\\/]/)
+      expect(home).not.toContain("%")
+    },
+  )
 })
 
 function facts(
@@ -213,6 +228,12 @@ describe("the test-only lock home a test hands a CLI child (#12978 review)", () 
   test("an empty or relative value is ignored", () => {
     for (const value of [undefined, "", "relative/home"])
       expect(testLockHome({ [TEST_LOCK_HOME_ENV]: value }, marked)).toBeUndefined()
+  })
+
+  test("a rooted path without a drive, or a UNC path, is ignored", () => {
+    for (const value of ["\\\\tmp\\child-home", "\\\\server\\share\\child-home"])
+      expect(testLockHome({ [TEST_LOCK_HOME_ENV]: value }, marked)).toBeUndefined()
+    expect(testLockHome({ [TEST_LOCK_HOME_ENV]: "C:/tmp/child-home" }, marked)).toBe("C:/tmp/child-home")
   })
 })
 

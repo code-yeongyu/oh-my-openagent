@@ -78,13 +78,21 @@ function windowsProfile(facts: PlatformFacts): string | undefined {
   return home !== undefined && !home.includes("%") && win32.isAbsolute(home) ? home : undefined
 }
 
+// A path that names a location without depending on the process's current drive or directory.
+// On Windows only a drive-absolute path qualifies: a rooted path without a drive (\\tmp\\x) is
+// drive-relative, and a UNC path names a share rather than a local drive.
+const DRIVE_ABSOLUTE = /^[A-Za-z]:[\\/]/
+export function isDriveAbsolutePath(path: string): boolean {
+  return DRIVE_ABSOLUTE.test(path)
+}
+
 // Windows searches the current directory before PATH for a bare command name, so `whoami` or `reg` would run a
 // whoami.exe or reg.exe planted in the repository omo starts in. Only the copy in %SystemRoot%\System32 runs, and only
 // when SystemRoot is a drive-absolute path without `..` and the tool exists there; otherwise there is no lookup and the
 // lock stays under homedir().
 function system32Tool(facts: PlatformFacts, name: "whoami.exe" | "reg.exe"): string | undefined {
   const root = facts.env.SystemRoot
-  if (root === undefined || !/^[A-Za-z]:[\\/]/.test(root) || root.split(/[\\/]/).includes("..")) return undefined
+  if (root === undefined || !isDriveAbsolutePath(root) || root.split(/[\\/]/).includes("..")) return undefined
   const tool = win32.join(root, "System32", name)
   return facts.isFile(tool) ? tool : undefined
 }
@@ -147,7 +155,7 @@ const INJECTED_SECRETS = Symbol.for("omo.test.injectedSecrets")
  */
 export function testLockHome(env: Readonly<Record<string, string | undefined>>, secrets: unknown): string | undefined {
   const home = env[TEST_LOCK_HOME_ENV]
-  if (home === undefined || !(posix.isAbsolute(home) || win32.isAbsolute(home))) return undefined
+  if (home === undefined || !(posix.isAbsolute(home) || isDriveAbsolutePath(home))) return undefined
   const marked =
     typeof secrets === "object" &&
     secrets !== null &&
