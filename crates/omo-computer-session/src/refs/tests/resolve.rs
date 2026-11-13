@@ -151,3 +151,25 @@ fn live_twins_get_fresh_distinct_tokens_and_a_secure_twin_shows_role_and_ref_onl
         assert!(refs.locate(&again, true).is_ok(), "{again} after the new observation");
     }
 }
+
+/// Review L2 (#13368, ruling R70z, the checker's falsifier): the fresh candidate tokens identify,
+/// they do not license an act. After `AmbiguousTarget` the window's exec gate refuses until a
+/// new full observation; the sub-generation the failing resolve minted does not count as one.
+#[test]
+fn an_act_after_ambiguous_target_waits_for_a_new_observe() {
+    let twins = vec![el("button", "Send").obj(20).at(5.0, 0.0), el("button", "Send").obj(21).at(9.0, 0.0)];
+    let mut tree = Tree::default().window("w", 1, vec![window(vec![el("button", "Send").at(0.0, 0.0)]), window(twins)]);
+    let mut refs = RefRegistry::default();
+    let g1 = snap(&mut tree, &mut refs, "w");
+    let token = format!("s{g1}:e{}", n_of(&refs, "w", g1, "Send"));
+    tree.show("w", 1);
+    let ambiguous = refs.resolve(&token, true, &mut tree).expect_err("two live twins");
+    assert_eq!(ambiguous.refusal, Refusal::bare(EngineCode::AmbiguousTarget));
+    assert_eq!(
+        refs.exec_gate("w"),
+        Err(refusal(EngineCode::ControlRequired, Reason::NeedsObserve)),
+        "no act on a candidate's fresh token before a new observe"
+    );
+    snap(&mut tree, &mut refs, "w");
+    assert_eq!(refs.exec_gate("w"), Ok(()), "a new full observation lifts it");
+}
