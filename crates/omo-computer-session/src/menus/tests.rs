@@ -179,6 +179,26 @@ fn url_policy_denied_host_refuses_before_send() {
     assert_eq!(sent(&sink).len(), 3);
 }
 
+/// Review M2 of #13347: the deny list holds for the window a point lands in, not only for a
+/// named window target. A desktop click (no target) at a point inside the denied-host browser
+/// window is refused `url_policy` with nothing sent.
+#[test]
+fn url_policy_holds_for_a_desktop_point_landing_in_a_denied_window() {
+    let (mut s, sink) = bank(json!({ "101": "https://pay.bank.example/x" }), json!(["*.bank.example"]));
+    s.capture(params(json!({ "target": "desktop" }))).expect("capture the desktop");
+    s.control_grant(params(json!({ "reason": "desktop input" })));
+    let refused = s
+        .click(params(json!({ "x": 300, "y": 300 })))
+        .expect_err("the point lands in window 101");
+    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("ControlRequired", Some("url_policy")));
+    assert!(sent(&sink).is_empty(), "{:?}", sent(&sink));
+    let (mut s, sink) = bank(json!({ "101": "https://pay.bank.example/x" }), json!(["*.bank.example"]));
+    s.capture(params(json!({ "target": "desktop" }))).expect("capture the desktop");
+    s.control_grant(params(json!({ "reason": "desktop input" })));
+    assert!(s.click(params(json!({ "x": 10, "y": 10 }))).is_ok(), "a point on no window reads no URL");
+    assert!(!sent(&sink).is_empty());
+}
+
 #[test]
 fn url_policy_unreadable_delivers_stamped_unknown() {
     let (mut s, sink) = bank(json!({ "101": null }), json!(["*.bank.example"]));

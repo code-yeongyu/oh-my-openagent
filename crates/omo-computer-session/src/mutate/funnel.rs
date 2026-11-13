@@ -37,7 +37,7 @@ impl Session {
         let epoch = self.guard.supervisor().stop_epoch();
         let call = (mutation.method, &mutation.call.target, mutation.route);
         let mut plan = self.funnel.control.plan(self.backend.as_mut(), call, epoch);
-        let url = super::url::check(&self.funnel.url_policy, self.backend.as_mut(), &mutation.call.target);
+        let url = super::url::check(&self.funnel.url_policy, self.backend.as_mut(), &mutation.call);
         plan.stages.consequential = url.refusal;
         plan.stages.targets = mutation.targets.clone();
         self.funnel.url_unknown = url.unknown;
