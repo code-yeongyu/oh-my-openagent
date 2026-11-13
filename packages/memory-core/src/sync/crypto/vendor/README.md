@@ -4,7 +4,9 @@ Source: `sisyphuslabs/omo-service`, commit `e39e23ad1fbe19a39ffd9f5d8d9a867f372c
 (`main`: the recovery-phrase kind, #1026/#1029/#1045 as merged). `sync-format/index.ts` and
 `sync-format/keys.ts` stay at `5de1455489ea972ef2912e90b88f50628db09359`: upstream now imports
 `../vendored/strict-ed25519.ts`, which lies outside the vendored set, and memory-core keeps its own
-`crypto/strict-ed25519`. `manifest.json` records that split under `source.held_at`. The contract package is not yet published
+`crypto/strict-ed25519`. `manifest.json` records that split under `source.held_at`. `fixtures/sync-v1/phrase-chain.json` comes from
+#1068's head `b376b5ad072f01bcef4889f073cd9dd418dc6484` (`source.pending_upstream`) and is re-pinned to the merge
+commit when that PR merges. The contract package is not yet published
 (omo-service #387), so the memory sync client consumes the format library and its golden
 fixtures as this vendored copy until it is (work plan memory-sync-e2ee-20261015, todo 13).
 

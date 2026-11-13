@@ -237,9 +237,9 @@ test("#given actual pairing codes #when the person submits a different code #the
   expect(f.chain.length).toBe(before)
 }, 15_000)
 
-test("#given an empty keyring without genesis bridge #when registered enable runs #then it retains needs_first_device", async () => {
+test("#given an empty keyring without genesis bridge #when registered enable runs #then it asks for a method and offers none", async () => {
   const f = await setup(true)
-  expect(await f.joiner.call("enable")).toEqual({ kind: "needs_first_device" })
+  expect(await f.joiner.call("enable")).toEqual({ kind: "method_required", methods: [] })
   expect(f.server.pending()).toHaveLength(0)
-  expect(await f.joiner.call("status")).toMatchObject({ enable: { kind: "needs_first_device" } })
+  expect(await f.joiner.call("status")).toMatchObject({ enable: { kind: "method_required", methods: [] } })
 })

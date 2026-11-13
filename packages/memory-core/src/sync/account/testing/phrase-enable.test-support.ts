@@ -4,6 +4,7 @@ import { createPhraseGenesisBridge, type PhraseSurface } from "../../genesis/phr
 import { genesisIntentLocation } from "../../genesis/intent-store.ts"
 import { deviceKeyring, entryOf } from "../../genesis/vector.test-support.ts"
 import { generateRecoveryPhrase, TypedPhrase } from "../../recovery/phrase.ts"
+import type { PhraseGate, PhraseGateRefusal, ServiceFloor } from "../../genesis/phrase-gate.ts"
 import { principalOf } from "../join.ts"
 import { ACCOUNT } from "./genesis-enable.test-support.ts"
 
@@ -59,3 +60,16 @@ export const phraseMarkerExists = async (pinDir: string, principalId: string): P
     return false
   }
 }
+
+/** A gate with a scripted flag and floor that records every loud refusal line. */
+export const scriptedGate = (enabled: boolean, floor: ServiceFloor) => {
+  const refusals: { readonly reason: PhraseGateRefusal; readonly account: string }[] = []
+  const gate: PhraseGate = {
+    enabled,
+    serviceFloor: async () => floor,
+    refused: (reason, account) => void refusals.push({ reason, account }),
+  }
+  return { gate, refusals }
+}
+
+export const openGate = (): PhraseGate => scriptedGate(true, "on").gate

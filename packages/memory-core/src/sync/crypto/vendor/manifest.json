@@ -13,6 +13,14 @@
         "sync-format/keys.ts"
       ],
       "reason": "upstream now imports ../vendored/strict-ed25519.ts, outside the vendored set; memory-core keeps crypto/strict-ed25519"
+    },
+    "pending_upstream": {
+      "commit": "b376b5ad072f01bcef4889f073cd9dd418dc6484",
+      "pr": "sisyphuslabs/omo-service#1068",
+      "files": [
+        "fixtures/sync-v1/phrase-chain.json"
+      ],
+      "reason": "phrase vectors (A3 M6); re-pin to the merge commit once #1068 merges"
     }
   },
   "files": {
@@ -44,6 +52,7 @@
     "fixtures/sync-v1/objects/objects.json": "3MSfwPYVCTN2JKti6zAzzc2JHJBbF2aKFZMvzaggDco",
     "fixtures/sync-v1/objects/snapshot-c0.omob": "XLEalhpp0oL3qKo6WSBg-75cqQScg4QniFWXIJpXFmI",
     "fixtures/sync-v1/objects/snapshot-c1.omob": "BYnGRUG52mOs9VhiRu1aNYm4ih8WsQrg2RdlN5iKXzI",
+    "fixtures/sync-v1/phrase-chain.json": "hlUrDxQCNDmC-kJ_wF5iOhKf36bXs5YlHbTlV7Plxaw",
     "fixtures/sync-v1/snapshot.json": "oAXFc26vM_1cg2g1zeJ5BRZqUGXHHJbpuVe76YCv8AM",
     "fixtures/sync-v1/vectors.jsonl": "LTtISRTqU22fOagLILkdqkHn0pOLnlEb72I9uWLMlw8",
     "fixtures/sync-v1/wraps.json": "P-1N4Te6uXEj9i2VS69JZ14mTEwEgAkc4SAG04rYRZU",

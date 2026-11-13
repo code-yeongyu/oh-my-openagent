@@ -8,6 +8,7 @@ import type {
   SyncOperationAuthority,
 } from "@oh-my-opencode/memory-core/sync-engine"
 import type { DeviceKeyring } from "@oh-my-opencode/memory-core/keyring"
+import { SYNC_CAPABILITIES } from "@oh-my-opencode/memory-core/sync-engine"
 import { desktopSyncAccountPorts } from "./desktopSyncAccountPorts"
 import { desktopSyncBoundary } from "./desktopSyncBoundary"
 import { openDesktopSyncOperation } from "./desktopSyncOperation"
@@ -83,7 +84,9 @@ export async function openDesktopSyncAccount(wire: DesktopSyncEngineWire, home?:
       signal: AbortSignal.any([wire.signal, authority.signal]),
       admit: (effect) => accountAuthority.admit(() => authority.admit(effect)),
     })
-    const call = (data: Readonly<Record<string, unknown>>) => operation.request({ op: "service", data })
+    // A1.1-M3: desktop main copies syncCapabilities verbatim into the `omo-sync-capabilities` header of this request.
+    const call = (data: Readonly<Record<string, unknown>>) =>
+      operation.request({ op: "service", data: { ...data, syncCapabilities: SYNC_CAPABILITIES } })
     const keyring: DeviceKeyring = {
       principal: () => ({ kind: "device", id: descriptor.syncPrincipalId }),
       publicKeys: () => descriptor.publicKeys,
@@ -157,9 +160,13 @@ export async function openDesktopSyncAccount(wire: DesktopSyncEngineWire, home?:
       devices: operation.devices,
       close: operation.close,
     }
-    if (descriptor.genesis !== "supported") return ports
+    const phrase = descriptor.phraseGenesis === "supported"
+    if (descriptor.genesis !== "supported" && !phrase) return ports
     try {
-      const offered = capability.parse(await authority.admit(() => wire.request({ op: "capability" })))
+      const offered =
+        descriptor.genesis === "supported"
+          ? capability.parse(await authority.admit(() => wire.request({ op: "capability" })))
+          : { prfSupported: false, genesisSupported: false }
       // Bound to this operation's main-issued handle; never the background account ports.
       const genesis: GenesisBridge = {
         prfSupported: offered.prfSupported && offered.genesisSupported,
@@ -167,6 +174,14 @@ export async function openDesktopSyncAccount(wire: DesktopSyncEngineWire, home?:
           const reply = await options.operation.admit(() => operation.request({ op: "genesisRun", data: request }))
           return genesisResult.parse(reply) as GenesisBridgeResult
         },
+        ...(phrase && {
+          phraseSupported: true,
+          // The words stay in desktop main's protected window; only the public prepared genesis comes back.
+          async createPhraseGenesis(request, options) {
+            const reply = await options.operation.admit(() => operation.request({ op: "phraseGenesisRun", data: request }))
+            return genesisResult.parse(reply) as GenesisBridgeResult
+          },
+        }),
       }
       return { ...ports, genesis }
     } catch (error) {

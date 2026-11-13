@@ -6,6 +6,7 @@
 
 import type { KeyringEntry } from "../crypto/entry.ts"
 import { admitSyncOperation, syncOperationSignal, type SyncOperationOptions } from "../operation-authority.ts"
+import { syncHeaders } from "../contract-version.ts"
 import type {
   AppendResult,
   ChainRow,
@@ -26,6 +27,8 @@ export interface AccountState {
   readonly head: { readonly seq: number; readonly link: string; readonly keyring_link: string }
   readonly currentEpoch: number
   readonly rotationPending: boolean
+  /** omo-service `phrase_client_floor` (#1070): true only when the service refuses pre-phrase clients; absent reads false. */
+  readonly phraseClientFloor: boolean
 }
 
 export interface AccountHttp extends RecoveryTransport {
@@ -43,7 +46,12 @@ export class AccountHttpError extends Error {
   }
 }
 
-const REFUSALS: ReadonlySet<string> = new Set<TransportRefusal>(["stale_base", "rate_limited", "not_found"])
+const REFUSALS: ReadonlySet<string> = new Set<TransportRefusal>([
+  "stale_base",
+  "rate_limited",
+  "not_found",
+  "phrase_keys_not_accepted",
+])
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -62,7 +70,7 @@ export function createAccountHttp(options: AccountHttpOptions): AccountHttp {
     body: unknown,
     operation: SyncOperationOptions = options,
   ): Promise<Response> => {
-    const headers: Record<string, string> = { authorization: `Bearer ${await options.token()}` }
+    const headers: Record<string, string> = { ...syncHeaders(), authorization: `Bearer ${await options.token()}` }
     if (body !== undefined) headers["content-type"] = "application/json"
     const signal = syncOperationSignal(operation)
     return admitSyncOperation(operation, () =>
@@ -139,6 +147,7 @@ export function createAccountHttp(options: AccountHttpOptions): AccountHttp {
         head: { seq, link, keyring_link: keyringLink },
         currentEpoch: epoch,
         rotationPending: body["rotation_pending"] === true,
+        phraseClientFloor: body["phrase_client_floor"] === true,
       }
     },
   }

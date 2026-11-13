@@ -3,7 +3,7 @@ import { enableSync } from "../enable.ts"
 import { createAccountHttp } from "../http.ts"
 import { createPairingHttp } from "../pairing-http.ts"
 import { ACCOUNT } from "./genesis-enable.test-support.ts"
-import { phraseGenesis } from "./phrase-enable.test-support.ts"
+import { openGate, phraseGenesis } from "./phrase-enable.test-support.ts"
 
 const baseUrl = process.env["PHRASE_CRASH_URL"] ?? ""
 const token = process.env["PHRASE_CRASH_TOKEN"] ?? ""
@@ -19,6 +19,7 @@ await enableSync({
   chain: createAccountHttp(http),
   pairing: createPairingHttp(http),
   method: "phrase",
+  phraseGate: openGate(),
   genesis: {
     prfSupported: false,
     phraseSupported: true,

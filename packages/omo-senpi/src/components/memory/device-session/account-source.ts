@@ -295,6 +295,7 @@ export function createCliAccountSource(options: {
     await check()
     const descriptor: DesktopSyncDescriptor = {
       genesis: "unsupported",
+      phraseGenesis: "unsupported",
       rpId: null,
       userName: null,
       serviceOrigin: api,

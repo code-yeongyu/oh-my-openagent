@@ -10,13 +10,14 @@ import { startChainWireServer } from "./chain-wire-server.test-support.ts"
 
 export { ACCOUNT }
 
-export const fixture = async (serverOptions: { readonly stream?: boolean } = {}) => {
+export const fixture = async (serverOptions: { readonly stream?: boolean; readonly phraseClientFloor?: boolean } = {}) => {
   const v = await vector()
   const pinDir = await mkdtemp(join(tmpdir(), "genesis-enable-"))
   const entries: SyncEntry[] = []
   const server = startChainWireServer(ACCOUNT, entries, {
     requireConsent: true,
     ...(serverOptions.stream === undefined ? {} : { stream: serverOptions.stream }),
+    ...(serverOptions.phraseClientFloor === undefined ? {} : { phraseClientFloor: serverOptions.phraseClientFloor }),
   })
   const token = server.tokenFor(v.prepared.body.bootstrap.first_device, "service-first")
   let ceremonies = 0

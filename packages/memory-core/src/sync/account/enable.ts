@@ -14,6 +14,7 @@ import { completeAccountChain } from "../genesis/complete.ts"
 import { loadGenesisIntent, storeGenesisIntent, withGenesisLock } from "../genesis/intent-store.ts"
 import { verifyGenesisRequest } from "../genesis/intent-verify.ts"
 import { deletePhraseGenesisMarker, genesisPhraseState } from "../genesis/phrase-marker.ts"
+import { phraseCreationRefusal, type PhraseGate } from "../genesis/phrase-gate.ts"
 import type { AccountHttp } from "./http.ts"
 import type { PairingHttp } from "./pairing-http.ts"
 import { principalOf } from "./join.ts"
@@ -29,7 +30,7 @@ export type EnableOutcome =
   | { readonly kind: "method_required"; readonly methods: ReadonlyArray<EnableMethod>; readonly phraseVoid?: PhraseVoidNotice }
   | { readonly kind: "acknowledge_required"; readonly phraseVoid: PhraseVoidNotice }
   | { readonly kind: "passkey_unavailable" }
-  | { readonly kind: "phrase_unavailable" }
+  | { readonly kind: "phrase_unavailable"; readonly reason: "no-surface" | "disabled" | "service-floor-off" }
   | { readonly kind: "cancelled" }
   | { readonly kind: "in_progress" }
 
@@ -49,11 +50,15 @@ export interface EnableSyncInput extends SyncOperationOptions {
   readonly method?: EnableMethod
   /** Called right before a bridge ceremony starts, so a status read can report it in progress. */
   readonly onCeremony?: (method: EnableMethod) => void
+  /** The release gate for phrase key creation (amendment A1); absent means off. */
+  readonly phraseGate?: PhraseGate
 }
 
-const methodsOf = (genesis: GenesisBridge | undefined): ReadonlyArray<EnableMethod> => [
+const methodsOf = (genesis: GenesisBridge | undefined, gate: PhraseGate | undefined): ReadonlyArray<EnableMethod> => [
   ...(genesis?.prfSupported === true ? (["passkey"] as const) : []),
-  ...(genesis?.phraseSupported === true && genesis.createPhraseGenesis !== undefined ? (["phrase"] as const) : []),
+  ...(gate?.enabled === true && genesis?.phraseSupported === true && genesis.createPhraseGenesis !== undefined
+    ? (["phrase"] as const)
+    : []),
 ]
 
 /**
@@ -104,11 +109,15 @@ async function enableLocked(
   const creating = intent === null && !pin.ok && keys.length === 0
   const { genesis, serviceOrigin, rpId, userName } = input
   if (creating) {
-    if (input.method === undefined) return { kind: "method_required", methods: methodsOf(genesis), ...notice }
+    if (input.method === undefined) return { kind: "method_required", methods: methodsOf(genesis, input.phraseGate), ...notice }
     // An undelivered void notice stops every new ceremony until it is acknowledged (review M2).
     if (notice.phraseVoid !== undefined) return { kind: "acknowledge_required", phraseVoid: notice.phraseVoid }
     if (input.method === "phrase") {
-      if (genesis?.phraseSupported !== true || genesis.createPhraseGenesis === undefined) return { kind: "phrase_unavailable" }
+      if (input.phraseGate?.enabled !== true) return { kind: "phrase_unavailable", reason: "disabled" }
+      if (genesis?.phraseSupported !== true || genesis.createPhraseGenesis === undefined)
+        return { kind: "phrase_unavailable", reason: "no-surface" }
+      const refusal = await phraseCreationRefusal(input.phraseGate, input.account, captured.chain)
+      if (refusal !== null) return { kind: "phrase_unavailable", reason: refusal }
       if (!serviceOrigin) throw new GenesisEnableError("missing_configuration")
       return createPhraseGenesis(captured, { ...genesis, createPhraseGenesis: genesis.createPhraseGenesis }, serviceOrigin)
     }

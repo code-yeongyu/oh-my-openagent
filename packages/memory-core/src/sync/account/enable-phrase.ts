@@ -32,6 +32,7 @@ export const placeOf = (input: EnableSyncInput): PhraseGenesisPlace => ({
 export const commitIntent = async (captured: Captured, intent: GenesisIntent): Promise<EnableOutcome> => {
   const result = await completeGenesis(captured, intent)
   checkSyncOperation(captured)
+  if (result === "phrase_refused") return { kind: "phrase_unavailable", reason: "service-floor-off" }
   if (result !== "created")
     return isPhraseIntent(intent) ? { kind: "join_required", phraseVoid: { purpose: "genesis" } } : { kind: "join_required" }
   if (isPhraseIntent(intent)) await deletePhraseGenesisMarker(placeOf(captured))

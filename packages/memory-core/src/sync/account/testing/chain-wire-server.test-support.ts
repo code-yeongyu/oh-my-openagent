@@ -36,6 +36,10 @@ export interface ChainWireServer {
   readonly freeze: FreezeModel
   /** How many `PUT /v1/sync/keys` requests reached the server. */
   readonly keyAppendsReceived: number
+  /** omo-service #1069 M1: while false, a keys append carrying a phrase key is refused `phrase_keys_not_accepted`. */
+  readonly phrase: { accept: boolean }
+  /** The `omo-sync-capabilities` and `omo-contract-version` headers of every request, in order. */
+  readonly syncHeaders: ReadonlyArray<{ readonly path: string; readonly capabilities: string | null; readonly version: string | null }>
   /** Parks the next `PUT /v1/sync/keys` after it is received and before admission. */
   holdKeysAppend(): { readonly received: Promise<KeyringAppendRequest>; release(): void }
   stop(): Promise<void>
@@ -92,7 +96,13 @@ const chainRow = ({
 export function startChainWireServer(
   account: string,
   chain: SyncEntry[],
-  options: { readonly requireConsent?: boolean; readonly stream?: boolean; readonly entriesBatchId?: boolean } = {},
+  options: {
+    readonly requireConsent?: boolean
+    readonly stream?: boolean
+    readonly entriesBatchId?: boolean
+    /** Serves omo-service's `phrase_client_floor` on the state read; absent leaves the field out. */
+    readonly phraseClientFloor?: boolean
+  } = {},
 ): ChainWireServer {
   const authors = new Map<string, SyncAuthor>()
   const devices = new Map<string, string>()
@@ -103,6 +113,8 @@ export function startChainWireServer(
   const head = () => chain.at(-1)
   const pairings = new Map<string, Pending>()
   const switches: string[] = []
+  const phrase = { accept: true }
+  const syncHeaders: { path: string; capabilities: string | null; version: string | null }[] = []
   const hooks: { tamperReveal: ((reveal: Record<string, unknown>) => Record<string, unknown>) | null } = {
     tamperReveal: null,
   }
@@ -128,6 +140,11 @@ export function startChainWireServer(
       const author = authors.get((req.headers.get("authorization") ?? "").replace(/^Bearer /, ""))
       if (author === undefined) return refusal(401, "unauthorized")
       const path = url.pathname
+      syncHeaders.push({
+        path,
+        capabilities: req.headers.get("omo-sync-capabilities"),
+        version: req.headers.get("omo-contract-version"),
+      })
       const token = (req.headers.get("authorization") ?? "").replace(/^Bearer /, "")
       const device = devices.get(token) ?? ""
       if (freeze.isRevokedDevice(device)) return freeze.revokedRefusal()
@@ -153,6 +170,7 @@ export function startChainWireServer(
           oldest_retained_seq: 1,
           snapshot: null,
           min_client_format: 1,
+          ...(options.phraseClientFloor === undefined ? {} : { phrase_client_floor: options.phraseClientFloor }),
         })
       }
       if (req.method === "GET" && path === "/v1/sync/entries") {
@@ -306,6 +324,10 @@ export function startChainWireServer(
           parked.received(request)
           await parked.released
         }
+        // Binding D1: only a record that INTRODUCES a phrase key is refused; a fork resolution re-carrying one is not.
+        const introduces = request.record["kind"] === "genesis" || request.record["kind"] === "recovery-key"
+        if (!phrase.accept && introduces && JSON.stringify(request.record).includes('"survivable":"phrase"'))
+          return refusal(409, "phrase_keys_not_accepted")
         const digest = await sha256B64(jcsBytes(request.record))
         if (request.base_seq !== chain.length) return refusal(409, "stale_base")
         const kind = request.record["kind"]
@@ -345,6 +367,8 @@ export function startChainWireServer(
     },
   })
   return {
+    phrase,
+    syncHeaders,
     url: `http://127.0.0.1:${server.port}`,
     switches,
     get tamperReveal() {

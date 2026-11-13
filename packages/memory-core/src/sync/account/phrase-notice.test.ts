@@ -7,7 +7,7 @@ import { loadTrustAnchor } from "../crypto/trust-pin.ts"
 import { enableSync } from "./enable.ts"
 import { phraseNoticeStatus } from "./phrase-notice.ts"
 import { ACCOUNT, fixture } from "./testing/genesis-enable.test-support.ts"
-import { phraseGenesis, scriptedSurface } from "./testing/phrase-enable.test-support.ts"
+import { openGate, phraseGenesis, scriptedSurface } from "./testing/phrase-enable.test-support.ts"
 import { remainingTestTime } from "../../../../../test-support/test-deadline.ts"
 
 const cleanups: (() => Promise<void>)[] = []
@@ -67,7 +67,7 @@ test("#given a process killed after the phrase was shown and before the intent w
 
   const person = scriptedSurface()
   const genesis = { prfSupported: false, phraseSupported: true, createGenesis: f.input.genesis.createGenesis, createPhraseGenesis: phraseGenesis(person.surface) }
-  expect(await enableSync({ ...f.input, genesis, method: "phrase" })).toEqual({
+  expect(await enableSync({ ...f.input, genesis, method: "phrase", phraseGate: openGate() })).toEqual({
     kind: "acknowledge_required",
     phraseVoid: { purpose: "genesis" },
   })
@@ -80,7 +80,7 @@ test("#given a phrase genesis that committed and a crash after its intent was re
   cleanups.push(f.close)
   const place = { pinDir: f.input.pinDir, account: ACCOUNT, principalId: f.keyring.principal().id }
   const genesis = { prfSupported: false, phraseSupported: true, createGenesis: f.input.genesis.createGenesis, createPhraseGenesis: phraseGenesis(scriptedSurface().surface) }
-  expect(await enableSync({ ...f.input, genesis, method: "phrase" })).toEqual({ kind: "joined", created: true })
+  expect(await enableSync({ ...f.input, genesis, method: "phrase", phraseGate: openGate() })).toEqual({ kind: "joined", created: true })
   const pin = await loadTrustAnchor(f.input.pinDir, ACCOUNT)
   if (!pin.ok) throw new Error("expected a pin after the phrase genesis")
   await writePhraseGenesisMarker(place, { version: 1, account: ACCOUNT, startedAt: 3, genesisDigest: pin.anchor.genesisDigest })
