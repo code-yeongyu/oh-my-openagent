@@ -107,3 +107,22 @@ fn the_65537th_object_prunes_the_oldest_generation_and_its_token_resolves_to_not
     assert_eq!(refs.resolve(&first_tokens[0], true, &mut tree).map_err(|u| u.refusal), Err(Refusal::bare(EngineCode::StaleRef)));
     assert!(refs.locate(&first_tokens[1], true).is_ok(), "the next oldest stays");
 }
+
+/// Review L1 (#13368): the per-window maps hold only the numbers the kept generations hold, so
+/// element churn in a long session cannot grow them past the retained generations.
+#[test]
+fn element_churn_keeps_the_per_window_maps_to_the_kept_generations() {
+    let mut refs = RefRegistry::default();
+    for read in 0..40_u64 {
+        // Every read shows 50 elements never seen before.
+        refs.mint(&root("w"), &flat_walk(50, 1_000 * (read + 1)), None);
+    }
+    let window = refs.windows.get("w").expect("the window");
+    let held: std::collections::HashSet<u64> =
+        window.generations.values().flat_map(|g| g.entries.iter().map(|e| e.n)).collect();
+    assert_eq!(window.generations.len(), 8, "eight generations kept");
+    assert!(window.last_entry.keys().all(|n| held.contains(n)), "last_entry holds only kept numbers");
+    assert_eq!(window.last_entry.len(), held.len());
+    assert!(window.by_object.values().all(|n| held.contains(n)));
+    assert!(window.by_native_id.values().flatten().all(|n| held.contains(n)));
+}
