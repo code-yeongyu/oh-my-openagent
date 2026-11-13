@@ -499,6 +499,7 @@ describe("#13037 the sender half reaches a session on another device that is not
       ["an empty string", ""],
       ["65 characters", "a".repeat(65)],
       ["a string with a newline", "busy\nnow"],
+      ["a code with a trailing newline", "busy\n"],
     ] as const)("#given %s #then the reason is the constant and the text is not shown", async (_label, reason) => {
       const error = await refusalOf(reason)
       expect(error.details?.reason).toBe("unrecognised")
