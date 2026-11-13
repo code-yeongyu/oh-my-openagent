@@ -84,7 +84,7 @@ impl MarkerStore for FileMarker {
             return Err(error);
         }
         fs::rename(&temp, &self.path)?;
-        File::open(dir)?.sync_all()
+        sync_dir(dir)
     }
 
     fn path(&self) -> Option<&Path> {
@@ -191,6 +191,19 @@ fn owner_ok(file: &File) -> bool {
 #[cfg(not(unix))]
 fn owner_ok(_file: &File) -> bool {
     true
+}
+
+/// Makes the rename durable: fsync the directory that holds the marker.
+#[cfg(unix)]
+fn sync_dir(dir: &Path) -> io::Result<()> {
+    File::open(dir)?.sync_all()
+}
+
+/// Windows cannot open a directory as a file (`File::open` on one is "Access is denied"); the
+/// rename itself is the commit point there.
+#[cfg(not(unix))]
+fn sync_dir(_dir: &Path) -> io::Result<()> {
+    Ok(())
 }
 
 #[cfg(unix)]
