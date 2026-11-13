@@ -133,9 +133,12 @@ mod tests {
 
     #[test]
     fn recording_is_off_by_default_and_writes_nothing() {
+        // The real default: a session.open carrying no `computer.record` key (review L4).
+        let settings = omo_computer_core::settings::Settings::default();
+        assert_eq!(settings.record, None, "computer.record is absent unless the host sets it");
         let dir = tempfile::tempdir().expect("dir");
         let mut audit = MemoryAudit::new("hand", 0);
-        let recorder = Recorder::start(false, dir.path(), None, &mut audit).expect("start");
+        let recorder = Recorder::start(settings.record.unwrap_or_default(), dir.path(), None, &mut audit).expect("start");
         assert!(recorder.is_none());
         assert!(!dir.path().join(CURSOR_FILE).exists());
         assert!(actions(&audit).is_empty());
