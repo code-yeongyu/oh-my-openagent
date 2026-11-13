@@ -27,7 +27,6 @@ export function register(scenario: Scenario): void {
   registered.push(scenario)
 }
 
-
 /** Every scenario registered so far, in import order. */
 export function allRegistered(): readonly Scenario[] {
   return registered
