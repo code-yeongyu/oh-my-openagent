@@ -1,0 +1,190 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/shared-skills": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "skills/frontend/scripts/detect/cli.ts",
+        "skills/programming/scripts/{python,rust,go}/new-*.ts",
+        "scripts/detect-parity.ts",
+        "scripts/detect-parity-oracle.ts",
+        "scripts/detect-source-parity.ts",
+      ],
+      "ignoreFiles": [
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "depersonalization-gate.d.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/frontend-refs-manifest.d.mts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/browser/scripts/browser-doctor.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/browser/scripts/browser-install.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/debugging/references/scripts/fixture-adapter.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/frontend/scripts/perfection/check-accent-stripes.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/frontend/scripts/perfection/check-draft-guard.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/frontend/scripts/perfection/fixtures/accent-stripes/negative/inline-ok.tsx",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/frontend/scripts/perfection/fixtures/accent-stripes/negative/tailwind-ok.tsx",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/frontend/scripts/perfection/fixtures/accent-stripes/positive/accent-outlines.tsx",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/frontend/scripts/perfection/fixtures/accent-stripes/positive/cva-variant.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/frontend/scripts/perfection/fixtures/accent-stripes/positive/flat-stripe-side.tsx",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/frontend/scripts/perfection/fixtures/accent-stripes/positive/inline-styles.tsx",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/frontend/scripts/perfection/fixtures/accent-stripes/positive/non-visible-focus-and-nested.tsx",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/frontend/scripts/perfection/fixtures/accent-stripes/positive/styled-components.tsx",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/frontend/scripts/perfection/fixtures/accent-stripes/positive/tailwind-cards.tsx",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/frontend/scripts/perfection/fixtures/draft-guard/negative/attr-lookalikes.tsx",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/frontend/scripts/perfection/fixtures/draft-guard/negative/bound-values.tsx",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/frontend/scripts/perfection/fixtures/draft-guard/negative/const-generics.tsx",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/frontend/scripts/perfection/fixtures/draft-guard/negative/generics.tsx",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/frontend/scripts/perfection/fixtures/draft-guard/positive/components.tsx",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/frontend/scripts/perfection/fixtures/draft-guard/positive/emoji-icons.tsx",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/frontend/scripts/perfection/fixtures/draft-guard/positive/jsx-edges.tsx",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/frontend/scripts/perfection/fixtures/draft-guard/positive/promo-copy.tsx",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/lsp-setup/scripts/detect-lsp.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/lsp-setup/scripts/lsp-server-table.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/lsp-setup/scripts/verify-lsp.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/programming/scripts/typescript/check-no-excuse-rules.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/programming/scripts/typescript/new-project.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/programming/scripts/typescript/oxc/lint/oxlint-plugin/index.js",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/programming/scripts/typescript/oxc/lint/oxlint-plugin/no-em-dash-copy.js",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/programming/scripts/typescript/oxc/lint/oxlint-plugin/require-suppression-reason.js",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/ulw-plan/scripts/plan-templates.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/ulw-plan/scripts/scaffold-plan.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/ulw-research/scripts/tests/fixtures/fidelity/gen-legacy-dev.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "skills/visual-qa/scripts/visual-qa.mjs",
+      ],
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) sharedSkillsRootPath
+    "packages/shared-skills/index.d.ts": ["sharedSkillsRootPath"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) designpowersUpstreamName, excludedDesignpowersSkills, designpowersAgentFiles
+    "packages/shared-skills/scripts/designpowers-refs-manifest.mjs": ["designpowersUpstreamName", "excludedDesignpowersSkills", "designpowersAgentFiles"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) sharedSkillsRoot, tasteSkillFiles, uiUxDbFileRenames, brandDesignFiles, designMaterializeMap, uiUxDbMaterializeMap
+    "packages/shared-skills/scripts/frontend-refs-manifest.mjs": ["sharedSkillsRoot", "tasteSkillFiles", "uiUxDbFileRenames", "brandDesignFiles", "designMaterializeMap", "uiUxDbMaterializeMap"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) __scriptPath
+    "packages/shared-skills/scripts/materialize-frontend-refs.mjs": ["__scriptPath"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ignoredSkillSourceDirNames, ignoredSkillSourceFileNames, createSkillSourceCopyFilter
+    "packages/shared-skills/skill-source-filter.d.ts": ["ignoredSkillSourceDirNames", "ignoredSkillSourceFileNames", "createSkillSourceCopyFilter"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ignoredSkillSourceFileNames
+    "packages/shared-skills/skill-source-filter.mjs": ["ignoredSkillSourceFileNames"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) BROWSER_ENGINE_ENV
+    "packages/shared-skills/skills/browser/scripts/browser-engine-guard.mjs": ["BROWSER_ENGINE_ENV"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) BROWSER_ENGINE_ENV, resolveOmowrightEntry
+    "packages/shared-skills/skills/browser/scripts/omowright.mjs": ["BROWSER_ENGINE_ENV", "resolveOmowrightEntry"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) MAX_ROWS, MAX_OUTPUT_BYTES
+    "packages/shared-skills/skills/debugging/references/scripts/dap.mjs": ["MAX_ROWS", "MAX_OUTPUT_BYTES"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) classifyName
+    "packages/shared-skills/skills/frontend/scripts/perfection/accent-stripes/color.ts": ["classifyName"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) RULE_MESSAGES, FIX_HINT
+    "packages/shared-skills/skills/frontend/scripts/perfection/accent-stripes/findings.ts": ["RULE_MESSAGES", "FIX_HINT"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DRAFT_RULE_MESSAGES
+    "packages/shared-skills/skills/frontend/scripts/perfection/draft-guard/findings.ts": ["DRAFT_RULE_MESSAGES"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) locatorErrors, RULES, hasUnknownExactKeys, sourceUnit
+    "packages/shared-skills/skills/ulw-research/scripts/fact-ledger-kinds.mjs": ["locatorErrors", "RULES", "hasUnknownExactKeys", "sourceUnit"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DECIMAL, isNonEmpty, isString, FACT_STATUSES, QUALIFIERS, provenanceErrors
+    "packages/shared-skills/skills/ulw-research/scripts/fact-ledger-schema.mjs": ["DECIMAL", "isNonEmpty", "isString", "FACT_STATUSES", "QUALIFIERS", "provenanceErrors"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) exactFromDecimal, FACT_KINDS, FACT_STATUSES, QUALIFIERS, ROW_FIELDS
+    "packages/shared-skills/skills/ulw-research/scripts/fact-ledger.mjs": ["exactFromDecimal", "FACT_KINDS", "FACT_STATUSES", "QUALIFIERS", "ROW_FIELDS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) FIDELITY_ANSWERED_BY
+    "packages/shared-skills/skills/ulw-research/scripts/fidelity-brief.mjs": ["FIDELITY_ANSWERED_BY"],
+    // pre-existing at origin dev 4d3161eabd (#11310, 504f03da67): unused export(s) findRender
+    "packages/shared-skills/skills/ulw-research/scripts/fidelity-originals.mjs": ["findRender"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) STATE_FILENAME, STATE_SCHEMA_VERSION
+    "packages/shared-skills/skills/ulw-research/scripts/fidelity-state.mjs": ["STATE_FILENAME", "STATE_SCHEMA_VERSION"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) selectQuote
+    "packages/shared-skills/skills/ulw-research/scripts/fidelity-values.mjs": ["selectQuote"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) fontStacks, rankColors, readingMeasure
+    "packages/shared-skills/skills/ulw-research/scripts/format-extract-css.mjs": ["fontStacks", "rankColors", "readingMeasure"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) UNSUPPORTED_MESSAGE, FETCH_TIMEOUT_MS
+    "packages/shared-skills/skills/ulw-research/scripts/format-extract.mjs": ["UNSUPPORTED_MESSAGE", "FETCH_TIMEOUT_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) FIDELITY_GATE_CODES, fidelityPairs
+    "packages/shared-skills/skills/ulw-research/scripts/gates-fidelity.mjs": ["FIDELITY_GATE_CODES", "fidelityPairs"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) OVERFLOW_PX, SCROLL_SLACK_PX, ASPECT_DRIFT, OVERLAP_PX
+    "packages/shared-skills/skills/ulw-research/scripts/gates-layout.mjs": ["OVERFLOW_PX", "SCROLL_SLACK_PX", "ASPECT_DRIFT", "OVERLAP_PX"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) CLOSING_HEADING, SOURCES_HEADING, OTHER_KINDS
+    "packages/shared-skills/skills/ulw-research/scripts/gates-static.mjs": ["CLOSING_HEADING", "SOURCES_HEADING", "OTHER_KINDS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) UNCHECKED_KINDS
+    "packages/shared-skills/skills/ulw-research/scripts/gates-structure.mjs": ["UNCHECKED_KINDS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) skeletonTokens
+    "packages/shared-skills/skills/ulw-research/scripts/html-markup.mjs": ["skeletonTokens"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) SAMPLED_SELECTOR, EXCLUDED_ANCESTORS
+    "packages/shared-skills/skills/ulw-research/scripts/layout-probe.mjs": ["SAMPLED_SELECTOR", "EXCLUDED_ANCESTORS"],
+    // pre-existing at origin dev 4d3161eabd (#11286, 70fd003fec): unused export(s) inlineTargetEnd
+    "packages/shared-skills/skills/ulw-research/scripts/markdown-closers.mjs": ["inlineTargetEnd"],
+    // pre-existing at origin dev 4d3161eabd (#11310, 8aa1567e29): unused export(s) GROUP_SEPARATORS
+    "packages/shared-skills/skills/ulw-research/scripts/number-grammar.mjs": ["GROUP_SEPARATORS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ELLIPSIS
+    "packages/shared-skills/skills/ulw-research/scripts/placeholder.mjs": ["ELLIPSIS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) numeralKeys, SLOT, termCounts, POLISH_MARKUP_CHARACTERS, touchesReference
+    "packages/shared-skills/skills/ulw-research/scripts/polish-apply.mjs": ["numeralKeys", "SLOT", "termCounts", "POLISH_MARKUP_CHARACTERS", "touchesReference"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) SLOT
+    "packages/shared-skills/skills/ulw-research/scripts/polish-project.mjs": ["SLOT"],
+    // added on dev after the last merge (origin dev 4e6328d8df): unused export(s) detectEncoding
+    "packages/shared-skills/skills/ulw-research/scripts/raw-decode.mjs": ["detectEncoding"],
+    // added on dev after the last merge (origin dev 4e6328d8df): unused export(s) quoteContext
+    "packages/shared-skills/skills/ulw-research/scripts/raw-locator.mjs": ["quoteContext"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) measureOf, signatureOf
+    "packages/shared-skills/skills/ulw-research/scripts/repair-tracker.mjs": ["measureOf", "signatureOf"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) main
+    "packages/shared-skills/skills/ulw-research/scripts/report-tools.mjs": ["main"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) findAcronyms
+    "packages/shared-skills/skills/ulw-research/scripts/source-snapshot.mjs": ["findAcronyms"],
+    // added on dev after the last merge (origin dev 4e6328d8df): unused export(s) TEXT_SOURCES, readPart, textSourceOf
+    "packages/shared-skills/skills/ulw-research/scripts/source-view.mjs": ["TEXT_SOURCES", "readPart", "textSourceOf"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) METADATA
+    "packages/shared-skills/skills/ulw-research/scripts/unit-metadata.mjs": ["METADATA"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) plusUnit
+    "packages/shared-skills/skills/ulw-research/scripts/unit-pairs.mjs": ["plusUnit"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) precisionOf
+    "packages/shared-skills/skills/ulw-research/scripts/unit-precision.mjs": ["precisionOf"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) COMMON, needsContext
+    "packages/shared-skills/skills/ulw-research/scripts/unit-rules-shapes.mjs": ["COMMON", "needsContext"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) inferExpr, RuleError, operandUnit
+    "packages/shared-skills/skills/ulw-research/scripts/unit-rules.mjs": ["inferExpr", "RuleError", "operandUnit"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) CliError
+    "packages/shared-skills/skills/visual-qa/scripts/cli.ts": ["CliError"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) PngDecodeError
+    "packages/shared-skills/skills/visual-qa/scripts/png-decode.ts": ["PngDecodeError"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) STAGED_FILES
+    "packages/shared-skills/stage-omowright-runtime.mjs": ["STAGED_FILES"]
+  }
+}

@@ -1,0 +1,35 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/senpi-desktop-tool": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "test/fixtures.ts",
+        "vitest.config.ts",
+      ],
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) SingleActionBranches, BatchShape, ComputerActionsShape
+    "packages/senpi-desktop-tool/src/cua-actions.ts": ["SingleActionBranches", "BatchShape", "ComputerActionsShape"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ComputerDisabledError, COMPUTER_COMMAND_USAGE, COMPUTER_SUBCOMMANDS, runComputerCommand, ComputerArgumentsError, ComputerActionsParams, parseComputerActions, COMPUTER_ACTIONS_TOOL_NAME, computerActionsPermissionParser, computerActionsToolDefinition and 20 more
+    "packages/senpi-desktop-tool/src/index.ts": ["ComputerDisabledError", "COMPUTER_COMMAND_USAGE", "COMPUTER_SUBCOMMANDS", "runComputerCommand", "ComputerArgumentsError", "ComputerActionsParams", "parseComputerActions", "COMPUTER_ACTIONS_TOOL_NAME", "computerActionsPermissionParser", "computerActionsToolDefinition", "defaultStopHotkey", "ComputerActionShape", "ComputerParams", "MAX_TIMEOUT_SECONDS", "COMPUTER_PERMISSION", "computerPermissionParser", "computerTier", "AUDIT_FILE_NAME", "runSnapshot", "sessionOpenParams", "usesCoordinateSafeImageSizing", "ComputerSettingsError", "ComputerSettingsSchema", "COMPUTER_SKILL_NAME", "computerSkillMarkdown", "materializeComputerSkill", "COMPUTER_TOOL_NAME", "computerToolDefinition", "parseComputerParams", "runComputer"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) computerTier
+    "packages/senpi-desktop-tool/src/permission.ts": ["computerTier"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) defaultStopHotkey, COMPUTER_PERMISSION, computerTier, ComputerSettingsError, ComputerSettingsSchema, computerSkillMarkdown
+    "packages/senpi-desktop-tool/src/registration.ts": ["defaultStopHotkey", "COMPUTER_PERMISSION", "computerTier", "ComputerSettingsError", "ComputerSettingsSchema", "computerSkillMarkdown"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ComputerSettingsSchema
+    "packages/senpi-desktop-tool/src/settings.ts": ["ComputerSettingsSchema"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) computerSkillMarkdown
+    "packages/senpi-desktop-tool/src/skill.ts": ["computerSkillMarkdown"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "packages/senpi-desktop-tool/vitest.config.ts": ["default"]
+  }
+}
