@@ -8,13 +8,13 @@ import { ownMaterial, rotationAppend, signedAppend } from "./keyring-append.ts"
 import type { RecoveryBridge, RecoveryEvent, RecoveryTransport, TransportRefusal } from "./ports.ts"
 import { committedWrap, expectedHistory, loadServedChain } from "./served-chain.ts"
 
+/** A passkey removal asks the person to delete the passkey; a phrase on paper cannot be deleted or signalled (F10). */
+type RemovedKey =
+  | { readonly removedKind: "passkey"; readonly platformSignal: "signalled" | "unsupported"; readonly deleteFromPasskeyManager: true }
+  | { readonly removedKind: "phrase"; readonly platformSignal: "unsupported" }
+
 export type RemoveOutcome =
-  | {
-      readonly ok: true
-      readonly epoch: number
-      readonly platformSignal: "signalled" | "unsupported"
-      readonly deleteFromPasskeyManager: true
-    }
+  | ({ readonly ok: true; readonly epoch: number } & RemovedKey)
   | {
       readonly ok: false
       readonly reason:
@@ -26,13 +26,11 @@ export type RemoveOutcome =
         | "wrap-refused"
         | TransportRefusal
     }
-  | {
+  | ({
       /** The key is removed but no stored, verified rotation excludes it yet; call again to retry. */
       readonly ok: false
       readonly reason: "rotation-pending"
-      readonly platformSignal: "signalled" | "unsupported"
-      readonly deleteFromPasskeyManager: true
-    }
+    } & RemovedKey)
 
 export type RemoveInput = {
   /** This member device's pinned trust anchor (loadTrustAnchor); no pin means re-pair or recover first. */
@@ -47,6 +45,26 @@ export type RemoveInput = {
   readonly rejections: RejectionCounter
   readonly onEvent?: (event: RecoveryEvent) => void
 }
+
+const phraseCredential = (state: ChainState, credentialId: string): boolean =>
+  state.history.some(
+    (record) =>
+      (record.body.kind === "genesis" &&
+        record.body.recoveryKey.credential_id === credentialId &&
+        record.body.recoveryKey.survivable === "phrase") ||
+      (record.body.kind === "recovery-key" &&
+        record.body.key.credential_id === credentialId &&
+        record.body.key.survivable === "phrase"),
+  )
+
+const removedKey = async (input: RemoveInput, phrase: boolean): Promise<RemovedKey> =>
+  phrase
+    ? { removedKind: "phrase", platformSignal: "unsupported" }
+    : {
+        removedKind: "passkey",
+        platformSignal: input.bridge === null ? "unsupported" : await input.bridge.signalRemoved(input.rpId, input.credentialId),
+        deleteFromPasskeyManager: true,
+      }
 
 /** The epochs at which `credentialId` was removed (a credential id is enrolled at most once). */
 const removalEpochs = (state: ChainState, credentialId: string): number[] =>
@@ -93,15 +111,10 @@ export const removeRecoveryKey = async (input: RemoveInput): Promise<RemoveOutco
   ) {
     return { ok: false, reason: "not-member" }
   }
+  const phrase = phraseCredential(served.state, input.credentialId)
   if (removalRotated(served.state, authority, input.credentialId)) {
     input.onEvent?.("sync.recovery.removed")
-    return {
-      ok: true,
-      epoch: authority.epoch,
-      platformSignal:
-        input.bridge === null ? "unsupported" : await input.bridge.signalRemoved(input.rpId, input.credentialId),
-      deleteFromPasskeyManager: true,
-    }
+    return { ok: true, epoch: authority.epoch, ...(await removedKey(input, phrase)) }
   }
   const resuming = removalPending(served.state, authority, input.credentialId)
   if (!resuming && !authority.registry.has(input.credentialId)) return { ok: false, reason: "not-enrolled" }
@@ -114,7 +127,7 @@ export const removeRecoveryKey = async (input: RemoveInput): Promise<RemoveOutco
       : await ownMaterial(input.keyring, input.account, deviceWrap, expectedHistory(authority, authority.epoch))
   if (retained === null) return { ok: false, reason: "wrap-refused" }
   try {
-    return await removeWithMaterial(input, head, authority.epoch, resuming, retained)
+    return await removeWithMaterial(input, head, authority.epoch, resuming, retained, phrase)
   } finally {
     retained.current.fill(0)
     for (const row of retained.history) row.key.fill(0)
@@ -127,6 +140,7 @@ const removeWithMaterial = async (
   epoch: number,
   resuming: boolean,
   retained: EpochMaterial,
+  phrase: boolean,
 ): Promise<RemoveOutcome> => {
   if (!resuming) {
     const body = {
@@ -138,14 +152,8 @@ const removeWithMaterial = async (
     const removed = await input.transport.appendKeys(await signedAppend(input.keyring, head, body, []))
     if (!removed.ok) return { ok: false, reason: removed.reason }
   }
-  const platformSignal =
-    input.bridge === null ? "unsupported" : await input.bridge.signalRemoved(input.rpId, input.credentialId)
-  const pending: RemoveOutcome = {
-    ok: false,
-    reason: "rotation-pending",
-    platformSignal,
-    deleteFromPasskeyManager: true,
-  }
+  const removed = await removedKey(input, phrase)
+  const pending: RemoveOutcome = { ok: false, reason: "rotation-pending", ...removed }
   const after = await loadServedChain(input.transport, input.account, input.rejections, input.anchor)
   const afterAuthority = after.ok ? after.state.authority : null
   const afterHead = after.ok ? after.state.head : null
@@ -179,10 +187,5 @@ const removeWithMaterial = async (
     return pending
   }
   input.onEvent?.("sync.recovery.removed")
-  return {
-    ok: true,
-    epoch: epoch + 1,
-    platformSignal,
-    deleteFromPasskeyManager: true,
-  }
+  return { ok: true, epoch: epoch + 1, ...removed }
 }

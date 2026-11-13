@@ -16,6 +16,7 @@ import type {
 } from "./ports.ts"
 import { appendAndConfirmJoin, pinRecoveredRoot, rotationStored } from "./recover-join.ts"
 import { servedSaltInputs } from "./salt-inputs.ts"
+import { servedPhraseHints } from "./phrase-hints.ts"
 import { loadServedChain, recoveryCandidates } from "./served-chain.ts"
 import { holdWrites, releaseWriteHold } from "./write-hold.ts"
 
@@ -62,6 +63,8 @@ export type RecoverInput = {
   /** Where this device keeps its trust pin and write hold; recovery sets the pin from the anchored walk. */
   readonly stateDir: string
   readonly acknowledgeUnknownCredential?: boolean
+  /** Which enrolled key kind supplies the recovery keys (contract 6); default passkey. Only `begin` differs. */
+  readonly method?: "passkey" | "phrase"
   readonly onEvent?: (event: RecoveryEvent) => void
 }
 
@@ -92,24 +95,18 @@ export const recoverOnFreshDevice = async (input: RecoverInput): Promise<Recover
     input.onEvent?.("sync.recovery.recover_refused")
     return { ok: false, reason, next: ANCHOR_NEXT_STEP }
   }
-  if (input.bridge === null || !input.bridge.prfSupported) return refuse("approval-required")
+  const bridge = input.bridge
+  const phrase = input.method === "phrase"
+  if (bridge === null || (phrase ? bridge.recoverBeginWithPhrase === undefined : !bridge.prfSupported))
+    return refuse("approval-required")
   const keys = input.keyring.publicKeys()
   const id = input.keyring.principal().id
   if ((await deviceIdOf(keys.signing)) !== id) return refuse("bad-device")
   const existing = await loadTrustAnchor(input.stateDir, input.account)
   if (!existing.ok && existing.reason === "corrupt_pin") return refusePin("pin-corrupt")
   const pinned = existing.ok ? existing.anchor.genesisDigest : null
-  const served = await servedSaltInputs(input.transport)
-  if (!served.ok) return refuse(served.reason)
-  if (served.salts.length === 0) return refuse("no-recovery-key")
-  const bridge = input.bridge
-  const begun = await bridge.recoverBegin({
-    account: input.account,
-    rpId: input.rpId,
-    salts: served.salts,
-    knownCredentialIds: served.salts.map((salt) => salt.credentialId),
-    acknowledgeUnknown: input.acknowledgeUnknownCredential === true,
-  })
+  const begun = phrase ? await beginWithPhrase(input, bridge) : await beginWithPasskey(input, bridge)
+  if (begun === "no-recovery-key" || begun === "unavailable" || begun === "too-many-recovery-keys") return refuse(begun)
   if (!begun.ok) return refuse(begun.reason)
   try {
     return await recoverWithHandle(
@@ -129,6 +126,31 @@ export const recoverOnFreshDevice = async (input: RecoverInput): Promise<Recover
   } finally {
     await bridge.recoverAbort(begun.handle)
   }
+}
+
+type BeginRefusal = "no-recovery-key" | "unavailable" | "too-many-recovery-keys"
+
+const beginWithPasskey = async (input: RecoverInput, bridge: RecoveryBridge): Promise<RecoverBeginResult | BeginRefusal> => {
+  const served = await servedSaltInputs(input.transport)
+  if (!served.ok) return served.reason
+  if (served.salts.length === 0) return "no-recovery-key"
+  return bridge.recoverBegin({
+    account: input.account,
+    rpId: input.rpId,
+    salts: served.salts,
+    knownCredentialIds: served.salts.map((salt) => salt.credentialId),
+    acknowledgeUnknown: input.acknowledgeUnknownCredential === true,
+  })
+}
+
+/** The phrase is derived only against served phrase-kind hints; the anchored walk below decides (contract 6, DI). */
+const beginWithPhrase = async (input: RecoverInput, bridge: RecoveryBridge): Promise<RecoverBeginResult | BeginRefusal> => {
+  const begin = bridge.recoverBeginWithPhrase
+  if (begin === undefined) return "unavailable"
+  const served = await servedPhraseHints(input.transport)
+  if (!served.ok) return served.reason
+  if (served.hints.length === 0) return "no-recovery-key"
+  return begin({ account: input.account, hints: served.hints })
 }
 
 const recoverWithHandle = async (

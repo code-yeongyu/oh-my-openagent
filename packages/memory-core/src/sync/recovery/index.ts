@@ -6,3 +6,7 @@ export { classifyRecoveryJoin, type JoinNotice, VETO_WINDOW_MS } from "./join-no
 export type * from "./ports.ts"
 export { type RecoverInput, type RecoverOutcome, recoverOnFreshDevice } from "./recover.ts"
 export { type RemoveInput, type RemoveOutcome, removeRecoveryKey } from "./remove.ts"
+export { enrollPhraseRecoveryKey, type PhraseEnrollInput, type PhraseEnrollOutcome, type PhraseRotateOutcome, rotateRecoveryPhrase } from "./enroll-phrase.ts"
+export type { PhraseEnrollBridgeRequest } from "./bridge-enroll-phrase.ts"
+export type { PhraseEntrySurface, PhraseRecoverBeginRequest } from "./bridge-recover-phrase.ts"
+export type { PhraseRecoveryHint } from "./phrase-hints.ts"
