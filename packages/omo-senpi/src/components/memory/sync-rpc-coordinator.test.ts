@@ -332,7 +332,43 @@ test("#given the sync status read throws #when status is read #then it names sta
   })
   expect(await f.call("status", owner("a").context)).toMatchObject({ kind: "unavailable", code: "status_read_failed" })
   expect(warnings).toHaveLength(1)
+  expect(warnings[0]?.fields).toMatchObject({ code: "status_read_failed", step: "sync_status" })
   expect(JSON.stringify(warnings[0]?.fields)).toContain("status store unreadable")
+})
+
+test("#given the device list read fails #when devices is read twice #then it names operation_failed and warns once", async () => {
+  const warnings: { message: string; fields: Record<string, unknown> }[] = []
+  const f = await setup({ warn: (message, fields) => warnings.push({ message, fields }) })
+  const original = f.account.forOperation
+  f.account.forOperation = async (authority) => ({
+    ...(await original(authority)),
+    devices: async () => {
+      throw new Error("device list unreadable")
+    },
+  })
+  const a = owner("a")
+  expect(await f.call("devices", a.context)).toMatchObject({ kind: "unavailable", code: "operation_failed" })
+  expect(await f.call("devices", a.context)).toMatchObject({ kind: "unavailable", code: "operation_failed" })
+  expect(warnings).toHaveLength(1)
+  expect(warnings[0]?.fields).toMatchObject({ path: "read", code: "operation_failed" })
+  expect(JSON.stringify(warnings[0]?.fields)).toContain("device list unreadable")
+})
+
+test("#given no sync account #when devices is read #then it names no_account", async () => {
+  const f = await setup({ source: async () => null })
+  expect(await f.call("devices", owner("a").context)).toMatchObject({ kind: "unavailable", code: "no_account" })
+})
+
+test("#given enabling sync throws #when enable is called #then it names operation_failed and warns with the error", async () => {
+  const warnings: { message: string; fields: Record<string, unknown> }[] = []
+  const f = await setup({ warn: (message, fields) => warnings.push({ message, fields }) })
+  f.runtime.enableSync = async () => {
+    throw new Error("enable store unreadable")
+  }
+  expect(await f.call("enable", owner("a").context)).toMatchObject({ kind: "unavailable", code: "operation_failed" })
+  expect(warnings).toHaveLength(1)
+  expect(warnings[0]?.fields).toMatchObject({ path: "enable", code: "operation_failed" })
+  expect(JSON.stringify(warnings[0]?.fields)).toContain("enable store unreadable")
 })
 
 test("#given a working account #when status is read #then no unavailable warning is logged", async () => {

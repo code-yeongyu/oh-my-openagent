@@ -26,7 +26,13 @@ export function serviceProblem(error: unknown): SyncRpcProblem {
     error.status >= 400 &&
     error.status < 500
     ? { kind: "refused", reason: "The service refused this sync request." }
-    : unavailable()
+    : unavailable(error instanceof RetiredSyncOperation ? error.code : "operation_failed")
+}
+
+/** Log fields for the error behind an unavailable problem; a RetiredSyncOperation says all it knows in its code. */
+export function syncErrorFields(error: unknown): { readonly error?: string } {
+  if (error instanceof RetiredSyncOperation) return {}
+  return { error: error instanceof Error ? `${error.name}: ${error.message}` : String(error) }
 }
 
 export class RetiredSyncOperation extends Error {
@@ -235,6 +241,12 @@ export async function runSyncRpcOperation(
         : refused()
       : serviceProblem(error)
     record.problem = record.controller.signal.aborted ? refused() : serviceProblem(error)
+    if (record.problem.kind === "unavailable")
+      options.warn?.(`memory sync ${record.kind} unavailable`, {
+        path: record.kind,
+        code: record.problem.code,
+        ...syncErrorFields(error),
+      })
     record.approval = record.expired
       ? { kind: "expired" }
       : {

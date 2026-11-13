@@ -20,23 +20,23 @@ import {
   RetiredSyncOperation,
   runSyncRpcOperation,
   serviceProblem,
+  syncErrorFields,
   unavailable,
   type CeremonyOperation,
   type Operation,
 } from "./sync-rpc-operation"
 
 export function createSyncRpcCoordinator(options: SyncRpcOptions) {
-  // The desktop polls status, so a cause is logged once when it starts, not on every poll.
-  let lastUnavailable: SyncUnavailableCode | undefined
-  const reportUnavailable = (code: SyncUnavailableCode, error?: unknown): SyncRpcProblem => {
-    if (code !== lastUnavailable) {
-      lastUnavailable = code
-      options.warn?.("memory sync status unavailable", {
-        code,
-        ...(error === undefined
-          ? {}
-          : { error: error instanceof Error ? `${error.name}: ${error.message}` : String(error) }),
-      })
+  // The desktop polls status and the pending/devices reads, so a cause is logged once when it starts, not on every poll.
+  const lastUnavailable = new Map<"status" | "read", SyncUnavailableCode>()
+  const reportUnavailable = (
+    path: "status" | "read",
+    code: SyncUnavailableCode,
+    fields: Record<string, unknown> = {},
+  ): SyncRpcProblem => {
+    if (lastUnavailable.get(path) !== code) {
+      lastUnavailable.set(path, code)
+      options.warn?.(`memory sync ${path} unavailable`, { path, code, ...fields })
     }
     return unavailable(code)
   }
@@ -215,15 +215,20 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
     },
     async status(owner: SyncRpcContext): Promise<SyncStatusResponse> {
       const binding = lifetime.signal
+      let step: "account" | "identity" | "sync_status" | "recheck" = "account"
       try {
         const account = await current(owner)
+        step = "identity"
         const identity = identityOf(account)
+        step = "sync_status"
         const sync = await options.syncStatus()
+        step = "recheck"
         check(owner)
         binding.throwIfAborted()
-        if (account.signal.aborted || !(await account.isCurrent())) return reportUnavailable("account_not_current")
+        if (account.signal.aborted || !(await account.isCurrent()))
+          return reportUnavailable("status", "account_not_current", { step })
         check(owner)
-        lastUnavailable = undefined
+        lastUnavailable.delete("status")
         const visible = records().filter((record) => ensureOwned(record, owner) && record.identity === identity)
         return {
           ...(sync === undefined ? {} : { sync }),
@@ -238,10 +243,10 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
             })),
         }
       } catch (error) {
-        return reportUnavailable(
-          error instanceof RetiredSyncOperation ? error.code : "status_read_failed",
-          error instanceof RetiredSyncOperation ? undefined : error,
-        )
+        return reportUnavailable("status", error instanceof RetiredSyncOperation ? error.code : "status_read_failed", {
+          step,
+          ...syncErrorFields(error),
+        })
       }
     },
     async read<T>(owner: SyncRpcContext, use: (ports: SyncRpcOperation) => Promise<T>): Promise<T | SyncRpcProblem> {
@@ -257,11 +262,15 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
           auth.admit(() => undefined)
           const result = await use(ports)
           auth.admit(() => undefined)
-          if (!(await record.account.isCurrent())) return unavailable()
+          if (!(await record.account.isCurrent())) return reportUnavailable("read", "account_not_current")
           auth.admit(() => undefined)
+          lastUnavailable.delete("read")
           return result
         } catch (error) {
-          return serviceProblem(error)
+          const problem = serviceProblem(error)
+          return problem.kind === "unavailable" && problem.code !== undefined
+            ? reportUnavailable("read", problem.code, syncErrorFields(error))
+            : problem
         } finally {
           try {
             await ports?.close()
