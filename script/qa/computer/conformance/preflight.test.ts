@@ -80,7 +80,10 @@ describe("environment preflight [ADP-3]", () => {
     withDir((dir) => {
       // A real executable on every OS: a one-line Bun script compiled for this host.
       const source = join(dir, "engine.ts")
-      writeFileSync(source, `for await (const _ of console) {\n  console.log('{"jsonrpc":"2.0","id":1,"result":{}}')\n  break\n}\n`)
+      writeFileSync(
+        source,
+        `for await (const _ of console) {\n  console.log('{"jsonrpc":"2.0","id":1,"result":{}}')\n  break\n}\n`,
+      )
       const engine = join(dir, process.platform === "win32" ? "engine.exe" : "engine")
       const built = Bun.spawnSync(["bun", "build", "--compile", source, "--outfile", engine])
       expect(built.exitCode, built.stderr.toString()).toBe(0)
