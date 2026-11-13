@@ -19,6 +19,8 @@ import {
 import { signedAppend } from "./keyring-append.ts"
 import type { RecoveryBridge, RecoveryEvent, TransportRefusal } from "./ports.ts"
 import { MAX_RECOVERY_KEYS } from "./salt-inputs.ts"
+import { loadTrustAnchor } from "../crypto/trust-pin.ts"
+import { createRejectionCounter } from "../crypto/rejection.ts"
 import { committedWrap, expectedHistory, loadServedChain } from "./served-chain.ts"
 import { removeRecoveryKey } from "./remove.ts"
 import type { PhraseVoidNotice } from "../account/phrase-notice.ts"
@@ -38,6 +40,7 @@ export type PhraseEnrollOutcome =
         | "unavailable"
         | "unverified"
         | "not-member"
+        | "not-enrolled"
         | "too-many-recovery-keys"
         | TransportRefusal
     }
@@ -144,6 +147,12 @@ const enrollUnderLock = async (
     return { ok: false, reason: "not-member" }
   const deviceWrap = committedWrap(served.state, authority.epoch, `device:${self}`)
   if (deviceWrap === null) return { ok: false, reason: "not-member" }
+  // Review MEDIUM (#13336): a rotation names a registered PHRASE key, checked before any marker or word.
+  if (purpose === "rotate" && (oldCredentialId === undefined || authority.registry.get(oldCredentialId)?.survivable !== "phrase"))
+    return { ok: false, reason: "not-enrolled" }
+  // Rotation also stops at a full registry (review LOW, #13336, answered): it enrolls the new key BEFORE removing the
+  // old one (F7(c)), so the chain briefly holds MAX + 1 keys, and if the removal then failed every recovery would
+  // refuse the served list as too-many-recovery-keys. Removing another key first is the safe path.
   if (authority.registry.size >= MAX_RECOVERY_KEYS) return { ok: false, reason: "too-many-recovery-keys" }
   const credentialId = drawCredentialId(authority.enrolledEver)
   await writeEnrollMarker(place, {
@@ -228,3 +237,49 @@ export const rotateRecoveryPhrase = (
     await deleteEnrollMarker(result.place, result.credentialId)
     return { ok: true, credentialId: result.credentialId, epoch: removed.epoch }
   })
+
+/**
+ * Acknowledges a delivered enroll or rotate void notice (review HIGH, #13336). Called under the genesis lock by
+ * `acknowledgePhraseVoid`. Only a marker the VERIFIED chain proves void is deleted (its credential was never
+ * enrolled), optionally only the named credential; a saved, unresolved or unreadable state is left alone.
+ */
+export const acknowledgeEnrollVoid = async (
+  place: EnrollPlace,
+  purpose: "enroll" | "rotate",
+  credentialId: string | undefined,
+  chain: AccountHttp,
+  anchor?: TrustAnchor,
+): Promise<void> => {
+  let pinned = anchor
+  if (pinned === undefined) {
+    const pin = await loadTrustAnchor(place.pinDir, place.account)
+    if (!pin.ok) return
+    pinned = pin.anchor
+  }
+  const served = await loadServedChain(chain, place.account, createRejectionCounter(), pinned)
+  const facts = chainFactsOf(served.ok ? served.state : null)
+  for (const read of await listEnrollMarkers(place)) {
+    if (read.kind !== "marker" || read.marker.purpose !== purpose) continue
+    if (credentialId !== undefined && read.marker.credentialId !== credentialId) continue
+    if (resolveEnrollMarker(read.marker, facts).kind === "void") await deleteEnrollMarker(place, read.marker.credentialId)
+  }
+}
+
+/** Enroll and rotate markers for a status answer: read-only; without a verified chain they read as unresolved. */
+export const enrollNoticeStatus = async (
+  place: EnrollPlace,
+  state: ChainState | null | undefined,
+): Promise<{ readonly phraseVoid?: PhraseVoidNotice; readonly phraseUnresolved?: true }> => {
+  const markers = await listEnrollMarkers(place)
+  if (markers.length === 0) return {}
+  if (state === undefined) return { phraseUnresolved: true }
+  const facts = chainFactsOf(state)
+  for (const read of markers) {
+    if (read.kind === "corrupt") return { phraseUnresolved: true }
+    const resolution = resolveEnrollMarker(read.marker, facts)
+    if (resolution.kind === "void")
+      return { phraseVoid: resolution.purpose === "rotate" ? { purpose: "rotate", oldStillValid: true } : { purpose: "enroll" } }
+    if (resolution.kind === "unresolved") return { phraseUnresolved: true }
+  }
+  return {}
+}

@@ -17,18 +17,28 @@ export type ReferenceBridgeOptions = {
   /** Where this bridge shows a new phrase and reads a typed one; without it the bridge has no phrase members. */
   readonly phraseSurface?: PhraseSurface & PhraseEntrySurface
   readonly phraseRandom?: PhraseBridgeRandom
+  /** Aborts a running phrase ceremony (show and confirm). */
+  readonly signal?: AbortSignal
 }
 
-const ownOperation = { signal: new AbortController().signal, admit: <T>(begin: () => T): T => begin() }
+// Review LOW (#13336): the host's signal reaches show-and-confirm, so an enrollment can be cancelled through it.
+const operationOf = (signal: AbortSignal | undefined) => ({
+  signal: signal ?? new AbortController().signal,
+  admit: <T>(begin: () => T): T => {
+    signal?.throwIfAborted()
+    return begin()
+  },
+})
 
 const phraseMembers = (
   surface: PhraseSurface & PhraseEntrySurface,
   keyring: DeviceKeyring,
   handles: RecoveryHandles,
   random: PhraseBridgeRandom | undefined,
+  signal: AbortSignal | undefined,
 ): Pick<RecoveryBridge, "recoverBeginWithPhrase" | "enrollPhrase"> => ({
   recoverBeginWithPhrase: (request) => recoverBeginWithPhraseInBridge(surface, handles, request),
-  enrollPhrase: (request) => enrollPhraseInBridge(surface, keyring, request, ownOperation, random),
+  enrollPhrase: (request) => enrollPhraseInBridge(surface, keyring, request, operationOf(signal), random),
 })
 
 /**
@@ -60,6 +70,6 @@ export const createRecoveryBridge = (
       if (held !== null) disposeRecoveryKeys(held.keys)
     },
     signalRemoved: (rpId, credentialId) => authenticator.signalRemoved(rpId, credentialId),
-    ...(surface === undefined ? {} : phraseMembers(surface, keyring, handles, options.phraseRandom)),
+    ...(surface === undefined ? {} : phraseMembers(surface, keyring, handles, options.phraseRandom, options.signal)),
   }
 }
