@@ -175,17 +175,29 @@ async function probe(casePath: string): Promise<{ run: Run; argv: unknown[] }> {
   }
 }
 
+// A stand-in engine runnable on every OS: the script itself where its shebang runs it, and a
+// binary compiled for this host on Windows, which cannot spawn a script.
+async function standIn(name: string, source: string): Promise<string> {
+  const script = join(dir, `${name}.ts`)
+  await writeFile(script, source)
+  if (process.platform !== "win32") {
+    await chmod(script, 0o755)
+    return script
+  }
+  const binary = join(dir, `${name}.exe`)
+  const build = Bun.spawn(["bun", "build", "--compile", script, "--outfile", binary], {
+    stdout: "inherit",
+    stderr: "inherit",
+  })
+  expect(await build.exited).toBe(0)
+  return binary
+}
+
 beforeAll(async () => {
   dir = await mkdtemp(join(tmpdir(), "omo-replay-test-"))
-  scripted = join(dir, "scripted-engine.ts")
-  await writeFile(scripted, SCRIPTED_ENGINE)
-  await chmod(scripted, 0o755)
-  probeEngine = join(dir, "probe-engine.ts")
-  await writeFile(probeEngine, PROBE_ENGINE)
-  await chmod(probeEngine, 0o755)
-  plantEngine = join(dir, "plant-engine.ts")
-  await writeFile(plantEngine, PLANT_ENGINE)
-  await chmod(plantEngine, 0o755)
+  scripted = await standIn("scripted-engine", SCRIPTED_ENGINE)
+  probeEngine = await standIn("probe-engine", PROBE_ENGINE)
+  plantEngine = await standIn("plant-engine", PLANT_ENGINE)
   const build = Bun.spawn(["cargo", "build", "-p", "omo-computer-engine", "--locked"], {
     cwd: ROOT,
     stdout: "inherit",
