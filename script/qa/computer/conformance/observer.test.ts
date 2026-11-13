@@ -22,13 +22,6 @@ describe("desktop observer at preflight (P-17)", () => {
     expect(status).toEqual({ kind: "unavailable", reason: check.detail })
   })
 
-  test("a recording sentinel is reported by a relative path, like the fault paths", async () => {
-    const { check, status } = await observerCheck(sentinel("records", "export const recordsOn = () => true\n"), "macos")
-    expect(check.ok).toBe(true)
-    expect(isAbsolute(check.detail)).toBe(false)
-    expect(check.detail).toEndWith("records.ts")
-    expect(status).toEqual({ kind: "records" })
-  })
 
   test("a missing sentinel module is an environment fault", async () => {
     const { check } = await observerCheck(join(dir, "absent.ts"), "x11")
@@ -58,6 +51,10 @@ describe("desktop observer at preflight (P-17)", () => {
     expect(linux.check.ok).toBe(true)
     expect(linux.status).toEqual({ kind: "unavailable", reason: "no x11 recorder in the sentinel yet" })
     const macos = await observerCheck(path, "macos")
-    expect(macos).toEqual({ check: { name: "desktop-observer", ok: true, detail: path }, status: { kind: "records" } })
+    expect(macos.status).toEqual({ kind: "records" })
+    expect(macos.check.ok).toBe(true)
+    // Relative like the fault paths, so the same run reads the same on every host.
+    expect(isAbsolute(macos.check.detail)).toBe(false)
+    expect(macos.check.detail).toEndWith("macos-only.ts")
   })
 })

@@ -26,13 +26,21 @@ export async function observerCheck(sentinel: string, os: OsName): Promise<{ che
     const detail = `${repoPath(REPO, sentinel)} (row 3) is not on this checkout`
     return { check: { name: "desktop-observer", ok: false, detail }, status: { kind: "unavailable", reason: detail } }
   }
-  const recordsOn = recordsOnOf(await import(sentinel))
+  const shown = repoPath(REPO, sentinel)
+  let loaded: unknown
+  try {
+    loaded = await import(sentinel)
+  } catch (error) {
+    const detail = `${shown} could not be loaded: ${error instanceof Error ? error.message : String(error)}`
+    return { check: { name: "desktop-observer", ok: false, detail }, status: { kind: "unavailable", reason: detail } }
+  }
+  const recordsOn = recordsOnOf(loaded)
   if (recordsOn === undefined) {
-    const detail = `${repoPath(REPO, sentinel)} does not export recordsOn(os)`
+    const detail = `${shown} does not export recordsOn(os)`
     return { check: { name: "desktop-observer", ok: false, detail }, status: { kind: "unavailable", reason: detail } }
   }
   if (recordsOn(os))
-    return { check: { name: "desktop-observer", ok: true, detail: sentinel }, status: { kind: "records" } }
+    return { check: { name: "desktop-observer", ok: true, detail: shown }, status: { kind: "records" } }
   const reason = `no ${os} recorder in the sentinel yet`
   return {
     check: { name: "desktop-observer", ok: true, detail: `unavailable: ${reason}` },

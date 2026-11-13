@@ -107,7 +107,7 @@ export function buildReport(catalog: readonly Cell[], results: readonly CellResu
   const problems: string[] = []
   const structural: string[] = []
   const counts = { delivered: 0, refused: 0, failed: 0, skipped: 0, disturbed: 0, unobserved: 0 }
-  const observedDelivered = results.filter((result) => result.observed.kind === "delivered").length
+  let observedDelivered = 0
   let failedUnwatched = 0
   const declared = groupBy(catalog, cellId)
   const observed = groupBy(results, (result) => result.id)
@@ -129,6 +129,8 @@ export function buildReport(catalog: readonly Cell[], results: readonly CellResu
       counts.failed += 1
       continue
     }
+    // Counted per declared cell like every other count: a duplicate or undeclared row is a structural fault, not a delivery.
+    if (row.observed.kind === "delivered") observedDelivered += 1
     if (changedSignals(row, "deliver" in cell.expect ? cell.declares : []).length > 0) counts.disturbed += 1
     const judgement = judge(cell, id, row)
     if ("problem" in judgement) problems.push(judgement.problem)
