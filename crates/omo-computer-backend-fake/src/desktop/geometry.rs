@@ -1,12 +1,12 @@
-//! The fake's geometry helpers: displays, window filtering, input sink lines and capture rects.
+//! Scripted desktop geometry: display bounds, which display holds a window, and the rect a
+//! capture target covers.
 
-use omo_computer_core::backend::{BackendResult, InputEvent, Refusal, Target, WindowFilter};
+use omo_computer_core::backend::{BackendResult, Refusal, Target};
 use omo_computer_core::error::{EngineCode, Reason};
 use omo_computer_core::listing::Rect;
 use omo_computer_core::results::DisplayInfo;
 
 use crate::scenario::{FakeDisplay, FakeWindow};
-use crate::sink::quoted;
 use crate::state::FakeState;
 
 pub(super) fn display_info(display: &FakeDisplay) -> DisplayInfo {
@@ -24,7 +24,7 @@ pub(super) fn display_info(display: &FakeDisplay) -> DisplayInfo {
     }
 }
 
-pub(super) fn contains(display: &FakeDisplay, x: f64, y: f64) -> bool {
+fn contains(display: &FakeDisplay, x: f64, y: f64) -> bool {
     x >= display.x
         && y >= display.y
         && x < display.x + display.width
@@ -37,27 +37,6 @@ pub(super) fn display_of<'a>(state: &'a FakeState, window: &FakeWindow) -> Optio
         .iter()
         .find(|display| contains(display, window.x, window.y))
         .or_else(|| state.displays.first())
-}
-
-pub(super) fn matches(filter: &WindowFilter, window: &FakeWindow) -> bool {
-    filter.app.as_ref().is_none_or(|app| &window.app == app)
-        && filter
-            .title
-            .as_ref()
-            .is_none_or(|title| window.title.contains(title.as_str()))
-        && filter.pid.is_none_or(|pid| window.pid == pid)
-}
-
-pub(super) fn event_line(event: &InputEvent) -> String {
-    match event {
-        InputEvent::PointerMove(point) => format!("pointer_move x={} y={}", point.x, point.y),
-        InputEvent::Button { button, down } => {
-            format!("button {button:?} down={down}").to_lowercase()
-        }
-        InputEvent::Key { key, down } => format!("key {} down={down}", quoted(key)),
-        InputEvent::Scroll { dx, dy } => format!("scroll dx={dx} dy={dy}"),
-        InputEvent::Text(text) => format!("text {}", quoted(text)),
-    }
 }
 
 pub(super) fn capture_rect(state: &FakeState, target: &Target) -> BackendResult<(Rect, f64)> {
