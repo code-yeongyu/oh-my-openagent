@@ -5,8 +5,9 @@ import { type Answer, confirms, contradicts, failed, type Probe, unmeasured } fr
 /**
  * Decision rule (written into the ledger before the run): q3 is CONFIRMS only when a pid-routed click toggles the
  * DEFAULT checkbox, recording the precondition the delivery needed (none / app active / first mouse). A toggle of
- * the first-mouse control alone is its own finding, never a pass. "No" is proven only when nothing toggles while the
- * window receives the events and the app reads active; an aim or activation failure stays UNMEASURED.
+ * the first-mouse control alone is its own finding, never a pass. "No" needs a positive control: global clicks at the
+ * same aim reach the window with the app active while pid-routed events never do, or pid-routed events arrive, toggle
+ * nothing, and an AX press toggles the same checkbox. Anything else stays UNMEASURED.
  */
 
 const PID_ROUTES = [
@@ -98,6 +99,18 @@ async function activateFixture(
   return { active, note: `NSRunningApplication activate ${short(call)}, frontmost=${active}` }
 }
 
+async function axPressControl(
+  probe: Probe,
+  pid: string,
+): Promise<{ readonly toggled: boolean; readonly note: string }> {
+  const before = stateLines(probe.fixture.stateFile).length
+  const press = probe.control(["ax-press", pid])
+  if (failed(press) !== null) return { toggled: false, note: `AX press control failed: ${short(press)}` }
+  const state = await nextState(probe.fixture.stateFile, before, probe.settleMs)
+  const toggled = state !== undefined && !state.startsWith("first-mouse")
+  return { toggled, note: `AX press control ${short(press)}: ${state ?? "no toggle"}` }
+}
+
 export async function askPidClick(probe: Probe): Promise<Answer> {
   const pid = String(probe.fixture.pid)
   const target = probe.control(["ax-checkbox", pid])
@@ -142,8 +155,10 @@ export async function askPidClick(probe: Probe): Promise<Answer> {
     }
   }
 
+  const pidClicks: (Click | string)[] = []
   for (const [route, name] of PID_ROUTES) {
     const pidClick = await clickAt(probe, aim, route)
+    pidClicks.push(pidClick)
     notes.push(`${name} ${noteOf(pidClick)}`)
     if (toggledDefault(pidClick)) {
       const needed = precondition === "" ? "none (pid-routed delivery needed no activation)" : precondition
@@ -169,7 +184,18 @@ export async function askPidClick(probe: Probe): Promise<Answer> {
     return unmeasured(
       `the app never read active while the events arrived, so activation is the blocker; ${notes.join("; ")}`,
     )
-  return contradicts(
-    `no is proven: the window received the events with the app active and no checkbox toggled; ${notes.join("; ")}`,
+  const pidArrived = pidClicks.some((click) => typeof click !== "string" && click.delivered.length > 0)
+  if (!pidArrived)
+    return contradicts(
+      `pid-routed delivery refused: global clicks at the proven aim reached the window with the app active, while pid-routed events never reached the window; ${notes.join("; ")}`,
+    )
+  const press = await axPressControl(probe, pid)
+  notes.push(press.note)
+  if (press.toggled)
+    return contradicts(
+      `no is proven against the AX press control: pid-routed events reached the window and toggled nothing, while the AX press control toggled the same checkbox; ${notes.join("; ")}`,
+    )
+  return unmeasured(
+    `the toggle oracle is unproven: no click on any route and not the AX press control toggled the checkbox; ${notes.join("; ")}`,
   )
 }
