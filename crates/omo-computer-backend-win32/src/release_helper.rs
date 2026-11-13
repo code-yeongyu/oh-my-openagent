@@ -54,8 +54,11 @@ impl HelperState {
     /// (review L2 of #13349); otherwise the read-back decides.
     #[must_use]
     pub const fn from_spawn(refused: bool, in_job: Option<bool>) -> Self {
-        let _ = refused;
-        Self::from_read_back(in_job)
+        if refused {
+            Self::Unavailable
+        } else {
+            Self::from_read_back(in_job)
+        }
     }
 
     /// `capabilities().releaseHelper`.
