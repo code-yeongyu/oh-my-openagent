@@ -39,7 +39,11 @@ export type SyncEnableResponse =
   | { readonly kind: "first_device_created"; readonly rootChanged?: true }
   /** Legacy: kept decodable for older engines; this engine never emits it. */
   | { readonly kind: "needs_first_device" }
-  | { readonly kind: "method_required"; readonly methods: readonly SyncEnableMethod[]; readonly phraseVoid?: PhraseVoidNotice }
+  | {
+      readonly kind: "method_required"
+      readonly methods: readonly SyncEnableMethod[]
+      readonly phraseVoid?: PhraseVoidNotice
+    }
   | { readonly kind: "acknowledge_required"; readonly phraseVoid: PhraseVoidNotice }
   | { readonly kind: "passkey_unavailable" }
   | {

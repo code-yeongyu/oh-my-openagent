@@ -39,7 +39,11 @@ export interface ChainWireServer {
   /** omo-service #1069 M1: while false, a keys append carrying a phrase key is refused `phrase_keys_not_accepted`. */
   readonly phrase: { accept: boolean }
   /** The `omo-sync-capabilities` and `omo-contract-version` headers of every request, in order. */
-  readonly syncHeaders: ReadonlyArray<{ readonly path: string; readonly capabilities: string | null; readonly version: string | null }>
+  readonly syncHeaders: ReadonlyArray<{
+    readonly path: string
+    readonly capabilities: string | null
+    readonly version: string | null
+  }>
   /** Parks the next `PUT /v1/sync/keys` after it is received and before admission. */
   holdKeysAppend(): { readonly received: Promise<KeyringAppendRequest>; release(): void }
   stop(): Promise<void>

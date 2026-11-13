@@ -13,6 +13,7 @@ import {
   refusal,
   temporaryHome,
 } from "../../omo-opencode/src/cli/service-auth/test-support"
+import { withGenesisLock } from "../../memory-core/src/sync/genesis/intent-store"
 import { configureSyncCommands, EXIT_UNSUPPORTED_HERE, type SyncCommandDependencies } from "../sync-cli"
 import { signedInSyncContext, type SyncContext } from "../sync-context"
 
@@ -133,6 +134,28 @@ describe("omo sync", () => {
     const result = await runSync(["sync", "enable"], { context: async () => context({ keys: 0, switches }) })
     expect(switches).toEqual([])
     expect(result.exit).toBe(EXIT_UNSUPPORTED_HERE)
+  })
+
+  test("enable while another window holds the recovery setup lock exits 1 with the in-progress line, writing nothing", async () => {
+    const switches: string[] = []
+    const held = await context({ keys: 0, switches })
+    const release = Promise.withResolvers<undefined>()
+    const entered = Promise.withResolvers<undefined>()
+    const holder = withGenesisLock(held, async () => {
+      entered.resolve(undefined)
+      await release.promise
+    })
+    await entered.promise
+    let result: Awaited<ReturnType<typeof runSync>>
+    try {
+      result = await runSync(["sync", "enable"], { context: async () => held })
+    } finally {
+      release.resolve(undefined)
+      await holder
+    }
+    expect(result.exit).toBe(1)
+    expect(result.err.join("\n")).toContain("in the middle of a recovery setup")
+    expect(switches).toEqual([])
   })
 
   test("approve refuses without an interactive terminal, because the person must compare the codes", async () => {

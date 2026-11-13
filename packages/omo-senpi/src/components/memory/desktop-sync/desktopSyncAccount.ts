@@ -179,7 +179,9 @@ export async function openDesktopSyncAccount(wire: DesktopSyncEngineWire, home?:
           phraseSupported: true,
           // The words stay in desktop main's protected window; only the public prepared genesis comes back.
           async createPhraseGenesis(request, options) {
-            const reply = await options.operation.admit(() => operation.request({ op: "phraseGenesisRun", data: request }))
+            const reply = await options.operation.admit(() =>
+              operation.request({ op: "phraseGenesisRun", data: request }),
+            )
             return genesisResult.parse(reply) as GenesisBridgeResult
           },
         }),

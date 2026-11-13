@@ -25,9 +25,18 @@ import type { PhraseVoidNotice } from "./phrase-notice.ts"
 export type EnableMethod = "passkey" | "phrase"
 
 export type EnableOutcome =
-  | { readonly kind: "joined"; readonly created?: true; readonly rootChanged?: true; readonly phraseVoid?: PhraseVoidNotice }
+  | {
+      readonly kind: "joined"
+      readonly created?: true
+      readonly rootChanged?: true
+      readonly phraseVoid?: PhraseVoidNotice
+    }
   | { readonly kind: "join_required"; readonly phraseVoid?: PhraseVoidNotice }
-  | { readonly kind: "method_required"; readonly methods: ReadonlyArray<EnableMethod>; readonly phraseVoid?: PhraseVoidNotice }
+  | {
+      readonly kind: "method_required"
+      readonly methods: ReadonlyArray<EnableMethod>
+      readonly phraseVoid?: PhraseVoidNotice
+    }
   | { readonly kind: "acknowledge_required"; readonly phraseVoid: PhraseVoidNotice }
   | { readonly kind: "passkey_unavailable" }
   | {
@@ -114,7 +123,8 @@ async function enableLocked(
   const creating = intent === null && !pin.ok && keys.length === 0
   const { genesis, serviceOrigin, rpId, userName } = input
   if (creating) {
-    if (input.method === undefined) return { kind: "method_required", methods: methodsOf(genesis, input.phraseGate), ...notice }
+    if (input.method === undefined)
+      return { kind: "method_required", methods: methodsOf(genesis, input.phraseGate), ...notice }
     // An undelivered void notice stops every new ceremony until it is acknowledged (review M2).
     if (notice.phraseVoid !== undefined) return { kind: "acknowledge_required", phraseVoid: notice.phraseVoid }
     if (input.method === "phrase") {
@@ -124,7 +134,11 @@ async function enableLocked(
       const refusal = await phraseCreationRefusal(input.phraseGate, input.account, captured.chain)
       if (refusal !== null) return { kind: "phrase_unavailable", reason: refusal }
       if (!serviceOrigin) throw new GenesisEnableError("missing_configuration")
-      return createPhraseGenesis(captured, { ...genesis, createPhraseGenesis: genesis.createPhraseGenesis }, serviceOrigin)
+      return createPhraseGenesis(
+        captured,
+        { ...genesis, createPhraseGenesis: genesis.createPhraseGenesis },
+        serviceOrigin,
+      )
     }
     if (genesis?.prfSupported !== true) return { kind: "passkey_unavailable" }
     if (!serviceOrigin || !rpId || !userName) throw new GenesisEnableError("missing_configuration")
@@ -137,7 +151,8 @@ async function enableLocked(
   checkSyncOperation(input)
   if (intent === null && (pin.ok || keys.length > 0)) return { kind: member ? "joined" : "join_required", ...notice }
   if (intent === null) {
-    if (genesis === undefined || !serviceOrigin || !rpId || !userName) throw new GenesisEnableError("missing_configuration")
+    if (genesis === undefined || !serviceOrigin || !rpId || !userName)
+      throw new GenesisEnableError("missing_configuration")
     const operation = {
       signal: syncOperationSignal(input) ?? new AbortController().signal,
       admit: <T>(begin: () => T): T => admitSyncOperation(input, begin),
@@ -145,7 +160,13 @@ async function enableLocked(
     input.onCeremony?.("passkey")
     const result = await admitSyncOperation(input, () =>
       genesis.createGenesis(
-        { account: input.account, rpId, userName, roaming: input.roaming ?? false, firstDevice: principalOf(input.keyring) },
+        {
+          account: input.account,
+          rpId,
+          userName,
+          roaming: input.roaming ?? false,
+          firstDevice: principalOf(input.keyring),
+        },
         { operation },
       ),
     )

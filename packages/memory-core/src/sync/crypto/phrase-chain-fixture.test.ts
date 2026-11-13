@@ -29,7 +29,9 @@ type Fixture = {
   readonly main: ReadonlyArray<string>
   readonly branches: { readonly fork: ReadonlyArray<string> }
   readonly records: Readonly<Record<string, Record_>>
-  readonly refused: Readonly<Record<string, { readonly reason: string; readonly request: { readonly record: KeyringBody } }>>
+  readonly refused: Readonly<
+    Record<string, { readonly reason: string; readonly request: { readonly record: KeyringBody } }>
+  >
 }
 
 const bytes = readFileSync(resolve(FIXTURES, "phrase-chain.json"))
@@ -55,7 +57,10 @@ describe("omo-service phrase vectors (#1068) read by the engine", () => {
       const phrase = generateRecoveryPhrase((target) => void target.set(entropy))
       const derived = publicKeyText(await derivePhraseKeys(phrase, fixture.account, b64urlDecode(key.enrollment_nonce)))
       phrase.dispose()
-      expect(derived).toEqual({ sealing_public_key: key.sealing_public_key, signing_public_key: key.signing_public_key })
+      expect(derived).toEqual({
+        sealing_public_key: key.sealing_public_key,
+        signing_public_key: key.signing_public_key,
+      })
     }
   })
 
