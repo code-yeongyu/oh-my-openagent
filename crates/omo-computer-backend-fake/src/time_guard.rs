@@ -39,15 +39,33 @@ fn contains_word(line: &str, needle: &str) -> bool {
 }
 
 /// The byte offset just past the comment that starts at `at`, or `None` when no comment
-/// starts there. A line comment ends before its newline; an unclosed block comment runs to the end.
+/// starts there. A line comment ends before its newline. Block comments nest, as in Rust, so a
+/// block comment ends at the `*/` that closes its own opening; an unclosed one runs to the end.
 fn comment_end(text: &str, at: usize) -> Option<usize> {
     let rest = &text[at..];
     if rest.starts_with("//") {
-        Some(rest.find('\n').map_or(text.len(), |n| at + n))
-    } else {
-        rest.strip_prefix("/*")
-            .map(|body| body.find("*/").map_or(text.len(), |n| at + 2 + n + 2))
+        return Some(rest.find('\n').map_or(text.len(), |n| at + n));
     }
+    if !rest.starts_with("/*") {
+        return None;
+    }
+    let (mut depth, mut index) = (0_u32, at);
+    while index < text.len() {
+        let tail = &text[index..];
+        if tail.starts_with("/*") {
+            depth += 1;
+            index += 2;
+        } else if tail.starts_with("*/") {
+            depth -= 1;
+            index += 2;
+            if depth == 0 {
+                return Some(index);
+            }
+        } else {
+            index += tail.chars().next().map_or(1, char::len_utf8);
+        }
+    }
+    Some(text.len())
 }
 
 /// The top-level items of every grouped `std` import in `text`, each with the byte offset of its
