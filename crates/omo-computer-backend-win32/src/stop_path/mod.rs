@@ -121,9 +121,12 @@ impl StopCursor {
 
     /// True once for each stop counted after the cursor's last read.
     pub fn take(&mut self, count: u64) -> bool {
-        let _ = count;
-        let _ = self.seen;
-        false
+        if count > self.seen {
+            self.seen = count;
+            true
+        } else {
+            false
+        }
     }
 }
 
@@ -138,8 +141,7 @@ pub enum Liveness {
 /// ended and Windows dropped the hook and hotkey) or when both its hook and hotkey failed.
 #[must_use]
 pub const fn liveness(running: bool, hook: bool, hotkey: bool) -> Liveness {
-    let _ = running;
-    if hook || hotkey {
+    if running && (hook || hotkey) {
         Liveness::Listening
     } else {
         Liveness::Deaf

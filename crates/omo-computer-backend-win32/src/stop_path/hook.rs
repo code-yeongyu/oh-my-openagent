@@ -2,10 +2,14 @@
 //! thread runs `WH_KEYBOARD_LL`, re-installed every 500 ms new-before-old so a silently removed hook
 //! leaves no gap, plus the `RegisterHotKey` backstop. The hook procedure takes no lock, allocates
 //! nothing and does no I/O: it classifies the event (the same rule as [`super::HookEvent::origin`]),
-//! updates atomics and returns. A listener whose hook AND hotkey both failed is DEAF.
+//! updates atomics and returns. A listener whose hook AND hotkey both failed, or whose thread is
+//! not running (never started, or its message loop ended), is DEAF. The thread is started once per
+//! process and shared by every listener; each listener reads the stop count through its own
+//! [`super::StopCursor`] (review M1 of #13350).
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::mpsc;
+use std::sync::OnceLock;
 use std::time::Duration;
 
 use omo_computer_core::backend::{BackendResult, Refusal, StopListener};
@@ -21,18 +25,25 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 
 use super::{
-    is_chord, normalize_vk, HookEvent, HotkeyVerdict, Origin, PhysicalChord, Sightings, VK_ESCAPE,
+    is_chord, liveness, normalize_vk, HookEvent, HotkeyVerdict, Liveness, Origin, PhysicalChord,
+    Sightings, StopCursor, VK_ESCAPE,
 };
 
 /// The `RegisterHotKey` id of the stop chord backstop.
 const HOTKEY_ID: i32 = 0x5E01;
 /// The hook is re-installed on this beat.
 const REINSTALL: Duration = Duration::from_millis(500);
+/// How long `start` waits for the thread to report its hook and hotkey before calling it deaf.
+const READY: Duration = Duration::from_secs(2);
 
 /// What the hook procedure writes and the listener reads.
 struct Shared {
-    stop: AtomicBool,
-    deaf: AtomicBool,
+    /// Physical stops (and backstop stops) counted since the process started.
+    stops: AtomicU64,
+    /// The listener thread's message loop is running.
+    running: AtomicBool,
+    hook_ok: AtomicBool,
+    hotkey_ok: AtomicBool,
     /// One bit per virtual key the user holds physically (generic modifier codes).
     held: [AtomicU64; 4],
     /// One bit per virtual key an injector holds down (ours or another's).
@@ -42,8 +53,10 @@ struct Shared {
 }
 
 static SHARED: Shared = Shared {
-    stop: AtomicBool::new(false),
-    deaf: AtomicBool::new(false),
+    stops: AtomicU64::new(0),
+    running: AtomicBool::new(false),
+    hook_ok: AtomicBool::new(false),
+    hotkey_ok: AtomicBool::new(false),
     held: [
         AtomicU64::new(0),
         AtomicU64::new(0),
@@ -107,7 +120,7 @@ unsafe extern "system" fn keyboard(code: i32, wparam: WPARAM, lparam: LPARAM) ->
                     SHARED
                         .physical_sighting
                         .store(event.time, Ordering::Relaxed);
-                    SHARED.stop.store(true, Ordering::Release);
+                    SHARED.stops.fetch_add(1, Ordering::AcqRel);
                 }
                 Origin::Ours | Origin::Foreign => SHARED
                     .injected_sighting
@@ -142,11 +155,11 @@ fn on_hotkey(now: u64) {
         sightings.record(Origin::Foreign, injected);
     }
     if sightings.on_hotkey(now) == HotkeyVerdict::BackstopStop {
-        SHARED.stop.store(true, Ordering::Release);
+        SHARED.stops.fetch_add(1, Ordering::AcqRel);
     }
 }
 
-fn run() {
+fn run(ready: &mpsc::Sender<()>) {
     let mut hook = install();
     // SAFETY: a thread-bound hotkey; WM_HOTKEY arrives on this thread's queue.
     let hotkey = unsafe {
@@ -158,9 +171,10 @@ fn run() {
         )
     }
     .is_ok();
-    SHARED
-        .deaf
-        .store(hook.is_none() && !hotkey, Ordering::Release);
+    SHARED.hook_ok.store(hook.is_some(), Ordering::Release);
+    SHARED.hotkey_ok.store(hotkey, Ordering::Release);
+    SHARED.running.store(true, Ordering::Release);
+    let _ = ready.send(());
     let interval = u32::try_from(REINSTALL.as_millis()).unwrap_or(500);
     // SAFETY: a thread timer; WM_TIMER arrives on this thread's queue.
     let timer = unsafe { SetTimer(None, 0, interval, None) };
@@ -180,9 +194,7 @@ fn run() {
                         let _ = unsafe { UnhookWindowsHookEx(old) };
                     }
                     hook = fresh;
-                    SHARED
-                        .deaf
-                        .store(hook.is_none() && !hotkey, Ordering::Release);
+                    SHARED.hook_ok.store(hook.is_some(), Ordering::Release);
                 }
                 WM_HOTKEY if message.wParam.0 == usize::try_from(HOTKEY_ID).unwrap_or(0) => {
                     on_hotkey(u64::from(message.time))
@@ -191,25 +203,41 @@ fn run() {
             }
         }
     }
+    // The loop ended: Windows drops this thread's hook and hotkey with it, so every listener is
+    // deaf from here on rather than silently never stopping.
+    SHARED.running.store(false, Ordering::Release);
     // SAFETY: the timer of this thread.
     let _ = unsafe { KillTimer(None, timer) };
 }
 
-/// The stop listener the backend hands out.
+/// Starts the one listener thread of the process (once) and waits for its first report.
+fn ensure_started() {
+    static STARTED: OnceLock<()> = OnceLock::new();
+    STARTED.get_or_init(|| {
+        let (ready, wait) = mpsc::channel();
+        let spawned = std::thread::Builder::new()
+            .name("omo-computer-stop-hook".to_owned())
+            .spawn(move || run(&ready));
+        if spawned.is_ok() {
+            // A thread that does not report in time leaves `running` false: deaf, not silent.
+            let _ = wait.recv_timeout(READY);
+        }
+    });
+}
+
+/// The stop listener the backend hands out: a cursor on the process's one listener thread.
 pub struct HookListener {
-    _alive: Arc<()>,
+    cursor: StopCursor,
 }
 
 impl HookListener {
-    /// Starts the listener thread.
+    /// Starts the process's listener thread if it is not running yet, and returns a listener that
+    /// reports the stops counted from now on.
     #[must_use]
     pub fn start() -> Self {
-        std::thread::Builder::new()
-            .name("omo-computer-stop-hook".to_owned())
-            .spawn(run)
-            .ok();
+        ensure_started();
         Self {
-            _alive: Arc::new(()),
+            cursor: StopCursor::at(SHARED.stops.load(Ordering::Acquire)),
         }
     }
 
@@ -237,9 +265,14 @@ pub const DEAF: Refusal = Refusal::new(EngineCode::StopPathUnavailable, Reason::
 
 impl StopListener for HookListener {
     fn poll_stop(&mut self) -> BackendResult<bool> {
-        if SHARED.deaf.load(Ordering::Acquire) {
+        let state = liveness(
+            SHARED.running.load(Ordering::Acquire),
+            SHARED.hook_ok.load(Ordering::Acquire),
+            SHARED.hotkey_ok.load(Ordering::Acquire),
+        );
+        if state == Liveness::Deaf {
             return Err(DEAF);
         }
-        Ok(SHARED.stop.swap(false, Ordering::AcqRel))
+        Ok(self.cursor.take(SHARED.stops.load(Ordering::Acquire)))
     }
 }
