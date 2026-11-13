@@ -1,9 +1,10 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, spyOn, test } from "bun:test"
 import { createHash } from "node:crypto"
 import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import { b64urlDecode, b64urlEncode } from "../crypto/vendor/sync-format/jcs.ts"
 import { BIP39_ENGLISH_ROWS } from "./bip39/english.ts"
+import * as vendorKeys from "../crypto/vendor/sync-format/keys.ts"
 import { publicKeyText } from "./derive.ts"
 import {
   BIP39_ENGLISH_SHA256,
@@ -156,6 +157,41 @@ describe("phrase lifecycle", () => {
     const phrase = fromEntropy("00".repeat(32))
     for (const length of [0, 16, 31, 33]) {
       await expect(derivePhraseKeys(phrase, "account", new Uint8Array(length))).rejects.toThrow(RangeError)
+    }
+  })
+})
+
+describe("phrase derivation failure paths (#13330 checker LOWs)", () => {
+  test("phraseSalt with a wrong-length nonce rejects instead of throwing synchronously", async () => {
+    let pending: Promise<unknown> | undefined
+    expect(() => {
+      pending = phraseSalt("account", new Uint8Array(31))
+    }).not.toThrow()
+    await expect(pending).rejects.toThrow(RangeError)
+  })
+
+  test("when a later derivation step throws, every private key already derived is overwritten", async () => {
+    const phrase = generateRecoveryPhrase((bytes) => void bytes.fill(7))
+    const seen: Uint8Array[] = []
+    const realHkdf = vendorKeys.hkdfSha256
+    const hkdf = spyOn(vendorKeys, "hkdfSha256").mockImplementation(async (ikm, salt, info) => {
+      const out = await realHkdf(ikm, salt, info)
+      seen.push(out)
+      return out
+    })
+    const ed = spyOn(vendorKeys, "ed25519PublicKey").mockImplementation(async () => {
+      throw new Error("synthetic public-key failure")
+    })
+    try {
+      await expect(derivePhraseKeys(phrase, "account", new Uint8Array(32).fill(1))).rejects.toThrow(
+        "synthetic public-key failure",
+      )
+      expect(seen.length).toBe(2)
+      expect(seen.map((key) => key.every((byte) => byte === 0))).toEqual([true, true])
+    } finally {
+      hkdf.mockRestore()
+      ed.mockRestore()
+      phrase.dispose()
     }
   })
 })
