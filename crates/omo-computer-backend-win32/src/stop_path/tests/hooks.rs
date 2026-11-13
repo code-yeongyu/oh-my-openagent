@@ -184,6 +184,7 @@ fn the_physical_chord_typed_with_left_or_right_modifiers_stops() {
             Some(Origin::Physical),
             "ctrl+alt+shift+escape from {modifiers:x?} stops"
         );
+        tracker.on_key(&key(VK_ESCAPE, false, Origin::Physical, 3));
         for vk in modifiers {
             tracker.on_key(&key(vk, false, Origin::Physical, 3));
         }
