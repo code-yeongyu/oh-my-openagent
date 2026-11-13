@@ -343,3 +343,20 @@ for (const [label, extra] of [
     })
   })
 }
+
+// Ordering pin (checker F2, #13336 @ cb93057a): an undelivered void notice stops a new ceremony BEFORE the client
+// flag is read, so the person always learns the earlier phrase was not saved, even on a flag-off build.
+test("#given an undelivered enroll void notice and the client flag off #when a phrase enrollment is asked for #then it answers acknowledge-required, not disabled", async () => {
+  const s = await setup()
+  const refusing = {
+    ...s.base,
+    chain: chainOf(s.world, s.world.owner, { appendKeys: async () => ({ ok: false, reason: "refused" }) }),
+  }
+  expect(await enrollPhraseRecoveryKey(refusing)).toEqual({ ok: false, reason: "refused" })
+  const flagOff = gate(false, "on")
+  expect(await enrollPhraseRecoveryKey({ ...s.base, phraseGate: flagOff.phraseGate })).toEqual({
+    ok: false,
+    reason: "acknowledge-required",
+    phraseVoid: { purpose: "enroll" },
+  })
+})
