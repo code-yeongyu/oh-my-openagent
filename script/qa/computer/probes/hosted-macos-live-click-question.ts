@@ -6,8 +6,10 @@ import { type Answer, confirms, contradicts, failed, type Probe, unmeasured } fr
  * Decision rule (written into the ledger before the run): q3 is CONFIRMS only when a pid-routed click toggles the
  * DEFAULT checkbox, recording the precondition the delivery needed (none / app active / first mouse). A toggle of
  * the first-mouse control alone is its own finding, never a pass. "No" needs a positive control: global clicks at the
- * same aim reach the window with the app active while pid-routed events never do, or pid-routed events arrive, toggle
- * nothing, and an AX press toggles the same checkbox. Anything else stays UNMEASURED.
+ * same aim reach the window with the app active while pid-routed events never do. When pid-routed events arrive and
+ * toggle nothing, no global click toggled either (that case returned earlier), so a toggling AX press proves only the
+ * state oracle, not that a click at this aim can toggle: a broken click instrument looks the same, so it stays
+ * UNMEASURED, with the AX press recorded. Anything else stays UNMEASURED.
  */
 
 const PID_ROUTES = [
@@ -197,8 +199,8 @@ export async function askPidClick(probe: Probe): Promise<Answer> {
   const press = await axPressControl(probe, pid)
   notes.push(press.note)
   if (press.toggled)
-    return contradicts(
-      `no is proven against the AX press control: pid-routed events reached the window and toggled nothing, while the AX press control toggled the same checkbox; ${notes.join("; ")}`,
+    return unmeasured(
+      `pid-routed events reached the window and toggled nothing, but no global click toggled the checkbox either; the AX press toggling it proves only the state oracle, so a broken click instrument is not ruled out; ${notes.join("; ")}`,
     )
   return unmeasured(
     `the toggle oracle is unproven: no click on any route and not the AX press control toggled the checkbox; ${notes.join("; ")}`,

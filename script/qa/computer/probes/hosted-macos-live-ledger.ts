@@ -8,10 +8,12 @@
 // q3 decision rule (first written 2026-11-12 UTC in commit b4153b7c6, before run 43272005050): q3 is CONFIRMS
 // only when a pid-routed click toggles the DEFAULT checkbox, and the row records the precondition the delivery
 // needed (none / app active / first mouse). A toggle of the first-mouse control alone is its own finding, never a
-// pass. "No" needs a positive control: either global clicks at the same aim reach the window with the app active
-// while pid-routed events never reach it (delivery refused), or pid-routed events reach it, toggle nothing, and an
-// AX press toggles the same checkbox. Anything short of that stays UNMEASURED (amended after the review of
-// 902526967: the first rule accepted "nothing toggled" without a working toggle oracle).
+// pass. "No" needs a positive control: global clicks at the same aim reach the window with the app active while
+// pid-routed events never reach it (delivery refused). Anything short of that stays UNMEASURED (amended after the
+// review of 902526967: the first rule accepted "nothing toggled" without a working toggle oracle; amended again
+// 2026-11-13 UTC after the review of d393677dcb: an AX press that toggles while no global click did proves only the
+// state oracle, so "pid-routed events arrived and toggled nothing" is no longer a "no"). Both recorded q3 rows took
+// the delivery-refused path, so no recorded verdict changes.
 
 export const QUESTIONS = ["q1", "q2", "q3", "q4", "q5", "q6", "q7", "q8"] as const
 export type Question = (typeof QUESTIONS)[number]
