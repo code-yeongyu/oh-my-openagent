@@ -1,0 +1,191 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/memory-core": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "src/git/test-repo-config.test-support.ts",
+        "src/recall/bm25-persist.ts",
+        // bundled by path by script/build-reflection-lock.ts into the doctor CLI's reflection-lock.generated.js
+        "src/reflection/reflection-lock-bundle.ts",
+        "src/sync/item/test-support.ts",
+        "src/sync/account/testing/credential-writer.test-support.ts",
+        "src/sync/keyring-port.ts",
+        "src/sync/space/test-support.ts",
+      ],
+      "ignoreFiles": [
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/extract-consent-corpus.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/concurrency/loop-crash-consistency.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/concurrency/loop-harness.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/memfs/memory-hook-cli.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/sync/crypto/vendor/sync-format/index.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/sync/engine/adapters/qa-device.test-support.ts",
+      ],
+      "ignoreIssues": {
+        // pre-existing at origin dev 4686e425b5: duplicate export(s) evaluateTransitions, evaluate
+        "src/reflection/machine.ts": ["duplicates"],
+      },
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) legacyAgreementEventKey
+    "packages/memory-core/src/agreements/events.ts": ["legacyAgreementEventKey"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) readAgreementsBody
+    "packages/memory-core/src/agreements/guard.ts": ["readAgreementsBody"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) AGREEMENTS_DESCRIPTION, AGREEMENT_TEXT_MAX_CHARS, normalizeAgreementText, parseAgreementsLedger, serializeAgreementsLedger, applyAgreementRecords, describeAgreementsToolViolation, renderAgreementsSection, AgreementRecordValidationError, AGREEMENTS_NOTICE_WATERMARK_FILENAME
+    "packages/memory-core/src/agreements/index.ts": ["AGREEMENTS_DESCRIPTION", "AGREEMENT_TEXT_MAX_CHARS", "normalizeAgreementText", "parseAgreementsLedger", "serializeAgreementsLedger", "applyAgreementRecords", "describeAgreementsToolViolation", "renderAgreementsSection", "AgreementRecordValidationError", "AGREEMENTS_NOTICE_WATERMARK_FILENAME"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) AGREEMENTS_NOTICE_WATERMARK_FILENAME
+    "packages/memory-core/src/agreements/notice-watermark.ts": ["AGREEMENTS_NOTICE_WATERMARK_FILENAME"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) AgreementRecordValidationError
+    "packages/memory-core/src/agreements/record.ts": ["AgreementRecordValidationError"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) MEMORY_TEMPLATE_STRUCTURE_VERSION, MEMORY_BLOCK_COMPILER_VERSION
+    "packages/memory-core/src/compile/cache.ts": ["MEMORY_TEMPLATE_STRUCTURE_VERSION", "MEMORY_BLOCK_COMPILER_VERSION"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) MEMORY_SESSION_TRAILER
+    "packages/memory-core/src/compile/changes.ts": ["MEMORY_SESSION_TRAILER"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) formatTakeoverTimeline
+    "packages/memory-core/src/concurrency/takeover-trace.test-support.ts": ["formatTakeoverTimeline"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) TEARDOWN_GRACE_MS, FIXTURE_REMOVAL_BOUND_MS
+    "packages/memory-core/src/concurrency/two-process-kit.test-support.ts": ["TEARDOWN_GRACE_MS", "FIXTURE_REMOVAL_BOUND_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) windowsTreeKillArgs
+    "packages/memory-core/src/concurrency/windows-process-tree.d.mts": ["windowsTreeKillArgs"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) factsBatchSize
+    "packages/memory-core/src/facts/extraction.ts": ["factsBatchSize"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) FACTS_FAILURE_REASONS
+    "packages/memory-core/src/facts/failures-schema.ts": ["FACTS_FAILURE_REASONS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) applyFailure, clearForRetry, clearOnSuccess
+    "packages/memory-core/src/facts/failures-store.ts": ["applyFailure", "clearForRetry", "clearOnSuccess"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) applyFactsBatch, FACTS_FAILURES_VERSION, FACTS_FAILURE_REASONS, parseFailuresFile, renderFailuresFile, applyFailure, clearForRetry, clearOnSuccess, FACTS_STARVATION_MS, factsSelectionKey and 11 more
+    "packages/memory-core/src/facts/index.ts": ["applyFactsBatch", "FACTS_FAILURES_VERSION", "FACTS_FAILURE_REASONS", "parseFailuresFile", "renderFailuresFile", "applyFailure", "clearForRetry", "clearOnSuccess", "FACTS_STARVATION_MS", "factsSelectionKey", "factsRecordsHash", "normalizeObservationText", "planFactsRouting", "renderPersonTargets", "FACTS_QUEUE_VERSION", "canonicalPosition", "initialCursor", "parseConsumed", "parseCursor", "parseQueueEntry", "queueTimestamp"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) FACTS_STARVATION_MS
+    "packages/memory-core/src/facts/payload-cap.ts": ["FACTS_STARVATION_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) FACTS_QUEUE_VERSION
+    "packages/memory-core/src/facts/queue.ts": ["FACTS_QUEUE_VERSION"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) queueTimestamp
+    "packages/memory-core/src/facts/schema.ts": ["queueTimestamp"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isExclusiveFlag, openSyncWithExclusivePolicy
+    "packages/memory-core/src/fs/resilient.ts": ["isExclusiveFlag", "openSyncWithExclusivePolicy"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isGitConfigLockError
+    "packages/memory-core/src/git/config-lock.ts": ["isGitConfigLockError"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) GIT_ACTIVITY_LOCK_NAME, GIT_ACTIVITY_SHARED_WAIT_MS, GitActivityLockError
+    "packages/memory-core/src/git/git-activity-lock.ts": ["GIT_ACTIVITY_LOCK_NAME", "GIT_ACTIVITY_SHARED_WAIT_MS", "GitActivityLockError"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) listProcPids
+    "packages/memory-core/src/git/proc-view.ts": ["listProcPids"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) GIT_LOCK_SETTLE_MS
+    "packages/memory-core/src/git/repo-lock-sweep.ts": ["GIT_LOCK_SETTLE_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) NO_AUTO_MAINTENANCE
+    "packages/memory-core/src/git/repo.ts": ["NO_AUTO_MAINTENANCE"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) defaultProjectScopeFs
+    "packages/memory-core/src/identity/project-scope-fs.ts": ["defaultProjectScopeFs"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) PROJECT_SCOPE_SCAN_LIMIT
+    "packages/memory-core/src/identity/project-scope.ts": ["PROJECT_SCOPE_SCAN_LIMIT"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) AUTO_IDENTITY_MODES, SHORT_HASH_LENGTH
+    "packages/memory-core/src/identity/resolve.ts": ["AUTO_IDENTITY_MODES", "SHORT_HASH_LENGTH"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) TOOL_ARGS_TRUNCATE_LIMIT, truncateToolResult
+    "packages/memory-core/src/journal/entries.ts": ["TOOL_ARGS_TRUNCATE_LIMIT", "truncateToolResult"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) TOOL_ARGS_TRUNCATE_LIMIT, TOOL_RESULT_TRUNCATE_LIMIT, truncateToolResult, finalizeCursor, reflectedThroughByteOffset, withLocalJournalLock
+    "packages/memory-core/src/journal/index.ts": ["TOOL_ARGS_TRUNCATE_LIMIT", "TOOL_RESULT_TRUNCATE_LIMIT", "truncateToolResult", "finalizeCursor", "reflectedThroughByteOffset", "withLocalJournalLock"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isCandidatePublishRace
+    "packages/memory-core/src/locks/acquire.ts": ["isCandidatePublishRace"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) identityMatches
+    "packages/memory-core/src/locks/process-liveness.test-support.ts": ["identityMatches"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isCandidatePublishRace
+    "packages/memory-core/src/locks/publish.ts": ["isCandidatePublishRace"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isYamlMapping
+    "packages/memory-core/src/memfs/frontmatter-scalar.ts": ["isYamlMapping"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) describeHeaderViolation
+    "packages/memory-core/src/memfs/frontmatter-validation.ts": ["describeHeaderViolation"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) git, parseRawZ
+    "packages/memory-core/src/memfs/memory-hook-git.ts": ["git", "parseRawZ"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) parseRawZ, provenanceOf, preCommitFailures, commitMessageFailures
+    "packages/memory-core/src/memfs/memory-hook.ts": ["parseRawZ", "provenanceOf", "preCommitFailures", "commitMessageFailures"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) FRONTMATTER_NORMALIZATION_MARKER, FRONTMATTER_NORMALIZATION_SUBJECT
+    "packages/memory-core/src/memfs/normalize.ts": ["FRONTMATTER_NORMALIZATION_MARKER", "FRONTMATTER_NORMALIZATION_SUBJECT"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) CLAIM_SOURCES, isClaimSource, quotedUserMessage
+    "packages/memory-core/src/provenance/claim.ts": ["CLAIM_SOURCES", "isClaimSource", "quotedUserMessage"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) CLAIM_SOURCES, isClaimSource
+    "packages/memory-core/src/provenance/index.ts": ["CLAIM_SOURCES", "isClaimSource"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) CJK_CORPUS_MIN_SHARE, LARGE_CORPUS_MIN_DOCUMENTS, chooseRecallStrategy
+    "packages/memory-core/src/recall/index.ts": ["CJK_CORPUS_MIN_SHARE", "LARGE_CORPUS_MIN_DOCUMENTS", "chooseRecallStrategy"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) RECALL_LEDGER_VERSION
+    "packages/memory-core/src/recall/ledger.ts": ["RECALL_LEDGER_VERSION"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) MAX_RECALL_QUERIES
+    "packages/memory-core/src/recall/planner.ts": ["MAX_RECALL_QUERIES"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) RECALL_EXPANSION_WEIGHTS
+    "packages/memory-core/src/recall/select.ts": ["RECALL_EXPANSION_WEIGHTS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DROPPED_TRAILER
+    "packages/memory-core/src/reflection/completion-repair.ts": ["DROPPED_TRAILER"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) findSecretLikeFailure
+    "packages/memory-core/src/reflection/completion-secret-scan.ts": ["findSecretLikeFailure"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) REFLECTION_PENDING_MAX_CONVERSATIONS, REFLECTION_PENDING_MAX_BYTES, evaluate
+    "packages/memory-core/src/reflection/machine.ts": ["REFLECTION_PENDING_MAX_CONVERSATIONS", "REFLECTION_PENDING_MAX_BYTES", "evaluate"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ReflectionParkStateError
+    "packages/memory-core/src/reflection/park.ts": ["ReflectionParkStateError"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) createRemindersState, generateReminders, reminderKindFor
+    "packages/memory-core/src/reminders/index.ts": ["createRemindersState", "generateReminders", "reminderKindFor"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) SOUL_NOTICE_WATERMARK_FILENAME
+    "packages/memory-core/src/soul/watermark.ts": ["SOUL_NOTICE_WATERMARK_FILENAME"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) AccountHttpError
+    "packages/memory-core/src/sync/account/index.ts": ["AccountHttpError"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) hexOfB64url, spaceItems
+    "packages/memory-core/src/sync/account/verifier.ts": ["hexOfB64url", "spaceItems"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) MAX_CANONICAL_DEPTH
+    "packages/memory-core/src/sync/canonical-json.ts": ["MAX_CANONICAL_DEPTH"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) sealToPort, keyMaterial
+    "packages/memory-core/src/sync/crypto/testing/hpke-seal.ts": ["sealToPort", "keyMaterial"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) strictEd25519Key, strictEd25519Precheck, strictEd25519Verify, strictX25519Key, checkSharedSecret
+    "packages/memory-core/src/sync/crypto/testing/strict-ed25519-oracle.test-support.ts": ["strictEd25519Key", "strictEd25519Precheck", "strictEd25519Verify", "strictX25519Key", "checkSharedSecret"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) FIXTURES, headOf, digestOf
+    "packages/memory-core/src/sync/crypto/testing/sync-v1.test-support.ts": ["FIXTURES", "headOf", "digestOf"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) recordPreimage, entryAuthorKey, b64url
+    "packages/memory-core/src/sync/crypto/vendor/sync-format/chain.ts": ["recordPreimage", "entryAuthorKey", "b64url"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) framedPreimage, deriveDeviceId
+    "packages/memory-core/src/sync/crypto/vendor/sync-format/keys.ts": ["framedPreimage", "deriveDeviceId"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) OBJECT_MAGIC
+    "packages/memory-core/src/sync/crypto/vendor/sync-format/object.ts": ["OBJECT_MAGIC"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) verifySnapshot
+    "packages/memory-core/src/sync/crypto/vendor/sync-format/snapshot.ts": ["verifySnapshot"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) PLAINTEXT_LIMIT
+    "packages/memory-core/src/sync/crypto/vendor/sync-format/stream.ts": ["PLAINTEXT_LIMIT"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) SyncCommitError
+    "packages/memory-core/src/sync/engine/adapters/git-sync-repo.ts": ["SyncCommitError"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ManualClock, inProcessLock
+    "packages/memory-core/src/sync/engine/engine-harness.test-support.ts": ["ManualClock", "inProcessLock"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) POLL_MS
+    "packages/memory-core/src/sync/engine/engine.ts": ["POLL_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) createHttpTransport, SyncHttpError, SyncEngine
+    "packages/memory-core/src/sync/engine/index.ts": ["createHttpTransport", "SyncHttpError", "SyncEngine"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) MAX_RECEIPTS
+    "packages/memory-core/src/sync/item/capture-receipts.ts": ["MAX_RECEIPTS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) x25519PublicKey
+    "packages/memory-core/src/sync/recovery/derive.ts": ["x25519PublicKey"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) VETO_WINDOW_MS
+    "packages/memory-core/src/sync/recovery/index.ts": ["VETO_WINDOW_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) VETO_WINDOW_MS
+    "packages/memory-core/src/sync/recovery/join-notice.ts": ["VETO_WINDOW_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) envelopeBytes
+    "packages/memory-core/src/sync/recovery/key-material.ts": ["envelopeBytes"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) RECOVER_AGAIN
+    "packages/memory-core/src/sync/recovery/ports.ts": ["RECOVER_AGAIN"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) RECOVERY_HANDLE_TTL_MS
+    "packages/memory-core/src/sync/recovery/recovery-handles.ts": ["RECOVERY_HANDLE_TTL_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) WRITE_HOLD_NEXT_STEP
+    "packages/memory-core/src/sync/recovery/write-hold.ts": ["WRITE_HOLD_NEXT_STEP"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) toLf, linesOf
+    "packages/memory-core/src/sync/space/read-back.ts": ["toLf", "linesOf"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) MemoryApplyPatchError
+    "packages/memory-core/src/tools/memory-apply-patch.ts": ["MemoryApplyPatchError"]
+  }
+}
