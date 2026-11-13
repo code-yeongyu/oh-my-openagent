@@ -21,7 +21,8 @@ type ServedKey = { readonly salt: RecoverySaltInput; readonly prf: boolean }
 const prfCapable = (value: unknown): boolean => {
   const rpId: unknown = Reflect.get(Object(value), "rp_id")
   return (
-    Reflect.get(Object(value), "survivable") !== "phrase" && !(typeof rpId === "string" && rpId.startsWith(RESERVED_RP_PREFIX))
+    Reflect.get(Object(value), "survivable") !== "phrase" &&
+    !(typeof rpId === "string" && rpId.startsWith(RESERVED_RP_PREFIX))
   )
 }
 
