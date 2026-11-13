@@ -1841,8 +1841,9 @@
       "packages/telemetry-core/src/otlp-encode.ts": ["hexToBytes", "keyValues"],
       // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_OTLP_ENDPOINT, isOtlpTelemetryEnabled, isWireAttributeKey, resolveOtlpEndpoint
       "packages/telemetry-core/src/otlp-entry.ts": ["DEFAULT_OTLP_ENDPOINT", "isOtlpTelemetryEnabled", "isWireAttributeKey", "resolveOtlpEndpoint"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) MAX_BODY_BYTES, GZIP_THRESHOLD_BYTES, BACKOFF_MS, MAX_RETRY_AFTER_MS
-      "packages/telemetry-core/src/otlp-http.ts": ["MAX_BODY_BYTES", "GZIP_THRESHOLD_BYTES", "BACKOFF_MS", "MAX_RETRY_AFTER_MS"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) MAX_BODY_BYTES, GZIP_THRESHOLD_BYTES, BACKOFF_MS
+      // #12789 dropped MAX_RETRY_AFTER_MS: otlp-spool-not-before.ts now imports it
+      "packages/telemetry-core/src/otlp-http.ts": ["MAX_BODY_BYTES", "GZIP_THRESHOLD_BYTES", "BACKOFF_MS"],
       // pre-existing at origin dev 4686e425b5: unused export(s) file_opentelemetry_proto_collector_logs_v1_logs_service, ExportLogsPartialSuccessSchema, LogsService
       "packages/telemetry-core/src/otlp-proto/opentelemetry/proto/collector/logs/v1/logs_service_pb.ts": ["file_opentelemetry_proto_collector_logs_v1_logs_service", "ExportLogsPartialSuccessSchema", "LogsService"],
       // pre-existing at origin dev 4686e425b5: unused export(s) file_opentelemetry_proto_collector_trace_v1_trace_service, ExportTracePartialSuccessSchema, TraceService

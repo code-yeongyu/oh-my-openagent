@@ -13,12 +13,15 @@ export const MAX_RETRY_AFTER_MS = 60_000
 export const DEFAULT_REQUEST_TIMEOUT_MS = 10_000
 
 /**
- * The longest one batch's send can take: every attempt ends by its request timeout and every pause
- * between attempts is at most MAX_RETRY_AFTER_MS (the jittered backoff stays below it). The claim's
- * lease is not renewed past this point, so a send stuck anywhere else frees its batch for others.
+ * The longest one batch's send can take: every attempt ends by its request timeout, every pause
+ * between attempts is at most MAX_RETRY_AFTER_MS (the jittered backoff stays below it), and every
+ * attempt, the first included, may first wait out the install's shared not-before time, again at most
+ * MAX_RETRY_AFTER_MS. The claim's lease is not renewed past this point, so a send stuck anywhere else
+ * frees its batch for others.
  */
 export function maxSendMs(requestTimeoutMs: number): number {
-  return (BACKOFF_MS.length + 1) * requestTimeoutMs + BACKOFF_MS.length * MAX_RETRY_AFTER_MS
+  const attempts = BACKOFF_MS.length + 1
+  return attempts * (requestTimeoutMs + MAX_RETRY_AFTER_MS) + BACKOFF_MS.length * MAX_RETRY_AFTER_MS
 }
 
 const RETRYABLE = new Set([429, 502, 503, 504])
