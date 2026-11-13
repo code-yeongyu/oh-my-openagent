@@ -20,7 +20,10 @@
     "./sync-account-ports": {
       "import": "./src/sync/account/account-ports-runtime.ts"
     },
-    "./sync-device-retire": {
+    "./sync-capabilities": {
+    "import": "./src/sync/contract-version.ts"
+  },
+  "./sync-device-retire": {
       "import": "./src/sync/device-retire.ts"
     },
     "./personas": {

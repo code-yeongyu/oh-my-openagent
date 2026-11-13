@@ -8,7 +8,8 @@ import type {
   SyncOperationAuthority,
 } from "@oh-my-opencode/memory-core/sync-engine"
 import type { DeviceKeyring } from "@oh-my-opencode/memory-core/keyring"
-import { SYNC_CAPABILITIES } from "@oh-my-opencode/memory-core/sync-engine"
+// The light subpath: a value import from sync-engine would pull the whole engine (and its wasm asset) into this bundle.
+import { SYNC_CAPABILITIES } from "@oh-my-opencode/memory-core/sync-capabilities"
 import { desktopSyncAccountPorts } from "./desktopSyncAccountPorts"
 import { desktopSyncBoundary } from "./desktopSyncBoundary"
 import { openDesktopSyncOperation } from "./desktopSyncOperation"
