@@ -166,3 +166,61 @@ mod base64_tests {
         }
     }
 }
+
+#[cfg(test)]
+mod occluder_tests {
+    use omo_computer_backend_fake::{FakeBackend, FakeScenario};
+    use omo_computer_core::backend::FrameBytes;
+    use omo_computer_core::capabilities::CaptureRoute;
+    use omo_computer_core::frame::{Delivery, FrameGeometry};
+    use omo_computer_core::observation::{CursorMode, ImageMime};
+    use omo_computer_core::params::ReportMode;
+    use omo_computer_core::results::CaptureReply;
+
+    use super::super::CapturedFrame;
+    use crate::Session;
+
+    const SCENARIO: &str =
+        include_str!("../../../omo-computer-backend-fake/fixtures/two-displays-one-window.json");
+
+    fn reply(route: CaptureRoute, occluders_visible: bool) -> serde_json::Value {
+        let scenario = FakeScenario::from_json(SCENARIO).expect("scenario");
+        let mut session = Session::new(Box::new(FakeBackend::new(scenario)));
+        let bytes = FrameBytes {
+            width: 4,
+            height: 2,
+            mime: ImageMime::Png,
+            bytes: Vec::new(),
+            route: Some(route),
+            occluders_visible: Some(occluders_visible),
+            cursor: None,
+        };
+        let frame = CapturedFrame {
+            frame_id: "f1".to_owned(),
+            target: "101".to_owned(),
+            geometry: FrameGeometry::pixels_only("no_logical_geometry", 4, 2, 0),
+            bytes,
+            cursor: CursorMode::None,
+            route: Some(route),
+            occluders_visible: Some(occluders_visible),
+        };
+        match session.capture_reply(ReportMode::Object, frame, Delivery::InlinePng(Vec::new())) {
+            Ok(CaptureReply::Object(frame)) => serde_json::to_value(*frame).expect("serializes"),
+            other => panic!("an object reply, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_root_crop_frame_says_occluders_may_show_and_names_raise() {
+        let frame = reply(CaptureRoute::RootCrop, true);
+        assert_eq!(frame["occludersVisible"], true);
+        assert_eq!(frame["nextCall"], "win.raise()");
+    }
+
+    #[test]
+    fn a_composite_frame_omits_both_members() {
+        let frame = reply(CaptureRoute::Composite, false);
+        assert!(frame.get("occludersVisible").is_none());
+        assert!(frame.get("nextCall").is_none());
+    }
+}
