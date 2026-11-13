@@ -23,17 +23,18 @@ const STOP_MODIFIERS: [u16; 3] = [VK_CONTROL, VK_MENU, VK_SHIFT];
 /// generic VK_SHIFT/VK_CONTROL/VK_MENU); every other key is itself.
 #[must_use]
 pub const fn normalize_vk(vk: u16) -> u16 {
-    vk
+    match vk {
+        0xA0 | 0xA1 => VK_SHIFT,
+        0xA2 | 0xA3 => VK_CONTROL,
+        0xA4 | 0xA5 => VK_MENU,
+        other => other,
+    }
 }
 
 /// Whether `event` completes the stop chord, given which keys are held by the SAME origin
 /// (physical keys for a physical event, injected keys for an injected one).
 pub fn is_chord(event: &HookEvent, held: impl Fn(u16) -> bool) -> bool {
-    event.down
-        && event.vk == VK_ESCAPE
-        && STOP_MODIFIERS
-            .iter()
-            .all(|vk| event.origin() != Origin::Physical || held(*vk))
+    event.down && normalize_vk(event.vk) == VK_ESCAPE && STOP_MODIFIERS.iter().all(|vk| held(*vk))
 }
 
 /// One `KBDLLHOOKSTRUCT` as the procedure reads it.
@@ -79,22 +80,21 @@ impl PhysicalChord {
     /// sighting stops; an injected one is recorded for the hotkey dedupe).
     pub fn on_key(&mut self, event: &HookEvent) -> Option<Origin> {
         let origin = event.origin();
+        let vk = normalize_vk(event.vk);
         let keys = if origin == Origin::Physical {
             &mut self.held
         } else {
             &mut self.injected_down
         };
         if event.down {
-            if !keys.contains(&event.vk) {
-                keys.push(event.vk);
+            if !keys.contains(&vk) {
+                keys.push(vk);
             }
         } else {
-            keys.retain(|vk| *vk != event.vk);
+            keys.retain(|held| *held != vk);
         }
-        let complete = event.down
-            && event.vk == VK_ESCAPE
-            && STOP_MODIFIERS.iter().all(|vk| keys.contains(vk));
-        complete.then_some(origin)
+        let keys: &[u16] = keys;
+        is_chord(event, |modifier| keys.contains(&modifier)).then_some(origin)
     }
 
     /// The virtual keys seen physically down and not yet up.
@@ -144,5 +144,6 @@ impl Sightings {
 /// Whether `vk` is one of the stop chord's keys.
 #[must_use]
 pub fn is_stop_chord_key(vk: u16) -> bool {
+    let vk = normalize_vk(vk);
     vk == VK_ESCAPE || STOP_MODIFIERS.contains(&vk)
 }

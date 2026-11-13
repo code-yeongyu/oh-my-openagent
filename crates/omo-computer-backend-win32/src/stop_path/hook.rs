@@ -20,7 +20,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WM_KEYDOWN, WM_SYSKEYDOWN, WM_TIMER,
 };
 
-use super::{HookEvent, HotkeyVerdict, Origin, PhysicalChord, Sightings, VK_ESCAPE};
+use super::{
+    is_chord, normalize_vk, HookEvent, HotkeyVerdict, Origin, PhysicalChord, Sightings, VK_ESCAPE,
+};
 
 /// The `RegisterHotKey` id of the stop chord backstop.
 const HOTKEY_ID: i32 = 0x5E01;
@@ -31,8 +33,10 @@ const REINSTALL: Duration = Duration::from_millis(500);
 struct Shared {
     stop: AtomicBool,
     deaf: AtomicBool,
-    /// One bit per virtual key the user holds physically.
+    /// One bit per virtual key the user holds physically (generic modifier codes).
     held: [AtomicU64; 4],
+    /// One bit per virtual key an injector holds down (ours or another's).
+    injected_held: [AtomicU64; 4],
     physical_sighting: AtomicU64,
     injected_sighting: AtomicU64,
 }
@@ -46,12 +50,18 @@ static SHARED: Shared = Shared {
         AtomicU64::new(0),
         AtomicU64::new(0),
     ],
+    injected_held: [
+        AtomicU64::new(0),
+        AtomicU64::new(0),
+        AtomicU64::new(0),
+        AtomicU64::new(0),
+    ],
     physical_sighting: AtomicU64::new(0),
     injected_sighting: AtomicU64::new(0),
 };
 
-fn set_held(vk: u16, down: bool) {
-    let word = &SHARED.held[usize::from(vk / 64) & 3];
+fn set_bit(set: &[AtomicU64; 4], vk: u16, down: bool) {
+    let word = &set[usize::from(vk / 64) & 3];
     let bit = 1u64 << (vk % 64);
     if down {
         word.fetch_or(bit, Ordering::Relaxed);
@@ -60,8 +70,12 @@ fn set_held(vk: u16, down: bool) {
     }
 }
 
+fn bit(set: &[AtomicU64; 4], vk: u16) -> bool {
+    set[usize::from(vk / 64) & 3].load(Ordering::Relaxed) & (1u64 << (vk % 64)) != 0
+}
+
 fn is_held(vk: u16) -> bool {
-    SHARED.held[usize::from(vk / 64) & 3].load(Ordering::Relaxed) & (1u64 << (vk % 64)) != 0
+    bit(&SHARED.held, vk)
 }
 
 unsafe extern "system" fn keyboard(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
@@ -79,14 +93,14 @@ unsafe extern "system" fn keyboard(code: i32, wparam: WPARAM, lparam: LPARAM) ->
             time: u64::from(info.time),
         };
         let origin = event.origin();
-        if origin == Origin::Physical {
-            set_held(event.vk, event.down);
-        }
-        let chord = event.down
-            && event.vk == VK_ESCAPE
-            && [0x11u16, 0x12, 0x10]
-                .iter()
-                .all(|vk| origin != Origin::Physical || is_held(*vk));
+        // Left/right modifier codes are folded to the generic ones (review H1 of #13350).
+        let set = if origin == Origin::Physical {
+            &SHARED.held
+        } else {
+            &SHARED.injected_held
+        };
+        set_bit(set, normalize_vk(event.vk), event.down);
+        let chord = is_chord(&event, |vk| bit(set, vk));
         if chord {
             match origin {
                 Origin::Physical => {
