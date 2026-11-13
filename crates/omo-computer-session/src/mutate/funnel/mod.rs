@@ -65,7 +65,7 @@ impl Session {
                     "Lease" => plan.lease_detail.clone(),
                     _ => None,
                 };
-                let mut refused = self.stamp(blocked.refused, object);
+                let mut refused = self.stamp(*blocked.refused, object);
                 refused.detail = detail.map(Box::new);
                 return Err(self.refuse(record, Some(blocked.stage), refused));
             }
