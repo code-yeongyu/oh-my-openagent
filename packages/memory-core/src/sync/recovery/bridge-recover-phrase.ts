@@ -41,7 +41,11 @@ export const recoverBeginWithPhraseInBridge = async (
     const phrase = parsed.phrase
     try {
       for (const hint of request.hints) {
-        const keys: RecoveryKeyPairs = await derivePhraseKeys(phrase, request.account, b64urlDecode(hint.enrollmentNonce))
+        const keys: RecoveryKeyPairs = await derivePhraseKeys(
+          phrase,
+          request.account,
+          b64urlDecode(hint.enrollmentNonce),
+        )
         const publicKeys = publicKeyText(keys)
         if (
           publicKeys.sealing_public_key !== hint.sealing_public_key ||

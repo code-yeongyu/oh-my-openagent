@@ -75,7 +75,9 @@ test("#given an enrolled phrase #when a fresh device types it #then recovery run
   const s = await enrolledWorld()
   const { outcome } = await recoverWith(s.world, s.words)
   expect(outcome).toMatchObject({ ok: true, credentialId: s.credentialId })
-  const joined = (await verified(s.world, s.world.owner)).received.find((record) => record.body.kind === "recovery-join")
+  const joined = (await verified(s.world, s.world.owner)).received.find(
+    (record) => record.body.kind === "recovery-join",
+  )
   expect(joined?.body["credential_id"]).toBe(s.credentialId)
 })
 
@@ -85,7 +87,9 @@ test("#given a different but valid phrase #when it is typed #then nothing matche
   const { outcome } = await recoverWith(s.world, other.reveal())
   other.dispose()
   expect(outcome).toEqual({ ok: false, reason: "history-incomplete" })
-  expect((await verified(s.world, s.world.owner)).received.some((record) => record.body.kind === "recovery-join")).toBe(false)
+  expect((await verified(s.world, s.world.owner)).received.some((record) => record.body.kind === "recovery-join")).toBe(
+    false,
+  )
 })
 
 test("#given a mistyped phrase #when it is entered #then the surface is asked again with the checksum reason and no key is derived", async () => {

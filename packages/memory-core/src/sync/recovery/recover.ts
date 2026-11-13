@@ -130,7 +130,10 @@ export const recoverOnFreshDevice = async (input: RecoverInput): Promise<Recover
 
 type BeginRefusal = "no-recovery-key" | "unavailable" | "too-many-recovery-keys"
 
-const beginWithPasskey = async (input: RecoverInput, bridge: RecoveryBridge): Promise<RecoverBeginResult | BeginRefusal> => {
+const beginWithPasskey = async (
+  input: RecoverInput,
+  bridge: RecoveryBridge,
+): Promise<RecoverBeginResult | BeginRefusal> => {
   const served = await servedSaltInputs(input.transport)
   if (!served.ok) return served.reason
   if (served.salts.length === 0) return "no-recovery-key"
@@ -144,7 +147,10 @@ const beginWithPasskey = async (input: RecoverInput, bridge: RecoveryBridge): Pr
 }
 
 /** The phrase is derived only against served phrase-kind hints; the anchored walk below decides (contract 6, DI). */
-const beginWithPhrase = async (input: RecoverInput, bridge: RecoveryBridge): Promise<RecoverBeginResult | BeginRefusal> => {
+const beginWithPhrase = async (
+  input: RecoverInput,
+  bridge: RecoveryBridge,
+): Promise<RecoverBeginResult | BeginRefusal> => {
   const begin = bridge.recoverBeginWithPhrase
   if (begin === undefined) return "unavailable"
   const served = await servedPhraseHints(input.transport)

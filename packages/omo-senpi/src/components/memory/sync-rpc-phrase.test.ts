@@ -20,10 +20,13 @@ test("#given the phrase flag off or on #when features is asked #then phrase-gene
 test("#given enable with the phrase method #when the ceremony starts #then the method and gate reach enable, the call answers in_progress at once, and status settles to the created outcome", async () => {
   const phraseGate = gate(true)
   const f = await setup({ phraseGate })
-  const finish = Promise.withResolvers<void>()
+  const finish = Promise.withResolvers<undefined>()
   const seen: { method?: string; gate?: PhraseGate }[] = []
   f.runtime.enableSync = async (input) => {
-    seen.push({ ...(input.method !== undefined && { method: input.method }), ...(input.phraseGate !== undefined && { gate: input.phraseGate }) })
+    seen.push({
+      ...(input.method !== undefined && { method: input.method }),
+      ...(input.phraseGate !== undefined && { gate: input.phraseGate }),
+    })
     input.onCeremony?.("phrase")
     await finish.promise
     return { kind: "joined", created: true }
@@ -32,7 +35,7 @@ test("#given enable with the phrase method #when the ceremony starts #then the m
   expect(await f.call("enable", a.context, { method: "phrase" })).toEqual({ kind: "in_progress", method: "phrase" })
   expect(seen).toEqual([{ method: "phrase", gate: phraseGate }])
   expect(await f.call("status", a.context)).toMatchObject({ enable: { kind: "in_progress", method: "phrase" } })
-  finish.resolve()
+  finish.resolve(undefined)
   await f.coordinator.dispose()
 })
 
@@ -69,7 +72,9 @@ test("#given an acknowledge request #when it arrives #then only the named notice
     seen.push({ purpose: input.purpose, ...(input.credentialId !== undefined && { credentialId: input.credentialId }) })
     return { ok: true }
   }
-  expect(await f.call("acknowledge", a.context, { notice: "phrase_void", purpose: "rotate", credentialId: "c1" })).toEqual({
+  expect(
+    await f.call("acknowledge", a.context, { notice: "phrase_void", purpose: "rotate", credentialId: "c1" }),
+  ).toEqual({
     ok: true,
   })
   expect(seen).toEqual([{ purpose: "rotate", credentialId: "c1" }])
