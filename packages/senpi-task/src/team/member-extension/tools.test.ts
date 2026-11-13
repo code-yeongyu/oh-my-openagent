@@ -38,10 +38,7 @@ describe("member extension tools", () => {
   test("#given member and lead recipients #when task_send runs #then each durable inbox receives its unchanged message", async () => {
     // given
     const harness = createHarness()
-    const ids = [
-      "99999999-9999-4999-8999-999999999999",
-      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    ]
+    const ids = ["99999999-9999-4999-8999-999999999999", "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"]
     const deps = {
       teamRunId: TEAM_RUN_ID,
       memberName: "alice",
@@ -58,10 +55,22 @@ describe("member extension tools", () => {
     const leadResult = await runMemberTaskSend(deps, { to: "lead", message: "lead note" })
 
     // then
-    expect(memberResult.details).toEqual({ kind: "team_message", message_id: "99999999-9999-4999-8999-999999999999", to: "bob" })
-    expect(leadResult.details).toEqual({ kind: "team_message", message_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", to: "lead" })
-    expect((await listUnreadMessages(TEAM_RUN_ID, "bob", harness.config)).map((entry) => entry.body)).toEqual(["member note"])
-    expect((await listUnreadMessages(TEAM_RUN_ID, "lead", harness.config)).map((entry) => entry.body)).toEqual(["lead note"])
+    expect(memberResult.details).toEqual({
+      kind: "team_message",
+      message_id: "99999999-9999-4999-8999-999999999999",
+      to: "bob",
+    })
+    expect(leadResult.details).toEqual({
+      kind: "team_message",
+      message_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      to: "lead",
+    })
+    expect((await listUnreadMessages(TEAM_RUN_ID, "bob", harness.config)).map((entry) => entry.body)).toEqual([
+      "member note",
+    ])
+    expect((await listUnreadMessages(TEAM_RUN_ID, "lead", harness.config)).map((entry) => entry.body)).toEqual([
+      "lead note",
+    ])
     expect(harness.events.map((event) => event.type)).toEqual(["team_message_sent", "team_message_sent"])
   })
 
@@ -123,8 +132,12 @@ describe("member extension tools", () => {
     // when / then
     expect(parseMemberExtensionEnv(baseEnv).memberName).toBe("alice")
     for (const identity of ["", "alice", `${TEAM_RUN_ID}::`, `::alice`, `${TEAM_RUN_ID}::alice::extra`]) {
-      expect(() => parseMemberExtensionEnv({ ...baseEnv, SENPI_TASK_MEMBER: identity })).toThrow(MemberExtensionConfigError)
+      expect(() => parseMemberExtensionEnv({ ...baseEnv, SENPI_TASK_MEMBER: identity })).toThrow(
+        MemberExtensionConfigError,
+      )
     }
-    expect(() => parseMemberExtensionEnv({ ...baseEnv, SENPI_TASK_MEMBER_TASK_ID: "st_bad" })).toThrow(MemberExtensionConfigError)
+    expect(() => parseMemberExtensionEnv({ ...baseEnv, SENPI_TASK_MEMBER_TASK_ID: "st_bad" })).toThrow(
+      MemberExtensionConfigError,
+    )
   })
 })

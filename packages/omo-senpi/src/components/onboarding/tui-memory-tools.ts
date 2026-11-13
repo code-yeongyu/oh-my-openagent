@@ -85,11 +85,27 @@ export function createOnboardingMemoryTools(options: TuiMemoryToolsOptions): {
     searchKeywords: ["onboarding", "understanding", "memory candidates", "facts"],
     allowLazyActivation: true,
     executionMode: "sequential",
-    async execute(_toolCallId, params: Static<typeof OnboardingUnderstandParams>, signal, _onUpdate, ectx): Promise<AgentToolResult<OnboardingUnderstandDetails>> {
-      if (params.consent !== true) return failure("Ask the user first: understanding sends session digests to the model provider. Call again with consent: true once they agree.")
+    async execute(
+      _toolCallId,
+      params: Static<typeof OnboardingUnderstandParams>,
+      signal,
+      _onUpdate,
+      ectx,
+    ): Promise<AgentToolResult<OnboardingUnderstandDetails>> {
+      if (params.consent !== true)
+        return failure(
+          "Ask the user first: understanding sends session digests to the model provider. Call again with consent: true once they agree.",
+        )
       const loaded = await runtime()
       if (typeof loaded === "string") return failure(loaded)
-      return loaded.executeOnboardingUnderstand({ params, signal, ectx, runs, scan: options.scan, ...(options.seams === undefined ? {} : { seams: options.seams }) })
+      return loaded.executeOnboardingUnderstand({
+        params,
+        signal,
+        ectx,
+        runs,
+        scan: options.scan,
+        ...(options.seams === undefined ? {} : { seams: options.seams }),
+      })
     },
   }
 
@@ -105,7 +121,13 @@ export function createOnboardingMemoryTools(options: TuiMemoryToolsOptions): {
     searchKeywords: ["onboarding", "remember", "memory", "facts"],
     allowLazyActivation: true,
     executionMode: "sequential",
-    async execute(_toolCallId, params: Static<typeof OnboardingMemoryApplyParams>, _signal, _onUpdate, ectx): Promise<AgentToolResult<MemoryFactsApplyResponse | undefined>> {
+    async execute(
+      _toolCallId,
+      params: Static<typeof OnboardingMemoryApplyParams>,
+      _signal,
+      _onUpdate,
+      ectx,
+    ): Promise<AgentToolResult<MemoryFactsApplyResponse | undefined>> {
       const loaded = await runtime()
       if (typeof loaded === "string") return failure(loaded)
       return loaded.executeOnboardingMemoryApply({ params, ectx, runs, applier: sessionFactsApplier() })

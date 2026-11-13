@@ -213,7 +213,10 @@ describe("lazycodex marketplace validation guards", () => {
         2,
       )}\n`,
     )
-    await writeFile(join(pluginRoot, "components", "ulw-execute-continuation", "dist", "cli.js"), "#!/usr/bin/env node\n")
+    await writeFile(
+      join(pluginRoot, "components", "ulw-execute-continuation", "dist", "cli.js"),
+      "#!/usr/bin/env node\n",
+    )
 
     try {
       // when

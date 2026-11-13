@@ -47,6 +47,9 @@ struct Expected {
     message: Value,
     #[serde(default)]
     variable: Vec<String>,
+    /// Values a later `send` names as `{{name}}`.
+    #[serde(default)]
+    bind: BTreeMap<String, String>,
 }
 
 impl Validator<'_> {
@@ -112,6 +115,9 @@ impl Validator<'_> {
                     .find(|pointer| message.pointer(pointer).is_none())
                 {
                     return Err(format!("{at}: variable {pointer} names no member"));
+                }
+                if let Some(pointer) = expected.bind.values().find(|pointer| message.pointer(pointer).is_none()) {
+                    return Err(format!("{at}: bind {pointer} names no member"));
                 }
                 match message["method"].as_str() {
                     Some(name) => {

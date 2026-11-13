@@ -89,13 +89,15 @@ describe("TaskManager spawn-fact persistence", () => {
     const { manager } = makeManager({ process: processRunner })
 
     // when
-    const result = await manager.start(baseSpec({
-      execution_mode: "process",
-      memberEnv: {
-        SENPI_TASK_MEMBER: "11111111-1111-4111-8111-111111111111::alpha",
-        SENPI_TASK_TEAM_CONFIG: "{}",
-      },
-    }))
+    const result = await manager.start(
+      baseSpec({
+        execution_mode: "process",
+        memberEnv: {
+          SENPI_TASK_MEMBER: "11111111-1111-4111-8111-111111111111::alpha",
+          SENPI_TASK_TEAM_CONFIG: "{}",
+        },
+      }),
+    )
 
     // then
     if (result.kind !== "started") throw new Error("expected started")

@@ -22,7 +22,10 @@ export function resolveSkillContent(skillName: string, options?: SkillResolution
   return resolveWithOptions(skillName, withOpenCodeShell(options))
 }
 
-export function resolveMultipleSkills(skillNames: string[], options?: SkillResolutionOptions): ReturnType<typeof resolveMultipleWithOptions> {
+export function resolveMultipleSkills(
+  skillNames: string[],
+  options?: SkillResolutionOptions,
+): ReturnType<typeof resolveMultipleWithOptions> {
   return resolveMultipleWithOptions(skillNames, withOpenCodeShell(options))
 }
 

@@ -77,11 +77,7 @@ export function makeStaleRepo(agentsMode?: "committed" | "local"): string {
   if (agentsMode === "committed") writeFileAt(root, "AGENTS.md", "# Guide\n")
   commitAll(root, "fixture")
   if (agentsMode === "local") writeFileAt(root, "AGENTS.md", "# Guide\n")
-  writeFileAt(
-    root,
-    ".omo/init-deep.json",
-    "invalid",
-  )
+  writeFileAt(root, ".omo/init-deep.json", "invalid")
   return root
 }
 
@@ -93,8 +89,7 @@ export function createHarness(
 ) {
   const pi = new AdvisorFakeExtensionAPI()
   const select = mockFn(
-    selectImplementation ??
-      (async (_title: string, _options: string[], _opts?: { timeout?: number }) => choice),
+    selectImplementation ?? (async (_title: string, _options: string[], _opts?: { timeout?: number }) => choice),
   )
   const eventCtx = { cwd: root, hasUI, ui: { select } } as unknown as ExtensionContext
   return { pi, select, eventCtx }

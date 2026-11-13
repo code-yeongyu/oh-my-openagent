@@ -10,12 +10,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { OmoTaskSettingsSchema } from "@oh-my-opencode/omo-config-core"
-import {
-  createDagFileStore,
-  createDagManager,
-  createDagScheduler,
-  type DagRunId,
-} from "@oh-my-opencode/senpi-task/dag"
+import { createDagFileStore, createDagManager, createDagScheduler, type DagRunId } from "@oh-my-opencode/senpi-task/dag"
 import { createTaskManager, createTaskRecordStore } from "@oh-my-opencode/senpi-task"
 
 import { runDagTool, type DagToolResult } from "../../src/components/task/dag-tool"
@@ -45,7 +40,10 @@ const runner: ManagedRunner = {
     settlers.set(id, (value) => resolveOutcome?.(value))
     emitters.set(id, () => {
       for (const listener of listeners) {
-        listener({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: `${id} progress` }] } })
+        listener({
+          type: "message_end",
+          message: { role: "assistant", content: [{ type: "text", text: `${id} progress` }] },
+        })
       }
     })
     return Promise.resolve({
@@ -68,7 +66,10 @@ const runner: ManagedRunner = {
 
 const planner: ChildPlanner = (spec) => ({
   kind: "resolved",
-  plan: { model: `scripted/${spec.category ?? "default"}`, ...(spec.category === undefined ? {} : { category: spec.category }) },
+  plan: {
+    model: `scripted/${spec.category ?? "default"}`,
+    ...(spec.category === undefined ? {} : { category: spec.category }),
+  },
 })
 
 const projectDir = fs.mkdtempSync(join(tmpdir(), "dag-node-projection-qa-"))
@@ -102,9 +103,12 @@ await until(() => manager.record(runId, PARENT_SESSION).nodes.every((node) => no
 emitters.get("clone-profile")?.()
 emitters.get("clone-sources")?.()
 settlers.get("clone-sources")?.({ status: "completed", finalResponse: CLONE_SOURCES_CLAIM })
-await until(() => manager.record(runId, PARENT_SESSION).nodes.some((node) => node.id === "clone-sources" && node.state === "completed"))
+await until(() =>
+  manager.record(runId, PARENT_SESSION).nodes.some((node) => node.id === "clone-sources" && node.state === "completed"),
+)
 
-const quietTaskId = manager.record(runId, PARENT_SESSION).nodes.find((node) => node.id === "clone-profile")?.taskId ?? ""
+const quietTaskId =
+  manager.record(runId, PARENT_SESSION).nodes.find((node) => node.id === "clone-profile")?.taskId ?? ""
 const quietSince = new Date(Date.now() - 51 * 60_000)
 fs.utimesSync(taskEventLogPath(store.stateDir, quietTaskId), quietSince, quietSince)
 
@@ -132,7 +136,8 @@ settlers.get("clone-profile")?.({ status: "completed", finalResponse: "profile.h
 await run
 
 const report = {
-  what_was_tested: "workflow action=snapshot against a real DagManager/DagScheduler/TaskManager, one settled node and one running node whose child last wrote 51 minutes ago",
+  what_was_tested:
+    "workflow action=snapshot against a real DagManager/DagScheduler/TaskManager, one settled node and one running node whose child last wrote 51 minutes ago",
   model_visible_text: modelVisibleText,
   settled_node: completed,
   quiet_node: quiet,

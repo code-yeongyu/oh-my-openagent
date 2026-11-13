@@ -15,12 +15,22 @@ export type SharedToolFilterOptions = {
 }
 
 export function isTaskOrTeamFamilyTool(name: string): boolean {
-  return name === "workpool" || name.startsWith("workpool_") || name === "workflow" || name === "task" || name.startsWith("task_") || name.startsWith("team_")
+  return (
+    name === "workpool" ||
+    name.startsWith("workpool_") ||
+    name === "workflow" ||
+    name === "task" ||
+    name.startsWith("task_") ||
+    name.startsWith("team_")
+  )
 }
 
 export function isChildOrchestrationExcluded(name: string, includeTaskTools = false): boolean {
   if (name === "workflow" || name.startsWith("team_")) return true
-  return !includeTaskTools && (name === "workpool" || name.startsWith("workpool_") || name === "task" || name.startsWith("task_"))
+  return (
+    !includeTaskTools &&
+    (name === "workpool" || name.startsWith("workpool_") || name === "task" || name.startsWith("task_"))
+  )
 }
 
 /**
@@ -29,10 +39,7 @@ export function isChildOrchestrationExcluded(name: string, includeTaskTools = fa
  * layer - before any child session exists - to refuse a colliding name and to decide the
  * nested-host-scope rule (kernel-tools/nested-host-scope.ts).
  */
-export function childVisibleToolNames(
-  names: readonly string[],
-  uiOnlyToolNames: Iterable<string> = [],
-): string[] {
+export function childVisibleToolNames(names: readonly string[], uiOnlyToolNames: Iterable<string> = []): string[] {
   const uiOnly = new Set(uiOnlyToolNames)
   return names.filter((name) => !isChildOrchestrationExcluded(name, false) && !uiOnly.has(name))
 }
@@ -46,7 +53,9 @@ export function filterSharedParentTools<TTool extends Pick<ToolDefinition, "name
 ): TTool[] {
   const uiOnly = new Set(options.uiOnlyToolNames ?? [])
   return tools
-    .filter((tool) => !isChildOrchestrationExcluded(tool.name, options.includeTaskTools === true) && !uiOnly.has(tool.name))
+    .filter(
+      (tool) => !isChildOrchestrationExcluded(tool.name, options.includeTaskTools === true) && !uiOnly.has(tool.name),
+    )
     .map((tool) =>
       CHILD_DIRECT_EXPOSURE_TOOL_NAMES.has(tool.name) && tool.exposure === "search"
         ? { ...tool, exposure: "direct" }

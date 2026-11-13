@@ -1,9 +1,5 @@
 import { loadProjectAgents, loadUserAgents } from "../../features/claude-code-agent-loader"
-import {
-  getAgentConfigKey,
-  getAgentDisplayName,
-  stripAgentListSortPrefix,
-} from "../../shared/agent-display-names"
+import { getAgentConfigKey, getAgentDisplayName, stripAgentListSortPrefix } from "../../shared/agent-display-names"
 
 export type AgentMode = "subagent" | "primary" | "all" | undefined
 
@@ -15,17 +11,19 @@ export type AgentInfo = {
 }
 
 export function sanitizeSubagentType(subagentType: string): string {
-  return subagentType.trim().replace(/^[\\/"']+|[\\/"']+$/g, "").trim()
+  return subagentType
+    .trim()
+    .replace(/^[\\/"']+|[\\/"']+$/g, "")
+    .trim()
 }
 
-export function mergeWithClaudeCodeAgents(
-  serverAgents: AgentInfo[],
-  directory: string | undefined,
-): AgentInfo[] {
+export function mergeWithClaudeCodeAgents(serverAgents: AgentInfo[], directory: string | undefined): AgentInfo[] {
   const userAgentsRecord = loadUserAgents()
   const projectAgentsRecord = loadProjectAgents(directory)
 
-  const toAgentInfoList = (record: Record<string, { mode?: string; hidden?: boolean; model?: AgentInfo["model"] }>): AgentInfo[] =>
+  const toAgentInfoList = (
+    record: Record<string, { mode?: string; hidden?: boolean; model?: AgentInfo["model"] }>,
+  ): AgentInfo[] =>
     Object.entries(record).map(([name, config]) => ({
       name,
       mode: config.mode as AgentInfo["mode"],
@@ -49,11 +47,11 @@ export function mergeWithClaudeCodeAgents(
 }
 
 function buildComparableNames(agentName: string): Set<string> {
-  return new Set([
-    agentName,
-    getAgentDisplayName(agentName),
-    getAgentConfigKey(agentName),
-  ].map(name => stripAgentListSortPrefix(name).trim().toLowerCase()))
+  return new Set(
+    [agentName, getAgentDisplayName(agentName), getAgentConfigKey(agentName)].map((name) =>
+      stripAgentListSortPrefix(name).trim().toLowerCase(),
+    ),
+  )
 }
 
 function matchesRequestedAgent(agent: AgentInfo, requestedAgentName: string): boolean {
@@ -69,33 +67,32 @@ export function isTaskCallableAgentMode(mode: AgentMode): boolean {
 }
 
 export function isDemotedPlanAgent(agent: AgentInfo): boolean {
-  return agent.hidden === true
-    && agent.mode === "subagent"
-    && stripAgentListSortPrefix(agent.name).trim().toLowerCase() === "plan"
+  return (
+    agent.hidden === true &&
+    agent.mode === "subagent" &&
+    stripAgentListSortPrefix(agent.name).trim().toLowerCase() === "plan"
+  )
 }
 
 function isVisibleToTask(agent: AgentInfo): boolean {
   return agent.hidden !== true || isDemotedPlanAgent(agent)
 }
 
-export function findPrimaryAgentMatch(
-  agents: AgentInfo[],
-  requestedAgentName: string,
-): AgentInfo | undefined {
-  return agents.find(agent => agent.mode === "primary" && matchesRequestedAgent(agent, requestedAgentName))
+export function findPrimaryAgentMatch(agents: AgentInfo[], requestedAgentName: string): AgentInfo | undefined {
+  return agents.find((agent) => agent.mode === "primary" && matchesRequestedAgent(agent, requestedAgentName))
 }
 
-export function findCallableAgentMatch(
-  agents: AgentInfo[],
-  requestedAgentName: string,
-): AgentInfo | undefined {
-  return agents.find(agent => isTaskCallableAgentMode(agent.mode) && isVisibleToTask(agent) && matchesRequestedAgent(agent, requestedAgentName))
+export function findCallableAgentMatch(agents: AgentInfo[], requestedAgentName: string): AgentInfo | undefined {
+  return agents.find(
+    (agent) =>
+      isTaskCallableAgentMode(agent.mode) && isVisibleToTask(agent) && matchesRequestedAgent(agent, requestedAgentName),
+  )
 }
 
 export function listCallableAgentNames(agents: AgentInfo[]): string {
   return agents
-    .filter(agent => isTaskCallableAgentMode(agent.mode) && isVisibleToTask(agent))
-    .map(agent => stripAgentListSortPrefix(agent.name))
+    .filter((agent) => isTaskCallableAgentMode(agent.mode) && isVisibleToTask(agent))
+    .map((agent) => stripAgentListSortPrefix(agent.name))
     .sort()
     .join(", ")
 }

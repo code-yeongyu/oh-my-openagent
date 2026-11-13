@@ -23,7 +23,6 @@ const LEDGER = [
 ].join("\n")
 const roots: string[] = []
 
-
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 })))
 })

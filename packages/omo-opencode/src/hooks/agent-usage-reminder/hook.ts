@@ -1,44 +1,40 @@
-import type { PluginInput } from "@opencode-ai/plugin";
-import type { Message, Part } from "@opencode-ai/sdk";
-import {
-  loadAgentUsageState,
-  saveAgentUsageState,
-  clearAgentUsageState,
-} from "./storage";
-import { TARGET_TOOLS, AGENT_TOOLS, REMINDER_MESSAGE } from "./constants";
-import type { AgentUsageState } from "./types";
-import { getSessionAgent } from "../../features/claude-code-session-state";
-import { isRealUserTextPart, log } from "../../shared";
-import { getAgentConfigKey } from "../../shared/agent-display-names";
-import { resolveSessionEventID } from "../../shared/event-session-id";
+import type { PluginInput } from "@opencode-ai/plugin"
+import type { Message, Part } from "@opencode-ai/sdk"
+import { loadAgentUsageState, saveAgentUsageState, clearAgentUsageState } from "./storage"
+import { TARGET_TOOLS, AGENT_TOOLS, REMINDER_MESSAGE } from "./constants"
+import type { AgentUsageState } from "./types"
+import { getSessionAgent } from "../../features/claude-code-session-state"
+import { isRealUserTextPart, log } from "../../shared"
+import { getAgentConfigKey } from "../../shared/agent-display-names"
+import { resolveSessionEventID } from "../../shared/event-session-id"
 
 interface ToolExecuteInput {
-  tool: string;
-  sessionID: string;
-  callID: string;
+  tool: string
+  sessionID: string
+  callID: string
 }
 
 interface ToolExecuteOutput {
-  title: string;
-  output: string;
-  metadata: unknown;
+  title: string
+  output: string
+  metadata: unknown
 }
 
 interface EventInput {
   event: {
-    type: string;
-    properties?: unknown;
-  };
+    type: string
+    properties?: unknown
+  }
 }
 
-type MessageWithParts = { info: Message; parts: Part[] };
+type MessageWithParts = { info: Message; parts: Part[] }
 
 interface ReminderInjectionTarget {
-  message: MessageWithParts;
-  messageID: string;
-  sessionID: string;
-  state: AgentUsageState;
-  textPartIndex: number;
+  message: MessageWithParts
+  messageID: string
+  sessionID: string
+  state: AgentUsageState
+  textPartIndex: number
 }
 
 /**
@@ -46,18 +42,12 @@ interface ReminderInjectionTarget {
  * Subagents (explore, librarian, oracle, etc.) are the targets of delegation,
  * so reminding them to delegate to themselves is counterproductive.
  */
-const ORCHESTRATOR_AGENTS = new Set([
-  "sisyphus",
-  "sisyphus-junior",
-  "atlas",
-  "hephaestus",
-  "prometheus",
-]);
+const ORCHESTRATOR_AGENTS = new Set(["sisyphus", "sisyphus-junior", "atlas", "hephaestus", "prometheus"])
 
-const MAX_REMINDERS = 3;
+const MAX_REMINDERS = 3
 
 function isOrchestratorAgent(agentName: string): boolean {
-  return ORCHESTRATOR_AGENTS.has(getAgentConfigKey(agentName));
+  return ORCHESTRATOR_AGENTS.has(getAgentConfigKey(agentName))
 }
 
 function findLatestReminderTarget(
@@ -65,34 +55,34 @@ function findLatestReminderTarget(
   getState: (sessionID: string) => AgentUsageState,
 ): ReminderInjectionTarget | undefined {
   for (let messageIndex = messages.length - 1; messageIndex >= 0; messageIndex -= 1) {
-    const message = messages[messageIndex];
-    if (message?.info.role !== "user") continue;
-    const sessionID = message.info.sessionID;
-    const messageID = message.info.id;
-    if (typeof sessionID !== "string" || typeof messageID !== "string") continue;
+    const message = messages[messageIndex]
+    if (message?.info.role !== "user") continue
+    const sessionID = message.info.sessionID
+    const messageID = message.info.id
+    if (typeof sessionID !== "string" || typeof messageID !== "string") continue
 
-    const state = getState(sessionID);
+    const state = getState(sessionID)
     if (!state.reminderPending || state.agentUsed || state.reminderCount >= MAX_REMINDERS) {
-      continue;
+      continue
     }
 
     for (let partIndex = message.parts.length - 1; partIndex >= 0; partIndex -= 1) {
-      const part = message.parts[partIndex];
+      const part = message.parts[partIndex]
       if (part && isRealUserTextPart(part)) {
-        return { message, messageID, sessionID, state, textPartIndex: partIndex };
+        return { message, messageID, sessionID, state, textPartIndex: partIndex }
       }
     }
   }
 
-  return undefined;
+  return undefined
 }
 
 export function createAgentUsageReminderHook(_ctx: PluginInput) {
-  const sessionStates = new Map<string, AgentUsageState>();
+  const sessionStates = new Map<string, AgentUsageState>()
 
   function getOrCreateState(sessionID: string): AgentUsageState {
-    const cached = sessionStates.get(sessionID);
-    if (cached !== undefined) return cached;
+    const cached = sessionStates.get(sessionID)
+    if (cached !== undefined) return cached
 
     const state: AgentUsageState = loadAgentUsageState(sessionID) ?? {
       sessionID,
@@ -100,70 +90,67 @@ export function createAgentUsageReminderHook(_ctx: PluginInput) {
       reminderCount: 0,
       reminderPending: false,
       updatedAt: Date.now(),
-    };
-    sessionStates.set(sessionID, state);
-    return state;
+    }
+    sessionStates.set(sessionID, state)
+    return state
   }
 
   function persist(state: AgentUsageState): void {
-    state.updatedAt = Date.now();
-    saveAgentUsageState(state);
+    state.updatedAt = Date.now()
+    saveAgentUsageState(state)
   }
 
   function markAgentUsed(sessionID: string): void {
-    const state = getOrCreateState(sessionID);
-    state.agentUsed = true;
-    state.reminderPending = false;
-    persist(state);
+    const state = getOrCreateState(sessionID)
+    state.agentUsed = true
+    state.reminderPending = false
+    persist(state)
   }
 
   function resetState(sessionID: string): void {
-    sessionStates.delete(sessionID);
-    clearAgentUsageState(sessionID);
+    sessionStates.delete(sessionID)
+    clearAgentUsageState(sessionID)
   }
 
-  const toolExecuteAfter = async (
-    input: ToolExecuteInput,
-    _output: ToolExecuteOutput,
-  ) => {
-    const { tool, sessionID } = input;
+  const toolExecuteAfter = async (input: ToolExecuteInput, _output: ToolExecuteOutput) => {
+    const { tool, sessionID } = input
 
-    const agent = getSessionAgent(sessionID);
+    const agent = getSessionAgent(sessionID)
     if (agent && !isOrchestratorAgent(agent)) {
-      return;
+      return
     }
 
-    const toolLower = tool.toLowerCase();
+    const toolLower = tool.toLowerCase()
 
     if (AGENT_TOOLS.has(toolLower)) {
-      markAgentUsed(sessionID);
-      return;
+      markAgentUsed(sessionID)
+      return
     }
 
     if (!TARGET_TOOLS.has(toolLower)) {
-      return;
+      return
     }
 
-    const state = getOrCreateState(sessionID);
+    const state = getOrCreateState(sessionID)
 
     if (state.agentUsed || state.reminderCount >= MAX_REMINDERS || state.reminderPending) {
-      return;
+      return
     }
 
-    state.reminderPending = true;
-    persist(state);
+    state.reminderPending = true
+    persist(state)
     log("[agent-usage-reminder] Reminder queued", {
       sessionID,
       reminderCount: state.reminderCount,
-    });
-  };
+    })
+  }
 
   const messagesTransform = async (
     _input: Record<string, never>,
     output: { messages: MessageWithParts[] },
   ): Promise<void> => {
-    const target = findLatestReminderTarget(output.messages, getOrCreateState);
-    if (!target) return;
+    const target = findLatestReminderTarget(output.messages, getOrCreateState)
+    if (!target) return
 
     target.message.parts.splice(target.textPartIndex, 0, {
       id: `prt_agent_usage_reminder_${target.messageID}`,
@@ -172,28 +159,28 @@ export function createAgentUsageReminderHook(_ctx: PluginInput) {
       type: "text",
       text: REMINDER_MESSAGE,
       synthetic: true,
-    });
-    target.state.reminderPending = false;
-    target.state.reminderCount++;
-    persist(target.state);
+    })
+    target.state.reminderPending = false
+    target.state.reminderCount++
+    persist(target.state)
     log("[agent-usage-reminder] Reminder injected", {
       sessionID: target.sessionID,
       reminderCount: target.state.reminderCount,
-    });
-  };
+    })
+  }
 
   const eventHandler = async ({ event }: EventInput) => {
     if (event.type === "session.deleted") {
-      const sessionID = resolveSessionEventID(event.properties);
+      const sessionID = resolveSessionEventID(event.properties)
       if (sessionID) {
-        resetState(sessionID);
+        resetState(sessionID)
       }
     }
-  };
+  }
 
   return {
     "tool.execute.after": toolExecuteAfter,
     "experimental.chat.messages.transform": messagesTransform,
     event: eventHandler,
-  };
+  }
 }
