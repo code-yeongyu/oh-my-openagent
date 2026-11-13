@@ -1,6 +1,7 @@
-const { afterAll, afterEach, beforeEach, describe, expect, mock, test } = require("bun:test")
-const { preserveModuleMocksForTestFile, restoreModuleMocksForTestFile } =
-  await import("../../testing/module-mock-lifecycle")
+const { afterEach, beforeEach, describe, expect, mock, spyOn, test } = require("bun:test")
+import * as executeHookCommandModule from "../../shared/command-executor/execute-hook-command"
+import { dispatchHook } from "./dispatch-hook"
+import * as executeHttpHookModule from "./execute-http-hook"
 
 const capturedOptions: Array<Record<string, unknown>> = []
 
@@ -11,37 +12,18 @@ const mockExecuteHookCommand = mock(
   },
 )
 
-// Complete module mocks: once bun has built a module from a mock factory, that module keeps the factory's export names
-// for the rest of the process, so a partial mock hides the real exports from every later test file even after the
-// restore (#13331). Each factory spreads the real module and overrides only what this file controls.
-const actualExecuteHookCommand = await import("../../shared/command-executor/execute-hook-command")
-const actualExecuteHttpHook = await import("./execute-http-hook")
-
-mock.module("../../shared/command-executor/execute-hook-command", () => ({
-  ...actualExecuteHookCommand,
-  executeHookCommand: mockExecuteHookCommand,
-}))
-
-mock.module("./execute-http-hook", () => ({
-  ...actualExecuteHttpHook,
-  executeHttpHook: mock(() => Promise.resolve({ exitCode: 0, stdout: "", stderr: "" })),
-}))
-preserveModuleMocksForTestFile(import.meta.url)
-
-// A fresh copy binds the mocks above; the shared ./dispatch-hook module stays linked to the real modules (#13331).
-const { dispatchHook } = await import("./dispatch-hook?dispatch-hook-test")
-
-afterAll(() => {
-  restoreModuleMocksForTestFile(import.meta.url)
-})
-
+// Spies on the modules dispatch-hook imports, undone by mock.restore() after each test. Module mocks of these leaked
+// into later test files whenever another file had already loaded dispatch-hook (#13331).
 describe("dispatchHook", () => {
   beforeEach(() => {
     mockExecuteHookCommand.mockClear()
     capturedOptions.length = 0
+    spyOn(executeHookCommandModule, "executeHookCommand").mockImplementation(mockExecuteHookCommand)
+    spyOn(executeHttpHookModule, "executeHttpHook").mockResolvedValue({ exitCode: 0, stdout: "", stderr: "" })
   })
 
   afterEach(() => {
+    mock.restore()
     mockExecuteHookCommand.mockClear()
     capturedOptions.length = 0
   })
