@@ -240,8 +240,10 @@ jobs:
           "OMO_CONFORMANCE_FIXTURE_EXE=$exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "fixture built $exe"
 
-      # The WebView2 SDK ships only as a package; the fixtures lane's pinned release, checked by digest.
+      # The WebView2 SDK ships only as a package; the fixtures lane's pinned release, checked by digest. The step runs
+      # once the fixture app is in the tree; until then the Windows web-view cells stay not_run.
       - name: Build the Windows web-view fixture app
+        if: hashFiles('script/qa/computer/conformance/fixtures/webview-windows/build.ps1') != ''
         shell: bash
         run: |
           set -uo pipefail
