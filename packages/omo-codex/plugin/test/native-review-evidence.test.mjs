@@ -65,13 +65,16 @@ test("#given a bound native CLI envelope #when checking a read #then only succes
   const envelope = (extra = {}) => JSON.stringify({ chunk_id: "read", exit_code: 0, output: source, ...extra })
   for (const kind of ["function_call", "custom_tool_call"]) {
     const events = fixture(kind)
-    events[6].payload.output = [{ type: "input_text", text: "native tool metadata" }, { type: "input_text", text: envelope() }]
+    events[6].payload.output = [
+      { type: "input_text", text: "native tool metadata" },
+      { type: "input_text", text: envelope() },
+    ]
     const bound = evidence.nativeToolOutputEvidence(lines(events), actor, turn, callId)
     assert.equal(evidence.sourceReadPresent(bound.output, source), true)
   }
   assert.equal(evidence.sourceReadPresent(source, source), true)
   assert.equal(evidence.sourceReadPresent('{"value":1}\n', '{"value":1}\n'), true)
-  assert.equal(evidence.sourceReadPresent('{"nested":"one-line source"}', 'one-line source'), false)
+  assert.equal(evidence.sourceReadPresent('{"nested":"one-line source"}', "one-line source"), false)
   assert.equal(evidence.sourceReadPresent("anything", "\n"), false)
   assert.equal(evidence.sourceReadPresent([{ type: "input_text", text: source }], source), true)
   for (const output of [
@@ -81,7 +84,8 @@ test("#given a bound native CLI envelope #when checking a read #then only succes
     "prefix " + envelope(),
     JSON.stringify({ ...JSON.parse(envelope()), exit_code: "0" }),
     [{ type: "image", text: source }],
-  ]) assert.equal(evidence.sourceReadPresent(output, source), false)
+  ])
+    assert.equal(evidence.sourceReadPresent(output, source), false)
 })
 
 test("#given bootstrap and structured native commentary #when captured #then exact first-valid bytes and hashes survive", () => {
@@ -251,7 +255,9 @@ test("#given the normal CLI #when capture and independent verification run #then
   assert.deepEqual(JSON.parse(output.stdout).output, [{ type: "input_text", text: "opaque-marker\n" }])
   const source = "first source line\nsecond source line\n"
   const events = fixture()
-  events[6].payload.output = [{ type: "input_text", text: JSON.stringify({ chunk_id: "read", exit_code: 0, output: source }) }]
+  events[6].payload.output = [
+    { type: "input_text", text: JSON.stringify({ chunk_id: "read", exit_code: 0, output: source }) },
+  ]
   fs.writeFileSync(f.file, lines(events).join("\n") + "\n")
   const wrapped = f.run("tool-output", f.file, actor, turn, callId)
   assert.equal(wrapped.status, 0, wrapped.stderr)
