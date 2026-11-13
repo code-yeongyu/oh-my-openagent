@@ -11,7 +11,7 @@ The release is driven in its own process: the harness loads the release's comput
 - A foreground action can only be refused. The release asks a person to approve foreground control, and there is no person, so `ControlRequired` on a foreground cell is the shipped answer to this harness, not a judgement of foreground delivery.
 - Disturbance is **not measured** wherever the cells read `unobserved`. No recorder exists for Linux or Windows yet, so every signal there reads `not_observed`. A `disturbed` count of 0 beside a non-zero `unobserved` count means nothing was watched, never that nothing was disturbed.
 
-The sentinel leg (the background scenario set, run inside the sentinel) is **not run**: the sentinel records on macOS only. macOS has no leg at all yet, because its live tier has no machine. So the one gap the baseline was meant to show on macOS, a background click raising the clicked window, is not shown here.
+The sentinel leg (the background scenario set, run inside the sentinel) is **not run**: the sentinel records on macOS only. macOS has only the scoped accessibility leg below, because its live tier has no machine. So the one gap the baseline was meant to show on macOS, a background click raising the clicked window, is not shown here.
 
 ## What the shipped tool reports about each runner
 
@@ -53,6 +53,16 @@ Task set, replayed with no model: windows 1 of 12 (choosing a menu item by title
 - **Windows, native:** a click (by accessibility and by pixel), typing by pixel, a scroll (both), the accessibility value write, an accessibility press, and selecting a menu item by title.
 - **x11, native:** the accessibility value write, an accessibility press, and selecting a menu item by title.
 - **Both, foreground:** the accessibility value write and the accessibility press, which need no foreground grant.
+
+### macOS: the accessibility routes on a hosted runner
+
+Measured on hosted macOS 15.8.2 (run 43363704791), native AppKit fixture only. Per-cell record: `legacy-5.1.69-macos.json`. The row stays open: this is not the macOS baseline, only the part a hosted runner can show.
+
+- **What ran:** the 8 accessibility cells on the native fixture. The 42 pointer cells are `not_run`: pid-routed input is unavailable on a hosted runner (#13227). The 16 Electron and web-view cells are `not_run`: no macOS fixture app is mapped yet; #13298 adds them, and they are re-recorded after it merges.
+- **Delivered and received in the background:** typing by accessibility, the accessibility value write, an accessibility press, and selecting a menu item by title. Typing by accessibility in the background is refused `AxUnsupported` on x11 and Windows; on macOS the fixture received the text.
+- **Foreground:** the value write and the press are delivered and received; typing and the menu are refused `ControlRequired`, the same answer as on the other runners.
+- **Permissions:** the run measured the same cells twice. Plain launch: the runner's own agent is the responsible process and is already trusted, so the release reports every permission granted (inherited trust). Own responsible process: the release first reported capture, input and accessibility denied; after a run-time grant to the vendor-signed `bun` binary by path and designated requirement, it reported all three granted, and the grant was removed afterwards (0 rows left). The grant covered four services, wider than these cells need. Both launches gave the same outcome on every cell.
+- Disturbance is not measured here either.
 
 ## Findings
 

@@ -1,0 +1,3510 @@
+{
+  "schema": "omo-conformance-run/1",
+  "driver": "legacy",
+  "os": "macos",
+  "session": "aqua",
+  "results": [
+    {
+      "id": "macos/aqua/native/click/ax/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/native/click/ax/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/native/click/px/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/native/click/px/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/native/typeText/ax/background",
+      "observed": {
+        "kind": "delivered"
+      },
+      "oracle": {
+        "observed": "conformance"
+      },
+      "durationMs": 833.657958,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no desktop observer is wired for this OS: row 3 builds the macOS observer, rows 27, 30 and 31 the Windows and Linux recorders"
+    },
+    {
+      "id": "macos/aqua/native/typeText/ax/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "ControlRequired",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 397.9029579999999,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no desktop observer is wired for this OS: row 3 builds the macOS observer, rows 27, 30 and 31 the Windows and Linux recorders"
+    },
+    {
+      "id": "macos/aqua/native/typeText/px/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/native/typeText/px/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/native/scroll/ax/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/native/scroll/ax/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/native/scroll/px/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/native/scroll/px/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/native/drag/px/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/native/drag/px/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/native/keyChord/ax/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/native/keyChord/ax/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/native/ax.setValue/ax/background",
+      "observed": {
+        "kind": "delivered"
+      },
+      "oracle": {
+        "observed": "conformance"
+      },
+      "durationMs": 518.7501249999996,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no desktop observer is wired for this OS: row 3 builds the macOS observer, rows 27, 30 and 31 the Windows and Linux recorders"
+    },
+    {
+      "id": "macos/aqua/native/ax.setValue/ax/foreground",
+      "observed": {
+        "kind": "delivered"
+      },
+      "oracle": {
+        "observed": "conformance"
+      },
+      "durationMs": 428.25216699999964,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no desktop observer is wired for this OS: row 3 builds the macOS observer, rows 27, 30 and 31 the Windows and Linux recorders"
+    },
+    {
+      "id": "macos/aqua/native/ax.perform/ax/background",
+      "observed": {
+        "kind": "delivered"
+      },
+      "oracle": {
+        "observed": 1
+      },
+      "durationMs": 578.4312910000008,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no desktop observer is wired for this OS: row 3 builds the macOS observer, rows 27, 30 and 31 the Windows and Linux recorders"
+    },
+    {
+      "id": "macos/aqua/native/ax.perform/ax/foreground",
+      "observed": {
+        "kind": "delivered"
+      },
+      "oracle": {
+        "observed": 1
+      },
+      "durationMs": 575.2844580000001,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no desktop observer is wired for this OS: row 3 builds the macOS observer, rows 27, 30 and 31 the Windows and Linux recorders"
+    },
+    {
+      "id": "macos/aqua/native/menu.select/ax/background",
+      "observed": {
+        "kind": "delivered"
+      },
+      "oracle": {
+        "observed": "Conformance"
+      },
+      "durationMs": 939.8836249999995,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no desktop observer is wired for this OS: row 3 builds the macOS observer, rows 27, 30 and 31 the Windows and Linux recorders"
+    },
+    {
+      "id": "macos/aqua/native/menu.select/ax/foreground",
+      "observed": {
+        "kind": "refused",
+        "code": "ControlRequired",
+        "nothingSent": false
+      },
+      "oracle": {
+        "observed": ""
+      },
+      "durationMs": 285.9547910000001,
+      "journal": {
+        "key_focus": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "not_observed",
+          "firstAt": null,
+          "count": 0
+        }
+      },
+      "observerUnavailable": "no desktop observer is wired for this OS: row 3 builds the macOS observer, rows 27, 30 and 31 the Windows and Linux recorders"
+    },
+    {
+      "id": "macos/aqua/electron/click/ax/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/electron/click/ax/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/electron/click/px/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/electron/click/px/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/electron/typeText/ax/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no electron fixture app is ready on darwin yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/electron/typeText/ax/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no electron fixture app is ready on darwin yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/electron/typeText/px/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/electron/typeText/px/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/electron/scroll/ax/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/electron/scroll/ax/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/electron/scroll/px/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/electron/scroll/px/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/electron/drag/px/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/electron/drag/px/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/electron/keyChord/ax/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/electron/keyChord/ax/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/electron/ax.setValue/ax/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no electron fixture app is ready on darwin yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/electron/ax.setValue/ax/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no electron fixture app is ready on darwin yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/electron/ax.perform/ax/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no electron fixture app is ready on darwin yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/electron/ax.perform/ax/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no electron fixture app is ready on darwin yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/electron/menu.select/ax/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no electron fixture app is ready on darwin yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/electron/menu.select/ax/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no electron fixture app is ready on darwin yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/webview/click/ax/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/webview/click/ax/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/webview/click/px/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/webview/click/px/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/webview/typeText/ax/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no webview fixture app is ready on darwin yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/webview/typeText/ax/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no webview fixture app is ready on darwin yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/webview/typeText/px/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/webview/typeText/px/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/webview/scroll/ax/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/webview/scroll/ax/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/webview/scroll/px/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/webview/scroll/px/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/webview/drag/px/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/webview/drag/px/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/webview/keyChord/ax/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/webview/keyChord/ax/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "pid-routed input unavailable on a hosted runner (#13227)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/webview/ax.setValue/ax/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no webview fixture app is ready on darwin yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/webview/ax.setValue/ax/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no webview fixture app is ready on darwin yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/webview/ax.perform/ax/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no webview fixture app is ready on darwin yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/webview/ax.perform/ax/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no webview fixture app is ready on darwin yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/webview/menu.select/ax/background",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no webview fixture app is ready on darwin yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "macos/aqua/webview/menu.select/ax/foreground",
+      "observed": {
+        "kind": "not_run",
+        "reason": "fixture_unavailable: no webview fixture app is ready on darwin yet (row 4)"
+      },
+      "oracle": {
+        "observed": null
+      },
+      "durationMs": 0,
+      "journal": {
+        "key_focus": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "window_raised": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "typing": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "pointer": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "clipboard": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "space": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "dialog": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        },
+        "activation": {
+          "signal": "none",
+          "firstAt": null,
+          "count": 0
+        }
+      }
+    }
+  ]
+}
