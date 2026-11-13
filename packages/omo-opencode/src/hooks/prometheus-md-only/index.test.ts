@@ -122,7 +122,7 @@ describe("prometheus-md-only", () => {
 
     test("should enforce md-only restriction for Prometheus display name Planner", async () => {
       //#given
-      setupMessageStorage(TEST_SESSION_ID, "Prometheus - Plan Builder")
+      setupMessageStorage(TEST_SESSION_ID, "Prometheus - Planner")
       const hook = createPrometheusMdOnlyHook(createMockPluginInput())
       const input = {
         tool: "Write",

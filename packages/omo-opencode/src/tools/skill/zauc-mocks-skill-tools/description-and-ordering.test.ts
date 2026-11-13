@@ -1,6 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, it } from "bun:test"
+import { TOOL_DESCRIPTION_NO_SKILLS } from "../constants"
 import { createMockCommand, createMockSkill, createSkillTool, mockContext } from "./test-support"
 
 describe("skill tool - synchronous description", () => {
@@ -30,7 +31,7 @@ describe("skill tool - synchronous description", () => {
   it("shows no-skills message immediately when empty skills are pre-provided", () => {
     const tool = createSkillTool({ skills: [] })
 
-    expect(tool.description).toContain("No skills are currently available")
+    expect(tool.description).toBe(TOOL_DESCRIPTION_NO_SKILLS)
   })
 })
 
