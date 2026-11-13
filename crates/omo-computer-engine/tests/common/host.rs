@@ -47,7 +47,11 @@ fn bind(runtime: &Path) -> UnixListener {
     use std::os::unix::net::SocketAddr;
     let uid = fs::metadata(runtime).expect("the runtime dir").uid();
     let digest = Sha256::digest(runtime.to_string_lossy().as_bytes());
-    let suffix: String = digest.iter().take(8).map(|byte| format!("{byte:02x}")).collect();
+    let suffix: String = digest
+        .iter()
+        .take(8)
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
     let name = format!("omo-host-api-{uid}-{suffix}");
     let addr = SocketAddr::from_abstract_name(name.as_bytes()).expect("an abstract name");
     UnixListener::bind_addr(&addr).expect("the host name binds")
@@ -59,7 +63,8 @@ pub fn identity(runtime: &Path, verdict: &str) {
 }
 
 pub fn latch_file(runtime: &Path, suspended: bool, stop_epoch: u64) {
-    let latch = json!({"suspended": suspended, "stopEpoch": stop_epoch, "lineHash": "0".repeat(64)});
+    let latch =
+        json!({"suspended": suspended, "stopEpoch": stop_epoch, "lineHash": "0".repeat(64)});
     write_0600(&runtime.join(HOST_LATCH), &latch.to_string());
 }
 
@@ -77,13 +82,26 @@ pub fn serve(runtime: &Path, replies: Vec<Value>) {
         let mut served = 0_usize;
         for stream in listener.incoming() {
             let Ok(mut stream) = stream else { return };
-            let Ok(reader) = stream.try_clone() else { continue };
+            let Ok(reader) = stream.try_clone() else {
+                continue;
+            };
             for line in BufReader::new(reader).lines() {
-                let Ok(request) = line.map(|line| serde_json::from_str::<Value>(&line).unwrap_or(Value::Null)) else { break };
-                let result = replies.get(served).or_else(|| replies.last()).cloned().unwrap_or(Value::Null);
+                let Ok(request) =
+                    line.map(|line| serde_json::from_str::<Value>(&line).unwrap_or(Value::Null))
+                else {
+                    break;
+                };
+                let result = replies
+                    .get(served)
+                    .or_else(|| replies.last())
+                    .cloned()
+                    .unwrap_or(Value::Null);
                 served += 1;
                 let reply = json!({"jsonrpc": "2.0", "id": request["id"], "result": result});
-                if writeln!(stream, "{reply}").and_then(|()| stream.flush()).is_err() {
+                if writeln!(stream, "{reply}")
+                    .and_then(|()| stream.flush())
+                    .is_err()
+                {
                     break;
                 }
             }
@@ -96,7 +114,11 @@ pub fn setup(runtime: &Path, block: &Value) {
         identity(runtime, verdict);
     }
     if let Some(latch) = block.get("latchFile") {
-        latch_file(runtime, latch["suspended"] == json!(true), latch["stopEpoch"].as_u64().unwrap_or(0));
+        latch_file(
+            runtime,
+            latch["suspended"] == json!(true),
+            latch["stopEpoch"].as_u64().unwrap_or(0),
+        );
     }
     if let Some(computer_use) = block["consent"]["computerUse"].as_bool() {
         consent(runtime, computer_use);

@@ -7,7 +7,10 @@
 mod case;
 #[path = "common/compare.rs"]
 mod compare;
-#[allow(dead_code, reason = "this binary only replays host blocks; it scripts no host itself")]
+#[allow(
+    dead_code,
+    reason = "this binary only replays host blocks; it scripts no host itself"
+)]
 #[path = "common/host.rs"]
 mod host;
 #[path = "common/peer.rs"]
@@ -26,14 +29,17 @@ const V1_CONSUMERS: &str = "crates/omo-computer-engine/tests/fixtures/v1-consume
 const DAEMON_CASE: &str = "09-oneshot-daemon-session.json";
 
 fn provenance_cases() -> Vec<String> {
-    let manifest = fs::read_to_string(repo().join("crates/omo-computer-core/parity/ORACLE-PROVENANCE.tsv"))
-        .expect("the provenance manifest is readable");
+    let manifest =
+        fs::read_to_string(repo().join("crates/omo-computer-core/parity/ORACLE-PROVENANCE.tsv"))
+            .expect("the provenance manifest is readable");
     manifest
         .lines()
         .skip(1)
         .filter_map(|row| row.split('\t').next())
         .filter(|path| path.starts_with(CONFORMANCE) || path.starts_with(V1_CONSUMERS))
-        .filter(|path| path.ends_with(".json") && !path.ends_with(DAEMON_CASE) && !path.contains("/scenarios/"))
+        .filter(|path| {
+            path.ends_with(".json") && !path.ends_with(DAEMON_CASE) && !path.contains("/scenarios/")
+        })
         .map(str::to_owned)
         .collect()
 }
@@ -80,13 +86,18 @@ imported_case! {
 
 #[test]
 fn the_named_cases_are_exactly_the_22_the_manifest_imports() {
-    let mut listed: Vec<String> =
-        provenance_cases().into_iter().filter_map(|path| path.strip_prefix(CONFORMANCE).map(str::to_owned)).collect();
+    let mut listed: Vec<String> = provenance_cases()
+        .into_iter()
+        .filter_map(|path| path.strip_prefix(CONFORMANCE).map(str::to_owned))
+        .collect();
     listed.sort();
     let mut named: Vec<String> = NAMED.iter().map(|name| (*name).to_owned()).collect();
     named.sort();
     assert_eq!(named.len(), 22, "row 3 imported 22 cases");
-    assert_eq!(listed, named, "a manifest case without its own test, or a test the manifest does not list");
+    assert_eq!(
+        listed, named,
+        "a manifest case without its own test, or a test the manifest does not list"
+    );
 }
 
 #[test]
@@ -98,9 +109,14 @@ fn full_replay_passes_with_the_ledger_and_reports_every_delta_line_used() {
             *matched.entry(delta.line.clone()).or_default() += delta.matched;
         }
     }
-    let ledger = fs::read_to_string(repo().join(compare::DELTAS)).expect("the delta ledger is readable");
+    let ledger =
+        fs::read_to_string(repo().join(compare::DELTAS)).expect("the delta ledger is readable");
     let mut stale = Vec::new();
-    for line in ledger.lines().skip(1).filter(|line| !line.trim().is_empty()) {
+    for line in ledger
+        .lines()
+        .skip(1)
+        .filter(|line| !line.trim().is_empty())
+    {
         let count = matched.get(line).copied().unwrap_or(0);
         println!("DELTA matched={count} {line}");
         if count == 0 {
@@ -112,6 +128,15 @@ fn full_replay_passes_with_the_ledger_and_reports_every_delta_line_used() {
         .filter(|report| !report.failures.is_empty())
         .map(|report| format!("{}:\n  {}", report.name, report.failures.join("\n  ")))
         .collect();
-    assert!(failing.is_empty(), "{} case(s) did not replay clean:\n{}", failing.len(), failing.join("\n"));
-    assert!(stale.is_empty(), "stale ORACLE-DELTAS line(s), matched nothing:\n{}", stale.join("\n"));
+    assert!(
+        failing.is_empty(),
+        "{} case(s) did not replay clean:\n{}",
+        failing.len(),
+        failing.join("\n")
+    );
+    assert!(
+        stale.is_empty(),
+        "stale ORACLE-DELTAS line(s), matched nothing:\n{}",
+        stale.join("\n")
+    );
 }

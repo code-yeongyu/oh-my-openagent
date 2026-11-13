@@ -19,13 +19,60 @@ const SCENARIO: &str = "crates/omo-computer-backend-fake/fixtures/two-displays-o
 const V1_STOP_TOOL: &str = "desktop_stop";
 
 const SNAPSHOT: &[&str] = &[
-    "engine.hello", "capabilities", "displays", "windows", "apps.list", "pointer", "diagnose", "capture", "zoom",
-    "observe", "ax.snapshot", "ax.drill", "ax.node", "ax.children", "ax.focused", "elementAt", "waitFor",
-    "clipboard.read", "menu.items", "surface", "click", "move", "mouse.down", "mouse.up", "key.down", "key.up",
-    "drag", "type", "press", "paste", "scroll", "typeText", "keyChord", "holdKeys", "holdMouse", "raiseWindow",
-    "ax.setValue", "ax.perform", "ax.focus", "ax.typeText", "ax.selectText", "menu.select", "apps.open",
-    "apps.quit", "window.raise", "window.activate", "window.setFrame", "window.minimize", "window.restore",
-    "clipboard.write", "openSystemSurface", "stopPath.status", "stopPath.stop", "$/cancel",
+    "engine.hello",
+    "capabilities",
+    "displays",
+    "windows",
+    "apps.list",
+    "pointer",
+    "diagnose",
+    "capture",
+    "zoom",
+    "observe",
+    "ax.snapshot",
+    "ax.drill",
+    "ax.node",
+    "ax.children",
+    "ax.focused",
+    "elementAt",
+    "waitFor",
+    "clipboard.read",
+    "menu.items",
+    "surface",
+    "click",
+    "move",
+    "mouse.down",
+    "mouse.up",
+    "key.down",
+    "key.up",
+    "drag",
+    "type",
+    "press",
+    "paste",
+    "scroll",
+    "typeText",
+    "keyChord",
+    "holdKeys",
+    "holdMouse",
+    "raiseWindow",
+    "ax.setValue",
+    "ax.perform",
+    "ax.focus",
+    "ax.typeText",
+    "ax.selectText",
+    "menu.select",
+    "apps.open",
+    "apps.quit",
+    "window.raise",
+    "window.activate",
+    "window.setFrame",
+    "window.minimize",
+    "window.restore",
+    "clipboard.write",
+    "openSystemSurface",
+    "stopPath.status",
+    "stopPath.stop",
+    "$/cancel",
 ];
 
 fn repo() -> std::path::PathBuf {
@@ -35,8 +82,14 @@ fn repo() -> std::path::PathBuf {
 fn env(runtime: &Path) -> Vec<(String, String)> {
     vec![
         ("OMO_COMPUTER_BACKEND".to_owned(), "fake".to_owned()),
-        ("OMO_COMPUTER_RUNTIME_DIR".to_owned(), runtime.to_string_lossy().into_owned()),
-        ("OMO_COMPUTER_FAKE_SCENARIO".to_owned(), repo().join(SCENARIO).to_string_lossy().into_owned()),
+        (
+            "OMO_COMPUTER_RUNTIME_DIR".to_owned(),
+            runtime.to_string_lossy().into_owned(),
+        ),
+        (
+            "OMO_COMPUTER_FAKE_SCENARIO".to_owned(),
+            repo().join(SCENARIO).to_string_lossy().into_owned(),
+        ),
         ("OMO_COMPUTER_FAKE_STOP_PATH".to_owned(), "live".to_owned()),
     ]
 }
@@ -49,17 +102,33 @@ fn sink_entries(runtime: &Path) -> usize {
     std::fs::read_dir(runtime)
         .expect("the runtime dir is readable")
         .filter_map(Result::ok)
-        .filter(|entry| entry.file_name().to_string_lossy().starts_with("fake-sink-"))
-        .map(|entry| std::fs::read_to_string(entry.path()).unwrap_or_default().lines().count())
+        .filter(|entry| {
+            entry
+                .file_name()
+                .to_string_lossy()
+                .starts_with("fake-sink-")
+        })
+        .map(|entry| {
+            std::fs::read_to_string(entry.path())
+                .unwrap_or_default()
+                .lines()
+                .count()
+        })
         .sum()
 }
 
 #[test]
 fn the_method_tables_public_rows_equal_the_snapshot() {
-    let public: BTreeSet<&str> =
-        METHODS.iter().filter(|row| row.exposure == Exposure::Public).map(|row| row.name).collect();
+    let public: BTreeSet<&str> = METHODS
+        .iter()
+        .filter(|row| row.exposure == Exposure::Public)
+        .map(|row| row.name)
+        .collect();
     let snapshot: BTreeSet<&str> = SNAPSHOT.iter().copied().collect();
-    assert_eq!(public, snapshot, "the public surface changed; edit SNAPSHOT on purpose");
+    assert_eq!(
+        public, snapshot,
+        "the public surface changed; edit SNAPSHOT on purpose"
+    );
 }
 
 #[test]
@@ -79,8 +148,11 @@ fn the_mcp_catalog_is_exactly_the_public_methods() {
         .iter()
         .map(|tool| tool["name"].as_str().expect("a tool has a name").to_owned())
         .collect();
-    let mut expected: BTreeSet<String> =
-        SNAPSHOT.iter().filter(|name| !name.starts_with("$/")).map(|name| tool_name(name)).collect();
+    let mut expected: BTreeSet<String> = SNAPSHOT
+        .iter()
+        .filter(|name| !name.starts_with("$/"))
+        .map(|name| tool_name(name))
+        .collect();
     expected.insert(V1_STOP_TOOL.to_owned());
     assert_eq!(tools, expected);
     assert!(mcp.close().is_empty(), "the shim wrote nothing unasked");
@@ -88,20 +160,35 @@ fn the_mcp_catalog_is_exactly_the_public_methods() {
 
 #[test]
 fn oneshot_refuses_host_only_method() {
-    let host_only: Vec<&str> =
-        METHODS.iter().filter(|row| matches!(row.exposure, Exposure::HostOnly(_))).map(|row| row.name).collect();
-    assert!(host_only.contains(&"stopPath.resume"), "the lift is host-only");
+    let host_only: Vec<&str> = METHODS
+        .iter()
+        .filter(|row| matches!(row.exposure, Exposure::HostOnly(_)))
+        .map(|row| row.name)
+        .collect();
+    assert!(
+        host_only.contains(&"stopPath.resume"),
+        "the lift is host-only"
+    );
     for (id, method) in (1_i64..).zip(&host_only) {
         let runtime = tempfile::tempdir().expect("a runtime dir");
         let mut oneshot = Peer::spawn(&["--oneshot"], &env(runtime.path()), &repo());
         oneshot.send(&json!({"jsonrpc": "2.0", "id": id, "method": format!("desktop.{method}"), "params": {}}));
-        let reply: Value = oneshot.next().unwrap_or_else(|| panic!("{method}: one reply line"));
+        let reply: Value = oneshot
+            .next()
+            .unwrap_or_else(|| panic!("{method}: one reply line"));
         assert_eq!(
             reply,
             json!({"jsonrpc": "2.0", "id": id, "error": {"code": -32601, "message": "Method not found", "data": {"reason": "hostOnly"}}}),
             "{method} crossed the --oneshot bridge"
         );
-        assert!(oneshot.close().is_empty(), "{method}: exactly one reply line");
-        assert_eq!(sink_entries(runtime.path()), 0, "{method}: nothing was sent");
+        assert!(
+            oneshot.close().is_empty(),
+            "{method}: exactly one reply line"
+        );
+        assert_eq!(
+            sink_entries(runtime.path()),
+            0,
+            "{method}: nothing was sent"
+        );
     }
 }

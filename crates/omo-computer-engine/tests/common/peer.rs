@@ -27,7 +27,12 @@ pub struct Peer {
 impl Peer {
     pub fn spawn(args: &[&str], env: &[(String, String)], cwd: &Path) -> Self {
         let mut command = Command::new(engine());
-        command.args(args).current_dir(cwd).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::inherit());
+        command
+            .args(args)
+            .current_dir(cwd)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit());
         for (name, _) in std::env::vars().filter(|(name, _)| name.starts_with("OMO_COMPUTER_")) {
             command.env_remove(name);
         }
@@ -48,7 +53,11 @@ impl Peer {
             }
         });
         let stdin = child.stdin.take();
-        Self { child, stdin, replies }
+        Self {
+            child,
+            stdin,
+            replies,
+        }
     }
 
     pub fn send(&mut self, message: &Value) {
@@ -84,7 +93,9 @@ impl Peer {
         loop {
             match self.replies.recv_timeout(Duration::from_millis(200)) {
                 Ok(message) => leftovers.push(message),
-                Err(RecvTimeoutError::Timeout | RecvTimeoutError::Disconnected) => return leftovers,
+                Err(RecvTimeoutError::Timeout | RecvTimeoutError::Disconnected) => {
+                    return leftovers
+                }
             }
         }
     }

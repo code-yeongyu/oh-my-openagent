@@ -11,7 +11,8 @@ use tempfile::TempDir;
 use super::case::repo;
 use super::peer::Peer;
 
-pub const TWO_DISPLAYS: &str = "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json";
+pub const TWO_DISPLAYS: &str =
+    "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json";
 
 pub struct Live {
     runtime_dir: TempDir,
@@ -34,8 +35,14 @@ pub fn scenario_with(extra: &Value) -> Value {
 pub fn env(runtime: &Path, scenario: &Path) -> Vec<(String, String)> {
     vec![
         ("OMO_COMPUTER_BACKEND".to_owned(), "fake".to_owned()),
-        ("OMO_COMPUTER_RUNTIME_DIR".to_owned(), runtime.to_string_lossy().into_owned()),
-        ("OMO_COMPUTER_FAKE_SCENARIO".to_owned(), scenario.to_string_lossy().into_owned()),
+        (
+            "OMO_COMPUTER_RUNTIME_DIR".to_owned(),
+            runtime.to_string_lossy().into_owned(),
+        ),
+        (
+            "OMO_COMPUTER_FAKE_SCENARIO".to_owned(),
+            scenario.to_string_lossy().into_owned(),
+        ),
         ("OMO_COMPUTER_FAKE_STOP_PATH".to_owned(), "live".to_owned()),
     ]
 }
@@ -51,13 +58,19 @@ impl Live {
         let file = runtime.path().join("scenario.json");
         fs::write(&file, scenario.to_string()).expect("the scenario file");
         let peer = Peer::spawn(args, &env(runtime.path(), &file), &repo());
-        Self { runtime_dir: runtime, peer }
+        Self {
+            runtime_dir: runtime,
+            peer,
+        }
     }
 
     pub fn until_reply(&self, id: i64) -> Vec<Value> {
         let mut seen = Vec::new();
         loop {
-            let message = self.peer.next().unwrap_or_else(|| panic!("no reply to {id} after {seen:?}"));
+            let message = self
+                .peer
+                .next()
+                .unwrap_or_else(|| panic!("no reply to {id} after {seen:?}"));
             let done = message["id"] == json!(id);
             seen.push(message);
             if done {
@@ -72,6 +85,8 @@ impl Live {
 
     pub fn call(&mut self, id: i64, method: &str, params: &Value) -> Value {
         self.peer.send(&request(id, method, params));
-        self.until_reply(id).pop().expect("until_reply ends at the reply")
+        self.until_reply(id)
+            .pop()
+            .expect("until_reply ends at the reply")
     }
 }
