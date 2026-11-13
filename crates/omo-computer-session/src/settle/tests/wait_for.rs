@@ -66,3 +66,47 @@ fn wait_for_settle_is_bounded_by_the_call_timeout() {
         "one cap for the busy wait and the quiet window together"
     );
 }
+
+/// Review L1 (#13370): a window-gone wait matches only its tracked window, and an event wait
+/// only events on its target window; an unrelated destroyed element matches neither.
+#[test]
+fn window_gone_and_event_waits_ignore_an_unrelated_destroyed_element() {
+    let gone = json!({
+        "target": "101",
+        "predicate": {"window": {"state": "gone", "title": "Save"}},
+        "timeout": 1000
+    });
+    let property = json!({"target": "101", "predicate": {"event": {"kind": "property"}}, "timeout": 1000});
+    let unrelated = json!({"ax_notification_timeline": [
+        {"t_ms": 100, "window": "101", "kind": "AXUIElementDestroyed"},
+        {"t_ms": 200, "window": "102", "kind": "AXValueChanged"}
+    ]});
+    let mut rig = Rig::new(unrelated.clone());
+    let result = rig.session.wait_for(params(gone.clone())).expect("waitFor");
+    assert_eq!(result.outcome, WaitOutcome::Timeout, "an element of 101 is not the Save window");
+    let mut rig = Rig::new(unrelated);
+    let result = rig.session.wait_for(params(property.clone())).expect("waitFor");
+    assert_eq!(result.outcome, WaitOutcome::Timeout, "the change was on 102, not 101");
+    let related = json!({"ax_notification_timeline": [
+        {"t_ms": 100, "window": "101", "kind": "AXUIElementDestroyed"},
+        {"t_ms": 200, "window": "101", "kind": "AXValueChanged"},
+        {"t_ms": 300, "window": "102", "kind": "AXUIElementDestroyed"}
+    ]});
+    let mut rig = Rig::new(related.clone());
+    let result = rig.session.wait_for(params(gone)).expect("waitFor");
+    assert_eq!(result.outcome, WaitOutcome::Matched);
+    // The tree read after the wait costs fake time, so the clock is read as a range.
+    assert!(
+        (300..1_000).contains(&rig.clock.now_ms()),
+        "matched on the Save window's close at 300 ms, not before: {}",
+        rig.clock.now_ms()
+    );
+    let mut rig = Rig::new(related);
+    let result = rig.session.wait_for(params(property)).expect("waitFor");
+    assert_eq!(result.outcome, WaitOutcome::Matched);
+    assert!(
+        (200..300).contains(&rig.clock.now_ms()),
+        "matched on the change of 101 at 200 ms: {}",
+        rig.clock.now_ms()
+    );
+}
