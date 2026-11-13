@@ -210,6 +210,10 @@ const fn permission(state: PermissionState) -> &'static str {
     }
 }
 
+fn live_listener(caps: &Capabilities) -> bool {
+    caps.stop_path.kind == omo_computer_core::capabilities::StopPathKind::Global && !caps.stop_path.deaf
+}
+
 const fn known_true(state: Tristate) -> bool {
     matches!(state, Tristate::Known(true))
 }
@@ -231,8 +235,10 @@ pub fn legacy_capabilities(caps: &Capabilities, probe: &PermissionProbe) -> Lega
         ax_permission: permission(probe.accessibility).to_owned(),
         display_count: caps.display_count,
         focus_guard: caps.background_window_input,
-        stop_path: "none".to_owned(),
-        stop_reason: Some(NO_GLOBAL_LISTENER.to_owned()),
+        // The live global listener by name, as `diagnose` reports it; otherwise none (review L8
+        // of #13362, R70y(3)).
+        stop_path: if live_listener(caps) { caps.stop_path.listener.clone() } else { "none".to_owned() },
+        stop_reason: (!live_listener(caps)).then(|| NO_GLOBAL_LISTENER.to_owned()),
         integrity_level: None,
         screen_locked: known_true(caps.session.screen_locked),
         display_asleep: Some(known_true(caps.session.display_asleep)),

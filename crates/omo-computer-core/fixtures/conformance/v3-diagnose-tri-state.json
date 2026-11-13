@@ -36,8 +36,8 @@
                 "axPermission": "unknown",
                 "displayCount": 0,
                 "focusGuard": true,
-                "stopPath": "none",
-                "stopReason": "no-global-listener",
+                "stopPath": "xi2-raw",
+                "stopReason": null,
                 "integrityLevel": null,
                 "screenLocked": false,
                 "displayAsleep": false

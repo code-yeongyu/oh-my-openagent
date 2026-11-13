@@ -126,4 +126,27 @@ mod tests {
         );
         assert_eq!(wire["ok"], false, "no host identity on this layer, so never ready");
     }
+
+    /// Review L8 of #13362 (R70y(3)): the v1 record's `stopPath`/`stopReason` agree with the
+    /// stop listener `diagnose` reports, with the listener present and with it absent.
+    #[test]
+    fn legacy_stop_path_agrees_with_diagnose_in_both_states() {
+        use omo_computer_backend_fake::StopPathScript;
+        use omo_computer_core::backend::Backend;
+        for script in [StopPathScript::Live, StopPathScript::None] {
+            let backend = FakeBackend::new(FakeScenario::default()).with_stop_path(script);
+            let v1 = crate::legacy_capabilities(&backend.capabilities(), &backend.probe_permissions());
+            let session = Session::new(Box::new(FakeBackend::new(FakeScenario::default()).with_stop_path(script)));
+            let stop = session.diagnose().stop_path;
+            let live = stop.kind == omo_computer_core::capabilities::StopPathKind::Global && !stop.deaf;
+            if live {
+                assert_eq!(v1.stop_path, stop.listener, "{script:?}: the v1 record names the live listener");
+                assert_eq!(v1.stop_reason, None, "{script:?}");
+            } else {
+                assert_eq!(v1.stop_path, "none", "{script:?}");
+                assert_eq!(v1.stop_reason.as_deref(), Some(crate::NO_GLOBAL_LISTENER), "{script:?}");
+            }
+            assert_eq!(live, script == StopPathScript::Live, "the fixture covers both states");
+        }
+    }
 }
