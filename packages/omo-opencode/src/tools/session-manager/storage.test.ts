@@ -12,6 +12,8 @@ const TEST_SESSION_STORAGE = join(TEST_DIR, "session")
 const TEST_TODO_DIR = join(TEST_DIR, "todos")
 const TEST_TRANSCRIPT_DIR = join(TEST_DIR, "transcripts")
 let sqliteBackend = false
+// Tags this file's fixture functions so a later file can prove none of them is still reachable (#13286).
+const FIXTURE_TAG = { __sessionManagerFixture: true }
 
 // mock.restore() does not reach the modules that re-export a mocked one (the shared barrel, session-manager/index.ts),
 // so they kept this file's fixture paths for every later file in the process. afterAll re-mocks each module with the
@@ -39,7 +41,7 @@ mock.module("./constants", () => ({
 }))
 
 mock.module("../../shared/opencode-storage-detection", () => ({
-  isSqliteBackend: () => sqliteBackend,
+  isSqliteBackend: Object.assign(() => sqliteBackend, FIXTURE_TAG),
   resetSqliteBackendCache: () => {},
 }))
 
@@ -51,7 +53,7 @@ mock.module("../../shared/opencode-storage-paths", () => ({
 }))
 
 mock.module("../../shared/opencode-message-dir", () => ({
-  getMessageDir: (sessionID: string) => {
+  getMessageDir: Object.assign((sessionID: string) => {
     if (!sessionID.startsWith("ses_")) return null
     if (/[/\\]|\.\./.test(sessionID)) return null
     if (!existsSync(TEST_MESSAGE_STORAGE)) return null
@@ -69,7 +71,7 @@ mock.module("../../shared/opencode-message-dir", () => ({
     }
 
     return null
-  },
+  }, FIXTURE_TAG),
 }))
 
 afterAll(() => {
