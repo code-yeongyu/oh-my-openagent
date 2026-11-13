@@ -1,0 +1,56 @@
+{
+  "description": "A live host's latch is set and the stop marker is deleted (none planted): a host-less --oneshot typeText reads hand.status{latch} at its session.open and starts Suspended{host_latch} with nothing sent (d-safety.md '### 7.', d-test-qa.md row 29).",
+  "transport": "oneshot",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json",
+  "env": {
+    "OMO_COMPUTER_FAKE_STOP_PATH": "live"
+  },
+  "host": {
+    "replies": [
+      {
+        "consentFingerprint": "fp-test",
+        "latch": {
+          "suspended": true,
+          "stopEpoch": 7
+        }
+      }
+    ]
+  },
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "desktop.typeText",
+        "params": {
+          "target": "101",
+          "text": "x"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "error": {
+              "code": -32015,
+              "message": "Suspended",
+              "data": {
+                "code": "Suspended",
+                "hint": null,
+                "reason": "host_latch",
+                "nothingSent": true
+              }
+            }
+          },
+          "variable": [
+            "/error/data/path",
+            "/error/data/disposition",
+            "/error/data/nextCall"
+          ]
+        }
+      ],
+      "sink": 0
+    }
+  ]
+}

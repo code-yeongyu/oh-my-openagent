@@ -14,7 +14,7 @@ use super::peer::Peer;
 pub const TWO_DISPLAYS: &str = "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json";
 
 pub struct Live {
-    _runtime: TempDir,
+    runtime_dir: TempDir,
     pub peer: Peer,
 }
 
@@ -42,11 +42,16 @@ pub fn env(runtime: &Path, scenario: &Path) -> Vec<(String, String)> {
 
 impl Live {
     pub fn spawn(args: &[&str], scenario: &Value) -> Self {
+        Self::spawn_with(args, scenario, |_| {})
+    }
+
+    pub fn spawn_with(args: &[&str], scenario: &Value, prepare: impl FnOnce(&Path)) -> Self {
         let runtime = tempfile::tempdir().expect("a runtime dir");
+        prepare(runtime.path());
         let file = runtime.path().join("scenario.json");
         fs::write(&file, scenario.to_string()).expect("the scenario file");
         let peer = Peer::spawn(args, &env(runtime.path(), &file), &repo());
-        Self { _runtime: runtime, peer }
+        Self { runtime_dir: runtime, peer }
     }
 
     pub fn until_reply(&self, id: i64) -> Vec<Value> {
@@ -59,6 +64,10 @@ impl Live {
                 return seen;
             }
         }
+    }
+
+    pub fn runtime(&self) -> &Path {
+        self.runtime_dir.path()
     }
 
     pub fn call(&mut self, id: i64, method: &str, params: &Value) -> Value {

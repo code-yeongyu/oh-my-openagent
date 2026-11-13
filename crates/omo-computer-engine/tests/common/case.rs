@@ -56,6 +56,7 @@ pub struct Case {
     pub scenario: Option<String>,
     pub env: Vec<(String, String)>,
     pub plant: Vec<Plant>,
+    pub host: Option<Value>,
     pub steps: Vec<Step>,
 }
 
@@ -142,6 +143,7 @@ pub fn load(name: &str) -> Case {
         scenario: raw.get("scenario").and_then(Value::as_str).map(str::to_owned),
         env,
         plant: plant(&raw, name),
+        host: raw.get("host").cloned(),
         steps: steps.iter().enumerate().map(|(index, raw)| step(raw, index, name)).collect(),
     }
 }

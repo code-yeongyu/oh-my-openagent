@@ -6,8 +6,14 @@
 mod case;
 #[path = "common/compare.rs"]
 mod compare;
+#[path = "common/host.rs"]
+mod host;
+#[path = "common/latch_tests.rs"]
+mod latch_tests;
 #[path = "common/live.rs"]
 mod live;
+#[path = "common/seam_tests.rs"]
+mod seam_tests;
 #[path = "common/peer.rs"]
 mod peer;
 #[path = "common/replay.rs"]
