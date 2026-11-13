@@ -9,6 +9,17 @@ pub fn owner_only_sddl(user_sid: &str) -> String {
     format!("D:P(A;;FA;;;{user_sid})(A;;FA;;;SY)")
 }
 
+/// Whether SDDL trustee `trustee` is `user_sid`: the SID itself, or the alias SDDL read-back writes
+/// for a well-known account SID (`LA` = the domain's RID-500 administrator, `LG` = RID-501 guest).
+fn is_user(trustee: &str, user_sid: &str) -> bool {
+    let alias_rid = match trustee {
+        "LA" => "500",
+        "LG" => "501",
+        _ => return trustee == user_sid,
+    };
+    user_sid.starts_with("S-1-5-21-") && user_sid.rsplit('-').next() == Some(alias_rid)
+}
+
 /// Whether `dacl_sddl` is protected and grants exactly the user and SYSTEM, both present.
 #[must_use]
 pub fn is_owner_only(dacl_sddl: &str, user_sid: &str) -> bool {
@@ -24,9 +35,9 @@ pub fn is_owner_only(dacl_sddl: &str, user_sid: &str) -> bool {
         .filter(|ace| !ace.is_empty())
         .filter_map(|ace| ace.trim_start_matches('(').rsplit(';').next())
         .collect();
-    let allowed = |sid: &&str| *sid == user_sid || *sid == "SY" || *sid == "S-1-5-18";
+    let allowed = |sid: &&str| is_user(sid, user_sid) || *sid == "SY" || *sid == "S-1-5-18";
     trustees.iter().all(allowed)
-        && trustees.contains(&user_sid)
+        && trustees.iter().any(|sid| is_user(sid, user_sid))
         && trustees
             .iter()
             .any(|sid| *sid == "SY" || *sid == "S-1-5-18")
@@ -68,15 +79,16 @@ mod os {
         let mut token = HANDLE::default();
         // SAFETY: a pseudo-handle and an out-parameter; closed below.
         unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token)? };
-        let mut buffer = vec![0u8; 256];
+        // u64 elements keep the buffer 8-aligned for the TOKEN_USER read below (review L2).
+        let mut buffer = vec![0u64; 32];
         let mut needed = 0u32;
-        // SAFETY: `buffer` is large enough for a TOKEN_USER with one SID.
+        // SAFETY: `buffer` (256 bytes) is large enough for a TOKEN_USER with one SID.
         let read = unsafe {
             GetTokenInformation(
                 token,
                 TokenUser,
                 Some(buffer.as_mut_ptr().cast()),
-                u32::try_from(buffer.len()).unwrap_or(0),
+                u32::try_from(std::mem::size_of_val(buffer.as_slice())).unwrap_or(0),
                 &mut needed,
             )
         };
@@ -84,7 +96,7 @@ mod os {
         let _ = unsafe { CloseHandle(token) };
         read?;
         let mut text = PWSTR::null();
-        // SAFETY: the SID points into `buffer`; `text` is freed with LocalFree.
+        // SAFETY: the SID points into `buffer`, which is 8-aligned (u64); `text` is freed with LocalFree.
         unsafe {
             let user = &*buffer.as_ptr().cast::<TOKEN_USER>();
             ConvertSidToStringSidW(user.User.Sid, &mut text)?;
