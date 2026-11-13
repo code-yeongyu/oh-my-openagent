@@ -78,6 +78,9 @@ async function runSync(
     error: (line) => err.push(line),
     confirm: async () => false,
     interactive: true,
+    // Review MEDIUM (#13337): never the real environment or the real /dev/tty.
+    env: {},
+    terminalAvailable: () => false,
     ...dependencies,
   })
   await program.parseAsync(args, { from: "user" })
@@ -123,7 +126,7 @@ describe("omo sync", () => {
     },
   )
 
-  test("recover points at the desktop passkey flow or approval from another device, and exits 2", async () => {
+  test("recover without a controlling terminal refuses, points at the desktop passkey flow or approval from another device, and exits 2", async () => {
     const result = await runSync(["sync", "recover"], {})
     expect(result.exit).toBe(EXIT_UNSUPPORTED_HERE)
     expect(result.err.join("\n")).toContain("omo sync approve")
