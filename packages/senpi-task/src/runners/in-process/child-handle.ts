@@ -359,6 +359,8 @@ function createTrackedChildHandle(
     dispose: async () => {
       if (disposed) return
       disposed = true
+      aborted = true
+      promptAbort?.abort()
       unsubscribeObserver()
       await shutDownChildSession(session)
     },
