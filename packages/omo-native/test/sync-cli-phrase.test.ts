@@ -4,6 +4,8 @@ import { Command } from "commander"
 import { ACCOUNT, fixture } from "../../memory-core/src/sync/account/testing/genesis-enable.test-support"
 import { BIP39_ENGLISH_ROWS } from "../../memory-core/src/sync/recovery/bip39/english"
 import { writePhraseGenesisMarker } from "../../memory-core/src/sync/genesis/phrase-marker"
+import { phraseMarkerExists } from "../../memory-core/src/sync/account/testing/phrase-enable.test-support"
+import { phraseNoticeStatus } from "../../memory-core/src/sync/account/phrase-notice"
 import { configureSyncCommands, EXIT_UNSUPPORTED_HERE, PHRASE_GENESIS_FLAG, type SyncCommandDependencies } from "../sync-cli"
 import type { SyncContext } from "../sync-context"
 import type { PhraseTerminal } from "../sync-phrase-tty"
@@ -148,4 +150,8 @@ test("#given a void notice on the terminal #when the person cancels it instead o
   await program.parseAsync(["sync", "enable"], { from: "user" })
   expect(err.join("\n")).toContain("nothing changed")
   expect(terminal.opened).toBe(1)
+  // Review LOW (#13337 @ 6e726034): the notice really was NOT acknowledged - the marker stays and still reads void.
+  const place = { pinDir: f.input.pinDir, account: ACCOUNT, principalId: f.keyring.principal().id }
+  expect(await phraseMarkerExists(f.input.pinDir, place.principalId)).toBe(true)
+  expect(await phraseNoticeStatus(place)).toEqual({ phraseVoid: { purpose: "genesis" } })
 })
