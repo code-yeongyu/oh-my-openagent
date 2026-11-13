@@ -94,6 +94,14 @@ describe("conformance report, declared-outcome catalog [ADP-1]", () => {
     expect(report.failed).toBe(1)
   })
 
+  test("observed_delivered counts declared cells only, so a duplicate or undeclared row never pushes it past cells", () => {
+    expect(buildReport(catalog, passingRun()).observedDelivered).toBe(2)
+    const undeclared: CellResult = { ...delivered(deliverCell), id: "undeclared/cell" }
+    const report = buildReport(catalog, [...passingRun(), delivered(deliverCell), undeclared])
+    expect(report.observedDelivered).toBe(1)
+    expect(report.observedDelivered).toBeLessThanOrEqual(report.cells)
+  })
+
   test("a duplicate cell fails the report", () => {
     const report = buildReport(catalog, [...passingRun(), delivered(deliverCell)])
     expect(report.problems).toEqual([`duplicate cell ${cellId(deliverCell)}`])

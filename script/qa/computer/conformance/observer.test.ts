@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join, resolve } from "node:path"
+import { isAbsolute, join, resolve } from "node:path"
 
 import { observerCheck } from "./observer.ts"
 
@@ -15,6 +15,21 @@ function sentinel(name: string, source: string): string {
 }
 
 describe("desktop observer at preflight (P-17)", () => {
+  test("a sentinel that throws while loading is an environment fault, not a crash of the run", async () => {
+    const { check, status } = await observerCheck(sentinel("throws", 'throw new Error("boom at load")\n'), "macos")
+    expect(check.ok).toBe(false)
+    expect(check.detail).toContain("could not be loaded: boom at load")
+    expect(status).toEqual({ kind: "unavailable", reason: check.detail })
+  })
+
+  test("a recording sentinel is reported by a relative path, like the fault paths", async () => {
+    const { check, status } = await observerCheck(sentinel("records", "export const recordsOn = () => true\n"), "macos")
+    expect(check.ok).toBe(true)
+    expect(isAbsolute(check.detail)).toBe(false)
+    expect(check.detail).toEndWith("records.ts")
+    expect(status).toEqual({ kind: "records" })
+  })
+
   test("a missing sentinel module is an environment fault", async () => {
     const { check } = await observerCheck(join(dir, "absent.ts"), "x11")
     expect(check.ok).toBe(false)
