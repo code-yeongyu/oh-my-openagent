@@ -89,7 +89,7 @@ export function stripRangeBoundaryEcho(
   lines: string[],
   startLine: number,
   endLine: number,
-  newLines: string[]
+  newLines: string[],
 ): string[] {
   const replacedCount = endLine - startLine + 1
   if (newLines.length <= 1 || newLines.length <= replacedCount) {

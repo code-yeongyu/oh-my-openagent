@@ -38,7 +38,9 @@ function readLockOwner(lockPath: string): string[] | undefined {
 async function expectRuntimeDirectoryRemoved(teamRunId: string, config: TeamModeConfig): Promise<void> {
   const runtimeStateDirectory = getRuntimeStateDir(resolveBaseDir(config), teamRunId)
   await access(runtimeStateDirectory).then(
-    () => { throw new Error(`expected ${runtimeStateDirectory} to be removed`) },
+    () => {
+      throw new Error(`expected ${runtimeStateDirectory} to be removed`)
+    },
     () => undefined,
   )
 }
@@ -47,9 +49,11 @@ describe("deleteTeam force path takes state.lock", () => {
   const temporaryDirectories: string[] = []
 
   afterEach(async () => {
-    await Promise.all(temporaryDirectories.splice(0).map(async (directoryPath) => {
-      await rm(directoryPath, { recursive: true, force: true })
-    }))
+    await Promise.all(
+      temporaryDirectories.splice(0).map(async (directoryPath) => {
+        await rm(directoryPath, { recursive: true, force: true })
+      }),
+    )
     mock.restore()
   })
 
@@ -62,10 +66,12 @@ describe("deleteTeam force path takes state.lock", () => {
       const lockPath = getStateLockPath(fixture.teamRunId, fixture.config)
       const transitionOptions: Array<{ readonly force?: boolean } | undefined> = []
       const originalTransitionRuntimeState = runtimeStateStore.transitionRuntimeState
-      spyOn(runtimeStateStore, "transitionRuntimeState").mockImplementation(async (teamRunId, transition, config, options) => {
-        transitionOptions.push(options)
-        return await originalTransitionRuntimeState(teamRunId, transition, config, options)
-      })
+      spyOn(runtimeStateStore, "transitionRuntimeState").mockImplementation(
+        async (teamRunId, transition, config, options) => {
+          transitionOptions.push(options)
+          return await originalTransitionRuntimeState(teamRunId, transition, config, options)
+        },
+      )
       const saves: Array<{ status: string; lockOwner: string[] | undefined }> = []
       const originalSaveRuntimeState = runtimeStateStore.saveRuntimeState
       spyOn(runtimeStateStore, "saveRuntimeState").mockImplementation(async (runtimeState, config) => {
@@ -77,7 +83,12 @@ describe("deleteTeam force path takes state.lock", () => {
       await deleteTeam(fixture.teamRunId, fixture.config, undefined, undefined, { force: true })
 
       // then
-      const lockedByStateStore = [expect.stringMatching(/^team-state-store [0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i), String(process.pid)]
+      const lockedByStateStore = [
+        expect.stringMatching(
+          /^team-state-store [0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+        ),
+        String(process.pid),
+      ]
       expect(saves).toEqual([
         { status, lockOwner: lockedByStateStore },
         { status: "deleting", lockOwner: lockedByStateStore },
@@ -99,21 +110,23 @@ describe("deleteTeam force path takes state.lock", () => {
     let holder: Promise<void> | undefined
     let holderHoldsLock = false
     const originalTransitionRuntimeState = runtimeStateStore.transitionRuntimeState
-    spyOn(runtimeStateStore, "transitionRuntimeState").mockImplementation(async (teamRunId, transition, config, options) => {
-      if (options?.force === true) deletingWriteAttempted.resolve()
-      const nextRuntimeState = await originalTransitionRuntimeState(teamRunId, transition, config, options)
-      // the holder grabs state.lock right after the member-completion transition, so the deleting write has to wait for it
-      if (holder === undefined) {
-        holder = withLock(lockPath, async () => {
-          holderHoldsLock = true
-          holderAcquired.resolve()
-          await releaseHolder.promise
-          holderHoldsLock = false
-        })
-        await holderAcquired.promise
-      }
-      return nextRuntimeState
-    })
+    spyOn(runtimeStateStore, "transitionRuntimeState").mockImplementation(
+      async (teamRunId, transition, config, options) => {
+        if (options?.force === true) deletingWriteAttempted.resolve()
+        const nextRuntimeState = await originalTransitionRuntimeState(teamRunId, transition, config, options)
+        // the holder grabs state.lock right after the member-completion transition, so the deleting write has to wait for it
+        if (holder === undefined) {
+          holder = withLock(lockPath, async () => {
+            holderHoldsLock = true
+            holderAcquired.resolve()
+            await releaseHolder.promise
+            holderHoldsLock = false
+          })
+          await holderAcquired.promise
+        }
+        return nextRuntimeState
+      },
+    )
     const saves: Array<{ status: string; whileHolderHeldLock: boolean }> = []
     const originalSaveRuntimeState = runtimeStateStore.saveRuntimeState
     spyOn(runtimeStateStore, "saveRuntimeState").mockImplementation(async (runtimeState, config) => {
@@ -127,7 +140,8 @@ describe("deleteTeam force path takes state.lock", () => {
     const deletion = deleteTeam(fixture.teamRunId, fixture.config, undefined, undefined, { force: true })
     await holderAcquired.promise
     await deletingWriteAttempted.promise
-    const statusWhileHolderHeldLock = (await runtimeStateStore.loadRuntimeState(fixture.teamRunId, fixture.config)).status
+    const statusWhileHolderHeldLock = (await runtimeStateStore.loadRuntimeState(fixture.teamRunId, fixture.config))
+      .status
     releaseHolder.resolve()
     await holder
     await deletion
@@ -148,15 +162,21 @@ describe("deleteTeam force path takes state.lock", () => {
     temporaryDirectories.push(fixture.baseDir)
     const transitionOptions: Array<{ readonly force?: boolean } | undefined> = []
     const originalTransitionRuntimeState = runtimeStateStore.transitionRuntimeState
-    spyOn(runtimeStateStore, "transitionRuntimeState").mockImplementation(async (teamRunId, transition, config, options) => {
-      transitionOptions.push(options)
-      const nextRuntimeState = await originalTransitionRuntimeState(teamRunId, transition, config, options)
-      // the orphan handler may flip any status to orphaned, and orphaned has no FSM edge to deleted
-      if (nextRuntimeState.status === "deleting") {
-        await originalTransitionRuntimeState(teamRunId, (currentRuntimeState) => ({ ...currentRuntimeState, status: "orphaned" }), config)
-      }
-      return nextRuntimeState
-    })
+    spyOn(runtimeStateStore, "transitionRuntimeState").mockImplementation(
+      async (teamRunId, transition, config, options) => {
+        transitionOptions.push(options)
+        const nextRuntimeState = await originalTransitionRuntimeState(teamRunId, transition, config, options)
+        // the orphan handler may flip any status to orphaned, and orphaned has no FSM edge to deleted
+        if (nextRuntimeState.status === "deleting") {
+          await originalTransitionRuntimeState(
+            teamRunId,
+            (currentRuntimeState) => ({ ...currentRuntimeState, status: "orphaned" }),
+            config,
+          )
+        }
+        return nextRuntimeState
+      },
+    )
     const savedStatuses: string[] = []
     const originalSaveRuntimeState = runtimeStateStore.saveRuntimeState
     spyOn(runtimeStateStore, "saveRuntimeState").mockImplementation(async (runtimeState, config) => {

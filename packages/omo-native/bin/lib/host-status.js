@@ -40,7 +40,11 @@ function withLastActivity(payload, readActivity) {
 }
 
 function inventory(stdout) {
-  const line = stdout.trim().split("\n").filter((candidate) => candidate.trim() !== "").pop()
+  const line = stdout
+    .trim()
+    .split("\n")
+    .filter((candidate) => candidate.trim() !== "")
+    .pop()
   if (line === undefined) return undefined
   try {
     const parsed = JSON.parse(line)

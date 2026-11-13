@@ -3,7 +3,11 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { join } from "node:path"
 
-import { clearAstGrepSgProvisionTargetsForTesting, createAstGrepSgProvisionHook, type AstGrepSgProvisionDeps } from "./index"
+import {
+  clearAstGrepSgProvisionTargetsForTesting,
+  createAstGrepSgProvisionHook,
+  type AstGrepSgProvisionDeps,
+} from "./index"
 
 function createDeps(events: string[], overrides: Partial<AstGrepSgProvisionDeps> = {}): AstGrepSgProvisionDeps {
   return {
@@ -44,7 +48,9 @@ describe("createAstGrepSgProvisionHook", () => {
   test("#given sg already resolves #when session starts #then no provisioning is scheduled", () => {
     // given
     const events: string[] = []
-    const hook = createAstGrepSgProvisionHook(createDeps(events, { arch: "x64", findSgBinary: () => "/usr/bin/sg", platform: "linux" }))
+    const hook = createAstGrepSgProvisionHook(
+      createDeps(events, { arch: "x64", findSgBinary: () => "/usr/bin/sg", platform: "linux" }),
+    )
 
     // when
     hook.event({ event: { type: "session.created" } })
@@ -56,13 +62,15 @@ describe("createAstGrepSgProvisionHook", () => {
   test("#given provisioning fails #when background work runs #then the session hook logs and never throws", async () => {
     // given
     const events: string[] = []
-    const hook = createAstGrepSgProvisionHook(createDeps(events, {
-      platform: "linux",
-      arch: "x64",
-      provisionSgBinary: async () => {
-        throw new Error("download failed")
-      },
-    }))
+    const hook = createAstGrepSgProvisionHook(
+      createDeps(events, {
+        platform: "linux",
+        arch: "x64",
+        provisionSgBinary: async () => {
+          throw new Error("download failed")
+        },
+      }),
+    )
 
     // when
     expect(() => hook.event({ event: { type: "session.created" } })).not.toThrow()

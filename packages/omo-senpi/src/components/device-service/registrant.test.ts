@@ -19,7 +19,9 @@ type Started = { readonly agentDir: string; readonly sessionStore: unknown }
 // extension code and closes what was created inside it when that session ends.
 const sessionOwner = new AsyncLocalStorage<string>()
 
-function harness(options: Partial<DeviceServiceComponentOptions> & { readonly mode?: string; readonly hasUI?: boolean } = {}) {
+function harness(
+  options: Partial<DeviceServiceComponentOptions> & { readonly mode?: string; readonly hasUI?: boolean } = {},
+) {
   const pi = new FakeExtensionAPI()
   const deferred: StartupWork[] = []
   const started: Started[] = []
@@ -48,7 +50,8 @@ function harness(options: Partial<DeviceServiceComponentOptions> & { readonly mo
   component.register(pi, ctx)
   const start = (session = "session-1") =>
     sessionOwner.run(session, () => {
-      for (const { event, handler } of pi.handlers) if (event === "session_start") handler({ reason: "startup" }, eventCtx)
+      for (const { event, handler } of pi.handlers)
+        if (event === "session_start") handler({ reason: "startup" }, eventCtx)
     })
   const flush = async (session = "session-1") => {
     for (const work of deferred.splice(0)) await sessionOwner.run(session, () => work())
@@ -57,16 +60,19 @@ function harness(options: Partial<DeviceServiceComponentOptions> & { readonly mo
 }
 
 describe("device-service agent dir registrant start (#12379)", () => {
-  test.each(["tui", "rpc"])("a %s engine starts one registrant for its own resolved agent dir, with no OMO_BIN and no UI", async mode => {
-    const h = harness({ mode })
+  test.each(["tui", "rpc"])(
+    "a %s engine starts one registrant for its own resolved agent dir, with no OMO_BIN and no UI",
+    async (mode) => {
+      const h = harness({ mode })
 
-    h.start()
-    await h.flush()
+      h.start()
+      await h.flush()
 
-    expect(h.started.map(({ agentDir }) => agentDir)).toEqual([AGENT_DIR])
-  })
+      expect(h.started.map(({ agentDir }) => agentDir)).toEqual([AGENT_DIR])
+    },
+  )
 
-  test.each(["print", "json"])("a %s run starts no registrant", async mode => {
+  test.each(["print", "json"])("a %s run starts no registrant", async (mode) => {
     const h = harness({ mode })
 
     h.start()

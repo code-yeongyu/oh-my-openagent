@@ -1,9 +1,5 @@
 import { describe, it, expect } from "bun:test"
-import {
-  parsePeopleCard,
-  serializePeopleCard,
-  type PeopleCard,
-} from "./format"
+import { parsePeopleCard, serializePeopleCard, type PeopleCard } from "./format"
 
 describe("people card format (IC-16)", () => {
   const limits = { maxEntries: 40, maxEntryChars: 200 }
@@ -49,11 +45,7 @@ describe("people card format (IC-16)", () => {
   })
 
   describe("#given a card with blank lines between entries", () => {
-    const text = [
-      "IDENTITY: Engineer",
-      "",
-      "ATTRIBUTE: Likes dogs",
-    ].join("\n")
+    const text = ["IDENTITY: Engineer", "", "ATTRIBUTE: Likes dogs"].join("\n")
 
     it("#then parsePeopleCard skips blank lines", () => {
       const result = parsePeopleCard(text, limits)
@@ -64,11 +56,7 @@ describe("people card format (IC-16)", () => {
   })
 
   describe("#given a card with a comment-only line", () => {
-    const text = [
-      "IDENTITY: Engineer",
-      "# this is a comment",
-      "ATTRIBUTE: Likes dogs",
-    ].join("\n")
+    const text = ["IDENTITY: Engineer", "# this is a comment", "ATTRIBUTE: Likes dogs"].join("\n")
 
     it("#then parsePeopleCard skips comment lines without diagnostics", () => {
       const result = parsePeopleCard(text, limits)
@@ -79,10 +67,7 @@ describe("people card format (IC-16)", () => {
   })
 
   describe("#given an invalid prefix line", () => {
-    const text = [
-      "IDENTITY: Engineer",
-      "BADPREFIX: something",
-    ].join("\n")
+    const text = ["IDENTITY: Engineer", "BADPREFIX: something"].join("\n")
 
     it("#then parsePeopleCard returns a diagnostic instead of throwing", () => {
       const result = parsePeopleCard(text, limits)

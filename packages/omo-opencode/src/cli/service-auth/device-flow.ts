@@ -1,28 +1,51 @@
 import { setTimeout } from "node:timers/promises"
 import { generateDeviceKeys } from "./device-keys"
-import { ApiRefusal, type ChooseDevice, deviceCodeSchema, grantSchema, jsonRequest, parseReply, type Platform, SignInError } from "./protocol"
+import {
+  ApiRefusal,
+  type ChooseDevice,
+  deviceCodeSchema,
+  grantSchema,
+  jsonRequest,
+  parseReply,
+  type Platform,
+  SignInError,
+} from "./protocol"
 import type { Session } from "./session"
 
 export type DisplayCode = { readonly verificationUri: string; readonly userCode: string; readonly matchingCode: string }
-export async function loginDevice(session: Session, options: {
-  readonly name: string
-  readonly platform: Platform
-  readonly show: (code: DisplayCode) => void
-  readonly chooseDevice: ChooseDevice
-  readonly now?: () => number
-  readonly sleep?: (ms: number) => Promise<void>
-}): Promise<void> {
+export async function loginDevice(
+  session: Session,
+  options: {
+    readonly name: string
+    readonly platform: Platform
+    readonly show: (code: DisplayCode) => void
+    readonly chooseDevice: ChooseDevice
+    /** This machine's hardware digest (#6503), sent only when the service advertises machine identity. */
+    readonly machineDigest?: string
+    readonly now?: () => number
+    readonly sleep?: (ms: number) => Promise<void>
+  },
+): Promise<void> {
   await session.ready()
   const keys = generateDeviceKeys()
-  const minted = parseReply(deviceCodeSchema, await session.request("/v1/device/code",
-    jsonRequest({ client: { name: options.name, platform: options.platform } })))
+  const minted = parseReply(
+    deviceCodeSchema,
+    await session.request(
+      "/v1/device/code",
+      jsonRequest({ client: { name: options.name, platform: options.platform } }),
+    ),
+  )
   const uri = new URL(minted.verificationUri)
   if (uri.protocol !== "https:" && !(uri.protocol === "http:" && uri.hostname === "127.0.0.1" && uri.port !== "")) {
     throw new SignInError("The service returned an unsafe verification URL.")
   }
-  options.show({ verificationUri: minted.verificationUri, userCode: minted.userCode, matchingCode: minted.matchingCode })
+  options.show({
+    verificationUri: minted.verificationUri,
+    userCode: minted.userCode,
+    matchingCode: minted.matchingCode,
+  })
   const now = options.now ?? Date.now
-  const sleep = options.sleep ?? (ms => setTimeout(ms, undefined, { signal: session.signal }))
+  const sleep = options.sleep ?? ((ms) => setTimeout(ms, undefined, { signal: session.signal }))
   const expiresAt = Date.parse(minted.expiresAt)
   let interval = minted.intervalSeconds * 1000
   while (now() < expiresAt) {
@@ -30,15 +53,28 @@ export async function loginDevice(session: Session, options: {
     session.signal?.throwIfAborted()
     if (now() >= expiresAt) break
     try {
-      const grant = parseReply(grantSchema, await session.request("/v1/device/token", jsonRequest({
-        deviceCode: minted.deviceCode, ...keys.public,
-      })))
+      const grant = parseReply(
+        grantSchema,
+        await session.request(
+          "/v1/device/token",
+          jsonRequest({
+            deviceCode: minted.deviceCode,
+            ...keys.public,
+            ...(options.machineDigest === undefined ? {} : { machineDigest: options.machineDigest }),
+          }),
+        ),
+      )
       await session.save({ ...grant, ...keys.private })
       return
     } catch (error) {
       if (!(error instanceof ApiRefusal)) throw error
+      // #6503: this machine already has its device. Terminal: never retried, never a reason to remove or inherit that device.
+      if (error.code === "machine_exists") throw error
       if (error.status === 400 && error.code === "authorization_pending") continue
-      if (error.status === 400 && error.code === "slow_down") { interval += 5000; continue }
+      if (error.status === 400 && error.code === "slow_down") {
+        interval += 5000
+        continue
+      }
       if (error.status === 429) {
         interval = error.retryDelay(now(), Math.min(60_000, interval + 5000))
         continue

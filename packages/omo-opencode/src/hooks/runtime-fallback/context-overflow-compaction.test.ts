@@ -5,10 +5,7 @@ import type { OhMyOpenCodeConfig, RuntimeFallbackConfig } from "../../config"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { releaseAllPromptAsyncReservationsForTesting } from "../shared/prompt-async-gate"
 import { createRuntimeFallbackHook } from "./hook"
-import {
-  installRuntimeFallbackTestClock,
-  restoreRuntimeFallbackTestClock,
-} from "./test-timeout-clock.test-support"
+import { installRuntimeFallbackTestClock, restoreRuntimeFallbackTestClock } from "./test-timeout-clock.test-support"
 import type { RuntimeFallbackPluginInput } from "./types"
 
 const SESSION_ID = "test-session-context-overflow-compaction"
@@ -78,8 +75,7 @@ describe("runtime-fallback context overflow handling", () => {
           error: {
             name: "ContextOverflowError",
             data: {
-              message:
-                "Your input exceeds the context window of this model. Please adjust your input and try again.",
+              message: "Your input exceeds the context window of this model. Please adjust your input and try again.",
               responseBody:
                 '{"error":{"message":"Your input exceeds the context window of this model. Please adjust your input and try again.","type":"invalid_request_error","code":"context_too_large"}}',
             },

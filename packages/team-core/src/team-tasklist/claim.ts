@@ -71,27 +71,31 @@ export async function claimTask(
     throw new AlreadyClaimedError()
   }
 
-  return withLock(claimLockPath, async () => {
-    const refreshedTask = await getTask(teamRunId, taskId, config)
-    if (refreshedTask.status !== "pending") {
-      throw new AlreadyClaimedError()
-    }
+  return withLock(
+    claimLockPath,
+    async () => {
+      const refreshedTask = await getTask(teamRunId, taskId, config)
+      if (refreshedTask.status !== "pending") {
+        throw new AlreadyClaimedError()
+      }
 
-    const refreshedTasks = await listTasks(teamRunId, config)
-    if (!canClaim(refreshedTask, refreshedTasks)) {
-      throw new BlockedByError(getBlockingTaskIds(refreshedTask, refreshedTasks))
-    }
+      const refreshedTasks = await listTasks(teamRunId, config)
+      if (!canClaim(refreshedTask, refreshedTasks)) {
+        throw new BlockedByError(getBlockingTaskIds(refreshedTask, refreshedTasks))
+      }
 
-    const now = Date.now()
-    const updatedTask = TaskSchema.parse({
-      ...refreshedTask,
-      status: "claimed",
-      owner: memberName,
-      claimedAt: now,
-      updatedAt: now,
-    })
+      const now = Date.now()
+      const updatedTask = TaskSchema.parse({
+        ...refreshedTask,
+        status: "claimed",
+        owner: memberName,
+        claimedAt: now,
+        updatedAt: now,
+      })
 
-    await atomicWrite(taskPath, `${JSON.stringify(updatedTask, null, 2)}\n`)
-    return updatedTask
-  }, { ownerTag: memberName, staleAfterMs: CLAIM_STALE_AFTER_MS })
+      await atomicWrite(taskPath, `${JSON.stringify(updatedTask, null, 2)}\n`)
+      return updatedTask
+    },
+    { ownerTag: memberName, staleAfterMs: CLAIM_STALE_AFTER_MS },
+  )
 }

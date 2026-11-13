@@ -106,9 +106,11 @@ describe("runtime state store", () => {
   const temporaryDirectories: string[] = []
 
   afterEach(async () => {
-    await Promise.all(temporaryDirectories.splice(0).map(async (directoryPath) => {
-      await rm(directoryPath, { recursive: true, force: true })
-    }))
+    await Promise.all(
+      temporaryDirectories.splice(0).map(async (directoryPath) => {
+        await rm(directoryPath, { recursive: true, force: true })
+      }),
+    )
   })
 
   test("createRuntimeState persists creating state with computed bounds", async () => {
@@ -119,7 +121,9 @@ describe("runtime state store", () => {
 
     // when
     const runtimeState = await createRuntimeState(createSpec(), undefined, "user", config)
-    const persistedState = JSON.parse(await readFile(path.join(baseDir, "runtime", runtimeState.teamRunId, "state.json"), "utf8"))
+    const persistedState = JSON.parse(
+      await readFile(path.join(baseDir, "runtime", runtimeState.teamRunId, "state.json"), "utf8"),
+    )
 
     // then
     expect(runtimeState.teamRunId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)
@@ -134,7 +138,12 @@ describe("runtime state store", () => {
     })
     expect(runtimeState.members).toEqual([
       expect.objectContaining({ name: "lead", agentType: "leader", status: "pending", pendingInjectedMessageIds: [] }),
-      expect.objectContaining({ name: "worker", agentType: "general-purpose", status: "pending", pendingInjectedMessageIds: [] }),
+      expect.objectContaining({
+        name: "worker",
+        agentType: "general-purpose",
+        status: "pending",
+        pendingInjectedMessageIds: [],
+      }),
     ])
     expect(persistedState.status).toBe("creating")
   })
@@ -163,7 +172,11 @@ describe("runtime state store", () => {
     const createdState = await createRuntimeState(createSpec(), "lead-session", "project", config)
 
     // when
-    await transitionRuntimeState(createdState.teamRunId, (runtimeState) => ({ ...runtimeState, status: "active" }), config)
+    await transitionRuntimeState(
+      createdState.teamRunId,
+      (runtimeState) => ({ ...runtimeState, status: "active" }),
+      config,
+    )
     const runtimeState = await transitionRuntimeState(
       createdState.teamRunId,
       (currentRuntimeState) => ({ ...currentRuntimeState, status: "shutdown_requested" }),
@@ -330,10 +343,13 @@ describe("runtime state store", () => {
     const config = createConfig(baseDir)
     const runtimeState = await createRuntimeState(createSpec(), undefined, "user", config)
     const statePath = path.join(baseDir, "runtime", runtimeState.teamRunId, "state.json")
-    await writeFile(statePath, JSON.stringify({
-      ...runtimeState,
-      members: runtimeState.members.map((member) => ({ ...member, delegateTaskCallsUsed: 3 })),
-    }))
+    await writeFile(
+      statePath,
+      JSON.stringify({
+        ...runtimeState,
+        members: runtimeState.members.map((member) => ({ ...member, delegateTaskCallsUsed: 3 })),
+      }),
+    )
 
     // when
     const persistedState = await loadRuntimeState(runtimeState.teamRunId, config)

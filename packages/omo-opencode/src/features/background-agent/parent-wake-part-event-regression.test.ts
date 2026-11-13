@@ -55,13 +55,7 @@ async function dispatchParentWake(manager: BackgroundManager, sessionID: string)
     ) => void
     readonly flushPendingParentWake: (sessionID: string) => Promise<void>
   }>(manager)
-  internals.queuePendingParentWake(
-    sessionID,
-    "<system-reminder>done</system-reminder>",
-    { agent: "sisyphus" },
-    true,
-    0,
-  )
+  internals.queuePendingParentWake(sessionID, "<system-reminder>done</system-reminder>", { agent: "sisyphus" }, true, 0)
   await internals.flushPendingParentWake(sessionID)
 }
 

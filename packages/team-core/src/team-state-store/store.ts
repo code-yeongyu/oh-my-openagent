@@ -23,7 +23,10 @@ const ALLOWED_RUNTIME_TRANSITIONS: Readonly<Record<RuntimeState["status"], Reado
 }
 
 export class RuntimeStateError extends Error {
-  constructor(message: string, public readonly code: string) {
+  constructor(
+    message: string,
+    public readonly code: string,
+  ) {
     super(message)
     this.name = "RuntimeStateError"
   }
@@ -72,8 +75,6 @@ function serializeRuntimeState(runtimeState: RuntimeState): string {
   const parsedRuntimeState = RuntimeStateSchema.parse(runtimeState)
   return `${JSON.stringify(parsedRuntimeState, null, 2)}\n`
 }
-
-
 
 function stripLegacyRuntimeStateMemberFields(member: unknown): unknown {
   if (!isPlainRecord(member)) {
@@ -127,32 +128,35 @@ export async function createRuntimeState(
   const baseDir = resolveBaseDir(config)
   const teamRunId = randomUUID()
   const runtimeDirectoryPath = getRuntimeStateDir(baseDir, teamRunId)
-  const runtimeState = validateRuntimeState({
-    version: 1,
-    teamRunId,
-    teamName: spec.name,
-    specSource,
-    createdAt: Date.now(),
-    status: "creating",
-    leadSessionId,
-    members: spec.members.map((member) => ({
-      name: member.name,
-      agentType: spec.leadAgentId === member.name ? "leader" : "general-purpose",
-      status: "pending",
-      color: member.color,
-      worktreePath: member.worktreePath,
-      lastInjectedTurnMarker: undefined,
-      pendingInjectedMessageIds: [],
-    })),
-    shutdownRequests: [],
-    bounds: {
-      maxMembers: config.max_members,
-      maxParallelMembers: config.max_parallel_members,
-      maxMessagesPerRun: config.max_messages_per_run,
-      maxWallClockMinutes: config.max_wall_clock_minutes,
-      maxMemberTurns: config.max_member_turns,
+  const runtimeState = validateRuntimeState(
+    {
+      version: 1,
+      teamRunId,
+      teamName: spec.name,
+      specSource,
+      createdAt: Date.now(),
+      status: "creating",
+      leadSessionId,
+      members: spec.members.map((member) => ({
+        name: member.name,
+        agentType: spec.leadAgentId === member.name ? "leader" : "general-purpose",
+        status: "pending",
+        color: member.color,
+        worktreePath: member.worktreePath,
+        lastInjectedTurnMarker: undefined,
+        pendingInjectedMessageIds: [],
+      })),
+      shutdownRequests: [],
+      bounds: {
+        maxMembers: config.max_members,
+        maxParallelMembers: config.max_parallel_members,
+        maxMessagesPerRun: config.max_messages_per_run,
+        maxWallClockMinutes: config.max_wall_clock_minutes,
+        maxMemberTurns: config.max_member_turns,
+      },
     },
-  }, teamRunId)
+    teamRunId,
+  )
 
   await mkdir(runtimeDirectoryPath, { recursive: true })
   await atomicWrite(getStatePath(baseDir, teamRunId), serializeRuntimeState(runtimeState))
@@ -188,23 +192,25 @@ export async function transitionRuntimeState(
   const baseDir = resolveBaseDir(config)
   const runtimeDirectoryPath = getRuntimeStateDir(baseDir, teamRunId)
 
-  return withLock(path.join(runtimeDirectoryPath, "state.lock"), async () => {
-    const currentRuntimeState = await loadRuntimeState(teamRunId, config)
-    const nextRuntimeState = validateRuntimeState(transition(currentRuntimeState), teamRunId)
+  return withLock(
+    path.join(runtimeDirectoryPath, "state.lock"),
+    async () => {
+      const currentRuntimeState = await loadRuntimeState(teamRunId, config)
+      const nextRuntimeState = validateRuntimeState(transition(currentRuntimeState), teamRunId)
 
-    // force exists for force-deleting creating/orphaned teams, which the FSM deliberately has no edge for
-    if (options?.force !== true && !isValidTransition(currentRuntimeState.status, nextRuntimeState.status)) {
-      throw new InvalidTransitionError(currentRuntimeState.status, nextRuntimeState.status)
-    }
+      // force exists for force-deleting creating/orphaned teams, which the FSM deliberately has no edge for
+      if (options?.force !== true && !isValidTransition(currentRuntimeState.status, nextRuntimeState.status)) {
+        throw new InvalidTransitionError(currentRuntimeState.status, nextRuntimeState.status)
+      }
 
-    await saveRuntimeState(nextRuntimeState, config)
-    return nextRuntimeState
-  }, { ownerTag: "team-state-store" })
+      await saveRuntimeState(nextRuntimeState, config)
+      return nextRuntimeState
+    },
+    { ownerTag: "team-state-store" },
+  )
 }
 
-export async function listActiveTeams(
-  config: TeamModeConfig,
-): Promise<ActiveTeamSummary[]> {
+export async function listActiveTeams(config: TeamModeConfig): Promise<ActiveTeamSummary[]> {
   const baseDir = resolveBaseDir(config)
   const now = Date.now()
 
@@ -223,7 +229,7 @@ export async function listActiveTeams(
           continue
         }
 
-        if (runtimeState.status === "deleting" && await isDeletingRuntimeStale(baseDir, runtimeEntry.name, now)) {
+        if (runtimeState.status === "deleting" && (await isDeletingRuntimeStale(baseDir, runtimeEntry.name, now))) {
           await removeRuntimeDirectoryBestEffort(baseDir, runtimeEntry.name, "stale_deleting")
           continue
         }
@@ -245,7 +251,10 @@ export async function listActiveTeams(
       }
     }
 
-    activeTeams.sort((leftTeam, rightTeam) => leftTeam.teamName.localeCompare(rightTeam.teamName) || leftTeam.teamRunId.localeCompare(rightTeam.teamRunId))
+    activeTeams.sort(
+      (leftTeam, rightTeam) =>
+        leftTeam.teamName.localeCompare(rightTeam.teamName) || leftTeam.teamRunId.localeCompare(rightTeam.teamRunId),
+    )
     return activeTeams
   } catch (error) {
     const nodeError = error as NodeJS.ErrnoException

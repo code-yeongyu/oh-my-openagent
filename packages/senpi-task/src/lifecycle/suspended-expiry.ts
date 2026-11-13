@@ -50,8 +50,10 @@ export async function expireSuspendedChild(
       ? context.store.mutate(observed.task_id, (fresh) => {
           if (
             !parentLive() ||
-            (fresh.residency_state === "resident" && fresh.suspension_reason === undefined
-              && fresh.recovery_deadline_at === undefined && !isSuspensionExpiry(fresh)) ||
+            (fresh.residency_state === "resident" &&
+              fresh.suspension_reason === undefined &&
+              fresh.recovery_deadline_at === undefined &&
+              !isSuspensionExpiry(fresh)) ||
             (fresh.status !== "pending" && fresh.status !== "running") ||
             fresh.notification.run_epoch !== observed.notification.run_epoch ||
             fresh.residency_claim !== observed.residency_claim ||
@@ -109,12 +111,20 @@ export async function expireSuspendedChild(
     pending.attempt += 1
   }
   if (!isHostSessionRecord(record) && !closed) return
-  if (closed && record.isolation !== undefined && record.isolation.merge_result === undefined && context.isolation !== undefined) {
-    await salvageCrashedIsolation({
-      runtime: context.isolation,
-      stateDir: context.store.stateDir,
-      mutate: (taskId, mutation) => context.store.mutate(taskId, mutation),
-    }, record)
+  if (
+    closed &&
+    record.isolation !== undefined &&
+    record.isolation.merge_result === undefined &&
+    context.isolation !== undefined
+  ) {
+    await salvageCrashedIsolation(
+      {
+        runtime: context.isolation,
+        stateDir: context.store.stateDir,
+        mutate: (taskId, mutation) => context.store.mutate(taskId, mutation),
+      },
+      record,
+    )
   }
   const fresh = context.store.load(record.task_id)
   if (
@@ -133,9 +143,11 @@ export async function expireSuspendedChild(
     return rest
   })
   const message = withDroppedSteeringNotice(closureMessage, undelivered)
-  if (undelivered > 0) context.store.appendEvent(record.task_id, {
-    type: "steer_dropped", payload: { count: undelivered, reason: "target_gone" },
-  })
+  if (undelivered > 0)
+    context.store.appendEvent(record.task_id, {
+      type: "steer_dropped",
+      payload: { count: undelivered, reason: "target_gone" },
+    })
   // Dispose/release before notification. This is NOT a cancellation: externally caused failure
   // must take the normal fail transition so the waiting parent receives one result.
   context.dequeuePending(record.task_id)

@@ -14,7 +14,9 @@ function fixture() {
   const writes: string[] = []
   const store: GrantStore = {
     read: async () => snapshot,
-    add: async (digest) => { writes.push(digest) },
+    add: async (digest) => {
+      writes.push(digest)
+    },
     revoke: async () => {},
     list: async () => ({}),
     digest: async () => "0",
@@ -27,8 +29,12 @@ function fixture() {
     ids.push(id)
   })
   const info: SkillMcpClientInfo = {
-    sessionID: "review", skillName: "fixture", serverName: "fixture", scope: "project",
-    directory: "/synthetic/project", sourcePath: "/synthetic/project/SKILL.md",
+    sessionID: "review",
+    skillName: "fixture",
+    serverName: "fixture",
+    scope: "project",
+    directory: "/synthetic/project",
+    sourcePath: "/synthetic/project/SKILL.md",
   }
   const raw = { type: "http" as const, url: "https://example.invalid/${REVIEW_PRIVATE_TOKEN}" }
   return { policy, info, raw, ids, writes }
@@ -79,19 +85,29 @@ test("a handle superseded during declaration revalidation cannot write a grant",
   const f = fixture()
   let entered!: () => void
   let release!: () => void
-  const started = new Promise<void>((resolve) => { entered = resolve })
-  const resume = new Promise<void>((resolve) => { release = resolve })
+  const started = new Promise<void>((resolve) => {
+    entered = resolve
+  })
+  const resume = new Promise<void>((resolve) => {
+    release = resolve
+  })
   const sourcePath = f.info.sourcePath
   if (sourcePath === undefined) throw new Error("fixture has no sourcePath")
-  const info = { ...f.info, revalidateDeclaration: async () => {
-    entered()
-    await resume
-    return { config: f.raw, sourcePath, sourceKind: "frontmatter" as const }
-  } }
+  const info = {
+    ...f.info,
+    revalidateDeclaration: async () => {
+      entered()
+      await resume
+      return { config: f.raw, sourcePath, sourceKind: "frontmatter" as const }
+    },
+  }
   try {
     await f.policy.prepare(info, f.raw)
     // when
-    const granting = f.policy.grant(idAt(f.ids, 0)).then(() => undefined, (error: unknown) => error)
+    const granting = f.policy.grant(idAt(f.ids, 0)).then(
+      () => undefined,
+      (error: unknown) => error,
+    )
     await started
     await f.policy.prepare(info, f.raw, { REVIEW_EXPLICIT: "changed" })
     release()

@@ -28,12 +28,18 @@ function isPlanningName(path: string): boolean {
 }
 
 /** Return the authorized physical content path or final entry that execution must use. */
-export function resolveAllowedFile(filePath: string, workspaceRoot: string, mode: "content" | "entry" = "content"): string | undefined {
+export function resolveAllowedFile(
+  filePath: string,
+  workspaceRoot: string,
+  mode: "content" | "entry" = "content",
+): string | undefined {
   try {
     const input = filePath.replace(/\\/g, sep)
-    const planning = [...input.matchAll(/(?:^|[/\\])\.omo(?=[/\\]|$)/gi)].reverse().find(match =>
-      isPlanningName(resolveFileWritePath(input.slice(0, match.index + match[0].length), workspaceRoot, false)),
-    )
+    const planning = [...input.matchAll(/(?:^|[/\\])\.omo(?=[/\\]|$)/gi)]
+      .reverse()
+      .find((match) =>
+        isPlanningName(resolveFileWritePath(input.slice(0, match.index + match[0].length), workspaceRoot, false)),
+      )
     if (planning === undefined) return undefined
     const prefix = input.slice(0, planning.index + planning[0].length)
     const realRoot = realpathSync.native(workspaceRoot)
@@ -42,9 +48,11 @@ export function resolveAllowedFile(filePath: string, workspaceRoot: string, mode
     if (!isInside(planningRoot, realRoot)) return undefined
     const destination = resolveFileWritePath(filePath, workspaceRoot, mode === "content")
     if (!isInside(destination, planningRoot)) return undefined
-    return ALLOWED_EXTENSIONS.some(ext =>
-      input.toLowerCase().endsWith(ext) && destination.toLowerCase().endsWith(ext),
-    ) ? destination : undefined
+    return ALLOWED_EXTENSIONS.some(
+      (ext) => input.toLowerCase().endsWith(ext) && destination.toLowerCase().endsWith(ext),
+    )
+      ? destination
+      : undefined
   } catch {
     // Includes dangling links, loops, non-directory ancestors and inaccessible paths.
     return undefined
