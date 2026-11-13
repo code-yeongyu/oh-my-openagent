@@ -3,6 +3,8 @@ import type { ChainState } from "../crypto/chain.ts"
 import type { TrustAnchor } from "../crypto/anchor.ts"
 import type { AccountHttp } from "./http.ts"
 import { acknowledgeEnrollVoid, enrollNoticeStatus } from "../recovery/enroll-phrase.ts"
+import { loadServedChain } from "../recovery/served-chain.ts"
+import { createRejectionCounter } from "../crypto/rejection.ts"
 import type { DeviceKeyring } from "../keyring-port.ts"
 import type { SyncOperationOptions } from "../operation-authority.ts"
 import { loadGenesisIntent, withGenesisLock } from "../genesis/intent-store.ts"
@@ -51,6 +53,18 @@ export const phraseNoticeStatus = async (
   return enrollNoticeStatus(place, verifiedChain)
 }
 
+/**
+ * Status with enroll and rotate markers resolved against the verified chain (review LOW, #13336 @ 9f9734a8): the
+ * RPC status read calls this only when the local read is unresolved, so a delivered void notice can show.
+ */
+export const verifiedPhraseNoticeStatus = async (
+  input: PhraseGenesisPlace & { readonly chain: AccountHttp; readonly anchor?: TrustAnchor },
+): Promise<PhraseNoticeStatus> => {
+  const pinned = input.anchor ?? (await loadTrustAnchor(input.pinDir, input.account).then((pin) => (pin.ok ? pin.anchor : undefined)))
+  const served = pinned === undefined ? null : await loadServedChain(input.chain, input.account, createRejectionCounter(), pinned)
+  return phraseNoticeStatus(input, served !== null && served.ok ? served.state : null)
+}
+
 export type AcknowledgeInput = {
   readonly account: string
   readonly serviceOrigin?: string
@@ -75,7 +89,9 @@ export const acknowledgePhraseVoid = async (input: AcknowledgeInput): Promise<{ 
   withGenesisLock(input, async () => {
     const place = { pinDir: input.pinDir, account: input.account, principalId: input.keyring.principal().id }
     if (input.purpose !== "genesis") {
-      if (input.chain !== undefined) await acknowledgeEnrollVoid(place, input.purpose, input.credentialId, input.chain, input.anchor)
+      // Review LOW (#13336 @ 9f9734a8): never report an acknowledge that could not check anything.
+      if (input.chain === undefined) throw new TypeError("acknowledging an enroll or rotate notice needs the account chain")
+      await acknowledgeEnrollVoid(place, input.purpose, input.credentialId, input.chain, input.anchor)
       return { ok: true }
     }
     const state = await genesisPhraseState(place, {

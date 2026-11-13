@@ -72,6 +72,13 @@ export interface SyncRpcRuntime {
     readonly account: string
     readonly principalId: string
   }): Promise<PhraseNoticeStatus>
+  /** Status with enroll/rotate markers resolved against the verified chain; used only when the local read is unresolved. */
+  verifiedPhraseNoticeStatus?(input: {
+    readonly pinDir: string
+    readonly account: string
+    readonly principalId: string
+    readonly chain: SyncRpcOperation["chain"]
+  }): Promise<PhraseNoticeStatus>
   /** Absent when the host has not wired phrase notices: acknowledge then answers unavailable. */
   acknowledgePhraseVoid?(
     input: SyncRpcCeremonyInput & {

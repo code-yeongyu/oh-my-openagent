@@ -17,6 +17,7 @@ export {
   type AcknowledgeInput,
   phraseNoticeStatus,
   type PhraseNoticeStatus,
+  verifiedPhraseNoticeStatus,
   type PhraseVoidNotice,
 } from "../account/phrase-notice"
 export { type CeremonyClock, type JoinOutcome, joinAccount } from "../account/join"
