@@ -24,6 +24,7 @@ pub mod report;
 pub mod requests;
 pub mod results;
 pub mod schema;
+pub mod secure;
 pub mod session_state;
 pub mod settings;
 pub mod untrusted;

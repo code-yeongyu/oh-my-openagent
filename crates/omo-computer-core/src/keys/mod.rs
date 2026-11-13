@@ -1,6 +1,8 @@
 //! The keysym grammar of `key.down`/`key.up` and `holdKeys`: a chord is `+`-joined names,
 //! each a modifier, a named key, a function key or one character; aliases read to one name.
 
+pub mod unresolvable;
+
 /// A chord that does not parse, refused `InvalidKey` before any input is sent.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BadKey {
