@@ -81,7 +81,28 @@ for (const marker of ["PI_CODING_AGENT", "AI_AGENT", "CI"] as const) {
 
 // Detaches from any controlling terminal with Python's os.setsid (macOS ships no `setsid` binary; review MEDIUM,
 // #13338): fork so the child is never a group leader, start a new session, then exec the fixture.
-const DETACH = "import os, sys\nif os.fork():\n    _, status = os.wait()\n    sys.exit(os.waitstatus_to_exitcode(status))\nos.setsid()\nos.execvp(sys.argv[1], sys.argv[1:])"
+const DETACH = [
+  "import os, signal, sys",
+  "pid = os.fork()",
+  "if pid == 0:",
+  "    os.setsid()",
+  "    os.execvp(sys.argv[1], sys.argv[1:])",
+  // Review LOW (#13338 @ 437579d8): the deadline's SIGTERM reaches the detached fixture's whole session.
+  "def stop(*_):",
+  "    for kill in (lambda: os.killpg(pid, signal.SIGKILL), lambda: os.kill(pid, signal.SIGKILL)):",
+  "        try:",
+  "            kill()",
+  "        except OSError:",
+  "            pass",
+  "    try:",
+  "        os.waitpid(pid, 0)",
+  "    except OSError:",
+  "        pass",
+  "    os._exit(143)",
+  "signal.signal(signal.SIGTERM, stop)",
+  "_, status = os.waitpid(pid, 0)",
+  "sys.exit(os.waitstatus_to_exitcode(status))",
+].join("\n")
 
 posix("#given no controlling terminal (new session, the phrase piped on stdin) #when omo sync recover runs #then it refuses with exit 2 before asking for a phrase and no piped word reaches its output", async () => {
   const dir = await mkdtemp(join(tmpdir(), "omo-recover-notty-"))
@@ -92,7 +113,7 @@ posix("#given no controlling terminal (new session, the phrase piped on stdin) #
     stderr: "pipe",
     // Its own kill deadline (review LOW, #13338), so a hang never outlives the test.
     timeout: 30_000,
-    killSignal: "SIGKILL",
+    killSignal: "SIGTERM",
     env: { ...process.env, TMPDIR: dir, PI_CODING_AGENT: undefined, AI_AGENT: undefined, CI: undefined },
   })
   const [exit, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
@@ -100,3 +121,26 @@ posix("#given no controlling terminal (new session, the phrase piped on stdin) #
   expect(stderr).toContain("Run `omo sync recover` yourself in a terminal.")
   expect(ENROLLED.filter((word) => tokens(`${stdout}\n${stderr}`).has(word))).toEqual([])
 }, 60_000)
+
+posix("#given a detached child that hangs #when the spawn deadline fires #then the wrapper ends the child's whole session, so nothing outlives the test", async () => {
+  const child = Bun.spawn(["python3", "-c", DETACH, "sh", "-c", "echo $$; exec sleep 30"], {
+    stdout: "pipe",
+    stderr: "pipe",
+    timeout: 1_000,
+    killSignal: "SIGTERM",
+  })
+  const reader = child.stdout.getReader()
+  const first = await reader.read()
+  const pid = Number(new TextDecoder().decode(first.value).trim())
+  expect(Number.isSafeInteger(pid) && pid > 1).toBe(true)
+  await child.exited
+  const alive = (() => {
+    try {
+      process.kill(pid, 0)
+      return true
+    } catch {
+      return false
+    }
+  })()
+  expect(alive).toBe(false)
+}, 20_000)
