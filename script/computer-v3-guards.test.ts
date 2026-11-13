@@ -488,14 +488,16 @@ describe("computer-v3-guards --scope <row> <ref> --plan <file>", () => {
         "crates/senpi-desktop-core/src/lib.rs": "old\n",
         ".github/workflows/desktop-engine.yml": "old\n",
         "script/qa/desktop/a.ts": "old\n",
-        "knip.jsonc": "{}\n",
+        "knip.base.jsonc": "{}\n",
+        "script/knip.workspace.jsonc": "{}\n",
       })
       const scope = scopeRepo(repo)
 
       // given row 80 deleting class A and B paths and editing class C and D files
       repo.remove("crates/senpi-desktop-core", ".github/workflows/desktop-engine.yml", "script/qa/desktop")
       repo.write({
-        "knip.jsonc": "{ }\n",
+        "knip.base.jsonc": "{ }\n",
+        "script/knip.workspace.jsonc": "{ }\n",
         "script/ci-fast-path.mjs": "// re-pointed\n",
         "packages/omo-senpi/scripts/qa/fused-equivalence-golden/linux-x64/E21.json": "{}\n",
         "changes/unreleased/80.md": "removed\n",
