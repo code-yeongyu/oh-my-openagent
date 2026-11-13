@@ -83,6 +83,9 @@ async function desktopMain() {
   })
   let account: string | null = null
   let handles = 0
+  // Every request main receives, and one operationBegin main may hold unanswered (to cross its reply with `retired`).
+  const received: { op: string; handle?: string }[] = []
+  let held: { readonly arrived: PromiseWithResolvers<number>; id?: number } | undefined
   const send = (frame: unknown) => peer.write(`${JSON.stringify(frame)}\n`)
   let pending = ""
   peer.setEncoding("utf8")
@@ -96,6 +99,12 @@ async function desktopMain() {
         continue
       }
       const op = packet.request.op
+      received.push({ op, handle: packet.request.handle })
+      if (held !== undefined && held.id === undefined && op === "operationBegin" && account !== null) {
+        held.id = packet.id
+        held.arrived.resolve(packet.id)
+        continue
+      }
       if (account === null && op !== "operationCancel" && op !== "operationEnd") {
         send({ id: packet.id, ok: false, reason: "refused" })
         continue
@@ -114,6 +123,20 @@ async function desktopMain() {
   return {
     home,
     engine,
+    received,
+    /** Hold main's answer to the next operationBegin; `answer` sends it later, with the handle it would have issued. */
+    holdNextBegin() {
+      const hold = { arrived: Promise.withResolvers<number>() } as { arrived: PromiseWithResolvers<number>; id?: number }
+      held = hold
+      return {
+        arrived: hold.arrived.promise,
+        answer: () => {
+          const handle = `handle-${++handles}`
+          send({ id: hold.id, ok: true, value: { handle } })
+          return handle
+        },
+      }
+    },
     async signIn(next: string) {
       await record(next)
       account = next
@@ -182,8 +205,9 @@ describe("an account rollover on a live desktop channel (#13325)", () => {
         await main.signOut()
         await aborted(first.signal)
 
-        // then: the old account ended, the channel did not, and a refused describe reads as no account
-        expect(await source().catch(() => null)).toBeNull()
+        // then: the old account ended, the channel did not, and a refused describe reads as signed out (null) on
+        // both threads: no error, which the sync runner would treat as a failure rather than signed out
+        expect(await source()).toBeNull()
         expect(selection.channel.signal.aborted).toBe(false)
         await main.signIn(next)
         const second = await source()
@@ -196,6 +220,64 @@ describe("an account rollover on a live desktop channel (#13325)", () => {
       })
     }
   }
+
+  for (const [where, select] of [
+    ["the main thread", mainThreadSelection],
+    ["a session Worker", workerSelection],
+  ] as const) {
+    test(`${where}: an account replaced without a retired event ends, and stops listening for one`, async () => {
+      const main = await desktopMain()
+      await main.signIn("account-1")
+      const selection = await select(main.engine)
+      if (selection.kind !== "desktop") throw new Error(`selection ${selection.kind}`)
+      const source = accountSourceFromSelection({
+        selection: async () => selection,
+        cli: cliCanary,
+        openAccount: (wire: DesktopSyncEngineWire) => openDesktopSyncAccount(wire, main.home),
+      })
+      const first = await source()
+      if (first === null || first.kind !== "desktop") throw new Error(`first account ${JSON.stringify(first)}`)
+      let ended = 0
+      first.signal.addEventListener("abort", () => (ended += 1))
+
+      // when: main moves to another account and sends no `retired` (its describe and record changed)
+      await main.signIn("account-2")
+      const second = await source()
+
+      // then: the source replaced the account, and the replaced one ended exactly once
+      if (second === null || second.kind !== "desktop") throw new Error(`second account ${JSON.stringify(second)}`)
+      expect(second.descriptor.accountId).toBe("account-2")
+      expect(first.signal.aborted).toBe(true)
+      expect(ended).toBe(1)
+      expect(second.signal.aborted).toBe(false)
+      expect(selection.channel.signal.aborted).toBe(false)
+    })
+  }
+
+  test("a session Worker: an operationBegin whose reply crosses main's retirement leaves no handle the Worker can use", async () => {
+    const main = await desktopMain()
+    await main.signIn("account-1")
+    const selection = await workerSelection(main.engine)
+    if (selection.kind !== "desktop") throw new Error(`selection ${selection.kind}`)
+    const hold = main.holdNextBegin()
+    const begin = selection.channel.request({ op: "operationBegin" })
+    await hold.arrived
+
+    // when: main retires the account, then answers the begin it received before retiring
+    await main.signOut()
+    const stale = hold.answer()
+
+    // then: the Worker gets no handle from the old account, and the host never forwards that handle to main
+    expect(await begin.then(
+      () => "resolved",
+      (error: unknown) => (error instanceof Error ? error.name : String(error)),
+    )).toBe("DesktopSyncRefused")
+    await main.signIn("account-2")
+    expect(await selection.channel.request({ op: "service", handle: stale, data: {} }).catch(() => "refused")).toBe(
+      "refused",
+    )
+    expect(main.received.filter((request) => request.handle === stale)).toEqual([])
+  })
 
   test("a closed stream still ends the channel for good", async () => {
     const main = await desktopMain()
