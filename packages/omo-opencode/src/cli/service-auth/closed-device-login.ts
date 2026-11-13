@@ -15,6 +15,7 @@ export function withClosedDeviceLoginOptions(command: Command): Command {
     .option("--device")
     .option("--no-browser")
     .option("--api <url>")
+    .option("--help")
 }
 
 /** The device flow runs only for `--device` or `--no-browser` with nothing else left over (no operand, no unknown option). */
@@ -38,4 +39,38 @@ export function parsesAsClosedDeviceLogin(args: readonly string[]): boolean {
     return false
   }
   return isClosedDeviceLogin(command.opts(), command.args)
+}
+
+/** The bare form (#13265): plain `login` with no flag and no operand runs the device flow while closed, behind the
+ * attach-before-mint refusal (#13096); `login --` parses to exactly this form. Any flag or operand is not bare. */
+export function isClosedBareLogin(
+  options: {
+    readonly device?: unknown
+    readonly browser?: unknown
+    readonly api?: unknown
+    readonly help?: unknown
+  },
+  leftover: readonly string[],
+): boolean {
+  return (
+    options.device === undefined &&
+    options.browser !== false &&
+    options.api === undefined &&
+    options.help === undefined &&
+    leftover.length === 0
+  )
+}
+
+/** Whether a whole `omo …` argv is the bare closed `login`, parsed exactly as `commands.ts` parses it (#13265). */
+export function parsesAsBareClosedLogin(args: readonly string[]): boolean {
+  if (args[0] !== "login") return false
+  const command = withClosedDeviceLoginOptions(new Command("login"))
+    .exitOverride()
+    .configureOutput({ writeOut: () => {}, writeErr: () => {} })
+  try {
+    command.parse([...args.slice(1)], { from: "user" })
+  } catch {
+    return false
+  }
+  return isClosedBareLogin(command.opts(), command.args)
 }
