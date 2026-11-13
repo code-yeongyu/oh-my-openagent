@@ -1,0 +1,71 @@
+name: Generated bundles gate
+
+on:
+  pull_request:
+    branches: [dev]
+    # edited: the release marker reads the title and body, so a correction re-runs the gate.
+    types: [opened, synchronize, reopened, edited]
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+
+jobs:
+  generated-bundles-gate:
+    name: Generated bundles gate
+    concurrency:
+      group: generated-bundles-gate-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: true
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Full history: the checker diffs the merge base with the PR head.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Check that this PR commits no generated output
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          GENERATED_GATE_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          GENERATED_GATE_BRANCH: ${{ github.head_ref }}
+          # The release-state PR, recognised as the changelog gate does (#11704): a release branch pushed to THIS
+          # repository, plus publish.yml's title/body marker checked by the script (release-pr-marker.ts).
+          GENERATED_GATE_RELEASE: ${{ startsWith(github.head_ref, 'release/') && github.event.pull_request.head.repo.full_name == github.repository && '1' || '0' }}
+          GENERATED_GATE_TITLE: ${{ github.event.pull_request.title }}
+          GENERATED_GATE_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if [ "$EVENT_NAME" = "merge_group" ]; then
+            echo "generated-bundles-gate: PASS - queued PRs have already passed their PR gate"
+            exit 0
+          fi
+          # The gate that judges a PR is the BASE branch's copy of the checker and its list (#9903, as #10710 does for the
+          # changelog gate), started so that bun reads no bunfig.toml, tsconfig.json or .env from the PR checkout: the PR
+          # cannot change the checker, the list or the runtime that judges it. A pull_request run still uses the PR's copy
+          # of this workflow file, so edits to it need review. Only a base that predates the gate falls back to the PR's copy.
+          gate="$RUNNER_TEMP/generated-bundles-gate-base"
+          mkdir -p "$gate"
+          git fetch --no-tags origin "$GENERATED_GATE_BASE_REF"
+          git archive "origin/$GENERATED_GATE_BASE_REF" script | tar -x -C "$gate"
+          if [ -f "$gate/script/check-generated-bundles.ts" ] && [ -f "$gate/script/generated-bundles.json" ]; then
+            bun --config=/dev/null --tsconfig-override=/dev/null --no-env-file "$gate/script/check-generated-bundles.ts"
+          else
+            echo "generated-bundles-gate: NOTICE - the base branch predates this gate; running the PR's copy (bootstrap only)"
+            bun script/check-generated-bundles.ts
+          fi
+
+      - name: Write job summary
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          {
+            echo "## Generated bundles gate"
+            echo "- Status: $JOB_STATUS"
+          } >> "$GITHUB_STEP_SUMMARY"
