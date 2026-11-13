@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs"
-import { userInfo } from "node:os"
+import { tmpdir, userInfo } from "node:os"
 
 import { run } from "./xorg-session.ts"
 
@@ -9,17 +9,28 @@ export type TeardownFacts = {
   readonly inputDevices: string
   readonly x11Sockets: readonly string[]
   readonly xLocks: readonly string[]
+  readonly probeWorkdirs: readonly string[]
   readonly acl: { readonly code: number; readonly out: string } | "no-device"
 }
 
 const PROBE_SOCKET = /^X9\d$/
 const PROBE_LOCK = /^\.X9\d-lock$/
+const PROBE_DISPLAY = /^:9\d$/
+const PROBE_WORKDIR = /^omo-xorg-uinput-/
 const PGREP_NO_MATCH = 1
+
+function probeXorgPids(pgrepOut: string): string[] {
+  return pgrepOut
+    .split("\n")
+    .map((line) => line.trim().split(/\s+/))
+    .filter(([pid, , ...args]) => pid !== undefined && pid !== "" && args.some((arg) => PROBE_DISPLAY.test(arg)))
+    .map(([pid]) => pid ?? "")
+}
 
 export function judgeTeardown(facts: TeardownFacts): { readonly lines: readonly string[]; readonly ok: boolean } {
   const lines: string[] = []
   let ok = true
-  const xorgPids = facts.xorg.out.split("\n").filter((pid) => pid.trim() !== "")
+  const xorgPids = probeXorgPids(facts.xorg.out)
   if (facts.xorg.code !== 0 && facts.xorg.code !== PGREP_NO_MATCH) {
     lines.push(`Xorg UNREAD: pgrep exit ${facts.xorg.code}`)
     ok = false
@@ -41,6 +52,11 @@ export function judgeTeardown(facts: TeardownFacts): { readonly lines: readonly 
     lines.push(`X locks LEFT ${probeLocks.join(" ")}`)
     ok = false
   } else lines.push("X locks REMOVED (displays :90-:99)")
+  const workdirs = facts.probeWorkdirs.filter((name) => PROBE_WORKDIR.test(name))
+  if (workdirs.length > 0) {
+    lines.push(`probe workdirs LEFT ${workdirs.join(" ")}`)
+    ok = false
+  } else lines.push("probe workdirs REMOVED (omo-xorg-uinput-*)")
   if (facts.acl === "no-device") lines.push(`uinput ACL REMOVED ${facts.user} (no device)`)
   else if (facts.acl.code !== 0) {
     lines.push(`uinput ACL UNREAD ${facts.user}: getfacl exit ${facts.acl.code}`)
@@ -54,12 +70,14 @@ export function judgeTeardown(facts: TeardownFacts): { readonly lines: readonly 
 
 export async function collectTeardownFacts(): Promise<TeardownFacts> {
   const sockets = existsSync("/tmp/.X11-unix") ? readdirSync("/tmp/.X11-unix") : []
+  const probeTemp = process.env["RUNNER_TEMP"] ?? tmpdir()
   return {
     user: userInfo().username,
-    xorg: await run(["pgrep", "-x", "Xorg"]),
+    xorg: await run(["pgrep", "-a", "-x", "Xorg"]),
     inputDevices: readFileSync("/proc/bus/input/devices", "utf8"),
     x11Sockets: sockets,
     xLocks: readdirSync("/tmp").filter((name) => PROBE_LOCK.test(name)),
+    probeWorkdirs: existsSync(probeTemp) ? readdirSync(probeTemp).filter((name) => PROBE_WORKDIR.test(name)) : [],
     acl: existsSync("/dev/uinput") ? await run(["getfacl", "-p", "/dev/uinput"]) : "no-device",
   }
 }
