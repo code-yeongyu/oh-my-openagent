@@ -141,17 +141,18 @@ impl X11Connection {
         Ok(states.value32().is_some_and(|mut values| values.any(|atom| atom == hidden)))
     }
 
-    fn wait_damage(&self, damage_id: u32) -> Result<(), XError> {
+    /// Whether the window repainted (a `DamageNotify` arrived) before the deadline.
+    fn wait_damage(&self, damage_id: u32) -> Result<bool, XError> {
         let deadline = Instant::now() + DAMAGE_WAIT;
         while Instant::now() < deadline {
             while let Some(event) = self.conn.poll_for_event()? {
                 if matches!(event, Event::DamageNotify(notify) if notify.damage == damage_id) {
-                    return Ok(());
+                    return Ok(true);
                 }
             }
             std::thread::sleep(DAMAGE_POLL);
         }
-        Ok(())
+        Ok(false)
     }
 
     fn read_pixmap(&self, window: u32, placement: &WindowPlacement, redirected: bool) -> Result<PixmapRead, XError> {
@@ -162,12 +163,20 @@ impl X11Connection {
         } else {
             None
         };
+        let mut repainted = true;
         if redirected {
             self.conn.clear_area(true, window, 0, 0, 0, 0)?;
             self.conn.flush()?;
+            repainted = match damage_id {
+                Some(id) => self.wait_damage(id)?,
+                None => false,
+            };
+        }
+        if !repainted {
             if let Some(id) = damage_id {
-                self.wait_damage(id)?;
+                self.conn.damage_destroy(id)?;
             }
+            return Ok(PixmapRead::NotRepainted);
         }
         let pixmap = self.conn.generate_id()?;
         let named = self.conn.composite_name_window_pixmap(window, pixmap)?.check();

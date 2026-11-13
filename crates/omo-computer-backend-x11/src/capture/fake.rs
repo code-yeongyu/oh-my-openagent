@@ -39,6 +39,8 @@ pub struct FakeX {
     pub composite_extension: bool,
     pub cursor: Option<CursorImage>,
     pub redirects: Cell<u32>,
+    /// Whether a redirected window repaints before the Damage deadline.
+    pub repaints: bool,
 }
 
 fn mm_at_96_dpi(pixels: u32) -> u32 {
@@ -97,6 +99,7 @@ impl FakeX {
             composite_extension: true,
             cursor: None,
             redirects: Cell::new(0),
+            repaints: true,
         }
     }
 
@@ -218,6 +221,9 @@ impl XServer for FakeX {
             return Ok(PixmapRead::Unmapped);
         }
         self.redirects.set(self.redirects.get() + 1);
+        if !self.repaints {
+            return Ok(PixmapRead::NotRepainted);
+        }
         Ok(self
             .windows
             .iter()

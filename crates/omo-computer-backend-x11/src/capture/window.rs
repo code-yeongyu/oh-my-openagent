@@ -1,9 +1,9 @@
 //! Window frames: the window's own Composite pixmap after a Damage round trip, so a
 //! covering window never shows. The target window is always redirected for the read: a
 //! compositing manager redirects only the window manager's frames, and the server refuses
-//! NameWindowPixmap on a window that is not itself redirected. Only when Composite is absent
-//! or the redirect is refused does the frame fall back to a root crop, annotated
-//! `occludersVisible:true`.
+//! NameWindowPixmap on a window that is not itself redirected. When Composite is absent, the redirect is
+//! refused, or the window does not repaint before the Damage deadline, the frame falls back
+//! to a root crop, annotated `occludersVisible:true`.
 
 use image::{imageops, RgbaImage};
 use omo_computer_core::backend::{CaptureOptions, Refusal};
@@ -65,7 +65,9 @@ impl<S: XServer> X11Capture<S> {
             .map_err(|error| failed(&error))?;
         let (mut image, route, occluders_visible) = match read {
             PixmapRead::Image(raw) => (decode(&raw).map_err(|error| failed(&error))?, CaptureRoute::Composite, false),
-            PixmapRead::RedirectRefused => (self.root_crop(&placement)?, CaptureRoute::RootCrop, true),
+            PixmapRead::RedirectRefused | PixmapRead::NotRepainted => {
+                (self.root_crop(&placement)?, CaptureRoute::RootCrop, true)
+            }
             PixmapRead::Unmapped => {
                 return Err(Refusal::new(EngineCode::CaptureUnavailable, Reason::Unmapped.wire()));
             }

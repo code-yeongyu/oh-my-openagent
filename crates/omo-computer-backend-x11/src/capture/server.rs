@@ -114,6 +114,9 @@ pub enum PixmapRead {
     RedirectRefused,
     /// The window has no pixmap (unmapped between the placement read and the capture).
     Unmapped,
+    /// The window was redirected for the read but did not repaint before the Damage deadline
+    /// (or Damage is absent), so its fresh pixmap may still hold the parent's pixels.
+    NotRepainted,
 }
 
 /// A failed X request, as text for the engine log.
