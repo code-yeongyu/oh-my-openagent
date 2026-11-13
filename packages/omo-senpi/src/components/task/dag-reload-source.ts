@@ -7,7 +7,10 @@ const TERMINAL_DAG_RUN_STATUSES: ReadonlySet<string> = new Set(["completed", "fa
 // The narrow DAG seam the reload source reads: run summaries for a session plus the snapshot that
 // carries the human-facing run name used in the veto message.
 export interface DagReloadRunManager {
-  list(parentSessionId: string, options?: { readonly limit?: number }): readonly {
+  list(
+    parentSessionId: string,
+    options?: { readonly limit?: number },
+  ): readonly {
     readonly runId: string
     readonly status: string
   }[]

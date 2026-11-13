@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { parseExpectedHooks, summarizeRun } from "./app-server-client.mjs";
+import { describe, expect, it } from "bun:test"
+import { parseExpectedHooks, summarizeRun } from "./app-server-client.mjs"
 
 describe("app-server-client summary", () => {
   it("#given a completed expected event also has a failed hook run #when summarized #then the QA run fails", () => {
@@ -15,14 +15,14 @@ describe("app-server-client summary", () => {
         { method: "hook/completed", eventName: "userPromptSubmit", status: "failed", source: "plugin" },
       ],
       stderr: "",
-    });
+    })
 
-    expect(summary.ok).toBe(false);
-    expect(summary.missingHooks).toEqual([]);
+    expect(summary.ok).toBe(false)
+    expect(summary.missingHooks).toEqual([])
     expect(summary.failedHooks).toEqual([
       { method: "hook/completed", eventName: "userPromptSubmit", status: "failed", source: "plugin" },
-    ]);
-  });
+    ])
+  })
 
   it("#given all expected hooks complete #when summarized #then the QA run passes", () => {
     const summary = summarizeRun({
@@ -36,13 +36,13 @@ describe("app-server-client summary", () => {
         { method: "hook/completed", eventName: "userPromptSubmit", status: "completed", source: "plugin" },
       ],
       stderr: "",
-    });
+    })
 
-    expect(summary.ok).toBe(true);
-    expect(summary.failedHooks).toEqual([]);
-  });
+    expect(summary.ok).toBe(true)
+    expect(summary.failedHooks).toEqual([])
+  })
 
   it("#given a comma-separated expectation #when parsed #then whitespace and empties are ignored", () => {
-    expect(parseExpectedHooks(" sessionStart, ,userPromptSubmit ")).toEqual(["sessionStart", "userPromptSubmit"]);
-  });
-});
+    expect(parseExpectedHooks(" sessionStart, ,userPromptSubmit ")).toEqual(["sessionStart", "userPromptSubmit"])
+  })
+})

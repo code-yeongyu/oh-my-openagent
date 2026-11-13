@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:adc0c9ae0db7b2199d87a87956f2a065f91ef403e2c0816a4fe17111125c47b1:6fec9dd74fa6bb69f9064c703c94e024377de335a2c86ac93c5bd141b1290e69
+// omo-codex-install:7b5f0e80829fb070bb331cf6119fa1f5ccf7f2ebce7bc8ece18e008525df3e4d:1c0b63eacee6ef99d1b0b4c1713231cd6a3509c2793a429ed1689c7dff1fe18b
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -98,12 +98,7 @@ function writeFileAtomically(filePath, content, options = {}) {
 }
 var TOLERATED_FSYNC_CODES;
 var init_atomic_write = __esm(() => {
-  TOLERATED_FSYNC_CODES = new Set([
-    "EPERM",
-    "EACCES",
-    "ENOTSUP",
-    "EINVAL"
-  ]);
+  TOLERATED_FSYNC_CODES = new Set(["EPERM", "EACCES", "ENOTSUP", "EINVAL"]);
 });
 
 // packages/telemetry-core/src/day-claim.ts
@@ -10103,9 +10098,12 @@ class PostHogTelemetryTransport {
     await this.#client.flush();
   }
   async shutdown() {
-    await Promise.all([this.#client.shutdown(), this.#immediate?.then((sender) => sender.shutdown(), () => {
-      return;
-    })]);
+    await Promise.all([
+      this.#client.shutdown(),
+      this.#immediate?.then((sender) => sender.shutdown(), () => {
+        return;
+      })
+    ]);
   }
 }
 function createDefaultPostHogTransport(apiKey, options) {
@@ -10169,7 +10167,10 @@ var init_install_id = __esm(() => {
 
 // packages/telemetry-core/src/posthog-client.ts
 function createTelemetryClient2(input) {
-  return createTelemetryClient({ ...input, transportFactory: input.transportFactory ?? createDefaultPostHogTransport });
+  return createTelemetryClient({
+    ...input,
+    transportFactory: input.transportFactory ?? createDefaultPostHogTransport
+  });
 }
 var init_posthog_client = __esm(() => {
   init_injected_client();
@@ -10205,7 +10206,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.1.65",
+    version: "5.1.69",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -13154,7 +13155,7 @@ var LATEST_MODEL_BY_FAMILY = {
   claudeOpus: "claude-opus-5-5",
   claudeSonnet: "claude-sonnet-5-5",
   claudeHaiku: "claude-haiku-5-5",
-  claudeFable: "claude-fable-5-1",
+  claudeFable: "claude-fable-5-2",
   gptAstra: "gpt-6-astra",
   gptSol: "gpt-6.1-sol",
   gptSolFast: "gpt-6.1-sol-fast",
@@ -13619,7 +13620,7 @@ function toCodexResolution(resolution) {
   };
 }
 
-// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/util.js
+// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/util.js
 function getEnumValues(entries) {
   const numericValues = Object.values(entries).filter((v) => typeof v === "number");
   const values = Object.entries(entries).filter(([k, _]) => numericValues.indexOf(+k) === -1).map(([_, v]) => v);
@@ -13965,6 +13966,18 @@ function prefixIssues(path, issues) {
 function unwrapMessage(message) {
   return typeof message === "string" ? message : message?.message;
 }
+function sizeCaps(defChecks) {
+  const caps = [];
+  for (const ch of defChecks ?? []) {
+    const d = ch._zod.def;
+    if (!/_(length|size)$|_equals$/.test(d.check))
+      break;
+    const max = d.maximum ?? d.length ?? d.size;
+    if (max >= 0)
+      caps.push([max, ch]);
+  }
+  return caps;
+}
 function attachSchema(issues, start, inst) {
   var _a;
   for (let i = start;i < issues.length; i++) {
@@ -14162,7 +14175,7 @@ function constantCatch(value) {
   return fn;
 }
 
-// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/core.js
+// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/core.js
 var _a;
 var _zodDesc = { value: undefined, enumerable: false };
 var _E = "captureStackTrace" in Error ? Error : null;
@@ -14280,7 +14293,7 @@ function config(newConfig) {
     Object.assign(globalConfig, newConfig);
   return globalConfig;
 }
-// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/errors.js
+// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/errors.js
 function _getMessage() {
   const internals = this._zod;
   internals.message ?? (internals.message = JSON.stringify(internals.def, jsonStringifyReplacer, 2));
@@ -14395,7 +14408,7 @@ function formatError(error, mapper = (issue) => issue.message) {
   return fieldErrors;
 }
 
-// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/parse.js
+// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/parse.js
 function finalizeParams(callee, params) {
   return { callee: params?.callee ?? callee, Err: params?.Err };
 }
@@ -14542,7 +14555,7 @@ var _safeEncodeAsync = (_Err) => async (schema, value, _ctx) => {
 var _safeDecodeAsync = (_Err) => async (schema, value, _ctx) => {
   return _safeParseAsync(_Err)(schema, value, _ctx);
 };
-// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/regexes.js
+// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/regexes.js
 var cuid = /^[cC][0-9a-z]{6,}$/;
 var cuid2 = /^[0-9a-z]+$/;
 var ulid = /^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$/;
@@ -14600,7 +14613,7 @@ var boolean = /^(?:true|false)$/i;
 var lowercase = /^[^A-Z]*$/;
 var uppercase = /^[^a-z]*$/;
 
-// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/checks.js
+// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/checks.js
 var $ZodCheck = /* @__PURE__ */ $constructor("$ZodCheck", (inst, def) => {
   var _a;
   inst._zod ?? (inst._zod = {});
@@ -14916,7 +14929,7 @@ var $ZodCheckOverwrite = /* @__PURE__ */ $constructor("$ZodCheckOverwrite", (ins
   };
 });
 
-// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/doc.js
+// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/doc.js
 class Doc {
   constructor(args = [], closed = {}) {
     this.content = [];
@@ -14958,14 +14971,14 @@ ${content.join(`
   }
 }
 
-// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/versions.js
+// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/versions.js
 var version = {
   major: 4,
   minor: 6,
-  patch: 5
+  patch: 7
 };
 
-// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/schemas.js
+// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/schemas.js
 var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
   var _a;
   inst ?? (inst = {});
@@ -15514,6 +15527,29 @@ var $ZodNever = /* @__PURE__ */ $constructor("$ZodNever", (inst, def) => {
     return payload;
   };
 });
+function capSize(inst, size) {
+  const caps = sizeCaps(inst._zod.def.checks);
+  if (!caps.length)
+    return;
+  const cap = Math.min(...caps.map((c) => c[0]));
+  const parse = inst._zod.parse;
+  inst._zod.parse = (payload, ctx) => {
+    const n = size(payload.value);
+    if (n > cap && !ctx?.skipChecks && ctx?.direction !== "backward") {
+      for (const [max, ch] of sizeCaps(inst._zod.def.checks)) {
+        if (n > max && ch._zod.def.when(payload)) {
+          const start = payload.issues.length;
+          ch._zod.check(payload);
+          payload.issues[start].continue = false;
+          attachSchema(payload.issues, start, inst);
+          return payload;
+        }
+      }
+    }
+    return parse(payload, ctx);
+  };
+}
+var arraySize = (input) => Array.isArray(input) ? input.length : -1;
 function handleArrayResult(result, final, index) {
   if (result.issues.length) {
     final.issues.push(...prefixIssues(index, result.issues));
@@ -15557,6 +15593,7 @@ var $ZodArray = /* @__PURE__ */ $constructor("$ZodArray", (inst, def) => {
     }
     return payload;
   };
+  capSize(inst, arraySize);
 });
 function handlePropertyResult(result, final, key, input, optin, optout) {
   const isPresent = key in input;
@@ -16580,7 +16617,7 @@ function handleRefineResult(result, payload, input, inst) {
     payload.issues.push(issue(_iss));
   }
 }
-// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/memoizer.js
+// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/memoizer.js
 class $ZodCyclicError extends Error {
   constructor() {
     super(`Cannot parse a reference cycle that closes through a transform`);
@@ -16849,7 +16886,7 @@ function isBackEdge(ctx, value) {
   const backEdges = ctx[STATE]?.backEdges;
   return backEdges !== undefined && isRef(value) && backEdges.has(value);
 }
-// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/locales/en.js
+// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/locales/en.js
 var error = () => {
   const Sizable = {
     string: { unit: "characters", verb: "to have" },
@@ -16971,7 +17008,7 @@ function en_default() {
     localeError: error()
   };
 }
-// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/registries.js
+// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/registries.js
 var _a2;
 class $ZodRegistry {
   constructor() {
@@ -17018,7 +17055,7 @@ function registry() {
 }
 (_a2 = globalThis).__zod_globalRegistry ?? (_a2.__zod_globalRegistry = registry());
 var globalRegistry = globalThis.__zod_globalRegistry;
-// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/api.js
+// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/api.js
 function snapshotChecks(def) {
   if (def.checks)
     def.checks = [...def.checks];
@@ -17466,7 +17503,7 @@ function _check(fn, params) {
   ch._zod.check = fn;
   return ch;
 }
-// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/to-json-schema.js
+// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/to-json-schema.js
 function assignProps(target, ...sources) {
   for (const source of sources) {
     for (const key of Reflect.ownKeys(source)) {
@@ -17989,7 +18026,7 @@ var createStandardJSONSchemaMethod = (schema, io, processors = {}) => (params) =
   extractDefs(ctx, schema);
   return finalize(ctx, schema);
 };
-// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/core/json-schema-processors.js
+// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/json-schema-processors.js
 var narrowMin = (agg, key, value) => {
   if (agg[key] === undefined || value > agg[key])
     agg[key] = value;
@@ -18514,7 +18551,7 @@ var optionalProcessor = (schema, ctx, _json, params) => {
   const seen = ctx.seen.get(schema);
   seen.ref = def.innerType;
 };
-// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/classic/errors.js
+// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/classic/errors.js
 var _installedErrorProtos = /* @__PURE__ */ new WeakSet([Object.prototype, Error.prototype]);
 function _lazyMethod(proto, key, make) {
   Object.defineProperty(proto, key, {
@@ -18559,7 +18596,7 @@ var ZodRealError = /* @__PURE__ */ $constructor("ZodError", initializer2, undefi
   Parent: Error
 });
 
-// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/classic/parse.js
+// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/classic/parse.js
 var parse2 = /* @__PURE__ */ _parse(ZodRealError);
 var parseAsync = /* @__PURE__ */ _parseAsync(ZodRealError);
 var safeParse = /* @__PURE__ */ _safeParse(ZodRealError);
@@ -18573,7 +18610,7 @@ var safeDecode = /* @__PURE__ */ _safeDecode(ZodRealError);
 var safeEncodeAsync = /* @__PURE__ */ _safeEncodeAsync(ZodRealError);
 var safeDecodeAsync = /* @__PURE__ */ _safeDecodeAsync(ZodRealError);
 
-// node_modules/.bun/zod@4.6.5/node_modules/zod/v4/classic/schemas.js
+// node_modules/.bun/zod@4.6.7/node_modules/zod/v4/classic/schemas.js
 function _ensureDefaultLocale() {
   if (!globalConfig.localeError)
     config(en_default());
@@ -19525,10 +19562,7 @@ function splitReasoningSuffix(model, options) {
 
 // packages/omo-config-core/src/schema/model-ref.ts
 var REASONING_LEVELS_OR_AUTO = [...REASONING_LEVELS, "auto"];
-var OmoReasoningSchema = union([
-  _enum(REASONING_LEVELS_OR_AUTO),
-  string2()
-]);
+var OmoReasoningSchema = union([_enum(REASONING_LEVELS_OR_AUTO), string2()]);
 var OmoModelRefObjectSchema = object({
   model: string2(),
   reasoning: OmoReasoningSchema.optional(),
@@ -19630,10 +19664,7 @@ function isRecord3(value) {
 }
 var OmoAgentModelEntrySchema = union([string2(), OmoFallbackModelObjectSchema]);
 var PermissionValueSchema = _enum(["ask", "allow", "deny"]);
-var BashPermissionSchema = union([
-  PermissionValueSchema,
-  record(string2(), PermissionValueSchema)
-]);
+var BashPermissionSchema = union([PermissionValueSchema, record(string2(), PermissionValueSchema)]);
 var OmoAgentPermissionSchema = object({
   edit: PermissionValueSchema.optional(),
   bash: BashPermissionSchema.optional(),
@@ -19716,7 +19747,11 @@ var OmoComputerSettingsLayerSchema = object({
   audit_log: object({ enabled: boolean2() }).partial().strict(),
   screenshot_gc: object({ enabled: boolean2(), stale_ms: nonNegativeInteger, scan_interval_ms: nonNegativeInteger }).partial().strict(),
   engine_path: string2().min(1),
-  cua_adapter: boolean2()
+  cua_adapter: boolean2(),
+  run_sandbox: _enum(["vm", "quickjs"]).describe("Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"),
+  intervention: _enum(["continue", "pause"]).describe("What a background action does while the user uses the target app (default: continue)"),
+  macos_key_priming: _enum(["on", "off"]).describe("macOS background keys first make the target window key (default: off)"),
+  trace: boolean2().describe("Per-request timing traces (default: false)")
 }).partial().strict().describe("Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host.");
 var OmoComputerSettingsSchema = OmoComputerSettingsLayerSchema;
 
@@ -19788,7 +19823,12 @@ var OmoMemoryRecallSchema = object({
   enabled: boolean2().default(true),
   max_items: number2().int().min(1).max(5).default(2),
   category: string2().min(1).default("quick"),
-  event_caps: OmoMemoryRecallEventCapsSchema.default({ tool_args: 400, result_head: 600, assistant: 1500, prompt: 4000 }),
+  event_caps: OmoMemoryRecallEventCapsSchema.default({
+    tool_args: 400,
+    result_head: 600,
+    assistant: 1500,
+    prompt: 4000
+  }),
   sidecar_max_tokens: number2().int().positive().default(48000),
   max_concurrent_wakes: number2().int().positive().default(2),
   tool_budget: number2().int().positive().default(8),
@@ -19978,7 +20018,14 @@ var OmoMemorySettingsSchema = object({
   }),
   project_scope: OmoMemoryProjectScopeSchema.default({ nudge: true, recall: true }),
   projection: OmoMemoryProjectionSchema.default({ max_entries_per_directory: 0, max_bytes: 40960 }),
-  runtime: OmoMemoryRuntimeSchema.default({ retention_days: 7, abandoned_journal_days: 14, completions_days: 30, pass_budget_ms: 60000, discard_unreflected_journals: false, max_bytes: 2 * 1024 * 1024 * 1024 }),
+  runtime: OmoMemoryRuntimeSchema.default({
+    retention_days: 7,
+    abandoned_journal_days: 14,
+    completions_days: 30,
+    pass_budget_ms: 60000,
+    discard_unreflected_journals: false,
+    max_bytes: 2 * 1024 * 1024 * 1024
+  }),
   compile_warn_tokens: number2().int().positive().default(30000),
   agents: record(string2(), OmoMemoryAgentOverridesSchema).default({})
 }).strict();
@@ -21688,7 +21735,14 @@ function validateConfigLayer(path, data) {
   const sanitized = sanitizeUnsafeKeys(data);
   const record = toRecord2(sanitized.value);
   const unsafeIssuePaths = sanitized.issues.flatMap((issue) => issue.keys.map((key) => [...issue.path, key].join(".")));
-  const unsafeDiagnostics = unsafeIssuePaths.length === 0 ? [] : [{ kind: "unknown-keys", message: `Ignored unknown keys in ${path}: ${unsafeIssuePaths.join(", ")}`, path, issuePaths: unsafeIssuePaths }];
+  const unsafeDiagnostics = unsafeIssuePaths.length === 0 ? [] : [
+    {
+      kind: "unknown-keys",
+      message: `Ignored unknown keys in ${path}: ${unsafeIssuePaths.join(", ")}`,
+      path,
+      issuePaths: unsafeIssuePaths
+    }
+  ];
   const validation = OmoConfigLayerSchema.safeParse(sanitized.value);
   if (validation.success) {
     if (record !== null)
@@ -21708,7 +21762,12 @@ function validateConfigLayer(path, data) {
   if (unknownIssues.length > 0) {
     const { issuePaths, stripped } = stripUnrecognizedKeys(record, unknownIssues);
     if (issuePaths.length > 0) {
-      diagnostics.push({ kind: "unknown-keys", message: `Ignored unknown keys in ${path}: ${issuePaths.join(", ")}`, path, issuePaths });
+      diagnostics.push({
+        kind: "unknown-keys",
+        message: `Ignored unknown keys in ${path}: ${issuePaths.join(", ")}`,
+        path,
+        issuePaths
+      });
     }
     const strippedValidation = validateLayerRecord(stripped);
     if (strippedValidation.success)
@@ -21719,7 +21778,11 @@ function validateConfigLayer(path, data) {
   const pruned = pruneInvalidConfigPaths(candidate, issues, validateLayerRecord);
   if (!pruned.ok)
     return rejected;
-  return { loaded: true, diagnostics: [...diagnostics, ...invalidValueDiagnostics(path, pruned.dropped)], value: pruned.config };
+  return {
+    loaded: true,
+    diagnostics: [...diagnostics, ...invalidValueDiagnostics(path, pruned.dropped)],
+    value: pruned.config
+  };
 }
 
 // packages/omo-config-core/src/loader/paths.ts
@@ -21854,11 +21917,13 @@ function harnessLayer(config, harness) {
 function resolveOmoConfigView(options) {
   const profiles = toRecord3(options.config["profiles"]);
   const profile = options.profile === undefined ? undefined : toRecord3(profiles?.[options.profile]);
-  const diagnostics = profile === undefined && options.profile !== undefined ? [{
-    kind: "profile",
-    message: `Activated omo profile "${options.profile}" does not exist; using the base configuration`,
-    path: `profiles.${options.profile}`
-  }] : [];
+  const diagnostics = profile === undefined && options.profile !== undefined ? [
+    {
+      kind: "profile",
+      message: `Activated omo profile "${options.profile}" does not exist; using the base configuration`,
+      path: `profiles.${options.profile}`
+    }
+  ] : [];
   const layers = [
     withoutControlKeys(options.config),
     harnessLayer(options.config, options.harness),
@@ -21925,11 +21990,13 @@ function readConfigSource(path, scope, fileSystem) {
   const parsed = parseJsoncSafe(content);
   if (parsed.errors.length > 0) {
     return {
-      diagnostics: [{
-        kind: "parse",
-        message: `JSONC parse error in ${path}: ${parsed.errors.map((error) => error.message).join(", ")}`,
-        path
-      }],
+      diagnostics: [
+        {
+          kind: "parse",
+          message: `JSONC parse error in ${path}: ${parsed.errors.map((error) => error.message).join(", ")}`,
+          path
+        }
+      ],
       source: { exists: true, loaded: false, path, scope }
     };
   }
@@ -22016,7 +22083,11 @@ function loadOmoConfig(options = {}) {
   if (pruned.ok) {
     return {
       config: withExcludedModels(stripResolutionControlKeys(OmoConfigSchema.parse(pruned.config))),
-      diagnostics: [...diagnostics, ...resolved.diagnostics, ...invalidValueDiagnostics(MERGED_OMO_CONFIG_PATH, pruned.dropped)],
+      diagnostics: [
+        ...diagnostics,
+        ...resolved.diagnostics,
+        ...invalidValueDiagnostics(MERGED_OMO_CONFIG_PATH, pruned.dropped)
+      ],
       layers,
       ...resolved.profile === undefined ? {} : { profile: resolved.profile },
       sources
@@ -22024,7 +22095,11 @@ function loadOmoConfig(options = {}) {
   }
   return {
     config: stripResolutionControlKeys(OmoConfigSchema.parse(DEFAULT_RAW_CONFIG)),
-    diagnostics: [...diagnostics, ...resolved.diagnostics, validationDiagnostic(MERGED_OMO_CONFIG_PATH, finalConfig.error.issues)],
+    diagnostics: [
+      ...diagnostics,
+      ...resolved.diagnostics,
+      validationDiagnostic(MERGED_OMO_CONFIG_PATH, finalConfig.error.issues)
+    ],
     layers,
     ...resolved.profile === undefined ? {} : { profile: resolved.profile },
     sources
@@ -22391,7 +22466,9 @@ async function restorePreservedReasoning(input) {
   });
   if (bundledEffort === effort)
     return;
-  const replacement = replaceTopLevelStringSetting(content, "model_reasoning_effort", effort, { insertIfMissing: false });
+  const replacement = replaceTopLevelStringSetting(content, "model_reasoning_effort", effort, {
+    insertIfMissing: false
+  });
   if (!replacement.replaced)
     return;
   await writeFile7(input.linkPath, replacement.content);
@@ -22727,13 +22804,23 @@ async function linkCachedPluginAgents(input) {
     const agentFileName = basename4(agentPath);
     const agentName = agentNameFromToml2(agentFileName);
     const linkPath = join25(agentsDir, agentFileName);
-    receipts.set(agentName, await syncAgentFile({ ...input, agentName, agentPath, linkPath, previousReceipt: previousReceipts.get(agentName) }));
+    receipts.set(agentName, await syncAgentFile({
+      ...input,
+      agentName,
+      agentPath,
+      linkPath,
+      previousReceipt: previousReceipts.get(agentName)
+    }));
     linked.push({ name: agentFileName, path: linkPath, target: agentPath });
   }
   await writeAgentModelReceipts(input.codexHome, receipts);
   const worker = linked.find((entry) => entry.name === "lazycodex-worker-medium.toml");
   if (worker !== undefined) {
-    const fallback = await installDefaultAgentRole({ codexHome: input.codexHome, worker, enabled: input.defaultRoleEnabled !== false });
+    const fallback = await installDefaultAgentRole({
+      codexHome: input.codexHome,
+      worker,
+      enabled: input.defaultRoleEnabled !== false
+    });
     if (fallback !== null)
       linked.push(fallback);
   }
@@ -22746,7 +22833,10 @@ async function syncAgentFile(input) {
   const preservedReasoning = input.preservedReasoning?.get(input.agentName);
   const override = input.agentOverrides?.get(input.agentName);
   await replaceWithCopy(input.linkPath, input.agentPath);
-  await restorePreservedModel({ linkPath: input.linkPath, value: handEditedAgentModel(installedModel, input.previousReceipt) });
+  await restorePreservedModel({
+    linkPath: input.linkPath,
+    value: handEditedAgentModel(installedModel, input.previousReceipt)
+  });
   await restorePreservedReasoning({
     agentName: input.agentName,
     linkPath: input.linkPath,
@@ -23117,12 +23207,7 @@ function normalizeHookStatusVersion(version) {
 import { copyFile as copyFile2, lstat as lstat12, readFile as readFile20, writeFile as writeFile11 } from "node:fs/promises";
 import { dirname as dirname9, join as join28, resolve as resolve8 } from "node:path";
 var LEGACY_AGENT_CONFLICT_KEYS = ["max_threads"];
-var PROJECT_LOCAL_ARTIFACT_PATHS = [
-  ".codex/hooks.json",
-  ".codex/agents",
-  ".codex/prompts",
-  ".codex/skills"
-];
+var PROJECT_LOCAL_ARTIFACT_PATHS = [".codex/hooks.json", ".codex/agents", ".codex/prompts", ".codex/skills"];
 async function repairNearestProjectLocalCodexArtifacts(input) {
   if (input.startDirectory === undefined) {
     return emptyProjectLocalCodexCleanupResult();
@@ -23779,10 +23864,16 @@ function invocationsForPlatform(scriptPath, platform) {
   if (platform !== "win32")
     return [{ command: "bash", args: [scriptPath] }];
   const args = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath];
-  return [{ command: "pwsh", args }, { command: "powershell.exe", args }];
+  return [
+    { command: "pwsh", args },
+    { command: "powershell.exe", args }
+  ];
 }
 async function runInvocation(input) {
-  const child = input.spawnProcess(input.invocation.command, input.invocation.args, { cwd: input.skillDir, env: input.env });
+  const child = input.spawnProcess(input.invocation.command, input.invocation.args, {
+    cwd: input.skillDir,
+    env: input.env
+  });
   let timedOut = false;
   let terminateDeadline;
   let terminateDeadlineGrace;
@@ -23831,7 +23922,10 @@ async function runAstGrepSkillInstall(options) {
       if (outcome.kind === "exit") {
         if (outcome.code === 0)
           return { kind: "succeeded" };
-        return { kind: "failed", reason: `${invocation.command} exited ${outcome.code ?? outcome.signal ?? "without status"}` };
+        return {
+          kind: "failed",
+          reason: `${invocation.command} exited ${outcome.code ?? outcome.signal ?? "without status"}`
+        };
       }
       if (platform === "win32" && outcome.missingExecutable && invocation.command === "pwsh")
         continue;
@@ -24057,7 +24151,10 @@ function findRepoRootFromImporter(importerDir) {
   for (let depth = 0;depth <= 7; depth += 1) {
     if (isRepoRootWithCodexPlugin(current))
       return current;
-    for (const wrapperPackageRoot of [join39(current, "node_modules", "oh-my-openagent"), join39(current, "oh-my-openagent")]) {
+    for (const wrapperPackageRoot of [
+      join39(current, "node_modules", "oh-my-openagent"),
+      join39(current, "oh-my-openagent")
+    ]) {
       if (isRepoRootWithCodexPlugin(wrapperPackageRoot))
         return wrapperPackageRoot;
     }
@@ -24292,15 +24389,7 @@ function buildDelegatedOmoInvocation(parsed) {
 }
 function buildLazyCodexDoctorInvocation(doctorArgs) {
   const doctorOptions = parseLazyCodexDoctorOptions(doctorArgs);
-  const codexArgs = [
-    "exec",
-    "--ephemeral",
-    "--sandbox",
-    "danger-full-access",
-    "--skip-git-repo-check",
-    "--cd",
-    "."
-  ];
+  const codexArgs = ["exec", "--ephemeral", "--sandbox", "danger-full-access", "--skip-git-repo-check", "--cd", "."];
   if (doctorOptions.model !== undefined)
     codexArgs.push("--model", doctorOptions.model);
   codexArgs.push(buildLazyCodexDoctorPrompt(doctorOptions.args));
@@ -24477,9 +24566,19 @@ function resolveLazyCodexUpdatePlan(input = {}) {
   if (compareVersions(latest, current) <= 0)
     return { shouldUpdate: false, reason: "up-to-date" };
   if (isBunGlobalEntrypoint(input.invokedPath, input.env ?? process.env)) {
-    return { shouldUpdate: true, command: BUN_UPDATE_COMMAND, args: BUN_GLOBAL_UPDATE_ARGS, postUpdate: "bun-global-trust" };
+    return {
+      shouldUpdate: true,
+      command: BUN_UPDATE_COMMAND,
+      args: BUN_GLOBAL_UPDATE_ARGS,
+      postUpdate: "bun-global-trust"
+    };
   }
-  return { shouldUpdate: true, command: input.command ?? DEFAULT_UPDATE_COMMAND, args: input.args ?? DEFAULT_UPDATE_ARGS, postUpdate: "none" };
+  return {
+    shouldUpdate: true,
+    command: input.command ?? DEFAULT_UPDATE_COMMAND,
+    args: input.args ?? DEFAULT_UPDATE_ARGS,
+    postUpdate: "none"
+  };
 }
 function resolveCommand2(env) {
   return env.LAZYCODEX_AUTO_UPDATE_COMMAND?.trim() || DEFAULT_UPDATE_COMMAND;
@@ -24705,7 +24804,12 @@ async function runLazyCodexInstallLocalCli(input) {
       logInstalled(input.log, result);
       return 0;
     }
-    return runLazyCodexManualUpdate({ env: input.env, dryRun: parsed.dryRun, log: input.log, invokedPath: input.invokedPath });
+    return runLazyCodexManualUpdate({
+      env: input.env,
+      dryRun: parsed.dryRun,
+      log: input.log,
+      invokedPath: input.invokedPath
+    });
   }
   const repoRoot = parsed.repoRoot ? resolve11(parsed.repoRoot) : input.defaultRepoRoot;
   const result = await installMarketplaceLocally({

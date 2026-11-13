@@ -1,8 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import {
-  applyExclusiveTaskTarget,
-  normalizeExclusiveTaskTarget,
-} from "./normalize-task-target"
+import { applyExclusiveTaskTarget, normalizeExclusiveTaskTarget } from "./normalize-task-target"
 
 describe("normalizeExclusiveTaskTarget (#7920)", () => {
   test("#given @explore both category and subagent_type #when normalized #then only subagent_type remains", () => {

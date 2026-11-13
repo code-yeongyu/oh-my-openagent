@@ -74,8 +74,14 @@ export async function runCrashMatrix(config, artifacts) {
   const routeB = writeRoute(sandbox, "b", { parentSteps: [], childSteps: [] })
   const releaseA = join(routeA, "release")
   const releaseB = join(routeB, "release")
-  const scriptA = { parentSteps: parentSteps(routeA, "a", { readNotices: true }), childSteps: heldSteps(releaseA, "A child") }
-  const scriptB = { parentSteps: parentSteps(routeB, "b", { readNotices: true }), childSteps: heldSteps(releaseB, "B child") }
+  const scriptA = {
+    parentSteps: parentSteps(routeA, "a", { readNotices: true }),
+    childSteps: heldSteps(releaseA, "A child"),
+  }
+  const scriptB = {
+    parentSteps: parentSteps(routeB, "b", { readNotices: true }),
+    childSteps: heldSteps(releaseB, "B child"),
+  }
   writeFileSync(join(routeA, "mock-script.json"), `${JSON.stringify(scriptA, null, 2)}\n`)
   writeFileSync(join(routeB, "mock-script.json"), `${JSON.stringify(scriptB, null, 2)}\n`)
   const markerA = `[[mock-cwd:${routeA}]]`
@@ -92,7 +98,9 @@ export async function runCrashMatrix(config, artifacts) {
     const parentIds = [...groups.keys()]
     const [crashedParent, bystanderParent] = parentIds.map((id) => parents.find((parent) => parent.sessionId() === id))
     if (crashedParent === undefined || bystanderParent === undefined) {
-      throw new Error(`parent session ids ${JSON.stringify(parents.map((parent) => parent.sessionId()))} do not own the task records ${JSON.stringify(parentIds)}`)
+      throw new Error(
+        `parent session ids ${JSON.stringify(parents.map((parent) => parent.sessionId()))} do not own the task records ${JSON.stringify(parentIds)}`,
+      )
     }
     const before = endpointFacts(sandbox)
     const workersBefore = statusWorkers(sandbox)
@@ -100,8 +108,10 @@ export async function runCrashMatrix(config, artifacts) {
     const control = config.kind === "control"
     const topology = control
       ? sockets.length === 1 && sockets[0].endsWith("/rpc/rpc.sock") && workersBefore[0]?.workers === 6
-      : sockets.length === 2 && sockets.every((socket) => /\/p-[0-9a-f]{16}\.sock$/.test(socket)) &&
-        workersBefore.length === 2 && workersBefore.every((row) => row.workers === 3) &&
+      : sockets.length === 2 &&
+        sockets.every((socket) => /\/p-[0-9a-f]{16}\.sock$/.test(socket)) &&
+        workersBefore.length === 2 &&
+        workersBefore.every((row) => row.workers === 3) &&
         before.every((row) => row.host !== null && row.hostPpid === row.supervisor) &&
         !existsSync(join(sandbox.agentDir, "rpc", "rpc.sock"))
     if (!topology) throw new Error(`unexpected topology: ${JSON.stringify({ sockets, workersBefore, before })}`)
@@ -110,28 +120,42 @@ export async function runCrashMatrix(config, artifacts) {
     const endpointB = control ? before[0] : before.find((row) => row.owner === parentIds[1])
     if (endpointA?.host === null || endpointA?.host === undefined) throw new Error("host child A missing")
     process.kill(endpointA.host, "SIGSEGV")
-    const crashed = await observeState(sandbox.root, () => {
-      const rows = crashRows(sandbox, endpointA.socket)
-      return rows.length > 0 ? rows : undefined
-    }, { timeoutMs: 60_000 })
+    const crashed = await observeState(
+      sandbox.root,
+      () => {
+        const rows = crashRows(sandbox, endpointA.socket)
+        return rows.length > 0 ? rows : undefined
+      },
+      { timeoutMs: 60_000 },
+    )
     if (crashed === undefined) throw new Error("crash record did not appear")
 
     writeFileSync(releaseB, "go\n")
     const bIds = new Set(groups.get(parentIds[1]).map((record) => record.task_id))
-    const bFinished = await observeState(sandbox.root, () => {
-      const records = taskRecords(project).filter((record) => bIds.has(record.task_id))
-      return records.length === 3 && records.every(terminal) ? records : undefined
-    }, { timeoutMs: 180_000 })
+    const bFinished = await observeState(
+      sandbox.root,
+      () => {
+        const records = taskRecords(project).filter((record) => bIds.has(record.task_id))
+        return records.length === 3 && records.every(terminal) ? records : undefined
+      },
+      { timeoutMs: 180_000 },
+    )
     if (bFinished === undefined) throw new Error("parent B children did not settle during A fault window")
 
-    const replaced = await observeState(sandbox.root, () => {
-      const after = endpointFacts(sandbox).find((row) => row.socket === endpointA.socket)
-      return after?.supervisor !== null && after?.supervisor !== endpointA.supervisor ? after : undefined
-    }, { timeoutMs: 180_000 })
+    const replaced = await observeState(
+      sandbox.root,
+      () => {
+        const after = endpointFacts(sandbox).find((row) => row.socket === endpointA.socket)
+        return after?.supervisor !== null && after?.supervisor !== endpointA.supervisor ? after : undefined
+      },
+      { timeoutMs: 180_000 },
+    )
     writeFileSync(releaseA, "go\n")
     const final = await observeState(sandbox.root, () => allTerminal(project), { timeoutMs: 180_000 })
     if (final === undefined) throw new Error("six children did not settle")
-    const continuations = Object.fromEntries(final.map((record) => [record.task_id, continuationCount(sandbox, record.task_id)]))
+    const continuations = Object.fromEntries(
+      final.map((record) => [record.task_id, continuationCount(sandbox, record.task_id)]),
+    )
     const after = endpointFacts(sandbox)
     const bAfter = control ? after[0] : after.find((row) => row.socket === endpointB.socket)
     const status = statusAll(sandbox)
@@ -162,10 +186,18 @@ export async function runCrashMatrix(config, artifacts) {
       crashRows: crashed,
       replaced,
       bFinished: bFinished.map((record) => record.status),
-      final: final.map((record) => ({ task_id: record.task_id, parent: record.parent_session_id, status: record.status })),
+      final: final.map((record) => ({
+        task_id: record.task_id,
+        parent: record.parent_session_id,
+        status: record.status,
+      })),
       continuations,
-      bStable: control ? false : bAfter?.supervisor === endpointB.supervisor && bAfter?.host === endpointB.host &&
-        bAfter?.status?.instanceId === endpointB.status?.instanceId && crashRows(sandbox, endpointB.socket).length === 0,
+      bStable: control
+        ? false
+        : bAfter?.supervisor === endpointB.supervisor &&
+          bAfter?.host === endpointB.host &&
+          bAfter?.status?.instanceId === endpointB.status?.instanceId &&
+          crashRows(sandbox, endpointB.socket).length === 0,
       oldSupervisorGone: endpointA.supervisor !== null && !pidAlive(endpointA.supervisor),
     }
     writeFileSync(join(artifacts, `${config.kind}-crash.json`), `${JSON.stringify(facts, null, 2)}\n`)
@@ -184,24 +216,34 @@ export function crashRowsForReport(facts, artifacts) {
   const bystander = bystanderProblems(facts)
   return {
     topology_two_parent_shards: pass(evidence, { sockets: facts.sockets, workers: facts.workersBefore }),
-    host_crash_isolated: facts.bStable && bystander.length === 0
-      ? pass(evidence, { bStable: true, bystanderNotices: facts.notices.bystander, bystanderStatus: statusRow(facts, facts.bystanderSocket) })
-      : { status: "fail", evidence, reason: [...(facts.bStable ? [] : ["bystander shard changed"]), ...bystander].join("; ") },
-    crashed_shard_reattaches: facts.replaced !== undefined && oneEach && crashed.length === 0
-      ? pass(evidence, {
-          replaced: facts.replaced,
-          continuations: facts.continuations,
-          crashedNotices: facts.notices.crashed,
-          crashedStatus: statusRow(facts, facts.crashedSocket),
-        })
-      : {
-          status: "fail",
-          evidence,
-          reason: [
-            ...(facts.replaced !== undefined && oneEach ? [] : ["crashed shard did not replace with continuations"]),
-            ...crashed,
-          ].join("; "),
-        },
+    host_crash_isolated:
+      facts.bStable && bystander.length === 0
+        ? pass(evidence, {
+            bStable: true,
+            bystanderNotices: facts.notices.bystander,
+            bystanderStatus: statusRow(facts, facts.bystanderSocket),
+          })
+        : {
+            status: "fail",
+            evidence,
+            reason: [...(facts.bStable ? [] : ["bystander shard changed"]), ...bystander].join("; "),
+          },
+    crashed_shard_reattaches:
+      facts.replaced !== undefined && oneEach && crashed.length === 0
+        ? pass(evidence, {
+            replaced: facts.replaced,
+            continuations: facts.continuations,
+            crashedNotices: facts.notices.crashed,
+            crashedStatus: statusRow(facts, facts.crashedSocket),
+          })
+        : {
+            status: "fail",
+            evidence,
+            reason: [
+              ...(facts.replaced !== undefined && oneEach ? [] : ["crashed shard did not replace with continuations"]),
+              ...crashed,
+            ].join("; "),
+          },
     all_six_children_complete: sixComplete
       ? pass(evidence, { final: facts.final })
       : { status: "fail", evidence, reason: "not every child completed" },
@@ -212,9 +254,13 @@ export function controlRowForReport(facts, artifacts) {
   const evidence = [join(artifacts, "control-crash.json")]
   const parentCounts = Map.groupBy(facts.final, (record) => record.parent)
   const cascadedParents = [...parentCounts.values()].filter((records) =>
-    records.some((record) => (facts.continuations[record.task_id] ?? 0) >= 1))
-  const shared = facts.sockets.length === 1 && facts.sockets[0].endsWith("/rpc/rpc.sock") &&
-    facts.workersBefore.length === 1 && facts.workersBefore[0].workers === 6
+    records.some((record) => (facts.continuations[record.task_id] ?? 0) >= 1),
+  )
+  const shared =
+    facts.sockets.length === 1 &&
+    facts.sockets[0].endsWith("/rpc/rpc.sock") &&
+    facts.workersBefore.length === 1 &&
+    facts.workersBefore[0].workers === 6
   const allComplete = facts.final.length === 6 && facts.final.every((record) => record.status === "completed")
   return shared && cascadedParents.length === 2 && allComplete
     ? pass(evidence, {

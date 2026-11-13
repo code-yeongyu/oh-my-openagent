@@ -50,14 +50,18 @@ async function strand(repoDir: string, relative: string): Promise<string> {
 }
 
 async function writerRecord(paths: IdentityPaths, pid: number): Promise<void> {
-  await writeFile(memoryWriterLockPath(paths.locks), JSON.stringify({
-    pid,
-    process_start: "unavailable",
-    hostname: hostname(),
-    nonce: randomUUID(),
-    created_at: new Date().toISOString(),
-    purpose: "memory-write",
-  }), "utf8")
+  await writeFile(
+    memoryWriterLockPath(paths.locks),
+    JSON.stringify({
+      pid,
+      process_start: "unavailable",
+      hostname: hostname(),
+      nonce: randomUUID(),
+      created_at: new Date().toISOString(),
+      purpose: "memory-write",
+    }),
+    "utf8",
+  )
 }
 
 describe("the kept stranded-lock error gives a way out (omo #10199)", () => {

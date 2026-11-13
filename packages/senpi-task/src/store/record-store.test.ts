@@ -1,6 +1,16 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
 import * as fs from "node:fs"
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs"
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -83,8 +93,14 @@ describe("createTaskRecordStore caching", () => {
     for (const taskId of ids) store.save(baseRecord(taskId))
 
     // when
-    const first = store.list().records.map((record) => record.task_id).sort()
-    const second = store.list().records.map((record) => record.task_id).sort()
+    const first = store
+      .list()
+      .records.map((record) => record.task_id)
+      .sort()
+    const second = store
+      .list()
+      .records.map((record) => record.task_id)
+      .sort()
 
     // then
     expect(second).toEqual(first)
@@ -295,7 +311,7 @@ describe("createTaskRecordStore remove artifacts", () => {
     // children/<taskId>/sessions/<taskId>/x.jsonl
     const childDir = join(stateDir, "children", TASK_ID, "sessions", TASK_ID)
     mkdirSync(childDir, { recursive: true })
-    writeFileSync(join(childDir, "x.jsonl"), "{\"role\":\"user\",\"content\":\"hi\"}\n", "utf8")
+    writeFileSync(join(childDir, "x.jsonl"), '{"role":"user","content":"hi"}\n', "utf8")
 
     // completion-results/<taskId>.txt
     const spillDir = join(stateDir, "completion-results")
@@ -387,7 +403,10 @@ describe("createTaskRecordStore remove artifacts", () => {
 describe("createTaskRecordStore tombstone expunge", () => {
   const TASK_ID = "st_00000030"
 
-  function seedTombstoneCandidate(project: string): { store: ReturnType<typeof createTaskRecordStore>; stateDir: string } {
+  function seedTombstoneCandidate(project: string): {
+    store: ReturnType<typeof createTaskRecordStore>
+    stateDir: string
+  } {
     const store = createTaskRecordStore({ project_dir: project })
     store.save(baseRecord(TASK_ID))
     store.appendEvent(TASK_ID, { type: "created", payload: {} })

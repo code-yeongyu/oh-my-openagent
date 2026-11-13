@@ -6,10 +6,7 @@ import type { PrometheusExecutionArguments } from "../hooks/prometheus-md-only/h
 import { isTrackedBtwSideSession } from "../features/btw-side"
 import { getMainSessionID } from "../features/claude-code-session-state"
 import { log, replaceToolArgs } from "../shared"
-import {
-  applyExclusiveTaskTarget,
-  normalizeExclusiveTaskTarget,
-} from "../tools/delegate-task/normalize-task-target"
+import { applyExclusiveTaskTarget, normalizeExclusiveTaskTarget } from "../tools/delegate-task/normalize-task-target"
 import { resolveSessionAgent } from "./session-agent-resolver"
 import { stopContinuation } from "./stop-continuation"
 
@@ -41,8 +38,7 @@ function isPureSleepCommand(command: string): boolean {
     .map((line) => line.trim())
     .filter((line) => line.length > 0 && !line.startsWith("#"))
 
-  return commandLines.length > 0
-    && commandLines.every((line) => /^sleep\s+\d+(?:\.\d+)?[smhd]?\s*$/i.test(line))
+  return commandLines.length > 0 && commandLines.every((line) => /^sleep\s+\d+(?:\.\d+)?[smhd]?\s*$/i.test(line))
 }
 
 export function createToolExecuteBeforeHandler(args: {
@@ -71,10 +67,7 @@ export function createToolExecuteBeforeHandler(args: {
     }
 
     const normalizedToolName = input.tool.toLowerCase()
-    if (
-      BTW_DELEGATION_TOOLS.has(normalizedToolName) &&
-      isTrackedBtwSideSession(input.sessionID)
-    ) {
+    if (BTW_DELEGATION_TOOLS.has(normalizedToolName) && isTrackedBtwSideSession(input.sessionID)) {
       throw new Error("BTW side conversations cannot delegate work.")
     }
 
@@ -88,11 +81,9 @@ export function createToolExecuteBeforeHandler(args: {
       }
 
       if (
-        isPureSleepCommand(output.args.command)
-        && (
-          backgroundManager?.hasActiveChildTasks(input.sessionID) === true
-          || backgroundManager?.hasPendingParentWake(input.sessionID) === true
-        )
+        isPureSleepCommand(output.args.command) &&
+        (backgroundManager?.hasActiveChildTasks(input.sessionID) === true ||
+          backgroundManager?.hasPendingParentWake(input.sessionID) === true)
       ) {
         throw new Error(BACKGROUND_WAIT_BLOCK_MESSAGE)
       }
@@ -119,9 +110,9 @@ export function createToolExecuteBeforeHandler(args: {
     await hooks.teamToolGating?.["tool.execute.before"]?.(input, output)
 
     if (
-      normalizedToolName === "question"
-      || normalizedToolName === "ask_user_question"
-      || normalizedToolName === "askuserquestion"
+      normalizedToolName === "question" ||
+      normalizedToolName === "ask_user_question" ||
+      normalizedToolName === "askuserquestion"
     ) {
       const sessionID = input.sessionID || getMainSessionID()
       await hooks.sessionNotification?.({
@@ -148,9 +139,7 @@ export function createToolExecuteBeforeHandler(args: {
         })
         // Category routing still uses sisyphus-junior internally; OpenCode's
         // task() registry key is the config id, not the display name.
-        const hookTarget = normalized.category
-          ? { ...normalized, subagent_type: "sisyphus-junior" }
-          : normalized
+        const hookTarget = normalized.category ? { ...normalized, subagent_type: "sisyphus-junior" } : normalized
         output.args = applyExclusiveTaskTarget(output.args, hookTarget)
       } else if (taskId) {
         const resolvedAgent = await resolveSessionAgent(ctx.client, taskId)
@@ -168,11 +157,12 @@ export function createToolExecuteBeforeHandler(args: {
       }
 
       if (command === "goal" && sessionID && hooks.goal) {
-        const rawArgs = typeof output.args.user_message === "string"
-          ? output.args.user_message.trim()
-          : typeof output.args.arguments === "string"
-            ? output.args.arguments.trim()
-            : ""
+        const rawArgs =
+          typeof output.args.user_message === "string"
+            ? output.args.user_message.trim()
+            : typeof output.args.arguments === "string"
+              ? output.args.arguments.trim()
+              : ""
         if (rawArgs.length > 0) {
           hooks.goal.setGoal(sessionID, rawArgs)
         }
@@ -191,10 +181,13 @@ export function createToolExecuteBeforeHandler(args: {
         }
       }
     }
-    if (execution.approved && (
-      output.args !== execution.original ||
-      Object.entries(execution.approved).some(([field, value]) => !isDeepStrictEqual(execution.original[field], value))
-    )) {
+    if (
+      execution.approved &&
+      (output.args !== execution.original ||
+        Object.entries(execution.approved).some(
+          ([field, value]) => !isDeepStrictEqual(execution.original[field], value),
+        ))
+    ) {
       log("[prometheus-md-only] Blocked: approved arguments changed after authorization", {
         sessionID: input.sessionID,
         tool: input.tool,

@@ -3,7 +3,10 @@ import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { isKnownTaskCategory, normalizeExclusiveTaskTarget } from "./normalize-task-target"
 import { log } from "../../shared/logger"
 
-export async function prepareDelegateTaskArgs(args: Record<string, unknown>, ctx: ToolContextWithMetadata): Promise<DelegateTaskArgs> {
+export async function prepareDelegateTaskArgs(
+  args: Record<string, unknown>,
+  ctx: ToolContextWithMetadata,
+): Promise<DelegateTaskArgs> {
   const originalCategory = typeof args.category === "string" ? args.category : undefined
   const prompt = typeof args.prompt === "string" ? args.prompt : ""
   const originalSubagentType = typeof args.subagent_type === "string" ? args.subagent_type : undefined
@@ -15,10 +18,10 @@ export async function prepareDelegateTaskArgs(args: Record<string, unknown>, ctx
   const subagentType = target.subagent_type
 
   if (
-    isKnownTaskCategory(originalCategory)
-    && originalSubagentType
-    && originalSubagentType !== SISYPHUS_JUNIOR_AGENT
-    && subagentType === SISYPHUS_JUNIOR_AGENT
+    isKnownTaskCategory(originalCategory) &&
+    originalSubagentType &&
+    originalSubagentType !== SISYPHUS_JUNIOR_AGENT &&
+    subagentType === SISYPHUS_JUNIOR_AGENT
   ) {
     log("[task] category provided - overriding subagent_type to sisyphus-junior", {
       category: originalCategory,
@@ -90,7 +93,6 @@ export async function prepareDelegateTaskArgs(args: Record<string, unknown>, ctx
 
   const taskID = typeof args.task_id === "string" ? args.task_id : undefined
   const command = typeof args.command === "string" ? args.command : undefined
-
 
   return {
     category,
