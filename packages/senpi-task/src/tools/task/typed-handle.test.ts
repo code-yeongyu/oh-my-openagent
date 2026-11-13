@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { writeFileSync } from "node:fs"
+import { dirname } from "node:path"
 
 import { cleanupProjects, makeManager, settings } from "../../manager/__fixtures__/manager-fakes"
 import type { TaskRecord } from "../../state"
@@ -33,6 +34,9 @@ describe("typed task handles", () => {
     expect(receipt.sessionText).toBe("TYPED_HANDLE_SESSION_SENTINEL")
     expect(receipt.transcriptMessages).toHaveLength(1)
     for (const transcript of receipt.transcriptMessages) expect(transcript.after).toBe(transcript.before)
+    // Suite temp-leak contract (#9766): the engine writes into its agent dir after a test's cleanup, so the
+    // fixture's agent dir must sit in the process-scoped temp dir, never inside the per-test project.
+    expect(dirname(receipt.isolatedAgentDir)).toBe(process.env["OMO_TEST_PROCESS_TMPDIR"] ?? "unset")
     evidence("real-session", receipt)
   })
 
@@ -56,6 +60,26 @@ describe("typed task handles", () => {
     await expect(failed).rejects.toThrow("the fixture failed after the task tool reported")
     expect(retired).toHaveLength(1)
     expect(retired[0]).toMatch(/^st_[0-9a-f]+$/)
+  })
+
+  test("#given a start that outlives the teardown's wait #when the fixture tears down #then that start retires its own child", async () => {
+    // given
+    const retired: string[] = []
+    const retiredLate: string[] = []
+    // when
+    const failed = realSessionHandle({
+      registerAfterReport: true,
+      failAfterReport: true,
+      holdUntilTornDown: true,
+      teardownWaitMs: 1,
+      retired,
+      retiredLate,
+    })
+    // then
+    await expect(failed).rejects.toThrow("the fixture failed after the task tool reported")
+    expect(retired).toHaveLength(1)
+    // The teardown's own loop would also retire a late handle; only the start's branch reports here.
+    expect(retiredLate).toEqual(retired)
   })
 
   test("#given foreground output containing unrelated ids #when completed #then the body and record identity are preserved", async () => {
