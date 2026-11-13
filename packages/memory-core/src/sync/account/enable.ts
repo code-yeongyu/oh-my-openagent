@@ -30,7 +30,12 @@ export type EnableOutcome =
   | { readonly kind: "method_required"; readonly methods: ReadonlyArray<EnableMethod>; readonly phraseVoid?: PhraseVoidNotice }
   | { readonly kind: "acknowledge_required"; readonly phraseVoid: PhraseVoidNotice }
   | { readonly kind: "passkey_unavailable" }
-  | { readonly kind: "phrase_unavailable"; readonly reason: "no-surface" | "disabled" | "service-floor-off" }
+  | {
+      readonly kind: "phrase_unavailable"
+      readonly reason: "no-surface" | "disabled" | "service-floor-off"
+      /** Set when withdrawing this device's sync switch after a service refusal failed; it is still on. */
+      readonly deviceSyncLeftOn?: true
+    }
   | { readonly kind: "cancelled" }
   | { readonly kind: "in_progress" }
 
