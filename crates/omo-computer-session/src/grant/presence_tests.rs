@@ -199,3 +199,25 @@ fn a_stop_observed_by_the_gate_ends_the_lease_through_the_funnel_once() {
     let _ = s.click(params(json!({ "target": "1", "x": 1, "y": 1 })));
     assert!(std::mem::take(&mut *calls.0.lock().expect("lock")).is_empty(), "never a second Stop for the same epoch");
 }
+
+/// Review L1 of #13346: `control.acquire` runs the foreground grant's own checks and the stop
+/// latch before it shows presence or takes the machine slot.
+#[test]
+fn acquire_runs_the_grant_and_latch_checks_before_taking_the_slot() {
+    let sink = RecordingSink::default();
+    let mut never = session(&json!({ "object": true, "consent": { "foreground": "never" } }), &sink, None);
+    never.control_grant(params(json!({ "reason": "r" })));
+    let refused = never.control_acquire().expect_err("consent says never");
+    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("ControlRequired", Some("foreground")));
+    assert!(!never.holds_lease(), "no slot taken");
+    assert!(!sink.lines().iter().any(|line| line.contains("presence show")), "{:?}", sink.lines());
+
+    let sink = RecordingSink::default();
+    let mut latched = session(&json!({ "object": true }), &sink, None);
+    latched.guard.stop(Some("hotkey"), &mut omo_computer_safety::NoHolds);
+    latched.control_grant(params(json!({ "reason": "after the stop" })));
+    let refused = latched.control_acquire().expect_err("the stop latch is set");
+    assert_ne!(refused.refusal.code.wire(), "InputBusy");
+    assert!(!latched.holds_lease(), "no slot taken while latched");
+    assert!(!sink.lines().iter().any(|line| line.contains("presence show")), "{:?}", sink.lines());
+}

@@ -4,6 +4,7 @@
 //! user message, a re-approval). None of them is model-callable.
 
 use omo_computer_core::backend::Refusal;
+use omo_computer_core::methods::Method;
 use omo_computer_core::params::ControlGrantParams;
 use omo_computer_core::results::{ControlState, StopPathStatus};
 use omo_computer_safety::gate::verdicts::LeaseRefusal;
@@ -81,11 +82,19 @@ impl Session {
         if self.opened.is_none() {
             return Err(NOT_OPEN.into());
         }
+        self.reconcile_stop();
         let epoch = self.guard.supervisor().stop_epoch();
-        self.funnel.control.grant.reconcile(epoch);
-        if !self.funnel.control.grant.is_held() {
-            return Err(LeaseRefusal::Grant.refusal().into());
+        // A latched stop refuses every input; the lease is not taken for input that cannot run.
+        if let Some(latch) = self.guard.supervisor().latch() {
+            return Err(latch.refusal().into());
         }
+        // The grant's own checks, as a foreground call runs them: `foreground: never`, a remote
+        // hand (`headless_host`), then a live grant.
+        let control = &self.funnel.control;
+        control
+            .grant
+            .admit(control.consent.view(), (Method::ControlAcquire, None), control.consent.hand())
+            .map_err(|refusal| Refused::from(refusal.refusal()))?;
         let busy = |holder: &Holder| Refused {
             detail: Some(Box::new(holder_detail(holder))),
             ..Refused::from(LeaseRefusal::InputBusy.refusal())
