@@ -4,6 +4,9 @@
 //! `attribution{foreignEvents, firstForeignAtMs}` with the send already out; one outside is
 //! not counted, and the engine's own tagged input never is. Times are the backend's monotonic
 //! clock; the window's bounds are rows of `SETTLE_PROFILE`.
+//!
+//! Row 19 builds and tests the window; the send path consults it from row 22 (a `C5` row of
+//! `DEFERRED-LEGS.tsv` owes the wiring).
 
 use omo_computer_core::settle_profile::SETTLE_PROFILE;
 
