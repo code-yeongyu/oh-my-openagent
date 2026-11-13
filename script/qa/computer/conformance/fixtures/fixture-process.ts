@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs"
+import { dirname, join } from "node:path"
 import { type FixtureReport, readFixtureReport } from "./fixture-report.ts"
 
 const LINE_DEADLINE_MS = 30_000
@@ -16,7 +17,8 @@ export class FixtureProcess {
   }
 
   static async start(command: readonly string[], reportPath: string, sabotage: string): Promise<FixtureProcess> {
-    const env = { ...process.env, CONFORMANCE_FIXTURE_SABOTAGE: sabotage }
+    // Profile data of a web-hosting fixture lives in this run's directory, which the self-test removes.
+    const env = { ...process.env, CONFORMANCE_FIXTURE_SABOTAGE: sabotage, CONFORMANCE_FIXTURE_DATA_DIR: join(dirname(reportPath), "profile") }
     const child = Bun.spawn([...command, "--report", reportPath], {
       stdin: "pipe",
       stdout: "pipe",

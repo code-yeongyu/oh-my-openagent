@@ -19,10 +19,12 @@ let initial = null
 
 app.setName(APP)
 // Chromium's profile lives in a temp dir removed on quit, never in the user's real config directory.
-const profileDir = mkdtempSync(join(tmpdir(), "conformance-fixture-electron-"))
+// A driver passes CONFORMANCE_FIXTURE_DATA_DIR inside its own run directory and removes it after the run;
+// Chromium keeps writing its profile through shutdown, so cleanup inside the fixture cannot be relied on.
+const givenProfileDir = process.env.CONFORMANCE_FIXTURE_DATA_DIR
+const profileDir = givenProfileDir || mkdtempSync(join(tmpdir(), "conformance-fixture-electron-"))
 app.setPath("userData", profileDir)
-// Chromium rewrites its profile while shutting down after will-quit, so remove it when the process exits.
-process.on("exit", () => rmSync(profileDir, { recursive: true, force: true, maxRetries: 5 }))
+if (!givenProfileDir) app.on("will-quit", () => rmSync(profileDir, { recursive: true, force: true }))
 // The baseline run (43237342972) found the page's controls absent from the accessibility tree: with no
 // assistive client detected, Chromium ships no renderer accessibility (Windows exposed only the frame plus
 // "Chrome Legacy Window"). Force the accessibility tree on so every control of the shared page is visible to
