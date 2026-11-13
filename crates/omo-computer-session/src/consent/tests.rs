@@ -137,3 +137,24 @@ fn denied_app_seeds_exist_per_os_in_the_scope_stage_keys() {
     );
     assert!(allowed.admit_exec(Some(&app("1Password.exe", "aa"))).is_ok(), "unless explicitly allowed");
 }
+
+/// R70ab (review M3 of #13346): an entry bound to its path alone is satisfied only by a path that
+/// was READ and is equal. Equal: admitted path-only. Different: identity_changed. Unreadable
+/// identity AND path against a stored path: identity_changed, never an admit.
+#[test]
+fn r70ab_a_path_bound_entry_needs_a_read_equal_path() {
+    let consent = consent(json!({ "apps": { "allow": [{ "appKey": "com.example.app", "path": "/usr/bin/app" }] } }));
+    let target = |path: Option<&str>| AppTarget {
+        app_key: "com.example.app".to_owned(),
+        bound: BoundIdentity::new(path.map(str::to_owned), None),
+    };
+    assert_eq!(consent.admit_exec(Some(&target(Some("/usr/bin/app")))).map(|a| a.binding), Ok(Some(Binding::PathOnly)));
+    assert_eq!(refusal(consent.admit_exec(Some(&target(Some("/tmp/app"))))), Some(ConsentRefusal::IdentityChanged));
+    let unread = consent.admit_exec(Some(&target(None))).expect_err("an unreadable path cannot satisfy a stored one");
+    assert_eq!(unread.refusal, ConsentRefusal::IdentityChanged);
+    let observed = &unread.detail.expect("detail")["identity"]["observed"];
+    assert!(observed.get("path").is_none() && observed.get("identity").is_none(), "observed says both were unreadable: {observed}");
+    // An entry approved WITHOUT a path keeps today's behaviour.
+    let pathless = self::consent(json!({ "apps": { "allow": [{ "appKey": "com.example.app" }] } }));
+    assert_eq!(pathless.admit_exec(Some(&target(None))).map(|a| a.binding), Ok(Some(Binding::PathOnly)));
+}

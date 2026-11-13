@@ -41,13 +41,17 @@ impl BoundIdentity {
     /// # Errors
     /// [`IdentityChanged`] when the two name different code: a readable identity on both
     /// sides compares the identity; otherwise the entry is bound to its path alone and the
-    /// paths compare (an unknown path on either side cannot prove a change).
+    /// paths compare. A stored path is satisfied only by a path that was read and is equal
+    /// (R70ab); an entry stored without a path admits as path-only.
     pub fn check(&self, observed: &Self) -> Result<Binding, Box<IdentityChanged>> {
         match (&self.identity, &observed.identity) {
             (Some(approved), Some(seen)) if !same_code(approved, seen) => Err(self.changed(observed)),
             (Some(_), Some(_)) => Ok(Binding::Identity),
             _ => match (&self.path, &observed.path) {
                 (Some(approved), Some(seen)) if approved != seen => Err(self.changed(observed)),
+                // R70ab: a binding to the path is satisfied only by a path that was READ and is
+                // equal; an unreadable identity AND path against a stored path is a change.
+                (Some(_), None) if observed.identity.is_none() => Err(self.changed(observed)),
                 _ => Ok(Binding::PathOnly),
             },
         }
