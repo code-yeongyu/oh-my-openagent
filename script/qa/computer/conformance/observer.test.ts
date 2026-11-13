@@ -22,7 +22,6 @@ describe("desktop observer at preflight (P-17)", () => {
     expect(status).toEqual({ kind: "unavailable", reason: check.detail })
   })
 
-
   test("a missing sentinel module is an environment fault", async () => {
     const { check } = await observerCheck(join(dir, "absent.ts"), "x11")
     expect(check.ok).toBe(false)
