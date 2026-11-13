@@ -179,17 +179,18 @@ pub fn capture<O: CaptureOs + ?Sized>(
     if os.session_id() == 0 {
         return Err(SESSION0);
     }
+    let dark = os.session().is_dark();
     let monitors = os.monitors()?;
     let mut record = match target {
-        Target::Window(id) => window::capture(os, wgc, id, options.cursor, &monitors)?,
+        Target::Window(id) => window::capture(os, wgc, id, options.cursor, &monitors, dark)?,
         Target::Display(id) => {
             let monitor = monitors
                 .iter()
                 .find(|monitor| monitor.device_name == *id)
                 .ok_or(Refusal::bare(EngineCode::InvalidTarget))?;
-            display::capture(os, wgc, std::slice::from_ref(monitor), options.cursor)?
+            display::capture(os, wgc, std::slice::from_ref(monitor), options.cursor, dark)?
         }
-        Target::Desktop => display::capture(os, wgc, &monitors, options.cursor)?,
+        Target::Desktop => display::capture(os, wgc, &monitors, options.cursor, dark)?,
     };
     if let Some(region) = options.region {
         record = crop_record(record, region)?;

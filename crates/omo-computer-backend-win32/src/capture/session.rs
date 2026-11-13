@@ -1,9 +1,11 @@
 //! The session state capture reads through a seam (plan row 55; d-windows.md:383): a null or
 //! near-black frame while `session.sessionActive` is false or `session.displayAsleep` is true
 //! answers `CaptureFailed{null_frame|black_frame}` with the session as its cause. Row 55 has no
-//! OS source of its own: the Windows `SessionState` probes are design row N18 (plan row 60), so
-//! the real OS reads `unknown` until row 60 feeds this seam, and under `unknown` nothing fires
-//! (a dark desktop stays a frame).
+//! OS source of its own (ruling R70d(2)): the one source of session state is the backend's
+//! `InterventionSource::session_state()` (row 22's trait, not in row 55's base) fed by the Windows
+//! `SessionState` probes of design row N18 (plan row 60), so the real OS reads `unknown` until
+//! row 60 feeds this seam, and under `unknown` nothing fires (a dark desktop stays a frame). The
+//! reply half - the `session` stamp on the error and `nextCall:"ask_user"` - is owed to row 60.
 
 use omo_computer_core::session_state::{Tristate, UnknownLiteral};
 
