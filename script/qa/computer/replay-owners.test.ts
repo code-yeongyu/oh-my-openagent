@@ -35,11 +35,33 @@ const LEDGERS: Ledgers = {
     ["C4", "`leg-due.json` byte-equal", "13", "20", "owed"],
     ["C5", "`leg-passed.json` replays", "13", "40", "passed:some::test"],
     ["C6", "`v3-later.json` is owed", "16", "40", "owed"],
+    ["C7", "`leg-23.json` replays", "20", "23", "owed"],
+    ["C7", "`leg-17.json` replays", "16", "17", "owed"],
   ),
 }
 
+// A fake plan in the row format of the computer-use v3 plan: 26 -> 23 -> 20 -> 17, and 55 -> 7, 20.
+const PLAN = [
+  "- [ ] 7. Spike",
+  "  Parallelization: Wave 4 | Blocked by: 5 | Blocks: 55",
+  "- [ ] 17. Session",
+  "  Parallelization: Wave 8 | Blocked by: - | Blocks: 20",
+  "- [x] 19. Settle",
+  "  Parallelization: Wave 11 | Blocked by: 17, 20 | Blocks: 28",
+  "- [ ] 20. Frames",
+  "  Parallelization: Wave 10 | Blocked by: 17 | Blocks: 23, 55",
+  "- [ ] 23. Holds",
+  "  Parallelization: Wave 12 | Blocked by: 20 | Blocks: 26",
+  "- [ ] 26. Remote typing",
+  "  Parallelization: Wave 13 | Blocked by: 23 | Blocks: -",
+  "- [ ] 55. Windows capture",
+  "  Parallelization: Wave 20 | Blocked by: 7, 20 | Blocks: -",
+  "- [ ] F1. Plan compliance audit",
+  "  Parallelization: final | Blocked by: 26 | Blocks: -",
+].join("\n")
+
 const failed = (name: string): Outcome => ({ name: `${DIR}/${name}`, status: "failed" })
-const verdict = (name: string, row = 20) => classify(row, [failed(name)], LEDGERS).lines[0]
+const verdict = (name: string, row = 20) => classify(row, [failed(name)], LEDGERS, PLAN).lines[0]
 
 describe("R57 replay-all classification", () => {
   test("(a) a v3 case named for a row at or before N fails, a later row's name is looked up", () => {
@@ -69,6 +91,18 @@ describe("R57 replay-all classification", () => {
     expect(verdict("leg-passed.json")).toStartWith("FAIL ")
   })
 
+  test("(b) R57e: a due row is due at N only when it is N or a transitive blocker of N in the plan", () => {
+    expect(verdict("leg-23.json", 55)).toBe(`owed ${DIR}/leg-23.json row 23`)
+    expect(verdict("leg-owed.json", 55)).toBe(`owed ${DIR}/leg-owed.json row 27`)
+    expect(verdict("leg-23.json", 26)).toStartWith(`FAIL ${DIR}/leg-23.json due at row 23 `)
+    expect(verdict("leg-17.json", 55)).toStartWith(`FAIL ${DIR}/leg-17.json due at row 17 `)
+    expect(verdict("leg-23.json", 23)).toStartWith("FAIL ")
+  })
+
+  test("(b) R57e: a row the plan does not list is an input error", () => {
+    expect(() => classify(99, [], LEDGERS, PLAN)).toThrow("row 99")
+  })
+
   test("(c) an imported case owed only to later rows is owed to the row the ledgers name", () => {
     expect(verdict("leg-owed.json")).toBe(`owed ${DIR}/leg-owed.json row 27`)
   })
@@ -86,14 +120,14 @@ describe("R57 replay-all classification", () => {
       failed("leg-owed.json"),
       failed("orphan.json"),
     ]
-    const result = classify(20, outcomes, LEDGERS)
+    const result = classify(20, outcomes, LEDGERS, PLAN)
     expect(result.lines).toEqual([
       `owed ${DIR}/leg-owed.json row 27`,
       `FAIL ${DIR}/orphan.json unowned`,
       "replay-all R57 row=20: ok=1 skipped=1 failing=1 owed=1",
     ])
     expect(result.failing).toBe(1)
-    const clean = classify(20, [outcomes[0], outcomes[1], outcomes[2]], LEDGERS)
+    const clean = classify(20, [outcomes[0], outcomes[1], outcomes[2]], LEDGERS, PLAN)
     expect(clean.lines.at(-1)).toBe("replay-all R57 row=20: ok=1 skipped=1 failing=0 owed=1")
     expect(clean.failing).toBe(0)
   })
