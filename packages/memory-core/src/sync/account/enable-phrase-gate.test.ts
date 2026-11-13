@@ -61,15 +61,15 @@ test("#given the phrase flag on and the service floor on #when a phrase genesis 
 })
 
 // The engine reads the floor from the operation's own signed-in state route (omo-service #1070
-// `phrase_client_floor`): only a literal true admits a phrase genesis; false, absent or an error refuse.
+// `accepts_phrase_keys`): only a literal true admits a phrase genesis; false, absent or an error refuse.
 for (const [label, floor, outcome] of [
   ["true", true, "created"],
   ["false", false, "refused"],
   ["absent", undefined, "refused"],
   ["a request error", "error", "refused"],
 ] as const) {
-  test(`#given the phrase flag on and phrase_client_floor ${label} on the state route #when a phrase genesis is asked for #then it is ${outcome}`, async () => {
-    const f = await fixture(typeof floor === "boolean" ? { phraseClientFloor: floor } : {})
+  test(`#given the phrase flag on and accepts_phrase_keys ${label} on the state route #when a phrase genesis is asked for #then it is ${outcome}`, async () => {
+    const f = await fixture(typeof floor === "boolean" ? { acceptsPhraseKeys: floor } : {})
     cleanups.push(f.close)
     const refusals: string[] = []
     const { method: _passkey, ...base } = f.input
@@ -120,7 +120,7 @@ for (const [label, serviceFloor] of [
 }
 
 test("#given a host gate with no floor port (the production default until the A1 delta is CLEAR) #when the service reports the floor on #then phrase genesis is still refused", async () => {
-  const f = await fixture({ phraseClientFloor: true })
+  const f = await fixture({ acceptsPhraseKeys: true })
   cleanups.push(f.close)
   const refusals: string[] = []
   const { method: _passkey, ...base } = f.input
@@ -128,6 +128,22 @@ test("#given a host gate with no floor port (the production default until the A1
     ...base,
     method: "phrase",
     phraseGate: { enabled: true, refused: (reason: string) => void refusals.push(reason) },
+    genesis: { prfSupported: false, phraseSupported: true, createGenesis: f.input.genesis.createGenesis, createPhraseGenesis: phraseGenesis(scriptedSurface().surface) },
+  })
+  expect(result).toEqual({ kind: "phrase_unavailable", reason: "service-floor-off" })
+  expect(refusals).toEqual(["service-floor-off"])
+  expect(f.entries).toEqual([])
+})
+
+test("#given a state answer that carries only the retired field name phrase_client_floor: true #when a phrase genesis is asked for #then it is refused (the service now says accepts_phrase_keys)", async () => {
+  const f = await fixture({ extraState: { phrase_client_floor: true } })
+  cleanups.push(f.close)
+  const refusals: string[] = []
+  const { method: _passkey, ...base } = f.input
+  const result = await enableSync({
+    ...base,
+    method: "phrase",
+    phraseGate: { enabled: true, serviceFloor: readServiceFloor, refused: (reason: string) => void refusals.push(reason) },
     genesis: { prfSupported: false, phraseSupported: true, createGenesis: f.input.genesis.createGenesis, createPhraseGenesis: phraseGenesis(scriptedSurface().surface) },
   })
   expect(result).toEqual({ kind: "phrase_unavailable", reason: "service-floor-off" })

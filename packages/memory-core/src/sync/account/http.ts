@@ -27,8 +27,8 @@ export interface AccountState {
   readonly head: { readonly seq: number; readonly link: string; readonly keyring_link: string }
   readonly currentEpoch: number
   readonly rotationPending: boolean
-  /** omo-service `phrase_client_floor` (#1070): true only when the service refuses pre-phrase clients; absent reads false. */
-  readonly phraseClientFloor: boolean
+  /** omo-service `accepts_phrase_keys` (#1070): true only while the service accepts new phrase keys; absent reads false. */
+  readonly acceptsPhraseKeys: boolean
 }
 
 export interface AccountHttp extends RecoveryTransport {
@@ -147,7 +147,7 @@ export function createAccountHttp(options: AccountHttpOptions): AccountHttp {
         head: { seq, link, keyring_link: keyringLink },
         currentEpoch: epoch,
         rotationPending: body["rotation_pending"] === true,
-        phraseClientFloor: body["phrase_client_floor"] === true,
+        acceptsPhraseKeys: body["accepts_phrase_keys"] === true,
       }
     },
   }

@@ -4,7 +4,7 @@ import type { PhraseGate } from "@oh-my-opencode/memory-core/sync-engine"
 export const PHRASE_GENESIS_FLAG = "OMO_MEMORY_SYNC_PHRASE_GENESIS"
 
 /**
- * The host's phrase gate. memory-core re-reads the service floor (`phrase_client_floor`) on every
+ * The host's phrase gate. memory-core re-reads the service floor (`accepts_phrase_keys`) on every
  * creation through the operation's own state route; an absent or unreadable floor refuses (A1.3).
  */
 export function phraseGateFrom(
