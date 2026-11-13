@@ -18,6 +18,24 @@ pub const HOTKEY_DEDUPE_MS: u64 = 250;
 /// The stop chord's modifiers; the chord is these plus Escape (`ctrl+alt+shift+escape`).
 const STOP_MODIFIERS: [u16; 3] = [VK_CONTROL, VK_MENU, VK_SHIFT];
 
+/// The generic virtual key of a left/right modifier code (`WH_KEYBOARD_LL` reports VK_LSHIFT 0xA0,
+/// VK_RSHIFT 0xA1, VK_LCONTROL 0xA2, VK_RCONTROL 0xA3, VK_LMENU 0xA4 and VK_RMENU 0xA5, never the
+/// generic VK_SHIFT/VK_CONTROL/VK_MENU); every other key is itself.
+#[must_use]
+pub const fn normalize_vk(vk: u16) -> u16 {
+    vk
+}
+
+/// Whether `event` completes the stop chord, given which keys are held by the SAME origin
+/// (physical keys for a physical event, injected keys for an injected one).
+pub fn is_chord(event: &HookEvent, held: impl Fn(u16) -> bool) -> bool {
+    event.down
+        && event.vk == VK_ESCAPE
+        && STOP_MODIFIERS
+            .iter()
+            .all(|vk| event.origin() != Origin::Physical || held(*vk))
+}
+
 /// One `KBDLLHOOKSTRUCT` as the procedure reads it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HookEvent {

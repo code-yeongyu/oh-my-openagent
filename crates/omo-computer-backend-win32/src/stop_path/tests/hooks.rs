@@ -3,7 +3,10 @@
 use crate::input::ledger::{replay, Entry, Ledger, Step};
 use crate::input::{KeyUnit, ENGINE_TAG, VK_CONTROL, VK_MENU, VK_SHIFT};
 use crate::input_lock::{lock_verdict, LockVerdict};
-use crate::stop_path::{HookEvent, HotkeyVerdict, Origin, PhysicalChord, Sightings, VK_ESCAPE};
+use crate::stop_path::{
+    is_chord, is_stop_chord_key, normalize_vk, HookEvent, HotkeyVerdict, Origin, PhysicalChord,
+    Sightings, VK_ESCAPE,
+};
 
 fn key(vk: u16, down: bool, origin: Origin, time: u64) -> HookEvent {
     let (injected, extra) = match origin {
@@ -132,4 +135,78 @@ fn hold_ledger_skips_a_key_the_physical_chord_tracker_saw_down() {
         replay(&ledger, &tracker.held()),
         vec![Step::KeyUp(KeyUnit::virtual_key(VK_CONTROL, false))]
     );
+}
+
+/// Review H1 (#13350): `WH_KEYBOARD_LL` reports modifiers as their left/right codes.
+const VK_LSHIFT: u16 = 0xA0;
+const VK_RSHIFT: u16 = 0xA1;
+const VK_LCONTROL: u16 = 0xA2;
+const VK_RCONTROL: u16 = 0xA3;
+const VK_LMENU: u16 = 0xA4;
+const VK_RMENU: u16 = 0xA5;
+
+#[test]
+fn left_and_right_modifier_codes_are_the_generic_modifiers() {
+    for (side, generic) in [
+        (VK_LSHIFT, VK_SHIFT),
+        (VK_RSHIFT, VK_SHIFT),
+        (VK_LCONTROL, VK_CONTROL),
+        (VK_RCONTROL, VK_CONTROL),
+        (VK_LMENU, VK_MENU),
+        (VK_RMENU, VK_MENU),
+    ] {
+        assert_eq!(normalize_vk(side), generic);
+        assert!(is_stop_chord_key(side), "{side:#x} is a stop chord key");
+    }
+    assert_eq!(normalize_vk(0x41), 0x41);
+    assert_eq!(normalize_vk(VK_ESCAPE), VK_ESCAPE);
+}
+
+#[test]
+fn the_physical_chord_typed_with_left_or_right_modifiers_stops() {
+    for modifiers in [
+        [VK_LCONTROL, VK_LMENU, VK_LSHIFT],
+        [VK_RCONTROL, VK_RMENU, VK_RSHIFT],
+    ] {
+        let mut tracker = PhysicalChord::default();
+        for vk in modifiers {
+            assert_eq!(tracker.on_key(&key(vk, true, Origin::Physical, 1)), None);
+        }
+        let mut held = tracker.held();
+        held.sort_unstable();
+        assert_eq!(
+            held,
+            vec![VK_SHIFT, VK_CONTROL, VK_MENU],
+            "held keys read as generic codes"
+        );
+        assert_eq!(
+            tracker.on_key(&key(VK_ESCAPE, true, Origin::Physical, 2)),
+            Some(Origin::Physical),
+            "ctrl+alt+shift+escape from {modifiers:x?} stops"
+        );
+        for vk in modifiers {
+            tracker.on_key(&key(vk, false, Origin::Physical, 3));
+        }
+        assert!(
+            tracker.held().is_empty(),
+            "a left/right key-up releases the generic key"
+        );
+    }
+}
+
+#[test]
+fn the_hook_rule_needs_the_modifiers_for_every_origin() {
+    let held_all = |vk: u16| [VK_SHIFT, VK_CONTROL, VK_MENU].contains(&vk);
+    let held_none = |_: u16| false;
+    for origin in [Origin::Physical, Origin::Ours, Origin::Foreign] {
+        assert!(is_chord(&key(VK_ESCAPE, true, origin, 1), held_all));
+        assert!(
+            !is_chord(&key(VK_ESCAPE, true, origin, 1), held_none),
+            "a bare Escape from {origin:?} is no chord sighting (else the engine's own Escape discards the user's backstop stop)"
+        );
+        assert!(
+            !is_chord(&key(VK_ESCAPE, false, origin, 1), held_all),
+            "a key-up is no sighting"
+        );
+    }
 }
