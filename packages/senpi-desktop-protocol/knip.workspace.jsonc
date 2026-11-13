@@ -1,0 +1,30 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/senpi-desktop-protocol": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/engine-schema.generated.ts",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "scripts/generate-engine-schema.ts",
+        "vitest.config.ts",
+      ],
+      // pre-existing at origin dev 4686e425b5: executables this package runs that it does not declare
+      "ignoreBinaries": ["biome"],
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) STANDARD_RPC_ERRORS
+    "packages/senpi-desktop-protocol/src/index.ts": ["STANDARD_RPC_ERRORS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) STANDARD_RPC_ERRORS
+    "packages/senpi-desktop-protocol/src/json-rpc.ts": ["STANDARD_RPC_ERRORS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "packages/senpi-desktop-protocol/vitest.config.ts": ["default"]
+  }
+}
