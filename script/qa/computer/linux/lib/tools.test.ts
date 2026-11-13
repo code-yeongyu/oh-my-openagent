@@ -26,7 +26,10 @@ test("a tool absent from PATH is found in a libexec directory of the layout", ()
   layout((root) => {
     const libexec = join(root, "usr/libexec")
     place(join(libexec, "at-spi-bus-launcher"), 0o755)
-    const found = resolveTool("at-spi-bus-launcher", { which: () => null, libexecDirs: [join(root, "usr/lib/at-spi2-core"), libexec] })
+    const found = resolveTool("at-spi-bus-launcher", {
+      which: () => null,
+      libexecDirs: [join(root, "usr/lib/at-spi2-core"), libexec],
+    })
     expect(found).toBe(join(libexec, "at-spi-bus-launcher"))
   })
 })
@@ -42,6 +45,8 @@ test("PATH wins over a libexec copy, and a non-executable file is not a tool", (
 
 test("a tool in no directory of the layout is missing", () => {
   layout((root) => {
-    expect(resolveTool("at-spi-bus-launcher", { which: () => null, libexecDirs: [join(root, "usr/libexec")] })).toBeNull()
+    expect(
+      resolveTool("at-spi-bus-launcher", { which: () => null, libexecDirs: [join(root, "usr/libexec")] }),
+    ).toBeNull()
   })
 })

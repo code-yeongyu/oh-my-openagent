@@ -5,7 +5,9 @@
 import { mkdirSync } from "node:fs"
 import { join } from "node:path"
 import { until, type Processes } from "../lib/procs.ts"
+import { privateDirs } from "../lib/runtime-dirs.ts"
 import { missingTools, wmOwnsRoot } from "../lib/session-checks.ts"
+import { resolveTool } from "../lib/tools.ts"
 import type { Stage } from "../lib/scenario.ts"
 
 const DISPLAY = ":137"
@@ -20,21 +22,23 @@ export async function startXvfb(procs: Processes, runDir: string, nobus: boolean
     "xcompmgr",
     ...(nobus ? [] : ["dbus-daemon", "dbus-send", "at-spi-bus-launcher"]),
   ]
-  const missing = missingTools(tools, (tool) => Bun.which(tool) !== null)
-  if (missing.length > 0) throw new Error(`this host lacks ${missing.join(", ")} (the QA container has them)`)
-  const env: Record<string, string | undefined> = { DISPLAY }
+  const found = new Map(tools.map((tool) => [tool, resolveTool(tool)]))
+  const missing = missingTools(tools, (tool) => found.get(tool) !== null)
+  if (missing.length > 0) throw new Error(`this host lacks ${missing.join(", ")}`)
+  const bin = (tool: string): string => found.get(tool) ?? tool
+  const env: Record<string, string | undefined> = { DISPLAY, ...privateDirs(runDir) }
   if (!nobus) {
     const busDir = join(runDir, "bus")
     mkdirSync(busDir, { recursive: true })
     const address = `unix:path=${join(busDir, "session")}`
-    procs.start("dbus-daemon", ["dbus-daemon", "--session", "--address=" + address, "--fork", "--print-address=1"])
+    procs.start("dbus-daemon", [bin("dbus-daemon"), "--session", "--address=" + address, "--fork", "--print-address=1"])
     env.DBUS_SESSION_BUS_ADDRESS = address
     await until(
       () =>
         procs
           .run(
             [
-              "dbus-send",
+              bin("dbus-send"),
               "--session",
               "--dest=org.freedesktop.DBus",
               "--print-reply",
@@ -46,22 +50,22 @@ export async function startXvfb(procs: Processes, runDir: string, nobus: boolean
           .then((ran) => ran.code === 0),
       "the private bus to answer",
     )
-    procs.start("at-spi", ["at-spi-bus-launcher", "--launch-immediately"], env)
+    procs.start("at-spi", [bin("at-spi-bus-launcher"), "--launch-immediately"], env)
   }
-  procs.start("Xvfb", ["Xvfb", DISPLAY, "-screen", "0", SCREEN, "-nolisten", "tcp"], env)
+  procs.start("Xvfb", [bin("Xvfb"), DISPLAY, "-screen", "0", SCREEN, "-nolisten", "tcp"], env)
   await until(
-    () => procs.run(["xdpyinfo", "-display", DISPLAY], env).then((ran) => ran.code === 0),
+    () => procs.run([bin("xdpyinfo"), "-display", DISPLAY], env).then((ran) => ran.code === 0),
     "Xvfb to answer xdpyinfo",
   )
-  procs.start("xfwm4", ["xfwm4", "--display", DISPLAY], env)
+  procs.start("xfwm4", [bin("xfwm4"), "--display", DISPLAY], env)
   await until(
     () =>
       procs
-        .run(["xprop", "-root", "_NET_SUPPORTING_WM_CHECK"], env)
+        .run([bin("xprop"), "-root", "_NET_SUPPORTING_WM_CHECK"], env)
         .then((ran) => ran.code === 0 && wmOwnsRoot(ran.stdout)),
     "xfwm4 to own the root window",
   )
-  procs.start("xcompmgr", ["xcompmgr", "-d", DISPLAY], env)
+  procs.start("xcompmgr", [bin("xcompmgr"), "-d", DISPLAY], env)
   return { session: nobus ? "xvfb-nobus" : "xvfb", display: DISPLAY, env, runDir }
 }
 
