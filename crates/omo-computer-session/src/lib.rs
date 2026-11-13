@@ -25,6 +25,7 @@ pub mod presence;
 pub mod preview;
 pub mod diagnose_wire;
 pub mod recording;
+mod redaction;
 pub mod refs;
 pub mod route_ladder;
 pub mod reservation;
