@@ -1,7 +1,7 @@
 //! The JSON-RPC framing and refusal-wire tests (moved from rpc/mod.rs, R65: no change).
 
 use omo_computer_backend_fake::{FakeBackend, FakeClock, FakeScenario, RecordingSink};
-use omo_computer_core::backend::Backend;
+use omo_computer_core::backend::{Backend, Refusal};
 use omo_computer_core::error::EngineCode;
 use serde_json::{json, Value};
 
