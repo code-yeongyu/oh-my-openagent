@@ -1,0 +1,52 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/utils": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "src/logger.ts",
+      ],
+      "ignoreDependencies": [
+        // pre-existing at origin dev 4686e425b5: a declared dependency nothing imports
+        "@oh-my-opencode/omo-config-core",
+      ],
+      // pre-existing at origin dev 4686e425b5: executables this package runs that it does not declare
+      "ignoreBinaries": ["taskkill.exe", "where"],
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) executeCommand
+    "packages/utils/src/command-executor.ts": ["executeCommand"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) parseGitStatusPorcelainLine, parseGitStatusPorcelainZ, parseGitDiffNumstatZ
+    "packages/utils/src/git-worktree/index.ts": ["parseGitStatusPorcelainLine", "parseGitStatusPorcelainZ", "parseGitDiffNumstatZ"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isTextPartLike, isSyntheticOrInternalTextPart
+    "packages/utils/src/internal-initiator-marker.ts": ["isTextPartLike", "isSyntheticOrInternalTextPart"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) MODEL_TO_CATEGORY_MAP, shouldDeleteAgentConfig
+    "packages/utils/src/migration/agent-category.ts": ["MODEL_TO_CATEGORY_MAP", "shouldDeleteAgentConfig"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) BUILTIN_AGENT_NAMES
+    "packages/utils/src/migration/agent-names.ts": ["BUILTIN_AGENT_NAMES"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) HOOK_NAME_MAP
+    "packages/utils/src/migration/hook-names.ts": ["HOOK_NAME_MAP"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) MODEL_VERSION_MAP
+    "packages/utils/src/migration/model-versions.ts": ["MODEL_VERSION_MAP"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) hasExecutableToken, tokenLooksExecutable, findTokenStart, findTokenEnd, resolvePathForPlatform
+    "packages/utils/src/process-sweep/command-match.ts": ["hasExecutableToken", "tokenLooksExecutable", "findTokenStart", "findTokenEnd", "resolvePathForPlatform"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) hasExecutableToken, hasExecutableTokenUnderRootWithSuffix, normalizeForComparison, normalizeRoots, splitCommandTokens, tokenLooksExecutable, createDefaultProcessKiller, defaultIsProcessAlive, enumerateProcesses, listLspDaemonVersionDirs and 9 more
+    "packages/utils/src/process-sweep/index.ts": ["hasExecutableToken", "hasExecutableTokenUnderRootWithSuffix", "normalizeForComparison", "normalizeRoots", "splitCommandTokens", "tokenLooksExecutable", "createDefaultProcessKiller", "defaultIsProcessAlive", "enumerateProcesses", "listLspDaemonVersionDirs", "OMO_LSP_DAEMON_DIR_ENV", "OMO_LSP_DAEMON_VERSION_ENV", "planStaleLspDaemonVersionSweep", "readLspDaemonOwnerPid", "resolveLspDaemonBaseDir", "isOrphaned", "parsePosixProcessTable", "parseWindowsProcessTable", "discoverOmoOwnedRoots"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) OMO_LSP_DAEMON_DIR_ENV, listLspDaemonVersionDirs, readLspDaemonOwnerPid
+    "packages/utils/src/process-sweep/lsp-daemon-family.ts": ["OMO_LSP_DAEMON_DIR_ENV", "listLspDaemonVersionDirs", "readLspDaemonOwnerPid"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) extractPromptFailureMessage
+    "packages/utils/src/prompt-failure-classifier.ts": ["extractPromptFailureMessage"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) camelToSnake, snakeToCamel, transformObjectKeys, objectToCamelCase
+    "packages/utils/src/snake-case.ts": ["camelToSnake", "snakeToCamel", "transformObjectKeys", "objectToCamelCase"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) parseTarListingOutput
+    "packages/utils/src/zip-entry-listing/tar-zip-entry-listing.ts": ["parseTarListingOutput"]
+  }
+}
