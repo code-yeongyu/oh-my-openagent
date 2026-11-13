@@ -29,7 +29,8 @@ fn files_under(dir: &Path) -> Vec<String> {
     let mut found = Vec::new();
     let mut stack = vec![dir.to_owned()];
     while let Some(next) = stack.pop() {
-        for entry in fs::read_dir(next).expect("dir").filter_map(Result::ok) {
+        for entry in fs::read_dir(next).expect("dir") {
+            let entry = entry.expect("a readable dir entry");
             if entry.path().is_dir() {
                 stack.push(entry.path());
             } else {
