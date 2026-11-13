@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { dirname, join, relative } from "node:path"
+import { dirname, join, relative, sep } from "node:path"
 
 import { generatedPath as protocolGeneratedPath } from "../packages/omo-computer-protocol/scripts/generate-protocol.ts"
 
@@ -415,7 +415,7 @@ describe("computer-v3-guards --scope <row> <ref> --plan <file>", () => {
   test("the_name_maps_generated_entries_in_the_protocol_package_are_exactly_its_generators_output", () => {
     // given the generated list of the name map and the path the protocol generator writes
     const repoRoot = join(import.meta.dir, "..")
-    const output = relative(repoRoot, protocolGeneratedPath)
+    const output = relative(repoRoot, protocolGeneratedPath).split(sep).join("/")
     const generated: readonly string[] = nameMap.scope.generated
 
     // when the entries that fall inside the protocol package are taken
