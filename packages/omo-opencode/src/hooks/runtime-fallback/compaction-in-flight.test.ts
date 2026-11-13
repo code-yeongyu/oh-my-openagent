@@ -7,10 +7,7 @@ import {
   recordCompactionEnd,
   recordCompactionStart,
 } from "../../shared/compaction-in-flight"
-import {
-  installRuntimeFallbackTestClock,
-  restoreRuntimeFallbackTestClock,
-} from "./test-timeout-clock.test-support"
+import { installRuntimeFallbackTestClock, restoreRuntimeFallbackTestClock } from "./test-timeout-clock.test-support"
 
 describe("compaction-in-flight registry", () => {
   afterEach(() => {

@@ -2,9 +2,11 @@
 //! artifact-only), recorded as the target's latest frame.
 
 use senpi_desktop_core::error::CoreResult;
+use senpi_desktop_core::frame::FrameGeometry;
+use senpi_desktop_core::report::ReportMode;
 use senpi_desktop_core::protocol_params::CaptureParams;
 use senpi_desktop_core::types::{
-    CaptureCaps, CaptureRegion, CaptureResult, DesktopSessionOptions, Target,
+    CaptureCaps, CaptureRegion, CaptureResult, DesktopSessionOptions, Target, WindowIdentity,
 };
 
 use crate::budget::{plan_screenshot, Budget, Delivery, ScreenshotResult};
@@ -23,9 +25,20 @@ impl Worker {
         let screenshot = plan_screenshot(image, &mut geometry, &budget)?;
         let on_screen = geometry.window_is_on_screen();
         let legacy_capture = geometry.is_legacy_capture();
+        let identity = self.object_identity(&geometry);
         let frame_id = self.frames.record(&target, geometry);
         self.refresh_capabilities();
-        Ok(capture_response(screenshot, &target, frame_id, None, on_screen, legacy_capture))
+        Ok(with_identity(
+            capture_response(screenshot, &target, frame_id, None, on_screen, legacy_capture),
+            identity,
+        ))
+    }
+
+    /// The captured window's identity, reported in object mode only.
+    pub(crate) fn object_identity(&self, geometry: &FrameGeometry) -> Option<WindowIdentity> {
+        (self.registry.report_mode() == ReportMode::Object)
+            .then(|| geometry.identity().cloned())
+            .flatten()
     }
 
     pub(crate) fn capture_budget(&self, caps: Option<&CaptureCaps>) -> CoreResult<Budget> {
@@ -35,6 +48,14 @@ impl Worker {
             caps,
             self.artifact_dir(),
         )
+    }
+}
+
+/// A capture reply carrying `identity` (object mode).
+pub(crate) fn with_identity(response: Response, identity: Option<WindowIdentity>) -> Response {
+    match response {
+        Response::Capture(capture) => Response::Capture(CaptureResult { identity, ..capture }),
+        other => other,
     }
 }
 

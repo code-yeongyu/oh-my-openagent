@@ -1,6 +1,15 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs"
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -17,7 +26,14 @@ const roots: string[] = []
 
 afterEach(() => teardownRoots(roots))
 
-type Sandbox = { root: string, home: string, agentDir: string, opencodeDir: string, omoConfig: string, settings: string }
+type Sandbox = {
+  root: string
+  home: string
+  agentDir: string
+  opencodeDir: string
+  omoConfig: string
+  settings: string
+}
 
 function sandbox(): Sandbox {
   const root = mkdtempSync(join(tmpdir(), "omo-model-choices-"))
@@ -60,17 +76,24 @@ function readJson(path: string): Record<string, unknown> {
 
 // The issue's reproduction: provider ids only opencode spells (kimi-for-coding, zai-coding-plan).
 function issueUser(item: Sandbox): void {
-  write(join(item.opencodeDir, "opencode.jsonc"), `{
+  write(
+    join(item.opencodeDir, "opencode.jsonc"),
+    `{
     // opencode's own defaults
     "model": "kimi-for-coding/k3",
     "small_model": "opencode-go/glm-5.2",
     "agent": { "build": { "model": "opencode-go/kimi-k3" }, "explore": { "model": "zai-coding-plan/glm-5.2" } },
-  }`)
+  }`,
+  )
   write(join(item.opencodeDir, "oh-my-openagent.json"), {
     agents: { oracle: { model: "opencode-go/kimi-k3" }, librarian: { model: "zai-coding-plan/glm-5.2" } },
     categories: {
       quick: { model: "opencode-go/glm-5.2" },
-      "deep-low": { model: "kimi-for-coding/k3", fallback_models: ["opencode-go/kimi-k3", "opencode-go/no-such-model"], variant: "max" },
+      "deep-low": {
+        model: "kimi-for-coding/k3",
+        fallback_models: ["opencode-go/kimi-k3", "opencode-go/no-such-model"],
+        variant: "max",
+      },
     },
   })
 }
@@ -90,14 +113,19 @@ describe("omo setup model choices", () => {
       expect(loaded.diagnostics).toEqual([])
       expect(loaded.config.model_profile).toBe("kimi-coding/k3")
       expect(loaded.config.categories?.quick).toEqual({ model: "opencode-go/glm-5.2" })
-      expect(loaded.config.categories?.["deep-low"]).toEqual({ models: ["kimi-coding/k3", "opencode-go/kimi-k3"], reasoning: "max" })
+      expect(loaded.config.categories?.["deep-low"]).toEqual({
+        models: ["kimi-coding/k3", "opencode-go/kimi-k3"],
+        reasoning: "max",
+      })
       expect(loaded.config.agents?.librarian?.model).toBe("zai/glm-5.2")
       expect(loaded.config.agents?.explore?.model).toBe("zai/glm-5.2")
       expect(loaded.config.agents?.oracle).toBeUndefined()
       // In the [native] block, not the shared base: the OpenCode plugin's own view is unchanged.
       expect(nativeView(item, "opencode").config.categories?.quick).toBeUndefined()
       expect(readJson(item.settings)).toEqual({ defaultProvider: "kimi-coding", defaultModel: "k3" })
-      expect(stdout).toContain("model-choices-carried: default model, model_profile, category deep-low, category quick, agent explore, agent librarian")
+      expect(stdout).toContain(
+        "model-choices-carried: default model, model_profile, category deep-low, category quick, agent explore, agent librarian",
+      )
       expect(stdout).toContain("model-choices-not-carried: 4")
     })
   })
@@ -132,7 +160,9 @@ describe("omo setup model choices", () => {
       // then
       expect(existsSync(item.omoConfig)).toBe(false)
       expect(existsSync(item.settings)).toBe(false)
-      expect(stdout).toContain("planned-model-choices: default model, model_profile, category deep-low, category quick, agent explore, agent librarian")
+      expect(stdout).toContain(
+        "planned-model-choices: default model, model_profile, category deep-low, category quick, agent explore, agent librarian",
+      )
     })
   })
 
@@ -161,7 +191,16 @@ describe("omo setup model choices", () => {
       expect(loaded.config.telemetry?.enabled).toBe(false)
       expect(readJson(item.settings)).toEqual({ defaultProvider: "anthropic", defaultModel: "claude-opus-5-5" })
       expect(readdirSync(join(item.home, ".omo")).filter((name) => name.startsWith("omo.jsonc.bak-"))).toHaveLength(1)
-      expect(readFileSync(join(item.home, ".omo", readdirSync(join(item.home, ".omo")).find((name) => name.startsWith("omo.jsonc.bak-"))!), "utf8")).toBe(original)
+      expect(
+        readFileSync(
+          join(
+            item.home,
+            ".omo",
+            readdirSync(join(item.home, ".omo")).find((name) => name.startsWith("omo.jsonc.bak-"))!,
+          ),
+          "utf8",
+        ),
+      ).toBe(original)
       expect(stdout).toContain("model-choices-skipped-existing: default model, category quick")
     })
   })
@@ -170,7 +209,9 @@ describe("omo setup model choices", () => {
     test("#when setup is accepted #then it is carried to the provider setup tells the user to /login to", () => {
       // given
       const item = sandbox()
-      write(join(item.home, ".local", "share", "opencode", "auth.json"), { openai: { type: "oauth", refresh: "r", access: "a", expires: 1 } })
+      write(join(item.home, ".local", "share", "opencode", "auth.json"), {
+        openai: { type: "oauth", refresh: "r", access: "a", expires: 1 },
+      })
       write(join(item.opencodeDir, "opencode.json"), { model: "openai/gpt-5.5" })
 
       // when
@@ -206,7 +247,10 @@ describe("omo setup model choices", () => {
       const item = sandbox()
       write(join(item.opencodeDir, "opencode.json"), { model: "nowhere/some-model" })
       write(join(item.opencodeDir, "oh-my-openagent.json"), {
-        categories: { quick: { model: "kimi-for-coding/no-such-model", reasoning: "high" }, writing: { model: "nowhere/x" } },
+        categories: {
+          quick: { model: "kimi-for-coding/no-such-model", reasoning: "high" },
+          writing: { model: "nowhere/x" },
+        },
       })
 
       // when
@@ -215,8 +259,12 @@ describe("omo setup model choices", () => {
       // then
       expect(existsSync(item.omoConfig)).toBe(false)
       expect(existsSync(item.settings)).toBe(false)
-      expect(stdout).toContain("model choice not carried: default model nowhere/some-model: provider nowhere is not one omo serves or was carried over")
-      expect(stdout).toContain("model choice not carried: category quick model kimi-for-coding/no-such-model: omo's kimi-coding provider has no model no-such-model")
+      expect(stdout).toContain(
+        "model choice not carried: default model nowhere/some-model: provider nowhere is not one omo serves or was carried over",
+      )
+      expect(stdout).toContain(
+        "model choice not carried: category quick model kimi-for-coding/no-such-model: omo's kimi-coding provider has no model no-such-model",
+      )
       expect(stdout).toContain("model-choices-not-carried: 3")
     })
   })
@@ -227,7 +275,9 @@ describe("omo setup model choices", () => {
       const item = sandbox()
       write(join(item.opencodeDir, "opencode.json"), {
         model: "acme/acme-large",
-        provider: { acme: { options: { baseURL: "https://api.acme.example/v1", apiKey: "k" }, models: { "acme-large": {} } } },
+        provider: {
+          acme: { options: { baseURL: "https://api.acme.example/v1", apiKey: "k" }, models: { "acme-large": {} } },
+        },
       })
 
       // when
@@ -244,9 +294,19 @@ describe("omo setup model choices", () => {
       // given
       const item = sandbox()
       write(item.omoConfig, { "[opencode]": { categories: { quick: { model: "opencode-go/glm-5.2" } } } })
-      write(join(item.home, ".omo", "migration-backup-2026-09-24T00-00-00-000Z-opencode-config", ".config", "opencode", "oh-my-openagent.json"), {
-        categories: { quick: { model: "zai-coding-plan/glm-5.2" }, writing: { model: "kimi-for-coding/k3" } },
-      })
+      write(
+        join(
+          item.home,
+          ".omo",
+          "migration-backup-2026-09-24T00-00-00-000Z-opencode-config",
+          ".config",
+          "opencode",
+          "oh-my-openagent.json",
+        ),
+        {
+          categories: { quick: { model: "zai-coding-plan/glm-5.2" }, writing: { model: "kimi-for-coding/k3" } },
+        },
+      )
 
       // when
       run(item, ["setup", "--yes"])
@@ -263,7 +323,10 @@ describe("omo setup model choices", () => {
       // given
       const item = sandbox()
       write(join(item.opencodeDir, "oh-my-openagent.json"), {
-        agents: { metis: { model: "zai-coding-plan/glm-5.2" }, momus: { model: "kimi-for-coding/k3", variant: "high" } },
+        agents: {
+          metis: { model: "zai-coding-plan/glm-5.2" },
+          momus: { model: "kimi-for-coding/k3", variant: "high" },
+        },
       })
 
       // when

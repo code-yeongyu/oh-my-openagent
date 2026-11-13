@@ -6,7 +6,14 @@ import { useTestTimeout } from "../../../../../test-support/test-deadline"
 
 /** A listener process killed with SIGKILL never unlinks its socket file: connects to it are refused. */
 async function leaveStaleSocket(socketPath: string) {
-  const child = Bun.spawn([process.execPath, "-e", `require("node:net").createServer(() => {}).listen(${JSON.stringify(socketPath)}, () => console.log("up"))`], { stdout: "pipe" })
+  const child = Bun.spawn(
+    [
+      process.execPath,
+      "-e",
+      `require("node:net").createServer(() => {}).listen(${JSON.stringify(socketPath)}, () => console.log("up"))`,
+    ],
+    { stdout: "pipe" },
+  )
   const reader = child.stdout.getReader()
   await reader.read()
   reader.releaseLock()
@@ -15,8 +22,14 @@ async function leaveStaleSocket(socketPath: string) {
 }
 
 const worlds: Array<Awaited<ReturnType<typeof publishedWorld>>> = []
-afterEach(async () => { for (const world of worlds.splice(0)) await world.close() })
-async function world() { const w = await publishedWorld(); worlds.push(w); return w }
+afterEach(async () => {
+  for (const world of worlds.splice(0)) await world.close()
+})
+async function world() {
+  const w = await publishedWorld()
+  worlds.push(w)
+  return w
+}
 
 test("registered exact-id tool send delivers without global discovery", async () => {
   useTestTimeout(15000)
@@ -54,7 +67,10 @@ test("bound exact-id SDK send validates its target without global discovery", as
   useTestTimeout(15000)
   const w = await world()
   const target = await w.owner("a")
-  const bound = await w.sdk.bind({ session: "target", binding: { platform: "custom", account_id: "bot", chat_id: "chat" } })
+  const bound = await w.sdk.bind({
+    session: "target",
+    binding: { platform: "custom", account_id: "bot", chat_id: "chat" },
+  })
   if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
   const result = await w.sdk.send({ thread: "target", binding_id: bound.binding.binding_id, text: "hello bound" })
   expect(result).toMatchObject({ kind: "ok", delivery: { kind: "started" } })
@@ -172,9 +188,9 @@ test("a row only a delivery created keeps legacy discovery for the next send", a
   db.close()
   expect(await w.send()).toMatchObject({ kind: "ok", delivery: { kind: "started" } })
   expect(await w.store.sessionOwner("target")).toBeNull()
-  // The target is still busy with the first message: the live endpoint takes the second as a follow-up behind it.
+  // The target is still busy with the first message: the live endpoint takes the second into that turn (the default steers).
   const second = await w.send()
-  expect(second).toMatchObject({ kind: "ok", delivery: { kind: "queued" }, endpoint: { kind: "rpc_host" } })
+  expect(second).toMatchObject({ kind: "ok", delivery: { kind: "steered" }, endpoint: { kind: "rpc_host" } })
   expect(target.runtime.enqueueCalls).toHaveLength(2)
 }, 15000)
 
@@ -189,13 +205,21 @@ test("a live owner that lists slower than 200 ms is still reached", async () => 
 }, 10000)
 
 /** One thread_list, one auto send and one steer at the same owner, issued together as a caller would. */
-async function listSendSteer(w: Awaited<ReturnType<typeof publishedWorld>>, target: Awaited<ReturnType<Awaited<ReturnType<typeof publishedWorld>>["owner"]>>) {
+async function listSendSteer(
+  w: Awaited<ReturnType<typeof publishedWorld>>,
+  target: Awaited<ReturnType<Awaited<ReturnType<typeof publishedWorld>>["owner"]>>,
+) {
   const [list, send, steer] = await Promise.all([
     w.sdk.list({}),
-    w.sdk.send({ thread: "target", text: "busy followup" }),
+    w.sdk.send({ thread: "target", text: "busy followup", mode: "follow_up" }),
     w.sdk.send({ thread: "target", text: "busy steer", mode: "steer", expected_turn_id: target.runtime.epoch }),
   ])
-  const listed = list.kind === "ok" && "threads" in list ? (list.threads as ReadonlyArray<{ readonly thread_id: string; readonly alive?: boolean }>).find((thread) => thread.thread_id === "target") : undefined
+  const listed =
+    list.kind === "ok" && "threads" in list
+      ? (list.threads as ReadonlyArray<{ readonly thread_id: string; readonly alive?: boolean }>).find(
+          (thread) => thread.thread_id === "target",
+        )
+      : undefined
   return { listed, send, steer }
 }
 
@@ -282,12 +306,19 @@ test("a terminal the engine still reports dead is offline to thread_list, send a
   w.setVerdict(target.socketPath, { alive: false, reason: "live_unresponsive", paths: [target.sessionPath] })
   const listed = async () => {
     const result = await w.sdk.list({})
-    if (result.kind !== "ok" || !("threads" in result)) throw new Error(`expected a thread list, got ${JSON.stringify(result)}`)
-    return (result.threads as ReadonlyArray<{ readonly thread_id: string; readonly alive?: boolean; readonly error_note?: string }>).find((thread) => thread.thread_id === "target")
+    if (result.kind !== "ok" || !("threads" in result))
+      throw new Error(`expected a thread list, got ${JSON.stringify(result)}`)
+    return (
+      result.threads as ReadonlyArray<{
+        readonly thread_id: string
+        readonly alive?: boolean
+        readonly error_note?: string
+      }>
+    ).find((thread) => thread.thread_id === "target")
   }
   const before = await listed()
   const [send, steer] = await Promise.all([
-    w.sdk.send({ thread: "target", text: "busy followup" }),
+    w.sdk.send({ thread: "target", text: "busy followup", mode: "follow_up" }),
     w.sdk.send({ thread: "target", text: "busy steer", mode: "steer", expected_turn_id: target.runtime.epoch }),
   ])
   const after = await listed()
@@ -304,7 +335,10 @@ test("a bound send to a never-answering owner settles within one listing budget"
   useTestTimeout(30000)
   const w = await world()
   const target = await w.owner("a")
-  const bound = await w.sdk.bind({ session: "target", binding: { platform: "custom", account_id: "bot", chat_id: "chat" } })
+  const bound = await w.sdk.bind({
+    session: "target",
+    binding: { platform: "custom", account_id: "bot", chat_id: "chat" },
+  })
   if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
   target.listing.answer = false
   const started = performance.now()

@@ -22,7 +22,12 @@ const execFileAsync = promisify(execFile)
 /** A fake-store item that renders as `lines` (no lines: the item renders as deleted). */
 export const item = (key: string, ...lines: string[]): Item => ({
   key,
-  ops: encoder.encode(JSON.stringify({ adds: Object.fromEntries(lines.map((line, i) => [`${sha256Hex(encoder.encode(key)).slice(0, 12)}-${i}`, line])), kills: [] })),
+  ops: encoder.encode(
+    JSON.stringify({
+      adds: Object.fromEntries(lines.map((line, i) => [`${sha256Hex(encoder.encode(key)).slice(0, 12)}-${i}`, line])),
+      kills: [],
+    }),
+  ),
 })
 
 export async function publish(server: FakeSyncServer, ...items: Item[]): Promise<number> {
@@ -33,7 +38,15 @@ export async function publish(server: FakeSyncServer, ...items: Item[]): Promise
   const digest = sha256Hex(bytes)
   const uploadId = await transport.reserve(bytes.length, digest)
   await transport.upload(uploadId, bytes)
-  const result = await transport.append({ uploadId, digest, baseSeq, batchId, epoch: 1, link: "A".repeat(43), recordSig: "S".repeat(86) })
+  const result = await transport.append({
+    uploadId,
+    digest,
+    baseSeq,
+    batchId,
+    epoch: 1,
+    link: "A".repeat(43),
+    recordSig: "S".repeat(86),
+  })
   if (!result.ok) throw new Error("the member batch did not append")
   return result.seq
 }
@@ -67,7 +80,10 @@ export const gitConfigBytes = (d: Device): Promise<string> => readFile(join(d.re
 
 export async function gitConfigValue(d: Device, name: string): Promise<string | null> {
   try {
-    const { stdout } = await execFileAsync("git", ["config", "--get", name], { cwd: d.repo.root, env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1" } })
+    const { stdout } = await execFileAsync("git", ["config", "--get", name], {
+      cwd: d.repo.root,
+      env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1" },
+    })
     return stdout.trim()
   } catch (error) {
     if (error instanceof Error && "code" in error && error.code === 1) return null

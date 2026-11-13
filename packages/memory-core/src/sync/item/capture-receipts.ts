@@ -58,7 +58,11 @@ export async function readReceipts(stateDir: string, itemKey: string): Promise<C
   return parsed.map((entry) => asReceipt(entry, itemKey))
 }
 
-export async function writeReceipts(stateDir: string, itemKey: string, receipts: readonly CaptureReceipt[]): Promise<void> {
+export async function writeReceipts(
+  stateDir: string,
+  itemKey: string,
+  receipts: readonly CaptureReceipt[],
+): Promise<void> {
   const path = receiptPath(stateDir, itemKey)
   await mkdir(join(stateDir, "captures"), { recursive: true })
   const temp = `${path}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`
@@ -94,9 +98,25 @@ export function captureMessage(captureId: string): string {
 }
 
 function asReceipt(entry: unknown, itemKey: string): CaptureReceipt {
-  if (typeof entry === "object" && entry !== null && "base" in entry && "text" in entry && "at" in entry && "stamps" in entry && "seen" in entry && "span" in entry) {
+  if (
+    typeof entry === "object" &&
+    entry !== null &&
+    "base" in entry &&
+    "text" in entry &&
+    "at" in entry &&
+    "stamps" in entry &&
+    "seen" in entry &&
+    "span" in entry
+  ) {
     const { base, text, at, stamps, seen, span } = entry
-    if (typeof text === "string" && isFrontier(base) && isFrontier(at) && isStamps(stamps) && isTags(seen) && (span === null || isSpan(span))) {
+    if (
+      typeof text === "string" &&
+      isFrontier(base) &&
+      isFrontier(at) &&
+      isStamps(stamps) &&
+      isTags(seen) &&
+      (span === null || isSpan(span))
+    ) {
       return { base, text, at, stamps, seen, span }
     }
   }
@@ -110,7 +130,13 @@ function isTags(value: unknown): value is string[] {
 function isSpan(value: unknown): value is OpSpan {
   if (typeof value !== "object" || value === null) return false
   if (!("peer" in value) || !("start" in value) || !("end" in value) || !("captureId" in value)) return false
-  return typeof value.peer === "string" && /^[0-9]+$/.test(value.peer) && typeof value.start === "number" && typeof value.end === "number" && typeof value.captureId === "string"
+  return (
+    typeof value.peer === "string" &&
+    /^[0-9]+$/.test(value.peer) &&
+    typeof value.start === "number" &&
+    typeof value.end === "number" &&
+    typeof value.captureId === "string"
+  )
 }
 
 function isStamps(value: unknown): value is number[] {

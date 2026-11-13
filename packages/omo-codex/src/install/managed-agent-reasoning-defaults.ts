@@ -196,13 +196,12 @@ export function resolveManagedAgentReasoning(input: {
   const latest = steps[steps.length - 1]
   if (latest === undefined) return input.preserved.effort
   // A model-only upgrade must not invalidate cached bundles with the same current effort.
-  const bundledMatchesCurrentEffort = input.bundledEffort === latest.current.effort && steps.some(
-    (step) => input.bundledModel === step.current.model && input.bundledEffort === step.current.effort,
-  )
+  const bundledMatchesCurrentEffort =
+    input.bundledEffort === latest.current.effort &&
+    steps.some((step) => input.bundledModel === step.current.model && input.bundledEffort === step.current.effort)
   if (!bundledMatchesCurrentEffort) return input.preserved.effort
   const preservedMatchesAnyStep = steps.some(
-    (step) =>
-      input.preserved.model === step.previous.model && input.preserved.effort === step.previous.effort,
+    (step) => input.preserved.model === step.previous.model && input.preserved.effort === step.previous.effort,
   )
   return preservedMatchesAnyStep ? latest.current.effort : input.preserved.effort
 }

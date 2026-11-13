@@ -34,7 +34,10 @@ describe("comment-checker turn reset on a split session (O4)", () => {
           return violation
         },
       })
-      const session = await openScriptedSession(placement, composeOmoSenpiExtension([component]) as (pi: never) => unknown)
+      const session = await openScriptedSession(
+        placement,
+        composeOmoSenpiExtension([component]) as (pi: never) => unknown,
+      )
       sessions.push(session)
 
       // when

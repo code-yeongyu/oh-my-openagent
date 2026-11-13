@@ -1,5 +1,14 @@
 import { spawn } from "node:child_process"
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { createInterface } from "node:readline"
@@ -39,9 +48,7 @@ export interface Sandbox {
 
 /** Never inherit an agent's package, session, or auth directory into the child. */
 export function sandboxEnvironment(source: NodeJS.ProcessEnv, home: string, agentDir: string): NodeJS.ProcessEnv {
-  const clean = Object.fromEntries(
-    Object.entries(source).filter(([key]) => !/^(OMO|SENPI|PI)_/.test(key)),
-  )
+  const clean = Object.fromEntries(Object.entries(source).filter(([key]) => !/^(OMO|SENPI|PI)_/.test(key)))
   return withTelemetryOptOut({
     ...clean,
     HOME: home,
@@ -66,27 +73,48 @@ export function createSandbox(computer: Json, enginePath?: string): Sandbox {
   for (const dir of [cwd, agentDir, home, env.XDG_CONFIG_HOME, env.XDG_DATA_HOME, env.XDG_CACHE_HOME]) {
     if (dir !== undefined) mkdirSync(dir, { recursive: true })
   }
-  writeFileSync(join(agentDir, "settings.json"), JSON.stringify({
-    defaultProjectTrust: "ask",
-    packages: [plugin],
-    compaction: { enabled: false },
-    retry: { enabled: false },
-  }))
+  writeFileSync(
+    join(agentDir, "settings.json"),
+    JSON.stringify({
+      defaultProjectTrust: "ask",
+      packages: [plugin],
+      compaction: { enabled: false },
+      retry: { enabled: false },
+    }),
+  )
   writeFileSync(join(agentDir, "trust.json"), JSON.stringify({ [cwd]: true }))
   mkdirSync(join(cwd, ".omo"), { recursive: true })
-  writeFileSync(join(cwd, ".omo", "omo.jsonc"), JSON.stringify({
-    computer: { ...computer, ...(enginePath === undefined ? {} : { engine_path: enginePath }) },
-  }))
+  writeFileSync(
+    join(cwd, ".omo", "omo.jsonc"),
+    JSON.stringify({
+      computer: { ...computer, ...(enginePath === undefined ? {} : { engine_path: enginePath }) },
+    }),
+  )
   return { root, cwd, agentDir, home, env }
 }
 
 export function agentArgs(): readonly string[] {
   return [
-    "--mode", "rpc", "--offline", "--no-context-files", "--no-extensions",
-    "--no-skills", "--no-prompt-templates", "--no-themes",
-    "-e", join(plugin, "extensions/omo.js"),
-    "-e", provider, "--provider", "omo-mock", "--model", "mock-1",
-    "--permission", "computer:read=allow", "--permission", "computer:exec=allow",
+    "--mode",
+    "rpc",
+    "--offline",
+    "--no-context-files",
+    "--no-extensions",
+    "--no-skills",
+    "--no-prompt-templates",
+    "--no-themes",
+    "-e",
+    join(plugin, "extensions/omo.js"),
+    "-e",
+    provider,
+    "--provider",
+    "omo-mock",
+    "--model",
+    "mock-1",
+    "--permission",
+    "computer:read=allow",
+    "--permission",
+    "computer:exec=allow",
   ]
 }
 
@@ -97,7 +125,11 @@ function readAudit(root: string): readonly Json[] {
       return entry.isDirectory() ? walk(path) : entry.name === ".computer-audit.jsonl" ? [path] : []
     })
   return walk(root).flatMap((path) =>
-    readFileSync(path, "utf8").split("\n").filter(Boolean).map((line): unknown => JSON.parse(line)).filter(isRecord),
+    readFileSync(path, "utf8")
+      .split("\n")
+      .filter(Boolean)
+      .map((line): unknown => JSON.parse(line))
+      .filter(isRecord),
   )
 }
 
@@ -106,10 +138,12 @@ function outcome(event: Json): ToolOutcome {
   const parts = Array.isArray(result.content) ? result.content.filter(isRecord) : []
   return {
     isError: event.isError === true,
-    text: parts.flatMap((part) => typeof part.text === "string" ? [part.text] : []).join("\n"),
+    text: parts.flatMap((part) => (typeof part.text === "string" ? [part.text] : [])).join("\n"),
     images: parts.flatMap((part) =>
       typeof part.mimeType === "string" && typeof part.data === "string"
-        ? [{ mimeType: part.mimeType, data: part.data }] : []),
+        ? [{ mimeType: part.mimeType, data: part.data }]
+        : [],
+    ),
     details: isRecord(result.details) ? result.details : {},
   }
 }
@@ -134,17 +168,23 @@ export class AgentSession {
   constructor(computer: Json, bin: string, enginePath?: string) {
     this.#sandbox = createSandbox(computer, enginePath)
     this.#child = spawn(bin, [...agentArgs()], {
-      cwd: this.#sandbox.cwd, env: this.#sandbox.env, stdio: "pipe",
+      cwd: this.#sandbox.cwd,
+      env: this.#sandbox.env,
+      stdio: "pipe",
     })
     this.#child.stderr.setEncoding("utf8").on("data", (chunk: string) => {
       this.#stderr = (this.#stderr + chunk).slice(-4096)
     })
-    this.#exited = new Promise((resolve) => this.#child.once("close", (code, signal) => {
-      for (const waiter of this.#waiters)
-        waiter.reject(new Error(`senpi exited ${code ?? signal}: ${this.#stderr}; events=${this.#lastEvents.join(" | ")}`))
-      this.#waiters.clear()
-      resolve()
-    }))
+    this.#exited = new Promise((resolve) =>
+      this.#child.once("close", (code, signal) => {
+        for (const waiter of this.#waiters)
+          waiter.reject(
+            new Error(`senpi exited ${code ?? signal}: ${this.#stderr}; events=${this.#lastEvents.join(" | ")}`),
+          )
+        this.#waiters.clear()
+        resolve()
+      }),
+    )
     this.#child.on("error", (error) => {
       for (const waiter of this.#waiters) waiter.reject(error)
       this.#waiters.clear()
@@ -157,9 +197,15 @@ export class AgentSession {
         this.#lastEvents = [...this.#lastEvents, JSON.stringify(parsed).slice(0, 700)].slice(-16)
       // The QA stands in for the human: it approves the foreground-control confirm (#9651 B5) that
       // `desktop.control.acquire` raises, the way a person clicking "Allow" would.
-      if (parsed.type === "extension_ui_request" && parsed.method === "confirm" && typeof parsed.id === "string" &&
-        parsed.title === CONTROL_CONFIRM_TITLE) {
-        this.#child.stdin.write(`${JSON.stringify({ type: "extension_ui_response", id: parsed.id, confirmed: true })}\n`)
+      if (
+        parsed.type === "extension_ui_request" &&
+        parsed.method === "confirm" &&
+        typeof parsed.id === "string" &&
+        parsed.title === CONTROL_CONFIRM_TITLE
+      ) {
+        this.#child.stdin.write(
+          `${JSON.stringify({ type: "extension_ui_response", id: parsed.id, confirmed: true })}\n`,
+        )
         this.confirms += 1
       }
       for (const waiter of [...this.#waiters]) {
@@ -178,8 +224,14 @@ export class AgentSession {
       }, DEADLINE)
       const waiter: Waiter = {
         predicate,
-        resolve: (event) => { clearTimeout(timer); resolve(event) },
-        reject: (error) => { clearTimeout(timer); reject(error) },
+        resolve: (event) => {
+          clearTimeout(timer)
+          resolve(event)
+        },
+        reject: (error) => {
+          clearTimeout(timer)
+          reject(error)
+        },
       }
       this.#waiters.add(waiter)
     })
@@ -194,20 +246,23 @@ export class AgentSession {
   }
 
   async command(args: string): Promise<string> {
-    const notice = this.waitFor((event) => event.type === "extension_ui_request" &&
-      event.method === "notify" && typeof event.message === "string" &&
-      (event.message.includes("Computer use") || event.message.startsWith(`/computer ${args}:`) ||
-        (args === "resume" && event.message.startsWith("Computer input resumed:"))))
+    const notice = this.waitFor(
+      (event) =>
+        event.type === "extension_ui_request" &&
+        event.method === "notify" &&
+        typeof event.message === "string" &&
+        (event.message.includes("Computer use") ||
+          event.message.startsWith(`/computer ${args}:`) ||
+          (args === "resume" && event.message.startsWith("Computer input resumed:"))),
+    )
     await this.#send({ type: "prompt", message: `/computer ${args}` })
     return String((await notice).message)
   }
 
   async call(args: Json): Promise<ToolOutcome> {
     // The provider's response cursor advances twice per turn (tool call, then completion text).
-    const steps: Array<
-      { type: "text"; text: string } |
-      { type: "tool_call"; name: string; arguments: Json }
-    > = Array.from({ length: this.#step }, () => ({ type: "text", text: "unused" }))
+    const steps: Array<{ type: "text"; text: string } | { type: "tool_call"; name: string; arguments: Json }> =
+      Array.from({ length: this.#step }, () => ({ type: "text", text: "unused" }))
     steps.push({ type: "tool_call", name: "computer", arguments: args }, { type: "text", text: "done" })
     writeFileSync(join(this.#sandbox.cwd, "mock-script.json"), JSON.stringify({ steps }))
     const end = this.waitFor((event) => event.type === "tool_execution_end" && event.toolName === "computer")
@@ -219,14 +274,18 @@ export class AgentSession {
     return outcome(result)
   }
 
-  auditLog(): readonly Json[] { return readAudit(this.#sandbox.root) }
+  auditLog(): readonly Json[] {
+    return readAudit(this.#sandbox.root)
+  }
 
   async close(): Promise<void> {
     if (this.#closed) return
     this.#closed = true
     this.#child.kill("SIGTERM")
     const timer = setTimeout(() => this.#child.kill("SIGKILL"), 30_000)
-    try { await this.#exited } finally {
+    try {
+      await this.#exited
+    } finally {
       clearTimeout(timer)
       rmSync(this.#sandbox.root, { recursive: true, force: true })
     }
@@ -242,13 +301,15 @@ export function selfTestSandbox(): Json {
       throw new Error("OmO package not installed into sandbox")
     if (!existsSync(provider) || !existsSync(join(plugin, "extensions/omo.js")))
       throw new Error("built OmO extension or mock provider absent")
-    if ([sandbox.env.OMO_CODING_AGENT_DIR, sandbox.env.SENPI_CODING_AGENT_DIR, sandbox.env.PI_CODING_AGENT_DIR]
-      .some((dir) => dir !== sandbox.agentDir))
+    if (
+      [sandbox.env.OMO_CODING_AGENT_DIR, sandbox.env.SENPI_CODING_AGENT_DIR, sandbox.env.PI_CODING_AGENT_DIR].some(
+        (dir) => dir !== sandbox.agentDir,
+      )
+    )
       throw new Error("coding-agent directories are not isolated")
     if (sandbox.env.HOME === homedir() || sandbox.env.OMO_PACKAGE_DIR !== undefined)
       throw new Error("real home or package override leaked")
-    if (!agentArgs().includes(join(plugin, "extensions/omo.js")))
-      throw new Error("OmO extension not explicitly loaded")
+    if (!agentArgs().includes(join(plugin, "extensions/omo.js"))) throw new Error("OmO extension not explicitly loaded")
     return { isolated: true, plugin, provider, cliArgs: agentArgs() }
   } finally {
     rmSync(sandbox.root, { recursive: true, force: true })
@@ -271,10 +332,11 @@ export async function selfTestBinary(bin: string): Promise<Json> {
     const capabilities = isRecord(result.details.value) ? result.details.value : {}
     if (result.isError || capabilities.backend !== "fake")
       throw new Error(`OmO computer tool did not reach fake engine: ${result.text}`)
-    return { realSenpi: bin, engineBackend: capabilities.backend, command: "on",
-      tool: "computer", isolated: true }
+    return { realSenpi: bin, engineBackend: capabilities.backend, command: "on", tool: "computer", isolated: true }
   } finally {
-    try { await session?.close() } finally {
+    try {
+      await session?.close()
+    } finally {
       rmSync(directory, { recursive: true, force: true })
     }
   }

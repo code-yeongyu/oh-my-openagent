@@ -37,43 +37,64 @@ export function withSuperseded(injection: QueuedInjection): readonly IdleInjecti
 // reference and text range, and the engine decides custody per item at admission (design 4.5).
 export function admissionBatches(injections: readonly QueuedInjection[]) {
   if (injections.length === 0) return []
-  const contents = injections.map(injection => injection.content)
+  const contents = injections.map((injection) => injection.content)
   const ranges: (readonly [number, number])[] = []
   let offset = 0
   for (const content of contents) {
     ranges.push([offset, offset + content.length])
     offset += content.length + 2
   }
-  const details = injections.flatMap((item, index) => item.customType === undefined ? [] : [{
-    customType: item.customType, details: item.details,
-    ...(item.contextScoped === true ? { contentRange: ranges[index] ?? [0, 0] } : {}),
-  }])
-  const message: IdleInjectionMessage = { customType: "omo-senpi:wake", content: contents.join("\n\n"), display: false, details }
-  return [{
-    injections,
-    message,
-    items: injections.map(({ itemId, source, runRef, customType, details, display, contextScoped }, index): AdmissionItem => ({
-      itemId, producer: source, content: contents[index] ?? "", contentRange: ranges[index] ?? [0, 0],
-      ...(runRef === undefined ? {} : { runRef }),
-      ...(customType === undefined ? {} : { customType }),
-      ...(details === undefined ? {} : { details }),
-      ...(display === undefined ? {} : { display }),
-      ...(contextScoped === undefined ? {} : { contextScoped }),
-    })),
-  }]
+  const details = injections.flatMap((item, index) =>
+    item.customType === undefined
+      ? []
+      : [
+          {
+            customType: item.customType,
+            details: item.details,
+            ...(item.contextScoped === true ? { contentRange: ranges[index] ?? [0, 0] } : {}),
+          },
+        ],
+  )
+  const message: IdleInjectionMessage = {
+    customType: "omo-senpi:wake",
+    content: contents.join("\n\n"),
+    display: false,
+    details,
+  }
+  return [
+    {
+      injections,
+      message,
+      items: injections.map(
+        ({ itemId, source, runRef, customType, details, display, contextScoped }, index): AdmissionItem => ({
+          itemId,
+          producer: source,
+          content: contents[index] ?? "",
+          contentRange: ranges[index] ?? [0, 0],
+          ...(runRef === undefined ? {} : { runRef }),
+          ...(customType === undefined ? {} : { customType }),
+          ...(details === undefined ? {} : { details }),
+          ...(display === undefined ? {} : { display }),
+          ...(contextScoped === undefined ? {} : { contextScoped }),
+        }),
+      ),
+    },
+  ]
 }
 
 // Every entry (superseded ones included) gets its receipt in its own try; the errors come back to the caller.
 export function failItems(injections: readonly QueuedInjection[], error: unknown): ReceiptErrors {
-  return runReceipts(injections.flatMap(withSuperseded), entry => entry.onDeliveryFailed?.(error))
+  return runReceipts(injections.flatMap(withSuperseded), (entry) => entry.onDeliveryFailed?.(error))
 }
 
 export function settleItemReceipts(injections: readonly QueuedInjection[], result: unknown): ReceiptErrors {
   // A host with no custody receipts retains its synchronous successful-send contract.
   const custody = result !== undefined && Array.isArray(result)
-  const entries = injections.flatMap(injection => {
-    const receipt: unknown = custody ? result.find(value => isReceipt(value) && value.itemId === injection.itemId) : undefined
-    return withSuperseded(injection).map(entry => ({ entry, itemId: injection.itemId, receipt }))
+  const entries = injections.flatMap((injection) => {
+    const receipt: unknown = custody
+      ? result.find((value) => isReceipt(value) && value.itemId === injection.itemId)
+      : undefined
+    return withSuperseded(injection).map((entry) => ({ entry, itemId: injection.itemId, receipt }))
   })
   return runReceipts(entries, ({ entry, itemId, receipt }) => {
     if (!custody) entry.onFlushed?.()
@@ -85,7 +106,14 @@ export function settleItemReceipts(injections: readonly QueuedInjection[], resul
 }
 
 function isReceipt(value: unknown): value is ItemReceipt {
-  return typeof value === "object" && value !== null && "itemId" in value && typeof value.itemId === "string"
-    && "entryId" in value && typeof value.entryId === "string" && "disposition" in value
-    && (value.disposition === "notice_persisted" || value.disposition === "message_persisted")
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "itemId" in value &&
+    typeof value.itemId === "string" &&
+    "entryId" in value &&
+    typeof value.entryId === "string" &&
+    "disposition" in value &&
+    (value.disposition === "notice_persisted" || value.disposition === "message_persisted")
+  )
 }

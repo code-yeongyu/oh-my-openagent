@@ -46,18 +46,20 @@ export async function withWatermarkReadFault(
 ): Promise<void> {
   const read = fs.readFileSync
   let reads = 0
-  const intercepted = spyOn(fs, "readFileSync").mockImplementation(new Proxy(read, {
-    apply(original, receiver, args) {
-      if (String(args[0]) === target && ++reads === 1) {
-        if (fault === "malformed") return "{"
-        if (fault === "invalid-shape") return '{"version":2}'
-        throw Object.assign(new Error("injected watermark read failure"), {
-          code: fault === "missing" ? "ENOENT" : "EACCES",
-        })
-      }
-      return Reflect.apply(original, receiver, args)
-    },
-  }))
+  const intercepted = spyOn(fs, "readFileSync").mockImplementation(
+    new Proxy(read, {
+      apply(original, receiver, args) {
+        if (String(args[0]) === target && ++reads === 1) {
+          if (fault === "malformed") return "{"
+          if (fault === "invalid-shape") return '{"version":2}'
+          throw Object.assign(new Error("injected watermark read failure"), {
+            code: fault === "missing" ? "ENOENT" : "EACCES",
+          })
+        }
+        return Reflect.apply(original, receiver, args)
+      },
+    }),
+  )
   try {
     await consume()
   } finally {

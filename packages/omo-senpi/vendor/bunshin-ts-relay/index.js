@@ -62,8 +62,10 @@ var STATUS_STATES = [
   "authorization_stale",
   "service_degraded",
   "update_required",
-  "signed_out"
+  "signed_out",
+  "fail_closed"
 ];
+var STATUS_UPDATE_PHASES = ["trial", "committed"];
 var POLICY_STATES = ["off", "pending", "active"];
 var THIS_DEVICE_STATES = [
   "unclassified",
@@ -78,7 +80,6 @@ var OPTIONAL_CAPABILITIES = ["machine"];
 var REFUSED_REASONS = ["version", "data_home_required", "malformed"];
 var COMMAND_ID_CHARS = 22;
 var MACHINE_STATES = ["online", "offline", "unsupported"];
-var MACHINE_ROUTE_KINDS = ["internet", "lan"];
 var MACHINE_LOOKUP_STATES = ["in_flight", "terminal", "unknown"];
 // packages/local-api/src/errors.ts
 class LocalApiError extends Error {
@@ -238,7 +239,6 @@ import { createHash } from "node:crypto";
 // packages/bunshin-ts-relay/src/spec-proto.ts
 var SESSION_BLOB_MAX = 16777216;
 var SESSION_DEVICE_MAX_CHARS = 64;
-var SESSION_KIND_MAX_CHARS = 32;
 class ProtoError extends Error {
   code;
   constructor(code, detail) {
@@ -386,6 +386,19 @@ var commandAnswerOf = (v) => {
   return { command_id, ...refOf({ device, key, session }, "session.command data") };
 };
 
+// packages/local-api/src/validate-update.ts
+var READY_REASON_MAX_CHARS = 64;
+var statusUpdateOf = (v) => {
+  const m = exactly(v, ["update_id", "phase", "target_version", "ready", "ready_reason"], [], "status.update");
+  return {
+    update_id: localId(m["update_id"], "status.update.update_id"),
+    phase: oneOf(STATUS_UPDATE_PHASES, m["phase"], "status.update.phase"),
+    target_version: semver(m["target_version"], "status.update.target_version"),
+    ready: bool(m["ready"], "status.update.ready"),
+    ready_reason: nullable(m["ready_reason"], (r) => text(r, READY_REASON_MAX_CHARS, "status.update.ready_reason"))
+  };
+};
+
 // packages/local-api/src/validate-shapes.ts
 var CODE = /^[a-z_]{1,64}$/;
 var MILLIS_MAX = Number.MAX_SAFE_INTEGER;
@@ -418,9 +431,8 @@ var policyOf = (v) => {
   };
 };
 var statusOf = (v) => {
-  const m = exactly(v, ["state", "since_ms", "device", "origin_configured", "enabled"], ["detail", "policy"], "status");
-  const detail = m["detail"];
-  const policy = m["policy"];
+  const m = exactly(v, ["state", "since_ms", "device", "origin_configured", "enabled"], ["detail", "policy", "update"], "status");
+  const { detail, policy, update } = m;
   return {
     state: oneOf(STATUS_STATES, m["state"], "status.state"),
     since_ms: millis(m["since_ms"], "status.since_ms"),
@@ -428,7 +440,8 @@ var statusOf = (v) => {
     device: nullable(m["device"], (d) => deviceRef(d, "status.device")),
     origin_configured: bool(m["origin_configured"], "status.origin_configured"),
     enabled: bool(m["enabled"], "status.enabled"),
-    ...policy === undefined ? {} : { policy: policyOf(policy) }
+    ...policy === undefined ? {} : { policy: policyOf(policy) },
+    ...update === undefined ? {} : { update: statusUpdateOf(update) }
   };
 };
 var detailOf = (v) => {
@@ -450,7 +463,6 @@ var deviceRowOf = (v) => {
     online: bool(m["online"], "online")
   };
 };
-var ROW_KIND = new RegExp(`^[a-z][a-z0-9_-]{0,${SESSION_KIND_MAX_CHARS - 1}}$`);
 
 // packages/local-api/src/validate-delegated.ts
 var ENDPOINT_KEY = /^[A-Za-z0-9_-]{22}$/;
@@ -464,11 +476,16 @@ var keysOf = (v, max, what) => {
   return new Set(keys).size === keys.length ? keys : fail2(what);
 };
 var endpointsData = (v) => {
-  const m = exactly(v, ["endpoints"], ["environments"], "data");
+  const m = exactly(v, ["endpoints"], ["environments", "primary"], "data");
   const endpoints = keysOf(m["endpoints"], ENDPOINTS_MAX, "endpoints");
-  if (m["environments"] === undefined)
-    return { endpoints };
-  return { endpoints, environments: keysOf(m["environments"], ENVIRONMENTS_MAX, "environments") };
+  const primary = m["primary"] === undefined ? undefined : endpointKey(m["primary"], "primary");
+  if (primary !== undefined && !endpoints.includes(primary))
+    return fail2("primary");
+  return {
+    endpoints,
+    ...m["environments"] === undefined ? {} : { environments: keysOf(m["environments"], ENVIRONMENTS_MAX, "environments") },
+    ...primary === undefined ? {} : { primary }
+  };
 };
 
 // packages/local-api/src/validate-machine.ts
@@ -479,23 +496,25 @@ var empty = (v) => {
   return {};
 };
 var fields = (v, names) => exactly(v, names, [], "data");
-var routeOf = (v) => {
+var LEGACY_MACHINE_ROUTE_KINDS = ["internet", "lan"];
+var legacyRouteOf = (v) => {
   const r = exactly(v, ["kind", "online"], [], "machine route");
-  return {
-    kind: oneOf(MACHINE_ROUTE_KINDS, r["kind"], "machine route kind"),
-    online: bool(r["online"], "online")
-  };
+  const kind = oneOf(LEGACY_MACHINE_ROUTE_KINDS, r["kind"], "machine route kind");
+  bool(r["online"], "online");
+  return kind;
 };
 var machineRowOf = (v) => {
   const m = exactly(v, ["device", "label", "state"], ["routes"], "machine row");
   const routes = m["routes"];
-  if (routes !== undefined && (!Array.isArray(routes) || routes.length > MACHINE_ROUTE_KINDS.length))
+  if (routes !== undefined && (!Array.isArray(routes) || routes.length > LEGACY_MACHINE_ROUTE_KINDS.length))
+    return fail2("routes");
+  const listed = routes?.map(legacyRouteOf);
+  if (listed !== undefined && new Set(listed).size !== listed.length)
     return fail2("routes");
   return {
     device: deviceId(m["device"]),
     label: text(m["label"], LABEL_MAX_CHARS, "label", 0),
-    state: oneOf(MACHINE_STATES, m["state"], "machine state"),
-    ...routes === undefined ? {} : { routes: routes.map(routeOf) }
+    state: oneOf(MACHINE_STATES, m["state"], "machine state")
   };
 };
 var MACHINE_DATA = {
@@ -619,6 +638,7 @@ var DATA = {
   "session.read": (v) => ({ query_id: localId(one(v, "query_id"), "query_id") }),
   "enforcement.report": empty2,
   "owner.shutdown_for_upgrade": empty2,
+  "owner.update_committed": empty2,
   "control.attach.get": attachState,
   "control.attach.set": attachState,
   "control.remote_commands.get": remoteCommandsState,
@@ -834,7 +854,8 @@ var RELAY_STATUS_STATES = [
   "authorization_stale",
   "service_degraded",
   "update_required",
-  "signed_out"
+  "signed_out",
+  "fail_closed"
 ];
 var OUTPUT_CREDIT_BYTES = 65536;
 
@@ -1106,13 +1127,69 @@ class MachineWireError extends HubTransportError {
   }
 }
 
+// packages/bunshin-ts-relay/src/token-grant.ts
+var isRecord2 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+var canonical = (value) => JSON.stringify(value, (_key, v) => isRecord2(v) ? Object.fromEntries(Object.entries(v).toSorted(([a], [b]) => a < b ? -1 : 1)) : v);
+var admits = (constraint, value) => {
+  if (!isRecord2(constraint))
+    return false;
+  switch (constraint["kind"]) {
+    case "any":
+      return true;
+    case "exact":
+      return Object.hasOwn(constraint, "value") && canonical(value) === canonical(constraint["value"]);
+    case "oneOf": {
+      const values = constraint["values"];
+      return Array.isArray(values) && values.some((v) => canonical(v) === canonical(value));
+    }
+    case "prefix": {
+      const prefix = constraint["prefix"];
+      return typeof value === "string" && typeof prefix === "string" && value.startsWith(prefix);
+    }
+    case "range": {
+      const { min, max } = constraint;
+      return typeof value === "number" && typeof min === "number" && typeof max === "number" && value >= min && value <= max;
+    }
+    default:
+      return false;
+  }
+};
+var violation = (message) => {
+  throw new MachineWireError("constraint_violation", message);
+};
+var assertGrantCovers = (claims, args, taskId) => {
+  const granted = claims["taskId"];
+  if (granted !== undefined && granted !== taskId)
+    violation("the token was minted for another task");
+  const argConstraints = claims["argConstraints"];
+  if (argConstraints === undefined)
+    return;
+  if (!isRecord2(argConstraints))
+    return violation("the token's argConstraints are not an object");
+  for (const [field, constraint] of Object.entries(argConstraints)) {
+    if (!isRecord2(args) || !Object.hasOwn(args, field))
+      violation(`the token constrains ${field}, which the op does not carry`);
+    else if (!admits(constraint, args[field]))
+      violation(`${field} is outside the token's grant`);
+  }
+};
+
 // packages/bunshin-ts-relay/src/capability-token.ts
 var DEFAULT_TOKEN_TTL_MS = 15 * 60000;
+var CLAIM_KEYS = new Set([
+  "machineId",
+  "allowedOps",
+  "pathJail",
+  "argConstraints",
+  "taskId",
+  "exp",
+  "nbf"
+]);
 var malformed = (message) => {
   throw new CapabilityTokenMintError(400, "malformed_input", message);
 };
 var nonEmpty = (value) => typeof value === "string" && value !== "";
-var isRecord2 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+var isRecord3 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
 var mintCapabilityToken = (input, now = Date.now()) => {
   if (!nonEmpty(input.machineId))
     return malformed("machineId must be a non-empty string");
@@ -1122,7 +1199,7 @@ var mintCapabilityToken = (input, now = Date.now()) => {
     return malformed("every allowed op must be a non-empty string");
   if (!nonEmpty(input.pathJail))
     return malformed("pathJail must be a non-empty string");
-  if (input.argConstraints !== undefined && !isRecord2(input.argConstraints))
+  if (input.argConstraints !== undefined && !isRecord3(input.argConstraints))
     return malformed("argConstraints must be an object");
   if (input.taskId !== undefined && !nonEmpty(input.taskId))
     return malformed("taskId must be a non-empty string");
@@ -1143,7 +1220,7 @@ var mintCapabilityToken = (input, now = Date.now()) => {
   };
   return { token: Buffer.from(JSON.stringify(claims)).toString("base64url"), expiry: claims.exp };
 };
-var constraintsOf = (token) => {
+var constraintsOf = (token, machineId, args, taskId) => {
   let claims;
   try {
     claims = JSON.parse(Buffer.from(token, "base64url").toString("utf8"));
@@ -1152,13 +1229,25 @@ var constraintsOf = (token) => {
       cause: error
     });
   }
-  if (!isRecord2(claims) || !nonEmpty(claims["machineId"]) || !Array.isArray(claims["allowedOps"]))
+  if (!isRecord3(claims) || !nonEmpty(claims["machineId"]) || !Array.isArray(claims["allowedOps"]))
     throw new CapabilityTokenMintError(400, "malformed_token", "the token carries no claims");
-  return claims;
+  const unknown = Object.keys(claims).filter((key) => !CLAIM_KEYS.has(key));
+  if (unknown.length > 0)
+    throw new CapabilityTokenMintError(400, "malformed_token", `the token carries claims this sender cannot enforce: ${unknown.join(", ")}`);
+  if (claims["machineId"] !== machineId)
+    throw new MachineWireError("constraint_violation", "the token targets another machine");
+  const nbf = claims["nbf"];
+  if (typeof nbf !== "number" || !Number.isFinite(nbf))
+    throw new CapabilityTokenMintError(400, "malformed_token", "the token has no finite nbf");
+  if (nbf > Date.now())
+    throw new MachineWireError("constraint_violation", "the token is not active yet");
+  assertGrantCovers(claims, args, taskId);
+  const { allowedOps, pathJail, exp } = claims;
+  return { allowedOps, pathJail, exp };
 };
 
 // packages/bunshin-ts-relay/src/records.ts
-var isRecord3 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+var isRecord4 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
 var malformed2 = (what) => {
   throw new LocalApiError("protocol_violation", `${what} is malformed`);
 };
@@ -1166,11 +1255,11 @@ var strings = (value) => Array.isArray(value) ? value.filter((v) => typeof v ===
 var text2 = (value) => typeof value === "string" ? value : undefined;
 var STATES = new Set(["online", "offline", "unsupported"]);
 var machineRowsOf = (data) => {
-  const machines = isRecord3(data) ? data["machines"] : undefined;
+  const machines = isRecord4(data) ? data["machines"] : undefined;
   if (!Array.isArray(machines))
     return malformed2("machine.list");
   return machines.map((row) => {
-    if (!isRecord3(row))
+    if (!isRecord4(row))
       return malformed2("a machine.list row");
     const { device, label, state } = row;
     if (typeof device !== "string" || typeof label !== "string" || !STATES.has(String(state)))
@@ -1185,7 +1274,7 @@ var machineRowsOf = (data) => {
 var opsOf = (value) => (Array.isArray(value) ? value : []).flatMap((op) => {
   if (typeof op === "string")
     return [{ name: op }];
-  if (!isRecord3(op) || typeof op["name"] !== "string")
+  if (!isRecord4(op) || typeof op["name"] !== "string")
     return [];
   const version = text2(op["version"]);
   const description = text2(op["description"]);
@@ -1198,21 +1287,21 @@ var opsOf = (value) => (Array.isArray(value) ? value : []).flatMap((op) => {
   ];
 });
 var buildOf = (value) => {
-  if (!isRecord3(value))
+  if (!isRecord4(value))
     return;
   const version = text2(value["version"]);
   const binarySha256 = text2(value["sha256"]) ?? text2(value["binarySha256"]);
   return version === undefined || binarySha256 === undefined ? undefined : { version, binarySha256 };
 };
 var hostOf = (value) => {
-  if (!isRecord3(value))
+  if (!isRecord4(value))
     return;
   const { load1, cores } = value;
   return typeof load1 === "number" && typeof cores === "number" ? { load1, cores } : undefined;
 };
 var descriptionOf = (data) => {
-  const description = isRecord3(data) ? data["description"] : undefined;
-  if (!isRecord3(description))
+  const description = isRecord4(data) ? data["description"] : undefined;
+  if (!isRecord4(description))
     return malformed2("machine.describe");
   const os = text2(description["os"]);
   const arch = text2(description["arch"]);
@@ -1332,6 +1421,8 @@ var createDirectory = (deps) => {
   };
   const recordFor = async (row) => {
     if (row.state === "unsupported")
+      return recordOf(row, descriptions.get(row.device));
+    if (row.state === "offline" && unreachable.has(row.device))
       return recordOf(row, descriptions.get(row.device));
     const described = await describe(row.device);
     const offlineUnknown = row.state === "offline" && described.kind === "unreachable";
@@ -1488,7 +1579,7 @@ var openEvents = (feeds, options) => {
 };
 
 // packages/bunshin-ts-relay/src/blob.ts
-var violation = (detail) => {
+var violation2 = (detail) => {
   throw new LocalApiError("protocol_violation", detail);
 };
 
@@ -1496,16 +1587,16 @@ class BlobAssembler {
   #open = new Map;
   open(id, opId, bytes, sha256) {
     if (this.#open.has(id))
-      return violation("a blob id opened twice");
+      return violation2("a blob id opened twice");
     if (!Number.isSafeInteger(bytes) || bytes < 0 || bytes > LOCAL_BLOB_MAX)
-      return violation("a result blob over LOCAL_BLOB_MAX");
+      return violation2("a result blob over LOCAL_BLOB_MAX");
     this.#open.set(id, { opId, bytes, sha256, parts: [], received: 0 });
   }
   chunk(id, off, b) {
     const blob = this.#current(id);
     const data = new Uint8Array(Buffer.from(b, "base64"));
     if (off !== blob.received || blob.received + data.length > blob.bytes)
-      return violation("a result blob chunk out of order");
+      return violation2("a result blob chunk out of order");
     blob.parts.push(data);
     blob.received += data.length;
   }
@@ -1513,14 +1604,14 @@ class BlobAssembler {
     const blob = this.#current(id);
     this.#open.delete(id);
     if (blob.received !== blob.bytes)
-      return violation("a result blob done before its last chunk");
+      return violation2("a result blob done before its last chunk");
     const data = new Uint8Array(blob.bytes);
     let at = 0;
     for (const part of blob.parts) {
       data.set(part, at);
       at += part.length;
     }
-    return sha256Hex(data) === blob.sha256 ? { opId: blob.opId, data } : violation("a result blob digest mismatch");
+    return sha256Hex(data) === blob.sha256 ? { opId: blob.opId, data } : violation2("a result blob digest mismatch");
   }
   abort(id) {
     const blob = this.#current(id);
@@ -1528,7 +1619,7 @@ class BlobAssembler {
     return blob.opId;
   }
   #current(id) {
-    return this.#open.get(id) ?? violation("a result blob that is not open");
+    return this.#open.get(id) ?? violation2("a result blob that is not open");
   }
 }
 
@@ -1537,22 +1628,22 @@ import { createHash as createHash2 } from "node:crypto";
 var mintOpId = () => mintId();
 var OP_ID = /^[A-Za-z0-9_-]{22}$/;
 var wireOpIdOf = (opId) => OP_ID.test(opId) ? opId : createHash2("sha256").update(opId).digest().subarray(0, 16).toString("base64url");
-var isRecord4 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
-var violation2 = (detail) => {
+var isRecord5 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+var violation3 = (detail) => {
   throw new LocalApiError("protocol_violation", detail);
 };
 var text3 = (event, name) => {
   const value = event[name];
-  return typeof value === "string" ? value : violation2(`${event.kind} without ${name}`);
+  return typeof value === "string" ? value : violation3(`${event.kind} without ${name}`);
 };
 var entryOf = (value) => {
-  if (!isRecord4(value) || typeof value["state"] !== "string")
-    return violation2("an op result without a state");
+  if (!isRecord5(value) || typeof value["state"] !== "string")
+    return violation3("an op result without a state");
   const error = value["error"];
-  const code = isRecord4(error) ? error["code"] : undefined;
+  const code = isRecord5(error) ? error["code"] : undefined;
   if (error !== undefined && typeof code !== "string")
-    return violation2("an op error without a code");
-  const message = isRecord4(error) ? String(error["message"] ?? code) : "";
+    return violation3("an op error without a code");
+  const message = isRecord5(error) ? String(error["message"] ?? code) : "";
   return {
     state: value["state"],
     ..."response" in value ? { response: value["response"] } : {},
@@ -1563,7 +1654,7 @@ var argsOf = (args) => {
   if (args === undefined)
     return {};
   const plain = JSON.parse(JSON.stringify(args));
-  if (!isRecord4(plain))
+  if (!isRecord5(plain))
     throw new TypeError("machine op args must be a JSON object");
   return plain;
 };
@@ -1653,7 +1744,7 @@ class Invoker {
       cancel();
       throw transportErrorOf(error);
     });
-    const state = isRecord4(data) ? data["state"] : undefined;
+    const state = isRecord5(data) ? data["state"] : undefined;
     if (state === "terminal")
       return { state: "terminal", result: await this.#bounded(terminal, cancel) };
     cancel();
@@ -1661,7 +1752,7 @@ class Invoker {
       return { state: "in-flight" };
     if (state === "unknown")
       throw new RelayTransportError("result_expired", `no result is held for ${requestId}`);
-    return violation2("machine.result_of answered without a known state");
+    return violation3("machine.result_of answered without a known state");
   }
   #bounded(terminal, cancel) {
     return new Promise((resolve, reject) => {
@@ -1705,17 +1796,17 @@ class Invoker {
       case "machine.op_result": {
         const opId = text3(event, "op_id");
         const blob = event["blob"];
-        if (!isRecord4(blob))
+        if (!isRecord5(blob))
           return this.#settle(opId, entryOf(event["response"]));
         const { id, bytes, sha256 } = blob;
         if (typeof id !== "string" || typeof bytes !== "number" || typeof sha256 !== "string")
-          return violation2("a result blob reference is malformed");
+          return violation3("a result blob reference is malformed");
         return this.#blobs.open(id, opId, bytes, sha256);
       }
       case "machine.blob_chunk": {
         const off = event["off"];
         if (typeof off !== "number")
-          return violation2("machine.blob_chunk without off");
+          return violation3("machine.blob_chunk without off");
         return this.#blobs.chunk(text3(event, "id"), off, text3(event, "b"));
       }
       case "machine.blob_done": {
@@ -1859,7 +1950,7 @@ class OutputStreams {
 }
 
 // packages/bunshin-ts-relay/src/policy.ts
-var isRecord5 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+var isRecord6 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
 var malformed3 = (field) => {
   throw new TypeError(`the device answered a policy whose ${field} is malformed`);
 };
@@ -1867,7 +1958,7 @@ var strings2 = (value, field) => Array.isArray(value) && value.every((v) => type
 var SOURCES = ["ssh_config", "tailscale", "manual"];
 var sourceOf = (value) => SOURCES.find((s) => s === value) ?? malformed3("bridge.sources");
 var targetOf = (value) => {
-  if (!isRecord5(value) || typeof value["target"] !== "string")
+  if (!isRecord6(value) || typeof value["target"] !== "string")
     return malformed3("bridge.targets");
   const { target, enabled, hostKeyFp, home } = value;
   if (enabled !== undefined && typeof enabled !== "boolean")
@@ -1882,7 +1973,7 @@ var targetOf = (value) => {
   };
 };
 var bridgeOf = (value) => {
-  if (!isRecord5(value))
+  if (!isRecord6(value))
     return malformed3("bridge");
   const { enabled, sources, targets } = value;
   if (enabled !== undefined && typeof enabled !== "boolean")
@@ -1896,7 +1987,7 @@ var bridgeOf = (value) => {
   };
 };
 var policyOf2 = (value) => {
-  if (!isRecord5(value))
+  if (!isRecord6(value))
     return malformed3("shape");
   const { tags, alias, pathAppend, longShellBudgetMs, bridge } = value;
   if (alias !== undefined && typeof alias !== "string")
@@ -1912,17 +2003,43 @@ var policyOf2 = (value) => {
   };
 };
 
+// packages/bunshin-ts-relay/src/read-result.ts
+var isRecord7 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+var sdkResultOf = (capability, result) => {
+  if (capability !== "fs.read" || !isRecord7(result))
+    return result;
+  const base64 = result["bytes"];
+  if (typeof base64 !== "string")
+    return result;
+  const size = result["size"];
+  if (typeof size !== "number" || !Number.isFinite(size))
+    throw new RelayTransportError("unsupported", "the device's fs.read reply carries no numeric size, so whether the read is whole cannot be told");
+  const sizeBytes = Buffer.byteLength(base64, "base64");
+  const offset = typeof result["offset"] === "number" ? result["offset"] : 0;
+  const truncated = offset + sizeBytes < size;
+  return {
+    ...result,
+    bytes: { kind: truncated ? "truncated" : "full", base64 },
+    sizeBytes,
+    truncated
+  };
+};
+
 // packages/bunshin-ts-relay/src/transport.ts
 var SDK_TRANSPORT_VERSION = "0.1.0";
 var DESCRIBE_TIMEOUT_MS = 1e4;
+var SDK_CLIENT_NAMES = ["sdk"];
 var createRelayTransport = (options = {}) => {
+  const clientName = SDK_CLIENT_NAMES.find((name) => name === (options.clientName ?? "sdk"));
+  if (clientName === undefined)
+    throw new RelayTransportError("invalid_client_name", `clientName must be one of ${SDK_CLIENT_NAMES.join(", ")} (default sdk); it is a local API role, not an application name`);
   const stateDir = options.stateDir ?? defaultStateDir();
   const sessionRef = options.sessionRef ?? sessionRefFromEnv();
   const requestTimeoutMs = options.requestTimeoutMs ?? REQUEST_TIMEOUT_MS;
   const describeTimeoutMs = options.describeTimeoutMs ?? DESCRIBE_TIMEOUT_MS;
   const open = () => openConnection({
     stateDir,
-    clientName: options.clientName ?? "sdk",
+    clientName,
     clientVersion: options.clientVersion ?? SDK_TRANSPORT_VERSION,
     requestTimeoutMs,
     ...options.timer === undefined ? {} : { timer: options.timer }
@@ -1969,15 +2086,16 @@ var createRelayTransport = (options = {}) => {
   const invokeOp = async (machineId, capability, args, metadata, terminalTimeoutMs, signal) => {
     const { invoker } = await current();
     const token = metadata?.capabilityToken;
-    return invoker.invoke({
+    const result = await invoker.invoke({
       machineId,
       capability,
       args,
       ...metadata?.opId === undefined ? {} : { opId: metadata.opId },
       ...terminalTimeoutMs === undefined ? {} : { deadlineMs: terminalTimeoutMs },
-      ...token === undefined ? {} : { constraints: constraintsOf(token) },
+      ...token === undefined ? {} : { constraints: constraintsOf(token, machineId, args, metadata?.taskId) },
       ...signal === undefined ? {} : { signal }
     });
+    return sdkResultOf(capability, result);
   };
   return {
     kind: "relay",

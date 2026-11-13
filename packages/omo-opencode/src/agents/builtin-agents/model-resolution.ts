@@ -25,8 +25,7 @@ export function getFirstFallbackModel(
   const entry = requirement?.fallbackChain?.[0]
   if (!entry || entry.providers.length === 0) return undefined
   const provider =
-    entry.providers.find((candidate) => isAnyProviderConnected([candidate], availableModels))
-    ?? entry.providers[0]
+    entry.providers.find((candidate) => isAnyProviderConnected([candidate], availableModels)) ?? entry.providers[0]
   const transformedModel = transformModelForProvider(provider, entry.model)
   return {
     model: `${provider}/${transformedModel}`,

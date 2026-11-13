@@ -86,7 +86,7 @@ export function maybeCreateSisyphusConfig(input: {
     undefined,
     availableSkills,
     availableCategories,
-    useTaskSystem
+    useTaskSystem,
   )
 
   if (sisyphusResolvedVariant) {
@@ -100,7 +100,7 @@ export function maybeCreateSisyphusConfig(input: {
     sisyphusConfig.permission,
     resolvedModel,
     sisyphusOverride?.permission,
-    (sisyphusOverride as { tools?: Record<string, boolean> } | undefined)?.tools
+    (sisyphusOverride as { tools?: Record<string, boolean> } | undefined)?.tools,
   )
 
   sisyphusConfig = applyEnvironmentContext(sisyphusConfig, directory, {
@@ -120,7 +120,7 @@ export function maybeCreateSisyphusConfig(input: {
         undefined,
         availableSkills,
         availableCategories,
-        useTaskSystem
+        useTaskSystem,
       )
       rebuilt = applyOverrides(rebuilt, sisyphusOverride, mergedCategories, directory)
       rebuilt = applyEnvironmentContext(rebuilt, directory, { disableOmoEnv })

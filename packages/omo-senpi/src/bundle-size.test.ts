@@ -190,6 +190,8 @@ describe("omo-senpi bundle size budget has one source", () => {
     expect(mainCap, "build-extension.test.mjs must cap the main entry").not.toBeNull()
     expect(mainCap?.[1]).toBe("bundleBudget.omoJsBytes")
     expect(buildTest).toContain('from "../../bundle-budget.json"')
-    expect(readFileSync(join(packageRoot, "src", "bundle-size.test.ts"), "utf8")).toContain('from "../bundle-budget.json"')
+    expect(readFileSync(join(packageRoot, "src", "bundle-size.test.ts"), "utf8")).toContain(
+      'from "../bundle-budget.json"',
+    )
   })
 })
