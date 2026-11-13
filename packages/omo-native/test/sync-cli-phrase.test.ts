@@ -6,7 +6,13 @@ import { BIP39_ENGLISH_ROWS } from "../../memory-core/src/sync/recovery/bip39/en
 import { writePhraseGenesisMarker } from "../../memory-core/src/sync/genesis/phrase-marker"
 import { phraseMarkerExists } from "../../memory-core/src/sync/account/testing/phrase-enable.test-support"
 import { phraseNoticeStatus } from "../../memory-core/src/sync/account/phrase-notice"
-import { configureSyncCommands, EXIT_UNSUPPORTED_HERE, PHRASE_GENESIS_FLAG, type SyncCommandDependencies } from "../sync-cli"
+import { enableSync } from "../../memory-core/src/sync/account/enable"
+import {
+  configureSyncCommands,
+  EXIT_UNSUPPORTED_HERE,
+  PHRASE_GENESIS_FLAG,
+  type SyncCommandDependencies,
+} from "../sync-cli"
 import type { SyncContext } from "../sync-context"
 import type { PhraseTerminal } from "../sync-phrase-tty"
 
@@ -27,10 +33,15 @@ const scriptedTerminal = () => {
       write: (text) => void written.push(text),
       readLine: async () => {
         const screen = written.join("")
-        const asked = /Type words ([0-9, ]+) of your recovery phrase/.exec(screen.slice(screen.lastIndexOf("Type words")))
+        const asked = /Type words ([0-9, ]+) of your recovery phrase/.exec(
+          screen.slice(screen.lastIndexOf("Type words")),
+        )
         if (asked === null || screen.lastIndexOf("Type words") < screen.lastIndexOf("press Enter")) return ""
         const shown = [...screen.matchAll(/^ ?([0-9]{1,2})\. ([a-z]+)\r*$/gmu)].map((match) => match[2] ?? "")
-        return (asked[1] ?? "").split(", ").map((position) => shown[Number(position) - 1] ?? "").join(" ")
+        return (asked[1] ?? "")
+          .split(", ")
+          .map((position) => shown[Number(position) - 1] ?? "")
+          .join(" ")
       },
       close: () => undefined,
     }
@@ -41,20 +52,32 @@ const scriptedTerminal = () => {
 // Review LOW (#13337 @ c11d6cfd): the CLI's own fixed copy ("Memory sync is on for this device.") holds BIP39 words,
 // so a random phrase containing "memory" or "device" failed ~2.3% of runs. Fixed copy lines are removed first; a
 // leak is a shown word in any other output line.
-const CLI_COPY = new Set(["Memory sync is on for this device.", "Your memory is recovered on this device and memory sync is on."])
+const CLI_COPY = new Set([
+  "Memory sync is on for this device.",
+  "Your memory is recovered on this device and memory sync is on.",
+])
 const leakedWords = (shown: ReadonlyArray<string>, lines: ReadonlyArray<string>): ReadonlyArray<string> => {
-  const tokens = new Set(lines.filter((line) => !CLI_COPY.has(line)).flatMap((line) => line.toLowerCase().split(/[^a-z]+/u)))
+  const tokens = new Set(
+    lines.filter((line) => !CLI_COPY.has(line)).flatMap((line) => line.toLowerCase().split(/[^a-z]+/u)),
+  )
   return shown.filter((word) => WORDS.has(word) && tokens.has(word))
 }
 
 const shownWords = (terminal: ReadonlyArray<string>): ReadonlyArray<string> =>
   [...terminal.join("").matchAll(/^ ?[0-9]{1,2}\. ([a-z]+)\r*$/gmu)].map((match) => match[1] ?? "")
 
-const runEnable = async (dependencies: Partial<SyncCommandDependencies>) => {
+const runEnable = async (
+  dependencies: Partial<SyncCommandDependencies>,
+  before: (f: Awaited<ReturnType<typeof fixture>>) => Promise<void> = async () => undefined,
+) => {
   const f = await fixture()
   cleanups.push(f.close)
+  await before(f)
   const { genesis: _genesis, method: _method, rpId: _rp, userName: _user, roaming: _roaming, ...base } = f.input
-  const context: SyncContext = { ...base, authority: { signal: new AbortController().signal, admit: (dispatch) => dispatch() } }
+  const context: SyncContext = {
+    ...base,
+    authority: { signal: new AbortController().signal, admit: (dispatch) => dispatch() },
+  }
   const out: string[] = []
   const err: string[] = []
   const program = new Command("omo").exitOverride()
@@ -87,7 +110,11 @@ for (const marker of ["PI_CODING_AGENT", "AI_AGENT", "CI"] as const) {
 
 test("#given the terminal check reports no controlling terminal #when enable must create a phrase #then it refuses before opening any terminal and writes nothing", async () => {
   const terminal = scriptedTerminal()
-  const r = await runEnable({ env: { [PHRASE_GENESIS_FLAG]: "1" }, terminal: terminal.open, terminalAvailable: () => false })
+  const r = await runEnable({
+    env: { [PHRASE_GENESIS_FLAG]: "1" },
+    terminal: terminal.open,
+    terminalAvailable: () => false,
+  })
   expect(r.exit).toBe(EXIT_UNSUPPORTED_HERE)
   expect(r.err).toContain("Run `omo sync enable` yourself in a terminal.")
   expect(terminal.opened()).toBe(0)
@@ -127,16 +154,22 @@ test("#given a void notice on the terminal #when the person cancels it instead o
   }
   const f = await fixture()
   cleanups.push(f.close)
-  await writePhraseGenesisMarker({ pinDir: f.input.pinDir, account: ACCOUNT, principalId: f.keyring.principal().id }, {
-    version: 1,
-    account: ACCOUNT,
-    startedAt: 0,
-  })
+  await writePhraseGenesisMarker(
+    { pinDir: f.input.pinDir, account: ACCOUNT, principalId: f.keyring.principal().id },
+    {
+      version: 1,
+      account: ACCOUNT,
+      startedAt: 0,
+    },
+  )
   const { genesis: _genesis, method: _method, rpId: _rp, userName: _user, roaming: _roaming, ...base } = f.input
   const err: string[] = []
   const program = new Command("omo").exitOverride()
   configureSyncCommands(program, {
-    context: async () => ({ ...base, authority: { signal: new AbortController().signal, admit: (dispatch) => dispatch() } }),
+    context: async () => ({
+      ...base,
+      authority: { signal: new AbortController().signal, admit: (dispatch) => dispatch() },
+    }),
     clock: { now: () => 0, sleep: async () => undefined },
     output: () => undefined,
     error: (line) => void err.push(line),
@@ -154,4 +187,43 @@ test("#given a void notice on the terminal #when the person cancels it instead o
   const place = { pinDir: f.input.pinDir, account: ACCOUNT, principalId: f.keyring.principal().id }
   expect(await phraseMarkerExists(f.input.pinDir, place.principalId)).toBe(true)
   expect(await phraseNoticeStatus(place)).toEqual({ phraseVoid: { purpose: "genesis" } })
+})
+
+const writeVoidMarker = async (f: Awaited<ReturnType<typeof fixture>>) =>
+  writePhraseGenesisMarker(
+    { pinDir: f.input.pinDir, account: ACCOUNT, principalId: f.keyring.principal().id },
+    {
+      version: 1,
+      account: ACCOUNT,
+      startedAt: 0,
+    },
+  )
+
+test("#given an undelivered void notice and an agent marker #when enable runs #then the notice goes to stderr, is NOT acknowledged, and the person is told to run it themselves", async () => {
+  const terminal = scriptedTerminal()
+  const r = await runEnable({ env: { [PHRASE_GENESIS_FLAG]: "1", CI: "" }, terminal: terminal.open }, writeVoidMarker)
+  expect(r.exit).toBe(EXIT_UNSUPPORTED_HERE)
+  expect(r.err).toContain("The recovery phrase you saw was not saved to your account. Do not keep it.")
+  expect(r.err).toContain("Run `omo sync enable` yourself in a terminal.")
+  expect(terminal.opened()).toBe(0)
+  expect(await phraseMarkerExists(r.f.input.pinDir, r.f.keyring.principal().id)).toBe(true)
+})
+
+test("#given the person cancels before the words are shown #when enable runs #then it says nothing was saved and exits 1", async () => {
+  const open = (): PhraseTerminal => ({ write: () => undefined, readLine: async () => null, close: () => undefined })
+  const r = await runEnable({ env: { [PHRASE_GENESIS_FLAG]: "1" }, terminal: open })
+  expect(r.exit).toBe(1)
+  expect(r.err).toContain("Turning on memory sync was cancelled. Nothing was saved.")
+  expect(r.f.entries).toEqual([])
+})
+
+test("#given a device already in the chain whose earlier shown phrase was never saved #when enable runs #then it reports sync on and still delivers the void notice", async () => {
+  const r = await runEnable({ env: { [PHRASE_GENESIS_FLAG]: "1", CI: "" } }, async (f) => {
+    expect(await enableSync(f.input)).toEqual({ kind: "joined", created: true })
+    await writeVoidMarker(f)
+  })
+  expect(r.exit).toBe(0)
+  expect(r.out).toContain("Memory sync is on for this device.")
+  expect(r.err).toContain("The recovery phrase you saw was not saved to your account. Do not keep it.")
+  expect(await phraseMarkerExists(r.f.input.pinDir, r.f.keyring.principal().id)).toBe(true)
 })

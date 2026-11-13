@@ -37,21 +37,22 @@ export function controllingTerminalAvailable(): boolean {
 }
 
 export function openControllingTerminal(): PhraseTerminal | null {
+  // Checker LOW (#13337 @ e6ac0bca): each stream owns its own descriptor, so release closes each exactly once
+  // (one shared fd was closed by both streams, and the second close could hit a reused fd number).
+  const opened: number[] = []
   let input: ReadStream
   let output: WriteStream
   try {
-    if (process.platform === "win32") {
-      input = new ReadStream(openSync("CONIN$", "r"))
-      output = new WriteStream(openSync("CONOUT$", "w"))
-    } else {
-      const fd = openSync("/dev/tty", "r+")
-      input = new ReadStream(fd)
-      output = new WriteStream(fd)
-    }
+    const [inPath, outPath] = process.platform === "win32" ? ["CONIN$", "CONOUT$"] : ["/dev/tty", "/dev/tty"]
+    opened.push(openSync(inPath, "r"))
+    opened.push(openSync(outPath, "w"))
+    input = new ReadStream(opened[0] ?? -1)
+    output = new WriteStream(opened[1] ?? -1)
+    input.setRawMode(true)
   } catch {
+    for (const fd of opened) closeSync(fd)
     return null
   }
-  input.setRawMode(true)
   return terminalFromStreams(input, output, () => {
     input.setRawMode(false)
     input.destroy()

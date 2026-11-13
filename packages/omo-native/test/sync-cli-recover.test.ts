@@ -43,7 +43,10 @@ const enrolledAccount = async () => {
         confirm: async (positions) => new TypedPhrase(positions.map((p) => shown[p - 1] ?? "").join(" ")),
         enter: async () => null,
       },
-      phraseRandom: { phrase: () => generateRecoveryPhrase((bytes) => void bytes.fill(17)), positions: () => [1, 2, 3] },
+      phraseRandom: {
+        phrase: () => generateRecoveryPhrase((bytes) => void bytes.fill(17)),
+        positions: () => [1, 2, 3],
+      },
     }),
     chain: { ...transportFor(world, world.owner), listEntriesAfter: async () => null, state: async () => null },
     rejections: createRejectionCounter(),
@@ -73,31 +76,45 @@ const unused = async (): Promise<never> => {
   throw new Error("not used by recover")
 }
 
-const runRecover = async (dependencies: Partial<SyncCommandDependencies>) => {
-  const world = await enrolledAccount()
+type RecoverSetup = {
+  readonly plain?: boolean
+  readonly chain?: Record<string, unknown>
+  readonly contexts?: { count: number }
+}
+
+const runRecover = async (dependencies: Partial<SyncCommandDependencies>, setup: RecoverSetup = {}) => {
+  const world = setup.plain === true ? await createWorld() : await enrolledAccount()
   const fresh = await newDevice()
   const out: string[] = []
   const err: string[] = []
   const initial = process.exitCode
   const program = new Command("omo").exitOverride()
   configureSyncCommands(program, {
-    context: async () => ({
-      account: world.account,
-      serviceDeviceId: "svc-fresh",
-      keyring: fresh.keyring,
-      pinDir: freshStateDir(),
-      chain: { ...transportFor(world, fresh), listEntriesAfter: async () => null, state: async () => null },
-      pairing: {
-        setAccountSync: unused,
-        setDeviceSync: unused,
-        listPending: unused,
-        openPending: unused,
-        readPending: unused,
-        answerPending: unused,
-        revealPending: unused,
-      },
-      authority: { signal: new AbortController().signal, admit: (dispatch) => dispatch() },
-    }),
+    context: async () => {
+      if (setup.contexts !== undefined) setup.contexts.count += 1
+      return {
+        account: world.account,
+        serviceDeviceId: "svc-fresh",
+        keyring: fresh.keyring,
+        pinDir: freshStateDir(),
+        chain: {
+          ...transportFor(world, fresh),
+          listEntriesAfter: async () => null,
+          state: async () => null,
+          ...setup.chain,
+        },
+        pairing: {
+          setAccountSync: unused,
+          setDeviceSync: unused,
+          listPending: unused,
+          openPending: unused,
+          readPending: unused,
+          answerPending: unused,
+          revealPending: unused,
+        },
+        authority: { signal: new AbortController().signal, admit: (dispatch) => dispatch() },
+      }
+    },
     clock: { now: () => 0, sleep: async () => undefined },
     output: (line) => void out.push(line),
     error: (line) => void err.push(line),
@@ -114,18 +131,22 @@ const runRecover = async (dependencies: Partial<SyncCommandDependencies>) => {
 }
 
 for (const marker of ["PI_CODING_AGENT", "AI_AGENT", "CI"] as const) {
-  test(`#given ${marker} is set (even empty) #when omo sync recover runs #then it refuses with exit 2 before opening the terminal`, async () => {
+  test(`#given ${marker} is set (even empty) #when omo sync recover runs #then it refuses with exit 2 before loading the signed-in context or opening the terminal`, async () => {
     const terminal = typing([ENROLLED.join(" ")])
-    const r = await runRecover({ env: { [marker]: "" }, terminal: terminal.open })
+    const contexts = { count: 0 }
+    const r = await runRecover({ env: { [marker]: "" }, terminal: terminal.open }, { contexts })
+    expect(contexts.count).toBe(0)
     expect(r.exit).toBe(EXIT_UNSUPPORTED_HERE)
     expect(r.err).toContain("Run `omo sync recover` yourself in a terminal.")
     expect(terminal.opened()).toBe(0)
   })
 }
 
-test("#given no controlling terminal #when omo sync recover runs #then it refuses with exit 2 before opening any terminal", async () => {
+test("#given no controlling terminal #when omo sync recover runs #then it refuses with exit 2 before loading the signed-in context or opening any terminal", async () => {
   const terminal = typing([ENROLLED.join(" ")])
-  const r = await runRecover({ terminal: terminal.open, terminalAvailable: () => false })
+  const contexts = { count: 0 }
+  const r = await runRecover({ terminal: terminal.open, terminalAvailable: () => false }, { contexts })
+  expect(contexts.count).toBe(0)
   expect(r.exit).toBe(EXIT_UNSUPPORTED_HERE)
   expect(terminal.opened()).toBe(0)
 })
@@ -135,9 +156,18 @@ test("#given the enrolled phrase typed at the terminal #when omo sync recover ru
   const r = await runRecover({ terminal: terminal.open })
   expect(r.exit).toBe(0)
   expect(r.out.join("\n")).toContain("recovered")
-  const joined = (await verified(r.world, r.world.owner)).received.some((record) => record.body.kind === "recovery-join")
+  const joined = (await verified(r.world, r.world.owner)).received.some(
+    (record) => record.body.kind === "recovery-join",
+  )
   expect(joined).toBe(true)
-  expect(ENROLLED.filter((word) => [...r.out, ...r.err].join(" ").split(/[^a-z]+/u).includes(word))).toEqual([])
+  expect(
+    ENROLLED.filter((word) =>
+      [...r.out, ...r.err]
+        .join(" ")
+        .split(/[^a-z]+/u)
+        .includes(word),
+    ),
+  ).toEqual([])
 })
 
 test("#given a mistyped phrase then a cancel #when omo sync recover runs #then the terminal asks again with the typo reason and the command ends cancelled", async () => {
@@ -154,6 +184,33 @@ test("#given a valid phrase this account never enrolled #when omo sync recover r
   const r = await runRecover({ terminal: terminal.open })
   expect(r.exit).toBe(1)
   expect(r.err.join("\n")).toContain("history looks incomplete")
-  const joined = (await verified(r.world, r.world.owner)).received.some((record) => record.body.kind === "recovery-join")
+  const joined = (await verified(r.world, r.world.owner)).received.some(
+    (record) => record.body.kind === "recovery-join",
+  )
   expect(joined).toBe(false)
+})
+
+test("#given an account whose only recovery key is a passkey #when omo sync recover runs #then it says there is no recovery phrase, exits 2 and never opens the terminal", async () => {
+  const terminal = typing([ENROLLED.join(" ")])
+  const r = await runRecover({ terminal: terminal.open }, { plain: true })
+  expect(r.exit).toBe(EXIT_UNSUPPORTED_HERE)
+  expect(r.err.join("\n")).toContain("has no recovery phrase")
+  expect(terminal.opened()).toBe(0)
+})
+
+test("#given a key list the service cannot serve #when omo sync recover runs #then it reports the reason, says nothing secret was stored and exits 1", async () => {
+  const terminal = typing([ENROLLED.join(" ")])
+  const r = await runRecover({ terminal: terminal.open }, { chain: { listKeys: async () => null } })
+  expect(r.exit).toBe(1)
+  expect(r.err.join("\n")).toContain("Recovery did not complete (unavailable)")
+})
+
+test("#given the enrolled phrase and a rotation append the service refuses #when omo sync recover runs #then the device joins read-only and is told to run recover again", async () => {
+  const terminal = typing([ENROLLED.join(" ")])
+  const r = await runRecover(
+    { terminal: terminal.open },
+    { chain: { appendKeys: async () => ({ ok: false, reason: "refused" }) } },
+  )
+  expect(r.exit).toBe(0)
+  expect(r.out.join("\n")).toContain("another step is still pending")
 })
