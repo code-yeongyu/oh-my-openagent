@@ -8,6 +8,9 @@ import { removeTempRoot } from "./remove-temp-root.ts"
 
 // Each case spawns git and bun several times (about 4 s alone), so it gets a budget above bun's 5 s default.
 const SPAWN_TIMEOUT_MS = 30_000
+// One git or bun step is bounded below the case budget, so a stuck child is killed and reaped by the spawn itself and
+// the case fails with that step's error while afterEach can still remove its directory (#13366).
+const STEP_TIMEOUT_MS = 20_000
 const SCRIPT_DIR = import.meta.dir
 const LOG = "packages/omo-senpi/changes.md"
 const ENV = {
@@ -18,13 +21,14 @@ const ENV = {
   GIT_COMMITTER_EMAIL: "t@t",
 }
 
-const git = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8", env: ENV })
+const git = (cwd: string, ...args: string[]) =>
+  execFileSync("git", args, { cwd, encoding: "utf8", env: ENV, timeout: STEP_TIMEOUT_MS })
 const commit = (cwd: string, message: string) => {
   git(cwd, "add", "-A")
   git(cwd, "commit", "-q", "-m", message)
 }
 const bun = (cwd: string, args: string[], env: Record<string, string> = {}) =>
-  spawnSync("bun", args, { cwd, encoding: "utf8", env: { ...ENV, ...env } })
+  spawnSync("bun", args, { cwd, encoding: "utf8", env: { ...ENV, ...env }, timeout: STEP_TIMEOUT_MS })
 
 const scratchDirs: string[] = []
 // A timed-out or aborted test never reaches a finally block, and scratch() itself runs git and bun after the
@@ -40,6 +44,9 @@ const scratch = () => {
   git(dir, "init", "-q", "-b", "dev")
   // A runner's global core.autocrlf=true (windows-latest) would check files out with CRLF; the expectations are bytes.
   git(dir, "config", "core.autocrlf", "false")
+  // The commands run from this copy of script/ (500+ files); none of them reads it through git, and staging it made the
+  // base commit take most of the case's budget on windows-latest (#13366), so the copy stays out of the index.
+  writeFileSync(join(dir, ".git", "info", "exclude"), "/script/\n")
   cpSync(SCRIPT_DIR, join(dir, "script"), { recursive: true, filter: (p) => !p.includes("node_modules") })
   mkdirSync(join(dir, "packages/omo-senpi"), { recursive: true })
   mkdirSync(join(dir, "changes/unreleased"), { recursive: true })
