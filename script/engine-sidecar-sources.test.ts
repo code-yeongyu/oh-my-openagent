@@ -82,11 +82,65 @@ const installedLoaderPath = join(
   "loader.js",
 )
 
+const FACTORIES_BY_TYPESCRIPT: Record<string, readonly string[]> = {
+  createBunExtensionImporter: ["./bun-extension-importer.js"],
+  createJiti: ["jiti", "jiti/static"],
+}
+
+/** Independent of the production check: a factory the loader calls is bound only by an awaited import of its module. */
+function assertFactoryBindingsByTypeScript(source: ts.SourceFile): void {
+  for (const [name, modules] of Object.entries(FACTORIES_BY_TYPESCRIPT)) {
+    let called = false
+    let bindings = 0
+    const awaitedModule = (init: ts.Expression | undefined): string | undefined => {
+      if (init === undefined || !ts.isAwaitExpression(init) || !ts.isCallExpression(init.expression)) return undefined
+      const [first] = init.expression.arguments
+      return first !== undefined && ts.isStringLiteral(first) ? first.text : undefined
+    }
+    const visit = (node: ts.Node): void => {
+      if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === name) called = true
+      if (ts.isBindingElement(node) && ts.isIdentifier(node.name) && node.name.text === name) {
+        const declaration = node.parent.parent
+        const module = ts.isVariableDeclaration(declaration) ? awaitedModule(declaration.initializer) : undefined
+        if (node.propertyName !== undefined || module === undefined || !modules.includes(module))
+          throw new Error(`${name} is bound other than from its module`)
+        bindings += 1
+      } else if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === name) {
+        throw new Error(`${name} is bound to a value of its own`)
+      } else if (
+        (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) || ts.isClassDeclaration(node)) &&
+        node.name?.text === name
+      ) {
+        throw new Error(`${name} is declared locally`)
+      } else if (ts.isParameter(node) && ts.isIdentifier(node.name) && node.name.text === name) {
+        throw new Error(`${name} is a parameter`)
+      } else if (ts.isImportSpecifier(node) && node.name.text === name) {
+        const module = node.parent.parent.parent.moduleSpecifier
+        if (
+          (node.propertyName !== undefined && node.propertyName.text !== name) ||
+          !ts.isStringLiteral(module) ||
+          !modules.includes(module.text)
+        )
+          throw new Error(`${name} is imported other than from its module`)
+        bindings += 1
+      }
+      ts.forEachChild(node, visit)
+    }
+    visit(source)
+    if (called && bindings === 0) throw new Error(`${name} is called but never bound from its module`)
+  }
+}
+
 /** Independent of the production check: an option object must reach a call's arguments without being bound to a name. */
 function flowsDirectlyIntoCallByTypeScript(objectNode: ts.Node): boolean {
   let child = objectNode
   for (let parent = child.parent; parent !== undefined; child = parent, parent = parent.parent) {
-    if (ts.isCallExpression(parent)) return parent.arguments.some((argument) => argument === child)
+    if (ts.isCallExpression(parent))
+      return (
+        ts.isIdentifier(parent.expression) &&
+        parent.expression.text === "createJiti" &&
+        parent.arguments.some((argument) => argument === child)
+      )
     if (ts.isConditionalExpression(parent) && parent.condition === child) return false
     if (ts.isPropertyAssignment(parent) && parent.initializer !== child) return false
     if (
@@ -108,6 +162,7 @@ function flowsDirectlyIntoCallByTypeScript(objectNode: ts.Node): boolean {
  */
 function loaderTableByTypeScript(loaderPath = installedLoaderPath): string[] {
   const source = ts.createSourceFile(loaderPath, readFileSync(loaderPath, "utf8"), ts.ScriptTarget.Latest, true)
+  assertFactoryBindingsByTypeScript(source)
   let tableName: string | undefined
   const findImporter = (node: ts.Node): void => {
     if (
@@ -529,6 +584,83 @@ describe("sidecar parity set", () => {
     },
   )
 
+  test.each([
+    [
+      "a wrapper function",
+      loaderSource("    typebox: bundled,").replace(
+        "export async function createImporter",
+        "function mutate(o) { o.virtualModules.ws = bundled; }\nmutate({ virtualModules: VIRTUAL_MODULES });\nexport async function createImporter",
+      ),
+    ],
+    [
+      "an identity call",
+      loaderSource("    typebox: bundled,").replace(
+        "export async function createImporter",
+        "const o = ((x) => x)({ virtualModules: VIRTUAL_MODULES });\no.virtualModules.ws = bundled;\nexport async function createImporter",
+      ),
+    ],
+    [
+      "Object.assign",
+      loaderSource("    typebox: bundled,").replace(
+        "export async function createImporter",
+        "Object.assign({ virtualModules: VIRTUAL_MODULES }, {}).virtualModules.ws = bundled;\nexport async function createImporter",
+      ),
+    ],
+    [
+      "a local function named like the factory",
+      loaderSource("    typebox: bundled,").replace(
+        "export async function createImporter",
+        "function createJiti(url, o) { o.virtualModules.ws = bundled; }\ncreateJiti(import.meta.url, { virtualModules: VIRTUAL_MODULES });\nexport async function createImporter",
+      ),
+    ],
+    [
+      "a renamed jiti import",
+      loaderSource("    typebox: bundled,").replace(
+        "export async function createImporter",
+        'export async function load() {\n    const { createJiti: make } = await importNodeOnlyApi("jiti/static");\n    return make(import.meta.url, { virtualModules: VIRTUAL_MODULES });\n}\nexport async function createImporter',
+      ),
+    ],
+    [
+      "the factory bound from another module",
+      loaderSource("    typebox: bundled,").replace(
+        "export async function createImporter",
+        'export async function load() {\n    const { createJiti } = await import("./mutating-jiti.js");\n    return createJiti(import.meta.url, { virtualModules: VIRTUAL_MODULES });\n}\nexport async function createImporter',
+      ),
+    ],
+    [
+      "options returned from a function",
+      loaderSource("    typebox: bundled,").replace(
+        "export async function createImporter",
+        'const options = () => ({ virtualModules: VIRTUAL_MODULES });\nexport async function load() {\n    const { createJiti } = await importNodeOnlyApi("jiti/static");\n    return createJiti(import.meta.url, options());\n}\nexport async function createImporter',
+      ),
+    ],
+    [
+      "a renamed importer import",
+      loaderSource("    typebox: bundled,").replace(
+        'const { createBunExtensionImporter } = await import("./bun-extension-importer.js");\n    return createBunExtensionImporter(VIRTUAL_MODULES, {}, {});',
+        'const { createBunExtensionImporter: make } = await import("./bun-extension-importer.js");\n    make(VIRTUAL_MODULES);\n    return createBunExtensionImporter(VIRTUAL_MODULES, {}, {});',
+      ),
+    ],
+  ] as const)(
+    "#given a loader that hands its table to the factories through %s #when its table is read #then both readers refuse it",
+    (_label, source) => {
+      // given - only the two factories the installed loader calls, bound from their own modules, may receive the table
+      const host = join(tmpdir(), `omo-engine-foreign-sink-${process.pid}-${crypto.randomUUID()}`)
+      try {
+        writeEngineLoader(host, source)
+        const loaderPath = join(host, "dist", "core", "extensions", "loader.js")
+
+        // when / then
+        expect(() => engineServedSpecifiers(host)).toThrow(
+          `cannot read the engine's extension module table from ${loaderPath}`,
+        )
+        expect(() => loaderTableByTypeScript(loaderPath)).toThrow()
+      } finally {
+        rmSync(host, { recursive: true, force: true })
+      }
+    },
+  )
+
   test("#given a loader that also passes its table as a virtualModules option straight into a call #when its table is read #then both readers read it exactly", () => {
     // given - the installed loader hands the same table to jiti as `virtualModules`, inside the call's own options
     const host = join(tmpdir(), `omo-engine-option-table-${process.pid}-${crypto.randomUUID()}`)
@@ -537,7 +669,7 @@ describe("sidecar parity set", () => {
         host,
         loaderSource("    typebox: bundled,").replace(
           "export async function createImporter",
-          "export const load = (bundled) => createJiti(import.meta.url, {\n    moduleCache: false,\n    ...(bundled ? { virtualModules: VIRTUAL_MODULES, tryNative: false } : { alias: {} }),\n});\nexport async function createImporter",
+          'export async function load(bundled) {\n    const { createJiti } = await importNodeOnlyApi("jiti/static");\n    return createJiti(import.meta.url, {\n        moduleCache: false,\n        ...(bundled ? { virtualModules: VIRTUAL_MODULES, tryNative: false } : { alias: {} }),\n    });\n}\nexport async function createImporter',
         ),
       )
 
