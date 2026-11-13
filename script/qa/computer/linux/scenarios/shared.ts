@@ -1,11 +1,13 @@
 // Shared scenario plumbing: the fixture window, the independent xwd oracle, and the
 // marker lookup every pixel-asserting scenario reads. Nothing here reads the engine's
 // own report.
+import type { ChildProcess } from "node:child_process"
 import { join } from "node:path"
 import { readFile } from "node:fs/promises"
 import { fileURLToPath } from "node:url"
 import type { Context } from "../lib/scenario.ts"
 import { type Raster, pixelAt } from "../lib/pixels.ts"
+import { waitForWindow } from "../lib/window-wait.ts"
 
 const FIXTURES = fileURLToPath(new URL("../fixtures", import.meta.url))
 export const MARKER: readonly [number, number, number] = [255, 0, 0]
@@ -34,10 +36,16 @@ export function fixtureWindow(options: {
   return argv
 }
 
-/** The first window whose name matches `title`, as `xdotool` (the oracle) reports it. */
-export async function windowId(ctx: Context, title: string): Promise<string> {
-  const listed = await ctx.procs.stdout(["xdotool", "search", "--name", title], ctx.stage.env)
-  return listed.split("\n")[0] ?? ""
+/** The first window whose name matches `title`, as `xdotool` (the oracle) reports it, once `fixture` has mapped it. */
+export function windowId(ctx: Context, title: string, fixture: ChildProcess): Promise<string> {
+  return waitForWindow(
+    title,
+    () => ctx.procs.run(["xdotool", "search", "--name", title], ctx.stage.env),
+    () =>
+      fixture.exitCode !== null || fixture.signalCode !== null
+        ? `exit ${fixture.exitCode ?? fixture.signalCode}: ${ctx.procs.output(fixture)}`
+        : undefined,
+  )
 }
 
 /** `(x, y, width, height)` of a window, as `xdotool` (the oracle) reports them. */
