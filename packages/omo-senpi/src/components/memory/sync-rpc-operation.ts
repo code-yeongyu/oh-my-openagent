@@ -231,7 +231,8 @@ export async function runSyncRpcOperation(
                 record.enable = { ...previous, pairing: { ...previous.pairing, code } }
             },
           })
-          record.enable = joined.kind === "joined" && joinNotice !== undefined ? { ...joined, phraseVoid: joinNotice } : joined
+          record.enable =
+            joined.kind === "joined" && joinNotice !== undefined ? { ...joined, phraseVoid: joinNotice } : joined
           auth.admit(() => undefined)
           break
         }

@@ -2,7 +2,12 @@ import { afterEach, expect, test } from "bun:test"
 import { readServiceFloor, type ServiceFloor } from "../genesis/phrase-gate.ts"
 import { enableSync } from "./enable.ts"
 import { ACCOUNT, fixture } from "./testing/genesis-enable.test-support.ts"
-import { phraseGenesis, phraseMarkerExists, scriptedGate, scriptedSurface } from "./testing/phrase-enable.test-support.ts"
+import {
+  phraseGenesis,
+  phraseMarkerExists,
+  scriptedGate,
+  scriptedSurface,
+} from "./testing/phrase-enable.test-support.ts"
 
 const cleanups: (() => Promise<void>)[] = []
 afterEach(async () => {
@@ -20,7 +25,12 @@ const setup = async (enabled: boolean | undefined, floor: ServiceFloor) => {
   const input = {
     ...base,
     ...(enabled === undefined ? {} : { phraseGate: scripted.gate }),
-    genesis: { prfSupported: false, phraseSupported: true, createGenesis: f.input.genesis.createGenesis, createPhraseGenesis: phraseGenesis(person.surface) },
+    genesis: {
+      prfSupported: false,
+      phraseSupported: true,
+      createGenesis: f.input.genesis.createGenesis,
+      createPhraseGenesis: phraseGenesis(person.surface),
+    },
   }
   const untouched = async () => {
     expect(f.server.switches).toEqual([])
@@ -35,7 +45,10 @@ for (const enabled of [undefined, false] as const) {
   test(`#given the phrase flag ${enabled === undefined ? "absent" : "off"} #when a first device enables #then phrase is never offered and a phrase genesis is refused as disabled with nothing written`, async () => {
     const s = await setup(enabled, "on")
     expect(await enableSync(s.input)).toEqual({ kind: "method_required", methods: [] })
-    expect(await enableSync({ ...s.input, method: "phrase" })).toEqual({ kind: "phrase_unavailable", reason: "disabled" })
+    expect(await enableSync({ ...s.input, method: "phrase" })).toEqual({
+      kind: "phrase_unavailable",
+      reason: "disabled",
+    })
     await s.untouched()
     expect(s.refusals).toEqual([])
   })
@@ -80,8 +93,17 @@ for (const [label, floor, outcome] of [
     const input = {
       ...base,
       chain,
-      phraseGate: { enabled: true, serviceFloor: readServiceFloor, refused: (reason: string) => void refusals.push(reason) },
-      genesis: { prfSupported: false, phraseSupported: true, createGenesis: f.input.genesis.createGenesis, createPhraseGenesis: phraseGenesis(scriptedSurface().surface) },
+      phraseGate: {
+        enabled: true,
+        serviceFloor: readServiceFloor,
+        refused: (reason: string) => void refusals.push(reason),
+      },
+      genesis: {
+        prfSupported: false,
+        phraseSupported: true,
+        createGenesis: f.input.genesis.createGenesis,
+        createPhraseGenesis: phraseGenesis(scriptedSurface().surface),
+      },
     }
     const result = await enableSync({ ...input, method: "phrase" })
     if (outcome === "created") {
@@ -98,9 +120,12 @@ for (const [label, floor, outcome] of [
 
 // A1.1-M4: every way the floor port can fail refuses exactly like "unknown", before any marker, words or onCeremony.
 for (const [label, serviceFloor] of [
-  ["throws", (): Promise<ServiceFloor> => {
-    throw new Error("synthetic port throw")
-  }],
+  [
+    "throws",
+    (): Promise<ServiceFloor> => {
+      throw new Error("synthetic port throw")
+    },
+  ],
   ["rejects", async (): Promise<ServiceFloor> => Promise.reject(new Error("synthetic port rejection"))],
   ["never answers (timeout)", (): Promise<ServiceFloor> => new Promise<ServiceFloor>(() => undefined)],
   ["answers a value outside the protocol", async (): Promise<ServiceFloor> => JSON.parse('"maybe"')],
@@ -109,9 +134,19 @@ for (const [label, serviceFloor] of [
     const s = await setup(true, "on")
     const refusals: string[] = []
     const ceremonies: string[] = []
-    const phraseGate = { enabled: true, serviceFloor, floorTimeoutMs: 25, refused: (reason: string) => void refusals.push(reason) }
+    const phraseGate = {
+      enabled: true,
+      serviceFloor,
+      floorTimeoutMs: 25,
+      refused: (reason: string) => void refusals.push(reason),
+    }
     expect(
-      await enableSync({ ...s.input, phraseGate, method: "phrase", onCeremony: (method) => void ceremonies.push(method) }),
+      await enableSync({
+        ...s.input,
+        phraseGate,
+        method: "phrase",
+        onCeremony: (method) => void ceremonies.push(method),
+      }),
     ).toEqual({ kind: "phrase_unavailable", reason: "service-floor-off" })
     expect(refusals).toEqual(["service-floor-off"])
     expect(ceremonies).toEqual([])
@@ -128,7 +163,12 @@ test("#given a host gate with no floor port (the production default until the A1
     ...base,
     method: "phrase",
     phraseGate: { enabled: true, refused: (reason: string) => void refusals.push(reason) },
-    genesis: { prfSupported: false, phraseSupported: true, createGenesis: f.input.genesis.createGenesis, createPhraseGenesis: phraseGenesis(scriptedSurface().surface) },
+    genesis: {
+      prfSupported: false,
+      phraseSupported: true,
+      createGenesis: f.input.genesis.createGenesis,
+      createPhraseGenesis: phraseGenesis(scriptedSurface().surface),
+    },
   })
   expect(result).toEqual({ kind: "phrase_unavailable", reason: "service-floor-off" })
   expect(refusals).toEqual(["service-floor-off"])
@@ -143,8 +183,17 @@ test("#given a state answer that carries only the retired field name phrase_clie
   const result = await enableSync({
     ...base,
     method: "phrase",
-    phraseGate: { enabled: true, serviceFloor: readServiceFloor, refused: (reason: string) => void refusals.push(reason) },
-    genesis: { prfSupported: false, phraseSupported: true, createGenesis: f.input.genesis.createGenesis, createPhraseGenesis: phraseGenesis(scriptedSurface().surface) },
+    phraseGate: {
+      enabled: true,
+      serviceFloor: readServiceFloor,
+      refused: (reason: string) => void refusals.push(reason),
+    },
+    genesis: {
+      prfSupported: false,
+      phraseSupported: true,
+      createGenesis: f.input.genesis.createGenesis,
+      createPhraseGenesis: phraseGenesis(scriptedSurface().surface),
+    },
   })
   expect(result).toEqual({ kind: "phrase_unavailable", reason: "service-floor-off" })
   expect(refusals).toEqual(["service-floor-off"])

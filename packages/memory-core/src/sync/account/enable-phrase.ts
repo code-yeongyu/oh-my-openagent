@@ -45,7 +45,9 @@ export const commitIntent = async (captured: Captured, intent: GenesisIntent): P
     return { kind: "phrase_unavailable", reason: "service-floor-off" }
   }
   if (result !== "created")
-    return isPhraseIntent(intent) ? { kind: "join_required", phraseVoid: { purpose: "genesis" } } : { kind: "join_required" }
+    return isPhraseIntent(intent)
+      ? { kind: "join_required", phraseVoid: { purpose: "genesis" } }
+      : { kind: "join_required" }
   if (isPhraseIntent(intent)) await deletePhraseGenesisMarker(placeOf(captured))
   return (await rootChangedSinceRetired(captured.pinDir, captured.account, intent.genesisDigest))
     ? { kind: "joined", created: true, rootChanged: true }
@@ -80,7 +82,10 @@ export const createPhraseGenesis = async (
   try {
     result = await admitSyncOperation(captured, () => {
       entered = true
-      return genesis.createPhraseGenesis({ account: captured.account, firstDevice: principalOf(captured.keyring) }, { operation })
+      return genesis.createPhraseGenesis(
+        { account: captured.account, firstDevice: principalOf(captured.keyring) },
+        { operation },
+      )
     })
   } catch (error) {
     // Refused at admission (review LOW, #13335 @ 04991201): the bridge never ran, so no word was shown.
@@ -92,10 +97,16 @@ export const createPhraseGenesis = async (
     return { kind: "cancelled" }
   }
   const key = result.prepared.body.bootstrap.recovery_key
-  if (key.survivable !== "phrase" || key.rp_id !== PHRASE_RECOVERY_RP_ID) throw new GenesisEnableError("intent_mismatch")
+  if (key.survivable !== "phrase" || key.rp_id !== PHRASE_RECOVERY_RP_ID)
+    throw new GenesisEnableError("intent_mismatch")
   const built = await buildGenesis(captured.account, captured.keyring, result.prepared, captured)
   await verifyGenesisRequest(captured.account, captured.keyring, built.request)
-  await writePhraseGenesisMarker(place, { version: 1, account: captured.account, startedAt, genesisDigest: built.digest })
+  await writePhraseGenesisMarker(place, {
+    version: 1,
+    account: captured.account,
+    startedAt,
+    genesisDigest: built.digest,
+  })
   const intent: GenesisIntent = {
     version: 1,
     account: captured.account,

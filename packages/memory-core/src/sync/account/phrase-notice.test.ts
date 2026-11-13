@@ -66,7 +66,12 @@ test("#given a process killed after the phrase was shown and before the intent w
   expect(await phraseNoticeStatus(place)).toEqual({ phraseVoid: { purpose: "genesis" } })
 
   const person = scriptedSurface()
-  const genesis = { prfSupported: false, phraseSupported: true, createGenesis: f.input.genesis.createGenesis, createPhraseGenesis: phraseGenesis(person.surface) }
+  const genesis = {
+    prfSupported: false,
+    phraseSupported: true,
+    createGenesis: f.input.genesis.createGenesis,
+    createPhraseGenesis: phraseGenesis(person.surface),
+  }
   expect(await enableSync({ ...f.input, genesis, method: "phrase", phraseGate: openGate() })).toEqual({
     kind: "acknowledge_required",
     phraseVoid: { purpose: "genesis" },
@@ -79,10 +84,23 @@ test("#given a phrase genesis that committed and a crash after its intent was re
   const f = await fixture()
   cleanups.push(f.close)
   const place = { pinDir: f.input.pinDir, account: ACCOUNT, principalId: f.keyring.principal().id }
-  const genesis = { prfSupported: false, phraseSupported: true, createGenesis: f.input.genesis.createGenesis, createPhraseGenesis: phraseGenesis(scriptedSurface().surface) }
-  expect(await enableSync({ ...f.input, genesis, method: "phrase", phraseGate: openGate() })).toEqual({ kind: "joined", created: true })
+  const genesis = {
+    prfSupported: false,
+    phraseSupported: true,
+    createGenesis: f.input.genesis.createGenesis,
+    createPhraseGenesis: phraseGenesis(scriptedSurface().surface),
+  }
+  expect(await enableSync({ ...f.input, genesis, method: "phrase", phraseGate: openGate() })).toEqual({
+    kind: "joined",
+    created: true,
+  })
   const pin = await loadTrustAnchor(f.input.pinDir, ACCOUNT)
   if (!pin.ok) throw new Error("expected a pin after the phrase genesis")
-  await writePhraseGenesisMarker(place, { version: 1, account: ACCOUNT, startedAt: 3, genesisDigest: pin.anchor.genesisDigest })
+  await writePhraseGenesisMarker(place, {
+    version: 1,
+    account: ACCOUNT,
+    startedAt: 3,
+    genesisDigest: pin.anchor.genesisDigest,
+  })
   expect(await phraseNoticeStatus(place)).toEqual({})
 })

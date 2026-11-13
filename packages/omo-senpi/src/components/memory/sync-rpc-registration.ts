@@ -61,7 +61,8 @@ export function registerSyncRpc(rpc: SyncRpcRegistration, options: SyncRpcOption
           case "features":
             // Phrase genesis is listed only while the client flag is on (amendment A1).
             return {
-              features: options.phraseGate?.enabled === true ? FEATURES : FEATURES.filter((f) => f !== "phrase-genesis"),
+              features:
+                options.phraseGate?.enabled === true ? FEATURES : FEATURES.filter((f) => f !== "phrase-genesis"),
             }
           case "status":
             return await coordinator.status(context)
