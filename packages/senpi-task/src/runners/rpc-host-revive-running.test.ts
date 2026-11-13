@@ -2,7 +2,14 @@ import { afterEach, describe, expect, spyOn, test } from "bun:test"
 
 import type { TaskRecord } from "../state"
 import { runTaskSend } from "../tools/control/send"
-import { bounded, concurrencyOf, hostHolds, recordAt, startCancelLane, type CancelLane } from "./rpc-host/__fixtures__/cancel-lane"
+import {
+  bounded,
+  concurrencyOf,
+  hostHolds,
+  recordAt,
+  startCancelLane,
+  type CancelLane,
+} from "./rpc-host/__fixtures__/cancel-lane"
 import { HOST_CHILD_MODEL, type HostWorld } from "./rpc-host/__fixtures__/host-world"
 
 /**
@@ -46,7 +53,10 @@ describe("task_send to a parked running child", () => {
     world.host.failReply("prompt", "prompt refused by the host")
 
     // when
-    const refused = await bounded(runTaskSend(parent.manager, { to: child.task_id, message: "REFUSED_SENTINEL" }, parent.sessionId), "task_send")
+    const refused = await bounded(
+      runTaskSend(parent.manager, { to: child.task_id, message: "REFUSED_SENTINEL" }, parent.sessionId),
+      "task_send",
+    )
 
     // then
     expect(refused.details).toMatchObject({ kind: "not_continuable", task_id: child.task_id })
@@ -56,7 +66,10 @@ describe("task_send to a parked running child", () => {
 
     // when - the host takes messages again
     world.host.failReply("prompt", undefined)
-    const delivered = await bounded(runTaskSend(parent.manager, { to: child.task_id, message: "ACCEPTED_SENTINEL" }, parent.sessionId), "the second task_send")
+    const delivered = await bounded(
+      runTaskSend(parent.manager, { to: child.task_id, message: "ACCEPTED_SENTINEL" }, parent.sessionId),
+      "the second task_send",
+    )
 
     // then
     expect(delivered.details).toMatchObject({ kind: "revived", task_id: child.task_id })
@@ -71,13 +84,20 @@ describe("task_send to a parked running child", () => {
     let cancelling: Promise<unknown> | undefined
     spyOn(parent.store, "appendEvent").mockImplementation((taskId, event) => {
       const written = appendEvent(taskId, event)
-      if (taskId === child.task_id && event.type === "reconcile_reattached") cancelling = parent.manager.cancelTask(child.task_id)
+      if (taskId === child.task_id && event.type === "reconcile_reattached")
+        cancelling = parent.manager.cancelTask(child.task_id)
       return written
     })
 
     // when
-    const sent = await bounded(runTaskSend(parent.manager, { to: child.task_id, message: "LATE_SENTINEL" }, parent.sessionId), "task_send")
-    await bounded(cancelling ?? Promise.reject(new Error("the reopened child was never reattached")), "the racing task_cancel")
+    const sent = await bounded(
+      runTaskSend(parent.manager, { to: child.task_id, message: "LATE_SENTINEL" }, parent.sessionId),
+      "task_send",
+    )
+    await bounded(
+      cancelling ?? Promise.reject(new Error("the reopened child was never reattached")),
+      "the racing task_cancel",
+    )
 
     // then
     expect(sent.details).toMatchObject({ kind: "not_continuable", task_id: child.task_id })
@@ -102,7 +122,10 @@ describe("a cancel that skips the abort", () => {
     expect(concurrencyOf(parent).getCount(HOST_CHILD_MODEL)).toBe(1)
 
     // when
-    const cancelled = await bounded(parent.manager.cancelTask(child.task_id, "dag node skipped", { abort: "skip" }), "the cancel")
+    const cancelled = await bounded(
+      parent.manager.cancelTask(child.task_id, "dag node skipped", { abort: "skip" }),
+      "the cancel",
+    )
 
     // then
     expect(cancelled.kind).toBe("cancelled")

@@ -38,15 +38,19 @@ async function identityWithDeadWriter(agentId: string): Promise<IdentityPaths> {
   const dead = spawn(process.execPath, ["-e", ""], { stdio: "ignore" })
   expect(await exitedWithin(dead, 5_000)).toBe(true)
   if (dead.pid === undefined) throw new Error("dead child has no pid")
-  await writeFile(memoryWriterLockPath(paths.locks), JSON.stringify({
-    pid: dead.pid,
-    process_start: "unavailable",
-    hostname: hostname(),
-    nonce: randomUUID(),
-    created_at: new Date().toISOString(),
-    purpose: "memory-write",
-    git_activity_lock: true,
-  }), "utf8")
+  await writeFile(
+    memoryWriterLockPath(paths.locks),
+    JSON.stringify({
+      pid: dead.pid,
+      process_start: "unavailable",
+      hostname: hostname(),
+      nonce: randomUUID(),
+      created_at: new Date().toISOString(),
+      purpose: "memory-write",
+      git_activity_lock: true,
+    }),
+    "utf8",
+  )
   return paths
 }
 
@@ -70,58 +74,74 @@ async function withWriterLock<T>(paths: IdentityPaths, run: () => Promise<T>): P
 }
 
 describe("the dead-owner reclaim authorization is scoped to one acquisition of one lock (omo #10199 r5 MEDIUM 3)", () => {
-  test.skipIf(process.platform === "win32")("#given a takeover acquisition that was released #when a LATER ordinary acquisition sweeps #then the stranded lock is kept", async () => {
-    // #given
-    const paths = await identityWithDeadWriter("authz-released")
-    await withWriterLock(paths, async () => undefined)
-    const lockPath = await strandIndexLock(paths.repo)
+  test.skipIf(process.platform === "win32")(
+    "#given a takeover acquisition that was released #when a LATER ordinary acquisition sweeps #then the stranded lock is kept",
+    async () => {
+      // #given
+      const paths = await identityWithDeadWriter("authz-released")
+      await withWriterLock(paths, async () => undefined)
+      const lockPath = await strandIndexLock(paths.repo)
 
-    // #when
-    const report = await withWriterLock(paths, () => sweepStrandedGitLockFiles(paths.repo, 50))
+      // #when
+      const report = await withWriterLock(paths, () => sweepStrandedGitLockFiles(paths.repo, 50))
 
-    // #then
-    expect(report.removed).toEqual([])
-    expect(existsSync(lockPath)).toBe(true)
-  }, 30_000)
+      // #then
+      expect(report.removed).toEqual([])
+      expect(existsSync(lockPath)).toBe(true)
+    },
+    30_000,
+  )
 
-  test.skipIf(process.platform === "win32")("#given the dead writer reclaimed by the directory sweep of ANOTHER lock's acquisition #when the writer lock is then acquired and sweeps #then the stranded lock is kept", async () => {
-    // #given: acquiring the maintenance lock runs the directory hygiene, which reclaims the dead
-    // writer lock with a throwaway record. That proof belongs to no writer acquisition.
-    const paths = await identityWithDeadWriter("authz-other-lock")
-    const maintenance = await createLockRecord("memory-maintenance")
-    await acquireLock(memoryMaintenanceLockPath(paths.locks), maintenance, { waitTimeoutMs: 5_000, retryDelayMs: 5 })
-    await releaseLock(memoryMaintenanceLockPath(paths.locks), maintenance)
-    const lockPath = await strandIndexLock(paths.repo)
+  test.skipIf(process.platform === "win32")(
+    "#given the dead writer reclaimed by the directory sweep of ANOTHER lock's acquisition #when the writer lock is then acquired and sweeps #then the stranded lock is kept",
+    async () => {
+      // #given: acquiring the maintenance lock runs the directory hygiene, which reclaims the dead
+      // writer lock with a throwaway record. That proof belongs to no writer acquisition.
+      const paths = await identityWithDeadWriter("authz-other-lock")
+      const maintenance = await createLockRecord("memory-maintenance")
+      await acquireLock(memoryMaintenanceLockPath(paths.locks), maintenance, { waitTimeoutMs: 5_000, retryDelayMs: 5 })
+      await releaseLock(memoryMaintenanceLockPath(paths.locks), maintenance)
+      const lockPath = await strandIndexLock(paths.repo)
 
-    // #when
-    const report = await withWriterLock(paths, () => sweepStrandedGitLockFiles(paths.repo, 50))
+      // #when
+      const report = await withWriterLock(paths, () => sweepStrandedGitLockFiles(paths.repo, 50))
 
-    // #then
-    expect(report.removed).toEqual([])
-    expect(existsSync(lockPath)).toBe(true)
-  }, 30_000)
+      // #then
+      expect(report.removed).toEqual([])
+      expect(existsSync(lockPath)).toBe(true)
+    },
+    30_000,
+  )
 
-  test.skipIf(process.platform === "win32")("#given a takeover of identity A's writer lock held #when identity B's repo is swept under B's ordinary acquisition #then B's stranded lock is kept and A's is reclaimed", async () => {
-    // #given
-    const a = await identityWithDeadWriter("authz-a")
-    const root = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-sweep-authz-b-")))
-    roots.push(root)
-    const b = buildIdentityPaths(root, "authz-b")
-    await mkdir(b.repo, { recursive: true })
-    await mkdir(b.locks, { recursive: true })
-    await git(b.repo, ["init", "-b", "main"])
-    const lockA = await strandIndexLock(a.repo)
-    const lockB = await strandIndexLock(b.repo)
+  test.skipIf(process.platform === "win32")(
+    "#given a takeover of identity A's writer lock held #when identity B's repo is swept under B's ordinary acquisition #then B's stranded lock is kept and A's is reclaimed",
+    async () => {
+      // #given
+      const a = await identityWithDeadWriter("authz-a")
+      const root = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-sweep-authz-b-")))
+      roots.push(root)
+      const b = buildIdentityPaths(root, "authz-b")
+      await mkdir(b.repo, { recursive: true })
+      await mkdir(b.locks, { recursive: true })
+      await git(b.repo, ["init", "-b", "main"])
+      const lockA = await strandIndexLock(a.repo)
+      const lockB = await strandIndexLock(b.repo)
 
-    // #when
-    const [reportA, reportB] = await withWriterLock(a, async () => [
-      await sweepStrandedGitLockFiles(a.repo, 50),
-      await withWriterLock(b, () => sweepStrandedGitLockFiles(b.repo, 50)),
-    ] as const)
+      // #when
+      const [reportA, reportB] = await withWriterLock(
+        a,
+        async () =>
+          [
+            await sweepStrandedGitLockFiles(a.repo, 50),
+            await withWriterLock(b, () => sweepStrandedGitLockFiles(b.repo, 50)),
+          ] as const,
+      )
 
-    // #then
-    expect(reportB.removed).toEqual([])
-    expect(existsSync(lockB)).toBe(true)
-    expect(reportA.removed).toEqual([lockA])
-  }, 30_000)
+      // #then
+      expect(reportB.removed).toEqual([])
+      expect(existsSync(lockB)).toBe(true)
+      expect(reportA.removed).toEqual([lockA])
+    },
+    30_000,
+  )
 })

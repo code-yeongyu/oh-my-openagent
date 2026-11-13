@@ -3,7 +3,8 @@ const START = "<!-- omo:current-releases:start -->"
 const END = "<!-- omo:current-releases:end -->"
 
 export function stampCurrentSection(changelog: string, section: string): string {
-  if (typeof changelog !== "string" || typeof section !== "string" || !section.trim()) throw new Error("changelog and section are required")
+  if (typeof changelog !== "string" || typeof section !== "string" || !section.trim())
+    throw new Error("changelog and section are required")
   if (changelog.includes(START) || changelog.includes(END)) throw new Error("current release section already exists")
   return `${changelog.trimEnd()}\n\n${START}\n${section.trim()}\n${END}\n`
 }

@@ -15,12 +15,15 @@ function memoryFileSystem(paths: readonly string[]): ConfigMigrationDiscoveryFil
   return {
     existsSync: (path): boolean => files.has(win32.normalize(path).toLowerCase()),
     readdirSync: (directory): string[] => {
-      const prefix = `${win32.normalize(directory).replace(/[\\/]$/, "").toLowerCase()}\\`
-      return [...new Set(
-        [...files]
-          .filter((path) => path.startsWith(prefix))
-          .map((path) => path.slice(prefix.length).split("\\")[0])
-      )]
+      const prefix = `${win32
+        .normalize(directory)
+        .replace(/[\\/]$/, "")
+        .toLowerCase()}\\`
+      return [
+        ...new Set(
+          [...files].filter((path) => path.startsWith(prefix)).map((path) => path.slice(prefix.length).split("\\")[0]),
+        ),
+      ]
     },
     realpathSync: (path): string => win32.normalize(path),
   }
@@ -33,9 +36,8 @@ function shortPathMemoryFileSystem(
 ): ConfigMigrationDiscoveryFileSystem {
   const normalizedShortHome = win32.normalize(shortHome)
   const normalizedLongHome = win32.normalize(longHome)
-  const normalize = (path: string): string => win32.normalize(path)
-    .replace(normalizedShortHome, normalizedLongHome)
-    .toLowerCase()
+  const normalize = (path: string): string =>
+    win32.normalize(path).replace(normalizedShortHome, normalizedLongHome).toLowerCase()
   const files = new Set(paths.map(normalize))
   const existsSync = (path: string): boolean => {
     const key = normalize(path)
@@ -45,11 +47,11 @@ function shortPathMemoryFileSystem(
     existsSync,
     readdirSync: (directory): string[] => {
       const prefix = `${normalize(directory).replace(/[\\/]$/, "")}\\`
-      return [...new Set(
-        [...files]
-          .filter((path) => path.startsWith(prefix))
-          .map((path) => path.slice(prefix.length).split("\\")[0])
-      )]
+      return [
+        ...new Set(
+          [...files].filter((path) => path.startsWith(prefix)).map((path) => path.slice(prefix.length).split("\\")[0]),
+        ),
+      ]
     },
     realpathSync: (path): string => {
       if (!existsSync(path)) throw Object.assign(new Error(`Missing ${path}`), { code: "ENOENT" })
@@ -75,17 +77,17 @@ describe("legacy config discovery", () => {
     const homeDir = "/home/alice"
     const customProfileDir = "/home/alice/.config/opencode/profiles/kimi/"
     const fileSystem: ConfigMigrationDiscoveryFileSystem = {
-      existsSync: (path): boolean => new Set([
-        "/home/alice/.config/opencode/oh-my-openagent.jsonc",
-        "/home/alice/.config/opencode/profiles/kimi/oh-my-openagent.jsonc",
-        "/home/alice/.config/opencode/profiles/quiet/oh-my-opencode.json",
-        "/home/alice/.config/ai.opencode.desktop/oh-my-openagent.json",
-        "/work/repo/.opencode/oh-my-openagent.jsonc",
-        "/home/alice/.omo/config.jsonc",
-      ]).has(path),
-      readdirSync: (path): string[] => path === "/home/alice/.config/opencode/profiles"
-        ? ["kimi", "quiet", "__test"]
-        : [],
+      existsSync: (path): boolean =>
+        new Set([
+          "/home/alice/.config/opencode/oh-my-openagent.jsonc",
+          "/home/alice/.config/opencode/profiles/kimi/oh-my-openagent.jsonc",
+          "/home/alice/.config/opencode/profiles/quiet/oh-my-opencode.json",
+          "/home/alice/.config/ai.opencode.desktop/oh-my-openagent.json",
+          "/work/repo/.opencode/oh-my-openagent.jsonc",
+          "/home/alice/.omo/config.jsonc",
+        ]).has(path),
+      readdirSync: (path): string[] =>
+        path === "/home/alice/.config/opencode/profiles" ? ["kimi", "quiet", "__test"] : [],
       realpathSync: (path): string => path.replace(/\/$/, ""),
     }
 
@@ -104,10 +106,7 @@ describe("legacy config discovery", () => {
     })
 
     // then
-    expect(groups.map((group) => group.id)).toEqual([
-      OPENCODE_CONFIG_MIGRATION_ID,
-      CONFIG_JSONC_MIGRATION_ID,
-    ])
+    expect(groups.map((group) => group.id)).toEqual([OPENCODE_CONFIG_MIGRATION_ID, CONFIG_JSONC_MIGRATION_ID])
     const opencodeGroup = groups[0]
     expect(opencodeGroup.sources.map((source) => source.path)).toEqual([
       "/home/alice/.config/opencode/oh-my-openagent.jsonc",
@@ -135,14 +134,16 @@ describe("legacy config discovery", () => {
     const sourcePath = win32.join(shortHome, ".config", "opencode", "oh-my-openagent.json")
 
     // when
-    const groups = withProcessPlatform("win32", () => discoverLegacyConfigGroups({
-      cwd: win32.join(shortHome, "project"),
-      environment: { HOME: shortHome, OPENCODE_CONFIG_DIR: win32.join(shortHome, ".config", "opencode") },
-      fileSystem: shortPathMemoryFileSystem(shortHome, longHome, [sourcePath]),
-      homeDir: shortHome,
-      pathOperations: win32,
-      platform: "linux",
-    }))
+    const groups = withProcessPlatform("win32", () =>
+      discoverLegacyConfigGroups({
+        cwd: win32.join(shortHome, "project"),
+        environment: { HOME: shortHome, OPENCODE_CONFIG_DIR: win32.join(shortHome, ".config", "opencode") },
+        fileSystem: shortPathMemoryFileSystem(shortHome, longHome, [sourcePath]),
+        homeDir: shortHome,
+        pathOperations: win32,
+        platform: "linux",
+      }),
+    )
 
     // then
     expect(groups[0]?.sources).toEqual([
@@ -198,8 +199,9 @@ describe("legacy config discovery", () => {
           XDG_CONFIG_HOME: "/mnt/c/Users/Alice/.config",
         },
         fileSystem: {
-          existsSync: (path): boolean => path === "/mnt/c/Users/Alice/.config/opencode/profiles/kimi/oh-my-openagent.jsonc",
-          readdirSync: (path): string[] => path === "/mnt/c/Users/Alice/.config/opencode/profiles" ? ["kimi"] : [],
+          existsSync: (path): boolean =>
+            path === "/mnt/c/Users/Alice/.config/opencode/profiles/kimi/oh-my-openagent.jsonc",
+          readdirSync: (path): string[] => (path === "/mnt/c/Users/Alice/.config/opencode/profiles" ? ["kimi"] : []),
           realpathSync: (path): string => path.replace(/\/$/, ""),
         },
         homeDir: "/home/alice",

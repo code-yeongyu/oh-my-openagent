@@ -40,10 +40,12 @@ function protocolInfo(overrides: Partial<SenpiHostProtocolInfo> = {}): SenpiHost
  * that expects `fallback:engine_mismatch` only gets it when the host's engineVersion really differs
  * under policy `fallback`. The engine owns the authoritative table and its own test.
  */
-function fakeHostPort(options: {
-  readonly host?: SenpiHostProtocolInfo | undefined
-  readonly ensure?: (input: EnsureHostInput) => Promise<EnsuredSenpiHost>
-} = {}): TaskDaemonHostPort & { readonly probes: string[]; readonly ensured: EnsureHostInput[] } {
+function fakeHostPort(
+  options: {
+    readonly host?: SenpiHostProtocolInfo | undefined
+    readonly ensure?: (input: EnsureHostInput) => Promise<EnsuredSenpiHost>
+  } = {},
+): TaskDaemonHostPort & { readonly probes: string[]; readonly ensured: EnsureHostInput[] } {
   const probes: string[] = []
   const ensured: EnsureHostInput[] = []
   return {
@@ -108,12 +110,25 @@ function ensureInput(
 describe("resolveTaskHostSocket", () => {
   test("#given several socket overrides #when resolving #then the four names win in order and blanks are skipped", () => {
     // given / when / then
-    expect(TASK_HOST_SOCKET_ENV_NAMES).toEqual(["OMO_RPC_SOCKET", "SENPI_RPC_SOCKET", "PI_RPC_SOCKET", "OMO_RPC_SOCKET_PATH"])
+    expect(TASK_HOST_SOCKET_ENV_NAMES).toEqual([
+      "OMO_RPC_SOCKET",
+      "SENPI_RPC_SOCKET",
+      "PI_RPC_SOCKET",
+      "OMO_RPC_SOCKET_PATH",
+    ])
     const agentDir = join("/h", ".omo", "agent")
-    expect(resolveTaskHostSocket({ OMO_RPC_SOCKET: "/brand.sock", SENPI_RPC_SOCKET: "/legacy.sock" }, agentDir)).toBe("/brand.sock")
-    expect(resolveTaskHostSocket({ SENPI_RPC_SOCKET: "/legacy.sock", PI_RPC_SOCKET: "/pi.sock" }, agentDir)).toBe("/legacy.sock")
-    expect(resolveTaskHostSocket({ PI_RPC_SOCKET: "/pi.sock", OMO_RPC_SOCKET_PATH: "/desktop.sock" }, agentDir)).toBe("/pi.sock")
-    expect(resolveTaskHostSocket({ OMO_RPC_SOCKET: "  ", OMO_RPC_SOCKET_PATH: "/desktop.sock" }, agentDir)).toBe("/desktop.sock")
+    expect(resolveTaskHostSocket({ OMO_RPC_SOCKET: "/brand.sock", SENPI_RPC_SOCKET: "/legacy.sock" }, agentDir)).toBe(
+      "/brand.sock",
+    )
+    expect(resolveTaskHostSocket({ SENPI_RPC_SOCKET: "/legacy.sock", PI_RPC_SOCKET: "/pi.sock" }, agentDir)).toBe(
+      "/legacy.sock",
+    )
+    expect(resolveTaskHostSocket({ PI_RPC_SOCKET: "/pi.sock", OMO_RPC_SOCKET_PATH: "/desktop.sock" }, agentDir)).toBe(
+      "/pi.sock",
+    )
+    expect(resolveTaskHostSocket({ OMO_RPC_SOCKET: "  ", OMO_RPC_SOCKET_PATH: "/desktop.sock" }, agentDir)).toBe(
+      "/desktop.sock",
+    )
   })
 
   test("#given no socket override #when resolving #then the agent dir's public rpc socket is used", () => {
@@ -183,7 +198,10 @@ describe("ensureTaskDaemon", () => {
 
   test("#given no host on the socket #when ensuring #then the daemon is started", async () => {
     // given
-    const host = fakeHostPort({ host: undefined, ensure: async (input) => ({ pid: 7, socket: input.socket, reused: false }) })
+    const host = fakeHostPort({
+      host: undefined,
+      ensure: async (input) => ({ pid: 7, socket: input.socket, reused: false }),
+    })
 
     // when
     const ensured = await ensureTaskDaemon(ensureInput(host))
@@ -227,7 +245,9 @@ describe("ensureTaskDaemon", () => {
     const equal = fakeHostPort({ host: protocolInfo() })
 
     // when
-    const failure = await ensureTaskDaemon(ensureInput(differing, { policy: "fallback" })).catch((error: unknown) => error)
+    const failure = await ensureTaskDaemon(ensureInput(differing, { policy: "fallback" })).catch(
+      (error: unknown) => error,
+    )
     const ensured = await ensureTaskDaemon(ensureInput(equal, { policy: "fallback" }))
 
     // then
@@ -259,7 +279,9 @@ describe("ensureTaskDaemon", () => {
     const host = fakeHostPort({
       host: protocolInfo(),
       ensure: async () => {
-        throw new Error(`EACCES: permission denied, mkdir '${home}/.omo/agent/rpc'\n  at startHost (${home}/engine.js:1:1)`)
+        throw new Error(
+          `EACCES: permission denied, mkdir '${home}/.omo/agent/rpc'\n  at startHost (${home}/engine.js:1:1)`,
+        )
       },
     })
 
@@ -282,7 +304,9 @@ describe("ensureTaskDaemon", () => {
     const input = ensureInput(host)
 
     // when
-    const failure = await ensureTaskDaemon({ ...input, ports: { ...input.ports, platform: "win32" } }).catch((error: unknown) => error)
+    const failure = await ensureTaskDaemon({ ...input, ports: { ...input.ports, platform: "win32" } }).catch(
+      (error: unknown) => error,
+    )
 
     // then
     expect(failure).toBeInstanceOf(HostUnavailableError)
@@ -297,7 +321,9 @@ describe("ensureTaskDaemon", () => {
     const input = ensureInput(host)
 
     // when
-    const failure = await ensureTaskDaemon({ ...input, ports: { ...input.ports, bunRuntimeAvailable: false } }).catch((error: unknown) => error)
+    const failure = await ensureTaskDaemon({ ...input, ports: { ...input.ports, bunRuntimeAvailable: false } }).catch(
+      (error: unknown) => error,
+    )
 
     // then
     expect(failure).toBeInstanceOf(HostUnavailableError)
@@ -356,7 +382,6 @@ describe("ensureTaskDaemon", () => {
     // then
     expect(host.probes).toHaveLength(2)
   })
-
 })
 
 // What the ensured daemon can do decides `task.default_execution_mode: "auto"`, so the ensure hands
@@ -403,7 +428,10 @@ describe("ensureTaskDaemon capabilities", () => {
 
   test("#given a started daemon that answers no probe #when ensured #then the capabilities are absent instead of guessed", async () => {
     // given
-    const host = fakeHostPort({ host: undefined, ensure: async (input) => ({ pid: 7, socket: input.socket, reused: false }) })
+    const host = fakeHostPort({
+      host: undefined,
+      ensure: async (input) => ({ pid: 7, socket: input.socket, reused: false }),
+    })
 
     // when
     const ensured = await ensureTaskDaemon(ensureInput(host))
@@ -427,10 +455,13 @@ describe("ensureTaskDaemon attach hold", () => {
     // given
     const order: string[] = []
     let started = false
-    const base = fakeHostPort({ host: undefined, ensure: async (input) => {
-      started = true
-      return await heldEnsure(order, { reused: false })(input)
-    } })
+    const base = fakeHostPort({
+      host: undefined,
+      ensure: async (input) => {
+        started = true
+        return await heldEnsure(order, { reused: false })(input)
+      },
+    })
     const host: typeof base = {
       ...base,
       probeHost: async ({ socket }) => {
@@ -464,10 +495,13 @@ describe("ensureTaskDaemon attach hold", () => {
     // given
     const order: string[] = []
     let started = false
-    const base = fakeHostPort({ host: undefined, ensure: async (input) => {
-      started = true
-      return await heldEnsure(order, { reused: false })(input)
-    } })
+    const base = fakeHostPort({
+      host: undefined,
+      ensure: async (input) => {
+        started = true
+        return await heldEnsure(order, { reused: false })(input)
+      },
+    })
     const host: typeof base = {
       ...base,
       probeHost: async () => {
@@ -500,7 +534,10 @@ describe("ensureTaskDaemon attach hold", () => {
 
   test("#given an engine pin whose ensure carries no hold #when ensuring #then the ensure still succeeds", async () => {
     // given
-    const host = fakeHostPort({ host: protocolInfo(), ensure: async (input) => ({ pid: 1, socket: input.socket, reused: true }) })
+    const host = fakeHostPort({
+      host: protocolInfo(),
+      ensure: async (input) => ({ pid: 1, socket: input.socket, reused: true }),
+    })
 
     // when
     const ensured = await ensureTaskDaemon(ensureInput(host))

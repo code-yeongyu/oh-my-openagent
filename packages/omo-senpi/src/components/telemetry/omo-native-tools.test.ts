@@ -4,14 +4,8 @@ import { tmpdir } from "node:os"
 import { join, win32 } from "node:path"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import {
-  OMO_NATIVE_PROPERTY_ALLOWLISTS,
-  type OmoNativeEventName,
-} from "./product-identity"
-import {
-  builtinSkillNameFromCanonicalPaths,
-  registerOmoNativeToolTelemetry,
-} from "./omo-native-tools"
+import { OMO_NATIVE_PROPERTY_ALLOWLISTS, type OmoNativeEventName } from "./product-identity"
+import { builtinSkillNameFromCanonicalPaths, registerOmoNativeToolTelemetry } from "./omo-native-tools"
 import { AUTOMOUNT_TRIGGER_CASES, withAutomountTrap } from "../../automount-trap.test-support"
 
 type CapturedEvent = { readonly name: OmoNativeEventName; readonly properties: Readonly<Record<string, unknown>> }
@@ -71,7 +65,10 @@ function createSkill(skillsRoot: string, name: string): string {
   return path
 }
 
-function eventProperties(events: readonly CapturedEvent[], name: OmoNativeEventName): Readonly<Record<string, unknown>>[] {
+function eventProperties(
+  events: readonly CapturedEvent[],
+  name: OmoNativeEventName,
+): Readonly<Record<string, unknown>>[] {
   return events.filter((event) => event.name === name).map((event) => event.properties)
 }
 
@@ -82,7 +79,9 @@ describe("OmO Native tool telemetry", () => {
 
     await pi.dispatch("tool_result", result("builtin:Read", { path }), context())
 
-    expect(events).toEqual([{ name: "skill_loaded", properties: { $session_id: "hashed:session-a", skill_name: "ulw-plan" } }])
+    expect(events).toEqual([
+      { name: "skill_loaded", properties: { $session_id: "hashed:session-a", skill_name: "ulw-plan" } },
+    ])
   })
 
   test("#given outside, custom, traversal, symlink, and injected skill paths #when read results arrive #then no skill name is emitted", async () => {
@@ -94,7 +93,13 @@ describe("OmO Native tool telemetry", () => {
     const symlinkPath = join(skillsRoot, "debugging")
     symlinkSync(join(outsideRoot, "ulw-plan"), symlinkPath, process.platform === "win32" ? "junction" : "dir")
 
-    for (const path of [outside, custom, injected, join(skillsRoot, "..", "..", "etc", "passwd"), join(symlinkPath, "SKILL.md")]) {
+    for (const path of [
+      outside,
+      custom,
+      injected,
+      join(skillsRoot, "..", "..", "etc", "passwd"),
+      join(symlinkPath, "SKILL.md"),
+    ]) {
       await pi.dispatch("tool_result", result("read", { path }), context())
     }
     await pi.dispatch("tool_result", result("read", { path: null }), context())
@@ -105,21 +110,23 @@ describe("OmO Native tool telemetry", () => {
   test("#given canonical Windows paths #when builtin paths vary by case or namespace #then the builtin skill is matched", () => {
     const root = "C:\\Users\\runneradmin\\plugin\\skills"
 
-    expect(builtinSkillNameFromCanonicalPaths(
-      root,
-      "c:\\users\\RUNNERADMIN\\plugin\\SKILLS\\DEBUGGING\\skill.md",
-      win32,
-    )).toBe("debugging")
-    expect(builtinSkillNameFromCanonicalPaths(
-      root,
-      "\\\\?\\C:\\Users\\runneradmin\\plugin\\skills\\ulw-plan\\SKILL.md",
-      win32,
-    )).toBe("ulw-plan")
-    expect(builtinSkillNameFromCanonicalPaths(
-      "\\\\server\\share\\plugin\\skills",
-      "\\\\?\\UNC\\server\\share\\plugin\\skills\\debugging\\SKILL.md",
-      win32,
-    )).toBe("debugging")
+    expect(
+      builtinSkillNameFromCanonicalPaths(root, "c:\\users\\RUNNERADMIN\\plugin\\SKILLS\\DEBUGGING\\skill.md", win32),
+    ).toBe("debugging")
+    expect(
+      builtinSkillNameFromCanonicalPaths(
+        root,
+        "\\\\?\\C:\\Users\\runneradmin\\plugin\\skills\\ulw-plan\\SKILL.md",
+        win32,
+      ),
+    ).toBe("ulw-plan")
+    expect(
+      builtinSkillNameFromCanonicalPaths(
+        "\\\\server\\share\\plugin\\skills",
+        "\\\\?\\UNC\\server\\share\\plugin\\skills\\debugging\\SKILL.md",
+        win32,
+      ),
+    ).toBe("debugging")
   })
 
   test("#given canonical Windows paths outside the builtin root #when matched #then no skill name is emitted", () => {
@@ -139,16 +146,38 @@ describe("OmO Native tool telemetry", () => {
   test("#given a background category batch of three #when task completes #then every item uses the batch bucket", async () => {
     const { pi, events } = fixture()
 
-    await pi.dispatch("tool_result", result("omo/task", {
-      category: "deep-low",
-      run_in_background: true,
-      tasks: [{ prompt: "one" }, { prompt: "two" }, { prompt: "three" }],
-    }), context())
+    await pi.dispatch(
+      "tool_result",
+      result("omo/task", {
+        category: "deep-low",
+        run_in_background: true,
+        tasks: [{ prompt: "one" }, { prompt: "two" }, { prompt: "three" }],
+      }),
+      context(),
+    )
 
     expect(eventProperties(events, "delegation_started")).toEqual([
-      { $session_id: "hashed:session-a", kind: "category", name: "deep-low", background: true, batch_size_bucket: "2_4" },
-      { $session_id: "hashed:session-a", kind: "category", name: "deep-low", background: true, batch_size_bucket: "2_4" },
-      { $session_id: "hashed:session-a", kind: "category", name: "deep-low", background: true, batch_size_bucket: "2_4" },
+      {
+        $session_id: "hashed:session-a",
+        kind: "category",
+        name: "deep-low",
+        background: true,
+        batch_size_bucket: "2_4",
+      },
+      {
+        $session_id: "hashed:session-a",
+        kind: "category",
+        name: "deep-low",
+        background: true,
+        batch_size_bucket: "2_4",
+      },
+      {
+        $session_id: "hashed:session-a",
+        kind: "category",
+        name: "deep-low",
+        background: true,
+        batch_size_bucket: "2_4",
+      },
     ])
   })
 
@@ -168,14 +197,33 @@ describe("OmO Native tool telemetry", () => {
     const { pi, events } = fixture()
 
     await pi.dispatch("tool_result", result("task", { prompt: "review", subagent_type: "momus" }), context())
-    await pi.dispatch("tool_result", result("task", {
-      tasks: [{ prompt: "consult", subagent_type: "metis" }, { prompt: "scan", subagent_type: "explore" }],
-    }), context())
+    await pi.dispatch(
+      "tool_result",
+      result("task", {
+        tasks: [
+          { prompt: "consult", subagent_type: "metis" },
+          { prompt: "scan", subagent_type: "explore" },
+        ],
+      }),
+      context(),
+    )
 
     expect(eventProperties(events, "delegation_started")).toEqual([
       { $session_id: "hashed:session-a", kind: "subagent", name: "custom", background: false, batch_size_bucket: "1" },
-      { $session_id: "hashed:session-a", kind: "subagent", name: "custom", background: false, batch_size_bucket: "2_4" },
-      { $session_id: "hashed:session-a", kind: "subagent", name: "explore", background: false, batch_size_bucket: "2_4" },
+      {
+        $session_id: "hashed:session-a",
+        kind: "subagent",
+        name: "custom",
+        background: false,
+        batch_size_bucket: "2_4",
+      },
+      {
+        $session_id: "hashed:session-a",
+        kind: "subagent",
+        name: "explore",
+        background: false,
+        batch_size_bucket: "2_4",
+      },
     ])
   })
 
@@ -229,12 +277,15 @@ describe("OmO Native tool telemetry", () => {
 })
 
 describe("skill_loaded never resolves a macOS automount trigger (#11545)", () => {
-  test.each([...AUTOMOUNT_TRIGGER_CASES])("#given a read of %s on darwin #when its tool_result arrives #then no skill is reported and the trigger is never resolved", async (path) => {
-    const { pi, events } = fixture()
-    const touched = await withAutomountTrap(async () => {
-      await pi.dispatch("tool_result", result("read", { path }), context())
-    })
-    expect(touched).toEqual([])
-    expect(events.filter((event) => event.name === "skill_loaded")).toEqual([])
-  })
+  test.each([...AUTOMOUNT_TRIGGER_CASES])(
+    "#given a read of %s on darwin #when its tool_result arrives #then no skill is reported and the trigger is never resolved",
+    async (path) => {
+      const { pi, events } = fixture()
+      const touched = await withAutomountTrap(async () => {
+        await pi.dispatch("tool_result", result("read", { path }), context())
+      })
+      expect(touched).toEqual([])
+      expect(events.filter((event) => event.name === "skill_loaded")).toEqual([])
+    },
+  )
 })

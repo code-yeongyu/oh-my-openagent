@@ -14,12 +14,16 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(scriptDir, "..", "..")
 const defaultSourceRoot = process.env.OMO_OMOWRIGHT_SOURCE ?? join(repoRoot, "node_modules", "omowright")
-const defaultTargetDir = process.env.OMO_OMOWRIGHT_TARGET ?? join(scriptDir, "skills", "browser", "runtime", "omowright")
+const defaultTargetDir =
+  process.env.OMO_OMOWRIGHT_TARGET ?? join(scriptDir, "skills", "browser", "runtime", "omowright")
 
-export const STAGED_FILES = Object.freeze(["index.js", "page-bundle.js"])
+// LICENSE is omowright's own MIT text, copied verbatim so the notice ships beside the bundle (omowright#290).
+export const STAGED_FILES = Object.freeze(["index.js", "page-bundle.js", "LICENSE"])
 
 async function sha256(path) {
-  return createHash("sha256").update(await readFile(path)).digest("hex")
+  return createHash("sha256")
+    .update(await readFile(path))
+    .digest("hex")
 }
 
 async function readSourceVersion(sourceRoot) {
@@ -55,16 +59,27 @@ function resolveLayout(sourceRoot) {
 }
 
 async function sourceDigest(sourceRoot, layout) {
-  const entries = ["package.json", layout.entry, layout.pageBundle, ...layout.sources]
+  const entries = ["package.json", "LICENSE", layout.entry, layout.pageBundle, ...layout.sources]
   const hash = createHash("sha256")
-  for (const entry of entries) hash.update(entry).update("\0").update(await readFile(join(sourceRoot, entry)))
+  for (const entry of entries)
+    hash
+      .update(entry)
+      .update("\0")
+      .update(await readFile(join(sourceRoot, entry)))
   return hash.digest("hex")
 }
 
 function bundle({ sourceRoot, layout, outFile, bunExecutable }) {
   const result = spawnSync(
     bunExecutable,
-    ["build", join(sourceRoot, layout.entry), "--target=node", "--format=esm", "--minify-whitespace", `--outfile=${outFile}`],
+    [
+      "build",
+      join(sourceRoot, layout.entry),
+      "--target=node",
+      "--format=esm",
+      "--minify-whitespace",
+      `--outfile=${outFile}`,
+    ],
     { cwd: sourceRoot, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
   )
   if (result.status !== 0) {
@@ -78,6 +93,9 @@ export async function stageOmowrightRuntime(options = {}) {
   const bunExecutable = options.bunExecutable ?? process.env.BUN ?? "bun"
   const version = await readSourceVersion(sourceRoot)
   const layout = resolveLayout(sourceRoot)
+  if (!existsSync(join(sourceRoot, "LICENSE"))) {
+    throw new Error(`omowright has no LICENSE to ship beside the bundle: ${join(sourceRoot, "LICENSE")}`)
+  }
   const digest = await sourceDigest(sourceRoot, layout)
 
   await mkdir(dirname(targetDir), { recursive: true })
@@ -90,6 +108,7 @@ export async function stageOmowrightRuntime(options = {}) {
     await mkdir(tempDir, { recursive: true })
     bundle({ sourceRoot, layout, outFile: join(tempDir, "index.js"), bunExecutable })
     await copyFile(join(sourceRoot, layout.pageBundle), join(tempDir, "page-bundle.js"))
+    await copyFile(join(sourceRoot, "LICENSE"), join(tempDir, "LICENSE"))
     const files = {}
     for (const name of STAGED_FILES) files[name] = await sha256(join(tempDir, name))
     await writeFile(
@@ -97,7 +116,13 @@ export async function stageOmowrightRuntime(options = {}) {
       `${JSON.stringify({ version, sourceDigest: digest, files, stagedAtUtc: new Date().toISOString() }, null, 2)}\n`,
       "utf8",
     )
-    try { await access(targetDir); await rename(targetDir, backupDir); backupCreated = true } catch (error) { if (error.code !== "ENOENT") throw error }
+    try {
+      await access(targetDir)
+      await rename(targetDir, backupDir)
+      backupCreated = true
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error
+    }
     await rename(tempDir, targetDir)
     targetMoved = true
     if (backupCreated) await rm(backupDir, { recursive: true, force: true })
@@ -121,7 +146,8 @@ export async function checkOmowrightRuntimeFresh(options = {}) {
   try {
     manifest = JSON.parse(await readFile(join(targetDir, "manifest.json"), "utf8"))
   } catch (error) {
-    if (error.code === "ENOENT") throw new Error(`omowright runtime stale: manifest is missing: ${join(targetDir, "manifest.json")}`)
+    if (error.code === "ENOENT")
+      throw new Error(`omowright runtime stale: manifest is missing: ${join(targetDir, "manifest.json")}`)
     throw new Error(`omowright runtime stale: manifest is unreadable: ${error.message}`)
   }
   if (manifest.sourceDigest !== digest) {
@@ -129,12 +155,16 @@ export async function checkOmowrightRuntimeFresh(options = {}) {
   }
   for (const name of STAGED_FILES) {
     let actual
-    try { actual = await sha256(join(targetDir, name)) } catch (error) {
+    try {
+      actual = await sha256(join(targetDir, name))
+    } catch (error) {
       if (error.code === "ENOENT") throw new Error(`omowright runtime stale: ${name} is missing from ${targetDir}`)
       throw error
     }
     if (manifest.files?.[name] !== actual) {
-      throw new Error(`omowright runtime stale: ${name} sha256 ${actual} does not match manifest ${manifest.files?.[name]}`)
+      throw new Error(
+        `omowright runtime stale: ${name} sha256 ${actual} does not match manifest ${manifest.files?.[name]}`,
+      )
     }
   }
   return { ok: true, sourceRoot, targetDir, version: manifest.version, sourceDigest: digest }

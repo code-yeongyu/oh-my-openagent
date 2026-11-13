@@ -9,9 +9,13 @@ export const SKILL_MCP_DISCOVERY_TIMEOUT_MS = DEFAULT_REQUEST_TIMEOUT_MSEC / 2
 // its own, so its whole connect gets the same SDK request budget as a Streamable HTTP connect.
 export async function withConnectDeadline(connect: Promise<void>): Promise<void> {
   const expired = Promise.withResolvers<never>()
-  const timer = setTimeout(() => expired.reject(
-    new McpError(ErrorCode.RequestTimeout, "Request timed out", { timeout: DEFAULT_REQUEST_TIMEOUT_MSEC }),
-  ), DEFAULT_REQUEST_TIMEOUT_MSEC)
+  const timer = setTimeout(
+    () =>
+      expired.reject(
+        new McpError(ErrorCode.RequestTimeout, "Request timed out", { timeout: DEFAULT_REQUEST_TIMEOUT_MSEC }),
+      ),
+    DEFAULT_REQUEST_TIMEOUT_MSEC,
+  )
   try {
     await Promise.race([connect, expired.promise])
   } finally {

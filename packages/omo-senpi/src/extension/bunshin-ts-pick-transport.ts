@@ -66,12 +66,16 @@ export async function pickTransport(env: Env, deps: PickTransportDeps = BUNDLED)
   const choice = parseChoice(env[TRANSPORT_CHOICE_ENV])
   if (choice === "relay") return relayTransport(env)
   if (choice === "hub") {
-    if (deps.hub === undefined) throw new BunshinSessionError("hub_not_bundled", "hub transport is not bundled in this build")
+    if (deps.hub === undefined)
+      throw new BunshinSessionError("hub_not_bundled", "hub transport is not bundled in this build")
     return deps.hub.create()
   }
   const stateDir = nonEmpty(env[DEVICE_SERVICE_STATE_DIR_ENV])
   const status = await deps.relayStatus(stateDir === undefined ? {} : { stateDir })
   if (status.connected) return relayTransport(env)
   if (deps.hub !== undefined && (await deps.hub.configResolves())) return deps.hub.create()
-  throw new BunshinSessionError("no_transport", "no transport: the device service is not connected and no hub transport is available")
+  throw new BunshinSessionError(
+    "no_transport",
+    "no transport: the device service is not connected and no hub transport is available",
+  )
 }

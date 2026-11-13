@@ -32,22 +32,22 @@ const PRELUDE_ASSET_FIELDS: readonly (readonly [field: string, marker: string, s
   [
     "COMPUTER_PRELUDE_JAVASCRIPT",
     "computer.run() expects a function or code string",
-    "7737ef1e5b6304d31ed483243db644f7b180c13e79a5c8d1f9c885fa732f3190",
+    "7963947945cb137f8d069dd1e70c03b044857e0a7f643655fd0baafec1a1872d",
   ],
   [
     "COMPUTER_PRELUDE_PYTHON",
     "Positional args with trailing Nones dropped",
-    "acf410337ec2bac4561aaa06f77a6c5af05578a352e53cbf66aec8497c0493fa",
+    "db75c3498604c0ee87fa4e28a0b669bd8baa7860794978dd515f5c89636c7e7d",
   ],
   [
     "COMPUTER_DECLARATIONS",
     "interface ComputerClickOptions extends ComputerDeliveryOptions",
-    "4d3861c40895d296b8a4c9cc9139e3737970f227ed5b5b8fa82c9cf0924ef640",
+    "0b02aaffd28d14a2d189c3810719fe7ebe3975e9cadf4ef49db6af156ef4b0a8",
   ],
   [
     "COMPUTER_DOCUMENTATION",
     "host desktop facade, experimental (present while the `computer` tool is active)",
-    "bed4682e564615d4dc9521e3f1db2a7a99dbee75d431783bb34bca8c94a1c596",
+    "c6e5e38fcdf18803d39d227dbd29cd1f5342cc4423c7fbbfb7b5c0b2fac2277d",
   ],
   ["COMPUTER_SAFETY", "<critical>", "bd44e5231c66f4b65c9ac41f8e37234bf6ec70dea6242042ec7246b1a8658db2"],
 ]
@@ -87,7 +87,9 @@ describe("computer-use lazy runtime (#9113)", () => {
 
     for (const [field, marker, sha256] of PRELUDE_ASSET_FIELDS) {
       expect(main.includes(marker), `omo.js still bundles prelude text ${JSON.stringify(marker)}`).toBe(false)
-      expect(runtime.includes(marker), `${RUNTIME_FILE} still bundles prelude text ${JSON.stringify(marker)}`).toBe(false)
+      expect(runtime.includes(marker), `${RUNTIME_FILE} still bundles prelude text ${JSON.stringify(marker)}`).toBe(
+        false,
+      )
       expect(typeof asset[field], `staged prelude JSON lacks ${field}`).toBe("string")
       expect(
         createHash("sha256").update(asset[field]).digest("hex"),
@@ -97,61 +99,65 @@ describe("computer-use lazy runtime (#9113)", () => {
     }
   })
 
-  it("#given the built main bundle #when a session never uses the desktop #then the runtime entry is evaluated only on first use", async () => {
-    // given: a copy of the plugin whose runtime entry counts its own evaluations. It sits inside the
-    // package so the bundle's senpi peers resolve exactly as they do from plugin/extensions.
-    const root = mkdtempSync(join(packageRoot, ".computer-use-lazy-"))
-    roots.push(root)
-    const copyExtensions = join(root, "plugin", "extensions")
-    mkdirSync(copyExtensions, { recursive: true })
-    copyFileSync(join(pluginRoot, "package.json"), join(root, "plugin", "package.json"))
-    copyFileSync(join(extensionsDir, "omo.js"), join(copyExtensions, "omo.js"))
-    copyFileSync(join(extensionsDir, "assets.generated.json"), join(copyExtensions, "assets.generated.json"))
-    const realRuntime = join(extensionsDir, RUNTIME_FILE)
-    const reexport = existsSync(realRuntime)
-      ? `export * from ${JSON.stringify(pathToFileURL(copyRuntime(realRuntime, copyExtensions)).href)}\n`
-      : ""
-    writeFileSync(
-      join(copyExtensions, RUNTIME_FILE),
-      `globalThis.${EVALUATIONS} = (globalThis.${EVALUATIONS} ?? 0) + 1\n${reexport}`,
-    )
-    const home = join(root, "home")
-    mkdirSync(home)
-    const driver = join(root, "drive.mjs")
-    writeFileSync(driver, DRIVER_SOURCE)
+  it(
+    "#given the built main bundle #when a session never uses the desktop #then the runtime entry is evaluated only on first use",
+    async () => {
+      // given: a copy of the plugin whose runtime entry counts its own evaluations. It sits inside the
+      // package so the bundle's senpi peers resolve exactly as they do from plugin/extensions.
+      const root = mkdtempSync(join(packageRoot, ".computer-use-lazy-"))
+      roots.push(root)
+      const copyExtensions = join(root, "plugin", "extensions")
+      mkdirSync(copyExtensions, { recursive: true })
+      copyFileSync(join(pluginRoot, "package.json"), join(root, "plugin", "package.json"))
+      copyFileSync(join(extensionsDir, "omo.js"), join(copyExtensions, "omo.js"))
+      copyFileSync(join(extensionsDir, "assets.generated.json"), join(copyExtensions, "assets.generated.json"))
+      const realRuntime = join(extensionsDir, RUNTIME_FILE)
+      const reexport = existsSync(realRuntime)
+        ? `export * from ${JSON.stringify(pathToFileURL(copyRuntime(realRuntime, copyExtensions)).href)}\n`
+        : ""
+      writeFileSync(
+        join(copyExtensions, RUNTIME_FILE),
+        `globalThis.${EVALUATIONS} = (globalThis.${EVALUATIONS} ?? 0) + 1\n${reexport}`,
+      )
+      const home = join(root, "home")
+      mkdirSync(home)
+      const driver = join(root, "drive.mjs")
+      writeFileSync(driver, DRIVER_SOURCE)
 
-    // when
-    const child = Bun.spawn([process.execPath, driver, join(copyExtensions, "omo.js")], {
-      cwd: home,
-      env: {
-        ...process.env,
-        HOME: home,
-        USERPROFILE: home,
-        XDG_CONFIG_HOME: join(home, ".config"),
-        APPDATA: join(home, "AppData", "Roaming"),
-        LOCALAPPDATA: join(home, "AppData", "Local"),
-      },
-      stdout: "pipe",
-      stderr: "pipe",
-    })
-    const timer = setTimeout(() => child.kill(), DRIVER_TIMEOUT_MS)
-    const [stdout, stderr, exitCode] = await Promise.all([
-      new Response(child.stdout).text(),
-      new Response(child.stderr).text(),
-      child.exited,
-    ])
-    clearTimeout(timer)
+      // when
+      const child = Bun.spawn([process.execPath, driver, join(copyExtensions, "omo.js")], {
+        cwd: home,
+        env: {
+          ...process.env,
+          HOME: home,
+          USERPROFILE: home,
+          XDG_CONFIG_HOME: join(home, ".config"),
+          APPDATA: join(home, "AppData", "Roaming"),
+          LOCALAPPDATA: join(home, "AppData", "Local"),
+        },
+        stdout: "pipe",
+        stderr: "pipe",
+      })
+      const timer = setTimeout(() => child.kill(), DRIVER_TIMEOUT_MS)
+      const [stdout, stderr, exitCode] = await Promise.all([
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+        child.exited,
+      ])
+      clearTimeout(timer)
 
-    // then
-    expect(exitCode, `driver failed:\n${stderr}`).toBe(0)
-    const steps = JSON.parse(stdout.trim().split("\n").at(-1) ?? "{}") as DriverSteps
-    expect(steps.registered.tools).toEqual(["computer"])
-    expect(steps.registered.evaluations).toBe(0)
-    expect(steps.startup).toBe(0)
-    expect(steps.executed).toEqual({ evaluations: 1, text: "Closed the desktop session." })
-    expect(steps.status.evaluations).toBe(1)
-    expect(steps.status.notice).toContain("Computer use: enabled=true active=false engine=not started")
-  }, DRIVER_TIMEOUT_MS + 10_000)
+      // then
+      expect(exitCode, `driver failed:\n${stderr}`).toBe(0)
+      const steps = JSON.parse(stdout.trim().split("\n").at(-1) ?? "{}") as DriverSteps
+      expect(steps.registered.tools).toEqual(["computer"])
+      expect(steps.registered.evaluations).toBe(0)
+      expect(steps.startup).toBe(0)
+      expect(steps.executed).toEqual({ evaluations: 1, text: "Closed the desktop session." })
+      expect(steps.status.evaluations).toBe(1)
+      expect(steps.status.notice).toContain("Computer use: enabled=true active=false engine=not started")
+    },
+    DRIVER_TIMEOUT_MS + 10_000,
+  )
 })
 
 function copyRuntime(realRuntime: string, dir: string): string {

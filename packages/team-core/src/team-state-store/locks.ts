@@ -5,7 +5,13 @@ import { tolerantFsync } from "../tolerant-fsync"
 import { createLockLease, type LockLease } from "./lock-lease"
 import { publishLockRecord } from "./lock-publish"
 import { removeLockRecordIfUnchanged, type LockReclaimDeps, type LockReclaimOutcome } from "./lock-reclaim"
-import { buildLockRecord, forgetLockRecord, isLockRecordStale, markLockRecordReleased, readLockRecord } from "./lock-record"
+import {
+  buildLockRecord,
+  forgetLockRecord,
+  isLockRecordStale,
+  markLockRecordReleased,
+  readLockRecord,
+} from "./lock-record"
 
 export { type LockLease, LockLeaseLostError } from "./lock-lease"
 export { assertRetryableLockOpenError } from "./lock-publish"
@@ -75,7 +81,7 @@ export async function withLock<T>(
 
 export async function detectStaleLock(lockPath: string, staleAfterMs: number): Promise<boolean> {
   const observed = await readLockRecord(lockPath)
-  return observed !== null && await isLockRecordStale(observed, staleAfterMs)
+  return observed !== null && (await isLockRecordStale(observed, staleAfterMs))
 }
 
 export async function reapStaleLock(
@@ -85,7 +91,7 @@ export async function reapStaleLock(
 ): Promise<LockReclaimOutcome> {
   const observed = await readLockRecord(lockPath)
   if (observed === null) return "absent"
-  if (!await isLockRecordStale(observed, staleAfterMs)) return "changed"
+  if (!(await isLockRecordStale(observed, staleAfterMs))) return "changed"
   return await removeLockRecordIfUnchanged(lockPath, observed.content, staleAfterMs, deps)
 }
 
@@ -96,11 +102,7 @@ function isTransientFileContentionError(error: unknown): boolean {
 
 // Windows-only: libuv maps ERROR_ACCESS_DENIED / ERROR_SHARING_VIOLATION on a briefly held
 // handle (antivirus scan, concurrent reader) to EPERM / EBUSY; on POSIX the same codes are permanent.
-async function renameWithContentionRetry(
-  tmpPath: string,
-  filePath: string,
-  deps: AtomicWriteDeps,
-): Promise<void> {
+async function renameWithContentionRetry(tmpPath: string, filePath: string, deps: AtomicWriteDeps): Promise<void> {
   const renameFile = deps.rename ?? rename
   const wait = deps.delay ?? delay
   const retryEnabled = (deps.platform ?? process.platform) === "win32"

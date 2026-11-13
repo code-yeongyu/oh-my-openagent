@@ -27,7 +27,14 @@
 import { splitItem } from "../item/frontmatter"
 import type { RegisterValue } from "../item/index"
 
-import { adoptFields, extraValues, registersOf, renderFields, seedFields, type AdoptedFields } from "./adopt-frontmatter"
+import {
+  adoptFields,
+  extraValues,
+  registersOf,
+  renderFields,
+  seedFields,
+  type AdoptedFields,
+} from "./adopt-frontmatter"
 import { parseSyncConflictName, stripT2Blocks } from "./hub-trace"
 import { isOrderedSubsequence, mergeInsertions } from "./merge"
 import { firstMissingFact, normalizeInput } from "./read-back"
@@ -67,7 +74,11 @@ interface PlanResult {
 
 export type AdoptionPlan =
   | (PlanResult & { readonly action: "none" | "remove" })
-  | (PlanResult & { readonly action: "capture"; readonly workingText: string; readonly extraRegisterValues: readonly RegisterValue[] })
+  | (PlanResult & {
+      readonly action: "capture"
+      readonly workingText: string
+      readonly extraRegisterValues: readonly RegisterValue[]
+    })
 
 export function planAdoption(
   files: readonly Snapshot[],
@@ -89,7 +100,13 @@ export function planAdoption(
     first.text === item.lastMaterialised
   const base = normalizeInput(item.currentText ?? "")
   if (unchanged) {
-    return { action: item.tombstoned ? "remove" : "none", rendered: base, registers: item.registers, removalCandidates: [], retainedSources: [] }
+    return {
+      action: item.tombstoned ? "remove" : "none",
+      rendered: base,
+      registers: item.registers,
+      removalCandidates: [],
+      retainedSources: [],
+    }
   }
   const fields: AdoptedFields = new Map()
   const baseParsed = splitItem(base)
@@ -123,5 +140,13 @@ export function planAdoption(
   if (workingText === base && extraRegisterValues.length === 0) {
     return { action: item.tombstoned ? "remove" : "none", rendered, registers, removalCandidates, retainedSources }
   }
-  return { action: "capture", workingText, extraRegisterValues, rendered, registers, removalCandidates, retainedSources }
+  return {
+    action: "capture",
+    workingText,
+    extraRegisterValues,
+    rendered,
+    registers,
+    removalCandidates,
+    retainedSources,
+  }
 }

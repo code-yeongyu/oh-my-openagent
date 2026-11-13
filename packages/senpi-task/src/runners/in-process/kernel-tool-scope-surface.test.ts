@@ -24,7 +24,10 @@ function tool(name: string): ToolDefinition {
  * still matches the child's real surface proves the runner recomputed it instead of replaying the
  * tool layer's guess (a category child's real plan is only known at the runner).
  */
-async function grantOf(capability: FakeKernelToolsCapability, policy: Partial<ChildSpec> = {}): Promise<KernelToolGrant> {
+async function grantOf(
+  capability: FakeKernelToolsCapability,
+  policy: Partial<ChildSpec> = {},
+): Promise<KernelToolGrant> {
   capability.define({ name: "lookup", run: (args, host) => (args === "nested" ? host("write") : { seen: args }) })
   const resolved = await resolveKernelToolGrant({
     requestedNames: ["lookup"],
@@ -59,16 +62,18 @@ function runnerHarness() {
     },
   })
   const start = async (spec: Partial<ChildSpec>): Promise<unknown> =>
-    await runner.start({
-      taskId: "st_00000902",
-      cwd: process.cwd(),
-      sessionDir: `${process.cwd()}/`,
-      depth: 1,
-      parentSessionId: "parent",
-      rootSessionId: "parent",
-      prompt: "work",
-      ...spec,
-    } as ChildSpec).catch((error: unknown) => error)
+    await runner
+      .start({
+        taskId: "st_00000902",
+        cwd: process.cwd(),
+        sessionDir: `${process.cwd()}/`,
+        depth: 1,
+        parentSessionId: "parent",
+        rootSessionId: "parent",
+        prompt: "work",
+        ...spec,
+      } as ChildSpec)
+      .catch((error: unknown) => error)
   return { bindings, sessions, start }
 }
 

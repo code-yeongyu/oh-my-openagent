@@ -23,14 +23,18 @@ describe("json-agent-loader", () => {
     const dir = trackDir(mkdtempSync(join(tmpdir(), "json-agent-loader-test-")))
     const filePath = join(dir, "agent.json")
 
-    writeFileSync(filePath, JSON.stringify({
-      name: "test-agent",
-      description: "A test agent",
-      prompt: "You are a test agent.",
-      tools: ["Bash", "Read"],
-      model: "claude-3-5-sonnet-20241022",
-      mode: "subagent",
-    }), "utf-8")
+    writeFileSync(
+      filePath,
+      JSON.stringify({
+        name: "test-agent",
+        description: "A test agent",
+        prompt: "You are a test agent.",
+        tools: ["Bash", "Read"],
+        model: "claude-3-5-sonnet-20241022",
+        mode: "subagent",
+      }),
+      "utf-8",
+    )
 
     const result = parseJsonAgentFile(filePath, "definition-file")
 
@@ -48,7 +52,9 @@ describe("json-agent-loader", () => {
     const dir = trackDir(mkdtempSync(join(tmpdir(), "json-agent-loader-test-")))
     const filePath = join(dir, "agent.jsonc")
 
-    writeFileSync(filePath, `{
+    writeFileSync(
+      filePath,
+      `{
   // Agent name
   "name": "commented-agent",
   "description": "Agent with comments",
@@ -56,7 +62,9 @@ describe("json-agent-loader", () => {
   "tools": ["Bash"], // Tools for the agent
   // Model specification
   "model": "claude-3-5-sonnet-20241022"
-}`, "utf-8")
+}`,
+      "utf-8",
+    )
 
     const result = parseJsonAgentFile(filePath, "definition-file")
 
@@ -69,10 +77,14 @@ describe("json-agent-loader", () => {
     const dir = trackDir(mkdtempSync(join(tmpdir(), "json-agent-loader-test-")))
     const filePath = join(dir, "agent.json")
 
-    writeFileSync(filePath, JSON.stringify({
-      description: "Missing name",
-      prompt: "You are an agent.",
-    }), "utf-8")
+    writeFileSync(
+      filePath,
+      JSON.stringify({
+        description: "Missing name",
+        prompt: "You are an agent.",
+      }),
+      "utf-8",
+    )
 
     const result = parseJsonAgentFile(filePath, "definition-file")
     expect(result).toBeNull()
@@ -82,10 +94,14 @@ describe("json-agent-loader", () => {
     const dir = trackDir(mkdtempSync(join(tmpdir(), "json-agent-loader-test-")))
     const filePath = join(dir, "agent.json")
 
-    writeFileSync(filePath, JSON.stringify({
-      name: "missing-prompt",
-      description: "Missing prompt",
-    }), "utf-8")
+    writeFileSync(
+      filePath,
+      JSON.stringify({
+        name: "missing-prompt",
+        description: "Missing prompt",
+      }),
+      "utf-8",
+    )
 
     const result = parseJsonAgentFile(filePath, "definition-file")
     expect(result).toBeNull()
@@ -95,10 +111,14 @@ describe("json-agent-loader", () => {
     const dir = trackDir(mkdtempSync(join(tmpdir(), "json-agent-loader-test-")))
     const filePath = join(dir, "agent.json")
 
-    writeFileSync(filePath, JSON.stringify({
-      name: "minimal-agent",
-      prompt: "You are minimal.",
-    }), "utf-8")
+    writeFileSync(
+      filePath,
+      JSON.stringify({
+        name: "minimal-agent",
+        prompt: "You are minimal.",
+      }),
+      "utf-8",
+    )
 
     const result = parseJsonAgentFile(filePath, "definition-file")
 
@@ -113,11 +133,15 @@ describe("json-agent-loader", () => {
     const dir = trackDir(mkdtempSync(join(tmpdir(), "json-agent-loader-test-")))
     const filePath = join(dir, "agent.json")
 
-    writeFileSync(filePath, JSON.stringify({
-      name: "string-tools-agent",
-      prompt: "You are an agent.",
-      tools: "Bash, Read, Grep",
-    }), "utf-8")
+    writeFileSync(
+      filePath,
+      JSON.stringify({
+        name: "string-tools-agent",
+        prompt: "You are an agent.",
+        tools: "Bash, Read, Grep",
+      }),
+      "utf-8",
+    )
 
     const result = parseJsonAgentFile(filePath, "definition-file")
 
@@ -128,10 +152,13 @@ describe("json-agent-loader", () => {
     const dir = trackDir(mkdtempSync(join(tmpdir(), "json-agent-loader-test-")))
     const filePath = join(dir, "agent.json")
 
-    writeFileSync(filePath, `{
+    writeFileSync(
+      filePath,
+      `{
   "name": "broken",
   "prompt": "incomplete json`,
-      "utf-8")
+      "utf-8",
+    )
 
     const result = parseJsonAgentFile(filePath, "definition-file")
     expect(result).toBeNull()
