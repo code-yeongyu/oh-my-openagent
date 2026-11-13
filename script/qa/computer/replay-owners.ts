@@ -46,12 +46,14 @@ const rowOf = (cell: string | undefined) => {
   return Number.isInteger(row) && row > 0 ? row : undefined
 }
 
-// `name` appears in `text` as a whole file name, not as the tail of a longer one.
+// `text` names the case `name`: one of its `.json` paths is the case path or a whole-component
+// tail of it (a bare file name owns that name in any directory, a path only that path).
 const names = (text: string, name: string) =>
-  new RegExp(`(^|[^\\w.-])${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}($|[^\\w.-])`).test(text)
+  (text.match(/[\w./-]+/g) ?? [])
+    .map((token) => token.replace(/\.+$/, ""))
+    .some((token) => token.endsWith(".json") && (name === token || name.endsWith(`/${token}`)))
 
 function ownersOf(name: string, ledgers: Ledgers): Owner[] {
-  const file = basename(name)
   const old = new Set(
     table(ledgers.provenance)
       .filter((line) => line["new path"] === name)
@@ -64,7 +66,7 @@ function ownersOf(name: string, ledgers: Ledgers): Owner[] {
     if (mine && status !== "pending") owners.push({ source: `test-parity-manifest ${status}`, row: "passed" })
   }
   for (const line of table(ledgers.deferred)) {
-    if (!names(line.leg ?? "", file)) continue
+    if (!names(line.leg ?? "", name)) continue
     const status = line.status ?? ""
     const row = rowOf(line["owed to row"])
     const source = `DEFERRED-LEGS ${line["design row"]} recorded by row ${line["recorded by row"]}`
