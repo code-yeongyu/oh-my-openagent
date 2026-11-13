@@ -21,6 +21,7 @@ type Scene = {
   readonly eventsArrive: boolean
   readonly pidEventsArrive?: boolean
   readonly axPressToggles?: boolean
+  readonly failingRoute?: string
   readonly hitRole?: string
 }
 
@@ -66,6 +67,7 @@ function fakeProbe(scene: Scene): { probe: Probe; clicks: string[] } {
     }
     if (command === "click") {
       clicks.push(`${route}@${x},${y}`)
+      if (route === scene.failingRoute) return { helperError: `exit 3: omo-probe: click: ${route} did not resolve` }
       if (route === "hid" ? scene.eventsArrive : (scene.pidEventsArrive ?? scene.eventsArrive))
         appendFileSync(
           eventFile,
@@ -180,6 +182,24 @@ describe("q3 pid-routed click against the default checkbox (three-leg instrument
     const answer = await askPidClick(probe)
     expect(answer.verdict).toBe("CONTRADICTS")
     expect(answer.evidence).toContain("never reached the window")
+  }, 30_000)
+
+  test("a pid route whose helper call fails posted nothing, so its silence is unmeasured, never a refusal", async () => {
+    const { probe } = fakeProbe({
+      doubleToggles: false,
+      activatedToggles: false,
+      firstMouseToggles: false,
+      defaultAfterFirstMouse: false,
+      pidToggles: false,
+      activationWorks: true,
+      windowActive: true,
+      eventsArrive: true,
+      pidEventsArrive: false,
+      failingRoute: "sl",
+    })
+    const answer = await askPidClick(probe)
+    expect(answer.verdict).toBe("UNMEASURED")
+    expect(answer.evidence).toContain("did not post")
   }, 30_000)
 
   test("pid-routed events arrive and toggle nothing while the AX press control toggles: no is proven against that control", async () => {
