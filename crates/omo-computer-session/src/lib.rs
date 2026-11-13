@@ -1,5 +1,6 @@
 //! The mutate funnel, pre-input marker, audit, refs registry, settle, frames, consent and verbs.
 
+pub mod apps;
 pub mod audit;
 pub mod batch;
 pub mod budget;
@@ -14,6 +15,7 @@ pub mod lease;
 pub mod liveness;
 pub mod lock;
 pub mod marker;
+pub mod menus;
 pub mod mutate;
 pub mod observe;
 pub mod pause;
@@ -21,6 +23,7 @@ pub mod presence;
 pub mod preview;
 pub mod refs;
 pub mod reservation;
+pub mod surfaces;
 mod session;
 pub mod session_state;
 pub mod trace;

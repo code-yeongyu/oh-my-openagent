@@ -196,6 +196,7 @@ mod tests {
             audit_ids: Vec::new(),
             timings: None,
             evidence: Vec::new(),
+            url_policy: None,
             observation: crate::untrusted::UntrustedText,
             paused: Vec::new(),
             session: None,

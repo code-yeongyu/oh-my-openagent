@@ -29,6 +29,7 @@ fn parts(disposition: Disposition, effect: Effect, evidence: Vec<Evidence>) -> R
         audit_ids: Vec::new(),
         timings: None,
         evidence,
+        url_policy: None,
         observation: UntrustedText,
         paused: Vec::new(),
         session: None,

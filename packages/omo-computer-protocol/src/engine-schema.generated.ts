@@ -2,7 +2,7 @@
 // Do not edit by hand; run `bun run --cwd packages/omo-computer-protocol generate`.
 
 /** sha256 of the schema file this module was generated from; the schema-drift test compares it. */
-export const SCHEMA_SHA256 = "e8d03727cce8c913a43f78402a91bc5e289fbcbf175940a460453a2860948f6e" as const
+export const SCHEMA_SHA256 = "04e34d12d3acf5a007caa4ba269102f5c9c9828952b3da57324edb20e0097172" as const
 
 /** The wire protocol version `engine.hello` reports. */
 export const PROTOCOL_VERSION = "1" as const
@@ -399,6 +399,7 @@ export type ActionReport = {
 	auditIds?: string[]
 	timings?: Timings | null
 	evidence: Evidence[]
+	urlPolicy?: UrlPolicyStamp | null
 	observation: UntrustedText
 	paused?: Pause[]
 	session?: SessionState | null
@@ -1057,8 +1058,18 @@ export type McpSettings = {
 	tier: Tier
 }
 
+export type MenuItem = {
+	label: string
+	enabled: boolean
+	checked: boolean
+	accelerator?: string | null
+	submenu: boolean
+	path: string[]
+	observation: UntrustedText
+}
+
 export type MenuItems = {
-	items: ElementInfo[]
+	items: MenuItem[]
 	truncated?: boolean | null
 	observation: UntrustedText
 }
@@ -1557,6 +1568,8 @@ export type UnknownLiteral = "unknown"
 export type UntrustedText = {
 	untrustedText: true
 }
+
+export type UrlPolicyStamp = "unknown"
 
 export type UserActive = {
 	active: Tristate
