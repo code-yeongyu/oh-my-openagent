@@ -4,8 +4,8 @@ use crate::input::ledger::{replay, Entry, Ledger, Step};
 use crate::input::{KeyUnit, ENGINE_TAG, VK_CONTROL, VK_MENU, VK_SHIFT};
 use crate::input_lock::{lock_verdict, LockVerdict};
 use crate::stop_path::{
-    is_chord, is_stop_chord_key, normalize_vk, HookEvent, HotkeyVerdict, Origin, PhysicalChord,
-    Sightings, VK_ESCAPE,
+    is_chord, is_stop_chord_key, liveness, normalize_vk, HookEvent, HotkeyVerdict, Liveness,
+    Origin, PhysicalChord, Sightings, StopCursor, VK_ESCAPE,
 };
 
 fn key(vk: u16, down: bool, origin: Origin, time: u64) -> HookEvent {
@@ -209,4 +209,44 @@ fn the_hook_rule_needs_the_modifiers_for_every_origin() {
             "a key-up is no sighting"
         );
     }
+}
+
+/// Review M1 (#13350): every listener sees each stop once; a dead listener thread is deaf.
+#[test]
+fn every_listener_reports_each_stop_once() {
+    let mut first = StopCursor::at(0);
+    let mut second = StopCursor::at(0);
+    assert!(!first.take(0), "no stop counted yet");
+    assert!(first.take(1), "the first listener sees the stop");
+    assert!(second.take(1), "a second listener sees the same stop");
+    assert!(!first.take(1), "a stop is reported once per listener");
+    assert!(first.take(3), "later stops are seen");
+    let mut late = StopCursor::at(3);
+    assert!(
+        !late.take(3),
+        "a listener started after a stop does not report it"
+    );
+    assert!(late.take(4));
+}
+
+#[test]
+fn a_listener_whose_thread_is_not_running_is_deaf() {
+    assert_eq!(liveness(true, true, true), Liveness::Listening);
+    assert_eq!(
+        liveness(true, false, true),
+        Liveness::Listening,
+        "the hotkey alone still hears"
+    );
+    assert_eq!(
+        liveness(true, true, false),
+        Liveness::Listening,
+        "the hook alone still hears"
+    );
+    assert_eq!(liveness(true, false, false), Liveness::Deaf);
+    assert_eq!(
+        liveness(false, true, true),
+        Liveness::Deaf,
+        "a thread that never started or whose loop ended hears nothing"
+    );
+    assert_eq!(liveness(false, false, false), Liveness::Deaf);
 }

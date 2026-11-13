@@ -104,6 +104,48 @@ impl PhysicalChord {
     }
 }
 
+/// Each listener's view of the hook's stop count: every listener reports each stop exactly once,
+/// and a listener started after a stop does not report it (review M1 of #13350: one shared
+/// `swap(false)` let only the first poller see a stop).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StopCursor {
+    seen: u64,
+}
+
+impl StopCursor {
+    /// A cursor that has seen the stops counted so far.
+    #[must_use]
+    pub const fn at(count: u64) -> Self {
+        Self { seen: count }
+    }
+
+    /// True once for each stop counted after the cursor's last read.
+    pub fn take(&mut self, count: u64) -> bool {
+        let _ = count;
+        let _ = self.seen;
+        false
+    }
+}
+
+/// Whether the listener can hear the stop chord.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Liveness {
+    Listening,
+    Deaf,
+}
+
+/// A listener is DEAF when its thread is not running (never started, or its message loop
+/// ended and Windows dropped the hook and hotkey) or when both its hook and hotkey failed.
+#[must_use]
+pub const fn liveness(running: bool, hook: bool, hotkey: bool) -> Liveness {
+    let _ = running;
+    if hook || hotkey {
+        Liveness::Listening
+    } else {
+        Liveness::Deaf
+    }
+}
+
 /// What a `WM_HOTKEY` for the stop chord means.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HotkeyVerdict {
