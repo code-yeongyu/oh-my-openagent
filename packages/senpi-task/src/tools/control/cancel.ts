@@ -5,7 +5,7 @@ import type { Static } from "typebox"
 import type { TaskStatus } from "../../state"
 import { withDroppedSteeringNotice } from "../../state/queued-steering"
 import { renderTaskCancelCall, renderTaskCancelResult } from "./renderers"
-import { toolResult } from "./tool-result"
+import { toolErrorResult, toolResult } from "./tool-result"
 import type { CancelManager, CancelResultDetails, CancelToolResult } from "./types"
 
 export const TaskCancelParams = Type.Object({
@@ -34,7 +34,7 @@ export type TaskCancelDeps = {
 export async function runTaskCancel(manager: CancelManager, params: TaskCancelInput): Promise<CancelToolResult> {
   const idOrName = params.task_id ?? params.name
   if (idOrName === undefined) {
-    return toolResult("Provide task_id or name to identify the child task.", {
+    return toolErrorResult("Provide task_id or name to identify the child task.", {
       kind: "invalid_arguments",
       reason: "Provide task_id or name to identify the child task.",
     })
@@ -101,7 +101,7 @@ export async function runTaskCancel(manager: CancelManager, params: TaskCancelIn
         reason: outcome.reason,
       })
     case "not_found":
-      return toolResult(outcome.reason, { kind: "not_found", reason: outcome.reason })
+      return toolErrorResult(outcome.reason, { kind: "not_found", reason: outcome.reason })
   }
 }
 
