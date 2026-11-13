@@ -51,6 +51,8 @@ fn the_fake_reads_no_environment() {
         concat!("use std::{\n    // the module\n    e", "nv,\n};"),
         concat!("use std::{/* x */ e", "nv, fs};"),
         concat!("use std::{fs, /* a\n b */ e", "nv as ambient};"),
+        // Block comments nest in Rust: the item starts after the outer close.
+        concat!("use std::{/* /* n */ */ e", "nv, fs};"),
     ] {
         assert!(
             !scan_text("probe.rs", probe).is_empty(),
