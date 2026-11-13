@@ -30,7 +30,13 @@ test("auth commands expose device, no-browser, and service overrides", () => {
   configureServiceAuthCommands(program, true)
   expect(program.commands.map((command) => command.name())).toEqual(["login", "logout", "whoami"])
   const login = program.commands.find((command) => command.name() === "login")
-  expect(login?.options.map((option) => option.long)).toEqual(["--device", "--no-browser", "--api", "--accounts"])
+  expect(login?.options.map((option) => option.long)).toEqual([
+    "--device",
+    "--no-browser",
+    "--new-device",
+    "--api",
+    "--accounts",
+  ])
 })
 
 test.each(["http://localhost:1234", "http://127.0.0.1", "https://user:secret@example.com", "https://api.omo.dev/path"])(
