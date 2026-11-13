@@ -85,6 +85,7 @@ export interface SplitSession {
   prompt(text: string): Promise<void>
   bindExtensions(options: { mode: string }): Promise<void>
   dispose(): Promise<void> | void
+  whenToolChildClosed(): Promise<void>
 }
 
 export type Placement = "fused" | "split-local"
@@ -163,7 +164,10 @@ async function openSession(placement: Placement, extension: ExtensionFactory): P
     sessionManager: sdk.SessionManager.inMemory(cwd),
     autoTitleSessions: false,
   })
-  cleanups.push(() => session.dispose())
+  cleanups.push(async () => {
+    await session.dispose()
+    await session.whenToolChildClosed()
+  })
   await session.bindExtensions({ mode: "print" })
   // One call after another, so a later call in the same turn sees what the earlier call's hooks recorded.
   session.agent.toolExecution = "sequential"
