@@ -99,6 +99,8 @@ export function createRemoteThreadFixture() {
       rowState?: string
       live?: readonly string[]
       records?: readonly JsonObject[]
+      /** Entries the session stores once its turn ran (a queued send is stored when the queue drains): served on reads after the turn's records went out. */
+      entriesAfterAnswer?: readonly JsonObject[]
       rows?: readonly RemoteSessionRow[]
       registryDown?: "refused" | "throws" | "signed_out"
       /** Only the claim fails (resolve and aliasesOf still answer): a token that expired between the two calls. */
@@ -347,6 +349,7 @@ export function createRemoteThreadFixture() {
         },
         read: async (device, session) => {
           sent.push({ via: "read", device, session })
+          const drained = recordsOut
           if (answeredPrompt) writeRecords()
           return {
             kind: "ok",
@@ -354,6 +357,7 @@ export function createRemoteThreadFixture() {
               entries: [
                 { role: "user", content: "hi b" },
                 { role: "assistant", content: "hello from b" },
+                ...(drained ? (options.entriesAfterAnswer ?? []) : []),
               ],
             },
           }

@@ -770,6 +770,12 @@ describe("omo remote session verbs", () => {
     expect([code, written.join("")]).toEqual([REMOTE_EXIT.ok, "OK\nDone.\n"])
   })
 
+  // The engine stores a queued send only when the queue drains (#13272): the follow anchors on that entry, not on an older one.
+  const QUEUED_HI_STORED = [
+    { role: "user", content: "hi" },
+    { role: "assistant", content: "queued answer" },
+  ]
+
   test("#13268: a waiting send queued behind a running turn names its position on stderr at once, never on stdout, and --json carries it only in the typed result", async () => {
     const engine = { ...ENGINE, streaming: true, pending: 2 }
     const human = await run(
@@ -777,7 +783,7 @@ describe("omo remote session verbs", () => {
       undefined,
       SIGNED_IN,
       testBootstrap(),
-      fixture.account({ engine, records: [{ type: "agent_settled" }] }).remote,
+      fixture.account({ engine, records: [{ type: "agent_settled" }], entriesAfterAnswer: QUEUED_HI_STORED }).remote,
     )
     expect(human.code).toBe(REMOTE_EXIT.ok)
     expect(human.err).toEqual(["Queued on b/dur-on-b at position 2."])
@@ -787,7 +793,7 @@ describe("omo remote session verbs", () => {
       undefined,
       SIGNED_IN,
       testBootstrap(),
-      fixture.account({ engine, records: [{ type: "agent_settled" }] }).remote,
+      fixture.account({ engine, records: [{ type: "agent_settled" }], entriesAfterAnswer: QUEUED_HI_STORED }).remote,
     )
     expect(json.code).toBe(REMOTE_EXIT.ok)
     expect(json.err).toEqual([])
