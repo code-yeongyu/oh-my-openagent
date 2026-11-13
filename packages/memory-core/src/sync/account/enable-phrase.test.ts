@@ -191,7 +191,7 @@ test("#given the operation is refused at admission before the bridge runs #when 
     },
   }
   await expect(
-    enableSync({ ...s.input, method: "phrase", authority, onCeremony: () => void (refuse = true) }),
+    enableSync({ ...s.input, genesis: s.genesis, method: "phrase", authority, onCeremony: () => void (refuse = true) }),
   ).rejects.toThrow("synthetic admission refusal")
   expect(await s.marker()).toBe(false)
   expect(await phraseNoticeStatus(s.place)).toEqual({})
