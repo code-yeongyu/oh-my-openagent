@@ -22,12 +22,12 @@ const FLOOR_TIMEOUT_MS = 10_000
 
 export type PhraseGateRefusal = "disabled" | "service-floor-off"
 
-/** `GET /v1/sync/state` `phrase_client_floor`: true is on; false or absent (an older service) is off; an error is unknown. */
+/** `GET /v1/sync/state` `accepts_phrase_keys`: true is on; false or absent (an older service) is off; an error is unknown. */
 export const readServiceFloor = async (chain: AccountHttp): Promise<ServiceFloor> => {
   try {
     const state = await chain.state()
     if (state === null) return "unknown"
-    return state.phraseClientFloor ? "on" : "off"
+    return state.acceptsPhraseKeys ? "on" : "off"
   } catch {
     return "unknown"
   }

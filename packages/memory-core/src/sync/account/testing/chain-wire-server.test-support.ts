@@ -100,8 +100,10 @@ export function startChainWireServer(
     readonly requireConsent?: boolean
     readonly stream?: boolean
     readonly entriesBatchId?: boolean
-    /** Serves omo-service's `phrase_client_floor` on the state read; absent leaves the field out. */
-    readonly phraseClientFloor?: boolean
+    /** Serves omo-service's `accepts_phrase_keys` on the state read; absent leaves the field out. */
+    readonly acceptsPhraseKeys?: boolean
+    /** Extra raw fields on the state read, e.g. a field name the service no longer uses. */
+    readonly extraState?: Readonly<Record<string, unknown>>
   } = {},
 ): ChainWireServer {
   const authors = new Map<string, SyncAuthor>()
@@ -170,7 +172,8 @@ export function startChainWireServer(
           oldest_retained_seq: 1,
           snapshot: null,
           min_client_format: 1,
-          ...(options.phraseClientFloor === undefined ? {} : { phrase_client_floor: options.phraseClientFloor }),
+          ...options.extraState,
+          ...(options.acceptsPhraseKeys === undefined ? {} : { accepts_phrase_keys: options.acceptsPhraseKeys }),
         })
       }
       if (req.method === "GET" && path === "/v1/sync/entries") {
