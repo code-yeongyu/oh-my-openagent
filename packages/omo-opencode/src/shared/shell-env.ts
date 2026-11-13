@@ -127,34 +127,6 @@ export function buildEnvPrefix(env: Record<string, string>, shellType: ShellType
   }
 }
 
-/**
- * Escape a value for use in a double-quoted shell -c command argument.
- *
- * In shell -c "..." strings, these characters have special meaning and must be escaped:
- * - $ - variable expansion, command substitution $(...)
- * - ` - command substitution `...`
- * - \\ - escape character
- * - " - end quote
- * - ; | & - command separators
- * - # - comment
- * - () - grouping operators
- *
- * @param value - The value to escape
- * @returns Escaped value safe for double-quoted shell -c argument
- *
- * @example
- * ```ts
- * // For malicious input
- * const url = "http://localhost:3000'; cat /etc/passwd; echo '"
- * const escaped = shellEscapeForDoubleQuotedCommand(url)
- * // => "http://localhost:3000'\''; cat /etc/passwd; echo '"
- *
- * // Usage in command:
- * const cmd = `/bin/sh -c "opencode attach ${escaped} --session ${sessionId}"`
- * ```
- */
-export { shellEscapeForDoubleQuotedCommand } from "@oh-my-opencode/utils"
-
 export function shellSingleQuote(value: string): string {
   return `'${value.replace(/'/g, "'\\''")}'`
 }
