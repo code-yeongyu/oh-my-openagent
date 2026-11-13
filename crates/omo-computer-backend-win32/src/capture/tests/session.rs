@@ -164,3 +164,71 @@ fn unknown_never_fires_the_session_cause() {
     assert!(INACTIVE.is_dark());
     assert!(ASLEEP.is_dark());
 }
+
+/// An elevated window whose WGC answers `wgc` (R70g(2): the session cause comes first).
+fn elevated_os(
+    session: SessionCondition,
+    wgc: Result<crate::capture::RawFrame, crate::capture::CaptureFault>,
+) -> ScriptedOs {
+    let mut os = window_os(true);
+    os.session = session;
+    os.wgc_window = Some(wgc);
+    if let Some(facts) = os.window.as_mut() {
+        facts.elevated = true;
+    }
+    os
+}
+
+fn elevated_outcomes() -> [(
+    Result<crate::capture::RawFrame, crate::capture::CaptureFault>,
+    Reason,
+); 3] {
+    [
+        (
+            Err(crate::capture::CaptureFault::NullFrame),
+            Reason::NullFrame,
+        ),
+        (
+            Err(crate::capture::CaptureFault::ItemUnavailable),
+            Reason::NullFrame,
+        ),
+        (
+            Ok(solid(rect(100, 100, 400, 300), [0, 0, 0, 0])),
+            Reason::BlackFrame,
+        ),
+    ]
+}
+
+#[test]
+fn elevated_window_under_the_session_cause_answers_capture_failed() {
+    for session in [INACTIVE, ASLEEP] {
+        for (wgc, reason) in elevated_outcomes() {
+            let mut backend = Win32Backend::with_os(elevated_os(session, wgc));
+            let refusal = backend
+                .capture_record(&window_target(), &OPTIONS)
+                .expect_err(
+                    "an elevated window with no WGC frame under the session cause is refused",
+                );
+            assert_eq!(refusal.code, EngineCode::CaptureFailed);
+            assert_eq!(refusal.reason, Some(reason.wire()));
+            assert!(
+                !backend.os().calls.contains(&"print_window"),
+                "the PrintWindow floor never runs for an elevated window"
+            );
+        }
+    }
+}
+
+#[test]
+fn elevated_window_without_the_session_cause_answers_elevated_target() {
+    for session in [SessionCondition::UNKNOWN, LIVE] {
+        for (wgc, _) in elevated_outcomes() {
+            let mut backend = Win32Backend::with_os(elevated_os(session, wgc));
+            let refusal = backend
+                .capture_record(&window_target(), &OPTIONS)
+                .expect_err("an elevated window WGC cannot serve is refused");
+            assert_eq!(refusal.code, EngineCode::CaptureUnavailable);
+            assert_eq!(refusal.reason, Some(Reason::ElevatedTarget.wire()));
+        }
+    }
+}
