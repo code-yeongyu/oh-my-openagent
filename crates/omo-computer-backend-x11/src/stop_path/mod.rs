@@ -14,6 +14,8 @@ mod xi2;
 #[cfg(test)]
 pub(crate) mod fake;
 #[cfg(test)]
+mod live_tests;
+#[cfg(test)]
 mod overlay_tests;
 #[cfg(test)]
 mod review_tests;
