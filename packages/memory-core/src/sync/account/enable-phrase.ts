@@ -33,9 +33,12 @@ export const commitIntent = async (captured: Captured, intent: GenesisIntent): P
   const result = await completeGenesis(captured, intent)
   checkSyncOperation(captured)
   if (result === "phrase_refused") {
-    // The switches went on for this ceremony's append; the service refused it, so no chain exists: turn them back off.
+    // The switches went on for this ceremony's append and the service refused it. This device's switch goes back off;
+    // the account-wide one only when the chain is positively still empty (review LOW, #13335 @ 04991201): another
+    // device may have created a passkey genesis meanwhile, and that account must keep syncing.
     await captured.pairing.setDeviceSync(captured.serviceDeviceId, false)
-    await captured.pairing.setAccountSync(false)
+    const state = await captured.chain.state().catch(() => null)
+    if (state !== null && state.head.seq === 0) await captured.pairing.setAccountSync(false)
     return { kind: "phrase_unavailable", reason: "service-floor-off" }
   }
   if (result !== "created")
@@ -69,9 +72,18 @@ export const createPhraseGenesis = async (
   // A throw can come after the words were shown (review LOW, #13335), so the marker stays and the phrase reads void
   // once the lock is released. A false "not saved" notice is the safe direction (contract L8); only an explicit
   // cancel (the person themselves stopped, so they know nothing was saved) deletes it.
-  const result = await admitSyncOperation(captured, () =>
-    genesis.createPhraseGenesis({ account: captured.account, firstDevice: principalOf(captured.keyring) }, { operation }),
-  )
+  let entered = false
+  let result: Awaited<ReturnType<typeof genesis.createPhraseGenesis>>
+  try {
+    result = await admitSyncOperation(captured, () => {
+      entered = true
+      return genesis.createPhraseGenesis({ account: captured.account, firstDevice: principalOf(captured.keyring) }, { operation })
+    })
+  } catch (error) {
+    // Refused at admission (review LOW, #13335 @ 04991201): the bridge never ran, so no word was shown.
+    if (!entered) await deletePhraseGenesisMarker(place)
+    throw error
+  }
   if (!result.ok) {
     await deletePhraseGenesisMarker(place)
     return { kind: "cancelled" }
