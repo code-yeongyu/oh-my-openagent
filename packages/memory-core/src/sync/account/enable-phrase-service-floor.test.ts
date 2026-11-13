@@ -51,6 +51,7 @@ test("#given the service refuses phrase keys #when a fresh phrase genesis append
   expect(await enableSync(s.input)).toEqual({ kind: "phrase_unavailable", reason: "service-floor-off" })
   expect(s.f.entries).toEqual([])
   expect(s.f.server.switches.slice(-2)).toEqual(OFF_AGAIN)
+  expect(s.f.server.switches.at(-1)).toBe('/v1/account/sync {"enabled":false}')
   expect(await s.intentExists()).toBe(false)
   expect(await phraseNoticeStatus(s.place)).toEqual({ phraseVoid: { purpose: "genesis" } })
 })
@@ -140,4 +141,20 @@ test("#given an account that already holds a phrase chain and a service that no 
   const place = { pinDir: joiner.pinDir, account: ACCOUNT, principalId: second.principal().id }
   expect(await phraseNoticeStatus(place)).toEqual({})
   expect(await acknowledgePhraseVoid({ ...joiner, purpose: "genesis" })).toEqual({ ok: true })
+})
+
+test("#given another device's genesis landed while the service refused this phrase append #when enable answers service-floor-off #then only this device's switch goes off and the account keeps syncing", async () => {
+  const s = await phraseSetup()
+  const live = { head: { seq: 1, link: "x", keyring_link: "x" }, currentEpoch: 1, rotationPending: false, acceptsPhraseKeys: false }
+  const result = await enableSync({
+    ...s.input,
+    chain: {
+      ...s.input.chain,
+      appendKeys: async () => ({ ok: false, reason: "phrase_keys_not_accepted" }),
+      state: async () => live,
+    },
+  })
+  expect(result).toEqual({ kind: "phrase_unavailable", reason: "service-floor-off" })
+  expect(s.f.server.switches.at(-1)).toBe('/v1/devices/service-first/sync {"enabled":false}')
+  expect(s.f.server.switches.filter((row) => row === '/v1/account/sync {"enabled":false}')).toEqual([])
 })

@@ -87,3 +87,17 @@ test("#given the engine refuses phrase creation with a reason #when enable answe
     reason: "service-floor-off",
   })
 })
+
+test("#given an unresolved local phrase read and a verified-chain reader #when status is read #then the enroll void notice from the verified chain is shown", async () => {
+  const f = await setup()
+  const seen: string[] = []
+  f.runtime.phraseNoticeStatus = async () => ({ phraseUnresolved: true })
+  f.runtime.verifiedPhraseNoticeStatus = async (input) => {
+    seen.push(input.account)
+    return { phraseVoid: { purpose: "enroll" } }
+  }
+  const status = await f.call("status", owner("a").context)
+  expect(status).toMatchObject({ phraseVoid: { purpose: "enroll" } })
+  expect(status).not.toHaveProperty("phraseUnresolved")
+  expect(seen.length).toBe(1)
+})

@@ -269,3 +269,9 @@ test("#given the host signal is aborted while the words are shown #when enrollme
   expect(asked).toEqual([])
   expect((await verified(world, world.owner)).received.length).toBe(before)
 })
+
+test("#given an enroll void acknowledge without the account chain #when it is called #then it refuses instead of reporting success", async () => {
+  const s = await setup()
+  const ack = { account: s.world.account, serviceDeviceId: "", keyring: s.world.owner.keyring, pinDir: s.base.pinDir, purpose: "enroll" as const }
+  await expect(acknowledgePhraseVoid(ack)).rejects.toThrow("needs the account chain")
+})
