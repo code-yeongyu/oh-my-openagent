@@ -78,3 +78,4 @@ plans/
 
 # Rust workspace (crates/senpi-desktop-*)
 /target
+.test-shards/
