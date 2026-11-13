@@ -131,6 +131,18 @@ fn app_call(verb: VerbKind, event: &InputEvent) -> Call<'static> {
     }
 }
 
+/// The app as the Target and Scope stages see it: its identity, not a window.
+fn app_resolution(app: &AppInfo) -> PointTarget {
+    PointTarget::new(
+        None,
+        Resolution::Window(Identity {
+            pid: app.pid.unwrap_or(0),
+            app_key: app.app_key.clone(),
+            surface: None,
+        }),
+    )
+}
+
 #[cfg(test)]
 mod app_call_tests {
     use omo_computer_core::backend::InputEvent;
@@ -144,16 +156,4 @@ mod app_call_tests {
         let open = InputEvent::AppLaunch { app_key: "k".to_owned(), activate: true };
         assert!(!super::app_call(VerbKind::Pointer, &open).force, "apps.open has no force");
     }
-}
-
-/// The app as the Target and Scope stages see it: its identity, not a window.
-fn app_resolution(app: &AppInfo) -> PointTarget {
-    PointTarget::new(
-        None,
-        Resolution::Window(Identity {
-            pid: app.pid.unwrap_or(0),
-            app_key: app.app_key.clone(),
-            surface: None,
-        }),
-    )
 }
