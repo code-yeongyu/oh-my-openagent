@@ -47,6 +47,10 @@ fn the_fake_reads_no_environment() {
         ),
         concat!("use std::{\n    fs,\n    e", "nv,\n};"),
         concat!("use std::{\n    io::{self, Read},\n    e", "nv::args,\n};"),
+        // A comment in front of the item, inside the group.
+        concat!("use std::{\n    // the module\n    e", "nv,\n};"),
+        concat!("use std::{/* x */ e", "nv, fs};"),
+        concat!("use std::{fs, /* a\n b */ e", "nv as ambient};"),
     ] {
         assert!(
             !scan_text("probe.rs", probe).is_empty(),
@@ -58,6 +62,7 @@ fn the_fake_reads_no_environment() {
         "let gate_env = 1;",
         concat!("use crate::gate_e", "nv::Seam;"),
         "use std::{\n    fs,\n    io::{self, Read},\n};\nlet gate_env = 1;",
+        concat!("use std::{\n    // e", "nv is not imported here\n    fs,\n};"),
     ] {
         assert!(
             scan_text("probe.rs", clean).is_empty(),
