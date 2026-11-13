@@ -6,7 +6,8 @@
 //
 // --all runs every registered scenario and ends with ONE line 'SET linux/<session> pass=<n>
 // fail=<n> blocked=<n>': a scenario the session cannot admit (or a session that did not start)
-// counts blocked with its reason printed, never pass; exit non-zero iff fail > 0.
+// counts blocked with its reason printed, never pass; exit 1 when any scenario failed, 3 when
+// nothing passed and nothing failed (an all-blocked set proves nothing), else 0.
 //
 // Every session (xvfb, xvfb-nobus, none, xorg) is one file under sessions/ and every
 // scenario declares how its session is admitted; a scenario that declares no admission is

@@ -36,6 +36,11 @@ export function setLine(session: SessionName, outcomes: readonly Outcome[]): str
   return `SET linux/${session} pass=${pass} fail=${fail} blocked=${blocked}`
 }
 
+/** The exit of a set in which nothing passed and nothing failed: it proved nothing, so it is never 0. */
+export const ALL_BLOCKED_EXIT = 3
+
 export function setExitCode(outcomes: readonly Outcome[]): number {
-  return count(outcomes).fail > 0 ? 1 : 0
+  const { pass, fail } = count(outcomes)
+  if (fail > 0) return 1
+  return pass === 0 ? ALL_BLOCKED_EXIT : 0
 }
