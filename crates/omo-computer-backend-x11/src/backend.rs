@@ -24,6 +24,7 @@ fn no_display() -> Refusal {
 
 pub struct X11Backend<S = X11Connection> {
     capture: Option<X11Capture<S>>,
+    live: crate::stop_path::Live,
 }
 
 impl X11Backend<X11Connection> {
@@ -32,6 +33,7 @@ impl X11Backend<X11Connection> {
     #[must_use]
     pub fn from_env(display: Option<&str>, gdk_scale: Option<&str>) -> Self {
         let display = display.filter(|value| !value.is_empty());
+        let live = crate::stop_path::Live::for_display(display);
         let capture = display.and_then(|display| match X11Connection::connect(display) {
             Ok(connection) => Some(X11Capture::new(connection, gdk_scale.map(str::to_owned))),
             Err(error) => {
@@ -39,14 +41,22 @@ impl X11Backend<X11Connection> {
                 None
             }
         });
-        Self { capture }
+        Self { capture, live }
     }
 }
 
 impl<S: XServer> X11Backend<S> {
     #[must_use]
-    pub const fn with_capture(capture: Option<X11Capture<S>>) -> Self {
-        Self { capture }
+    pub fn with_capture(capture: Option<X11Capture<S>>) -> Self {
+        Self {
+            capture,
+            live: crate::stop_path::Live::for_display(None),
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn with_live(capture: Option<X11Capture<S>>, live: crate::stop_path::Live) -> Self {
+        Self { capture, live }
     }
 
     /// `none` when no display is reachable, else `x11`.
@@ -106,7 +116,8 @@ impl<S: XServer> Backend for X11Backend<S> {
     }
 
     fn capture(&mut self, target: &Target, options: &CaptureOptions) -> BackendResult<FrameBytes> {
-        let frame = self.capture.as_ref().ok_or_else(no_display)?.capture_frame(target, options)?;
+        let capture = self.capture.as_ref().ok_or_else(no_display)?;
+        let frame = self.live.overlay.hidden_for(|| capture.capture_frame(target, options))?;
         let bytes = png(&frame.image).map_err(|error| failed(&error))?;
         Ok(FrameBytes {
             width: frame.image.width(),
@@ -117,6 +128,33 @@ impl<S: XServer> Backend for X11Backend<S> {
             occluders_visible: Some(frame.occluders_visible),
             cursor: Some(frame.cursor),
         })
+    }
+
+    // --- Row 50: stop path, presence, epoch source, self set and doctor (stop_path::Live). ---
+
+    fn stop_listener(&mut self) -> BackendResult<Box<dyn omo_computer_core::backend::StopListener>> {
+        self.live.stop_listener()
+    }
+
+    fn presence(&mut self) -> Option<Box<dyn omo_computer_core::backend::Presence>> {
+        self.live.presence()
+    }
+
+    fn epoch_source(&mut self) -> Box<dyn omo_computer_core::backend::EpochSource> {
+        self.live.epoch_source()
+    }
+
+    fn processes(&self) -> Option<omo_computer_core::backend::ProcessTable> {
+        Some(self.live.processes())
+    }
+
+    fn take_lease_end(&mut self) -> bool {
+        self.live.lease_end.take()
+    }
+
+    fn diagnose(&self) -> Option<omo_computer_core::backend::BackendProbes> {
+        let compositor = self.capture.as_ref().map(|c| c.server().compositor_present().unwrap_or(false));
+        Some(self.live.diagnose(self.capture.is_some(), compositor))
     }
 }
 

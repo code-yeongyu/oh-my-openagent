@@ -128,6 +128,9 @@ impl Control {
             _ => Vec::new(),
         };
         self.grant.reconcile(stop_epoch);
+        if backend.take_lease_end() && self.lease_epoch.is_some() {
+            self.end_lease(backend, crate::presence::LeaseEnd::UserEsc);
+        }
         if self.lease_epoch.is_some_and(|epoch| epoch != stop_epoch) {
             self.presence.end(crate::presence::LeaseEnd::Stop);
             self.slot.release(&self.token);
@@ -202,6 +205,15 @@ impl Control {
         self.reservations
             .admit(&self.token, &plan.windows, now)
             .map_err(|busy| (LeaseRefusal::Window, Some(busy.detail())))
+    }
+
+    /// The lease ends under the user: presence goes, the slot is released, and the R45 hook
+    /// hears why exactly once.
+    pub(crate) fn end_lease(&mut self, backend: &mut dyn Backend, why: crate::presence::LeaseEnd) {
+        self.presence.end(why);
+        self.slot.release(&self.token);
+        self.lease_epoch = None;
+        self.lease_hook.lease_ended(backend, why);
     }
 
     /// The call's report went out.

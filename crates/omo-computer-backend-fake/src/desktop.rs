@@ -236,6 +236,10 @@ impl Backend for FakeBackend {
         })
     }
 
+    fn take_lease_end(&mut self) -> bool {
+        std::mem::take(&mut self.lock().lease_end_pressed)
+    }
+
     fn stop_listener(&mut self) -> BackendResult<Box<dyn StopListener>> {
         match self.stop_path {
             StopPathScript::None => Err(Refusal::new(

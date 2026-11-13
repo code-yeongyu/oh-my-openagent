@@ -171,6 +171,11 @@ impl FakeBackend {
         self.lock().stop_pressed = true;
     }
 
+    /// Row 50: the user presses the lease-end key; the session's next exec ends the lease.
+    pub fn press_lease_end(&self) {
+        self.lock().lease_end_pressed = true;
+    }
+
     /// Sends a preview frame to the subscriber; returns whether one is subscribed.
     pub fn publish_preview(&self, frame_id: &str) -> bool {
         let subscribed = self.lock().scenario.preview_subscribed;

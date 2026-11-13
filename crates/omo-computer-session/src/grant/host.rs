@@ -113,10 +113,7 @@ impl Session {
 
     /// The lease ends under the user (the next report reads `user_moved_on`, no `Suspended`).
     pub(crate) fn end_lease(&mut self, why: LeaseEnd) {
-        self.funnel.control.presence.end(why);
-        self.funnel.control.slot.release(&self.funnel.control.token);
-        self.funnel.control.lease_epoch = None;
-        self.funnel.control.lease_hook.lease_ended(self.backend.as_mut(), why);
+        self.funnel.control.end_lease(self.backend.as_mut(), why);
     }
 
     /// Installs the lease-end hook a later row's state lives in (R45).

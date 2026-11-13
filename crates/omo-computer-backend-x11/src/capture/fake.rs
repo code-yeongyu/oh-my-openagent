@@ -39,6 +39,8 @@ pub struct FakeX {
     pub composite_extension: bool,
     pub cursor: Option<CursorImage>,
     pub redirects: Cell<u32>,
+    /// Row 50: `_NET_WM_PID` per window xid.
+    pub pids: Vec<(u32, u32)>,
 }
 
 fn mm_at_96_dpi(pixels: u32) -> u32 {
@@ -97,6 +99,7 @@ impl FakeX {
             composite_extension: true,
             cursor: None,
             redirects: Cell::new(0),
+            pids: Vec::new(),
         }
     }
 
@@ -232,7 +235,7 @@ impl XServer for FakeX {
                 xid: w.xid,
                 title: format!("window {}", w.xid),
                 class: "Fake".to_owned(),
-                pid: None,
+                pid: self.pids.iter().find(|(xid, _)| *xid == w.xid).map(|(_, pid)| *pid),
                 focused: false,
                 desktop: None,
                 placement: WindowPlacement {

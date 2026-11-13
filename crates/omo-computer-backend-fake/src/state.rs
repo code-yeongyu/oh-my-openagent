@@ -44,6 +44,8 @@ pub struct FakeState {
     pub ax_reads: BTreeMap<String, usize>,
     pub ax_event_pos: usize,
     pub stop_pressed: bool,
+    /// Row 50: the user pressed the lease-end key (a bare physical Escape).
+    pub lease_end_pressed: bool,
 }
 
 impl FakeState {
@@ -89,6 +91,7 @@ impl FakeState {
             ax_reads: BTreeMap::new(),
             ax_event_pos: 0,
             stop_pressed: false,
+            lease_end_pressed: false,
             scenario,
         }
     }

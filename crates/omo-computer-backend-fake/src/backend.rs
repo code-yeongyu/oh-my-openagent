@@ -35,6 +35,19 @@ pub struct FakeBackend {
 }
 
 impl FakeBackend {
+    /// Row 50: a second handle on the same desktop, so a test can press keys after the backend
+    /// is boxed into a session.
+    #[must_use]
+    pub fn handle(&self) -> Self {
+        Self {
+            shared: Arc::clone(&self.shared),
+            sink: self.sink.clone(),
+            clock: self.clock.clone(),
+            persona: self.persona,
+            stop_path: self.stop_path,
+        }
+    }
+
     /// A backend on a fresh clock at 0 and an in-memory sink.
     #[must_use]
     pub fn new(scenario: FakeScenario) -> Self {

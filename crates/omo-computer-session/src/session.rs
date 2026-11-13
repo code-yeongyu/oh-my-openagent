@@ -78,7 +78,7 @@ impl Session {
         let request = read_session_open(params);
         let policy = StopPolicy::read(Transport::Local, request.allow_host_relay_only_stop);
         self.opened = None;
-        self.guard.open(policy, HostAdditions::default())?;
+        self.guard.open_on(self.backend.as_ref(), policy, HostAdditions::default())?;
         self.opened = Some(Opened {
             report_mode: request.report_mode,
             tag: random_u64(),

@@ -3,11 +3,13 @@
 //! answers a typed refusal with nothing sent. The session calls `post_input` only from
 //! `mutate()`: it is the one side-effect sink.
 
+mod processes;
 mod refusal;
 mod refusing;
 mod sources;
 mod types;
 
+pub use processes::{ProcessRow, ProcessTable};
 pub use refusal::{BackendResult, Refusal};
 pub use refusing::{refusing_capabilities, unknown_session_state};
 pub use sources::{AxEventSource, EpochSource, NoAxEvents, NoEpochSource, Presence, StopListener};
@@ -146,6 +148,20 @@ pub trait Backend: Send {
     /// session keeps its default view.
     fn host_consent(&self) -> Option<serde_json::Value> {
         None
+    }
+
+    // --- Row 50 (R62): the OS's own process table and the physical lease-end key. ---
+
+    /// The uid's processes with their parents, TTYs and the TTY owners, read for the self set.
+    /// `None` (the default): the guard keeps its own source (the engine process alone).
+    fn processes(&self) -> Option<ProcessTable> {
+        None
+    }
+
+    /// Whether the user pressed the lease-end key (a bare physical Escape) since the last call;
+    /// taking it consumes it. `false` by default: the backend hears no such key.
+    fn take_lease_end(&mut self) -> bool {
+        false
     }
 }
 
