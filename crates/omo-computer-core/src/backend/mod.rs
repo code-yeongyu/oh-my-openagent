@@ -69,17 +69,18 @@ pub trait Backend: Send {
     }
 
     /// The tri-state permission read; never prompts. Unknown by default, which is never granted.
-    /// R62: the backend's own doctor checks; `None` (the default) adds nothing to `diagnose`.
-    fn diagnose(&self) -> Option<BackendProbes> {
-        None
-    }
-
     fn probe_permissions(&self) -> PermissionProbe {
         PermissionProbe {
             capture: PermissionState::Unknown,
             input: PermissionState::Unknown,
             accessibility: PermissionState::Unknown,
         }
+    }
+
+    /// R62: the backend's own doctor checks, read only and never prompting; `None` (the default)
+    /// adds nothing to `diagnose`.
+    fn diagnose(&self) -> Option<BackendProbes> {
+        None
     }
 
     /// The epoch source; by default one whose every read refuses.
