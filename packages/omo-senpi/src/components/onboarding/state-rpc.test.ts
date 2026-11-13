@@ -33,9 +33,13 @@ describe("omo.onboarding.state.*", () => {
   test("#given a fresh install #when an RPC client completes onboarding #then the TUI never claims it again", async () => {
     const dir = stateDir()
     const desktop = createOnboardingHarness(dir, "desktop", "rpc")
-    expect(await desktop.rpc(ONBOARDING_STATE_GET_RPC_METHOD)).toEqual({ completed: false, completedAt: null, inProgress: false })
+    expect(await desktop.rpc(ONBOARDING_STATE_GET_RPC_METHOD)).toEqual({
+      completed: false,
+      completedAt: null,
+      inProgress: false,
+    })
 
-    const completed = await desktop.rpc(ONBOARDING_STATE_COMPLETE_RPC_METHOD) as OnboardingStateResponse
+    const completed = (await desktop.rpc(ONBOARDING_STATE_COMPLETE_RPC_METHOD)) as OnboardingStateResponse
     expect(completed.completed).toBe(true)
     expect(typeof completed.completedAt).toBe("string")
     expect(state.isOnboardingComplete(dir)).toBe(true)
@@ -52,11 +56,15 @@ describe("omo.onboarding.state.*", () => {
     expect(onboardingContexts(await tui.prompt())).toBe(1)
     await tui.agentStart()
 
-    expect(await tui.rpc(ONBOARDING_STATE_GET_RPC_METHOD)).toEqual({ completed: false, completedAt: null, inProgress: true })
+    expect(await tui.rpc(ONBOARDING_STATE_GET_RPC_METHOD)).toEqual({
+      completed: false,
+      completedAt: null,
+      inProgress: true,
+    })
 
     await tui.end()
     await tui.settle()
-    const read = await tui.rpc(ONBOARDING_STATE_GET_RPC_METHOD) as OnboardingStateResponse
+    const read = (await tui.rpc(ONBOARDING_STATE_GET_RPC_METHOD)) as OnboardingStateResponse
     expect(read.completed).toBe(true)
     expect(read.inProgress).toBe(false)
     expect(Date.parse(read.completedAt ?? "")).not.toBeNaN()
@@ -68,7 +76,7 @@ describe("omo.onboarding.state.*", () => {
     expect(onboardingContexts(await tui.prompt())).toBe(1)
     await tui.agentStart()
 
-    const completed = await tui.rpc(ONBOARDING_STATE_COMPLETE_RPC_METHOD) as OnboardingStateResponse
+    const completed = (await tui.rpc(ONBOARDING_STATE_COMPLETE_RPC_METHOD)) as OnboardingStateResponse
     expect(completed.completed).toBe(true)
 
     await tui.end("error")
@@ -78,9 +86,16 @@ describe("omo.onboarding.state.*", () => {
 
   test("#given a marker written by an older engine #when the state is read #then it still counts as completed", async () => {
     const dir = stateDir()
-    writeFileSync(join(dir, "onboarding-completed"), JSON.stringify({ completedAt: "2026-09-01T00:00:00.000Z", version: 1 }))
+    writeFileSync(
+      join(dir, "onboarding-completed"),
+      JSON.stringify({ completedAt: "2026-09-01T00:00:00.000Z", version: 1 }),
+    )
     const desktop = createOnboardingHarness(dir, "desktop", "rpc")
-    expect(await desktop.rpc(ONBOARDING_STATE_GET_RPC_METHOD)).toEqual({ completed: true, completedAt: "2026-09-01T00:00:00.000Z", inProgress: false })
+    expect(await desktop.rpc(ONBOARDING_STATE_GET_RPC_METHOD)).toEqual({
+      completed: true,
+      completedAt: "2026-09-01T00:00:00.000Z",
+      inProgress: false,
+    })
   })
 
   test("#given this process finished onboarding #when an RPC client resets it #then the same process onboards again on its next prompt", async () => {
@@ -91,7 +106,11 @@ describe("omo.onboarding.state.*", () => {
     await tui.end()
     await tui.settle()
 
-    expect(await tui.rpc(ONBOARDING_STATE_RESET_RPC_METHOD)).toEqual({ completed: false, completedAt: null, inProgress: false })
+    expect(await tui.rpc(ONBOARDING_STATE_RESET_RPC_METHOD)).toEqual({
+      completed: false,
+      completedAt: null,
+      inProgress: false,
+    })
     tui.branch.length = 0
     expect(onboardingContexts(await tui.prompt())).toBe(1)
   })
@@ -100,7 +119,11 @@ describe("omo.onboarding.state.*", () => {
     const dir = stateDir()
     state.claimOnboarding(dir)
     const desktop = createOnboardingHarness(dir, "desktop", "rpc")
-    expect(await desktop.rpc(ONBOARDING_STATE_RESET_RPC_METHOD)).toEqual({ completed: false, completedAt: null, inProgress: false })
+    expect(await desktop.rpc(ONBOARDING_STATE_RESET_RPC_METHOD)).toEqual({
+      completed: false,
+      completedAt: null,
+      inProgress: false,
+    })
 
     const tui = createOnboardingHarness(dir, "tui", "tui")
     expect(onboardingContexts(await tui.prompt())).toBe(1)
@@ -109,8 +132,8 @@ describe("omo.onboarding.state.*", () => {
   test("#given an already completed onboarding #when complete is called again #then it stays completed with the first timestamp", async () => {
     const dir = stateDir()
     const desktop = createOnboardingHarness(dir, "desktop", "rpc")
-    const first = await desktop.rpc(ONBOARDING_STATE_COMPLETE_RPC_METHOD) as OnboardingStateResponse
-    const second = await desktop.rpc(ONBOARDING_STATE_COMPLETE_RPC_METHOD) as OnboardingStateResponse
+    const first = (await desktop.rpc(ONBOARDING_STATE_COMPLETE_RPC_METHOD)) as OnboardingStateResponse
+    const second = (await desktop.rpc(ONBOARDING_STATE_COMPLETE_RPC_METHOD)) as OnboardingStateResponse
     expect(second).toEqual(first)
   })
 })
@@ -133,7 +156,11 @@ describe("onboarding claim owner liveness", () => {
   }
 
   function writeClaim(dir: string, owner?: { pid: number; processStart: string | null }, claimedAt = NOW): void {
-    const record = { claimedAt: new Date(claimedAt).toISOString(), version: 2, ...(owner === undefined ? {} : { owner }) }
+    const record = {
+      claimedAt: new Date(claimedAt).toISOString(),
+      version: 2,
+      ...(owner === undefined ? {} : { owner }),
+    }
     writeFileSync(join(dir, "onboarding-completed"), JSON.stringify(record))
   }
 
@@ -145,8 +172,18 @@ describe("onboarding claim owner liveness", () => {
   test("#given a claim whose owner process is gone #when the desktop reads the state #then it is not in progress", async () => {
     const dir = stateDir()
     writeClaim(dir, { pid: DEAD_TUI, processStart: "proc-start-epoch:100" })
-    const desktop = createOnboardingHarness(dir, "desktop", "rpc", undefined, seams(5151, { 5151: "proc-start-epoch:500" }))
-    expect(await desktop.rpc(ONBOARDING_STATE_GET_RPC_METHOD)).toEqual({ completed: false, completedAt: null, inProgress: false })
+    const desktop = createOnboardingHarness(
+      dir,
+      "desktop",
+      "rpc",
+      undefined,
+      seams(5151, { 5151: "proc-start-epoch:500" }),
+    )
+    expect(await desktop.rpc(ONBOARDING_STATE_GET_RPC_METHOD)).toEqual({
+      completed: false,
+      completedAt: null,
+      inProgress: false,
+    })
   })
 
   test("#given a claim whose owner process is gone #when a new TUI prompts #then it takes the claim over and onboards", async () => {
@@ -156,14 +193,24 @@ describe("onboarding claim owner liveness", () => {
     const tui = createOnboardingHarness(dir, "tui", "tui", undefined, live)
     expect(onboardingContexts(await tui.prompt())).toBe(1)
     expect(claimOwnerPid(dir)).toBe(5151)
-    expect(await tui.rpc(ONBOARDING_STATE_GET_RPC_METHOD)).toEqual({ completed: false, completedAt: null, inProgress: true })
+    expect(await tui.rpc(ONBOARDING_STATE_GET_RPC_METHOD)).toEqual({
+      completed: false,
+      completedAt: null,
+      inProgress: true,
+    })
   })
 
   test("#given a dead claim #when the desktop completes #then completion is recorded and nothing is in progress", async () => {
     const dir = stateDir()
     writeClaim(dir, { pid: DEAD_TUI, processStart: "proc-start-epoch:100" })
-    const desktop = createOnboardingHarness(dir, "desktop", "rpc", undefined, seams(5151, { 5151: "proc-start-epoch:500" }))
-    const completed = await desktop.rpc(ONBOARDING_STATE_COMPLETE_RPC_METHOD) as OnboardingStateResponse
+    const desktop = createOnboardingHarness(
+      dir,
+      "desktop",
+      "rpc",
+      undefined,
+      seams(5151, { 5151: "proc-start-epoch:500" }),
+    )
+    const completed = (await desktop.rpc(ONBOARDING_STATE_COMPLETE_RPC_METHOD)) as OnboardingStateResponse
     expect(completed.completed).toBe(true)
     expect(completed.inProgress).toBe(false)
   })
@@ -173,7 +220,11 @@ describe("onboarding claim owner liveness", () => {
     writeClaim(dir, { pid: DEAD_TUI, processStart: "proc-start-epoch:100" })
     const live = seams(5151, { [DEAD_TUI]: "proc-start-epoch:100", 5151: "proc-start-epoch:500" })
     const tui = createOnboardingHarness(dir, "tui", "tui", undefined, live)
-    expect(await tui.rpc(ONBOARDING_STATE_GET_RPC_METHOD)).toEqual({ completed: false, completedAt: null, inProgress: true })
+    expect(await tui.rpc(ONBOARDING_STATE_GET_RPC_METHOD)).toEqual({
+      completed: false,
+      completedAt: null,
+      inProgress: true,
+    })
     expect(onboardingContexts(await tui.prompt())).toBe(0)
     expect(claimOwnerPid(dir)).toBe(DEAD_TUI)
   })
@@ -183,7 +234,11 @@ describe("onboarding claim owner liveness", () => {
     writeClaim(dir, { pid: DEAD_TUI, processStart: "proc-start-epoch:100" })
     const reused = seams(5151, { [DEAD_TUI]: "proc-start-epoch:900", 5151: "proc-start-epoch:500" })
     const tui = createOnboardingHarness(dir, "tui", "tui", undefined, reused)
-    expect(await tui.rpc(ONBOARDING_STATE_GET_RPC_METHOD)).toEqual({ completed: false, completedAt: null, inProgress: false })
+    expect(await tui.rpc(ONBOARDING_STATE_GET_RPC_METHOD)).toEqual({
+      completed: false,
+      completedAt: null,
+      inProgress: false,
+    })
     expect(onboardingContexts(await tui.prompt())).toBe(1)
     expect(claimOwnerPid(dir)).toBe(5151)
   })
@@ -191,14 +246,34 @@ describe("onboarding claim owner liveness", () => {
   test("#given an ownerless claim from an older build #when it is younger than 24 hours #then it still blocks, and once older it is abandoned", async () => {
     const recent = stateDir()
     writeClaim(recent, undefined, NOW - HOUR)
-    const recentTui = createOnboardingHarness(recent, "tui", "tui", undefined, seams(5151, { 5151: "proc-start-epoch:500" }))
-    expect(await recentTui.rpc(ONBOARDING_STATE_GET_RPC_METHOD)).toEqual({ completed: false, completedAt: null, inProgress: true })
+    const recentTui = createOnboardingHarness(
+      recent,
+      "tui",
+      "tui",
+      undefined,
+      seams(5151, { 5151: "proc-start-epoch:500" }),
+    )
+    expect(await recentTui.rpc(ONBOARDING_STATE_GET_RPC_METHOD)).toEqual({
+      completed: false,
+      completedAt: null,
+      inProgress: true,
+    })
     expect(onboardingContexts(await recentTui.prompt())).toBe(0)
 
     const stale = stateDir()
     writeClaim(stale, undefined, NOW - 24 * HOUR)
-    const staleTui = createOnboardingHarness(stale, "tui", "tui", undefined, seams(5151, { 5151: "proc-start-epoch:500" }))
-    expect(await staleTui.rpc(ONBOARDING_STATE_GET_RPC_METHOD)).toEqual({ completed: false, completedAt: null, inProgress: false })
+    const staleTui = createOnboardingHarness(
+      stale,
+      "tui",
+      "tui",
+      undefined,
+      seams(5151, { 5151: "proc-start-epoch:500" }),
+    )
+    expect(await staleTui.rpc(ONBOARDING_STATE_GET_RPC_METHOD)).toEqual({
+      completed: false,
+      completedAt: null,
+      inProgress: false,
+    })
     expect(onboardingContexts(await staleTui.prompt())).toBe(1)
     expect(claimOwnerPid(stale)).toBe(5151)
   })

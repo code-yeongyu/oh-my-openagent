@@ -22,14 +22,17 @@ export type GatedChildMachine = {
   cleanup(): void
 }
 
-export async function createGatedChildMachine(options: { readonly settingsPreset?: string } = { settingsPreset: "ask" }): Promise<GatedChildMachine> {
+export async function createGatedChildMachine(
+  options: { readonly settingsPreset?: string } = { settingsPreset: "ask" },
+): Promise<GatedChildMachine> {
   const senpi = await loadSenpiBarrel()
   const root = mkdtempSync(join(tmpdir(), "senpi-task-6189-"))
   const agentDir = join(root, "agent")
   const cwd = join(root, "work")
   mkdirSync(agentDir, { recursive: true })
   mkdirSync(cwd, { recursive: true })
-  if (options.settingsPreset !== undefined) writeFileSync(join(agentDir, "settings.json"), JSON.stringify({ permissionPreset: options.settingsPreset }))
+  if (options.settingsPreset !== undefined)
+    writeFileSync(join(agentDir, "settings.json"), JSON.stringify({ permissionPreset: options.settingsPreset }))
   const probe = join(cwd, "probe.txt")
   const modelRuntime = senpi.ModelRuntime.createSync({ agentDir, allowModelNetwork: false, refreshOnCreate: false })
   const modelRegistry = new senpi.ModelRegistry(modelRuntime)
@@ -38,12 +41,25 @@ export async function createGatedChildMachine(options: { readonly settingsPreset
     api: "openai-completions",
     baseUrl: "file://gated-child-test",
     apiKey: "test-key",
-    models: [{ id: MODEL, name: MODEL, reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 200_000, maxTokens: 4096 }],
+    models: [
+      {
+        id: MODEL,
+        name: MODEL,
+        reasoning: false,
+        input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 200_000,
+        maxTokens: 4096,
+      },
+    ],
     streamSimple() {
       calls += 1
       if (calls > 1) return streamMessage(assistant(MODEL, "stop", "done", undefined, PROVIDER))
       const toolUse = assistant(MODEL, "toolUse", "", undefined, PROVIDER)
-      return streamMessage({ ...toolUse, content: [{ type: "toolCall", id: "call-probe", name: "write", arguments: { path: probe, content: "probe" } }] })
+      return streamMessage({
+        ...toolUse,
+        content: [{ type: "toolCall", id: "call-probe", name: "write", arguments: { path: probe, content: "probe" } }],
+      })
     },
   }
   Reflect.apply(modelRegistry.registerProvider, modelRegistry, [PROVIDER, provider])
@@ -52,7 +68,14 @@ export async function createGatedChildMachine(options: { readonly settingsPreset
   return {
     probe,
     openParent: async () => {
-      const { session } = await senpi.createAgentSession({ cwd, agentDir, sessionManager: senpi.SessionManager.inMemory(cwd), modelRuntime, modelRegistry, model })
+      const { session } = await senpi.createAgentSession({
+        cwd,
+        agentDir,
+        sessionManager: senpi.SessionManager.inMemory(cwd),
+        modelRuntime,
+        modelRegistry,
+        model,
+      })
       return { sessionId: session.sessionManager.getSessionId(), dispose: () => session.dispose() }
     },
     spec: (taskId, parentSessionId = "parent-6189") => ({

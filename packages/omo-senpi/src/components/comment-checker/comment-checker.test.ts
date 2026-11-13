@@ -213,7 +213,7 @@ describe("omo-senpi comment-checker component", () => {
     expect(missingPath).toEqual([undefined])
     expect(badPayload).toEqual([undefined])
   })
-it("#given no local checker #when the pinned release downloads #then one download serves every later result in the session", async () => {
+  it("#given no local checker #when the pinned release downloads #then one download serves every later result in the session", async () => {
     // given
     const cwd = createTempCwd()
     const logger = createRecordingLogger()
@@ -237,7 +237,10 @@ it("#given no local checker #when the pinned release downloads #then one downloa
 
     // then
     expect(downloads).toBe(1)
-    expect(calls.map((call) => call.binaryPath)).toEqual(["/tmp/downloaded-comment-checker", "/tmp/downloaded-comment-checker"])
+    expect(calls.map((call) => call.binaryPath)).toEqual([
+      "/tmp/downloaded-comment-checker",
+      "/tmp/downloaded-comment-checker",
+    ])
     expect(logger.entries).toEqual([])
   })
 

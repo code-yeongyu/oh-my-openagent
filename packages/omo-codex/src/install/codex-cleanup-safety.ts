@@ -20,7 +20,8 @@ export function validateManagedCleanupTarget(input: {
   if (!isAbsolute(input.path)) return skipped(input.path, "outside managed Codex cleanup scope")
 
   const codexHome = resolve(input.codexHome)
-  if (codexHomeResolvesToFilesystemRoot(codexHome)) return skipped(input.path, "Codex home resolves to a filesystem root")
+  if (codexHomeResolvesToFilesystemRoot(codexHome))
+    return skipped(input.path, "Codex home resolves to a filesystem root")
 
   const target = resolve(input.path)
   if (!isWithinDirectory(codexHome, target)) return skipped(input.path, "outside managed Codex cleanup scope")
@@ -50,7 +51,9 @@ function isManagedBootstrapDriftPath(codexHome: string, target: string): boolean
   if (segments[0] !== "plugins") return false
   if (segments[segments.length - 1] !== "bootstrap") return false
   const ownerName = segments[segments.length - 2]
-  return ownerName !== undefined && ownerName.startsWith("omo") && ownerName.slice("omo".length).includes("sisyphuslabs")
+  return (
+    ownerName !== undefined && ownerName.startsWith("omo") && ownerName.slice("omo".length).includes("sisyphuslabs")
+  )
 }
 
 function skipped(path: string, reason: SkippedCleanupPath["reason"]): SkippedCleanupPath {

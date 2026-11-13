@@ -65,22 +65,31 @@ export async function runProducerScopedNarrowedChild(): Promise<Record<string, u
     assert.equal(hold.toolName, "hold")
     pumpNestedCalls(kernel, nested, stopped)
 
-    const details = ((await env.taskTool.execute(
-      "omp-b2-producer",
-      {
-        prompt: "Call fixture_probe for read, then for write, then report what you saw.",
-        subagent_type: RESTRICTED,
-        run_in_background: false,
-        tools: ["fixture_probe"],
-      } as never,
-      undefined,
-      undefined,
-      env.context(kernel.capability) as never,
-    )) as AgentToolResult<TaskToolDetails>).details
+    const details = (
+      (await env.taskTool.execute(
+        "omp-b2-producer",
+        {
+          prompt: "Call fixture_probe for read, then for write, then report what you saw.",
+          subagent_type: RESTRICTED,
+          run_in_background: false,
+          tools: ["fixture_probe"],
+        } as never,
+        undefined,
+        undefined,
+        env.context(kernel.capability) as never,
+      )) as AgentToolResult<TaskToolDetails>
+    ).details
 
-    assert.equal(details.kernel_tools?.status, "granted", "the real producer advertises the scope, so the narrowed child is granted")
+    assert.equal(
+      details.kernel_tools?.status,
+      "granted",
+      "the real producer advertises the scope, so the narrowed child is granted",
+    )
     assert.equal(details.kernel_tools?.scoped, true)
-    assert.deepEqual(details.kernel_tools?.scope, { allow: EXPECTED_SCOPE.tools.allow, deny: EXPECTED_SCOPE.tools.deny })
+    assert.deepEqual(details.kernel_tools?.scope, {
+      allow: EXPECTED_SCOPE.tools.allow,
+      deny: EXPECTED_SCOPE.tools.deny,
+    })
     assert.equal(details.status, "completed")
 
     const record = env.store.load(details.task_id)

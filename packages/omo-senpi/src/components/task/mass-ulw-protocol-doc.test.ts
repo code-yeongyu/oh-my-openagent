@@ -11,10 +11,13 @@ const doc = fs.readFileSync(docPath, "utf8")
 
 const bridgeSource = fs.readFileSync(join(import.meta.dir, "dag-rpc-bridge.ts"), "utf8")
 const handlerSource = fs.readFileSync(join(import.meta.dir, "dag-rpc-handlers.ts"), "utf8")
-const eventTypesSource = fs.readFileSync(join(repoRoot, "packages", "senpi-task", "src", "dag", "event-types.ts"), "utf8")
+const eventTypesSource = fs.readFileSync(
+  join(repoRoot, "packages", "senpi-task", "src", "dag", "event-types.ts"),
+  "utf8",
+)
 
 function extract(pattern: RegExp): readonly string[] {
-  const captures = [...doc.matchAll(pattern)].flatMap((match) => match[1] === undefined ? [] : [match[1]])
+  const captures = [...doc.matchAll(pattern)].flatMap((match) => (match[1] === undefined ? [] : [match[1]]))
   return [...new Set(captures)]
 }
 
@@ -26,8 +29,7 @@ describe("mass-ulw protocol doc", () => {
       it("#then each name exists as a string literal in the source", () => {
         expect(wireNames.length).toBeGreaterThan(0)
         for (const name of wireNames) {
-          const shipped =
-            bridgeSource.includes(`"${name}"`) || handlerSource.includes(`"${name}"`)
+          const shipped = bridgeSource.includes(`"${name}"`) || handlerSource.includes(`"${name}"`)
           expect(`${name}:${shipped}`).toBe(`${name}:true`)
         }
       })
