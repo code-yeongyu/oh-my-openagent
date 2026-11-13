@@ -69,9 +69,10 @@ export async function recreateChannel(
   log: (line: string) => void,
 ): Promise<void> {
   const key = `channels/${channel}`
-  // publish.yml's rule: a prerelease ships on beta, a stable release on latest.
-  const expected: Channel = isPrerelease(version) ? "beta" : "latest"
-  if (channel !== expected) throw new MirrorPlanError(`${version} belongs on channels/${expected}, not ${key}`)
+  // publish.yml's rule: latest only ever holds a stable release, while beta holds the newer of the latest stable and
+  // the newest prerelease (#12987), so a stable version may sit on beta but a prerelease never on latest.
+  if (channel === "latest" && isPrerelease(version))
+    throw new MirrorPlanError(`${version} belongs on channels/beta, not ${key}`)
   const marker = `releases/v${version}/.complete`
   const mirrored = await signedRequest(credentials, "HEAD", marker)
   if (mirrored.status !== 200)

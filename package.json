@@ -194,11 +194,11 @@
   "dependencies": {
     "@opentui/solid": "^0.5.11",
     "detect-libc": "^2.1.2",
-    "zod": "^4.6.5"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@clack/prompts": "^1.8.1",
-    "@code-yeongyu/senpi": "2026.11.10-2",
+    "@code-yeongyu/senpi": "2026.11.12",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@oh-my-opencode/agents-md-core": "workspace:*",
     "@oh-my-opencode/ast-grep-mcp": "workspace:*",
