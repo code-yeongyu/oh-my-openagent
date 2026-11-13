@@ -65,6 +65,7 @@ describe("typed task handles", () => {
   test("#given a start that outlives the teardown's wait #when the fixture tears down #then that start retires its own child", async () => {
     // given
     const retired: string[] = []
+    const retiredLate: string[] = []
     // when
     const failed = realSessionHandle({
       registerAfterReport: true,
@@ -72,10 +73,13 @@ describe("typed task handles", () => {
       holdUntilTornDown: true,
       teardownWaitMs: 1,
       retired,
+      retiredLate,
     })
     // then
     await expect(failed).rejects.toThrow("the fixture failed after the task tool reported")
     expect(retired).toHaveLength(1)
+    // The teardown's own loop would also retire a late handle; only the start's branch reports here.
+    expect(retiredLate).toEqual(retired)
   })
 
   test("#given foreground output containing unrelated ids #when completed #then the body and record identity are preserved", async () => {

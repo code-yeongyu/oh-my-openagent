@@ -21,12 +21,14 @@ import { makeDeps } from "./task-tool-fakes"
 // and none of the launch's writes lands after the test's cleanup.
 //
 // `failAfterReport` fails the fixture right after the tool returned, while that start is still in flight;
-// `retired` receives the task id of every child the teardown retires.
+// `retired` receives the task id of every child that is retired, and `retiredLate` the ones a start retired
+// itself because it finished after the teardown had given up on it.
 export async function realSessionHandle(
   options: {
     readonly registerAfterReport?: boolean
     readonly failAfterReport?: boolean
     readonly retired?: string[]
+    readonly retiredLate?: string[]
     readonly holdUntilTornDown?: boolean
     readonly teardownWaitMs?: number
   } = {},
@@ -96,6 +98,7 @@ export async function realSessionHandle(
       if (tornDown) {
         // The teardown gave up on this launch (the test's deadline ran out): nothing else will retire this child.
         await retire(handle)
+        options.retiredLate?.push(handle.task_id)
         throw new Error("the fixture was torn down before this start finished")
       }
       handles.push(handle)
