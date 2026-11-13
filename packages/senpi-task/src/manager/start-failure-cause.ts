@@ -8,7 +8,12 @@ import { RPC_RESPONSE_TIMEOUT_PREFIX as TIMEOUT_PREFIX } from "../runners/rpc-ho
 import { ERROR_CODE_SHAPE, PROVIDER_SHAPE } from "../runners/rpc/errors"
 
 export type StartCauseClass =
-  "request_timeout" | "host_refused" | "transport_lost" | "credentials_missing" | "chain_not_held"
+  | "request_timeout"
+  | "host_refused"
+  | "transport_lost"
+  | "credentials_missing"
+  | "chain_not_held"
+  | "engine_restart_required"
 
 export type StartCause = {
   readonly cause_class: StartCauseClass
@@ -24,6 +29,12 @@ const TRANSPORT_LOSS_CODES = new Set(["rpc_transport_gone", "session_detached", 
 // refreshed is as provider-wide as a missing key, so both walk the chain the same way.
 const CREDENTIAL_CODES = new Set(["provider_credentials_missing", "provider_credentials_expired"])
 const CHAIN_NOT_HELD_CODES = new Set(["unsupported", "refused", "timeout"])
+// The engine refuses to load next to a redaction registry slot it did not pin (#12965). The refusal
+// is permanent for the process (a failed module evaluation stays cached), so the only remedy is a
+// restart. Recognize it by the typed error name or its refusal code, never by the message text:
+// the caught message is untrusted child/host output.
+const ENGINE_RESTART_REQUIRED_NAME = "SenpiEngineRestartRequiredError"
+const ENGINE_RESTART_REQUIRED_CODE = "SENPI_REDACTION_SLOT_INCOMPATIBLE"
 // A designated model is named exactly as its selector (`provider/model[:thinking]`); anything else is dropped.
 const MODEL_SELECTOR_SHAPE = /^[A-Za-z0-9][\w.-]{0,63}\/[\w.:/@+-]{1,160}$/
 
@@ -32,6 +43,7 @@ export function classifyStartCause(cause: unknown): StartCause | undefined {
     if (!(cause instanceof Error)) return undefined
     const code = (cause as { readonly code?: unknown }).code
     if (typeof code === "string" && TRANSPORT_LOSS_CODES.has(code)) return { cause_class: "transport_lost" }
+    if (isEngineRestartRequired(cause, code)) return { cause_class: "engine_restart_required" }
     if (cause.name === "DesignatedChainNotHeldError") return chainNotHeld(cause)
     if (cause.name === "RpcCommandError") {
       const refusal = cause as { readonly errorCode?: unknown; readonly errorData?: unknown }
@@ -42,6 +54,11 @@ export function classifyStartCause(cause: unknown): StartCause | undefined {
   } catch {
     return undefined
   }
+}
+
+function isEngineRestartRequired(cause: Error, code: unknown): boolean {
+  if (cause.name === ENGINE_RESTART_REQUIRED_NAME) return true
+  return code === ENGINE_RESTART_REQUIRED_CODE
 }
 
 function chainNotHeld(cause: Error): StartCause {
@@ -101,6 +118,8 @@ export function describeStartCause(cause: StartCause, operation: "prompt" | "ses
       const code = cause.cause_code === undefined ? "chain_not_held" : `chain_not_held: ${cause.cause_code}`
       return `the engine could not hold its designated model chain${chain} (${code}), and a child never runs outside its designated models`
     }
+    case "engine_restart_required":
+      return "the engine refused to load because an incompatible engine copy is already loaded in this process (engine_restart_required); restart omo to start task children again"
     default:
       return assertNever(cause.cause_class)
   }
