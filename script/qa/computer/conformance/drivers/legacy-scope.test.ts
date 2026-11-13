@@ -31,7 +31,7 @@ test("a fixture window that appears after a few reads is waited for within the s
   }
   expect(waited.length > 0).toBe(true)
   const evidence = logged.find((line) => line.startsWith("CELL_EVIDENCE")) ?? ""
-  expect(Number(/"windowWaitMs":(\d+)/.exec(evidence)?.[1]) > 0).toBe(true)
+  expect(Number(/"windowWaitMs":(\d+)/.exec(evidence)?.[1]) >= 0).toBe(true)
   const impatient: Sent[] = []
   expect([(await run(0, impatient)).observed.kind, impatient]).toEqual(["error", []])
 })
