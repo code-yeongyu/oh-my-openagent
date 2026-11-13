@@ -355,6 +355,58 @@ describe("#13272 review: the anchor survives a rewritten send and never takes an
     follow.stop()
   })
 
+  test("#given an older same-text send followed by a blocker and this queued send not yet stored #when the follow reads #then it waits for its own entry instead of printing the older answer", async () => {
+    const transcript = [
+      message("u1", "user", "ping"),
+      message("a1", "assistant", "old answer\n"),
+      message("u2", "user", "blocker"),
+    ]
+    const { remote, deliver } = followSurface(transcript)
+    const printed: string[] = []
+    const follow = await followRemote(remote, ROW, (text) => printed.push(text), {
+      text: "ping",
+      clientMessageId: "cm-new",
+    })
+    if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
+    follow.aim("queued")
+    deliver([{ type: "agent_settled" }])
+    await flush()
+    expect(printed).toEqual([])
+    transcript.push(
+      message("a2", "assistant", "blocker answer\n"),
+      withId("u3", "ping", "cm-new"),
+      message("a3", "assistant", "new answer\n"),
+    )
+    deliver([{ type: "agent_settled" }])
+    await withTimeout(follow.settled, 5_000, "the queued send's own answer never completed")
+    expect(printed).toEqual(["new answer\n"])
+    follow.stop()
+  })
+
+  test("#given an engine that stores no client message id #when the queued send's entry lands after an older same-text one #then the next same-text entry anchors, never the older one", async () => {
+    const transcript = [
+      message("u1", "user", "ping"),
+      message("a1", "assistant", "old answer\n"),
+      message("u2", "user", "blocker"),
+    ]
+    const { remote, deliver } = followSurface(transcript)
+    const printed: string[] = []
+    const follow = await followRemote(remote, ROW, (text) => printed.push(text), {
+      text: "ping",
+      clientMessageId: "cm-new",
+    })
+    if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
+    follow.aim("queued")
+    deliver([{ type: "agent_settled" }])
+    await flush()
+    expect(printed).toEqual([])
+    transcript.push(message("u3", "user", "ping"), message("a3", "assistant", "new answer\n"))
+    deliver([{ type: "agent_settled" }])
+    await withTimeout(follow.settled, 5_000, "the queued send's own answer never completed")
+    expect(printed).toEqual(["new answer\n"])
+    follow.stop()
+  })
+
   test("#given entries with no client message id #when the anchor is chosen #then an exact entry wins over a longer one containing the text, and a wrapped entry anchors only when no exact one exists", () => {
     const wrapped = message("u1", "user", "<context>\nping")
     const exact = message("u2", "user", "ping")

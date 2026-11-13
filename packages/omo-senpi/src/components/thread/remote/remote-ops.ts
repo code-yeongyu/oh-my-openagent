@@ -252,8 +252,9 @@ export async function followRemote(
   let newMessage = false
   let checking = false
   let pendingSignal = false
-  // How many entries carried this send's text when a read first saw any: that count is this send's ordinal among
-  // identical-text messages, because its own entry is the newest such entry at its admission (#13272 review).
+  // This send's ordinal among identical-text entries, fixed at its first read: without a client message id, the count
+  // that read saw (its own entry assumed the newest); with an id the engine has not stamped yet, one past that count,
+  // since a queued entry is stored only when the queue drains (#13272 review).
   let matchOrdinal: number | undefined
   const check = async (settleSignal: boolean): Promise<void> => {
     const text = options?.text
@@ -269,10 +270,28 @@ export async function followRemote(
       const raw = page.response["entries"]
       if (!Array.isArray(raw)) return
       const entries = raw.filter(isRecord)
-      const matches = anchorMatches(entries, text, options?.clientMessageId)
-      if (matches.length === 0) return
-      if (matchOrdinal === undefined) matchOrdinal = matches.length
-      const anchor = matches[Math.min(matchOrdinal, matches.length) - 1]
+      const clientMessageId = options?.clientMessageId
+      const own =
+        clientMessageId === undefined
+          ? -1
+          : entries.findIndex((entry) => isUserEntry(entry) && entryClientMessageIdOf(entry) === clientMessageId)
+      let anchor: number
+      if (own >= 0) anchor = own
+      else {
+        const matches = anchorMatches(entries, text)
+        if (clientMessageId === undefined) {
+          if (matches.length === 0) return
+          if (matchOrdinal === undefined) matchOrdinal = matches.length
+          anchor = matches[Math.min(matchOrdinal, matches.length) - 1]
+        } else {
+          // senpi stores a queued send's entry only when the queue drains, so a send that carries an id and finds no
+          // entry with it has not been stored yet: every same-text entry its first read sees is an earlier send,
+          // and its own is the next one (#13272 review). It waits for that entry rather than print an older answer.
+          if (matchOrdinal === undefined) matchOrdinal = matches.length + 1
+          if (matches.length < matchOrdinal) return
+          anchor = matches[matchOrdinal - 1]
+        }
+      }
       const answer: string[] = []
       let superseded = false
       let answerAtTail = false
