@@ -250,3 +250,43 @@ fn a_listener_whose_thread_is_not_running_is_deaf() {
     );
     assert_eq!(liveness(false, false, false), Liveness::Deaf);
 }
+
+/// Review L1 (#13350): a key the user already held when the lease began must be able to come up,
+/// or swallowing its key-up leaves it stuck down in the OS key state.
+#[test]
+fn input_lock_passes_the_key_up_of_a_key_held_before_the_lease() {
+    let a = 0x41;
+    let mut at_lease = PhysicalChord::default();
+    at_lease.on_key(&key(a, true, Origin::Physical, 1));
+    at_lease.on_key(&key(0xA2, true, Origin::Physical, 1));
+    assert_eq!(
+        lock_verdict(&key(a, false, Origin::Physical, 5), true, true, &at_lease),
+        LockVerdict::Pass,
+        "the key-up of a key held before the lease passes"
+    );
+    assert_eq!(
+        lock_verdict(
+            &key(0xA2, false, Origin::Physical, 5),
+            true,
+            true,
+            &at_lease
+        ),
+        LockVerdict::Pass,
+        "a left/right modifier held before the lease comes up too"
+    );
+    assert_eq!(
+        lock_verdict(&key(a, true, Origin::Physical, 5), true, true, &at_lease),
+        LockVerdict::Swallow,
+        "a new press is still swallowed"
+    );
+    assert_eq!(
+        lock_verdict(
+            &key(0x42, false, Origin::Physical, 5),
+            true,
+            true,
+            &at_lease
+        ),
+        LockVerdict::Swallow,
+        "the key-up of a key pressed during the lease is swallowed with its press"
+    );
+}
