@@ -1,0 +1,24 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/ast-grep-mcp": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "src/cli.ts",
+      ],
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) AST_GREP_ERROR_CODES, AST_GREP_MCP_TOOLS, runMcpStdioServer
+    "packages/ast-grep-mcp/src/index.ts": ["AST_GREP_ERROR_CODES", "AST_GREP_MCP_TOOLS", "runMcpStdioServer"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) AST_GREP_SERVER_NAME, AST_GREP_SERVER_VERSION, coerceToolArguments
+    "packages/ast-grep-mcp/src/mcp.ts": ["AST_GREP_SERVER_NAME", "AST_GREP_SERVER_VERSION", "coerceToolArguments"]
+  }
+}
