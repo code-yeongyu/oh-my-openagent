@@ -53,7 +53,9 @@ pub(super) fn capture<O: CaptureOs + ?Sized>(
 }
 
 /// WGC is the only route to an elevated window; its one retry on a blank frame is a second WGC
-/// frame, and a WGC that cannot serve the window answers [`ELEVATED`] with nothing captured.
+/// frame, and a WGC that cannot serve the window answers [`ELEVATED`] with nothing captured -
+/// except under the session cause, where a null frame or missing item is
+/// `CaptureFailed{null_frame}` and two blank frames `CaptureFailed{black_frame}` (R70g(2)).
 fn elevated_window<O: CaptureOs + ?Sized>(
     os: &mut O,
     wgc: bool,
@@ -70,10 +72,18 @@ fn elevated_window<O: CaptureOs + ?Sized>(
             Ok(frame) if !is_blank(&frame.bgra) => return wgc_frame(frame, scale, dark),
             Ok(_) => {}
             Err(CaptureFault::Timeout) => return Err(failed(Reason::Timeout)),
+            Err(CaptureFault::ItemUnavailable | CaptureFault::NullFrame) if dark => {
+                return Err(failed(Reason::NullFrame));
+            }
             Err(CaptureFault::ItemUnavailable | CaptureFault::NullFrame) => return Err(ELEVATED),
         }
     }
-    Err(ELEVATED)
+    // Two blank frames: the session's black frame under its cause (R70g(2)), else elevation (R34).
+    Err(if dark {
+        failed(Reason::BlackFrame)
+    } else {
+        ELEVATED
+    })
 }
 
 /// A non-blank WGC frame: refused as `CaptureFailed{black_frame}` when near black under the
