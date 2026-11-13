@@ -140,7 +140,40 @@ function isNameOnly(node: AstNode, parent: AstNode | undefined): boolean {
  * `virtualModules` option. Any other reference could write to it after its declaration (a member assignment,
  * Object.assign, a reassignment, a delete), so its keys would no longer be the served set.
  */
-function isKnownTableRead(node: AstNode, parent: AstNode | undefined, declarator: AstNode): boolean {
+/** Expressions an option object may pass through on its way into a call without being bound to a name. */
+const OPTION_CARRIERS = new Set([
+  "ObjectExpression",
+  "ConditionalExpression",
+  "ParenthesizedExpression",
+  "SpreadElement",
+])
+
+/**
+ * Whether an object literal goes straight into a call's arguments, through only object literals, conditionals,
+ * parentheses and spreads: the shape the installed loader passes its jiti options in. An object bound to a name, or
+ * reaching anything else, could be written through (o.virtualModules.ws = ...), so its table read is not accepted.
+ */
+function flowsDirectlyIntoCall(objectNode: AstNode, parents: ReadonlyMap<AstNode, AstNode | undefined>): boolean {
+  let child = objectNode
+  for (let parent = parents.get(child); parent !== undefined; child = parent, parent = parents.get(child)) {
+    if (parent.type === "CallExpression")
+      return Array.isArray(parent["arguments"]) && parent["arguments"].includes(child)
+    if (parent.type === "ConditionalExpression" && parent["test"] === child) return false
+    if (parent.type === "Property") {
+      if (parent["value"] !== child || parent["computed"] === true) return false
+      continue
+    }
+    if (!OPTION_CARRIERS.has(parent.type)) return false
+  }
+  return false
+}
+
+function isKnownTableRead(
+  node: AstNode,
+  parent: AstNode | undefined,
+  declarator: AstNode,
+  parents: ReadonlyMap<AstNode, AstNode | undefined>,
+): boolean {
   if (parent === declarator && declarator["id"] === node) return true
   if (parent?.type === "CallExpression" && Array.isArray(parent["arguments"]) && parent["arguments"].includes(node)) {
     const callee = parent["callee"]
@@ -148,7 +181,14 @@ function isKnownTableRead(node: AstNode, parent: AstNode | undefined, declarator
   }
   if (parent?.type === "Property" && parent["value"] === node && parent["computed"] !== true) {
     const key = parent["key"]
-    return isAstNode(key) && key.type === "Identifier" && key["name"] === "virtualModules"
+    const options = parents.get(parent)
+    return (
+      isAstNode(key) &&
+      key.type === "Identifier" &&
+      key["name"] === "virtualModules" &&
+      options?.type === "ObjectExpression" &&
+      flowsDirectlyIntoCall(options, parents)
+    )
   }
   return false
 }
@@ -217,9 +257,13 @@ export function engineServedSpecifiers(hostPackageDir = senpiPackageDir): Readon
       node["declarations"].includes(declarator),
   )[0]?.["kind"]
   if (kind !== "const") return fail(`${tableName} is not declared with const`)
+  const parents = new Map<AstNode, AstNode | undefined>()
+  visitWithParent(parsed.program, undefined, (node, parent) => {
+    parents.set(node, parent)
+  })
   visitWithParent(parsed.program, undefined, (node, parent) => {
     if (node.type !== "Identifier" || node["name"] !== tableName || isNameOnly(node, parent)) return
-    if (isKnownTableRead(node, parent, declarator)) return
+    if (isKnownTableRead(node, parent, declarator, parents)) return
     const start = typeof node["start"] === "number" ? node["start"] : 0
     const line = source.slice(0, start).split("\n").length
     fail(

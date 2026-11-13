@@ -82,6 +82,25 @@ const installedLoaderPath = join(
   "loader.js",
 )
 
+/** Independent of the production check: an option object must reach a call's arguments without being bound to a name. */
+function flowsDirectlyIntoCallByTypeScript(objectNode: ts.Node): boolean {
+  let child = objectNode
+  for (let parent = child.parent; parent !== undefined; child = parent, parent = parent.parent) {
+    if (ts.isCallExpression(parent)) return parent.arguments.some((argument) => argument === child)
+    if (ts.isConditionalExpression(parent) && parent.condition === child) return false
+    if (ts.isPropertyAssignment(parent) && parent.initializer !== child) return false
+    if (
+      !ts.isObjectLiteralExpression(parent) &&
+      !ts.isConditionalExpression(parent) &&
+      !ts.isParenthesizedExpression(parent) &&
+      !ts.isSpreadAssignment(parent) &&
+      !ts.isPropertyAssignment(parent)
+    )
+      return false
+  }
+  return false
+}
+
 /**
  * The keys of the table a loader passes to createBunExtensionImporter, read with the TypeScript parser: independent of
  * the oxc-based reader under test. It refuses, as that reader must, a table used anywhere other than its declaration,
@@ -127,7 +146,8 @@ function loaderTableByTypeScript(loaderPath = installedLoaderPath): string[] {
       ts.isPropertyAssignment(parent) &&
       parent.initializer === use &&
       ts.isIdentifier(parent.name) &&
-      parent.name.text === "virtualModules"
+      parent.name.text === "virtualModules" &&
+      flowsDirectlyIntoCallByTypeScript(parent.parent)
     const isMemberName = ts.isPropertyAccessExpression(parent) && parent.name === use
     if (!isDeclaration && !isImporterArgument && !isVirtualModulesOption && !isMemberName) {
       throw new Error(
@@ -460,15 +480,64 @@ describe("sidecar parity set", () => {
     },
   )
 
-  test("#given a loader that also passes its table as a virtualModules option #when its table is read #then both readers read it exactly", () => {
-    // given - the installed loader hands the same table to jiti as `virtualModules`
+  test.each([
+    [
+      "a member write through it",
+      loaderSource("    typebox: bundled,").replace(
+        "export async function createImporter",
+        `const o = { virtualModules: VIRTUAL_MODULES };\no.virtualModules.ws = bundled;\nexport async function createImporter`,
+      ),
+    ],
+    [
+      "an Object.assign through it",
+      loaderSource("    typebox: bundled,").replace(
+        "export async function createImporter",
+        `const o = { virtualModules: VIRTUAL_MODULES };\nObject.assign(o.virtualModules, { ws: bundled });\nexport async function createImporter`,
+      ),
+    ],
+    [
+      "a delete through it",
+      loaderSource("    typebox: bundled,").replace(
+        "export async function createImporter",
+        `const o = { virtualModules: VIRTUAL_MODULES };\ndelete o.virtualModules.typebox;\nexport async function createImporter`,
+      ),
+    ],
+    [
+      "an exported handle to it",
+      loaderSource("    typebox: bundled,").replace(
+        "export async function createImporter",
+        "export const jitiOptions = { virtualModules: VIRTUAL_MODULES };\nexport async function createImporter",
+      ),
+    ],
+  ] as const)(
+    "#given a loader that binds a virtualModules option object to a name, with %s #when its table is read #then both readers refuse it",
+    (_label, source) => {
+      // given - an option object bound to a name can be written through, so its read is not the installed shape
+      const host = join(tmpdir(), `omo-engine-bound-option-${process.pid}-${crypto.randomUUID()}`)
+      try {
+        writeEngineLoader(host, source)
+        const loaderPath = join(host, "dist", "core", "extensions", "loader.js")
+
+        // when / then
+        expect(() => engineServedSpecifiers(host)).toThrow(
+          `cannot read the engine's extension module table from ${loaderPath}`,
+        )
+        expect(() => loaderTableByTypeScript(loaderPath)).toThrow("VIRTUAL_MODULES is ")
+      } finally {
+        rmSync(host, { recursive: true, force: true })
+      }
+    },
+  )
+
+  test("#given a loader that also passes its table as a virtualModules option straight into a call #when its table is read #then both readers read it exactly", () => {
+    // given - the installed loader hands the same table to jiti as `virtualModules`, inside the call's own options
     const host = join(tmpdir(), `omo-engine-option-table-${process.pid}-${crypto.randomUUID()}`)
     try {
       writeEngineLoader(
         host,
         loaderSource("    typebox: bundled,").replace(
           "export async function createImporter",
-          "export const jitiOptions = { virtualModules: VIRTUAL_MODULES, tryNative: false };\nexport async function createImporter",
+          "export const load = (bundled) => createJiti(import.meta.url, {\n    moduleCache: false,\n    ...(bundled ? { virtualModules: VIRTUAL_MODULES, tryNative: false } : { alias: {} }),\n});\nexport async function createImporter",
         ),
       )
 
