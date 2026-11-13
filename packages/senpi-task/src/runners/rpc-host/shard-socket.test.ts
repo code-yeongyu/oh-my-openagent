@@ -18,7 +18,14 @@ import {
   shardSocketPathForKey,
   validateBindPath,
 } from "./shard-socket"
-import { LEGACY_OVERRIDES, OWNER, OWNER_KEY, inheritedIdentity, nativePath, rootIdentity } from "./shard-socket.test-support"
+import {
+  LEGACY_OVERRIDES,
+  OWNER,
+  OWNER_KEY,
+  inheritedIdentity,
+  nativePath,
+  rootIdentity,
+} from "./shard-socket.test-support"
 
 // Shared naming vectors: senpi's `shardSocketPath` and the Desktop mirror pin the same literals.
 const VECTORS = [
@@ -53,7 +60,13 @@ describe("shard naming", () => {
   test("#given shard and foreign basenames #when parsing #then only kind-key sockets parse", () => {
     expect(parseShardBasename(`/r/p-${OWNER_KEY}.sock`)).toEqual({ kind: "p", key: OWNER_KEY })
     expect(parseShardBasename("i-da99f196e11b1cf9.sock")).toEqual({ kind: "i", key: "da99f196e11b1cf9" })
-    for (const foreign of ["/r/rpc.sock", "/r/p-6d410ba8.sock", `/r/x-${OWNER_KEY}.sock`, `/r/p-${OWNER_KEY}.meta.json`, `/r/p-${OWNER_KEY.toUpperCase()}.sock`]) {
+    for (const foreign of [
+      "/r/rpc.sock",
+      "/r/p-6d410ba8.sock",
+      `/r/x-${OWNER_KEY}.sock`,
+      `/r/p-${OWNER_KEY}.meta.json`,
+      `/r/p-${OWNER_KEY.toUpperCase()}.sock`,
+    ]) {
       expect(parseShardBasename(foreign)).toBeNull()
     }
   })
@@ -73,10 +86,18 @@ describe("shardRoot", () => {
 
   test("#given OMO_RPC_SHARD_ROOT #when resolving the socket #then the override moves it", () => {
     // when
-    const resolution = resolveShardSocket({ agentDir: "/h/.omo/agent", env: { [SHARD_ROOT_ENV]: " /tmp/x " }, identity: rootIdentity() })
+    const resolution = resolveShardSocket({
+      agentDir: "/h/.omo/agent",
+      env: { [SHARD_ROOT_ENV]: " /tmp/x " },
+      identity: rootIdentity(),
+    })
 
     // then
-    expect(resolution).toEqual({ socket: nativePath(`/tmp/x/p-${OWNER_KEY}.sock`), shard: rootIdentity(), root: "primary" })
+    expect(resolution).toEqual({
+      socket: nativePath(`/tmp/x/p-${OWNER_KEY}.sock`),
+      shard: rootIdentity(),
+      root: "primary",
+    })
   })
 })
 
@@ -108,7 +129,12 @@ describe("resolveShardSocket under the primary root", () => {
   test("#given a root and an inherited identity for one owner #when resolving #then socket, meta, parse and child context agree on one key", () => {
     // given
     const agentDir = "/h/.omo/agent"
-    const baseSpec: RpcSpawnSpec = { task_id: "st_1a2b3c4d", cwd: "/tmp/project", state_dir: "/tmp/project/.omo/senpi-task", prompt: "go" }
+    const baseSpec: RpcSpawnSpec = {
+      task_id: "st_1a2b3c4d",
+      cwd: "/tmp/project",
+      state_dir: "/tmp/project/.omo/senpi-task",
+      prompt: "go",
+    }
 
     // when
     const root = resolveShardSocket({ agentDir, env: {}, identity: rootIdentity() })

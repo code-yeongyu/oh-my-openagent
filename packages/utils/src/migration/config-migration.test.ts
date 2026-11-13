@@ -138,16 +138,12 @@ describe("migrateConfigFile sidecar write ordering", () => {
     // then
     expect(needsWrite).toBe(true)
     expect(rawConfig.appliedMigrations).toBeUndefined()
-    expect((rawConfig.agents as Record<string, Record<string, unknown>>).oracle.model).toBe(
-      "anthropic/claude-opus-4-6",
-    )
+    expect((rawConfig.agents as Record<string, Record<string, unknown>>).oracle.model).toBe("anthropic/claude-opus-4-6")
 
     const sidecar = JSON.parse(readFileSync(getSidecarPath(configPath), "utf-8")) as {
       appliedMigrations: string[]
     }
-    expect(sidecar.appliedMigrations).toEqual([
-      "model-version:anthropic/claude-opus-4-6->anthropic/claude-opus-4-7",
-    ])
+    expect(sidecar.appliedMigrations).toEqual(["model-version:anthropic/claude-opus-4-6->anthropic/claude-opus-4-7"])
   })
 })
 

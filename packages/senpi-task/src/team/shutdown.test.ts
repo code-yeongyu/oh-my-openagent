@@ -60,14 +60,29 @@ async function setMemberStatus(
   )
 }
 
-function recordingMessenger(): { sent: ShutdownOutboundMessage[]; send: (message: ShutdownOutboundMessage) => Promise<void> } {
+function recordingMessenger(): {
+  sent: ShutdownOutboundMessage[]
+  send: (message: ShutdownOutboundMessage) => Promise<void>
+} {
   const sent: ShutdownOutboundMessage[] = []
-  return { sent, send: (message) => { sent.push(message); return Promise.resolve() } }
+  return {
+    sent,
+    send: (message) => {
+      sent.push(message)
+      return Promise.resolve()
+    },
+  }
 }
 
 function recordingCanceller(): { cancelled: string[]; cancelMemberTask: (memberName: string) => Promise<void> } {
   const cancelled: string[] = []
-  return { cancelled, cancelMemberTask: (memberName) => { cancelled.push(memberName); return Promise.resolve() } }
+  return {
+    cancelled,
+    cancelMemberTask: (memberName) => {
+      cancelled.push(memberName)
+      return Promise.resolve()
+    },
+  }
 }
 
 describe("team shutdown protocol", () => {
@@ -133,7 +148,11 @@ describe("team shutdown protocol", () => {
     await requestShutdown(teamRunId, "alpha", { config, sendMessage: messenger.send })
 
     // when
-    await approveShutdown(teamRunId, "alpha", { config, sendMessage: messenger.send, cancelMemberTask: canceller.cancelMemberTask })
+    await approveShutdown(teamRunId, "alpha", {
+      config,
+      sendMessage: messenger.send,
+      cancelMemberTask: canceller.cancelMemberTask,
+    })
 
     // then
     const state = await loadRuntimeState(teamRunId, config)
@@ -154,7 +173,11 @@ describe("team shutdown protocol", () => {
     // when
     let rejected: unknown
     try {
-      await approveShutdown(teamRunId, "alpha", { config, sendMessage: messenger.send, cancelMemberTask: canceller.cancelMemberTask })
+      await approveShutdown(teamRunId, "alpha", {
+        config,
+        sendMessage: messenger.send,
+        cancelMemberTask: canceller.cancelMemberTask,
+      })
     } catch (error) {
       rejected = error
     }
@@ -175,7 +198,11 @@ describe("team shutdown protocol", () => {
     await setMemberStatus(config, teamRunId, "alpha", "completed")
 
     // when
-    await approveShutdown(teamRunId, "alpha", { config, sendMessage: messenger.send, cancelMemberTask: canceller.cancelMemberTask })
+    await approveShutdown(teamRunId, "alpha", {
+      config,
+      sendMessage: messenger.send,
+      cancelMemberTask: canceller.cancelMemberTask,
+    })
 
     // then
     const state = await loadRuntimeState(teamRunId, config)
@@ -199,7 +226,11 @@ describe("team shutdown protocol", () => {
     expect(state.members.find((candidate) => candidate.name === "alpha")?.status).toBe("running")
     expect(state.shutdownRequests[0]?.rejectedAt).toBeGreaterThan(0)
     expect(state.shutdownRequests[0]?.rejectedReason).toBe("still needed for the release")
-    expect(messenger.sent.some((message) => message.kind === "shutdown_rejected" && message.body === "still needed for the release")).toBe(true)
+    expect(
+      messenger.sent.some(
+        (message) => message.kind === "shutdown_rejected" && message.body === "still needed for the release",
+      ),
+    ).toBe(true)
   })
 
   test("#given no pending request #when rejectShutdown runs #then a typed no_pending_request error is raised", async () => {

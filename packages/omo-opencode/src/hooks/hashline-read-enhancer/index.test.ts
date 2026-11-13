@@ -117,13 +117,9 @@ describe("hashline-read-enhancer", () => {
     const input = { tool: "read", sessionID: "s", callID: "c" }
     const output = {
       title: "README.md",
-      output: [
-        "1: # Oh-My-OpenCode Features",
-        "2:",
-        "3: Hashline test",
-        "",
-        "(End of file - total 3 lines)",
-      ].join("\n"),
+      output: ["1: # Oh-My-OpenCode Features", "2:", "3: Hashline test", "", "(End of file - total 3 lines)"].join(
+        "\n",
+      ),
       metadata: {},
     }
 

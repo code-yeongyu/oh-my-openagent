@@ -7,7 +7,6 @@ import { GitMemoryRepo } from "../git"
 import { RecallCorpusCache } from "./provider"
 import { removeTree } from "../../../../test-support/remove-tree"
 
-
 const tempDirs: string[] = []
 
 async function createRepo(description: string): Promise<{ dir: string; repo: GitMemoryRepo }> {
@@ -15,9 +14,7 @@ async function createRepo(description: string): Promise<{ dir: string; repo: Git
   tempDirs.push(dir)
   const repo = new GitMemoryRepo({ dir, agentId: "recall-agent" })
   await repo.init({
-    seedFiles: [
-      { relativePath: "reference/topic.md", content: `---\ndescription: ${description}\n---\nBody.\n` },
-    ],
+    seedFiles: [{ relativePath: "reference/topic.md", content: `---\ndescription: ${description}\n---\nBody.\n` }],
   })
   return { dir, repo }
 }
@@ -90,7 +87,9 @@ describe("RecallCorpusCache shared mode", () => {
 
     // when
     const direct = await new RecallCorpusCache({ shared: true }).load(new GitMemoryRepo({ dir, agentId: "session-a" }))
-    const viaLink = await new RecallCorpusCache({ shared: true }).load(new GitMemoryRepo({ dir: linked, agentId: "session-b" }))
+    const viaLink = await new RecallCorpusCache({ shared: true }).load(
+      new GitMemoryRepo({ dir: linked, agentId: "session-b" }),
+    )
 
     // then
     expect(viaLink).toBe(direct)

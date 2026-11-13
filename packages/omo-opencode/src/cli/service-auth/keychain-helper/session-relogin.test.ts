@@ -31,9 +31,15 @@ describe("re-login over an item nobody here can read (#11262 addendum row 8b)", 
     )
     const { store, session } = await helperSession(keychain, false, { beforeKeysDiscarded })
     await session.save(fresh)
-    expect(keychain.events.filter(event => event === "discarded unreadable" || event.startsWith("retire"))).toEqual(["discarded unreadable", "retire <A>"])
+    expect(keychain.events.filter((event) => event === "discarded unreadable" || event.startsWith("retire"))).toEqual([
+      "discarded unreadable",
+      "retire <A>",
+    ])
     expect(keychain.items.get(A)).toMatchObject({ owner: "helper", marker: true })
-    expect(JSON.parse(keychain.items.get(A)?.value ?? "null")).toEqual({ ...fresh, credentialGeneration: expect.any(String) })
+    expect(JSON.parse(keychain.items.get(A)?.value ?? "null")).toEqual({
+      ...fresh,
+      credentialGeneration: expect.any(String),
+    })
     expect(keychain.items.get(`${A}.old`)?.owner).toBe("runtime")
     expect(await store.read()).toEqual({ ...fresh, credentialGeneration: expect.any(String) })
     expect(await session.accessToken()).toBe("fresh-access")
@@ -47,7 +53,7 @@ describe("re-login over an item nobody here can read (#11262 addendum row 8b)", 
     await session.update(async () => store.write(fresh))
     expect(keychain.items.get(A)?.owner).toBe("runtime")
     expect(keychain.items.has(`${A}.old`)).toBe(false)
-    expect(keychain.events.some(event => event.startsWith("retire"))).toBe(false)
+    expect(keychain.events.some((event) => event.startsWith("retire"))).toBe(false)
   })
 
   test("#given a non-owned .old already left over #when the user signs in again #then the item retires to .old.1 and the save succeeds (RULING-73)", async () => {
@@ -65,12 +71,13 @@ describe("re-login over an item nobody here can read (#11262 addendum row 8b)", 
   test("#given all 8 retire slots hold copies nobody here can remove #when the user signs in again #then one actionable failure, no dialog and no retry", async () => {
     const keychain = fakeKeychain()
     keychain.put(A, stored, "runtime", "other")
-    for (const suffix of [".old", ".old.1", ".old.2", ".old.3", ".old.4", ".old.5", ".old.6", ".old.7"]) keychain.put(`${A}${suffix}`, stored, "runtime", "other")
+    for (const suffix of [".old", ".old.1", ".old.2", ".old.3", ".old.4", ".old.5", ".old.6", ".old.7"])
+      keychain.put(`${A}${suffix}`, stored, "runtime", "other")
     const { session } = await helperSession(keychain)
     const failure = session.save(fresh)
     await expect(failure).rejects.toBeInstanceOf(CredentialStoreError)
     await expect(failure).rejects.toThrow("Open Keychain Access")
-    expect(keychain.events.filter(event => event.startsWith("retire"))).toHaveLength(1)
+    expect(keychain.events.filter((event) => event.startsWith("retire"))).toHaveLength(1)
     expect(keychain.stats.approves).toBe(0)
     expect(keychain.items.get(A)?.owner).toBe("runtime")
   })
@@ -109,7 +116,7 @@ describe("#11589 review folds", () => {
     const { store, session } = await helperSession(keychain)
     expect(await store.read()).toEqual(credentials)
     await session.save(fresh)
-    expect(keychain.events.some(event => event.startsWith("retire"))).toBe(false)
+    expect(keychain.events.some((event) => event.startsWith("retire"))).toBe(false)
     expect(keychain.items.has(`${A}.old`)).toBe(false)
     expect(keychain.stats.approves).toBe(1)
   })
@@ -117,8 +124,11 @@ describe("#11589 review folds", () => {
   test("#given an approve already running for one backend #when another backend in this process reads #then it attaches, with one dialog and no refusal", async () => {
     let open = () => {}
     let started = () => {}
-    const approveStarted = new Promise<void>(resolve => (started = resolve))
-    const keychain = fakeKeychain({ approveGate: new Promise<void>(resolve => (open = resolve)), onApprove: () => started() })
+    const approveStarted = new Promise<void>((resolve) => (started = resolve))
+    const keychain = fakeKeychain({
+      approveGate: new Promise<void>((resolve) => (open = resolve)),
+      onApprove: () => started(),
+    })
     keychain.put(A, stored, "runtime", "ours")
     // One home shared by both backends: one dialog in total. (The attach inside approveOnce is pinned directly in
     // darwin-read-attach.test.ts; here the second read is already deduplicated before it reaches approveOnce.)
@@ -141,7 +151,7 @@ describe("#11589 review folds", () => {
     keychain.put(`${A}.old.2`, stored, "helper", "none")
     const { store, session } = await helperSession(keychain)
     await session.update(async () => store.clear())
-    expect(keychain.events.filter(event => event.startsWith("remove .old"))).toEqual(["remove .old", "remove .old.2"])
+    expect(keychain.events.filter((event) => event.startsWith("remove .old"))).toEqual(["remove .old", "remove .old.2"])
     expect([...keychain.items.keys()]).toEqual([])
   })
 
@@ -152,7 +162,7 @@ describe("#11589 review folds", () => {
     const { store, session } = await helperSession(keychain)
     await session.update(async () => store.clear())
     // Recovery may already remove the reported slot; what matters is that clear() attempted every one of the 8 names.
-    expect(new Set(keychain.events.filter(event => event.startsWith("remove .old"))).size).toBe(8)
+    expect(new Set(keychain.events.filter((event) => event.startsWith("remove .old"))).size).toBe(8)
     expect(keychain.items.has(`${A}.old.5`)).toBe(false)
   })
 })

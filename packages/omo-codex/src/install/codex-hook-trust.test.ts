@@ -19,12 +19,7 @@ function __repoRootFrom(start: string): string {
 describe("codex-hook-trust", () => {
   test("computes trusted hook hashes for vendored plugin", async () => {
     // given
-    const pluginRoot = join(
-      __repoRootFrom(dirname(fileURLToPath(import.meta.url))),
-      "packages",
-      "omo-codex",
-      "plugin",
-    )
+    const pluginRoot = join(__repoRootFrom(dirname(fileURLToPath(import.meta.url))), "packages", "omo-codex", "plugin")
 
     // when
     const states = await trustedHookStatesForPlugin({
@@ -43,10 +38,7 @@ describe("codex-hook-trust", () => {
     const pluginRoot = join(tmpdir(), `omo-codex-hook-trust-${crypto.randomUUID()}`)
     await mkdir(join(pluginRoot, ".codex-plugin"), { recursive: true })
     await mkdir(join(pluginRoot, "hooks"), { recursive: true })
-    await writeFile(
-      join(pluginRoot, ".codex-plugin", "plugin.json"),
-      JSON.stringify({ hooks: "./hooks/hooks.json" }),
-    )
+    await writeFile(join(pluginRoot, ".codex-plugin", "plugin.json"), JSON.stringify({ hooks: "./hooks/hooks.json" }))
     await writeFile(
       join(pluginRoot, "hooks", "hooks.json"),
       JSON.stringify({
@@ -56,8 +48,8 @@ describe("codex-hook-trust", () => {
               hooks: [
                 {
                   type: "command",
-                  command: "node \"${PLUGIN_ROOT}/unix.js\"",
-                  commandWindows: "powershell -File \"${PLUGIN_ROOT}\\win.ps1\"",
+                  command: 'node "${PLUGIN_ROOT}/unix.js"',
+                  commandWindows: 'powershell -File "${PLUGIN_ROOT}\\win.ps1"',
                   timeout: 5,
                   statusMessage: "checking windows",
                 },

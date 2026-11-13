@@ -48,7 +48,8 @@ async function removeDanglingGeneratedCommandShim(linkPath: string): Promise<voi
     const content = await readFile(linkPath, "utf8")
     if (!content.includes(COMMAND_SHIM_MARKER)) return
     const target = extractCommandShimTarget(content)
-    if (target !== null && !(await isFileSystemEntry(target)) && isManagedComponentBinTarget(target)) await rm(linkPath, { force: true })
+    if (target !== null && !(await isFileSystemEntry(target)) && isManagedComponentBinTarget(target))
+      await rm(linkPath, { force: true })
   } catch (error) {
     if (isNodeErrorWithCode(error) && error.code === "ENOENT") return
     throw error

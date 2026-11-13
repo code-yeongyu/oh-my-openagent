@@ -38,6 +38,6 @@ export function credentialGuidance(result, providerMap, existing = {}) {
  */
 export function commandCodeGuidance() {
   return [
-    "To make the Command Code provider enforce zero data retention, add the header \"x-cmd-zdr: 1\" to its models.json entry by hand.",
+    'To make the Command Code provider enforce zero data retention, add the header "x-cmd-zdr: 1" to its models.json entry by hand.',
   ]
 }

@@ -29,11 +29,7 @@ async function fixture(): Promise<{ repo: GitMemoryRepo; lock: MemoryToolLock }>
   return { repo, lock }
 }
 
-async function seed(
-  setup: Awaited<ReturnType<typeof fixture>>,
-  path: string,
-  text: string,
-): Promise<void> {
+async function seed(setup: Awaited<ReturnType<typeof fixture>>, path: string, text: string): Promise<void> {
   const fullPath = join(setup.repo.dir, path)
   await mkdir(dirname(fullPath), { recursive: true })
   await writeFile(fullPath, renderMemoryFile({ description: "Seed" }, text), "utf8")
@@ -105,7 +101,7 @@ describe("runMemoryTool soul-edit result", () => {
         reason: "record what the user said not to do",
         file_path: "system/boundaries.md",
         insert_line: 999,
-        insert_text: "- [2026-09-13] \"never force-push shared branches\" <!-- src: session-1 -->",
+        insert_text: '- [2026-09-13] "never force-push shared branches" <!-- src: session-1 -->',
         author: AUTHOR,
       },
     })
@@ -152,7 +148,8 @@ describe("runMemoryTool soul-edit result", () => {
         reason: "promote an observation",
         file_path: "system/self-aware.md",
         insert_line: 999,
-        insert_text: "- [2026-09-14] cond: a remote machine is named | reaction: \"why here\" (msg-1) | obs: searched local fs first, 2 of 9 | next: run the host check first <!-- status: observed; expires: 2026-12-14 -->",
+        insert_text:
+          '- [2026-09-14] cond: a remote machine is named | reaction: "why here" (msg-1) | obs: searched local fs first, 2 of 9 | next: run the host check first <!-- status: observed; expires: 2026-12-14 -->',
         author: AUTHOR,
       },
     })

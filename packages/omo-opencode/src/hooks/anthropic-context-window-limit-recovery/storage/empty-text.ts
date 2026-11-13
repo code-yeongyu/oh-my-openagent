@@ -51,7 +51,7 @@ export async function replaceEmptyTextPartsAsync(
   client: OpencodeClient,
   sessionID: string,
   messageID: string,
-  replacementText: string
+  replacementText: string,
 ): Promise<boolean> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
@@ -104,7 +104,7 @@ export function findMessagesWithEmptyTextParts(sessionID: string): string[] {
 
 export async function findMessagesWithEmptyTextPartsFromSDK(
   client: OpencodeClient,
-  sessionID: string
+  sessionID: string,
 ): Promise<string[]> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })

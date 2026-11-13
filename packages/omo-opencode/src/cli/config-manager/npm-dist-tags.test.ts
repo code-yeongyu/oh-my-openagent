@@ -14,12 +14,14 @@ describe("fetchNpmDistTags", () => {
 
   test("returns dist-tags on success", async () => {
     //#given
-    globalThis.fetch = unsafeTestValue<typeof fetch>(mock(() =>
-      Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve({ latest: "3.13.1", beta: "3.14.0-beta.1" }),
-      } as Response)
-    ))
+    globalThis.fetch = unsafeTestValue<typeof fetch>(
+      mock(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ latest: "3.13.1", beta: "3.14.0-beta.1" }),
+        } as Response),
+      ),
+    )
 
     //#when
     const result = await fetchNpmDistTags("oh-my-openagent")
@@ -55,12 +57,14 @@ describe("fetchNpmDistTags", () => {
 
   test("returns null on non-ok response", async () => {
     //#given
-    globalThis.fetch = unsafeTestValue<typeof fetch>(mock(() =>
-      Promise.resolve({
-        ok: false,
-        status: 404,
-      } as Response)
-    ))
+    globalThis.fetch = unsafeTestValue<typeof fetch>(
+      mock(() =>
+        Promise.resolve({
+          ok: false,
+          status: 404,
+        } as Response),
+      ),
+    )
 
     //#when
     const result = await fetchNpmDistTags("oh-my-openagent")

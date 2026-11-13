@@ -1,8 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import {
-  findNearestMessageWithFields,
-  findNearestMessageWithFieldsFromSDK,
-} from "../../features/hook-message-injector"
+import { findNearestMessageWithFields, findNearestMessageWithFieldsFromSDK } from "../../features/hook-message-injector"
 import { getMessageDir, isSqliteBackend, normalizePromptTools, normalizeSDKResponse } from "../../shared"
 import type { ModelInfo } from "./types"
 
@@ -32,17 +29,20 @@ export async function resolveRecentPromptContextForSession(
 ): Promise<PromptContext> {
   try {
     const messagesResp = await ctx.client.session.messages({ path: { id: sessionID } })
-    const messages = normalizeSDKResponse(messagesResp, [] as Array<{
-      id?: string
-      info?: {
-        model?: ModelInfo
-        modelID?: string
-        providerID?: string
-        variant?: string
-        tools?: Record<string, boolean | "allow" | "deny" | "ask">
-        time?: { created?: number }
-      }
-    }>).sort((left, right) => {
+    const messages = normalizeSDKResponse(
+      messagesResp,
+      [] as Array<{
+        id?: string
+        info?: {
+          model?: ModelInfo
+          modelID?: string
+          providerID?: string
+          variant?: string
+          tools?: Record<string, boolean | "allow" | "deny" | "ask">
+          time?: { created?: number }
+        }
+      }>,
+    ).sort((left, right) => {
       const leftTime = left.info?.time?.created ?? Number.NEGATIVE_INFINITY
       const rightTime = right.info?.time?.created ?? Number.NEGATIVE_INFINITY
       if (leftTime !== rightTime) return rightTime - leftTime
@@ -108,7 +108,7 @@ export async function resolveRecentPromptContextForSession(
 
 export async function resolveRecentModelForSession(
   ctx: PluginInput,
-  sessionID: string
+  sessionID: string,
 ): Promise<ModelInfo | undefined> {
   const context = await resolveRecentPromptContextForSession(ctx, sessionID)
   return context.model
