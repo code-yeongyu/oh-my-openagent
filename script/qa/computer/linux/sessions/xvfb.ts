@@ -5,12 +5,23 @@
 import { mkdirSync } from "node:fs"
 import { join } from "node:path"
 import { until, type Processes } from "../lib/procs.ts"
+import { missingTools, wmOwnsRoot } from "../lib/session-checks.ts"
 import type { Stage } from "../lib/scenario.ts"
 
 const DISPLAY = ":137"
 const SCREEN = "1280x800x24"
 
 export async function startXvfb(procs: Processes, runDir: string, nobus: boolean): Promise<Stage> {
+  const tools = [
+    "Xvfb",
+    "xdpyinfo",
+    "xprop",
+    "xfwm4",
+    "xcompmgr",
+    ...(nobus ? [] : ["dbus-daemon", "dbus-send", "at-spi-bus-launcher"]),
+  ]
+  const missing = missingTools(tools, (tool) => Bun.which(tool) !== null)
+  if (missing.length > 0) throw new Error(`this host lacks ${missing.join(", ")} (the QA container has them)`)
   const env: Record<string, string | undefined> = { DISPLAY }
   if (!nobus) {
     const busDir = join(runDir, "bus")
@@ -44,7 +55,10 @@ export async function startXvfb(procs: Processes, runDir: string, nobus: boolean
   )
   procs.start("xfwm4", ["xfwm4", "--display", DISPLAY], env)
   await until(
-    () => procs.run(["xprop", "-root", "_NET_SUPPORTING_WM_CHECK"], env).then((ran) => ran.code === 0),
+    () =>
+      procs
+        .run(["xprop", "-root", "_NET_SUPPORTING_WM_CHECK"], env)
+        .then((ran) => ran.code === 0 && wmOwnsRoot(ran.stdout)),
     "xfwm4 to own the root window",
   )
   procs.start("xcompmgr", ["xcompmgr", "-d", DISPLAY], env)
