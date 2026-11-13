@@ -3,7 +3,7 @@ import { hostname } from "node:os"
 
 import { admitWindow, type LatencyRecord, p99 } from "../latency.ts"
 import { observeCell } from "../observe-cell.ts"
-import { judgeAxSheetTrial, judgeSelfTest, PLANT_NOUN, type Trial } from "../selftest-judge.ts"
+import { judgeAxSheetTrial, judgeSelfTest, observerFailureLines, PLANT_NOUN, type Trial } from "../selftest-judge.ts"
 import { dialogHits, SIGNALS, type Signal } from "../summary.ts"
 import { withSentinel } from "../with-sentinel.ts"
 import { plant } from "./plants.ts"
@@ -116,6 +116,7 @@ export async function runSelfTest(options: SelfTestOptions): Promise<{ exitCode:
     const unregistered = session.events.filter((event) => event.kind === "observer_failed").length
     const lateRegistered = session.events.filter((event) => event.kind === "observer_late").length
     console.log(`SENTINEL_OBSERVERS failed=${unregistered} late=${lateRegistered}`)
+    for (const line of observerFailureLines(session.events)) console.log(line)
     const result = judgeSelfTest(trials, control.observed.signals)
     for (const line of result.lines) console.log(line)
     return { exitCode: result.exitCode, receipts: await session.close() }

@@ -203,6 +203,8 @@ describe("AX observer registration gaps", () => {
     ({
       t: 3_500,
       kind: "observer_failed",
+      app: "com.example.app",
+      policy: "regular",
       pid: 300,
       axError: "cannotComplete",
       attempts: 10,

@@ -151,7 +151,8 @@ final class Recorder: NSObject {
     }
     registering.remove(pid)
     emit([
-      "kind": "observer_failed", "pid": Int(pid), "axError": axErrorName(error), "attempts": attempt,
+      "kind": "observer_failed", "pid": Int(pid), "app": app.bundleIdentifier ?? app.localizedName ?? "unknown",
+      "policy": policyName(app.activationPolicy), "axError": axErrorName(error), "attempts": attempt,
       "regular": regular, "since": since,
     ])
   }

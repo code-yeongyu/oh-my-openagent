@@ -48,6 +48,9 @@ export type SentinelEvent = { readonly t: number } & (
       // (observer_late) or ever (observer_failed): a sheet in that gap is invisible to every branch.
       readonly kind: "observer_failed"
       readonly pid: number
+      // bundle id, else the process name; and the activation policy at the last attempt
+      readonly app: string
+      readonly policy: "regular" | "accessory" | "prohibited" | "unknown"
       readonly axError: string
       readonly attempts: number
       readonly regular: boolean
@@ -108,7 +111,15 @@ const SHAPES: Readonly<Record<SentinelEvent["kind"], Readonly<Record<string, Che
     axError: optional(str),
     axReads: optional(num),
   },
-  observer_failed: { pid: num, axError: str, attempts: num, regular: bool, since: num },
+  observer_failed: {
+    pid: num,
+    app: str,
+    policy: oneOf("regular", "accessory", "prohibited", "unknown"),
+    axError: str,
+    attempts: num,
+    regular: bool,
+    since: num,
+  },
   observer_late: { pid: num, attempts: num, regular: bool, since: num },
   leak: { what: oneOf("key", "mouse") },
 }

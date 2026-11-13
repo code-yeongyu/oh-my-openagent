@@ -1,4 +1,4 @@
-import { type DialogHit, type SentinelSummary, SIGNALS, type Signal, verdict } from "./summary.ts"
+import { type DialogHit, type SentinelEvent, type SentinelSummary, SIGNALS, type Signal, verdict } from "./summary.ts"
 
 // The self-test is the proof that every detector can fail: each planted disturbance must read `happened` on exactly
 // its own signal, a null run must read `none` on all eight, and the 50 px warp-and-return must be seen.
@@ -45,6 +45,17 @@ export function judgeAxSheetTrial(hits: readonly DialogHit[]): string | undefine
   if (hit.axReads === null || hit.axReads < 2)
     return `the sheet's role read succeeded on attempt ${hit.axReads ?? "unknown"}: its retry was never exercised`
   return undefined
+}
+
+// One line per app whose window observer never registered, so a claim about which apps they were is measured.
+export function observerFailureLines(events: readonly SentinelEvent[]): string[] {
+  return events.flatMap((event) =>
+    event.kind === "observer_failed"
+      ? [
+          `SENTINEL_OBSERVER_FAILED pid=${event.pid} app=${event.app} policy=${event.policy} attempts=${event.attempts} ax=${event.axError}`,
+        ]
+      : [],
+  )
 }
 
 export function judgeSelfTest(trials: readonly Trial[], negativeControl: SentinelSummary): SelfTestResult {

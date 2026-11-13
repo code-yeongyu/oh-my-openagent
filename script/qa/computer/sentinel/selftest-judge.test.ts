@@ -151,7 +151,7 @@ describe("judging the AX-only sheet trial", () => {
 // The self-test prints one line per app whose window observer never registered, so the claim that such apps are all
 // background agents is read from the run, not deduced from its verdict.
 describe("observer registration failures are listed per app", () => {
-  const failed = (pid: number, app: string, policy: string) =>
+  const failed = (pid: number, app: string, policy: "regular" | "accessory" | "prohibited" | "unknown") =>
     ({
       t: 10,
       kind: "observer_failed",
