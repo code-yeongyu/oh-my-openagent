@@ -91,5 +91,8 @@ describe("environment preflight [ADP-3]", () => {
       expect(environment.checks.find((check) => check.name === "engine-stdio")?.ok).toBe(true)
       expect(environment.checks.find((check) => check.name === "engine-binary")?.ok).toBe(true)
     })
-  }, 60_000)
+    // 60 s for the compile and the run, plus withDir's worst-case cleanup: removeTreeSync's linear backoff
+    // sleeps 500 ms x (1 + ... + 10) = 27.5 s synchronously, so a slow Windows cleanup surfaces as its own
+    // error instead of as this test's timeout.
+  }, 90_000)
 })
