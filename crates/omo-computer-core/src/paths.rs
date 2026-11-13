@@ -6,7 +6,9 @@
 //! `OMO_COMPUTER_RUNTIME_DIR` (a test seam) moves both roots into one test directory.
 
 use std::fmt;
-use std::path::{Path, PathBuf};
+#[cfg(any(unix, test))]
+use std::path::Path;
+use std::path::PathBuf;
 
 /// The stop marker's file name under the STATE root.
 pub const STOP_MARKER_FILE: &str = "global-stop";

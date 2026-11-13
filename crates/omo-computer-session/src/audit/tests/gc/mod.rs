@@ -2,6 +2,7 @@
 
 mod age;
 mod cap;
+mod errors;
 
 use std::fs::{self, File};
 use std::path::Path;
@@ -22,8 +23,10 @@ pub(super) fn seed(dir: &Path, name: &str, bytes: usize, modified_ms: u64) {
 pub(super) fn names(dir: &Path) -> Vec<String> {
     let mut names: Vec<String> = fs::read_dir(dir)
         .expect("dir")
-        .filter_map(Result::ok)
-        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .map(|entry| {
+            let entry = entry.expect("a readable dir entry");
+            entry.file_name().to_string_lossy().into_owned()
+        })
         .collect();
     names.sort();
     names

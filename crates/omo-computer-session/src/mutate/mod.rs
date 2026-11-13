@@ -6,7 +6,9 @@
 
 mod binding;
 mod call;
+mod diagnostics;
 mod funnel;
+mod memory_markers;
 mod poison;
 mod record;
 mod recovery;
@@ -19,6 +21,7 @@ mod tests;
 
 pub use binding::{Binding, SecureInputProbe, SecureProbe};
 pub use call::Mutation;
+pub use memory_markers::MemoryMarkers;
 pub(crate) use route::{key_event, route_for};
 
 use std::path::{Path, PathBuf};
@@ -35,7 +38,7 @@ use crate::audit::gc::{ArtifactStore, GcLimits};
 use crate::audit::{AuditLimits, AuditSink, AuditWriter, MemoryAudit, UnavailableAudit, WriterId};
 use crate::budget::Permits;
 use crate::lock::InteractionLock;
-use crate::marker::{MarkerDir, MarkerStore, MemoryMarkers};
+use crate::marker::{MarkerDir, MarkerStore};
 use crate::Session;
 use poison::Poisoned;
 
@@ -70,6 +73,8 @@ pub struct Refused {
     pub detail: Option<Box<Value>>,
     /// What row 22 stamps on a refusal, boxed so the error type stays small.
     pub stamps: Box<Stamps>,
+    /// `write_failed` when the refusal's own audit line could not be written.
+    pub warning: Option<String>,
 }
 
 /// The members a refusal carries beside its code.
@@ -94,6 +99,7 @@ impl From<Refusal> for Refused {
             interrupted: None,
             stamps: Box::default(),
             detail: None,
+            warning: None,
         }
     }
 }
@@ -128,6 +134,8 @@ pub(crate) struct Funnel {
     // Row 25: the hand's `computer.url_policy` and the last call's unknown-URL stamp.
     pub(crate) url_policy: omo_computer_core::url_policy::UrlPolicy,
     pub(crate) url_unknown: bool,
+    #[cfg(test)]
+    warned: Vec<String>,
 }
 
 impl Funnel {
@@ -178,32 +186,44 @@ impl Funnel {
             control: crate::grant::Control::default(),
             url_policy: omo_computer_core::url_policy::UrlPolicy::default(),
             url_unknown: false,
+            #[cfg(test)]
+            warned: Vec::new(),
         }
     }
 
     /// The audit sink, opened at first use; a file that cannot be opened refuses every exec.
     fn audit(&mut self) -> &mut dyn AuditSink {
-        let generation = self.generation;
-        let spec = &self.audit_spec;
-        self.audit
-            .get_or_insert_with(|| match spec {
-                AuditSpec::Memory => Box::new(MemoryAudit::new(LOCAL_HAND, generation)),
-                AuditSpec::Dir(dir) => {
-                    match AuditWriter::open(
-                        dir,
-                        LOCAL_HAND,
-                        generation,
-                        WriterId::current(),
-                        AuditLimits::default(),
-                    ) {
-                        Ok(writer) => Box::new(writer),
-                        Err(_) => Box::new(UnavailableAudit::at(crate::audit::audit_path(
-                            dir, LOCAL_HAND,
-                        ))),
-                    }
-                }
-            })
-            .as_mut()
+        let sink = match self.audit.take() {
+            Some(sink) => sink,
+            None => self.open_audit(),
+        };
+        self.audit.insert(sink).as_mut()
+    }
+
+    /// The per-hand audit writer; one that cannot be opened is logged and refuses every exec.
+    fn open_audit(&mut self) -> Box<dyn AuditSink> {
+        let dir = match &self.audit_spec {
+            AuditSpec::Memory => return Box::new(MemoryAudit::new(LOCAL_HAND, self.generation)),
+            AuditSpec::Dir(dir) => dir.clone(),
+        };
+        let opened = AuditWriter::open(
+            &dir,
+            LOCAL_HAND,
+            self.generation,
+            WriterId::current(),
+            AuditLimits::default(),
+        );
+        match opened {
+            Ok(writer) => Box::new(writer),
+            Err(error) => {
+                self.warn(format!(
+                    "audit file not opened, every exec refuses: {error}"
+                ));
+                Box::new(UnavailableAudit::at(crate::audit::audit_path(
+                    &dir, LOCAL_HAND,
+                )))
+            }
+        }
     }
 
     /// Row 25: `computer.url_policy` from the session's settings (absent is the empty table).

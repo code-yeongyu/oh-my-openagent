@@ -16,7 +16,7 @@
 //   --stubs                            no unimplemented!, todo!(, .skip(, .only( or bare #[ignore] in new sources
 
 import { existsSync, lstatSync, readFileSync } from "node:fs"
-import { dirname, join, posix, resolve } from "node:path"
+import { dirname, isAbsolute, join, posix, resolve } from "node:path"
 
 import nameMap from "./computer-v3-name-map.json"
 
@@ -367,6 +367,36 @@ function blockerEdits(planFile: string, row: string): Set<string> {
   return listed
 }
 
+/**
+ * SCOPE-ADDENDA.tsv beside the plan (the plan is never edited): `row<TAB>path<TAB>ruling` admits EXACTLY that path
+ * for EXACTLY that row. A path with a glob or brace character, a trailing `/`, a `..` segment or an absolute path,
+ * or a line without three cells, is a finding.
+ */
+function addenda(planFile: string, row: string): { readonly admitted: Set<string>; readonly problems: string[] } {
+  const name = nameMap.scope.addenda
+  const content = readInput(join(dirname(planFile), name), `scope addenda ${name}`)
+  const admitted = new Set<string>()
+  const problems: string[] = []
+  if (content === undefined) return { admitted, problems }
+  content.split("\n").forEach((line, index) => {
+    if (line.trim().length === 0 || line.startsWith("#")) return
+    const cells = line.split("\t")
+    const [lineRow = "", path = "", ruling = ""] = cells
+    const exact =
+      path.length > 0 &&
+      !/[\s*?[{]/.test(path) &&
+      !path.endsWith("/") &&
+      !isAbsolute(path) &&
+      !path.split(/[\\/]/).includes("..")
+    if (cells.length !== 3 || !/^\d+$/.test(lineRow) || !exact || ruling.trim().length === 0)
+      problems.push(
+        `scope: ${name} line ${index + 1} is malformed (expected <row><TAB><exact file path><TAB><ruling>; no glob, no directory)`,
+      )
+    else if (lineRow === row) admitted.add(path)
+  })
+  return { admitted, problems }
+}
+
 function scope(git: Git, row: string, ref: string, planFile: string): string[] {
   const text = readInput(planFile, `plan file ${planFile}`)
   if (text === undefined) throw new GuardInputError(`plan file ${planFile} does not exist`)
@@ -374,18 +404,20 @@ function scope(git: Git, row: string, ref: string, planFile: string): string[] {
   const own = planRow(lines, row)
   const blockers = transitiveBlockers(lines, row)
   const listed = blockerEdits(planFile, row)
+  const { admitted, problems } = addenda(planFile, row)
   const { sharedAppend, sharedAppendNewFilesOnly, generated, driverEntryFiles } = nameMap.scope
   const isOwn = matcher([...own.scope, ...sharedAppend, ...unitFiles(own.scope), ...generated])
   const isNewFileRule = matcher(sharedAppendNewFilesOnly)
   const isBlockerOwned = matcher([...blockers.values()].flatMap(({ scope: patterns }) => patterns))
   const isDriverEntry = matcher(driverEntryFiles)
-  return changedPaths(git, ref)
+  const outside = changedPaths(git, ref)
     .filter(({ status, path }) => {
-      if (isOwn(path) || (status === "A" && isNewFileRule(path))) return false
+      if (isOwn(path) || admitted.has(path) || (status === "A" && isNewFileRule(path))) return false
       // A listed blocker path never admits a QA driver entry file or an existing scenario or v3- case (they are only ever added).
       return !(listed.has(path) && isBlockerOwned(path) && !isDriverEntry(path) && !isNewFileRule(path))
     })
     .map(({ path }) => `scope: ${path} is outside row ${row}'s write scope`)
+  return [...problems, ...outside]
 }
 
 // ---------------------------------------------------------------------------------------------------------
