@@ -168,7 +168,7 @@ pub(super) fn from_fault(fault: CaptureFault) -> Refusal {
 ///
 /// # Errors
 /// `PermissionDenied{not_interactive}` in Session 0; `WindowNotFound`; `InvalidTarget` for an
-/// unknown display; `CaptureUnavailable{minimized|other_desktop}`;
+/// unknown display; `CaptureUnavailable{minimized|other_desktop|elevated_target}`;
 /// `CaptureFailed{black_frame|null_frame|timeout}`.
 pub fn capture<O: CaptureOs + ?Sized>(
     os: &mut O,
