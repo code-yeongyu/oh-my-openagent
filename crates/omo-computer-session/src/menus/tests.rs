@@ -46,6 +46,25 @@ fn menus_imported_scenario_lists_the_fixture_tree() {
     assert!(sink.lines().is_empty(), "a listing sends, raises and focuses nothing: {:?}", sink.lines());
 }
 
+/// Review M1 of #13347: a denied app's menu is never read by `menu.select`. A wrong path and
+/// an existing one answer the same `denied_app`, so the reply cannot reveal which items exist.
+#[test]
+fn menu_select_on_a_denied_app_is_refused_before_its_menu_is_read() {
+    let mut scenario = fixture("menus.json");
+    scenario["consent"] = json!({ "apps": { "deny": ["Code"] } });
+    let sink = RecordingSink::default();
+    let (mut s, _) = session(scenario, json!({}), &sink);
+    for path in [json!(["File", "Sav"]), json!(["File", "Save"])] {
+        let refused = s.menu_select(params(json!({ "target": "101", "path": path }))).expect_err("denied");
+        assert_eq!(
+            (refused.refusal.code.wire(), refused.refusal.reason),
+            ("ControlRequired", Some("denied_app")),
+            "{path}"
+        );
+    }
+    assert!(sent(&sink).is_empty());
+}
+
 #[test]
 fn menu_select_by_exact_label_only() {
     let sink = RecordingSink::default();

@@ -61,7 +61,8 @@ impl Session {
     /// `menu.select{target, path}`: proven against a fresh listing, then sent.
     ///
     /// # Errors
-    /// [`NOT_OPEN`], `StaleRef` / `AmbiguousTarget` when the fresh listing no longer holds
+    /// [`NOT_OPEN`], a consent refusal for the window's app (before its menu is read),
+    /// `StaleRef` / `AmbiguousTarget` when the fresh listing no longer holds
     /// exactly that enabled item, or the funnel's refusal.
     pub fn menu_select(&mut self, params: MenuSelectParams) -> Result<ExecReply, Refused> {
         self.opened.as_ref().ok_or(NOT_OPEN)?;
@@ -70,6 +71,10 @@ impl Session {
             unreachable!("read_menu_select always reads a menu.select");
         };
         let target = request.target.unwrap_or_default();
+        // Consent before the menu is read: a denied or out-of-scope app's menu is refused like
+        // its exec, so its items are never listed or proven (review M1 of #13347).
+        let app = window_app(self, &target);
+        self.funnel.control.consent.admit_exec(app.as_ref()).map_err(denied)?;
         let nodes = shell(self)?.menu_tree(&target)?;
         prove(&nodes, &path)?;
         let route = match request.policy.delivery {
