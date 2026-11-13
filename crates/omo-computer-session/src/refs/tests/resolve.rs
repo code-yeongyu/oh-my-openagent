@@ -113,3 +113,41 @@ fn unknown_field_on_sole_candidate_is_resolution_identity_unknown() {
     assert_eq!(refs.resolve(&token, true, &mut tree).err().map(|u| u.refusal), unknown);
     assert_eq!(tree.now_ms() - before, omo_computer_core::ax::SLICE_MS);
 }
+
+/// Review L2 (#13368, ruling R70x): live (rung 3) candidates are told apart. Each carries a
+/// fresh token in a real sub-generation (never the input token, never generation 0); by
+/// amendment A1 each keeps its e number in the next observation; a secure twin shows role +
+/// ref only.
+#[test]
+fn live_twins_get_fresh_distinct_tokens_and_a_secure_twin_shows_role_and_ref_only() {
+    let mut secure = el("button", "Send").obj(21).at(9.0, 0.0);
+    secure.read.secure = true;
+    let twins = vec![el("button", "Send").obj(20).at(5.0, 0.0), secure];
+    let mut tree = Tree::default().window("w", 1, vec![window(vec![el("button", "Send").at(0.0, 0.0)]), window(twins)]);
+    let mut refs = RefRegistry::default();
+    let g1 = snap(&mut tree, &mut refs, "w");
+    let token = format!("s{g1}:e{}", n_of(&refs, "w", g1, "Send"));
+    tree.show("w", 1);
+    let ambiguous = refs.resolve(&token, true, &mut tree).expect_err("two live twins");
+    assert_eq!(ambiguous.refusal, Refusal::bare(EngineCode::AmbiguousTarget));
+    let [plain, hidden] = ambiguous.candidates.as_slice() else { panic!("two candidates: {:?}", ambiguous.candidates) };
+    assert_ne!(plain.reference, hidden.reference, "the twins are told apart");
+    for candidate in [plain, hidden] {
+        assert_ne!(candidate.reference, token, "never the input token");
+        assert!(candidate.generation > g1, "a real, newer generation: {}", candidate.generation);
+        assert!(refs.locate(&candidate.reference, true).is_ok(), "{} locates", candidate.reference);
+    }
+    assert_eq!(plain.label.as_deref(), Some("Send"));
+    assert_eq!(
+        (hidden.role.as_str(), &hidden.label, &hidden.title, &hidden.value, &hidden.bounds, &hidden.actions),
+        ("button", &None, &None, &None, &None, &None),
+        "a secure candidate carries role + ref only"
+    );
+    // The next observation keeps each twin's e number (amendment A1), so the number resolves.
+    let g3 = snap(&mut tree, &mut refs, "w");
+    for candidate in [plain, hidden] {
+        let n = candidate.reference.split(':').nth(1).expect("e<n>");
+        let again = format!("s{g3}:{n}");
+        assert!(refs.locate(&again, true).is_ok(), "{again} after the new observation");
+    }
+}
