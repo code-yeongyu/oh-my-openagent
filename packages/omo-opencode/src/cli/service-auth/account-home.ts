@@ -82,7 +82,7 @@ function windowsProfile(facts: PlatformFacts): string | undefined {
 // On Windows only a drive-absolute path qualifies: a rooted path without a drive (\\tmp\\x) is
 // drive-relative, and a UNC path names a share rather than a local drive.
 const DRIVE_ABSOLUTE = /^[A-Za-z]:[\\/]/
-export function isDriveAbsolutePath(path: string): boolean {
+function isDriveAbsolutePath(path: string): boolean {
   return DRIVE_ABSOLUTE.test(path)
 }
 
