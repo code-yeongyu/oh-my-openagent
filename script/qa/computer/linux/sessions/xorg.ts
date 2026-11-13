@@ -5,6 +5,7 @@
 import { existsSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { until, type Processes } from "../lib/procs.ts"
+import { privateDirs } from "../lib/runtime-dirs.ts"
 import type { Stage } from "../lib/scenario.ts"
 
 const DISPLAY = ":64"
@@ -36,7 +37,7 @@ export async function start(procs: Processes, runDir: string): Promise<Stage> {
   const conf = join(runDir, "xorg.conf")
   writeFileSync(conf, CONF)
   procs.start("Xorg", ["Xorg", DISPLAY, "-config", conf, "-noreset", "-logfile", join(runDir, "Xorg.log")])
-  const env = { DISPLAY }
+  const env = { DISPLAY, ...privateDirs(runDir) }
   await until(
     () => procs.run(["xdpyinfo", "-display", DISPLAY], env).then((ran) => ran.code === 0),
     "Xorg to answer xdpyinfo",

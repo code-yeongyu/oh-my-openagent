@@ -1,4 +1,5 @@
 import type { Result, Scenario, SessionName } from "./scenario.ts"
+import { resolveTool } from "./tools.ts"
 
 export type Outcome =
   | { readonly kind: "ran"; readonly result: Result }
@@ -9,12 +10,12 @@ export function admission(
   scenario: Scenario,
   session: SessionName,
   startFailure: string | undefined,
-  present: (tool: string) => boolean = (tool) => Bun.which(tool) !== null,
+  present: (tool: string) => boolean = (tool) => resolveTool(tool) !== null,
 ): string | undefined {
   if (startFailure !== undefined) return `session ${session} did not start: ${startFailure}`
   if (!scenario.sessions.includes(session)) return `scenario ${scenario.name} does not run under ${session}`
   const missing = scenario.requires.filter((tool) => !present(tool))
-  if (missing.length > 0) return `this host lacks ${missing.join(", ")} (the QA container has them)`
+  if (missing.length > 0) return `this host lacks ${missing.join(", ")}`
   return undefined
 }
 
