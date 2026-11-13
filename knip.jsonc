@@ -902,8 +902,6 @@
       "packages/omo-opencode/src/shared/omo-process-sweep.ts": ["sweepOrphanedLspDaemonProxiesBestEffort", "sweepStaleLspDaemonVersionsBestEffort"],
       // pre-existing at origin dev 4686e425b5: unused export(s) openCodeShellName
       "packages/omo-opencode/src/shared/opencode-shell.ts": ["openCodeShellName"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) resetSqliteBackendCache
-      "packages/omo-opencode/src/shared/opencode-storage-detection.ts": ["resetSqliteBackendCache"],
       // pre-existing at origin dev 4686e425b5: unused export(s) parseToolsConfig
       "packages/omo-opencode/src/shared/parse-tools-config.ts": ["parseToolsConfig"],
       // pre-existing at origin dev 4686e425b5: unused export(s) findAvailablePort
@@ -962,8 +960,6 @@
       "packages/omo-opencode/src/tools/index.ts": ["startTmuxCheck", "createTeamSendMessageTool"],
       // pre-existing at origin dev 4686e425b5: unused export(s) isHardcodedMultimodalFallbackModel
       "packages/omo-opencode/src/tools/look-at/multimodal-fallback-chain.ts": ["isHardcodedMultimodalFallbackModel"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) OPENCODE_STORAGE, SESSION_DELETE_DESCRIPTION, TOOL_NAME_PREFIX
-      "packages/omo-opencode/src/tools/session-manager/constants.ts": ["OPENCODE_STORAGE", "SESSION_DELETE_DESCRIPTION", "TOOL_NAME_PREFIX"],
       // pre-existing at origin dev 4686e425b5: unused export(s) getSdkSessionMessagePage
       "packages/omo-opencode/src/tools/session-manager/sdk-storage.ts": ["getSdkSessionMessagePage"],
       // pre-existing at origin dev 4686e425b5: unused export(s) readSessionTranscript
