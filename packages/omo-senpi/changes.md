@@ -1,10 +1,3 @@
-## 2026-11-13 - A replaced desktop account ends, and a begin that crosses a retirement owns nothing (#13327 review follow-up)
-
-- **An account that is no longer current ends.** `desktopSyncAccount.ts` `isCurrent()` ends the account (aborts its signal) when it answers false: main's describe or durable record moved on without a `retired` event. Its `retired` listener leaves the channel, and the resolver's `onEnded` ends sessions on it once; before, it stayed on the channel with a live signal until the next `retired` or the channel's end.
-- **Session Workers.** `workerPort.ts` counts main's `retired` events; an `operationBegin` whose reply arrives after a retirement it was sent before is refused to the Worker and its handle is never owned, so the host never forwards that dead handle to main.
-- The rollover test now asserts a refused describe reads signed out (`null`) on both threads exactly; on the main thread that is #13329's refusal mapping, which this follow-up merges.
-- **Must not break:** an account the account source has replaced must not keep listening on the channel; a handle begun for a retired account must never be owned.
-
 ## 2026-11-13 - An account rollover on the desktop's private channel no longer ends memory sync (#13325)
 
 - **`retired` ends the account, not the channel.** `desktop-sync/channel.ts` hands a `retired` event to its listeners and keeps the channel open; a closed stream (and a malformed or foreign frame) is still the only permanent end.
