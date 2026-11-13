@@ -85,9 +85,10 @@ describe("R57 replay-all classification", () => {
     expect(verdict("delta-later.json")).toBe(`FAIL ${DIR}/delta-later.json unowned`)
   })
 
-  test("(b) an imported case with a leg due at or before N fails, a passed leg fails", () => {
+  test("(b) an imported case with a leg due at N or a blocker of N fails, a passed leg fails", () => {
     expect(verdict("leg-due.json")).toStartWith("FAIL ")
-    expect(verdict("leg-due.json", 19)).toBe(`owed ${DIR}/leg-due.json row 20`)
+    expect(verdict("leg-due.json", 19)).toStartWith("FAIL ")
+    expect(verdict("leg-due.json", 17)).toBe(`owed ${DIR}/leg-due.json row 20`)
     expect(verdict("leg-passed.json")).toStartWith("FAIL ")
   })
 

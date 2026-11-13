@@ -1,19 +1,23 @@
-// Planner ruling R57: after a row-scoped replay of the corpus (`replay.ts --dir <dir> --row <N>`),
+// Planner ruling R57: after a row-scoped replay of the corpus (`replay.ts --dir <dir> --row <N> --plan <plan.md>`),
 // every case that did not replay clean is either FAIL or owed to a later row, looked up in the
 // parity ledgers of crates/omo-computer-core/parity/:
 //   (a) a `v3-*` case FAILs when a row <= N created it: `v3-r<NN>-*` names its row NN; any other
 //       `v3-*` case in the row-N checkout was added by row N or a row merged into it, so <= N.
 //       (A superseded case is SKIPPED, never replayed, so it never reaches here.)
-//   (b) an imported case FAILs when a ledger marks it passed or due at a row <= N:
+//   (b) an imported case FAILs when a ledger marks it passed or due at N or a transitive blocker of
+//       N, read from the plan's `Blocked by:` lines (ruling R57e; a lower-numbered row that is not
+//       in N's ancestry is not merged into N and is not due there):
 //       test-parity-manifest.tsv (its `fixture` row, keyed by the old path ORACLE-PROVENANCE.tsv
 //       maps the case to, or a `ported:<case>` status) with any status but `pending` is passed;
 //       a DEFERRED-LEGS.tsv leg that names the case's file is passed (`passed:*`) or due at its
 //       `owed to row`. An ORACLE-DELTAS.tsv `row` is the row that recorded a delta, not a row the
 //       case is due at, so ORACLE-DELTAS neither makes a case due nor owns it (ruling R57c).
-//   (c) otherwise, with every owner due after N, it is `owed <case> row <M>`, M the latest of them;
+//   (c) otherwise, with every owner due at a row outside N's ancestry, it is `owed <case> row <M>`,
+//       M the latest of them;
 //   (d) a case no ledger owns with a row (a `pending` manifest row carries none) FAILs `unowned`.
 import { readFile } from "node:fs/promises"
 import { basename, join } from "node:path"
+import { InputError } from "./replay-case"
 
 export type Outcome = { readonly name: string; readonly status: "ok" | "skipped" | "failed" }
 export type Ledgers = {
@@ -70,8 +74,43 @@ function ownersOf(name: string, ledgers: Ledgers): Owner[] {
   return owners
 }
 
-// One verdict line for a case that did not replay clean.
-function verdict(row: number, name: string, ledgers: Ledgers): { line: string; failing: boolean } {
+// Row N and every row it is transitively blocked by. The plan lists each row as a header
+// `- [ ] <N>. <title>` followed by a line carrying `Blocked by: <rows, comma separated, or ->`.
+function ancestryOf(plan: string, row: number): ReadonlySet<number> {
+  const blockedBy = new Map<number, number[]>()
+  let current: number | undefined
+  for (const line of plan.split("\n")) {
+    const header = /^- \[[ xX]\] (\w+)\. /.exec(line)
+    if (header) {
+      current = rowOf(header[1])
+      if (current !== undefined) blockedBy.set(current, [])
+      continue
+    }
+    const blockers = /Blocked by:([^|]*)/.exec(line)
+    if (current === undefined || !blockers) continue
+    blockedBy.set(
+      current,
+      (blockers[1] ?? "").split(",").flatMap((cell) => rowOf(cell.trim()) ?? []),
+    )
+  }
+  if (!blockedBy.has(row)) throw new InputError(`the plan lists no row ${row}`)
+  const ancestry = new Set<number>()
+  const visit = (n: number) => {
+    if (ancestry.has(n)) return
+    ancestry.add(n)
+    for (const blocker of blockedBy.get(n) ?? []) visit(blocker)
+  }
+  visit(row)
+  return ancestry
+}
+
+// One verdict line for a case that did not replay clean; `ancestry` is row N and its blockers.
+function verdict(
+  row: number,
+  ancestry: ReadonlySet<number>,
+  name: string,
+  ledgers: Ledgers,
+): { line: string; failing: boolean } {
   const fail = (reason: string) => ({ line: `FAIL ${name} ${reason}`, failing: true })
   const file = basename(name)
   if (file.startsWith("v3-")) {
@@ -83,19 +122,20 @@ function verdict(row: number, name: string, ledgers: Ledgers): { line: string; f
   const owners = ownersOf(name, ledgers)
   const passed = owners.find((owner) => owner.row === "passed")
   if (passed) return fail(`passed in ${passed.source}`)
-  const due = owners.find((owner) => typeof owner.row === "number" && owner.row <= row)
-  if (due) return fail(`due at row ${due.row} <= ${row} in ${due.source}`)
+  const due = owners.find((owner) => typeof owner.row === "number" && ancestry.has(owner.row))
+  if (due) return fail(`due at row ${due.row} (row ${row} or a blocker of it) in ${due.source}`)
   const rows = owners.flatMap((owner) => (typeof owner.row === "number" ? [owner.row] : []))
   if (rows.length === 0) return fail("unowned")
   return { line: `owed ${name} row ${Math.max(...rows)}`, failing: false }
 }
 
-export function classify(row: number, outcomes: readonly Outcome[], ledgers: Ledgers): Classified {
+export function classify(row: number, outcomes: readonly Outcome[], ledgers: Ledgers, plan: string): Classified {
+  const ancestry = ancestryOf(plan, row)
   const lines: string[] = []
   let failing = 0
   for (const outcome of outcomes) {
     if (outcome.status !== "failed") continue
-    const result = verdict(row, outcome.name, ledgers)
+    const result = verdict(row, ancestry, outcome.name, ledgers)
     lines.push(result.line)
     if (result.failing) failing++
   }
