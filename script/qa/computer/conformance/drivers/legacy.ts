@@ -185,7 +185,7 @@ export function createLegacyDriver(parts: LegacyDriverParts): Driver {
       const { tool, fixtures, observer } = available
       const target = fixtures.target(cell)
       if ("unavailable" in target) return notRun(cell, `fixture_unavailable: ${target.unavailable}`)
-      const code = cellCode(cell, target)
+      const code = cellCode(cell, target, parts.settleMs ?? SETTLE_MS)
       try {
         await fixtures.reset(cell)
         const started = performance.now()
@@ -274,5 +274,6 @@ if (import.meta.main && process.argv.includes("--control"))
       fixtures: hostFixtures(process.platform, process.env, session),
       context: () => hostContext(session()),
       settle: (read, expected) => settled(read, expected, SETTLE_MS),
+      windowWaitMs: SETTLE_MS,
     }),
   )

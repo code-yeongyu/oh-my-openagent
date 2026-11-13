@@ -43,6 +43,9 @@ jobs:
     name: computer baseline legacy (x11)
     runs-on: ubuntu-26.04
     timeout-minutes: 45
+    env:
+      # Chromium (the Electron fixture) joins the AT-SPI bus only with this set in its environment.
+      ACCESSIBILITY_ENABLED: "1"
     steps:
       - uses: actions/checkout@v7
         with:
@@ -237,6 +240,27 @@ jobs:
           "OMO_CONFORMANCE_FIXTURE_EXE=$exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "fixture built $exe"
 
+      # The WebView2 SDK ships only as a package; the fixtures lane's pinned release, checked by digest.
+      - name: Build the Windows web-view fixture app
+        shell: bash
+        run: |
+          set -uo pipefail
+          url=https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/1.0.4314.35/microsoft.web.webview2.1.0.4314.35.nupkg
+          for attempt in 1 2 3; do
+            if curl -fsSL -o "$RUNNER_TEMP/webview2.zip" "$url" \
+              && echo "90778deb1b77e36292828b4b5833c9255c27533f40e0ddd55891ae718944edc4  $RUNNER_TEMP/webview2.zip" | sha256sum -c -; then
+              unzip -q -o "$RUNNER_TEMP/webview2.zip" -d "$RUNNER_TEMP/webview2"
+              exe="$RUNNER_TEMP/webview/ConformanceFixtureWeb.exe"
+              pwsh -NoProfile -File script/qa/computer/conformance/fixtures/webview-windows/build.ps1 -Out "$(cygpath -w "$exe")" -Sdk "$(cygpath -w "$RUNNER_TEMP/webview2")" || exit 1
+              echo "OMO_CONFORMANCE_WEBVIEW_EXE=$(cygpath -w "$exe")" >> "$GITHUB_ENV"
+              echo "web-view fixture built on attempt ${attempt}: $exe"
+              exit 0
+            fi
+            [ "$attempt" -lt 3 ] && sleep 20
+          done
+          echo "::error::ENVIRONMENT failure, the runner could not fetch the WebView2 SDK (not a baseline finding)"
+          exit 1
+
       # No package in the repository carries Electron; the fixture app runs one pinned release (row 4).
       - name: Fetch Electron 45.3.1
         shell: bash
@@ -297,8 +321,8 @@ jobs:
         shell: powershell
         run: |
           $left = 0
-          Get-Process -Name conformance-fixture, electron -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-          foreach ($name in @("senpi-desktop-engine*", "conformance-fixture", "electron")) {
+          Get-Process -Name conformance-fixture, ConformanceFixtureWeb, electron -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          foreach ($name in @("senpi-desktop-engine*", "conformance-fixture", "ConformanceFixtureWeb", "electron")) {
             $procs = Get-Process -Name $name -ErrorAction SilentlyContinue
             if ($procs) { "$name LEFT $($procs.Id -join ' ')"; $left = 1 } else { "$name procs 0" }
           }

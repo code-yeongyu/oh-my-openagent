@@ -31,7 +31,8 @@ function appsFor(platform: string, env: Readonly<Record<string, string | undefin
   if (platform !== "win32") return `no fixture apps of row 4 are ready on ${platform} yet`
   const exe = env.OMO_CONFORMANCE_FIXTURE_EXE?.trim()
   if (!exe) return "OMO_CONFORMANCE_FIXTURE_EXE does not name the built Windows fixture app"
-  return { native: [exe], ...electronApp(env) }
+  const webview = env.OMO_CONFORMANCE_WEBVIEW_EXE?.trim()
+  return { native: [exe], ...electronApp(env), ...(webview ? { webview: [webview] } : {}) }
 }
 
 // The fixture's accessible names are unique in its window, so elements are found by name alone: a guessed role

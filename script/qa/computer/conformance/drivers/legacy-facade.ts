@@ -29,7 +29,8 @@ export type HitTest = "element" | "root" | "other" | "offscreen"
 
 const OFFSCREEN = { x: 900, y: 900, width: 20, height: 10 }
 
-function facade(sent: Sent[], refuse?: string, listing: Listing = "field", hit: HitTest = "element") {
+function facade(sent: Sent[], refuse?: string, listing: Listing = "field", hit: HitTest = "element", windowAfter = 0) {
+  let windowReads = 0
   const record =
     (verb: string) =>
     async (...args: unknown[]) => {
@@ -75,8 +76,10 @@ function facade(sent: Sent[], refuse?: string, listing: Listing = "field", hit: 
       if (hit === "root") return { role: "filler", title: null }
       return { role: "button", title: hit === "other" ? "Elsewhere" : TARGET.element.title }
     },
-    windows: async (filter?: { title?: string }) =>
-      filter?.title === undefined ? listed : listed.filter((entry) => entry.title.includes(filter.title ?? "")),
+    windows: async (filter?: { title?: string }) => {
+      if (++windowReads <= windowAfter) return []
+      return filter?.title === undefined ? listed : listed.filter((entry) => entry.title.includes(filter.title ?? ""))
+    },
     window: async (id: string) => {
       if (id !== "w1") throw new Error(`unknown window ${id}`)
       return win
@@ -89,12 +92,15 @@ export function fakeTool(
   refuse?: string,
   listing?: Listing,
   hit?: HitTest,
+  windowAfter?: number,
 ): ShippedTool & { calls: number } {
   const tool = {
     calls: 0,
     async execute(_id: string, input: Readonly<Record<string, unknown>>) {
       tool.calls += 1
-      const value: unknown = await new AsyncFunction("desktop", String(input.code))(facade(sent, refuse, listing, hit))
+      const value: unknown = await new AsyncFunction("desktop", String(input.code))(
+        facade(sent, refuse, listing, hit, windowAfter),
+      )
       return { details: { value } }
     },
   }

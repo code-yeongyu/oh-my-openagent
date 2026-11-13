@@ -7,7 +7,45 @@ import { catalogFor } from "../catalog.ts"
 import type { Cell } from "../vocabulary.ts"
 import { createLegacyDriver } from "./legacy.ts"
 import { fakeTool, fixtures, observer, type Sent } from "./legacy-facade.ts"
-import { hostScope } from "./legacy-fixtures.ts"
+import { hostFixtures, hostScope } from "./legacy-fixtures.ts"
+
+test("a fixture window that appears after a few reads is waited for within the settle budget, and not past it", async () => {
+  const [cell] = cells
+  if (cell === undefined) throw new Error("empty catalog")
+  const run = (settleMs: number, sent: Sent[]) =>
+    createLegacyDriver({
+      session,
+      settleMs,
+      tool: { ready: fakeTool(sent, undefined, undefined, undefined, 3) },
+      fixtures: { ready: fixtures(1) },
+      observer: { ready: observer },
+    }).runCell(cell)
+  const waited: Sent[] = []
+  const logged: string[] = []
+  const log = console.log
+  console.log = (line: unknown) => void logged.push(String(line))
+  try {
+    expect((await run(2_000, waited)).observed.kind).toBe("delivered")
+  } finally {
+    console.log = log
+  }
+  expect(waited.length > 0).toBe(true)
+  const evidence = logged.find((line) => line.startsWith("CELL_EVIDENCE")) ?? ""
+  expect(Number(/"windowWaitMs":(\d+)/.exec(evidence)?.[1]) > 0).toBe(true)
+  const impatient: Sent[] = []
+  expect([(await run(0, impatient)).observed.kind, impatient]).toEqual(["error", []])
+})
+
+test("a Windows web-view cell runs only when the workflow names the built web-view fixture", () => {
+  const webviewCell = catalogFor("windows", "console").find((c) => c.toolkit === "webview")
+  if (webviewCell === undefined) throw new Error("the Windows catalog has no web-view cell")
+  const env = { OMO_CONFORMANCE_FIXTURE_EXE: "fixture.exe" }
+  const without = hostFixtures("win32", env, () => sessionDir)
+  const named = hostFixtures("win32", { ...env, OMO_CONFORMANCE_WEBVIEW_EXE: "web.exe" }, () => sessionDir)
+  if (!("ready" in without) || !("ready" in named)) throw new Error("the Windows fixtures did not load")
+  expect("unavailable" in without.ready.target(webviewCell)).toBe(true)
+  expect("unavailable" in named.ready.target(webviewCell)).toBe(false)
+})
 
 const cells = catalogFor("x11", "xorg")
 const sessionDir = mkdtempSync(join(tmpdir(), "legacy-scope-test-"))
