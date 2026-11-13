@@ -132,15 +132,17 @@ function windowLookup(target: FixtureTarget, waitMs: number): string[] {
   const title = JSON.stringify(target.title)
   return [
     `const lookUp = async () => (await desktop.windows({ title: ${title} })).find((entry) => entry.title === ${title})`,
-    `const waitUntil = Date.now() + ${waitMs}`,
+    "const waitStarted = Date.now()",
+    `const waitUntil = waitStarted + ${waitMs}`,
     "let record = await lookUp()",
     "while (record === undefined && Date.now() < waitUntil) {",
     `  await new Promise((done) => setTimeout(done, ${WINDOW_POLL_MS}))`,
     "  record = await lookUp()",
     "}",
+    "resolved.windowWaitMs = Date.now() - waitStarted",
     "if (record === undefined) {",
     `  const seen = (await desktop.windows()).slice(0, 12).map((entry) => ({ app: entry.app, title: entry.title, pid: entry.pid }))`,
-    `  return { kind: "error", message: \`no window titled ${target.title.replaceAll("`", "")}; engine lists \${JSON.stringify(seen)}\` }`,
+    `  return { kind: "error", message: \`no window titled ${target.title.replaceAll("`", "")} after waiting \${resolved.windowWaitMs} ms; engine lists \${JSON.stringify(seen)}\`, resolved }`,
     "}",
     "const win = await desktop.window(record.id)",
   ]

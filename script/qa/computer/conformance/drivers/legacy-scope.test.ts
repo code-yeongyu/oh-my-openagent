@@ -21,8 +21,17 @@ test("a fixture window that appears after a few reads is waited for within the s
       observer: { ready: observer },
     }).runCell(cell)
   const waited: Sent[] = []
-  expect((await run(2_000, waited)).observed.kind).toBe("delivered")
+  const logged: string[] = []
+  const log = console.log
+  console.log = (line: unknown) => void logged.push(String(line))
+  try {
+    expect((await run(2_000, waited)).observed.kind).toBe("delivered")
+  } finally {
+    console.log = log
+  }
   expect(waited.length > 0).toBe(true)
+  const evidence = logged.find((line) => line.startsWith("CELL_EVIDENCE")) ?? ""
+  expect(Number(/"windowWaitMs":(\d+)/.exec(evidence)?.[1]) > 0).toBe(true)
   const impatient: Sent[] = []
   expect([(await run(0, impatient)).observed.kind, impatient]).toEqual(["error", []])
 })
