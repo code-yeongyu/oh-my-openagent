@@ -1,4 +1,10 @@
 {
+  "description": "Row 24 (R60a(b)): clipboard.read while a secure field has focus answers the REFUSED REPORT (effect refused, reason secure_focus, nothingSent true, not_delivered/after_user), never ClipboardContent; nothing is read.",
+  "transport": "stdio",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/v3-clipboard-secure-focus.json",
+  "env": {
+    "OMO_COMPUTER_FAKE_STOP_PATH": "live"
+  },
   "steps": [
     {
       "send": {
@@ -9,88 +15,95 @@
           "reportMode": "object"
         }
       },
-      "reply": {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "result": {
-          "capabilities": {
-            "backend": "fake",
-            "displayCount": 2,
-            "deliveryModes": [
-              "background",
-              "foreground"
-            ],
-            "capture": {
-              "available": true,
-              "route": "composite"
-            },
-            "windowCapture": {
-              "available": true
-            },
-            "windowInput": {
-              "available": true
-            },
-            "observe": true,
-            "settle": true,
-            "ocr": false,
-            "background_window_input": true,
-            "background_window_input_basis": "route_available",
-            "inputModes": [
-              "pointer",
-              "keyboard",
-              "ax"
-            ],
-            "backgroundReach": "full",
-            "toolkitRoutes": {
-              "seeded": [],
-              "learned": []
-            },
-            "session": {
-              "screenLocked": "unknown",
-              "displayAsleep": "unknown",
-              "userActive": {
-                "active": "unknown",
-                "lastInputAgeMs": null
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayCount": 2,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capture": {
+                  "available": true,
+                  "route": "composite"
+                },
+                "windowCapture": {
+                  "available": true
+                },
+                "windowInput": {
+                  "available": true
+                },
+                "observe": true,
+                "settle": true,
+                "ocr": false,
+                "background_window_input": true,
+                "background_window_input_basis": "route_available",
+                "inputModes": [
+                  "pointer",
+                  "keyboard",
+                  "ax"
+                ],
+                "backgroundReach": "full",
+                "toolkitRoutes": {
+                  "seeded": [],
+                  "learned": []
+                },
+                "session": {
+                  "screenLocked": "unknown",
+                  "displayAsleep": "unknown",
+                  "userActive": {
+                    "active": "unknown",
+                    "lastInputAgeMs": null
+                  },
+                  "secureInputActive": true,
+                  "sessionActive": "unknown",
+                  "screensaverActive": "unknown",
+                  "pauseReasons": [],
+                  "sampledAt": 0
+                },
+                "sessionProbes": {
+                  "screenLocked": "none",
+                  "displayAsleep": "none",
+                  "userActive": "none",
+                  "secureInputActive": "none",
+                  "sessionActive": "none",
+                  "screensaverActive": "none",
+                  "sessionActiveDeliveryVerified": false
+                },
+                "displayAwake": {
+                  "state": "idle",
+                  "graceMs": 0,
+                  "capMs": 0,
+                  "heldSinceMs": null,
+                  "mechanism": "unavailable"
+                },
+                "surfaces": [],
+                "routeLadder": [],
+                "sendOnEnter": {
+                  "keys": 0
+                },
+                "stopPath": {
+                  "kind": "global",
+                  "hostRelayLive": false,
+                  "allowHostRelayOnly": false,
+                  "listener": "xi2-raw",
+                  "deaf": false,
+                  "stale": false
+                }
               },
-              "secureInputActive": true,
-              "sessionActive": "unknown",
-              "screensaverActive": "unknown",
-              "pauseReasons": [],
-              "sampledAt": 0
-            },
-            "sessionProbes": {
-              "screenLocked": "none",
-              "displayAsleep": "none",
-              "userActive": "none",
-              "secureInputActive": "none",
-              "sessionActive": "none",
-              "screensaverActive": "none",
-              "sessionActiveDeliveryVerified": false
-            },
-            "displayAwake": {
-              "state": "idle",
-              "graceMs": 0,
-              "capMs": 0,
-              "heldSinceMs": null,
-              "mechanism": "unavailable"
-            },
-            "surfaces": [],
-            "routeLadder": [],
-            "sendOnEnter": {
-              "keys": 0
-            },
-            "stopPath": {
-              "kind": "global",
-              "hostRelayLive": false,
-              "allowHostRelayOnly": false,
-              "listener": "xi2-raw",
-              "deaf": false,
-              "stale": false
+              "resumeToken": "27f74f47585675961fa1676f7259aeff"
             }
           },
-          "resumeToken": "5fdc342c18a976fa6d9ec79b250bbcb8"
+          "variable": [
+            "/result/resumeToken"
+          ]
         }
-      },
+      ],
       "sink": 0
     },
     {
@@ -100,18 +113,23 @@
         "method": "stopPath.start",
         "params": {}
       },
-      "reply": {
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": {
-          "suspended": false,
-          "globalLive": true,
-          "hostRelayLive": false,
-          "heartbeatFresh": true,
-          "stopPath": "global",
-          "reason": null
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "suspended": false,
+              "globalLive": true,
+              "hostRelayLive": false,
+              "heartbeatFresh": true,
+              "stopPath": "global",
+              "reason": null
+            }
+          },
+          "variable": []
         }
-      },
+      ],
       "sink": 0
     },
     {
@@ -123,15 +141,20 @@
           "reason": "conformance"
         }
       },
-      "reply": {
-        "jsonrpc": "2.0",
-        "id": 3,
-        "result": {
-          "active": true,
-          "reason": "conformance",
-          "grantedAt": null
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "result": {
+              "active": true,
+              "reason": "conformance",
+              "grantedAt": null
+            }
+          },
+          "variable": []
         }
-      },
+      ],
       "sink": 0
     },
     {
@@ -141,28 +164,31 @@
         "method": "clipboard.read",
         "params": {}
       },
-      "reply": {
-        "jsonrpc": "2.0",
-        "id": 4,
-        "result": {
-          "disposition": {
-            "delivery": "not_delivered",
-            "retry": "after_user"
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "result": {
+              "disposition": {
+                "delivery": "not_delivered",
+                "retry": "after_user"
+              },
+              "effect": "refused",
+              "route": "background_window",
+              "reason": "secure_focus",
+              "nothingSent": true,
+              "auditIds": [],
+              "evidence": [],
+              "observation": {
+                "untrustedText": true
+              }
+            }
           },
-          "effect": "refused",
-          "route": "background_window",
-          "reason": "secure_focus",
-          "nothingSent": true,
-          "auditIds": [],
-          "evidence": [],
-          "observation": {
-            "untrustedText": true
-          }
+          "variable": []
         }
-      },
+      ],
       "sink": 0
     }
-  ],
-  "sinkAfterClose": 0,
-  "sinkLines": []
+  ]
 }

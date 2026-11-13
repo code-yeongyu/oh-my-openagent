@@ -1,4 +1,10 @@
 {
+  "description": "Row 24 (R56a): an AX insertion the app does not answer is AxUnconfirmed; the write landed (one ax_type_text in the sink), so the caller observes before retrying.",
+  "transport": "stdio",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/ax-type-text.json",
+  "env": {
+    "OMO_COMPUTER_FAKE_STOP_PATH": "live"
+  },
   "steps": [
     {
       "send": {
@@ -9,88 +15,95 @@
           "reportMode": "object"
         }
       },
-      "reply": {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "result": {
-          "capabilities": {
-            "backend": "fake",
-            "displayCount": 2,
-            "deliveryModes": [
-              "background",
-              "foreground"
-            ],
-            "capture": {
-              "available": true,
-              "route": "composite"
-            },
-            "windowCapture": {
-              "available": true
-            },
-            "windowInput": {
-              "available": true
-            },
-            "observe": true,
-            "settle": true,
-            "ocr": false,
-            "background_window_input": true,
-            "background_window_input_basis": "route_available",
-            "inputModes": [
-              "pointer",
-              "keyboard",
-              "ax"
-            ],
-            "backgroundReach": "full",
-            "toolkitRoutes": {
-              "seeded": [],
-              "learned": []
-            },
-            "session": {
-              "screenLocked": "unknown",
-              "displayAsleep": "unknown",
-              "userActive": {
-                "active": "unknown",
-                "lastInputAgeMs": null
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayCount": 2,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capture": {
+                  "available": true,
+                  "route": "composite"
+                },
+                "windowCapture": {
+                  "available": true
+                },
+                "windowInput": {
+                  "available": true
+                },
+                "observe": true,
+                "settle": true,
+                "ocr": false,
+                "background_window_input": true,
+                "background_window_input_basis": "route_available",
+                "inputModes": [
+                  "pointer",
+                  "keyboard",
+                  "ax"
+                ],
+                "backgroundReach": "full",
+                "toolkitRoutes": {
+                  "seeded": [],
+                  "learned": []
+                },
+                "session": {
+                  "screenLocked": "unknown",
+                  "displayAsleep": "unknown",
+                  "userActive": {
+                    "active": "unknown",
+                    "lastInputAgeMs": null
+                  },
+                  "secureInputActive": "unknown",
+                  "sessionActive": "unknown",
+                  "screensaverActive": "unknown",
+                  "pauseReasons": [],
+                  "sampledAt": 0
+                },
+                "sessionProbes": {
+                  "screenLocked": "none",
+                  "displayAsleep": "none",
+                  "userActive": "none",
+                  "secureInputActive": "none",
+                  "sessionActive": "none",
+                  "screensaverActive": "none",
+                  "sessionActiveDeliveryVerified": false
+                },
+                "displayAwake": {
+                  "state": "idle",
+                  "graceMs": 0,
+                  "capMs": 0,
+                  "heldSinceMs": null,
+                  "mechanism": "unavailable"
+                },
+                "surfaces": [],
+                "routeLadder": [],
+                "sendOnEnter": {
+                  "keys": 0
+                },
+                "stopPath": {
+                  "kind": "global",
+                  "hostRelayLive": false,
+                  "allowHostRelayOnly": false,
+                  "listener": "xi2-raw",
+                  "deaf": false,
+                  "stale": false
+                }
               },
-              "secureInputActive": "unknown",
-              "sessionActive": "unknown",
-              "screensaverActive": "unknown",
-              "pauseReasons": [],
-              "sampledAt": 0
-            },
-            "sessionProbes": {
-              "screenLocked": "none",
-              "displayAsleep": "none",
-              "userActive": "none",
-              "secureInputActive": "none",
-              "sessionActive": "none",
-              "screensaverActive": "none",
-              "sessionActiveDeliveryVerified": false
-            },
-            "displayAwake": {
-              "state": "idle",
-              "graceMs": 0,
-              "capMs": 0,
-              "heldSinceMs": null,
-              "mechanism": "unavailable"
-            },
-            "surfaces": [],
-            "routeLadder": [],
-            "sendOnEnter": {
-              "keys": 0
-            },
-            "stopPath": {
-              "kind": "global",
-              "hostRelayLive": false,
-              "allowHostRelayOnly": false,
-              "listener": "xi2-raw",
-              "deaf": false,
-              "stale": false
+              "resumeToken": "9ca43ac5bba64e89f7bc0083c9842aa8"
             }
           },
-          "resumeToken": "73085fb9684162484fa68293a60fa415"
+          "variable": [
+            "/result/resumeToken"
+          ]
         }
-      },
+      ],
       "sink": 0
     },
     {
@@ -100,18 +113,23 @@
         "method": "stopPath.start",
         "params": {}
       },
-      "reply": {
-        "jsonrpc": "2.0",
-        "id": 2,
-        "result": {
-          "suspended": false,
-          "globalLive": true,
-          "hostRelayLive": false,
-          "heartbeatFresh": true,
-          "stopPath": "global",
-          "reason": null
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "suspended": false,
+              "globalLive": true,
+              "hostRelayLive": false,
+              "heartbeatFresh": true,
+              "stopPath": "global",
+              "reason": null
+            }
+          },
+          "variable": []
         }
-      },
+      ],
       "sink": 0
     },
     {
@@ -123,15 +141,20 @@
           "target": "101"
         }
       },
-      "reply": {
-        "jsonrpc": "2.0",
-        "id": 3,
-        "result": {
-          "text": "e1 window \"Untitled - Notes\"\n  e2 textarea value=\"\" focused\n  e3 button \"Save\"",
-          "nodeCount": 3,
-          "truncated": false
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "result": {
+              "text": "e1 window \"Untitled - Notes\"\n  e2 textarea value=\"\" focused\n  e3 button \"Save\"",
+              "nodeCount": 3,
+              "truncated": false
+            }
+          },
+          "variable": []
         }
-      },
+      ],
       "sink": 0
     },
     {
@@ -144,45 +167,48 @@
           "text": "draft"
         }
       },
-      "reply": {
-        "jsonrpc": "2.0",
-        "id": 4,
-        "error": {
-          "code": -32025,
-          "message": "AxUnconfirmed",
-          "data": {
-            "code": "AxUnconfirmed",
-            "hint": null,
-            "callId": "engine-1b2abc6dc7e8c5af",
-            "disposition": {
-              "delivery": "delivery_uncertain",
-              "retry": "unsafe"
-            },
-            "delivered": {
-              "count": 1,
-              "of": 1
-            },
-            "session": {
-              "screenLocked": "unknown",
-              "displayAsleep": "unknown",
-              "userActive": {
-                "active": "unknown",
-                "lastInputAgeMs": null
-              },
-              "secureInputActive": "unknown",
-              "sessionActive": "unknown",
-              "screensaverActive": "unknown",
-              "pauseReasons": [],
-              "sampledAt": 0
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "error": {
+              "code": -32025,
+              "message": "AxUnconfirmed",
+              "data": {
+                "code": "AxUnconfirmed",
+                "hint": null,
+                "callId": "engine-494be541b19dfa30",
+                "disposition": {
+                  "delivery": "delivery_uncertain",
+                  "retry": "unsafe"
+                },
+                "delivered": {
+                  "count": 1,
+                  "of": 1
+                },
+                "session": {
+                  "screenLocked": "unknown",
+                  "displayAsleep": "unknown",
+                  "userActive": {
+                    "active": "unknown",
+                    "lastInputAgeMs": null
+                  },
+                  "secureInputActive": "unknown",
+                  "sessionActive": "unknown",
+                  "screensaverActive": "unknown",
+                  "pauseReasons": [],
+                  "sampledAt": 0
+                }
+              }
             }
-          }
+          },
+          "variable": [
+            "/error/data/callId"
+          ]
         }
-      },
+      ],
       "sink": 1
     }
-  ],
-  "sinkAfterClose": 1,
-  "sinkLines": [
-    "ax_type_text ref=s1:e2 chars=5"
   ]
 }
