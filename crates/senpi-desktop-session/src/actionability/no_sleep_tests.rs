@@ -1,13 +1,26 @@
-//! Class check: the actionability tests and the harness they run on never
-//! wait on the host's clock. Their timing is fake time; a fixed sleep there
-//! only makes a test slower or dependent on how busy the host is.
+//! Class check: the files in `SOURCES` contain no direct host wait, by token.
+//! A fixed host wait there only makes a test slower or dependent on how busy
+//! the host is.
 //!
 //! The scan works on tokens, not text: comments and string literals are
-//! skipped, and a host wait is flagged however it is spelled or imported
-//! (`std::thread::sleep(..)`, a bare `sleep(..)` after `use std::thread::sleep`,
-//! `tokio::time::sleep`, `park_timeout`, ...). A `fn sleep` definition and a
-//! `.sleep(..)` method call (the fake clock's `BatteryClock::sleep`) are not
-//! host waits and pass.
+//! skipped, and a name in `HOST_WAITS` is flagged however it is spelled or
+//! imported (`std::thread::sleep(..)`, a bare `sleep(..)` after
+//! `use std::thread::sleep`, `tokio::time::timeout(..)`, `rx.recv_timeout(..)`,
+//! ...). A `fn` definition of such a name passes, and so does a `.sleep(..)`
+//! method call (the fake clock's `BatteryClock::sleep`). `ALLOWED` lists the
+//! host waits kept on purpose, per file and name, each with its reason.
+//!
+//! What it does not guarantee:
+//! - It reads only the text of these files, not the code they call. Tests that
+//!   open the harness on host time with `opened()` still poll through
+//!   `HostClock::sleep` (actionability.rs), a real `std::thread::sleep`, by
+//!   design: `a_harness_left_on_host_time_measures_ready_after_ms_on_host_time_too`
+//!   and `the_battery_waits_until_the_bounds_hold_still_across_two_reads` in
+//!   tests.rs, and `another_engine_sends_input_while_actionability_waits` and
+//!   `cancellation_during_actionability_wait_sends_nothing` in lock_tests.rs.
+//! - It knows waits by name only: a wait under another name, an unbounded
+//!   wait (`recv()`, `join()`, `Child::wait()`) or a busy loop on `Instant`
+//!   is not flagged.
 
 /// Every source file of the actionability tests and the session test harness.
 const SOURCES: [(&str, &str); 9] = [
@@ -40,18 +53,36 @@ const SOURCES: [(&str, &str); 9] = [
     ),
 ];
 
-/// Names of functions that block on the host's clock.
-const HOST_WAITS: [&str; 6] = [
+/// Names of functions and methods that block on the host's clock.
+const HOST_WAITS: [&str; 20] = [
     "sleep",
     "sleep_ms",
     "sleep_until",
     "park_timeout",
     "park_timeout_ms",
     "delay_for",
+    "recv_timeout",
+    "recv_deadline",
+    "send_timeout",
+    "wait_timeout",
+    "wait_timeout_ms",
+    "wait_timeout_while",
+    "wait_for",
+    "wait_until",
+    "wait_while_for",
+    "wait_while_until",
+    "try_lock_for",
+    "try_lock_until",
+    "timeout",
+    "timeout_at",
 ];
 
-/// Files allowed to wait on the host's clock, each with its reason. None today.
-const ALLOWED: [&str; 0] = [];
+/// Host waits kept on purpose: (file, wait, reason).
+const ALLOWED: [(&str, &str, &str); 1] = [(
+    "actionability/lock_tests.rs",
+    "recv_timeout",
+    "a hang guard on engine A's events: it returns when the event arrives",
+)];
 
 /// The number of `#` at `chars[start..]`.
 fn hashes_at(chars: &[char], start: usize) -> usize {
@@ -122,8 +153,8 @@ fn tokens(source: &str) -> Vec<(usize, String)> {
     out
 }
 
-/// Each host wait in `source`: a wait name that is neither defined (`fn`)
-/// nor called as a method (`.`).
+/// Each host wait in `path`'s `source`: a wait name that is neither defined
+/// (`fn`), nor the fake clock's `.sleep`, nor allowed for `path`.
 fn host_waits(path: &str, source: &str) -> Vec<String> {
     let tokens = tokens(source);
     tokens
@@ -133,7 +164,11 @@ fn host_waits(path: &str, source: &str) -> Vec<String> {
             let before = index
                 .checked_sub(1)
                 .map(|previous| tokens[previous].1.as_str());
-            HOST_WAITS.contains(&token.as_str()) && !matches!(before, Some("fn" | "."))
+            let fake_clock = before == Some(".") && token == "sleep";
+            let allowed = ALLOWED
+                .iter()
+                .any(|(file, wait, _)| *file == path && wait == token);
+            HOST_WAITS.contains(&token.as_str()) && before != Some("fn") && !fake_clock && !allowed
         })
         .map(|(_, (line, token))| format!("{path}:{line}: {token}"))
         .collect()
@@ -144,7 +179,6 @@ fn no_actionability_test_or_harness_file_waits_on_the_host_clock() {
     // Given / When
     let offenders: Vec<String> = SOURCES
         .iter()
-        .filter(|(path, _)| !ALLOWED.contains(path))
         .flat_map(|(path, source)| host_waits(path, source))
         .collect();
     // Then

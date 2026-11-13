@@ -1,0 +1,2 @@
+### Fixed
+- Desktop session tests: the check that the actionability tests do not wait on the host clock no longer stops reading a file at a raw identifier such as `r#type`. It also flags timed channel, condvar, lock and tokio waits (`recv_timeout`, `wait_timeout`, `tokio::time::timeout`, ...). Its doc comment now states that it checks only the text of the listed files, and that the tests that open the harness on host time still poll through `HostClock::sleep` by design.
