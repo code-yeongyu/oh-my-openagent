@@ -12,7 +12,7 @@
  */
 
 import type { MonitorConfig as SchemaMonitorConfig } from "../../config/schema/monitor"
-import { programsForAllowlist } from "./allowlist-programs"
+import { commandsForPermission, programsForAllowlist } from "./allowlist-programs"
 
 export type MonitorConfig = Pick<SchemaMonitorConfig, "enabled" | "allowed_commands"> & Partial<SchemaMonitorConfig>
 
@@ -54,11 +54,28 @@ async function checkBashEquivalentPermission(
   command: string,
   bashPermissionAsk: (input: BashPermissionAskInput) => Promise<void>,
 ): Promise<MonitorPermissionResult> {
+  const commands = commandsForPermission(command)
+  if (commands === null) {
+    return {
+      allowed: false,
+      reason:
+        "command hides commands bash permission cannot check (command substitution, subshell, case or function); run it from a script",
+      via: "bash-equivalent",
+    }
+  }
+  if (commands.length === 0) {
+    return {
+      allowed: false,
+      reason: "command runs nothing",
+      via: "bash-equivalent",
+    }
+  }
+
   try {
     await bashPermissionAsk({
       permission: "bash",
-      patterns: [command],
-      always: [command],
+      patterns: commands,
+      always: commands,
       metadata: { command },
     })
   } catch (error) {
