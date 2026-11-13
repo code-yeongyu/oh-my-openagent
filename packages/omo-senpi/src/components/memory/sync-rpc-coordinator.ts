@@ -268,6 +268,8 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
           return result
         } catch (error) {
           const problem = serviceProblem(error)
+          // A refusal means the service answered, so an earlier unavailable cause has ended and its recurrence logs again.
+          if (problem.kind === "refused") lastUnavailable.delete("read")
           return problem.kind === "unavailable" && problem.code !== undefined
             ? reportUnavailable("read", problem.code, syncErrorFields(error))
             : problem
