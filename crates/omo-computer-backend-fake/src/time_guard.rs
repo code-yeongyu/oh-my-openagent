@@ -38,27 +38,51 @@ fn contains_word(line: &str, needle: &str) -> bool {
     })
 }
 
-/// The top-level items of every grouped `std` import in `text`, each with the byte offset it
-/// starts at. A group may span lines (rustfmt splits a long one), so this reads the whole text.
+/// The byte offset just past the comment that starts at `at`, or `None` when no comment
+/// starts there. A line comment ends before its newline; an unclosed block comment runs to the end.
+fn comment_end(text: &str, at: usize) -> Option<usize> {
+    let rest = &text[at..];
+    if rest.starts_with("//") {
+        Some(rest.find('\n').map_or(text.len(), |n| at + n))
+    } else {
+        rest.strip_prefix("/*")
+            .map(|body| body.find("*/").map_or(text.len(), |n| at + 2 + n + 2))
+    }
+}
+
+/// The top-level items of every grouped `std` import in `text`, each with the byte offset of its
+/// first character. A group may span lines (rustfmt splits a long one), so this reads the whole
+/// text; comments inside the group are skipped, so they neither hide an item nor split one.
 fn grouped_std_items(text: &str) -> Vec<(usize, String)> {
     let mut items = Vec::new();
     for (at, _) in text.match_indices(STD_GROUP) {
-        let start = at + STD_GROUP.len();
-        let (mut depth, mut item_at, mut item) = (0_u32, start, String::new());
-        for (offset, ch) in text[start..].char_indices() {
+        let (mut depth, mut item_at, mut item) = (0_u32, None, String::new());
+        let mut index = at + STD_GROUP.len();
+        while let Some(ch) = text[index..].chars().next() {
+            if let Some(end) = comment_end(text, index) {
+                item.push(' ');
+                index = end;
+                continue;
+            }
             match ch {
                 '{' => depth += 1,
                 '}' if depth == 0 => break,
                 '}' => depth -= 1,
                 ',' if depth == 0 => {
-                    items.push((item_at, std::mem::take(&mut item)));
-                    item_at = start + offset + 1;
+                    items.push((item_at.unwrap_or(index), std::mem::take(&mut item)));
+                    item_at = None;
                 }
-                _ if depth == 0 => item.push(ch),
+                _ if depth == 0 => {
+                    if !ch.is_whitespace() && item_at.is_none() {
+                        item_at = Some(index);
+                    }
+                    item.push(ch);
+                }
                 _ => {}
             }
+            index += ch.len_utf8();
         }
-        items.push((item_at, item));
+        items.push((item_at.unwrap_or(index), item));
     }
     items
 }
