@@ -56,6 +56,18 @@ impl FakeBackend {
         Box::new(FakeEpochSource::new(self.shared.clone()))
     }
 
+    /// Row 21: the scenario's `consent` view, with `fullAccess` set under the full-access preset.
+    pub(super) fn scripted_host_consent(&self) -> Option<serde_json::Value> {
+        let state = self.lock();
+        let mut view = state.scenario.consent.clone();
+        if state.scenario.full_access_preset {
+            if let Some(map) = view.get_or_insert_with(|| serde_json::json!({})).as_object_mut() {
+                map.insert("fullAccess".to_owned(), serde_json::Value::Bool(true));
+            }
+        }
+        view
+    }
+
     pub(super) fn scripted_presence(&self) -> Option<Box<dyn Presence>> {
         let available = self.lock().scenario.presence_surface.unwrap_or(true);
         available.then(|| Box::new(FakePresence::new(self.sink.clone())) as Box<dyn Presence>)
