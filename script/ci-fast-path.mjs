@@ -29,6 +29,8 @@ const platformSensitiveExactPaths = new Set([
   "script/ci-leg-tests-guard.mjs",
   "script/root-test-serial-quarantine.ts",
   "packages/openclaw-core/src/reply-listener-process.ts",
+  "packages/omo-opencode/src/cli/service-auth/account-home.ts",
+  "packages/omo-opencode/src/cli/service-auth/account-home.test.ts",
 ])
 const platformSensitivePrefixes = [
   "crates/",

@@ -262,6 +262,8 @@ describe("full-matrix classification", () => {
       ["windows rpc-host panic retry runner", "script/bun-panic-retry.ts"],
       ["shared serial quarantine", "script/root-test-serial-quarantine.ts"],
       ["reply-listener process identity (win32 branch)", "packages/openclaw-core/src/reply-listener-process.ts"],
+      ["credential lock home (win32 lookup)", "packages/omo-opencode/src/cli/service-auth/account-home.ts"],
+      ["credential lock home tests", "packages/omo-opencode/src/cli/service-auth/account-home.test.ts"],
       ["the label-triggered full-matrix workflow", ".github/workflows/ci-full-matrix-label.yml"],
       ["the platform package publish workflow", ".github/workflows/publish-platform.yml"],
       ["a CI helper script the legs run", ".github/scripts/write-job-summary.sh"],
