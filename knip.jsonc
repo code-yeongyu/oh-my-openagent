@@ -866,8 +866,6 @@
       "packages/omo-opencode/src/plugin/event-session-lifecycle.ts": ["isCompactionAgent"],
       // pre-existing at origin dev 4686e425b5: unused export(s) detectUltrawork
       "packages/omo-opencode/src/plugin/ultrawork-model-override.ts": ["detectUltrawork"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) validateAgentOrder
-      "packages/omo-opencode/src/shared/agent-ordering.ts": ["validateAgentOrder"],
       // pre-existing at origin dev 4686e425b5: unused export(s) createConnectedProvidersCacheStore, findProviderModelMetadata
       "packages/omo-opencode/src/shared/connected-providers-cache.ts": ["createConnectedProvidersCacheStore", "findProviderModelMetadata"],
       // pre-existing at origin dev 4686e425b5: unused export(s) containsPath
