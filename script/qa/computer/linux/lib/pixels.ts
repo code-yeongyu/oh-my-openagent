@@ -41,9 +41,10 @@ export function decodeXwd(bytes: Uint8Array): Raster {
   if (word(2) !== 2) throw new Error(`xwd format ${word(2)} is not ZPixmap`)
   const width = word(4)
   const height = word(5)
-  const bitsPerPixel = word(12)
-  const bytesPerLine = word(13)
-  const masks: [number, number, number] = [word(21), word(22), word(23)]
+  // X11/XWDFile.h order: 11 bits_per_pixel, 12 bytes_per_line, 14-16 red/green/blue masks.
+  const bitsPerPixel = word(11)
+  const bytesPerLine = word(12)
+  const masks: [number, number, number] = [word(14), word(15), word(16)]
   const byteOrder = word(7)
   if (bitsPerPixel !== 24 && bitsPerPixel !== 32) throw new Error(`xwd ${bitsPerPixel} bits per pixel`)
   if (headerSize < XWD_HEADER_WORDS * 4) throw new Error(`xwd header of ${headerSize} bytes is too short`)
