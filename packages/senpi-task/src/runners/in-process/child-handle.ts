@@ -35,7 +35,7 @@ export type ChildSession = RunHoldSession & {
   readonly sessionId: string
   readonly model?: CatalogModelIdentity
   readonly effectiveServiceTier?: string
-  prompt(text: string, options?: InputIdentity): Promise<void>
+  prompt(text: string, options?: Partial<InputIdentity> & { readonly signal?: AbortSignal }): Promise<void>
   steer(text: string, images?: undefined, options?: InputIdentity): Promise<QueuedInputDisposition>
   followUp(text: string, images?: undefined, options?: InputIdentity): Promise<QueuedInputDisposition>
   abort(): Promise<void>
@@ -217,13 +217,14 @@ function turnOutcome(
 async function runTurn(
   session: ChildSession,
   text: string,
+  signal: AbortSignal,
   isAborted: () => boolean,
   observation: TurnObservation,
   completion: ChildCompletionPolicy,
   identity: InputIdentity | undefined,
 ): Promise<RunnerOutcome> {
   try {
-    await session.prompt(text, identity)
+    await session.prompt(text, { ...identity, signal })
   } catch (error) {
     if (isAborted()) return { status: "cancelled" }
     if (error instanceof Error) {
@@ -268,6 +269,7 @@ function createTrackedChildHandle(
   let aborted = false
   let disposed = false
   let turnActive = false
+  let promptAbort: AbortController | undefined
   // Seeded for the restored case; createChildHandle's beginTurn replaces it immediately.
   let running: Promise<RunnerOutcome> = Promise.resolve(settledSessionOutcome(session, completion))
   const observation: TurnObservation = {
@@ -285,13 +287,14 @@ function createTrackedChildHandle(
   const beginTurn = (text: string, identity?: InputIdentity): void => {
     aborted = false
     turnActive = true
+    promptAbort = new AbortController()
     observation.text = undefined
     observation.stopReason = undefined
     observation.errorMessage = undefined
     observation.provider = undefined
     observation.model = undefined
     observation.baseline = session.getLastAssistantText()
-    running = runTurn(session, text, () => aborted, observation, completion, identity)
+    running = runTurn(session, text, promptAbort.signal, () => aborted, observation, completion, identity)
     void running.then(
       () => {
         turnActive = false
@@ -345,6 +348,9 @@ function createTrackedChildHandle(
     },
     abort: async () => {
       aborted = true
+      // abort() alone only reaches a turn that already owns session work. Fence a prompt still
+      // in preflight too, so it cannot start after cancellation and outlive child disposal.
+      promptAbort?.abort()
       await session.abort()
     },
     subscribe: (listener) => session.subscribe(listener),
