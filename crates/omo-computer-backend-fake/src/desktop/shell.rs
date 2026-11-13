@@ -13,18 +13,6 @@ use crate::sink::quoted;
 use crate::scenario::{FakeAxNode, FakeMenuNode};
 
 impl FakeBackend {
-    /// The scenario's `consent` view, with `fullAccess` set under the full-access preset.
-    pub(super) fn fake_host_consent(&self) -> Option<serde_json::Value> {
-        let state = self.lock();
-        let mut view = state.scenario.consent.clone();
-        if state.scenario.full_access_preset {
-            if let Some(map) = view.get_or_insert_with(|| serde_json::json!({})).as_object_mut() {
-                map.insert("fullAccess".to_owned(), serde_json::Value::Bool(true));
-            }
-        }
-        view
-    }
-
     fn fake_menu_tree(&self, window: &str) -> BackendResult<Vec<MenuNode>> {
         let menus = self.menus(window).ok_or(Refusal::bare(EngineCode::AxUnsupported))?;
         Ok(menus.iter().map(menu_node).collect())
