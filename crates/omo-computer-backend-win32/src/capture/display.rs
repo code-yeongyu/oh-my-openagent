@@ -1,12 +1,16 @@
 //! The display ladder: WGC per monitor when supported, `BitBlt` per monitor otherwise, composited
-//! in physical pixels under `MAX_COMPOSITE_PIXELS` with every dropped display named.
+//! in physical pixels under `MAX_COMPOSITE_PIXELS` with every dropped display named. Under the
+//! session cause (`dark`, see [`super::session`]) a near-black composite is
+//! `CaptureFailed{black_frame}`; without it a dark desktop is a frame.
 
 use omo_computer_core::backend::Refusal;
 use omo_computer_core::capabilities::CaptureRoute;
 use omo_computer_core::error::Reason;
 use omo_computer_core::frame::MAX_COMPOSITE_PIXELS;
 
-use super::{composite, failed, from_fault, record, CaptureFault, CaptureOs, FrameRecord};
+use super::{
+    composite, failed, from_fault, is_near_black, record, CaptureFault, CaptureOs, FrameRecord,
+};
 use crate::displays::{Monitor, PhysRect};
 
 pub(super) fn capture<O: CaptureOs + ?Sized>(
@@ -14,6 +18,7 @@ pub(super) fn capture<O: CaptureOs + ?Sized>(
     wgc: bool,
     monitors: &[Monitor],
     cursor: bool,
+    dark: bool,
 ) -> Result<FrameRecord, Refusal> {
     let mut frames = Vec::with_capacity(monitors.len());
     let mut dropped = Vec::new();
@@ -53,6 +58,9 @@ pub(super) fn capture<O: CaptureOs + ?Sized>(
         .find(|monitor| !dropped.contains(&monitor.device_name))
         .map_or(1.0, Monitor::scale);
     let frame = composite(&frames).ok_or(failed(Reason::NullFrame))?;
+    if dark && is_near_black(&frame.bgra) {
+        return Err(failed(Reason::BlackFrame));
+    }
     let mut record = record(route, frame, scale);
     record.dropped = dropped;
     Ok(record)
