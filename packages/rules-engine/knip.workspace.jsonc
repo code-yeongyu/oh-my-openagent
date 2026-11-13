@@ -1,0 +1,29 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/rules-engine": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+      ],
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) staticDedupKey, dynamicDedupKey
+    "packages/rules-engine/src/engine/cache.ts": ["staticDedupKey", "dynamicDedupKey"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) createSessionState, clearSession, isDynamicInjected, isStaticInjected, markDynamicInjected, markStaticInjected, BUNDLED_RULE_SUBDIR, DEFAULT_DYNAMIC_MAX_RESULT_CHARS, DEFAULT_DYNAMIC_MAX_RULE_CHARS, DEFAULT_MAX_RESULT_CHARS and 25 more
+    "packages/rules-engine/src/engine/index.ts": ["createSessionState", "clearSession", "isDynamicInjected", "isStaticInjected", "markDynamicInjected", "markStaticInjected", "BUNDLED_RULE_SUBDIR", "DEFAULT_DYNAMIC_MAX_RESULT_CHARS", "DEFAULT_DYNAMIC_MAX_RULE_CHARS", "DEFAULT_MAX_RESULT_CHARS", "DEFAULT_MAX_RULE_CHARS", "DEFAULT_MAX_SCAN_FILES", "DEFAULT_POST_COMPACT_MAX_RESULT_CHARS", "DEFAULT_POST_COMPACT_MAX_RULE_CHARS", "DEFAULT_PROMPT_MAX_RESULT_CHARS", "DEFAULT_PROMPT_MAX_RULE_CHARS", "GLOBAL_DISTANCE", "PROJECT_MARKERS", "PROJECT_RULE_SUBDIRS", "PROJECT_SINGLE_FILES", "RULE_FILE_EXTENSIONS", "SCANNER_EXCLUDED_DIRS", "TRUNCATION_NOTICE", "USER_HOME_RULE_SUBDIRS", "USER_HOME_SINGLE_FILES", "loadDynamicCandidates", "loadCandidate", "staticMatchReason", "isRootSingleFile", "pathBasesForTarget", "toPosixPath", "loadStaticCandidates", "DEFAULT_AUTO_DISABLED_SOURCES", "truncateBudget", "truncateRule"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) compareCandidates
+    "packages/rules-engine/src/engine/ordering.ts": ["compareCandidates"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_AUTO_DISABLED_SOURCES
+    "packages/rules-engine/src/engine/sources.ts": ["DEFAULT_AUTO_DISABLED_SOURCES"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) calculateDistance, AGENTS_FILENAME, EXCLUDED_DIRS, GITHUB_INSTRUCTIONS_PATTERN, GLOBAL_DISTANCE, OPENCODE_USER_RULE_DIRS, PROJECT_MARKERS, PROJECT_RULE_FILES, PROJECT_RULE_SUBDIRS, RULE_EXTENSIONS and 2 more
+    "packages/rules-engine/src/index.ts": ["calculateDistance", "AGENTS_FILENAME", "EXCLUDED_DIRS", "GITHUB_INSTRUCTIONS_PATTERN", "GLOBAL_DISTANCE", "OPENCODE_USER_RULE_DIRS", "PROJECT_MARKERS", "PROJECT_RULE_FILES", "PROJECT_RULE_SUBDIRS", "RULE_EXTENSIONS", "SOURCE_PRIORITY", "USER_RULE_DIR"]
+  }
+}
