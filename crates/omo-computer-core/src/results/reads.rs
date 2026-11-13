@@ -105,3 +105,13 @@ pub struct WaitResult {
     pub outcome: WaitOutcome,
     pub observation: Box<Observation>,
 }
+
+/// `clipboard.read`'s reply (R60a(b), repin item 52): the content, or under a secure focus the
+/// refused report (`effect:"refused"`, `reason:"secure_focus"`, `nothingSent:true`), never a
+/// `ClipboardContent`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum ClipboardReadReply {
+    Content(ClipboardContent),
+    Refused(crate::report::ActionReport),
+}

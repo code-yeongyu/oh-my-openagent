@@ -1,5 +1,8 @@
 //! R59: the frame read-back kind follows design row C8, and every other kind derives as before.
 
+use serde_json::json;
+
+use super::wire_check;
 use crate::listing::Rect;
 use crate::report::{Evidence, EvidenceClass, EvidenceKind};
 
@@ -29,4 +32,23 @@ fn every_existing_evidence_kind_derives_as_before() {
         let equal = if receipts_before.contains(&kind) || kind == EvidenceKind::ValueReadback { EvidenceClass::Receipt } else { EvidenceClass::Observation };
         assert_eq!(Evidence::derived_class(kind, Some("a"), Some("a")), equal, "{kind:?}, equal");
     }
+}
+
+#[test]
+fn a_frame_readback_on_the_wire_keeps_intended_and_other_kinds_still_may_not() {
+    let frame = |kind: &str, class: &str| {
+        json!({
+            "effect": "confirmed",
+            "route": "background_window",
+            "delivered": { "count": 1, "of": 1 },
+            "observation": { "untrustedText": true },
+            "auditIds": [],
+            "disposition": { "delivery": "delivered_verified", "retry": "unsafe" },
+            "evidence": [{ "kind": kind, "class": class, "intended": "10,20,500,300", "value": "10,20,500,300" }],
+        })
+    };
+    if let Err(error) = wire_check(&frame("frame_readback", "receipt"), None) {
+        panic!("R59: frame_readback records both raw frames: {error}");
+    }
+    assert!(wire_check(&frame("barrier_consumed", "receipt"), None).is_err(), "intended stays refused on other kinds");
 }

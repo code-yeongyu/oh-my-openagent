@@ -2,7 +2,7 @@
 // Do not edit by hand; run `bun run --cwd packages/omo-computer-protocol generate`.
 
 /** sha256 of the schema file this module was generated from; the schema-drift test compares it. */
-export const SCHEMA_SHA256 = "6c1b6a6e1c22df360d06e40eb5bd97d5903711a33977d90f2f9ba56f5f49388b" as const
+export const SCHEMA_SHA256 = "6bcb576fd6db0fb6d4fd5032c575cdf3c0cbdc2241d3c38c09135dbb3a1a0822" as const
 
 /** The wire protocol version `engine.hello` reports. */
 export const PROTOCOL_VERSION = "1" as const
@@ -645,6 +645,8 @@ export type ClipboardContent = {
 	reason?: ConcealedReason | null
 	observation: UntrustedText
 }
+
+export type ClipboardReadReply = ClipboardContent | ActionReport
 
 export type ClipboardWriteParams = {
 	text: string
@@ -1758,7 +1760,7 @@ export type MethodResults = {
 	"ax.focused": AxNode | null
 	"elementAt": ElementInfo | null
 	"waitFor": WaitResult
-	"clipboard.read": ClipboardContent
+	"clipboard.read": ClipboardReadReply
 	"menu.items": MenuItems
 	"surface": Surface
 	"click": ExecReply

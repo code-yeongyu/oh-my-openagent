@@ -62,7 +62,7 @@ fn check_effect(shape: &Shape<'_>, verb: Option<VerbClass>) -> Result<(), Report
         Some(verb) => entry.kind() == verb.confirming_kind() || (verb == VerbClass::Value && entry.kind() == EvidenceKind::FrameReadback),
         None => matches!(
             entry.kind(),
-            EvidenceKind::BarrierConsumed | EvidenceKind::ValueReadback
+            EvidenceKind::BarrierConsumed | EvidenceKind::ValueReadback | EvidenceKind::FrameReadback
         ),
     };
     let confirming = receipts().any(confirms);

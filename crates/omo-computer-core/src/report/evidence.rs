@@ -265,7 +265,7 @@ impl TryFrom<WireEvidence> for Evidence {
                 derived,
             });
         }
-        if wire.intended.is_some() && wire.kind != EvidenceKind::ValueReadback {
+        if wire.intended.is_some() && !matches!(wire.kind, EvidenceKind::ValueReadback | EvidenceKind::FrameReadback) {
             return Err(ReportRejection::IntendedOutsideValueReadback { kind: wire.kind });
         }
         if wire.event.is_some() != (wire.kind == EvidenceKind::AxNotification) {

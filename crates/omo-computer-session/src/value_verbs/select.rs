@@ -13,7 +13,9 @@ pub(super) fn range_of(value: &str, range: &TextRange) -> Result<Utf16Range, cra
         TextRange::Span { start, end } => {
             let (start, end) = (usize::try_from(*start).unwrap_or(usize::MAX), usize::try_from(*end).unwrap_or(usize::MAX));
             if end < start {
-                return Err(Refused::from(Refusal::new(EngineCode::Internal, Reason::SpanInverted.wire())));
+                let mut refused = Refused::from(Refusal::new(EngineCode::Internal, Reason::SpanInverted.wire()));
+                refused.detail = Some(Box::new(serde_json::json!({ "field": "end", "message": "/end: expected end >= start" })));
+                return Err(refused);
             }
             let length = value.encode_utf16().count();
             if end > length {
@@ -71,7 +73,7 @@ mod tests {
         assert_eq!(wire("abc", TextRange::Text { text: "z".into() }), ("InvalidTarget".into(), Some("text_absent".into()), None));
         assert_eq!(wire("abab", TextRange::Text { text: "ab".into() }), ("InvalidTarget".into(), Some("ambiguous".into()), Some(serde_json::json!({"occurrences": 2}))));
         assert_eq!(wire("a\u{1F4CB}", TextRange::Span { start: 0, end: 4 }), ("InvalidTarget".into(), Some("span_out_of_range".into()), Some(serde_json::json!({"length": 3}))), "length in UTF-16 units");
-        assert_eq!(wire("abc", TextRange::Span { start: 2, end: 1 }), ("Internal".into(), Some("span_inverted".into()), None));
+        assert_eq!(wire("abc", TextRange::Span { start: 2, end: 1 }), ("Internal".into(), Some("span_inverted".into()), Some(serde_json::json!({"field": "end", "message": "/end: expected end >= start"}))));
         assert!(range_of("abc", &TextRange::Span { start: 1, end: 3 }).is_ok());
     }
 }

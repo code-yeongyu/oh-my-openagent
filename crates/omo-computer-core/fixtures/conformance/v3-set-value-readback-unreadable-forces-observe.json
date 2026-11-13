@@ -1,7 +1,7 @@
 {
   "description": "Row 24 (C8): a value that cannot be read back is unverifiable with nextCall observe; nothing is claimed confirmed.",
   "transport": "stdio",
-  "scenario": "crates/omo-computer-backend-fake/fixtures/v3-null-value-readback.json",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/v3-value-readback-unreadable.json",
   "env": {
     "OMO_COMPUTER_FAKE_STOP_PATH": "live"
   },

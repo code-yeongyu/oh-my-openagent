@@ -230,7 +230,7 @@
         "$ref": "#/$defs/EmptyParams"
       },
       "result": {
-        "$ref": "#/$defs/ClipboardContent"
+        "$ref": "#/$defs/ClipboardReadReply"
       }
     },
     "menu.items": {
@@ -2393,6 +2393,17 @@
         "observation"
       ],
       "description": "`clipboard.read`: a concealed clipboard answers `{secure:true, text:null, reason:\"concealed\"}`."
+    },
+    "ClipboardReadReply": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ClipboardContent"
+        },
+        {
+          "$ref": "#/$defs/ActionReport"
+        }
+      ],
+      "description": "`clipboard.read`'s reply (R60a(b), repin item 52): the content, or under a secure focus the\nrefused report (`effect:\"refused\"`, `reason:\"secure_focus\"`, `nothingSent:true`), never a\n`ClipboardContent`."
     },
     "ClipboardWriteParams": {
       "type": "object",

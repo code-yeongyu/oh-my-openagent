@@ -20,7 +20,7 @@ use crate::params::{
     WindowFrameParams, WindowParams, WindowsParams, ZoomParams,
 };
 use crate::results::{
-    AxNode, AxSnapshotText, AxTypeTextReply, CapabilitiesReply, CaptureReply, ClipboardContent,
+    AxNode, AxSnapshotText, AxTypeTextReply, CapabilitiesReply, CaptureReply, ClipboardReadReply,
     ControlState, Diagnosis, DisplayInfo, ExecReply, MenuItems, ObserveReply, PointerPosition,
     SessionOpened, StopPathStatus, WaitResult, WindowsReply,
 };
@@ -91,7 +91,7 @@ method_table! {
     AxFocused = "ax.focused", Read, PUBLIC, EmptyParams => Option<AxNode>;
     ElementAt = "elementAt", Read, PUBLIC, ElementAtParams => Option<ElementInfo>;
     WaitFor = "waitFor", Read, PUBLIC, WaitForParams => WaitResult;
-    ClipboardRead = "clipboard.read", Read, PUBLIC, EmptyParams => ClipboardContent;
+    ClipboardRead = "clipboard.read", Read, PUBLIC, EmptyParams => ClipboardReadReply;
     MenuItems = "menu.items", Read, PUBLIC, MenuItemsParams => MenuItems;
     Surface = "surface", Read, PUBLIC, SurfaceParams => Surface;
     Click = "click", Exec, PUBLIC, ClickParams => ExecReply;
