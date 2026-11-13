@@ -7,7 +7,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 public static class SmokeNative {
   [DllImport("user32.dll", SetLastError = true)] public static extern IntPtr OpenInputDesktop(uint flags, bool inherit, uint access);
-  [DllImport("user32.dll", SetLastError = true)] public static extern bool GetUserObjectInformationW(IntPtr obj, int index, StringBuilder info, int length, out int needed);
+  [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)] public static extern bool GetUserObjectInformationW(IntPtr obj, int index, StringBuilder info, int length, out int needed);
   [DllImport("user32.dll")] public static extern bool CloseDesktop(IntPtr desktop);
 }
 '@
