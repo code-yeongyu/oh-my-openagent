@@ -19,6 +19,8 @@ type Scene = {
   readonly activationWorks: boolean
   readonly windowActive: boolean
   readonly eventsArrive: boolean
+  readonly pidEventsArrive?: boolean
+  readonly axPressToggles?: boolean
   readonly hitRole?: string
 }
 
@@ -51,6 +53,10 @@ function fakeProbe(scene: Scene): { probe: Probe; clicks: string[] } {
       return { found: true, value: on ? 1 : 0, frame: [100, 200, 40, 20], firstMouseFrame: [100, 100, 40, 20] }
     if (command === "ax-hit") return { axError: 0, pid: 4242, role: scene.hitRole ?? "AXCheckBox" }
     if (command === "frontmost") return { frontmost: active }
+    if (command === "ax-press") {
+      if (scene.axPressToggles === true) toggleDefault()
+      return { found: true, axError: 0 }
+    }
     if (command === "activate") {
       if (scene.activationWorks) {
         active = true
@@ -60,7 +66,7 @@ function fakeProbe(scene: Scene): { probe: Probe; clicks: string[] } {
     }
     if (command === "click") {
       clicks.push(`${route}@${x},${y}`)
-      if (scene.eventsArrive)
+      if (route === "hid" ? scene.eventsArrive : (scene.pidEventsArrive ?? scene.eventsArrive))
         appendFileSync(
           eventFile,
           `1 ${x} ${y} active=${scene.windowActive || active} key=${scene.windowActive || active}\n`,
@@ -159,7 +165,7 @@ describe("q3 pid-routed click against the default checkbox (three-leg instrument
     expect(clicks).toContain("sl@120,210")
   }, 30_000)
 
-  test("nothing toggles while the window sees the events with the app active: no is proven", async () => {
+  test("global events arrive with the app active, pid-routed events never reach the window: delivery refusal is proven", async () => {
     const { probe } = fakeProbe({
       doubleToggles: false,
       activatedToggles: false,
@@ -169,10 +175,45 @@ describe("q3 pid-routed click against the default checkbox (three-leg instrument
       activationWorks: true,
       windowActive: true,
       eventsArrive: true,
+      pidEventsArrive: false,
     })
     const answer = await askPidClick(probe)
     expect(answer.verdict).toBe("CONTRADICTS")
-    expect(answer.evidence).toContain("no is proven")
+    expect(answer.evidence).toContain("never reached the window")
+  }, 30_000)
+
+  test("pid-routed events arrive and toggle nothing while the AX press control toggles: no is proven against that control", async () => {
+    const { probe } = fakeProbe({
+      doubleToggles: false,
+      activatedToggles: false,
+      firstMouseToggles: false,
+      defaultAfterFirstMouse: false,
+      pidToggles: false,
+      activationWorks: true,
+      windowActive: true,
+      eventsArrive: true,
+      axPressToggles: true,
+    })
+    const answer = await askPidClick(probe)
+    expect(answer.verdict).toBe("CONTRADICTS")
+    expect(answer.evidence).toContain("AX press control toggled")
+  }, 30_000)
+
+  test("nothing toggles under any click and the AX press control fails too: the toggle oracle is unproven", async () => {
+    const { probe } = fakeProbe({
+      doubleToggles: false,
+      activatedToggles: false,
+      firstMouseToggles: false,
+      defaultAfterFirstMouse: false,
+      pidToggles: false,
+      activationWorks: true,
+      windowActive: true,
+      eventsArrive: true,
+      axPressToggles: false,
+    })
+    const answer = await askPidClick(probe)
+    expect(answer.verdict).toBe("UNMEASURED")
+    expect(answer.evidence).toContain("toggle oracle")
   }, 30_000)
 
   test("activation that never makes the app active leaves the leg unmeasured", async () => {
