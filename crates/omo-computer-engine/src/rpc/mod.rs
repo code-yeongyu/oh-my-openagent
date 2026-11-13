@@ -3,7 +3,6 @@
 //! and never reaches the session, so it can send nothing. The one notification the protocol
 //! defines, `$/cancel`, has nothing to cancel on this serial loop.
 
-use omo_computer_core::backend::Refusal;
 use omo_computer_core::methods::Method;
 use omo_computer_session::Session;
 use serde::de::DeserializeOwned;
@@ -130,7 +129,7 @@ fn reply(id: &Value, outcome: Result<Value, Failure>) -> String {
 #[cfg(test)]
 mod tests {
     use omo_computer_backend_fake::{FakeBackend, FakeClock, FakeScenario, RecordingSink};
-    use omo_computer_core::backend::Backend;
+    use omo_computer_core::backend::{Backend, Refusal};
     use omo_computer_core::error::EngineCode;
     use serde_json::{json, Value};
 
