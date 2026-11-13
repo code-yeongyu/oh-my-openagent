@@ -123,7 +123,9 @@ describe("root test CI partition", () => {
     // this suite passed with for years.
     expect(posixStep).toContain("bash .github/scripts/ci-root-shard-2.sh")
     expect(posixShard2).toContain(serialQuarantineCommand())
-    expect(posixShard2).toContain("bun --config=bunfig.win2.parallel.toml test --timeout 20000 $(junit root-2-remainder)\n")
+    expect(posixShard2).toContain(
+      "bun --config=bunfig.win2.parallel.toml test --timeout 20000 $(junit root-2-remainder)\n",
+    )
     expect(posixShard2).not.toContain("bun --config=bunfig.win2.parallel.toml test --parallel")
     expect(posixShard2.indexOf(serialQuarantineCommand())).toBeLessThan(
       posixShard2.indexOf("bun --config=bunfig.win2.parallel.toml test --timeout 20000"),
