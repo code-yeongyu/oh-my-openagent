@@ -127,7 +127,7 @@ test("same principal cannot start a second native ceremony while the first owns 
   })
   await entered.promise
   try {
-    await expect(enableSync(f.input)).rejects.toMatchObject({ name: "LockContentionError" })
+    expect(await enableSync(f.input)).toEqual({ kind: "in_progress" })
     expect(f.ceremonies()).toBe(0)
   } finally {
     release.resolve()

@@ -32,7 +32,12 @@ export const placeOf = (input: EnableSyncInput): PhraseGenesisPlace => ({
 export const commitIntent = async (captured: Captured, intent: GenesisIntent): Promise<EnableOutcome> => {
   const result = await completeGenesis(captured, intent)
   checkSyncOperation(captured)
-  if (result === "phrase_refused") return { kind: "phrase_unavailable", reason: "service-floor-off" }
+  if (result === "phrase_refused") {
+    // The switches went on for this ceremony's append; the service refused it, so no chain exists: turn them back off.
+    await captured.pairing.setDeviceSync(captured.serviceDeviceId, false)
+    await captured.pairing.setAccountSync(false)
+    return { kind: "phrase_unavailable", reason: "service-floor-off" }
+  }
   if (result !== "created")
     return isPhraseIntent(intent) ? { kind: "join_required", phraseVoid: { purpose: "genesis" } } : { kind: "join_required" }
   if (isPhraseIntent(intent)) await deletePhraseGenesisMarker(placeOf(captured))
@@ -61,15 +66,12 @@ export const createPhraseGenesis = async (
     signal: syncOperationSignal(captured) ?? new AbortController().signal,
     admit: <T>(begin: () => T): T => admitSyncOperation(captured, begin),
   }
-  let result: Awaited<ReturnType<typeof genesis.createPhraseGenesis>>
-  try {
-    result = await admitSyncOperation(captured, () =>
-      genesis.createPhraseGenesis({ account: captured.account, firstDevice: principalOf(captured.keyring) }, { operation }),
-    )
-  } catch (error) {
-    await deletePhraseGenesisMarker(place)
-    throw error
-  }
+  // A throw can come after the words were shown (review LOW, #13335), so the marker stays and the phrase reads void
+  // once the lock is released. A false "not saved" notice is the safe direction (contract L8); only an explicit
+  // cancel (the person themselves stopped, so they know nothing was saved) deletes it.
+  const result = await admitSyncOperation(captured, () =>
+    genesis.createPhraseGenesis({ account: captured.account, firstDevice: principalOf(captured.keyring) }, { operation }),
+  )
   if (!result.ok) {
     await deletePhraseGenesisMarker(place)
     return { kind: "cancelled" }

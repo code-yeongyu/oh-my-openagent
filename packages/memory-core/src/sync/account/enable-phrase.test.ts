@@ -166,3 +166,16 @@ test("#given another live process holds the genesis lock #when enable runs #then
   await holder
   expect(s.person.calls.show).toBe(0)
 })
+
+test("#given the bridge throws after the ceremony started #when enable fails #then the marker is kept and the phrase reads void once the lock is free", async () => {
+  const s = await setup()
+  const genesis = {
+    ...s.genesis,
+    createPhraseGenesis: async () => {
+      throw new Error("synthetic failure after the words were shown")
+    },
+  }
+  await expect(enableSync({ ...s.input, method: "phrase", genesis })).rejects.toThrow("synthetic failure")
+  expect(await s.marker()).toBe(true)
+  expect(await phraseNoticeStatus(s.place)).toEqual({ phraseVoid: { purpose: "genesis" } })
+})
