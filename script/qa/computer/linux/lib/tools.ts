@@ -4,7 +4,7 @@
 import { accessSync, constants, statSync } from "node:fs"
 import { join } from "node:path"
 
-export const LIBEXEC_DIRS: readonly string[] = ["/usr/libexec", "/usr/lib/at-spi2-core", "/usr/lib"]
+const LIBEXEC_DIRS: readonly string[] = ["/usr/libexec", "/usr/lib/at-spi2-core", "/usr/lib"]
 
 export interface ToolLookup {
   readonly which: (tool: string) => string | null
