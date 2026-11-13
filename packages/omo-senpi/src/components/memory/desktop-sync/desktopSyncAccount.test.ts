@@ -175,8 +175,15 @@ describe("the desktop account ports for phrase keys (A3 part 2a)", () => {
       service: () => ({ kind: "json", status: 409, body: { error: { code: "phrase_keys_not_accepted" } } }),
     })
     const operation = await (await openDesktopSyncAccount(main.wire, "/unused")).forOperation(owner())
-    const request = { record: {}, base_seq: 0, link: "l", keyring_link: "k", record_sig: "s", wraps: [] }
-    expect(await operation.chain.appendKeys(request as Parameters<typeof operation.chain.appendKeys>[0])).toEqual({
+    const request: Parameters<typeof operation.chain.appendKeys>[0] = {
+      record: { kind: "recovery-key", account: "account-1", epoch: 1 },
+      base_seq: 0,
+      link: "l",
+      keyring_link: "k",
+      record_sig: "s",
+      wraps: [],
+    }
+    expect(await operation.chain.appendKeys(request)).toEqual({
       ok: false,
       reason: "phrase_keys_not_accepted",
     })
