@@ -27,7 +27,9 @@ setDefaultTimeout(DAEMON_WORLD_TIMEOUT_MS)
 const worlds: HostWorld[] = []
 
 afterEach(async () => {
-  for (const world of worlds.splice(0)) await awaitWithinTestBudget(world.cleanup(), "the daemon world cleaning up")
+  // Teardown runs under the hook's own timeout, not the test budget: a test that used its budget
+  // must still clean up, and a failed wait must not add a second, misleading teardown error.
+  for (const world of worlds.splice(0)) await world.cleanup()
 })
 
 async function daemonWorld(options: FakeHostOptions = {}): Promise<HostWorld> {
