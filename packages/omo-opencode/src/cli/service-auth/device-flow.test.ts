@@ -185,4 +185,39 @@ describe("device authorization", () => {
       expect(offers).toBe(0)
     },
   )
+
+  // #6503: the digest rides the token poll, and a machine that already has its device is a terminal refusal.
+  test("sends machineDigest with the token poll, and machine_exists stops without retrying, saving or removing a device", async () => {
+    const digest = "c".repeat(64)
+    const secrets = memorySecrets()
+    const seen: string[] = []
+    const api = fakeApi(async (request) => {
+      const url = new URL(request.url)
+      seen.push(`${request.method} ${url.pathname}`)
+      if (url.pathname.endsWith("/code")) return Response.json(minted)
+      expect((await request.json()).machineDigest).toBe(digest)
+      return refusal("machine_exists", { deviceId: "dev-existing" }, 409)
+    })
+    const login = loginDevice(
+      createSession({
+        beforeKeysDiscarded: async () => undefined,
+        api,
+        store: secrets.store(api),
+        home: await temporaryHome(),
+      }),
+      {
+        name: "Test",
+        platform: "linux",
+        ...clock(),
+        show: () => {},
+        chooseDevice: async () => {
+          throw new Error("no device may be offered for removal")
+        },
+        machineDigest: digest,
+      },
+    )
+    await expect(login).rejects.toThrow("This computer already has an OmO device")
+    expect(seen).toEqual(["POST /v1/device/code", "POST /v1/device/token"])
+    expect(secrets.writes).toHaveLength(0)
+  })
 })
