@@ -7,7 +7,10 @@ import type { SessionControl } from "../control/port"
 import type { DeliveryTransport } from "../gateway/transport"
 import type { RemoteSessionRow, RemoteThreadSurface } from "./ports"
 
-type Runtime = Pick<typeof CrossDevice, "listAcross" | "planCreate" | "renameAlias" | "withAlias"> &
+type Runtime = Pick<
+  typeof CrossDevice,
+  "claimCreatedAlias" | "listAcross" | "planCreate" | "renameAlias" | "withAlias"
+> &
   Pick<typeof RemoteOps, "deviceOnline"> &
   Pick<typeof RelayTransport, "createRelayTransport"> &
   Pick<typeof RelayControl, "createRelayControl">
@@ -23,6 +26,8 @@ export const planCreate = async (...args: Parameters<Runtime["planCreate"]>) =>
 export const renameAlias = async (...args: Parameters<Runtime["renameAlias"]>) =>
   await (await runtime()).renameAlias(...args)
 export const withAlias = async (...args: Parameters<Runtime["withAlias"]>) => await (await runtime()).withAlias(...args)
+export const claimCreatedAlias = async (...args: Parameters<Runtime["claimCreatedAlias"]>) =>
+  await (await runtime()).claimCreatedAlias(...args)
 export const deviceOnline = async (...args: Parameters<Runtime["deviceOnline"]>) =>
   await (await runtime()).deviceOnline(...args)
 
@@ -56,6 +61,7 @@ export const createRelayControl = (remote: RemoteThreadSurface, row: RemoteSessi
     thread_id: rowThreadId(row),
     device: row.device,
     title: row.title,
+    visible: async () => await (await built).visible(),
     interrupt: async (turnId) => await (await built).interrupt(turnId),
     close: async () => await (await built).close(),
     setName: async (name) => await (await built).setName(name),

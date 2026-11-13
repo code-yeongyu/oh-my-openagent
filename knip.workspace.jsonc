@@ -1,0 +1,112 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    ".": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "**/*.test-d.ts",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "postinstall.mjs",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "test-env.ts",
+        "test-hermetic-home.ts",
+        "test-setup.ts",
+        "test-temp-leak-match.ts",
+        "test-temp-root.ts",
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+      ],
+      "ignoreFiles": [
+
+      ],
+      "ignoreDependencies": [
+        // computer-use v2: script/package-registration-audit.test.ts requires every desktop workspace as a root devDependency;
+        // its by-name importers live inside packages/senpi-desktop-service, which knip does not count for the root manifest
+        "@oh-my-opencode/senpi-desktop-sdk",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@clack/prompts",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@modelcontextprotocol/sdk",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@oh-my-opencode/agents-md-core",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@oh-my-opencode/ast-grep-mcp",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@oh-my-opencode/boulder-state",
+        "@oh-my-opencode/device-service-core",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@oh-my-opencode/claude-code-compat-core",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@oh-my-opencode/comment-checker-core",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@oh-my-opencode/delegate-core",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@oh-my-opencode/git-bash-mcp",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@oh-my-opencode/hashline-core",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@oh-my-opencode/isolation-core",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@oh-my-opencode/lsp-core",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@oh-my-opencode/mcp-client-core",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@oh-my-opencode/mcp-stdio-core",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@oh-my-opencode/omo-codex",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@oh-my-opencode/omo-opencode",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@oh-my-opencode/openclaw-core",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@oh-my-opencode/prompts-core",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@oh-my-opencode/rules-engine",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@oh-my-opencode/senpi-desktop-prelude",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@oh-my-opencode/senpi-desktop-service",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@oh-my-opencode/skills-loader-core",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@oh-my-opencode/team-core",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@oh-my-opencode/tmux-core",
+        // computer-use v3 (row 5, #13051): a workspace devDependency the registration audit requires before anything at the root imports it
+        "@oh-my-opencode/omo-computer-protocol",
+        // computer-use v3 (row 5, #13051): a workspace devDependency the registration audit requires before anything at the root imports it
+        "@oh-my-opencode/omo-computer-sdk",
+        // computer-use v3 (row 5, #13051): a workspace devDependency the registration audit requires before anything at the root imports it
+        "@oh-my-opencode/omo-computer-engine",
+        // computer-use v3 (row 5, #13051): a workspace devDependency the registration audit requires before anything at the root imports it
+        "@oh-my-opencode/omo-computer-hand",
+        // computer-use v3 (row 5, #13051): a workspace devDependency the registration audit requires before anything at the root imports it
+        "@oh-my-opencode/omo-computer-carriers",
+        // computer-use v3 (row 5, #13051): a workspace devDependency the registration audit requires before anything at the root imports it
+        "@oh-my-opencode/omo-computer-tool",
+        // computer-use v3 (row 5, #13051): a workspace devDependency the registration audit requires before anything at the root imports it
+        "@oh-my-opencode/omo-computer-prelude",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@opencode-ai/plugin",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@opencode-ai/sdk",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@opencode/plugin",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@types/js-yaml",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@xterm/addon-unicode11",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@xterm/xterm",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "diff",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "picocolors",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "picomatch",
+      ]
+    }
+  }
+}
