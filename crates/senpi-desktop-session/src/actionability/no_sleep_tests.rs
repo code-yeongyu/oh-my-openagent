@@ -53,6 +53,17 @@ const HOST_WAITS: [&str; 6] = [
 /// Files allowed to wait on the host's clock, each with its reason. None today.
 const ALLOWED: [&str; 0] = [];
 
+/// The number of `#` at `chars[start..]`.
+fn hashes_at(chars: &[char], start: usize) -> usize {
+    chars[start..].iter().take_while(|ch| **ch == '#').count()
+}
+
+/// Whether a raw string (`r".."`, `r#".."#`, ...) starts at `chars[i]`; a raw
+/// identifier (`r#type`) is not one.
+fn raw_string_at(chars: &[char], i: usize) -> bool {
+    chars[i] == 'r' && chars.get(i + 1 + hashes_at(chars, i + 1)) == Some(&'"')
+}
+
 /// The identifier and punctuation tokens of `source` with their line numbers,
 /// skipping whitespace, comments, and string and char literals.
 fn tokens(source: &str) -> Vec<(usize, String)> {
@@ -77,13 +88,9 @@ fn tokens(source: &str) -> Vec<(usize, String)> {
                 i += 1;
             }
             i += 2;
-        } else if c == '"' || (c == 'r' && (at(i + 1) == '"' || at(i + 1) == '#')) {
+        } else if c == '"' || raw_string_at(&chars, i) {
             let raw = c == 'r';
-            let hashes = if raw {
-                chars[i + 1..].iter().take_while(|ch| **ch == '#').count()
-            } else {
-                0
-            };
+            let hashes = if raw { hashes_at(&chars, i + 1) } else { 0 };
             i += if raw { 2 + hashes } else { 1 };
             loop {
                 match at(i) {
