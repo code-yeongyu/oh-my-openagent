@@ -1,9 +1,6 @@
 import type { HookAction, HookCommand } from "./types"
-import {
-  type CommandResult,
-  type ExecuteHookOptions,
-  executeHookCommand,
-} from "../../shared/command-executor/execute-hook-command"
+import type { CommandResult, ExecuteHookOptions } from "../../shared/command-executor/execute-hook-command"
+import { executeHookCommand } from "../../shared"
 import { executeHttpHook } from "./execute-http-hook"
 import { DEFAULT_CONFIG } from "./plugin-config"
 

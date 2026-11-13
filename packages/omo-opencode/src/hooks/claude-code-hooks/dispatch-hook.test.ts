@@ -1,5 +1,5 @@
 const { afterEach, beforeEach, describe, expect, mock, spyOn, test } = require("bun:test")
-import * as executeHookCommandModule from "../../shared/command-executor/execute-hook-command"
+import * as sharedModule from "../../shared"
 import { dispatchHook } from "./dispatch-hook"
 import * as executeHttpHookModule from "./execute-http-hook"
 
@@ -18,7 +18,7 @@ describe("dispatchHook", () => {
   beforeEach(() => {
     mockExecuteHookCommand.mockClear()
     capturedOptions.length = 0
-    spyOn(executeHookCommandModule, "executeHookCommand").mockImplementation(mockExecuteHookCommand)
+    spyOn(sharedModule, "executeHookCommand").mockImplementation(mockExecuteHookCommand)
     spyOn(executeHttpHookModule, "executeHttpHook").mockResolvedValue({ exitCode: 0, stdout: "", stderr: "" })
   })
 
