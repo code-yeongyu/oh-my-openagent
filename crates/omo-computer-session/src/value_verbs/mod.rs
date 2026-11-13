@@ -96,8 +96,13 @@ impl Session {
                 if let Err(refusal) = self.backend.post_input(&input, omo_computer_core::backend::Route::BackgroundPid) {
                     return (outcome_of(Err(refusal)), None);
                 }
-                let _ = pid;
-                return (Outcome { count: 1, of: 1, stop: None }, None);
+                let running = self
+                    .backend
+                    .windows(&omo_computer_core::backend::WindowFilter::default())
+                    .map(|list| list.windows.iter().any(|w| &w.app_key == app_key || pid.is_some_and(|pid| w.identity.pid == pid)))
+                    .unwrap_or(true);
+                let read = Some(if running { "running" } else { "exited" }.to_owned());
+                return (Outcome { count: 1, of: 1, stop: None }, Some(ReadBack::judge("exited", read, Some("running".to_owned()))));
             }
             Write::Minimized { window, minimize } => {
                 let sent = self.backend.set_minimized(window, *minimize).map(|()| omo_computer_core::backend::Delivered { count: 1, of: 1 });
