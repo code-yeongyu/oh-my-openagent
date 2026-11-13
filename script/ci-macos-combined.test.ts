@@ -85,7 +85,7 @@ describe("combined macOS CI execution contract (#9974)", () => {
       "working-directory": "packages/lsp-daemon",
     })
     expect(steps.find((step) => step.id === "root-tests-posix-1")?.run).toBe(
-      "bun test --timeout 20000 packages/omo-opencode packages/memory-core",
+      'mkdir -p "$CI_JUNIT_DIR"\nbun test --timeout 20000 packages/omo-opencode packages/memory-core --reporter=junit --reporter-outfile="$CI_JUNIT_DIR/root-1.xml"\n',
     )
     expect(steps.find((step) => step.id === "root-tests-posix-2")?.run).toBe("bash .github/scripts/ci-root-shard-2.sh")
     expect(steps.find((step) => step.id === "codex-platform-tests")?.run).toBe(
