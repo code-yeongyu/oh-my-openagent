@@ -23,7 +23,10 @@ describe("desktop observer at preflight (P-17)", () => {
 
   test("a missing sentinel is named by its repo-relative path with forward slashes, the same text on every OS", async () => {
     const repo = resolve(import.meta.dir, "../../../..")
-    const { check, status } = await observerCheck(join(repo, "script", "qa", "computer", "sentinel", "absent.ts"), "x11")
+    const { check, status } = await observerCheck(
+      join(repo, "script", "qa", "computer", "sentinel", "absent.ts"),
+      "x11",
+    )
     const detail = "script/qa/computer/sentinel/absent.ts (row 3) is not on this checkout"
     expect(check).toEqual({ name: "desktop-observer", ok: false, detail })
     expect(status).toEqual({ kind: "unavailable", reason: detail })
