@@ -9,7 +9,7 @@ use super::{fixture, lines, run};
 use crate::refs::RefRegistry;
 
 fn changed(diff: &str) -> Vec<&str> {
-    lines(diff).into_iter().filter(|line| line.starts_with("~ ") || line.starts_with("+ ")).collect()
+    lines(diff).into_iter().filter(|line| line.starts_with("~ ") || line.starts_with('+')).collect()
 }
 
 #[test]
@@ -86,7 +86,7 @@ fn diff_abandoned_when_surviving_order_changes() {
     assert_eq!(fallback, None);
     let diff = diff.expect("diff");
     assert_eq!(changed(&diff).len(), 1, "{diff}");
-    assert!(diff.contains("+ - button \"Button 99\"") && diff.contains("removed: e"), "{diff}");
+    assert!(diff.contains(") - button \"Button 99\"") && diff.contains("+(under e") && diff.contains("removed: e"), "{diff}");
 }
 
 #[test]

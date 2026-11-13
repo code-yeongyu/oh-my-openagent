@@ -118,9 +118,9 @@ fn an_insert_among_shared_ids_is_a_real_diff_not_a_reorder() {
         let second = run_full(&mut refs, &mut tree, json!({"target": "w", "skeleton": false, "since": first.generation}));
         assert_eq!(second.diff_fallback, None, "{case}");
         let diff = second.diff.expect("a diff");
-        let changed: Vec<&str> = diff.lines().filter(|l| l.starts_with("~ ") || l.starts_with("+ ")).collect();
+        let changed: Vec<&str> = diff.lines().filter(|l| l.starts_with("~ ") || l.starts_with('+')).collect();
         assert_eq!(changed.len(), 1, "{case}:\n{diff}");
-        assert!(changed[0].starts_with("+ - listitem \"N\""), "{case}:\n{diff}");
+        assert!(changed[0].starts_with("+(") && changed[0].contains(") - listitem \"N\""), "{case}:\n{diff}");
     }
 }
 

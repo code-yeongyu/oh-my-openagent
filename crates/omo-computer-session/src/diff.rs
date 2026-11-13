@@ -3,6 +3,13 @@
 //! surviving elements in their old relative order, not a `query` projection, and the diff
 //! strictly shorter than the full tree. Otherwise the full tree with the failing gate's reason.
 //! Nodes are keyed by element number, never by line position.
+//!
+//! The diff applies back to the baseline (amendment A-IS-59): `~ <line>` replaces a survivor's
+//! line; added nodes come in runs of adjacent added siblings under one surviving parent, each
+//! printed whole with its subtree, the run's first line marked `+(under e<p> after e<n>)` or
+//! `+(under e<p> first)` (`under` left out at the root) and every other line `+ `, indented
+//! from the run's first line; `removed: ...` lists what went away. A survivor whose rendered
+//! parent changed is a move, and moves give the full tree as `reordered`.
 
 use std::collections::{HashMap, HashSet};
 
@@ -81,37 +88,46 @@ pub fn decide(baseline: Option<&Side>, current: &Side, nodes_observed: u32) -> D
     Decision::Diff(diff)
 }
 
-/// The survivors, compared as sequences of element numbers, are not in their old order.
+/// The survivors, compared as sequences of element numbers, are not in their old order, or a
+/// survivor's rendered parent is another element than in the baseline (a move, A-IS-59).
 fn reordered(baseline: &Outline, current: &Outline) -> bool {
-    let now: HashSet<u64> = current.lines.iter().map(|line| line.n).collect();
-    let old: HashSet<u64> = baseline.lines.iter().map(|line| line.n).collect();
-    let before = baseline.lines.iter().map(|line| line.n).filter(|n| now.contains(n));
-    let after = current.lines.iter().map(|line| line.n).filter(|n| old.contains(n));
-    !before.eq(after)
+    let now: HashMap<u64, Option<u64>> = current.lines.iter().map(|line| (line.n, line.parent)).collect();
+    let old: HashMap<u64, Option<u64>> = baseline.lines.iter().map(|line| (line.n, line.parent)).collect();
+    let before = baseline.lines.iter().map(|line| line.n).filter(|n| now.contains_key(n));
+    let after = current.lines.iter().map(|line| line.n).filter(|n| old.contains_key(n));
+    let moved = current.lines.iter().any(|line| old.get(&line.n).is_some_and(|parent| *parent != line.parent));
+    moved || !before.eq(after)
 }
 
 fn render(baseline: &Side, current: &Side, nodes_observed: u32) -> String {
     let old: HashMap<u64, &OutlineLine> = baseline.outline.lines.iter().map(|line| (line.n, line)).collect();
     let mut out: Vec<String> = Vec::new();
-    let mut added_root_indent: Option<usize> = None;
-    for line in &current.outline.lines {
+    let added: HashSet<u64> = current.outline.lines.iter().map(|line| line.n).filter(|n| !old.contains_key(n)).collect();
+    // The run being printed: its parent and the indentation of its first line.
+    let mut run: Option<(Option<u64>, usize)> = None;
+    for (at, line) in current.outline.lines.iter().enumerate() {
         let body = line.text.trim_start();
-        match old.get(&line.n) {
-            None => {
-                let base = *added_root_indent.get_or_insert(line.indent);
-                let base = if line.indent < base {
-                    added_root_indent = Some(line.indent);
-                    line.indent
-                } else {
-                    base
-                };
-                out.push(format!("+ {}{body}", "  ".repeat(line.indent - base)));
+        if !added.contains(&line.n) {
+            run = None;
+            if old.get(&line.n).is_some_and(|before| before.key != line.key) {
+                out.push(format!("~ {body}"));
             }
-            Some(before) => {
-                added_root_indent = None;
-                if before.key != line.key || before.parent != line.parent {
-                    out.push(format!("~ {body}"));
-                }
+            continue;
+        }
+        let inside_added = line.parent.is_some_and(|parent| added.contains(&parent));
+        match run {
+            // A descendant of an added node, or a further added sibling of the run.
+            Some((parent, base)) if inside_added || parent == line.parent => {
+                out.push(format!("+ {}{body}", "  ".repeat(line.indent.saturating_sub(base))));
+            }
+            _ => {
+                let after = current.outline.lines[..at]
+                    .iter()
+                    .rev()
+                    .find(|sibling| sibling.parent == line.parent && !added.contains(&sibling.n))
+                    .map(|sibling| sibling.n);
+                out.push(format!("+({}) {body}", place(line.parent, after)));
+                run = Some((line.parent, line.indent));
             }
         }
     }
@@ -131,6 +147,13 @@ fn render(baseline: &Side, current: &Side, nodes_observed: u32) -> String {
         current.outline.lines.len()
     ));
     out.join("\n")
+}
+
+/// A run's place: `under e<p>` (left out at the root), then `after e<n>` or `first`.
+fn place(parent: Option<u64>, after: Option<u64>) -> String {
+    let under = parent.map(|parent| format!("under e{parent} "));
+    let after = after.map_or_else(|| "first".to_owned(), |sibling| format!("after e{sibling}"));
+    format!("{}{after}", under.unwrap_or_default())
 }
 
 /// `e12-e19, e44`: sorted numbers, runs compressed.
