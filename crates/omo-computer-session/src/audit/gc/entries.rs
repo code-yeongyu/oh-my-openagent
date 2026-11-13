@@ -21,8 +21,13 @@ pub(super) fn list(dir: &Path, warnings: &mut Vec<String>) -> Vec<PathBuf> {
             Vec::new()
         }
         Ok(read) => read
-            .filter_map(Result::ok)
-            .map(|entry| entry.path())
+            .filter_map(|entry| match entry {
+                Ok(entry) => Some(entry.path()),
+                Err(error) => {
+                    warnings.push(format!("{}: {error}", dir.display()));
+                    None
+                }
+            })
             .collect(),
     }
 }
@@ -51,22 +56,27 @@ pub(super) fn file_entry(path: &Path, warnings: &mut Vec<String>) -> Option<Entr
     }
 }
 
-/// A trace session dir: its bytes summed, its age the newest file's.
-pub(super) fn dir_entry(path: PathBuf) -> Entry {
+/// A trace session dir: its bytes summed, its age the newest file's. A child that cannot be
+/// read is a warning (its size and age are then missing from the sum, never silently).
+pub(super) fn dir_entry(path: PathBuf, warnings: &mut Vec<String>) -> Entry {
     let (mut bytes, mut newest) = (0, fs::metadata(&path).map_or(0, |meta| modified_ms(&meta)));
     let mut stack = vec![path.clone()];
     while let Some(dir) = stack.pop() {
-        for child in fs::read_dir(&dir)
-            .into_iter()
-            .flatten()
-            .filter_map(Result::ok)
-        {
-            let Ok(meta) = child.metadata() else { continue };
-            if meta.is_dir() {
-                stack.push(child.path());
-            } else {
-                bytes += meta.len();
-                newest = newest.max(modified_ms(&meta));
+        let children = match fs::read_dir(&dir) {
+            Ok(children) => children,
+            Err(error) => {
+                warnings.push(format!("{}: {error}", dir.display()));
+                continue;
+            }
+        };
+        for child in children {
+            match child.and_then(|child| child.metadata().map(|meta| (child.path(), meta))) {
+                Err(error) => warnings.push(format!("{}: {error}", dir.display())),
+                Ok((child, meta)) if meta.is_dir() => stack.push(child),
+                Ok((_, meta)) => {
+                    bytes += meta.len();
+                    newest = newest.max(modified_ms(&meta));
+                }
             }
         }
     }

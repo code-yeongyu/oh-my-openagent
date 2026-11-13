@@ -215,7 +215,8 @@
     ],
     "outsideRepositoryInfix": " repository: ",
     "removalInventoryEntry": "every path of the Removal inventory",
-    "blockerEdits": "evidence/task-<row>.blocker-edits.txt"
+    "blockerEdits": "evidence/task-<row>.blocker-edits.txt",
+    "addenda": "SCOPE-ADDENDA.tsv"
   },
   "parity": {
     "manifest": "crates/omo-computer-core/parity/test-parity-manifest.tsv",
