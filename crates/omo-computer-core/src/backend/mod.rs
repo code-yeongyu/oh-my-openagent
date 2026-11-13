@@ -153,6 +153,15 @@ pub trait Backend: Send {
         None
     }
 
+    /// Row 24: quits the app (`apps.quit`); the gate has already refused the self set and the
+    /// protected table.
+    ///
+    /// # Errors
+    /// `AxUnsupported{perform_unsupported}` by default, with nothing sent.
+    fn quit_app(&mut self, _app: &str) -> BackendResult<Delivered> {
+        Err(Refusal::new(EngineCode::AxUnsupported, crate::error::Reason::PerformUnsupported.wire()))
+    }
+
     /// Row 24: `window.minimize` (`minimize: true`) or `window.restore` (`false`).
     ///
     /// # Errors

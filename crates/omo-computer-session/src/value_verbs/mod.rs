@@ -20,6 +20,8 @@ pub enum Write {
     Focus { reference: String },
     /// `ax.typeText` by AX insertion into a native text field.
     Insert { reference: String, text: String },
+    /// `apps.quit`: the app's windows are read back as exited.
+    Quit { app: String },
     /// `ax.selectText`: a range in UTF-16 units.
     Select { reference: String, range: omo_computer_core::text_range::Utf16Range },
     /// `ax.perform`: a named action; never `confirmed` from a read-back (an observer event or a
@@ -86,6 +88,18 @@ impl Session {
             Write::SetFrame { window, asked } => return self.send_frame(window, *asked),
             Write::Clipboard { text } => return (outcome_of(self.backend.clipboard_write(text).map(|()| omo_computer_core::backend::Delivered { count: 1, of: 1 })), None),
             Write::Paste { text, chord, restore } => return self.send_paste(text, chord, restore),
+            Write::Quit { app } => {
+                if let Err(refusal) = self.backend.quit_app(app) {
+                    return (outcome_of(Err(refusal)), None);
+                }
+                let running = self
+                    .backend
+                    .windows(&omo_computer_core::backend::WindowFilter::default())
+                    .map(|list| list.windows.iter().any(|w| &w.app == app))
+                    .unwrap_or(true);
+                let read = Some(if running { "running" } else { "exited" }.to_owned());
+                return (Outcome { count: 1, of: 1, stop: None }, Some(ReadBack::judge("exited", read, Some("running".to_owned()))));
+            }
             Write::Minimized { window, minimize } => {
                 let sent = self.backend.set_minimized(window, *minimize).map(|()| omo_computer_core::backend::Delivered { count: 1, of: 1 });
                 return (outcome_of(sent), None);
@@ -111,7 +125,7 @@ impl Session {
             Write::Insert { reference, text } => ax.insert_text(&Ref(reference.clone()), text),
             Write::Select { reference, range } => ax.select_range(&Ref(reference.clone()), *range),
             Write::Perform { reference, action } => ax.perform(&Ref(reference.clone()), &Semantic(action.clone())),
-            Write::SetFrame { .. } | Write::Minimized { .. } | Write::Clipboard { .. } | Write::Paste { .. } => {
+            Write::SetFrame { .. } | Write::Minimized { .. } | Write::Clipboard { .. } | Write::Paste { .. } | Write::Quit { .. } => {
                 unreachable!("non-AX writes return above")
             }
         };
@@ -190,6 +204,7 @@ fn outcome_of(sent: Result<omo_computer_core::backend::Delivered, Refusal>) -> O
 
 mod dispatch;
 mod keys;
+mod quit;
 mod select;
 mod verbs;
 
@@ -197,6 +212,8 @@ mod verbs;
 mod e2e_tests;
 #[cfg(test)]
 mod keys_tests;
+#[cfg(test)]
+mod quit_tests;
 #[cfg(test)]
 mod window_frame_tests;
 #[cfg(test)]

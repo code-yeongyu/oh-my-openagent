@@ -239,6 +239,17 @@ impl Backend for FakeBackend {
         Some(window.map_or_else(|| FakeBackend::secure_focus_role(self).is_some(), |window| FakeBackend::secure_focus(self, window)))
     }
 
+    fn quit_app(&mut self, app: &str) -> BackendResult<Delivered> {
+        let mut state = self.lock();
+        let ids: Vec<String> = state.windows.iter().filter(|w| w.app == app).map(|w| w.id.clone()).collect();
+        for id in ids {
+            state.exited.insert(id);
+        }
+        drop(state);
+        self.sink.record(format!("quit_app app={app}"));
+        Ok(Delivered { count: 1, of: 1 })
+    }
+
     fn frame_settable(&self, window: &str) -> Option<bool> {
         self.lock().scenario.window_frame_policy.get(window).and_then(|policy| policy.settable)
     }
