@@ -1,6 +1,8 @@
 //! Row 27's wire method, chained from row 25's last link (R50): `diagnose` answers the readiness
-//! report from reads alone. On this generic layer the identity and the lock policy are `unknown`;
-//! the per-OS rows supply their own.
+//! report from reads alone. This generic layer has no host facts: the identity is `unknown`, so
+//! `ok` is false over the wire until an OS row supplies a matching identity, the lock policy is
+//! `unknown`, and it attaches no settings pane of its own. A denial carries a `settingsUrl` only
+//! when the backend's own R62 `Backend::diagnose()` returns a permission entry that has one.
 
 use std::collections::BTreeMap;
 
@@ -83,5 +85,45 @@ mod tests {
         assert_eq!(caps["capturePermission"], wire(capture), "{caps}");
         assert_eq!(caps["inputPermission"], wire(input), "{caps}");
         assert_eq!(caps["axPermission"], wire(accessibility), "{caps}");
+    }
+    struct PanePointingBackend;
+
+    impl omo_computer_core::backend::Backend for PanePointingBackend {
+        fn capabilities(&self) -> omo_computer_core::capabilities::Capabilities {
+            omo_computer_core::backend::refusing_capabilities()
+        }
+
+        fn capture(
+            &mut self,
+            _target: &omo_computer_core::backend::Target,
+            _options: &omo_computer_core::backend::CaptureOptions,
+        ) -> omo_computer_core::backend::BackendResult<omo_computer_core::backend::FrameBytes> {
+            Err(omo_computer_core::backend::Refusal::bare(omo_computer_core::error::EngineCode::CaptureUnavailable))
+        }
+
+        fn diagnose(&self) -> Option<omo_computer_core::backend::BackendProbes> {
+            let denied = omo_computer_core::results::PermissionReport {
+                state: Denied,
+                settings_url: Some("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility".to_owned()),
+                relaunch_required: None,
+            };
+            Some(omo_computer_core::backend::BackendProbes {
+                permissions: [("accessibility".to_owned(), denied)].into(),
+                ..Default::default()
+            })
+        }
+    }
+
+    #[test]
+    fn a_backend_denial_carries_its_settings_pane_over_the_wire_and_ok_stays_false() {
+        let session = Session::new(Box::new(PanePointingBackend));
+        let wire = serde_json::to_value(session.diagnose()).expect("wire");
+        assert_eq!(wire["permissions"]["accessibility"]["state"], "Denied");
+        assert_eq!(
+            wire["permissions"]["accessibility"]["settingsUrl"],
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+            "the backend's pane reaches the reply"
+        );
+        assert_eq!(wire["ok"], false, "no host identity on this layer, so never ready");
     }
 }
