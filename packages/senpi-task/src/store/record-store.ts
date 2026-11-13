@@ -1,19 +1,17 @@
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  statSync,
-  type Stats,
-} from "node:fs"
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, type Stats } from "node:fs"
 import { join } from "node:path"
 
 import { parseTaskId, transitionTaskRecord } from "../state"
 import type { TaskId, TaskRecord } from "../state"
 import { appendTaskEvent, closeAppendFd, taskEventLogPath, type AppendFdCache } from "./event-log"
-import { holdsTombstone, removeExpungeOwner, readExpungeOwnerFile, restoreTombstone, takeOverTombstone, writeExpungeOwner } from "./expunge-owner"
+import {
+  holdsTombstone,
+  removeExpungeOwner,
+  readExpungeOwnerFile,
+  restoreTombstone,
+  takeOverTombstone,
+  writeExpungeOwner,
+} from "./expunge-owner"
 import { withTaskRecordLock } from "./record-lock"
 import { parseTaskRecord } from "./record-parse"
 import { writeRecord } from "./record-write"
@@ -56,7 +54,10 @@ export type ResidentTaskRecordStore = TaskRecordStore & {
   residentFigures(): TaskRecordStoreResidentFigures
 }
 
-export function createTaskRecordStore(config: StateDirConfig, options: TaskRecordStoreOptions = {}): ResidentTaskRecordStore {
+export function createTaskRecordStore(
+  config: StateDirConfig,
+  options: TaskRecordStoreOptions = {},
+): ResidentTaskRecordStore {
   const stateDir = resolveStateDir(config)
   const platform = options.platform ?? process.platform
   const cache = new Map<string, CacheEntry>()
@@ -211,7 +212,9 @@ function listRecords(stateDir: string, cache: Map<string, CacheEntry>): ListTask
   const diagnostics: TaskRecordDiagnostic[] = []
   const seen = new Set<string>()
 
-  for (const file of readDirectoryNames(tasksDir).filter((entry) => entry.endsWith(".json")).toSorted()) {
+  for (const file of readDirectoryNames(tasksDir)
+    .filter((entry) => entry.endsWith(".json"))
+    .toSorted()) {
     const path = join(tasksDir, file)
     seen.add(path)
     try {

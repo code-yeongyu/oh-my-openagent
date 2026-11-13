@@ -6,7 +6,13 @@ import { createTaskLifecycle } from "../create"
 import type { HostGenerationView } from "../host-session"
 import type { LifecycleDeps } from "../port"
 import type { TaskLifecycle } from "../types"
-import { hostLifecycleDeps, hostSession, hostSessionRecordInput, type HostLifecycleFixture, type HostLifecycleInput } from "./host-session-fakes"
+import {
+  hostLifecycleDeps,
+  hostSession,
+  hostSessionRecordInput,
+  type HostLifecycleFixture,
+  type HostLifecycleInput,
+} from "./host-session-fakes"
 import { seedRecord, tempStore } from "./lifecycle-fakes"
 
 export type RecordedEvent = { readonly taskId: string; readonly type: string; readonly payload: unknown }
@@ -69,7 +75,11 @@ export function cancelHarness(input: CancelHarnessInput): CancelHarness {
   const fixture = hostLifecycleDeps({ ...input, store, hostPid: 4_242 })
   const view = new FakeGenerationView()
   const identity = hostSession(input.taskId, { instance_id: "instance-old" })
-  const record = seedRecord(store, { ...hostSessionRecordInput(input.taskId, identity), status: "running", residency_state: "rpc_detached" })
+  const record = seedRecord(store, {
+    ...hostSessionRecordInput(input.taskId, identity),
+    status: "running",
+    residency_state: "rpc_detached",
+  })
   const lifecycle = createTaskLifecycle({ ...fixture.deps, hostGenerationView: view, ...input.deps })
   const stopRequests: string[] = []
   const stopSettlements: string[] = []
@@ -81,7 +91,9 @@ export function cancelHarness(input: CancelHarnessInput): CancelHarness {
     reserveForRevive: () => ({ ok: true, commit: () => undefined, release: () => undefined }),
     destruction: {
       destroyResidentTask: (taskId, cause) => lifecycle.destroyResidentTask(taskId, cause),
-      ...(input.withCancelPort === false || lifecycle.hostSessionCancel === undefined ? {} : { hostSessionCancel: lifecycle.hostSessionCancel }),
+      ...(input.withCancelPort === false || lifecycle.hostSessionCancel === undefined
+        ? {}
+        : { hostSessionCancel: lifecycle.hostSessionCancel }),
     },
     runStatsSnapshot: () => undefined,
     stopRequested: (taskId) => stopRequests.push(taskId),
@@ -92,7 +104,14 @@ export function cancelHarness(input: CancelHarnessInput): CancelHarness {
     now: () => Date.parse("2026-10-29T00:00:00.000Z"),
   }
   return {
-    store, fixture, view, lifecycle, record, events, stopRequests, stopSettlements,
+    store,
+    fixture,
+    view,
+    lifecycle,
+    record,
+    events,
+    stopRequests,
+    stopSettlements,
     engine: createSteeringEngine(port),
     nextEvent: (type) => new Promise((resolve) => eventWaiters.push({ type, resolve })),
     nextSettlement: () => new Promise((resolve) => settleWaiters.push(resolve)),

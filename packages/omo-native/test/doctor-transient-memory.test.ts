@@ -5,7 +5,11 @@ import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
 
-import { countTransientMemoryIdentities, DOCTOR_PLUGIN_ARTIFACTS, formatTransientMemoryLines } from "../bin/lib/doctor.js"
+import {
+  countTransientMemoryIdentities,
+  DOCTOR_PLUGIN_ARTIFACTS,
+  formatTransientMemoryLines,
+} from "../bin/lib/doctor.js"
 
 const SOURCE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
 const roots: string[] = []
@@ -59,19 +63,25 @@ describe("omo doctor transient memory identities", () => {
     const packageRoot = join(root, "app")
     mkdirSync(packageRoot, { recursive: true })
     cpSync(join(SOURCE_ROOT, "bin"), join(packageRoot, "bin"), { recursive: true })
-    writeFile(join(packageRoot, "package.json"), JSON.stringify({
-      name: "omo-ai",
-      version: "1.2.3-test.0",
-      type: "module",
-      dependencies: { "@code-yeongyu/senpi": "2026.8.9" },
-    }))
+    writeFile(
+      join(packageRoot, "package.json"),
+      JSON.stringify({
+        name: "omo-ai",
+        version: "1.2.3-test.0",
+        type: "module",
+        dependencies: { "@code-yeongyu/senpi": "2026.8.9" },
+      }),
+    )
     const senpiRoot = join(packageRoot, "node_modules", "@code-yeongyu", "senpi")
-    writeFile(join(senpiRoot, "package.json"), JSON.stringify({
-      name: "@code-yeongyu/senpi",
-      version: "2026.8.9",
-      type: "module",
-      exports: { ".": "./dist/index.js" },
-    }))
+    writeFile(
+      join(senpiRoot, "package.json"),
+      JSON.stringify({
+        name: "@code-yeongyu/senpi",
+        version: "2026.8.9",
+        type: "module",
+        exports: { ".": "./dist/index.js" },
+      }),
+    )
     writeFile(join(senpiRoot, "dist", "index.js"), "export const fixture = true\n")
     writeFile(join(senpiRoot, "dist", "cli.js"), "process.exit(0)\n")
     writeFile(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")

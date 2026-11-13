@@ -58,7 +58,11 @@ describe("plan-reviewer one-shot policy over the real TaskManager", () => {
     // when step 1: plan-reviewer is spawned with a chatty zero-path prompt
     const first = await execute(
       "call-1",
-      { prompt: "please review my plan, I worked really hard on it and think it is great", subagent_type: "plan-reviewer", run_in_background: true },
+      {
+        prompt: "please review my plan, I worked really hard on it and think it is great",
+        subagent_type: "plan-reviewer",
+        run_in_background: true,
+      },
       undefined,
       undefined,
       CTX,
@@ -85,7 +89,11 @@ describe("plan-reviewer one-shot policy over the real TaskManager", () => {
     expect(inProcess.startedSpecs[1]?.prompt).toBe(canonical(PLAN_B))
 
     // when step 3a: the running plan-reviewer is sent a message
-    const runningSend = await manager.sendToTask({ idOrName: firstId, message: "please reconsider your verdict", deliverAs: "steer" })
+    const runningSend = await manager.sendToTask({
+      idOrName: firstId,
+      message: "please reconsider your verdict",
+      deliverAs: "steer",
+    })
 
     // then the refusal is the registry reminder and NOTHING reaches the child session
     expect(runningSend.kind).toBe("one_shot_agent")

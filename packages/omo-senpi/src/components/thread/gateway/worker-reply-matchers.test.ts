@@ -50,9 +50,13 @@ describe("gateway tests ban expect().rejects/.resolves entirely (bun#43819; an u
   })
 
   test("#given every test file under gateway/ #when it is scanned #then none uses expect().rejects or .resolves, awaited or not", () => {
-    const offenders = testFiles(import.meta.dir).filter((file) => file !== import.meta.path).flatMap((file) =>
-      matcherAwaits(readFileSync(file, "utf8")).map((line) => `${relative(import.meta.dir, file)}:${line}: ${USE_INSTEAD}`),
-    )
+    const offenders = testFiles(import.meta.dir)
+      .filter((file) => file !== import.meta.path)
+      .flatMap((file) =>
+        matcherAwaits(readFileSync(file, "utf8")).map(
+          (line) => `${relative(import.meta.dir, file)}:${line}: ${USE_INSTEAD}`,
+        ),
+      )
     expect(offenders).toEqual([])
   })
 })

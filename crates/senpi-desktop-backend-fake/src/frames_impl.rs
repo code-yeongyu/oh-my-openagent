@@ -1,6 +1,7 @@
 use senpi_desktop_core::error::CoreResult;
 use senpi_desktop_core::frame::FrameGeometry;
-use senpi_desktop_core::types::{DisplaySelector, Target};
+use senpi_desktop_core::types::{DesktopWindow, DisplaySelector, Target, WindowIdentity};
+use senpi_desktop_core::user_input::UserInputFeed;
 
 use crate::fake::FakeBackend;
 
@@ -20,10 +21,26 @@ impl FakeBackend {
                 Ok((FrameGeometry::for_displays(&displays), width, height))
             }
             Target::Window(id) => {
-                let window = self.window(id)?;
-                let frame = FrameGeometry::for_window(window, window.width, window.height);
+                let window = self.identified(self.window(id)?);
+                let frame = FrameGeometry::for_window(&window, window.width, window.height);
                 Ok((frame, window.width, window.height))
             }
+        }
+    }
+
+    /// `window` with the identity its scripted owning process reports; a
+    /// window whose process has no scripted start time stays unidentified.
+    pub(crate) fn identified(&self, window: &DesktopWindow) -> DesktopWindow {
+        let identity = window.pid.and_then(|pid| {
+            self.user_input.process_started(pid).map(|start| WindowIdentity {
+                window_number: window.id.clone(),
+                pid,
+                process_start: Some(start),
+            })
+        });
+        DesktopWindow {
+            identity,
+            ..window.clone()
         }
     }
 

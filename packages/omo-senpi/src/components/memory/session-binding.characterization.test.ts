@@ -36,7 +36,8 @@ afterEach(async () => {
     await pi.dispatch("session_shutdown", {}, sessionContext())
     overBudget.push(...ctx.logs.filter((entry) => entry.message === "memory shutdown drain hit its budget"))
   }
-  for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0))
+    rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   expect(overBudget).toEqual([])
 })
 
@@ -47,13 +48,25 @@ function tempDir(prefix: string): string {
 }
 
 type SyncCall =
-  | { readonly kind: "acquire"; readonly identity: string; readonly repo: string; readonly profile: unknown; readonly projectDir: unknown }
+  | {
+      readonly kind: "acquire"
+      readonly identity: string
+      readonly repo: string
+      readonly profile: unknown
+      readonly projectDir: unknown
+    }
   | { readonly kind: "release"; readonly repo: string }
 
 function recordingSyncRunner(calls: SyncCall[]): SyncRunner {
   return {
     acquire: async (identity, paths, _settings, options) => {
-      calls.push({ kind: "acquire", identity, repo: paths.repo, profile: options?.profile, projectDir: options?.projectDir })
+      calls.push({
+        kind: "acquire",
+        identity,
+        repo: paths.repo,
+        profile: options?.profile,
+        projectDir: options?.projectDir,
+      })
     },
     release: async (repo) => {
       calls.push({ kind: "release", repo })
@@ -64,7 +77,11 @@ function recordingSyncRunner(calls: SyncCall[]): SyncRunner {
 }
 
 function boundEntry(identity: string, repoPath: string, boundAt = 1): SessionEntryFixture {
-  return { type: "custom", customType: MEMORY_BINDING_CUSTOM_TYPE, data: createMemoryBinding({ identity, repoPath, boundAt }) }
+  return {
+    type: "custom",
+    customType: MEMORY_BINDING_CUSTOM_TYPE,
+    data: createMemoryBinding({ identity, repoPath, boundAt }),
+  }
 }
 
 function harness(options: { readonly agent?: string; readonly now?: number } = {}) {
@@ -108,12 +125,16 @@ describe("X8c memory binding at session_start (characterization)", () => {
     await h.pi.dispatch("session_start", {}, sessionContext({ notifications, cwd: sessionCwd }))
 
     // then
-    expect(h.pi.entries).toEqual([{
-      customType: MEMORY_BINDING_CUSTOM_TYPE,
-      data: createMemoryBinding({ identity: identity.id, repoPath: identity.paths.repo, boundAt: 1234 }),
-      options: { startupBookkeeping: true },
-    }])
-    expect(h.syncCalls).toEqual([{ kind: "acquire", identity: identity.id, repo: identity.paths.repo, profile: "auto", projectDir: sessionCwd }])
+    expect(h.pi.entries).toEqual([
+      {
+        customType: MEMORY_BINDING_CUSTOM_TYPE,
+        data: createMemoryBinding({ identity: identity.id, repoPath: identity.paths.repo, boundAt: 1234 }),
+        options: { startupBookkeeping: true },
+      },
+    ])
+    expect(h.syncCalls).toEqual([
+      { kind: "acquire", identity: identity.id, repo: identity.paths.repo, profile: "auto", projectDir: sessionCwd },
+    ])
     expect(supervisorDelta(before)).toBe(1)
     expect(notifications).toEqual([])
   })
@@ -128,12 +149,22 @@ describe("X8c memory binding at session_start (characterization)", () => {
     await h.pi.dispatch("session_start", {}, sessionContext())
 
     // then
-    expect(h.pi.entries).toEqual([{
-      customType: MEMORY_BINDING_CUSTOM_TYPE,
-      data: createMemoryBinding({ identity: hostIdentity.id, repoPath: hostIdentity.paths.repo, boundAt: 1235 }),
-      options: { startupBookkeeping: true },
-    }])
-    expect(h.syncCalls).toEqual([{ kind: "acquire", identity: hostIdentity.id, repo: hostIdentity.paths.repo, profile: "auto", projectDir: h.hostCwd }])
+    expect(h.pi.entries).toEqual([
+      {
+        customType: MEMORY_BINDING_CUSTOM_TYPE,
+        data: createMemoryBinding({ identity: hostIdentity.id, repoPath: hostIdentity.paths.repo, boundAt: 1235 }),
+        options: { startupBookkeeping: true },
+      },
+    ])
+    expect(h.syncCalls).toEqual([
+      {
+        kind: "acquire",
+        identity: hostIdentity.id,
+        repo: hostIdentity.paths.repo,
+        profile: "auto",
+        projectDir: h.hostCwd,
+      },
+    ])
     expect(supervisorDelta(before)).toBe(1)
   })
 
@@ -148,16 +179,24 @@ describe("X8c memory binding at session_start (characterization)", () => {
     const before = memoryModuleSupervisor.refCount
 
     // when
-    await h.pi.dispatch("session_start", {}, sessionContext({ entries: [boundEntry(recorded.id, recorded.paths.repo)], notifications, cwd: sessionCwd }))
+    await h.pi.dispatch(
+      "session_start",
+      {},
+      sessionContext({ entries: [boundEntry(recorded.id, recorded.paths.repo)], notifications, cwd: sessionCwd }),
+    )
 
     // then
-    expect(h.pi.entries).toEqual([{
-      customType: MEMORY_BINDING_CUSTOM_TYPE,
-      data: createMemoryBinding({ identity: recorded.id, repoPath: recorded.paths.repo, boundAt: 1236 }),
-      options: { startupBookkeeping: true },
-    }])
+    expect(h.pi.entries).toEqual([
+      {
+        customType: MEMORY_BINDING_CUSTOM_TYPE,
+        data: createMemoryBinding({ identity: recorded.id, repoPath: recorded.paths.repo, boundAt: 1236 }),
+        options: { startupBookkeeping: true },
+      },
+    ])
     expect(h.ctx.logs.filter((entry) => entry.level === "info" && entry.message.includes("rebound"))).toHaveLength(1)
-    expect(h.syncCalls).toEqual([{ kind: "acquire", identity: recorded.id, repo: recorded.paths.repo, profile: "auto", projectDir: sessionCwd }])
+    expect(h.syncCalls).toEqual([
+      { kind: "acquire", identity: recorded.id, repo: recorded.paths.repo, profile: "auto", projectDir: sessionCwd },
+    ])
     expect(supervisorDelta(before)).toBe(1)
     expect(notifications).toEqual([])
   })
@@ -172,7 +211,11 @@ describe("X8c memory binding at session_start (characterization)", () => {
       boundEntry(older.id, older.paths.repo, 1),
       boundEntry(latest.id, latest.paths.repo, 2),
       { type: "custom", customType: MEMORY_BINDING_CUSTOM_TYPE, data: { identity: older.id } },
-      { type: "message", customType: MEMORY_BINDING_CUSTOM_TYPE, data: createMemoryBinding({ identity: older.id, repoPath: older.paths.repo, boundAt: 3 }) },
+      {
+        type: "message",
+        customType: MEMORY_BINDING_CUSTOM_TYPE,
+        data: createMemoryBinding({ identity: older.id, repoPath: older.paths.repo, boundAt: 3 }),
+      },
     ]
     const before = memoryModuleSupervisor.refCount
 
@@ -180,11 +223,13 @@ describe("X8c memory binding at session_start (characterization)", () => {
     await h.pi.dispatch("session_start", {}, sessionContext({ entries, cwd: sessionCwd }))
 
     // then
-    expect(h.pi.entries).toEqual([{
-      customType: MEMORY_BINDING_CUSTOM_TYPE,
-      data: createMemoryBinding({ identity: latest.id, repoPath: latest.paths.repo, boundAt: 1237 }),
-      options: { startupBookkeeping: true },
-    }])
+    expect(h.pi.entries).toEqual([
+      {
+        customType: MEMORY_BINDING_CUSTOM_TYPE,
+        data: createMemoryBinding({ identity: latest.id, repoPath: latest.paths.repo, boundAt: 1237 }),
+        options: { startupBookkeeping: true },
+      },
+    ])
     expect(supervisorDelta(before)).toBe(1)
   })
 
@@ -197,14 +242,20 @@ describe("X8c memory binding at session_start (characterization)", () => {
     const before = memoryModuleSupervisor.refCount
 
     // when
-    await h.pi.dispatch("session_start", {}, sessionContext({ entries: [boundEntry(identity.id, "/elsewhere/repo")], notifications, cwd: sessionCwd }))
+    await h.pi.dispatch(
+      "session_start",
+      {},
+      sessionContext({ entries: [boundEntry(identity.id, "/elsewhere/repo")], notifications, cwd: sessionCwd }),
+    )
 
     // then
-    expect(h.pi.entries).toEqual([{
-      customType: MEMORY_BINDING_CUSTOM_TYPE,
-      data: createMemoryBinding({ identity: identity.id, repoPath: identity.paths.repo, boundAt: 1238 }),
-      options: { startupBookkeeping: true },
-    }])
+    expect(h.pi.entries).toEqual([
+      {
+        customType: MEMORY_BINDING_CUSTOM_TYPE,
+        data: createMemoryBinding({ identity: identity.id, repoPath: identity.paths.repo, boundAt: 1238 }),
+        options: { startupBookkeeping: true },
+      },
+    ])
     expect(notifications).toEqual([])
     expect(supervisorDelta(before)).toBe(1)
   })
@@ -218,7 +269,11 @@ describe("X8c memory binding at session_start (characterization)", () => {
     const before = memoryModuleSupervisor.refCount
 
     // when
-    await h.pi.dispatch("before_agent_start", {}, sessionContext({ entries: [boundEntry(identity.id, "/elsewhere/repo")], notifications, cwd: sessionCwd }))
+    await h.pi.dispatch(
+      "before_agent_start",
+      {},
+      sessionContext({ entries: [boundEntry(identity.id, "/elsewhere/repo")], notifications, cwd: sessionCwd }),
+    )
 
     // then
     expect(h.pi.entries).toEqual([])
@@ -245,8 +300,12 @@ describe("X8c memory binding at session_start (characterization)", () => {
 
     // then
     expect([afterFirstStart, afterRebind, notifications.length]).toEqual([1, 1, 2])
-    expect(notifications.every((notice) => notice.level === "error" && notice.message.includes("memory identity conflict"))).toBe(true)
-    expect(h.ctx.logs.filter((entry) => entry.level === "warn" && entry.message.includes("failed closed"))).toHaveLength(2)
+    expect(
+      notifications.every((notice) => notice.level === "error" && notice.message.includes("memory identity conflict")),
+    ).toBe(true)
+    expect(
+      h.ctx.logs.filter((entry) => entry.level === "warn" && entry.message.includes("failed closed")),
+    ).toHaveLength(2)
     expect(h.pi.entries).toEqual([])
     expect(h.syncCalls).toEqual([])
     expect(supervisorDelta(before)).toBe(0)
@@ -283,7 +342,10 @@ describe("X8c memory binding at session_start (characterization)", () => {
 
     // then
     expect(afterFirst).toBe(1)
-    expect(h.pi.entries.map((entry) => entry.customType)).toEqual([MEMORY_BINDING_CUSTOM_TYPE, MEMORY_BINDING_CUSTOM_TYPE])
+    expect(h.pi.entries.map((entry) => entry.customType)).toEqual([
+      MEMORY_BINDING_CUSTOM_TYPE,
+      MEMORY_BINDING_CUSTOM_TYPE,
+    ])
     expect(h.pi.entries.every((entry) => entry.options?.startupBookkeeping === true)).toBe(true)
     expect(h.syncCalls.map((call) => call.kind)).toEqual(["acquire", "release", "acquire"])
     expect(h.syncCalls[1]).toEqual({ kind: "release", repo: identity.paths.repo })
@@ -301,11 +363,13 @@ describe("X8c memory binding at session_start (characterization)", () => {
     await h.pi.dispatch("session_start", {}, { ...sessionContext({ cwd: sessionCwd }), hasUI: false })
 
     // then
-    expect(h.pi.entries).toEqual([{
-      customType: MEMORY_BINDING_CUSTOM_TYPE,
-      data: createMemoryBinding({ identity: identity.id, repoPath: identity.paths.repo, boundAt: 1241 }),
-      options: { startupBookkeeping: true },
-    }])
+    expect(h.pi.entries).toEqual([
+      {
+        customType: MEMORY_BINDING_CUSTOM_TYPE,
+        data: createMemoryBinding({ identity: identity.id, repoPath: identity.paths.repo, boundAt: 1241 }),
+        options: { startupBookkeeping: true },
+      },
+    ])
     expect(h.syncCalls).toEqual([])
     expect(supervisorDelta(before)).toBe(1)
   })

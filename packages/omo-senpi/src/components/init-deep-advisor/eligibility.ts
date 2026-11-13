@@ -61,10 +61,7 @@ function driftEligibility(drift: Extract<DriftMetrics, { kind: "valid" }>): Elig
     churnLocRatio: drift.churnLocRatio,
     daysSince: drift.daysSince,
   }
-  if (
-    drift.commitsSince >= COMMIT_DISTANCE_THRESHOLD &&
-    drift.touchedRatio >= TOUCHED_RATIO_THRESHOLD
-  ) {
+  if (drift.commitsSince >= COMMIT_DISTANCE_THRESHOLD && drift.touchedRatio >= TOUCHED_RATIO_THRESHOLD) {
     return { trigger: "commit-and-touch", drift: data }
   }
   if (drift.churnLocRatio >= CHURN_LOC_RATIO_THRESHOLD) {

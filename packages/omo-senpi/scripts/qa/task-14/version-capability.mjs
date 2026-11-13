@@ -35,16 +35,29 @@ function probeProtocol(socketPath, timeoutMs = 5000) {
   return new Promise((resolve, reject) => {
     const socket = createConnection(socketPath)
     let buffer = ""
-    const timer = setTimeout(() => { socket.destroy(); reject(new Error("protocol probe timeout")) }, timeoutMs)
-    const done = (error, value) => { clearTimeout(timer); socket.destroy(); error ? reject(error) : resolve(value) }
+    const timer = setTimeout(() => {
+      socket.destroy()
+      reject(new Error("protocol probe timeout"))
+    }, timeoutMs)
+    const done = (error, value) => {
+      clearTimeout(timer)
+      socket.destroy()
+      error ? reject(error) : resolve(value)
+    }
     socket.on("error", (error) => done(error))
-    socket.on("connect", () => socket.write(`${JSON.stringify({ id: "ensure-host-probe", type: "get_protocol_info" })}\n`))
+    socket.on("connect", () =>
+      socket.write(`${JSON.stringify({ id: "ensure-host-probe", type: "get_protocol_info" })}\n`),
+    )
     socket.on("data", (chunk) => {
       buffer += chunk.toString("utf8")
       const newline = buffer.indexOf("\n")
       if (newline < 0) return
       let frame
-      try { frame = JSON.parse(buffer.slice(0, newline)) } catch (error) { return done(error) }
+      try {
+        frame = JSON.parse(buffer.slice(0, newline))
+      } catch (error) {
+        return done(error)
+      }
       const data = frame?.data
       if (frame?.success !== true || typeof data?.serverVersion !== "string" || !Array.isArray(data?.capabilities)) {
         return done(new Error(`fixture returned an unparseable handshake: ${JSON.stringify(frame)}`))
@@ -76,10 +89,18 @@ mkdirSync(evidence, { recursive: true })
 try {
   const script = join(CODING_AGENT, "scripts", "qa-rpc-socket", "ensure-host.mjs")
   const result = await new Promise((resolve) => {
-    const child = spawn(process.execPath, [script], { env: withTelemetryOptOut(process.env), stdio: ["ignore", "pipe", "pipe"] })
-    let stdout = "", stderr = ""
-    child.stdout.on("data", (v) => { stdout += v })
-    child.stderr.on("data", (v) => { stderr += v })
+    const child = spawn(process.execPath, [script], {
+      env: withTelemetryOptOut(process.env),
+      stdio: ["ignore", "pipe", "pipe"],
+    })
+    let stdout = "",
+      stderr = ""
+    child.stdout.on("data", (v) => {
+      stdout += v
+    })
+    child.stderr.on("data", (v) => {
+      stderr += v
+    })
     child.on("close", (status) => resolve({ status, stdout, stderr }))
   })
   if (result.status !== 0) throw new Error(result.stderr || result.stdout)
@@ -100,28 +121,46 @@ try {
   const handshake = await probeProtocol(socket)
   const versionMismatch = handshake.serverVersion !== VERSION
   const missingCapabilities = REQUIRED_CAPABILITIES.filter((capability) => !handshake.capabilities.includes(capability))
-  if (!versionMismatch) throw new Error(`fixture was version-COMPATIBLE, injection is void: ${handshake.serverVersion} === ${VERSION}`)
-  if (missingCapabilities.length === 0) throw new Error(`fixture had every required capability, injection is void: ${JSON.stringify(handshake.capabilities)}`)
+  if (!versionMismatch)
+    throw new Error(`fixture was version-COMPATIBLE, injection is void: ${handshake.serverVersion} === ${VERSION}`)
+  if (missingCapabilities.length === 0)
+    throw new Error(
+      `fixture had every required capability, injection is void: ${JSON.stringify(handshake.capabilities)}`,
+    )
 
   let refusal
   let adopted
-  try { adopted = await ensureHost({ socket, agentDir: join(root, "agent") }) } catch (error) { refusal = error }
+  try {
+    adopted = await ensureHost({ socket, agentDir: join(root, "agent") })
+  } catch (error) {
+    refusal = error
+  }
   // An engine carrying senpi #2242 hands back an attach hold; never keep one past this probe.
   adopted?.release?.()
 
   // The fixture must still be the socket owner: refusal means "hands off", not "replace".
   const fixtureSurvived = unmanaged.pid !== undefined && processAlive(unmanaged.pid)
-  if (unmanaged.pid) { try { process.kill(unmanaged.pid, "SIGKILL") } catch {} await waitGone(unmanaged.pid) }
+  if (unmanaged.pid) {
+    try {
+      process.kill(unmanaged.pid, "SIGKILL")
+    } catch {}
+    await waitGone(unmanaged.pid)
+  }
 
-  if (adopted !== undefined) throw new Error(`incompatible unmanaged host was ADOPTED instead of refused: ${JSON.stringify(adopted)}`)
-  if (!fixtureSurvived) throw new Error("incompatible unmanaged host was killed/replaced; refusal must leave a foreign socket owner alone")
+  if (adopted !== undefined)
+    throw new Error(`incompatible unmanaged host was ADOPTED instead of refused: ${JSON.stringify(adopted)}`)
+  if (!fixtureSurvived)
+    throw new Error("incompatible unmanaged host was killed/replaced; refusal must leave a foreign socket owner alone")
 
   // TYPED discriminator: classify the refusal structurally from the product's own decision
   // inputs (probe answered + pid file does not own the socket => unmanaged_host), and require
   // that exact discriminant. No substring matching on the message.
   const refusalKind = classifyRefusal({ refusal, handshake, pidFileOwnsSocket: false })
-  if (refusalKind !== "unmanaged_host") throw new Error(`expected typed unmanaged_host refusal, got kind=${refusalKind} error=${String(refusal)}`)
-  console.log(`assert unmanaged-incompatible-refusal typed_kind=${refusalKind} adopted=false fixture_survived=${fixtureSurvived} version_mismatch=${versionMismatch} (${handshake.serverVersion}!=${VERSION}) missing_capabilities=${JSON.stringify(missingCapabilities)}`)
+  if (refusalKind !== "unmanaged_host")
+    throw new Error(`expected typed unmanaged_host refusal, got kind=${refusalKind} error=${String(refusal)}`)
+  console.log(
+    `assert unmanaged-incompatible-refusal typed_kind=${refusalKind} adopted=false fixture_survived=${fixtureSurvived} version_mismatch=${versionMismatch} (${handshake.serverVersion}!=${VERSION}) missing_capabilities=${JSON.stringify(missingCapabilities)}`,
+  )
   console.log("PASS version-capability")
 } finally {
   rmSync(root, { recursive: true, force: true })

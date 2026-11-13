@@ -24,4 +24,3 @@ export async function deleteBtwSide(args: {
     return false
   }
 }
-

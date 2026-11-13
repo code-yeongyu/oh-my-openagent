@@ -5,7 +5,12 @@
 
 import { redactKibitzerEventText } from "./events"
 import { normalizeGateReason } from "./judge-outcome"
-import type { KibitzerWakeConfiguration, KibitzerWakeOutcome, KibitzerWakeStatus, KibitzerWakeUsage } from "./sidecar-outcome"
+import type {
+  KibitzerWakeConfiguration,
+  KibitzerWakeOutcome,
+  KibitzerWakeStatus,
+  KibitzerWakeUsage,
+} from "./sidecar-outcome"
 
 /** Hard bound of one serialized `wakes.ndjson` line, newline included. */
 export const KIBITZER_WAKE_RECORD_MAX_CHARS = 4096
@@ -68,7 +73,9 @@ export function kibitzerWakeRecord(outcome: KibitzerWakeOutcome, at: number): Ki
     ...(outcome.cause === undefined ? {} : { cause: outcome.cause }),
     ...(reason === undefined ? {} : { reason }),
     ...(configuration === undefined ? {} : { configuration }),
-    ...(outcome.model === undefined ? {} : { model: capped(redactKibitzerEventText(outcome.model), WAKE_MODEL_MAX_CHARS) }),
+    ...(outcome.model === undefined
+      ? {}
+      : { model: capped(redactKibitzerEventText(outcome.model), WAKE_MODEL_MAX_CHARS) }),
     candidateCount: outcome.candidateCount,
     nudged: outcome.nudges.map((nudge) => capped(nudge.path, WAKE_PATH_MAX_CHARS)),
     steered: outcome.steered,
@@ -90,13 +97,19 @@ export function capped(text: string, max: number): string {
 }
 
 /** The configuration as it may be written: provider names masked and bounded like the model field. */
-function recordConfiguration(configuration: KibitzerWakeConfiguration | undefined): KibitzerWakeConfiguration | undefined {
+function recordConfiguration(
+  configuration: KibitzerWakeConfiguration | undefined,
+): KibitzerWakeConfiguration | undefined {
   if (configuration === undefined) return undefined
   return {
     category: capped(redactKibitzerEventText(configuration.category), WAKE_MODEL_MAX_CHARS),
     cause: configuration.cause,
     ...(configuration.missingProviders === undefined
       ? {}
-      : { missingProviders: configuration.missingProviders.slice(0, WAKE_PROVIDER_MAX_COUNT).map((provider) => capped(redactKibitzerEventText(provider), WAKE_PROVIDER_MAX_CHARS)) }),
+      : {
+          missingProviders: configuration.missingProviders
+            .slice(0, WAKE_PROVIDER_MAX_COUNT)
+            .map((provider) => capped(redactKibitzerEventText(provider), WAKE_PROVIDER_MAX_CHARS)),
+        }),
   }
 }

@@ -34,7 +34,12 @@ describe("task_send lazy terminal RPC revival", () => {
         },
       },
     })
-    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings() })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry: new FakeRegistry(),
+      config: settings(),
+    })
 
     const outcome = await manager.sendToTask({ idOrName: record.task_id, message: "second pass" })
 

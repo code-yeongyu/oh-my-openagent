@@ -24,7 +24,7 @@ export function buildAuthorizationUrl(
     state: string
     scopes?: string[]
     resource?: string
-  }
+  },
 ): string {
   const url = new URL(authorizationEndpoint)
   url.searchParams.set("response_type", "code")
@@ -58,10 +58,11 @@ export function startCallbackServer(port: number, validation?: IssuerValidation)
 
       const requestUrl = new URL(request.url ?? "/", `http://localhost:${port}`)
       const issuer = requestUrl.searchParams.get("iss")
-      if (validation && (
-        (issuer !== null && issuer !== validation.issuer)
-        || (issuer === null && validation.authorizationResponseIssParameterSupported)
-      )) {
+      if (
+        validation &&
+        ((issuer !== null && issuer !== validation.issuer) ||
+          (issuer === null && validation.authorizationResponseIssParameterSupported))
+      ) {
         response.writeHead(400, { "content-type": "text/html" })
         response.end("<html><body><h1>Authorization failed</h1></body></html>")
         server.close()
@@ -133,14 +134,16 @@ function openBrowser(url: string): void {
   }
 }
 
-export async function runAuthorizationCodeRedirect(options: IssuerValidation & {
-  authorizationEndpoint: string
-  callbackPort: number
-  clientId: string
-  redirectUri: string
-  scopes?: string[]
-  resource?: string
-}): Promise<{ code: string; verifier: string }> {
+export async function runAuthorizationCodeRedirect(
+  options: IssuerValidation & {
+    authorizationEndpoint: string
+    callbackPort: number
+    clientId: string
+    redirectUri: string
+    scopes?: string[]
+    resource?: string
+  },
+): Promise<{ code: string; verifier: string }> {
   const verifier = generateCodeVerifier()
   const challenge = generateCodeChallenge(verifier)
   const state = randomBytes(16).toString("hex")

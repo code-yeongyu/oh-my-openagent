@@ -10,7 +10,7 @@ export function createSisyphusJuniorNotepadHook(ctx: PluginInput) {
   return {
     "tool.execute.before": async (
       input: { tool: string; sessionID: string; callID: string },
-      output: { args: Record<string, unknown>; message?: string }
+      output: { args: Record<string, unknown>; message?: string },
     ): Promise<void> => {
       // 1. Check if tool is task
       if (input.tool !== "task") {
