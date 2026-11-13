@@ -184,16 +184,16 @@ test("#given a phrase marker that appears during a passkey genesis #when the pas
 
 test("#given another live process holds the genesis lock #when enable runs #then it answers in_progress and shows nothing", async () => {
   const s = await setup()
-  const held = Promise.withResolvers<void>()
-  const release = Promise.withResolvers<void>()
+  const held = Promise.withResolvers<undefined>()
+  const release = Promise.withResolvers<undefined>()
   const holder = withGenesisLock(s.f.input, async () => {
-    held.resolve()
+    held.resolve(undefined)
     await release.promise
   })
   await held.promise
   expect(await enableSync({ ...s.input, genesis: s.genesis, method: "phrase" })).toEqual({ kind: "in_progress" })
   expect(await phraseNoticeStatus(s.place)).toEqual({ inProgress: true })
-  release.resolve()
+  release.resolve(undefined)
   await holder
   expect(s.person.calls.show).toBe(0)
 })

@@ -20,7 +20,7 @@ test("#given the phrase flag off or on #when features is asked #then phrase-gene
 test("#given enable with the phrase method #when the ceremony starts #then the method and gate reach enable, the call answers in_progress at once, and status settles to the created outcome", async () => {
   const phraseGate = gate(true)
   const f = await setup({ phraseGate })
-  const finish = Promise.withResolvers<void>()
+  const finish = Promise.withResolvers<undefined>()
   const seen: { method?: string; gate?: PhraseGate }[] = []
   f.runtime.enableSync = async (input) => {
     seen.push({
@@ -35,7 +35,7 @@ test("#given enable with the phrase method #when the ceremony starts #then the m
   expect(await f.call("enable", a.context, { method: "phrase" })).toEqual({ kind: "in_progress", method: "phrase" })
   expect(seen).toEqual([{ method: "phrase", gate: phraseGate }])
   expect(await f.call("status", a.context)).toMatchObject({ enable: { kind: "in_progress", method: "phrase" } })
-  finish.resolve()
+  finish.resolve(undefined)
   await f.coordinator.dispose()
 })
 
