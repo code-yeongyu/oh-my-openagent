@@ -10,28 +10,17 @@ let testConfigDir: string
 let originalConfigDir: string | undefined
 
 function writeOpenCodeConfig(plugins: readonly string[]): void {
-  writeFileSync(
-    join(testConfigDir, "opencode.json"),
-    JSON.stringify({ plugin: plugins }, null, 2) + "\n",
-    "utf-8",
-  )
+  writeFileSync(join(testConfigDir, "opencode.json"), JSON.stringify({ plugin: plugins }, null, 2) + "\n", "utf-8")
 }
 
 function writeTuiConfig(plugins: readonly string[]): void {
-  writeFileSync(
-    join(testConfigDir, "tui.json"),
-    JSON.stringify({ plugin: plugins }, null, 2) + "\n",
-    "utf-8",
-  )
+  writeFileSync(join(testConfigDir, "tui.json"), JSON.stringify({ plugin: plugins }, null, 2) + "\n", "utf-8")
 }
 
 describe("tui-plugin-config unresolvable named entries", () => {
   beforeEach(() => {
     originalConfigDir = process.env.OPENCODE_CONFIG_DIR
-    testConfigDir = join(
-      tmpdir(),
-      `omo-doctor-tui-unresolvable-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    )
+    testConfigDir = join(tmpdir(), `omo-doctor-tui-unresolvable-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     mkdirSync(testConfigDir, { recursive: true })
     process.env.OPENCODE_CONFIG_DIR = testConfigDir
   })

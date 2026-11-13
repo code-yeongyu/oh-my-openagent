@@ -29,7 +29,10 @@ export type SendTeamRunIdResolution =
 // Explicit ids (bound routing first, then the param) always win. Without one, the wiring's default
 // resolver (single-owned-team defaulting) is consulted; without a resolver the historical
 // team_run_id-required error is preserved so un-wired adapters behave exactly as before.
-export async function resolveSendTeamRunId(params: TaskSendInput, teamRouting: TaskSendTeamRouting): Promise<SendTeamRunIdResolution> {
+export async function resolveSendTeamRunId(
+  params: TaskSendInput,
+  teamRouting: TaskSendTeamRouting,
+): Promise<SendTeamRunIdResolution> {
   const explicit = teamRouting.teamRunId ?? params.team_run_id
   if (explicit !== undefined) return { kind: "resolved", teamRunId: explicit }
   if (teamRouting.resolveDefaultTeamRunId === undefined) {
@@ -62,7 +65,11 @@ export async function routeStructuredMessage(
       if (!(error instanceof SenpiShutdownError) && !isMissingStateError(error)) throw error
       return shutdownFailure(error, { operation: "request", team_run_id: runId, member: to })
     }
-    return toolResult(`Shutdown requested for ${to} (team ${runId}).`, { kind: "shutdown_requested", team_run_id: runId, member: to })
+    return toolResult(`Shutdown requested for ${to} (team ${runId}).`, {
+      kind: "shutdown_requested",
+      team_run_id: runId,
+      member: to,
+    })
   }
 
   if (message.approve === true) {

@@ -1,12 +1,6 @@
 import type { TurnEndEvent } from "@code-yeongyu/senpi"
-import type {
-  EventTelemetryClient,
-  TelemetryDiagnosticInput,
-} from "@oh-my-opencode/telemetry-core"
-import {
-  OMO_NATIVE_PROPERTY_ALLOWLISTS,
-  maskProviderAndModel,
-} from "./product-identity"
+import type { EventTelemetryClient, TelemetryDiagnosticInput } from "@oh-my-opencode/telemetry-core"
+import { OMO_NATIVE_PROPERTY_ALLOWLISTS, maskProviderAndModel } from "./product-identity"
 import type { SessionSummaryRecorder } from "./omo-native-session-summary"
 import type { TelemetrySessionRole } from "./session-role"
 import { usdOf } from "./session-summary-window"
@@ -24,9 +18,7 @@ export type OmoNativeTurnHandlerOptions = {
 type TurnCompletedProperty = (typeof OMO_NATIVE_PROPERTY_ALLOWLISTS.turn_completed)[number]
 type NumberResult = { readonly value: number; readonly valid: boolean }
 
-export function createOmoNativeTurnHandler(
-  options: OmoNativeTurnHandlerOptions,
-): (event: TurnEndEvent) => void {
+export function createOmoNativeTurnHandler(options: OmoNativeTurnHandlerOptions): (event: TurnEndEvent) => void {
   return (event) => {
     if (event.message.role !== "assistant") return
 
@@ -123,6 +115,6 @@ export function toCost1e4(costUsd: number): number {
 
 function asRecord(value: unknown): Readonly<Record<string, unknown>> | undefined {
   return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? value as Readonly<Record<string, unknown>>
+    ? (value as Readonly<Record<string, unknown>>)
     : undefined
 }

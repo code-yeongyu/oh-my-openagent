@@ -13,7 +13,10 @@ const PLAIN_THEME = {
 function render(data: MemoryRecallRecord | undefined): string[] {
   const component = renderRecallEntry({ data } as never, { expanded: false }, PLAIN_THEME as never)
   expect(component).toBeDefined()
-  return component!.render(120).slice(1, -1).map((line) => line.slice(1).trimEnd())
+  return component!
+    .render(120)
+    .slice(1, -1)
+    .map((line) => line.slice(1).trimEnd())
 }
 
 describe("renderRecallEntry", () => {

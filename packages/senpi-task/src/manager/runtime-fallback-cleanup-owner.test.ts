@@ -37,7 +37,11 @@ describe("runtime fallback: an in-process child whose cleanup rejects keeps a cl
     expect(starts).toEqual([PRIMARY])
 
     // A child kept only for cleanup is not a conversation: task_send must not revive it.
-    const sent = await manager.sendToTask({ idOrName: started.task_id, message: "continue", callerSessionId: "parent-1" })
+    const sent = await manager.sendToTask({
+      idOrName: started.task_id,
+      message: "continue",
+      callerSessionId: "parent-1",
+    })
     expect(sent.kind).toBe("not_continuable")
     expect(first.followUpCalls).toEqual([])
     expect(store.load(started.task_id)?.status).toBe("error")
@@ -101,7 +105,11 @@ describe("runtime fallback: an in-process child whose cleanup rejects keeps a cl
     await kept.promise
     expect(manager.getResidentHandle(started.task_id)?.task_id).toBe(started.task_id)
 
-    const sent = await manager.sendToTask({ idOrName: started.task_id, message: "continue", callerSessionId: "parent-1" })
+    const sent = await manager.sendToTask({
+      idOrName: started.task_id,
+      message: "continue",
+      callerSessionId: "parent-1",
+    })
     expect(sent.kind).toBe("not_continuable")
     expect(late?.followUpCalls).toEqual([])
     expect(store.load(started.task_id)?.status).toBe("interrupted")

@@ -1,15 +1,14 @@
 import type { Hooks } from "@opencode-ai/plugin"
 import { normalize, sep } from "path"
 
-const NOTEPAD_ROOTS = [
-  normalize(".sisyphus/notepads"),
-  normalize(".omo/notepads"),
-] as const
+const NOTEPAD_ROOTS = [normalize(".sisyphus/notepads"), normalize(".omo/notepads")] as const
 
 function hasNotepadRoot(normalizedPath: string, notepadRoot: string): boolean {
-  return normalizedPath === notepadRoot
-    || normalizedPath.startsWith(`${notepadRoot}${sep}`)
-    || normalizedPath.includes(`${sep}${notepadRoot}${sep}`)
+  return (
+    normalizedPath === notepadRoot ||
+    normalizedPath.startsWith(`${notepadRoot}${sep}`) ||
+    normalizedPath.includes(`${sep}${notepadRoot}${sep}`)
+  )
 }
 
 function isNotepadPath(filePath: string): boolean {
@@ -26,10 +25,7 @@ function resolveFilePath(args: unknown): string | undefined {
 
 export function createNotepadWriteGuardHook(): Hooks {
   return {
-    "tool.execute.before": async (
-      input: { tool?: string },
-      _output: unknown,
-    ): Promise<void> => {
+    "tool.execute.before": async (input: { tool?: string }, _output: unknown): Promise<void> => {
       if (input.tool?.toLowerCase() !== "write") return
 
       const outputRecord = _output as { args?: unknown } | undefined

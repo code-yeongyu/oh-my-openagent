@@ -6,10 +6,12 @@ mod screen;
 
 use std::sync::Arc;
 
-pub(crate) use panicky::{Panics, Watches};
+pub(crate) use panicky::{AfterPointer, Panics, Watches};
 pub(crate) use screen::{AwakeHolds, FakeScreen};
 use parking_lot::Mutex;
-use senpi_desktop_backend_fake::{FakeBackend, FakeScenario, FakeUserInput, Faults, RecordingSink, SinkOp};
+use senpi_desktop_backend_fake::{
+    FakeBackend, FakeClock as AxClock, FakeScenario, FakeUserInput, Faults, RecordingSink, SinkOp,
+};
 use senpi_desktop_core::backend::{Backend, DeliveryMode, Modifiers, MouseButton, PointerEvent};
 use senpi_desktop_core::error::CoreResult;
 use senpi_desktop_core::frame::FrameGeometry;
@@ -38,6 +40,9 @@ pub(crate) struct Harness {
     pub(crate) audits: Arc<Mutex<Vec<AuditEvent>>>,
     pub(crate) awake: AwakeHolds,
     pub(crate) screen: FakeScreen,
+    pub(crate) after_pointer: AfterPointer,
+    /// The fake's time for `ready_after_ms`, moved only by the test.
+    pub(crate) ax_clock: AxClock,
     user_input: Arc<FakeUserInput>,
 }
 
@@ -50,15 +55,21 @@ struct Factory {
     awake: AwakeHolds,
     screen: FakeScreen,
     watches: Watches,
+    after_pointer: AfterPointer,
+    ax_clock: Option<AxClock>,
 }
 
 impl BackendFactory for Factory {
     fn create(&self, _options: &DesktopSessionOptions) -> CoreResult<Box<dyn Backend>> {
-        let backend = FakeBackend::new(self.scenario.clone());
+        let mut backend = FakeBackend::new(self.scenario.clone());
+        if let Some(clock) = &self.ax_clock {
+            backend.set_ax_clock(clock.clone());
+        }
         *self.built.lock() = Some((backend.sink(), backend.faults(), backend.user_input()));
         Ok(Box::new(panicky::PanickyFake {
             inner: backend,
             panics: self.panics.clone(),
+            after_pointer: self.after_pointer.clone(),
             awake: self.awake.clone(),
             screen: self.screen.clone(),
             watches: self.watches.clone(),
@@ -84,6 +95,8 @@ pub(crate) fn session_factory(awake: &AwakeHolds, screen: &FakeScreen) -> impl B
         awake: awake.clone(),
         screen: screen.clone(),
         watches: Watches::default(),
+        after_pointer: AfterPointer::default(),
+        ax_clock: None,
     }
 }
 
@@ -96,6 +109,15 @@ pub(crate) fn harness(overlay: &Value) -> Harness {
 /// A harness whose session shares `slot` with other harnesses, as the
 /// engine's sessions share the process-wide slot.
 pub(crate) fn harness_with_slot(overlay: &Value, slot: Arc<crate::grant::ControlSlot>) -> Harness {
+    harness_opened(overlay, slot, DesktopSessionOptions::default())
+}
+
+/// A harness whose session was opened with `options`.
+pub(crate) fn harness_opened(
+    overlay: &Value,
+    slot: Arc<crate::grant::ControlSlot>,
+    options: DesktopSessionOptions,
+) -> Harness {
     let scenario = scenario(overlay);
     let built = Built::default();
     let clock = Arc::new(FakeClock::new(0));
@@ -111,7 +133,11 @@ pub(crate) fn harness_with_slot(overlay: &Value, slot: Arc<crate::grant::Control
     let panics = Panics::default();
     let (awake, screen) = (AwakeHolds::default(), FakeScreen::default());
     let watches = Watches::default();
+    let after_pointer = AfterPointer::default();
+    let ax_clock = AxClock::new(0);
     let factory = Factory {
+        ax_clock: Some(ax_clock.clone()),
+        after_pointer: after_pointer.clone(),
         scenario,
         built: Arc::clone(&built),
         panics: panics.clone(),
@@ -123,7 +149,7 @@ pub(crate) fn harness_with_slot(overlay: &Value, slot: Arc<crate::grant::Control
     let report_mode = Arc::new(Mutex::new(senpi_desktop_core::report::ReportMode::Null));
     let display = (Arc::default(), crate::screen_notes::ScreenNotes::default());
     let mut worker = Worker::new(Box::new(factory), capabilities, report_mode, safety, display);
-    worker.open(DesktopSessionOptions::default());
+    worker.open(options);
     let (sink, faults, user_input) = built.lock().clone().expect("open built a backend");
     Harness {
         worker,
@@ -136,6 +162,8 @@ pub(crate) fn harness_with_slot(overlay: &Value, slot: Arc<crate::grant::Control
         audits,
         awake,
         screen,
+        after_pointer,
+        ax_clock,
         user_input,
     }
 }

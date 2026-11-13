@@ -216,7 +216,9 @@ describe("runTaskOutput", () => {
     if (result.details.kind === "status") {
       expect(result.details.snapshot.residency_state).toBe("persisted_only")
       expect(result.details.snapshot.suspended).toBeDefined()
-      expect(firstText(result)).toContain(result.details.snapshot.suspended?.explanation ?? "missing recovery presentation")
+      expect(firstText(result)).toContain(
+        result.details.snapshot.suspended?.explanation ?? "missing recovery presentation",
+      )
     }
   })
 
@@ -233,7 +235,9 @@ describe("runTaskOutput", () => {
     if (result.details.kind === "status") {
       expect(result.details.snapshot.residency_state).toBe("rpc_detached")
       expect(result.details.snapshot.suspended).toBeDefined()
-      expect(firstText(result)).toContain(result.details.snapshot.suspended?.explanation ?? "missing recovery presentation")
+      expect(firstText(result)).toContain(
+        result.details.snapshot.suspended?.explanation ?? "missing recovery presentation",
+      )
     }
   })
 
@@ -275,7 +279,11 @@ describe("runTaskOutput runner notices", () => {
     const record = makeRecord({ task_id: "st_quiet", status: "running" })
 
     // when
-    const withNotices = await runTaskOutput({ ...depsFrom([record]), notices: () => [] }, { task_id: "st_quiet" }, "session-parent")
+    const withNotices = await runTaskOutput(
+      { ...depsFrom([record]), notices: () => [] },
+      { task_id: "st_quiet" },
+      "session-parent",
+    )
     const without = await runTaskOutput(depsFrom([record]), { task_id: "st_quiet" }, "session-parent")
 
     // then

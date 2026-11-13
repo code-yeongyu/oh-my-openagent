@@ -106,7 +106,13 @@ describe("foreground wait cap", () => {
       },
     })
     const execute = buildTaskExecute(makeDeps(manager), { env: {}, scheduleDeadline: timer.scheduleDeadline })
-    const execution = execute("capped", { prompt: "long work", category: "quick" }, undefined, undefined, contextWithBudget(3570))
+    const execution = execute(
+      "capped",
+      { prompt: "long work", category: "quick" },
+      undefined,
+      undefined,
+      contextWithBudget(3570),
+    )
     await started
 
     // when

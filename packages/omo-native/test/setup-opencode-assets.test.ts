@@ -15,7 +15,7 @@ function write(path: string, content: string): void {
   writeFileSync(path, content)
 }
 
-function fixture(config: unknown, options: { jsonc?: string, skills?: string[] } = {}) {
+function fixture(config: unknown, options: { jsonc?: string; skills?: string[] } = {}) {
   const root = mkdtempSync(join(tmpdir(), "omo-assets-"))
   roots.push(root)
   const home = join(root, "home")
@@ -44,16 +44,18 @@ describe("opencode asset plan", () => {
           },
         })
 
-        expect(plan.mcpServers).toEqual([{
-          name: "my-tool",
-          config: {
-            type: "stdio",
-            command: "bun",
-            args: ["x", "my-mcp", "--flag"],
-            env: { TOKEN: "${MY_TOKEN}" },
-            enabled: false,
+        expect(plan.mcpServers).toEqual([
+          {
+            name: "my-tool",
+            config: {
+              type: "stdio",
+              command: "bun",
+              args: ["x", "my-mcp", "--flag"],
+              env: { TOKEN: "${MY_TOKEN}" },
+              enabled: false,
+            },
           },
-        }])
+        ])
       })
     })
   })
@@ -63,7 +65,9 @@ describe("opencode asset plan", () => {
       test("#then the cwd carries over so the server starts where opencode started it", () => {
         const plan = fixture({ mcp: { rooted: { type: "local", command: ["./bin/server"], cwd: "/srv/tools" } } })
 
-        expect(plan.mcpServers).toEqual([{ name: "rooted", config: { type: "stdio", command: "./bin/server", cwd: "/srv/tools" } }])
+        expect(plan.mcpServers).toEqual([
+          { name: "rooted", config: { type: "stdio", command: "./bin/server", cwd: "/srv/tools" } },
+        ])
       })
     })
   })
@@ -77,10 +81,12 @@ describe("opencode asset plan", () => {
           },
         })
 
-        expect(plan.mcpServers).toEqual([{
-          name: "remote",
-          config: { type: "http", url: "https://example.test/mcp", headers: { A: "b" }, auth: false },
-        }])
+        expect(plan.mcpServers).toEqual([
+          {
+            name: "remote",
+            config: { type: "http", url: "https://example.test/mcp", headers: { A: "b" }, auth: false },
+          },
+        ])
       })
     })
   })
@@ -90,14 +96,24 @@ describe("opencode asset plan", () => {
       test("#then the client id, scopes and callback port carry over and a client secret is reported", () => {
         const plan = fixture({
           mcp: {
-            gh: { type: "remote", url: "https://gh.test/mcp", oauth: { clientId: "cid", clientSecret: "s3cret", scope: "repo read:org", callbackPort: 19876 } },
+            gh: {
+              type: "remote",
+              url: "https://gh.test/mcp",
+              oauth: { clientId: "cid", clientSecret: "s3cret", scope: "repo read:org", callbackPort: 19876 },
+            },
           },
         })
 
-        expect(plan.mcpServers).toEqual([{
-          name: "gh",
-          config: { type: "http", url: "https://gh.test/mcp", oauth: { clientId: "cid", callbackPort: 19876, scopes: ["repo", "read:org"] } },
-        }])
+        expect(plan.mcpServers).toEqual([
+          {
+            name: "gh",
+            config: {
+              type: "http",
+              url: "https://gh.test/mcp",
+              oauth: { clientId: "cid", callbackPort: 19876, scopes: ["repo", "read:org"] },
+            },
+          },
+        ])
         expect(plan.notices.join("\n")).toContain("gh oauth clientSecret")
         expect(plan.notices.join("\n")).not.toContain("s3cret")
       })
@@ -126,16 +142,25 @@ describe("opencode asset plan", () => {
       test("#then those servers are refused with a notice instead of carrying literal placeholder text", () => {
         const plan = fixture({
           mcp: {
-            "file-header": { type: "remote", url: "https://f.test/mcp", headers: { Authorization: "Bearer {file:~/.secrets/token}" } },
+            "file-header": {
+              type: "remote",
+              url: "https://f.test/mcp",
+              headers: { Authorization: "Bearer {file:~/.secrets/token}" },
+            },
             "dashed-env": { type: "local", command: ["tool"], environment: { TOKEN: "{env:MY-TOKEN}" } },
             plain: { type: "local", command: ["tool"], environment: { TOKEN: "{env:MY_TOKEN}" } },
           },
         })
 
-        expect(plan.mcpServers).toEqual([{ name: "plain", config: { type: "stdio", command: "tool", env: { TOKEN: "${MY_TOKEN}" } } }])
+        expect(plan.mcpServers).toEqual([
+          { name: "plain", config: { type: "stdio", command: "tool", env: { TOKEN: "${MY_TOKEN}" } } },
+        ])
         expect(plan.notices.join("\n")).toContain("file-header")
         expect(plan.notices.join("\n")).toContain("dashed-env")
-        expect(plan.refusedServers.map((server: { name: string }) => server.name)).toEqual(["file-header", "dashed-env"])
+        expect(plan.refusedServers.map((server: { name: string }) => server.name)).toEqual([
+          "file-header",
+          "dashed-env",
+        ])
       })
     })
   })
@@ -159,10 +184,12 @@ describe("opencode asset plan", () => {
           jsonc: `{\n  "mcp": {\n    "u": { "type": "remote", "url": "https://example.test/mcp" } // trailing\n  }\n}\n`,
         })
 
-        expect(plan.mcpServers).toEqual([{
-          name: "u",
-          config: { type: "http", url: "https://example.test/mcp" },
-        }])
+        expect(plan.mcpServers).toEqual([
+          {
+            name: "u",
+            config: { type: "http", url: "https://example.test/mcp" },
+          },
+        ])
       })
     })
   })
@@ -174,7 +201,9 @@ describe("opencode asset plan", () => {
           jsonc: `{\n  // forces the jsonc path\n  "mcp": {\n    "s": { "type": "local", "command": ["run", "a,]", "b, }",], },\n  },\n}\n`,
         })
 
-        expect(plan.mcpServers).toEqual([{ name: "s", config: { type: "stdio", command: "run", args: ["a,]", "b, }"] } }])
+        expect(plan.mcpServers).toEqual([
+          { name: "s", config: { type: "stdio", command: "run", args: ["a,]", "b, }"] } },
+        ])
       })
     })
   })
@@ -195,19 +224,25 @@ describe("opencode asset plan", () => {
   describe("#given both an opencode.json and an opencode.jsonc", () => {
     describe("#when they are planned", () => {
       test("#then both are read and merged the way opencode merges them, jsonc last", () => {
-        const plan = fixture({
-          mcp: {
-            "from-json": { type: "local", command: ["json-tool"] },
-            shared: { type: "local", command: ["shared-tool"], environment: { A: "1" } },
+        const plan = fixture(
+          {
+            mcp: {
+              "from-json": { type: "local", command: ["json-tool"] },
+              shared: { type: "local", command: ["shared-tool"], environment: { A: "1" } },
+            },
           },
-        }, {
-          jsonc: `{\n  // jsonc layer\n  "mcp": {\n    "from-jsonc": { "type": "remote", "url": "https://c.test/mcp" },\n    "shared": { "enabled": false, "environment": { "B": "2" } },\n  },\n}\n`,
-        })
+          {
+            jsonc: `{\n  // jsonc layer\n  "mcp": {\n    "from-jsonc": { "type": "remote", "url": "https://c.test/mcp" },\n    "shared": { "enabled": false, "environment": { "B": "2" } },\n  },\n}\n`,
+          },
+        )
 
         expect(plan.notices).toEqual([])
         expect(plan.mcpServers).toEqual([
           { name: "from-json", config: { type: "stdio", command: "json-tool" } },
-          { name: "shared", config: { type: "stdio", command: "shared-tool", env: { A: "1", B: "2" }, enabled: false } },
+          {
+            name: "shared",
+            config: { type: "stdio", command: "shared-tool", env: { A: "1", B: "2" }, enabled: false },
+          },
           { name: "from-jsonc", config: { type: "http", url: "https://c.test/mcp" } },
         ])
       })
@@ -239,13 +274,27 @@ describe("opencode asset plan", () => {
         const home = join(root, "home")
         const globalDir = join(root, "config", "opencode")
         const profileDir = join(root, "profile")
-        write(join(globalDir, "opencode.json"), JSON.stringify({ mcp: { global: { type: "local", command: ["g"] }, shared: { type: "local", command: ["from-global"] } } }))
-        write(join(profileDir, "opencode.jsonc"), `{ "mcp": { "profile": { "type": "local", "command": ["p"] }, "shared": { "command": ["from-profile"] }, }, }`)
+        write(
+          join(globalDir, "opencode.json"),
+          JSON.stringify({
+            mcp: { global: { type: "local", command: ["g"] }, shared: { type: "local", command: ["from-global"] } },
+          }),
+        )
+        write(
+          join(profileDir, "opencode.jsonc"),
+          `{ "mcp": { "profile": { "type": "local", "command": ["p"] }, "shared": { "command": ["from-profile"] }, }, }`,
+        )
         write(join(globalDir, "skills", "global-skill", "SKILL.md"), "---\nname: global-skill\ndescription: g\n---\n")
         write(join(home, ".opencode", "skill", "dot-skill", "SKILL.md"), "---\nname: dot-skill\ndescription: d\n---\n")
-        write(join(profileDir, "skills", "profile-skill", "SKILL.md"), "---\nname: profile-skill\ndescription: p\n---\n")
+        write(
+          join(profileDir, "skills", "profile-skill", "SKILL.md"),
+          "---\nname: profile-skill\ndescription: p\n---\n",
+        )
 
-        const plan = planOpencodeAssets({ home, env: { XDG_CONFIG_HOME: join(root, "config"), OPENCODE_CONFIG_DIR: profileDir } })
+        const plan = planOpencodeAssets({
+          home,
+          env: { XDG_CONFIG_HOME: join(root, "config"), OPENCODE_CONFIG_DIR: profileDir },
+        })
 
         expect(plan.mcpServers).toEqual([
           { name: "global", config: { type: "stdio", command: "g" } },
@@ -282,7 +331,10 @@ describe("opencode asset plan", () => {
         expect(plan.skills.map((skill) => skill.name)).toEqual(["good"])
         expect(plan.notices.join("\n")).toContain("skill no-skill-file has no SKILL.md")
         expect(plan.notices.join("\n")).toContain("skill no-description has no description")
-        expect(plan.skippedSkills.map((skill: { name: string }) => skill.name).sort()).toEqual(["no-description", "no-skill-file"])
+        expect(plan.skippedSkills.map((skill: { name: string }) => skill.name).sort()).toEqual([
+          "no-description",
+          "no-skill-file",
+        ])
       })
     })
   })

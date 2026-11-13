@@ -49,15 +49,7 @@ describe("task tool metadata awaiting", () => {
     }
 
     // when
-    const result = await executeBackgroundTask(
-      args,
-      ctx,
-      executorCtx,
-      parentContext,
-      "explore",
-      undefined,
-      undefined,
-    )
+    const result = await executeBackgroundTask(args, ctx, executorCtx, parentContext, "explore", undefined, undefined)
 
     // then
     expect(result).toContain("Background task launched")

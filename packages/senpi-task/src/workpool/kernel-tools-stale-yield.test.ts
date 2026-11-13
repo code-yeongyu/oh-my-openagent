@@ -10,7 +10,12 @@ describe("workpool workers after a stale kernel tool", () => {
   test("#given a worker that yields a stale kernel-tool error #when the pool closes #then one keyed error and one aggregate are delivered with no retry", async () => {
     const messages: WorkpoolAggregateMessage[] = []
     const f = deliveryFixture()
-    f.manager.workpools.bindAggregate({ enqueue: (message, receipts) => { messages.push(message); receipts.ack() } })
+    f.manager.workpools.bindAggregate({
+      enqueue: (message, receipts) => {
+        messages.push(message)
+        receipts.ack()
+      },
+    })
     const worker = await f.start("a")
     const turnsBefore = f.turns.length
 

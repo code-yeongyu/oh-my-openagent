@@ -2,13 +2,7 @@ import type { FallbackEntry } from "../../shared/model-requirements"
 import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
 import type { SessionPermissionRule } from "../../shared/question-denied-session-permission"
 
-export type BackgroundTaskStatus =
-  | "pending"
-  | "running"
-  | "completed"
-  | "error"
-  | "cancelled"
-  | "interrupt"
+export type BackgroundTaskStatus = "pending" | "running" | "completed" | "error" | "cancelled" | "interrupt"
 
 export interface ToolCallWindow {
   lastSignature: string

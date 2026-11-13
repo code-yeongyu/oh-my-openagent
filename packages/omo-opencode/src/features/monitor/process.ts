@@ -25,14 +25,17 @@ interface SpawnedMonitorProcess {
   readonly signalCode?: NodeJS.Signals | null
 }
 
-type SpawnFunction = (argv: readonly string[], options: {
-  readonly cwd?: string
-  readonly env?: Record<string, string>
-  readonly detached: boolean
-  readonly stdin: "ignore"
-  readonly stdout: "pipe"
-  readonly stderr: "pipe"
-}) => SpawnedMonitorProcess
+type SpawnFunction = (
+  argv: readonly string[],
+  options: {
+    readonly cwd?: string
+    readonly env?: Record<string, string>
+    readonly detached: boolean
+    readonly stdin: "ignore"
+    readonly stdout: "pipe"
+    readonly stderr: "pipe"
+  },
+) => SpawnedMonitorProcess
 
 const KILL_GRACE_MS = 5_000
 
@@ -122,18 +125,20 @@ export function spawnMonitoredProcess(
     settlePublicExit({ code: null, signal: "SIGALRM" })
   }, opts.maxRuntimeMs)
 
-  subprocess.exited.then((code) => {
-    actualExited = true
-    clearWatchdog()
-    clearGraceTimer()
-    settlePublicExit({ code, signal: subprocess.signalCode ?? null })
-  }).catch((error) => {
-    void error
-    actualExited = true
-    clearWatchdog()
-    clearGraceTimer()
-    settlePublicExit({ code: null, signal: null })
-  })
+  subprocess.exited
+    .then((code) => {
+      actualExited = true
+      clearWatchdog()
+      clearGraceTimer()
+      settlePublicExit({ code, signal: subprocess.signalCode ?? null })
+    })
+    .catch((error) => {
+      void error
+      actualExited = true
+      clearWatchdog()
+      clearGraceTimer()
+      settlePublicExit({ code: null, signal: null })
+    })
 
   return {
     kill,

@@ -64,9 +64,7 @@ describe("#given the OS matrix jobs that report required contexts", () => {
 describe("#given native binary parity, which has no ubuntu leg", () => {
   test("#then the whole job is skipped outside the full matrix and heavy validation", () => {
     const condition = String(job("ci.yml", "native-binary-parity")["if"])
-    expect(condition).toBe(
-      "needs.ci-mode.outputs.run_heavy == 'true' && needs.ci-mode.outputs.full_matrix == 'true'",
-    )
+    expect(condition).toBe("needs.ci-mode.outputs.run_heavy == 'true' && needs.ci-mode.outputs.full_matrix == 'true'")
   })
 })
 
@@ -82,8 +80,17 @@ describe("#given the path-filtered workflows that also run macOS/Windows on dev 
         if (body === undefined) throw new Error(`${file} concurrency must be an expression`)
         return new Function("github", `return ${toJavaScript(body)}`)(github)
       }
-      const group = (github: unknown) => String(concurrency["group"]).replace(/\$\{\{\s*(.+?)\s*\}\}/g, (_match, body: string) => String(new Function("github", `return ${toJavaScript(body)}`)(github)))
-      const pr = { workflow: "W", event_name: "pull_request", event: { pull_request: { number: 7 } }, ref: "refs/pull/7/merge", sha: "a" }
+      const group = (github: unknown) =>
+        String(concurrency["group"]).replace(/\$\{\{\s*(.+?)\s*\}\}/g, (_match, body: string) =>
+          String(new Function("github", `return ${toJavaScript(body)}`)(github)),
+        )
+      const pr = {
+        workflow: "W",
+        event_name: "pull_request",
+        event: { pull_request: { number: 7 } },
+        ref: "refs/pull/7/merge",
+        sha: "a",
+      }
       const push = (sha: string) => ({ workflow: "W", event_name: "push", event: {}, ref: "refs/heads/dev", sha })
 
       expect(group(pr)).toBe("W-7")

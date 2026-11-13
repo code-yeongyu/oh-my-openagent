@@ -5,10 +5,12 @@
 //! exec (1) permits; each admitted request waits for its reply, deadline, or
 //! `$/cancel` on its own task, so replies may leave out of order. A writer
 //! task owns the output behind a bounded channel. Queued notifications are
-//! written right after each reply (see [`crate::outbox`]).
+//! written right after each reply (see [`crate::outbox`]); on a `--serve`
+//! daemon they go to every live connection of the shared session.
 
 use std::collections::HashMap;
 use std::io;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use parking_lot::Mutex;
@@ -17,7 +19,7 @@ use senpi_desktop_core::methods::Method;
 use senpi_desktop_core::protocol::{MethodRejection, RequestId, RpcRequest};
 use serde_json::Value;
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
-use tokio::sync::mpsc::error::SendError;
+use tokio::sync::mpsc::error::{SendError, TrySendError};
 use tokio::sync::{mpsc, oneshot};
 
 use crate::engine::{Engine, SessionCall};
@@ -34,6 +36,52 @@ struct Queued {
     method: Method,
     call: SessionCall,
     cancel: oneshot::Receiver<()>,
+    /// The stop generation when the request arrived; a stop read after it
+    /// makes its reply a late one (see [`dispatch`]).
+    generation: u64,
+}
+
+/// The live connections of one `--serve` daemon. A notification drained by
+/// any of them is written to all of them (#12229 T25-18).
+#[derive(Clone, Default)]
+pub struct Fanout {
+    next: Arc<AtomicU64>,
+    live: Arc<Mutex<Vec<LiveConnection>>>,
+}
+
+/// A live connection's id and output.
+type LiveConnection = (u64, mpsc::Sender<String>);
+
+impl Fanout {
+    fn join(&self, out: mpsc::Sender<String>) -> u64 {
+        let id = self.next.fetch_add(1, Ordering::Relaxed);
+        self.live.lock().push((id, out));
+        id
+    }
+
+    fn leave(&self, id: u64) {
+        self.live.lock().retain(|(live, _)| *live != id);
+    }
+
+    /// Queues `line` on every live connection but `own`. A connection whose
+    /// output is full is not waited for; the line it misses is reported.
+    fn others(&self, own: u64, line: &str) {
+        for (id, out) in self.live.lock().iter() {
+            if *id == own {
+                continue;
+            }
+            if let Err(TrySendError::Full(_)) = out.try_send(line.to_owned()) {
+                eprintln!("senpi-desktop-engine: dropped a notification for --serve connection {id}: its output is full");
+            }
+        }
+    }
+}
+
+/// Where one connection's replies go, and the daemon's other connections.
+#[derive(Clone)]
+struct Outbound {
+    own: mpsc::Sender<String>,
+    shared: Option<(u64, Fanout)>,
 }
 
 /// Cancel handles of the requests of this connection that await a reply,
@@ -101,7 +149,26 @@ where
     R: AsyncRead + Unpin,
     W: AsyncWrite + Unpin + Send + 'static,
 {
-    serve_inner(engine, reader, writer, false).await
+    serve_inner(engine, reader, writer, false, None).await
+}
+
+/// A `--serve` client of the daemon's shared session: like
+/// [`serve_connection`], and notifications reach every connection in `fanout`.
+///
+/// # Errors
+/// Reading the input or writing the output failed.
+#[cfg(unix)]
+pub async fn serve_shared_connection<R, W>(
+    engine: Arc<Engine>,
+    reader: R,
+    writer: W,
+    fanout: &Fanout,
+) -> io::Result<()>
+where
+    R: AsyncRead + Unpin,
+    W: AsyncWrite + Unpin + Send + 'static,
+{
+    serve_inner(engine, reader, writer, false, Some(fanout)).await
 }
 
 #[cfg(any(test, target_os = "macos"))]
@@ -110,16 +177,24 @@ where
     R: AsyncRead + Unpin,
     W: AsyncWrite + Unpin + Send + 'static,
 {
-    serve_inner(engine, reader, writer, true).await
+    serve_inner(engine, reader, writer, true, None).await
 }
 
-async fn serve_inner<R, W>(engine: Arc<Engine>, reader: R, writer: W, disconnect_cancels: bool) -> io::Result<()>
+async fn serve_inner<R, W>(
+    engine: Arc<Engine>,
+    reader: R,
+    writer: W,
+    disconnect_cancels: bool,
+    fanout: Option<&Fanout>,
+) -> io::Result<()>
 where
     R: AsyncRead + Unpin,
     W: AsyncWrite + Unpin + Send + 'static,
 {
-    let (out, lines) = mpsc::channel(OUTBOUND_CAPACITY);
+    let (own, lines) = mpsc::channel(OUTBOUND_CAPACITY);
     let writer = tokio::spawn(write_lines(writer, lines));
+    let shared = fanout.map(|fanout| (fanout.join(own.clone()), fanout.clone()));
+    let out = Outbound { own, shared };
     let (queue, queued) = mpsc::unbounded_channel();
     let in_flight = InFlight::default();
     let dispatcher = tokio::spawn(dispatch(
@@ -129,6 +204,10 @@ where
         in_flight.clone(),
     ));
     let read = read_requests(&engine, reader, &out, &queue, &in_flight).await;
+    // The fanout's copy of this connection's sender would keep its writer open.
+    if let Some((id, fanout)) = &out.shared {
+        fanout.leave(*id);
+    }
     // A session connection's disconnect cancels everything; otherwise only
     // holds are interrupted so their input is released before draining.
     if disconnect_cancels { in_flight.cancel_all(); } else { in_flight.cancel_holds(); }
@@ -145,7 +224,7 @@ where
 async fn read_requests<R: AsyncRead + Unpin>(
     engine: &Engine,
     reader: R,
-    out: &mpsc::Sender<String>,
+    out: &Outbound,
     queue: &mpsc::UnboundedSender<Queued>,
     in_flight: &InFlight,
 ) -> io::Result<()> {
@@ -214,6 +293,7 @@ fn handle_line(
                 method,
                 call,
                 cancel,
+                generation: engine.stop_paths().generation(),
             };
             queue.send(queued).err().map(|unsent| {
                 let stopped = DesktopError::internal("the request dispatcher stopped");
@@ -240,14 +320,14 @@ pub(crate) fn parse_request(text: &[u8]) -> Result<RpcRequest, ParseFailure> {
 ///
 /// # Errors
 /// The writer stopped: nobody reads the output any more.
-async fn deliver(
-    engine: &Engine,
-    out: &mpsc::Sender<String>,
-    reply: String,
-) -> Result<(), SendError<String>> {
-    out.send(reply).await?;
+async fn deliver(engine: &Engine, out: &Outbound, reply: String) -> Result<(), SendError<String>> {
+    engine.announce_epochs();
+    out.own.send(reply).await?;
     for line in engine.outbox().drain() {
-        out.send(line).await?;
+        if let Some((id, fanout)) = &out.shared {
+            fanout.others(*id, &line);
+        }
+        out.own.send(line).await?;
     }
     Ok(())
 }

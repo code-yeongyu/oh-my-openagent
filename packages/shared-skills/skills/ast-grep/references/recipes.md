@@ -10,7 +10,7 @@ python3 scripts/ast_grep_helper.py replace '<PATTERN>' '<REWRITE>' [path] --lang
 python3 scripts/ast_grep_helper.py replace '<PATTERN>' '<REWRITE>' [path] --lang <LANG> --apply
 ```
 
-Put any `[path]` BEFORE `--lang`: the helper's `paths` argument is `nargs='*'`, and on Python 3.9 (the stock macOS `python3`, which the helper supports) a positional after `--lang` is rejected with `unrecognized arguments`. A pattern or rewrite containing a literal `|` (e.g. `$T | None`) is refused by the helper's alternation check — run two calls, or pass `--force` to reach `sg` anyway.
+Put any `[path]` BEFORE `--lang`: the helper's `paths` argument is `nargs='*'`, and older Pythons reject a positional after `--lang` with `unrecognized arguments` (measured on 3.9, the stock macOS `python3` the helper supports, and on 3.12; 3.13 and later accept either order). The path-first order works on every version. A pattern or rewrite containing a literal `|` (e.g. `$T | None`) is refused by the helper's alternation check — run two calls, or pass `--force` to reach `sg` anyway.
 
 Or directly:
 
