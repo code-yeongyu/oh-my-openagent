@@ -1,6 +1,8 @@
 // A PNG reader for the frames the engine returns, so a scenario asserts pixels rather than
 // the engine's own numbers. Only the 8-bit RGB/RGBA non-interlaced form the engine writes is
 // read; anything else throws, so a decoding slip can never pass as a pixel fact.
+import { inflateSync } from "node:zlib"
+
 import type { Raster } from "./pixels.ts"
 
 const SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
@@ -40,7 +42,8 @@ export function decodePng(bytes: Uint8Array): Raster {
     joined.set(part, written)
     written += part.length
   }
-  return unfilter(Bun.inflateSync(joined), header)
+  // IDAT is a zlib stream (RFC 1950); Bun.inflateSync reads raw DEFLATE only.
+  return unfilter(new Uint8Array(inflateSync(joined)), header)
 }
 
 function unfilter(raw: Uint8Array, header: { width: number; height: number; channels: number }): Raster {
