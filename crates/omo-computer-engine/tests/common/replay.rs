@@ -14,6 +14,7 @@ use super::peer::Peer;
 
 const SINK_PREFIX: &str = "fake-sink-";
 const RUNTIME_PLACEHOLDER: &str = "${RUNTIME_DIR}";
+const TOKEN_PLACEHOLDER: &str = "${RESUME_TOKEN}";
 
 pub struct Report {
     pub name: String,
@@ -82,12 +83,20 @@ fn env_for(case: &Case, runtime: &Path) -> Vec<(String, String)> {
 
 pub fn replay_case(case: &Case) -> Report {
     let runtime = tempfile::tempdir().expect("a runtime dir");
-    plant_in(runtime.path(), &case.plant);
-    let env = env_for(case, runtime.path());
+    if let Some(block) = &case.host {
+        super::host::setup(runtime.path(), block);
+    }
+    replay_case_in(case, runtime.path())
+}
+
+pub fn replay_case_in(case: &Case, runtime: &Path) -> Report {
+    plant_in(runtime, &case.plant);
+    let env = env_for(case, runtime);
     let spawn = || Peer::spawn(case.transport.args(), &env, &repo());
     let mut deltas = compare::load(&case.name);
     let mut failures = Vec::new();
     let persistent = case.transport != Transport::Oneshot;
+    let mut token: Option<String> = None;
     let mut peer = persistent.then(spawn);
     for (index, step) in case.steps.iter().enumerate() {
         let Step::Send { send, expect, sink } = step else {
@@ -102,7 +111,11 @@ pub fn replay_case(case: &Case) -> Report {
             Some(peer) => peer,
             None => oneshot.insert(spawn()),
         };
-        target.send(send);
+        let send = match &token {
+            Some(token) => serde_json::from_str(&send.to_string().replace(TOKEN_PLACEHOLDER, token)).expect("a substituted send"),
+            None => send.clone(),
+        };
+        target.send(&send);
         for (j, expectation) in expect.iter().enumerate() {
             let label = format!("step={} message={}", index + 1, j + 1);
             let Some(message) = target.next() else {
@@ -114,6 +127,9 @@ pub fn replay_case(case: &Case) -> Report {
                 deltas: &mut deltas,
                 failures: Vec::new(),
             };
+            if let Some(seen) = message["result"]["resumeToken"].as_str() {
+                token = Some(seen.to_owned());
+            }
             compare(&expectation.message, Some(&message), "", &mut ctx);
             failures.extend(ctx.failures.into_iter().map(|f| format!("MISMATCH {label} {f}")));
         }
@@ -121,7 +137,7 @@ pub fn replay_case(case: &Case) -> Report {
             failures.extend(done.close().into_iter().map(|m| format!("LEFTOVER {m}")));
         }
         if let Some(want) = sink {
-            let found = sink_count(runtime.path());
+            let found = sink_count(runtime);
             if found != *want {
                 failures.push(format!("MISMATCH step={} sink: expected {want} entries, found {found}", index + 1));
             }

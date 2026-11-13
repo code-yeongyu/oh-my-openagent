@@ -7,6 +7,9 @@
 mod case;
 #[path = "common/compare.rs"]
 mod compare;
+#[allow(dead_code, reason = "this binary only replays host blocks; it scripts no host itself")]
+#[path = "common/host.rs"]
+mod host;
 #[path = "common/peer.rs"]
 mod peer;
 #[path = "common/replay.rs"]

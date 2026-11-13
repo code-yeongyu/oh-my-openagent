@@ -1,0 +1,151 @@
+{
+  "description": "The host is unlatched at session.open, the engine is stopped, then the host's latch is set: stopPath.resume is refused Suspended{host_latch} (re-read at resume admission), and a fresh session.open relatches (d-safety.md '### 7.', round-13 fold). The resume carries the session's own valid token (read from the session.open reply), so the refusal holds whichever of the latch and the token is checked first (R70k).",
+  "transport": "stdio",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json",
+  "env": {
+    "OMO_COMPUTER_FAKE_STOP_PATH": "live"
+  },
+  "host": {
+    "identity": "pass",
+    "replies": [
+      {
+        "consentFingerprint": "fp-test",
+        "latch": {
+          "suspended": false,
+          "stopEpoch": 6
+        }
+      },
+      {
+        "consentFingerprint": "fp-test",
+        "latch": {
+          "suspended": true,
+          "stopEpoch": 7
+        }
+      }
+    ]
+  },
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session.open",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {}
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken",
+            "/result/consent",
+            "/result/generation",
+            "/result/session"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "stopPath.stop",
+        "params": {
+          "source": "user"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "suspended": true
+            }
+          },
+          "variable": [
+            "/result/globalLive",
+            "/result/hostRelayLive",
+            "/result/heartbeatFresh",
+            "/result/stopPath",
+            "/result/reason",
+            "/result/stopEpoch"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "stopPath.resume",
+        "params": {
+          "token": "${RESUME_TOKEN}"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "error": {
+              "code": -32015,
+              "message": "Suspended",
+              "data": {
+                "code": "Suspended",
+                "hint": null,
+                "reason": "host_latch",
+                "nothingSent": true
+              }
+            }
+          },
+          "variable": [
+            "/error/data/path",
+            "/error/data/disposition",
+            "/error/data/nextCall"
+          ]
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "restart": true
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "session.open",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "error": {
+              "code": -32015,
+              "message": "Suspended",
+              "data": {
+                "code": "Suspended",
+                "hint": null,
+                "reason": "host_latch",
+                "nothingSent": true
+              }
+            }
+          },
+          "variable": [
+            "/error/data/path",
+            "/error/data/disposition",
+            "/error/data/nextCall"
+          ]
+        }
+      ],
+      "sink": 0
+    }
+  ]
+}
