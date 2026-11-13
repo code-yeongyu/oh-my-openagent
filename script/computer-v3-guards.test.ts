@@ -123,7 +123,9 @@ describe("computer-v3-guards --residue", () => {
       // then the guard reports one finding that names the path, instead of crashing or calling it absent
       const result = repo.guard("--residue")
       expect(result.exitCode).toBe(1)
-      expect(result.findings.filter((line) => line.includes("crates/") && line.includes("cannot be checked (ELOOP)"))).toHaveLength(1)
+      expect(
+        result.findings.filter((line) => line.includes("crates/") && line.includes("cannot be checked (ELOOP)")),
+      ).toHaveLength(1)
     })
   })
 
