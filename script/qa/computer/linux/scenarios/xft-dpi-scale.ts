@@ -20,7 +20,7 @@ export const xftDpiScale: Scenario = {
     const { engine, procs, stage } = ctx
     await writeFile(join(stage.runDir, "resources"), "Xft.dpi: 192\n", "utf8")
     await procs.stdout(["xrdb", "-merge", join(stage.runDir, "resources")], stage.env)
-    procs.start(
+    const fixture = procs.start(
       "marker-window",
       fixtureWindow({
         title: TITLE,
@@ -31,7 +31,7 @@ export const xftDpiScale: Scenario = {
       }),
       stage.env,
     )
-    const id = await windowId(ctx, TITLE)
+    const id = await windowId(ctx, TITLE, fixture)
     await procs.stdout(["xdotool", "windowmove", id, String(WINDOW_AT.x), String(WINDOW_AT.y)], stage.env)
     const geometry = await windowGeometry(ctx, id)
 

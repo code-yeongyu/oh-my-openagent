@@ -18,11 +18,11 @@ export const occluderOracle: Scenario = {
   requires: ["xdotool", "xwd"],
   async run(ctx: Context): Promise<Checked> {
     const { engine, procs, stage } = ctx
-    procs.start("under-window", fixtureWindow({ ...TARGET, markers: [] }), stage.env)
-    const under = await windowId(ctx, TARGET.title)
+    const underFixture = procs.start("under-window", fixtureWindow({ ...TARGET, markers: [] }), stage.env)
+    const under = await windowId(ctx, TARGET.title, underFixture)
     const underGeometry = await windowGeometry(ctx, under)
 
-    procs.start(
+    const overFixture = procs.start(
       "occluder-window",
       fixtureWindow({
         title: OCCLUDER.title,
@@ -33,7 +33,7 @@ export const occluderOracle: Scenario = {
       }),
       stage.env,
     )
-    const over = await windowId(ctx, OCCLUDER.title)
+    const over = await windowId(ctx, OCCLUDER.title, overFixture)
     await procs.stdout(
       ["xdotool", "windowmove", over, String(underGeometry.x), String(underGeometry.y), "windowactivate", over],
       stage.env,
