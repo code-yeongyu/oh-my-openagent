@@ -2,10 +2,10 @@
 //! call's `timeout` (absent: the cap of the regime in force) on the backend's monotonic clock.
 //! No predicate lists windows or polls a tree; the call ends on an observation of its target.
 
-use omo_computer_core::backend::{NotificationFingerprint, Refusal};
+use omo_computer_core::backend::{NotificationFingerprint, Refusal, WindowFilter};
 use omo_computer_core::error::EngineCode;
 use omo_computer_core::observation::{Observation, SettleOutcome};
-use omo_computer_core::params::{ElementState, WaitForParams};
+use omo_computer_core::params::{ElementState, EventKind, WaitForParams, WindowState};
 use omo_computer_core::requests::{read_wait_for, ReadRequest, WaitSpec};
 use omo_computer_core::results::{NotificationMatch, WaitOutcome, WaitResult};
 use omo_computer_core::untrusted::UntrustedText;
@@ -84,12 +84,25 @@ impl Session {
                 outcome
             }
             WaitSpec::Window { state, title, app } => {
-                self.wait_event_match(&EventMatch::Window { state, title, app }, timeout_ms)
+                // A closed window cannot be read, so a gone wait names the windows it tracks
+                // up front: the target, or the windows the title and app pick (one listing).
+                let only = (state == WindowState::Gone)
+                    .then(|| self.tracked_windows(&target, title.as_deref(), app.as_deref()));
+                self.wait_event_match(
+                    &EventMatch::Window { state, title, app },
+                    only.as_deref(),
+                    timeout_ms,
+                )
             }
             WaitSpec::Surface { kind, state } => {
-                self.wait_event_match(&EventMatch::Surface { kind, state }, timeout_ms)
+                self.wait_event_match(&EventMatch::Surface { kind, state }, None, timeout_ms)
             }
-            WaitSpec::Event(kind) => self.wait_event_match(&EventMatch::Event(kind), timeout_ms),
+            // An event wait counts events on its target window; a window that opens is never
+            // the target, so `window_opened` counts every new window.
+            WaitSpec::Event(kind) => {
+                let only = (kind != EventKind::WindowOpened).then(|| vec![target.clone()]);
+                self.wait_event_match(&EventMatch::Event(kind), only.as_deref(), timeout_ms)
+            }
             WaitSpec::Text(text) => self.wait_observed(&target, timeout_ms, |_, o| {
                 o.tree.as_deref().is_some_and(|tree| tree.contains(&text))
             })?,
@@ -114,7 +127,37 @@ impl Session {
     }
 
     /// Waits for an observer event that `wanted` matches.
-    fn wait_event_match(&mut self, wanted: &EventMatch, timeout_ms: u64) -> WaitOutcome {
+    /// The windows a gone wait tracks: `target` when neither title nor app is named, else every
+    /// listed window whose title contains `title` and whose app is `app`.
+    fn tracked_windows(
+        &mut self,
+        target: &str,
+        title: Option<&str>,
+        app: Option<&str>,
+    ) -> Vec<String> {
+        if title.is_none() && app.is_none() {
+            return vec![target.to_owned()];
+        }
+        self.backend
+            .windows(&WindowFilter::default())
+            .map(|list| list.windows)
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|window| {
+                title.is_none_or(|wanted| window.title.contains(wanted))
+                    && app.is_none_or(|wanted| window.app == wanted)
+            })
+            .map(|window| window.id)
+            .collect()
+    }
+
+    /// Waits for an event `wanted` matches, on one of the windows in `only` when it is given.
+    fn wait_event_match(
+        &mut self,
+        wanted: &EventMatch,
+        only: Option<&[String]>,
+        timeout_ms: u64,
+    ) -> WaitOutcome {
         let Some(mut feed) = feed(self.backend.as_mut()) else {
             return WaitOutcome::Unsupported;
         };
@@ -124,7 +167,8 @@ impl Session {
                 Err(_) => return WaitOutcome::Unsupported,
                 Ok(None) => return WaitOutcome::Timeout,
                 Ok(Some(event)) => {
-                    if wanted.matches(&event, feed.backend().ax_reader()) {
+                    let on_tracked = only.is_none_or(|ids| ids.contains(&event.window));
+                    if on_tracked && wanted.matches(&event, feed.backend().ax_reader()) {
                         return WaitOutcome::Matched;
                     }
                 }
