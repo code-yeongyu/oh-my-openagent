@@ -220,7 +220,8 @@ const utf8 = (text: string): Uint8Array<ArrayBuffer> => {
 }
 
 /** salt = SHA-256("omo-sync/v1/recovery-phrase-salt" || 0x00 || UTF-8(NFC(account)) || enrollment_nonce[32]). */
-export const phraseSalt = (account: string, enrollmentNonce: Uint8Array): Promise<Uint8Array<ArrayBuffer>> => {
+export const phraseSalt = async (account: string, enrollmentNonce: Uint8Array): Promise<Uint8Array<ArrayBuffer>> => {
+  // Async so a wrong-length nonce rejects like every other failure of this Promise (#13330 checker LOW).
   if (enrollmentNonce.length !== NONCE_BYTES) throw new RangeError("an enrollment nonce is exactly 32 bytes")
   return sha256(concatBytes([asciiBytes(PHRASE_SALT_LABEL), Uint8Array.from([0]), utf8(account), enrollmentNonce]))
 }
@@ -284,15 +285,22 @@ export const derivePhraseKeys = async (
 ): Promise<RecoveryKeyPairs> => {
   const salt = await phraseSalt(account, enrollmentNonce)
   const ikm = Uint8Array.from(entropyOf(phrase))
+  // Every private key derived so far is overwritten if a later step throws (#13330 checker LOW).
+  const derived: Uint8Array[] = []
   try {
     const sealPrivate = await hkdfSha256(ikm, salt, asciiBytes(PHRASE_SEAL_LABEL))
+    derived.push(sealPrivate)
     const signSeed = await hkdfSha256(ikm, salt, asciiBytes(PHRASE_SIGN_LABEL))
+    derived.push(signSeed)
     return new PhraseKeyPairs({
       sealPrivate,
       sealPublic: x25519PublicKey(sealPrivate),
       signSeed,
       signPublic: await ed25519PublicKey(signSeed),
     })
+  } catch (error) {
+    for (const key of derived) key.fill(0)
+    throw error
   } finally {
     ikm.fill(0)
   }
