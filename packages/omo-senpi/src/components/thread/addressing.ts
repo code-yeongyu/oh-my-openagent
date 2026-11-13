@@ -165,10 +165,12 @@ function addressError(
 }
 
 function toCandidate(entry: ThreadAddressEntry): ThreadCandidate {
+  // #13304: a candidate from another device prints its title and project escaped; the entry itself stays as received.
+  const shown = entry.transport?.kind === "relay" ? escapeForDisplay : (text: string) => text
   return {
     id: entry.thread_id,
-    name: entry.name,
-    cwd: entry.cwd,
+    name: shown(entry.name),
+    cwd: shown(entry.cwd),
     preview: entry.preview ?? "",
     updatedAt: entry.updated_at,
     state: entry.status,

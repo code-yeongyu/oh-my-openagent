@@ -1,6 +1,6 @@
 import { AMBIGUOUS_CANDIDATE_LIMIT, normalizeThreadName, type ThreadCandidate } from "../addressing"
 import type { ThreadLocalAliasNote, ThreadStatus, ThreadToolResult } from "../contracts"
-import { createRelaySessionHost, listedThread } from "../control/relay-session-host"
+import { createRelaySessionHost, displayedThread } from "../control/relay-session-host"
 import type { HostedThread, SessionHost, SessionOpenRequest } from "../control/session-host"
 import { threadToolFailure } from "../errors"
 import {
@@ -227,7 +227,7 @@ export async function planCreate(
     if (target.kind === "error") return { kind: "done", result: target.result }
     if (target.kind === "local") return openHere(target.address)
     // A device's listing names its ended sessions too; only those are opened again, from their file (B's engine holds a live one).
-    if (target.row.state !== "ended") return alreadyLive(listedThread(target.row), target.row.device)
+    if (target.row.state !== "ended") return alreadyLive(displayedThread(target.row), target.row.device)
     return {
       kind: "open",
       host: createRelaySessionHost(remote, target.row.device, target.row),
@@ -381,7 +381,7 @@ export async function listAcross(
     threads: [
       ...local.threads,
       ...others.map((row) => {
-        const { sessionId: _routing, ...thread } = listedThread(row)
+        const { sessionId: _routing, ...thread } = displayedThread(row)
         return thread
       }),
     ],

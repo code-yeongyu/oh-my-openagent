@@ -1,4 +1,5 @@
 import type { CommandResult } from "@oh-my-opencode/device-service-core"
+import { escapeForDisplay } from "@oh-my-opencode/utils"
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import type { RemoteCommandOutcome } from "./ports"
 
@@ -82,45 +83,47 @@ export function outcomeFailure(
   outcome: Exclude<RemoteCommandOutcome, { readonly kind: "ok" }>,
   device: string,
 ): Failure {
+  // #13304: a reason another device sent is printed escaped; the comparisons below read it as received.
+  const reason = escapeForDisplay(outcome.reason)
   if (outcome.kind === "uncertain")
     return fail(
       "idempotency_uncertain",
-      `The command to device ${device} may or may not have run (${outcome.reason}).`,
+      `The command to device ${device} may or may not have run (${reason}).`,
       "Read the thread before deciding whether to retry.",
-      { device, reason: outcome.reason },
+      { device, reason },
     )
   if (outcome.reason === "capability_missing")
     return fail(
       "scope_denied",
       `Device ${device} does not grant this command.`,
       "Allow commands from this device on the other device, then retry.",
-      { device, reason: outcome.reason },
+      { device, reason },
     )
   if (outcome.reason === "host_detached")
     return fail(
       "host_unavailable",
       `Device ${device} is not attached to the relay.`,
       "Retry when that device is signed in and online.",
-      { device, reason: outcome.reason },
+      { device, reason },
     )
   if (UNANSWERED.has(outcome.reason))
     return fail(
       "host_unavailable",
-      `Device ${device} did not answer (${outcome.reason}); this call changed nothing there.`,
+      `Device ${device} did not answer (${reason}); this call changed nothing there.`,
       "Retry; nothing needs to be checked first.",
-      { device, reason: outcome.reason },
+      { device, reason },
     )
   if (outcome.reason === "record_too_large")
     return fail(
       "unsupported",
       `The thread on device ${device} is too large to send back in one relay record (record_too_large).`,
       "Read it on that device, or ask that thread for a summary with thread_send.",
-      { device, reason: outcome.reason },
+      { device, reason },
     )
   return fail(
     "unsupported",
-    `Device ${device} refused the command (${outcome.reason}).`,
+    `Device ${device} refused the command (${reason}).`,
     "Update omo on that device, or address a thread on this device.",
-    { device, reason: outcome.reason },
+    { device, reason },
   )
 }

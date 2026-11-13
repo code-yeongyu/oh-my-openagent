@@ -1,4 +1,5 @@
 export * from "./deep-merge"
+export * from "./escape-for-display"
 export * from "./config-merge"
 export * from "./config-section-parser"
 export * from "./env-expansion"

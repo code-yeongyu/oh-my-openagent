@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto"
+import { escapeForDisplay } from "@oh-my-opencode/utils"
 import { rowThreadId } from "./ports"
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import { hashArgs } from "../gateway/bindings"
@@ -356,9 +357,9 @@ export function createRelayTransport(
     if (sent.kind === "refused" && (ADMIT_UNSUPPORTED.has(sent.reason) || sent.reason.startsWith("Unknown command")))
       return fail(
         "unsupported",
-        `Device ${row.device} runs an engine without admit_external_message (${sent.reason}); a peer message cannot be delivered there as a delivery.`,
+        `Device ${row.device} runs an engine without admit_external_message (${escapeForDisplay(sent.reason)}); a peer message cannot be delivered there as a delivery.`,
         "Update omo and senpi on that device, then retry.",
-        { device: row.device, reason: sent.reason },
+        { device: row.device, reason: escapeForDisplay(sent.reason) },
       )
     if (sent.kind !== "ok") return outcomeFailure(sent, row.device)
     const reply = replyData(sent.response)
