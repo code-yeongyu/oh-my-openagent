@@ -74,6 +74,22 @@ fn next_post(posts: &[NotificationPost], start: u64, now: u64, until: u64) -> Op
         .min()
 }
 
+/// Fires every scripted stop-chord press due by `now`: the live listener's next poll reports it.
+fn fire_stop_presses(state: &mut FakeState, now: u64) {
+    let start = state.start_ms;
+    let due = state
+        .scenario
+        .stop_timeline
+        .iter()
+        .skip(state.stop_press_pos)
+        .take_while(|press| start.saturating_add(press.t_ms) <= now)
+        .count();
+    if due > 0 {
+        state.stop_press_pos += due;
+        state.stop_pressed = true;
+    }
+}
+
 /// The observer event a notification post raises on the notification surface's tree.
 pub const NOTIFICATION_EVENT: &str = "notification_posted";
 /// The window id the notification surface's events carry.
@@ -102,9 +118,11 @@ impl SettleSource for FakeSettleSource {
             .min();
         let Some(wake) = wake else {
             self.clock.advance(until_ms.saturating_sub(now));
+            fire_stop_presses(&mut state, until_ms.max(now));
             return Ok(None);
         };
         self.clock.advance(wake - now);
+        fire_stop_presses(&mut state, wake);
         if let Some((_, event)) = next_ax.filter(|(at, _)| *at == wake) {
             state.ax_event_pos = from + 1;
             return Ok(Some(AxEvent {
