@@ -19,12 +19,23 @@ test("#given a phrase genesis over the account and pairing routes #when the serv
     ...base,
     method: "phrase",
     phraseGate: openGate(),
-    genesis: { prfSupported: false, phraseSupported: true, createGenesis: f.input.genesis.createGenesis, createPhraseGenesis: phraseGenesis(scriptedSurface().surface) },
+    genesis: {
+      prfSupported: false,
+      phraseSupported: true,
+      createGenesis: f.input.genesis.createGenesis,
+      createPhraseGenesis: phraseGenesis(scriptedSurface().surface),
+    },
   })
   expect(result).toEqual({ kind: "joined", created: true })
   const seen = f.server.syncHeaders
   expect(new Set(seen.map((row) => row.path))).toEqual(
-    new Set(["/v1/sync/keys", "/v1/sync/state", "/v1/sync/entries", "/v1/account/sync", "/v1/devices/service-first/sync"]),
+    new Set([
+      "/v1/sync/keys",
+      "/v1/sync/state",
+      "/v1/sync/entries",
+      "/v1/account/sync",
+      "/v1/devices/service-first/sync",
+    ]),
   )
   expect(seen.filter((row) => row.capabilities !== "phrase" || row.version !== "1.44.0")).toEqual([])
 })

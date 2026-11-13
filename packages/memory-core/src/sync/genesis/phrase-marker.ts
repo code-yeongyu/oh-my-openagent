@@ -63,7 +63,10 @@ const readMarker = async (place: PhraseGenesisPlace): Promise<MarkerRead> => {
 }
 
 /** Atomic and durable: a crash leaves the old marker or the new one, never a torn file. */
-export const writePhraseGenesisMarker = async (place: PhraseGenesisPlace, marker: PhraseGenesisMarker): Promise<void> => {
+export const writePhraseGenesisMarker = async (
+  place: PhraseGenesisPlace,
+  marker: PhraseGenesisMarker,
+): Promise<void> => {
   const target = markerPath(place)
   await mkdir(dirname(target), { recursive: true, mode: 0o700 })
   const staging = `${target}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`
@@ -104,14 +107,15 @@ export const genesisLockHeldByLiveOwner = async (place: PhraseGenesisPlace): Pro
  * retired); otherwise the intent was never stored or was retired by a lost race, so the phrase is void.
  */
 export type GenesisPhraseState =
-  | { readonly kind: "none" }
-  | { readonly kind: "void" }
-  | { readonly kind: "saved" }
-  | { readonly kind: "unresolved" }
+  { readonly kind: "none" } | { readonly kind: "void" } | { readonly kind: "saved" } | { readonly kind: "unresolved" }
 
 export const genesisPhraseState = async (
   place: PhraseGenesisPlace,
-  facts: { readonly intentPresent: boolean; readonly pinnedGenesisDigest: string | null; readonly chainEmpty?: boolean },
+  facts: {
+    readonly intentPresent: boolean
+    readonly pinnedGenesisDigest: string | null
+    readonly chainEmpty?: boolean
+  },
 ): Promise<GenesisPhraseState> => {
   const read = await readMarker(place)
   if (read.kind === "absent" || facts.intentPresent) return { kind: "none" }

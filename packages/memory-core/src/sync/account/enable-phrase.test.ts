@@ -19,7 +19,10 @@ afterEach(async () => {
   for (const close of cleanups.splice(0).reverse()) await close()
 })
 
-const setup = async (plan: SurfacePlan = {}, options: { readonly prf?: boolean; readonly onConfirm?: () => void | Promise<void> } = {}) => {
+const setup = async (
+  plan: SurfacePlan = {},
+  options: { readonly prf?: boolean; readonly onConfirm?: () => void | Promise<void> } = {},
+) => {
   const f = await fixture()
   cleanups.push(f.close)
   const person = scriptedSurface(plan, { ...(options.onConfirm === undefined ? {} : { onConfirm: options.onConfirm }) })
@@ -36,7 +39,15 @@ const setup = async (plan: SurfacePlan = {}, options: { readonly prf?: boolean; 
       () => false,
     )
   const input = { ...f.input, phraseGate: openGate() }
-  return { f, input, person, genesis, place, intentExists, marker: () => phraseMarkerExists(f.input.pinDir, place.principalId) }
+  return {
+    f,
+    input,
+    person,
+    genesis,
+    place,
+    intentExists,
+    marker: () => phraseMarkerExists(f.input.pinDir, place.principalId),
+  }
 }
 
 test("#given an empty account and no method #when enable runs #then it answers method_required with the offered methods and writes nothing", async () => {
@@ -54,7 +65,9 @@ test("#given an empty account and no method #when enable runs #then it answers m
 
 test("#given no PRF #when the passkey method is asked for #then it answers passkey_unavailable and writes nothing", async () => {
   const s = await setup()
-  expect(await enableSync({ ...s.input, genesis: s.genesis, method: "passkey" })).toEqual({ kind: "passkey_unavailable" })
+  expect(await enableSync({ ...s.input, genesis: s.genesis, method: "passkey" })).toEqual({
+    kind: "passkey_unavailable",
+  })
   expect(s.f.server.switches).toEqual([])
   expect(s.f.ceremonies()).toBe(0)
 })
@@ -62,7 +75,10 @@ test("#given no PRF #when the passkey method is asked for #then it answers passk
 test("#given no phrase surface in this process #when the phrase method is asked for #then it answers phrase_unavailable and writes nothing", async () => {
   const s = await setup()
   const genesis = { prfSupported: false, createGenesis: s.genesis.createGenesis }
-  expect(await enableSync({ ...s.input, genesis, method: "phrase" })).toEqual({ kind: "phrase_unavailable", reason: "no-surface" })
+  expect(await enableSync({ ...s.input, genesis, method: "phrase" })).toEqual({
+    kind: "phrase_unavailable",
+    reason: "no-surface",
+  })
   expect(s.f.server.switches).toEqual([])
   expect(await s.marker()).toBe(false)
 })
@@ -71,11 +87,19 @@ test("#given the phrase method #when the person confirms #then nothing is switch
   let switchesAtConfirm: ReadonlyArray<string> | undefined
   const s = await setup({}, { onConfirm: () => void (switchesAtConfirm = [...s.f.server.switches]) })
   const ceremonies: string[] = []
-  const outcome = await enableSync({ ...s.input, genesis: s.genesis, method: "phrase", onCeremony: (method) => void ceremonies.push(method) })
+  const outcome = await enableSync({
+    ...s.input,
+    genesis: s.genesis,
+    method: "phrase",
+    onCeremony: (method) => void ceremonies.push(method),
+  })
   expect(outcome).toEqual({ kind: "joined", created: true })
   expect(ceremonies).toEqual(["phrase"])
   expect(switchesAtConfirm).toEqual([])
-  expect(s.f.server.switches).toEqual(['/v1/account/sync {"enabled":true}', '/v1/devices/service-first/sync {"enabled":true}'])
+  expect(s.f.server.switches).toEqual([
+    '/v1/account/sync {"enabled":true}',
+    '/v1/devices/service-first/sync {"enabled":true}',
+  ])
   const first = s.f.entries[0]
   const body = first?.kind === "keyring" ? first.body : undefined
   expect(body?.kind).toBe("genesis")
@@ -85,7 +109,11 @@ test("#given the phrase method #when the person confirms #then nothing is switch
   expect(await s.intentExists()).toBe(false)
 })
 
-for (const plan of [{ show: false }, { answers: ["cancel"] }, { answers: ["wrong", "cancel"] }] satisfies SurfacePlan[]) {
+for (const plan of [
+  { show: false },
+  { answers: ["cancel"] },
+  { answers: ["wrong", "cancel"] },
+] satisfies SurfacePlan[]) {
   test(`#given the phrase method #when the person cancels (${JSON.stringify(plan)}) #then switches, intent, chain and marker are untouched`, async () => {
     const s = await setup(plan)
     expect(await enableSync({ ...s.input, genesis: s.genesis, method: "phrase" })).toEqual({ kind: "cancelled" })
@@ -98,7 +126,10 @@ for (const plan of [{ show: false }, { answers: ["cancel"] }, { answers: ["wrong
 
 test("#given a wrong 3-word answer #when the person retries #then it is asked again and commits only after it matches", async () => {
   const s = await setup({ answers: ["wrong", "wrong", "right"] })
-  expect(await enableSync({ ...s.input, genesis: s.genesis, method: "phrase" })).toEqual({ kind: "joined", created: true })
+  expect(await enableSync({ ...s.input, genesis: s.genesis, method: "phrase" })).toEqual({
+    kind: "joined",
+    created: true,
+  })
   expect(s.person.calls.confirm).toBe(3)
 })
 

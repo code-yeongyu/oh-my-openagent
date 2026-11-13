@@ -64,7 +64,12 @@ export const createPhraseGenesisBridge =
     const bytes = random.bytes ?? randomBytes
     const phrase = (random.phrase ?? generateRecoveryPhrase)()
     try {
-      const confirmed = await showAndConfirm(surface, phrase, options.operation, random.positions ?? confirmationPositions)
+      const confirmed = await showAndConfirm(
+        surface,
+        phrase,
+        options.operation,
+        random.positions ?? confirmationPositions,
+      )
       if (!confirmed) return { ok: false, reason: "cancelled" }
       const nonce = bytes(32)
       const keys = await derivePhraseKeys(phrase, request.account, nonce)
