@@ -1,4 +1,4 @@
-import { afterEach } from "bun:test"
+import { onTestFinished } from "bun:test"
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -7,6 +7,7 @@ import {
   buildIdentityPaths,
   ReflectionReservationStore,
   TranscriptJournal,
+  type InFlightReads,
   type MemoryIdentity,
   type ReservedRun,
   type TranscriptEntry,
@@ -29,11 +30,6 @@ import { createShutdownDrain, type ShutdownDrainSteps } from "./shutdown-drain"
 export const CONVERSATION = "conversation-a"
 export const NOW_MS = Date.parse("2026-08-10T12:00:00.000Z")
 export const IDLE_MS = 30 * 60_000
-
-const roots: string[] = []
-afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
-})
 
 export function triggerSettings(overrides: Partial<DreamTriggerSettings> = {}): DreamTriggerSettings {
   return { ...DEFAULT_DREAM_TRIGGER_SETTINGS, ...overrides }
@@ -82,22 +78,33 @@ export interface Fixture {
   readonly session: DreamTriggerSession
 }
 
-export async function fixture(options: {
-  readonly settings?: Partial<DreamTriggerSettings>
-  readonly lastDreamAt?: string
-  readonly conversationText?: string | null
-  readonly reservationStore?: DreamTriggerSession["store"]
-  readonly now?: () => number
-} = {}): Promise<Fixture> {
+export async function fixture(
+  options: {
+    readonly settings?: Partial<DreamTriggerSettings>
+    readonly lastDreamAt?: string
+    readonly conversationText?: string | null
+    readonly reservationStore?: DreamTriggerSession["store"]
+    readonly now?: () => number
+    readonly work?: InFlightReads
+  } = {},
+): Promise<Fixture> {
   const root = await mkdtemp(join(tmpdir(), "omo-dream-trigger-"))
-  roots.push(root)
-  const identity: MemoryIdentity = { id: "agent-test", safeSlug: "agent-test", paths: buildIdentityPaths(root, "agent-test") }
-  const text = options.conversationText === undefined ? "x".repeat(DREAM_VOLUME_GATE_BYTES + 1) : options.conversationText
+  onTestFinished(() => rm(root, { recursive: true, force: true }))
+  const identity: MemoryIdentity = {
+    id: "agent-test",
+    safeSlug: "agent-test",
+    paths: buildIdentityPaths(root, "agent-test"),
+  }
+  const text =
+    options.conversationText === undefined ? "x".repeat(DREAM_VOLUME_GATE_BYTES + 1) : options.conversationText
   if (text !== null) await writeConversation(identity.paths.transcripts, CONVERSATION, text)
   if (options.lastDreamAt !== undefined) {
     const dreamDir = join(identity.paths.runtime, "dream")
     await mkdir(dreamDir, { recursive: true })
-    await writeFile(join(dreamDir, "state.json"), `${JSON.stringify({ last_dream_at: options.lastDreamAt, lastRunId: "run-0" })}\n`)
+    await writeFile(
+      join(dreamDir, "state.json"),
+      `${JSON.stringify({ last_dream_at: options.lastDreamAt, lastRunId: "run-0" })}\n`,
+    )
   }
   let runCounter = 0
   const store = new ReflectionReservationStore({
@@ -134,6 +141,7 @@ export async function fixture(options: {
     resolveSettings: () => triggerSettings(options.settings),
     now: options.now ?? (() => NOW_MS),
     scheduler,
+    ...(options.work === undefined ? {} : { work: options.work }),
     logger: {
       info: () => {},
       warn: (message, details) => warnings.push({ message, details }),

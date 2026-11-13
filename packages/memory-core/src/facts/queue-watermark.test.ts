@@ -6,18 +6,15 @@ import { realpathSync } from "node:fs"
 
 import { buildIdentityPaths, type MemoryIdentityPaths } from "../identity"
 import type { TranscriptEntry } from "../journal"
-import {
-  FactsQueue,
-  factsQueuePaths,
-  type FactsEnqueueRequest,
-} from "./queue"
+import { FactsQueue, factsQueuePaths, type FactsEnqueueRequest } from "./queue"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const IDENTITY = "facts-queue-agent"
 const CONVERSATION = "conversation-alpha"
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })))
 })
 
 async function identityFixture(): Promise<MemoryIdentityPaths> {
@@ -65,7 +62,7 @@ function clockFrom(start: number): () => Date {
 }
 
 async function queueFileNames(paths: MemoryIdentityPaths): Promise<string[]> {
-  const names = await readdir(paths.factsQueue).catch(() => [] as string[])
+  const names = await readdir(paths.factsQueue).catch(() => [])
   return names.filter((name) => name.endsWith(".json") && name !== "consumed.json").sort()
 }
 
@@ -147,10 +144,7 @@ describe("facts queue watermark monotonicity", () => {
 
     // then
     expect(next.enqueued).toBe(true)
-    const ranges = (await queue.listPending()).map((item) => [
-      item.range.start_message_id,
-      item.range.end_message_id,
-    ])
+    const ranges = (await queue.listPending()).map((item) => [item.range.start_message_id, item.range.end_message_id])
     expect(ranges).toEqual([
       ["m1", "m2"],
       ["m3", "m4"],

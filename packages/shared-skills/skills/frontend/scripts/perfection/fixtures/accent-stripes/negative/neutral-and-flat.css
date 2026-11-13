@@ -1,0 +1,6 @@
+.list-item { border-bottom: 1px solid #e5e7eb; }
+.panel { border-radius: 12px; border-top: 1px solid rgba(0, 0, 0, 0.08); }
+.quiet { border-radius: 12px; border-left: 4px solid #e5e7eb; }
+blockquote { border-left: 3px solid #d4d4d8; padding-left: 16px; }
+.token { border-radius: 8px; border-left: 2px solid var(--color-border); }
+.ink { border-radius: 8px; border-left: 2px solid var(--text-primary); }

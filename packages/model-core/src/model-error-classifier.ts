@@ -1,6 +1,7 @@
 import type { FallbackEntry } from "./model-requirements"
 import type { ProviderCache } from "./provider-cache"
 import * as connectedProvidersCache from "./connected-providers-cache"
+import { classifyRuntimeFallbackError, isTerminalQuotaError } from "./runtime-fallback-error-classifier"
 
 /**
  * Error names that indicate a retryable model error.
@@ -12,12 +13,6 @@ const RETRYABLE_ERROR_NAMES = new Set([
   "modelunavailableerror",
   "providerconnectionerror",
   "authenticationerror",
-])
-
-const STOP_ERROR_NAMES = new Set([
-  "quotaexceedederror",
-  "insufficientcreditserror",
-  "freeusagelimiterror",
 ])
 
 /**
@@ -79,55 +74,16 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "selected provider is forbidden",
   "provider is forbidden",
   // Chinese retryable patterns (Zhipu, etc.)
-  "频率限制",           // "rate limit"
-  "请求过于频繁",       // "too many requests"
-  "暂时不可用",         // "temporarily unavailable"
-  "服务不可用",         // "service unavailable"
+  "频率限制", // "rate limit"
+  "请求过于频繁", // "too many requests"
+  "暂时不可用", // "temporarily unavailable"
+  "服务不可用", // "service unavailable"
   "server_error",
   "an error occurred while processing",
   "upstream request failed",
 ]
 
-/**
- * Message patterns that indicate a non-retryable STOP error (quota/billing exhaustion).
- * These take precedence over RETRYABLE_MESSAGE_PATTERNS.
- */
-const STOP_MESSAGE_PATTERNS = [
-  "quota will reset after",
-  "quota exceeded",
-  "free usage limit",
-  "billing limit",
-  "billing hard limit",
-  "monthly limit",
-  "plan limit",
-  "subscription quota",
-  "subscription limit",
-  "payment required",
-  "out of credits",
-  "credits exhausted",
-  "insufficient credits",
-  "insufficient balance",
-  "credit balance",
-  "usage limit for this month",
-  "exhausted your capacity",
-  // GLM/Z.ai business error codes that indicate permanent quota/billing exhaustion
-  "daily call limit",
-  "daily limit",
-  "usage limit reached for",
-  "in arrears",
-  "fair use policy",
-  "recharge and try",
-  "使用上限",
-  "额度不足",
-  "余额不足",
-  "已耗尽",
-]
-
-const AUTO_RETRY_GATE_PATTERNS = [
-  "rate limit",
-  "cooling down",
-  "credentials for model",
-]
+const AUTO_RETRY_GATE_PATTERNS = ["rate limit", "cooling down", "credentials for model"]
 
 function hasProviderAutoRetrySignal(message: string): boolean {
   if (!message.includes("retrying in")) {
@@ -148,29 +104,25 @@ export interface ErrorInfo {
  * Returns true if it's a known retryable type OR matches retryable message patterns.
  */
 export function isRetryableModelError(error: ErrorInfo): boolean {
-  // If we have an error name, check against known lists
-  if (error.name) {
-    const errorNameLower = error.name.toLowerCase()
-    // Explicit non-retryable takes precedence
-    if (NON_RETRYABLE_ERROR_NAMES.has(errorNameLower)) {
-      return false
-    }
-    if (STOP_ERROR_NAMES.has(errorNameLower)) {
-      return false
-    }
-    // Check if it's a known retryable error
-    if (RETRYABLE_ERROR_NAMES.has(errorNameLower)) {
-      return true
-    }
-  }
-
-  // Check message patterns for unknown errors
-  const msg = error.message?.toLowerCase() ?? ""
-
-  // STOP patterns take precedence over retryable patterns
-  if (STOP_MESSAGE_PATTERNS.some((pattern) => msg.includes(pattern))) {
+  const errorNameLower = error.name?.toLowerCase()
+  if (errorNameLower !== undefined && NON_RETRYABLE_ERROR_NAMES.has(errorNameLower)) {
     return false
   }
+
+  // One vocabulary for both classifiers: a usage, quota, or billing limit moves the chain to the next
+  // model; only a quota the provider marks as terminal stops it.
+  if (isTerminalQuotaError(error)) {
+    return false
+  }
+  if (classifyRuntimeFallbackError(error) === "quota_exceeded") {
+    return true
+  }
+
+  if (errorNameLower !== undefined && RETRYABLE_ERROR_NAMES.has(errorNameLower)) {
+    return true
+  }
+
+  const msg = error.message?.toLowerCase() ?? ""
 
   if (hasProviderAutoRetrySignal(msg)) {
     return true
@@ -178,10 +130,7 @@ export function isRetryableModelError(error: ErrorInfo): boolean {
 
   // HTTP status code check: catches rate-limit errors regardless of message format/language.
   // Uses the same codes as runtime-fallback config (400 excluded as it is a permanent client error).
-  if (
-    error.statusCode != null &&
-    (error.statusCode === 429 || error.statusCode === 503 || error.statusCode === 529)
-  ) {
+  if (error.statusCode != null && (error.statusCode === 429 || error.statusCode === 503 || error.statusCode === 529)) {
     return true
   }
 
@@ -200,20 +149,14 @@ export function shouldRetryError(error: ErrorInfo): boolean {
  * Gets the next fallback model from the chain based on attempt count.
  * Returns undefined if all fallbacks have been exhausted.
  */
-export function getNextFallback(
-  fallbackChain: FallbackEntry[],
-  attemptCount: number,
-): FallbackEntry | undefined {
+export function getNextFallback(fallbackChain: FallbackEntry[], attemptCount: number): FallbackEntry | undefined {
   return fallbackChain[attemptCount]
 }
 
 /**
  * Checks if there are more fallbacks available after the current attempt.
  */
-export function hasMoreFallbacks(
-  fallbackChain: FallbackEntry[],
-  attemptCount: number,
-): boolean {
+export function hasMoreFallbacks(fallbackChain: FallbackEntry[], attemptCount: number): boolean {
   return attemptCount < fallbackChain.length
 }
 
@@ -224,15 +167,8 @@ export function hasMoreFallbacks(
  * 2) Preferred provider when connected (and entry providers are unavailable)
  * 3) First provider listed in the fallback entry
  */
-export function selectFallbackProvider(
-  providers: string[],
-  preferredProviderID?: string,
-): string {
-  return selectFallbackProviderWithCache(
-    providers,
-    connectedProvidersCache,
-    preferredProviderID,
-  )
+export function selectFallbackProvider(providers: string[], preferredProviderID?: string): string {
+  return selectFallbackProviderWithCache(providers, connectedProvidersCache, preferredProviderID)
 }
 
 export function selectFallbackProviderWithCache(
@@ -242,7 +178,7 @@ export function selectFallbackProviderWithCache(
 ): string {
   const connectedProviders = providerCache.readConnectedProvidersCache()
   if (connectedProviders) {
-    const connectedSet = new Set(connectedProviders.map(p => p.toLowerCase()))
+    const connectedSet = new Set(connectedProviders.map((p) => p.toLowerCase()))
 
     for (const provider of providers) {
       if (connectedSet.has(provider.toLowerCase())) {
@@ -250,10 +186,7 @@ export function selectFallbackProviderWithCache(
       }
     }
 
-    if (
-      preferredProviderID &&
-      connectedSet.has(preferredProviderID.toLowerCase())
-    ) {
+    if (preferredProviderID && connectedSet.has(preferredProviderID.toLowerCase())) {
       return preferredProviderID
     }
   }

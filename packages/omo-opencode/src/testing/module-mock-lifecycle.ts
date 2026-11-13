@@ -8,9 +8,7 @@ type MockApi = {
   restore: () => unknown
 }
 
-type ModuleLoadResult =
-  | { ok: true; value: unknown }
-  | { ok: false; error: Error }
+type ModuleLoadResult = { ok: true; value: unknown } | { ok: false; error: Error }
 
 type ModuleSnapshot = {
   restoreSpecifier: string
@@ -26,7 +24,7 @@ type ActiveModuleMock = {
 type ModuleMockLifecycleOptions = {
   getCallerUrl?: () => string
   resolveSpecifier?: (specifier: string, callerUrl: string) => string
-  loadOriginalModule?: (specifier: string, callerUrl: string) => ModuleLoadResult
+  loadUnmockedModule?: (specifier: string, callerUrl: string) => ModuleLoadResult
   shouldPreserveActiveMocksOnRestore?: () => boolean
   registerGlobalRestore?: boolean
 }
@@ -117,7 +115,7 @@ function defaultResolveSpecifier(specifier: string, callerUrl: string): string {
   }
 }
 
-function defaultLoadOriginalModule(specifier: string, callerUrl: string): ModuleLoadResult {
+function defaultLoadUnmockedModule(specifier: string, callerUrl: string): ModuleLoadResult {
   try {
     const require = createRequire(callerUrl)
     return { ok: true, value: require(specifier) }
@@ -144,10 +142,12 @@ export function installModuleMockLifecycle(
   const delegateRestore = mockApi.restore.bind(mockApi)
   const getCallerUrl = options.getCallerUrl ?? defaultGetCallerUrl
   const resolveSpecifier = options.resolveSpecifier ?? defaultResolveSpecifier
-  const loadOriginalModule = options.loadOriginalModule ?? defaultLoadOriginalModule
-  const shouldPreserveActiveMocksOnRestore = options.shouldPreserveActiveMocksOnRestore ?? (() => {
-    return new Error().stack?.includes("/test-setup.ts") ?? false
-  })
+  const loadUnmockedModule = options.loadUnmockedModule ?? defaultLoadUnmockedModule
+  const shouldPreserveActiveMocksOnRestore =
+    options.shouldPreserveActiveMocksOnRestore ??
+    (() => {
+      return new Error().stack?.includes("/test-setup.ts") ?? false
+    })
   const preserveOwners = new Set<string>()
   let handledPreserveCleanup = false
 
@@ -290,7 +290,7 @@ export function installModuleMockLifecycle(
     const restoreSpecifier = resolveSpecifier(specifier, callerUrl)
 
     if (!snapshots.has(restoreSpecifier)) {
-      const originalModule = loadOriginalModule(specifier, callerUrl)
+      const originalModule = loadUnmockedModule(specifier, callerUrl)
 
       if (originalModule.ok) {
         const clonedExports = cloneModuleExports(originalModule.value)

@@ -1,13 +1,13 @@
 import type { ChildHandle, CreateChildSession, InProcessRunnerLike } from "@oh-my-opencode/senpi-task"
 
 import type { ComponentLogger } from "../../extension/types"
-import { abortAndDispose } from "./kibitzer-lifecycle"
 
 const DEFAULT_DEADLINE_MS = 5 * 60_000
 
 type TaskRuntime = typeof import("#omo-task-runtime")
 export type StartChildInput = Parameters<InProcessRunnerLike["start"]>[0]
-export type InProcessMemoryChildState = { cancelled: boolean; cancel?: () => void }
+/** `released` settles once a child that started (even after the run returned) has been disposed. */
+export type InProcessMemoryChildState = { cancelled: boolean; cancel?: () => void; released?: Promise<void> }
 
 export type MemoryChildResult =
   | { readonly status: "completed" }
@@ -32,17 +32,22 @@ export async function runInProcessMemoryChild(input: RunInProcessMemoryChildInpu
   let deadlineReached = false
   let resolveCancelled: (() => void) | undefined
   let disposal: Promise<void> | undefined
-  const cancelled = new Promise<"cancelled">((resolve) => { resolveCancelled = () => resolve("cancelled") })
+  const cancelled = new Promise<"cancelled">((resolve) => {
+    resolveCancelled = () => resolve("cancelled")
+  })
   input.state.cancel = () => {
     input.state.cancelled = true
     resolveCancelled?.()
   }
   input.onState?.(input.state)
   const deadline = new Promise<"deadline">((resolve) => {
-    deadlineTimer = setTimeout(() => {
-      deadlineReached = true
-      resolve("deadline")
-    }, Math.max(0, input.deadlineMs ?? DEFAULT_DEADLINE_MS))
+    deadlineTimer = setTimeout(
+      () => {
+        deadlineReached = true
+        resolve("deadline")
+      },
+      Math.max(0, input.deadlineMs ?? DEFAULT_DEADLINE_MS),
+    )
     deadlineTimer.unref?.()
   })
   const expired = (): boolean => deadlineReached || input.state.cancelled
@@ -65,11 +70,11 @@ export async function runInProcessMemoryChild(input: RunInProcessMemoryChildInpu
     input.onSetupSettled?.()
     const taskRuntime = await import("#omo-task-runtime")
     if (expired()) return undefined
-    const runner = input.createRunner?.(
-      input.createSession === undefined ? {} : { createSession: input.createSession },
-    ) ?? taskRuntime.createInProcessJudgeRunner(
-      input.createSession === undefined ? {} : { createSession: input.createSession },
-    )
+    const runner =
+      input.createRunner?.(input.createSession === undefined ? {} : { createSession: input.createSession }) ??
+      taskRuntime.createInProcessJudgeRunner(
+        input.createSession === undefined ? {} : { createSession: input.createSession },
+      )
     return runner.start(input.buildStart(taskRuntime))
   })()
   const setupResult = setup.then(
@@ -92,7 +97,9 @@ export async function runInProcessMemoryChild(input: RunInProcessMemoryChildInpu
     if (settled === "deadline") {
       input.state.cancel?.()
       void setup.then(
-        (handle) => { if (handle !== undefined) void disposeOnce(handle, true) },
+        (handle) => {
+          if (handle !== undefined) void disposeOnce(handle, true)
+        },
         () => undefined,
       )
       return { status: "failed", cause: "deadline" }
@@ -114,17 +121,32 @@ export async function runInProcessMemoryChild(input: RunInProcessMemoryChildInpu
     if (turn.status !== "completed") return { status: "failed", cause: "child_failed" }
     return { status: "completed" }
   } catch (error: unknown) {
-    input.logger?.warn("kibitzer gate child session creation failed", {
-      error: error instanceof Error ? error.message : String(error),
+    input.logger?.warn("memory child session creation failed", {
+      error: describe(error),
       runId: input.runId,
     })
     return { status: "failed", cause: "session_create_failed" }
   } finally {
     clearTimeout(deadlineTimer)
     input.state.cancel = undefined
-    void setup.then(
-      (handle) => { if (handle !== undefined) void disposeOnce(handle, expired()) },
+    input.state.released = setup.then(
+      (handle) => (handle === undefined ? undefined : disposeOnce(handle, expired())),
       () => undefined,
     )
   }
+}
+
+/** Abort the child's turn, then dispose it even when the abort itself failed. */
+async function abortAndDispose(handle: ChildHandle, logger: ComponentLogger | undefined, runId: string): Promise<void> {
+  try {
+    await handle.abort()
+  } catch (error) {
+    logger?.warn("memory child abort failed", { error: describe(error), runId })
+  } finally {
+    handle.dispose()
+  }
+}
+
+function describe(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }

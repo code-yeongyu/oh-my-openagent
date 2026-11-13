@@ -3,7 +3,9 @@ import { describe, test, expect, mock, afterAll } from "bun:test"
 const mockLog = mock()
 mock.module("../../shared/logger", () => ({ log: mockLog }))
 
-afterAll(() => { mock.restore() })
+afterAll(() => {
+  mock.restore()
+})
 
 const { isActiveSessionStatus, isTerminalSessionStatus } = await import("./session-status-classifier")
 mock.restore()
@@ -36,7 +38,7 @@ describe("isActiveSessionStatus", () => {
   })
 
   describe("#given an unknown session status", () => {
-    test('#when type is an arbitrary unknown string #then returns false and logs warning', () => {
+    test("#when type is an arbitrary unknown string #then returns false and logs warning", () => {
       mockLog.mockClear()
       expect(isActiveSessionStatus("some-unknown-status")).toBe(false)
       expect(mockLog).toHaveBeenCalledWith(
@@ -45,7 +47,7 @@ describe("isActiveSessionStatus", () => {
       )
     })
 
-    test('#when type is empty string #then returns false', () => {
+    test("#when type is empty string #then returns false", () => {
       expect(isActiveSessionStatus("")).toBe(false)
     })
   })
@@ -64,7 +66,7 @@ describe("isTerminalSessionStatus", () => {
     expect(isTerminalSessionStatus("busy")).toBe(false)
   })
 
-  test('#when type is an unknown string #then returns false', () => {
+  test("#when type is an unknown string #then returns false", () => {
     expect(isTerminalSessionStatus("some-unknown")).toBe(false)
   })
 })

@@ -19,12 +19,7 @@ import {
 import { RUNTIME_FALLBACK_RETRYABLE_ERROR_PATTERNS } from "./runtime-fallback-retryable-patterns"
 
 export type RuntimeFallbackErrorType =
-  | "missing_api_key"
-  | "invalid_api_key"
-  | "model_not_found"
-  | "quota_exceeded"
-  | "context_overflow"
-  | "abort"
+  "missing_api_key" | "invalid_api_key" | "model_not_found" | "quota_exceeded" | "context_overflow" | "abort"
 
 export interface RuntimeFallbackRetryOptions {
   onUnsafeRetryableSignalRejected?: (details: {
@@ -72,10 +67,7 @@ function getDetailErrorType(error: unknown): string | undefined {
 }
 
 function isTerminalQuotaMessage(message: string): boolean {
-  if (
-    /\bnon[-\s]+terminal\s+quota\b/i.test(message) ||
-    /\bnon[-\s]+terminal\s+billing\s+limit\b/i.test(message)
-  ) {
+  if (/\bnon[-\s]+terminal\s+quota\b/i.test(message) || /\bnon[-\s]+terminal\s+billing\s+limit\b/i.test(message)) {
     return false
   }
   return (
@@ -85,16 +77,20 @@ function isTerminalQuotaMessage(message: string): boolean {
   )
 }
 
+/** A quota the provider marks as permanent: no reset, so no fallback retry either. */
+export function isTerminalQuotaError(error: unknown): boolean {
+  return (
+    getDetailErrorType(error) === "terminal_quota_exhausted" ||
+    isTerminalQuotaMessage(getRuntimeFallbackErrorMessage(error))
+  )
+}
+
 export function classifyRuntimeFallbackError(error: unknown): RuntimeFallbackErrorType | undefined {
-  const detailType = getDetailErrorType(error)
-  if (detailType === "terminal_quota_exhausted") {
+  if (isTerminalQuotaError(error)) {
     return "abort"
   }
 
   const message = getRuntimeFallbackErrorMessage(error)
-  if (isTerminalQuotaMessage(message)) {
-    return "abort"
-  }
 
   const errorName = getRuntimeFallbackErrorName(error)?.toLowerCase().replace(/[_-]/g, "")
 
@@ -131,20 +127,30 @@ export function classifyRuntimeFallbackError(error: unknown): RuntimeFallbackErr
     errorName?.includes("insufficientquota") ||
     errorName?.includes("billingerror") ||
     errorName?.includes("resourceexhausted") ||
+    errorName?.includes("insufficientcredits") ||
+    errorName?.includes("usagelimit") ||
     /quota.?exceeded/i.test(message) ||
     /exceeded.*quota/i.test(message) ||
+    /quota\b.*\breset/i.test(message) ||
     /usage\s*quota/i.test(message) ||
     /subscription.?(?:quota|limit)/i.test(message) ||
-    /insufficient.?(?:quota|balance|funds?)/i.test(message) ||
+    /insufficient.?(?:quota|balance|funds?|credits?)/i.test(message) ||
+    /credits?\s+exhausted/i.test(message) ||
+    /\b(?:session|weekly|monthly|daily|hourly|\d+[-\s]hour|plan|call)\s+limit\b/i.test(message) ||
+    /\bhit\s+your\b[^.]*\blimit\b/i.test(message) ||
+    /\bin\s+arrears\b/i.test(message) ||
+    /\brecharge\s+and\s+try\b/i.test(message) ||
     /billing.?(?:hard.?)?limit/i.test(message) ||
     /exhausted\s+your\s+capacity/i.test(message) ||
     /resource.?exhausted/i.test(message) ||
+    /\bcapacity_limit\b/i.test(message) ||
     /out\s+of\s+credits?/i.test(message) ||
     /payment.?required/i.test(message) ||
     /usage\s+limit/i.test(message) ||
     /credit\s+balance.*too\s+low/i.test(message) ||
     /limit\s+exhausted/i.test(message) ||
     /使用上限/.test(message) ||
+    /用量上限/.test(message) ||
     /达到.*限制/.test(message) ||
     /额度.*不足/.test(message) ||
     /余额.*不足/.test(message) ||
@@ -169,11 +175,11 @@ export function isRuntimeFallbackRetryableError(
   // OpenCode starts native compaction for this error; fallback would abort that compaction on its timeout.
   if (errorType === "abort" || errorType === "context_overflow") return false
 
-  if (
-    errorType === "missing_api_key" ||
-    errorType === "model_not_found" ||
-    errorType === "quota_exceeded"
-  ) {
+  if (getRuntimeFallbackErrorName(error)?.toLowerCase().replace(/[_-]/g, "") === "contentfiltererror") {
+    return true
+  }
+
+  if (errorType === "missing_api_key" || errorType === "model_not_found" || errorType === "quota_exceeded") {
     return true
   }
 

@@ -12,19 +12,38 @@
  *   different model, so overrides / prompt_append / env context are preserved.
  */
 export type SisyphusRuntimePromptContext = {
-  configuredModel: string;
-  bakedPrompt: string;
-  rebuildPromptForModel: (runtimeModel: string) => string;
-};
+  configuredModel: string
+  bakedPrompt: string
+  rebuildPromptForModel: (runtimeModel: string) => string
+}
 
-let context: SisyphusRuntimePromptContext | undefined;
+let context: SisyphusRuntimePromptContext | undefined
 
 export function setSisyphusRuntimePromptContext(ctx: SisyphusRuntimePromptContext): void {
-  context = ctx;
+  context = ctx
 }
 
 export function clearSisyphusRuntimePromptContext(): void {
-  context = undefined;
+  context = undefined
+}
+
+/**
+ * The plugin's config hook rewrites registered prompts after registration (Native frame tool snippets and
+ * permission rules). When `registered` is the baked Sisyphus prompt, track the rewritten prompt instead and
+ * apply the same rewrite to every rebuild, so the runtime swap still finds the prompt opencode sends.
+ */
+export function rebaseSisyphusRuntimePrompt(
+  registered: string,
+  rewritten: string,
+  rewrite: (prompt: string) => string,
+): void {
+  if (!context || context.bakedPrompt !== registered) return
+  const rebuild = context.rebuildPromptForModel
+  context = {
+    ...context,
+    bakedPrompt: rewritten,
+    rebuildPromptForModel: (runtimeModel) => rewrite(rebuild(runtimeModel)),
+  }
 }
 
 /**
@@ -48,10 +67,7 @@ export function clearSisyphusRuntimePromptContext(): void {
  *
  * Returns true if a swap was performed.
  */
-export function reconcileSisyphusRuntimePrompt(
-  system: string[],
-  runtimeModel: string | undefined,
-): boolean {
+export function reconcileSisyphusRuntimePrompt(system: string[], runtimeModel: string | undefined): boolean {
   if (!runtimeModel || !context) return false
 
   // Same exact model => the baked body already matches the runtime model; leave it.

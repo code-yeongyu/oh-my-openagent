@@ -36,10 +36,15 @@ function createProbeChild(): ChildProcess {
 }
 
 afterEach(async () => {
-  await Promise.all(children.splice(0).map((child) => new Promise<void>((resolve) => {
-    child.once("exit", () => resolve())
-    child.kill()
-  })))
+  await Promise.all(
+    children.splice(0).map(
+      (child) =>
+        new Promise<void>((resolve) => {
+          child.once("exit", () => resolve())
+          child.kill()
+        }),
+    ),
+  )
   for (const stateDir of stateDirs.splice(0)) {
     rmSync(stateDir, { recursive: true, force: true })
   }
@@ -52,24 +57,27 @@ describe("RpcProcessRunner model admission", () => {
     let spawnOptions: Record<string, unknown> | undefined
 
     // when
-    const result = probeModelCatalog({
-      command: process.execPath,
-      args: ["--version"],
-      cwd: process.cwd(),
-      env: process.env,
-    }, {
-      spawnProcess: (_command: string, _args: readonly string[], options: Record<string, unknown>) => {
-        spawnOptions = options
-        queueMicrotask(() => child.emit("close", 0, null))
-        return child
+    const result = probeModelCatalog(
+      {
+        command: process.execPath,
+        args: ["--version"],
+        cwd: process.cwd(),
+        env: process.env,
       },
-    })
+      {
+        spawnProcess: (_command: string, _args: readonly string[], options: Record<string, unknown>) => {
+          spawnOptions = options
+          queueMicrotask(() => child.emit("close", 0, null))
+          return child
+        },
+      },
+    )
 
     // then
     await expect(result).resolves.toMatchObject({ code: 0, timedOut: false })
     expect(spawnOptions).toMatchObject({
       shell: false,
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ["ignore", expect.any(Number), "pipe"],
       windowsHide: true,
       detached: process.platform !== "win32",
     })
@@ -89,19 +97,22 @@ describe("RpcProcessRunner model admission", () => {
 
     // when
     let settled = false
-    const result = probeModelCatalog({
-      command: process.execPath,
-      args: ["--version"],
-      cwd: process.cwd(),
-      env: process.env,
-    }, {
-      timeoutMs: 0,
-      spawnProcess: () => child,
-      terminateChild: async () => {
-        markTerminationStarted?.()
-        await terminationReleased
+    const result = probeModelCatalog(
+      {
+        command: process.execPath,
+        args: ["--version"],
+        cwd: process.cwd(),
+        env: process.env,
       },
-    }).then((value) => {
+      {
+        timeoutMs: 0,
+        spawnProcess: () => child,
+        terminateChild: async () => {
+          markTerminationStarted?.()
+          await terminationReleased
+        },
+      },
+    ).then((value) => {
       settled = true
       return value
     })
@@ -195,5 +206,22 @@ describe("RpcProcessRunner model admission", () => {
 
     // then
     expect(order).toEqual(["admit", "spawn"])
+  })
+
+  test("#given a catalog listing only the base id #when the pin carries a thinking level #then admission accepts it (#9722)", async () => {
+    // given: the child profile lists fixture/visible, never fixture/visible:medium
+    const { createRpcModelAdmission } = await import("./model-admission")
+    const catalogOutput = "fixture  visible  128K  8K  yes  no\n"
+    const admission = createRpcModelAdmission({
+      probe: () => Promise.resolve({ code: 0, stdout: catalogOutput, stderr: "", timedOut: false }),
+    })
+
+    // when / then: a :level pin is admitted against the base id, not rejected as absent
+    await expect(admission(makeSpec("fixture/visible:medium"))).resolves.toBeUndefined()
+
+    // and: an id the base catalog truly lacks still fails admission after the confirming re-probe
+    await expect(admission(makeSpec("fixture/missing:medium"))).rejects.toMatchObject({
+      failure: { kind: "model_unavailable" },
+    })
   })
 })

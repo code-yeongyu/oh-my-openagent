@@ -2,11 +2,9 @@ import { join } from "node:path"
 
 import type { ExtensionContext, SessionStartEvent } from "@code-yeongyu/senpi"
 
+import { deferUntilAfterFirstPaint } from "../../extension/startup-deferral"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
-import {
-  isExtensionContext,
-  isSessionStartEvent,
-} from "../onboarding/component"
+import { isExtensionContext, isSessionStartEvent } from "../onboarding/component"
 import { getOnboardingMarkerMtime } from "../onboarding/state"
 import { getOmoNativeStateDir } from "../telemetry/product-identity"
 import { gitToplevel } from "./git-helpers"
@@ -16,11 +14,7 @@ declare const OMO_SENPI_BUNDLED: boolean
 
 const RUNTIME_FILE_NAME = "omo-init-deep-advisor.js"
 
-type AdvisorRunner = (
-  pi: SenpiExtensionAPI,
-  eventCtx: ExtensionContext,
-  preflight: AdvisorPreflight,
-) => Promise<void>
+type AdvisorRunner = (pi: SenpiExtensionAPI, eventCtx: ExtensionContext, preflight: AdvisorPreflight) => Promise<void>
 
 export interface InitDeepAdvisorComponentDependencies {
   readonly runAfterPreflight: AdvisorRunner
@@ -44,8 +38,15 @@ export function createInitDeepAdvisorComponent(
         if (payload.reason !== "startup") return
         if (!isExtensionContext(rawEventCtx)) return
         const eventCtx: ExtensionContext = rawEventCtx
-        void runAdvisor(pi, ctx, eventCtx, dependencies.runAfterPreflight).catch((error) => {
-          ctx.logger.warn("init-deep-advisor failed", { error })
+        // The preflight spawns `git rev-parse` and stats the onboarding marker before it can even
+        // decide the advisor is ineligible - measured at ~20 ms on the session_start dispatch path,
+        // inside the engine's `interactiveMode.init` phase. Nothing observes the advisor before the
+        // first paint (it opens a dialog the user answers afterwards), so the whole run, decision
+        // included, moves one tick past it.
+        deferUntilAfterFirstPaint(ctx, "init-deep-advisor", () => {
+          void runAdvisor(pi, ctx, eventCtx, dependencies.runAfterPreflight).catch((error) => {
+            ctx.logger.warn("init-deep-advisor failed", { error })
+          })
         })
       })
     },
@@ -87,10 +88,7 @@ async function runAdvisorRuntime(
   await Reflect.apply(runner, undefined, [pi, eventCtx, preflight])
 }
 
-function advisorPreflight(
-  pi: SenpiExtensionAPI,
-  eventCtx: ExtensionContext,
-): AdvisorPreflight | null {
+function advisorPreflight(pi: SenpiExtensionAPI, eventCtx: ExtensionContext): AdvisorPreflight | null {
   if (!eventCtx.hasUI) return null
   if (pi.getFlag("omo-senpi-init-deep-advisor-disabled") === true) return null
   const onboardingStateDir = getOmoNativeStateDir(process.env)

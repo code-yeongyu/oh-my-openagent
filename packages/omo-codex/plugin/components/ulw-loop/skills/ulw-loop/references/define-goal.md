@@ -39,8 +39,7 @@ Every criterion carries, at definition time, not after the work:
 
 - a binary pass condition ("returns 200 and the body matches the schema", never "works correctly");
 - the exact scenario: the literal command, request, page action, or payload that will prove it;
-- the evidence artifact it will capture: transcript, status plus body, screenshot path, diff, parsed dump;
-- the failing-first proof (test id or scenario) that will be captured RED before implementation.
+- the evidence artifact it will capture: transcript, status plus body, screenshot path, diff, parsed dump.
 
 A criterion that cannot fail is not a criterion. If no input could make the scenario fail, it measures nothing; rewrite it until failure is possible.
 
@@ -50,7 +49,7 @@ Prefer numbers that represent real success over decorative precision. A threshol
 
 | Domain | Quantify as |
 | --- | --- |
-| Bug fix | reproduction first, fix second: the failing case captured RED, then the same validator green |
+| Bug fix | reproduction first, fix second: the failing case captured before, the same case passing after |
 | Tests | the exact command and required pass condition, plus run count for flake-sensitive suites |
 | Performance | metric, target threshold, measurement method, and run count ("p95 under 250ms across 3 consecutive local runs") |
 | Quality work | the observable acceptance bar: lint, typecheck, and test pass; reviewed examples; a user-approved artifact |
@@ -88,7 +87,7 @@ Repaired: "Resolve every open change-requesting review comment on PR 123 touchin
 | an active goal conflicting with this intent | Stop and surface the conflict; the user decides whether to finish it, complete it, or branch. |
 
 2. Goals are unlimited. Never invent a numeric budget, token limit, or deadline the user did not state — that ban covers run quotas; the `assumed:` work constraints from Objective anatomy #4 are different and required.
-3. In a ulw-loop run, the loop CLI owns per-goal state (`.omo/ulw-loop/goals.json`): `create_goal` registers the aggregate objective from the printed handoff, and this reference shapes both that objective and every goal's `successCriteria` at `create-goals` time.
+3. In a ulw-loop run, the loop SDK owns per-goal state (`.omo/ulw-loop/<session-id>/goals.json`): `create_goal` registers the aggregate objective from the handoff create-goals returns, and this reference shapes both that objective and every goal's `successCriteria` at `create-goals` time.
 
 ## Completion honesty
 

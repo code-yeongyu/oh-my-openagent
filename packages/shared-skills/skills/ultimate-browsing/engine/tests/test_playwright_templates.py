@@ -21,7 +21,7 @@ def _write_file(path: Path, content: str) -> None:
 
 def _install_fake_playwright(node_modules: Path) -> None:
     _write_file(
-        node_modules / "playwright" / "index.js",
+        node_modules / "playwright-core" / "index.js",
         """
         const page = {
           async goto() {},
@@ -47,7 +47,6 @@ def _install_fake_playwright(node_modules: Path) -> None:
         };
 
         exports.chromium = {
-          use() {},
           async launchPersistentContext() { return context; },
         };
         exports.devices = {
@@ -78,9 +77,7 @@ def _install_working_playwright_extra(node_modules: Path) -> None:
     _write_file(
         node_modules / "playwright-extra" / "index.js",
         """
-        const playwright = require('playwright');
-        exports.chromium = playwright.chromium;
-        exports.devices = playwright.devices;
+        exports.addExtra = (browserType) => browserType;
         """,
     )
 
@@ -149,7 +146,7 @@ def _run_template(
 
 @unittest.skipUnless(shutil.which("node"), "node is required for Playwright template tests")
 class PlaywrightTemplateErrorHandling(unittest.TestCase):
-    def test_missing_playwright_extra_warns_and_falls_back_to_plain_playwright(self) -> None:
+    def test_missing_playwright_extra_warns_and_falls_back_to_playwright_core(self) -> None:
         for template_name in TEMPLATE_NAMES:
             with self.subTest(template_name=template_name):
                 result = _run_template(
@@ -166,7 +163,7 @@ class PlaywrightTemplateErrorHandling(unittest.TestCase):
                 self.assertIn("best-effort optional module playwright-extra failed:", result.stderr)
                 self.assertIn("Cannot find module 'playwright-extra'", result.stderr)
 
-    def test_missing_stealth_plugin_warns_and_falls_back_to_plain_playwright(self) -> None:
+    def test_missing_stealth_plugin_warns_and_falls_back_to_playwright_core(self) -> None:
         for template_name in TEMPLATE_NAMES:
             with self.subTest(template_name=template_name):
                 result = _run_template(

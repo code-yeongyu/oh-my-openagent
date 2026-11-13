@@ -1,0 +1,93 @@
+{
+  "request": "session.attach",
+  "cases": [
+    {
+      "name": "an attach answers its handle, then the snapshot, then the records",
+      "outcome": "ok",
+      "steps": [
+        {
+          "send": {
+            "id": "att",
+            "type": "session.attach",
+            "device": "dev-peer-1",
+            "session_id": "c2Vzc2lvbi1rZXktMDAwMQ"
+          }
+        },
+        {
+          "expect": {
+            "id": "att",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "attach": "<capture:a>"
+            }
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.snapshot",
+            "attach": "<ref:a>",
+            "attach_id": 1
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.records",
+            "attach": "<ref:a>",
+            "attach_id": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "an unknown device is refused peer_not_found",
+      "outcome": "refusal",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "session.attach",
+            "device": "dev-unknown",
+            "session_id": "c2Vzc2lvbi1rZXktMDAwMQ"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "peer_not_found"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "an unknown session on a known device is refused session_not_found",
+      "outcome": "refusal",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "session.attach",
+            "device": "dev-peer-1",
+            "session_id": "bm8tc3VjaC1zZXNzaW9uLTE"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "session_not_found"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

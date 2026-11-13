@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { SenpiSessionProvider, searchTranscripts } from "./index"
+import { removeTreeSync } from "../../../../test-support/remove-tree"
 
 // Fixtures mirror the on-disk senpi format verified against
 // senpi packages/coding-agent/src/core/session-manager.ts (SessionHeader / SessionEntryBase /
@@ -11,7 +12,7 @@ import { SenpiSessionProvider, searchTranscripts } from "./index"
 const roots: string[] = []
 
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0)) removeTreeSync(root, { maxRetries: 10, retryDelay: 200 })
 })
 
 function sessionsRoot(): string {
@@ -64,7 +65,14 @@ describe("SenpiSessionProvider", () => {
     const root = sessionsRoot()
     writeSession(join(root, "--tmp-project--"), "sess-b.jsonl", [
       header("sess-b"),
-      JSON.stringify({ type: "model_change", id: "mc", parentId: null, timestamp: "2026-08-05T17:09:02.282Z", provider: "apitopia", modelId: "kimi-k3" }),
+      JSON.stringify({
+        type: "model_change",
+        id: "mc",
+        parentId: null,
+        timestamp: "2026-08-05T17:09:02.282Z",
+        provider: "apitopia",
+        modelId: "kimi-k3",
+      }),
       userEntry("u1", "mc", "run the migration"),
       JSON.stringify({
         type: "message",
@@ -142,7 +150,12 @@ describe("SenpiSessionProvider", () => {
       "{ this is not json",
       userEntry("ok-1", null, "still readable"),
       "",
-      JSON.stringify({ type: "message", id: "no-message-field", parentId: null, timestamp: "2026-08-05T17:09:02.340Z" }),
+      JSON.stringify({
+        type: "message",
+        id: "no-message-field",
+        parentId: null,
+        timestamp: "2026-08-05T17:09:02.340Z",
+      }),
       userEntry("ok-2", "ok-1", "also readable"),
     ])
     writeSession(join(root, "--tmp-project--"), "headerless.jsonl", [userEntry("orphan", null, "no header here")])
@@ -164,7 +177,10 @@ describe("SenpiSessionProvider", () => {
     writeSession(projectDir, "plain.jsonl", [header("plain"), userEntry("p1", null, "beta visible")])
     writeSession(projectDir, "archived.jsonl", [header("archived"), userEntry("a1", null, "beta archived")])
     writeFileSync(join(projectDir, "archived.jsonl.archived"), "")
-    writeSession(join(root, "--omo-reflection--"), "reflect.jsonl", [header("reflect"), userEntry("r1", null, "beta reflection")])
+    writeSession(join(root, "--omo-reflection--"), "reflect.jsonl", [
+      header("reflect"),
+      userEntry("r1", null, "beta reflection"),
+    ])
     writeSession(projectDir, "task-child.jsonl", [header("task-child"), userEntry("k1", null, "beta task child")])
     const provider = new SenpiSessionProvider({
       sessionsDir: root,

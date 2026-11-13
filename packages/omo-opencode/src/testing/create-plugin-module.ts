@@ -35,11 +35,7 @@ import { sweepOmoFamiliesBestEffort } from "../shared/omo-process-sweep"
 import { injectServerAuthIntoClient } from "../shared/opencode-server-auth"
 import { PROCESS_LISTENERS_CAP_DEFAULT, raiseProcessListenersCap } from "../shared/raise-process-listeners-cap"
 import { recordPluginTelemetry } from "../shared/posthog"
-import {
-  initLiveServerRoute,
-  setLiveParentWakeRoutingDisabled,
-  warmLiveServerProbe,
-} from "../shared/live-server-route"
+import { initLiveServerRoute, setLiveParentWakeRoutingDisabled, warmLiveServerProbe } from "../shared/live-server-route"
 import { startBackgroundCheck as startTmuxCheck } from "../tools/interactive-bash"
 import { runOpenCodeStartupMigration } from "../startup-migration"
 
@@ -143,19 +139,34 @@ function startupToastBody(input: {
   readonly error?: string
   readonly migratedFrom: readonly string[]
   readonly skippedConflictCount: number
+  readonly targetBackupPaths: readonly string[]
 }): Record<string, unknown> | undefined {
-  const summary = input.migratedFrom.length === 0
-    ? ""
-    : `Migrated ${input.migratedFrom.length} legacy source${input.migratedFrom.length === 1 ? "" : "s"}.`
-  const conflicts = input.skippedConflictCount === 0
-    ? ""
-    : ` Kept ${input.skippedConflictCount} existing value${input.skippedConflictCount === 1 ? "" : "s"}.`
+  const summary =
+    input.migratedFrom.length === 0
+      ? ""
+      : `Migrated ${input.migratedFrom.length} legacy source${input.migratedFrom.length === 1 ? "" : "s"}.`
+  const conflicts =
+    input.skippedConflictCount === 0
+      ? ""
+      : ` Kept ${input.skippedConflictCount} existing value${input.skippedConflictCount === 1 ? "" : "s"}.`
   const diagnostics = input.diagnostics.length === 0 ? "" : ` ${input.diagnostics.join(" ")}`
+  const backups =
+    input.targetBackupPaths.length === 0 ? "" : ` Previous config saved as ${input.targetBackupPaths.join(", ")}.`
   if (input.error !== undefined) {
-    return { title: "Configuration migration failed", message: `${input.error}${diagnostics}`, variant: "error" }
+    return {
+      title: "Configuration migration failed",
+      message: `${input.error}${backups}${diagnostics}`,
+      variant: "error",
+    }
   }
-  if (summary.length > 0) return { title: "Configuration migrated", message: `${summary}${conflicts}${diagnostics}`, variant: "success" }
-  if (diagnostics.length > 0) return { title: "Configuration diagnostics", message: input.diagnostics.join(" "), variant: "warning" }
+  if (summary.length > 0 || backups.length > 0)
+    return {
+      title: "Configuration migrated",
+      message: `${summary}${conflicts}${backups}${diagnostics}`.trim(),
+      variant: "success",
+    }
+  if (diagnostics.length > 0)
+    return { title: "Configuration diagnostics", message: input.diagnostics.join(" "), variant: "warning" }
   return undefined
 }
 
@@ -163,11 +174,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
   const deps = { ...defaultPluginModuleDeps, ...overrides }
   let startupMigration: ReturnType<PluginModuleDeps["runOpenCodeStartupMigration"]> | undefined
   const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
-    // Raise the process listener cap at the earliest startup point — before any
-    // manager/hook/tmux listener registers — so the MaxListenersExceededWarning
-    // does not fire on legitimate accumulation (#4334). Done here rather than at
-    // module import so merely importing the entry never mutates host-global
-    // `process` state.
+    // Apply the host-global threshold only when the server starts, before managers add listeners.
     deps.raiseProcessListenersCap(PROCESS_LISTENERS_CAP_DEFAULT)
     deps.installAgentSortShim()
     deps.initConfigContext("opencode", null)
@@ -184,6 +191,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
       journalResumed: startupMigration.journalResumed,
       migratedFrom: startupMigration.migratedFrom,
       skippedConflictCount: startupMigration.skippedConflictCount,
+      targetBackupPaths: startupMigration.targetBackupPaths,
     })
     if (startupMigration.error !== undefined) {
       console.warn(`[config-migration] legacy configuration changes were not applied: ${startupMigration.error}`)
@@ -193,6 +201,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
       ...(startupMigration.error === undefined ? {} : { error: startupMigration.error }),
       migratedFrom: startupMigration.migratedFrom,
       skippedConflictCount: startupMigration.skippedConflictCount,
+      targetBackupPaths: startupMigration.targetBackupPaths,
     })
     if (toast !== undefined) showStartupToast(input.client, toast, deps.log)
 
@@ -200,13 +209,11 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
     // throttled per-family inside the sweep functions. Never awaited and
     // never allowed to reject into startup.
     try {
-      void deps
-        .startOmoProcessSweep()
-        .catch((error: unknown) => {
-          deps.log("[oh-my-openagent] omo process sweep failed", {
-            error: error instanceof Error ? error.message : String(error),
-          })
+      void deps.startOmoProcessSweep().catch((error: unknown) => {
+        deps.log("[oh-my-openagent] omo process sweep failed", {
+          error: error instanceof Error ? error.message : String(error),
         })
+      })
     } catch (error) {
       deps.log("[oh-my-openagent] omo process sweep failed to start", {
         error: error instanceof Error ? error.message : String(error),
@@ -251,7 +258,9 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
         runtimeSkillSource = await deps.createRuntimeSkillSourceServer({ skills: runtimeSecuritySkills })
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
-        console.warn(`[runtime-skills] bundled security skill source unavailable; continuing without config.skills.urls: ${detail}`)
+        console.warn(
+          `[runtime-skills] bundled security skill source unavailable; continuing without config.skills.urls: ${detail}`,
+        )
       }
     }
     deps.initI18n(pluginConfig.i18n?.locale ? { locale: pluginConfig.i18n.locale } : undefined)

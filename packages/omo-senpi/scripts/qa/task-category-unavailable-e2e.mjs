@@ -7,15 +7,7 @@
 //   negative: task.warnings.unavailable_categories=false -> neither frame nor message.
 // Isolation: real ~/.senpi/agent credential files must stay byte-identical; the sandbox is removed.
 import { spawn } from "node:child_process"
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from "node:fs"
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { delimiter, dirname, isAbsolute, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -23,6 +15,7 @@ import { fileURLToPath } from "node:url"
 import { createHash } from "node:crypto"
 
 import { createSandbox, credentialDigest, seedSandbox } from "./drive.mjs"
+import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const mockProviderEntry = join(scriptDir, "task-category-unavailable-mock-provider.ts")
@@ -165,7 +158,7 @@ function driveRpc(senpiBin, scenario) {
       {
         cwd: scenario.sandbox.cwd,
         env: {
-          ...process.env,
+          ...isolatedChildEnv(process.env, scenario.sandbox.agentDir),
           // HOME must be sandboxed: senpi resolves its settings/tips paths from HOME even when the
           // agent-dir env is set, and the omo user config layer lives at $HOME/.omo. Every agent-dir
           // env spelling is set: the omo brand prefix wins first (OMO_CODING_AGENT_DIR leaks the
@@ -217,7 +210,9 @@ function driveRpc(senpiBin, scenario) {
       stderr += String(error)
       finish("spawn-error")
     })
-    child.stdin.write(`${JSON.stringify({ id: "probe-1", type: "prompt", message: "spawn the quick task twice and stop" })}\n`)
+    child.stdin.write(
+      `${JSON.stringify({ id: "probe-1", type: "prompt", message: "spawn the quick task twice and stop" })}\n`,
+    )
   })
 }
 
@@ -343,10 +338,11 @@ async function main() {
     realOmoConfigUnchanged: beforeOmoConfig === afterOmoConfig,
     realSettingsMtimeUnchanged: beforeSettingsMtime === afterSettingsMtime,
   }
-  const allPass = reports.every((report) => report.result.result === "PASS")
-    && isolation.credentialDigestUnchanged
-    && isolation.realOmoConfigUnchanged
-    && isolation.realSettingsMtimeUnchanged
+  const allPass =
+    reports.every((report) => report.result.result === "PASS") &&
+    isolation.credentialDigestUnchanged &&
+    isolation.realOmoConfigUnchanged &&
+    isolation.realSettingsMtimeUnchanged
   console.log(
     JSON.stringify(
       {

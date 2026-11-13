@@ -19,7 +19,9 @@ const spawnBackground = (prompt, name) => ({
 })
 
 export const RESUME_OMO_CONFIG = {
-  categories: { mockcat: { description: "Local mock category pinned to the mock provider.", model: "omo-mock/mock-1" } },
+  categories: {
+    mockcat: { description: "Local mock category pinned to the mock provider.", model: "omo-mock/mock-1" },
+  },
 }
 
 export function resumeOmoConfig(taskOverrides) {
@@ -44,7 +46,11 @@ export function happyRun1Script(sentinel) {
 export function happyRun2Script(sentinel) {
   return {
     parentSteps: [
-      { type: "tool_call", name: "task_send", arguments: { to: "finchild", message: `${PING_TOKEN} post-resume steerability probe` } },
+      {
+        type: "tool_call",
+        name: "task_send",
+        arguments: { to: "finchild", message: `${PING_TOKEN} post-resume steerability probe` },
+      },
       bash(waitForFileCommand(sentinel)),
       text("run two settled, quitting"),
     ],
@@ -78,11 +84,11 @@ export function killRun1Script(sentinel) {
 
 // Cap-1 LRU lane: the agent-side record wait guarantees lruone is a terminal idle resident before
 // lrutwo's spawn forces the eviction (only terminal idle residents are evictable).
-export function lruRun1Script(cwd, sentinel) {
+export function lruRun1Script(sandbox, sentinel) {
   return {
     parentSteps: [
       spawnBackground("lru-child oldest unit", "lruone"),
-      bash(waitForRecordStatusCommand(cwd, "lruone", "completed")),
+      bash(waitForRecordStatusCommand(sandbox, "lruone", "completed")),
       spawnBackground("lru-child newest unit", "lrutwo"),
       bash(waitForFileCommand(sentinel)),
       text("lru run settled, quitting"),
@@ -90,12 +96,12 @@ export function lruRun1Script(cwd, sentinel) {
   }
 }
 
-export function ttlRun1Script(cwd, sentinel) {
+export function ttlRun1Script(sandbox, sentinel) {
   return {
     parentSteps: [
       spawnBackground("ttl-child expiring unit", "ttlchild"),
       spawnBackground("midturn-child ttl witness", "ttlwitness"),
-      bash(waitForRecordStatusCommand(cwd, "ttlchild", "completed")),
+      bash(waitForRecordStatusCommand(sandbox, "ttlchild", "completed")),
       bash(waitForFileCommand(sentinel)),
       text("ttl run settled, quitting"),
     ],
@@ -105,10 +111,7 @@ export function ttlRun1Script(cwd, sentinel) {
 // Resume verification runs need no child spawns; the hold lets the witness continuation land.
 export function resumeProbeScript(sentinel) {
   return {
-    parentSteps: [
-      bash(waitForFileCommand(sentinel)),
-      text("resume probe settled, quitting"),
-    ],
+    parentSteps: [bash(waitForFileCommand(sentinel)), text("resume probe settled, quitting")],
   }
 }
 

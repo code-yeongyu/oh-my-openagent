@@ -38,9 +38,7 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
       client: input.client,
       sessionID: input.sessionID,
       source: "background-agent-parent-wake",
-      ...(input.emptyAssistantTurnRetry
-        ? { dedupeKey: createEmptyAssistantTurnRetryDedupeKey(input.latestWake) }
-        : {}),
+      ...(input.emptyAssistantTurnRetry ? { dedupeKey: createEmptyAssistantTurnRetryDedupeKey(input.latestWake) } : {}),
       settleMs: 0,
       queueBehavior: "defer",
       checkStatus: input.forceNoReply !== true && input.skipPromptGateStatusCheck !== true,
@@ -65,7 +63,10 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
         dispatchedWake.dispatchedAt = dispatchStartedAt
         if (await input.hasRecordedPromptAfterDispatch(dispatchedWake)) {
           markRetainedNoReplyAdmission(input, dispatchStartedAt)
-          input.trackDispatchedWake(createTrackedDispatchedWake(input.latestWake, input.forceNoReply), dispatchStartedAt)
+          input.trackDispatchedWake(
+            createTrackedDispatchedWake(input.latestWake, input.forceNoReply),
+            dispatchStartedAt,
+          )
           log("[background-agent] Treated failed parent wake prompt as accepted after observing session history:", {
             sessionID: input.sessionID,
             error: promptResult.error,
@@ -83,8 +84,9 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
         })
         return
       }
+      const retryDelayMs = gateHoldRetryDelayMs(input.latestWake, promptResult.expiresAt)
       input.requeueWake(input.latestWake)
-      input.scheduleFlush(2_000)
+      input.scheduleFlush(retryDelayMs)
       log("[background-agent] Requeued parent wake flush reserved by promptAsync gate hold:", {
         sessionID: input.sessionID,
       })
@@ -101,6 +103,7 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
     }
     log("[background-agent] Sent deferred parent wake:", { sessionID: input.sessionID })
     delete input.latestWake.allowEmptyAssistantTurnRetry
+    delete input.latestWake.gateHoldExpiresAt
     markRetainedNoReplyAdmission(input, dispatchStartedAt)
     input.trackDispatchedWake(createTrackedDispatchedWake(input.latestWake, input.forceNoReply), dispatchStartedAt)
   } catch (error) {
@@ -109,6 +112,23 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
     input.scheduleFlush()
     log("[background-agent] Failed to send deferred parent wake:", { sessionID: input.sessionID, error: errorText })
   }
+}
+
+const PROMPT_GATE_HOLD_RETRY_MS = 2_000
+
+// The first meeting with a hold keeps the full back-off: it is the window a live
+// parent turn gets to consume a retained noReply admission. Meeting the SAME hold
+// again means the retry timer fired a tick before the lazy Date.now() expiry check
+// (coarse Windows timers), so wait only what is left of it, not a second hold.
+function gateHoldRetryDelayMs(wake: PendingParentWake, expiresAt: number | undefined): number {
+  if (expiresAt === undefined) {
+    return PROMPT_GATE_HOLD_RETRY_MS
+  }
+  if (wake.gateHoldExpiresAt === expiresAt) {
+    return Math.max(0, expiresAt - Date.now())
+  }
+  wake.gateHoldExpiresAt = expiresAt
+  return PROMPT_GATE_HOLD_RETRY_MS
 }
 
 function markRetainedNoReplyAdmission(input: ParentWakePromptDispatchInput, dispatchStartedAt: number): void {

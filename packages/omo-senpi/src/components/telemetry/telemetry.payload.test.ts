@@ -4,15 +4,15 @@ import {
   DEFAULT_POSTHOG_API_KEY,
   DEFAULT_POSTHOG_HOST,
   createTelemetryClient,
-  getTelemetryDistinctId,
+  getTelemetryInstallDistinctId,
   type TelemetryCaptureMessage,
 } from "@oh-my-opencode/telemetry-core"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import {
-  SENPI_MACHINE_ID_PREFIX,
   SENPI_TELEMETRY_EVENT_NAME,
   createSenpiTelemetryComponent,
   createSenpiTelemetryProductConfig,
+  getSenpiTelemetryStateDir,
 } from "./index"
 import {
   FIXED_NOW,
@@ -34,7 +34,6 @@ describe("omo-senpi telemetry payloads", () => {
       const coreTransport = createTransportRecorder()
       const env = createEnabledEnv(agentDir)
       const osProvider = createOsProvider("senpi-payload-host")
-      const expectedDistinctId = getTelemetryDistinctId(SENPI_MACHINE_ID_PREFIX, osProvider)
       createSenpiTelemetryComponent({
         env,
         now: FIXED_NOW,
@@ -54,7 +53,7 @@ describe("omo-senpi telemetry payloads", () => {
       await pi.dispatch("session_start", {})
       coreClient.trackActive({
         dayUTC: "2026-07-03",
-        distinctId: expectedDistinctId,
+        distinctId: getTelemetryInstallDistinctId(getSenpiTelemetryStateDir(env)),
         reason: "session_start",
       })
       await coreClient.flush()
@@ -65,7 +64,6 @@ describe("omo-senpi telemetry payloads", () => {
         defaultApiKey: DEFAULT_POSTHOG_API_KEY,
         defaultHost: DEFAULT_POSTHOG_HOST,
         eventName: SENPI_TELEMETRY_EVENT_NAME,
-        machineIdPrefix: SENPI_MACHINE_ID_PREFIX,
         packageName: "@oh-my-opencode/omo-senpi",
         platform: "omo-senpi",
         productEnvPrefix: "OMO_SENPI",

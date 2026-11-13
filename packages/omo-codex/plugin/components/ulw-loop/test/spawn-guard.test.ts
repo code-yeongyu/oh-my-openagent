@@ -6,7 +6,13 @@ import { Readable, Writable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PreToolUsePayload } from "../src/codex-hook.ts";
-import { applySpawnGuards, DEFAULT_FANOUT_LIMIT, runSpawnAdmissionRecorderCli } from "../src/spawn-guard.ts";
+// Budget/artifact behavior is independent of role admission; the native entry
+// point and its composition are covered in spawn-role-matrix.test.ts.
+import {
+	applySpawnBudgetGuards as applySpawnGuards,
+	DEFAULT_FANOUT_LIMIT,
+	runSpawnAdmissionRecorderCli,
+} from "../src/spawn-guard.ts";
 
 let workDir: string;
 let originalLimit: string | undefined;
@@ -424,9 +430,10 @@ describe("applySpawnGuards gate-artifact guard", () => {
 		expect(applySpawnGuards(genericGate)).toBe("");
 
 		const fourth = deny(applySpawnGuards(explicitGate));
-		expect(fourth.permissionDecisionReason).toContain("omo-senpi-gate-reviewer 4/3");
+		expect(fourth.permissionDecisionReason).toContain("omo-native-gate-reviewer 4/3");
 		const counters = JSON.parse(readFileSync(join(sessionDir(), "review-spawn-counts.json"), "utf8"));
-		expect(counters["omo-senpi-gate-reviewer:g1:a1"]).toBe(3);
+		expect(counters["omo-native-gate-reviewer:g1:a1"]).toBe(3);
+		expect(counters["omo-senpi-gate-reviewer:g1:a1"]).toBeUndefined();
 		expect(counters["lazycodex-gate-reviewer:g1:a1"]).toBeUndefined();
 	});
 
@@ -445,9 +452,10 @@ describe("applySpawnGuards gate-artifact guard", () => {
 		expect(applySpawnGuards(senpiReviewer)).toBe("");
 
 		const fourth = deny(applySpawnGuards(lazycodexReviewer));
-		expect(fourth.permissionDecisionReason).toContain("omo-senpi-code-reviewer 4/3");
+		expect(fourth.permissionDecisionReason).toContain("omo-native-code-reviewer 4/3");
 		const counters = JSON.parse(readFileSync(join(sessionDir(), "review-spawn-counts.json"), "utf8"));
-		expect(counters["omo-senpi-code-reviewer:g1:a1"]).toBe(3);
+		expect(counters["omo-native-code-reviewer:g1:a1"]).toBe(3);
+		expect(counters["omo-senpi-code-reviewer:g1:a1"]).toBeUndefined();
 		expect(counters["lazycodex-code-reviewer:g1:a1"]).toBeUndefined();
 	});
 

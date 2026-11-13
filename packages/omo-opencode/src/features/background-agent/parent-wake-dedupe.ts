@@ -17,6 +17,7 @@ export type PendingParentWake = {
   toolCallDeferralStartedAt?: number
   allowEmptyAssistantTurnRetry?: boolean
   noAssistantOutputRetryCount?: number
+  gateHoldExpiresAt?: number
 }
 
 export function resolveParentWakePromptContext(promptContext: ParentWakePromptContext): ParentWakePromptContext {
@@ -47,22 +48,27 @@ export function cloneParentWake(wake: PendingParentWake): PendingParentWake {
     ...(wake.noAssistantOutputRetryCount !== undefined
       ? { noAssistantOutputRetryCount: wake.noAssistantOutputRetryCount }
       : {}),
+    ...(wake.gateHoldExpiresAt !== undefined ? { gateHoldExpiresAt: wake.gateHoldExpiresAt } : {}),
   }
 }
 
 export function isRedundantParentWake(latestWake: PendingParentWake, dispatchedWake: PendingParentWake): boolean {
-  return parentWakePromptContextMatches(latestWake, dispatchedWake)
-    && parentWakeReplyModeIsCovered(latestWake, dispatchedWake)
-    && parentWakeNotificationsAreCovered(latestWake, dispatchedWake)
+  return (
+    parentWakePromptContextMatches(latestWake, dispatchedWake) &&
+    parentWakeReplyModeIsCovered(latestWake, dispatchedWake) &&
+    parentWakeNotificationsAreCovered(latestWake, dispatchedWake)
+  )
 }
 
-export function mergeParentWakeNotifications(existingNotifications: readonly string[], nextNotification: string): string[] {
+export function mergeParentWakeNotifications(
+  existingNotifications: readonly string[],
+  nextNotification: string,
+): string[] {
   if (isFinalBackgroundTaskNotification(nextNotification)) {
     return [
       nextNotification,
-      ...existingNotifications.filter((notification) =>
-        notification !== nextNotification
-        && !isBackgroundTaskProgressNotification(notification)
+      ...existingNotifications.filter(
+        (notification) => notification !== nextNotification && !isBackgroundTaskProgressNotification(notification),
       ),
     ]
   }
@@ -72,8 +78,8 @@ export function mergeParentWakeNotifications(existingNotifications: readonly str
   }
 
   if (
-    isBackgroundTaskProgressNotification(nextNotification)
-    && existingNotifications.some(isFinalBackgroundTaskNotification)
+    isBackgroundTaskProgressNotification(nextNotification) &&
+    existingNotifications.some(isFinalBackgroundTaskNotification)
   ) {
     return [...existingNotifications]
   }
@@ -95,22 +101,28 @@ function parentWakeNotificationsAreCovered(latestWake: PendingParentWake, dispat
 }
 
 export function isFailureParentWake(wake: PendingParentWake): boolean {
-  return wake.shouldReply && wake.notifications.some((notification) =>
-    getSystemReminderHeaderLines(notification).some(isBackgroundTaskFailureHeader)
+  return (
+    wake.shouldReply &&
+    wake.notifications.some((notification) =>
+      getSystemReminderHeaderLines(notification).some(isBackgroundTaskFailureHeader),
+    )
   )
 }
 
 function isBackgroundTaskFailureHeader(line: string): boolean {
-  return line === "[BACKGROUND TASK ERROR]"
-    || line === "[BACKGROUND TASK CANCELLED]"
-    || line === "[BACKGROUND TASK INTERRUPTED]"
-    || (line.startsWith("[ALL BACKGROUND TASKS FINISHED") && line.endsWith("]"))
+  return (
+    line === "[BACKGROUND TASK ERROR]" ||
+    line === "[BACKGROUND TASK CANCELLED]" ||
+    line === "[BACKGROUND TASK INTERRUPTED]" ||
+    (line.startsWith("[ALL BACKGROUND TASKS FINISHED") && line.endsWith("]"))
+  )
 }
 
 function isFinalBackgroundTaskNotification(notification: string): boolean {
-  return getSystemReminderHeaderLines(notification).some((line) =>
-    line === "[ALL BACKGROUND TASKS COMPLETE]"
-    || (line.startsWith("[ALL BACKGROUND TASKS FINISHED") && line.endsWith("]"))
+  return getSystemReminderHeaderLines(notification).some(
+    (line) =>
+      line === "[ALL BACKGROUND TASKS COMPLETE]" ||
+      (line.startsWith("[ALL BACKGROUND TASKS FINISHED") && line.endsWith("]")),
   )
 }
 
@@ -119,16 +131,20 @@ function isBackgroundTaskProgressNotification(notification: string): boolean {
     return false
   }
 
-  return notification.split("\n").some((line) =>
-    /^\*\*\d+ tasks? still in progress\.\*\* You WILL be notified when ALL complete\.$/.test(line.trim())
-  )
+  return notification
+    .split("\n")
+    .some((line) =>
+      /^\*\*\d+ tasks? still in progress\.\*\* You WILL be notified when ALL complete\.$/.test(line.trim()),
+    )
 }
 
 function isBackgroundTaskProgressHeader(line: string): boolean {
-  return line === "[BACKGROUND TASK RESULT READY]"
-    || line === "[BACKGROUND TASK CANCELLED]"
-    || line === "[BACKGROUND TASK INTERRUPTED]"
-    || line === "[BACKGROUND TASK ERROR]"
+  return (
+    line === "[BACKGROUND TASK RESULT READY]" ||
+    line === "[BACKGROUND TASK CANCELLED]" ||
+    line === "[BACKGROUND TASK INTERRUPTED]" ||
+    line === "[BACKGROUND TASK ERROR]"
+  )
 }
 
 function getSystemReminderHeaderLines(notification: string): string[] {
@@ -138,9 +154,8 @@ function getSystemReminderHeaderLines(notification: string): string[] {
     return []
   }
 
-  const headerStartIndex = lines[firstContentLineIndex]?.trim() === "<system-reminder>"
-    ? firstContentLineIndex + 1
-    : firstContentLineIndex
+  const headerStartIndex =
+    lines[firstContentLineIndex]?.trim() === "<system-reminder>" ? firstContentLineIndex + 1 : firstContentLineIndex
   const headerLines: string[] = []
   for (let index = headerStartIndex; index < lines.length; index++) {
     const line = lines[index]?.trim()

@@ -12,7 +12,7 @@ import {
   type TeamCoreConfig,
 } from "@oh-my-opencode/senpi-task"
 
-import type { IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
+import { IdleInjectionRetiredError, type IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
 import type { ComponentLogger, SenpiExtensionAPI } from "../../extension/types"
 import type { TaskRuntimeContext } from "./runtime-context"
 
@@ -37,11 +37,11 @@ export type LeadPollerLifecycleDeps = {
 export type LeadPollerLifecycle = {
   tick(): Promise<void>
   resolveLeadPoller(teamRunId: string): LeadPollerPort | undefined
-  resolveTeamRunId(explicit?: string): Promise<
-    | { readonly ok: true; readonly teamRunId: string }
-    | { readonly ok: false; readonly reason: string }
-  >
+  resolveTeamRunId(
+    explicit?: string,
+  ): Promise<{ readonly ok: true; readonly teamRunId: string } | { readonly ok: false; readonly reason: string }>
   resolveDefaultTeamRunId(): Promise<DefaultTeamRunIdResolution>
+  kick(): void
   shutdown(): void
 }
 
@@ -56,7 +56,6 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
   const pollers = new Map<string, OwnedPoller>()
   const createPoller = deps.createPoller ?? createLeadPoller
   const readMap = deps.readMemberTaskMap ?? readMemberTaskMap
-  const sink = createInjectionSink(deps)
   let stopped = false
   let syncInFlight: Promise<readonly ActiveTeamSummary[]> | undefined
   let tickInFlight: Promise<void> | undefined
@@ -75,9 +74,7 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
     if (stopped) return []
     const sessionId = deps.runtime.sessionId()
     const teams = await deps.listTeams()
-    const owned = sessionId === undefined
-      ? []
-      : teams.filter((team) => team.leadSessionId === sessionId)
+    const owned = sessionId === undefined ? [] : teams.filter((team) => team.leadSessionId === sessionId)
     const ownedIds = new Set(owned.map((team) => team.teamRunId))
 
     for (const [teamRunId, entry] of pollers) {
@@ -95,7 +92,7 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
       const poller = createPoller({
         teamRunId: team.teamRunId,
         config: deps.config,
-        coordinator: sink,
+        coordinator: createInjectionSink(deps, team.teamRunId),
         ...(deps.deliveryJournal !== undefined ? { deliveryJournal: deps.deliveryJournal } : {}),
         appendEvent: deps.appendTaskEvent,
         eventTaskId: (message) => memberTaskMap[message.from],
@@ -124,6 +121,15 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
         }
         return
       }
+      // Only this session's own tool calls can create an owned team, so with none the 1 Hz
+      // poll stands down (zero registry reads while idle) until kick() re-arms it.
+      if (owned.length === 0) {
+        standby = true
+        disarmInterval()
+      } else {
+        standby = false
+        armInterval()
+      }
       if (runtimeUnavailable) {
         runtimeUnavailable = false
         deps.logger.info("omo-senpi lead poller runtime recovered")
@@ -142,16 +148,16 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
   }
 
   const resolveLeadPoller = (teamRunId: string): LeadPollerPort | undefined => {
-    if (stopped || deps.runtime.sessionFile() === undefined || isTransition(deps.runtime.parentState())) return undefined
+    if (stopped || deps.runtime.sessionFile() === undefined || isTransition(deps.runtime.parentState()))
+      return undefined
     const entry = pollers.get(teamRunId)
     if (entry === undefined || entry.ownerSessionId !== deps.runtime.sessionId()) return undefined
     return entry.poller
   }
 
-  const resolveTeamRunId = async (explicit?: string): Promise<
-    | { readonly ok: true; readonly teamRunId: string }
-    | { readonly ok: false; readonly reason: string }
-  > => {
+  const resolveTeamRunId = async (
+    explicit?: string,
+  ): Promise<{ readonly ok: true; readonly teamRunId: string } | { readonly ok: false; readonly reason: string }> => {
     const owned = await synchronize()
     if (explicit !== undefined) {
       return owned.some((team) => team.teamRunId === explicit)
@@ -172,29 +178,50 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
     return { kind: "ambiguous", reason: multipleOwnedReason(owned) }
   }
 
-  const disposeInterval = (deps.scheduleInterval ?? scheduleInterval)(() => {
+  let intervalDisposer: (() => void) | undefined
+  let standby = false
+  const armInterval = (): void => {
+    if (stopped || intervalDisposer !== undefined) return
+    intervalDisposer = (deps.scheduleInterval ?? scheduleInterval)(() => {
+      void tick().catch((error: unknown) => {
+        deps.logger.warn("omo-senpi lead poller tick failed", {
+          error: error instanceof Error ? error.message : String(error),
+        })
+      })
+    }, POLL_INTERVAL_MS)
+  }
+  const disarmInterval = (): void => {
+    intervalDisposer?.()
+    intervalDisposer = undefined
+  }
+  const kick = (): void => {
+    if (stopped || !standby) return
+    standby = false
+    armInterval()
     void tick().catch((error: unknown) => {
-      deps.logger.warn("omo-senpi lead poller tick failed", {
+      deps.logger.warn("omo-senpi lead poller kick failed", {
         error: error instanceof Error ? error.message : String(error),
       })
     })
-  }, POLL_INTERVAL_MS)
+  }
+  armInterval()
 
   return {
     tick,
     resolveLeadPoller,
     resolveTeamRunId,
     resolveDefaultTeamRunId,
+    kick,
     shutdown() {
       if (stopped) return
       stopped = true
-      disposeInterval()
+      disarmInterval()
       for (const entry of pollers.values()) entry.poller.shutdown()
       pollers.clear()
     },
   }
 
-  function createInjectionSink(input: LeadPollerLifecycleDeps): LeadInjectionSink {
+  function createInjectionSink(input: LeadPollerLifecycleDeps, teamRunId: string): LeadInjectionSink {
     return {
       enqueue(injection) {
         if (input.coordinator === undefined) {
@@ -203,17 +230,23 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
               customType: "senpi-task:team-message",
               content: injection.content,
               display: false,
+              details: { runRef: { kind: "team", id: teamRunId } },
             },
             { triggerTurn: true, deliverAs: "steer" },
           )
           injection.onFlushed?.()
           return
         }
-        input.coordinator.enqueue({
+        // Refused (coordinator retired with the session): throw so the lead poller releases its
+        // durable delivery reservation and redelivers the message after the reload, instead of
+        // leaving it reserved-but-never-flushed.
+        const accepted = input.coordinator.enqueue({
           ...injection,
+          runRef: { kind: "team", id: teamRunId },
           customType: "senpi-task:team-message",
           display: false,
         })
+        if (accepted === false) throw new IdleInjectionRetiredError()
         const parentState = input.runtime.parentState()
         switch (parentState.kind) {
           case "streaming":
@@ -260,9 +293,7 @@ function scheduleInterval(tick: () => void, intervalMs: number): () => void {
 }
 
 function isRuntimeAccessError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error
-    && "code" in error
-    && (error.code === "EACCES" || error.code === "EPERM")
+  return error instanceof Error && "code" in error && (error.code === "EACCES" || error.code === "EPERM")
 }
 
 function assertNever(value: never): never {

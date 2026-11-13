@@ -12,6 +12,7 @@ import {
   settings,
   tempStore,
 } from "./__fixtures__/lifecycle-fakes"
+import { NO_HOST_ENDPOINT } from "./host-session"
 
 afterEach(cleanupProjects)
 
@@ -20,14 +21,21 @@ function iso(offsetMs: number): string {
 }
 
 describe("admitResident (residency cap + LRU eviction)", () => {
-  test("#given a terminal resident idle beyond the retention window #when the idle sweep runs #then the idle sweep evicts it", async () => {
+  test("#given a terminal resident idle beyond the retention window #when the idle sweep runs #then the idle sweep suspends it", async () => {
     const store = tempStore()
-    seedRecord(store, { task_id: "st_00000009", status: "completed", residency_state: "resident", updated_at: iso(0), host_pid: process.pid })
+    seedRecord(store, {
+      task_id: "st_00000009",
+      status: "completed",
+      residency_state: "resident",
+      updated_at: iso(0),
+      host_pid: process.pid,
+    })
     const registry = new FakeRegistry()
     const handle = fakeHandle("st_00000009", "in-process", [])
     registry.add(handle)
     const timer: IdleReclaimerTimer = {}
     const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
       store,
       registry,
       config: settings({ residency_max_children: 42 }),
@@ -42,7 +50,7 @@ describe("admitResident (residency cap + LRU eviction)", () => {
     })
 
     await lifecycle.reclaimIdleResidents?.()
-    expect(store.load("st_00000009")?.residency_state).toBe("evicted")
+    expect(store.load("st_00000009")?.residency_state).toBe("persisted_only")
     expect(handle.disposed()).toBe(true)
     lifecycle.dispose?.()
   })
@@ -51,7 +59,12 @@ describe("admitResident (residency cap + LRU eviction)", () => {
     // given
     const store = tempStore()
     seedRecord(store, { task_id: "st_00000001", status: "running", residency_state: "resident" })
-    const lifecycle = createTaskLifecycle({ store, registry: new FakeRegistry(), config: settings({ residency_max_children: 8 }) })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry: new FakeRegistry(),
+      config: settings({ residency_max_children: 8 }),
+    })
 
     // when
     const result = await lifecycle.admitResident("parent-1")
@@ -69,7 +82,12 @@ describe("admitResident (residency cap + LRU eviction)", () => {
       seedRecord(store, { task_id: id, status: "completed", residency_state: "resident", updated_at: iso(index) })
       registry.add(fakeHandle(id, "in-process", []))
     })
-    const lifecycle = createTaskLifecycle({ store, registry, config: settings({ residency_max_children: 2 }) })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry,
+      config: settings({ residency_max_children: 2 }),
+    })
 
     // when
     const result = await lifecycle.admitResident("parent-1")
@@ -89,7 +107,12 @@ describe("admitResident (residency cap + LRU eviction)", () => {
     registry.add(fakeHandle("st_000000b0", "in-process", []))
     registry.add(fakeHandle("st_000000b1", "in-process", []))
     registry.markPending("st_000000b0")
-    const lifecycle = createTaskLifecycle({ store, registry, config: settings({ residency_max_children: 2 }) })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry,
+      config: settings({ residency_max_children: 2 }),
+    })
 
     // when
     const result = await lifecycle.admitResident("parent-1")
@@ -109,7 +132,12 @@ describe("admitResident (residency cap + LRU eviction)", () => {
       seedRecord(store, { task_id: id, status: "running", residency_state: "resident", updated_at: iso(index) })
       registry.add(fakeHandle(id, "in-process", order))
     })
-    const lifecycle = createTaskLifecycle({ store, registry, config: settings({ residency_max_children: 2 }) })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry,
+      config: settings({ residency_max_children: 2 }),
+    })
 
     // when
     const result = await lifecycle.admitResident("parent-1")
@@ -126,9 +154,24 @@ describe("admitResident (residency cap + LRU eviction)", () => {
   test("#given other-session residents fill the cap #when admitting for a fresh session #then it is admitted (cap is per parent session)", async () => {
     // given
     const store = tempStore()
-    seedRecord(store, { task_id: "st_000000d0", parent_session_id: "other", status: "running", residency_state: "resident" })
-    seedRecord(store, { task_id: "st_000000d1", parent_session_id: "other", status: "running", residency_state: "resident" })
-    const lifecycle = createTaskLifecycle({ store, registry: new FakeRegistry(), config: settings({ residency_max_children: 2 }) })
+    seedRecord(store, {
+      task_id: "st_000000d0",
+      parent_session_id: "other",
+      status: "running",
+      residency_state: "resident",
+    })
+    seedRecord(store, {
+      task_id: "st_000000d1",
+      parent_session_id: "other",
+      status: "running",
+      residency_state: "resident",
+    })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry: new FakeRegistry(),
+      config: settings({ residency_max_children: 2 }),
+    })
 
     // when
     const result = await lifecycle.admitResident("parent-1")
@@ -141,7 +184,12 @@ describe("admitResident (residency cap + LRU eviction)", () => {
     const store = tempStore()
     seedRecord(store, { task_id: "st_000000e0", status: "lost", residency_state: "resident", updated_at: iso(0) })
     seedRecord(store, { task_id: "st_000000e1", status: "running", residency_state: "resident", updated_at: iso(10) })
-    const lifecycle = createTaskLifecycle({ store, registry: new FakeRegistry(), config: settings({ residency_max_children: 2 }) })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry: new FakeRegistry(),
+      config: settings({ residency_max_children: 2 }),
+    })
 
     // when
     const result = await lifecycle.admitResident("parent-1")
@@ -157,7 +205,12 @@ describe("admitResident (residency cap + LRU eviction)", () => {
     const store = tempStore()
     seedRecord(store, { task_id: "st_000000f0", status: "cancelled", residency_state: "resident", updated_at: iso(0) })
     seedRecord(store, { task_id: "st_000000f1", status: "running", residency_state: "resident", updated_at: iso(10) })
-    const lifecycle = createTaskLifecycle({ store, registry: new FakeRegistry(), config: settings({ residency_max_children: 2 }) })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry: new FakeRegistry(),
+      config: settings({ residency_max_children: 2 }),
+    })
 
     // when
     const result = await lifecycle.admitResident("parent-1")

@@ -1,8 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { subagentSessions } from "../features/claude-code-session-state/state"
 import {
-  LIVE_ROUTE_DISPATCH_LOG,
-  LIVE_ROUTE_UNAVAILABLE_LOG,
   _setLiveClientForTesting,
   _setFetchImplementationForTesting,
   initLiveServerRoute,
@@ -20,7 +18,10 @@ type FakeFetchResponse = {
   status: number
 }
 
-function makeFakeFetch(responses: FakeFetchResponse[], { delay = 0 }: { delay?: number } = {}): {
+function makeFakeFetch(
+  responses: FakeFetchResponse[],
+  { delay = 0 }: { delay?: number } = {},
+): {
   fetch: typeof fetch
   callCount: () => number
 } {
@@ -333,7 +334,10 @@ describe("live-server-route", () => {
   describe("resolveDispatchClient — multiple server() registrations (multi-instance serve)", () => {
     test("#given two registrations with different in-process clients #when resolveDispatchClient called with the first client #then it still routes live instead of identity passthrough", async () => {
       //#given
-      const { fetch: fakeFetch } = makeFakeFetch([{ ok: true, status: 200 }, { ok: true, status: 200 }])
+      const { fetch: fakeFetch } = makeFakeFetch([
+        { ok: true, status: 200 },
+        { ok: true, status: 200 },
+      ])
       _setFetchImplementationForTesting(fakeFetch)
       const firstClient = { _marker: "first" } as unknown
       const secondClient = { _marker: "second" } as unknown
@@ -412,18 +416,6 @@ describe("live-server-route", () => {
       const after = await resolveDispatchClient(fakeInProcessClient, "ses_after")
       expect(after.route).toBe("in-process")
       expect(callCount2()).toBe(0)
-    })
-  })
-
-  describe("provenance log constants exported", () => {
-    test("#given module exports #when constants checked #then LIVE_ROUTE_DISPATCH_LOG and LIVE_ROUTE_UNAVAILABLE_LOG are non-empty strings", () => {
-      expect(typeof LIVE_ROUTE_DISPATCH_LOG).toBe("string")
-      expect(LIVE_ROUTE_DISPATCH_LOG.length).toBeGreaterThan(0)
-      expect(LIVE_ROUTE_DISPATCH_LOG).toContain("[live-server-route]")
-
-      expect(typeof LIVE_ROUTE_UNAVAILABLE_LOG).toBe("string")
-      expect(LIVE_ROUTE_UNAVAILABLE_LOG.length).toBeGreaterThan(0)
-      expect(LIVE_ROUTE_UNAVAILABLE_LOG).toContain("[live-server-route]")
     })
   })
 

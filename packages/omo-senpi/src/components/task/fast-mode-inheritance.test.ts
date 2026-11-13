@@ -9,7 +9,7 @@ type CatalogModel = SenpiModelPort & {
   readonly serviceTier?: "auto" | "flex" | "priority"
 }
 
-const CODEX = "openai-codex"
+const CODEX = "chatgpt-subscription"
 const LUNA = "gpt-5.6-luna"
 const LUNA_FAST = `${LUNA}-fast`
 
@@ -20,12 +20,18 @@ function fastVariant(provider: string, baseId: string): CatalogModel {
 function registry(models: readonly CatalogModel[]): TaskModelRegistry {
   return {
     getAvailable: () => models,
-    find: (provider, modelId) => models.find((candidate) => candidate.provider === provider && candidate.id === modelId),
+    find: (provider, modelId) =>
+      models.find((candidate) => candidate.provider === provider && candidate.id === modelId),
   }
 }
 
 function plannerFor(models: readonly CatalogModel[], parentTier: "priority" | "auto" | undefined) {
-  return createTaskChildPlanner({}, {}, () => registry(models), () => parentTier)
+  return createTaskChildPlanner(
+    {},
+    {},
+    () => registry(models),
+    () => parentTier,
+  )
 }
 
 function expectResolved(plan: ReturnType<ReturnType<typeof createTaskChildPlanner>>) {
@@ -39,7 +45,9 @@ describe("delegated task inherits the parent's fast mode", () => {
     const planner = plannerFor([{ provider: CODEX, id: LUNA }, fastVariant(CODEX, LUNA)], "priority")
 
     // when
-    const plan = expectResolved(planner({ prompt: "Return exactly OK.", parent_session_id: "p", depth: 0, model: `${CODEX}/${LUNA}` }))
+    const plan = expectResolved(
+      planner({ prompt: "Return exactly OK.", parent_session_id: "p", depth: 0, model: `${CODEX}/${LUNA}` }),
+    )
 
     // then
     expect(plan.model).toBe(`${CODEX}/${LUNA_FAST}`)
@@ -71,13 +79,45 @@ describe("delegated task inherits the parent's fast mode", () => {
     expect(plan.resolved_model?.variant).toBe("low")
   })
 
+  test("#given a -fast alias whose pairing only the registry accessors report (models.json) #when a fast parent plans #then the child runs the alias (#10536)", () => {
+    // given: senpi's ModelRegistry resolves serviceTier/upstreamModelId from provider config, not the entry
+    const models: readonly CatalogModel[] = [
+      { provider: CODEX, id: LUNA },
+      { provider: CODEX, id: LUNA_FAST },
+    ]
+    const configured: TaskModelRegistry & {
+      getServiceTier(model: SenpiModelPort): string | undefined
+      getUpstreamModelId(model: SenpiModelPort): string | undefined
+    } = {
+      ...registry(models),
+      getServiceTier: (model) => (model.id === LUNA_FAST ? "priority" : undefined),
+      getUpstreamModelId: (model) => (model.id === LUNA_FAST ? LUNA : undefined),
+    }
+    const planner = createTaskChildPlanner(
+      {},
+      {},
+      () => configured,
+      () => "priority",
+    )
+
+    // when
+    const plan = expectResolved(planner({ prompt: "x", parent_session_id: "p", depth: 0, model: `${CODEX}/${LUNA}` }))
+
+    // then
+    expect(plan.model).toBe(`${CODEX}/${LUNA_FAST}`)
+  })
+
   test("#given a parent that is not fast #when planned #then the child keeps the planned model", () => {
     // given
     const models = [{ provider: CODEX, id: LUNA }, fastVariant(CODEX, LUNA)]
 
     // when
-    const standard = expectResolved(plannerFor(models, "auto")({ prompt: "x", parent_session_id: "p", depth: 0, model: `${CODEX}/${LUNA}` }))
-    const unknown = expectResolved(plannerFor(models, undefined)({ prompt: "x", parent_session_id: "p", depth: 0, model: `${CODEX}/${LUNA}` }))
+    const standard = expectResolved(
+      plannerFor(models, "auto")({ prompt: "x", parent_session_id: "p", depth: 0, model: `${CODEX}/${LUNA}` }),
+    )
+    const unknown = expectResolved(
+      plannerFor(models, undefined)({ prompt: "x", parent_session_id: "p", depth: 0, model: `${CODEX}/${LUNA}` }),
+    )
 
     // then
     expect(standard.model).toBe(`${CODEX}/${LUNA}`)
@@ -108,7 +148,9 @@ describe("delegated task inherits the parent's fast mode", () => {
     )
 
     // when
-    const cursor = expectResolved(planner({ prompt: "x", parent_session_id: "p", depth: 0, model: "cursor/composer-2.5" }))
+    const cursor = expectResolved(
+      planner({ prompt: "x", parent_session_id: "p", depth: 0, model: "cursor/composer-2.5" }),
+    )
     const custom = expectResolved(planner({ prompt: "x", parent_session_id: "p", depth: 0, model: `${CODEX}/custom` }))
 
     // then
@@ -121,7 +163,9 @@ describe("delegated task inherits the parent's fast mode", () => {
     const planner = plannerFor([{ provider: CODEX, id: LUNA }, fastVariant(CODEX, LUNA)], "priority")
 
     // when
-    const plan = expectResolved(planner({ prompt: "x", parent_session_id: "p", depth: 0, model: `${CODEX}/${LUNA_FAST}` }))
+    const plan = expectResolved(
+      planner({ prompt: "x", parent_session_id: "p", depth: 0, model: `${CODEX}/${LUNA_FAST}` }),
+    )
 
     // then
     expect(plan.model).toBe(`${CODEX}/${LUNA_FAST}`)

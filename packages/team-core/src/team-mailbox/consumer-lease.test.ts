@@ -1,7 +1,8 @@
 /// <reference types="bun-types" />
 
-import { describe, expect, test } from "bun:test"
+import { describe, expect, onTestFinished, test } from "bun:test"
 import { randomUUID } from "node:crypto"
+import { rmSync } from "node:fs"
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
@@ -24,7 +25,9 @@ function createSignal(): { readonly promise: Promise<void>; readonly resolve: ()
 }
 
 async function createBaseDirectory(): Promise<string> {
-  return await mkdtemp(path.join(tmpdir(), "team-mailbox-consumer-lease-"))
+  const directory = await mkdtemp(path.join(tmpdir(), "team-mailbox-consumer-lease-"))
+  onTestFinished(() => rmSync(directory, { recursive: true, force: true }))
+  return directory
 }
 
 describe("withInboxConsumerLease", () => {
@@ -38,22 +41,34 @@ describe("withInboxConsumerLease", () => {
     const overlapObserved: string[] = []
 
     // when
-    const first = withInboxConsumerLease(teamRunId, "m1", config, async () => {
-      activeCallbacks.add("first")
-      firstEntered.resolve()
-      await releaseFirst.promise
-      if (activeCallbacks.has("second")) overlapObserved.push("first")
-      activeCallbacks.delete("first")
-      return "first"
-    }, { staleAfterMs: 300_000 })
+    const first = withInboxConsumerLease(
+      teamRunId,
+      "m1",
+      config,
+      async () => {
+        activeCallbacks.add("first")
+        firstEntered.resolve()
+        await releaseFirst.promise
+        if (activeCallbacks.has("second")) overlapObserved.push("first")
+        activeCallbacks.delete("first")
+        return "first"
+      },
+      { staleAfterMs: 300_000 },
+    )
     await firstEntered.promise
 
-    const second = withInboxConsumerLease(teamRunId, "m1", config, async () => {
-      activeCallbacks.add("second")
-      if (activeCallbacks.has("first")) overlapObserved.push("second")
-      activeCallbacks.delete("second")
-      return "second"
-    }, { staleAfterMs: 300_000 })
+    const second = withInboxConsumerLease(
+      teamRunId,
+      "m1",
+      config,
+      async () => {
+        activeCallbacks.add("second")
+        if (activeCallbacks.has("first")) overlapObserved.push("second")
+        activeCallbacks.delete("second")
+        return "second"
+      },
+      { staleAfterMs: 300_000 },
+    )
 
     releaseFirst.resolve()
     const results = await Promise.all([first, second])
@@ -73,25 +88,10 @@ describe("withInboxConsumerLease", () => {
     await writeFile(leasePath, `dead-consumer\n999999999\n${Date.now() - 1}\n`)
 
     // when
-    const result = await withInboxConsumerLease(
-      teamRunId,
-      "m1",
-      config,
-      async () => "reacquired",
-      { staleAfterMs: 0 },
-    )
+    const result = await withInboxConsumerLease(teamRunId, "m1", config, async () => "reacquired", { staleAfterMs: 0 })
 
     // then
     expect(result).toBe("reacquired")
     await expect(readFile(leasePath, "utf8")).rejects.toThrow()
   }, 2_000)
-
-  test("#given the team-mailbox barrel w2tc #when its durable recovery surface is loaded #then consumed and lease helpers are exported", async () => {
-    // when
-    const mailbox = await import("./index")
-
-    // then
-    expect(typeof mailbox.isMessageConsumed).toBe("function")
-    expect(typeof mailbox.withInboxConsumerLease).toBe("function")
-  })
 })

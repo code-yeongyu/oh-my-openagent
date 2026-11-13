@@ -13,7 +13,7 @@ describe("remapAgentKeysToDisplayNames", () => {
     // when remapping
     const result = remapAgentKeysToDisplayNames(agents)
 
-    // then known agents get display name keys only
+    // then known agents get display name keys only; config keys are not copied
     expect(result[getAgentListDisplayName("sisyphus")]).toBeDefined()
     expect(result["oracle"]).toBeDefined()
     expect(result["sisyphus"]).toBeUndefined()
@@ -48,7 +48,7 @@ describe("remapAgentKeysToDisplayNames", () => {
     // when remapping
     const result = remapAgentKeysToDisplayNames(agents)
 
-    // then all get display name keys
+    // then all get display name keys and original config keys are gone
     expect(result[getAgentListDisplayName("sisyphus")]).toBeDefined()
     expect(result["sisyphus"]).toBeUndefined()
     expect(result[getAgentListDisplayName("hephaestus")]).toBeDefined()
@@ -67,7 +67,7 @@ describe("remapAgentKeysToDisplayNames", () => {
     expect(result["sisyphus-junior"]).toBeUndefined()
   })
 
-  it("does not emit both config and display keys for remapped agents", () => {
+  it("does not emit config-key alias copies at remap time", () => {
     // given one remapped agent
     const agents = {
       sisyphus: { prompt: "test", mode: "primary" },
@@ -76,9 +76,10 @@ describe("remapAgentKeysToDisplayNames", () => {
     // when remapping
     const result = remapAgentKeysToDisplayNames(agents)
 
-    // then only display key is emitted
-    expect(Object.keys(result)).toEqual([getAgentListDisplayName("sisyphus")])
-    expect(result[getAgentListDisplayName("sisyphus")]).toBeDefined()
+    // then only the display-name row exists; aliases are attached after applyToolConfig
+    const display = getAgentListDisplayName("sisyphus")
+    expect(result[display]).toMatchObject({ prompt: "test", mode: "primary" })
+    expect((result[display] as { hidden?: boolean }).hidden).not.toBe(true)
     expect(result["sisyphus"]).toBeUndefined()
   })
 
@@ -92,7 +93,10 @@ describe("remapAgentKeysToDisplayNames", () => {
     })
 
     // when
-    const remappedNames = Object.keys(result)
+    const remappedNames = Object.keys(result).filter((key) => {
+      const value = result[key]
+      return !(typeof value === "object" && value !== null && (value as { hidden?: boolean }).hidden === true)
+    })
 
     // then
     expect(remappedNames).toEqual([
@@ -117,7 +121,11 @@ describe("remapAgentKeysToDisplayNames", () => {
     const result = remapAgentKeysToDisplayNames(agents)
 
     // then keys and names both use the same runtime-facing list names
-    expect(Object.keys(result).slice(0, 4)).toEqual([
+    const visibleKeys = Object.keys(result).filter((key) => {
+      const value = result[key]
+      return !(typeof value === "object" && value !== null && (value as { hidden?: boolean }).hidden === true)
+    })
+    expect(visibleKeys.slice(0, 4)).toEqual([
       getAgentListDisplayName("sisyphus"),
       getAgentListDisplayName("hephaestus"),
       getAgentListDisplayName("prometheus"),
@@ -190,13 +198,14 @@ describe("remapAgentKeysToDisplayNames", () => {
     // when remapping
     const result = remapAgentKeysToDisplayNames(agents)
 
-    // then exactly one row is emitted under the clean literal display name
+    // then the only row is the clean literal display name
     const displayName = getAgentListDisplayName("sisyphus")
     expect(Object.keys(result)).toEqual([displayName])
     expect(result[displayName]).toEqual({
       name: displayName,
       foo: "bar",
     })
+    expect(result["sisyphus"]).toBeUndefined()
   })
 
   describe("displayName i18n override (#4004)", () => {

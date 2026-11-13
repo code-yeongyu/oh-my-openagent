@@ -1,19 +1,29 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
+import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js"
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
 import { log } from "../logger"
 import { registerProcessCleanup, startCleanupTimer } from "./cleanup"
 import { redactSensitiveData } from "./error-redaction"
 import { buildHttpRequestInit } from "./oauth-handler"
 import type { ManagedClient, McpClient, McpTransport, SkillMcpClientConnectionParams } from "./types"
+import { createProtocolTransport } from "./protocol-transport"
+import { protocolHttpFetch } from "./protocol-http-fetch"
+import { createRequestAbortFetch } from "./request-abort-fetch"
+import { connectWithPolicySignal, McpEnvironmentPolicyChangedError } from "./policy-connection"
+import { withConnectDeadline } from "./timeouts"
 
 type HttpClientFactory = (
   clientInfo: { name: string; version: string },
-  options: { capabilities: Record<string, never> }
+  options: { capabilities: Record<string, never> },
 ) => McpClient
+
+type HttpTransportKind = "streamable-http" | "sse"
 
 type HttpTransportFactory = (
   url: URL,
-  options?: { requestInit?: RequestInit }
+  options: { requestInit?: RequestInit } | undefined,
+  client: McpClient,
+  transportKind: HttpTransportKind,
 ) => McpTransport
 
 interface HttpClientDependencies {
@@ -24,15 +34,23 @@ interface HttpClientDependencies {
 
 const defaultHttpClientDependencies: HttpClientDependencies = {
   createClient: (clientInfo, options) => new Client(clientInfo, options),
-  createTransport: (url, options) => new StreamableHTTPClientTransport(url, options),
+  createTransport: (url, options, client, transportKind) =>
+    transportKind === "sse"
+      ? new SSEClientTransport(url, options)
+      : createProtocolTransport(
+          new StreamableHTTPClientTransport(url, {
+            ...options,
+            fetch: createRequestAbortFetch(protocolHttpFetch),
+          }),
+          client instanceof Client ? client : undefined,
+          `http:${url.toString()}`,
+        ),
   log,
 }
 
 let httpClientDependencies: HttpClientDependencies = defaultHttpClientDependencies
 
-export function setHttpClientDependenciesForTesting(
-  dependencies?: Partial<HttpClientDependencies>
-): void {
+export function setHttpClientDependenciesForTesting(dependencies?: Partial<HttpClientDependencies>): void {
   httpClientDependencies = dependencies
     ? {
         ...defaultHttpClientDependencies,
@@ -110,7 +128,7 @@ export async function createHttpClient(params: SkillMcpClientConnectionParams): 
     }
     throw new Error(
       `MCP server "${info.serverName}" has invalid URL: ${redactUrl(config.url)}\n\n` +
-      `Expected a valid URL like: https://mcp.example.com/mcp`
+        `Expected a valid URL like: https://mcp.example.com/mcp`,
     )
   }
 
@@ -118,31 +136,33 @@ export async function createHttpClient(params: SkillMcpClientConnectionParams): 
 
   const requestInit = await buildHttpRequestInit(config, state.authProviders, state.createOAuthProvider)
   const transportOptions = requestInit ? { requestInit } : undefined
-  const transport: McpTransport = httpClientDependencies.createTransport(url, transportOptions)
-
   const client: McpClient = httpClientDependencies.createClient(
     { name: `skill-mcp-${info.skillName}-${info.serverName}`, version: "1.0.0" },
-    { capabilities: {} }
+    { capabilities: {} },
   )
+  const transportKind: HttpTransportKind = config.type === "sse" ? "sse" : "streamable-http"
+  const transport: McpTransport = httpClientDependencies.createTransport(url, transportOptions, client, transportKind)
 
   try {
-    await client.connect(transport)
+    const connecting = connectWithPolicySignal(client, transport, params.policySignal)
+    await (transportKind === "sse" ? withConnectDeadline(connecting) : connecting)
   } catch (error) {
     await closeHttpResourceIgnoringFailure(() => transport.close(), {
       resource: "transport",
       serverName: info.serverName,
       phase: "connect-failure",
     })
+    if (error instanceof McpEnvironmentPolicyChangedError) throw error
 
     const errorMessage = redactCleanupErrorMessage(error instanceof Error ? error.message : String(error))
     throw new Error(
       `Failed to connect to MCP server "${info.serverName}".\n\n` +
-      `URL: ${redactUrl(config.url)}\n` +
-      `Reason: ${errorMessage}\n\n` +
-      `Hints:\n` +
-      `  - Verify the URL is correct and the server is running\n` +
-      `  - Check if authentication headers are required\n` +
-      `  - Ensure the server supports MCP over HTTP`
+        `URL: ${redactUrl(config.url)}\n` +
+        `Reason: ${errorMessage}\n\n` +
+        `Hints:\n` +
+        `  - Verify the URL is correct and the server is running\n` +
+        `  - Check if authentication headers are required\n` +
+        `  - Ensure the server supports MCP over HTTP`,
     )
   }
 

@@ -4,7 +4,6 @@ import * as React from "react"
 import { ChevronDown } from "lucide-react"
 import { DocsSidebar, type DocsShellSection } from "@/components/docs/docs-sidebar"
 import { useDocsNavigation } from "@/components/docs/use-docs-navigation"
-import type { DocSectionId } from "@/lib/docs-sections"
 import { cn } from "@/lib/utils"
 
 export type { DocsShellSection }
@@ -12,7 +11,9 @@ export type { DocsShellSection }
 export interface DocsShellProps {
   /** Label for the sidebar disclosure (< lg) and the scroll region. */
   readonly mobileHeader: string
+  readonly searchLabel: string
   readonly searchPlaceholder: string
+  readonly sectionsLabel: string
   readonly sections: readonly DocsShellSection[]
   readonly children: React.ReactNode
 }
@@ -29,14 +30,20 @@ export interface DocsShellProps {
  */
 export function DocsShell({
   mobileHeader,
+  searchLabel,
   searchPlaceholder,
+  sectionsLabel,
   sections,
   children,
 }: DocsShellProps): React.JSX.Element {
   const scrollerRef = React.useRef<HTMLDivElement | null>(null)
   const [searchQuery, setSearchQuery] = React.useState("")
   const [isMenuOpen, setIsMenuOpen] = React.useState(false)
-  const { activeSection, scrollToSection, handleInternalLinkClick } = useDocsNavigation(scrollerRef)
+  const sectionIds = React.useMemo(() => sections.map((section) => section.id), [sections])
+  const { activeSection, scrollToSection, handleInternalLinkClick } = useDocsNavigation(
+    scrollerRef,
+    sectionIds,
+  )
 
   const filteredSections = React.useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
@@ -45,7 +52,7 @@ export function DocsShell({
   }, [searchQuery, sections])
 
   const handleSelect = React.useCallback(
-    (id: DocSectionId) => {
+    (id: string) => {
       scrollToSection(id)
       setIsMenuOpen(false)
     },
@@ -53,14 +60,14 @@ export function DocsShell({
   )
 
   return (
-    <div className="mx-auto grid min-h-0 w-full max-w-[90rem] grid-cols-[minmax(0,1fr)] lg:h-[calc(100dvh-60px)] lg:grid-cols-[16rem_minmax(0,1fr)]">
+    <div className="mx-auto grid min-h-0 w-full max-w-[90rem] grid-cols-[minmax(0,1fr)] lg:h-[calc(100dvh-var(--nav-h))] lg:grid-cols-[16rem_minmax(0,1fr)]">
       <aside className="border-line min-h-0 min-w-0 border-b lg:overflow-y-auto lg:border-r lg:border-b-0">
         <button
           type="button"
           aria-expanded={isMenuOpen}
           aria-controls="docs-sidebar-panel"
           onClick={() => setIsMenuOpen((open) => !open)}
-          className="text-text-hi focus-visible:outline-accent-32 ease-standard flex min-h-11 w-full items-center justify-between gap-3 px-4 text-sm font-medium transition-colors duration-[var(--dur-micro)] focus-visible:outline-2 focus-visible:-outline-offset-2 sm:px-5 lg:hidden"
+          className="text-text-hi ease-standard focus-ring-inset flex min-h-11 w-full items-center justify-between gap-3 px-4 text-sm font-medium transition-colors duration-[var(--dur-micro)] sm:px-5 lg:hidden"
         >
           <span>{mobileHeader}</span>
           <ChevronDown
@@ -82,7 +89,9 @@ export function DocsShell({
               sections={filteredSections}
               activeSection={activeSection}
               searchQuery={searchQuery}
+              searchLabel={searchLabel}
               searchPlaceholder={searchPlaceholder}
+              sectionsLabel={sectionsLabel}
               onSearchChange={setSearchQuery}
               onSelect={handleSelect}
               className="px-4 pt-4 pb-6 sm:px-5 lg:p-5"
@@ -97,7 +106,7 @@ export function DocsShell({
         aria-label={mobileHeader}
         tabIndex={0}
         onClickCapture={handleInternalLinkClick}
-        className="focus-visible:outline-accent-32 min-h-0 min-w-0 focus-visible:outline-2 focus-visible:-outline-offset-2 lg:overflow-auto"
+        className="focus-ring-inset min-h-0 min-w-0 lg:overflow-auto"
       >
         <div className="mx-auto w-full max-w-3xl px-4 pt-10 pb-24 sm:px-5 lg:px-8 lg:pt-12">
           {children}

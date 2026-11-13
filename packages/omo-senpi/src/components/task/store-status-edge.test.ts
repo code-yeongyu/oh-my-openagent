@@ -3,7 +3,12 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { createTaskRecord, createTaskRecordStore, type TaskRecord, type TaskRecordStore } from "@oh-my-opencode/senpi-task"
+import {
+  createTaskRecord,
+  createTaskRecordStore,
+  type TaskRecord,
+  type TaskRecordStore,
+} from "@oh-my-opencode/senpi-task"
 
 import { createMutationNotifyingStore } from "./store-mutation-observer"
 import { createTaskTerminalObservers, type TaskTerminalEdge } from "./terminal-observers"
@@ -38,7 +43,7 @@ function harness(): {
         root_session_id: "parent-1",
         depth: 0,
         execution_mode: "in-process",
-        model: "anthropic/claude-opus-5",
+        model: "anthropic/claude-opus-5-5",
         notify_on_terminal: false,
         task_seq: 0,
       })
@@ -125,7 +130,7 @@ describe("store status-edge observation", () => {
       root_session_id: "parent-1",
       depth: 0,
       execution_mode: "in-process",
-      model: "anthropic/claude-opus-5",
+      model: "anthropic/claude-opus-5-5",
       notify_on_terminal: false,
     })
 
@@ -147,15 +152,19 @@ describe("store status-edge observation", () => {
       throw new Error("observer exploded")
     })
     let mutations = 0
-    const store = createMutationNotifyingStore(backing, () => {
-      mutations += 1
-    }, observers)
+    const store = createMutationNotifyingStore(
+      backing,
+      () => {
+        mutations += 1
+      },
+      observers,
+    )
     const draft = createTaskRecord({
       parent_session_id: "parent-1",
       root_session_id: "parent-1",
       depth: 0,
       execution_mode: "in-process",
-      model: "anthropic/claude-opus-5",
+      model: "anthropic/claude-opus-5-5",
       notify_on_terminal: false,
     })
     backing.save({ ...draft, status: "running" })
@@ -187,7 +196,7 @@ describe("store status-edge observation", () => {
       root_session_id: "parent-1",
       depth: 0,
       execution_mode: "in-process",
-      model: "anthropic/claude-opus-5",
+      model: "anthropic/claude-opus-5-5",
       notify_on_terminal: false,
     })
 

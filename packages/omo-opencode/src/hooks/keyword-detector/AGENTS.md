@@ -12,7 +12,7 @@ This matches the package layering direction in [`ROADMAP.md`](../../../../../ROA
 
 | Keyword | Pattern | Effect |
 |---------|---------|--------|
-| `ultrawork` / `ulw` | `/\b(ultrawork|ulw)\b/i` | Full orchestration mode: parallel agents, deep exploration, relentless execution |
+| `ultrawork` / `ulw` | `ULTRAWORK_PATTERN` (from `constants.ts`; ignores `ulw-*` skill names, shared with the model override) | Full orchestration mode: parallel agents, deep exploration, relentless execution |
 | Team mode | `TEAM_PATTERN` (from `team/`) | Forces orchestration via `team_*` tools when user invokes `team mode` / `team-mode` / `team_mode` / `teammode`; instructs user to enable `team_mode.enabled` if tools are absent and reminds lead to run the closure sequence once every task is terminal |
 | Hyperplan mode | `HYPERPLAN_PATTERN` (from `hyperplan/`) | Loads the `hyperplan` skill and injects adversarial planning mode guidance |
 | Hyperplan-ultrawork combo | `HYPERPLAN_ULTRAWORK_PATTERN` (from `constants.ts`) | Prepends the combo banner, requires the `hyperplan` skill, then appends the routed ultrawork message |

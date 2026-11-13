@@ -21,7 +21,7 @@ The root plugin manifest exports one Codex plugin named `omo`, with aggregate ho
 
 ## Telemetry
 
-The bundled telemetry component emits the anonymous `omo_codex_daily_active` event at most once per UTC day per machine when the Codex `SessionStart` hook runs. It uses `sha256("omo-codex:" + hostname)` as the distinct ID, disables PostHog person profiles, and stores daily deduplication state in `$XDG_DATA_HOME/omo-codex/posthog-activity.json` or `~/.local/share/omo-codex/posthog-activity.json`.
+The bundled telemetry component emits the anonymous `omo_codex_daily_active` event at most once per UTC day per machine when the Codex `SessionStart` hook runs. It uses `sha256` of a random install id (stored as `install-id` next to the deduplication state) as the distinct ID, disables PostHog person profiles, and stores daily deduplication state in `$XDG_DATA_HOME/omo-codex/posthog-activity.json` or `~/.local/share/omo-codex/posthog-activity.json`.
 
 Captured properties are limited to product/runtime metadata, operating-system metadata, coarse machine shape, locale/timezone, shell/terminal hints, `source`, `reason`, and `day_utc`. It does not send prompt contents, chat transcripts, source files, repository contents, file paths, access tokens, API keys, raw hostnames, Git remotes, usernames, email addresses, or runtime error diagnostics.
 

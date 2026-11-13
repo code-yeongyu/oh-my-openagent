@@ -11,32 +11,23 @@ let testConfigDir: string
 let originalConfigDir: string | undefined
 
 function writeOpenCodeConfig(plugins: string[]): void {
-  writeFileSync(
-    join(testConfigDir, "opencode.json"),
-    JSON.stringify({ plugin: plugins }, null, 2) + "\n",
-    "utf-8",
-  )
+  writeFileSync(join(testConfigDir, "opencode.json"), JSON.stringify({ plugin: plugins }, null, 2) + "\n", "utf-8")
 }
 
 function writeTuiConfig(plugins: readonly unknown[]): void {
-  writeFileSync(
-    join(testConfigDir, "tui.json"),
-    JSON.stringify({ plugin: plugins }, null, 2) + "\n",
-    "utf-8",
-  )
+  writeFileSync(join(testConfigDir, "tui.json"), JSON.stringify({ plugin: plugins }, null, 2) + "\n", "utf-8")
 }
 
-function createPackageJson(packageName: string, exportsValue: Record<string, unknown> = { ".": "./dist/index.js" }): string {
+function createPackageJson(
+  packageName: string,
+  exportsValue: Record<string, unknown> = { ".": "./dist/index.js" },
+): string {
   return JSON.stringify({ name: packageName, exports: exportsValue }, null, 2) + "\n"
 }
 
 function writeFilePluginPackage(dir: string, packageName: string, exportsValue?: Record<string, unknown>): string {
   mkdirSync(dir, { recursive: true })
-  writeFileSync(
-    join(dir, "package.json"),
-    createPackageJson(packageName, exportsValue),
-    "utf-8",
-  )
+  writeFileSync(join(dir, "package.json"), createPackageJson(packageName, exportsValue), "utf-8")
   return `file:${dir}`
 }
 
@@ -49,10 +40,7 @@ function writeInstalledPackage(packageName: string, exportsValue?: Record<string
 describe("tui-plugin-config check", () => {
   beforeEach(() => {
     originalConfigDir = process.env.OPENCODE_CONFIG_DIR
-    testConfigDir = join(
-      tmpdir(),
-      `omo-doctor-tui-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    )
+    testConfigDir = join(tmpdir(), `omo-doctor-tui-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     mkdirSync(testConfigDir, { recursive: true })
     process.env.OPENCODE_CONFIG_DIR = testConfigDir
   })
@@ -270,6 +258,57 @@ describe("tui-plugin-config check", () => {
     expect(result.status).toBe("skip")
     expect(result.issues).toHaveLength(0)
     expect(result.message).toContain("not registered")
+  })
+
+  it("#given leftover @latest and bare entries #when checking #then it warns about the duplicate", async () => {
+    // given — 4.19.4 installer wrote @latest; a later run appended the bare name
+    writeInstalledPackage(PLUGIN_NAME, { ".": "./dist/index.js", "./tui": "./dist/tui.js" })
+    writeOpenCodeConfig([PLUGIN_NAME])
+    writeTuiConfig([`${PLUGIN_NAME}@latest`, PLUGIN_NAME])
+
+    // when
+    const result = await checkTuiPluginConfig()
+
+    // then
+    expect(result.status).toBe("warn")
+    expect(result.message).toContain("more than once")
+    expect(result.issues).toHaveLength(1)
+    expect(result.issues[0].title).toContain("more than once")
+    expect(result.issues[0].fix).toContain("install")
+  })
+
+  it("#given leftover @latest and bare entries #when ensureTuiPluginEntry runs #then doctor passes", async () => {
+    // given
+    writeInstalledPackage(PLUGIN_NAME, { ".": "./dist/index.js", "./tui": "./dist/tui.js" })
+    writeOpenCodeConfig([PLUGIN_NAME])
+    writeTuiConfig([`${PLUGIN_NAME}@latest`, PLUGIN_NAME])
+
+    // when
+    const ensureResult = ensureTuiPluginEntry({ configDir: testConfigDir })
+    const result = await checkTuiPluginConfig()
+
+    // then
+    expect(ensureResult).toEqual({ changed: true, reason: "added" })
+    expect(result.status).toBe("pass")
+    expect(result.issues).toHaveLength(0)
+  })
+
+  it("#given a tuple server entry and a tuple TUI entry #when checking #then both halves are detected", async () => {
+    // given
+    writeInstalledPackage(PLUGIN_NAME, { ".": "./dist/index.js", "./tui": "./dist/tui.js" })
+    writeFileSync(
+      join(testConfigDir, "opencode.json"),
+      JSON.stringify({ plugin: [[PLUGIN_NAME, { verbose: true }]] }, null, 2) + "\n",
+      "utf-8",
+    )
+    writeTuiConfig([[PLUGIN_NAME, { enabled: true }]])
+
+    // when
+    const result = await checkTuiPluginConfig()
+
+    // then
+    expect(result.status).toBe("pass")
+    expect(result.issues).toHaveLength(0)
   })
 
   it("passes when legacy server entry is paired with legacy TUI package entry", async () => {

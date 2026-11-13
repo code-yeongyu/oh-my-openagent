@@ -11,12 +11,19 @@ export const LOCK_DOMAINS = [
   "facts-queue",
   "facts-runs",
   "notice",
+  "memory-maintenance",
+  "receipts",
 ] as const
 
 export type LockDomain = (typeof LOCK_DOMAINS)[number]
 
 export function memoryWriterLockPath(locksDirectory: string): string {
   return path.join(locksDirectory, "memory-write.lock")
+}
+
+/** Held for the whole of a background maintenance pass; one runner per identity across every process. */
+export function memoryMaintenanceLockPath(locksDirectory: string): string {
+  return path.join(locksDirectory, "memory-maintenance.lock")
 }
 
 export function reflectionSchedulerLockPath(locksDirectory: string): string {
@@ -31,7 +38,11 @@ export function runFinalizationLockPath(locksDirectory: string, runId: string): 
   if (/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$/.test(trimmed)) {
     return path.join(locksDirectory, `finalize-${trimmed}.lock`)
   }
-  const slug = trimmed.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^[.-]+|[.-]+$/g, "").slice(0, 48) || "run"
+  const slug =
+    trimmed
+      .replace(/[^a-zA-Z0-9._-]+/g, "-")
+      .replace(/^[.-]+|[.-]+$/g, "")
+      .slice(0, 48) || "run"
   const digest = createHash("sha256").update(trimmed).digest("hex").slice(0, 16)
   return path.join(locksDirectory, `finalize-${slug}-${digest}.lock`)
 }
@@ -65,4 +76,9 @@ export function factsRunsLockPath(locksDirectory: string): string {
 
 export function noticeLockPath(locksDirectory: string): string {
   return path.join(locksDirectory, "notice.lock")
+}
+
+/** Serialises appends to `receipts.jsonl`, and the read-then-append of an idempotent receipt. */
+export function receiptsLockPath(locksDirectory: string): string {
+  return path.join(locksDirectory, "receipts.lock")
 }

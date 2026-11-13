@@ -1,0 +1,61 @@
+{
+  "description": "method-level rejections use -32601 with data.reason: an unknown name is unknown; a test-only method without SENPI_DESKTOP_FAKE_CLOCK=1 is testOnly.",
+  "scenario": "crates/senpi-desktop-backend-fake/fixtures/two-displays-one-window.json",
+  "env": {},
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "reset",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "error": {
+              "code": -32601,
+              "message": "Method not found",
+              "data": {
+                "reason": "unknown"
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "$/test.advanceClock",
+        "params": {
+          "ms": 1
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "error": {
+              "code": -32601,
+              "message": "Method not found",
+              "data": {
+                "reason": "testOnly"
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    }
+  ]
+}

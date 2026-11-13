@@ -46,10 +46,10 @@ describe("loadOmoConfig telemetry resolution", () => {
     }
   })
 
-  test("#given base telemetry is disabled and the senpi block enables it #when loading the senpi view #then the senpi override wins", () => {
+  test("#given base telemetry is disabled and the native block enables it #when loading the senpi view #then the harness override wins", () => {
     // given
     const fixture = makeFixture()
-    writeUserConfig(fixture.homeDir, `{"telemetry":{"enabled":false},"[senpi]":{"telemetry":{"enabled":true}}}`)
+    writeUserConfig(fixture.homeDir, `{"telemetry":{"enabled":false},"[native]":{"telemetry":{"enabled":true}}}`)
 
     try {
       // when
@@ -143,22 +143,25 @@ describe("loadOmoConfig telemetry resolution", () => {
     ["number", `{"telemetry":{"enabled":1}}`],
     ["null", `{"telemetry":{"enabled":null}}`],
     ["deeply nested garbage", `{"telemetry":{"enabled":{"nested":{"garbage":true}}}}`],
-  ])("#given telemetry enabled is %s #when loading the senpi view #then malformed input is rejected", (_name, content) => {
-    // given
-    const fixture = makeFixture()
-    writeUserConfig(fixture.homeDir, content)
+  ])(
+    "#given telemetry enabled is %s #when loading the senpi view #then malformed input is rejected",
+    (_name, content) => {
+      // given
+      const fixture = makeFixture()
+      writeUserConfig(fixture.homeDir, content)
 
-    try {
-      // when
-      const result = loadSenpi(fixture)
+      try {
+        // when
+        const result = loadSenpi(fixture)
 
-      // then
-      expect(result.diagnostics).toHaveLength(1)
-      expect(result.diagnostics[0]).toMatchObject({ kind: "validation" })
-      expect(result.diagnostics[0]?.issuePaths).toContain("telemetry.enabled")
-      expect(isOmoTelemetryEnabled(result.config)).toBe(true)
-    } finally {
-      rmSync(fixture.root, { force: true, recursive: true })
-    }
-  })
+        // then
+        expect(result.diagnostics).toHaveLength(1)
+        expect(result.diagnostics[0]).toMatchObject({ kind: "validation" })
+        expect(result.diagnostics[0]?.issuePaths).toContain("telemetry.enabled")
+        expect(isOmoTelemetryEnabled(result.config)).toBe(true)
+      } finally {
+        rmSync(fixture.root, { force: true, recursive: true })
+      }
+    },
+  )
 })

@@ -57,6 +57,22 @@ export class TaskHistory {
     this.entries.delete(parentSessionID)
   }
 
+  restoreEntry(parentSessionID: string, taskID: string, entry: TaskHistoryEntry | undefined): void {
+    const list = this.entries.get(parentSessionID)
+    if (!list) {
+      if (entry) this.record(parentSessionID, entry)
+      return
+    }
+    const index = list.findIndex((current) => current.id === taskID)
+    if (index !== -1) {
+      if (entry) list[index] = { ...entry }
+      else list.splice(index, 1)
+    } else if (entry) {
+      this.record(parentSessionID, entry)
+    }
+    if (list.length === 0) this.entries.delete(parentSessionID)
+  }
+
   clearAll(): void {
     this.entries.clear()
   }
@@ -107,7 +123,11 @@ function formatCompactionEntry(entry: TaskHistoryEntry): string {
 }
 
 function compactInline(value: string, maxChars: number): string {
-  const normalized = value.replace(/[\n\r]+/g, " ").replace(/\s+/g, " ").replace(/`/g, "'").trim()
+  const normalized = value
+    .replace(/[\n\r]+/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/`/g, "'")
+    .trim()
   if (normalized.length <= maxChars) {
     return normalized
   }

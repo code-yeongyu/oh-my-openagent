@@ -11,8 +11,8 @@ Highest level          tokio::sync::mpsc / broadcast / watch
                        Arc<Mutex<T>> / Arc<RwLock<T>>
                        (shared mutable state — common, easy to get right)
 
-                       parking_lot::{Mutex, RwLock, Condvar}
-                       (faster sync locks, no poisoning)
+                       std::sync / parking_lot::{Mutex, RwLock, Condvar}
+                       (sync locks for critical sections without .await)
 
                        Atomics (AtomicUsize, AtomicBool, AtomicPtr)
                        (single-word lock-free state)
@@ -43,10 +43,10 @@ Need to share state between tasks?
 │   └── AtomicBool / OnceLock<T> / OnceCell<T>
 ├── State needs mutation across many tasks/threads, cheap critical sections
 │   ├── async context           → tokio::sync::Mutex<T>
-│   └── sync context (no .await held) → parking_lot::Mutex<T>
+│   └── sync context (no .await held) → std::sync::Mutex<T> / parking_lot::Mutex<T>
 ├── State needs mutation, many readers, few writers
 │   ├── async context           → tokio::sync::RwLock<T>
-│   └── sync context            → parking_lot::RwLock<T>
+│   └── sync context            → std::sync::RwLock<T> / parking_lot::RwLock<T>
 └── State is a custom lock-free primitive (channels, hazard pointers)
     └── UnsafeCell + atomics + loom-tested + miri-tested + a co-author
 ```
@@ -83,29 +83,20 @@ let n = c.load(Ordering::Relaxed);
 
 ### Publish-then-load pattern
 
+Write data, then `store(true, Release)` a flag; a reader that `load(Acquire)`s `true` is guaranteed to see the data written before the store. Do not hand-roll it around a `static mut` (the 2024 edition denies references to one, and every access is `unsafe`): `OnceLock<T>` is exactly this pattern behind a safe API.
+
 ```rust
-static READY: AtomicBool = AtomicBool::new(false);
-static mut DATA: Option<Config> = None;
+static CONFIG: std::sync::OnceLock<Config> = std::sync::OnceLock::new();
 
-// Producer thread:
-unsafe { DATA = Some(load_config()); }
-READY.store(true, Ordering::Release);
-
-// Consumer thread:
-if READY.load(Ordering::Acquire) {
-    // SAFETY: producer's Release pairs with our Acquire; if we see READY=true,
-    // we are guaranteed to also see the DATA write that happened-before it.
-    let cfg = unsafe { DATA.as_ref().unwrap() };
-}
+// Producer, once:  CONFIG.set(cfg) returns Err(cfg) if already set.
+// Consumer:        CONFIG.get() is Some only after the publishing set completed.
 ```
-
-This is the canonical Release/Acquire pattern. **Use `OnceLock<Config>` instead** in new code — it encapsulates exactly this with safe API.
 
 ## Std vs parking_lot vs tokio for locks
 
 | | std::sync::Mutex | parking_lot::Mutex | tokio::sync::Mutex |
 |---|---|---|---|
-| Speed | Slowest (OS futex direct) | Fastest (smarter parking) | Slow (await-aware) |
+| Speed | Fast (futex-based since 1.62) | Fast (adaptive spinning, smaller) | Slower (await-aware) |
 | Poisoning | Yes (`PoisonError`) | No | No |
 | Hold across `.await` | Dangerous (deadlock under current-thread runtime) | Dangerous | Safe |
 | Drop guard releases | Yes | Yes | Yes |
@@ -115,17 +106,17 @@ This is the canonical Release/Acquire pattern. **Use `OnceLock<Config>` instead*
 
 **Rule of thumb:**
 
-- Hot, short critical section, no await inside → `parking_lot::Mutex`.
+- Short critical section, no await inside → `std::sync::Mutex`, or `parking_lot::Mutex` when the crate already depends on it or you want no poisoning. Neither is universally faster; measure before switching for speed.
 - Shared state held across `.await` → `tokio::sync::Mutex`.
 - Static init / app config → `OnceLock` or `LazyLock`.
-- Avoid `std::sync::Mutex` for new code; the poisoning behavior is more annoying than useful and `parking_lot` is strictly faster.
+- A `PoisonError` from `std` means another thread panicked mid-update; propagate it or recover the data deliberately with `into_inner()`, never `unwrap()` it away.
 
 ### Common deadlock — async + sync mutex
 
 ```rust
-let m = std::sync::Mutex::new(0u64);
-let guard = m.lock().unwrap();
-something_async().await;  // ❌ guard is held across await
+let m = parking_lot::Mutex::new(0u64);
+let mut guard = m.lock();
+something_async().await;  // WRONG: guard is held across await
 *guard += 1;
 ```
 
@@ -135,7 +126,7 @@ Fix:
 
 ```rust
 {
-    let mut guard = m.lock().unwrap();
+    let mut guard = m.lock();
     *guard += 1;
 }  // guard released
 something_async().await;
@@ -172,12 +163,12 @@ tx.send(new_config)?;
 // Consumer:
 loop {
     rx.changed().await?;
-    let cfg = rx.borrow();
-    apply(&cfg);
+    let cfg = rx.borrow_and_update().clone(); // release the read lock before any .await
+    apply(&cfg).await;
 }
 ```
 
-Receivers see only the latest value (older updates are dropped). Perfect for config reload, leadership changes, "current time" propagation.
+Receivers see only the latest value (older updates are dropped). Perfect for config reload, leadership changes, "current time" propagation. The `borrow()` guard blocks the sender while held; never keep it across an `.await`.
 
 ### Broadcast — fanout queue
 
@@ -209,10 +200,11 @@ Bound concurrent operations:
 
 ```rust
 let sem = Arc::new(tokio::sync::Semaphore::new(10));
+let mut set = tokio::task::JoinSet::new();
 
 for task in tasks {
-    let permit = sem.clone().acquire_owned().await?;
-    tokio::spawn(async move {
+    let permit = Arc::clone(&sem).acquire_owned().await?;
+    set.spawn(async move {
         let _hold = permit;       // released when task exits
         process(task).await
     });
@@ -232,13 +224,14 @@ A semaphore with `permits=1` is a mutex. Use the actual `Mutex` for that — cle
 
 ```rust
 let shared = Arc::new(BigData::new());
+let mut set = tokio::task::JoinSet::new();
 for _ in 0..workers {
-    let s = shared.clone();
-    tokio::spawn(async move { use_data(&s).await });
+    let s = Arc::clone(&shared);
+    set.spawn(async move { use_data(&s).await });
 }
 ```
 
-`Arc::clone(&s)` is just a reference-count increment; the data is not copied.
+`Arc::clone(&s)` is just a reference-count increment; the data is not copied. Write it as `Arc::clone(&x)`, never `x.clone()` (`clone_on_ref_ptr`), so a deep clone never hides behind the same spelling.
 
 **Do not clone in hot loops** if you can pass a reference. `&Arc<T>` is fine to pass; only call `Arc::clone` when you need to move ownership across a thread/task boundary.
 
@@ -247,27 +240,25 @@ for _ in 0..workers {
 ## Once-init primitives
 
 ```rust
-use std::sync::{OnceLock, LazyLock};
+use std::sync::LazyLock;
 
-// Lazy initialization, computed on first read
-static CONFIG: LazyLock<Config> = LazyLock::new(|| Config::load_from_env().unwrap());
-
-fn get_config() -> &'static Config {
-    &CONFIG
-}
-
-// One-shot publication, set explicitly
-static DB: OnceLock<sqlx::PgPool> = OnceLock::new();
+// Lazy initialization of an infallible value, computed on first read
+static WORD_RE: LazyLock<regex::Regex> = LazyLock::new(|| {
+    #[expect(clippy::expect_used, reason = "literal pattern; covered by a unit test")]
+    regex::Regex::new(r"\w+").expect("valid regex literal")
+});
 
 #[tokio::main]
-async fn main() {
-    let pool = sqlx::PgPool::connect(&env_url()).await.unwrap();
-    DB.set(pool).expect("only set once");
-    // Now everywhere: DB.get().unwrap()
+async fn main() -> anyhow::Result<()> {
+    // Fallible setup happens in main, where `?` reports it; pass the result down
+    // as a parameter instead of reaching for a global.
+    let config = Config::load_from_env()?;
+    let pool = sqlx::PgPool::connect(&config.database_url).await?;
+    run(&config, &pool).await
 }
 ```
 
-`OnceLock` is `std::sync` and stable. `LazyLock` is in `std::sync` since 1.80. Avoid the older `once_cell` crate for new code.
+`LazyLock` runs its closure on first access, where no caller can handle an error, so it holds only values that cannot fail at runtime. `OnceLock` and `LazyLock` are in `std::sync` (1.70 / 1.80); avoid `once_cell` and `lazy_static!` for new code.
 
 ## Loom — model-checking lock-free code
 
@@ -306,8 +297,8 @@ mod loom_tests {
     fn concurrent_push_pop_preserves_order() {
         loom::model(|| {
             let queue = Arc::new(MyQueue::new());
-            let q1 = queue.clone();
-            let q2 = queue.clone();
+            let q1 = Arc::clone(&queue);
+            let q2 = Arc::clone(&queue);
             let h1 = thread::spawn(move || q1.push(1));
             let h2 = thread::spawn(move || q2.pop());
             h1.join().unwrap();
@@ -324,7 +315,7 @@ Run:
 RUSTFLAGS="--cfg loom" cargo test --release -- --test-threads 1
 ```
 
-Loom explores every legal scheduling of the threads, including those a real scheduler would rarely produce. If your code has a race, loom will find it deterministically.
+Loom systematically explores the thread interleavings its model allows (bounded by `LOOM_MAX_PREEMPTIONS`), including those a real scheduler would rarely produce, and replays a failing schedule deterministically. It is strong evidence within that bound, not a proof over unbounded executions.
 
 ### Loom's limits
 
@@ -332,6 +323,29 @@ Loom explores every legal scheduling of the threads, including those a real sche
 - Single-machine only. Doesn't model distributed systems.
 - Doesn't catch UB inside `unsafe` blocks the way miri does. **Run both: miri for memory safety, loom for thread schedules.**
 - Doesn't handle `tokio` directly. Loom replaces stdlib's sync primitives; tokio's are independent.
+
+## Scoped threads and per-thread state
+
+For a fixed number of short-lived threads that borrow local data, `std::thread::scope` joins every thread before it returns, so no `Arc` or `'static` bound is needed:
+
+```rust
+let (left, right) = data.split_at(data.len() / 2);
+let (a, b) = std::thread::scope(|s| {
+    let a = s.spawn(|| checksum(left));
+    let b = s.spawn(|| checksum(right));
+    (a.join(), b.join())
+});
+// a and b are Result<_, panic payload>: a panicked thread surfaces here
+```
+
+For data-parallel work over a collection, `rayon`'s `par_iter()` is simpler. Per-thread scratch state (a reusable buffer, a per-thread RNG) is `thread_local!` with `Cell` / `RefCell`, never a `static mut`:
+
+```rust
+thread_local! {
+    static SCRATCH: std::cell::RefCell<Vec<u8>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+SCRATCH.with_borrow_mut(|buf| { buf.clear(); encode_into(buf, msg) });
+```
 
 ## Send and Sync — what they mean
 

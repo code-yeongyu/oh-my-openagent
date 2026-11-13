@@ -1,4 +1,4 @@
-# src/cli/doctor/ — Health Diagnostics (25 Check Files)
+# src/cli/doctor/ — Health Diagnostics (26 Check Files)
 
 **Generated:** 2026-08-10 / 38d268995
 
@@ -34,7 +34,9 @@ Registered by `getCodexCheckDefinitions()` (3): **CODEX** (critical, `checks/cod
 
 `checks/legacy-config-leftovers.ts` is not registered standalone; the Config aggregator invokes it.
 
-## SUPPORTING CHECK FILES (25 total)
+`checks/latest-version.ts` is not a check either: `runner.ts` runs `gatherEditionDistTags(target)` in parallel with the checks (npm dist-tags for `oh-my-openagent` / `lazycodex-ai`, 5s fetch timeout, `null` when unreachable) and `resolveLatestVersion()` picks the tag matching the installed channel. The result lands in `DoctorResult.latestVersion`, which the default formatter prints on the OK summary line together with the edition label and the per-edition update command (`framework/constants.ts` `EDITION_LABELS` / `UPDATE_COMMANDS`; `null` renders as `could not check`).
+
+## SUPPORTING CHECK FILES (26 total)
 
 ```
 checks/
@@ -61,6 +63,7 @@ checks/
 ├── telemetry.ts                           # Telemetry state
 ├── team-mode.ts                           # Team-mode dependencies
 ├── legacy-config-leftovers.ts             # Invoked by the Config aggregator, not registered
+├── latest-version.ts                      # Edition dist-tags fetch + channel pick for the summary line, not registered
 ├── codex.ts                               # Codex install (critical)
 ├── codex-components.ts                    # Codex plugin components
 └── codex-runtime-wrapper.ts               # Codex runtime wrapper bins
@@ -72,6 +75,7 @@ checks/
 doctor command
   → runner.ts: parallel check execution with 30s per-check timeout
   → checks/index.ts: getAllCheckDefinitions() (8) + getCodexCheckDefinitions() (3)
+  → checks/latest-version.ts: gatherEditionDistTags(target) runs alongside the checks
   → each check returns CheckResult: { name, status, message, details?, issues, duration? }
   → formatter.ts: render to stdout (text/status/json)
   → exit code: EXIT_CODES.SUCCESS (0) | EXIT_CODES.FAILURE (1)

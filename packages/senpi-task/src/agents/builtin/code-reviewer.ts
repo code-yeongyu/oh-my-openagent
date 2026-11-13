@@ -2,12 +2,13 @@ import type { AgentDefinition } from "../types"
 
 // Ported and senpi-adapted from the LazyCodex reviewer contract in
 // packages/omo-codex/plugin/components/ultrawork/agents/lazycodex-code-reviewer.toml. The name is
-// load-bearing: the ulw-loop final quality gate (quality-gate.ts REVIEWER_ROLES_BY_SURFACE) accepts
-// exactly this identity for codeReview.by on the omo-senpi surface.
+// load-bearing: the ulw-loop final quality gate (quality-gate.ts REVIEWER_ROLES_BY_SURFACE) still
+// names the pre-rename identity for codeReview.by on the omo-senpi surface, and that spelling
+// reaches this agent through LEGACY_AGENT_NAME_ALIASES.
 export const CODE_REVIEWER_AGENT: AgentDefinition = {
-  name: "omo-senpi-code-reviewer",
+  name: "omo-native-code-reviewer",
   description:
-    "omo-senpi code-quality reviewer for ulw-loop final gates. Audits diffs, tests, and risk, then writes an artifact-backed review report.",
+    "OmO Native code-quality reviewer for ulw-loop final gates. Audits diffs, tests, and risk, then writes an artifact-backed review report.",
   mode: "subagent",
   executionMode: "in-process",
   categories: ["unspecified-high"],
@@ -23,7 +24,7 @@ Before judging test relevance or maintainability, explicitly load or consult the
 
 Run the \`remove-ai-slops\` overfit/slop review pass over tests and production code. Flag deletion-only tests, tests that merely verify a requested removal, tautological tests, tests that only mirror implementation constants, and unnecessary production data extraction, parsing, or normalization that the goal does not require. Apply the \`programming\` perspective to reject brittle prompt tests, implementation-mirroring tests, untyped escape hatches, needless abstraction, and validation/parsing inside production code when the boundary or goal does not require it. Record useless tests or needless production complexity as MEDIUM by default; raise to HIGH only when they demonstrably cause a correctness, regression, or maintenance failure for this goal.
 
-Write your report artifact to \`<attemptDir>/<goalId>-code-review.md\`, where you read \`currentAttemptDir\` from \`omo-agent-toolkit ulw-loop status --json\` (\`.omo/evidence/ulw/<session>/<goalId>/a<attempt>\`); when no ulw-loop plan exists, fall back to \`.omo/evidence/<goal>-code-review.md\`. The report must include findings by severity: CRITICAL, HIGH, MEDIUM, LOW. Include file and line references when a finding is tied to code.
+Write your report artifact to \`<attemptDir>/<goalId>-code-review.md\`, where you read \`currentAttemptDir\` inside a JS eval cell: \`\`const { agentToolkit } = await import(\`\${env("OMO_AGENT_TOOLKIT_SDK_ROOT")}/sdk.js\`); const s = await agentToolkit.status(); print(s.result?.currentAttemptDir)\`\` (\`.omo/evidence/ulw/<session>/<goalId>/a<attempt>\`); when no ulw-loop plan exists, fall back to \`.omo/evidence/<goal>-code-review.md\`. The report must include findings by severity: CRITICAL, HIGH, MEDIUM, LOW. Include file and line references when a finding is tied to code.
 
 Return:
 - \`codeQualityStatus\`: CLEAR, WATCH, or BLOCK.

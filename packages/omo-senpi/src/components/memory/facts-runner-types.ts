@@ -1,14 +1,25 @@
 import type { FactsApplyRecovery, FactsQueue, MemoryIdentity } from "@oh-my-opencode/memory-core"
-import type { CreateChildSession, InProcessRunnerLike, SenpiModelPort, SenpiModelRegistryPort } from "@oh-my-opencode/senpi-task"
+import type {
+  CreateChildSession,
+  InProcessRunnerLike,
+  SenpiModelPort,
+  SenpiModelRegistryPort,
+} from "@oh-my-opencode/senpi-task"
 
 import type { ComponentLogger } from "../../extension/types"
 import type { SenpiOmoConfigResult } from "../config-resolution"
 import type { FactsFailurePort, FactsQueuedKey } from "./facts-failure-recording"
+import type { ReflectionSessionModel } from "./worker/resolve-model"
 
 export type FactsLaunchResult =
   | { readonly status: "empty" | "active" | "skipped" }
   | { readonly status: "committed"; readonly runId: string; readonly sha: string }
   | { readonly status: "no_facts" | "failed" | "parent_dirty"; readonly runId: string }
+
+export interface FactsModelSelection {
+  readonly registry: SenpiModelRegistryPort<SenpiModelPort> | undefined
+  readonly sessionModel: ReflectionSessionModel | undefined
+}
 
 export interface FactsExtractorRunnerOptions {
   readonly identity: MemoryIdentity
@@ -16,6 +27,7 @@ export interface FactsExtractorRunnerOptions {
   readonly queue?: FactsQueue
   readonly loadConfig: () => SenpiOmoConfigResult
   readonly resolveModelRegistry: () => SenpiModelRegistryPort<SenpiModelPort> | undefined
+  readonly resolveSessionModel?: () => ReflectionSessionModel | undefined
   readonly logger?: ComponentLogger
   readonly env?: NodeJS.ProcessEnv
   readonly deadlineMs?: number

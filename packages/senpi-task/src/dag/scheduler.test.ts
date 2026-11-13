@@ -17,7 +17,13 @@ import type { DagExecutionModeSources } from "./execution-mode"
 import { controlJournal } from "./node-control-context"
 import { dagNodeTransitionedEvent } from "./events"
 import { persistDagNodeResult } from "./results"
-import { applyDagSchedulerEvent, createDagScheduler, DagNodeControlError, type DagNodeSpawnPolicy, type DagSchedulerOptions } from "./scheduler"
+import {
+  applyDagSchedulerEvent,
+  createDagScheduler,
+  DagNodeControlError,
+  type DagNodeSpawnPolicy,
+  type DagSchedulerOptions,
+} from "./scheduler"
 import { createDagJournal } from "./journal"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNode, DagNodeId, DagRunEvent, DagRunId } from "./types"
@@ -150,9 +156,26 @@ class FakeTaskManager implements TaskManager {
   readonly #childListeners = new Map<string, Set<ManagedChildListener>>()
   #residents = 0
   #taskCounter = 0
+  readonly #residencyWaiters = new Map<string, ReturnType<typeof deferred<void>>>()
 
   constructor(options: FakeOptions = {}) {
     this.#options = options
+  }
+
+  residencyChanged(session: string): Promise<void> {
+    let waiter = this.#residencyWaiters.get(session)
+    if (waiter === undefined) {
+      waiter = deferred<void>()
+      this.#residencyWaiters.set(session, waiter)
+    }
+    return waiter.promise
+  }
+
+  #notifyResidency(session: string): void {
+    const waiter = this.#residencyWaiters.get(session)
+    if (waiter === undefined) return
+    this.#residencyWaiters.delete(session)
+    waiter.resolve()
   }
 
   whenStarted(nodeId: string): Promise<void> {
@@ -181,6 +204,7 @@ class FakeTaskManager implements TaskManager {
         : { error_message: `${status} ${nodeId}` }),
     }
     task.completion.resolve(task.record)
+    this.#notifyResidency(task.record.parent_session_id)
   }
 
   async startOwned(spec: ManagerStartSpec, owner: DagTaskOwner): Promise<OwnedStartResult> {
@@ -205,7 +229,8 @@ class FakeTaskManager implements TaskManager {
       }
       this.#tasks.delete(existing.record.task_id)
     }
-    const startFailureKind = this.#options.startFailureKinds?.[nodeId] ??
+    const startFailureKind =
+      this.#options.startFailureKinds?.[nodeId] ??
       (this.#options.startFailureNodeIds?.includes(nodeId) === true ? "start_failed" : undefined)
     if (startFailureKind === "plan_unresolved") {
       return { kind: "plan_unresolved", error: { code: "unknown_target", message: `unresolved ${nodeId}` } }
@@ -228,7 +253,19 @@ class FakeTaskManager implements TaskManager {
     const limit = this.#options.residencyLimit ?? Number.POSITIVE_INFINITY
     if (this.#residents >= limit) {
       this.residencyDenials.push(nodeId)
-      return { kind: "residency_denied", reason: "resident child cap reached" }
+      return {
+        kind: "residency_denied",
+        reason: "resident child cap reached",
+        cause: "residents",
+        max_children: limit,
+        residents: [...this.#tasks.values()]
+          .filter((entry) => entry.record.status === "pending" || entry.record.status === "running")
+          .map((entry) => ({
+            task_id: entry.record.task_id,
+            name: entry.record.name ?? entry.record.task_id,
+            status: entry.record.status,
+          })),
+      }
     }
 
     this.#taskCounter += 1
@@ -293,10 +330,11 @@ class FakeTaskManager implements TaskManager {
   }
 
   findOwnedTask(owner: Pick<DagTaskOwner, "kind" | "runId" | "nodeId">): TaskRecord | undefined {
-    return [...this.#tasks.values()].find((entry) =>
-      entry.record.owner?.kind === owner.kind &&
-      entry.record.owner.runId === owner.runId &&
-      entry.record.owner.nodeId === owner.nodeId,
+    return [...this.#tasks.values()].find(
+      (entry) =>
+        entry.record.owner?.kind === owner.kind &&
+        entry.record.owner.runId === owner.runId &&
+        entry.record.owner.nodeId === owner.nodeId,
     )?.record
   }
 
@@ -341,13 +379,21 @@ class FakeTaskManager implements TaskManager {
     })
   }
 
-  start(): Promise<never> { throw new Error("not implemented") }
-  continueTask(): Promise<never> { throw new Error("not implemented") }
+  start(): Promise<never> {
+    throw new Error("not implemented")
+  }
+  continueTask(): Promise<never> {
+    throw new Error("not implemented")
+  }
   sendToTask(input: SendInput): Promise<SendOutcome> {
     this.sends.push(input)
     const task = this.#tasks.get(input.idOrName)
     if (task === undefined) {
-      return Promise.resolve({ kind: "not_found", reason: `No task found for "${input.idOrName}".`, suggestion: "use task_output" })
+      return Promise.resolve({
+        kind: "not_found",
+        reason: `No task found for "${input.idOrName}".`,
+        suggestion: "use task_output",
+      })
     }
     const nodeId = String(task.record.owner?.nodeId)
     const scripted = this.#options.sendOutcomes?.[nodeId]
@@ -356,7 +402,12 @@ class FakeTaskManager implements TaskManager {
       return Promise.resolve({ kind: "queued", task_id: task.record.task_id, queue_position: 1 })
     }
     if (task.record.status === "running") {
-      return Promise.resolve({ kind: "steered", task_id: task.record.task_id, status: "running", delivered: "followUp" })
+      return Promise.resolve({
+        kind: "steered",
+        task_id: task.record.task_id,
+        status: "running",
+        delivered: "followUp",
+      })
     }
     if (task.record.status === "completed" || task.record.status === "error" || task.record.status === "interrupted") {
       this.rearm(task.record.task_id)
@@ -369,8 +420,12 @@ class FakeTaskManager implements TaskManager {
       suggestion: "use task_output",
     })
   }
-  interruptTask(): Promise<never> { throw new Error("not implemented") }
-  async cancelTask(taskId: string): Promise<{ readonly kind: "cancelled"; readonly task_id: string; readonly previous_status: TaskStatus }> {
+  interruptTask(): Promise<never> {
+    throw new Error("not implemented")
+  }
+  async cancelTask(
+    taskId: string,
+  ): Promise<{ readonly kind: "cancelled"; readonly task_id: string; readonly previous_status: TaskStatus }> {
     const task = this.#tasks.get(taskId)
     if (task === undefined) throw new Error(`unknown fake task ${taskId}`)
     const nodeId = String(task.record.owner?.nodeId)
@@ -384,9 +439,13 @@ class FakeTaskManager implements TaskManager {
     this.complete(nodeId, "cancelled")
     return { kind: "cancelled", task_id: taskId, previous_status: previousStatus }
   }
-  list(): readonly [] { return [] }
-  forget(): void {}
-  getResidentHandle(): undefined { return undefined }
+  list(): readonly [] {
+    return []
+  }
+  forget(_taskId: string, _options: Parameters<TaskManager["forget"]>[1]): void {}
+  getResidentHandle(): undefined {
+    return undefined
+  }
   subscribeChild(taskId: string, listener: ManagedChildListener): () => void {
     const listeners = this.#childListeners.get(taskId) ?? new Set<ManagedChildListener>()
     listeners.add(listener)
@@ -418,9 +477,15 @@ class FakeTaskManager implements TaskManager {
     if (task === undefined) throw new Error(`unknown fake task for ${nodeId}`)
     return task
   }
-  residentTaskIds(): readonly string[] { return [] }
-  promoteToBackground(): boolean { return false }
-  wasBackground(): boolean { return true }
+  residentTaskIds(): readonly string[] {
+    return []
+  }
+  promoteToBackground(): boolean {
+    return false
+  }
+  wasBackground(): boolean {
+    return true
+  }
 }
 
 function schedulerFixture(
@@ -469,7 +534,10 @@ function schedulerFixture(
   return { scheduler, events, store, resultPathCallsUnderLock: () => resultPathCallsUnderLock }
 }
 
-function waveMembership(events: readonly DagRunEvent[], type: "dag.wave.started" | "dag.wave.completed"): readonly string[][] {
+function waveMembership(
+  events: readonly DagRunEvent[],
+  type: "dag.wave.started" | "dag.wave.completed",
+): readonly string[][] {
   return events
     .filter((event): event is Extract<DagRunEvent, { type: typeof type }> => event.type === type)
     .map((event) => event.nodeIds.map(String))
@@ -515,12 +583,67 @@ describe("DAG scheduler terminal result persistence", () => {
     expect(result.status).toBe("completed")
     expect(resultPathCallsUnderLock()).toBeGreaterThan(0)
     expect(fs.readFileSync(store.paths.result(runId, "artifact"), "utf8")).toBe("done artifact")
-    expect(JSON.parse(fs.readFileSync(store.paths.result(runId, "artifact").replace(/\.txt$/, ".stats.json"), "utf8"))).toEqual({
+    expect(
+      JSON.parse(fs.readFileSync(store.paths.result(runId, "artifact").replace(/\.txt$/, ".stats.json"), "utf8")),
+    ).toEqual({
       schemaVersion: 1,
       runId,
       nodeId: "artifact",
       runStats: { runtime_ms: 25, turns: 2, tool_calls: 1, output_tokens: 8 },
     })
+  })
+})
+
+describe("#8020 scheduler quiescence", () => {
+  test("#given an in-flight admission #when suspended #then lease handoff waits for admission and stale completion cannot write", async () => {
+    const admitted = deferred<void>()
+    const release = deferred<void>()
+    class GatedManager extends FakeTaskManager {
+      override async startOwned(spec: ManagerStartSpec, owner: DagTaskOwner): Promise<OwnedStartResult> {
+        const result = await super.startOwned(spec, owner)
+        admitted.resolve()
+        await release.promise
+        return result
+      }
+    }
+    const manager = new GatedManager({ autoComplete: false })
+    const { scheduler, store } = schedulerFixture(definition([node("live"), node("next", ["live"])]), manager)
+    const running = scheduler.run()
+    await within(admitted.promise, 3000)
+    let quiesced = false
+    const suspending = scheduler.suspend().then(() => {
+      quiesced = true
+    })
+    expect(quiesced).toBe(false)
+    const seq = scheduler.snapshot().checkpointSeq
+    release.resolve()
+    await within(suspending, 3000)
+    await within(running, 3000)
+    manager.complete("live")
+    await scheduler.whenIdle()
+    expect(store.readCheckpoint<DagRunRecordV1>(runId)?.checkpointSeq).toBe(seq)
+    expect(manager.starts).toEqual(["live"])
+    expect(manager.cancellations).toEqual([])
+    expect(scheduler.snapshot().nodes.map((entry) => entry.state)).toEqual(["scheduled", "pending"])
+  })
+
+  test("#given an attached running child #when suspended then the child settles #then the retired frontier never admits its dependent", async () => {
+    const manager = new FakeTaskManager({ autoComplete: false })
+    const { scheduler } = schedulerFixture(definition([node("live"), node("next", ["live"])]), manager)
+    const attached = deferred<void>()
+    scheduler.subscribe((event) => {
+      if (event.type === "dag.node.task-attached") attached.resolve()
+    })
+    const running = scheduler.run()
+    await within(attached.promise, 3000)
+    await scheduler.suspend()
+    await within(running, 3000)
+    const before = scheduler.snapshot()
+    manager.complete("live")
+    await scheduler.whenIdle()
+    expect(scheduler.snapshot()).toEqual(before)
+    expect(manager.starts).toEqual(["live"])
+    expect(manager.cancellations).toEqual([])
   })
 })
 
@@ -624,6 +747,27 @@ describe("DAG scheduler failure semantics", () => {
     expect(Object.fromEntries(result.nodes.map((entry) => [entry.id, entry.error?.code]))).toEqual(expected)
   })
 
+  test("#given every leaf fails at admission with nothing attached #when the pass ends #then dependents are skipped and the run settles failed instead of parking (#8396)", async () => {
+    // given - both leaves refuse to start; the aggregator's only dependencies are those leaves.
+    const manager = new FakeTaskManager({ startFailureNodeIds: ["leaf-a", "leaf-b"] })
+    const { scheduler, events } = schedulerFixture(
+      definition([node("leaf-a"), node("leaf-b"), node("aggregate", ["leaf-a", "leaf-b"])]),
+      manager,
+    )
+
+    // when - nothing was ever attached, so no settlement can drive the loop forward.
+    const result = await scheduler.run()
+
+    // then - the skip cascade still runs and the run reaches a terminal status.
+    expect(result.status).toBe("failed")
+    expect(result.nodes.map((entry) => `${entry.id}:${entry.state}`)).toEqual([
+      "leaf-a:failed",
+      "leaf-b:failed",
+      "aggregate:skipped",
+    ])
+    expect(events().at(-1)?.type).toBe("dag.run.failed")
+  })
+
   test("#given a failed root with a descendant chain #when failure cascades #then every descendant skip is persisted separately", async () => {
     // given
     const manager = new FakeTaskManager({ startFailureNodeIds: ["root"] })
@@ -642,8 +786,9 @@ describe("DAG scheduler failure semantics", () => {
       "grandchild:skipped",
       "independent:completed",
     ])
-    const skipEvents = events().filter((event): event is Extract<DagRunEvent, { type: "dag.node.transitioned" }> =>
-      event.type === "dag.node.transitioned" && event.to === "skipped",
+    const skipEvents = events().filter(
+      (event): event is Extract<DagRunEvent, { type: "dag.node.transitioned" }> =>
+        event.type === "dag.node.transitioned" && event.to === "skipped",
     )
     expect(skipEvents.map((event) => String(event.nodeId))).toEqual(["child", "grandchild"])
     expect(new Set(skipEvents.map((event) => event.seq)).size).toBe(2)
@@ -723,14 +868,7 @@ describe("DAG scheduler cancellation", () => {
     await cancelling
     const afterWait = waitSurface.wait(runId, parentSessionId)
     const afterAttach = waitSurface.attach(runId, parentSessionId).done()
-    const results = await Promise.all([
-      beforeWait,
-      beforeAttach,
-      duringWait,
-      duringAttach,
-      afterWait,
-      afterAttach,
-    ])
+    const results = await Promise.all([beforeWait, beforeAttach, duringWait, duringAttach, afterWait, afterAttach])
     await running
 
     // then
@@ -738,7 +876,9 @@ describe("DAG scheduler cancellation", () => {
     expect(results.map((result) => result.status)).toEqual(Array.from({ length: 6 }, () => "cancelled"))
     expect(results.every((result) => result.nodes.CA?.state === "cancelled")).toBe(true)
     expect(results.every((result) => result.nodes.CB?.state === "cancelled")).toBe(true)
-    expect(results.every((result) => result.nodes.CA?.state === "cancelled" && result.nodes.CA.reason === "live cancel")).toBe(true)
+    expect(
+      results.every((result) => result.nodes.CA?.state === "cancelled" && result.nodes.CA.reason === "live cancel"),
+    ).toBe(true)
     expect(waitSurface.waiterCount(runId)).toBe(0)
   })
 
@@ -747,7 +887,13 @@ describe("DAG scheduler cancellation", () => {
     // attached (and cancellable) while wave-0 sibling `running` is still mid-flight.
     const manager = new FakeTaskManager({ autoComplete: false, queuedNodeIds: ["queued"] })
     const { scheduler, events, store } = schedulerFixture(
-      definition([node("finished"), node("running"), node("queued"), node("next", ["finished"]), node("last", ["next"])]),
+      definition([
+        node("finished"),
+        node("running"),
+        node("queued"),
+        node("next", ["finished"]),
+        node("last", ["next"]),
+      ]),
       manager,
     )
     const attached = deferred<void>()
@@ -789,11 +935,13 @@ describe("DAG scheduler cancellation", () => {
     expect(waitResult.status).toBe("cancelled")
     expect(waitResult.nodes.next?.state).toBe("cancelled")
     expect(waitResult.nodes.last?.state).toBe("cancelled")
-    expect(events()).toContainEqual(expect.objectContaining({
-      type: "dag.run.cancelled",
-      reason: "stop now",
-      cancelledNodeIds: ["running", "queued", "next", "last"],
-    }))
+    expect(events()).toContainEqual(
+      expect.objectContaining({
+        type: "dag.run.cancelled",
+        reason: "stop now",
+        cancelledNodeIds: ["running", "queued", "next", "last"],
+      }),
+    )
   })
 
   test("#given one startOwned rejects after a sibling starts #when cancellation follows #then admission clears and the sibling is attached and cancelled", async () => {
@@ -828,7 +976,9 @@ describe("DAG scheduler cancellation", () => {
     await manager.whenStarted("a")
 
     // when
-    const cancellationFailure = expect(scheduler.cancel(runId, "intentional cancel")).rejects.toThrow("intentional abort")
+    const cancellationFailure = expect(scheduler.cancel(runId, "intentional cancel")).rejects.toThrow(
+      "intentional abort",
+    )
     const after = await waitSurface.wait(runId, parentSessionId)
     await Promise.all([running, cancellationFailure])
 
@@ -895,7 +1045,11 @@ describe("DAG scheduler dependency-frontier admission", () => {
     expect(manager.starts).toEqual(["a", "b", "c"])
     expect(waveMembership(events(), "dag.wave.started")).toEqual([["a"], ["b"], ["c"]])
     expect(waveMembership(events(), "dag.wave.completed")).toEqual([["a"], ["b"], ["c"]])
-    expect(result.nodes.map((entry) => `${entry.id}:${entry.state}`)).toEqual(["a:completed", "b:completed", "c:completed"])
+    expect(result.nodes.map((entry) => `${entry.id}:${entry.state}`)).toEqual([
+      "a:completed",
+      "b:completed",
+      "c:completed",
+    ])
   })
 
   test("#given a diamond DAG #when run #then the fan-out shares one admission pass and the join waits for both", async () => {
@@ -963,7 +1117,8 @@ describe("DAG scheduler dependency-frontier admission", () => {
     const { scheduler } = schedulerFixture(definition([node("reject"), node("sibling")]), manager)
     const rejected = deferred<void>()
     scheduler.subscribe((event) => {
-      if (event.type === "dag.node.transitioned" && event.nodeId === "reject" && event.to === "failed") rejected.resolve()
+      if (event.type === "dag.node.transitioned" && event.nodeId === "reject" && event.to === "failed")
+        rejected.resolve()
     })
     const running = scheduler.run()
     await Promise.all([manager.whenStarted("reject"), manager.whenStarted("sibling")])
@@ -975,14 +1130,13 @@ describe("DAG scheduler dependency-frontier admission", () => {
 
     // then
     expect(result.status).toBe("failed")
-    expect(result.nodes.map((entry) => `${entry.id}:${entry.state}`)).toEqual([
-      "reject:failed",
-      "sibling:completed",
-    ])
-    expect(result.nodes.find((entry) => entry.id === "reject")?.error).toEqual(expect.objectContaining({
-      code: "task_error",
-      message: "wait rejected reject",
-    }))
+    expect(result.nodes.map((entry) => `${entry.id}:${entry.state}`)).toEqual(["reject:failed", "sibling:completed"])
+    expect(result.nodes.find((entry) => entry.id === "reject")?.error).toEqual(
+      expect.objectContaining({
+        code: "task_error",
+        message: "wait rejected reject",
+      }),
+    )
   })
 
   test("#given one root start fails #when its wave is admitted #then siblings and the independent branch still run", async () => {
@@ -1017,13 +1171,15 @@ describe("DAG scheduler dependency-frontier admission", () => {
     await scheduler.run()
 
     // then
-    expect(events()).toContainEqual(expect.objectContaining({
-      type: "dag.node.transitioned",
-      nodeId: "a",
-      from: "scheduled",
-      to: "scheduled",
-      reason: { kind: "task_queued", queuePosition: 3 },
-    }))
+    expect(events()).toContainEqual(
+      expect.objectContaining({
+        type: "dag.node.transitioned",
+        nodeId: "a",
+        from: "scheduled",
+        to: "scheduled",
+        reason: { kind: "task_queued", queuePosition: 3 },
+      }),
+    )
   })
 
   test("#given startOwned queues a scheduled node #when the queued child is promoted to running #then the node transitions to running with startedAt", async () => {
@@ -1041,13 +1197,15 @@ describe("DAG scheduler dependency-frontier admission", () => {
     manager.promote("a")
 
     // then
-    expect(events()).toContainEqual(expect.objectContaining({
-      type: "dag.node.transitioned",
-      nodeId: "a",
-      from: "scheduled",
-      to: "running",
-      reason: { kind: "started" },
-    }))
+    expect(events()).toContainEqual(
+      expect.objectContaining({
+        type: "dag.node.transitioned",
+        nodeId: "a",
+        from: "scheduled",
+        to: "running",
+        reason: { kind: "started" },
+      }),
+    )
     expect(scheduler.snapshot().nodes.find((entry) => entry.id === "a")?.startedAt).toBeDefined()
     manager.complete("a")
     const result = await within(running)
@@ -1062,7 +1220,8 @@ describe("DAG scheduler dependency-frontier admission", () => {
     const { scheduler, events } = schedulerFixture(definition([node("a")]), manager)
     const transitioned = deferred<void>()
     scheduler.subscribe((event) => {
-      if (event.type === "dag.node.transitioned" && event.nodeId === "a" && event.to === "running") transitioned.resolve()
+      if (event.type === "dag.node.transitioned" && event.nodeId === "a" && event.to === "running")
+        transitioned.resolve()
     })
 
     // when
@@ -1070,13 +1229,15 @@ describe("DAG scheduler dependency-frontier admission", () => {
     await within(transitioned.promise)
 
     // then
-    expect(events()).toContainEqual(expect.objectContaining({
-      type: "dag.node.transitioned",
-      nodeId: "a",
-      from: "scheduled",
-      to: "running",
-      reason: { kind: "started" },
-    }))
+    expect(events()).toContainEqual(
+      expect.objectContaining({
+        type: "dag.node.transitioned",
+        nodeId: "a",
+        from: "scheduled",
+        to: "running",
+        reason: { kind: "started" },
+      }),
+    )
     expect(scheduler.snapshot().nodes.find((entry) => entry.id === "a")?.startedAt).toBeDefined()
     expect(manager.listenerCount()).toBe(0)
     manager.complete("a")
@@ -1146,7 +1307,11 @@ describe("DAG scheduler dependency-frontier admission", () => {
 
     // then
     expect(manager.attempts).toEqual(["a", "b", "b"])
-    expect(events().filter((event) => event.type === "dag.node.transitioned" && event.nodeId === "b" && event.to === "failed")).toEqual([])
+    expect(
+      events().filter(
+        (event) => event.type === "dag.node.transitioned" && event.nodeId === "b" && event.to === "failed",
+      ),
+    ).toEqual([])
     manager.complete("b")
     const result = await running
     expect(result.nodes.find((entry) => entry.id === "b")?.state).toBe("completed")
@@ -1173,11 +1338,11 @@ describe("DAG scheduler node spawn policy", () => {
     // given
     const manager = new FakeTaskManager()
     const { scheduler } = schedulerFixture(
-      definition([{ id: "review", prompt: "review the plan", subagent_type: "momus" }]),
+      definition([{ id: "review", prompt: "review the plan", subagent_type: "plan-reviewer" }]),
       manager,
       undefined,
       undefined,
-      () => ({ kind: "deny" as const, message: "momus requires a plan gate" }),
+      () => ({ kind: "deny" as const, message: "plan-reviewer requires a plan gate" }),
     )
 
     // when
@@ -1185,7 +1350,7 @@ describe("DAG scheduler node spawn policy", () => {
 
     // then
     expect(result.nodes[0]?.state).toBe("failed")
-    expect(result.nodes[0]?.error?.message).toContain("momus requires a plan gate")
+    expect(result.nodes[0]?.error?.message).toContain("plan-reviewer requires a plan gate")
     expect(manager.attempts).toEqual([])
   })
 
@@ -1194,7 +1359,7 @@ describe("DAG scheduler node spawn policy", () => {
     const manager = new FakeTaskManager()
     const canonical = "Review the work plan at .omo/plans/x.md for contradictions and blocking issues."
     const { scheduler } = schedulerFixture(
-      definition([{ id: "review", prompt: "caller wording", subagent_type: "momus" }]),
+      definition([{ id: "review", prompt: "caller wording", subagent_type: "plan-reviewer" }]),
       manager,
       undefined,
       undefined,
@@ -1295,9 +1460,14 @@ describe("DAG scheduler node controls", () => {
   test("#given a cancelled node child #when send is requested #then it refuses with node_not_continuable and names retry", async () => {
     // given
     const manager = new FakeTaskManager()
-    const { scheduler } = settledFixture(definition([node("cancelled")]), manager, {
-      cancelled: { state: "cancelled", taskId: "task-cancelled", attempt: 1 },
-    }, { status: "cancelled" })
+    const { scheduler } = settledFixture(
+      definition([node("cancelled")]),
+      manager,
+      {
+        cancelled: { state: "cancelled", taskId: "task-cancelled", attempt: 1 },
+      },
+      { status: "cancelled" },
+    )
     manager.seed("cancelled", "cancelled")
 
     // when
@@ -1349,7 +1519,13 @@ describe("DAG scheduler node controls", () => {
     expect(manager.starts).toEqual(["broken", "dependent"])
     expect(record.nodes.find((entry) => entry.id === "root")?.taskId).toBe("task-root")
     const retryEvent = events().find((event) => event.type === "dag.node.retried")
-    expect(retryEvent).toMatchObject({ type: "dag.node.retried", nodeId: "broken", execAttempt: 1, promptChanged: false, priorTaskId: "task-broken" })
+    expect(retryEvent).toMatchObject({
+      type: "dag.node.retried",
+      nodeId: "broken",
+      execAttempt: 1,
+      promptChanged: false,
+      priorTaskId: "task-broken",
+    })
     const types = events().map((event) => event.type)
     expect(types.indexOf("dag.run.resumed")).toBeGreaterThan(types.indexOf("dag.node.retried"))
   })
@@ -1369,11 +1545,15 @@ describe("DAG scheduler node controls", () => {
     expect(manager.owners[0]?.fingerprint).not.toBe(
       dagFingerprint({ definitionFingerprint: "definition-fingerprint", nodeId: "broken" }),
     )
-    expect(manager.owners[0]?.fingerprint).toBe(dagFingerprint(ownerFingerprintInput({
-      definitionFingerprint: "definition-fingerprint",
-      nodeId: "broken" as DagNodeId,
-      execAttempt: 1,
-    })))
+    expect(manager.owners[0]?.fingerprint).toBe(
+      dagFingerprint(
+        ownerFingerprintInput({
+          definitionFingerprint: "definition-fingerprint",
+          nodeId: "broken" as DagNodeId,
+          execAttempt: 1,
+        }),
+      ),
+    )
   })
 
   test("#given an explicit retry of only the failed ancestor #when re-entered #then its skipped dependents are restored to blocked", async () => {
@@ -1398,25 +1578,24 @@ describe("DAG scheduler node controls", () => {
       "dependent:blocked",
       "grandchild:blocked",
     ])
-    expect(retried.record.nodes.filter((entry) => entry.execAttempt !== undefined).map((entry) => String(entry.id)))
-      .toEqual(["broken"])
-    expect(events().filter((event) => event.type === "dag.node.transitioned" && event.to === "blocked").map((event) =>
-      event.type === "dag.node.transitioned" ? String(event.nodeId) : "",
-    )).toEqual(["dependent", "grandchild"])
+    expect(
+      retried.record.nodes.filter((entry) => entry.execAttempt !== undefined).map((entry) => String(entry.id)),
+    ).toEqual(["broken"])
+    expect(
+      events()
+        .filter((event) => event.type === "dag.node.transitioned" && event.to === "blocked")
+        .map((event) => (event.type === "dag.node.transitioned" ? String(event.nodeId) : "")),
+    ).toEqual(["dependent", "grandchild"])
     expect((await retried.run).status).toBe("completed")
   })
 
   test("#given a skipped node whose failed ancestor stays failed #when retried alone #then it refuses and names the ancestor", () => {
     // given
     const manager = new FakeTaskManager()
-    const { scheduler } = settledFixture(
-      definition([node("broken"), node("dependent", ["broken"])]),
-      manager,
-      {
-        broken: { state: "failed", taskId: "task-broken", attempt: 1 },
-        dependent: { state: "skipped" },
-      },
-    )
+    const { scheduler } = settledFixture(definition([node("broken"), node("dependent", ["broken"])]), manager, {
+      broken: { state: "failed", taskId: "task-broken", attempt: 1 },
+      dependent: { state: "skipped" },
+    })
 
     // when
     const refusal = () => scheduler.retryNode(runId, ["dependent" as DagNodeId])
@@ -1434,10 +1613,15 @@ describe("DAG scheduler node controls", () => {
   test("#given a running run #when retry is requested #then it refuses with run_still_active and journals nothing", () => {
     // given
     const manager = new FakeTaskManager()
-    const { scheduler, events } = settledFixture(definition([node("broken"), node("busy")]), manager, {
-      broken: { state: "failed", taskId: "task-broken", attempt: 1 },
-      busy: { state: "running", taskId: "task-busy", attempt: 1 },
-    }, { status: "running", completedAt: undefined })
+    const { scheduler, events } = settledFixture(
+      definition([node("broken"), node("busy")]),
+      manager,
+      {
+        broken: { state: "failed", taskId: "task-broken", attempt: 1 },
+        busy: { state: "running", taskId: "task-busy", attempt: 1 },
+      },
+      { status: "running", completedAt: undefined },
+    )
 
     // when
     const refusal = () => scheduler.retryNode(runId, ["broken" as DagNodeId])
@@ -1458,15 +1642,21 @@ describe("DAG scheduler node controls", () => {
     const manager = new FakeTaskManager()
     const foreignPid = 424242
     const probed: number[] = []
-    const { scheduler, runId } = settledFixture(definition([node("broken")]), manager, {
-      broken: { state: "failed", taskId: "task-broken", attempt: 1 },
-    }, { leaseHolderPid: foreignPid } as Partial<DagRunRecordV1>, {
-      hostPid: foreignPid + 1,
-      isProcessAlive: (pid: number) => {
-        probed.push(pid)
-        return true
+    const { scheduler, runId } = settledFixture(
+      definition([node("broken")]),
+      manager,
+      {
+        broken: { state: "failed", taskId: "task-broken", attempt: 1 },
       },
-    })
+      { leaseHolderPid: foreignPid } as Partial<DagRunRecordV1>,
+      {
+        hostPid: foreignPid + 1,
+        isProcessAlive: (pid: number) => {
+          probed.push(pid)
+          return true
+        },
+      },
+    )
 
     // when — the REAL run id, so execution reaches the lease block instead of the run-mismatch branch.
     const refusal = () => scheduler.retryNode(runId, ["broken" as DagNodeId])
@@ -1487,12 +1677,18 @@ describe("DAG scheduler node controls", () => {
     // liveness rather than on the pid field being present at all.
     const manager = new FakeTaskManager()
     const foreignPid = 424242
-    const { scheduler, runId, events } = settledFixture(definition([node("broken")]), manager, {
-      broken: { state: "failed", taskId: "task-broken", attempt: 1 },
-    }, { leaseHolderPid: foreignPid } as Partial<DagRunRecordV1>, {
-      hostPid: foreignPid + 1,
-      isProcessAlive: () => false,
-    })
+    const { scheduler, runId, events } = settledFixture(
+      definition([node("broken")]),
+      manager,
+      {
+        broken: { state: "failed", taskId: "task-broken", attempt: 1 },
+      },
+      { leaseHolderPid: foreignPid } as Partial<DagRunRecordV1>,
+      {
+        hostPid: foreignPid + 1,
+        isProcessAlive: () => false,
+      },
+    )
 
     // when
     scheduler.retryNode(runId, ["broken" as DagNodeId])
@@ -1521,12 +1717,14 @@ describe("DAG scheduler node controls", () => {
     expect(manager.sends.map((entry) => entry.message)).toEqual(["focus on the tests"])
     expect(scheduler.snapshot().nodes[0]?.state).toBe("running")
     expect(store.readCheckpoint<DagRunRecordV1>(runId)?.nodes[0]?.state).toBe("running")
-    expect(events()).toContainEqual(expect.objectContaining({
-      type: "dag.node.steered",
-      nodeId: "chatty",
-      taskId: "task-1",
-      delivery: "steer",
-    }))
+    expect(events()).toContainEqual(
+      expect.objectContaining({
+        type: "dag.node.steered",
+        nodeId: "chatty",
+        taskId: "task-1",
+        delivery: "steer",
+      }),
+    )
     manager.complete("chatty")
     await running
   })
@@ -1539,7 +1737,12 @@ describe("DAG scheduler node controls", () => {
         state: "failed",
         taskId: "task-revivable",
         attempt: 1,
-        error: { code: "task_error", message: "boom", nodeId: "revivable" as DagNodeId, at: "2026-08-14T00:00:05.000Z" },
+        error: {
+          code: "task_error",
+          message: "boom",
+          nodeId: "revivable" as DagNodeId,
+          at: "2026-08-14T00:00:05.000Z",
+        },
       },
     })
     manager.seed("revivable", "error", "task-revivable")
@@ -1556,7 +1759,9 @@ describe("DAG scheduler node controls", () => {
     expect(durable().nodes[0]).toMatchObject({ state: "completed" })
     expect(durable().nodes[0]?.error).toBeUndefined()
     expect(events()).toContainEqual(expect.objectContaining({ type: "dag.node.steered", delivery: "revive" }))
-    expect(events().filter((event) => event.type === "dag.node.transitioned" && event.to === "completed")).toHaveLength(1)
+    expect(events().filter((event) => event.type === "dag.node.transitioned" && event.to === "completed")).toHaveLength(
+      1,
+    )
     expect(fs.readFileSync(store.paths.result(runId, "revivable"), "utf8")).toBe("done revivable")
   })
 
@@ -1564,13 +1769,30 @@ describe("DAG scheduler node controls", () => {
     // given
     const manager = new FakeTaskManager({
       sendOutcomes: {
-        "one-shot": { kind: "one_shot_agent", task_id: "task-one-shot", agent: "momus", message: "momus takes no follow-ups" },
-        denied: { kind: "scope_denied", task_id: "task-denied", owning_session_id: "other", reason: "belongs to another session" },
+        "one-shot": {
+          kind: "one_shot_agent",
+          task_id: "task-one-shot",
+          agent: "plan-reviewer",
+          message: "plan-reviewer takes no follow-ups",
+        },
+        denied: {
+          kind: "scope_denied",
+          task_id: "task-denied",
+          owning_session_id: "other",
+          reason: "belongs to another session",
+        },
         detached: { kind: "not_continuable", task_id: "task-detached", reason: "suspended", suggestion: "task_output" },
       },
     })
     const { scheduler } = settledFixture(
-      definition([node("queued"), node("one-shot"), node("denied"), node("detached"), node("never-ran"), node("ghost")]),
+      definition([
+        node("queued"),
+        node("one-shot"),
+        node("denied"),
+        node("detached"),
+        node("never-ran"),
+        node("ghost"),
+      ]),
       manager,
       {
         queued: { state: "running", taskId: "task-queued", attempt: 1 },
@@ -1606,7 +1828,7 @@ describe("DAG scheduler node controls", () => {
       queuePosition: 1,
     })
     expect(outcomes["one-shot"]).toContain("node_not_continuable")
-    expect(outcomes["one-shot"]).toContain("momus takes no follow-ups")
+    expect(outcomes["one-shot"]).toContain("plan-reviewer takes no follow-ups")
     expect(outcomes.denied).toContain("node_not_continuable")
     expect(outcomes.denied).toContain("belongs to another session")
     expect(outcomes.detached).toContain("node_not_continuable")
@@ -1643,7 +1865,11 @@ describe("DAG scheduler node controls", () => {
     // fingerprint is the only signal the synchronous verb has, and the guard under test is what turns
     // it into a caller-visible refusal instead of a silent retry on the unamended definition.
     const manager = new FakeTaskManager()
-    const { scheduler, events, runId: id } = settledFixture(definition([node("broken")]), manager, {
+    const {
+      scheduler,
+      events,
+      runId: id,
+    } = settledFixture(definition([node("broken")]), manager, {
       broken: { state: "failed", taskId: "task-broken", attempt: 1 },
     })
     const oversized = "x".repeat(262145)
@@ -1790,9 +2016,14 @@ describe("DAG scheduler terminal-run send gate (#7412)", () => {
     // resident. A revive here would journal running nodes under a completed run - a checkpoint no
     // recovery path can ever claim again (resume only claims "paused").
     const manager = new FakeTaskManager()
-    const { scheduler, events, durable } = settledFixture(definition([node("done-node")]), manager, {
-      "done-node": { state: "completed", taskId: "task-done-node", attempt: 1 },
-    }, { status: "completed" })
+    const { scheduler, events, durable } = settledFixture(
+      definition([node("done-node")]),
+      manager,
+      {
+        "done-node": { state: "completed", taskId: "task-done-node", attempt: 1 },
+      },
+      { status: "completed" },
+    )
     manager.seed("done-node", "completed", "task-done-node")
 
     // when / then - refused with the existing retry-family vocabulary.
@@ -1811,9 +2042,14 @@ describe("DAG scheduler terminal-run send gate (#7412)", () => {
     // given - cancellation is an explicit stop: a child that finished before the cancel must not
     // be revivable through the run.
     const manager = new FakeTaskManager()
-    const { scheduler, durable } = settledFixture(definition([node("early")]), manager, {
-      early: { state: "completed", taskId: "task-early", attempt: 1 },
-    }, { status: "cancelled" })
+    const { scheduler, durable } = settledFixture(
+      definition([node("early")]),
+      manager,
+      {
+        early: { state: "completed", taskId: "task-early", attempt: 1 },
+      },
+      { status: "cancelled" },
+    )
     manager.seed("early", "completed", "task-early")
 
     // when / then
@@ -1844,10 +2080,24 @@ describe("DAG scheduler terminal-run send gate (#7412)", () => {
     })
     expect(persisted.kind).not.toBe("failed")
     const fresh = controlJournal(options, durable())
-    fresh.append(dagNodeTransitionedEvent({ nodeId: "dup" as DagNodeId, from: "running", to: "completed", reason: { kind: "succeeded" } }))
+    fresh.append(
+      dagNodeTransitionedEvent({
+        nodeId: "dup" as DagNodeId,
+        from: "running",
+        to: "completed",
+        reason: { kind: "succeeded" },
+      }),
+    )
 
     // when - the stale instance re-appends the same terminal transition.
-    const duplicate = stale.append(dagNodeTransitionedEvent({ nodeId: "dup" as DagNodeId, from: "running", to: "completed", reason: { kind: "succeeded" } }))
+    const duplicate = stale.append(
+      dagNodeTransitionedEvent({
+        nodeId: "dup" as DagNodeId,
+        from: "running",
+        to: "completed",
+        reason: { kind: "succeeded" },
+      }),
+    )
 
     // then - the locked recover saw the durable truth and dropped the duplicate.
     expect(duplicate).toBeUndefined()

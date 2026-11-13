@@ -6,7 +6,6 @@ export {
   createCliPostHog,
   createInstallPostHog,
   createPluginPostHog,
-  getPostHogDistinctId,
 } from "./posthog"
 
 export type { PostHogActivityReason, PostHogClient } from "./posthog"

@@ -2,7 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import { join } from "node:path"
 
-import { createReadToolDefinition, type ToolDefinition } from "@code-yeongyu/senpi"
+import { SessionManager, createReadToolDefinition, type ToolDefinition } from "@code-yeongyu/senpi"
+import { buildChildSessionOptions } from "../runners/in-process/child-options"
 
 import { createTaskRecord, isSpawnSpecV1, type ResolvedModelRecord } from "../state"
 import { FakeRunner, baseSpec, cleanupProjects, makeManager } from "./__fixtures__/manager-fakes"
@@ -56,12 +57,14 @@ describe("spawn_spec v1 persistence", () => {
     const { manager, store, project } = makeManager({ planner: fullPlanner() })
 
     // when an in-process task starts
-    const result = await manager.start(managerSpec({
-      execution_mode: "in-process",
-      prompt: "RAW PROMPT",
-      instructions: "be careful",
-      memberScopedTools: [makeTool("alpha_read"), makeTool("alpha_write")],
-    }))
+    const result = await manager.start(
+      managerSpec({
+        execution_mode: "in-process",
+        prompt: "RAW PROMPT",
+        instructions: "be careful",
+        memberScopedTools: [makeTool("alpha_read"), makeTool("alpha_write")],
+      }),
+    )
 
     // then the persisted spec is v1 and carries the post-planner prompt, never the raw one
     if (result.kind !== "started") throw new Error("expected started")
@@ -81,11 +84,13 @@ describe("spawn_spec v1 persistence", () => {
     const { manager, store } = makeManager({ planner: fullPlanner() })
 
     // when the task starts
-    const result = await manager.start(managerSpec({
-      execution_mode: "process",
-      extensions: ["/tmp/member-extension.ts"],
-      memberEnv: { SENPI_TASK_MEMBER: "run-1::alpha" },
-    }))
+    const result = await manager.start(
+      managerSpec({
+        execution_mode: "process",
+        extensions: ["/tmp/member-extension.ts"],
+        memberEnv: { SENPI_TASK_MEMBER: "run-1::alpha" },
+      }),
+    )
 
     // then process mode persists the same v1 shape and the untrusted inputs stay out of it
     if (result.kind !== "started") throw new Error("expected started")
@@ -124,16 +129,44 @@ describe("spawn_spec v1 persistence", () => {
 })
 
 describe("buildRespawnManagedSpec", () => {
+  test("#given an older curated spec allowing write and a member-scoped write tool #when child options are restored #then the current curated floor excludes both", () => {
+    // given / when
+    const options = buildChildSessionOptions({
+      spec: {
+        taskId: "st_00000902",
+        cwd: process.cwd(),
+        sessionDir: process.cwd(),
+        depth: 1,
+        parentSessionId: "parent",
+        rootSessionId: "parent",
+        prompt: "recorded",
+        agentType: "explore",
+        toolAllowlist: ["read", "write", "member_write"],
+        toolDenylist: ["edit"],
+        memberScopedTools: [makeTool("member_write")],
+      },
+      sessionManager: SessionManager.inMemory(),
+      sharedParentTools: [makeTool("write")],
+      uiOnlyToolNames: [],
+    })
+    // then
+    expect(options.tools).toEqual(["read"])
+    expect(options.excludeTools).toEqual(["edit"])
+    expect(options.customTools?.map((tool) => tool.name)).toEqual(["bash"])
+  })
+
   test("#given a spawned in-process record #when a respawn spec is built #then it matches the original start spec minus runtime-only objects", async () => {
     // given a started in-process task with the full planner output and member-scoped tools
     const inProcess = new FakeRunner()
     const { manager, store } = makeManager({ inProcess, planner: fullPlanner() })
-    const result = await manager.start(managerSpec({
-      execution_mode: "in-process",
-      prompt: "RAW PROMPT",
-      subagent_type: "explore",
-      memberScopedTools: [makeTool("alpha_read")],
-    }))
+    const result = await manager.start(
+      managerSpec({
+        execution_mode: "in-process",
+        prompt: "RAW PROMPT",
+        subagent_type: "explore",
+        memberScopedTools: [makeTool("alpha_read")],
+      }),
+    )
     if (result.kind !== "started") throw new Error("expected started")
     const original = inProcess.startedSpecs[0]
     if (original === undefined) throw new Error("expected a start spec")
@@ -160,6 +193,7 @@ describe("buildRespawnManagedSpec", () => {
       instructions: "planner instructions",
       toolAllowlist: ["read", "bash"],
       toolDenylist: ["write", "edit"],
+      includeTaskTools: true,
       memberScopedToolNames: ["alpha_read"],
     })
     expect("memberScopedTools" in rebuilt.spec).toBe(false)

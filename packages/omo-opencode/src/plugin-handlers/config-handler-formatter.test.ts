@@ -9,6 +9,7 @@ import type { PluginComponents } from "./plugin-components-loader"
 import * as providerConfigHandler from "./provider-config-handler"
 import * as shared from "../shared"
 import * as toolConfigHandler from "./tool-config-handler"
+import { openCodeShellTypeResolver } from "../shared/opencode-shell"
 
 let logSpy: ReturnType<typeof spyOn>
 let loadPluginComponentsSpy: ReturnType<typeof spyOn>
@@ -55,10 +56,7 @@ beforeEach(async () => {
   mock.restore()
 
   logSpy = spyOn(shared, "log").mockImplementation(() => {})
-  loadPluginComponentsSpy = spyOn(
-    pluginComponentsLoader,
-    "loadPluginComponents",
-  ).mockResolvedValue({
+  loadPluginComponentsSpy = spyOn(pluginComponentsLoader, "loadPluginComponents").mockResolvedValue({
     commands: {},
     skills: {},
     agents: {},
@@ -67,21 +65,11 @@ beforeEach(async () => {
     plugins: [],
     errors: [],
   })
-  applyAgentConfigSpy = spyOn(agentConfigHandler, "applyAgentConfig").mockResolvedValue(
-    {},
-  )
-  applyToolConfigSpy = spyOn(toolConfigHandler, "applyToolConfig").mockImplementation(
-    () => {},
-  )
+  applyAgentConfigSpy = spyOn(agentConfigHandler, "applyAgentConfig").mockResolvedValue({})
+  applyToolConfigSpy = spyOn(toolConfigHandler, "applyToolConfig").mockImplementation(() => {})
   applyMcpConfigSpy = spyOn(mcpConfigHandler, "applyMcpConfig").mockResolvedValue()
-  applyCommandConfigSpy = spyOn(
-    commandConfigHandler,
-    "applyCommandConfig",
-  ).mockResolvedValue()
-  applyProviderConfigSpy = spyOn(
-    providerConfigHandler,
-    "applyProviderConfig",
-  ).mockImplementation(() => {})
+  applyCommandConfigSpy = spyOn(commandConfigHandler, "applyCommandConfig").mockResolvedValue()
+  applyProviderConfigSpy = spyOn(providerConfigHandler, "applyProviderConfig").mockImplementation(() => {})
   ;({ createConfigHandler } = await importFreshConfigHandlerModule())
 })
 
@@ -97,6 +85,22 @@ afterEach(() => {
 })
 
 describe("createConfigHandler formatter pass-through", () => {
+  test("records OpenCode's configured shell before assembling config", async () => {
+    const setShell = spyOn(openCodeShellTypeResolver, "setConfiguredShell").mockImplementation(() => {})
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig: createPluginConfig(),
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    await handler({ shell: "/bin/tcsh" })
+
+    expect(setShell).toHaveBeenCalledWith("/bin/tcsh")
+  })
+
   test("preserves formatter object configured in opencode config", async () => {
     // given
     const pluginConfig = createPluginConfig()

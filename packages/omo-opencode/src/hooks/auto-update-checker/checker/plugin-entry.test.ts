@@ -53,7 +53,7 @@ describe("findPluginEntry", () => {
 
   beforeEach(() => {
     originalConfigDir = process.env.OPENCODE_CONFIG_DIR
-    temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "omo-plugin-entry-test-"))
+    temporaryDirectory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "omo-plugin-entry-test-")))
     const emptyConfigDirectory = path.join(temporaryDirectory, "empty-config")
     fs.mkdirSync(emptyConfigDirectory, { recursive: true })
     process.env.OPENCODE_CONFIG_DIR = emptyConfigDirectory
@@ -178,10 +178,7 @@ describe("findPluginEntry", () => {
     // #given profile-specific user config after module import
     const profileConfigDir = path.join(temporaryDirectory, "profiles", "today")
     fs.mkdirSync(profileConfigDir, { recursive: true })
-    fs.writeFileSync(
-      path.join(profileConfigDir, "opencode.json"),
-      JSON.stringify({ plugin: [`${PACKAGE_NAME}@beta`] }),
-    )
+    fs.writeFileSync(path.join(profileConfigDir, "opencode.json"), JSON.stringify({ plugin: [`${PACKAGE_NAME}@beta`] }))
 
     // #when plugin entry is detected
     const result = runFindPluginEntry(path.join(temporaryDirectory, "workspace"), {

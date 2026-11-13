@@ -7,29 +7,29 @@ export interface GraphNode {
 }
 
 export const graphNodes: readonly GraphNode[] = [
-  { id: "sisyphus", label: "Orchestrator", role: "lead", wave: 1, position: [-3, 0, 0] },
-  { id: "prometheus", label: "Planner", role: "planner", wave: 2, position: [0, 2, -2] },
-  { id: "metis", label: "Metis", role: "consultant", wave: 2, position: [0, 0, -2] },
-  { id: "momus", label: "Plan reviewer", role: "reviewer", wave: 2, position: [0, -2, -2] },
-  { id: "atlas", label: "Atlas", role: "executor", wave: 3, position: [3, 3, -4] },
-  { id: "hephaestus", label: "Hephaestus", role: "builder", wave: 3, position: [4, 2, -4] },
-  { id: "oracle", label: "Oracle", role: "advisor", wave: 3, position: [3, 1, -4] },
-  { id: "librarian", label: "Librarian", role: "researcher", wave: 3, position: [4, 0, -4] },
-  { id: "explore", label: "Explore", role: "search", wave: 3, position: [3, -1, -4] },
+  { id: "orchestrator", label: "Orchestrator", role: "lead", wave: 1, position: [-3, 0, 0] },
+  { id: "planner", label: "Ultrawork Planner", role: "planner", wave: 2, position: [0, 2, -2] },
   {
-    id: "sisyphus-junior",
-    label: "Worker",
+    id: "plan-consultant",
+    label: "Plan Consultant",
+    role: "consultant",
+    wave: 2,
+    position: [0, 0, -2],
+  },
+  { id: "plan-reviewer", label: "Plan Reviewer", role: "reviewer", wave: 2, position: [0, -2, -2] },
+  { id: "kibitzer", label: "Kibitzer", role: "advisor", wave: 3, position: [3, 3, -4] },
+  { id: "architect", label: "Architect", role: "architect", wave: 3, position: [4, 2, -4] },
+  { id: "deep", label: "Deep", role: "worker", wave: 3, position: [3, 1, -4] },
+  { id: "quick", label: "Quick", role: "worker", wave: 3, position: [4, 0, -4] },
+  {
+    id: "visual-engineering",
+    label: "Visual Engineering",
     role: "worker",
     wave: 3,
-    position: [4, -2, -4],
+    position: [3, -1, -4],
   },
-  {
-    id: "multimodal-looker",
-    label: "Multimodal-Looker",
-    role: "media",
-    wave: 3,
-    position: [3, -3, -4],
-  },
+  { id: "explore", label: "Explore", role: "search", wave: 3, position: [4, -2, -4] },
+  { id: "librarian", label: "Librarian", role: "researcher", wave: 3, position: [3, -3, -4] },
 ]
 
 export const graphEdges = graphNodes.flatMap((source) =>
@@ -38,11 +38,11 @@ export const graphEdges = graphNodes.flatMap((source) =>
     .map((target) => ({ source: source.id, target: target.id })),
 )
 export const mobileNodeIds = [
-  "sisyphus",
-  "prometheus",
-  "atlas",
-  "hephaestus",
-  "oracle",
-  "librarian",
+  "orchestrator",
+  "planner",
+  "plan-reviewer",
+  "architect",
+  "deep",
   "explore",
+  "librarian",
 ] as const

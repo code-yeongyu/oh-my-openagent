@@ -2,10 +2,10 @@
 // resolve-evidence-dir.mjs - pick the canonical evidence directory for a live Senpi QA run.
 //
 // Live Senpi QA artifacts belong under .omo/evidence/omo-senpi-adapter/<slug>/ and nowhere else.
-// That path is the repository-standard location every reviewer and AGENTS.md rule points at, so a
-// hand-typed alternative (local-ignore/qa-evidence/..., a temp dir, a traversal) silently strands
-// the evidence where the PR cannot cite it. Resolving through this script makes the path a checked
-// contract instead of a convention.
+// That path is the repository-standard location every AGENTS.md rule points at, and it is gitignored,
+// so a hand-typed alternative (local-ignore/qa-evidence/..., .qa-evidence/ at the worktree root, a temp
+// dir, a traversal) either strands the evidence or lands it in a commit (#8703). Resolving through
+// this script makes the path a checked contract instead of a convention.
 //
 // The resolver COMPUTES and VALIDATES only; creating the directory stays the caller's decision, so
 // a rejected slug never leaves a stray directory behind.

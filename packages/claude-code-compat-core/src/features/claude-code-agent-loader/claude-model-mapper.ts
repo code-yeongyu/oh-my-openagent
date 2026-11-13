@@ -1,12 +1,13 @@
 import { normalizeModelFormat } from "../../shared/model-format-normalizer"
 import { normalizeModelID } from "../../shared/model-normalization"
+import { LATEST_MODEL_BY_FAMILY } from "@oh-my-opencode/model-core/latest-models"
 
 const ANTHROPIC_PREFIX = "anthropic/"
 
 const CLAUDE_CODE_ALIAS_MAP = new Map<string, string>([
-  ["sonnet", `${ANTHROPIC_PREFIX}claude-sonnet-4-6`],
-  ["opus", `${ANTHROPIC_PREFIX}claude-opus-4-8`],
-  ["haiku", `${ANTHROPIC_PREFIX}claude-haiku-4-5`],
+  ["sonnet", `${ANTHROPIC_PREFIX}${LATEST_MODEL_BY_FAMILY.claudeSonnet}`],
+  ["opus", `${ANTHROPIC_PREFIX}${LATEST_MODEL_BY_FAMILY.claudeOpus}`],
+  ["haiku", `${ANTHROPIC_PREFIX}${LATEST_MODEL_BY_FAMILY.claudeHaiku}`],
 ])
 
 function mapClaudeModelString(model: string | undefined, anthropicProvider?: string): string | undefined {
@@ -28,9 +29,7 @@ function mapClaudeModelString(model: string | undefined, anthropicProvider?: str
 
     if (providerID.length === 0 || modelID.length === 0) return trimmed
 
-    return modelID.startsWith("claude-")
-      ? `${providerID}/${normalizeModelID(modelID)}`
-      : trimmed
+    return modelID.startsWith("claude-") ? `${providerID}/${normalizeModelID(modelID)}` : trimmed
   }
 
   const normalized = normalizeModelID(trimmed)

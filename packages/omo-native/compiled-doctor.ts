@@ -1,0 +1,180 @@
+import { existsSync } from "node:fs"
+import { adoptedEngineTrust } from "@code-yeongyu/senpi/engine-trust"
+import { join } from "node:path"
+import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
+import { doctorCoverageLines } from "./bin/lib/category-coverage.js"
+import { doctorComputerUseLines } from "./bin/lib/computer-use-doctor.js"
+import { daemonReportLines } from "./bin/lib/daemon.js"
+import { keychainHelperDoctorLines } from "./bin/lib/keychain-helper-doctor.js"
+import { reapStaleEngines, staleEngineReport, transientMemoryReport, warningsForSettings } from "./bin/lib/doctor.js"
+import { migrationReport } from "./bin/lib/doctor-migration.js"
+import {
+  memoryRuntimeDiscardResolver,
+  memoryRuntimeMaxBytesResolver,
+  memoryRuntimeReport,
+} from "./bin/lib/doctor-memory-runtime.js"
+import { runDoctorModels } from "./bin/lib/model-chains.js"
+import { piConfigReport } from "./bin/lib/doctor-pi-config.js"
+import { launchSpecDoctorLines } from "./bin/lib/launch-spec-mode.js"
+import { needsSetupSuggestion, type detectHarnesses } from "./bin/lib/setup-detect.js"
+import { compiledDiagnosticRuntimeLoader, loadCompiledCoverageEngine } from "./compiled-diagnostic-runtime"
+import { configDoctorLines } from "./config-doctor-runtime"
+import { claudeCodeDoctorLines } from "./claude-code-doctor"
+import { engineTrustDoctorLines, readEngineTrustRecords } from "./engine-trust-doctor"
+
+type DaemonEngine = {
+  run(
+    args: string[],
+    options: { env: Record<string, string | undefined> },
+  ): { exitCode: number; stdout: string; stderr: string }
+}
+
+export type CompiledDoctorOptions = {
+  readonly env?: NodeJS.ProcessEnv
+  readonly homeDir?: string
+  readonly platform?: NodeJS.Platform
+  readonly coverageLines?: () => Promise<string[]>
+  readonly computerUseLines?: () => Promise<string[]>
+  readonly keychainHelperLines?: () => string[]
+  readonly trustLines?: () => Promise<string[]>
+  readonly memoryRuntimeLines?: () => Promise<string[]>
+  readonly list?: () => { pid: number; ppid: number; elapsed: string; tty: string; command: string }[]
+  readonly kill?: (pid: number, signal: NodeJS.Signals) => void
+}
+
+const doctorArtifacts = [
+  ["plugin manifest", "plugin/package.json"],
+  ["extension", "plugin/extensions/omo.js"],
+  ["lsp-daemon runtime", "plugin/runtime/lsp-daemon/dist/cli.js"],
+] as const
+
+export type CompiledDoctorInput = {
+  readonly inventory: Awaited<ReturnType<typeof detectHarnesses>>
+  readonly execDir: string
+  readonly version: string
+  readonly versionText: string
+  readonly updateCommand: string
+  readonly engine?: DaemonEngine
+  readonly args?: readonly string[]
+  readonly options?: CompiledDoctorOptions
+}
+
+function computerUseLines(input: CompiledDoctorInput, env: NodeJS.ProcessEnv): Promise<string[]> {
+  if (input.options?.computerUseLines) return input.options.computerUseLines()
+  return doctorComputerUseLines({
+    loadRuntime: compiledDiagnosticRuntimeLoader(input.execDir),
+    packageRoot: input.execDir,
+    version: input.version,
+    env: { ...env, OMO_PACKAGE_DIR: env.OMO_PACKAGE_DIR ?? input.execDir },
+  })
+}
+
+/** Design revision 11: the adopted generation's default-file outcome, INFO only, from the trust log beside it. */
+async function trustLines(options: CompiledDoctorOptions): Promise<string[]> {
+  if (options.trustLines) return options.trustLines()
+  const marker = adoptedEngineTrust()
+  return engineTrustDoctorLines({ platform: process.platform, marker, records: await readEngineTrustRecords(marker) })
+}
+
+/** The memory-runtime section the npm launcher's doctor prints (bin/lib/launcher.js), from the same report. */
+async function memoryRuntimeLines(input: CompiledDoctorInput, env: NodeJS.ProcessEnv): Promise<string[]> {
+  try {
+    if (input.options?.memoryRuntimeLines) return await input.options.memoryRuntimeLines()
+    const pluginRoot = join(input.execDir, "plugin")
+    const report = await memoryRuntimeReport({
+      env,
+      maxBytesFor: memoryRuntimeMaxBytesResolver({ pluginRoot, env }),
+      discardFor: memoryRuntimeDiscardResolver({ pluginRoot, env }),
+    })
+    return report.lines
+  } catch (error) {
+    // A runtime the user cannot read (EACCES) must not take the rest of doctor down with it.
+    return [memoryRuntimeUnavailableLine(error)]
+  }
+}
+
+function memoryRuntimeUnavailableLine(error: unknown): string {
+  return `WARN memory runtime: unavailable: ${error instanceof Error ? error.message : String(error)}`
+}
+
+function coverageLines(input: CompiledDoctorInput, env: NodeJS.ProcessEnv): Promise<string[]> {
+  if (input.options?.coverageLines) return input.options.coverageLines()
+  return doctorCoverageLines({
+    agentDir: canonicalAgentDir(env),
+    env,
+    loadRuntime: compiledDiagnosticRuntimeLoader(input.execDir),
+    loadEngine: loadCompiledCoverageEngine,
+  })
+}
+
+export async function runCompiledDoctor(input: CompiledDoctorInput): Promise<void> {
+  const options = input.options ?? {}
+  if (input.args?.[0] === "--reap") {
+    const result = reapStaleEngines(input.args.slice(1), options)
+    console.log(result.lines.join("\n"))
+    process.exitCode = result.failed ? 1 : 0
+    return
+  }
+  const env = options.env ?? process.env
+  if (input.args?.[0] === "--models") {
+    process.exitCode = await runDoctorModels([...input.args.slice(1)], {
+      agentDir: canonicalAgentDir(env),
+      env,
+      loadRuntime: compiledDiagnosticRuntimeLoader(input.execDir),
+      loadEngine: loadCompiledCoverageEngine,
+    })
+    return
+  }
+  let failed = false
+  const lines: string[] = []
+  for (const [label, artifact] of doctorArtifacts) {
+    if (existsSync(join(input.execDir, artifact))) lines.push(`PASS ${label}: ${artifact}`)
+    else {
+      lines.push(`FAIL ${label}: missing ${artifact}`)
+      failed = true
+    }
+  }
+  for (const line of input.versionText.split("\n")) lines.push(`INFO ${line}`)
+  lines.push(`INFO Update: ${input.updateCommand}`)
+  const launchSpec = launchSpecDoctorLines(join(input.execDir, "plugin"))
+  if (launchSpec.some((line) => line.startsWith("FAIL "))) failed = true
+  lines.push(...launchSpec)
+  lines.push(
+    ...(input.options?.keychainHelperLines?.() ??
+      keychainHelperDoctorLines({ packageRoot: input.execDir, helperRelPath: "omo-keychain" })),
+  )
+  if (input.engine !== undefined) {
+    lines.push(
+      ...daemonReportLines({
+        engine: input.engine,
+        pluginRoot: join(input.execDir, "plugin"),
+        agentDir: canonicalAgentDir(),
+        env: process.env,
+        platform: process.platform,
+      }),
+    )
+  }
+  lines.push(...migrationReport({ ...options, standalone: true }, null))
+  lines.push(...warningsForSettings())
+  lines.push(...configDoctorLines({ cwd: process.cwd(), env }))
+  lines.push(...piConfigReport({ env: options.env, homeDir: options.homeDir }))
+  lines.push(...staleEngineReport(options))
+  lines.push(...transientMemoryReport({ env }))
+  lines.push(...(await trustLines(options)))
+  const [computerUse, coverage, memoryRuntime] = await Promise.all([
+    computerUseLines(input, env),
+    coverageLines(input, env),
+    memoryRuntimeLines(input, env),
+  ])
+  if (computerUse.some((line) => line.startsWith("FAIL "))) failed = true
+  lines.push(
+    ...computerUse,
+    ...claudeCodeDoctorLines({ runtimeDir: input.execDir, env }),
+    ...coverage,
+    ...memoryRuntime,
+  )
+  if (needsSetupSuggestion(input.inventory))
+    lines.push("INFO no credentials found; run omo setup to review sibling stores")
+  console.log(lines.join("\n"))
+  process.exitCode = failed ? 1 : 0
+}

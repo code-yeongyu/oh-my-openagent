@@ -1,21 +1,19 @@
-import { afterEach, describe, expect, it, setDefaultTimeout } from "bun:test"
+import { afterEach, describe, expect, it } from "bun:test"
 import { existsSync, realpathSync } from "node:fs"
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { GitMemoryRepo, createNodeGitExec } from "../git"
+import { GitMemoryRepo, createNodeGitExec, type GitExec } from "../git"
 import {
   createReflectionWorktree,
   discardReflectionWorktree,
   finalizeReflectionWorktree,
   type ReflectionWorktree,
 } from "./worktree"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const roots: string[] = []
-const WINDOWS_INTEGRATION_TEST_TIMEOUT = process.platform === "win32" ? 20_000 : 5_000
 const exec = createNodeGitExec()
-
-setDefaultTimeout(WINDOWS_INTEGRATION_TEST_TIMEOUT)
 
 async function fixture() {
   const root = realpathSync.native(await mkdtemp(join(tmpdir(), "reflection-worktree-")))
@@ -42,7 +40,7 @@ async function assertCleaned(worktree: ReflectionWorktree, parentDir: string) {
 }
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 })))
 })
 
 describe("reflection worktree finalization", () => {
@@ -86,7 +84,10 @@ describe("reflection worktree finalization", () => {
     const result = await finalizeReflectionWorktree(worktree, {
       mode: "auto",
       summary: "learned facts",
-      withWriterLock: async (operation) => { lockCalls += 1; return operation() },
+      withWriterLock: async (operation) => {
+        lockCalls += 1
+        return operation()
+      },
     })
 
     // #then
@@ -94,8 +95,9 @@ describe("reflection worktree finalization", () => {
     expect(result.cleanup).toEqual({ worktreeRemoved: true, branchRemoved: true })
     expect(lockCalls).toBe(1)
     expect(await repo.show("HEAD", "learned.md")).toBe("learned\n")
-    expect((await exec.run(["log", "-1", "--format=%s"], { cwd: parentDir, timeoutMs: 30_000 })).stdout.trim())
-      .toBe("merge(reflection): learned facts")
+    expect((await exec.run(["log", "-1", "--format=%s"], { cwd: parentDir, timeoutMs: 30_000 })).stdout.trim()).toBe(
+      "merge(reflection): learned facts",
+    )
     await assertCleaned(worktree, parentDir)
   })
 
@@ -112,7 +114,10 @@ describe("reflection worktree finalization", () => {
       mode: "auto",
       summary: "targeted dream",
       allowedPaths: ["reference-style.md"],
-      withWriterLock: async (operation) => { lockCalls += 1; return operation() },
+      withWriterLock: async (operation) => {
+        lockCalls += 1
+        return operation()
+      },
     })
 
     // #then
@@ -158,7 +163,9 @@ describe("reflection worktree finalization", () => {
     // #then
     expect(result.status).toBe("merge_conflict")
     expect(await repo.status()).toBe("")
-    expect((await exec.run(["rev-parse", "-q", "--verify", "MERGE_HEAD"], { cwd: parentDir, timeoutMs: 30_000 })).code).toBe(1)
+    expect(
+      (await exec.run(["rev-parse", "-q", "--verify", "MERGE_HEAD"], { cwd: parentDir, timeoutMs: 30_000 })).code,
+    ).toBe(1)
     await assertCleaned(worktree, parentDir)
   })
 
@@ -202,7 +209,33 @@ describe("reflection worktree finalization", () => {
     expect(await repo.show("HEAD", "child.md")).toBe("child\n")
     expect(await repo.show("HEAD", "parent.md")).toBe("parent\n")
     await assertCleaned(worktree, parentDir)
-  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
+  })
+
+  it("#given a branch deletion that keeps failing #when a merged reflection finalizes #then the landed outcome survives the incomplete cleanup", async () => {
+    // #given
+    const { repo, worktreesDir } = await fixture()
+    const blockBranchDelete: GitExec = {
+      run: async (argv, options) =>
+        argv[0] === "branch" && argv[1] === "-D"
+          ? { code: 1, stdout: "", stderr: "error: cannot delete branch used by worktree" }
+          : exec.run(argv, options),
+    }
+    const worktree = await createReflectionWorktree(repo, "cleanup-blocked", worktreesDir, blockBranchDelete)
+    await commit(worktree, "learned.md", "learned\n")
+
+    // #when
+    const result = await finalizeReflectionWorktree(worktree, {
+      mode: "auto",
+      summary: "landed but uncleaned",
+      withWriterLock: async (operation) => operation(),
+    })
+
+    // #then
+    expect(result.status).toBe("merged")
+    expect(result.cleanup).toEqual({ worktreeRemoved: true, branchRemoved: false })
+    expect(result.detail).toContain("Reflection cleanup did not fully complete")
+    expect(await repo.show("HEAD", "learned.md")).toBe("learned\n")
+  })
 
   it("#given an externally merged reflection branch #when explicit finalization verifies reachability #then it reports merged and cleans up", async () => {
     // #given
@@ -221,5 +254,5 @@ describe("reflection worktree finalization", () => {
     expect(result.status).toBe("merged")
     expect(await repo.show("HEAD", "explicit.md")).toBe("integrated\n")
     await assertCleaned(worktree, parentDir)
-  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
+  })
 })

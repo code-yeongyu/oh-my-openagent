@@ -1,4 +1,5 @@
 import color from "picocolors"
+import { NATIVE_PACKAGE_SPEC } from "./install-native/plan"
 import type {
   BooleanArg,
   ClaudeSubscription,
@@ -36,8 +37,11 @@ export function formatConfigSummary(config: InstallConfig): string {
   if (config.hasCodex) {
     lines.push(`  ${SYMBOLS.info} Codex autonomous mode: ${config.codexAutonomous ? "enabled" : "disabled"}`)
   }
-  if (config.hasSenpi) {
-    lines.push(`  ${SYMBOLS.info} Senpi adapter: enabled`)
+  if (config.hasNative) {
+    lines.push(`  ${SYMBOLS.info} OmO Native: installing from ${NATIVE_PACKAGE_SPEC}`)
+  }
+  if (config.hasNativeDev) {
+    lines.push(`  ${SYMBOLS.info} OmO Native development adapter: enabled`)
   }
 
   if (!config.hasOpenCode) return lines.join("\n")
@@ -99,20 +103,13 @@ export function printWarning(message: string): void {
 
 export function printBox(content: string, title?: string): void {
   const lines = content.split("\n")
-  const maxWidth =
-    Math.max(
-      ...lines.map((line) => line.replace(ANSI_COLOR_PATTERN, "").length),
-      title?.length ?? 0,
-    ) + 4
+  const maxWidth = Math.max(...lines.map((line) => line.replace(ANSI_COLOR_PATTERN, "").length), title?.length ?? 0) + 4
   const border = color.dim("─".repeat(maxWidth))
 
   console.log()
   if (title) {
     console.log(
-      color.dim("┌─") +
-        color.bold(` ${title} `) +
-        color.dim("─".repeat(maxWidth - title.length - 4)) +
-        color.dim("┐"),
+      color.dim("┌─") + color.bold(` ${title} `) + color.dim("─".repeat(maxWidth - title.length - 4)) + color.dim("┐"),
     )
   } else {
     console.log(color.dim("┌") + border + color.dim("┐"))
@@ -211,7 +208,8 @@ function collectCodexOnlyOpenCodeFlagErrors(args: InstallArgs): string[] {
   if (args.kimiForCoding !== undefined) errors.push("--kimi-for-coding cannot be used with --platform=codex")
   if (args.opencodeGo !== undefined) errors.push("--opencode-go cannot be used with --platform=codex")
   if (args.bailianCodingPlan !== undefined) errors.push("--bailian-coding-plan cannot be used with --platform=codex")
-  if (args.minimaxCnCodingPlan !== undefined) errors.push("--minimax-cn-coding-plan cannot be used with --platform=codex")
+  if (args.minimaxCnCodingPlan !== undefined)
+    errors.push("--minimax-cn-coding-plan cannot be used with --platform=codex")
   if (args.minimaxCodingPlan !== undefined) errors.push("--minimax-coding-plan cannot be used with --platform=codex")
   if (args.vercelAiGateway !== undefined) errors.push("--vercel-ai-gateway cannot be used with --platform=codex")
   return errors
@@ -221,7 +219,8 @@ export function argsToConfig(args: InstallArgs): InstallConfig {
   const platform = resolvePlatform(args)
   const hasOpenCode = platform === "opencode" || platform === "both"
   const hasCodex = platform === "codex" || platform === "both"
-  const hasSenpi = platform === "senpi"
+  const hasNative = platform === "native"
+  const hasNativeDev = platform === "native-dev"
 
   return {
     platform,
@@ -232,7 +231,8 @@ export function argsToConfig(args: InstallArgs): InstallConfig {
     hasGemini: hasOpenCode && args.gemini === "yes",
     hasCopilot: hasOpenCode && args.copilot === "yes",
     hasCodex,
-    hasSenpi,
+    hasNative,
+    hasNativeDev,
     hasOpencodeZen: hasOpenCode && args.opencodeZen === "yes",
     hasZaiCodingPlan: hasOpenCode && args.zaiCodingPlan === "yes",
     hasKimiForCoding: hasOpenCode && args.kimiForCoding === "yes",

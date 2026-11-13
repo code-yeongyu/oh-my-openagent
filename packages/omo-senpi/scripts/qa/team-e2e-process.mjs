@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process"
+import { windowsTreeKillArgs } from "../../../memory-core/src/concurrency/windows-process-tree.mjs"
 
 export function killProcess(pid) {
   try {
@@ -20,9 +21,10 @@ export async function terminateProcessTree(pid, operations = {}) {
 
   if (platform === "win32") {
     const run = operations.spawnSync ?? spawnSync
-    const result = run("taskkill.exe", ["/PID", String(pid), "/T", "/F"], { encoding: "utf8" })
-    const aliveAfter = processAlive(pid)
-    if (result.status === 0 && !aliveAfter) return { kind: "terminated", pid, platform }
+    const args = windowsTreeKillArgs(pid, run)
+    if (args.length === 0) return { kind: "already-exited", pid, platform }
+    const result = run("taskkill.exe", args, { encoding: "utf8", windowsHide: true })
+    if (result.status === 0) return { kind: "terminated", pid, platform }
     return { kind: "failed", pid, platform, status: result.status ?? null, error: processTreeError(result) }
   }
 
@@ -31,7 +33,13 @@ export async function terminateProcessTree(pid, operations = {}) {
     signal(-pid, "SIGKILL")
   } catch (error) {
     if (isMissingProcess(error)) return { kind: "already-exited", pid, platform }
-    return { kind: "failed", pid, platform, status: null, error: error instanceof Error ? error.message : String(error) }
+    return {
+      kind: "failed",
+      pid,
+      platform,
+      status: null,
+      error: error instanceof Error ? error.message : String(error),
+    }
   }
   const pause = operations.pause ?? delay
   const pollAttempts = operations.pollAttempts ?? 20
@@ -43,8 +51,7 @@ export async function terminateProcessTree(pid, operations = {}) {
 }
 
 export async function killProcessGroup(pid, operations = {}) {
-  const terminate = operations.terminateProcessTree
-    ?? ((targetPid) => terminateProcessTree(targetPid, operations))
+  const terminate = operations.terminateProcessTree ?? ((targetPid) => terminateProcessTree(targetPid, operations))
   return (await terminate(pid)).kind !== "failed"
 }
 
@@ -66,8 +73,7 @@ export function createOwnedProcessRegistry() {
 export async function cleanupProcessGroups(groupIds, operations = {}) {
   const platform = operations.platform ?? process.platform
   if (platform === "win32") {
-    const terminate = operations.terminateProcessTree
-      ?? ((targetPid) => terminateProcessTree(targetPid, operations))
+    const terminate = operations.terminateProcessTree ?? ((targetPid) => terminateProcessTree(targetPid, operations))
     let leaked = 0
     for (const groupId of groupIds) {
       if ((await terminate(groupId))?.kind === "failed") leaked += 1

@@ -47,6 +47,21 @@ describe("OmoMemorySettingsSchema v2 block defaults", () => {
     expect(result.success).toBe(false)
   })
 
+  test("#given global and per-agent extraction models #when parsed #then both explicit selections are preserved", () => {
+    const parsed = OmoMemorySettingsSchema.parse({
+      facts: { model: "test/global" },
+      agents: { fixture: { facts: { model: "test/agent" } } },
+    })
+    expect(parsed).toMatchObject({
+      facts: { model: "test/global" },
+      agents: { fixture: { facts: { model: "test/agent" } } },
+    })
+  })
+
+  test("#given an empty extraction model #when parsed #then the schema rejects it", () => {
+    expect(OmoMemorySettingsSchema.safeParse({ facts: { model: "" } }).success).toBe(false)
+  })
+
   test("#given facts debounce_settles below 1 #when parsed #then validation fails", () => {
     // given
     const input = { facts: { debounce_settles: 0 } }

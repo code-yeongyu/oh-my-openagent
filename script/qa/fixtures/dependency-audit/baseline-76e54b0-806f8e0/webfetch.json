@@ -1,0 +1,162 @@
+{
+  "command": [
+    "bun",
+    "script/qa/dependency-audit-capture.ts",
+    "--phase",
+    "baseline",
+    "--binary",
+    "$INPUT_BINARY",
+    "--out",
+    "$OUT"
+  ],
+  "machine": "darwin-arm64-20030cfa6181",
+  "versions": {
+    "bun": "1.4.2",
+    "node": "v26.7.0"
+  },
+  "exitCode": 0,
+  "timestamp": "2026-09-13T10:53:23.152Z",
+  "schemaVersion": 1,
+  "phase": "baseline",
+  "case": "webfetch",
+  "binarySha256": "c593321c06beacd0af1a94cda7a93fc5d76608e0f62efeb7fc5bf324c6059d76",
+  "pass": true,
+  "fixtures": [
+    {
+      "path": "/fixtures/reader",
+      "markdown": "## Reader fixture\n\nThis local article explains deterministic fixture rendering, table content, relative links, and independent captures. This local article explains deterministic fixture rendering, table content, relative links, and independent captures. This local article explains deterministic fixture rendering, table content, relative links, and independent captures. This local article explains deterministic fixture rendering, table content, relative links, and independent captures.\n\nSecond paragraph **bold** and [link](http://127.0.0.1:PORT/destination).",
+      "text": "Reader fixture\n\nThis local article explains deterministic fixture rendering, table content, relative links, and independent captures. This local article explains deterministic fixture rendering, table content, relative links, and independent captures. This local article explains deterministic fixture rendering, table content, relative links, and independent captures. This local article explains deterministic fixture rendering, table content, relative links, and independent captures.\n\nSecond paragraph bold and link.",
+      "status": 200,
+      "converted": true,
+      "finalUrl": "http://127.0.0.1:PORT/fixtures/reader",
+      "truncated": false,
+      "outputTruncated": false,
+      "outputBytes": 565,
+      "outputTotalBytes": 565,
+      "url": "http://127.0.0.1:PORT/fixtures/reader",
+      "format": "markdown",
+      "contentType": "text/html; charset=utf-8",
+      "bytes": 744,
+      "timeoutSeconds": 10,
+      "textDetails": {
+        "status": 200,
+        "converted": true,
+        "finalUrl": "http://127.0.0.1:PORT/fixtures/reader",
+        "truncated": false,
+        "outputTruncated": false,
+        "outputBytes": 520,
+        "outputTotalBytes": 520,
+        "url": "http://127.0.0.1:PORT/fixtures/reader",
+        "format": "text",
+        "contentType": "text/html; charset=utf-8",
+        "bytes": 744,
+        "timeoutSeconds": 10
+      }
+    },
+    {
+      "path": "/fixtures/tistory",
+      "markdown": "## Tistory fixture\n\nThis local article explains deterministic fixture rendering, table content, relative links, and independent captures. This local article explains deterministic fixture rendering, table content, relative links, and independent captures. This local article explains deterministic fixture rendering, table content, relative links, and independent captures. This local article explains deterministic fixture rendering, table content, relative links, and independent captures.\n\n-   First\n-   Second\n\ncell",
+      "text": "Tistory fixture\n\nThis local article explains deterministic fixture rendering, table content, relative links, and independent captures. This local article explains deterministic fixture rendering, table content, relative links, and independent captures. This local article explains deterministic fixture rendering, table content, relative links, and independent captures. This local article explains deterministic fixture rendering, table content, relative links, and independent captures.\n\nFirst\n\nSecond\n\ncell",
+      "status": 200,
+      "converted": true,
+      "finalUrl": "http://127.0.0.1:PORT/fixtures/tistory",
+      "truncated": false,
+      "outputTruncated": false,
+      "outputBytes": 519,
+      "outputTotalBytes": 519,
+      "url": "http://127.0.0.1:PORT/fixtures/tistory",
+      "format": "markdown",
+      "contentType": "text/html; charset=utf-8",
+      "bytes": 737,
+      "timeoutSeconds": 10,
+      "textDetails": {
+        "status": 200,
+        "converted": true,
+        "finalUrl": "http://127.0.0.1:PORT/fixtures/tistory",
+        "truncated": false,
+        "outputTruncated": false,
+        "outputBytes": 509,
+        "outputTotalBytes": 509,
+        "url": "http://127.0.0.1:PORT/fixtures/tistory",
+        "format": "text",
+        "contentType": "text/html; charset=utf-8",
+        "bytes": 737,
+        "timeoutSeconds": 10
+      }
+    },
+    {
+      "path": "/fixtures/base/start",
+      "markdown": "## Redirect fixture\n\nThis local article explains deterministic fixture rendering, table content, relative links, and independent captures. This local article explains deterministic fixture rendering, table content, relative links, and independent captures. This local article explains deterministic fixture rendering, table content, relative links, and independent captures. This local article explains deterministic fixture rendering, table content, relative links, and independent captures.\n\n[Guide](http://127.0.0.1:PORT/fixtures/assets/guide)[Section](http://127.0.0.1:PORT/fixtures/assets/#section)![fixture](http://127.0.0.1:PORT/fixtures/assets/image.png)",
+      "text": "Redirect fixture\n\nThis local article explains deterministic fixture rendering, table content, relative links, and independent captures. This local article explains deterministic fixture rendering, table content, relative links, and independent captures. This local article explains deterministic fixture rendering, table content, relative links, and independent captures. This local article explains deterministic fixture rendering, table content, relative links, and independent captures.\n\nGuideSection",
+      "status": 200,
+      "converted": true,
+      "finalUrl": "http://127.0.0.1:PORT/fixtures/base/final",
+      "truncated": false,
+      "outputTruncated": false,
+      "outputBytes": 665,
+      "outputTotalBytes": 665,
+      "url": "http://127.0.0.1:PORT/fixtures/base/start",
+      "format": "markdown",
+      "contentType": "text/html; charset=utf-8",
+      "bytes": 727,
+      "timeoutSeconds": 10,
+      "textDetails": {
+        "status": 200,
+        "converted": true,
+        "finalUrl": "http://127.0.0.1:PORT/fixtures/base/final",
+        "truncated": false,
+        "outputTruncated": false,
+        "outputBytes": 503,
+        "outputTotalBytes": 503,
+        "url": "http://127.0.0.1:PORT/fixtures/base/start",
+        "format": "text",
+        "contentType": "text/html; charset=utf-8",
+        "bytes": 727,
+        "timeoutSeconds": 10
+      }
+    }
+  ],
+  "requests": [
+    "/fixtures/reader",
+    "/fixtures/reader",
+    "/fixtures/tistory",
+    "/fixtures/tistory",
+    "/fixtures/base/start",
+    "/fixtures/base/final",
+    "/fixtures/base/start",
+    "/fixtures/base/final"
+  ],
+  "serverClosed": true,
+  "commands": [
+    {
+      "command": [
+        "$SANDBOX/omo",
+        "--version"
+      ],
+      "exitCode": 0,
+      "stdout": "omob dev build\nomo   76e54b0a9bfa7bc730afefa877aea03f2c948b08 2026-09-13T12:03:49+09:00 (dev)\nsenpi 806f8e0ab4de7d4237e835c5f3cd4e2378c97f38 2026-09-13T01:17:58Z (main)\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "$BINARY",
+        "--mode",
+        "rpc",
+        "--no-session",
+        "--no-extensions",
+        "--extension",
+        "$SANDBOX/fixtures/extension.ts",
+        "--no-skills",
+        "--no-context-files",
+        "--provider",
+        "audit-local",
+        "--model",
+        "audit-v1"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "cleanup": "isolated HOME, agent, copied binary, and temporary workspace removed"
+}

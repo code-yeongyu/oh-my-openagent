@@ -1,6 +1,6 @@
 import { mkdir } from "@oh-my-opencode/memory-core/fs"
 
-import type { MemoryIdentityPaths } from "@oh-my-opencode/memory-core"
+import type { AutoIdentityMode, MemoryIdentityPaths } from "@oh-my-opencode/memory-core"
 
 import type { MemorySessionBinding } from "./binding"
 
@@ -17,22 +17,33 @@ export interface MemoryRepoAccess {
 export interface MemoryIdentityContext {
   readonly identity: string
   readonly identityPaths: MemoryIdentityPaths
+  /**
+   * `<memory>/agents/<id>`: where this identity's memory lives once it owns a `repo/`. Equal to
+   * `identityPaths.root` for every durable run, and the promotion target of a transient one
+   * (transient-identity.ts).
+   */
+  readonly durableRoot: string
   readonly repoAccess: MemoryRepoAccess
   readonly binding: MemorySessionBinding
   readonly ledger: MemoryPendingLedger
+  readonly projectScope?: { readonly memoryRoot: string; readonly autoIdentity: AutoIdentityMode }
 }
 
 export function createMemoryIdentityContext(input: {
   readonly identity: string
   readonly identityPaths: MemoryIdentityPaths
   readonly binding: MemorySessionBinding
+  readonly durableRoot?: string
+  readonly projectScope?: { readonly memoryRoot: string; readonly autoIdentity: AutoIdentityMode }
 }): MemoryIdentityContext {
   let repoAccess: MemoryRepoAccess | undefined
   return {
     identity: input.identity,
     identityPaths: input.identityPaths,
+    durableRoot: input.durableRoot ?? input.identityPaths.root,
     binding: input.binding,
     ledger: { pendingCompaction: false, configRestartNotified: false },
+    ...(input.projectScope === undefined ? {} : { projectScope: input.projectScope }),
     get repoAccess(): MemoryRepoAccess {
       repoAccess ??= {
         path: input.identityPaths.repo,
@@ -49,16 +60,18 @@ export function getMemoryRepo(context: MemoryIdentityContext): MemoryRepoAccess 
 
 /** First-write seam: callers invoke this before mutation; reads must never create identity storage. */
 export async function ensureIdentityRuntimeDirs(paths: MemoryIdentityPaths): Promise<void> {
-  await Promise.all([
-    paths.locks,
-    paths.transcripts,
-    paths.reflection,
-    paths.reflectionSessions,
-    paths.worktrees,
-    paths.viewers,
-    paths.pushQueue,
-    paths.factsQueue,
-    paths.facts,
-    paths.notices,
-  ].map((path) => mkdir(path, { recursive: true })))
+  await Promise.all(
+    [
+      paths.locks,
+      paths.transcripts,
+      paths.reflection,
+      paths.reflectionSessions,
+      paths.worktrees,
+      paths.viewers,
+      paths.pushQueue,
+      paths.factsQueue,
+      paths.facts,
+      paths.notices,
+    ].map((path) => mkdir(path, { recursive: true, mode: 0o700 })),
+  )
 }

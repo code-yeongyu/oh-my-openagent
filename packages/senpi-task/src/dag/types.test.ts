@@ -40,15 +40,24 @@ const EXPECTED_JOURNALED_EVENT_TYPES = [
   "dag.definition.amended",
   "dag.diagnostic.added",
   "dag.stream.overflow",
+  "dag.guidance.added",
+  "dag.guidance.edited",
+  "dag.guidance.removed",
+  "dag.guidance.dispatching",
+  "dag.guidance.delivered",
+  "dag.node.cancel_requested",
+  "dag.node.retry-staged",
+  "dag.node.pause-recovered",
+  "dag.node.pause-lost",
 ] as const
 
 describe("dag domain types", () => {
-  test("#given the journaled payload union #when its type tags are enumerated #then it has exactly 14 members and excludes live activity", () => {
+  test("#given the journaled payload union #when its type tags are enumerated #then it includes durable paused controls and excludes live activity", () => {
     // given / when
     const tags = [...DAG_RUN_EVENT_TYPES]
 
     // then
-    expect(tags).toHaveLength(17)
+    expect(tags).toHaveLength(26)
     expect([...tags].sort()).toEqual([...EXPECTED_JOURNALED_EVENT_TYPES].sort())
     expect(tags).not.toContain("dag.node.activity")
     expectTypeOf<DagRunEventPayload["type"]>().toEqualTypeOf<(typeof DAG_RUN_EVENT_TYPES)[number]>()
@@ -105,7 +114,7 @@ describe("dag domain types", () => {
   test("#given a dag route #when kinds are enumerated #then category XOR agent holds and a pure model route is impossible", () => {
     // given
     const categoryRoute: DagRoute = { kind: "category", category: "quick" }
-    const agentRoute: DagRoute = { kind: "agent", agent: "momus", model: "openai/gpt-5" }
+    const agentRoute: DagRoute = { kind: "agent", agent: "plan-reviewer", model: "openai/gpt-5" }
 
     // when / then
     expect(categoryRoute.kind).toBe("category")
@@ -121,29 +130,19 @@ describe("dag domain types", () => {
     // given
     const byCategory: DagNodeTargetInput = { category: "quick", prompt: "do it" }
     const bySubagent: DagNodeTargetInput = {
-      subagent_type: "momus",
+      subagent_type: "plan-reviewer",
       model: "openai/gpt-5",
       prompt: "do it",
     }
 
     // when / then
     expect(byCategory.category).toBe("quick")
-    expect(bySubagent.subagent_type).toBe("momus")
-    expectTypeOf<Extract<DagNodeTargetInput, { category: string }>["subagent_type"]>().toEqualTypeOf<
-      undefined
-    >()
-    expectTypeOf<Extract<DagNodeTargetInput, { category: string }>["model"]>().toEqualTypeOf<
-      undefined
-    >()
-    expectTypeOf<
-      Extract<DagNodeTargetInput, { subagent_type: string }>["category"]
-    >().toEqualTypeOf<undefined>()
-    expectTypeOf<
-      Extract<DagNodeTargetInput, { subagent_type: string }>["model"]
-    >().toEqualTypeOf<string | undefined>()
-    expectTypeOf<
-      import("./types").DagNodeTargetErrorCode
-    >().toEqualTypeOf<TaskTargetErrorCode>()
+    expect(bySubagent.subagent_type).toBe("plan-reviewer")
+    expectTypeOf<Extract<DagNodeTargetInput, { category: string }>["subagent_type"]>().toEqualTypeOf<undefined>()
+    expectTypeOf<Extract<DagNodeTargetInput, { category: string }>["model"]>().toEqualTypeOf<undefined>()
+    expectTypeOf<Extract<DagNodeTargetInput, { subagent_type: string }>["category"]>().toEqualTypeOf<undefined>()
+    expectTypeOf<Extract<DagNodeTargetInput, { subagent_type: string }>["model"]>().toEqualTypeOf<string | undefined>()
+    expectTypeOf<import("./types").DagNodeTargetErrorCode>().toEqualTypeOf<TaskTargetErrorCode>()
   })
 
   test("#given the settings block #when defaults resolve #then every documented default holds", () => {
@@ -162,19 +161,13 @@ describe("dag domain types", () => {
 
   test("#given the state vocabularies #when enumerated #then run statuses node states error codes and transition reasons match the contract", () => {
     // given / when / then
-    expect([...DAG_RUN_STATUSES]).toEqual([
-      "pending",
-      "running",
-      "paused",
-      "completed",
-      "failed",
-      "cancelled",
-    ])
+    expect([...DAG_RUN_STATUSES]).toEqual(["pending", "running", "paused", "completed", "failed", "cancelled"])
     expect([...DAG_NODE_STATES]).toEqual([
       "pending",
       "blocked",
       "scheduled",
       "running",
+      "paused",
       "completed",
       "failed",
       "cancelled",
@@ -190,6 +183,8 @@ describe("dag domain types", () => {
       "task_lost",
       "task_cancelled",
       "resume_task_missing",
+      "resume_task_orphaned",
+      "lost_while_paused",
       "journal_corrupt",
     ])
     expect(DAG_NODE_TRANSITION_REASONS).toEqual([

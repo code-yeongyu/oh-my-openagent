@@ -1,4 +1,6 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { createHash } from "node:crypto"
+import { loadEngineTables } from "./account-inventory"
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "bun:test"
 
@@ -10,7 +12,12 @@ import {
 } from "@oh-my-opencode/telemetry-core"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { getSenpiTelemetryStateDir, SENPI_TELEMETRY_EVENT_NAME } from "./index"
-import { OMO_NATIVE_PROPERTY_ALLOWLISTS, getOmoNativeStateDir } from "./product-identity"
+import {
+  OMO_NATIVE_COMMON_PROPERTY_SCHEMAS,
+  OMO_NATIVE_PROPERTY_ALLOWLISTS,
+  getOmoNativeStateDir,
+  getOmoNativeInstallIdPath,
+} from "./product-identity"
 import { createOmoNativeSessionComponent } from "./omo-native-session"
 import {
   FIXED_NOW,
@@ -41,38 +48,54 @@ function createRecorder(): Recorder {
       shutdowns.push(0)
       return {
         capture: (message) => messages.push(message),
-        flush: async () => { flushes[index] = (flushes[index] ?? 0) + 1 },
-        shutdown: async () => { shutdowns[index] = (shutdowns[index] ?? 0) + 1 },
+        flush: async () => {
+          flushes[index] = (flushes[index] ?? 0) + 1
+        },
+        shutdown: async () => {
+          shutdowns[index] = (shutdowns[index] ?? 0) + 1
+        },
       }
     },
   }
 }
 
-function writeInventory(agentDir: string, input: {
-  readonly providers?: Record<string, { readonly models?: readonly { readonly id: string }[] }>
-  readonly defaultProvider?: string
-  readonly defaultModel?: string
-} = {}): void {
+function writeInventory(
+  agentDir: string,
+  input: {
+    readonly providers?: Record<string, { readonly models?: readonly { readonly id: string }[] }>
+    readonly defaultProvider?: string
+    readonly defaultModel?: string
+  } = {},
+): void {
   mkdirSync(agentDir, { recursive: true })
   writeFileSync(join(agentDir, "models.json"), JSON.stringify({ providers: input.providers ?? {} }))
-  writeFileSync(join(agentDir, "settings.json"), JSON.stringify({
-    ...(input.defaultProvider === undefined ? {} : { defaultProvider: input.defaultProvider }),
-    ...(input.defaultModel === undefined ? {} : { defaultModel: input.defaultModel }),
-  }))
+  writeFileSync(
+    join(agentDir, "settings.json"),
+    JSON.stringify({
+      ...(input.defaultProvider === undefined ? {} : { defaultProvider: input.defaultProvider }),
+      ...(input.defaultModel === undefined ? {} : { defaultModel: input.defaultModel }),
+    }),
+  )
 }
 
 function sessionCtx(sessionId = "session-1", cwd = "/repo"): unknown {
   return { cwd, sessionManager: { getSessionId: () => sessionId } }
 }
 
-function register(agentDir: string, recorder: Recorder, options: {
-  readonly env?: Record<string, string | undefined>
-  readonly now?: Date
-  readonly configEnabled?: boolean
-  readonly diagnostics?: (input: TelemetryDiagnosticInput | { readonly event: "omo_native_inventory_read_failed" }) => void
-  readonly setTimeoutFn?: (callback: () => void, delay: number) => unknown
-  readonly timeZone?: () => string
-} = {}): FakeExtensionAPI {
+function register(
+  agentDir: string,
+  recorder: Recorder,
+  options: {
+    readonly env?: Record<string, string | undefined>
+    readonly now?: Date
+    readonly configEnabled?: boolean
+    readonly diagnostics?: (
+      input: TelemetryDiagnosticInput | { readonly event: "omo_native_inventory_read_failed" },
+    ) => void
+    readonly setTimeoutFn?: (callback: () => void, delay: number) => unknown
+    readonly timeZone?: () => string
+  } = {},
+): FakeExtensionAPI {
   const pi = new FakeExtensionAPI()
   const configEnabled = options.configEnabled
   createOmoNativeSessionComponent({
@@ -105,62 +128,66 @@ function registryCtx(sessionId: string): unknown {
   }
 }
 
-const SHARED_KEYS = [
-  "$process_person_profile", "install_id", "package_version", "platform", "product_name", "schema_version", "surface",
-]
+const SHARED_KEYS = Object.keys(OMO_NATIVE_COMMON_PROPERTY_SCHEMAS)
 
 describe("OmO Native session telemetry", () => {
   it.each([
     ["DO_NOT_TRACK", { DO_NOT_TRACK: "1" }, true],
     ["omo.json telemetry.enabled false", {}, undefined],
-  ])("#given %s #when session_start fires #then native and legacy telemetry both emit nothing", async (name, optOut, configEnabled) => {
-    await withTempAgentDir(async (agentDir) => {
-      // given
-      writeInventory(agentDir)
-      const recorder = createRecorder()
-      const home = join(agentDir, "home")
-      if (name === "omo.json telemetry.enabled false") {
-        mkdirSync(join(home, ".omo"), { recursive: true })
-        writeFileSync(join(home, ".omo", "omo.json"), '{"telemetry":{"enabled":false}}')
-      }
-      const env = { ...createEnabledEnv(agentDir), HOME: home, ...optOut }
-      const pi = register(agentDir, recorder, { env, configEnabled })
+  ])(
+    "#given %s #when session_start fires #then native and legacy telemetry both emit nothing",
+    async (name, optOut, configEnabled) => {
+      await withTempAgentDir(async (agentDir) => {
+        // given
+        writeInventory(agentDir)
+        const recorder = createRecorder()
+        const home = join(agentDir, "home")
+        if (name === "omo.json telemetry.enabled false") {
+          mkdirSync(join(home, ".omo"), { recursive: true })
+          writeFileSync(join(home, ".omo", "omo.json"), '{"telemetry":{"enabled":false}}')
+        }
+        const env = { ...createEnabledEnv(agentDir), HOME: home, ...optOut }
+        const pi = register(agentDir, recorder, { env, configEnabled })
 
-      // when
-      await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, sessionCtx())
+        // when
+        await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, sessionCtx())
 
-      // then
-      expect(recorder.messages).toEqual([])
-      expect(existsSync(getTelemetryActivityStateFilePath(getOmoNativeStateDir(env)))).toBe(false)
-      expect(existsSync(getTelemetryActivityStateFilePath(getSenpiTelemetryStateDir(env)))).toBe(false)
-    })
-  })
+        // then
+        expect(recorder.messages).toEqual([])
+        expect(existsSync(getTelemetryActivityStateFilePath(getOmoNativeStateDir(env)))).toBe(false)
+        expect(existsSync(getTelemetryActivityStateFilePath(getSenpiTelemetryStateDir(env)))).toBe(false)
+      })
+    },
+  )
 
   it.each([
     ["no config file", undefined, true],
     ["telemetry enabled false", '{"telemetry":{"enabled":false}}', false],
     ["telemetry enabled true", '{"telemetry":{"enabled":true}}', true],
-  ])("#given %s #when session_start loads config #then telemetry matches the resolved setting", async (_name, config, expectedEnabled) => {
-    await withTempAgentDir(async (agentDir) => {
-      // given
-      writeInventory(agentDir)
-      const home = join(agentDir, "home")
-      const cwd = join(home, "project")
-      mkdirSync(cwd, { recursive: true })
-      if (config !== undefined) {
-        mkdirSync(join(home, ".omo"), { recursive: true })
-        writeFileSync(join(home, ".omo", "omo.json"), config)
-      }
-      const recorder = createRecorder()
-      const pi = register(agentDir, recorder, { env: { ...createEnabledEnv(agentDir), HOME: home } })
+  ])(
+    "#given %s #when session_start loads config #then telemetry matches the resolved setting",
+    async (_name, config, expectedEnabled) => {
+      await withTempAgentDir(async (agentDir) => {
+        // given
+        writeInventory(agentDir)
+        const home = join(agentDir, "home")
+        const cwd = join(home, "project")
+        mkdirSync(cwd, { recursive: true })
+        if (config !== undefined) {
+          mkdirSync(join(home, ".omo"), { recursive: true })
+          writeFileSync(join(home, ".omo", "omo.json"), config)
+        }
+        const recorder = createRecorder()
+        const pi = register(agentDir, recorder, { env: { ...createEnabledEnv(agentDir), HOME: home } })
 
-      // when
-      await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, sessionCtx("config", cwd))
+        // when
+        await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, sessionCtx("config", cwd))
 
-      // then
-      expect(recorder.messages.some(({ event }) => event === "session_started")).toBe(expectedEnabled)
-    })
-  })
+        // then
+        expect(recorder.messages.some(({ event }) => event === "session_started")).toBe(expectedEnabled)
+      })
+    },
+  )
 
   it("#given malformed existing config #when session_start loads config #then telemetry is disabled and a diagnostic is emitted", async () => {
     await withTempAgentDir(async (agentDir) => {
@@ -236,11 +263,76 @@ describe("OmO Native session telemetry", () => {
       await tomorrow.dispatch("session_start", { type: "session_start", reason: "new" }, sessionCtx("tomorrow"))
 
       // then
-      expect(recorder.messages.filter(({ event }) => event === "daily_active").map(({ properties }) => properties?.day_utc)).toEqual([
-        "2026-07-03",
-        "2026-07-04",
-      ])
+      expect(
+        recorder.messages.filter(({ event }) => event === "daily_active").map(({ properties }) => properties?.day_utc),
+      ).toEqual(["2026-07-03", "2026-07-04"])
       expect(recorder.messages.filter(({ event }) => event === SENPI_TELEMETRY_EVENT_NAME)).toHaveLength(2)
+    })
+  })
+
+  it("#given a persisted install id #when native events are captured #then distinct_id is sha256(install id), install_hash mirrors it, the raw id never ships and the legacy event uses its own random install id", async () => {
+    await withTempAgentDir(async (agentDir) => {
+      // given
+      writeInventory(agentDir)
+      const recorder = createRecorder()
+      const pi = register(agentDir, recorder)
+
+      // when
+      await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, sessionCtx("identity"))
+
+      // then
+      const installId = readFileSync(getOmoNativeInstallIdPath(createEnabledEnv(agentDir)), "utf8").trim()
+      const installHash = createHash("sha256").update(installId).digest("hex")
+      const native = recorder.messages.filter(({ event }) => event !== SENPI_TELEMETRY_EVENT_NAME)
+      expect(native.length).toBeGreaterThan(0)
+      for (const message of native) {
+        expect(message.distinctId).toBe(installHash)
+        expect(message.properties?.install_hash).toBe(message.distinctId)
+        expect(message.properties).not.toHaveProperty("install_id")
+        expect(message.properties).not.toHaveProperty("machine_hash")
+        expect(message.properties?.schema_version).toBe(4)
+      }
+      const legacy = recorder.messages.find(({ event }) => event === SENPI_TELEMETRY_EVENT_NAME)
+      const legacyInstallId = readFileSync(
+        join(getSenpiTelemetryStateDir(createEnabledEnv(agentDir)), "install-id"),
+        "utf8",
+      ).trim()
+      expect(legacyInstallId).toMatch(/^[0-9a-f]{64}$/)
+      expect(legacy?.distinctId).toBe(createHash("sha256").update(legacyInstallId).digest("hex"))
+      expect(legacy?.distinctId).not.toBe(installHash)
+    })
+  })
+
+  it("#given the install id file disappears between sessions #when the next session starts #then a new 0600 id is minted and events ship under its hash", async () => {
+    await withTempAgentDir(async (agentDir) => {
+      // given
+      writeInventory(agentDir)
+      const recorder = createRecorder()
+      const env = createEnabledEnv(agentDir)
+      const installIdPath = getOmoNativeInstallIdPath(env)
+      await register(agentDir, recorder).dispatch(
+        "session_start",
+        { type: "session_start", reason: "startup" },
+        sessionCtx("before"),
+      )
+      const firstId = readFileSync(installIdPath, "utf8").trim()
+      rmSync(installIdPath)
+
+      // when
+      const next = createRecorder()
+      await register(agentDir, next).dispatch(
+        "session_start",
+        { type: "session_start", reason: "new" },
+        sessionCtx("after"),
+      )
+
+      // then
+      const secondId = readFileSync(installIdPath, "utf8").trim()
+      expect(secondId).toMatch(/^[0-9a-f]{64}$/)
+      expect(secondId).not.toBe(firstId)
+      if (process.platform !== "win32") expect(statSync(installIdPath).mode & 0o777).toBe(0o600)
+      const started = next.messages.find(({ event }) => event === "session_started")
+      expect(started?.distinctId).toBe(createHash("sha256").update(secondId).digest("hex"))
     })
   })
 
@@ -274,13 +366,14 @@ describe("OmO Native session telemetry", () => {
         memory_bucket: "64_plus_gb",
         model_count: 3,
         provider_count: 2,
-        providers: "anthropic",
+        signed_in_provider_count: 0,
+        configured_provider_count: 2,
+        providers: "anthropic,custom",
         reason: "fork",
       })
-      expect(Object.keys(captured?.properties ?? {}).sort()).toEqual([
-        ...OMO_NATIVE_PROPERTY_ALLOWLISTS.session_started,
-        ...SHARED_KEYS,
-      ].sort())
+      expect(Object.keys(captured?.properties ?? {}).sort()).toEqual(
+        [...OMO_NATIVE_PROPERTY_ALLOWLISTS.session_started, ...SHARED_KEYS].sort(),
+      )
     })
   })
 
@@ -302,10 +395,9 @@ describe("OmO Native session telemetry", () => {
       expect(configs).toHaveLength(1)
       expect(configs[0]?.properties?.$session_id).toBe(started?.properties?.$session_id)
       expect(configs[0]?.properties?.source).toBe("resume")
-      expect(Object.keys(configs[0]?.properties ?? {}).sort()).toEqual([
-        ...OMO_NATIVE_PROPERTY_ALLOWLISTS.category_config,
-        ...SHARED_KEYS,
-      ].sort())
+      expect(Object.keys(configs[0]?.properties ?? {}).sort()).toEqual(
+        [...OMO_NATIVE_PROPERTY_ALLOWLISTS.category_config, ...SHARED_KEYS].sort(),
+      )
       expect(recorder.messages.map(({ event }) => event).indexOf("category_config")).toBeGreaterThan(
         recorder.messages.map(({ event }) => event).indexOf("session_started"),
       )
@@ -340,10 +432,14 @@ describe("OmO Native session telemetry", () => {
       })
 
       // when
-      await expect(pi.dispatch("session_start", { type: "session_start", reason: "startup" }, sessionCtx("zoneless"))).resolves.toBeDefined()
+      await expect(
+        pi.dispatch("session_start", { type: "session_start", reason: "startup" }, sessionCtx("zoneless")),
+      ).resolves.toBeDefined()
 
       // then
-      expect(recorder.messages.find(({ event }) => event === "session_started")?.properties).not.toHaveProperty("timezone")
+      expect(recorder.messages.find(({ event }) => event === "session_started")?.properties).not.toHaveProperty(
+        "timezone",
+      )
     })
   })
 
@@ -372,25 +468,50 @@ describe("OmO Native session telemetry", () => {
   it.each([
     ["corrupt models.json", "{not json"],
     ["absent inventory", undefined],
-  ])("#given %s #when session_start fires #then counts are zero, defaults are omitted, and one diagnostic is reported", async (_name, modelsContent) => {
+  ])(
+    "#given %s #when session_start fires #then counts are zero, defaults are omitted, and one diagnostic is reported",
+    async (_name, modelsContent) => {
+      await withTempAgentDir(async (agentDir) => {
+        // given
+        mkdirSync(agentDir, { recursive: true })
+        if (modelsContent !== undefined) writeFileSync(join(agentDir, "models.json"), modelsContent)
+        writeFileSync(
+          join(agentDir, "settings.json"),
+          JSON.stringify({ defaultProvider: "anthropic", defaultModel: "claude-sonnet-5" }),
+        )
+        const diagnostics: Array<TelemetryDiagnosticInput | { readonly event: "omo_native_inventory_read_failed" }> = []
+        const recorder = createRecorder()
+        const pi = register(agentDir, recorder, { diagnostics: (input) => diagnostics.push(input) })
+
+        // when
+        await expect(
+          pi.dispatch("session_start", { type: "session_start", reason: "startup" }, sessionCtx()),
+        ).resolves.toBeDefined()
+
+        // then
+        const properties = recorder.messages.find(({ event }) => event === "session_started")?.properties
+        expect(properties).toMatchObject({ model_count: 0, provider_count: 0, providers: "" })
+        expect(properties).not.toHaveProperty("default_provider")
+        expect(properties).not.toHaveProperty("default_model")
+        expect(diagnostics.filter(({ event }) => event === "omo_native_inventory_read_failed")).toHaveLength(1)
+      })
+    },
+  )
+
+  it("#given linked accounts in auth.json #when session_started emits #then connected_account_count carries the kind counts and no account detail (#10919)", async () => {
     await withTempAgentDir(async (agentDir) => {
-      // given
-      mkdirSync(agentDir, { recursive: true })
-      if (modelsContent !== undefined) writeFileSync(join(agentDir, "models.json"), modelsContent)
-      writeFileSync(join(agentDir, "settings.json"), JSON.stringify({ defaultProvider: "anthropic", defaultModel: "claude-sonnet-5" }))
-      const diagnostics: Array<TelemetryDiagnosticInput | { readonly event: "omo_native_inventory_read_failed" }> = []
+      writeInventory(agentDir)
+      writeFileSync(
+        join(agentDir, "auth.json"),
+        JSON.stringify({ "chatgpt-subscription": { accounts: [{ name: "me@example.com" }, { name: "two" }] } }),
+      )
       const recorder = createRecorder()
-      const pi = register(agentDir, recorder, { diagnostics: (input) => diagnostics.push(input) })
-
-      // when
-      await expect(pi.dispatch("session_start", { type: "session_start", reason: "startup" }, sessionCtx())).resolves.toBeDefined()
-
-      // then
+      const pi = register(agentDir, recorder)
+      await loadEngineTables()
+      await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, sessionCtx("accounts"))
       const properties = recorder.messages.find(({ event }) => event === "session_started")?.properties
-      expect(properties).toMatchObject({ model_count: 0, provider_count: 0, providers: "" })
-      expect(properties).not.toHaveProperty("default_provider")
-      expect(properties).not.toHaveProperty("default_model")
-      expect(diagnostics.filter(({ event }) => event === "omo_native_inventory_read_failed")).toHaveLength(1)
+      expect(properties).toMatchObject({ connected_account_count: "chatgpt-subscription:2" })
+      expect(JSON.stringify(properties)).not.toContain("example.com")
     })
   })
 
@@ -415,13 +536,84 @@ describe("OmO Native session telemetry", () => {
     })
   })
 
+  it("#given a host that defers startup work #when session_start fires #then nothing is captured on the dispatch path and the deferred tick captures it", async () => {
+    await withTempAgentDir(async (agentDir) => {
+      // given
+      writeInventory(agentDir)
+      const recorder = createRecorder()
+      const deferred: Array<() => void | Promise<void>> = []
+      const pi = new FakeExtensionAPI()
+      createOmoNativeSessionComponent({
+        env: createEnabledEnv(agentDir),
+        hashSessionId: (raw) => `hashed:${raw}`,
+        isConfigEnabled: () => true,
+        now: FIXED_NOW,
+        osProvider: createOsProvider("native-session-host"),
+        transportFactory: recorder.factory,
+      }).register(pi, {
+        config: pi,
+        logger: createSilentLogger(),
+        deferStartupWork: (_label, work) => deferred.push(work),
+      })
+
+      // when
+      await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, sessionCtx())
+
+      // then
+      expect(recorder.messages).toEqual([])
+      expect(deferred).toHaveLength(1)
+
+      // when
+      await deferred[0]?.()
+
+      // then
+      expect(recorder.messages.map(({ event }) => event)).toContain("session_started")
+    })
+  })
+
+  it("#given a session that shuts down before the deferred tick #when the tick runs #then no telemetry client is created behind the closed session", async () => {
+    await withTempAgentDir(async (agentDir) => {
+      // given
+      writeInventory(agentDir)
+      const recorder = createRecorder()
+      const deferred: Array<() => void | Promise<void>> = []
+      const pi = new FakeExtensionAPI()
+      createOmoNativeSessionComponent({
+        env: createEnabledEnv(agentDir),
+        hashSessionId: (raw) => `hashed:${raw}`,
+        isConfigEnabled: () => true,
+        now: FIXED_NOW,
+        osProvider: createOsProvider("native-session-host"),
+        transportFactory: recorder.factory,
+      }).register(pi, {
+        config: pi,
+        logger: createSilentLogger(),
+        deferStartupWork: (_label, work) => deferred.push(work),
+      })
+      await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, sessionCtx())
+
+      // when
+      await pi.dispatch("session_shutdown", { type: "session_shutdown", reason: "quit" }, sessionCtx())
+      await deferred[0]?.()
+
+      // then
+      expect(recorder.messages).toEqual([])
+      expect(recorder.shutdowns).toEqual([])
+    })
+  })
+
   it("#given an injected timer #when session_shutdown fires #then the native client flushes once and uses the 1000ms bound", async () => {
     await withTempAgentDir(async (agentDir) => {
       // given
       writeInventory(agentDir)
       const delays: number[] = []
       const recorder = createRecorder()
-      const pi = register(agentDir, recorder, { setTimeoutFn: (_callback, delay) => { delays.push(delay); return 1 } })
+      const pi = register(agentDir, recorder, {
+        setTimeoutFn: (_callback, delay) => {
+          delays.push(delay)
+          return 1
+        },
+      })
       await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, sessionCtx())
 
       // when

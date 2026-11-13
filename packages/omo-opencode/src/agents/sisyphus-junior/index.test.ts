@@ -1,10 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import {
-  createSisyphusJuniorAgentWithOverrides,
-  SISYPHUS_JUNIOR_DEFAULTS,
-  getSisyphusJuniorPromptSource,
-  buildSisyphusJuniorPrompt,
-} from "./index"
+import { createSisyphusJuniorAgentWithOverrides, SISYPHUS_JUNIOR_DEFAULTS, buildSisyphusJuniorPrompt } from "./index"
 
 describe("createSisyphusJuniorAgentWithOverrides", () => {
   describe("honored fields", () => {
@@ -283,7 +278,9 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       } as { permission: Record<string, string> }
 
       // when
-      const result = createSisyphusJuniorAgentWithOverrides(override as Parameters<typeof createSisyphusJuniorAgentWithOverrides>[0])
+      const result = createSisyphusJuniorAgentWithOverrides(
+        override as Parameters<typeof createSisyphusJuniorAgentWithOverrides>[0],
+      )
 
       // then - task blocked, but call_omo_agent allowed for explore/librarian spawning
       const tools = result.tools as Record<string, boolean> | undefined
@@ -304,7 +301,9 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
         tools: { grep: false, write: false, read: true } as Record<string, boolean>,
       }
       // when
-      const result = createSisyphusJuniorAgentWithOverrides(override as Parameters<typeof createSisyphusJuniorAgentWithOverrides>[0])
+      const result = createSisyphusJuniorAgentWithOverrides(
+        override as Parameters<typeof createSisyphusJuniorAgentWithOverrides>[0],
+      )
       // then
       const permission = result.permission as Record<string, string>
       expect(permission.grep).toBe("deny")
@@ -321,7 +320,9 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
         } as Record<string, string>,
       }
       // when
-      const result = createSisyphusJuniorAgentWithOverrides(override as Parameters<typeof createSisyphusJuniorAgentWithOverrides>[0])
+      const result = createSisyphusJuniorAgentWithOverrides(
+        override as Parameters<typeof createSisyphusJuniorAgentWithOverrides>[0],
+      )
       // then
       const permission = result.permission as Record<string, string>
       expect(permission["mcp__context7__resolve-library-id"]).toBe("allow")
@@ -418,184 +419,6 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
   })
 })
 
-describe("getSisyphusJuniorPromptSource", () => {
-  test("returns 'kimi-k2' for kimi-k2-6 model", () => {
-    // given
-    const model = "moonshotai/Kimi-K2.6"
-
-    // when
-    const source = getSisyphusJuniorPromptSource(model)
-
-    // then
-    expect(source).toBe("kimi-k2")
-  })
-
-  test("returns 'kimi-k2' for kimi-k2-5 model", () => {
-    // given
-    const model = "kimi-k2.5"
-
-    // when
-    const source = getSisyphusJuniorPromptSource(model)
-
-    // then
-    expect(source).toBe("kimi-k2")
-  })
-
-  test("returns 'kimi-k2' for k2p6 shorthand", () => {
-    // given
-    const model = "moonshot/k2p6"
-
-    // when
-    const source = getSisyphusJuniorPromptSource(model)
-
-    // then
-    expect(source).toBe("kimi-k2")
-  })
-
-  test("returns 'kimi-k3' for kimi-k3 model, not 'kimi-k2-7' or 'kimi-k2'", () => {
-    // given
-    const model = "opencode-go/kimi-k3"
-
-    // when
-    const source = getSisyphusJuniorPromptSource(model)
-
-    // then
-    expect(source).toBe("kimi-k3")
-  })
-
-  test("returns 'kimi-k3' for k3p1 shorthand", () => {
-    // given
-    const model = "kimi-for-coding/k3p1"
-
-    // when
-    const source = getSisyphusJuniorPromptSource(model)
-
-    // then
-    expect(source).toBe("kimi-k3")
-  })
-
-  test("returns 'kimi-k2-7' for kimi-k2.7 model, not 'kimi-k2'", () => {
-    // given
-    const model = "opencode-go/kimi-k2.7"
-
-    // when
-    const source = getSisyphusJuniorPromptSource(model)
-
-    // then
-    expect(source).toBe("kimi-k2-7")
-  })
-
-  test("returns 'kimi-k2-7' for k2p7 shorthand", () => {
-    // given
-    const model = "kimi-for-coding/k2p7"
-
-    // when
-    const source = getSisyphusJuniorPromptSource(model)
-
-    // then
-    expect(source).toBe("kimi-k2-7")
-  })
-
-  test("returns 'gpt-5-4' for GPT 5.4 models", () => {
-    // given
-    const model = "openai/gpt-5.4"
-
-    // when
-    const source = getSisyphusJuniorPromptSource(model)
-
-    // then
-    expect(source).toBe("gpt-5-4")
-  })
-
-  test("returns 'gpt-5-4' for GitHub Copilot GPT 5.4", () => {
-    // given
-    const model = "github-copilot/gpt-5.4"
-
-    // when
-    const source = getSisyphusJuniorPromptSource(model)
-
-    // then
-    expect(source).toBe("gpt-5-4")
-  })
-
-  test("returns 'gpt-5-5' for GPT 5.5 models", () => {
-    // given
-    const model = "openai/gpt-5.5"
-
-    // when
-    const source = getSisyphusJuniorPromptSource(model)
-
-    // then
-    expect(source).toBe("gpt-5-5")
-  })
-
-  test("returns 'gpt-5-5' for GitHub Copilot GPT 5.5", () => {
-    // given
-    const model = "github-copilot/gpt-5.5"
-
-    // when
-    const source = getSisyphusJuniorPromptSource(model)
-
-    // then
-    expect(source).toBe("gpt-5-5")
-  })
-
-  test("returns 'gpt-5-5' for GPT 5.6 models", () => {
-    // given
-    const model = "openai/gpt-5.6-sol"
-
-    // when
-    const source = getSisyphusJuniorPromptSource(model)
-
-    // then
-    expect(source).toBe("gpt-5-5")
-  })
-
-  test("returns 'gpt' for generic GPT models", () => {
-    // given
-    const model = "openai/gpt-4o"
-
-    // when
-    const source = getSisyphusJuniorPromptSource(model)
-
-    // then
-    expect(source).toBe("gpt")
-  })
-
-  test("returns 'gpt' for GitHub Copilot generic GPT models", () => {
-    // given
-    const model = "github-copilot/gpt-4o"
-
-    // when
-    const source = getSisyphusJuniorPromptSource(model)
-
-    // then
-    expect(source).toBe("gpt")
-  })
-
-  test("returns 'default' for Claude models", () => {
-    // given
-    const model = "anthropic/claude-sonnet-5"
-
-    // when
-    const source = getSisyphusJuniorPromptSource(model)
-
-    // then
-    expect(source).toBe("default")
-  })
-
-  test("returns 'default' for undefined model", () => {
-    // given
-    const model = undefined
-
-    // when
-    const source = getSisyphusJuniorPromptSource(model)
-
-    // then
-    expect(source).toBe("default")
-  })
-})
-
 describe("buildSisyphusJuniorPrompt", () => {
   test("useTaskSystem=true wires the task tool contract for GPT 5.4", () => {
     // given
@@ -631,26 +454,5 @@ describe("buildSisyphusJuniorPrompt", () => {
     // then
     expect(prompt).toContain("todowrite")
     expect(prompt).not.toContain("task_create")
-  })
-
-  test("routes each model id to its prompt source", () => {
-    // given
-    const cases = [
-      ["opencode-go/kimi-k3", "kimi-k3"],
-      ["opencode-go/kimi-k2.7", "kimi-k2-7"],
-      ["opencode-go/kimi-k2.6", "kimi-k2"],
-      ["openai/gpt-5.6-sol", "gpt-5-5"],
-      ["openai/gpt-5.5", "gpt-5-5"],
-      ["openai/gpt-5.4", "gpt-5-4"],
-      ["openai/gpt-4o", "gpt"],
-      ["google/gemini-3.1-pro", "gemini"],
-      ["zai/glm-5.2", "glm-5-2"],
-      ["anthropic/claude-sonnet-5", "default"],
-    ] as const
-
-    // when / then
-    expect(cases.map(([model]) => getSisyphusJuniorPromptSource(model))).toEqual(
-      cases.map(([, source]) => source),
-    )
   })
 })

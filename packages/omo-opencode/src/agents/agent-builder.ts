@@ -9,11 +9,7 @@ export function isFactory(source: AgentSource): source is AgentFactory {
   return typeof source === "function"
 }
 
-export function buildAgent(
-  source: AgentSource,
-  model: string,
-  categories?: CategoriesConfig
-): AgentConfig {
+export function buildAgent(source: AgentSource, model: string, categories?: CategoriesConfig): AgentConfig {
   const base = isFactory(source) ? source(model) : { ...source }
   const categoryConfigs: Record<string, CategoryConfig> = mergeCategories(categories)
 
@@ -33,8 +29,8 @@ export function buildAgent(
     }
   }
 
-  if (isFactory(source) && (base as AgentConfig & { mode?: string }).mode === undefined) {
-    ;(base as AgentConfig & { mode?: string }).mode = source.mode
+  if (isFactory(source) && base.mode === undefined) {
+    base.mode = source.mode
   }
 
   return base

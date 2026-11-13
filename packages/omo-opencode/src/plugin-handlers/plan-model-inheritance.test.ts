@@ -51,10 +51,7 @@ describe("buildPlanDemoteConfig", () => {
     expect(result.reasoningEffort).toBe("high")
     expect(result.textVerbosity).toBe("medium")
     expect(result.providerOptions).toEqual({ key: "value" })
-    expect(result.fallback_models).toEqual([
-      { model: "openai/gpt-5.5", variant: "high" },
-      "opencode-go/glm-5.2",
-    ])
+    expect(result.fallback_models).toEqual([{ model: "openai/gpt-5.5", variant: "high" }, "opencode-go/glm-5.2"])
     expect(result.prompt).toBeUndefined()
     expect(result.permission).toBeUndefined()
     expect(result.description).toBeUndefined()

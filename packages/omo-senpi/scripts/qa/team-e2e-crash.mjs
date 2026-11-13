@@ -30,10 +30,12 @@ export function hasCrashLivenessEvent(stdout) {
 }
 
 function isCrashLivenessDetails(details) {
-  return details !== null
-    && typeof details === "object"
-    && details.memberName === "crash"
-    && (ABNORMAL_MEMBER_STATES.has(details.lastKnownState) || details.killed === true)
+  return (
+    details !== null &&
+    typeof details === "object" &&
+    details.memberName === "crash" &&
+    (ABNORMAL_MEMBER_STATES.has(details.lastKnownState) || details.killed === true)
+  )
 }
 
 export async function runCrashRestartScenario(input) {
@@ -56,30 +58,30 @@ export async function runCrashRestartScenario(input) {
       extraEnv: { SENPI_TASK_QA_HOLD_AFTER_INJECT: markerPath },
     })
     const target = await ops.pollUntil(
-      () => Promise.resolve(ops.readCrashTarget(sandbox.cwd, markerPath)),
+      () => Promise.resolve(ops.readCrashTarget(sandbox, markerPath)),
       (value) => value.ready,
       HOLD_TIMEOUT_MS,
     )
-    const before = ops.readCrashReservationState(sandbox.cwd, target)
+    const before = ops.readCrashReservationState(sandbox, target)
     const parentAliveAtHold = initial.pid !== undefined && ops.isProcessAlive(initial.pid)
     const memberAliveAtHold = target.pid !== undefined && ops.isProcessAlive(target.pid)
-    const memberKilled = parentAliveAtHold && memberAliveAtHold && target.pid !== undefined
-      ? ops.killProcess(target.pid)
-      : false
+    const memberKilled =
+      parentAliveAtHold && memberAliveAtHold && target.pid !== undefined ? ops.killProcess(target.pid) : false
     const memberTerminal = memberKilled
       ? await ops.pollUntil(
-        () => Promise.resolve(ops.readMemberTerminal(sandbox.cwd, target)),
-        (value) => value.kind !== undefined,
-        HOLD_TIMEOUT_MS,
-      )
+          () => Promise.resolve(ops.readMemberTerminal(sandbox, target)),
+          (value) => value.kind !== undefined,
+          HOLD_TIMEOUT_MS,
+        )
       : { kind: undefined }
     const parentAliveBeforeTermination = initial.pid !== undefined && ops.isProcessAlive(initial.pid)
-    const parentTermination = parentAliveBeforeTermination && memberTerminal.kind !== undefined && initial.pid !== undefined
-      ? await ops.terminateProcessTree(initial.pid)
-      : failedParentTermination(initial.pid, "parent was not live after the member terminal transition")
-    const reservationAged = target.ready ? ops.ageCrashReservation(sandbox.cwd, target) : false
+    const parentTermination =
+      parentAliveBeforeTermination && memberTerminal.kind !== undefined && initial.pid !== undefined
+        ? await ops.terminateProcessTree(initial.pid)
+        : failedParentTermination(initial.pid, "parent was not live after the member terminal transition")
+    const reservationAged = target.ready ? ops.ageCrashReservation(sandbox, target) : false
     const initialResult = await initial.completion
-    const afterKillRecord = target.taskId === undefined ? undefined : ops.taskRecord(sandbox.cwd, target.taskId)
+    const afterKillRecord = target.taskId === undefined ? undefined : ops.taskRecord(sandbox, target.taskId)
     writeRunLogs(input.outDir, "crash-initial", initialResult)
 
     let restartStatus = null
@@ -98,8 +100,8 @@ export async function runCrashRestartScenario(input) {
       restartStatus = restartResult.status
       writeRunLogs(input.outDir, "crash-restart", restartResult)
       livenessInjected = hasCrashLivenessEvent(restartResult.stdout)
-      afterRestartRecord = target.taskId === undefined ? undefined : ops.taskRecord(sandbox.cwd, target.taskId)
-      afterReclaim = ops.readPostCrashMailbox(sandbox.cwd, target)
+      afterRestartRecord = target.taskId === undefined ? undefined : ops.taskRecord(sandbox, target.taskId)
+      afterReclaim = ops.readPostCrashMailbox(sandbox, target)
       afterReplacement = await runReplacementMember(input, sandbox, target, ops)
     }
 
@@ -132,46 +134,45 @@ export function evaluateCrashRecovery(evidence) {
   const runEpoch = evidence.afterRestartRecord?.notification?.run_epoch
   const livenessNotifiedEpoch = evidence.afterRestartRecord?.notification?.liveness_notified_epoch
   return {
-    crashHoldReached: evidence.target.ready && evidence.parentAliveAtHold === true && evidence.memberAliveAtHold === true,
+    crashHoldReached:
+      evidence.target.ready && evidence.parentAliveAtHold === true && evidence.memberAliveAtHold === true,
     crashKilledMemberAtHold:
-      evidence.memberKilled === true
-      && evidence.memberTerminal?.kind !== undefined
-      && evidence.parentAliveBeforeTermination === true
-      && evidence.parentTermination?.kind === "terminated"
-      && evidence.initialStatus !== 0,
+      evidence.memberKilled === true &&
+      evidence.memberTerminal?.kind !== undefined &&
+      evidence.parentAliveBeforeTermination === true &&
+      evidence.parentTermination?.kind === "terminated" &&
+      evidence.initialStatus !== 0,
     crashReservationUncommittedAtKill:
-      evidence.before.reservedExists === true
-      && evidence.before.processedExists === false
-      && evidence.before.eventCount === 0,
+      evidence.before.reservedExists === true &&
+      evidence.before.processedExists === false &&
+      evidence.before.eventCount === 0,
     crashReservationRestoredUnread:
-      evidence.reservationAged === true
-      && evidence.afterReclaim.reservedExists === false
-      && evidence.afterReclaim.unreadExists === true,
+      evidence.reservationAged === true &&
+      evidence.afterReclaim.reservedExists === false &&
+      evidence.afterReclaim.unreadExists === true,
     crashReservationNoResidue: evidence.afterReplacement.reservedExists === false,
     crashReservedMessageDeliveredExactlyOnce:
-      evidence.afterReplacement.unreadExists === false
-      && evidence.afterReplacement.processedExists === true
-      && evidence.afterReplacement.eventCount === 1
-      && evidence.afterReplacement.envelopeCount === 1,
+      evidence.afterReplacement.unreadExists === false &&
+      evidence.afterReplacement.processedExists === true &&
+      evidence.afterReplacement.eventCount === 1 &&
+      evidence.afterReplacement.envelopeCount === 1,
     crashRestartExitClean: evidence.restartStatus === 0,
     crashLivenessInjectedToLead: evidence.livenessInjected === true,
     crashLivenessAcknowledged:
-      typeof runEpoch === "number"
-      && typeof livenessNotifiedEpoch === "number"
-      && livenessNotifiedEpoch >= runEpoch,
+      typeof runEpoch === "number" && typeof livenessNotifiedEpoch === "number" && livenessNotifiedEpoch >= runEpoch,
   }
 }
 
 async function runReplacementMember(input, sandbox, target, ops) {
   if (input.memberExtensionEntry === undefined) return emptyMailboxState(target)
-  const memberEnv = replacementMemberEnv(sandbox.cwd, target)
+  const memberEnv = replacementMemberEnv(sandbox, target)
   const replacement = input.startRun({
     senpiBin: input.senpiBin,
     sandbox,
     prompt: "MOCKROLE=quick recover the exact stranded crash message",
     script: crashReplacementScript(
-      unreadMessagePath(sandbox.cwd, target.runId, "crash", target.messageId),
-      processedMessagePath(sandbox.cwd, target.runId, "crash", target.messageId),
+      unreadMessagePath(sandbox, target.runId, "crash", target.messageId),
+      processedMessagePath(sandbox, target.runId, "crash", target.messageId),
     ),
     noExtensions: true,
     extensionEntries: [input.memberExtensionEntry],
@@ -180,7 +181,7 @@ async function runReplacementMember(input, sandbox, target, ops) {
   })
   try {
     return await ops.pollUntil(
-      () => Promise.resolve(ops.readPostCrashMailbox(sandbox.cwd, target)),
+      () => Promise.resolve(ops.readPostCrashMailbox(sandbox, target)),
       (value) => value.processedExists && value.eventCount === 1 && value.envelopeCount === 1,
       HOLD_TIMEOUT_MS,
     )

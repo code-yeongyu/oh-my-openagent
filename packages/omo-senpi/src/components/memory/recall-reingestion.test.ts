@@ -14,7 +14,7 @@ import { TranscriptJournal, buildIdentityPaths } from "@oh-my-opencode/memory-co
 
 import { createMemoryJournalWiring, projectSessionEntries } from "./journal-wiring"
 import { MEMORY_NOTICE_CUSTOM_TYPE } from "./prompt"
-import { NUDGED_ENTRY_TYPE } from "./kibitzer-notice"
+import { NUDGED_ENTRY_TYPE } from "./kibitzer/notice"
 import { RECALL_CUSTOM_TYPE } from "./recall-wiring"
 import { rmSyncEfaultTolerant } from "./teardown.test-support"
 

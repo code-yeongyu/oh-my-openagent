@@ -6,11 +6,21 @@ import { join } from "node:path"
 
 import { writeRunJsonAtomic } from "./run-artifacts"
 import { waitForRunCompletion, waitForRunSentinel } from "./run-sentinel"
+import { remainingTestTime } from "../../../../../../test-support/test-deadline"
 
 const roots: string[] = []
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))))
 
 describe("run completion sentinel", () => {
+  test("#given an armed outcome watcher #when its observer cancels #then it releases without a sentinel", async () => {
+    const runDir = await mkdtemp(join(tmpdir(), "run-sentinel-abort-"))
+    roots.push(runDir)
+    const controller = new AbortController()
+    const pending = waitForRunSentinel(join(runDir, "outcome.json"), Date.now() + 60_000, Date.now, controller.signal)
+    controller.abort()
+    expect(await pending).toBe("timeout")
+  })
+
   test("#given a missing watch directory #when the watcher cannot start #then the bounded fallback reaches timeout", async () => {
     // given
     const path = join(tmpdir(), "missing-run-sentinel", "outcome.json")
@@ -35,7 +45,7 @@ describe("run completion sentinel", () => {
       outcomePath,
       launchPath,
       () => (JSON.parse(readFileSync(outcomePath, "utf8")) as { attempt?: number }).attempt === 2,
-      Date.now() + 5_000,
+      Date.now() + remainingTestTime(),
       Date.now,
     )
     await writeRunJsonAtomic(outcomePath, { version: 1, runId: "run-1", attempt: 2 })

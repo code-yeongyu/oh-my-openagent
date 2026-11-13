@@ -7,6 +7,7 @@ import { tmpdir } from "os"
 import {
   resolveCommentCheckerBinary,
   runCommentChecker as runCommentCheckerCore,
+  sendAndCloseStdin,
   type CheckResult,
   type HookInput,
 } from "@oh-my-opencode/comment-checker-core"
@@ -17,7 +18,7 @@ const DEBUG_FILE = join(tmpdir(), "comment-checker-debug.log")
 
 function debugLog(...args: unknown[]) {
   if (DEBUG) {
-    const msg = `[${new Date().toISOString()}] [comment-checker:cli] ${args.map(a => typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)).join(' ')}\n`
+    const msg = `[${new Date().toISOString()}] [comment-checker:cli] ${args.map((a) => (typeof a === "object" ? JSON.stringify(a, null, 2) : String(a))).join(" ")}\n`
     fs.appendFileSync(DEBUG_FILE, msg)
   }
 }
@@ -26,7 +27,10 @@ function getBinaryName(): string {
   return process.platform === "win32" ? "comment-checker.exe" : "comment-checker"
 }
 
-export function resolveCommentCheckerPathFromPath(binaryName: string, which: (binary: string) => string | null = bunWhich): string | null {
+export function resolveCommentCheckerPathFromPath(
+  binaryName: string,
+  which: (binary: string) => string | null = bunWhich,
+): string | null {
   try {
     return which(binaryName)
   } catch (error) {
@@ -117,11 +121,13 @@ export function getCommentCheckerPathSync(): string | null {
 export function startBackgroundInit(): void {
   if (!initPromise) {
     initPromise = getCommentCheckerPath()
-    initPromise.then(path => {
-      debugLog("background init complete:", path || "no binary")
-    }).catch(err => {
-      debugLog("background init error:", err)
-    })
+    initPromise
+      .then((path) => {
+        debugLog("background init complete:", path || "no binary")
+      })
+      .catch((err) => {
+        debugLog("background init error:", err)
+      })
   }
 }
 
@@ -133,7 +139,11 @@ export type { HookInput, CheckResult }
  * @param cliPath Optional explicit path to CLI binary
  * @param customPrompt Optional custom prompt to replace default warning message
  */
-export async function runCommentChecker(input: HookInput, cliPath?: string, customPrompt?: string): Promise<CheckResult> {
+export async function runCommentChecker(
+  input: HookInput,
+  cliPath?: string,
+  customPrompt?: string,
+): Promise<CheckResult> {
   const binaryPath = cliPath ?? resolvedCliPath ?? getCommentCheckerPathSync()
 
   if (!binaryPath) {
@@ -146,12 +156,20 @@ export async function runCommentChecker(input: HookInput, cliPath?: string, cust
       { hookInput: input, binaryPath, customPrompt },
       {
         existsSync,
-        spawn: (args: readonly string[]) =>
-          spawn([...args], {
+        spawn: (args: readonly string[]) => {
+          const subprocess = spawn([...args], {
             stdin: "pipe",
             stdout: "pipe",
             stderr: "pipe",
-          }),
+          })
+          return {
+            stdin: { send: (hookInput: string) => sendAndCloseStdin(subprocess.stdin, hookInput) },
+            stdout: subprocess.stdout,
+            stderr: subprocess.stderr,
+            exited: subprocess.exited,
+            kill: (signal) => subprocess.kill(signal),
+          }
+        },
       },
     )
     return result

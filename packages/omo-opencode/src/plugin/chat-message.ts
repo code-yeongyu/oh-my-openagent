@@ -2,14 +2,11 @@ import type { OhMyOpenCodeConfig } from "../config"
 
 import { updateSessionAgent } from "../features/claude-code-session-state"
 import { detectSlashCommand, extractPromptText } from "../hooks/auto-slash-command/detector"
-import {
-  isRuntimeFallbackRetryTextParts,
-  isSyntheticOrInternalOnlyTextParts,
-  log,
-} from "../shared"
+import { isRuntimeFallbackRetryTextParts, isSyntheticOrInternalOnlyTextParts, log } from "../shared"
 import { applyUltraworkModelOverrideOnMessage } from "./ultrawork-model-override"
 import type { PluginContext } from "./types"
 import { handleGoalMessage } from "./chat-message/loop-commands"
+import { extractPromptText as extractGoalPromptText } from "./chat-message/prompt-text"
 import { notifyWhenModelCacheIsMissing } from "./chat-message/model-cache-warning"
 import { recordSessionModel, getStoredMainSessionModel } from "./chat-message/session-model"
 import { runUlwExecuteHookIfApplicable } from "./chat-message/ulw-execute-message"
@@ -39,10 +36,7 @@ type PluginContextWithTui = {
   }
 }
 
-function isRuntimeFallbackEnabled(
-  hooks: ChatMessageHooks,
-  pluginConfig: OhMyOpenCodeConfig,
-): boolean {
+function isRuntimeFallbackEnabled(hooks: ChatMessageHooks, pluginConfig: OhMyOpenCodeConfig): boolean {
   return (
     hooks.runtimeFallback !== null &&
     hooks.runtimeFallback !== undefined &&
@@ -80,18 +74,12 @@ export function createChatMessageHandler(args: {
   pluginConfig: OhMyOpenCodeConfig
   firstMessageVariantGate: FirstMessageVariantGate
   hooks: ChatMessageHooks
-}): (
-  input: ChatMessageInput,
-  output: ChatMessageHandlerOutput
-) => Promise<void> {
+}): (input: ChatMessageInput, output: ChatMessageHandlerOutput) => Promise<void> {
   const { ctx, pluginConfig, firstMessageVariantGate, hooks } = args
   const pluginContext = ctx as PluginContextWithTui
   const runtimeFallbackEnabled = isRuntimeFallbackEnabled(hooks, pluginConfig)
 
-  return async (
-    input: ChatMessageInput,
-    output: ChatMessageHandlerOutput,
-  ): Promise<void> => {
+  return async (input: ChatMessageInput, output: ChatMessageHandlerOutput): Promise<void> => {
     const nativeGoalCommand = consumeNativeGoalCommandMarker(output.parts)
     if (isSyntheticOrInternalOnlyTextParts(output.parts)) {
       if (isRuntimeFallbackRetryTextParts(output.parts)) {
@@ -107,6 +95,7 @@ export function createChatMessageHandler(args: {
       updateSessionAgent(input.sessionID, input.agent)
     }
 
+    const originalPromptText = extractGoalPromptText(output.parts)
     const slashCommand = detectSlashCommand(extractPromptText(output.parts))
     if (slashCommand?.command === "stop-continuation") {
       stopContinuation({
@@ -121,11 +110,7 @@ export function createChatMessageHandler(args: {
       firstMessageVariantGate.markApplied(input.sessionID)
     }
 
-    const storedMainSessionModel = getStoredMainSessionModel(
-      input,
-      pluginConfig,
-      isFirstMessage,
-    )
+    const storedMainSessionModel = getStoredMainSessionModel(input, pluginConfig, isFirstMessage)
     if (storedMainSessionModel) {
       output.message.model = storedMainSessionModel
     }
@@ -145,6 +130,7 @@ export function createChatMessageHandler(args: {
       isFirstMessage,
       pluginConfig,
       nativeGoalCommand,
+      originalPromptText,
     })
     await applyUltraworkModelOverrideOnMessage(
       pluginConfig,

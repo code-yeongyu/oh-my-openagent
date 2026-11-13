@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
 import { getFallbackModelsForSession } from "./fallback-models"
+import { detectAgentFromSession, resolveAgentForSession } from "./agent-resolver"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
@@ -103,28 +104,27 @@ describe("runtime-fallback fallback-models", () => {
     expect(result).toEqual([])
   })
 
-  test.each([
-    { planner_enabled: false },
-    { replace_plan: false },
-    { disabled: true },
-  ])("does not inherit prometheus fallback_models when plan replacement is disabled: %#", (sisyphusAgent) => {
-    //#given
-    const pluginConfig = unsafeTestValue({
-      sisyphus_agent: sisyphusAgent,
-      agents: {
-        plan: {},
-        prometheus: {
-          fallback_models: ["openai/gpt-5.5"],
+  test.each([{ planner_enabled: false }, { replace_plan: false }, { disabled: true }])(
+    "does not inherit prometheus fallback_models when plan replacement is disabled: %#",
+    (sisyphusAgent) => {
+      //#given
+      const pluginConfig = unsafeTestValue({
+        sisyphus_agent: sisyphusAgent,
+        agents: {
+          plan: {},
+          prometheus: {
+            fallback_models: ["openai/gpt-5.5"],
+          },
         },
-      },
-    })
+      })
 
-    //#when
-    const result = getFallbackModelsForSession("ses_runtime_fallback_plan", "plan", pluginConfig)
+      //#when
+      const result = getFallbackModelsForSession("ses_runtime_fallback_plan", "plan", pluginConfig)
 
-    //#then
-    expect(result).toEqual([])
-  })
+      //#then
+      expect(result).toEqual([])
+    },
+  )
 
   test("does not fall back to another agent chain when agent cannot be resolved", () => {
     //#given
@@ -144,5 +144,47 @@ describe("runtime-fallback fallback-models", () => {
 
     //#then
     expect(result).toEqual([])
+  })
+
+  // #8402 — general agent must resolve fallback_models like any other named agent
+  test("resolves fallback_models for general agent via normalizeAgentName (#8402)", () => {
+    //#given
+    const pluginConfig = unsafeTestValue({
+      agents: {
+        general: {
+          fallback_models: ["openai/gpt-5.5"],
+        },
+      },
+    })
+
+    //#when
+    const sessionID = "ses_any_session"
+    const agent = resolveAgentForSession(sessionID, "general")
+    const result = getFallbackModelsForSession(sessionID, agent, pluginConfig)
+
+    //#then
+    expect(result).toEqual(["openai/gpt-5.5"])
+  })
+
+  test("does not infer general from an opaque session ID substring", () => {
+    //#given
+    const sessionID = "ses_abcdefgeneral012345"
+
+    //#when
+    const agent = detectAgentFromSession(sessionID)
+
+    //#then
+    expect(agent).toBeUndefined()
+  })
+
+  test("explicit agent takes precedence over a general token in the session ID", () => {
+    //#given
+    const sessionID = "ses-general-storage"
+
+    //#when
+    const agent = resolveAgentForSession(sessionID, "oracle")
+
+    //#then
+    expect(agent).toBe("oracle")
   })
 })

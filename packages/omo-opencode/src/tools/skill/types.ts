@@ -19,6 +19,13 @@ export interface SkillInfo {
   allowedTools?: string[]
 }
 
+/** One entry of OpenCode core's own skill list (Skill.all()), as returned by SkillLoadOptions.nativeSkills.all(). */
+export interface CoreListedSkill {
+  name: string
+  description?: string
+  location: string
+}
+
 export interface SkillLoadOptions {
   /** When true, only load from OpenCode paths (.opencode/skills/, ~/.config/opencode/skills/) */
   opencodeOnly?: boolean
@@ -46,8 +53,15 @@ export interface SkillLoadOptions {
   enabledPluginsOverride?: Record<string, boolean>
   /** Native skill accessor from PluginInput for discovering skills registered via config.skills.paths */
   nativeSkills?: {
-    all(): { name: string; description: string; location: string; content: string }[] | Promise<{ name: string; description: string; location: string; content: string }[]>
-    get(name: string): { name: string; description: string; location: string; content: string } | undefined | Promise<{ name: string; description: string; location: string; content: string } | undefined>
+    all():
+      | { name: string; description: string; location: string; content: string }[]
+      | Promise<{ name: string; description: string; location: string; content: string }[]>
+    get(
+      name: string,
+    ):
+      | { name: string; description: string; location: string; content: string }
+      | undefined
+      | Promise<{ name: string; description: string; location: string; content: string } | undefined>
     dirs(): string[] | Promise<string[]>
   }
   includeSkillsInDescription?: boolean

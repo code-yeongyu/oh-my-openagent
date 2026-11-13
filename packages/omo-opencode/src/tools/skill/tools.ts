@@ -3,7 +3,7 @@ import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import { TOOL_DESCRIPTION_PREFIX } from "./constants"
 import { shouldInvalidateSkillCacheForSession } from "./session-skill-cache"
-import type { SkillArgs, SkillLoadOptions } from "./types"
+import type { CoreListedSkill, SkillArgs, SkillLoadOptions } from "./types"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
 import { clearSkillCache, getAllSkills } from "../../features/opencode-skill-loader/skill-content"
 import { injectGitMasterConfig } from "../../features/opencode-skill-loader/skill-content"
@@ -12,21 +12,19 @@ import type { CommandInfo } from "../slashcommand/types"
 import { formatLoadedCommand } from "../slashcommand/command-output-formatter"
 import { formatCombinedDescription } from "./description-formatter"
 import { formatMcpCapabilities } from "./mcp-capability-formatter"
-import {
-  findPartialMatches,
-  matchCommandByName,
-  matchSkillByName,
-} from "./skill-matcher"
+import { findPartialMatches, matchCommandByName, matchSkillByName } from "./skill-matcher"
 import { extractSkillBody } from "./skill-body"
-import {
-  isPromiseLike,
-  loadedSkillToInfo,
-  mergeNativeSkillInfos,
-  mergeNativeSkills,
-} from "./native-skills"
+import { isPromiseLike, loadedSkillToInfo, mergeNativeSkillInfos, mergeNativeSkills } from "./native-skills"
+import { reportSkillBlocked, SkillLinkBlockedError } from "@oh-my-opencode/skills-loader-core/opencode-skill-loader"
 
 export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
   let cachedDescription: string | null = null
+  // Last list core's Skill.all() returned; undefined until a read succeeds, so nothing is deduped before then.
+  let coreListedSkills: readonly CoreListedSkill[] | undefined
+  const rejectedSkills = new Map<string, Error>()
+  const onRejected = (name: string, error: Error) => {
+    rejectedSkills.set(name, error)
+  }
 
   const getBaseSkills = async (context?: ToolContext): Promise<LoadedSkill[]> => {
     if (shouldInvalidateSkillCacheForSession(context?.sessionID)) {
@@ -38,12 +36,13 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
       return [...loadedSkills]
     }
 
-    const discovered = (await getAllSkills({
-      disabledSkills: options?.disabledSkills,
-      browserProvider: options?.browserProvider,
-      teamModeEnabled: options?.teamModeEnabled,
-      directory: options.directory,
-    })) ?? []
+    const discovered =
+      (await getAllSkills({
+        disabledSkills: options?.disabledSkills,
+        browserProvider: options?.browserProvider,
+        teamModeEnabled: options?.teamModeEnabled,
+        directory: options.directory,
+      })) ?? []
     return options.skills ? [...options.skills] : discovered
   }
 
@@ -51,9 +50,15 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
     if (options.nativeSkills) {
       try {
         const nativeAll = await options.nativeSkills.all()
-        mergeNativeSkills(skills, nativeAll, options.disabledSkills)
+        coreListedSkills = nativeAll
+        mergeNativeSkills(skills, nativeAll, options.disabledSkills, options.directory, onRejected)
       } catch (error) {
+        if (error instanceof SkillLinkBlockedError) {
+          reportSkillBlocked(error)
+          throw error
+        }
         if (!(error instanceof Error)) throw error
+        coreListedSkills = undefined
       }
     }
   }
@@ -67,10 +72,12 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
   const getCommands = (): CommandInfo[] => {
     if (options.commands) return [...options.commands]
 
-    return commandDiscovery.discoverCommandsSync(undefined, {
-      pluginsEnabled: options.pluginsEnabled,
-      enabledPluginsOverride: options.enabledPluginsOverride,
-    }) ?? []
+    return (
+      commandDiscovery.discoverCommandsSync(undefined, {
+        pluginsEnabled: options.pluginsEnabled,
+        enabledPluginsOverride: options.enabledPluginsOverride,
+      }) ?? []
+    )
   }
 
   const buildDescription = async (force = false): Promise<string> => {
@@ -84,6 +91,7 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
     const skillInfos = publicSkills.map(loadedSkillToInfo)
     cachedDescription = formatCombinedDescription(skillInfos, commands, {
       includeSkills: options.includeSkillsInDescription,
+      coreListedSkills,
     })
     return cachedDescription
   }
@@ -100,7 +108,8 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
         if (isPromiseLike(nativeAll)) {
           needsAsyncRefresh = true
         } else {
-          mergeNativeSkillInfos(skillInfos, nativeAll, options.disabledSkills)
+          coreListedSkills = nativeAll
+          mergeNativeSkillInfos(skillInfos, nativeAll, options.disabledSkills, options.directory, onRejected)
         }
       } catch (error) {
         if (!(error instanceof Error)) throw error
@@ -109,6 +118,7 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
 
     cachedDescription = formatCombinedDescription(skillInfos, commandsForDescription, {
       includeSkills: options.includeSkillsInDescription,
+      coreListedSkills,
     })
     if (needsAsyncRefresh) {
       void buildDescription(true)
@@ -127,11 +137,17 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
       return cachedDescription ?? TOOL_DESCRIPTION_PREFIX
     },
     args: {
-      name: tool.schema.string().describe("The skill or command name (e.g., 'review-work' or 'publish'). Use without leading slash for commands."),
+      name: tool.schema
+        .string()
+        .describe(
+          "The skill or command name (e.g., 'review-work' or 'publish'). Use without leading slash for commands.",
+        ),
       user_message: tool.schema
         .string()
         .optional()
-        .describe("Optional arguments or context for command invocation. Example: name='publish', user_message='patch'"),
+        .describe(
+          "Optional arguments or context for command invocation. Example: name='publish', user_message='patch'",
+        ),
     },
     async execute(args: SkillArgs, ctx?: ToolContext) {
       const skills = await getBaseSkills(ctx)
@@ -144,9 +160,12 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
         await mergeNativeSkillsInto(skills)
         matchedSkill = matchSkillByName(skills, requestedName)
       }
+      const rejection = rejectedSkills.get(requestedName.toLowerCase())
+      if (!matchedSkill && rejection) throw rejection
 
       cachedDescription = formatCombinedDescription(skills.map(loadedSkillToInfo), commands, {
         includeSkills: options.includeSkillsInDescription,
+        coreListedSkills,
       })
 
       if (matchedSkill) {
@@ -171,13 +190,7 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
 
         const dir = matchedSkill.path ? dirname(matchedSkill.path) : matchedSkill.resolvedPath || process.cwd()
 
-        const output = [
-          `## Skill: ${matchedSkill.name}`,
-          "",
-          `**Base directory**: ${dir}`,
-          "",
-          body,
-        ]
+        const output = [`## Skill: ${matchedSkill.name}`, "", `**Base directory**: ${dir}`, "", body]
 
         if (options.mcpManager && matchedSkill.mcpConfig) {
           const sessionID = ctx?.sessionID || options.getSessionID?.()
@@ -189,7 +202,8 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
           const mcpInfo = await formatMcpCapabilities(
             matchedSkill,
             options.mcpManager,
-            sessionID
+            sessionID,
+            ctx?.directory ?? options.directory,
           )
           if (mcpInfo) {
             output.push(mcpInfo)
@@ -208,18 +222,13 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
       const partialMatches = findPartialMatches(skills, commands, requestedName)
 
       if (partialMatches.length > 0) {
-        throw new Error(
-          `Skill or command "${args.name}" not found. Did you mean: ${partialMatches.join(", ")}?`
-        )
+        throw new Error(`Skill or command "${args.name}" not found. Did you mean: ${partialMatches.join(", ")}?`)
       }
 
-      const available = [
-        ...skills.map((skill) => skill.name),
-        ...commands.map((command) => `/${command.name}`),
-      ].join(", ")
-      throw new Error(
-        `Skill or command "${args.name}" not found. Available: ${available || "none"}`
+      const available = [...skills.map((skill) => skill.name), ...commands.map((command) => `/${command.name}`)].join(
+        ", ",
       )
+      throw new Error(`Skill or command "${args.name}" not found. Available: ${available || "none"}`)
     },
   })
 }

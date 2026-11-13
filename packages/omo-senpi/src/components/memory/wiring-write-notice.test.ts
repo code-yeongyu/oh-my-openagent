@@ -11,12 +11,7 @@ import { resolveMemoryIdentity } from "@oh-my-opencode/memory-core"
 
 import { ensureIdentityRuntimeDirs } from "./context"
 import { createMemoryComponent } from "./index"
-import {
-  MemoryFakeExtensionAPI,
-  componentContext,
-  loadedMemoryConfig,
-  memorySettings,
-} from "./memory.test-support"
+import { MemoryFakeExtensionAPI, componentContext, loadedMemoryConfig, memorySettings } from "./memory.test-support"
 import { MEMORY_TOOL_NAME } from "./tools"
 
 const roots: string[] = []
@@ -79,7 +74,7 @@ describe("memory write notice wiring", () => {
     const rendered = lines(renderResult)
 
     // then
-    expect(rendered.join("\n")).toContain("Memory updated · 2nd entry today")
+    expect(rendered.join("\n")).toContain("Remembered · 2nd entry today")
     expect(rendered.join("\n")).not.toContain("committed locally")
   }, 30_000)
 

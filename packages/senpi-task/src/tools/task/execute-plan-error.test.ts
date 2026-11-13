@@ -13,7 +13,7 @@ describe("buildTaskExecute plan errors", () => {
         error: {
           code: "unknown_target",
           message: 'Target "nope" not found.',
-          availableAgents: ["explore", "momus"],
+          availableAgents: ["explore", "plan-reviewer"],
           availableCategories: ["deep", "quick"],
         },
       }),
@@ -26,7 +26,7 @@ describe("buildTaskExecute plan errors", () => {
     // then
     const text = result.content[0]?.type === "text" ? result.content[0].text : ""
     expect(text).toBe(
-      'Target "nope" not found. Available agents: explore, momus. Available categories: deep, quick.',
+      'Target "nope" not found. Available agents: explore, plan-reviewer. Available categories: deep, quick.',
     )
   })
 
@@ -45,13 +45,19 @@ describe("buildTaskExecute plan errors", () => {
     const execute = buildTaskExecute(makeDeps(manager))
 
     // when
-    const result = await execute("call-model-unavailable", { prompt: "p", category: "quick" }, undefined, undefined, CTX)
+    const result = await execute(
+      "call-model-unavailable",
+      { prompt: "p", category: "quick" },
+      undefined,
+      undefined,
+      CTX,
+    )
 
     // then
     const text = result.content[0]?.type === "text" ? result.content[0].text : ""
     expect(text).toContain("Valid category names: deep, quick")
     expect(text).toContain("omo.json")
-    expect(text).not.toContain('Pass model:')
+    expect(text).not.toContain("Pass model:")
     expect(text).not.toContain("Available categories:")
   })
 })

@@ -59,7 +59,6 @@ It also enables:
 plugins = true
 plugin_hooks = true
 multi_agent = true
-child_agents_md = true
 
 [plugins."omo@sisyphuslabs"]
 enabled = true

@@ -167,20 +167,15 @@ describe("system check", () => {
       })
       mockGetLatestPluginVersion.mockResolvedValue("3.0.0-canary.2")
       mockGetSuggestedInstallTag.mockReturnValue("canary")
-      mockCompareVersions
-        .mockImplementationOnce(() => true)
-        .mockImplementationOnce(() => false)
+      mockCompareVersions.mockImplementationOnce(() => true).mockImplementationOnce(() => false)
 
       //#when
       const result = await checkSystem(createSystemDeps())
 
       //#then
       const outdatedIssue = result.issues.find((issue) => issue.title === "Loaded plugin is outdated")
-      expect(outdatedIssue?.fix).toBe(
-        'Update: cd "/Users/test/Library/Caches/opencode with spaces" && bun add oh-my-opencode@canary\n' +
-          'If Bun reports blocked postinstalls, inspect them: cd "/Users/test/Library/Caches/opencode with spaces" && bun pm untrusted\n' +
-          'Then trust only OMO-related packages from that list: cd "/Users/test/Library/Caches/opencode with spaces" && bun pm trust oh-my-opencode @code-yeongyu/comment-checker'
-      )
+      const commands = outdatedIssue?.fix?.split("\n").map((line) => line.split(" && ")[1])
+      expect(commands).toEqual(["bun add oh-my-opencode@canary", "bun pm untrusted", "bun pm trust oh-my-opencode"])
     })
   })
 
@@ -202,9 +197,7 @@ describe("system check", () => {
       //#then
       const legacyEntryIssue = result.issues.find((issue) => issue.title === "Using legacy package name")
       expect(legacyEntryIssue?.severity).toBe("warning")
-      expect(legacyEntryIssue?.fix).toBe(
-        'Update your opencode.json plugin entry: "oh-my-opencode" → "oh-my-openagent"'
-      )
+      expect(legacyEntryIssue?.fix).toBe('Update your opencode.json plugin entry: "oh-my-opencode" → "oh-my-openagent"')
     })
 
     it("adds a warning for a version-pinned legacy entry", async () => {
@@ -225,7 +218,7 @@ describe("system check", () => {
       const legacyEntryIssue = result.issues.find((issue) => issue.title === "Using legacy package name")
       expect(legacyEntryIssue?.severity).toBe("warning")
       expect(legacyEntryIssue?.fix).toBe(
-        'Update your opencode.json plugin entry: "oh-my-opencode@3.0.0" → "oh-my-openagent@3.0.0"'
+        'Update your opencode.json plugin entry: "oh-my-opencode@3.0.0" → "oh-my-openagent@3.0.0"',
       )
     })
 

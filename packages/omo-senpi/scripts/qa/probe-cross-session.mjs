@@ -6,12 +6,13 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
-import { toSpawnTarget } from "../../src/components/ulw-loop/omo-command.ts"
+import { withTelemetryOptOut } from "./telemetry-opt-out-env.mjs"
 
 const scriptPath = fileURLToPath(import.meta.url)
 const repoRoot = join(dirname(scriptPath), "../../../..")
-const toolkitExecutable = process.platform === "win32" ? "omo-agent-toolkit.cmd" : "omo-agent-toolkit"
-const toolkitBin = join(repoRoot, "packages/omo-senpi/plugin/runtime/agent-toolkit", toolkitExecutable)
+// Native no longer stages a toolkit CLI. This probe drives the component's CLI from source with the
+// runtime already executing this script, so it needs no build step and no staged payload.
+const toolkitBin = join(repoRoot, "packages/omo-codex/plugin/components/ulw-loop/src/cli.ts")
 // Senpi never puts a session id on the extension host's process.env, so the host-with-no-session-identity
 // scenario is the one that actually models production. It must never continue an unscoped run.
 const NO_SESSION = "--no-session"
@@ -85,10 +86,7 @@ function runNoSessionScenario() {
     assert(unscopedPlan, "the unscoped legacy plan fixture was not created")
 
     const child = runChild(cwd, NO_SESSION)
-    assert(
-      child.messageCount === 0,
-      `host without session identity continued ${child.messageCount} times, expected 0`,
-    )
+    assert(child.messageCount === 0, `host without session identity continued ${child.messageCount} times, expected 0`)
     return { sessionId: null, messageCount: child.messageCount, unscopedPlan, toolkitRefusedUnscoped: true }
   } finally {
     rmSync(cwd, { recursive: true, force: true })
@@ -140,22 +138,19 @@ function writeLegacyUnscopedPlan(cwd) {
       2,
     )}\n`,
   )
-  writeFileSync(join(dir, "ledger.jsonl"), `${JSON.stringify({ at: now, kind: "plan_created", message: "1 goal(s) created" })}\n`)
+  writeFileSync(
+    join(dir, "ledger.jsonl"),
+    `${JSON.stringify({ at: now, kind: "plan_created", message: "1 goal(s) created" })}\n`,
+  )
 }
 
 async function runExtensionChild(sessionId) {
-  const [{ FakeExtensionAPI }, { createUlwLoopComponent }] = await Promise.all([
-    import(
-      pathToFileURL(join(repoRoot, "packages/omo-senpi/test-support/fake-extension-api.ts")).href
-    ),
-    import(
-      pathToFileURL(join(repoRoot, "packages/omo-senpi/src/components/ulw-loop/index.ts")).href
-    ),
+  const [{ dispatchRunEnd, FakeExtensionAPI }, { createUlwLoopComponent }] = await Promise.all([
+    import(pathToFileURL(join(repoRoot, "packages/omo-senpi/test-support/fake-extension-api.ts")).href),
+    import(pathToFileURL(join(repoRoot, "packages/omo-senpi/src/components/ulw-loop/index.ts")).href),
   ])
   const pi = new FakeExtensionAPI()
-  await createUlwLoopComponent({
-    resolveOmoBin: () => toolkitBin,
-  }).register(pi, {
+  await createUlwLoopComponent().register(pi, {
     logger: {
       info() {},
       warn() {},
@@ -164,9 +159,9 @@ async function runExtensionChild(sessionId) {
     config: { getFlag: () => false },
   })
 
-  await pi.dispatch(
-    "agent_end",
-    { type: "agent_end" },
+  await dispatchRunEnd(
+    pi,
+    { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
     {
       cwd: process.cwd(),
       // A host with no session identity exposes no session id at all, exactly like the real extension host.
@@ -195,8 +190,7 @@ function runChild(cwd, sessionId) {
 }
 
 function runToolkit(args, cwd, sessionId, expectedStatus) {
-  const target = toSpawnTarget(toolkitBin, args)
-  const child = spawnSync(target.command, [...target.args], {
+  const child = spawnSync(process.execPath, [toolkitBin, ...args], {
     cwd,
     env: sessionEnv(sessionId),
     encoding: "utf8",
@@ -216,7 +210,7 @@ function sessionEnv(sessionId) {
   delete env.CODEX_THREAD_ID
   delete env.PI_SESSION_ID
   if (sessionId !== null) env.PI_SESSION_ID = sessionId
-  return env
+  return withTelemetryOptOut(env)
 }
 
 function assert(condition, message) {

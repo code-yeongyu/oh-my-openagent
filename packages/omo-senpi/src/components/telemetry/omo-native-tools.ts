@@ -1,4 +1,5 @@
 import { realpathSync } from "node:fs"
+import { isDarwinAutomountTriggerPath } from "@oh-my-opencode/utils/path-containment"
 import { isAbsolute, relative, resolve, sep, win32 } from "node:path"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
@@ -30,10 +31,7 @@ const BUILTIN_SKILLS = new Set<string>(BUILTIN_SKILL_NAMES)
 const BUILTIN_CATEGORIES = new Set<string>(BUILTIN_CATEGORY_NAMES)
 const BUILTIN_AGENTS = new Set<string>(CURATED_AGENTS)
 
-export function registerOmoNativeToolTelemetry(
-  pi: SenpiExtensionAPI,
-  options: ToolTelemetryOptions,
-): void {
+export function registerOmoNativeToolTelemetry(pi: SenpiExtensionAPI, options: ToolTelemetryOptions): void {
   const featureUsage = new Map<string, Set<string>>()
   const sessionHash = options.hashSessionId ?? hashSessionId
   const skillsRoot = options.skillsRoot ?? getBuiltinSkillsRoot()
@@ -83,10 +81,7 @@ export function registerOmoNativeToolTelemetry(
   })
 }
 
-function readToolResult(
-  value: unknown,
-  diagnostics: ToolTelemetryOptions["diagnostics"],
-): ToolResult | undefined {
+function readToolResult(value: unknown, diagnostics: ToolTelemetryOptions["diagnostics"]): ToolResult | undefined {
   if (!isRecord(value) || value.type !== "tool_result" || typeof value.toolName !== "string") return undefined
   if (!isRecord(value.input)) {
     diagnostics?.("omo-native tool_result missing input", { toolName: value.toolName })
@@ -102,7 +97,10 @@ function builtinSkillName(rawPath: unknown, eventContext: unknown, skillsRoot: s
   try {
     const root = realpathSync(skillsRoot)
     const cwd = isRecord(eventContext) && typeof eventContext.cwd === "string" ? eventContext.cwd : process.cwd()
-    const target = realpathSync(resolve(cwd, rawPath))
+    const lexical = resolve(cwd, rawPath)
+    // A macOS automount trigger is never a shipped skill, and resolving it can park the host loop (#11545).
+    if (isDarwinAutomountTriggerPath(lexical)) return undefined
+    const target = realpathSync(lexical)
     return builtinSkillNameFromCanonicalPaths(root, target, { isAbsolute, relative, sep })
   } catch {
     return undefined
@@ -118,7 +116,13 @@ export function builtinSkillNameFromCanonicalPaths(
   const comparableRoot = windows ? windowsPathWithoutNamespace(root) : root
   const comparableTarget = windows ? windowsPathWithoutNamespace(target) : target
   const pathFromRoot = path.relative(comparableRoot, comparableTarget)
-  if (pathFromRoot === "" || pathFromRoot.startsWith(`..${path.sep}`) || pathFromRoot === ".." || path.isAbsolute(pathFromRoot)) return undefined
+  if (
+    pathFromRoot === "" ||
+    pathFromRoot.startsWith(`..${path.sep}`) ||
+    pathFromRoot === ".." ||
+    path.isAbsolute(pathFromRoot)
+  )
+    return undefined
   const parts = pathFromRoot.split(path.sep)
   if (parts.length !== 2) return undefined
   const skillName = parts[0]
@@ -182,7 +186,12 @@ function extractSessionId(eventContext: unknown): string | undefined {
 function matchesToolName(toolName: string, expected: string): boolean {
   const normalized = normalizeToolName(toolName)
   const suffix = normalizeToolName(expected)
-  return normalized === suffix || normalized.endsWith(`_${suffix}`) || normalized.endsWith(`:${suffix}`) || normalized.endsWith(`/${suffix}`)
+  return (
+    normalized === suffix ||
+    normalized.endsWith(`_${suffix}`) ||
+    normalized.endsWith(`:${suffix}`) ||
+    normalized.endsWith(`/${suffix}`)
+  )
 }
 
 function normalizeToolName(toolName: string): string {

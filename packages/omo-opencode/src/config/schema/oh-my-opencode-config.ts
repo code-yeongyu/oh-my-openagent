@@ -58,7 +58,10 @@ export const OhMyOpenCodeConfigSchema = z.object({
   /** Enable hashline_edit tool/hook integrations (default: false) */
   hashline_edit: z.boolean().optional(),
   /** Enable anonymous telemetry. Default: enabled when omitted. Set to false to disable. */
-  telemetry: z.boolean().optional().describe("Enable or disable anonymous telemetry. Default: enabled when omitted. Set to false to disable."),
+  telemetry: z
+    .boolean()
+    .optional()
+    .describe("Enable or disable anonymous telemetry. Default: enabled when omitted. Set to false to disable."),
   /** Enable model fallback on API errors (default: false). Set to true to enable automatic model switching when model errors occur. */
   model_fallback: z.boolean().optional(),
   agents: AgentOverridesSchema.optional(),
@@ -89,7 +92,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   keyword_detector: KeywordDetectorConfigSchema.optional(),
   babysitting: BabysittingConfigSchema.optional(),
   git_master: GitMasterConfigSchema.default({
-    commit_footer: true,
+    commit_footer: false,
     include_co_authored_by: true,
     git_env_prefix: "GIT_MASTER=1",
   }),

@@ -7,6 +7,7 @@ import { mergeSkillDefinitions } from "./merger/skill-definition-merger"
 import { normalizeSkillsConfig } from "./merger/skills-config-normalizer"
 import { SCOPE_PRIORITY } from "./merger/scope-priority"
 import { isDisabledSkillAlias } from "./skill-discovery"
+import { getSkillSourceProvenance } from "./config-source-discovery"
 
 export interface MergeSkillsOptions {
   configDir?: string
@@ -23,9 +24,7 @@ function normalizeSkillAliasName(name: string): string {
   return name.toLowerCase()
 }
 
-function collectDisabledSkillNames(
-  normalizedConfig: ReturnType<typeof normalizeSkillsConfig>,
-): Set<string> {
+function collectDisabledSkillNames(normalizedConfig: ReturnType<typeof normalizeSkillsConfig>): Set<string> {
   const disabledSkillNames = new Set(normalizedConfig.disable.map(normalizeSkillAliasName))
   for (const [name, entry] of Object.entries(normalizedConfig.entries)) {
     if (isDisabledConfigEntry(entry)) {
@@ -43,7 +42,7 @@ export function mergeSkills(
   userOpencodeSkills: LoadedSkill[],
   projectClaudeSkills: LoadedSkill[],
   projectOpencodeSkills: LoadedSkill[],
-  options: MergeSkillsOptions = {}
+  options: MergeSkillsOptions = {},
 ): LoadedSkill[] {
   const skillMap = new Map<string, LoadedSkill>()
 
@@ -62,7 +61,7 @@ export function mergeSkills(
 
     if (entry.disable) continue
 
-    const loaded = configEntryToLoadedSkill(name, entry, options.configDir)
+    const loaded = configEntryToLoadedSkill(name, entry, options.configDir, getSkillSourceProvenance(config))
     if (loaded) {
       const existing = skillMap.get(name)
       if (existing && !entry.template && !entry.from) {

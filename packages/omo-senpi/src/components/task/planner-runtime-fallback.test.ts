@@ -28,18 +28,19 @@ describe("createTaskChildPlanner runtime fallback", () => {
             model: "kimi-coding/kimi-for-coding-highspeed-unlocked",
             reasoningEffort: "minimal",
             fallback_models: [
-              { model: "openai-codex/gpt-5.6-luna-fast", reasoningEffort: "minimal" },
+              { model: "chatgpt-subscription/gpt-6-luna-fast", reasoningEffort: "minimal" },
               { model: "example-gateway/z-ai/glm-5.2-ultrafast-unlocked", reasoningEffort: "none" },
             ],
           },
         },
       },
       {},
-      () => registry([
-        model("kimi-coding", "kimi-for-coding-highspeed-unlocked"),
-        model("openai-codex", "gpt-5.6-luna-fast"),
-        model("example-gateway", "z-ai/glm-5.2-ultrafast-unlocked"),
-      ]),
+      () =>
+        registry([
+          model("kimi-coding", "kimi-for-coding-highspeed-unlocked"),
+          model("chatgpt-subscription", "gpt-6-luna-fast"),
+          model("example-gateway", "z-ai/glm-5.2-ultrafast-unlocked"),
+        ]),
     )
 
     // when
@@ -61,8 +62,8 @@ describe("createTaskChildPlanner runtime fallback", () => {
       fallback_models: [
         {
           source: "category",
-          provider: "openai-codex",
-          model_id: "gpt-5.6-luna-fast",
+          provider: "chatgpt-subscription",
+          model_id: "gpt-6-luna-fast",
           reasoning_effort: "minimal",
         },
         {
@@ -77,13 +78,8 @@ describe("createTaskChildPlanner runtime fallback", () => {
 
   test("#given a builtin category whose chain head is unavailable #when planned #then the remaining chain rungs become fallback models", () => {
     // given
-    const planner = createTaskChildPlanner(
-      {},
-      {},
-      () => registry([
-        model("openai-codex", "gpt-5.6-luna-fast"),
-        model("opencode-go", "minimax-m3"),
-      ]),
+    const planner = createTaskChildPlanner({}, {}, () =>
+      registry([model("deepseek", "deepseek-flash"), model("opencode-go", "minimax-m3")]),
     )
 
     // when
@@ -97,24 +93,23 @@ describe("createTaskChildPlanner runtime fallback", () => {
     // then
     if (result.kind !== "resolved") throw new Error(`Expected resolved plan, got ${result.kind}`)
     expect(result.plan).toMatchObject({
-      model: "openai-codex/gpt-5.6-luna-fast",
+      model: "deepseek/deepseek-flash",
       requested_model: {
         source: "category",
-        provider: "kimi-coding",
-        model_id: "kimi-for-coding-highspeed",
+        provider: "chatgpt-subscription",
+        model_id: "gpt-6-luna-fast",
       },
       resolved_model: {
         source: "category",
-        provider: "openai-codex",
-        model_id: "gpt-5.6-luna-fast",
-        variant: "low",
+        provider: "deepseek",
+        model_id: "deepseek-flash",
+        variant: "off",
       },
       fallback_models: [
         {
           source: "category",
           provider: "opencode-go",
           model_id: "minimax-m3",
-          variant: "max",
         },
       ],
     })
@@ -126,15 +121,12 @@ describe("createTaskChildPlanner runtime fallback", () => {
       {
         categories: {
           quick: {
-            fallback_models: [{ model: "openai-codex/gpt-5.6-luna-fast", variant: "low" }],
+            fallback_models: [{ model: "chatgpt-subscription/gpt-6-luna-fast", variant: "low" }],
           },
         },
       },
       {},
-      () => registry([
-        model("openai-codex", "gpt-5.6-luna-fast"),
-        model("opencode-go", "minimax-m3"),
-      ]),
+      () => registry([model("chatgpt-subscription", "gpt-6-luna-fast"), model("opencode-go", "minimax-m3")]),
     )
 
     // when
@@ -147,10 +139,10 @@ describe("createTaskChildPlanner runtime fallback", () => {
 
     // then
     if (result.kind !== "resolved") throw new Error(`Expected resolved plan, got ${result.kind}`)
-    expect(result.plan.model).toBe("openai-codex/gpt-5.6-luna-fast")
+    expect(result.plan.model).toBe("chatgpt-subscription/gpt-6-luna-fast")
     expect(result.plan.resolved_model).toMatchObject({
-      provider: "openai-codex",
-      model_id: "gpt-5.6-luna-fast",
+      provider: "chatgpt-subscription",
+      model_id: "gpt-6-luna-fast",
       variant: "low",
     })
     expect(result.plan.fallback_models).toEqual([
@@ -159,7 +151,6 @@ describe("createTaskChildPlanner runtime fallback", () => {
         provider: "opencode-go",
         model_id: "minimax-m3",
         display: "opencode-go/minimax-m3",
-        variant: "max",
       },
     ])
   })

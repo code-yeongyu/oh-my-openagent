@@ -5,7 +5,7 @@ import { createHash } from "node:crypto"
 import { existsSync, readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 
-// The isolation guarantee the driver GATES on (Metis #7/#8): the real agent dir's credential/config files
+// The isolation guarantee the driver GATES on (plan-consultant #7/#8): the real agent dir's credential/config files
 // are never read or rewritten - a child must resolve auth/models from the SANDBOX agent dir. These are
 // byte-stable across a run, unlike the whole-dir digest which a live dev machine churns through ambient
 // senpi activity (other sessions' JSONL, the global ~/.senpi/agent/senpi-debug.log that ignores
@@ -62,7 +62,9 @@ export function childSessionJsonlExists(stateDir, taskId) {
   const dir = join(stateDir, "children", taskId, "sessions", taskId)
   if (!existsSync(dir)) return false
   const walk = (root) =>
-    readdirSync(root, { withFileTypes: true }).some((e) => (e.isDirectory() ? walk(join(root, e.name)) : e.name.endsWith(".jsonl")))
+    readdirSync(root, { withFileTypes: true }).some((e) =>
+      e.isDirectory() ? walk(join(root, e.name)) : e.name.endsWith(".jsonl"),
+    )
   return walk(dir)
 }
 
@@ -82,7 +84,11 @@ export function analyzeRpcRouting(records) {
   const reason = routed
     ? undefined
     : `execution_mode=${record.execution_mode} pid=${hasPid} spawnPathFailure=${spawnPathFailure} status=${record.status}`
-  return { routed, reason, facts: { task_id: record.task_id, pid: record.pid, status: record.status, error_excerpt: message.slice(0, 160) } }
+  return {
+    routed,
+    reason,
+    facts: { task_id: record.task_id, pid: record.pid, status: record.status, error_excerpt: message.slice(0, 160) },
+  }
 }
 
 // The forward-correct spawn assertion (plan todo-27 scenario 1): a real rpc-process child is proven when
@@ -101,7 +107,18 @@ export function analyzeSpawn(records, stateDir) {
   const reason = pass
     ? undefined
     : `execution_mode=${record.execution_mode} pid=${pid ?? "absent"} sessionJsonl=${sessionJsonl} residency=${record.residency_state}`
-  return { pass, reason, facts: { task_id: record.task_id, execution_mode: record.execution_mode, pid, sessionJsonl, residency_state: record.residency_state }, record }
+  return {
+    pass,
+    reason,
+    facts: {
+      task_id: record.task_id,
+      execution_mode: record.execution_mode,
+      pid,
+      sessionJsonl,
+      residency_state: record.residency_state,
+    },
+    record,
+  }
 }
 
 export function eventsMentionSteerAck(events) {

@@ -96,7 +96,11 @@ function isContext7ApiKeyFlag(value: string): boolean {
 
 function isPlaceholderContext7ApiKey(value: unknown): boolean {
   if (typeof value !== "string") return false
-  const normalized = value.trim().toLowerCase().replace(/[<>"'`]/g, "").replace(/[\s_-]+/g, " ")
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[<>"'`]/g, "")
+    .replace(/[\s_-]+/g, " ")
   return normalized.length === 0 || normalized === "your api key"
 }
 

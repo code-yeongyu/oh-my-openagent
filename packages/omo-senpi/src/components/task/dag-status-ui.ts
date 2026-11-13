@@ -1,12 +1,7 @@
 import type { CapturedUi } from "./runtime-context"
 import { runRows, type DagStatusRunSnapshot } from "./dag-status-row-format"
 
-export type {
-  DagStatusNode,
-  DagStatusRoute,
-  DagStatusRunSnapshot,
-  DagStatusWave,
-} from "./dag-status-row-format"
+export type { DagStatusNode, DagStatusRoute, DagStatusRunSnapshot, DagStatusWave } from "./dag-status-row-format"
 
 // Own widget key: the DAG rows render BESIDE the existing "omo-task" widget, never over it.
 export const DAG_STATUS_UI_KEY = "omo-dag"
@@ -106,7 +101,7 @@ export function createDagStatusUi(deps: DagStatusUiDeps): DagStatusUi {
 
   function render(): void {
     const ui = deps.runtime.ui()
-    // TUI only: setWidget is a no-op in app-server mode, so skip the work entirely there.
+    // TUI only: no widget surface exists outside interactive mode, so skip the work entirely there.
     if (ui === undefined || deps.runtime.mode() !== "tui") {
       clearLiveRefresh()
       return

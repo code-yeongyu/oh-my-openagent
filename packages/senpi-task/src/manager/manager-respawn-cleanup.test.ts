@@ -6,7 +6,14 @@ import { afterEach, describe, expect, test } from "bun:test"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
 import type { TaskRecord } from "../state"
 import { createTaskRecordStore } from "../store"
-import { FakeRunner, categoryPlanner, cleanupProjects, makeHandle, settings, tempProject } from "./__fixtures__/manager-fakes"
+import {
+  FakeRunner,
+  categoryPlanner,
+  cleanupProjects,
+  makeHandle,
+  settings,
+  tempProject,
+} from "./__fixtures__/manager-fakes"
 import type { ManagedStartSpec } from "./types"
 import { createTaskManager } from "./manager"
 import { createParentRegistrySessionContext } from "./parent-registry-context"
@@ -55,12 +62,13 @@ describe.each(cleanupStages)("TaskManager respawn %s cleanup", (cleanupStage) =>
         disposeCalls += 1
         return cleanupStage === "dispose" ? Promise.reject(cleanupFailure) : Promise.resolve()
       },
-      terminate: () => cleanupStage === "terminate" ? Promise.reject(cleanupFailure) : Promise.resolve(),
+      terminate: () => (cleanupStage === "terminate" ? Promise.reject(cleanupFailure) : Promise.resolve()),
       exitOutcome: () => undefined,
-      waitForExit: () => Promise.resolve({
-        kind: "clean" as const,
-        facts: { pid: 4321, code: 0, signal: null, stderrTail: "" },
-      }),
+      waitForExit: () =>
+        Promise.resolve({
+          kind: "clean" as const,
+          facts: { pid: 4321, code: 0, signal: null, stderrTail: "" },
+        }),
       lastSeen: () => undefined,
       switchSession: () => Promise.resolve({ cancelled: true }),
     } satisfies RpcChildHandle
@@ -117,10 +125,11 @@ describe("TaskManager respawn launch trust boundary", () => {
       dispose: () => Promise.resolve(),
       terminate: () => Promise.resolve(),
       exitOutcome: () => undefined,
-      waitForExit: () => Promise.resolve({
-        kind: "clean" as const,
-        facts: { pid: 4321, code: 0, signal: null, stderrTail: "" },
-      }),
+      waitForExit: () =>
+        Promise.resolve({
+          kind: "clean" as const,
+          facts: { pid: 4321, code: 0, signal: null, stderrTail: "" },
+        }),
       lastSeen: () => undefined,
       switchSession: () => Promise.resolve({ cancelled: false }),
     } satisfies RpcChildHandle
@@ -189,10 +198,11 @@ describe("TaskManager team-member respawn", () => {
       dispose: () => Promise.resolve(),
       terminate: () => Promise.resolve(),
       exitOutcome: () => undefined,
-      waitForExit: () => Promise.resolve({
-        kind: "clean" as const,
-        facts: { pid: 4321, code: 0, signal: null, stderrTail: "" },
-      }),
+      waitForExit: () =>
+        Promise.resolve({
+          kind: "clean" as const,
+          facts: { pid: 4321, code: 0, signal: null, stderrTail: "" },
+        }),
       lastSeen: () => undefined,
       switchSession: () => Promise.resolve({ cancelled: false }),
     } satisfies RpcChildHandle
@@ -253,10 +263,11 @@ describe("TaskManager respawn variant", () => {
       dispose: () => Promise.resolve(),
       terminate: () => Promise.resolve(),
       exitOutcome: () => undefined,
-      waitForExit: () => Promise.resolve({
-        kind: "clean" as const,
-        facts: { pid: 4321, code: 0, signal: null, stderrTail: "" },
-      }),
+      waitForExit: () =>
+        Promise.resolve({
+          kind: "clean" as const,
+          facts: { pid: 4321, code: 0, signal: null, stderrTail: "" },
+        }),
       lastSeen: () => undefined,
       switchSession: () => Promise.resolve({ cancelled: false }),
     } satisfies RpcChildHandle
@@ -369,15 +380,18 @@ describe("TaskManager in-process respawn", () => {
       spawn_spec: { version: 1, cwd: project, prompt: "continue safely" },
     }
     let childResumeCalls = 0
-    const managedRunner = createInProcessManagedRunner({
-      start: () => {
-        throw new Error("start must not be called during respawn")
+    const managedRunner = createInProcessManagedRunner(
+      {
+        start: () => {
+          throw new Error("start must not be called during respawn")
+        },
+        resume: () => {
+          childResumeCalls += 1
+          throw new Error("resume must be guarded before child spawn")
+        },
       },
-      resume: () => {
-        childResumeCalls += 1
-        throw new Error("resume must be guarded before child spawn")
-      },
-    }, createParentRegistrySessionContext(() => undefined))
+      createParentRegistrySessionContext(() => undefined),
+    )
     const manager = createTaskManager({
       store,
       runners: { "in-process": managedRunner, process: new FakeRunner() },
@@ -495,6 +509,46 @@ describe("TaskManager guarded reattach", () => {
     })
     expect(store.load(record.task_id)?.error_message).toBeUndefined()
     expect(store.load(record.task_id)?.final_response).toBeUndefined()
+  })
+
+  test("#given a pid-less record revived onto a daemon session #when reattached #then the record names that session", async () => {
+    // given
+    const project = tempProject()
+    const store = createTaskRecordStore({ project_dir: project })
+    store.list()
+    const { pid: _pid, ...withoutPid } = respawnRecord()
+    const record: TaskRecord = { ...withoutPid, host_pid: 7001 }
+    store.replace(record)
+    const manager = createTaskManager({
+      store,
+      runners: { "in-process": new FakeRunner(), process: new FakeRunner() },
+      planner: categoryPlanner(),
+      config: settings(),
+      cwd: project,
+      hostPid: 7001,
+    })
+    const hostSession = {
+      socket: "/tmp/dh-fake/rpc.sock",
+      routingId: "routing-revived",
+      sessionPath: "/tmp/dh-fake/sessions/revived.jsonl",
+      instanceId: "instance-2",
+    }
+    const handle = Object.assign(makeHandle(record.task_id).handle, { kind: "host-session" as const, hostSession })
+
+    // when
+    const result = await manager.reattach(record, handle)
+
+    // then
+    expect(result).toEqual({ ok: true })
+    expect(store.load(record.task_id)).toMatchObject({
+      runner_kind: "host-session",
+      host_session: {
+        socket: hostSession.socket,
+        routing_id: "routing-revived",
+        session_path: hostSession.sessionPath,
+        instance_id: "instance-2",
+      },
+    })
   })
 
   test("#given a claimed terminal record #when reattached #then run_epoch is unchanged", async () => {
@@ -644,7 +698,10 @@ describe("TaskManager respawn continuation", () => {
     const { manager, followUpCalls } = continuationHarness()
 
     // when
-    const result = await manager.respawn({ ...respawnRecord(), status: "completed", final_response: "done" }, sessionPath)
+    const result = await manager.respawn(
+      { ...respawnRecord(), status: "completed", final_response: "done" },
+      sessionPath,
+    )
 
     // then
     expect(result.ok).toBe(true)

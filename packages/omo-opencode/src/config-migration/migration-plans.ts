@@ -6,6 +6,14 @@ import { mergeRecords } from "./record-values"
 import { transformConfigJsoncSources } from "./transform-config-jsonc"
 import { transformOpenCodeSources } from "./transform-opencode"
 import { REASONING_UNIFICATION_MIGRATION_ID, transformReasoningUnification } from "./reasoning-unification"
+import { CATEGORY_DEEP_SPLIT_MIGRATION_ID, transformCategoryDeepSplit } from "./category-deep-split"
+import { HARNESS_NATIVE_RENAME_MIGRATION_ID, transformHarnessNativeRename } from "./harness-native-rename"
+import {
+  hasLegacySubscriptionProviderIds,
+  SUBSCRIPTION_PROVIDER_RENAME_MIGRATION_ID,
+  transformSubscriptionProviderRename,
+} from "./subscription-provider-rename"
+import { hasLegacyCategoryNames, hasLegacyHarnessBlocks } from "@oh-my-opencode/omo-config-core"
 import type { ConfigMigrationDiscoveryOptions, DiscoveredLegacyConfigSource } from "./types"
 import type { ConfigMigrationTransformResult, OpenCodeTransformScope } from "./transform-types"
 
@@ -13,6 +21,7 @@ export type LegacyConfigMigrationPlan = {
   readonly id: string
   readonly inspect: (sources: Parameters<MigrationTransform>[0]) => ConfigMigrationTransformResult
   readonly mode?: "merge" | "replace-target"
+  readonly shouldRun?: (target: Readonly<Record<string, unknown>>) => boolean
   readonly sources: readonly MigrationSourceDescriptor[]
   readonly targetPath: string
   readonly transform: MigrationTransform
@@ -46,15 +55,17 @@ function descriptors(
 ): readonly MigrationSourceDescriptor[] {
   const homeDir = canonicalPath(options.homeDir, options)
   const pathOperations = hostPathOperations(options)
-  const userBackupRoot = pathOperations.join(
-    homeDir,
-    ".omo",
-    `migration-backup-${timestamp}-opencode-config`,
-  )
+  const userBackupRoot = pathOperations.join(homeDir, ".omo", `migration-backup-${timestamp}-opencode-config`)
   return sources.map((source) => ({
-    backupPath: source.projectRoot === undefined
-      ? pathOperations.join(userBackupRoot, safeRelativePath(source.path, homeDir, options))
-      : pathOperations.join(source.projectRoot, ".omo", `migration-backup-${timestamp}`, pathOperations.basename(source.path)),
+    backupPath:
+      source.projectRoot === undefined
+        ? pathOperations.join(userBackupRoot, safeRelativePath(source.path, homeDir, options))
+        : pathOperations.join(
+            source.projectRoot,
+            ".omo",
+            `migration-backup-${timestamp}`,
+            pathOperations.basename(source.path),
+          ),
     path: source.path,
   }))
 }
@@ -63,13 +74,16 @@ function openCodeInspection(
   input: OpenCodePlanInput,
   loaded: Parameters<MigrationTransform>[0],
 ): ConfigMigrationTransformResult {
-  return input.scopes.reduce<ConfigMigrationTransformResult>((result, scope) => {
-    const next = transformOpenCodeSources({ discovered: input.sources, scope, sources: loaded })
-    return {
-      diagnostics: [...result.diagnostics, ...next.diagnostics],
-      document: mergeRecords(result.document, next.document),
-    }
-  }, { diagnostics: [], document: {} })
+  return input.scopes.reduce<ConfigMigrationTransformResult>(
+    (result, scope) => {
+      const next = transformOpenCodeSources({ discovered: input.sources, scope, sources: loaded })
+      return {
+        diagnostics: [...result.diagnostics, ...next.diagnostics],
+        document: mergeRecords(result.document, next.document),
+      }
+    },
+    { diagnostics: [], document: {} },
+  )
 }
 
 function openCodePlan(
@@ -120,6 +134,52 @@ function reasoningPlan(targetPath: string): LegacyConfigMigrationPlan {
   }
 }
 
+// Gated on content, unlike the reasoning plan: a config that never named a retired category is left
+// untouched - no backup, no journal, no `_migrations` marker - instead of being rewritten to itself.
+function categoryDeepSplitPlan(targetPath: string): LegacyConfigMigrationPlan {
+  const inspect = (sources: Parameters<MigrationTransform>[0]): ConfigMigrationTransformResult =>
+    transformCategoryDeepSplit(sources[0]?.value)
+  return {
+    id: CATEGORY_DEEP_SPLIT_MIGRATION_ID,
+    inspect,
+    mode: "replace-target",
+    shouldRun: hasLegacyCategoryNames,
+    sources: [],
+    targetPath,
+    transform: inspect,
+  }
+}
+
+// Gated on content like the category plan: a config that never named the legacy harness block is
+// left untouched - no backup, no journal, no `_migrations` marker.
+function harnessNativeRenamePlan(targetPath: string): LegacyConfigMigrationPlan {
+  const inspect = (sources: Parameters<MigrationTransform>[0]): ConfigMigrationTransformResult =>
+    transformHarnessNativeRename(sources[0]?.value)
+  return {
+    id: HARNESS_NATIVE_RENAME_MIGRATION_ID,
+    inspect,
+    mode: "replace-target",
+    shouldRun: hasLegacyHarnessBlocks,
+    sources: [],
+    targetPath,
+    transform: inspect,
+  }
+}
+
+function subscriptionProviderRenamePlan(targetPath: string): LegacyConfigMigrationPlan {
+  const inspect = (sources: Parameters<MigrationTransform>[0]): ConfigMigrationTransformResult =>
+    transformSubscriptionProviderRename(sources[0]?.value)
+  return {
+    id: SUBSCRIPTION_PROVIDER_RENAME_MIGRATION_ID,
+    inspect,
+    mode: "replace-target",
+    shouldRun: hasLegacySubscriptionProviderIds,
+    sources: [],
+    targetPath,
+    transform: inspect,
+  }
+}
+
 function existingOmoConfigPath(directory: string, options: ConfigMigrationDiscoveryOptions): string | undefined {
   const fileSystem = discoveryFileSystem(options)
   for (const fileName of ["omo.jsonc", "omo.json"] as const) {
@@ -144,9 +204,10 @@ export function createLegacyConfigMigrationPlans(
     sources.push(source)
     projectSources.set(source.projectRoot, sources)
   }
-  const userInput: OpenCodePlanInput | undefined = userSources.length === 0
-    ? undefined
-    : { scopes: [{ kind: "user" }], sources: userSources, targetPath: userTargetPath }
+  const userInput: OpenCodePlanInput | undefined =
+    userSources.length === 0
+      ? undefined
+      : { scopes: [{ kind: "user" }], sources: userSources, targetPath: userTargetPath }
   const projectInputs: OpenCodePlanInput[] = []
   for (const [projectRoot, sources] of projectSources) {
     projectInputs.push({
@@ -155,23 +216,23 @@ export function createLegacyConfigMigrationPlans(
       targetPath: pathOperations.join(projectRoot, ".omo", "omo.jsonc"),
     })
   }
-  const openCodeInputs: OpenCodePlanInput[] = [
-    ...(userInput === undefined ? [] : [userInput]),
-    ...projectInputs,
-  ]
+  const openCodeInputs: OpenCodePlanInput[] = [...(userInput === undefined ? [] : [userInput]), ...projectInputs]
   const plans = mergeOpenCodeInputs(openCodeInputs, options).map((input) => openCodePlan(input, options, timestamp))
-  const legacyPlans = configJsoncGroup.id !== CONFIG_JSONC_MIGRATION_ID || configJsoncGroup.sources.length === 0
-    ? plans
-    : [
-      ...plans,
-      {
-        id: CONFIG_JSONC_MIGRATION_ID,
-        inspect: (loaded: Parameters<MigrationTransform>[0]) => transformConfigJsoncSources({ discovered: configJsoncGroup.sources, sources: loaded }),
-        sources: descriptors(configJsoncGroup.sources, options, timestamp),
-        targetPath: userTargetPath,
-        transform: (loaded: Parameters<MigrationTransform>[0]) => transformConfigJsoncSources({ discovered: configJsoncGroup.sources, sources: loaded }),
-      },
-    ]
+  const legacyPlans =
+    configJsoncGroup.id !== CONFIG_JSONC_MIGRATION_ID || configJsoncGroup.sources.length === 0
+      ? plans
+      : [
+          ...plans,
+          {
+            id: CONFIG_JSONC_MIGRATION_ID,
+            inspect: (loaded: Parameters<MigrationTransform>[0]) =>
+              transformConfigJsoncSources({ discovered: configJsoncGroup.sources, sources: loaded }),
+            sources: descriptors(configJsoncGroup.sources, options, timestamp),
+            targetPath: userTargetPath,
+            transform: (loaded: Parameters<MigrationTransform>[0]) =>
+              transformConfigJsoncSources({ discovered: configJsoncGroup.sources, sources: loaded }),
+          },
+        ]
 
   const reasoningTargets = new Map<string, string>()
   const addReasoningTarget = (targetPath: string | undefined): void => {
@@ -184,5 +245,12 @@ export function createLegacyConfigMigrationPlans(
   }
   for (const plan of legacyPlans) addReasoningTarget(plan.targetPath)
 
-  return [...legacyPlans, ...[...reasoningTargets.values()].map(reasoningPlan)]
+  const inPlaceTargets = [...reasoningTargets.values()]
+  return [
+    ...legacyPlans,
+    ...inPlaceTargets.map(reasoningPlan),
+    ...inPlaceTargets.map(categoryDeepSplitPlan),
+    ...inPlaceTargets.map(harnessNativeRenamePlan),
+    ...inPlaceTargets.map(subscriptionProviderRenamePlan),
+  ]
 }

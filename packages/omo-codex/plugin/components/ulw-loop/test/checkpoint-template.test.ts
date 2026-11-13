@@ -100,7 +100,7 @@ describe("checkpoint --print-template", () => {
 		const gate = result["qualityGateTemplate"] as Record<string, unknown>;
 		expect(Object.keys(gate)).toEqual(["manualQa", "gateReview", "iteration", "criteriaCoverage"]);
 		expect((gate["manualQa"] as Record<string, unknown>)["by"]).toBe("main-session");
-		expect((gate["gateReview"] as Record<string, unknown>)["by"]).toBe("category:deep");
+		expect((gate["gateReview"] as Record<string, unknown>)["by"]).toBe("category:deep-high");
 		expect(result["codexGoalTemplate"]).toEqual({
 			goal: { objective: "Exact objective from goals.json", status: "complete" },
 		});

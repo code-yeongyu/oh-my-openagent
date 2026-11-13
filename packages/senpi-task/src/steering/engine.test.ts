@@ -26,7 +26,11 @@ function toRunning(harness: SteeringHarness, record: TaskRecord): void {
 
 function toCompleted(harness: SteeringHarness, record: TaskRecord): void {
   toRunning(harness, record)
-  harness.store.transition(record.task_id, { type: "complete", timestamp: new Date().toISOString(), final_response: "first pass" })
+  harness.store.transition(record.task_id, {
+    type: "complete",
+    timestamp: new Date().toISOString(),
+    final_response: "first pass",
+  })
 }
 
 const flavors: RunnerFlavor[] = ["in-process", "rpc"]
@@ -41,7 +45,11 @@ describe.each(flavors)("steering engine over the %s runner fake", (flavor) => {
     harness.setLive(record.task_id, fake.handle)
 
     // when
-    const outcome = await harness.engine.sendToTask({ idOrName: record.task_id, message: "keep going", deliverAs: "steer" })
+    const outcome = await harness.engine.sendToTask({
+      idOrName: record.task_id,
+      message: "keep going",
+      deliverAs: "steer",
+    })
 
     // then
     expect(outcome.kind).toBe("steered")
@@ -58,7 +66,11 @@ describe.each(flavors)("steering engine over the %s runner fake", (flavor) => {
     harness.setLive(record.task_id, fake.handle)
     harness.setEvicting(record.task_id, true)
 
-    const outcome = await harness.engine.sendToTask({ idOrName: record.task_id, message: "too late", deliverAs: "steer" })
+    const outcome = await harness.engine.sendToTask({
+      idOrName: record.task_id,
+      message: "too late",
+      deliverAs: "steer",
+    })
 
     expect(outcome.kind).toBe("not_continuable")
     expect(fake.steerCalls).toEqual([])
@@ -84,18 +96,27 @@ describe.each(flavors)("steering engine over the %s runner fake", (flavor) => {
   test("#given two overlapping sends #when the first settles #then pending state remains true until the second settles", async () => {
     let releaseFirst!: () => void
     let releaseSecond!: () => void
-    const firstGate = new Promise<void>((resolve) => { releaseFirst = resolve })
-    const secondGate = new Promise<void>((resolve) => { releaseSecond = resolve })
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve
+    })
+    const secondGate = new Promise<void>((resolve) => {
+      releaseSecond = resolve
+    })
     const harness = makeHarness()
     const record = harness.seedRecord()
     toRunning(harness, record)
     let started = 0
     let bothStarted!: () => void
-    const startedSignal = new Promise<void>((resolve) => { bothStarted = resolve })
-    const fake = makeFakeHandle(record.task_id, flavor, { followUpGates: [firstGate, secondGate], onFollowUpStart: () => {
-      started += 1
-      if (started === 2) bothStarted()
-    } })
+    const startedSignal = new Promise<void>((resolve) => {
+      bothStarted = resolve
+    })
+    const fake = makeFakeHandle(record.task_id, flavor, {
+      followUpGates: [firstGate, secondGate],
+      onFollowUpStart: () => {
+        started += 1
+        if (started === 2) bothStarted()
+      },
+    })
     harness.setLive(record.task_id, fake.handle)
     const first = harness.engine.sendToTask({ idOrName: record.task_id, message: "one" })
     const second = harness.engine.sendToTask({ idOrName: record.task_id, message: "two" })
@@ -251,7 +272,11 @@ describe("steering engine scope + resolution guards", () => {
     harness.setLive(record.task_id, makeFakeHandle(record.task_id, "in-process").handle)
 
     // when
-    const outcome = await harness.engine.sendToTask({ idOrName: record.task_id, message: "hi", callerSessionId: "parent-2" })
+    const outcome = await harness.engine.sendToTask({
+      idOrName: record.task_id,
+      message: "hi",
+      callerSessionId: "parent-2",
+    })
 
     // then
     if (outcome.kind !== "scope_denied") throw new Error("expected scope_denied")
@@ -267,7 +292,12 @@ describe("steering engine scope + resolution guards", () => {
     harness.setLive(record.task_id, fake.handle)
 
     // when
-    const outcome = await harness.engine.sendToTask({ idOrName: record.task_id, message: "hi", callerSessionId: "parent-2", allScope: true })
+    const outcome = await harness.engine.sendToTask({
+      idOrName: record.task_id,
+      message: "hi",
+      callerSessionId: "parent-2",
+      allScope: true,
+    })
 
     // then
     expect(outcome.kind).toBe("steered")
@@ -370,7 +400,7 @@ describe("steering pending cancellation", () => {
     expect(harness.store.load(record.task_id)?.pending_steering).toHaveLength(2)
 
     // when the manager forgets the task before it ever launches, then a stale start fires
-    harness.engine.dropPending(record.task_id)
+    harness.engine.dropPending(record.task_id, "task_forgotten")
     const fake = makeFakeHandle(record.task_id, "in-process")
     harness.setLive(record.task_id, fake.handle)
     await harness.engine.notifyStarted(record.task_id)
@@ -452,6 +482,26 @@ describe("durable prelaunch steering", () => {
     expect(restarted.store.load(record.task_id)?.pending_steering ?? []).toEqual([])
   })
 
+  test("#given queued sends #when a restarted engine drains them #then each goes to the child under its own queue entry id (#2838)", async () => {
+    // given
+    const harness = makeHarness()
+    const record = harness.seedRecord()
+    await harness.engine.sendToTask({ idOrName: record.task_id, message: "first", deliverAs: "steer" })
+    await harness.engine.sendToTask({ idOrName: record.task_id, message: "second" })
+    const entryIds = harness.store.load(record.task_id)?.pending_steering?.map((entry) => entry.id) ?? []
+
+    // when
+    const restarted = restartHarness(harness.store.stateDir)
+    const fake = makeFakeHandle(record.task_id, "rpc")
+    restarted.live.set(record.task_id, fake.handle)
+    await restarted.engine.notifyStarted(record.task_id)
+
+    // then: the child holds each input under the id it was queued with, so a repeated drain replays it
+    expect(entryIds).toHaveLength(2)
+    expect(fake.inputIds).toEqual(entryIds)
+    expect(new Set(fake.inputIds).size).toBe(2)
+  })
+
   test("#given a pending child with queued sends #when cancelled #then the persisted queue is cleared and a post-restart start delivers nothing", async () => {
     // given
     const harness = makeHarness()
@@ -475,7 +525,7 @@ describe("durable prelaunch steering", () => {
     expect(tracked.order).toEqual([])
   })
 
-  test("#given a running child suspended to persisted_only #when sent #then it is not_continuable with the suspended reason copy and NO revive", async () => {
+  test("#given a running child parked persisted_only #when sent #then the message waits durably for recovery", async () => {
     // given (session shutdown suspended the resident: status kept, residency persisted_only)
     const harness = makeHarness()
     const record = harness.seedRecord()
@@ -485,13 +535,13 @@ describe("durable prelaunch steering", () => {
     // when
     const outcome = await harness.engine.sendToTask({ idOrName: record.task_id, message: "wake up" })
 
-    // then (no lazy revive-on-send: resume the session instead)
-    if (outcome.kind !== "not_continuable") throw new Error("expected not_continuable")
-    expect(outcome.reason).toContain("suspended - resumes when its session is resumed")
+    // then recovery owns revival, while steering owns the durable message
+    expect(outcome.kind).toBe("queued")
+    expect(harness.store.load(record.task_id)?.pending_steering?.map((entry) => entry.message)).toEqual(["wake up"])
     expect(harness.store.load(record.task_id)?.status).toBe("running")
   })
 
-  test("#given a running child suspended to rpc_detached #when sent #then it is not_continuable with the suspended reason copy", async () => {
+  test("#given a running child parked rpc_detached #when sent #then the message waits durably for recovery", async () => {
     // given
     const harness = makeHarness()
     const record = harness.seedRecord()
@@ -502,8 +552,8 @@ describe("durable prelaunch steering", () => {
     const outcome = await harness.engine.sendToTask({ idOrName: record.task_id, message: "wake up" })
 
     // then
-    if (outcome.kind !== "not_continuable") throw new Error("expected not_continuable")
-    expect(outcome.reason).toContain("suspended - resumes when its session is resumed")
+    expect(outcome.kind).toBe("queued")
+    expect(harness.store.load(record.task_id)?.pending_steering?.map((entry) => entry.message)).toEqual(["wake up"])
   })
 
   test("#given a persisted queue with one malformed entry #when the child starts after a restart #then the bad entry is dropped with a parse warning and the rest deliver in order", async () => {

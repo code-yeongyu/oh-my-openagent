@@ -54,8 +54,9 @@ export class ParentWakePendingQueue {
     if (pendingWake) {
       pendingWake.queuedAt ??= now
       const mergedNotifications = mergeParentWakeNotifications(pendingWake.notifications, notification)
-      const notificationsChanged = mergedNotifications.length !== pendingWake.notifications.length
-        || mergedNotifications.some((merged, index) => merged !== pendingWake.notifications[index])
+      const notificationsChanged =
+        mergedNotifications.length !== pendingWake.notifications.length ||
+        mergedNotifications.some((merged, index) => merged !== pendingWake.notifications[index])
       pendingWake.notifications = mergedNotifications
       pendingWake.promptContext = resolvedPromptContext
       pendingWake.shouldReply = pendingWake.shouldReply || shouldReply
@@ -90,6 +91,9 @@ export class ParentWakePendingQueue {
       pendingWake.noReplyAdmittedAt ??= latestWake.noReplyAdmittedAt
       pendingWake.toolCallDeferralStartedAt ??= latestWake.toolCallDeferralStartedAt
       pendingWake.allowEmptyAssistantTurnRetry ||= latestWake.allowEmptyAssistantTurnRetry
+      if (latestWake.gateHoldExpiresAt !== undefined) {
+        pendingWake.gateHoldExpiresAt = latestWake.gateHoldExpiresAt
+      }
       const noAssistantOutputRetryCount = Math.max(
         pendingWake.noAssistantOutputRetryCount ?? 0,
         latestWake.noAssistantOutputRetryCount ?? 0,

@@ -11,15 +11,29 @@ const TODO_HEADING_PATTERN = /^##[ \t]+TODOs(?:[ \t]+#+)?[ \t]*$/i;
 const FINAL_VERIFICATION_HEADING_PATTERN = /^##[ \t]+Final Verification Wave(?:[ \t]+#+)?[ \t]*$/i;
 const SECTION_BOUNDARY_HEADING_PATTERN = /^#{1,2}(?:[ \t]+|$)/;
 const FENCE_PATTERN = /^[ \t]{0,3}(`{3,}|~{3,})(.*)$/;
-const SIMPLE_CHECKBOX_PATTERN = /^[-*][ \t]*\[[ \t]*([xX]?)[ \t]*\][ \t]+(.+)$/;
-const TODO_CHECKBOX_PATTERN = /^- \[([ xX])\] ([1-9]\d*\. .+)$/;
-const FINAL_WAVE_CHECKBOX_PATTERN = /^- \[([ xX])\] (F[1-9]\d*\. .+)$/i;
+const SIMPLE_CHECKBOX_PATTERN = /^[-*][ \t]*\[[ \t]*([xX~]?)[ \t]*\][ \t]+(.+)$/;
+const STRUCTURED_CHECKBOX_PATTERN = /^- \[([ xX~])\] (.+)$/;
+const TODO_TASK_LABEL_PATTERN =
+	/^([1-9]\d*|T[1-9]\d*(?:\.[1-9]\d*[a-z]?)?)(?:\.[ \t]+|[ \t]+(?:[-\u2014][ \t]+)?)(.+)$/i;
+const FINAL_WAVE_TASK_LABEL_PATTERN =
+	/^([FH][1-9]\d*(?:\.[1-9]\d*[a-z]?)?)(?:\.[ \t]+|[ \t]+(?:[-\u2014][ \t]+)?)(.+)$/i;
 
 type ChecklistSection = "todo" | "final-wave" | "other";
 
+// Mirrors @oh-my-opencode/boulder-state's plan grammar: `[~]` marks a blocked task that counts toward
+// the total but is neither completed nor remaining work.
+type CheckboxStatus = "open" | "done" | "in-progress";
+
 type ParsedCheckbox = {
-	readonly checked: boolean;
+	readonly status: CheckboxStatus;
 	readonly label: string;
+};
+
+type ChecklistCounter = {
+	completed: number;
+	remaining: number;
+	total: number;
+	nextTaskLabel: string | null;
 };
 
 type MarkdownFence = {
@@ -42,9 +56,8 @@ export function parsePlanChecklist(markdown: string): PlanChecklist {
 	const lines = markdown.split(/\r?\n/);
 	if (!hasStructuredSection(lines)) return parseSimpleChecklist(lines);
 
-	let completed = 0;
-	let remaining = 0;
-	let nextTaskLabel: string | null = null;
+	const counter = emptyCounter();
+	let hasUntrackedTopLevelCheckbox = false;
 	let section: ChecklistSection = "other";
 	let fence: MarkdownFence | null = null;
 
@@ -63,18 +76,32 @@ export function parsePlanChecklist(markdown: string): PlanChecklist {
 			section = parseStructuredSectionHeading(line);
 			continue;
 		}
-		if (section === "other") continue;
+		if (section === "other") {
+			if (parseSimpleTopLevelCheckbox(line) !== null) hasUntrackedTopLevelCheckbox = true;
+			continue;
+		}
 
 		const checkbox = parseStructuredCheckbox(line, section);
-		if (checkbox === null) continue;
-		if (checkbox.checked) completed += 1;
-		else {
-			remaining += 1;
-			nextTaskLabel = nextTaskLabel ?? checkbox.label;
-		}
+		if (checkbox !== null) countCheckbox(counter, checkbox);
 	}
 
-	return { completed, remaining, total: completed + remaining, nextTaskLabel };
+	// Canonical headings that hold only template text while the real rows live under another heading
+	// would otherwise count nothing; fall back to every top-level checkbox in that case.
+	if (counter.total === 0 && hasUntrackedTopLevelCheckbox) return parseSimpleChecklist(lines);
+	return { ...counter };
+}
+
+function emptyCounter(): ChecklistCounter {
+	return { completed: 0, remaining: 0, total: 0, nextTaskLabel: null };
+}
+
+function countCheckbox(counter: ChecklistCounter, checkbox: ParsedCheckbox): void {
+	counter.total += 1;
+	if (checkbox.status === "done") counter.completed += 1;
+	else if (checkbox.status === "open") {
+		counter.remaining += 1;
+		counter.nextTaskLabel = counter.nextTaskLabel ?? checkbox.label;
+	}
 }
 
 function hasStructuredSection(lines: readonly string[]): boolean {
@@ -95,9 +122,7 @@ function hasStructuredSection(lines: readonly string[]): boolean {
 }
 
 function parseSimpleChecklist(lines: readonly string[]): PlanChecklist {
-	let completed = 0;
-	let remaining = 0;
-	let nextTaskLabel: string | null = null;
+	const counter = emptyCounter();
 	let fence: MarkdownFence | null = null;
 
 	for (const line of lines) {
@@ -112,15 +137,10 @@ function parseSimpleChecklist(lines: readonly string[]): PlanChecklist {
 		}
 
 		const checkbox = parseSimpleTopLevelCheckbox(line);
-		if (checkbox === null) continue;
-		if (checkbox.checked) completed += 1;
-		else {
-			remaining += 1;
-			nextTaskLabel = nextTaskLabel ?? checkbox.label;
-		}
+		if (checkbox !== null) countCheckbox(counter, checkbox);
 	}
 
-	return { completed, remaining, total: completed + remaining, nextTaskLabel };
+	return { ...counter };
 }
 
 function parseStructuredSectionHeading(line: string): ChecklistSection {
@@ -130,12 +150,13 @@ function parseStructuredSectionHeading(line: string): ChecklistSection {
 }
 
 function parseStructuredCheckbox(line: string, section: "todo" | "final-wave"): ParsedCheckbox | null {
-	const pattern = section === "todo" ? TODO_CHECKBOX_PATTERN : FINAL_WAVE_CHECKBOX_PATTERN;
-	const match = line.match(pattern);
+	const match = line.match(STRUCTURED_CHECKBOX_PATTERN);
 	const marker = match?.[1];
 	const label = match?.[2];
 	if (marker === undefined || label === undefined) return null;
-	return { checked: marker.toLowerCase() === "x", label };
+	const labelPattern = section === "todo" ? TODO_TASK_LABEL_PATTERN : FINAL_WAVE_TASK_LABEL_PATTERN;
+	if (!labelPattern.test(label)) return null;
+	return { status: parseCheckboxStatus(marker), label };
 }
 
 function parseSimpleTopLevelCheckbox(line: string): ParsedCheckbox | null {
@@ -143,7 +164,12 @@ function parseSimpleTopLevelCheckbox(line: string): ParsedCheckbox | null {
 	const marker = match?.[1];
 	const label = match?.[2];
 	if (marker === undefined || label === undefined) return null;
-	return { checked: marker.toLowerCase() === "x", label };
+	return { status: parseCheckboxStatus(marker), label };
+}
+
+function parseCheckboxStatus(marker: string): CheckboxStatus {
+	if (marker.toLowerCase() === "x") return "done";
+	return marker === "~" ? "in-progress" : "open";
 }
 
 function parseOpeningFence(line: string): MarkdownFence | null {

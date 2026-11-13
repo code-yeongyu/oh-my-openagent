@@ -1,3 +1,4 @@
+import { absentSenpiSeams, SENPI_SEAMS } from "../src/extension/senpi-seams"
 import type { SenpiExtensionAPI } from "../src/extension/types"
 
 export type FakeEventHandler = (payload: unknown, ctx?: unknown) => unknown | Promise<unknown>
@@ -36,6 +37,12 @@ export interface FakeRpcEvent {
   data: unknown
 }
 
+export interface FakeHandlerRegistration {
+  event: string
+  handler: FakeEventHandler
+  options?: { previewSafe?: boolean }
+}
+
 type FakeExtensionEventHandler = (payload: unknown) => void
 const extensionEventHandlers = new WeakMap<FakeExtensionAPI, Map<string, Set<FakeExtensionEventHandler>>>()
 
@@ -63,11 +70,24 @@ export function fakeExtensionEventHandlerCount(pi: FakeExtensionAPI, name: strin
   return extensionEventHandlers.get(pi)?.get(name)?.size ?? 0
 }
 
+/**
+ * One finished host run: `agent_end`, then the `agent_settled` edge the host emits once no automatic
+ * retry, compaction or queued continuation will run. The plan-continuation producers decide on that
+ * second edge, so a test that dispatches only `agent_end` is asserting a run the host still owns.
+ * Returns the `agent_end` results so handler-result assertions stay unchanged.
+ */
+export async function dispatchRunEnd(pi: FakeExtensionAPI, payload: unknown, ctx?: unknown): Promise<unknown[]> {
+  const results = await pi.dispatch("agent_end", payload, ctx)
+  await pi.dispatch("agent_settled", { type: "agent_settled" }, ctx)
+  return results
+}
+
 export class FakeExtensionAPI implements SenpiExtensionAPI {
   // Mirrors the host's per-session cwd; left undefined to emulate hosts that predate it.
   cwd?: string
-  readonly handlers: Array<{ event: string; handler: FakeEventHandler }> = []
+  readonly handlers: FakeHandlerRegistration[] = []
   readonly tools: Record<string, unknown>[] = []
+  readonly removedToolHints = new Map<string, string>()
   readonly commands: FakeCommandRegistration[] = []
   readonly flags: FakeFlagRegistration[] = []
   readonly messages: FakeSendMessageCall[] = []
@@ -75,17 +95,47 @@ export class FakeExtensionAPI implements SenpiExtensionAPI {
   readonly messageRenderers: FakeMessageRendererRegistration[] = []
   readonly mcpServers: Array<{ name: string; config: Record<string, unknown> }> = []
   readonly rpcEvents: FakeRpcEvent[] = []
+  // Session-scoped model spies (senpi ExtensionAPI.setSessionModel / setSessionThinkingLevel).
+  // No persisting model setter exists here on purpose: the senpi one writes the global default.
+  // Optional so hand-built fakes typed as `Omit<FakeExtensionAPI, ...>` literals keep compiling.
+  readonly sessionModels?: unknown[] = []
+  readonly sessionThinkingLevels?: string[] = []
+  readonly setSessionModel?: (model: unknown) => Promise<boolean> = async (model) => {
+    this.sessionModels?.push(model)
+    return true
+  }
+  readonly setSessionThinkingLevel?: (level: string) => void = (level) => {
+    this.sessionThinkingLevels?.push(level)
+  }
   events?: SenpiExtensionAPI["events"]
   rpc?: { emit(name: string, data: unknown): void }
+  // Absent by default, like a host that predates senpi#3684; a test installs the engine's limit store.
+  getSubscriptionLimits?: SenpiExtensionAPI["getSubscriptionLimits"]
+  onSubscriptionLimits?: SenpiExtensionAPI["onSubscriptionLimits"]
+  // Absent by default, like a host that predates `getCommands`; a test installs the listing.
+  // #12544 review: the onboarding harness assigns this, so it must exist on the fake type.
+  // Declared as a method (not a property) so test subclasses may override it with a method.
+  getCommands?(): readonly {
+    readonly name: string
+    readonly description?: string
+    readonly source: string
+    readonly sourceInfo?: { readonly path?: string }
+  }[]
+  // Absent by default, like a host that predates senpi#3864; a test installs a recorder for run completions.
+  lifecycle?: SenpiExtensionAPI["lifecycle"]
 
   private readonly flagValues = new Map<string, boolean | string | undefined>()
 
-  on(event: string, handler: FakeEventHandler): void {
-    this.handlers.push({ event, handler })
+  on(event: string, handler: FakeEventHandler, options?: { previewSafe?: boolean }): void {
+    this.handlers.push({ event, handler, ...(options === undefined ? {} : { options }) })
   }
 
   registerTool(tool: Record<string, unknown>): void {
     this.tools.push(tool)
+  }
+
+  registerRemovedToolHint(name: string, hint: string): void {
+    this.removedToolHints.set(name, hint)
   }
 
   registerMessageRenderer(customType: string, renderer: unknown): void {
@@ -115,7 +165,10 @@ export class FakeExtensionAPI implements SenpiExtensionAPI {
     this.messages.push({ message, options })
   }
 
-  sendUserMessage(content: string | readonly Record<string, unknown>[], options?: { deliverAs?: "steer" | "followUp" }): void {
+  sendUserMessage(
+    content: string | readonly Record<string, unknown>[],
+    options?: { deliverAs?: "steer" | "followUp" },
+  ): void {
     this.userMessages.push({ content, options })
   }
 
@@ -133,4 +186,30 @@ export class FakeExtensionAPI implements SenpiExtensionAPI {
     }
     return results
   }
+}
+
+// Gives a fake every listed senpi seam it lacks as an inert stand-in, so a composed fake reports no absent seam and a test
+// that watches the logger sees only the warnings it is about.
+export function withInertSenpiSeams<T extends object>(pi: T): T {
+  for (const path of absentSenpiSeams(pi)) {
+    const keys = path.split(".")
+    const last = keys.pop() ?? path
+    let holder: object = pi
+    for (const key of keys) {
+      const next: unknown = Reflect.get(holder, key)
+      if (typeof next === "object" && next !== null) holder = next
+      else {
+        const created = {}
+        Reflect.set(holder, key, created)
+        holder = created
+      }
+    }
+    const kind = SENPI_SEAMS[path as keyof typeof SENPI_SEAMS]
+    Reflect.set(
+      holder,
+      last,
+      kind === "function" ? () => undefined : kind === "object" ? {} : kind === "string" ? "/" : undefined,
+    )
+  }
+  return pi
 }

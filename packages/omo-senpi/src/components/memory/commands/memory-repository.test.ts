@@ -1,17 +1,10 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
-import { rm } from "node:fs/promises"
-
 import { CONFIG_KEY } from "@oh-my-opencode/memory-core"
 
 import { MemoryFakeExtensionAPI } from "../memory.test-support"
-import {
-  fakeCommandContext,
-  fakeDeps,
-  invoke,
-  seededRepo,
-  tempIdentity,
-} from "./commands.test-support"
+import { fakeCommandContext, fakeDeps, invoke, seededRepo, tempIdentity } from "./commands.test-support"
 import { registerMemoryRepositoryCommand } from "./memory-repository"
+import { removeTree } from "../../../../../../test-support/remove-tree"
 
 const tempDirs: string[] = []
 
@@ -28,12 +21,10 @@ const CREDENTIALED_URL = "https://user:s3cr3t-token@127.0.0.1:1/memory.git"
 setDefaultTimeout(process.platform === "win32" ? 60_000 : 20_000)
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })))
 })
 
-const SEEDS = [
-  { relativePath: "system/persona.md", content: "---\ndescription: Persona\n---\nseeded persona\n" },
-]
+const SEEDS = [{ relativePath: "system/persona.md", content: "---\ndescription: Persona\n---\nseeded persona\n" }]
 
 async function harness(options: { readonly seeded?: boolean } = {}) {
   const { root, identity } = await tempIdentity()

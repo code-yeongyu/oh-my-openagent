@@ -5,12 +5,7 @@ import { join } from "node:path"
 import { log } from "../../shared/logger"
 import { HOOK_NAME } from "./ulw-execute-hook"
 
-export const NOTEPAD_FILES = [
-  "learnings.md",
-  "decisions.md",
-  "issues.md",
-  "problems.md",
-] as const
+export const NOTEPAD_FILES = ["learnings.md", "decisions.md", "issues.md", "problems.md"] as const
 
 export type NotepadFileName = (typeof NOTEPAD_FILES)[number]
 
@@ -28,18 +23,13 @@ const NOTEPAD_LABELS: Readonly<Record<NotepadFileName, string>> = {
   "problems.md": "Problems",
 }
 
-const NOTEPAD_FOOTER =
-  "_Auto-scaffolded by /ulw-execute. Append new entries below - never overwrite._"
+const NOTEPAD_FOOTER = "_Auto-scaffolded by /ulw-execute. Append new entries below - never overwrite._"
 
-function buildHeader(
-  fileName: NotepadFileName,
-  planName: string,
-  timestamp: string,
-): string {
+function buildHeader(fileName: NotepadFileName, planName: string, timestamp: string): string {
   void timestamp
   const label = NOTEPAD_LABELS[fileName]
   const purpose = NOTEPAD_PURPOSES[fileName]
-  return `# ${label} \u2014 ${planName}\n\n${purpose}\n\n${NOTEPAD_FOOTER}\n\n---\n`
+  return `# ${label} - ${planName}\n\n${purpose}\n\n${NOTEPAD_FOOTER}\n\n---\n`
 }
 
 export function ensureNotepadScaffold(params: {

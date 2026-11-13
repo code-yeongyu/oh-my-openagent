@@ -65,13 +65,31 @@ export type TaskRecordStore = {
   readonly tombstoneIfExpired: (
     taskId: string,
     shouldRetain: (record: TaskRecord) => boolean,
+    owner?: ExpungeOwner,
   ) => TombstoneResult
   // TTL expunge, phase 2 (outside the lock) AND crash recovery for interrupted sweeps: delete the
   // children dir, spill file, and event log, then drop the tombstone. A tombstoned record is
   // already committed to deletion and is never resurrected, so completion is idempotent and needs
   // no lock.
-  readonly completeExpunge: (taskId: string) => void
+  // With `owner`, only while that attempt still owns the tombstone: an attempt another sweep took over,
+  // or one whose record was restored and revived meanwhile, deletes nothing. Returns whether it deleted.
+  readonly completeExpunge: (taskId: string, owner?: ExpungeOwner) => boolean
   // Task ids with a leftover <taskId>.json.expunging tombstone from a sweep that crashed between
   // the phases. Every TTL sweep completes phase 2 for these before doing anything else.
   readonly listExpunging: () => readonly string[]
+  // The record inside a tombstone, for a sweep that must end the record's child before phase 2.
+  readonly loadExpunging: (taskId: string) => TaskRecord | null
+  // Undo phase 1 (inside the record lock): a sweep that could not confirm the record's child is gone
+  // puts the record back, visible and claimable, instead of deleting its only pointer to that child.
+  // A no-op when the record was already restored or never tombstoned, or (with `owner`) when another
+  // attempt owns the tombstone now.
+  readonly restoreExpunging: (taskId: string, owner?: ExpungeOwner) => void
+  // The expunge attempt that owns a tombstone, if it recorded one.
+  readonly readExpungeOwner: (taskId: string) => ExpungeOwner | undefined
+  // Take a tombstone over from `from` (an abandoned attempt; undefined for a tombstone written without
+  // an owner). Under the record lock; false when another attempt owns it now.
+  readonly takeOverExpunging: (taskId: string, from: ExpungeOwner | undefined, to: ExpungeOwner) => boolean
 }
+
+// The TTL sweep attempt that tombstoned a record: its process and a token unique to the attempt.
+export type ExpungeOwner = { readonly pid: number; readonly token: string }

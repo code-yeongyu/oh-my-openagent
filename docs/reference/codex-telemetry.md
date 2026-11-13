@@ -10,11 +10,11 @@ The Codex adapter emits one PostHog event:
 | ----- | ----- |
 | Event name | `omo_codex_daily_active` |
 | Product platform | `omo-codex` |
-| Distinct ID | `sha256("omo-codex:" + hostname)` |
+| Distinct ID | `sha256(install id)`, where the install id is a random value created on this computer |
 | Daily limit | At most once per UTC day per machine |
 | Person profiles | Disabled with `$process_person_profile: false` |
 
-The raw hostname is never sent. It is used locally only to derive the one-way hashed distinct ID.
+The install id is a random 64-hex value created on the first send and stored next to the daily deduplication state (see Local State). It is not derived from the hostname, user name, hardware or accounts, and only its hash is sent.
 
 ## Sources
 
@@ -60,6 +60,8 @@ The file contains the last UTC day captured for the machine, for example:
 ```json
 { "lastActiveDayUTC": "2026-06-03" }
 ```
+
+The random install id lives in the same directory as `install-id`. Deleting it makes the next send create a new one.
 
 ## Opt Out
 

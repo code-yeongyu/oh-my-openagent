@@ -9,8 +9,6 @@ export type SessionMessage = {
   parts?: SessionMessagePart[]
 }
 
-
-
 function isSessionMessage(value: unknown): value is SessionMessage {
   return isRecord(value)
 }

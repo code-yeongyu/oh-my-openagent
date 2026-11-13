@@ -14,16 +14,15 @@ import {
 } from "./commands.test-support"
 import { backupTimestamp } from "./backup"
 import { registerMemfsCommand } from "./memfs"
+import { removeTree } from "../../../../../../test-support/remove-tree"
 
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })))
 })
 
-const SEEDS = [
-  { relativePath: "system/persona.md", content: "---\ndescription: Persona\n---\nseeded persona\n" },
-]
+const SEEDS = [{ relativePath: "system/persona.md", content: "---\ndescription: Persona\n---\nseeded persona\n" }]
 
 interface Harness {
   readonly root: string
@@ -91,8 +90,9 @@ describe("/memfs backup", () => {
     // then
     expect(await backupNames(identityRoot)).toEqual([existingName, `${existingName}-2`])
     expect(await readFile(existingPersona, "utf8")).toBe("existing backup sentinel\n")
-    expect(await readFile(join(identityRoot, `${existingName}-2`, "system", "persona.md"), "utf8"))
-      .toContain("seeded persona")
+    expect(await readFile(join(identityRoot, `${existingName}-2`, "system", "persona.md"), "utf8")).toContain(
+      "seeded persona",
+    )
   })
 })
 

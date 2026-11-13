@@ -38,16 +38,20 @@ describe("team e2e Senpi discovery", () => {
     const shim = "C:\\npm\\senpi.cmd"
     const absolute = "C:\\Tools\\Senpi\\senpi.exe"
 
-    expect(resolveSenpi({
-      platform: "win32",
-      env: { PATH: "C:\\npm" },
-      existsSync: (path: string) => path === shim,
-    })).toBe(shim)
-    expect(resolveSenpi({
-      platform: "win32",
-      env: { SENPI_BIN: absolute, PATH: "" },
-      existsSync: (path: string) => path === absolute,
-    })).toBe(absolute)
+    expect(
+      resolveSenpi({
+        platform: "win32",
+        env: { PATH: "C:\\npm" },
+        existsSync: (path: string) => path === shim,
+      }),
+    ).toBe(shim)
+    expect(
+      resolveSenpi({
+        platform: "win32",
+        env: { SENPI_BIN: absolute, PATH: "" },
+        existsSync: (path: string) => path === absolute,
+      }),
+    ).toBe(absolute)
   })
 })
 
@@ -70,7 +74,13 @@ describe("team e2e crash recovery evidence", () => {
       parentTermination: { kind: "terminated", pid: 5151, platform: "win32" },
       reservationAged: true,
       afterReclaim: { reservedExists: false, unreadExists: true },
-      afterReplacement: { reservedExists: false, unreadExists: false, processedExists: true, eventCount: 1, envelopeCount: 1 },
+      afterReplacement: {
+        reservedExists: false,
+        unreadExists: false,
+        processedExists: true,
+        eventCount: 1,
+        envelopeCount: 1,
+      },
       initialStatus: null,
       restartStatus: 0,
       livenessInjected: true,
@@ -146,30 +156,61 @@ describe("runCrashRestartScenario orchestration", () => {
         senpiBin: "/fake/senpi",
         outDir,
         memberExtensionEntry: "/fake/omo-member.js",
-        createSandbox: () => ({ root: sandboxRoot, cwd, agentDir: join(sandboxRoot, "agent"), xdgConfigHome: join(sandboxRoot, "xdg") }),
+        createSandbox: () => ({
+          root: sandboxRoot,
+          cwd,
+          agentDir: join(sandboxRoot, "agent"),
+          xdgConfigHome: join(sandboxRoot, "xdg"),
+        }),
         seedProject: () => undefined,
         startRun: () => {
           startCount += 1
           if (startCount === 1) {
-            return { pid: 101, kill: () => undefined, completion: Promise.resolve({ status: null, stdout: "", stderr: "", events: [] }) }
+            return {
+              pid: 101,
+              kill: () => undefined,
+              completion: Promise.resolve({ status: null, stdout: "", stderr: "", events: [] }),
+            }
           }
           if (startCount === 2) {
             const stdout = JSON.stringify({
               type: "message_end",
-              message: { customType: "senpi-task.team-member-liveness", details: { memberName: "crash", lastKnownState: "lost" } },
+              message: {
+                customType: "senpi-task.team-member-liveness",
+                details: { memberName: "crash", lastKnownState: "lost" },
+              },
             })
-            return { pid: 301, kill: () => undefined, completion: Promise.resolve({ status: 0, stdout, stderr: "", events: [] }) }
+            return {
+              pid: 301,
+              kill: () => undefined,
+              completion: Promise.resolve({ status: 0, stdout, stderr: "", events: [] }),
+            }
           }
-          return { pid: 401, kill: () => { order.push("replacement-killed") }, completion: Promise.resolve({ status: null, stdout: "", stderr: "", events: [] }) }
+          return {
+            pid: 401,
+            kill: () => {
+              order.push("replacement-killed")
+            },
+            completion: Promise.resolve({ status: null, stdout: "", stderr: "", events: [] }),
+          }
         },
         operations: {
           pollUntil: async (readValue: () => Promise<unknown>) => readValue(),
           readCrashTarget: () => target,
           readCrashReservationState: () => ({ reservedExists: true, processedExists: false, eventCount: 0 }),
           isProcessAlive: () => true,
-          killProcess: () => { order.push("member-killed"); return true },
-          readMemberTerminal: () => { order.push("member-terminal"); return { kind: "exit" } },
-          terminateProcessTree: () => { order.push("parent-terminated"); return { kind: "terminated", pid: 101, platform: "linux" } },
+          killProcess: () => {
+            order.push("member-killed")
+            return true
+          },
+          readMemberTerminal: () => {
+            order.push("member-terminal")
+            return { kind: "exit" }
+          },
+          terminateProcessTree: () => {
+            order.push("parent-terminated")
+            return { kind: "terminated", pid: 101, platform: "linux" }
+          },
           ageCrashReservation: () => true,
           taskRecord: () => ({ notification: { run_epoch: 0, liveness_notified_epoch: 0 } }),
           readPostCrashMailbox: () => {
@@ -197,10 +238,12 @@ describe("team e2e crash liveness detector", () => {
       message: {
         customType: "omo-senpi:wake",
         content: "Team member liveness: crash exited abnormally; last known state: error.",
-        details: [{
-          customType: "senpi-task.team-member-liveness",
-          details: { memberName: "crash", lastKnownState: "error" },
-        }],
+        details: [
+          {
+            customType: "senpi-task.team-member-liveness",
+            details: { memberName: "crash", lastKnownState: "error" },
+          },
+        ],
       },
     })
 
@@ -213,10 +256,12 @@ describe("team e2e crash liveness detector", () => {
       message: {
         role: "assistant",
         customType: "note",
-        details: [{
-          customType: "senpi-task.team-member-liveness",
-          details: { memberName: "crash", lastKnownState: "error" },
-        }],
+        details: [
+          {
+            customType: "senpi-task.team-member-liveness",
+            details: { memberName: "crash", lastKnownState: "error" },
+          },
+        ],
       },
     })
 
@@ -226,7 +271,10 @@ describe("team e2e crash liveness detector", () => {
   it("#given only matching prose without structured liveness details #when detected #then it cannot satisfy the gate", () => {
     const stdout = JSON.stringify({
       type: "message_end",
-      message: { customType: "note", content: "Team member liveness: crash exited abnormally; last known state: lost." },
+      message: {
+        customType: "note",
+        content: "Team member liveness: crash exited abnormally; last known state: lost.",
+      },
     })
 
     expect(hasCrashLivenessEvent(stdout)).toBe(false)
@@ -234,6 +282,17 @@ describe("team e2e crash liveness detector", () => {
 })
 
 describe("team e2e process cleanup", () => {
+  // #12129: the fake root pid must never equal the test runner's own pid —
+  // `windowsTreeKillArgs` refuses `rootPid === process.pid` (self-kill guard),
+  // so the literal 4242 failed whenever the runner happened to get pid 4242.
+  // It also failed when the runner got pid 4243 or 4245: the taskkill cases
+  // build their mock tree as root+1/+2/+3, so the runner's own pid landed
+  // inside it, and the ancestor guard in `windows-process-tree.mjs:52-58`
+  // strips the runner and its ancestors from the kill list, changing the
+  // expected taskkill args. `process.pid + 1` keeps the whole mock tree
+  // clear of the runner's pid.
+  const FAKE_ROOT_PID = process.pid + 1
+
   it("#given a Windows npm senpi shim #when the spawn invocation is resolved #then Node launches the package CLI without cmd shell forwarding", () => {
     // given
     const shim = "C:\\Users\\qa\\AppData\\Roaming\\npm\\senpi"
@@ -257,21 +316,25 @@ describe("team e2e process cleanup", () => {
     const shim = "C:\\repo\\node_modules\\.bin\\senpi.cmd"
     const cli = "C:\\repo\\node_modules\\@code-yeongyu\\senpi\\dist\\cli.js"
 
-    expect(runtime.resolveSenpiInvocation(shim, {
-      platform: "win32",
-      execPath: "C:\\Program Files\\nodejs\\node.exe",
-      existsSync: (path: string) => path === cli,
-    })).toEqual({
+    expect(
+      runtime.resolveSenpiInvocation(shim, {
+        platform: "win32",
+        execPath: "C:\\Program Files\\nodejs\\node.exe",
+        existsSync: (path: string) => path === cli,
+      }),
+    ).toEqual({
       command: "C:\\Program Files\\nodejs\\node.exe",
       prefixArgs: [cli],
     })
   })
 
   it("#given a Windows shim with no package CLI #when resolved #then the harness fails loudly instead of direct-spawning the shim", () => {
-    expect(() => runtime.resolveSenpiInvocation("C:\\npm\\senpi.cmd", {
-      platform: "win32",
-      existsSync: () => false,
-    })).toThrow("cannot be mapped to the package CLI")
+    expect(() =>
+      runtime.resolveSenpiInvocation("C:\\npm\\senpi.cmd", {
+        platform: "win32",
+        existsSync: () => false,
+      }),
+    ).toThrow("cannot be mapped to the package CLI")
   })
 
   it("#given a native Windows senpi executable with mixed-case extension #when resolved #then the executable is preserved verbatim", () => {
@@ -295,31 +358,37 @@ describe("team e2e process cleanup", () => {
 
     // when / then
     for (const pid of invalidPids) {
-      expect(await runtime.terminateProcessTree(pid, {
-        platform: "win32",
-        isProcessAlive: (candidate: number) => {
-          probes.push(candidate)
-          return true
-        },
-        spawnSync: () => {
-          windowsCalls.push(pid)
-          return { status: 0, stdout: "SUCCESS", stderr: "" }
-        },
-      })).toEqual({
+      expect(
+        await runtime.terminateProcessTree(pid, {
+          platform: "win32",
+          isProcessAlive: (candidate: number) => {
+            probes.push(candidate)
+            return true
+          },
+          spawnSync: () => {
+            windowsCalls.push(pid)
+            return { status: 0, stdout: "SUCCESS", stderr: "" }
+          },
+        }),
+      ).toEqual({
         kind: "failed",
         pid,
         platform: "win32",
         status: null,
         error: "pid must be a positive safe integer",
       })
-      expect(await runtime.terminateProcessTree(pid, {
-        platform: "linux",
-        isProcessAlive: (candidate: number) => {
-          probes.push(candidate)
-          return true
-        },
-        processKill: () => { posixCalls.push(pid) },
-      })).toEqual({
+      expect(
+        await runtime.terminateProcessTree(pid, {
+          platform: "linux",
+          isProcessAlive: (candidate: number) => {
+            probes.push(candidate)
+            return true
+          },
+          processKill: () => {
+            posixCalls.push(pid)
+          },
+        }),
+      ).toEqual({
         kind: "failed",
         pid,
         platform: "linux",
@@ -332,32 +401,44 @@ describe("team e2e process cleanup", () => {
     expect(posixCalls).toEqual([])
   })
 
-  it("#given a live Windows QA root pid #when its process tree is terminated #then taskkill targets only that pid tree and returns structured evidence", async () => {
+  it("#given taskkill reports success before pid visibility settles #when its process tree is terminated #then command completion is authoritative", async () => {
     // given
     const calls: Array<{ command: string; args: readonly string[] }> = []
-    const aliveReads = [true, false]
+    const root = FAKE_ROOT_PID
+    const child = root + 1
+    const unrelated = root + 2
+    const grandchild = root + 3
 
     // when
-    const result = await runtime.terminateProcessTree(4242, {
+    const result = await runtime.terminateProcessTree(root, {
       platform: "win32",
-      isProcessAlive: () => aliveReads.shift() ?? false,
+      isProcessAlive: () => true,
       spawnSync: (command: string, args: readonly string[]) => {
+        if (command === "powershell.exe") {
+          return {
+            status: 0,
+            stdout: `${root} 1 200 bun.exe\n${child} ${root} 210 node.exe\n${unrelated} ${child} 100 unrelated.exe\n${grandchild} ${child} 220 child.exe\n`,
+            stderr: "",
+          }
+        }
         calls.push({ command, args })
         return { status: 0, stdout: "SUCCESS", stderr: "" }
       },
     })
 
     // then
-    expect(calls).toEqual([{
-      command: "taskkill.exe",
-      args: ["/PID", "4242", "/T", "/F"],
-    }])
-    expect(result).toEqual({ kind: "terminated", pid: 4242, platform: "win32" })
+    expect(calls).toEqual([
+      {
+        command: "taskkill.exe",
+        args: ["/F", "/PID", String(root), "/PID", String(child), "/PID", String(grandchild)],
+      },
+    ])
+    expect(result).toEqual({ kind: "terminated", pid: root, platform: "win32" })
   })
 
   it("#given taskkill returns nonzero after the root disappears #when termination is evaluated #then status and stderr remain a failure", async () => {
     const aliveReads = [true, false]
-    const result = await runtime.terminateProcessTree(4242, {
+    const result = await runtime.terminateProcessTree(FAKE_ROOT_PID, {
       platform: "win32",
       isProcessAlive: () => aliveReads.shift() ?? false,
       spawnSync: () => ({ status: 1, stdout: "", stderr: "partial tree kill" }),
@@ -365,11 +446,32 @@ describe("team e2e process cleanup", () => {
 
     expect(result).toEqual({
       kind: "failed",
-      pid: 4242,
+      pid: FAKE_ROOT_PID,
       platform: "win32",
       status: 1,
       error: "partial tree kill",
     })
+  })
+
+  it("#given the root pid equals the runner's own pid #when its process tree is terminated #then the self-kill guard refuses without calling taskkill", async () => {
+    // given: #12129 — the guard `windowsTreeKillArgs` applies must hold even
+    // when the runner's pid collides with the target, and the fake root pid
+    // used above must never be that pid.
+    const calls: Array<{ command: string; args: readonly string[] }> = []
+
+    // when
+    const result = await runtime.terminateProcessTree(process.pid, {
+      platform: "win32",
+      isProcessAlive: () => true,
+      spawnSync: (command: string, args: readonly string[]) => {
+        calls.push({ command, args })
+        return { status: 0, stdout: "SUCCESS", stderr: "" }
+      },
+    })
+
+    // then
+    expect(calls).toEqual([])
+    expect(result).toEqual({ kind: "already-exited", pid: process.pid, platform: "win32" })
   })
 
   it("#given a POSIX group is briefly alive after SIGKILL #when survivor polling observes it die #then termination succeeds", async () => {
@@ -380,8 +482,12 @@ describe("team e2e process cleanup", () => {
     const result = await runtime.terminateProcessTree(5151, {
       platform: "linux",
       isProcessAlive: () => aliveReads.shift() ?? false,
-      processKill: (pid: number, signal: string) => { signals.push([pid, signal]) },
-      pause: (ms: number) => { pauses.push(ms) },
+      processKill: (pid: number, signal: string) => {
+        signals.push([pid, signal])
+      },
+      pause: (ms: number) => {
+        pauses.push(ms)
+      },
       pollAttempts: 3,
     })
 

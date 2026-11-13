@@ -12,7 +12,8 @@ type CleanupRegistration = {
   shutdown: () => void | Promise<void>
 }
 
-type CleanupSessionTeamRunsFn = typeof import("./features/team-mode/team-runtime/session-cleanup").cleanupSessionTeamRuns
+type CleanupSessionTeamRunsFn =
+  typeof import("./features/team-mode/team-runtime/session-cleanup").cleanupSessionTeamRuns
 
 const markServerRunningInProcess = mock(() => {})
 let backgroundManagerOptions: {
@@ -174,7 +175,10 @@ describe("createManagers", () => {
     tuiMirrorStopCount = 0
   })
 
-  afterEach(() => {
+  afterEach(async () => {
+    for (const manager of registeredCleanupManagers.splice(0)) {
+      await manager.shutdown()
+    }
     dispatchOpenClawEvent.mockRestore()
   })
 

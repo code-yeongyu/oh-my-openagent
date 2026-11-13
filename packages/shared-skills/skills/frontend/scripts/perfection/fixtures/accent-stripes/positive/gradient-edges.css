@@ -1,0 +1,26 @@
+.hard-stop {
+  border-radius: 12px;
+  background: linear-gradient(to right, #6366f1 4px, #fff 4px);
+}
+
+.image-border {
+  border-radius: 12px;
+  border-left: 4px solid;
+  border-image: linear-gradient(#6366f1, #a855f7) 1;
+}
+
+.glow { position: relative; border-radius: 12px; }
+.glow::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 3px;
+  background: linear-gradient(to bottom, #6366f1, #a855f7);
+}
+
+.end-band {
+  border-radius: 12px;
+  background-image: linear-gradient(to right, #fff calc(100% - 4px), #f43f5e calc(100% - 4px));
+}

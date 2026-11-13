@@ -1,24 +1,20 @@
 import { describe, expect, test, afterEach } from "bun:test"
-import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, readFile, readdir, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { realpathSync } from "node:fs"
 
 import { buildIdentityPaths, type MemoryIdentityPaths } from "../identity"
 import type { TranscriptEntry } from "../journal"
-import {
-  FactsQueue,
-  factsQueuePaths,
-  type FactsEnqueueRequest,
-  type FactsQueueEntry,
-} from "./queue"
+import { FactsQueue, factsQueuePaths, type FactsEnqueueRequest, type FactsQueueEntry } from "./queue"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const IDENTITY = "facts-queue-agent"
 const CONVERSATION = "conversation-alpha"
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })))
 })
 
 async function identityFixture(): Promise<MemoryIdentityPaths> {
@@ -67,9 +63,7 @@ function clockFrom(start: number): () => Date {
 
 async function queueFileNames(paths: MemoryIdentityPaths): Promise<string[]> {
   const names = await readdir(paths.factsQueue).catch(() => [] as string[])
-  return names.filter((name) =>
-    name.endsWith(".json") && name !== "consumed.json" && name !== "claims.json"
-  ).sort()
+  return names.filter((name) => name.endsWith(".json") && name !== "consumed.json" && name !== "claims.json").sort()
 }
 
 describe("facts queue enqueue", () => {
@@ -93,12 +87,7 @@ describe("facts queue enqueue", () => {
     expect(pending[0]?.range.start_message_id).toBe("m1")
     expect(pending[0]?.range.end_message_id).toBe("m2")
     expect(pending[0]?.range.end_snapshot_line).toBe(entries.length)
-    expect(pending[0]?.entries.map((row) => row.source_message_id)).toEqual([
-      "m1",
-      "m1",
-      "m2",
-      "m2",
-    ])
+    expect(pending[0]?.entries.map((row) => row.source_message_id)).toEqual(["m1", "m1", "m2", "m2"])
   })
 
   test("#given an identical settle #when enqueue runs again #then the duplicate endpoint is skipped", async () => {
@@ -178,70 +167,101 @@ describe("facts queue enqueue", () => {
     expect(await queueFileNames(paths)).toHaveLength(0)
   })
 })
-  test("#given an aborted drain signal #when enqueue is attempted #then nothing publishes and the cursor stays untouched", async () => {
-    // given
-    const paths = await identityFixture()
-    const queue = new FactsQueue({ identityPaths: paths, now: clockFrom(0) })
-    const aborted = new AbortController()
-    aborted.abort()
+test("#given an aborted drain signal #when enqueue is attempted #then nothing publishes and the cursor stays untouched", async () => {
+  // given
+  const paths = await identityFixture()
+  const queue = new FactsQueue({ identityPaths: paths, now: clockFrom(0) })
+  const aborted = new AbortController()
+  aborted.abort()
 
-    // when
-    const result = await queue.enqueue(request(journal(2), { signal: aborted.signal }))
+  // when
+  const result = await queue.enqueue(request(journal(2), { signal: aborted.signal }))
 
-    // then
-    expect(result.enqueued).toBe(false)
-    expect(await queue.listPending()).toHaveLength(0)
-    const cursor = await queue.readCursor(CONVERSATION)
-    expect(cursor.enqueued_through_message_id).toBeNull()
-    expect(cursor.consumed_through_message_id).toBeNull()
-  })
+  // then
+  expect(result.enqueued).toBe(false)
+  expect(await queue.listPending()).toHaveLength(0)
+  const cursor = await queue.readCursor(CONVERSATION)
+  expect(cursor.enqueued_through_message_id).toBeNull()
+  expect(cursor.consumed_through_message_id).toBeNull()
+})
 
-  test("#given the abort fires at the interior clock hook #when enqueue runs #then nothing publishes and the cursor stays untouched", async () => {
-    // given
-    const paths = await identityFixture()
-    const aborted = new AbortController()
-    const queue = new FactsQueue({
-      identityPaths: paths,
-      now: () => {
-        aborted.abort()
-        return new Date("2026-01-15T12:00:00.000Z")
-      },
-    })
-
-    // when
-    const result = await queue.enqueue(request(journal(2), { signal: aborted.signal }))
-
-    // then
-    expect(result.enqueued).toBe(false)
-    expect(await queue.listPending()).toHaveLength(0)
-    const cursor = await queue.readCursor(CONVERSATION)
-    expect(cursor.enqueued_through_message_id).toBeNull()
-  })
-
-  test("#given the abort fires after the publish lands #when the cursor advance is attempted #then the batch stays retryable with the watermark unmoved", async () => {
-    // given
-    const paths = await identityFixture()
-    const aborted = new AbortController()
-    const prototype = FactsQueue.prototype as unknown as Record<string, (entry: FactsQueueEntry, at: Date, signal?: AbortSignal) => Promise<void>>
-    const original = prototype["publish"]
-    prototype["publish"] = async (entry, at, signal) => {
-      await original.call(queue, entry, at, signal)
+test("#given the abort fires at the interior clock hook #when enqueue runs #then nothing publishes and the cursor stays untouched", async () => {
+  // given
+  const paths = await identityFixture()
+  const aborted = new AbortController()
+  const queue = new FactsQueue({
+    identityPaths: paths,
+    now: () => {
       aborted.abort()
-    }
-    const queue = new FactsQueue({ identityPaths: paths, now: () => new Date("2026-01-15T12:00:00.000Z") })
+      return new Date("2026-01-15T12:00:00.000Z")
+    },
+  })
+
+  // when
+  const result = await queue.enqueue(request(journal(2), { signal: aborted.signal }))
+
+  // then
+  expect(result.enqueued).toBe(false)
+  expect(await queue.listPending()).toHaveLength(0)
+  const cursor = await queue.readCursor(CONVERSATION)
+  expect(cursor.enqueued_through_message_id).toBeNull()
+})
+
+test("#given the abort fires after the publish lands #when the cursor advance is attempted #then the batch stays retryable with the watermark unmoved", async () => {
+  // given
+  const paths = await identityFixture()
+  const aborted = new AbortController()
+  const prototype = FactsQueue.prototype as unknown as Record<
+    string,
+    (entry: FactsQueueEntry, at: Date, signal?: AbortSignal) => Promise<void>
+  >
+  const original = prototype["publish"]
+  prototype["publish"] = async (entry, at, signal) => {
+    await original.call(queue, entry, at, signal)
+    aborted.abort()
+  }
+  const queue = new FactsQueue({ identityPaths: paths, now: () => new Date("2026-01-15T12:00:00.000Z") })
+
+  // when
+  let result: Awaited<ReturnType<FactsQueue["enqueue"]>>
+  try {
+    result = await queue.enqueue(request(journal(2), { signal: aborted.signal }))
+  } finally {
+    prototype["publish"] = original
+  }
+
+  // then: the publish landed (one started atomic write), but the watermark never moved,
+  // so a later launch sees the batch as pending and retries it.
+  expect(result.enqueued).toBe(true)
+  expect(await queue.listPending()).toHaveLength(1)
+  const cursor = await queue.readCursor(CONVERSATION)
+  expect(cursor.enqueued_through_message_id).toBeNull()
+})
+
+describe("facts queue consent lead", () => {
+  test("#given a second settle #when it is enqueued #then the queue entry keeps the assistant message right before it as lead and the file round-trips", async () => {
+    // given
+    const paths = await identityFixture()
+    const queue = new FactsQueue({ identityPaths: paths, now: clockFrom(Date.parse("2026-01-01T00:00:00.000Z")) })
+    const first = journal(1)
+    await queue.enqueue(request(first))
 
     // when
-    let result: Awaited<ReturnType<FactsQueue["enqueue"]>>
-    try {
-      result = await queue.enqueue(request(journal(2), { signal: aborted.signal }))
-    } finally {
-      prototype["publish"] = original
-    }
+    const result = await queue.enqueue(request([...first, entry("user", "m2", "ok"), entry("assistant", "m2", "done")]))
 
-    // then: the publish landed (one started atomic write), but the watermark never moved,
-    // so a later launch sees the batch as pending and retries it.
-    expect(result.enqueued).toBe(true)
-    expect(await queue.listPending()).toHaveLength(1)
-    const cursor = await queue.readCursor(CONVERSATION)
-    expect(cursor.enqueued_through_message_id).toBeNull()
+    // then
+    expect(result.enqueued && result.entry.lead).toEqual(entry("assistant", "m1", "answer 1"))
+    const pending = await queue.listPending()
+    expect(pending.at(-1)?.lead).toEqual(entry("assistant", "m1", "answer 1"))
+    expect(pending[0]?.lead).toBeUndefined()
   })
+
+  test("#given an image-only user message right before the reply #when it is enqueued #then the lead is that user message", async () => {
+    const paths = await identityFixture()
+    const queue = new FactsQueue({ identityPaths: paths, now: clockFrom(Date.parse("2026-01-01T00:00:00.000Z")) })
+    const first = journal(1)
+    await queue.enqueue(request(first))
+    const result = await queue.enqueue(request([...first, entry("user", "m2", ""), entry("user", "m3", "ok")]))
+    expect(result.enqueued && result.entry.lead).toEqual(entry("user", "m2", ""))
+  })
+})

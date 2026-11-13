@@ -58,7 +58,7 @@ describe("compileDag structure", () => {
     // given
     const withTargets = definition([
       node("a", [], { label: "Alpha", task_summary: "sum", description: "desc", load_skills: ["programming"] }),
-      { id: "b", prompt: "run b", subagent_type: "momus", model: "gpt-5.6", dependsOn: ["a"] },
+      { id: "b", prompt: "run b", subagent_type: "plan-reviewer", model: "gpt-5.6", dependsOn: ["a"] },
     ])
 
     // when
@@ -78,15 +78,37 @@ describe("compileDag structure", () => {
     expect(result.nodes[1]).toMatchObject({
       id: nodeId("b"),
       prompt: "run b",
-      route: { kind: "agent", agent: "momus", model: "gpt-5.6" },
+      route: { kind: "agent", agent: "plan-reviewer", model: "gpt-5.6" },
       dependsOn: [nodeId("a")],
       state: "pending",
     })
   })
 
+  it("#given a node with a retired curated subagent_type #when compiled #then the route stores the submitted id verbatim and keeps the DagRoute shape", () => {
+    // given
+    const withRetired = definition([
+      { id: "retired", prompt: "review", subagent_type: "momus", model: "gpt-5.6" },
+      { id: "canonical", prompt: "review", subagent_type: "plan-reviewer", model: "gpt-5.6" },
+      { id: "custom", prompt: "build", subagent_type: "custom-agent" },
+    ])
+
+    // when
+    const result = compileDag(withRetired, { at: AT })
+
+    // then
+    expect(result.ok).toBe(true)
+    expect(result.nodes[0]?.route).toEqual({ kind: "agent", agent: "momus", model: "gpt-5.6" })
+    expect(result.nodes[1]?.route).toEqual({ kind: "agent", agent: "plan-reviewer", model: "gpt-5.6" })
+    expect(Object.keys(result.nodes[0]?.route ?? {}).sort()).toEqual(["agent", "kind", "model"])
+    expect(result.nodes[2]?.route).toEqual({ kind: "agent", agent: "custom-agent" })
+  })
+
   it("#given a downstream node #when compiled #then the prompt is never templated with upstream ids", () => {
     // given: scheduling-only dependsOn, no substitution
-    const templated = definition([node("plan"), { id: "build", prompt: "use {{plan}}", category: "quick", dependsOn: ["plan"] }])
+    const templated = definition([
+      node("plan"),
+      { id: "build", prompt: "use {{plan}}", category: "quick", dependsOn: ["plan"] },
+    ])
 
     // when
     const result = compileDag(templated, { at: AT })
@@ -114,7 +136,12 @@ describe("compileDag ordering determinism", () => {
   it("#given identical graphs declared in different node order #when compiled #then wave membership is identical", () => {
     const forward = compileDag(diamond, { at: AT })
     const backward = compileDag(
-      definition([node("synthesize", ["build", "test"]), node("test", ["plan"]), node("build", ["plan"]), node("plan")]),
+      definition([
+        node("synthesize", ["build", "test"]),
+        node("test", ["plan"]),
+        node("build", ["plan"]),
+        node("plan"),
+      ]),
       { at: AT },
     )
     expect(backward.waves.map((wave) => [...wave.nodeIds].sort())).toEqual(
@@ -219,6 +246,30 @@ describe("compileDag validation", () => {
 
     expect(second.errors[0]?.nodeIds).toEqual(first.errors[0]?.nodeIds ?? [])
   })
+
+  it.each([
+    ["a parent-directory segment", "../../../etc/pwn"],
+    ["a forward slash", "a/b"],
+    ["a backslash", "a\\b"],
+    ["a colon", "a:b"],
+    ["a NUL byte", "a\0b"],
+    ["a lone dot", "."],
+    ["a double dot", ".."],
+    ["an empty id", ""],
+  ])(
+    "#given a node id with %s #when compiled #then rejected as invalid_node_id and no graph produced",
+    (_label, unsafeId) => {
+      const result = compileDag(definition([node(unsafeId)]), { at: AT })
+
+      expect(result.ok).toBe(false)
+      expect(result.nodes).toEqual([])
+      expect(result.errors.map((error) => error.code)).toEqual(["invalid_node_id"])
+    },
+  )
+
+  it("#given a dot-only three-character id #when compiled #then it is accepted, because only the traversal segments are refused", () => {
+    expect(compileDag(definition([node("...")]), { at: AT }).ok).toBe(true)
+  })
 })
 
 describe("compileDag size bounds", () => {
@@ -266,7 +317,9 @@ describe("compileDag size bounds", () => {
 
     expect(result.ok).toBe(false)
     expect(result.errors.map((error) => error.code)).toContain("dependency_fanout_exceeded")
-    expect(result.errors.find((error) => error.code === "dependency_fanout_exceeded")?.nodeIds).toEqual([nodeId("join")])
+    expect(result.errors.find((error) => error.code === "dependency_fanout_exceeded")?.nodeIds).toEqual([
+      nodeId("join"),
+    ])
   })
 })
 

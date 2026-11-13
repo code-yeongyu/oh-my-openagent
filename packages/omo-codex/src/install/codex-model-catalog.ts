@@ -1,6 +1,7 @@
 import { isPlainRecord } from "./codex-cache-fs"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
+import { LATEST_MODEL_BY_FAMILY } from "@oh-my-opencode/model-core/latest-models"
 
 export type CodexReasoningProfile = {
   readonly model: string
@@ -18,7 +19,7 @@ export type CodexModelCatalog = {
 
 const FALLBACK_CODEX_MODEL_CATALOG: CodexModelCatalog = {
   current: {
-    model: "gpt-6-astra",
+    model: LATEST_MODEL_BY_FAMILY.gptAstra,
     modelContextWindow: 600_000,
     modelReasoningEffort: "high",
     planModeReasoningEffort: "xhigh",
@@ -100,7 +101,9 @@ function parseProfileMatch(match: Record<string, unknown>): CodexReasoningProfil
   } = {}
   if (typeof match["model"] === "string") profile.model = match["model"]
   if (typeof match["model_context_window"] === "number") profile.modelContextWindow = match["model_context_window"]
-  if (typeof match["model_reasoning_effort"] === "string") profile.modelReasoningEffort = match["model_reasoning_effort"]
-  if (typeof match["plan_mode_reasoning_effort"] === "string") profile.planModeReasoningEffort = match["plan_mode_reasoning_effort"]
+  if (typeof match["model_reasoning_effort"] === "string")
+    profile.modelReasoningEffort = match["model_reasoning_effort"]
+  if (typeof match["plan_mode_reasoning_effort"] === "string")
+    profile.planModeReasoningEffort = match["plan_mode_reasoning_effort"]
   return profile
 }

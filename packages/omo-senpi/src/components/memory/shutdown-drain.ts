@@ -1,12 +1,29 @@
-// Bounded session_shutdown drain (IC-10). senpi awaits session_shutdown handlers before
-// disposing the runtime, so the drain owns a hard budget: an absolute deadline propagated
-// with a shared AbortSignal into every step. Shutdown enqueues the final transcript delta but
-// never launches facts: an in-process extractor cannot outlive this session. Pending work is
-// launched by the next session_start reconcile path.
+// Bounded session_shutdown drain (IC-10). senpi bounds each session_shutdown handler with its own
+// warn threshold, per-handler hard timeout and total quit budget - shipped defaults of 2 s, 10 s and
+// 2 s, all user-tunable and 0-disableable - so the drain owns a hard budget: an absolute deadline
+// propagated with a shared AbortSignal into every step.
+// Shutdown enqueues the final transcript delta but never launches facts: an in-process
+// extractor cannot outlive this session. Pending work is launched by the next session_start
+// reconcile path.
 
 import type { ComponentLogger } from "../../extension/types"
 
-/** Hard drain budget in milliseconds. Pinned by test: senpi blocks shutdown on this handler. */
+// senpi's handler bounds are settings, not fixed facts: `sessionShutdownHandlerWarnMs`,
+// `sessionShutdownHandlerTimeoutMs` and `sessionShutdownQuitBudgetMs` in
+// code-yeongyu/senpi `packages/coding-agent/src/core/settings-manager.ts` (senpi#3711), whose shipped
+// defaults are a 2 s warning and a 10 s hard timeout for one handler plus a 2 s total wait on every
+// handler when the process quits. omo adds no cap of its own; the drain budget below is sized against
+// those defaults and `shutdown-drain.test.ts` reads them from the installed senpi, so a host release
+// that lowers a default under the drain fails there instead of quietly here.
+/**
+ * Hard drain budget in milliseconds. Under senpi's default handler bounds the host waits for this
+ * handler until it settles or its 10 s timeout aborts it, and the whole shutdown pass only gets the
+ * 2 s quit budget, so the drain stays below the warn threshold and the quit budget: the drain plus
+ * the teardown after it in the same handler finish inside the host's bounds and cannot outlive them.
+ * 1500 ms still leaves room for a real journal flush without a hung persist stalling shutdown. An
+ * operator who lowers `sessionShutdownHandlerWarnMs` or `sessionShutdownQuitBudgetMs` below this
+ * value puts the host's bound first, which is their call to make - the drain never blocks on it.
+ */
 export const SESSION_SHUTDOWN_DRAIN_BUDGET_MS = 1500
 
 export type ShutdownReason = "quit" | "reload" | "new" | "resume" | "fork"
@@ -47,6 +64,15 @@ export interface ShutdownDrain {
    * owns that alarm exactly once.
    */
   flushJournal(input: ShutdownDrainInput): Promise<boolean>
+  /**
+   * One pre-drain cleanup await, raced against the SAME deadline the drain steps share. The work
+   * is always started (it is what hands back the resources the session still holds - the Kibitzer
+   * wake lease, the sidecar directory owner lock, the facts child) but never awaited past the
+   * budget: on expiry this logs the drain's budget warning with `step: name`, RETURNS, and lets the
+   * work run detached to completion, reporting a late failure instead of leaving it unhandled.
+   * Returns whether the work completed inside the budget.
+   */
+  raceDetached(input: ShutdownDrainInput, name: string, work: () => Promise<void>): Promise<boolean>
   run(input: ShutdownDrainInput, options?: { readonly journalFlushed?: boolean }): Promise<void>
 }
 
@@ -62,6 +88,8 @@ export function shutdownDeadlineAt(now: () => number): number {
 
 export function createShutdownDrain(options: ShutdownDrainOptions): ShutdownDrain {
   const evaluators: ShutdownEvaluator[] = []
+  /** Detached steps that completed inside the budget, per session; read by the next budget warning. */
+  const detachedSteps = new Map<string, string[]>()
 
   const execute = async (
     input: ShutdownDrainInput,
@@ -104,17 +132,8 @@ export function createShutdownDrain(options: ShutdownDrainOptions): ShutdownDrai
       }
       // Errors are settled at attach time so an abandoned step can never surface as an
       // unhandled rejection after the drain returned; only a step that wins its race is reported.
-      const settled = work().then(
-        () => undefined,
-        (error: unknown) => error,
-      )
-      const remainingMs = Math.max(0, input.deadlineAt - now())
-      let timer: ReturnType<typeof setTimeout> | undefined
-      const expired = new Promise<typeof BUDGET_EXPIRED>((resolve) => {
-        timer = setTimeout(() => resolve(BUDGET_EXPIRED), remainingMs)
-      })
-      const outcome = await Promise.race([settled, expired])
-      if (timer !== undefined) clearTimeout(timer)
+      const settled = settleInline(work)
+      const outcome = await raceAgainstBudget(settled, Math.max(0, input.deadlineAt - now()))
       if (outcome === BUDGET_EXPIRED) {
         exhaust(name)
         return false
@@ -143,9 +162,11 @@ export function createShutdownDrain(options: ShutdownDrainOptions): ShutdownDrai
         if (!journalCompleted) return false
       }
       if (settings.journalOnly) return journalCompleted
-      if (!(await runStep("facts-enqueue", () => options.steps.enqueueFinalDelta(input.sessionId, signal)))) return journalCompleted
+      if (!(await runStep("facts-enqueue", () => options.steps.enqueueFinalDelta(input.sessionId, signal))))
+        return journalCompleted
       if (input.reason !== "quit") return journalCompleted
-      if (!(await runStep("skills-usage-flush", () => options.steps.flushSkillsUsage(input.sessionId, signal)))) return journalCompleted
+      if (!(await runStep("skills-usage-flush", () => options.steps.flushSkillsUsage(input.sessionId, signal))))
+        return journalCompleted
       for (const evaluator of evaluators) {
         const proceed = await runStep("shutdown-evaluator", async () => {
           await evaluator(evaluatorInput)
@@ -167,10 +188,66 @@ export function createShutdownDrain(options: ShutdownDrainOptions): ShutdownDrai
     flushJournal(input: ShutdownDrainInput): Promise<boolean> {
       return execute(input, { journalOnly: true })
     },
+    async raceDetached(input: ShutdownDrainInput, name: string, work: () => Promise<void>): Promise<boolean> {
+      const now = input.now ?? Date.now
+      const completedSteps = detachedSteps.get(input.sessionId) ?? []
+      detachedSteps.set(input.sessionId, completedSteps)
+      const settled = settleInline(work)
+      const outcome = await raceAgainstBudget(settled, Math.max(0, input.deadlineAt - now()))
+      if (outcome === BUDGET_EXPIRED) {
+        // The handler returns here; the work keeps running so what it owns is still released.
+        void settled.then((error: unknown) => {
+          if (error === undefined) return
+          options.logger?.warn("memory shutdown drain detached step failed", {
+            step: name,
+            reason: input.reason,
+            sessionId: input.sessionId,
+            error: String(error),
+          })
+        })
+        options.logger?.warn("memory shutdown drain hit its budget", {
+          step: name,
+          reason: input.reason,
+          sessionId: input.sessionId,
+          remainingMs: Math.max(0, input.deadlineAt - now()),
+          completedSteps: [...completedSteps],
+        })
+        return false
+      }
+      if (outcome !== undefined) {
+        options.logger?.warn("memory shutdown drain step failed", {
+          step: name,
+          reason: input.reason,
+          error: String(outcome),
+        })
+      }
+      completedSteps.push(name)
+      return true
+    },
     async run(input: ShutdownDrainInput, settings): Promise<void> {
       await execute(input, settings)
+      detachedSteps.delete(input.sessionId)
     },
   }
+}
+
+/** Starts the work and turns its rejection into a value, so an abandoned step never goes unhandled. */
+function settleInline(work: () => Promise<void>): Promise<unknown> {
+  return work().then(
+    () => undefined,
+    (error: unknown) => error,
+  )
+}
+
+/** The settled result (`undefined` on success, otherwise the error) or `BUDGET_EXPIRED`. */
+async function raceAgainstBudget(settled: Promise<unknown>, remainingMs: number): Promise<unknown> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const expired = new Promise<typeof BUDGET_EXPIRED>((resolve) => {
+    timer = setTimeout(() => resolve(BUDGET_EXPIRED), remainingMs)
+  })
+  const outcome = await Promise.race([settled, expired])
+  if (timer !== undefined) clearTimeout(timer)
+  return outcome
 }
 
 const BUDGET_EXPIRED = Symbol("shutdown-drain-budget-expired")

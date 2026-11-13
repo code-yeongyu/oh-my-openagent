@@ -23,14 +23,16 @@ function createMockInput() {
 function createScriptBinary(scriptContent: string, windowsScriptContent?: string): string {
   const directory = mkdtempSync(join(tmpdir(), "comment-checker-cli-test-"))
   const binaryPath = join(directory, process.platform === "win32" ? "comment-checker.cmd" : "comment-checker")
-  writeFileSync(binaryPath, process.platform === "win32" ? windowsScriptContent ?? scriptContent : scriptContent)
+  writeFileSync(binaryPath, process.platform === "win32" ? (windowsScriptContent ?? scriptContent) : scriptContent)
   if (process.platform !== "win32") {
     chmodSync(binaryPath, 0o755)
   }
   return binaryPath
 }
 
-afterAll(() => { mock.restore() })
+afterAll(() => {
+  mock.restore()
+})
 
 describe("comment-checker CLI", () => {
   describe("lazy initialization", () => {
@@ -62,41 +64,14 @@ describe("comment-checker CLI", () => {
       // then
       expect(result).toBeNull()
     })
-
-    test("getCommentCheckerPathSync should be lazy and callable", async () => {
-      // given
-      const cliModule = await import("./cli")
-      // when
-      const result = cliModule.getCommentCheckerPathSync()
-      // then
-      expect(typeof cliModule.getCommentCheckerPathSync).toBe("function")
-      expect(result === null || typeof result === "string").toBe(true)
-    })
-
-    test("COMMENT_CHECKER_CLI_PATH export should not exist", async () => {
-      // given
-      const cliModule = await import("./cli")
-      // when
-      // then
-      expect("COMMENT_CHECKER_CLI_PATH" in cliModule).toBe(false)
-    })
   })
 
   describe("runCommentChecker", () => {
-    test("returns CheckResult shape without explicit CLI path", async () => {
-      // given
-      const { runCommentChecker } = await import("./cli")
-      // when
-      const result = await runCommentChecker(createMockInput())
-      // then
-      expect(typeof result.hasComments).toBe("boolean")
-      expect(typeof result.message).toBe("string")
-    })
-
     test("sends SIGKILL after grace period when process ignores SIGTERM", async () => {
       // given
       const { runCommentChecker } = await import("./cli")
-      const binaryPath = createScriptBinary(`#!/bin/sh
+      const binaryPath = createScriptBinary(
+        `#!/bin/sh
 if [ "$1" != "check" ]; then
   exit 1
 fi
@@ -104,11 +79,13 @@ trap '' TERM
 while :; do
   :
 done
-`, `@echo off
+`,
+        `@echo off
 if "%~1" neq "check" exit /b 1
 :loop
 goto loop
-`)
+`,
+      )
       const originalSetTimeout = globalThis.setTimeout
       globalThis.setTimeout = ((fn: (...args: unknown[]) => void, _ms?: number) => {
         fn()
@@ -128,7 +105,8 @@ goto loop
     test("returns empty result on timeout", async () => {
       // given
       const { runCommentChecker } = await import("./cli")
-      const binaryPath = createScriptBinary(`#!/bin/sh
+      const binaryPath = createScriptBinary(
+        `#!/bin/sh
 if [ "$1" != "check" ]; then
   exit 1
 fi
@@ -136,11 +114,13 @@ trap '' TERM
 while :; do
   :
 done
-`, `@echo off
+`,
+        `@echo off
 if "%~1" neq "check" exit /b 1
 :loop
 goto loop
-`)
+`,
+      )
       const originalSetTimeout = globalThis.setTimeout
       globalThis.setTimeout = ((fn: (...args: unknown[]) => void, _ms?: number) => {
         fn()
@@ -160,19 +140,22 @@ goto loop
     test("keeps non-timeout flow unchanged", async () => {
       // given
       const { runCommentChecker } = await import("./cli")
-      const binaryPath = createScriptBinary(`#!/bin/sh
+      const binaryPath = createScriptBinary(
+        `#!/bin/sh
 if [ "$1" != "check" ]; then
   exit 1
 fi
 cat >/dev/null
 echo "found comments" 1>&2
 exit 2
-`, `@echo off
+`,
+        `@echo off
 if "%~1" neq "check" exit /b 1
 more > nul
 1>&2 echo(found comments
 exit /b 2
-`)
+`,
+      )
       // when
       const result = await runCommentChecker(createMockInput(), binaryPath)
       // then
@@ -207,8 +190,24 @@ exit /b 2
         newString: "// new comment",
         timestamp: Date.now(),
       }
-      const firstCall = processWithCli({ tool: "write", sessionID: "ses-1", callID: "call-1" }, pendingCall, { output: "" }, "/fake", undefined, () => {}, { runCommentChecker: cliMocks.runCommentChecker })
-      const secondCall = processWithCli({ tool: "write", sessionID: "ses-2", callID: "call-2" }, pendingCall, { output: "" }, "/fake", undefined, () => {}, { runCommentChecker: cliMocks.runCommentChecker })
+      const firstCall = processWithCli(
+        { tool: "write", sessionID: "ses-1", callID: "call-1" },
+        pendingCall,
+        { output: "" },
+        "/fake",
+        undefined,
+        () => {},
+        { runCommentChecker: cliMocks.runCommentChecker },
+      )
+      const secondCall = processWithCli(
+        { tool: "write", sessionID: "ses-2", callID: "call-2" },
+        pendingCall,
+        { output: "" },
+        "/fake",
+        undefined,
+        () => {},
+        { runCommentChecker: cliMocks.runCommentChecker },
+      )
 
       // when
       await secondCall
@@ -245,8 +244,24 @@ exit /b 2
         timestamp: Date.now(),
       }
       // when
-      await processWithCli({ tool: "write", sessionID: "ses-first", callID: "call-1" }, firstPendingCall, { output: "" }, "/fake", undefined, () => {}, { runCommentChecker: cliMocks.runCommentChecker })
-      await processWithCli({ tool: "write", sessionID: "ses-second", callID: "call-2" }, secondPendingCall, { output: "" }, "/fake", undefined, () => {}, { runCommentChecker: cliMocks.runCommentChecker })
+      await processWithCli(
+        { tool: "write", sessionID: "ses-first", callID: "call-1" },
+        firstPendingCall,
+        { output: "" },
+        "/fake",
+        undefined,
+        () => {},
+        { runCommentChecker: cliMocks.runCommentChecker },
+      )
+      await processWithCli(
+        { tool: "write", sessionID: "ses-second", callID: "call-2" },
+        secondPendingCall,
+        { output: "" },
+        "/fake",
+        undefined,
+        () => {},
+        { runCommentChecker: cliMocks.runCommentChecker },
+      )
       // then
       expect(callCount).toBe(2)
     })

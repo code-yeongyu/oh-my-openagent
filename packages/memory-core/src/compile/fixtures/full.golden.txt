@@ -22,12 +22,9 @@ Run tests once.
   </prefs>
 </human>
 <external_projection>
-$MEMORY_DIR/
-├── archive/
-│   └── diagram.png
-├── reference/
-│   └── details.md
-└── README.MD
+$MEMORY_DIR/: README.MD
+archive/: diagram.png
+reference/: details.md
 </external_projection>
 </memory>
 

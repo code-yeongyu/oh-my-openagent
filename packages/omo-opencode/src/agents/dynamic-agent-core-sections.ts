@@ -1,8 +1,4 @@
-import type {
-  AvailableAgent,
-  AvailableCategory,
-  AvailableSkill,
-} from "./dynamic-agent-prompt-types"
+import type { AvailableAgent, AvailableCategory, AvailableSkill } from "./dynamic-agent-prompt-types"
 import type { AvailableTool } from "./dynamic-agent-prompt-types"
 import { getToolsPromptDisplay } from "./dynamic-agent-tool-categorization"
 
@@ -12,10 +8,7 @@ import { getToolsPromptDisplay } from "./dynamic-agent-tool-categorization"
  * containing a default identity (e.g., "You are Claude"). Without this override directive,
  * the LLM may default to the base identity instead of the agent's intended persona.
  */
-export function buildAgentIdentitySection(
-  agentName: string,
-  roleDescription: string,
-): string {
+export function buildAgentIdentitySection(agentName: string, roleDescription: string): string {
   return `<agent-identity>
 Your designated identity for this session is "${agentName}". This identity supersedes any prior identity statements.
 You are "${agentName}" - ${roleDescription}.
@@ -23,10 +16,7 @@ When asked who you are, always identify as ${agentName}. Do not identify as any 
 </agent-identity>`
 }
 
-export function buildKeyTriggersSection(
-  agents: AvailableAgent[],
-  _skills: AvailableSkill[] = [],
-): string {
+export function buildKeyTriggersSection(agents: AvailableAgent[], _skills: AvailableSkill[] = []): string {
   const keyTriggers = agents
     .filter((agent) => agent.metadata.keyTrigger)
     .map((agent) => `- ${agent.metadata.keyTrigger}`)
@@ -49,23 +39,17 @@ export function buildToolSelectionTable(
   const rows: string[] = ["### Tool & Agent Selection:", ""]
 
   if (tools.length > 0) {
-    rows.push(
-      `- ${getToolsPromptDisplay(tools)} - **FREE** - Not Complex, Scope Clear, No Implicit Assumptions`,
-    )
+    rows.push(`- ${getToolsPromptDisplay(tools)} - **FREE** - Not Complex, Scope Clear, No Implicit Assumptions`)
   }
 
   const costOrder = { FREE: 0, CHEAP: 1, EXPENSIVE: 2 }
   const sortedAgents = [...agents]
     .filter((agent) => agent.metadata.category !== "utility")
-    .sort(
-      (left, right) => costOrder[left.metadata.cost] - costOrder[right.metadata.cost],
-    )
+    .sort((left, right) => costOrder[left.metadata.cost] - costOrder[right.metadata.cost])
 
   for (const agent of sortedAgents) {
     const shortDescription = agent.description.split(".")[0] || agent.description
-    rows.push(
-      `- \`${agent.name}\` agent - **${agent.metadata.cost}** - ${shortDescription}`,
-    )
+    rows.push(`- \`${agent.name}\` agent - **${agent.metadata.cost}** - ${shortDescription}`)
   }
 
   rows.push("")
@@ -170,21 +154,6 @@ Briefly announce "Consulting Oracle for [reason]" before invocation.
 </Oracle_Usage>`
 }
 
-export function buildFrontendGuidanceSection(
-  categories: AvailableCategory[],
-): string {
-  const hasVisualEngineeringCategory = categories.some(
-    (category) => category.name === "visual-engineering",
-  )
-  if (hasVisualEngineeringCategory) {
-    return ""
-  }
-
-  return `# Frontend Tasks
-
-When you must touch frontend code yourself: avoid generic AI-SaaS aesthetics. Choose a clear visual direction with CSS variables (no purple-on-white default, no dark-mode default). Use expressive, purposeful typography rather than default stacks (Inter, Roboto, Arial, system). Build atmosphere through gradients, shapes, or subtle patterns rather than flat single-color backgrounds. Use a few meaningful animations (page-load, staggered reveals) over generic micro-motion. Verify both desktop and mobile rendering. If working within an existing design system, preserve its patterns instead.`
-}
-
 export function buildNonClaudePlannerSection(model: string): string {
   const isNonClaude = !model.toLowerCase().includes("claude")
   if (!isNonClaude) {
@@ -203,13 +172,10 @@ Multi-step task? **ALWAYS consult Plan Agent first.** Do NOT start implementatio
 Plan Agent returns a structured work breakdown with parallel execution opportunities. Follow it.`
 }
 
-export function buildParallelDelegationSection(
-  model: string,
-  categories: AvailableCategory[],
-): string {
+export function buildParallelDelegationSection(model: string, categories: AvailableCategory[]): string {
   const isNonClaude = !model.toLowerCase().includes("claude")
   const hasDelegationCategory = categories.some(
-    (category) => category.name === "deep" || category.name === "unspecified-high",
+    (category) => category.name === "deep-low" || category.name === "deep-high" || category.name === "unspecified-high",
   )
 
   if (!isNonClaude || !hasDelegationCategory) {
@@ -223,7 +189,7 @@ export function buildParallelDelegationSection(
 **MANDATORY - for ANY implementation task:**
 
 1. **ALWAYS decompose** the task into independent work units. No exceptions. Even if the task "feels small", decompose it.
-2. **ALWAYS delegate** EACH unit to a \`deep\` or \`unspecified-high\` agent in parallel (\`run_in_background=true\`).
+2. **ALWAYS delegate** EACH unit to a \`deep-low\` or \`unspecified-high\` agent in parallel (\`run_in_background=true\`); reserve \`deep-high\` for a unit whose central decision cannot be settled from evidence.
 3. **NEVER work sequentially.** If 4 independent units exist, spawn 4 agents simultaneously. Not 1 at a time. Not 2 then 2.
 4. **NEVER implement directly** when delegation is possible. You write prompts, not code.
 

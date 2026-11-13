@@ -2,6 +2,7 @@ import type { CreatedHooks } from "../create-hooks"
 import { parseGoalCommand } from "../hooks/goal/command-arguments"
 import { log } from "../shared/logger"
 import { stopContinuation } from "./stop-continuation"
+import type { SkillMcpManager } from "../features/skill-mcp-manager"
 
 type CommandExecuteBeforeInput = {
   command: string
@@ -15,9 +16,7 @@ type CommandExecuteBeforeOutput = {
 
 const NATIVE_GOAL_COMMAND_MARKER = "<omo-native-goal-command>"
 
-export function markNativeGoalCommand(
-  parts: CommandExecuteBeforeOutput["parts"],
-): void {
+export function markNativeGoalCommand(parts: CommandExecuteBeforeOutput["parts"]): void {
   parts.push({
     type: "text",
     text: NATIVE_GOAL_COMMAND_MARKER,
@@ -25,15 +24,9 @@ export function markNativeGoalCommand(
   })
 }
 
-export function consumeNativeGoalCommandMarker(
-  parts: CommandExecuteBeforeOutput["parts"],
-): boolean {
+export function consumeNativeGoalCommandMarker(parts: CommandExecuteBeforeOutput["parts"]): boolean {
   const markerIndex = parts.findIndex(
-    (part) => (
-      part.type === "text"
-      && part.text === NATIVE_GOAL_COMMAND_MARKER
-      && part["synthetic"] === true
-    ),
+    (part) => part.type === "text" && part.text === NATIVE_GOAL_COMMAND_MARKER && part["synthetic"] === true,
   )
   if (markerIndex === -1) {
     return false
@@ -52,13 +45,20 @@ function hasPartsOutput(value: unknown): value is CommandExecuteBeforeOutput {
 export function createCommandExecuteBeforeHandler(args: {
   directory: string
   hooks: CreatedHooks
-}): (
-  input: CommandExecuteBeforeInput,
-  output: CommandExecuteBeforeOutput,
-) => Promise<void> {
+  mcpManager?: SkillMcpManager
+  notify?: (message: string) => void
+}): (input: CommandExecuteBeforeInput, output: CommandExecuteBeforeOutput) => Promise<void> {
   const { directory, hooks } = args
 
   return async (input, output): Promise<void> => {
+    if (input.command.toLowerCase() === "omo-mcp-env-grant") {
+      const [id, ...names] = input.arguments.trim().split(/\s+/)
+      if (!id || !args.mcpManager) throw new Error("Usage: /omo-mcp-env-grant <id> [NAME...]")
+      const message = await args.mcpManager.grantEnvironment(id, names)
+      output.parts.push({ type: "text", text: message, synthetic: true })
+      args.notify?.(message)
+      return
+    }
     await hooks.autoSlashCommand?.["command.execute.before"]?.(input, output)
 
     const normalizedCommand = input.command.toLowerCase()
@@ -92,11 +92,7 @@ export function createCommandExecuteBeforeHandler(args: {
       markNativeGoalCommand(output.parts)
     }
 
-    if (
-      hooks.ulwExecute
-      && normalizedCommand === "ulw-execute"
-      && hasPartsOutput(output)
-    ) {
+    if (hooks.ulwExecute && normalizedCommand === "ulw-execute" && hasPartsOutput(output)) {
       await hooks.ulwExecute["command.execute.before"]?.(input, output)
       if (hooks.stopContinuationGuard?.isStopped(sessionID)) {
         hooks.stopContinuationGuard.clear(sessionID)

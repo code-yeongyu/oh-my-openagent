@@ -16,9 +16,7 @@ import type { SenpiModelPort } from "@oh-my-opencode/senpi-task"
 
 import type { SenpiOmoConfigResult } from "../../config-resolution"
 import type { ResolveAndPreflightMemoryLaunch } from "./memory-launch-preflight"
-import type {
-  ReflectionCompletionApi,
-} from "./completion"
+import type { ReflectionCompletionApi } from "./completion"
 import { SenpiSubprocessRunner } from "./runner"
 import type { ReflectionSpawnArgs } from "./spawn"
 
@@ -33,10 +31,7 @@ export class CapturedCompletionApi implements ReflectionCompletionApi {
     this.entries.push({ customType, data })
   }
 
-  registerEntryRenderer<T>(
-    customType: string,
-    renderer: EntryRenderer<T>,
-  ): void {
+  registerEntryRenderer<T>(customType: string, renderer: EntryRenderer<T>): void {
     this.renderers.push({ customType, renderer: renderer as EntryRenderer<unknown> })
   }
 }
@@ -65,10 +60,55 @@ const childFixture = join(import.meta.dir, "__fixtures__", "reflection-child.ts"
 function isChainMode(childMode: string): boolean {
   return childMode === "model-fallback" || childMode === "model-exhausted" || childMode === "provider-cooldown"
 }
+
+/**
+ * Modes whose only model comes from a provider an extension registers (#9175): a child started with
+ * `--no-extensions` never sees it. `extension-provider` lists it once extensions load;
+ * `extension-provider-unreachable` never lists it, so even the extension-loading child misses it.
+ */
+function isExtensionProviderMode(childMode: string): boolean {
+  return childMode === "extension-provider" || childMode === "extension-provider-unreachable"
+}
+
+function fakeSenpiCatalog(childMode: string, listed: readonly HarnessModel[]): string {
+  const rows = (models: readonly SenpiModelPort[]) =>
+    JSON.stringify(`${models.map((candidate) => `${candidate.provider}/${candidate.id}`).join("\n")}\n`)
+  if (!isExtensionProviderMode(childMode)) return `process.stdout.write(${rows(listed)})`
+  const core: readonly SenpiModelPort[] = [{ provider: "builtin", id: "other" }]
+  const withExtensions = childMode === "extension-provider" ? [...listed, ...core] : core
+  return `process.stdout.write(process.argv.includes("--no-extensions") ? ${rows(core)} : ${rows(withExtensions)})`
+}
 const supervisorFixture = join(import.meta.dir, "memory-run-supervisor.ts")
 
+async function reserveDream(store: ReflectionReservationStore, journal: TranscriptJournal) {
+  const snapshot = await journal.captureReflectionSnapshot()
+  if (!snapshot) throw new Error("expected a dream snapshot")
+  return store.tryReserve({
+    trigger: "dream",
+    origin: "idle",
+    conversationIds: ["conversation-a"],
+    snapshots: [{ conversationId: "conversation-a", snapshot }],
+  })
+}
+
 export async function createRunnerHarness(options: {
-  readonly childMode: "commit" | "timeout" | "admin" | "model-fallback" | "model-exhausted" | "provider-cooldown"
+  readonly childMode:
+    | "commit"
+    | "timeout"
+    | "admin"
+    | "model-fallback"
+    | "model-exhausted"
+    | "provider-cooldown"
+    | "extension-provider"
+    | "extension-provider-unreachable"
+    | "noop"
+    | "commit-fail"
+    | "commit-hang"
+    | "commit-late-ok"
+  /** Builds the identity under this directory instead of a fresh temp dir. */
+  readonly root?: string
+  /** Reserves a dream run (origin `idle`) instead of a step-count reflection. */
+  readonly dream?: boolean
   readonly categoryAvailable?: boolean
   readonly config?: OmoConfig
   readonly models?: readonly HarnessModel[]
@@ -77,12 +117,13 @@ export async function createRunnerHarness(options: {
   readonly terminationGraceMs?: number
   readonly now?: () => Date
   readonly resolveAndPreflightLaunch?: ResolveAndPreflightMemoryLaunch
-  readonly resolveSessionModel?: () => { readonly provider: string; readonly id: string; readonly thinking?: string } | undefined
+  readonly resolveSessionModel?: () =>
+    { readonly provider: string; readonly id: string; readonly thinking?: string } | undefined
   readonly resolveParentContextTokens?: () => number | undefined
   readonly resolveParentSessionFile?: () => string | undefined
   readonly resolveParentCacheReusable?: () => boolean
 }): Promise<RunnerHarness> {
-  const root = await mkdtemp(join(tmpdir(), "memory-reflection-worker-"))
+  const root = options.root ?? (await mkdtemp(join(tmpdir(), "memory-reflection-worker-")))
   const identity: MemoryIdentity = {
     id: "agent-test",
     safeSlug: "agent-test",
@@ -90,10 +131,12 @@ export async function createRunnerHarness(options: {
   }
   const repo = new GitMemoryRepo({ dir: identity.paths.repo, agentId: identity.id })
   await repo.init({
-    seedFiles: [{
-      relativePath: "system/base.md",
-      content: "---\ndescription: Initial memory\n---\nInitial fact.\n",
-    }],
+    seedFiles: [
+      {
+        relativePath: "system/base.md",
+        content: "---\ndescription: Initial memory\n---\nInitial fact.\n",
+      },
+    ],
   })
 
   const journal = new TranscriptJournal({
@@ -113,7 +156,10 @@ export async function createRunnerHarness(options: {
     },
     createRunId: () => `run-${++nextRun}`,
   })
-  const reserved = await store.evaluate("conversation-a", { kind: "settled", success: true })
+  const reserved =
+    options.dream === true
+      ? await reserveDream(store, journal)
+      : await store.evaluate("conversation-a", { kind: "settled", success: true })
   if (!reserved || reserved.status !== "active") throw new Error("expected active reflection reservation")
 
   const model: SenpiModelPort = { provider: "omo-mock", id: "mock-1" }
@@ -121,8 +167,14 @@ export async function createRunnerHarness(options: {
     { provider: "extension-only", id: "primary" },
     { provider: "kimi-coding", id: "fallback" },
   ]
-  const models = options.models
-    ?? (isChainMode(options.childMode) ? fallbackModels : [model])
+  const extensionModel: SenpiModelPort = { provider: "extension-only", id: "primary" }
+  const models =
+    options.models ??
+    (isChainMode(options.childMode)
+      ? fallbackModels
+      : isExtensionProviderMode(options.childMode)
+        ? [extensionModel]
+        : [model])
   const categoryAvailable = options.categoryAvailable ?? true
   const memory = OmoMemorySettingsSchema.parse({
     reflection: { category: "quick", timeout_minutes: 15, merge: "auto" },
@@ -138,7 +190,9 @@ export async function createRunnerHarness(options: {
                   { model: "kimi-coding/fallback", reasoning: "minimal" },
                 ],
               }
-            : { model: "omo-mock/mock-1", reasoning: "high" },
+            : isExtensionProviderMode(options.childMode)
+              ? { model: "extension-only/primary", reasoning: "off" }
+              : { model: "omo-mock/mock-1", reasoning: "high" },
         }
       : {},
   }
@@ -147,7 +201,7 @@ export async function createRunnerHarness(options: {
   const preflightProbeLog = join(root, "preflight-probes.log")
   await writeFile(
     senpiLauncher,
-    `import { appendFileSync } from "node:fs"\nappendFileSync(${JSON.stringify(preflightProbeLog)}, "probe\\n")\nprocess.stdout.write(${JSON.stringify(`${(options.preflightModels ?? models).map((candidate) => `${candidate.provider}/${candidate.id}`).join("\n")}\n`)})\n`,
+    `import { appendFileSync } from "node:fs"\nappendFileSync(${JSON.stringify(preflightProbeLog)}, "probe\\n")\n${fakeSenpiCatalog(options.childMode, options.preflightModels ?? models)}\n`,
     "utf8",
   )
   const api = new CapturedCompletionApi()
@@ -157,10 +211,9 @@ export async function createRunnerHarness(options: {
     identity,
     reservation: store,
     resolveModelRegistry: () => ({
-      getAvailable: () => categoryAvailable ? models : [],
-      find: (provider, modelId) => models.find((candidate) =>
-        provider === candidate.provider && modelId === candidate.id
-      ),
+      getAvailable: () => (categoryAvailable ? models : []),
+      find: (provider, modelId) =>
+        models.find((candidate) => provider === candidate.provider && modelId === candidate.id),
     }),
     loadConfig: () => loaded,
     cwd: root,
@@ -172,9 +225,15 @@ export async function createRunnerHarness(options: {
     senpiPrefixArgs: [senpiLauncher],
     resolveAndPreflightLaunch: options.resolveAndPreflightLaunch,
     ...(options.resolveSessionModel === undefined ? {} : { resolveSessionModel: options.resolveSessionModel }),
-    ...(options.resolveParentContextTokens === undefined ? {} : { resolveParentContextTokens: options.resolveParentContextTokens }),
-    ...(options.resolveParentSessionFile === undefined ? {} : { resolveParentSessionFile: options.resolveParentSessionFile }),
-    ...(options.resolveParentCacheReusable === undefined ? {} : { resolveParentCacheReusable: options.resolveParentCacheReusable }),
+    ...(options.resolveParentContextTokens === undefined
+      ? {}
+      : { resolveParentContextTokens: options.resolveParentContextTokens }),
+    ...(options.resolveParentSessionFile === undefined
+      ? {}
+      : { resolveParentSessionFile: options.resolveParentSessionFile }),
+    ...(options.resolveParentCacheReusable === undefined
+      ? {}
+      : { resolveParentCacheReusable: options.resolveParentCacheReusable }),
     getTranscriptState: (conversationId) => {
       if (conversationId !== "conversation-a") throw new Error(`unknown conversation: ${conversationId}`)
       return journal.getState()
@@ -186,13 +245,26 @@ export async function createRunnerHarness(options: {
     }),
     sandbox: (spawnArgs) => {
       spawnCalls.push(spawnArgs)
-      const mode = options.childMode === "model-fallback"
-        ? spawnArgs.args.includes("extension-only/primary") ? "model-not-found" : "commit"
-        : options.childMode === "model-exhausted"
-          ? spawnArgs.args.includes("extension-only/primary") ? "model-not-found" : "auth-missing"
-          : options.childMode === "provider-cooldown"
-            ? spawnArgs.args.includes("extension-only/primary") ? "provider-cooldown" : "commit"
-            : options.childMode
+      const mode =
+        options.childMode === "model-fallback"
+          ? spawnArgs.args.includes("extension-only/primary")
+            ? "model-not-found"
+            : "commit"
+          : options.childMode === "model-exhausted"
+            ? spawnArgs.args.includes("extension-only/primary")
+              ? "model-not-found"
+              : "auth-missing"
+            : options.childMode === "provider-cooldown"
+              ? spawnArgs.args.includes("extension-only/primary")
+                ? "provider-cooldown"
+                : "commit"
+              : options.childMode === "extension-provider"
+                ? spawnArgs.args.includes("--no-extensions")
+                  ? "model-not-found"
+                  : "commit"
+                : options.childMode === "extension-provider-unreachable"
+                  ? "model-not-found"
+                  : options.childMode
       return {
         ...spawnArgs,
         command: process.execPath,

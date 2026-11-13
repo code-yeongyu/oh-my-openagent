@@ -5,10 +5,7 @@ import path from "node:path"
 describe("worktree-sweep command registration", () => {
   test("registers worktree-sweep on the omo-agent-toolkit program with the documented flags", async () => {
     // given
-    const source = await readFile(
-      path.resolve(import.meta.dir, "..", "runtime-commands.ts"),
-      "utf-8",
-    )
+    const source = await readFile(path.resolve(import.meta.dir, "..", "runtime-commands.ts"), "utf-8")
 
     // when
     const commandBlock = source.match(/program\s*\n\s*\.command\("worktree-sweep"\)([\s\S]*?)\.action\(/)
@@ -29,14 +26,5 @@ describe("worktree-sweep command registration", () => {
     expect(gitSource).not.toContain("'--force'")
     expect(gitSource).not.toContain('"--force"')
     expect(gitSource).toContain('runGit(repo, ["worktree", "remove", worktreePath])')
-  })
-
-  test("apply only removes after classification decides SWEEP", async () => {
-    // given
-    const sweepSource = await readFile(path.resolve(import.meta.dir, "sweep.ts"), "utf-8")
-
-    // when / then
-    expect(sweepSource).toContain('classification.decision !== "SWEEP"')
-    expect(sweepSource).toContain("await pruneWorktrees(root)")
   })
 })

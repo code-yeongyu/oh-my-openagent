@@ -19,10 +19,7 @@ class MockClient {
   readonly readResource = mock(async () => ({ contents: [] }))
   readonly getPrompt = mock(async () => ({ messages: [] }))
 
-  constructor(
-    _clientInfo: { name: string; version: string },
-    _options: { capabilities: Record<string, never> }
-  ) {}
+  constructor(_clientInfo: { name: string; version: string }, _options: { capabilities: Record<string, never> }) {}
 
   async connect(_transport: Transport): Promise<void> {
     // Successful connect, env-related assertions happen on transport constructor args
@@ -45,10 +42,7 @@ interface MockHttpTransportOptions {
   requestInit?: RequestInit
 }
 
-function getHeaderValue(
-  headers: HeadersInit | undefined,
-  name: string,
-): string | undefined {
+function getHeaderValue(headers: HeadersInit | undefined, name: string): string | undefined {
   if (!headers) {
     return undefined
   }
@@ -110,10 +104,7 @@ function createState(): SkillMcpManagerState {
   return state
 }
 
-function createClientInfo(
-  serverName: string,
-  scope?: SkillMcpClientInfo["scope"],
-): SkillMcpClientInfo {
+function createClientInfo(serverName: string, scope?: SkillMcpClientInfo["scope"]): SkillMcpClientInfo {
   return {
     serverName,
     skillName: "env-skill",
@@ -152,11 +143,12 @@ afterEach(async () => {
 describe("getOrCreateClient env var expansion", () => {
   describe("#given a scope-sensitive stdio skill MCP config", () => {
     test.each([
-      ["opencode-project", "Authorization:Bearer "],
-      ["local", "Authorization:Bearer "],
+      // Ungranted project references stay literal for later grants (#10693).
+      ["opencode-project", "Authorization:Bearer ${SLACK_USER_TOKEN}"],
+      ["local", "Authorization:Bearer ${SLACK_USER_TOKEN}"],
       ["user", "Authorization:Bearer xoxp-scope-token"],
       ["builtin", "Authorization:Bearer xoxp-scope-token"],
-    ] satisfies Array<[NonNullable<SkillMcpClientInfo["scope"]>, string]>) (
+    ] satisfies Array<[NonNullable<SkillMcpClientInfo["scope"]>, string]>)(
       "#when creating the client for %s scope #then args expand to %s",
       async (scope, expectedAuthorizationHeader) => {
         // given
@@ -181,6 +173,9 @@ describe("getOrCreateClient env var expansion", () => {
         // then
         expect(createdStdioTransports).toHaveLength(1)
         expect(createdStdioTransports[0]?.options.args?.[4]).toBe(expectedAuthorizationHeader)
+        if (scope === "opencode-project" || scope === "local") {
+          expect(createdStdioTransports[0]?.options.env?.SLACK_USER_TOKEN).toBeUndefined()
+        }
       },
     )
 
@@ -192,13 +187,7 @@ describe("getOrCreateClient env var expansion", () => {
       const clientKey = createClientKey(info)
       const config: ClaudeCodeMcpServer = {
         command: "npx",
-        args: [
-          "-y",
-          "mcp-remote",
-          "https://mcp.slack.com/mcp",
-          "--header",
-          "Authorization:Bearer ${SLACK_USER_TOKEN}",
-        ],
+        args: ["-y", "mcp-remote", "https://mcp.slack.com/mcp", "--header", "Authorization:Bearer ${SLACK_USER_TOKEN}"],
       }
 
       // when
@@ -206,9 +195,7 @@ describe("getOrCreateClient env var expansion", () => {
 
       // then
       expect(createdStdioTransports).toHaveLength(1)
-      expect(createdStdioTransports[0]?.options.args?.[4]).toBe(
-        "Authorization:Bearer xoxp-undefined-scope-token",
-      )
+      expect(createdStdioTransports[0]?.options.args?.[4]).toBe("Authorization:Bearer xoxp-undefined-scope-token")
     })
   })
 
@@ -221,13 +208,7 @@ describe("getOrCreateClient env var expansion", () => {
       const clientKey = createClientKey(info)
       const config: ClaudeCodeMcpServer = {
         command: "npx",
-        args: [
-          "-y",
-          "mcp-remote",
-          "https://mcp.slack.com/mcp",
-          "--header",
-          "Authorization:Bearer ${SLACK_USER_TOKEN}",
-        ],
+        args: ["-y", "mcp-remote", "https://mcp.slack.com/mcp", "--header", "Authorization:Bearer ${SLACK_USER_TOKEN}"],
       }
 
       // when
@@ -286,11 +267,11 @@ describe("getOrCreateClient env var expansion", () => {
       // when
       await getOrCreateClient({ state, clientKey, info, config })
 
-        // then
-        expect(createdHttpTransports).toHaveLength(1)
-        expect(getHeaderValue(createdHttpTransports[0]?.options?.requestInit?.headers, "Authorization")).toBe(
-          "Bearer xoxp-http-secret"
-        )
-      })
+      // then
+      expect(createdHttpTransports).toHaveLength(1)
+      expect(getHeaderValue(createdHttpTransports[0]?.options?.requestInit?.headers, "Authorization")).toBe(
+        "Bearer xoxp-http-secret",
+      )
+    })
   })
 })

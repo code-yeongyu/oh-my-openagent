@@ -7,10 +7,8 @@ import type { TaskRecord } from "@oh-my-opencode/senpi-task"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
-import {
-  TEAM_MEMBER_LIVENESS_MESSAGE_TYPE,
-  createTeamMemberLivenessNotifier,
-} from "./member-liveness"
+import { TEAM_MEMBER_LIVENESS_MESSAGE_TYPE, createTeamMemberLivenessNotifier } from "./member-liveness"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const roots: string[] = []
 
@@ -44,8 +42,22 @@ describe("team member liveness notifier", () => {
     const pi = new FakeExtensionAPI()
     const scheduled: Array<() => void> = []
     const coordinator = new IdleInjectionCoordinator(
-      (message, options) => pi.sendMessage(message, { triggerTurn: true, deliverAs: options.deliverAs }),
-      { scheduleFlush: (flush) => scheduled.push(flush) },
+      (message, options) => {
+        expect(
+          options.items.every(
+            (item) => item.runRef?.kind === "team" && item.runRef.id === "11111111-1111-4111-8111-111111111111",
+          ),
+        ).toBe(true)
+        pi.sendMessage(
+          { ...message, content: options.items.map((item) => item.content).join("\n\n") },
+          { triggerTurn: true, deliverAs: options.deliverAs },
+        )
+      },
+      {
+        scheduleFlush: (flush) => {
+          scheduled.push(flush)
+        },
+      },
     )
     const notifier = createTeamMemberLivenessNotifier({ pi, coordinator, isStreaming: () => true })
 
@@ -53,24 +65,29 @@ describe("team member liveness notifier", () => {
     notifier.notifyTerminal(memberRecord())
     for (const flush of scheduled) flush()
 
-    expect(pi.messages).toEqual([{
-      message: {
-        customType: "omo-senpi:wake",
-        content: "Team member liveness: alpha exited abnormally; last known state: error. Reason: RPC child killed by signal SIGKILL",
-        display: false,
-        details: [{
-          customType: TEAM_MEMBER_LIVENESS_MESSAGE_TYPE,
-          details: {
-              memberName: "alpha",
-              lastKnownState: "error",
-              reason: "RPC child killed by signal SIGKILL",
-              killed: true,
-              deliveryKey: "team-member-liveness:st_00000001:0",
-          },
-        }],
+    expect(pi.messages).toEqual([
+      {
+        message: {
+          customType: "omo-senpi:wake",
+          content:
+            "Team member liveness: alpha exited abnormally; last known state: error. Reason: RPC child killed by signal SIGKILL",
+          display: false,
+          details: [
+            {
+              customType: TEAM_MEMBER_LIVENESS_MESSAGE_TYPE,
+              details: {
+                memberName: "alpha",
+                lastKnownState: "error",
+                reason: "RPC child killed by signal SIGKILL",
+                killed: true,
+                deliveryKey: "team-member-liveness:st_00000001:0",
+              },
+            },
+          ],
+        },
+        options: { triggerTurn: true, deliverAs: "steer" },
       },
-      options: { triggerTurn: true, deliverAs: "steer" },
-    }])
+    ])
   })
 
   test("#given an injected liveness message not yet persisted #when persistence checks run #then ack waits for the exact JSONL marker", async () => {
@@ -80,7 +97,9 @@ describe("team member liveness notifier", () => {
     const persisted: number[] = []
     const retries: Array<() => void> = []
     let resolvePersisted: () => void = () => undefined
-    const persistedSignal = new Promise<void>((resolve) => { resolvePersisted = resolve })
+    const persistedSignal = new Promise<void>((resolve) => {
+      resolvePersisted = resolve
+    })
     const notifier = createTeamMemberLivenessNotifier({
       pi: new FakeExtensionAPI(),
       isStreaming: () => false,
@@ -97,15 +116,18 @@ describe("team member liveness notifier", () => {
     expect(persisted).toEqual([])
     expect(retries).toHaveLength(1)
 
-    writeFileSync(sessionFile, `${JSON.stringify({
-      type: "custom_message",
-      customType: TEAM_MEMBER_LIVENESS_MESSAGE_TYPE,
-      content: "liveness",
-      display: false,
-      details: { deliveryKey: "team-member-liveness:st_00000001:0" },
-    })}\n`)
+    writeFileSync(
+      sessionFile,
+      `${JSON.stringify({
+        type: "custom_message",
+        customType: TEAM_MEMBER_LIVENESS_MESSAGE_TYPE,
+        content: "liveness",
+        display: false,
+        details: { deliveryKey: "team-member-liveness:st_00000001:0" },
+      })}\n`,
+    )
     retries.shift()?.()
-    await withTimeout(persistedSignal, 1_000)
+    await withTimeout(persistedSignal, remainingTestTime(), "persistedSignal")
 
     expect(persisted).toEqual([0])
   })
@@ -113,6 +135,7 @@ describe("team member liveness notifier", () => {
   test("#given a failed direct injection #when the delivery promise rejects #then local dedupe clears and a bounded retry sends again", async () => {
     const attempts: string[] = []
     const retries: Array<() => void> = []
+    const retryQueued = Promise.withResolvers<void>()
     const notifier = createTeamMemberLivenessNotifier({
       pi: {
         sendMessage: () => {
@@ -121,23 +144,26 @@ describe("team member liveness notifier", () => {
         },
       },
       isStreaming: () => false,
-      scheduleRetry: (retry) => retries.push(retry),
+      scheduleRetry: (retry) => {
+        retries.push(retry)
+        retryQueued.resolve()
+      },
       maxDeliveryRetries: 1,
     })
 
     notifier.notifyTerminal(memberRecord())
-    await flushMicrotasks()
+    await withTimeout(retryQueued.promise, remainingTestTime(), "retryQueued.promise")
     expect(attempts).toEqual(["send"])
     expect(retries).toHaveLength(1)
 
     retries.shift()?.()
-    await flushMicrotasks()
     expect(attempts).toEqual(["send", "send"])
   })
 
   test("#given a failed coordinator delivery #when its promise rejects #then the liveness injection is requeued and delivered on retry", async () => {
     const deliveries: string[] = []
     const retries: Array<() => void> = []
+    const retryQueued = Promise.withResolvers<void>()
     const coordinator = new IdleInjectionCoordinator((message) => {
       deliveries.push(message.content)
       return deliveries.length === 1 ? Promise.reject(new Error("admission failed")) : Promise.resolve()
@@ -146,19 +172,44 @@ describe("team member liveness notifier", () => {
       pi: new FakeExtensionAPI(),
       coordinator,
       isStreaming: () => false,
-      scheduleRetry: (retry) => retries.push(retry),
+      scheduleRetry: (retry) => {
+        retries.push(retry)
+        retryQueued.resolve()
+      },
       maxDeliveryRetries: 1,
     })
 
     notifier.notifyTerminal(memberRecord())
     coordinator.flushOnIdle()
-    await flushMicrotasks()
+    await withTimeout(retryQueued.promise, remainingTestTime(), "retryQueued.promise")
     expect(retries).toHaveLength(1)
 
     retries.shift()?.()
     coordinator.flushOnIdle()
-    await flushMicrotasks()
     expect(deliveries).toHaveLength(2)
+  })
+
+  test("#given a retired coordinator #when a liveness notice is queued #then the refusal fails the delivery and a retry is scheduled", () => {
+    // given a coordinator retired by session_shutdown: it refuses the enqueue and owes no receipt
+    const errors: unknown[] = []
+    const retries: Array<() => void> = []
+    const coordinator = new IdleInjectionCoordinator(() => undefined)
+    coordinator.retire()
+    const notifier = createTeamMemberLivenessNotifier({
+      pi: new FakeExtensionAPI(),
+      coordinator,
+      isStreaming: () => true,
+      scheduleRetry: (retry) => retries.push(retry),
+      onError: (error) => errors.push(error),
+    })
+
+    // when
+    notifier.notifyTerminal(memberRecord())
+
+    // then the notice is not silently swallowed: the failure path runs and the retry is armed
+    expect(coordinator.pendingCount()).toBe(0)
+    expect(errors).toHaveLength(1)
+    expect(retries).toHaveLength(1)
   })
 
   test("#given the liveness epoch is already persisted #when a restarted notifier observes the terminal record #then it suppresses replay", () => {
@@ -174,10 +225,23 @@ describe("team member liveness notifier", () => {
     expect(pi.messages).toEqual([])
   })
 
+  test("#given a parked process member #when revived and later killed #then parking does not consume the death notification", () => {
+    const pi = new FakeExtensionAPI()
+    const notifier = createTeamMemberLivenessNotifier({ pi, isStreaming: () => false })
+    notifier.notifyTerminal(memberRecord({ residency_state: "rpc_detached", killed: undefined }))
+    expect(pi.messages).toEqual([])
+    notifier.notifyTerminal(memberRecord({ residency_state: "disposed" }))
+    expect(pi.messages).toHaveLength(1)
+  })
+
   test("#given a normal member completion #when observed #then no liveness event is injected", () => {
     const sent: Record<string, unknown>[] = []
     const notifier = createTeamMemberLivenessNotifier({
-      pi: { sendMessage: (message) => { sent.push(message) } },
+      pi: {
+        sendMessage: (message) => {
+          sent.push(message)
+        },
+      },
       isStreaming: () => false,
     })
 
@@ -189,16 +253,22 @@ describe("team member liveness notifier", () => {
   test("#given a completed resident process was later marked killed #when observed #then liveness preserves the completed turn as its last known state", () => {
     const sent: Record<string, unknown>[] = []
     const notifier = createTeamMemberLivenessNotifier({
-      pi: { sendMessage: (message) => { sent.push(message) } },
+      pi: {
+        sendMessage: (message) => {
+          sent.push(message)
+        },
+      },
       isStreaming: () => false,
     })
 
-    notifier.notifyTerminal(memberRecord({
-      status: "completed",
-      residency_state: "disposed",
-      killed: true,
-      error_message: "reattach disabled for crashed resident",
-    }))
+    notifier.notifyTerminal(
+      memberRecord({
+        status: "completed",
+        residency_state: "disposed",
+        killed: true,
+        error_message: "reattach disabled for crashed resident",
+      }),
+    )
 
     expect(sent[0]?.details).toMatchObject({
       memberName: "alpha",
@@ -212,7 +282,11 @@ describe("team member liveness notifier", () => {
     // given a member whose errored record was suspended at session shutdown and still awaits revival
     const sent: Record<string, unknown>[] = []
     const notifier = createTeamMemberLivenessNotifier({
-      pi: { sendMessage: (message) => { sent.push(message) } },
+      pi: {
+        sendMessage: (message) => {
+          sent.push(message)
+        },
+      },
       isStreaming: () => false,
     })
 
@@ -225,20 +299,14 @@ describe("team member liveness notifier", () => {
   })
 })
 
-async function withTimeout<T>(signal: Promise<T>, timeoutMs: number): Promise<T> {
+async function withTimeout<T>(signal: Promise<T>, timeoutMs: number, what: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const timeout = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => reject(new Error(`timed out after ${timeoutMs}ms`)), timeoutMs)
+    timer = setTimeout(() => reject(new Error(`${what} did not arrive within ${timeoutMs}ms`)), timeoutMs)
   })
   try {
     return await Promise.race([signal, timeout])
   } finally {
     if (timer !== undefined) clearTimeout(timer)
   }
-}
-
-async function flushMicrotasks(): Promise<void> {
-  await Promise.resolve()
-  await Promise.resolve()
-  await Promise.resolve()
 }

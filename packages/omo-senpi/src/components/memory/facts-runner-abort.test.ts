@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { existsSync } from "node:fs"
-import { readFile, readdir } from "node:fs/promises"
+import { mkdir, readFile, readdir, rm } from "node:fs/promises"
 import { join } from "node:path"
 
 import { FactsFailureStore } from "@oh-my-opencode/memory-core"
@@ -28,27 +28,36 @@ describe("facts runner shutdown abort boundary", () => {
     // given
     const { root, identity, queue } = await fixture()
     let signalStart: (() => void) | undefined
-    const startCalled = new Promise<void>((resolve) => { signalStart = resolve })
+    const startCalled = new Promise<void>((resolve) => {
+      signalStart = resolve
+    })
     let aborted = 0
     let disposed = 0
-    const runner = new FactsExtractorRunner(runnerOptions(root, identity, queue, "fact", {
-      createRunner: () => ({
-        start: async () => {
-          signalStart?.()
-          return {
-            task_id: "facts-child",
-            sessionId: "facts-child",
-            steer: async () => undefined,
-            followUp: async () => undefined,
-            abort: async () => { aborted += 1 },
-            subscribe: () => () => undefined,
-            waitForIdle: async () => await new Promise(() => undefined),
-            lastAssistantText: () => undefined,
-            dispose: () => { disposed += 1 },
-          }
-        },
+    const runner = new FactsExtractorRunner(
+      runnerOptions(root, identity, queue, "fact", {
+        createRunner: () => ({
+          start: async () => {
+            signalStart?.()
+            return {
+              task_id: "facts-child",
+              sessionId: "facts-child",
+              effectiveModel: () => undefined,
+              steer: async () => undefined,
+              followUp: async () => undefined,
+              abort: async () => {
+                aborted += 1
+              },
+              subscribe: () => () => undefined,
+              waitForIdle: async () => await new Promise(() => undefined),
+              lastAssistantText: () => undefined,
+              dispose: () => {
+                disposed += 1
+              },
+            }
+          },
+        }),
       }),
-    }))
+    )
     const launch = runner.launchPending()
     await startCalled
 
@@ -75,12 +84,14 @@ describe("facts runner shutdown abort boundary", () => {
     // reservation boundary - the composite must stop before creating the run.
     const { root, identity, queue } = await fixture()
     const aborted = new AbortController()
-    const runner = new FactsExtractorRunner(runnerOptions(root, identity, queue, "fact", {
-      createBatchId: () => {
-        aborted.abort()
-        return "11111111-1111-4111-8111-111111111111"
-      },
-    }))
+    const runner = new FactsExtractorRunner(
+      runnerOptions(root, identity, queue, "fact", {
+        createBatchId: () => {
+          aborted.abort()
+          return "11111111-1111-4111-8111-111111111111"
+        },
+      }),
+    )
 
     // when
     const result = await runner.launchPending(aborted.signal)
@@ -89,5 +100,50 @@ describe("facts runner shutdown abort boundary", () => {
     expect(result.status).toBe("skipped")
     expect(await queue.listPending()).toHaveLength(1)
     expect(existsSync(join(identity.paths.facts, "runs"))).toBe(false)
+  }, 30_000)
+
+  test("#given a bind-time reconcile still in flight #when cancelActive is requested #then it settles only after the reconcile stops, and the reconcile launches nothing", async () => {
+    // Maintenance floats past bind. Shutdown must join its real artifact cleanup before
+    // releasing the identity, even though reconcile no longer reads launch/failure eligibility.
+    const { root, identity, queue } = await fixture()
+    const tombstone = join(identity.paths.facts, "runs", ".prune-interrupted")
+    await mkdir(tombstone, { recursive: true })
+    const cleanupStarted = Promise.withResolvers<void>()
+    const cleanupGate = Promise.withResolvers<void>()
+    const runner = new FactsExtractorRunner(
+      runnerOptions(root, identity, queue, "fact", {
+        resolveModelRegistry: () => {
+          throw new Error("maintenance must not resolve a launch model")
+        },
+        removeRunArtifact: async (path) => {
+          if (path === tombstone) {
+            cleanupStarted.resolve()
+            await cleanupGate.promise
+          }
+          await rm(path, { recursive: true, force: true })
+        },
+      }),
+    )
+    const order: string[] = []
+    const reconcile = runner.reconcilePending().then((result) => {
+      order.push("reconcile")
+      return result
+    })
+    await cleanupStarted.promise
+
+    // when
+    const cancel = runner.cancelActive().then(() => {
+      order.push("cancel")
+    })
+    cleanupGate.resolve()
+    await Promise.all([cancel, reconcile])
+
+    // then
+    expect(order).toEqual(["reconcile", "cancel"])
+    expect((await reconcile).status).toBe("skipped")
+    expect(await queue.listPending()).toHaveLength(1)
+    expect(await readdir(join(identity.paths.facts, "runs"))).toEqual([])
+    expect(existsSync(tombstone)).toBe(false)
+    expect(existsSync(join(identity.paths.repo, ".git"))).toBe(false)
   }, 30_000)
 })

@@ -1,16 +1,18 @@
 /// <reference path="../../../bun-test.d.ts" />
 
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { describe, expect, test } from "bun:test"
+import { describe, expect, onTestFinished, test } from "bun:test"
 
 import type { BoulderState, BoulderWorkState } from "./types"
 import { getWorkForSession, readBoulderState } from "./storage/read-state"
 import { normalizeSessionId } from "./storage/shared"
 
 function createTempDirectory(): string {
-  return mkdtempSync(join(tmpdir(), "boulder-read-state-"))
+  const directory = mkdtempSync(join(tmpdir(), "boulder-read-state-"))
+  onTestFinished(() => rmSync(directory, { recursive: true, force: true }))
+  return directory
 }
 
 function writeState(directory: string, state: BoulderState): void {
@@ -130,20 +132,23 @@ describe("getWorkForSession", () => {
   test("#given multiple works for one session #when reading by session #then newest updated work is returned", () => {
     // given
     const directory = createTempDirectory()
-    writeState(directory, createState([
-      createWork({
-        workId: "older",
-        sessionIds: ["opencode:sess-a"],
-        startedAt: "2026-06-05T01:00:00.000Z",
-        updatedAt: "2026-06-05T02:00:00.000Z",
-      }),
-      createWork({
-        workId: "newest",
-        sessionIds: ["opencode:sess-a"],
-        startedAt: "2026-06-05T01:30:00.000Z",
-        updatedAt: "2026-06-05T03:00:00.000Z",
-      }),
-    ]))
+    writeState(
+      directory,
+      createState([
+        createWork({
+          workId: "older",
+          sessionIds: ["opencode:sess-a"],
+          startedAt: "2026-06-05T01:00:00.000Z",
+          updatedAt: "2026-06-05T02:00:00.000Z",
+        }),
+        createWork({
+          workId: "newest",
+          sessionIds: ["opencode:sess-a"],
+          startedAt: "2026-06-05T01:30:00.000Z",
+          updatedAt: "2026-06-05T03:00:00.000Z",
+        }),
+      ]),
+    )
 
     // when
     const work = getWorkForSession(directory, "sess-a")
@@ -155,18 +160,21 @@ describe("getWorkForSession", () => {
   test("#given matching works without updated times #when reading by session #then newest started work is returned", () => {
     // given
     const directory = createTempDirectory()
-    writeState(directory, createState([
-      createWork({
-        workId: "older-start",
-        sessionIds: ["opencode:sess-a"],
-        startedAt: "2026-06-05T01:00:00.000Z",
-      }),
-      createWork({
-        workId: "newer-start",
-        sessionIds: ["opencode:sess-a"],
-        startedAt: "2026-06-05T02:00:00.000Z",
-      }),
-    ]))
+    writeState(
+      directory,
+      createState([
+        createWork({
+          workId: "older-start",
+          sessionIds: ["opencode:sess-a"],
+          startedAt: "2026-06-05T01:00:00.000Z",
+        }),
+        createWork({
+          workId: "newer-start",
+          sessionIds: ["opencode:sess-a"],
+          startedAt: "2026-06-05T02:00:00.000Z",
+        }),
+      ]),
+    )
 
     // when
     const work = getWorkForSession(directory, "opencode:sess-a")
@@ -178,20 +186,23 @@ describe("getWorkForSession", () => {
   test("#given matching works with identical sort times #when reading by session #then first inserted work is returned", () => {
     // given
     const directory = createTempDirectory()
-    writeState(directory, createState([
-      createWork({
-        workId: "first",
-        sessionIds: ["opencode:sess-a"],
-        startedAt: "2026-06-05T01:00:00.000Z",
-        updatedAt: "2026-06-05T02:00:00.000Z",
-      }),
-      createWork({
-        workId: "second",
-        sessionIds: ["opencode:sess-a"],
-        startedAt: "2026-06-05T01:30:00.000Z",
-        updatedAt: "2026-06-05T02:00:00.000Z",
-      }),
-    ]))
+    writeState(
+      directory,
+      createState([
+        createWork({
+          workId: "first",
+          sessionIds: ["opencode:sess-a"],
+          startedAt: "2026-06-05T01:00:00.000Z",
+          updatedAt: "2026-06-05T02:00:00.000Z",
+        }),
+        createWork({
+          workId: "second",
+          sessionIds: ["opencode:sess-a"],
+          startedAt: "2026-06-05T01:30:00.000Z",
+          updatedAt: "2026-06-05T02:00:00.000Z",
+        }),
+      ]),
+    )
 
     // when
     const work = getWorkForSession(directory, "sess-a")
@@ -203,20 +214,23 @@ describe("getWorkForSession", () => {
   test("#given matching works with invalid sort times #when reading by session #then first inserted work is returned", () => {
     // given
     const directory = createTempDirectory()
-    writeState(directory, createState([
-      createWork({
-        workId: "first-invalid",
-        sessionIds: ["opencode:sess-a"],
-        startedAt: "not-a-date",
-        updatedAt: "also-not-a-date",
-      }),
-      createWork({
-        workId: "second-invalid",
-        sessionIds: ["opencode:sess-a"],
-        startedAt: "still-not-a-date",
-        updatedAt: "nope",
-      }),
-    ]))
+    writeState(
+      directory,
+      createState([
+        createWork({
+          workId: "first-invalid",
+          sessionIds: ["opencode:sess-a"],
+          startedAt: "not-a-date",
+          updatedAt: "also-not-a-date",
+        }),
+        createWork({
+          workId: "second-invalid",
+          sessionIds: ["opencode:sess-a"],
+          startedAt: "still-not-a-date",
+          updatedAt: "nope",
+        }),
+      ]),
+    )
 
     // when
     const work = getWorkForSession(directory, "sess-a")
@@ -228,20 +242,23 @@ describe("getWorkForSession", () => {
   test("#given valid and invalid matching work times #when reading by session #then valid time wins", () => {
     // given
     const directory = createTempDirectory()
-    writeState(directory, createState([
-      createWork({
-        workId: "invalid",
-        sessionIds: ["opencode:sess-a"],
-        startedAt: "not-a-date",
-        updatedAt: "also-not-a-date",
-      }),
-      createWork({
-        workId: "valid",
-        sessionIds: ["opencode:sess-a"],
-        startedAt: "2026-06-05T01:00:00.000Z",
-        updatedAt: "2026-06-05T02:00:00.000Z",
-      }),
-    ]))
+    writeState(
+      directory,
+      createState([
+        createWork({
+          workId: "invalid",
+          sessionIds: ["opencode:sess-a"],
+          startedAt: "not-a-date",
+          updatedAt: "also-not-a-date",
+        }),
+        createWork({
+          workId: "valid",
+          sessionIds: ["opencode:sess-a"],
+          startedAt: "2026-06-05T01:00:00.000Z",
+          updatedAt: "2026-06-05T02:00:00.000Z",
+        }),
+      ]),
+    )
 
     // when
     const work = getWorkForSession(directory, "sess-a")

@@ -6,11 +6,11 @@ import { describe, expect, test } from "bun:test"
 import type { RpcChildHandle } from "../types"
 import { createRpcChildHandle } from "./handle"
 import type { RpcProtocolClient } from "./protocol-client"
+import { createChildExtensionEvents } from "../child-extension-events"
 
 type RpcHandleWithTerminalFacts = RpcChildHandle & {
   terminalAssistantMessage():
-    | { readonly text?: string; readonly stopReason?: string; readonly errorMessage?: string }
-    | undefined
+    { readonly text?: string; readonly stopReason?: string; readonly errorMessage?: string } | undefined
   wasAbortedByUser(): boolean
 }
 
@@ -21,6 +21,7 @@ function createHarness(): {
   const child = Object.assign(new EventEmitter(), { pid: 4242 }) as unknown as ChildProcess
   const listeners = new Set<(event: AgentSessionEvent) => void>()
   const client = {
+    extensionEvents: createChildExtensionEvents(),
     stderrTail: "",
     send: () => Promise.resolve({ success: true }),
     onEvent: (listener: (event: AgentSessionEvent) => void) => {
@@ -54,16 +55,19 @@ describe("createRpcChildHandle terminal turn observation", () => {
     const harness = createHarness()
 
     // when
-    harness.emit(event({
-      type: "message_end",
-      message: {
-        role: "assistant",
-        content: [{ type: "text", text: "partial" }],
-        stopReason: "error",
-        errorMessage: "401 unauthorized; re-authenticate",
-      },
-    }))
+    harness.emit(
+      event({
+        type: "message_end",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "partial" }],
+          stopReason: "error",
+          errorMessage: "401 unauthorized; re-authenticate",
+        },
+      }),
+    )
     harness.emit(event({ type: "agent_end", willRetry: false }))
+    harness.emit(event({ type: "agent_idle" }))
     await harness.handle.waitForIdle()
 
     // then
@@ -92,11 +96,14 @@ describe("createRpcChildHandle terminal turn observation", () => {
   test("#given a completed resident turn #when a follow-up revives it #then terminal facts reset for the new turn while last text remains available", async () => {
     // given
     const harness = createHarness()
-    harness.emit(event({
-      type: "message_end",
-      message: { role: "assistant", content: [{ type: "text", text: "first" }], stopReason: "stop" },
-    }))
+    harness.emit(
+      event({
+        type: "message_end",
+        message: { role: "assistant", content: [{ type: "text", text: "first" }], stopReason: "stop" },
+      }),
+    )
     harness.emit(event({ type: "agent_end", willRetry: false }))
+    harness.emit(event({ type: "agent_idle" }))
     await harness.handle.waitForIdle()
 
     // when

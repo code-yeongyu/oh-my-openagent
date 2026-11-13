@@ -2,16 +2,17 @@ import { afterEach, describe, expect, it } from "bun:test"
 import { Buffer } from "node:buffer"
 import { spawn } from "node:child_process"
 import { existsSync, realpathSync } from "node:fs"
-import { mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/promises"
+import { mkdtemp, readdir, readFile, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { TranscriptJournal, withLocalJournalLock } from "./store"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })))
 })
 
 async function createJournal(): Promise<{ dir: string; journal: TranscriptJournal }> {
@@ -64,9 +65,7 @@ describe("transcript journal store", () => {
   it("#given a stale derived counter on disk #when state is written #then the counter is recomputed", async () => {
     // given
     const { dir, journal } = await createJournal()
-    await journal.reconcile([
-      { kind: "assistant", messageId: "assistant-1", textBlocks: ["one"] },
-    ])
+    await journal.reconcile([{ kind: "assistant", messageId: "assistant-1", textBlocks: ["one"] }])
     await writeFile(
       join(dir, "state.json"),
       `${JSON.stringify({
@@ -113,7 +112,7 @@ describe("cancellable journal flush", () => {
 
     // then
     expect(await readFile(lockPath, "utf8")).toBe(`${process.pid}\n`)
-  }, 15_000)
+  })
 
   it("#given a signal aborted before acquisition #when flush runs #then it throws AbortError and creates no lock file", async () => {
     // given
@@ -143,7 +142,9 @@ describe("cancellable journal flush", () => {
     queueMicrotask(() => controller.abort())
     const failure = await withLocalJournalLock(
       lockPath,
-      async () => { taskRuns += 1 },
+      async () => {
+        taskRuns += 1
+      },
       controller.signal,
     ).catch((error: unknown) => error)
 
@@ -174,78 +175,80 @@ describe("cancellable journal flush", () => {
     expect(existsSync(lockPath)).toBe(false)
   })
 
-describe("stale journal lock recovery", () => {
-  async function spawnExitedChildPid(): Promise<number> {
-    const child = spawn(process.execPath, ["-e", "process.exit(0)"], { stdio: "ignore" })
-    await new Promise<void>((resolve, reject) => {
-      child.once("exit", () => resolve())
-      child.once("error", reject)
-    })
-    if (child.pid === undefined) throw new Error("exited child has no pid")
-    return child.pid
-  }
+  describe("stale journal lock recovery", () => {
+    async function spawnExitedChildPid(): Promise<number> {
+      const child = spawn(process.execPath, ["-e", "process.exit(0)"], { stdio: "ignore" })
+      await new Promise<void>((resolve, reject) => {
+        child.once("exit", () => resolve())
+        child.once("error", reject)
+      })
+      if (child.pid === undefined) throw new Error("exited child has no pid")
+      return child.pid
+    }
 
-  it("#given a lock file left by a dead process #when the lock is acquired #then the stale lock is reclaimed and the task runs", async () => {
-    // given
-    const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-journal-lock-")))
-    tempDirs.push(dir)
-    const lockPath = join(dir, "state.lock")
-    const deadPid = await spawnExitedChildPid()
-    await writeFile(lockPath, `${deadPid}\n`, "utf8")
+    it("#given a lock file left by a dead process #when the lock is acquired #then the stale lock is reclaimed and the task runs", async () => {
+      // given
+      const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-journal-lock-")))
+      tempDirs.push(dir)
+      const lockPath = join(dir, "state.lock")
+      const deadPid = await spawnExitedChildPid()
+      await writeFile(lockPath, `${deadPid}\n`, "utf8")
 
-    // when
-    let taskRuns = 0
-    await withLocalJournalLock(lockPath, async () => {
-      taskRuns += 1
-      const payload = await readFile(lockPath, "utf8")
-      expect(payload.startsWith(`${process.pid}\n`)).toBe(true)
-    })
+      // when
+      let taskRuns = 0
+      await withLocalJournalLock(lockPath, async () => {
+        taskRuns += 1
+        const payload = await readFile(lockPath, "utf8")
+        expect(payload.startsWith(`${process.pid}\n`)).toBe(true)
+      })
 
-    // then
-    expect(taskRuns).toBe(1)
-    expect(existsSync(lockPath)).toBe(false)
-  }, 15_000)
-
-  it("#given a payload-free lock file abandoned mid-acquisition #when the lock is acquired #then the artifact is reclaimed by age", async () => {
-    // given
-    const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-journal-lock-")))
-    tempDirs.push(dir)
-    const lockPath = join(dir, "state.lock")
-    await writeFile(lockPath, "", "utf8")
-    const abandonedAt = new Date(Date.now() - 60_000)
-    await utimes(lockPath, abandonedAt, abandonedAt)
-
-    // when
-    let taskRuns = 0
-    await withLocalJournalLock(lockPath, async () => {
-      taskRuns += 1
+      // then
+      expect(taskRuns).toBe(1)
+      expect(existsSync(lockPath)).toBe(false)
     })
 
-    // then
-    expect(taskRuns).toBe(1)
-    expect(existsSync(lockPath)).toBe(false)
-  }, 15_000)
+    it("#given a payload-free lock file abandoned mid-acquisition #when the lock is acquired #then the artifact is reclaimed by age", async () => {
+      // given
+      const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-journal-lock-")))
+      tempDirs.push(dir)
+      const lockPath = join(dir, "state.lock")
+      await writeFile(lockPath, "", "utf8")
+      const abandonedAt = new Date(Date.now() - 60_000)
+      await utimes(lockPath, abandonedAt, abandonedAt)
 
-  it("#given a lock file owned by a live process #when the wait deadline passes #then it throws and the live lock is never stolen", async () => {
-    // given
-    const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-journal-lock-")))
-    tempDirs.push(dir)
-    const lockPath = join(dir, "state.lock")
-    await writeFile(lockPath, `${process.pid}\n`, "utf8")
+      // when
+      let taskRuns = 0
+      await withLocalJournalLock(lockPath, async () => {
+        taskRuns += 1
+      })
 
-    // when
-    let taskRuns = 0
-    const failure = await withLocalJournalLock(lockPath, async () => {
-      taskRuns += 1
-    }).catch((error: unknown) => error)
+      // then
+      expect(taskRuns).toBe(1)
+      expect(existsSync(lockPath)).toBe(false)
+    })
 
-    // then
-    expect(failure).toBeInstanceOf(Error)
-    expect((failure as Error).name).toBe("JournalLockTimeoutError")
-    expect(taskRuns).toBe(0)
-    expect(await readFile(lockPath, "utf8")).toBe(`${process.pid}\n`)
-  }, 15_000)
-})
+    // Waits the full 5 s acquisition deadline before it can throw, and bun gives every file after the
+    // first in a plain `bun test` run only its 5 s default, so this test carries its own budget.
+    it("#given a lock file owned by a live process #when the wait deadline passes #then it throws and the live lock is never stolen", async () => {
+      // given
+      const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-journal-lock-")))
+      tempDirs.push(dir)
+      const lockPath = join(dir, "state.lock")
+      await writeFile(lockPath, `${process.pid}\n`, "utf8")
+
+      // when
+      let taskRuns = 0
+      const failure = await withLocalJournalLock(lockPath, async () => {
+        taskRuns += 1
+      }).catch((error: unknown) => error)
+
+      // then
+      expect(failure).toBeInstanceOf(Error)
+      expect((failure as Error).name).toBe("JournalLockTimeoutError")
+      expect(taskRuns).toBe(0)
+      expect(await readFile(lockPath, "utf8")).toBe(`${process.pid}\n`)
+    }, 15_000)
+  })
 
   it("#given an injected journal lock #when flush runs #then the lock is never invoked", async () => {
     // given
@@ -263,5 +266,79 @@ describe("stale journal lock recovery", () => {
 
     // then
     expect(existsSync(join(dir, "state.lock"))).toBe(false)
+  })
+})
+
+describe("transcript journal state writes", () => {
+  it("#given the platform refuses the state rename #when state is written #then the write rejects and leaves no temporary file", async () => {
+    // given
+    const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-journal-refused-")))
+    tempDirs.push(dir)
+    const journal = new TranscriptJournal({
+      journalDir: dir,
+      now: () => new Date("2026-08-09T12:00:00.000Z"),
+      renameFile: async () => {
+        throw Object.assign(new Error("EPERM: operation not permitted, rename"), { code: "EPERM" })
+      },
+    })
+
+    // when
+    const written = journal.setPendingCompaction(true)
+
+    // then
+    await expect(written).rejects.toMatchObject({ code: "EPERM" })
+    expect((await readdir(dir)).filter((name) => name.startsWith("state.json.tmp-"))).toEqual([])
+  })
+})
+
+describe("transcript journal with nothing to record (#9737)", () => {
+  async function missingJournal(): Promise<{ dir: string; journal: TranscriptJournal }> {
+    const parent = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-journal-missing-")))
+    tempDirs.push(parent)
+    const dir = join(parent, "session-without-messages")
+    return { dir, journal: new TranscriptJournal({ journalDir: dir, now: () => new Date("2026-08-09T12:00:00.000Z") }) }
+  }
+
+  it("#given no journal yet #when reconciled or appended with nothing #then nothing is written", async () => {
+    // given
+    const { dir, journal } = await missingJournal()
+
+    // when
+    const reconciled = await journal.reconcile([])
+    const appended = await journal.append([])
+
+    // then
+    expect(reconciled).toEqual({ appended: 0, skipped: 0 })
+    expect(appended).toEqual({ appended: 0, skipped: 0 })
+    expect(existsSync(dir)).toBe(false)
+  })
+
+  it("#given no journal yet #when its state, entries or a reflection snapshot are read #then they are empty and nothing is written", async () => {
+    // given
+    const { dir, journal } = await missingJournal()
+
+    // when
+    const state = await journal.getState()
+    const entries = await journal.readEntries()
+    const snapshot = await journal.captureReflectionSnapshot()
+
+    // then
+    expect(state.total_completed_steps).toBe(0)
+    expect(entries).toEqual([])
+    expect(snapshot).toBeNull()
+    expect(existsSync(dir)).toBe(false)
+  })
+
+  it("#given no journal yet #when the first real message is reconciled #then the journal is created with it", async () => {
+    // given
+    const { dir, journal } = await missingJournal()
+
+    // when
+    const result = await journal.reconcile([{ kind: "user", messageId: "user-1", text: "hello" }])
+
+    // then
+    expect(result).toEqual({ appended: 1, skipped: 0 })
+    expect((await readFile(join(dir, "transcript.jsonl"), "utf8")).trim().split("\n")).toHaveLength(1)
+    expect(existsSync(join(dir, "state.json"))).toBe(true)
   })
 })

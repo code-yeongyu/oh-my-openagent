@@ -11,6 +11,40 @@ import {
 const DEFAULT_RETRY_CODES = [429, 500, 502, 503, 504] as const
 
 describe("runtime fallback error classifier", () => {
+  test("recognizes named content-filter errors without retrying validation messages about filtering", () => {
+    const errors = [
+      {
+        name: "ContentFilterError",
+        data: { message: "Blocked by the provider's content management policy." },
+      },
+      {
+        error: {
+          name: "content_filter_error",
+          data: { message: "The provider refused this response." },
+        },
+      },
+      {
+        name: "ValidationError",
+        statusCode: 400,
+        message: "Invalid content filter configuration.",
+      },
+      {
+        name: "ValidationError",
+        data: {
+          statusCode: 400,
+          message: "Unsupported content_filter setting; ContentFilterError is not a valid request option.",
+        },
+      },
+    ]
+
+    expect(errors.map((error) => isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES))).toEqual([
+      true,
+      true,
+      false,
+      false,
+    ])
+  })
+
   test("classifies representative Anthropic provider payloads without adapter state", () => {
     //#given
     const cases = [
@@ -113,9 +147,14 @@ describe("runtime fallback error classifier", () => {
     expect(results).toEqual([
       { message: "", statusCode: undefined, type: undefined, retryable: false },
       { message: "", statusCode: undefined, type: undefined, retryable: false },
-      { message: "{\"statuscode\":\"429\",\"message\":429}", statusCode: 429, type: undefined, retryable: true },
-      { message: "{\"data\":{\"error\":{\"name\":7,\"message\":false}}}", statusCode: undefined, type: undefined, retryable: false },
-      { message: "{\"data\":{\"error\":null},\"error\":\"broken\"}", statusCode: undefined, type: undefined, retryable: false },
+      { message: '{"statuscode":"429","message":429}', statusCode: 429, type: undefined, retryable: true },
+      {
+        message: '{"data":{"error":{"name":7,"message":false}}}',
+        statusCode: undefined,
+        type: undefined,
+        retryable: false,
+      },
+      { message: '{"data":{"error":null},"error":"broken"}', statusCode: undefined, type: undefined, retryable: false },
     ])
   })
 
@@ -137,9 +176,7 @@ describe("runtime fallback error classifier", () => {
     ] as const
 
     //#when
-    const retryable = cases.map(({ error }) =>
-      isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES),
-    )
+    const retryable = cases.map(({ error }) => isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES))
 
     //#then
     expect(retryable).toEqual(cases.map(({ expected }) => expected))
@@ -156,6 +193,22 @@ describe("runtime fallback error classifier", () => {
     //#then
     expect(retryable).toBe(true)
     expect(type).toBeUndefined()
+  })
+
+  test("#given the Cursor provider's capacity_limit UnknownError #when classified #then it is retryable quota exhaustion", () => {
+    // given
+    const error = {
+      name: "UnknownError",
+      data: { message: "Cursor Run failed after 3 attempts: Cursor API error (code=capacity_limit)" },
+    }
+
+    // when
+    const type = classifyRuntimeFallbackError(error)
+    const retryable = isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES)
+
+    // then
+    expect(type).toBe("quota_exceeded")
+    expect(retryable).toBe(true)
   })
 
   test("leaves OpenCode context overflow to native compaction", () => {
@@ -228,24 +281,24 @@ describe("runtime fallback error classifier", () => {
     expect(retryable).toBe(false)
   })
 
-  test.each([
-    "non-terminal quota exceeded",
-    "non-terminal billing limit reached",
-  ])("#given %s #when classified #then remains retryable", (message) => {
-    // given
-    const error = {
-      name: "QuotaExceededError",
-      message,
-    }
+  test.each(["non-terminal quota exceeded", "non-terminal billing limit reached"])(
+    "#given %s #when classified #then remains retryable",
+    (message) => {
+      // given
+      const error = {
+        name: "QuotaExceededError",
+        message,
+      }
 
-    // when
-    const type = classifyRuntimeFallbackError(error)
-    const retryable = isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES)
+      // when
+      const type = classifyRuntimeFallbackError(error)
+      const retryable = isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES)
 
-    // then
-    expect(type).toBe("quota_exceeded")
-    expect(retryable).toBe(true)
-  })
+      // then
+      expect(type).toBe("quota_exceeded")
+      expect(retryable).toBe(true)
+    },
+  )
 
   test("#given a throwing detail getter #when classified #then property access failure is conservative", () => {
     // given

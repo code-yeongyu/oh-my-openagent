@@ -20,29 +20,44 @@ describe("no-hephaestus-non-gpt hook", () => {
   test("shows toast on every chat.message when hephaestus uses non-gpt model", async () => {
     // given - hephaestus with claude model
     const showToast = spyOn({ fn: async (_input: unknown) => ({}) }, "fn")
-    const hook = createNoHephaestusNonGptHook(unsafeTestValue({
-      client: { tui: { showToast } },
-    }))
+    const hook = createNoHephaestusNonGptHook(
+      unsafeTestValue({
+        client: { tui: { showToast } },
+      }),
+    )
 
     const output1 = createOutput()
     const output2 = createOutput()
 
     // when - chat.message is called repeatedly
-    await hook["chat.message"]?.({
-      sessionID: "ses_1",
-      agent: HEPHAESTUS_DISPLAY,
-      model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
-    }, output1)
-    await hook["chat.message"]?.({
-      sessionID: "ses_1",
-      agent: HEPHAESTUS_DISPLAY,
-      model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
-    }, output2)
+    const first = hook["chat.message"]?.(
+      {
+        sessionID: "ses_1",
+        agent: HEPHAESTUS_DISPLAY,
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      },
+      output1,
+    )
+    const second = hook["chat.message"]?.(
+      {
+        sessionID: "ses_1",
+        agent: HEPHAESTUS_DISPLAY,
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      },
+      output2,
+    )
 
-    // then - toast is shown and agent is switched to sisyphus
+    // then - toast is shown and a typed error is thrown instead of a silent switch
+    await expect(first).rejects.toMatchObject({
+      name: "HephaestusRequiresGptError",
+      message: expect.stringContaining("Hephaestus requires a GPT-family model (got claude-opus-4-7)"),
+    })
+    await expect(second).rejects.toMatchObject({
+      name: "HephaestusRequiresGptError",
+    })
     expect(showToast).toHaveBeenCalledTimes(2)
-    expect(output1.message.agent).toBe("sisyphus")
-    expect(output2.message.agent).toBe("sisyphus")
+    expect(output1.message.agent).toBeUndefined()
+    expect(output2.message.agent).toBeUndefined()
     expect(showToast.mock.calls[0]?.[0]).toMatchObject({
       body: {
         title: "NEVER Use Hephaestus with Non-GPT",
@@ -55,20 +70,26 @@ describe("no-hephaestus-non-gpt hook", () => {
   test("shows warning and does not switch agent when allow_non_gpt_model is enabled", async () => {
     // given - hephaestus with claude model and opt-out enabled
     const showToast = spyOn({ fn: async (_input: unknown) => ({}) }, "fn")
-    const hook = createNoHephaestusNonGptHook(unsafeTestValue({
-      client: { tui: { showToast } },
-    }), {
-      allowNonGptModel: true,
-    })
+    const hook = createNoHephaestusNonGptHook(
+      unsafeTestValue({
+        client: { tui: { showToast } },
+      }),
+      {
+        allowNonGptModel: true,
+      },
+    )
 
     const output = createOutput()
 
     // when - chat.message runs
-    await hook["chat.message"]?.({
-      sessionID: "ses_opt_out",
-      agent: HEPHAESTUS_DISPLAY,
-      model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
-    }, output)
+    await hook["chat.message"]?.(
+      {
+        sessionID: "ses_opt_out",
+        agent: HEPHAESTUS_DISPLAY,
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      },
+      output,
+    )
 
     // then - warning toast is shown but agent is not switched
     expect(showToast).toHaveBeenCalledTimes(1)
@@ -84,18 +105,23 @@ describe("no-hephaestus-non-gpt hook", () => {
   test("does not show toast when hephaestus uses gpt model", async () => {
     // given - hephaestus with gpt model
     const showToast = spyOn({ fn: async (_input: unknown) => ({}) }, "fn")
-    const hook = createNoHephaestusNonGptHook(unsafeTestValue({
-      client: { tui: { showToast } },
-    }))
+    const hook = createNoHephaestusNonGptHook(
+      unsafeTestValue({
+        client: { tui: { showToast } },
+      }),
+    )
 
     const output = createOutput()
 
     // when - chat.message runs
-    await hook["chat.message"]?.({
-      sessionID: "ses_2",
-      agent: HEPHAESTUS_DISPLAY,
-      model: { providerID: "openai", modelID: "gpt-5.5" },
-    }, output)
+    await hook["chat.message"]?.(
+      {
+        sessionID: "ses_2",
+        agent: HEPHAESTUS_DISPLAY,
+        model: { providerID: "openai", modelID: "gpt-5.5" },
+      },
+      output,
+    )
 
     // then - no toast, agent unchanged
     expect(showToast).toHaveBeenCalledTimes(0)
@@ -105,18 +131,23 @@ describe("no-hephaestus-non-gpt hook", () => {
   test("does not show toast for non-hephaestus agent", async () => {
     // given - sisyphus with claude model (non-gpt)
     const showToast = spyOn({ fn: async (_input: unknown) => ({}) }, "fn")
-    const hook = createNoHephaestusNonGptHook(unsafeTestValue({
-      client: { tui: { showToast } },
-    }))
+    const hook = createNoHephaestusNonGptHook(
+      unsafeTestValue({
+        client: { tui: { showToast } },
+      }),
+    )
 
     const output = createOutput()
 
     // when - chat.message runs
-    await hook["chat.message"]?.({
-      sessionID: "ses_3",
-      agent: SISYPHUS_DISPLAY,
-      model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
-    }, output)
+    await hook["chat.message"]?.(
+      {
+        sessionID: "ses_3",
+        agent: SISYPHUS_DISPLAY,
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      },
+      output,
+    )
 
     // then - no toast
     expect(showToast).toHaveBeenCalledTimes(0)
@@ -128,20 +159,29 @@ describe("no-hephaestus-non-gpt hook", () => {
     _resetForTesting()
     updateSessionAgent("ses_4", HEPHAESTUS_DISPLAY)
     const showToast = spyOn({ fn: async (_input: unknown) => ({}) }, "fn")
-    const hook = createNoHephaestusNonGptHook(unsafeTestValue({
-      client: { tui: { showToast } },
-    }))
+    const hook = createNoHephaestusNonGptHook(
+      unsafeTestValue({
+        client: { tui: { showToast } },
+      }),
+    )
 
     const output = createOutput()
 
     // when - chat.message runs without input.agent
-    await hook["chat.message"]?.({
-      sessionID: "ses_4",
-      model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
-    }, output)
+    const result = hook["chat.message"]?.(
+      {
+        sessionID: "ses_4",
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      },
+      output,
+    )
 
-    // then - toast shown via session-agent fallback, switched to sisyphus
+    // then - toast shown via session-agent fallback, typed error thrown
+    await expect(result).rejects.toMatchObject({
+      name: "HephaestusRequiresGptError",
+      message: expect.stringContaining("got claude-opus-4-7"),
+    })
     expect(showToast).toHaveBeenCalledTimes(1)
-    expect(output.message.agent).toBe("sisyphus")
+    expect(output.message.agent).toBeUndefined()
   })
 })

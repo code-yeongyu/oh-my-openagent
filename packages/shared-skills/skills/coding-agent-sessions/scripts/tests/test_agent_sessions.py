@@ -316,6 +316,43 @@ def test_dedupe_prefers_linked_session_regardless_of_order() -> None:
         assert result[0].parent_id == "t0", f"dedupe dropped spawn linkage for ordering starting with {ordering[0]}"
 
 
+def test_search_matches_a_middle_prompt_without_rereading_the_transcript(claude_home: Path) -> None:
+    transcript = claude_home / ".claude" / "projects" / "-tmp-work" / "multi-sid.jsonl"
+    transcript.write_text("\n".join(_claude_line("multi-sid", prompt) for prompt in ("alpha-edge", "needle-middle-only", "omega-edge")) + "\n")
+    sessions = scanners.scan(frozenset({"claude"}), (), 4)
+    transcript.unlink()
+
+    payload = cli._search_payload(sessions, sessions, ("needle-middle-only", "omega-edge"), 10, 2)
+
+    fields = {
+        str(group["query"]): [reason["field"] for item in _rows(group, "results") for reason in _rows(item, "match_reasons")]
+        for group in _rows(payload, "queries")
+    }
+    assert fields == {"needle-middle-only": ["user_message"], "omega-edge": ["last_user_message"]}
+
+
+def test_codex_db_thread_searches_the_prompts_scanned_from_its_rollout(codex_home: Path) -> None:
+    day = codex_home / "sessions" / "2026" / "06" / "02"
+    day.mkdir(parents=True)
+    rollout = day / "rollout-2026-06-02T00-00-00-thread-7.jsonl"
+    meta: JsonMap = {"type": "session_meta", "payload": {"id": "thread-7", "cwd": "/tmp/work", "model_provider": "openai", "source": "cli"}}
+    prompts: list[JsonMap] = [
+        {"type": "response_item", "payload": {"type": "message", "role": "user", "content": [{"type": "input_text", "text": prompt}]}}
+        for prompt in ("alpha-edge", "needle-middle-only", "omega-edge")
+    ]
+    rollout.write_text("\n".join(json.dumps(row) for row in (meta, *prompts)) + "\n")
+    with sqlite3.connect(codex_home / "state_9.sqlite") as conn:
+        conn.execute(CODEX_NEW_SCHEMA)
+        conn.execute("INSERT INTO threads VALUES ('thread-7', ?, 100, 200, 'cli', 'openai', '/tmp/work', 'gpt-5', 'alpha-edge', 9, NULL, NULL)", (str(rollout),))
+    sessions = scanners.scan(frozenset({"codex"}), (), 4)
+
+    payload = cli._search_payload(sessions, sessions, ("needle-middle-only",), 10, 2)
+
+    results = _rows(payload, "results")
+    assert [item["id"] for item in results] == ["thread-7"]
+    assert _rows(results[0], "match_reasons")[0]["field"] == "user_message"
+
+
 def test_cli_search_matches_agent_name(family: list[Session]) -> None:
     payload = cli._search_payload(family, family, ("explore",), 10, 2, include_subagents=True)
 

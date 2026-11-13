@@ -14,6 +14,7 @@ import { dirname, join } from "node:path"
 import { tmpdir } from "node:os"
 import { spawnSync } from "node:child_process"
 import { pathToFileURL } from "node:url"
+import { spawnTimeout } from "../test-support/spawn-timeout"
 
 const packageRoot = join(import.meta.dir, "..")
 const pluginRoot = join(packageRoot, "plugin")
@@ -70,7 +71,7 @@ describe("omo-senpi local-path runtime dependencies", () => {
     const result = spawnSync(
       "node",
       ["--input-type=module", "-e", `await import(${JSON.stringify(importedExtensionUrl)})`],
-      { cwd: join(root, "host"), encoding: "utf8", timeout: 10_000 },
+      { cwd: join(root, "host"), encoding: "utf8", timeout: spawnTimeout() },
     )
 
     expect(result.error).toBeUndefined()
@@ -117,8 +118,16 @@ function collectPackageNames(value: unknown): Set<string> {
   return new Set(Object.keys(value))
 }
 
+// An `npm:<name>@<version>` alias installs <name>'s manifest under the alias directory.
+function installedPackageNameOf(packageName: string): string {
+  const dependencies = readPackageManifest().dependencies as Record<string, string> | undefined
+  const spec = dependencies?.[packageName]
+  if (spec === undefined || !spec.startsWith("npm:")) return packageName
+  return spec.slice("npm:".length, spec.lastIndexOf("@"))
+}
+
 function findPackageRoot(specifier: string): string {
-  const packageName = packageNameOf(specifier)
+  const packageName = installedPackageNameOf(packageNameOf(specifier))
   let current = dirname(requireFromPackage.resolve(specifier))
   for (;;) {
     const manifestPath = join(current, "package.json")

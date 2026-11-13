@@ -56,9 +56,11 @@ function orderingProbe(runsDir: string) {
       const names = await readdir(runsDir).catch(() => [] as string[])
       observed.push({
         failureId: request.failureId,
-        sentinelExisted: names.some((name) =>
-          existsSync(join(runsDir, name, "final.json")) || existsSync(join(runsDir, name, "abandoned.json"))),
+        sentinelExisted: names.some(
+          (name) => existsSync(join(runsDir, name, "final.json")) || existsSync(join(runsDir, name, "abandoned.json")),
+        ),
       })
+      return { version: 1, updatedAt: new Date(0).toISOString(), entries: [] }
     },
     clearOnSuccess: async () => undefined,
   }
@@ -102,9 +104,11 @@ describe("facts terminal failure recording", () => {
     // the reverse order would lose the increment forever.
     const { root, identity, queue } = await fixture()
     const probe = orderingProbe(join(identity.paths.facts, "runs"))
-    const runner = new FactsExtractorRunner(runnerOptions(root, identity, queue, "fail", {
-      failures: probe.port,
-    }))
+    const runner = new FactsExtractorRunner(
+      runnerOptions(root, identity, queue, "fail", {
+        failures: probe.port,
+      }),
+    )
 
     // when
     const result = await runner.launchPending()
@@ -119,11 +123,13 @@ describe("facts terminal failure recording", () => {
   test("#given finalize crashed after the failure record #when reconcile replays the same runId #then the streak stays at one", async () => {
     // given: the record landed, the sentinel did not - exactly the crash window the ordering buys.
     const { root, identity, queue } = await fixture()
-    const crashing = new FactsExtractorRunner(runnerOptions(root, identity, queue, "fail", {
-      writeTerminalSentinel: async () => {
-        throw new Error("injected crash between failure record and sentinel")
-      },
-    }))
+    const crashing = new FactsExtractorRunner(
+      runnerOptions(root, identity, queue, "fail", {
+        writeTerminalSentinel: async () => {
+          throw new Error("injected crash between failure record and sentinel")
+        },
+      }),
+    )
     await expect(crashing.launchPending()).rejects.toThrow("injected crash")
     const runDir = await onlyRunDir(identity)
     expect(existsSync(join(runDir, "final.json"))).toBe(false)
@@ -131,9 +137,11 @@ describe("facts terminal failure recording", () => {
     expect((await store.readFailures()).entries[0]).toMatchObject({ streak: 1 })
 
     // when: a fresh runner reconciles the same run dir, replaying the same runId
-    await reconcileOnly(new FactsExtractorRunner(
-      runnerOptions(root, identity, queue, "fail", { now: () => new Date("2026-08-11T12:00:00.000Z") }),
-    ))
+    await reconcileOnly(
+      new FactsExtractorRunner(
+        runnerOptions(root, identity, queue, "fail", { now: () => new Date("2026-08-11T12:00:00.000Z") }),
+      ),
+    )
 
     // then
     expect(existsSync(join(runDir, "final.json"))).toBe(true)
@@ -147,10 +155,12 @@ describe("facts terminal failure recording", () => {
     const { root, identity, queue } = await fixture()
     const runDir = await seedUnknownLivenessRun(identity.paths.facts)
     const probe = orderingProbe(join(identity.paths.facts, "runs"))
-    const runner = new FactsExtractorRunner(runnerOptions(root, identity, queue, "fail", {
-      failures: probe.port,
-      now: () => new Date("2026-08-11T12:00:00.000Z"),
-    }))
+    const runner = new FactsExtractorRunner(
+      runnerOptions(root, identity, queue, "fail", {
+        failures: probe.port,
+        now: () => new Date("2026-08-11T12:00:00.000Z"),
+      }),
+    )
 
     // when
     await reconcileOnly(runner)
@@ -166,9 +176,13 @@ describe("facts terminal failure recording", () => {
     await seedUnknownLivenessRun(identity.paths.facts)
 
     // when
-    await reconcileOnly(new FactsExtractorRunner(runnerOptions(root, identity, queue, "fail", {
-      now: () => new Date("2026-08-11T12:00:00.000Z"),
-    })))
+    await reconcileOnly(
+      new FactsExtractorRunner(
+        runnerOptions(root, identity, queue, "fail", {
+          now: () => new Date("2026-08-11T12:00:00.000Z"),
+        }),
+      ),
+    )
 
     // then
     const state = await new FactsFailureStore({ identityPaths: identity.paths }).readFailures()
@@ -186,15 +200,17 @@ describe("facts terminal failure recording", () => {
     // given
     const { root, identity, queue } = await fixture()
     let dirty = true
-    const runner = new FactsExtractorRunner(runnerOptions(root, identity, queue, "fact", {
-      withWriterLock: async (operation) => {
-        if (dirty) {
-          dirty = false
-          await writeFile(join(identity.paths.repo, "foreign.md"), "parent bytes\n")
-        }
-        return operation()
-      },
-    }))
+    const runner = new FactsExtractorRunner(
+      runnerOptions(root, identity, queue, "fact", {
+        withWriterLock: async (operation) => {
+          if (dirty) {
+            dirty = false
+            await writeFile(join(identity.paths.repo, "foreign.md"), "parent bytes\n")
+          }
+          return operation()
+        },
+      }),
+    )
 
     // when
     const result = await runner.launchPending()
@@ -248,7 +264,7 @@ describe("facts terminal failure recording", () => {
     expect((await store.readFailures()).entries).toEqual([])
   }, 30_000)
 
-  test("#given the quick category cannot resolve #when a launch is attempted #then a preflight-scoped failure is recorded", async () => {
+  test("#given no user-selected model can resolve #when a launch is attempted #then the queue stays pending without recording an extraction failure", async () => {
     // given
     const { root, identity, queue } = await fixture()
     const runner = new FactsExtractorRunner({
@@ -265,9 +281,8 @@ describe("facts terminal failure recording", () => {
     // then
     expect(result.status).toBe("skipped")
     const state = await new FactsFailureStore({ identityPaths: identity.paths }).readFailures()
-    expect(state.entries).toHaveLength(1)
-    expect(state.entries[0]).toMatchObject({ streak: 1, lastReason: "quick_category_unavailable" })
-    expect(state.entries[0]?.lastFailureId).toMatch(/^preflight-[0-9a-f-]{36}$/)
+    expect(state.entries).toEqual([])
+    expect(await queue.listPending()).toHaveLength(1)
     expect(existsSync(join(identity.paths.facts, "runs"))).toBe(false)
   }, 30_000)
 
@@ -293,9 +308,11 @@ describe("facts terminal failure recording", () => {
 
     // when
     for (let attempt = 1; attempt <= 5; attempt += 1) {
-      const runner = new FactsExtractorRunner(runnerOptions(root, identity, queue, "fail", {
-        now: () => new Date(`2026-08-1${attempt}T12:00:00.000Z`),
-      }))
+      const runner = new FactsExtractorRunner(
+        runnerOptions(root, identity, queue, "fail", {
+          now: () => new Date(`2026-08-1${attempt}T12:00:00.000Z`),
+        }),
+      )
       expect((await runner.launchPending()).status).toBe("failed")
     }
 
@@ -303,7 +320,8 @@ describe("facts terminal failure recording", () => {
     const state = await store.readFailures()
     expect(state.entries).toHaveLength(1)
     expect(state.entries[0]).toMatchObject({ state: "parked", streak: 5, nextEligibleAt: null })
-    expect(await queue.listPending()).toHaveLength(1)
+    expect(await queue.listPending()).toHaveLength(0)
+    expect(await readdir(factsQueuePaths(identity.paths).parkedDir)).toHaveLength(1)
   }, 60_000)
 
   test("#given retention keeps freeing the attempt name #when six launches fail #then the streak still parks the endpoint", async () => {
@@ -318,9 +336,11 @@ describe("facts terminal failure recording", () => {
     // when: six launches, each followed by a busier digest's newer run taking the always-kept
     // newest slot, so pruning removes this digest's trace before the next attempt.
     for (let cycle = 1; cycle <= 6; cycle += 1) {
-      const runner = new FactsExtractorRunner(runnerOptions(root, identity, queue, "fail", {
-        now: () => new Date(`2026-08-${10 + cycle}T12:00:00.000Z`),
-      }))
+      const runner = new FactsExtractorRunner(
+        runnerOptions(root, identity, queue, "fail", {
+          now: () => new Date(`2026-08-${10 + cycle}T12:00:00.000Z`),
+        }),
+      )
       statuses.push((await runner.launchPending()).status)
       const runs = await readdir(join(identity.paths.facts, "runs"))
       names.push(...runs.filter((name) => !name.startsWith("facts-busier-")))

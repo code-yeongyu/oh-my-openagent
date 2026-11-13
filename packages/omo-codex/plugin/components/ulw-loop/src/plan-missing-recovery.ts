@@ -1,4 +1,11 @@
+import { UlwLoopError } from "./runtime.js";
+import type { UlwLoopToolkitSurface } from "./surface.js";
+
 export const ULW_LOOP_CREATE_GOALS_COMMAND = 'omo-agent-toolkit ulw-loop create-goals --brief "<brief>" --json';
+
+export function createGoalsAction(surface: UlwLoopToolkitSurface): string {
+	return surface === "omo-senpi" ? 'agentToolkit.createGoals({ brief: "<brief>" })' : ULW_LOOP_CREATE_GOALS_COMMAND;
+}
 
 export interface PlanMissingRecovery {
 	readonly message: string;
@@ -9,13 +16,29 @@ export interface PlanMissingRecovery {
  * A missing plan is either "never bootstrapped" or "bootstrapped under a different
  * session id"; the recovery text has to answer both without the caller guessing.
  */
-export function planMissingRecovery(existingSessionIds: readonly string[]): PlanMissingRecovery {
-	const lines = [`Recovery: bootstrap the plan with \`${ULW_LOOP_CREATE_GOALS_COMMAND}\`.`];
+export function planMissingRecovery(
+	existingSessionIds: readonly string[],
+	surface: UlwLoopToolkitSurface = "lazycodex",
+): PlanMissingRecovery {
+	const lines = [`Recovery: bootstrap the plan with \`${createGoalsAction(surface)}\`.`];
 	if (existingSessionIds.length === 0) return { message: lines.join("\n") };
 	lines.push(
-		`Existing ulw-loop session ids under .omo/ulw-loop/: ${existingSessionIds.join(", ")}. Re-run with \`--session-id <id>\` to target one of them.`,
+		surface === "omo-senpi"
+			? `Existing ulw-loop session ids under .omo/ulw-loop/: ${existingSessionIds.join(", ")}. The SDK is bound to the current session; resume the owning session to target its plan.`
+			: `Existing ulw-loop session ids under .omo/ulw-loop/: ${existingSessionIds.join(", ")}. Re-run with \`--session-id <id>\` to target one of them.`,
 	);
 	return { message: lines.join("\n"), details: { existingSessionIds } };
+}
+
+export function planMissingError(
+	planPath: string,
+	existingSessionIds: readonly string[],
+	surface: UlwLoopToolkitSurface = "lazycodex",
+): UlwLoopError {
+	const recovery = planMissingRecovery(existingSessionIds, surface);
+	return new UlwLoopError(`No ulw-loop plan found at ${planPath}.\n${recovery.message}`, "ULW_LOOP_PLAN_MISSING", {
+		...(recovery.details === undefined ? {} : { details: recovery.details }),
+	});
 }
 
 export function sessionScopeRequiredMessage(flag: string, existingSessionIds: readonly string[]): string {

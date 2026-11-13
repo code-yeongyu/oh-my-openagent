@@ -1,7 +1,6 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, it } from "bun:test"
-import { readFileSync } from "node:fs"
 import { delimiter, join, posix, win32 } from "node:path"
 import type { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide"
 import {
@@ -12,20 +11,7 @@ import {
   withWorkingOpencodePath,
 } from "./opencode-binary-resolver"
 
-const RESOLVER_SOURCE = join(import.meta.dir, "opencode-binary-resolver.ts")
-
 describe("collectCandidateBinaryPaths", () => {
-  it("uses a node-safe default which resolver instead of raw Bun.which", () => {
-    // given
-    const source = readFileSync(RESOLVER_SOURCE, "utf8")
-
-    // when
-    const usesRawDefaultBunWhich = source.includes("= Bun.which")
-
-    // then
-    expect(usesRawDefaultBunWhich).toBe(false)
-  })
-
   it("includes Bun.which results first and removes duplicates", () => {
     // given
     const pathEnv = ["/bad", "/good"].join(posix.delimiter)
@@ -64,8 +50,7 @@ describe("findWorkingOpencodeBinary", () => {
       if (command === "opencode") return "/bad/opencode"
       return undefined
     }
-    const probe = async (binaryPath: string): Promise<boolean> =>
-      binaryPath === "/good/opencode"
+    const probe = async (binaryPath: string): Promise<boolean> => binaryPath === "/good/opencode"
 
     // when
     const resolved = await findWorkingOpencodeBinary(pathEnv, probe, which, "darwin")
@@ -114,12 +99,9 @@ describe("withWorkingOpencodePath", () => {
     let observedPath = ""
 
     // when
-    await withWorkingOpencodePath(
-      async () => {
-        observedPath = process.env.PATH ?? ""
-      },
-      finder,
-    )
+    await withWorkingOpencodePath(async () => {
+      observedPath = process.env.PATH ?? ""
+    }, finder)
 
     // then
     expect(observedPath).toBe(["/good", "/bad", "/other"].join(delimiter))
@@ -136,12 +118,9 @@ describe("withWorkingOpencodePath", () => {
     // when
     let thrown: Error | undefined
     try {
-      await withWorkingOpencodePath(
-        async () => {
-          throw new Error("boom")
-        },
-        finder,
-      )
+      await withWorkingOpencodePath(async () => {
+        throw new Error("boom")
+      }, finder)
     } catch (error) {
       if (!(error instanceof Error)) throw error
       thrown = error

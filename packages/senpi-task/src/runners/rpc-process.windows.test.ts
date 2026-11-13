@@ -3,11 +3,10 @@ import { once } from "node:events"
 import { dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { expect, test } from "bun:test"
+import { windowsTreeKillArgs } from "../../../memory-core/src/concurrency/windows-process-tree.mjs"
 
 const isWin32 = process.platform === "win32"
-const probePath = fileURLToPath(
-  new URL("./rpc/__fixtures__/windows-console-probe.ts", import.meta.url),
-)
+const probePath = fileURLToPath(new URL("./rpc/__fixtures__/windows-console-probe.ts", import.meta.url))
 const PROBE_TIMEOUT_MS = 90_000
 const CLEANUP_TIMEOUT_MS = 10_000
 
@@ -16,7 +15,10 @@ type ProbeExit = {
   readonly signal: NodeJS.Signals | null
 }
 
-function createDeadline(timeoutMs: number, label: string): {
+function createDeadline(
+  timeoutMs: number,
+  label: string,
+): {
   readonly promise: Promise<never>
   readonly cancel: () => void
 } {
@@ -39,7 +41,7 @@ async function waitForClose(child: ChildProcess): Promise<ProbeExit> {
   const [code, signal] = await once(child, "close")
   return {
     code: typeof code === "number" ? code : null,
-    signal: typeof signal === "string" ? signal as NodeJS.Signals : null,
+    signal: typeof signal === "string" ? (signal as NodeJS.Signals) : null,
   }
 }
 
@@ -50,7 +52,9 @@ async function terminateProcessTree(child: ChildProcess): Promise<void> {
     child.kill("SIGKILL")
     return
   }
-  const killer = spawn("taskkill.exe", ["/pid", String(pid), "/T", "/F"], {
+  const args = windowsTreeKillArgs(pid)
+  if (args.length === 0) return
+  const killer = spawn("taskkill.exe", args, {
     stdio: "ignore",
     windowsHide: true,
   })

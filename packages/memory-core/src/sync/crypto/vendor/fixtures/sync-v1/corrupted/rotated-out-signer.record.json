@@ -1,0 +1,17 @@
+{
+  "seq": 9,
+  "base_seq": 8,
+  "kind": "batch",
+  "account": "encoding-account",
+  "epoch": 3,
+  "author": {
+    "id": "PDv3T8-fwlpWrp0DPgjWhA",
+    "kind": "device",
+    "sealing_public_key": "CAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg",
+    "signing_public_key": "6kpsY-KcUgq-9VB7Ey7F-ZVHdq6-vnuSQh7qaRRG0iw"
+  },
+  "digest": "njzlVjmN8-d2hOPGb78XQACdS4PigYsAAxfEhideP_Y",
+  "link": "Mf5MNDvYCJfK1mRmUwCvj6kVNgiUQRAanCUmaVzs6uk",
+  "keyring_link": null,
+  "record_sig": "RyXSWKCjTfgu0XwelDwqVXAsq3yArrmsMiPEPQUUr0Q6CNbsqwaYcI6P2BQmTe65_EHQDNyYB1qx92CV0mLIDA"
+}

@@ -43,7 +43,7 @@ describe("normalizeSenpiTeamSpec", () => {
 
   test("#given a spec that already carries its own name #when normalized #then the explicit name is preserved", () => {
     // given
-    const rawSpec = { name: "explicit-name", members: [{ kind: "subagent_type", subagent_type: "atlas" }] }
+    const rawSpec = { name: "explicit-name", members: [{ kind: "subagent_type", subagent_type: "builder" }] }
 
     // when
     const spec = normalizeSenpiTeamSpec(rawSpec, "record-key")
@@ -189,7 +189,10 @@ describe("normalizeSenpiTeamSpec lenient input", () => {
 
   test("#given a single member object instead of an array #when normalized #then it is wrapped into a one-member array", () => {
     // given / when
-    const spec = normalizeSenpiTeamSpec({ members: { kind: "category", category: "quick", prompt: "work" } }, "single-member")
+    const spec = normalizeSenpiTeamSpec(
+      { members: { kind: "category", category: "quick", prompt: "work" } },
+      "single-member",
+    )
 
     // then
     expect(spec.members).toHaveLength(1)
@@ -201,7 +204,11 @@ describe("normalizeSenpiTeamSpec task_summary", () => {
   test("#given a member with a task_summary #when normalized #then the summary survives the schema parse", () => {
     // given / when
     const spec = normalizeSenpiTeamSpec(
-      { members: [{ kind: "category", category: "quick", prompt: "work", task_summary: "Investigate the failing test" }] },
+      {
+        members: [
+          { kind: "category", category: "quick", prompt: "work", task_summary: "Investigate the failing test" },
+        ],
+      },
       "demo",
     )
 
@@ -221,4 +228,3 @@ describe("normalizeSenpiTeamSpec task_summary", () => {
     expect(spec.members[0]?.task_summary?.endsWith("...")).toBe(true)
   })
 })
-

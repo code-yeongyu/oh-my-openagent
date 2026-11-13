@@ -17,12 +17,9 @@ export * from "./claude-config-dir"
 export * from "./jsonc-parser"
 export * from "./migration"
 export * from "./opencode-config-dir"
+export * from "./opencode-plugin-sandbox"
 export * from "./resolve-agent-definition-paths"
-export type {
-  OpenCodeBinaryType,
-  OpenCodeConfigDirOptions,
-  OpenCodeConfigPaths,
-} from "./opencode-config-dir-types"
+export type { OpenCodeBinaryType, OpenCodeConfigDirOptions, OpenCodeConfigPaths } from "./opencode-config-dir-types"
 export * from "./opencode-version"
 export * from "./opencode-storage-detection"
 export * from "./permission-compat"
@@ -40,11 +37,7 @@ export * from "./model-resolver"
 export { normalizeModel, normalizeModelID } from "./model-normalization"
 export { normalizeFallbackModels, flattenToFallbackModelStrings } from "./model-resolver"
 export { resolveModelPipeline } from "./model-resolution-pipeline"
-export type {
-  ModelResolutionRequest,
-  ModelResolutionProvenance,
-  ModelResolutionResult,
-} from "./model-resolution-types"
+export type { ModelResolutionRequest, ModelResolutionProvenance, ModelResolutionResult } from "./model-resolution-types"
 export * from "./model-availability"
 export * from "./model-capabilities"
 export * from "./model-capabilities-cache"
@@ -85,5 +78,4 @@ export * from "./legacy-workspace-migration"
 export * from "./task-system-enabled"
 export * from "./parse-tools-config"
 export { parseModelString } from "./model-string-parser"
-export { EXCLUDED_DIRS } from "./excluded-dirs"
 export * from "./replace-tool-args"

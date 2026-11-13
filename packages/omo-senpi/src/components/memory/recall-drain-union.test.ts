@@ -4,7 +4,7 @@ import { PendingNudges, RecallLedger, renderNudgeBlock } from "@oh-my-opencode/m
 
 import { MemoryFakeExtensionAPI, memorySettings } from "./memory.test-support"
 import { rmEfaultTolerant } from "./teardown.test-support"
-import { NUDGED_ENTRY_TYPE } from "./kibitzer-notice"
+import { NUDGED_ENTRY_TYPE } from "./kibitzer/notice"
 import { createRecallDrain } from "./recall-drain"
 import {
   ROLLOUTS_PATH,
@@ -18,16 +18,19 @@ import {
 const NUDGE = { path: ROLLOUTS_PATH, hint: "Drain kubernetes nodes before a rollout." }
 const OTHER_NUDGE = { path: "reference/deployments.md", hint: "Review deployment ownership." }
 
-async function setup(tempDirs: string[], options: {
-  readonly queued?: readonly typeof NUDGE[]
-  readonly pending?: readonly typeof NUDGE[]
-  readonly take?: () => Promise<typeof NUDGE[]>
-  readonly logs?: Array<{ message: string; details?: unknown }>
-  readonly drainQueued?: () => typeof NUDGE[]
-} = {}) {
+async function setup(
+  tempDirs: string[],
+  options: {
+    readonly queued?: readonly (typeof NUDGE)[]
+    readonly pending?: readonly (typeof NUDGE)[]
+    readonly take?: () => Promise<(typeof NUDGE)[]>
+    readonly logs?: Array<{ message: string; details?: unknown }>
+    readonly drainQueued?: () => (typeof NUDGE)[]
+  } = {},
+) {
   const { context } = await fixture(tempDirs)
   const pending = new PendingNudges(context.identityPaths.recallPending)
-  if (options.pending !== undefined) await pending.write(SESSION_ID, options.pending, { epoch: 0 })
+  if (options.pending !== undefined) await pending.write(SESSION_ID, options.pending)
   const pi = new MemoryFakeExtensionAPI()
   const logs = options.logs ?? []
   const queued = options.queued
@@ -36,9 +39,11 @@ async function setup(tempDirs: string[], options: {
     resolveSettings: () => memorySettings(),
     env: {},
     ledgerFor: () => new RecallLedger(context.identityPaths.recallLedger),
-    pendingFor: () => ({ take: options.take ?? (() => pending.take(SESSION_ID, { currentEpoch: 0 })) }),
+    pendingFor: () => ({ take: options.take ?? (() => pending.take(SESSION_ID)) }),
     ...(options.drainQueued === undefined
-      ? queued === undefined ? {} : { drainQueued: () => [...queued] }
+      ? queued === undefined
+        ? {}
+        : { drainQueued: () => [...queued] }
       : { drainQueued: options.drainQueued }),
     logger: {
       info: (message, details) => logs.push({ message, details }),
@@ -51,7 +56,11 @@ async function setup(tempDirs: string[], options: {
 }
 
 async function dispatch(pi: MemoryFakeExtensionAPI): Promise<BeforeAgentStartEventResult | undefined> {
-  const results = await pi.dispatch("before_agent_start", beforeAgentStart(), eventContext([userEntry("m1", "anything at all")]))
+  const results = await pi.dispatch(
+    "before_agent_start",
+    beforeAgentStart(),
+    eventContext([userEntry("m1", "anything at all")]),
+  )
   const result = results.find((candidate): candidate is BeforeAgentStartEventResult => candidate !== undefined)
   return result
 }
@@ -60,7 +69,11 @@ describe("recall prompt-drain union", () => {
   const tempDirs: string[] = []
 
   afterEach(async () => {
-    await Promise.all(tempDirs.splice(0).map((dir) => rmEfaultTolerant(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+    await Promise.all(
+      tempDirs
+        .splice(0)
+        .map((dir) => rmEfaultTolerant(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })),
+    )
   })
 
   test("#given queued and file nudges share a path #when the prompt starts #then one block and one prompt entry are produced", async () => {
@@ -68,14 +81,20 @@ describe("recall prompt-drain union", () => {
     const result = await dispatch(pi)
 
     expect(result?.message?.content).toBe(renderNudgeBlock(NUDGE))
-    expect(typeof result?.message?.content === "string" ? result.message.content.match(/<recalled-memory /g) : []).toHaveLength(1)
-    expect(pi.entries).toEqual([{ customType: NUDGED_ENTRY_TYPE, data: { version: 1, nudges: [NUDGE], via: "prompt" } }])
-    expect(await pending.take(SESSION_ID, { currentEpoch: 0 })).toEqual([])
+    expect(
+      typeof result?.message?.content === "string" ? result.message.content.match(/<recalled-memory /g) : [],
+    ).toHaveLength(1)
+    expect(pi.entries).toEqual([
+      { customType: NUDGED_ENTRY_TYPE, data: { version: 1, nudges: [NUDGE], via: "prompt" } },
+    ])
+    expect(await pending.take(SESSION_ID)).toEqual([])
   })
 
   test("#given a queued path is already ledgered #when the prompt starts #then the queued nudge still injects", async () => {
     const { context, pi } = await setup(tempDirs, { queued: [NUDGE] })
-    await new RecallLedger(context.identityPaths.recallLedger).markSurfaced(SESSION_ID, [{ path: NUDGE.path, hash: "prior" }])
+    await new RecallLedger(context.identityPaths.recallLedger).markSurfaced(SESSION_ID, [
+      { path: NUDGE.path, hash: "prior" },
+    ])
 
     const result = await dispatch(pi)
 
@@ -113,4 +132,3 @@ describe("recall prompt-drain union", () => {
     expect(logs.some(({ message }) => message.includes("pending take skipped"))).toBe(true)
   })
 })
-

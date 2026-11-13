@@ -1,7 +1,8 @@
 // Test harness for the memory command suite: fake contexts, temp identities,
 // seeded git repos, and overridable deps.
 
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises"
+import { onTestFinished } from "bun:test"
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -40,12 +41,14 @@ export interface FakeCommandContext extends MemoryCommandContext {
   readonly sessionId: string
 }
 
-export function fakeCommandContext(options: {
-  readonly sessionId?: string
-  readonly hasUI?: boolean
-  readonly agentDir?: string
-  readonly withWaitForIdle?: boolean
-} = {}): FakeCommandContext {
+export function fakeCommandContext(
+  options: {
+    readonly sessionId?: string
+    readonly hasUI?: boolean
+    readonly agentDir?: string
+    readonly withWaitForIdle?: boolean
+  } = {},
+): FakeCommandContext {
   const order: string[] = []
   const ui: FakeCommandUi = {
     notifications: [],
@@ -95,8 +98,14 @@ export function trackSendOrder(pi: MemoryFakeExtensionAPI, ctx: FakeCommandConte
   return ctx.order
 }
 
+async function createdIdentityRoot(): Promise<string> {
+  const identityRoot = await mkdtemp(join(tmpdir(), "memory-commands-"))
+  onTestFinished(() => rm(identityRoot, { recursive: true, force: true }))
+  return identityRoot
+}
+
 export async function tempIdentity(root?: string): Promise<{ root: string; identity: MemoryCommandIdentity }> {
-  const identityRoot = root ?? (await mkdtemp(join(tmpdir(), "memory-commands-")))
+  const identityRoot = root ?? (await createdIdentityRoot())
   return {
     root: identityRoot,
     identity: {
@@ -119,7 +128,9 @@ export async function seededRepo(
     },
     ...(exec === undefined ? {} : { exec }),
   })
-  await repo.init({ seedFiles })
+  // Trusted seeds do not need hook checks; commands under test still get the real hooks.
+  await repo.init({ seedFiles, installHooks: () => undefined })
+  installHooks(repo.dir)
   return repo
 }
 
@@ -164,28 +175,28 @@ export function fakeDeps(
  * Every timestamp derives from the caller's argument, never from the wall clock, which is what lets
  * reflection-health severity assertions stay a pure function of their fixtures.
  */
-export async function seedReflectionFailureStreak(
-  reflectionDir: string,
-  newestFinishedAtMs: number,
-): Promise<void> {
+export async function seedReflectionFailureStreak(reflectionDir: string, newestFinishedAtMs: number): Promise<void> {
   const completions = join(reflectionDir, "completions")
   await mkdir(completions, { recursive: true })
   for (let index = 0; index < 3; index += 1) {
     const finishedAtMs = newestFinishedAtMs - (2 - index) * 60_000
-    await writeFile(join(completions, `run-${index}.json`), `${JSON.stringify({
-      schemaVersion: 1,
-      runId: `run-${index}`,
-      identity: TEST_IDENTITY,
-      category: "quick",
-      conversationIds: ["past-session"],
-      trigger: "manual",
-      outcome: "failed",
-      reason: "model-not-found",
-      detail: "configured model unavailable",
-      startedAt: new Date(finishedAtMs - 60_000).toISOString(),
-      finishedAt: new Date(finishedAtMs).toISOString(),
-      delivery: { status: "consumed" },
-    })}\n`)
+    await writeFile(
+      join(completions, `run-${index}.json`),
+      `${JSON.stringify({
+        schemaVersion: 1,
+        runId: `run-${index}`,
+        identity: TEST_IDENTITY,
+        category: "quick",
+        conversationIds: ["past-session"],
+        trigger: "manual",
+        outcome: "failed",
+        reason: "model-not-found",
+        detail: "configured model unavailable",
+        startedAt: new Date(finishedAtMs - 60_000).toISOString(),
+        finishedAt: new Date(finishedAtMs).toISOString(),
+        delivery: { status: "consumed" },
+      })}\n`,
+    )
   }
 }
 

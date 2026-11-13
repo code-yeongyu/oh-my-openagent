@@ -7,8 +7,8 @@ import type { TaskRecord, TaskRecordStore } from "@oh-my-opencode/senpi-task"
  * task's generation.
  *
  * The stamp is sticky, never re-stamped: `save`/`replace` of a record that carries no generation
- * inherits the persisted one when it exists, so the manager's post-claim rewrite (spawn_spec) and
- * every later bookkeeping write keep the original planning generation instead of picking up a
+ * inherits persisted provenance, including unknown. The manager's post-claim rewrite (spawn_spec)
+ * and every later bookkeeping write keep the original planning generation instead of picking up a
  * newer session's configuration.
  */
 export function createConfigGenerationStampingStore(
@@ -17,21 +17,13 @@ export function createConfigGenerationStampingStore(
 ): TaskRecordStore {
   const stamp = (record: TaskRecord): TaskRecord => {
     if (record.config_generation !== undefined) return record
-    const generation = persistedGeneration(backing, record.task_id) ?? currentGeneration()
+    const persisted = backing.load(record.task_id)
+    const generation = persisted === null ? currentGeneration() : persisted.config_generation
     return generation === undefined ? record : { ...record, config_generation: generation }
   }
   return {
     ...backing,
     save: (record) => backing.save(stamp(record)),
     replace: (record) => backing.replace(stamp(record)),
-  }
-}
-
-// An unreadable or absent record simply has no generation to inherit; the write must not fail for it.
-function persistedGeneration(backing: TaskRecordStore, taskId: string): number | undefined {
-  try {
-    return backing.load(taskId)?.config_generation
-  } catch {
-    return undefined
   }
 }

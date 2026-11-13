@@ -3,6 +3,7 @@
 import { LocateFixed, Maximize } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react"
 
+import { Tooltip } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 
 import { DagEdgeLayer } from "./dag-edge-layer"
@@ -57,7 +58,12 @@ export function DagGraphView({
   const [drawingEdges, setDrawingEdges] = useState<ReadonlySet<string>>(EMPTY)
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null)
   const prevStatesRef = useRef<ReadonlyMap<string, DagState>>(new Map())
-  const seenRef = useRef<ReadonlySet<string>>(EMPTY)
+  // Entry cascade: the run's node set is fixed for the life of this mount (the parent remounts
+  // per replay cycle), so every node enters at mount; a node leaves the map once its entry
+  // animation has ended.
+  const [entering, setEntering] = useState<ReadonlyMap<string, number>>(
+    () => new Map(layout.nodes.map((placement, index) => [placement.node.id, index] as const)),
+  )
 
   const nodeState = useMemo(
     () => new Map(run.nodes.map((node) => [node.id, node.state] as const)),
@@ -104,15 +110,6 @@ export function DagGraphView({
     centerWave(activeWave, rows)
   }, [overflowing, activeWave, layout, centerWave])
 
-  const entering = new Map<string, number>()
-  for (const placement of layout.nodes) {
-    if (!seenRef.current.has(placement.node.id)) entering.set(placement.node.id, entering.size)
-  }
-  useEffect(() => {
-    if (entering.size === 0) return
-    seenRef.current = new Set([...seenRef.current, ...entering.keys()])
-  })
-
   const clearOneShot = useCallback((nodeId: string) => {
     const drop = (previous: ReadonlySet<string>) => {
       if (!previous.has(nodeId)) return previous
@@ -122,6 +119,12 @@ export function DagGraphView({
     }
     setPopping(drop)
     setShaking(drop)
+    setEntering((previous) => {
+      if (!previous.has(nodeId)) return previous
+      const next = new Map(previous)
+      next.delete(nodeId)
+      return next
+    })
   }, [])
   const onDrawn = useCallback(() => setDrawingEdges(EMPTY), [])
 
@@ -139,7 +142,7 @@ export function DagGraphView({
   )
 
   const toolbarButton =
-    "text-text-mid hover:bg-ink-3 hover:text-text-hi focus-visible:outline-accent ease-standard flex size-11 cursor-pointer items-center justify-center transition-colors duration-[var(--dur-micro)] focus-visible:outline-2 focus-visible:outline-offset-2 disabled:pointer-events-none disabled:opacity-40"
+    "text-text-mid hover:bg-ink-3 hover:text-text-hi ease-standard flex size-11 cursor-pointer items-center justify-center transition-colors duration-[var(--dur-micro)] focus-ring disabled:pointer-events-none disabled:opacity-40"
 
   return (
     <div
@@ -237,31 +240,33 @@ export function DagGraphView({
         className="border-line bg-ink-1 absolute right-2 bottom-2 z-10 flex flex-col gap-0.5 border p-1"
         onPointerDown={(event) => event.stopPropagation()}
       >
-        <button
-          type="button"
-          aria-label={labels.fit}
-          title={labels.fit}
-          className={toolbarButton}
-          onClick={camera.fit}
-        >
-          <Maximize aria-hidden="true" className="size-4" />
-        </button>
-        <button
-          type="button"
-          aria-label={labels.center}
-          title={labels.center}
-          disabled={activeWave === null}
-          className={toolbarButton}
-          onClick={() => {
-            if (activeWave === null) return
-            camera.centerWave(
-              activeWave,
-              layout.nodes.filter((n) => n.waveIndex === activeWave).map((n) => n.y),
-            )
-          }}
-        >
-          <LocateFixed aria-hidden="true" className="size-4" />
-        </button>
+        <Tooltip label={labels.fit}>
+          <button
+            type="button"
+            aria-label={labels.fit}
+            className={toolbarButton}
+            onClick={camera.fit}
+          >
+            <Maximize aria-hidden="true" className="size-4" />
+          </button>
+        </Tooltip>
+        <Tooltip label={labels.center}>
+          <button
+            type="button"
+            aria-label={labels.center}
+            disabled={activeWave === null}
+            className={toolbarButton}
+            onClick={() => {
+              if (activeWave === null) return
+              camera.centerWave(
+                activeWave,
+                layout.nodes.filter((n) => n.waveIndex === activeWave).map((n) => n.y),
+              )
+            }}
+          >
+            <LocateFixed aria-hidden="true" className="size-4" />
+          </button>
+        </Tooltip>
       </div>
     </div>
   )

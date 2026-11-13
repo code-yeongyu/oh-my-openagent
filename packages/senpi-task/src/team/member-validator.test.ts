@@ -13,7 +13,10 @@ const allowAll: SenpiTeamMemberPorts = {
 describe("validateSenpiTeamMembers vocabulary hints", () => {
   test("#given an unknown category with named ports #when validated #then the error lists the available categories", () => {
     // given
-    const spec = normalizeSenpiTeamSpec({ members: [{ kind: "category", category: "quikc", prompt: "work" }] }, "typo-team")
+    const spec = normalizeSenpiTeamSpec(
+      { members: [{ kind: "category", category: "quikc", prompt: "work" }] },
+      "typo-team",
+    )
     const ports: SenpiTeamMemberPorts = {
       isCategoryResolvable: (category) => category === "quick" || category === "deep",
       isKnownAgent: () => true,
@@ -37,7 +40,10 @@ describe("validateSenpiTeamMembers vocabulary hints", () => {
 
   test("#given an unknown subagent_type with named ports #when validated #then the error lists the available agents", () => {
     // given
-    const spec = normalizeSenpiTeamSpec({ members: [{ kind: "subagent_type", subagent_type: "orakel", prompt: "work" }] }, "typo-team")
+    const spec = normalizeSenpiTeamSpec(
+      { members: [{ kind: "subagent_type", subagent_type: "orakel", prompt: "work" }] },
+      "typo-team",
+    )
     const ports: SenpiTeamMemberPorts = {
       isCategoryResolvable: () => true,
       isKnownAgent: (agent) => agent === "sisyphus",
@@ -82,10 +88,7 @@ describe("validateSenpiTeamMembers", () => {
 
   test("#given an unresolvable category #when validated #then it throws naming the allowed kinds", () => {
     // given
-    const spec = normalizeSenpiTeamSpec(
-      { members: [{ kind: "unresolvable-kind", name: "x" }] },
-      "bad-category-team",
-    )
+    const spec = normalizeSenpiTeamSpec({ members: [{ kind: "unresolvable-kind", name: "x" }] }, "bad-category-team")
     const ports: SenpiTeamMemberPorts = {
       isCategoryResolvable: () => false,
       isKnownAgent: () => true,
@@ -111,10 +114,7 @@ describe("validateSenpiTeamMembers", () => {
 
   test("#given an unknown subagent_type #when validated #then it throws a typed diagnostic", () => {
     // given
-    const spec = normalizeSenpiTeamSpec(
-      { members: [{ kind: "agent", subagent_type: "not-loaded" }] },
-      "bad-agent-team",
-    )
+    const spec = normalizeSenpiTeamSpec({ members: [{ kind: "agent", subagent_type: "not-loaded" }] }, "bad-agent-team")
     const ports: SenpiTeamMemberPorts = {
       isCategoryResolvable: () => true,
       isKnownAgent: () => false,
@@ -138,7 +138,7 @@ describe("validateSenpiTeamMembers", () => {
   test("#given a curated read-only agent #when validated #then it is rejected before the known-agent check", () => {
     // given
     const spec = normalizeSenpiTeamSpec(
-      { members: [{ kind: "agent", subagent_type: "momus" }] },
+      { members: [{ kind: "agent", subagent_type: "explore" }] },
       "curated-agent-team",
     )
 
@@ -155,9 +155,45 @@ describe("validateSenpiTeamMembers", () => {
     if (caught instanceof SenpiTeamSpecError) {
       expect(caught.code).toBe("UNKNOWN_SUBAGENT_TYPE")
       expect(caught.message).toBe(
-        'curated read-only agent "momus" cannot be a team member; delegate via the task tool instead',
+        'curated read-only agent "explore" cannot be a team member; delegate via the task tool instead',
       )
     }
+  })
+
+  test("#given a member naming a retired curated id #when validated #then it is an ordinary unknown subagent_type, named verbatim", () => {
+    // given
+    const spec = normalizeSenpiTeamSpec({ members: [{ kind: "agent", subagent_type: "momus" }] }, "retired-agent-team")
+    const ports: SenpiTeamMemberPorts = {
+      isCategoryResolvable: () => true,
+      isKnownAgent: () => false,
+    }
+
+    // when
+    let caught: unknown
+    try {
+      validateSenpiTeamMembers(spec, ports)
+    } catch (error) {
+      caught = error
+    }
+
+    // then: the retired id is neither canonicalized nor treated as a curated agent
+    expect(caught).toBeInstanceOf(SenpiTeamSpecError)
+    if (caught instanceof SenpiTeamSpecError) {
+      expect(caught.code).toBe("UNKNOWN_SUBAGENT_TYPE")
+      expect(caught.message).toContain("unknown subagent_type 'momus'")
+      expect(caught.message).not.toContain("plan-reviewer")
+    }
+  })
+
+  test("#given a retired curated id that the host resolves as a user-defined agent #when validated #then it is admitted like any custom agent", () => {
+    // given
+    const spec = normalizeSenpiTeamSpec(
+      { members: [{ kind: "agent", subagent_type: "metis" }] },
+      "retired-curated-team",
+    )
+
+    // when / then: no curated-agent rejection fires for the retired id anymore
+    expect(() => validateSenpiTeamMembers(spec, allowAll)).not.toThrow()
   })
 
   test("#given an ulw reviewer agent #when validated #then it is rejected before the known-agent check", () => {

@@ -1,9 +1,22 @@
 #!/usr/bin/env node
 import { spawn, spawnSync } from "node:child_process"
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, watch, writeFileSync } from "node:fs"
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  watch,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { basename, delimiter, dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
+import { isolatedChildEnv, sandboxStateDir } from "./sandbox-child-env.mjs"
+import { withTelemetryOptOut } from "./telemetry-opt-out-env.mjs"
 
 const COLLISION_TEXT = "Task record already exists"
 const scriptDir = dirname(fileURLToPath(import.meta.url))
@@ -45,7 +58,9 @@ async function main() {
       reasons,
       ...metadata,
     })
-    console.log(JSON.stringify({ result: pass ? "PASS" : "FAIL", reasons, taskIds: last.taskIds, buckets: last.buckets }))
+    console.log(
+      JSON.stringify({ result: pass ? "PASS" : "FAIL", reasons, taskIds: last.taskIds, buckets: last.buckets }),
+    )
     if (!pass) process.exitCode = 1
   } finally {
     restorePlugin(generated)
@@ -60,7 +75,8 @@ function regeneratePlugin() {
     encoding: "utf8",
     timeout: 120_000,
   })
-  if (result.status !== 0 && !existsSync(pluginEntry)) throw new Error(`plugin build failed:\n${result.stdout}${result.stderr}`)
+  if (result.status !== 0 && !existsSync(pluginEntry))
+    throw new Error(`plugin build failed:\n${result.stdout}${result.stderr}`)
   return originals
 }
 
@@ -76,7 +92,13 @@ async function runAttempt(input) {
   const root = mkdtempSync(join(tmpdir(), "omo-senpi-task-id-race-"))
   const projectDir = join(root, "project")
   seedProject(projectDir)
-  const parents = ["parent-a", "parent-b"].map((name) => createParent(root, name, projectDir, input.timeoutMs))
+  // Both parents share ONE agent dir, as two sessions on one machine share ~/.omo/agent: the task
+  // store now lives in the agent dir, so separate agent dirs would give each parent its own store and
+  // there would be no shared record namespace left to race on.
+  const agentDir = join(root, "agent")
+  const parents = ["parent-a", "parent-b"].map((name) =>
+    createParent(root, name, projectDir, agentDir, input.timeoutMs),
+  )
   const runs = []
   let cleanup = { pids: [], terminated: [], verified_dead: [], sandbox_removed: false }
   let before = ""
@@ -85,21 +107,29 @@ async function runAttempt(input) {
   let taskIds = []
   const reasons = []
   try {
-    before = lsTasks(projectDir)
+    before = lsTasks(projectDir, agentDir)
     for (const parent of parents) runs.push(startSenpi(input.senpiBin, parent, projectDir, input.timeoutMs))
     await Promise.all(parents.map((parent) => waitForFile(parent.readyFile, input.timeoutMs)))
     buckets.before = Math.floor(Date.now() / 65_536)
     for (const parent of parents) writeFileSync(parent.goFile, "go\n", { flag: "wx" })
-    const completions = await Promise.all(runs.map((run) => waitForCompletion(run, input.timeoutMs, attemptDir, "post-go")))
+    const completions = await Promise.all(
+      runs.map((run) => waitForCompletion(run, input.timeoutMs, attemptDir, "post-go")),
+    )
     buckets.after = Math.floor(Date.now() / 65_536)
-    after = lsTasks(projectDir)
+    after = lsTasks(projectDir, agentDir)
     taskIds = taskIdsFromListing(after)
     for (let index = 0; index < completions.length; index += 1) {
       writeFileSync(join(attemptDir, `${parents[index].name}.stdout.jsonl`), completions[index].stdout)
       writeFileSync(join(attemptDir, `${parents[index].name}.stderr.log`), completions[index].stderr)
-      writeJson(join(attemptDir, `${parents[index].name}.exit.json`), { status: completions[index].status, signal: completions[index].signal })
+      writeJson(join(attemptDir, `${parents[index].name}.exit.json`), {
+        status: completions[index].status,
+        signal: completions[index].signal,
+      })
       copySessionTranscript(parents[index].sessionDir, join(attemptDir, `${parents[index].name}.sessions`))
-      if (completions[index].status !== 0) reasons.push(`${parents[index].name} senpi exited ${completions[index].status ?? completions[index].signal ?? "unknown"}`)
+      if (completions[index].status !== 0)
+        reasons.push(
+          `${parents[index].name} senpi exited ${completions[index].status ?? completions[index].signal ?? "unknown"}`,
+        )
     }
     const transcript = completions.map((completion) => `${completion.stdout}\n${completion.stderr}`).join("\n")
     if (transcript.includes(COLLISION_TEXT)) reasons.push(`transcript contains ${JSON.stringify(COLLISION_TEXT)}`)
@@ -110,23 +140,28 @@ async function runAttempt(input) {
     writeFileSync(join(attemptDir, "tasks-after.ls.txt"), after)
     writeJson(join(attemptDir, "run.json"), { buckets, taskIds, reasons, ...input.metadata })
   } catch (error) {
-    const message = error instanceof Error ? error.stack ?? error.message : String(error)
+    const message = error instanceof Error ? (error.stack ?? error.message) : String(error)
     reasons.push(message)
     writeFileSync(join(attemptDir, "driver-error.log"), `${message}\n`)
     writeFileSync(join(attemptDir, "tasks-before.ls.txt"), before)
-    writeFileSync(join(attemptDir, "tasks-after.ls.txt"), after || lsTasks(projectDir))
+    writeFileSync(join(attemptDir, "tasks-after.ls.txt"), after || lsTasks(projectDir, agentDir))
   } finally {
     cleanup = await cleanupRuns(runs, root, input.timeoutMs, attemptDir)
     writeJson(join(attemptDir, "cleanup-receipt.json"), cleanup)
     writeJson(join(input.evidenceDir, "cleanup-receipt.txt"), cleanup)
   }
-  return { attempt: input.attempt, bucketStable: buckets.before !== null && buckets.before === buckets.after, buckets, taskIds, reasons }
+  return {
+    attempt: input.attempt,
+    bucketStable: buckets.before !== null && buckets.before === buckets.after,
+    buckets,
+    taskIds,
+    reasons,
+  }
 }
 
-function createParent(root, name, projectDir, timeoutMs) {
+function createParent(root, name, projectDir, agentDir, timeoutMs) {
   const parentRoot = join(root, name)
   const home = join(parentRoot, "home")
-  const agentDir = join(parentRoot, "agent")
   const sessionDir = join(parentRoot, "sessions")
   const gates = join(parentRoot, "gates")
   mkdirSync(home, { recursive: true })
@@ -138,7 +173,16 @@ function createParent(root, name, projectDir, timeoutMs) {
   writeJson(join(agentDir, "trust.json"), { [canonicalProject]: true })
   const script = {
     steps: [
-      { type: "tool_call", name: "task", arguments: { category: "mockcat", prompt: `race task from ${name}`, run_in_background: true, name: `${name}-race` } },
+      {
+        type: "tool_call",
+        name: "task",
+        arguments: {
+          category: "mockcat",
+          prompt: `race task from ${name}`,
+          run_in_background: true,
+          name: `${name}-race`,
+        },
+      },
       { type: "text", text: `${name} parent complete` },
     ],
   }
@@ -164,29 +208,47 @@ function seedProject(projectDir) {
 }
 
 function startSenpi(senpiBin, parent, projectDir, timeoutMs) {
-  const child = spawn(senpiBin, [
-    "-e", mockProviderEntry, "-p", "--mode", "json", "--provider", "omo-mock", "--model", "mock-1",
-    "--session-dir", parent.sessionDir, `launch the ${parent.name} background race task`,
-  ], {
-    cwd: projectDir,
-    env: {
-      ...process.env,
-      HOME: parent.home,
-      SENPI_CODING_AGENT_DIR: parent.agentDir,
-      SENPI_CODING_AGENT_SESSION_DIR: parent.sessionDir,
-      SENPI_QA_MOCK_SCRIPT: parent.scriptPath,
-      SENPI_QA_READY_FILE: parent.readyFile,
-      SENPI_QA_GO_FILE: parent.goFile,
-      SENPI_QA_GATE_TIMEOUT_MS: String(timeoutMs),
-      OMO_SENPI_QA: "1",
+  const child = spawn(
+    senpiBin,
+    [
+      "-e",
+      mockProviderEntry,
+      "-p",
+      "--mode",
+      "json",
+      "--provider",
+      "omo-mock",
+      "--model",
+      "mock-1",
+      "--session-dir",
+      parent.sessionDir,
+      `launch the ${parent.name} background race task`,
+    ],
+    {
+      cwd: projectDir,
+      env: {
+        ...isolatedChildEnv(process.env, parent.agentDir),
+        HOME: parent.home,
+        SENPI_CODING_AGENT_DIR: parent.agentDir,
+        SENPI_CODING_AGENT_SESSION_DIR: parent.sessionDir,
+        SENPI_QA_MOCK_SCRIPT: parent.scriptPath,
+        SENPI_QA_READY_FILE: parent.readyFile,
+        SENPI_QA_GO_FILE: parent.goFile,
+        SENPI_QA_GATE_TIMEOUT_MS: String(timeoutMs),
+        OMO_SENPI_QA: "1",
+      },
+      detached: true,
+      stdio: ["ignore", "pipe", "pipe"],
     },
-    detached: true,
-    stdio: ["ignore", "pipe", "pipe"],
-  })
+  )
   let stdout = ""
   let stderr = ""
-  child.stdout.on("data", (chunk) => { stdout += chunk })
-  child.stderr.on("data", (chunk) => { stderr += chunk })
+  child.stdout.on("data", (chunk) => {
+    stdout += chunk
+  })
+  child.stderr.on("data", (chunk) => {
+    stderr += chunk
+  })
   const completion = new Promise((resolve) => {
     child.on("close", (status, signal) => resolve({ status, signal, stdout, stderr }))
     child.on("error", (error) => resolve({ status: null, signal: null, stdout, stderr: `${stderr}\n${error.message}` }))
@@ -250,28 +312,41 @@ async function cleanupRuns(runs, root, timeoutMs, artifactDir) {
   }
   await Promise.all(runs.map((run) => waitForCompletion(run, timeoutMs, artifactDir, "teardown")))
   const verified_dead = pids.filter((pid) => !isAlive(pid))
-  if (verified_dead.length !== pids.length) throw new Error(`cleanup could not terminate process groups: ${pids.filter((pid) => isAlive(pid)).join(", ")}`)
+  if (verified_dead.length !== pids.length)
+    throw new Error(`cleanup could not terminate process groups: ${pids.filter((pid) => isAlive(pid)).join(", ")}`)
   rmSync(root, { recursive: true, force: true })
   return { pids, terminated, verified_dead, sandbox_removed: !existsSync(root) }
 }
 
 function isAlive(pid) {
-  try { process.kill(pid, 0); return true } catch (error) { if (isMissingProcess(error)) return false; throw error }
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    if (isMissingProcess(error)) return false
+    throw error
+  }
 }
 
 function isMissingProcess(error) {
   return error instanceof Error && "code" in error && error.code === "ESRCH"
 }
 
-function lsTasks(projectDir) {
-  const tasksDir = join(projectDir, ".omo", "senpi-task", "tasks")
+// The engine keys the store by its own cwd, which the OS reports canonicalized (darwin tmpdir is a
+// /var -> /private/var symlink), so the listing resolves from the canonical project path too.
+function lsTasks(projectDir, agentDir) {
+  const tasksDir = join(sandboxStateDir({ cwd: realpathSync(projectDir), agentDir }), "tasks")
   if (!existsSync(tasksDir)) return "<absent>\n"
   const result = spawnSync("ls", ["-la", tasksDir], { encoding: "utf8", timeout: 30_000 })
   return `${result.stdout}${result.stderr}`
 }
 
 function taskIdsFromListing(listing) {
-  return listing.split(/\r?\n/).map((line) => line.trim().split(/\s+/).at(-1) ?? "").filter((entry) => /^st_[0-9a-f]{8}\.json$/.test(entry)).map((entry) => entry.slice(0, -5))
+  return listing
+    .split(/\r?\n/)
+    .map((line) => line.trim().split(/\s+/).at(-1) ?? "")
+    .filter((entry) => /^st_[0-9a-f]{8}\.json$/.test(entry))
+    .map((entry) => entry.slice(0, -5))
 }
 
 function copySessionTranscript(from, to) {
@@ -286,7 +361,8 @@ function parseArgs(args) {
     else if (args[index] === "--timeout-ms") timeoutMs = Number(args[++index])
     else throw new Error(`unknown argument: ${args[index]}`)
   }
-  if (typeof evidenceDir !== "string" || evidenceDir.length === 0) throw new Error("usage: node task-id-race-qa.mjs --evidence-dir <dir> [--timeout-ms 120000]")
+  if (typeof evidenceDir !== "string" || evidenceDir.length === 0)
+    throw new Error("usage: node task-id-race-qa.mjs --evidence-dir <dir> [--timeout-ms 120000]")
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new Error("--timeout-ms must be a positive number")
   return { evidenceDir: resolve(evidenceDir), timeoutMs }
 }
@@ -301,7 +377,11 @@ function resolveSenpi(bin) {
 }
 
 function versionOf(bin) {
-  const result = spawnSync(bin, ["--version"], { encoding: "utf8", timeout: 30_000 })
+  const result = spawnSync(bin, ["--version"], {
+    encoding: "utf8",
+    timeout: 30_000,
+    env: withTelemetryOptOut(process.env),
+  })
   return `${result.stdout}${result.stderr}`.trim() || "unknown"
 }
 
@@ -315,6 +395,6 @@ function writeJson(path, value) {
 }
 
 main().catch((error) => {
-  console.error(error instanceof Error ? error.stack ?? error.message : String(error))
+  console.error(error instanceof Error ? (error.stack ?? error.message) : String(error))
   process.exitCode = 1
 })

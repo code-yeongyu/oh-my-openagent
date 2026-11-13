@@ -14,6 +14,8 @@ import { homedir, tmpdir } from "node:os"
 import { delimiter, dirname, join, relative, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
+import { withTelemetryOptOut } from "../../../omo-senpi/scripts/qa/telemetry-opt-out-env.mjs"
+
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const packageRoot = resolve(scriptDir, "..", "..")
 const repoRoot = resolve(packageRoot, "..", "..")
@@ -159,7 +161,10 @@ console.log(JSON.stringify({
   if (evidenceDir !== undefined) {
     writeFileSync(join(evidenceDir, "resolution-probe.log"), `${probe.stdout}\n${probe.stderr}`)
   }
-  const line = probe.stdout.trim().split(/\r?\n/).findLast((entry) => entry.startsWith("{"))
+  const line = probe.stdout
+    .trim()
+    .split(/\r?\n/)
+    .findLast((entry) => entry.startsWith("{"))
   if (line === undefined) throw new Error("resolution probe printed no JSON")
   return JSON.parse(line)
 }
@@ -191,7 +196,10 @@ console.log(JSON.stringify({ pathOnly: resolveServerBinary(["biome", "lsp-proxy"
   if (evidenceDir !== undefined) {
     writeFileSync(join(evidenceDir, "baseline-path-only-probe.log"), `${probe.stdout}\n${probe.stderr}`)
   }
-  const line = probe.stdout.trim().split(/\r?\n/).findLast((entry) => entry.startsWith("{"))
+  const line = probe.stdout
+    .trim()
+    .split(/\r?\n/)
+    .findLast((entry) => entry.startsWith("{"))
   return JSON.parse(line)
 }
 
@@ -264,7 +272,7 @@ function runSenpiProbe(fixture, pathValue, senpiBin, workRoot, evidenceDir) {
     {
       cwd: fixture.root,
       encoding: "utf8",
-      env: {
+      env: withTelemetryOptOut({
         ...process.env,
         PATH: pathValue,
         HOME: homeDir,
@@ -275,7 +283,7 @@ function runSenpiProbe(fixture, pathValue, senpiBin, workRoot, evidenceDir) {
         SENPI_CODING_AGENT_DIR: agentDir,
         SENPI_CODING_AGENT_SESSION_DIR: sessionDir,
         OMO_SENPI_QA: "1",
-      },
+      }),
       timeout: 180_000,
       maxBuffer: 64 * 1024 * 1024,
     },
@@ -341,7 +349,10 @@ await runWithRequestContext(context, async () => { await getLspManager().stopAll
     writeFileSync(join(evidenceDir, "diagnostics-probe.log"), `${probe.stdout}\n${probe.stderr}`)
   }
   if (probe.status !== 0) throw new Error(`diagnostics probe failed: ${probe.stderr || probe.stdout}`)
-  const line = probe.stdout.trim().split(/\r?\n/).findLast((entry) => entry.startsWith("{"))
+  const line = probe.stdout
+    .trim()
+    .split(/\r?\n/)
+    .findLast((entry) => entry.startsWith("{"))
   if (line === undefined) throw new Error("diagnostics probe printed no JSON")
   const parsed = JSON.parse(line)
   return {

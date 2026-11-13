@@ -20,12 +20,23 @@ export type DelegateModelResolutionInput = {
   readonly categoryDefaultModel?: string
   readonly isUserConfiguredCategoryModel?: boolean
   readonly fallbackChain?: readonly DelegateFallbackEntry[]
+  /**
+   * Let a chain rung match its model on a provider the rung does not list. Off by default: a builtin
+   * chain must never route to a provider it does not name, such as a gateway re-publishing the same
+   * model (#9146). Only a caller whose rungs come from the user's own selection opts in.
+   */
+  readonly allowUnlistedProviders?: boolean
   readonly availableModels: ReadonlySet<string>
   readonly systemDefaultModel?: string
 }
 
 export type DelegateModelResolutionResult =
-  | { readonly model: string; readonly variant?: string; readonly fallbackEntry?: DelegateFallbackEntry; readonly matchedFallback?: boolean }
+  | {
+      readonly model: string
+      readonly variant?: string
+      readonly fallbackEntry?: DelegateFallbackEntry
+      readonly matchedFallback?: boolean
+    }
   | { readonly skipped: true }
   | undefined
 
@@ -49,11 +60,13 @@ function getExplicitHighBaseModel(model: string): string | null {
   return isExplicitHighModel(model) ? model.replace(/-high$/, "") : null
 }
 
-function parseUserFallbackModel(fallbackModel: string): {
-  readonly baseModel: string
-  readonly providerHint?: string[]
-  readonly variant?: string
-} | undefined {
+function parseUserFallbackModel(fallbackModel: string):
+  | {
+      readonly baseModel: string
+      readonly providerHint?: string[]
+      readonly variant?: string
+    }
+  | undefined {
   const normalizedFallback = normalizeModel(fallbackModel)
   if (!normalizedFallback) {
     return undefined
@@ -86,16 +99,10 @@ export function resolveModelForDelegateTask(
   const userModel = normalizeModel(input.userModel)
   if (userModel) {
     const parsed = parseUserFallbackModel(userModel)
-    const userResult = parsed?.variant
-      ? { model: parsed.baseModel, variant: parsed.variant }
-      : { model: userModel }
+    const userResult = parsed?.variant ? { model: parsed.baseModel, variant: parsed.variant } : { model: userModel }
 
     const userFallbackModels = input.userFallbackModels
-    if (
-      input.availableModels.size > 0 &&
-      userFallbackModels &&
-      userFallbackModels.length > 0
-    ) {
+    if (input.availableModels.size > 0 && userFallbackModels && userFallbackModels.length > 0) {
       const providerHint = parsed?.providerHint
       const primaryMatch = fuzzyMatchModel(userResult.model, new Set(input.availableModels), providerHint)
       if (!primaryMatch) {
@@ -108,10 +115,13 @@ export function resolveModelForDelegateTask(
             parsedFallback.providerHint,
           )
           if (fbMatch) {
-            deps.log?.("[resolveModelForDelegateTask] user primary model unreachable; promoting user fallback_models entry", {
-              userPrimary: userResult.model,
-              selectedFallback: fbMatch,
-            })
+            deps.log?.(
+              "[resolveModelForDelegateTask] user primary model unreachable; promoting user fallback_models entry",
+              {
+                userPrimary: userResult.model,
+                selectedFallback: fbMatch,
+              },
+            )
             return {
               model: fbMatch,
               variant: parsedFallback.variant,
@@ -197,7 +207,11 @@ export function resolveModelForDelegateTask(
         const parsedFallback = parseUserFallbackModel(fallbackModel)
         if (!parsedFallback) continue
 
-        const match = fuzzyMatchModel(parsedFallback.baseModel, new Set(input.availableModels), parsedFallback.providerHint)
+        const match = fuzzyMatchModel(
+          parsedFallback.baseModel,
+          new Set(input.availableModels),
+          parsedFallback.providerHint,
+        )
         if (match) {
           return { model: match, variant: parsedFallback.variant, matchedFallback: true }
         }
@@ -218,7 +232,12 @@ export function resolveModelForDelegateTask(
                 provider,
                 model: entry.model,
               })
-              return { model: `${provider}/${transformedModelId}`, variant: entry.variant, fallbackEntry: entry, matchedFallback: true }
+              return {
+                model: `${provider}/${transformedModelId}`,
+                variant: entry.variant,
+                fallbackEntry: entry,
+                matchedFallback: true,
+              }
             }
           }
         }
@@ -228,15 +247,25 @@ export function resolveModelForDelegateTask(
         const provider = first?.providers?.[0]
         if (first && provider) {
           const transformedModelId = transformModelForProvider(provider, first.model)
-          return { model: `${provider}/${transformedModelId}`, variant: first.variant, fallbackEntry: first, matchedFallback: true }
+          return {
+            model: `${provider}/${transformedModelId}`,
+            variant: first.variant,
+            fallbackEntry: first,
+            matchedFallback: true,
+          }
         }
       }
     } else {
       for (const [entryIndex, entry] of fallbackChain.entries()) {
         for (const provider of entry.providers) {
-          const transformedModelId = transformModelForProvider(provider, modelIDForProvider(provider, entry.model))
-          const fullModel = `${provider}/${transformedModelId}`
-          const match = fuzzyMatchModel(fullModel, new Set(input.availableModels), [provider])
+          const entryModelId = modelIDForProvider(provider, entry.model)
+          const transformedModelId = transformModelForProvider(provider, entryModelId)
+          // A listed provider may publish the rung id as the chain spells it rather than transformed
+          // (kimi-coding/kimi-k3 for a kimi-k3 rung); both spellings stay on this provider.
+          const candidateIds = transformedModelId === entryModelId ? [entryModelId] : [transformedModelId, entryModelId]
+          const match = candidateIds
+            .map((modelId) => fuzzyMatchModel(`${provider}/${modelId}`, new Set(input.availableModels), [provider]))
+            .find((candidate) => candidate !== null)
           if (match) {
             if (explicitHighModel && entry.variant === "high" && match === explicitHighBaseModel) {
               return { model: explicitHighModel, fallbackEntry: entry, matchedFallback: true }
@@ -245,6 +274,8 @@ export function resolveModelForDelegateTask(
             return { model: match, variant: entry.variant, fallbackEntry: entry, matchedFallback: true }
           }
         }
+
+        if (input.allowUnlistedProviders !== true) continue
 
         const laterRungProviders = new Set(
           fallbackChain

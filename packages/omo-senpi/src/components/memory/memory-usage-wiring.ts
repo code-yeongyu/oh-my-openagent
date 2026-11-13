@@ -39,8 +39,8 @@ export function registerMemoryUsage(
     return tracker
   }
 
-  pi.on("tool_call", (payload): void => {
-    const context = options.resolveContext(payload)
+  pi.on("tool_call", (payload, eventContext): void => {
+    const context = options.resolveContext(eventContext)
     if (context === undefined) return
 
     const event = readToolCall(payload)
@@ -71,11 +71,12 @@ function readToolCall(value: unknown): ToolCall | undefined {
 
 function isReadTool(toolName: string): boolean {
   const normalized = toolName.trim().toLowerCase().replaceAll("-", "_")
-  return READ_TOOL_NAMES.some((name) =>
-    normalized === name
-    || normalized.endsWith(`_${name}`)
-    || normalized.endsWith(`:${name}`)
-    || normalized.endsWith(`/${name}`),
+  return READ_TOOL_NAMES.some(
+    (name) =>
+      normalized === name ||
+      normalized.endsWith(`_${name}`) ||
+      normalized.endsWith(`:${name}`) ||
+      normalized.endsWith(`/${name}`),
   )
 }
 

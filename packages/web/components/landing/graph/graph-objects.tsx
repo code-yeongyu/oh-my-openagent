@@ -104,9 +104,9 @@ export function GraphWires({
       }),
     [nodes],
   )
-  const resources = useMemo(() => {
-    const lines = new BufferGeometry()
-    lines.setAttribute(
+  const lines = useMemo(() => {
+    const geometry = new BufferGeometry()
+    geometry.setAttribute(
       "position",
       new BufferAttribute(
         new Float32Array(
@@ -115,45 +115,42 @@ export function GraphWires({
         3,
       ),
     )
-    const count = Math.min(mobile ? 24 : 48, edges.length * 2)
-    const progress = new Float32Array(count)
-    const positions = new Float32Array(count * 3)
-    const points = new BufferGeometry()
-    const attribute = new BufferAttribute(positions, 3)
-    points.setAttribute("position", attribute)
-    return { lines, points, positions, progress, count, attribute }
-  }, [edges, mobile])
-  useEffect(
-    () => () => {
-      resources.lines.dispose()
-      resources.points.dispose()
-    },
-    [resources],
-  )
+    return geometry
+  }, [edges])
+  useEffect(() => () => lines.dispose(), [lines])
+  const count = Math.min(mobile ? 24 : 48, edges.length * 2)
+  const positions = useMemo(() => new Float32Array(count * 3), [count])
+  // The pulse positions are written every frame through the attribute ref, never through the
+  // memoised array itself; the JSX-declared geometry is disposed by the renderer on unmount.
+  const pulses = useRef<BufferAttribute>(null)
   useFrame(({ clock }) => {
+    const attribute = pulses.current
+    if (!attribute) return
     const phase = clock.elapsedTime % 12
-    for (let i = 0; i < resources.count; i++) {
+    for (let i = 0; i < count; i++) {
       const edge = edges[i % edges.length]
       if (!edge) continue
       const start = edge.source.wave === 1 ? 1 : 4
       const t = (phase - start) / 2 - Math.floor(i / edges.length) * 0.25
-      resources.progress[i] = t
-      for (const axis of [0, 1, 2] as const) {
-        resources.positions[i * 3 + axis] =
-          t >= 0 && t <= 1
-            ? edge.source.position[axis] +
-              (edge.target.position[axis] - edge.source.position[axis]) * t
-            : 10000
-      }
+      const inFlight = t >= 0 && t <= 1
+      const at = (axis: 0 | 1 | 2): number =>
+        inFlight
+          ? edge.source.position[axis] +
+            (edge.target.position[axis] - edge.source.position[axis]) * t
+          : 10000
+      attribute.setXYZ(i, at(0), at(1), at(2))
     }
-    resources.attribute.needsUpdate = true
+    attribute.needsUpdate = true
   })
   return (
     <>
-      <lineSegments geometry={resources.lines}>
+      <lineSegments geometry={lines}>
         <lineBasicMaterial color={palette.accentDim} transparent opacity={0.35} />
       </lineSegments>
-      <points geometry={resources.points} frustumCulled={false}>
+      <points frustumCulled={false}>
+        <bufferGeometry>
+          <bufferAttribute ref={pulses} attach="attributes-position" args={[positions, 3]} />
+        </bufferGeometry>
         <pointsMaterial
           color={palette.accentHot}
           size={6}

@@ -1,9 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import type { BeforeAgentStartEventResult } from "@code-yeongyu/senpi"
-import {
-  GitMemoryRepo,
-  RecallLedger,
-} from "@oh-my-opencode/memory-core"
+import { GitMemoryRepo, RecallLedger } from "@oh-my-opencode/memory-core"
 
 import { MemoryFakeExtensionAPI, memorySettings } from "./memory.test-support"
 import { RECALL_CUSTOM_TYPE, createMemoryRecallWiring } from "./recall-wiring"
@@ -38,7 +35,6 @@ interface WiringInput {
   readonly env?: Record<string, string | undefined>
   readonly logs?: Array<{ message: string; details?: unknown }>
   readonly ledgerFor?: (context: MemoryIdentityContext) => RecallLedgerType
-  readonly currentCompactionEpoch?: (sessionId: string) => number
 }
 
 function wiringFor(input: WiringInput) {
@@ -52,9 +48,6 @@ function wiringFor(input: WiringInput) {
     createRepo: () => input.repo,
     env: input.env ?? {},
     ...(input.ledgerFor === undefined ? {} : { ledgerFor: input.ledgerFor }),
-    ...(input.currentCompactionEpoch === undefined
-      ? {}
-      : { currentCompactionEpoch: input.currentCompactionEpoch }),
     ...(input.logs === undefined
       ? {}
       : {

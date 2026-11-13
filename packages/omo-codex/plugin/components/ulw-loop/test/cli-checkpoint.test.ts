@@ -128,6 +128,33 @@ describe("ulwLoopCommand checkpoint", () => {
 		expect(stdoutJson()).toHaveProperty("goal.status", "complete");
 	});
 
+	it("#given a complete checkpoint with an objective difference #when invoked with JSON #then exposes driver advice and warning", async () => {
+		await createPlan();
+		await passCriterion("G001-goal-a", "C001");
+		await passCriterion("G001-goal-a", "C002");
+		await passCriterion("G001-goal-a", "C003");
+
+		expect(
+			await ulwLoopCommand([
+				"checkpoint",
+				"--goal-id",
+				"G001-goal-a",
+				"--status",
+				"complete",
+				"--evidence",
+				"implementation done and validation passed",
+				"--codex-goal-json",
+				JSON.stringify({ goal: { objective: "different driver", status: "budget_limited" } }),
+				"--json",
+			]),
+		).toBe(0);
+		const result = stdoutJson();
+		expect(result).toMatchObject({ ok: true });
+		expect(result).toHaveProperty("nextActions");
+		expect(JSON.stringify(result)).toContain("driver_objective_differs");
+		expect(JSON.stringify(result)).toContain("/goal resume");
+	});
+
 	it("ACCEPTS when all criteria pass", async () => {
 		await createPlan();
 		await passCriterion("G001-goal-a", "C001");

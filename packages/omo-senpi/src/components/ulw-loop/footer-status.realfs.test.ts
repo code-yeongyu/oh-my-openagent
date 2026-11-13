@@ -60,8 +60,7 @@ async function createFooterScenario(sessionId: string): Promise<FooterScenario> 
   const calls: StatusCall[] = []
   const pi = new FakeExtensionAPI()
   await createUlwLoopComponent({
-    resolveOmoBin: () => "/tmp/omo",
-    runCommand: async () => ({ code: 0, stdout: activeStatus() }),
+    readStatus: async () => ({ code: 0, stdout: activeStatus() }),
     footerStatus: { timers },
   }).register(pi, {
     logger: createLogger(),
@@ -103,7 +102,11 @@ describe("omo-senpi ulw-loop footer real filesystem plan lookup", () => {
     try {
       writeFileSync(scenario.scopedGoalsPath, "{}\n")
 
-      await scenario.pi.dispatch("session_start", { type: "session_start" }, eventContext(scenario.cwd, sessionId, scenario.ui))
+      await scenario.pi.dispatch(
+        "session_start",
+        { type: "session_start" },
+        eventContext(scenario.cwd, sessionId, scenario.ui),
+      )
       scenario.timers.fire()
       scenario.timers.fire()
       scenario.timers.fire()
@@ -121,7 +124,11 @@ describe("omo-senpi ulw-loop footer real filesystem plan lookup", () => {
       mkdirSync(join(scenario.cwd, ".omo", "ulw-loop"), { recursive: true })
       writeFileSync(join(scenario.cwd, ".omo", "ulw-loop", "goals.json"), "{}\n")
 
-      await scenario.pi.dispatch("session_start", { type: "session_start" }, eventContext(scenario.cwd, sessionId, scenario.ui))
+      await scenario.pi.dispatch(
+        "session_start",
+        { type: "session_start" },
+        eventContext(scenario.cwd, sessionId, scenario.ui),
+      )
       scenario.timers.fire()
 
       expect(footerFrames(scenario.ui)).toEqual([])
@@ -137,7 +144,11 @@ describe("omo-senpi ulw-loop footer real filesystem plan lookup", () => {
       mkdirSync(join(scenario.cwd, ".omo", "ulw-loop", "other-name"), { recursive: true })
       writeFileSync(join(scenario.cwd, ".omo", "ulw-loop", "other-name", "goals.json"), "{}\n")
 
-      await scenario.pi.dispatch("session_start", { type: "session_start" }, eventContext(scenario.cwd, sessionId, scenario.ui))
+      await scenario.pi.dispatch(
+        "session_start",
+        { type: "session_start" },
+        eventContext(scenario.cwd, sessionId, scenario.ui),
+      )
       scenario.timers.fire()
 
       expect(footerFrames(scenario.ui)).toEqual([])

@@ -10,7 +10,7 @@ import {
 } from "@/components/manifesto/manifesto-section"
 
 export async function FutureSection(): Promise<JSX.Element> {
-  const t = await getTranslations("manifesto")
+  const t = await getTranslations("manifestoLegacy")
   const futureKeys = ["focus", "quality", "complexity", "promptEngineering"] as const
 
   return (

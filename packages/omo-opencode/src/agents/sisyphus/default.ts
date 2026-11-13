@@ -3,12 +3,7 @@
  * Used for Claude and other non-specialized models.
  */
 
-import type {
-  AvailableAgent,
-  AvailableTool,
-  AvailableSkill,
-  AvailableCategory,
-} from "../dynamic-agent-prompt-builder";
+import type { AvailableAgent, AvailableTool, AvailableSkill, AvailableCategory } from "../dynamic-agent-prompt-builder"
 import {
   buildKeyTriggersSection,
   buildToolSelectionTable,
@@ -23,9 +18,9 @@ import {
   buildNonClaudePlannerSection,
   buildAntiDuplicationSection,
   categorizeTools,
-} from "../dynamic-agent-prompt-builder";
+} from "../dynamic-agent-prompt-builder"
 
-export function buildTaskManagementSection(useTaskSystem: boolean): string {
+function buildTaskManagementSection(useTaskSystem: boolean): string {
   if (useTaskSystem) {
     return `<Task_Management>
 ## Task Management (CRITICAL)
@@ -78,7 +73,7 @@ I want to make sure I understand correctly.
 
 Should I proceed with [recommendation], or would you prefer differently?
 \`\`\`
-</Task_Management>`;
+</Task_Management>`
   }
 
   return `<Task_Management>
@@ -132,7 +127,7 @@ I want to make sure I understand correctly.
 
 Should I proceed with [recommendation], or would you prefer differently?
 \`\`\`
-</Task_Management>`;
+</Task_Management>`
 }
 
 export function buildDefaultSisyphusPrompt(
@@ -143,28 +138,21 @@ export function buildDefaultSisyphusPrompt(
   availableCategories: AvailableCategory[] = [],
   useTaskSystem = false,
 ): string {
-  const keyTriggers = buildKeyTriggersSection(availableAgents, availableSkills);
-  const toolSelection = buildToolSelectionTable(
-    availableAgents,
-    availableTools,
-    availableSkills,
-  );
-  const exploreSection = buildExploreSection(availableAgents);
-  const librarianSection = buildLibrarianSection(availableAgents);
-  const categorySkillsGuide = buildCategorySkillsDelegationGuide(
-    availableCategories,
-    availableSkills,
-  );
-  const delegationTable = buildDelegationTable(availableAgents);
-  const oracleSection = buildOracleSection(availableAgents);
-  const hardBlocks = buildHardBlocksSection();
-  const antiPatterns = buildAntiPatternsSection();
-  const parallelDelegationSection = buildParallelDelegationSection(model, availableCategories);
-  const nonClaudePlannerSection = buildNonClaudePlannerSection(model);
-  const taskManagementSection = buildTaskManagementSection(useTaskSystem);
+  const keyTriggers = buildKeyTriggersSection(availableAgents, availableSkills)
+  const toolSelection = buildToolSelectionTable(availableAgents, availableTools, availableSkills)
+  const exploreSection = buildExploreSection(availableAgents)
+  const librarianSection = buildLibrarianSection(availableAgents)
+  const categorySkillsGuide = buildCategorySkillsDelegationGuide(availableCategories, availableSkills)
+  const delegationTable = buildDelegationTable(availableAgents)
+  const oracleSection = buildOracleSection(availableAgents)
+  const hardBlocks = buildHardBlocksSection()
+  const antiPatterns = buildAntiPatternsSection()
+  const parallelDelegationSection = buildParallelDelegationSection(model, availableCategories)
+  const nonClaudePlannerSection = buildNonClaudePlannerSection(model)
+  const taskManagementSection = buildTaskManagementSection(useTaskSystem)
   const todoHookNote = useTaskSystem
     ? "YOUR TASK CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TASK CONTINUATION])"
-    : "YOUR TODO CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TODO CONTINUATION])";
+    : "YOUR TODO CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TODO CONTINUATION])"
 
   return `<Role>
 You are "Sisyphus" - Powerful AI Agent with orchestration capabilities from OhMyOpenCode.
@@ -208,7 +196,7 @@ Before classifying the task, identify what the user actually wants from you as a
 
 **Verbalize before proceeding:**
 
-> "I detect [research / implementation / investigation / evaluation / fix / open-ended] intent - [reason]. My approach: [explore → answer / plan → delegate / clarify first / etc.]."
+"I detect [research / implementation / investigation / evaluation / fix / open-ended] intent - [reason]. My approach: [explore → answer / plan → delegate / clarify first / etc.]."
 
 This verbalization anchors your routing decision and makes your reasoning transparent to the user. It does NOT commit you to implementation - only the user's explicit request does that.
 </intent_verbalization>
@@ -539,7 +527,7 @@ ${antiPatterns}
 - Prefer small, focused changes over large refactors
 - When uncertain about scope, ask
 </Constraints>
-`;
+`
 }
 
-export { categorizeTools };
+export { categorizeTools }

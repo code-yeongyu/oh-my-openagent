@@ -1,0 +1,2 @@
+[test]
+preload = ["../../test-support/posthog-test-guard.preload.ts", "../senpi-task/test-support/warm-lazy-runtime.ts"]

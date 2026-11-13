@@ -17,19 +17,19 @@ This skill may include examples copied from the OpenCode harness. In Senpi, do n
 | --- | --- |
 | \`call_omo_agent(subagent_type="explore", ...)\` | \`task\` tool with \`subagent_type: "explore"\` |
 | \`call_omo_agent(subagent_type="librarian", ...)\` | \`task\` tool with \`subagent_type: "librarian"\` |
-| worker/implementation \`task(...)\` | \`task\` tool with \`category\` from the delegation router (\`quick\`, \`unspecified-low\`, \`unspecified-high\`, \`deep\`, \`ultrabrain\`, \`visual-engineering\`, \`writing\`); honor the plan's \`Recommended task executor category:\` line |
-| final-review / gate-reviewer \`task(...)\` | fresh \`task\` with \`subagent_type: "omo-senpi-gate-reviewer"\` (the builtin gate reviewer, category-routed \`deep\` then \`unspecified-high\`) and the review inputs; \`momus\`/\`metis\` are plan-gated curated reviewers, spawnable only while the plan gate is open |
+| worker/implementation \`task(...)\` | \`task\` tool with \`category\` from the delegation router (\`quick\`, \`unspecified-low\`, \`unspecified-high\`, \`deep-low\`, \`deep-high\`, \`ultrabrain\`, \`visual-engineering\`, \`writing\`); honor the plan's \`Recommended task executor category:\` line |
+| final-review / gate-reviewer \`task(...)\` | fresh \`task\` with \`subagent_type: "omo-native-gate-reviewer"\` (the builtin gate reviewer, category-routed \`deep-high\` then \`unspecified-high\`) and the review inputs; \`plan-reviewer\`/\`plan-consultant\` are plan-gated curated reviewers, spawnable only while the plan gate is open |
 | \`background_output(task_id="...")\` | \`task_output\` tool with the task id |
 | \`team_*(...)\` | Lead team tools (\`team_create\`, \`task_create\`, ...); send with \`task_send\` |
+| \`team_list\` / \`team_status\` | no Senpi equivalent: follow the run from the \`team_create\` result, member completion notifications, and \`task_output\` on a member |
+| \`team_shutdown_request\` -> \`team_approve_shutdown\` | \`task_send\` the member \`{type: \"shutdown_request\"}\`, then \`{type: \"shutdown_response\", approve: true}\` once it wraps up, then \`team_delete\` |
 | a watcher on a lane's completion state | \`monitor\` to arm it, \`kill_bash\` to tear it down |
 
 If a code block below conflicts with this section, this section wins.
 
 `
 
-const senpiCompatibilityEndMarkers = [
-  "If a code block below conflicts with this section, this section wins.\n\n",
-]
+const senpiCompatibilityEndMarkers = ["If a code block below conflicts with this section, this section wins.\n\n"]
 
 function findSenpiCompatibilitySectionEnd(content, searchStart) {
   const structuralEndPattern = /\n(?:---|export\s+const\s+|#{1,6}\s)/g

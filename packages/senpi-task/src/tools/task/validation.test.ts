@@ -15,15 +15,74 @@ describe("validateTaskTarget", () => {
     expect(result).toEqual({ kind: "category", category: "quick" })
   })
 
-  test("#given only subagent_type #when validated #then resolves to a subagent selection", () => {
+  test("#given the retired deep category #when validated #then the spawn is canonicalized to deep-low", () => {
     // given
-    const params = { prompt: "do it", subagent_type: "momus" }
+    const params = { prompt: "do it", category: " deep " }
 
     // when
     const result = validateTaskTarget(params)
 
     // then
+    expect(result).toEqual({ kind: "category", category: "deep-low" })
+  })
+
+  test("#given a live category name #when validated #then it passes through unchanged", () => {
+    for (const category of ["deep-low", "deep-high", "ultrabrain", "my-own-lane"]) {
+      expect(validateTaskTarget({ prompt: "do it", category })).toEqual({ kind: "category", category })
+    }
+  })
+
+  test("#given only subagent_type #when validated #then resolves to a subagent selection", () => {
+    // given
+    const params = { prompt: "do it", subagent_type: "plan-reviewer" }
+
+    // when
+    const result = validateTaskTarget(params)
+
+    // then
+    expect(result).toEqual({ kind: "subagent_type", subagentType: "plan-reviewer" })
+  })
+
+  test("#given a retired curated subagent_type #when validated #then it passes through untouched like any other name", () => {
+    // when
+    const result = validateTaskTarget({ prompt: "do it", subagent_type: "momus" })
+
+    // then
     expect(result).toEqual({ kind: "subagent_type", subagentType: "momus" })
+  })
+
+  test("#given a canonical subagent_type #when validated #then the selection carries only the submitted id", () => {
+    // when
+    const result = validateTaskTarget({ prompt: "do it", subagent_type: "plan-consultant" })
+
+    // then
+    expect(result).toEqual({ kind: "subagent_type", subagentType: "plan-consultant" })
+  })
+
+  test("#given an unknown subagent_type #when validated #then it passes through untouched", () => {
+    // when
+    const result = validateTaskTarget({ prompt: "do it", subagent_type: " custom-agent " })
+
+    // then
+    expect(result).toEqual({ kind: "subagent_type", subagentType: "custom-agent" })
+  })
+
+  test("#given a batch item with a retired curated subagent_type #when items are resolved #then the item carries the submitted id verbatim", () => {
+    // when
+    const result = resolveSpawnItems({
+      tasks: [
+        { prompt: "a", subagent_type: "metis" },
+        { prompt: "b", subagent_type: "explore" },
+      ],
+    })
+
+    // then
+    expect(result.kind).toBe("ok")
+    if (result.kind !== "ok") throw new Error("expected ok")
+    expect(result.items[0]).toMatchObject({ kind: "subagent_type", subagentType: "metis" })
+    expect(result.items[0]).not.toHaveProperty("legacySubagentType")
+    expect(result.items[1]).toMatchObject({ kind: "subagent_type", subagentType: "explore" })
+    expect(result.items[1]).not.toHaveProperty("legacySubagentType")
   })
 
   test("#given both category and subagent_type #when validated #then returns a typed both_targets error", () => {
@@ -142,7 +201,7 @@ describe("resolveSpawnItems", () => {
     // given
     const params = {
       prompt: "do it",
-      subagent_type: "momus",
+      subagent_type: "plan-reviewer",
       model: "anthropic/claude-opus-4",
       load_skills: ["a"],
     }
@@ -158,7 +217,7 @@ describe("resolveSpawnItems", () => {
     if (item === undefined) throw new Error("expected item")
     expect(item.kind).toBe("subagent_type")
     if (item.kind !== "subagent_type") throw new Error("expected subagent_type")
-    expect(item.subagentType).toBe("momus")
+    expect(item.subagentType).toBe("plan-reviewer")
     expect(item.prompt).toBe("do it")
     expect(item.model).toBe("anthropic/claude-opus-4")
     expect(item.load_skills).toEqual(["a"])
@@ -167,7 +226,7 @@ describe("resolveSpawnItems", () => {
   test("#given a 3-item batch w2val #when resolved #then inherits top-level model/subagent and item overrides win", () => {
     // given
     const params = {
-      subagent_type: "momus",
+      subagent_type: "plan-reviewer",
       model: "anthropic/claude-opus-4",
       load_skills: ["shared"],
       tasks: [
@@ -192,9 +251,9 @@ describe("resolveSpawnItems", () => {
     if (first.kind !== "subagent_type" || second.kind !== "subagent_type" || third.kind !== "subagent_type") {
       throw new Error("expected subagent_type")
     }
-    expect(first.subagentType).toBe("momus")
-    expect(second.subagentType).toBe("momus")
-    expect(third.subagentType).toBe("momus")
+    expect(first.subagentType).toBe("plan-reviewer")
+    expect(second.subagentType).toBe("plan-reviewer")
+    expect(third.subagentType).toBe("plan-reviewer")
     expect(first.model).toBe("anthropic/claude-opus-4")
     expect(second.model).toBe("anthropic/claude-haiku")
     expect(third.model).toBe("anthropic/claude-opus-4")
@@ -207,7 +266,7 @@ describe("resolveSpawnItems", () => {
     // given
     const params = {
       category: "quick",
-      tasks: [{ prompt: "one" }, { prompt: "two", subagent_type: "momus" }],
+      tasks: [{ prompt: "one" }, { prompt: "two", subagent_type: "plan-reviewer" }],
     }
 
     // when
@@ -223,7 +282,7 @@ describe("resolveSpawnItems", () => {
     expect(inherited.category).toBe("quick")
     expect(suppressed.kind).toBe("subagent_type")
     if (suppressed.kind !== "subagent_type") throw new Error("expected subagent_type")
-    expect(suppressed.subagentType).toBe("momus")
+    expect(suppressed.subagentType).toBe("plan-reviewer")
     expect("category" in suppressed).toBe(false)
   })
 
@@ -271,7 +330,7 @@ describe("resolveSpawnItems", () => {
     // given
     const params = {
       category: "quick",
-      tasks: [{ prompt: "ok" }, { prompt: "bad", category: "deep", subagent_type: "momus" }],
+      tasks: [{ prompt: "ok" }, { prompt: "bad", category: "deep", subagent_type: "plan-reviewer" }],
     }
 
     // when
@@ -306,10 +365,7 @@ describe("resolveSpawnItems task_summary", () => {
     const resolved = resolveSpawnItems({
       task_summary: "Top-level summary",
       category: "quick",
-      tasks: [
-        { prompt: "TASK: first.", task_summary: "First summary" },
-        { prompt: "TASK: second." },
-      ],
+      tasks: [{ prompt: "TASK: first.", task_summary: "First summary" }, { prompt: "TASK: second." }],
     })
 
     // then
@@ -328,7 +384,7 @@ describe("batch spawn types", () => {
       prompt: "p",
       load_skills: [],
       kind: "subagent_type",
-      subagentType: "momus",
+      subagentType: "plan-reviewer",
     }
     const detail: TaskToolItemDetail = { task_id: "t1", status: "completed" }
 
@@ -355,7 +411,7 @@ describe("batch spawn types", () => {
 describe("validateTaskTarget category+model exclusivity", () => {
   test("#given category with model #when validated #then returns a typed category_with_model error", () => {
     // given
-    const params = { prompt: "p", category: "architect", model: "openai-codex/gpt-5.6-luna-fast" }
+    const params = { prompt: "p", category: "architect", model: "chatgpt-subscription/gpt-5.6-luna-fast" }
 
     // when
     const result = validateTaskTarget(params)
@@ -369,13 +425,13 @@ describe("validateTaskTarget category+model exclusivity", () => {
 
   test("#given subagent_type with model #when validated #then resolves to a subagent selection", () => {
     // given
-    const params = { prompt: "p", subagent_type: "momus", model: "openai/gpt-5.6-sol" }
+    const params = { prompt: "p", subagent_type: "plan-reviewer", model: "openai/gpt-5.6-sol" }
 
     // when
     const result = validateTaskTarget(params)
 
     // then
-    expect(result).toEqual({ kind: "subagent_type", subagentType: "momus" })
+    expect(result).toEqual({ kind: "subagent_type", subagentType: "plan-reviewer" })
   })
 })
 
@@ -393,7 +449,10 @@ describe("resolveSpawnItems category+model exclusivity", () => {
 
   test("#given a top-level model inherited by a category item #then returns an item_target error", () => {
     // given / when
-    const result = resolveSpawnItems({ model: "openai/gpt-5.6-luna-fast", tasks: [{ prompt: "one", category: "quick" }] })
+    const result = resolveSpawnItems({
+      model: "openai/gpt-5.6-luna-fast",
+      tasks: [{ prompt: "one", category: "quick" }],
+    })
 
     // then
     expect(result.kind).toBe("error")
@@ -404,7 +463,10 @@ describe("resolveSpawnItems category+model exclusivity", () => {
 
   test("#given a top-level category and an item model #then returns an item_target error", () => {
     // given / when
-    const result = resolveSpawnItems({ category: "quick", tasks: [{ prompt: "one" }, { prompt: "two", model: "openai/gpt-5.6-luna-fast" }] })
+    const result = resolveSpawnItems({
+      category: "quick",
+      tasks: [{ prompt: "one" }, { prompt: "two", model: "openai/gpt-5.6-luna-fast" }],
+    })
 
     // then
     expect(result.kind).toBe("error")
@@ -415,7 +477,11 @@ describe("resolveSpawnItems category+model exclusivity", () => {
 
   test("#given subagent items inheriting a top-level model #then resolves ok with the model attached", () => {
     // given / when
-    const result = resolveSpawnItems({ subagent_type: "momus", model: "openai/gpt-5.6-sol", tasks: [{ prompt: "one" }] })
+    const result = resolveSpawnItems({
+      subagent_type: "plan-reviewer",
+      model: "openai/gpt-5.6-sol",
+      tasks: [{ prompt: "one" }],
+    })
 
     // then
     expect(result.kind).toBe("ok")

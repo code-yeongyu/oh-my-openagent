@@ -2,16 +2,17 @@ import {
   createDefaultPostHogTransport,
   createTelemetryClient,
   getDefaultTelemetryOsProvider,
-  getTelemetryDistinctId,
+  getTelemetryInstallDistinctId,
 } from "@oh-my-opencode/telemetry-core"
 import type {
   PostHogActivityCaptureState,
   TelemetryDiagnosticInput,
   TelemetryEnv,
   TelemetryOsProvider,
+  TelemetryProductConfig,
   TelemetryTransportFactory,
 } from "@oh-my-opencode/telemetry-core"
-import { getPostHogActivityCaptureState } from "./posthog-activity-state"
+import { getPostHogActivityCaptureState, getPostHogActivityStateDir } from "./posthog-activity-state"
 import { log } from "./logger"
 import { createOpencodeTelemetryProductConfig } from "./telemetry-product-identity"
 
@@ -33,9 +34,7 @@ function resolveTransportFactory(): TelemetryTransportFactory {
 }
 
 /** @internal test-only */
-export function __setActivityStateProviderForTesting(
-  provider: typeof getPostHogActivityCaptureState,
-): void {
+export function __setActivityStateProviderForTesting(provider: typeof getPostHogActivityCaptureState): void {
   activityStateProviderOverride = provider
 }
 
@@ -66,7 +65,8 @@ export type PostHogSource = "cli" | "plugin"
 export type PostHogActivityReason = "run_started" | "plugin_loaded"
 
 export type PostHogClient = {
-  readonly trackActive: (distinctId: string, reason: PostHogActivityReason) => void
+  readonly trackActive: (reason: PostHogActivityReason) => void
+  readonly flush: () => Promise<void>
   readonly shutdown: () => Promise<void>
 }
 
@@ -74,12 +74,17 @@ type CreatePostHogOptions = {
   readonly configEnabled?: boolean
 }
 
+// Plugin load queues one event and flushes it explicitly. With the core default flushAt of 1,
+// capture() starts a background flush whose failure posthog-node prints via console.error into the TUI.
+const PLUGIN_TRANSPORT_OPTIONS = { flushAt: 20 }
+
 type RecordPluginTelemetryInput = {
   readonly configEnabled?: boolean
 }
 
 const NO_OP_POSTHOG: PostHogClient = {
   trackActive: () => undefined,
+  flush: async () => undefined,
   shutdown: async () => undefined,
 }
 
@@ -123,6 +128,18 @@ function logTelemetryDiagnostic(input: TelemetryDiagnosticInput): void {
   })
 }
 
+function createProductConfig(source: PostHogSource): TelemetryProductConfig {
+  const product = createOpencodeTelemetryProductConfig()
+  if (source !== "plugin") {
+    return product
+  }
+
+  return {
+    ...product,
+    transportOptions: { ...product.transportOptions, ...PLUGIN_TRANSPORT_OPTIONS },
+  }
+}
+
 function createPostHogClient(source: PostHogSource, options: CreatePostHogOptions = {}): PostHogClient {
   const env = process.env
   if (shouldDisablePostHog(env, options.configEnabled)) {
@@ -133,7 +150,7 @@ function createPostHogClient(source: PostHogSource, options: CreatePostHogOption
     diagnostics: logTelemetryDiagnostic,
     env: createCoreCompatibleTelemetryEnv(env),
     osProvider: resolveOsProvider(),
-    product: createOpencodeTelemetryProductConfig(),
+    product: createProductConfig(source),
     source,
     transportFactory: resolveTransportFactory(),
   })
@@ -143,7 +160,7 @@ function createPostHogClient(source: PostHogSource, options: CreatePostHogOption
   }
 
   return {
-    trackActive: (distinctId, reason) => {
+    trackActive: (reason) => {
       const activityState = resolveActivityState()
       if (!activityState.captureDaily) {
         return
@@ -151,18 +168,25 @@ function createPostHogClient(source: PostHogSource, options: CreatePostHogOption
 
       client.trackActive({
         dayUTC: activityState.dayUTC,
-        distinctId,
+        distinctId: getTelemetryInstallDistinctId(getPostHogActivityStateDir()),
         reason,
       })
+    },
+    flush: async () => {
+      try {
+        await client.flush()
+      } catch (error) {
+        log("[posthog] telemetry flush failed", {
+          error: String(error),
+          errorKind: error instanceof Error ? "error" : "non_error",
+          source,
+        })
+      }
     },
     shutdown: async () => {
       await client.shutdown()
     },
   }
-}
-
-export function getPostHogDistinctId(): string {
-  return getTelemetryDistinctId(createOpencodeTelemetryProductConfig().machineIdPrefix, resolveOsProvider())
 }
 
 export function createCliPostHog(options: CreatePostHogOptions = {}): PostHogClient {
@@ -175,7 +199,6 @@ export function createPluginPostHog(options: CreatePostHogOptions = {}): PostHog
 
 export function recordPluginTelemetry(input: RecordPluginTelemetryInput): void {
   const posthog = createPluginPostHog({ configEnabled: input.configEnabled })
-  const distinctId = getPostHogDistinctId()
-  posthog.trackActive(distinctId, "plugin_loaded")
-  void posthog.shutdown()
+  posthog.trackActive("plugin_loaded")
+  void posthog.flush()
 }
