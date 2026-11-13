@@ -1,0 +1,34 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/senpi-desktop-prelude": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "scripts/generate-assets.ts",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "test/display-declaration.ts",
+        "test/harness.ts",
+        "test/helper-names.ts",
+        "test/observe-declaration.ts",
+        "test/python-setup.ts",
+        "vitest.config.ts",
+      ],
+      "ignoreFiles": [
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/prelude.js",
+      ],
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "packages/senpi-desktop-prelude/test/python-setup.ts": ["default"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "packages/senpi-desktop-prelude/vitest.config.ts": ["default"]
+  }
+}

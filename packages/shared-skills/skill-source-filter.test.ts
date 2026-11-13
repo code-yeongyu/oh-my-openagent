@@ -35,6 +35,7 @@ describe("createSkillSourceCopyFilter", () => {
     expect(shouldCopy(join(root, ".gitignore"))).toBe(false)
     expect(shouldCopy(join(root, ".npmignore"))).toBe(false)
     expect(shouldCopy(join(root, "pyrightconfig.json"))).toBe(false)
+    expect(shouldCopy(join(root, "engine", "templates", "knip.workspace.jsonc"))).toBe(false)
     expect(shouldCopy(join(root, "scripts", "helper.test.ts"))).toBe(false)
     expect(shouldCopy(join(root, "scripts", "__init__.pyc"))).toBe(false)
     expect(shouldCopy(join(root, "scripts", "helper.ts"))).toBe(true)
