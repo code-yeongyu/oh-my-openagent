@@ -75,6 +75,17 @@ fn under_a_compositing_manager_the_target_is_still_redirected_for_the_read() {
 }
 
 #[test]
+fn a_redirected_window_that_never_repaints_is_an_annotated_root_crop() {
+    let mut server = occluded();
+    server.repaints = false;
+    let capture = X11Capture::new(server, None);
+    let frame = capture.capture_frame(&Target::Window("7".into()), &options(false)).expect("frame");
+    assert_eq!(frame.route, CaptureRoute::RootCrop);
+    assert!(frame.occluders_visible, "stale pixels never pass as a clean Composite frame");
+    assert!(count(&frame.image, MAGENTA) > 0);
+}
+
+#[test]
 fn refused_redirect_is_an_annotated_root_crop() {
     let mut server = occluded();
     server.compositor = false;
