@@ -23,7 +23,10 @@ test("#given enable with the phrase method #when the ceremony starts #then the m
   const finish = Promise.withResolvers<void>()
   const seen: { method?: string; gate?: PhraseGate }[] = []
   f.runtime.enableSync = async (input) => {
-    seen.push({ ...(input.method !== undefined && { method: input.method }), ...(input.phraseGate !== undefined && { gate: input.phraseGate }) })
+    seen.push({
+      ...(input.method !== undefined && { method: input.method }),
+      ...(input.phraseGate !== undefined && { gate: input.phraseGate }),
+    })
     input.onCeremony?.("phrase")
     await finish.promise
     return { kind: "joined", created: true }
@@ -69,7 +72,9 @@ test("#given an acknowledge request #when it arrives #then only the named notice
     seen.push({ purpose: input.purpose, ...(input.credentialId !== undefined && { credentialId: input.credentialId }) })
     return { ok: true }
   }
-  expect(await f.call("acknowledge", a.context, { notice: "phrase_void", purpose: "rotate", credentialId: "c1" })).toEqual({
+  expect(
+    await f.call("acknowledge", a.context, { notice: "phrase_void", purpose: "rotate", credentialId: "c1" }),
+  ).toEqual({
     ok: true,
   })
   expect(seen).toEqual([{ purpose: "rotate", credentialId: "c1" }])

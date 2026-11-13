@@ -140,7 +140,12 @@ test("#given an account that already holds a phrase chain and a service that no 
 
 test("#given another device's genesis landed while the service refused this phrase append #when enable answers service-floor-off #then only this device's switch goes off and the account keeps syncing", async () => {
   const s = await phraseSetup()
-  const live = { head: { seq: 1, link: "x", keyring_link: "x" }, currentEpoch: 1, rotationPending: false, acceptsPhraseKeys: false }
+  const live = {
+    head: { seq: 1, link: "x", keyring_link: "x" },
+    currentEpoch: 1,
+    rotationPending: false,
+    acceptsPhraseKeys: false,
+  }
   const result = await enableSync({
     ...s.input,
     chain: {

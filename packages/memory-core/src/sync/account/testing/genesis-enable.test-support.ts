@@ -11,7 +11,11 @@ import { startChainWireServer } from "./chain-wire-server.test-support.ts"
 export { ACCOUNT }
 
 export const fixture = async (
-  serverOptions: { readonly stream?: boolean; readonly acceptsPhraseKeys?: boolean; readonly extraState?: Readonly<Record<string, unknown>> } = {},
+  serverOptions: {
+    readonly stream?: boolean
+    readonly acceptsPhraseKeys?: boolean
+    readonly extraState?: Readonly<Record<string, unknown>>
+  } = {},
 ) => {
   const v = await vector()
   const pinDir = await mkdtemp(join(tmpdir(), "genesis-enable-"))

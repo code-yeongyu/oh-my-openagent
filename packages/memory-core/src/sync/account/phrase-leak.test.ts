@@ -55,13 +55,18 @@ test("#given a phrase genesis and a refused one #when every sink is captured #th
   }
   const refused = await enableSync({ ...base, genesis, method: "phrase", phraseGate: refusing.gate })
   const opened = scriptedGate(true, "on")
-  const gate = { ...opened.gate, refused: (reason: string, account: string) => void logged.push(`${reason} ${account}`) }
+  const gate = {
+    ...opened.gate,
+    refused: (reason: string, account: string) => void logged.push(`${reason} ${account}`),
+  }
   const created = await enableSync({ ...base, genesis, method: "phrase", phraseGate: gate })
   expect(created).toEqual({ kind: "joined", created: true })
 
   const sinks = [
     JSON.stringify([refused, created, refusing.refusals, logged]),
-    JSON.stringify(await phraseNoticeStatus({ pinDir: f.input.pinDir, account: ACCOUNT, principalId: f.keyring.principal().id })),
+    JSON.stringify(
+      await phraseNoticeStatus({ pinDir: f.input.pinDir, account: ACCOUNT, principalId: f.keyring.principal().id }),
+    ),
     await files(f.input.pinDir),
     JSON.stringify(f.entries),
     JSON.stringify(f.server.syncHeaders),

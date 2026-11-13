@@ -16,7 +16,10 @@ const fixedPositions = () => [2, 11, 23]
 export type SurfacePlan = { readonly show?: boolean; readonly answers?: ReadonlyArray<"right" | "wrong" | "cancel"> }
 
 /** A scripted person: shows, then answers each 3-word check per plan (default: right first time). */
-export const scriptedSurface = (plan: SurfacePlan = {}, during?: { readonly onConfirm?: () => void | Promise<void> }) => {
+export const scriptedSurface = (
+  plan: SurfacePlan = {},
+  during?: { readonly onConfirm?: () => void | Promise<void> },
+) => {
   const calls = { show: 0, confirm: 0 }
   let shown: ReadonlyArray<string> = []
   const surface: PhraseSurface = {
