@@ -223,4 +223,10 @@ state.saved = documentState()
 changed()
 
 // Sabotage leg of the a11y check: the host asks the page to hide itself from assistive technology.
-if (window.conformanceHost?.hideA11y) document.body.setAttribute("aria-hidden", "true")
+// aria-hidden alone is ignored by WebKitGTK and WebView2; inert and visibility:hidden drop the controls from
+// every engine's accessibility tree while keeping layout, so the scripted pokes still work.
+if (window.conformanceHost?.hideA11y) {
+  document.body.setAttribute("aria-hidden", "true")
+  document.body.inert = true
+  document.body.style.visibility = "hidden"
+}
