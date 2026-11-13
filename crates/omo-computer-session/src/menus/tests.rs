@@ -223,6 +223,25 @@ fn apps_scenario(extra_app: Value) -> Value {
     scenario
 }
 
+/// Review L2 of #13347: an app that is not running has no pid, which the gate sees as pid 0.
+/// Opening it is judged by its app key: an ordinary app launches, a protected one is refused,
+/// and pid 0 is never mistaken for the engine's own process.
+#[test]
+fn apps_open_of_a_non_running_app_is_judged_by_its_key_not_pid_0() {
+    let sink = RecordingSink::default();
+    let editor = json!({ "app_key": "com.example.editor", "name": "Editor", "running": false, "source": "launch_services" });
+    let (mut s, _) = session(apps_scenario(editor), json!({}), &sink);
+    s.apps_open(params(json!({ "target": "com.example.editor" }))).expect("a non-running app launches");
+    assert!(sent(&sink).iter().any(|line| line.contains(r#"app_launch "com.example.editor""#)), "{:?}", sent(&sink));
+
+    let sink = RecordingSink::default();
+    let shell = json!({ "app_key": "gnome-shell", "name": "GNOME Shell", "running": false, "source": "launch_services" });
+    let (mut s, _) = session(apps_scenario(shell), json!({}), &sink);
+    let refused = s.apps_open(params(json!({ "target": "gnome-shell" }))).expect_err("protected by key");
+    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("InvalidTarget", Some("protected_surface")));
+    assert!(sent(&sink).is_empty());
+}
+
 #[test]
 fn apps_quit_protected_process() {
     let sink = RecordingSink::default();
