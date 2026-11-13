@@ -7,6 +7,7 @@ import { createRequire } from "node:module"
 import { dirname, join, relative, resolve, sep } from "node:path"
 import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs"
 import { fileURLToPath } from "node:url"
+import { parseSync } from "oxc-parser"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(scriptDir, "..")
@@ -83,31 +84,98 @@ function dependencyManifestPath(packageDir: string, dependencyName: string): str
   return packageRequire.resolve(`${dependencyName}/package.json`)
 }
 
-const VIRTUAL_MODULES_TABLE = join("dist", "core", "extensions", "virtual-modules.js")
+const EXTENSION_LOADER = join("dist", "core", "extensions", "loader.js")
+const EXTENSION_IMPORTER = "createBunExtensionImporter"
+
+interface AstNode {
+  readonly type: string
+  readonly [field: string]: unknown
+}
+
+function isAstNode(value: unknown): value is AstNode {
+  return typeof value === "object" && value !== null && typeof Reflect.get(value, "type") === "string"
+}
+
+function collectNodes(node: unknown, match: (candidate: AstNode) => boolean, found: AstNode[] = []): AstNode[] {
+  if (Array.isArray(node)) {
+    for (const child of node) collectNodes(child, match, found)
+    return found
+  }
+  if (!isAstNode(node)) return found
+  if (match(node)) found.push(node)
+  for (const [field, child] of Object.entries(node)) {
+    if (field !== "type" && typeof child === "object") collectNodes(child, match, found)
+  }
+  return found
+}
+
+function propertyKey(property: AstNode, fail: (reason: string) => never): string {
+  if (property.type !== "Property" || property["computed"] === true || property["kind"] !== "init") {
+    return fail(`its table has a ${property.type === "SpreadElement" ? "spread" : "computed or non-plain"} entry`)
+  }
+  const key = property["key"]
+  if (isAstNode(key) && key.type === "Identifier" && typeof key["name"] === "string") return key["name"]
+  if (isAstNode(key) && key.type === "Literal" && typeof key["value"] === "string") return key["value"]
+  return fail("its table has a key that is neither an identifier nor a string")
+}
 
 /**
- * The package roots the engine's extension loader serves to extensions (its VIRTUAL_MODULES table), read from the
- * installed engine the way senpi's own copier reads it. Only these come from the compiled engine; every other
- * package codemode imports must be staged beside it, even when the engine depends on the same package itself.
+ * The specifiers the installed engine's extension loader serves to extensions: the keys of the object its loader
+ * passes to createBunExtensionImporter, read structurally from the installed loader module. This is the table
+ * senpi's own codemode sidecar copier reads. Anything the parse cannot read exactly fails the build.
  */
-export function engineServedPackages(hostPackageDir = senpiPackageDir): ReadonlySet<string> {
-  const tablePath = join(hostPackageDir, VIRTUAL_MODULES_TABLE)
-  const text = existsSync(tablePath) ? readFileSync(tablePath, "utf8") : ""
-  const table = text.match(/export const VIRTUAL_MODULES = \{([\s\S]*?)\n\};/)?.[1] ?? ""
-  const specifiers = Array.from(
-    table.matchAll(/^\s*(?:"([^"]+)"|([\w$]+)):\s*/gm),
-    (match) => match[1] ?? match[2] ?? "",
-  )
-  if (specifiers.length === 0) {
-    throw new Error(`cannot read the engine's extension VIRTUAL_MODULES table from ${tablePath}`)
+export function engineServedSpecifiers(hostPackageDir = senpiPackageDir): ReadonlySet<string> {
+  const loaderPath = join(hostPackageDir, EXTENSION_LOADER)
+  const fail = (reason: string): never => {
+    throw new Error(`cannot read the engine's extension module table from ${loaderPath}: ${reason}`)
   }
+  if (!existsSync(loaderPath)) return fail("the loader module does not exist")
+  const parsed = parseSync(loaderPath, readFileSync(loaderPath, "utf8"))
+  if (parsed.errors.length > 0) return fail(`it does not parse (${parsed.errors[0]?.message ?? "unknown error"})`)
+  const calls = collectNodes(parsed.program, (node) => {
+    const callee = node["callee"]
+    return (
+      node.type === "CallExpression" &&
+      isAstNode(callee) &&
+      callee.type === "Identifier" &&
+      callee["name"] === EXTENSION_IMPORTER
+    )
+  })
+  const tableNames = new Set(
+    calls.map((call) => {
+      const [first] = Array.isArray(call["arguments"]) ? call["arguments"] : []
+      return isAstNode(first) && first.type === "Identifier" && typeof first["name"] === "string" ? first["name"] : ""
+    }),
+  )
+  const [tableName] = tableNames
+  if (tableName === undefined) return fail(`it never calls ${EXTENSION_IMPORTER}`)
+  if (tableNames.size !== 1 || tableName === "") return fail(`${EXTENSION_IMPORTER} is not passed one named table`)
+  const declarations = collectNodes(parsed.program["body"], (node) => {
+    const id = node["id"]
+    return node.type === "VariableDeclarator" && isAstNode(id) && id.type === "Identifier" && id["name"] === tableName
+  })
+  const table = declarations.length === 1 ? declarations[0]?.["init"] : undefined
+  if (!isAstNode(table) || table.type !== "ObjectExpression" || !Array.isArray(table["properties"])) {
+    return fail(`${tableName} is not declared once as an object literal`)
+  }
+  const specifiers = table["properties"].map((property: unknown) =>
+    isAstNode(property) ? propertyKey(property, fail) : fail("its table has an unreadable entry"),
+  )
+  if (specifiers.length === 0) return fail(`${tableName} is empty`)
+  return new Set(specifiers)
+}
+
+function packageRoot(specifier: string): string {
+  return specifier
+    .split("/")
+    .slice(0, specifier.startsWith("@") ? 2 : 1)
+    .join("/")
+}
+
+/** The packages the engine serves whole: a served subpath alone (typebox/value) does not provide the package. */
+export function engineServedPackages(hostPackageDir = senpiPackageDir): ReadonlySet<string> {
   return new Set(
-    specifiers.map((specifier) =>
-      specifier
-        .split("/")
-        .slice(0, specifier.startsWith("@") ? 2 : 1)
-        .join("/"),
-    ),
+    [...engineServedSpecifiers(hostPackageDir)].filter((specifier) => packageRoot(specifier) === specifier),
   )
 }
 
