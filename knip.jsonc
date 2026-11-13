@@ -2119,6 +2119,8 @@
         "script/senpi-worker-compile.ts",
         "test-support/remove-tree.ts",
         "test-support/test-deadline.ts",
+        // spike probes, run by path (crates/omo-computer-engine/probes/README.md)
+        "crates/omo-computer-engine/probes/probe-sp-r.ts",
         // preloaded by path from the package bunfig.toml files (the bun plugin adds it with exports unchecked)
         "test-support/test-deadline.preload.ts",
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
