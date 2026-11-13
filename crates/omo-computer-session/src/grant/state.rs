@@ -128,11 +128,6 @@ impl Control {
             _ => Vec::new(),
         };
         self.grant.reconcile(stop_epoch);
-        if self.lease_epoch.is_some_and(|epoch| epoch != stop_epoch) {
-            self.presence.end(crate::presence::LeaseEnd::Stop);
-            self.slot.release(&self.token);
-            self.lease_epoch = None;
-        }
         let lease = if plan.foreground {
             self.lease_verdict(backend, (method, target_str))
         } else {

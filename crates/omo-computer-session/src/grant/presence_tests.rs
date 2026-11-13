@@ -175,3 +175,27 @@ fn every_lease_end_path_calls_the_hook_once_with_its_cause() {
     s.end_lease(crate::presence::LeaseEnd::DisplayRelease);
     assert_eq!(taken(), ["ended DisplayRelease"], "a direct end_lease");
 }
+
+/// Review M1 of #13346: a physical (hotkey) stop commits through the gate's listener poll, not
+/// through `stop_control`. It must still end the lease through `end_lease` (the hook sees
+/// `Stop` exactly once), and the next host call or mutation frees the machine slot and the surface.
+#[test]
+fn a_stop_observed_by_the_gate_ends_the_lease_through_the_funnel_once() {
+    let sink = RecordingSink::default();
+    let mut s = session(&json!({ "object": true }), &sink, None);
+    let calls = Recorded::default();
+    s.set_lease_hook(Box::new(calls.clone()));
+    s.control_grant(params(json!({ "reason": "r" })));
+    capture(&mut s, "1");
+    s.control_acquire().expect("lease");
+    assert!(s.holds_lease());
+    // The hotkey path: the supervisor latches a stop; nothing calls stop_control.
+    s.guard.stop(Some("hotkey"), &mut omo_computer_safety::NoHolds);
+    // The next call is a control call that ends nothing itself: it must already reconcile the stop.
+    let _ = s.host_call(omo_computer_core::methods::Method::PreviewSubscribe, json!({}));
+    assert!(!s.holds_lease(), "the slot is freed on the next host call, not only the next mutation");
+    assert!(sink.lines().iter().any(|line| line.contains("presence hide")), "{:?}", sink.lines());
+    assert_eq!(std::mem::take(&mut *calls.0.lock().expect("lock")), ["ended Stop"], "through end_lease, once");
+    let _ = s.click(params(json!({ "target": "1", "x": 1, "y": 1 })));
+    assert!(std::mem::take(&mut *calls.0.lock().expect("lock")).is_empty(), "never a second Stop for the same epoch");
+}

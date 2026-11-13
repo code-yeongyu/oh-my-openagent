@@ -111,6 +111,18 @@ impl Session {
         self.end_lease(LeaseEnd::Release);
     }
 
+    /// A stop the gate's listener poll latched (the hotkey path, never through `stop_control`):
+    /// a lease taken under an earlier stop epoch ends through [`Self::end_lease`], once.
+    pub(crate) fn reconcile_stop(&mut self) {
+        let backend = &mut self.backend;
+        self.guard.observe(&mut || backend.stop_listener(), &mut omo_computer_safety::NoHolds);
+        let epoch = self.guard.supervisor().stop_epoch();
+        self.funnel.control.grant.reconcile(epoch);
+        if self.funnel.control.lease_epoch.is_some_and(|taken| taken != epoch) {
+            self.end_lease(LeaseEnd::Stop);
+        }
+    }
+
     /// The lease ends under the user (the next report reads `user_moved_on`, no `Suspended`).
     pub(crate) fn end_lease(&mut self, why: LeaseEnd) {
         self.funnel.control.presence.end(why);

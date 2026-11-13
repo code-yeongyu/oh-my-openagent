@@ -34,6 +34,7 @@ impl Session {
         let target = target_id(&mutation.call.target);
         let secure = self.funnel.secure.secure(self.backend.as_ref(), target);
         let record = Record::new(&self.funnel, &mutation, &call_id, secure);
+        self.reconcile_stop();
         let epoch = self.guard.supervisor().stop_epoch();
         let call = (mutation.method, &mutation.call.target, mutation.route);
         let plan = self.funnel.control.plan(self.backend.as_mut(), call, epoch);
