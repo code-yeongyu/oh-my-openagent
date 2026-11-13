@@ -9,6 +9,7 @@ pub mod displays;
 pub mod input;
 pub mod ocr;
 pub mod release_helper;
+pub mod uia;
 
 pub use backend::Win32Backend;
 
