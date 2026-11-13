@@ -60,8 +60,11 @@ export const phraseNoticeStatus = async (
 export const verifiedPhraseNoticeStatus = async (
   input: PhraseGenesisPlace & { readonly chain: AccountHttp; readonly anchor?: TrustAnchor },
 ): Promise<PhraseNoticeStatus> => {
-  const pinned = input.anchor ?? (await loadTrustAnchor(input.pinDir, input.account).then((pin) => (pin.ok ? pin.anchor : undefined)))
-  const served = pinned === undefined ? null : await loadServedChain(input.chain, input.account, createRejectionCounter(), pinned)
+  const pinned =
+    input.anchor ??
+    (await loadTrustAnchor(input.pinDir, input.account).then((pin) => (pin.ok ? pin.anchor : undefined)))
+  const served =
+    pinned === undefined ? null : await loadServedChain(input.chain, input.account, createRejectionCounter(), pinned)
   return phraseNoticeStatus(input, served !== null && served.ok ? served.state : null)
 }
 
@@ -90,7 +93,8 @@ export const acknowledgePhraseVoid = async (input: AcknowledgeInput): Promise<{ 
     const place = { pinDir: input.pinDir, account: input.account, principalId: input.keyring.principal().id }
     if (input.purpose !== "genesis") {
       // Review LOW (#13336 @ 9f9734a8): never report an acknowledge that could not check anything.
-      if (input.chain === undefined) throw new TypeError("acknowledging an enroll or rotate notice needs the account chain")
+      if (input.chain === undefined)
+        throw new TypeError("acknowledging an enroll or rotate notice needs the account chain")
       await acknowledgeEnrollVoid(place, input.purpose, input.credentialId, input.chain, input.anchor)
       return { ok: true }
     }

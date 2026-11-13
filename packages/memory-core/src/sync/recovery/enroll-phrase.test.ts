@@ -79,8 +79,7 @@ const setup = async (plan: { readonly cancel?: boolean } = {}) => {
     phraseGate: gate(true, "on").phraseGate,
   }
   const place = { pinDir, account: world.account, principalId: world.owner.keyring.principal().id }
-  const markers = () =>
-    existsSync(`${genesisIntentLocation(pinDir, world.account, place.principalId)}.phrase-enroll`)
+  const markers = () => existsSync(`${genesisIntentLocation(pinDir, world.account, place.principalId)}.phrase-enroll`)
   return { world, who, bridge, base, place, markers }
 }
 
@@ -138,7 +137,10 @@ test("#given the person cancels while the words are shown #when enrollment ends 
 
 test("#given the words were shown and the append is refused (M3) #when the chain is read #then the phrase reads void and the next enrollment must acknowledge first", async () => {
   const s = await setup()
-  const refusing = { ...s.base, chain: chainOf(s.world, s.world.owner, { appendKeys: async () => ({ ok: false, reason: "refused" }) }) }
+  const refusing = {
+    ...s.base,
+    chain: chainOf(s.world, s.world.owner, { appendKeys: async () => ({ ok: false, reason: "refused" }) }),
+  }
   expect(await enrollPhraseRecoveryKey(refusing)).toEqual({ ok: false, reason: "refused" })
   const state = await verified(s.world, s.world.owner)
   expect(await pendingPhraseVoid(s.place, state)).toEqual({ purpose: "enroll" })
@@ -155,9 +157,15 @@ test("#given the service refuses new phrase keys #when a phrase enrollment appen
   const s = await setup()
   const floorOff = {
     ...s.base,
-    chain: chainOf(s.world, s.world.owner, { appendKeys: async () => ({ ok: false, reason: "phrase_keys_not_accepted" }) }),
+    chain: chainOf(s.world, s.world.owner, {
+      appendKeys: async () => ({ ok: false, reason: "phrase_keys_not_accepted" }),
+    }),
   }
-  expect(await enrollPhraseRecoveryKey(floorOff)).toEqual({ ok: false, reason: "phrase-unavailable", why: "service-floor-off" })
+  expect(await enrollPhraseRecoveryKey(floorOff)).toEqual({
+    ok: false,
+    reason: "phrase-unavailable",
+    why: "service-floor-off",
+  })
   expect(await pendingPhraseVoid(s.place, await verified(s.world, s.world.owner))).toEqual({ purpose: "enroll" })
 })
 
@@ -182,7 +190,10 @@ test("#given a member rotates its phrase #when both the enrollment and the remov
   expect(rotated.ok).toBe(true)
   const state = await verified(s.world, s.world.owner)
   expect(state.authority?.registry.has(first.credentialId)).toBe(false)
-  expect([...(state.authority?.registry.values() ?? [])].map((key) => key.survivable).sort()).toEqual(["phrase", "synced"])
+  expect([...(state.authority?.registry.values() ?? [])].map((key) => key.survivable).sort()).toEqual([
+    "phrase",
+    "synced",
+  ])
   expect(await pendingPhraseVoid(s.place, state)).toBeNull()
 })
 
@@ -191,7 +202,13 @@ test("#given a phrase key #when it is removed #then the outcome names the phrase
   const enrolled = await enrollPhraseRecoveryKey(s.base)
   if (!enrolled.ok) throw new Error("expected the enrollment to land")
   const signals: string[] = []
-  const bridge: RecoveryBridge = { ...s.bridge, signalRemoved: async (_rp, id) => (signals.push(id), "signalled") }
+  const bridge: RecoveryBridge = {
+    ...s.bridge,
+    signalRemoved: async (_rp, id) => {
+      signals.push(id)
+      return "signalled"
+    },
+  }
   const removed = await removeRecoveryKey({
     anchor: s.world.anchor,
     account: s.world.account,
@@ -210,11 +227,23 @@ test("#given a phrase key #when it is removed #then the outcome names the phrase
 
 test("#given a shown enrollment phrase that never landed #when the void notice is acknowledged with the verified chain #then status clears and the next enrollment shows words again", async () => {
   const s = await setup()
-  const refusing = { ...s.base, chain: chainOf(s.world, s.world.owner, { appendKeys: async () => ({ ok: false, reason: "refused" }) }) }
+  const refusing = {
+    ...s.base,
+    chain: chainOf(s.world, s.world.owner, { appendKeys: async () => ({ ok: false, reason: "refused" }) }),
+  }
   expect(await enrollPhraseRecoveryKey(refusing)).toEqual({ ok: false, reason: "refused" })
-  expect(await phraseNoticeStatus(s.place, await verified(s.world, s.world.owner))).toEqual({ phraseVoid: { purpose: "enroll" } })
+  expect(await phraseNoticeStatus(s.place, await verified(s.world, s.world.owner))).toEqual({
+    phraseVoid: { purpose: "enroll" },
+  })
   expect(await phraseNoticeStatus(s.place)).toEqual({ phraseUnresolved: true })
-  const ack = { account: s.world.account, serviceDeviceId: "", keyring: s.world.owner.keyring, pinDir: s.base.pinDir, chain: s.base.chain, anchor: s.world.anchor }
+  const ack = {
+    account: s.world.account,
+    serviceDeviceId: "",
+    keyring: s.world.owner.keyring,
+    pinDir: s.base.pinDir,
+    chain: s.base.chain,
+    anchor: s.world.anchor,
+  }
   expect(await acknowledgePhraseVoid({ ...ack, purpose: "enroll" })).toEqual({ ok: true })
   expect(await phraseNoticeStatus(s.place, await verified(s.world, s.world.owner))).toEqual({})
   const shown = s.who.calls.show
@@ -229,7 +258,10 @@ for (const [label, oldCredentialId] of [
   test(`#given a rotation naming ${label} #when it is asked for #then it is refused as not-enrolled before any marker or word`, async () => {
     const s = await setup()
     const id = oldCredentialId === "PASSKEY" ? s.world.firstKey : oldCredentialId
-    expect(await rotateRecoveryPhrase({ ...s.base, oldCredentialId: id })).toMatchObject({ ok: false, reason: "not-enrolled" })
+    expect(await rotateRecoveryPhrase({ ...s.base, oldCredentialId: id })).toMatchObject({
+      ok: false,
+      reason: "not-enrolled",
+    })
     expect(s.who.calls.show).toBe(0)
     expect(s.markers()).toBe(false)
   })
@@ -272,6 +304,42 @@ test("#given the host signal is aborted while the words are shown #when enrollme
 
 test("#given an enroll void acknowledge without the account chain #when it is called #then it refuses instead of reporting success", async () => {
   const s = await setup()
-  const ack = { account: s.world.account, serviceDeviceId: "", keyring: s.world.owner.keyring, pinDir: s.base.pinDir, purpose: "enroll" as const }
+  const ack = {
+    account: s.world.account,
+    serviceDeviceId: "",
+    keyring: s.world.owner.keyring,
+    pinDir: s.base.pinDir,
+    purpose: "enroll" as const,
+  }
   await expect(acknowledgePhraseVoid(ack)).rejects.toThrow("needs the account chain")
 })
+
+for (const [label, extra] of [
+  ["no trust anchor is passed and this device holds no pin", {}],
+  ["the served chain does not verify against the anchor", { anchorFromOtherWorld: true }],
+] as const) {
+  test(`#given an enroll void notice and ${label} #when it is acknowledged #then it refuses and the marker stays`, async () => {
+    const s = await setup()
+    const refusing = {
+      ...s.base,
+      chain: chainOf(s.world, s.world.owner, { appendKeys: async () => ({ ok: false, reason: "refused" }) }),
+    }
+    expect(await enrollPhraseRecoveryKey(refusing)).toEqual({ ok: false, reason: "refused" })
+    const anchor = "anchorFromOtherWorld" in extra ? { anchor: (await createWorld("acct-other")).anchor } : {}
+    const ack = {
+      account: s.world.account,
+      serviceDeviceId: "",
+      keyring: s.world.owner.keyring,
+      pinDir: s.base.pinDir,
+      chain: s.base.chain,
+      ...anchor,
+    }
+    await expect(acknowledgePhraseVoid({ ...ack, purpose: "enroll" })).rejects.toMatchObject({
+      name: "PhraseAcknowledgeUnverifiedError",
+    })
+    expect(s.markers()).toBe(true)
+    expect(await phraseNoticeStatus(s.place, await verified(s.world, s.world.owner))).toEqual({
+      phraseVoid: { purpose: "enroll" },
+    })
+  })
+}

@@ -28,7 +28,11 @@ import type { PhraseVoidNotice } from "../account/phrase-notice.ts"
 export type PhraseEnrollOutcome =
   | { readonly ok: true; readonly credentialId: string; readonly seq: number }
   | { readonly ok: false; readonly reason: "acknowledge-required"; readonly phraseVoid: PhraseVoidNotice }
-  | { readonly ok: false; readonly reason: "phrase-unavailable"; readonly why: "disabled" | "service-floor-off" | "no-surface" }
+  | {
+      readonly ok: false
+      readonly reason: "phrase-unavailable"
+      readonly why: "disabled" | "service-floor-off" | "no-surface"
+    }
   | { readonly ok: false; readonly reason: "unresolved" }
   | {
       readonly ok: false
@@ -107,7 +111,8 @@ export const pendingPhraseVoid = async (
 
 // A passkey-only refusal from a phrase bridge means the bridge cannot run this ceremony at all.
 const bridgeRefusal = (
-  reason: "cancelled" | "no-prf" | "no-user-verification" | "not-survivable" | "credential-reused" | "device-wrap-refused",
+  reason:
+    "cancelled" | "no-prf" | "no-user-verification" | "not-survivable" | "credential-reused" | "device-wrap-refused",
 ): "cancelled" | "credential-reused" | "device-wrap-refused" | "unavailable" =>
   reason === "no-prf" || reason === "no-user-verification" || reason === "not-survivable" ? "unavailable" : reason
 
@@ -143,12 +148,19 @@ const enrollUnderLock = async (
   if (enrollPhrase === undefined) return { ok: false, reason: "phrase-unavailable", why: "no-surface" }
   const { authority, head } = served.state
   const self = input.keyring.principal().id
-  if (authority === null || head === null || authority.members.get(self)?.signing_public_key !== input.keyring.publicKeys().signing)
+  if (
+    authority === null ||
+    head === null ||
+    authority.members.get(self)?.signing_public_key !== input.keyring.publicKeys().signing
+  )
     return { ok: false, reason: "not-member" }
   const deviceWrap = committedWrap(served.state, authority.epoch, `device:${self}`)
   if (deviceWrap === null) return { ok: false, reason: "not-member" }
   // Review MEDIUM (#13336): a rotation names a registered PHRASE key, checked before any marker or word.
-  if (purpose === "rotate" && (oldCredentialId === undefined || authority.registry.get(oldCredentialId)?.survivable !== "phrase"))
+  if (
+    purpose === "rotate" &&
+    (oldCredentialId === undefined || authority.registry.get(oldCredentialId)?.survivable !== "phrase")
+  )
     return { ok: false, reason: "not-enrolled" }
   // Rotation also stops at a full registry (review LOW, #13336, answered): it enrolls the new key BEFORE removing the
   // old one (F7(c)), so the chain briefly holds MAX + 1 keys, and if the removal then failed every recovery would
@@ -178,7 +190,8 @@ const enrollUnderLock = async (
     if (enrolled.reason === "cancelled") await deleteEnrollMarker(place, credentialId)
     return { ok: false, reason: bridgeRefusal(enrolled.reason) }
   }
-  if (enrolled.key.credential_id !== credentialId || !isPhraseKey(enrolled.key)) return { ok: false, reason: "key-mismatch" }
+  if (enrolled.key.credential_id !== credentialId || !isPhraseKey(enrolled.key))
+    return { ok: false, reason: "key-mismatch" }
   const body = {
     kind: "recovery-key",
     account: input.account,
@@ -189,7 +202,8 @@ const enrollUnderLock = async (
   }
   const appended = await input.chain.appendKeys(await signedAppend(input.keyring, head, body, [enrolled.wrap]))
   if (!appended.ok) {
-    if (appended.reason === "phrase_keys_not_accepted") return { ok: false, reason: "phrase-unavailable", why: "service-floor-off" }
+    if (appended.reason === "phrase_keys_not_accepted")
+      return { ok: false, reason: "phrase-unavailable", why: "service-floor-off" }
     return { ok: false, reason: appended.reason }
   }
   input.onEvent?.("sync.recovery.enrolled")
@@ -243,6 +257,13 @@ export const rotateRecoveryPhrase = (
  * `acknowledgePhraseVoid`. Only a marker the VERIFIED chain proves void is deleted (its credential was never
  * enrolled), optionally only the named credential; a saved, unresolved or unreadable state is left alone.
  */
+export class PhraseAcknowledgeUnverifiedError extends Error {
+  override readonly name = "PhraseAcknowledgeUnverifiedError"
+  constructor(readonly reason: string) {
+    super(`the recovery phrase notice was not acknowledged: the account chain could not be verified (${reason})`)
+  }
+}
+
 export const acknowledgeEnrollVoid = async (
   place: EnrollPlace,
   purpose: "enroll" | "rotate",
@@ -250,18 +271,21 @@ export const acknowledgeEnrollVoid = async (
   chain: AccountHttp,
   anchor?: TrustAnchor,
 ): Promise<void> => {
+  // Checker F1 (#13336 @ cb93057a): an acknowledge that cannot verify the chain never reports success.
   let pinned = anchor
   if (pinned === undefined) {
     const pin = await loadTrustAnchor(place.pinDir, place.account)
-    if (!pin.ok) return
+    if (!pin.ok) throw new PhraseAcknowledgeUnverifiedError("no trust anchor")
     pinned = pin.anchor
   }
   const served = await loadServedChain(chain, place.account, createRejectionCounter(), pinned)
-  const facts = chainFactsOf(served.ok ? served.state : null)
+  if (!served.ok) throw new PhraseAcknowledgeUnverifiedError(served.reason)
+  const facts = chainFactsOf(served.state)
   for (const read of await listEnrollMarkers(place)) {
     if (read.kind !== "marker" || read.marker.purpose !== purpose) continue
     if (credentialId !== undefined && read.marker.credentialId !== credentialId) continue
-    if (resolveEnrollMarker(read.marker, facts).kind === "void") await deleteEnrollMarker(place, read.marker.credentialId)
+    if (resolveEnrollMarker(read.marker, facts).kind === "void")
+      await deleteEnrollMarker(place, read.marker.credentialId)
   }
 }
 
@@ -278,7 +302,10 @@ export const enrollNoticeStatus = async (
     if (read.kind === "corrupt") return { phraseUnresolved: true }
     const resolution = resolveEnrollMarker(read.marker, facts)
     if (resolution.kind === "void")
-      return { phraseVoid: resolution.purpose === "rotate" ? { purpose: "rotate", oldStillValid: true } : { purpose: "enroll" } }
+      return {
+        phraseVoid:
+          resolution.purpose === "rotate" ? { purpose: "rotate", oldStillValid: true } : { purpose: "enroll" },
+      }
     if (resolution.kind === "unresolved") return { phraseUnresolved: true }
   }
   return {}
