@@ -3515,6 +3515,20 @@
             }
           ]
         },
+        "occludersVisible": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "`true` when windows covering the target may show in the pixels (an X11 root crop);\nomitted otherwise."
+        },
+        "nextCall": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The call that gets a clean frame when `occludersVisible` is set."
+        },
         "session": {
           "$ref": "#/$defs/SessionState"
         },

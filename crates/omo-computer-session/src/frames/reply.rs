@@ -20,6 +20,9 @@ pub const ARTIFACT_TTL_MS: u64 = 43_200_000;
 /// What an artifact-only frame tells the model.
 const OVER_BUDGET_NOTE: &str = "over the inline budget";
 
+/// The call that brings a window whose frame may show its occluders to the front.
+const RAISE_FOR_A_CLEAN_FRAME: &str = "win.raise()";
+
 /// An artifact written for a frame over the inline budget.
 struct Written {
     path: String,
@@ -102,8 +105,10 @@ impl Session {
             target,
             bytes,
             cursor,
+            occluders_visible,
             ..
         } = frame;
+        let occluders_visible = occluders_visible.filter(|visible| *visible);
         let (width, height) = (bytes.width, bytes.height);
         Ok(match mode {
             ReportMode::Null => CaptureReply::Legacy(Box::new(LegacyFrame {
@@ -144,6 +149,8 @@ impl Session {
                     mime,
                     ttl_ms: ARTIFACT_TTL_MS,
                 }),
+                occluders_visible,
+                next_call: occluders_visible.map(|_| RAISE_FOR_A_CLEAN_FRAME.to_owned()),
                 session: self.backend.capabilities().session,
                 observation: UntrustedText,
             })),

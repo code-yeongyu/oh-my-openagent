@@ -50,6 +50,13 @@ pub struct Frame {
     pub path: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub artifact: Option<FrameArtifact>,
+    /// `true` when windows covering the target may show in the pixels (an X11 root crop);
+    /// omitted otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub occluders_visible: Option<bool>,
+    /// The call that gets a clean frame when `occludersVisible` is set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_call: Option<String>,
     pub session: SessionState,
     pub observation: UntrustedText,
 }
