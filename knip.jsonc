@@ -2151,6 +2151,9 @@
         "script/print-release-notes.ts",
         // run by path as the computer-use v3 corpus replay driver
         "script/qa/computer/replay.ts",
+        // run by path as the computer-use v3 Linux QA driver (row 47)
+        "script/qa/computer/linux.ts",
+        // run by path as the computer-use v3 Windows QA driver and its probes (row 55)
         "script/qa/computer/windows.ts",
         "script/qa/computer/windows/capture-marker-pixels.ts",
         "script/qa/computer/windows/capture-session0-refused.ts",

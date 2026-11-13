@@ -2,8 +2,10 @@
 //! is unknown forever: every re-drive reads `delivery_uncertain/unsafe` and is never resent,
 //! after the marker that recorded the crash is cleared (so the scope serves other calls), and
 //! after an engine restart. On disk each one is an empty file
-//! `markers/<issuer>/<scope>.uncertain/<callId>` under the RUNTIME root, created and fsynced
-//! before the marker is cleared.
+//! `markers/<issuer>/<scope>.uncertain/<name>` under the RUNTIME root, created and fsynced
+//! before the marker is cleared. `<name>` is the callId when it is a plain path component,
+//! else `h-` and 62 hex of its SHA-256, so every callId the wire admits can be recorded and a
+//! crash never wedges its scope.
 //!
 //! The read fails CLOSED: an `uncertain/` directory that is a symlink or not a directory, and
 //! any error reading it or the record other than "not there", count as poisoned. One error
@@ -17,6 +19,8 @@ use std::collections::BTreeSet;
 use std::fs::{self, File, OpenOptions};
 use std::io;
 use std::path::{Path, PathBuf};
+
+use sha2::{Digest, Sha256};
 
 use crate::marker::{component, private_dir, MARKERS_DIR};
 
@@ -37,9 +41,7 @@ impl Poisoned {
         Self::Dir(runtime.join(MARKERS_DIR))
     }
 
-    /// Whether `call_id` crashed in this scope, failing closed (see the module doc). A callId
-    /// that cannot name a file was never recorded here (its marker, which still holds it,
-    /// refuses it instead).
+    /// Whether `call_id` crashed in this scope, failing closed (see the module doc).
     pub(super) fn contains(&self, issuer: &str, scope: &str, call_id: &str) -> bool {
         match self {
             Self::Memory(set) => set.contains(&key(issuer, scope, call_id)),
@@ -111,5 +113,18 @@ fn path(root: &Path, issuer: &str, scope: &str, call_id: &str) -> io::Result<Pat
     Ok(root
         .join(component(issuer)?)
         .join(format!("{}.uncertain", component(scope)?))
-        .join(component(call_id)?))
+        .join(record_name(call_id)))
+}
+
+/// The callId itself when it is a plain path component; else `h-` + 62 hex of its SHA-256
+/// (64 bytes, a plain component too, equal to another call's id only by a SHA-256 preimage).
+fn record_name(call_id: &str) -> String {
+    if component(call_id).is_ok() {
+        return call_id.to_owned();
+    }
+    let hex: String = Sha256::digest(call_id.as_bytes())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    format!("h-{}", &hex[..62])
 }
