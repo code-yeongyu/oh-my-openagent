@@ -1,0 +1,297 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    ".": {
+      "entry": [
+        "script/beta-follows-latest.mjs",
+        "script/build-binaries.ts",
+        "script/build-brand-logo.ts",
+        "script/build-cli-node.ts",
+        "script/build-codex-install.ts",
+        "script/build-model-capabilities.ts",
+        "script/build-omo-binary.ts",
+        "script/build-omo-native.ts",
+        "script/build-omo-schema.ts",
+        "script/build-omob.ts",
+        "script/build-schema.ts",
+        "script/build-service-auth.ts",
+        "script/build.ts",
+        "script/bun-panic-retry.ts",
+        "script/changelog-section.ts",
+        "script/check-cargo-pinned-deps.mjs",
+        "script/check-copy.ts",
+        "script/check-pr-changelog.ts",
+        "script/check-temp-leak-report-only.mjs",
+        "script/ci-fast-path.mjs",
+        "script/ci-leg-tests-guard.mjs",
+        "script/desktop-engine-ci-proof.ts",
+        "script/desktop-engine-release.ts",
+        "script/engine-trust-helper-smoke.ts",
+        "script/generate-changelog.ts",
+        "script/install-codex-dev.ts",
+        "script/installer/channel-maintenance.ts",
+        "script/installer/mirror-release-to-r2.ts",
+        "script/keychain-helper-release.ts",
+        "script/lint-ratchet.ts",
+        "script/oxlint/biome-ports.ts",
+        "script/patch-node-require-shim.ts",
+        "script/preflight-trust.mjs",
+        "script/print-release-notes.ts",
+        "script/published-install-smoke.mjs",
+        "script/qa/computer/conformance/report.ts",
+        "script/qa/computer/conformance/run.ts",
+        "script/qa/computer/pool/windows-full.ts",
+        "script/qa/computer/pool/xorg-uinput-probe.ts",
+        // run by path as the live GNOME Wayland window-input QA (docs/guide/computer-use.md)
+        "script/qa/desktop/gnome.ts",
+        "script/qa/desktop/hyprland.ts",
+        "script/qa/desktop/kwin.ts",
+        "script/qa/desktop/linux.ts",
+        "script/qa/desktop/linux/expect-sabotage.ts",
+        "script/qa/desktop/windows.ts",
+        "script/qa/desktop/windows/expect-sabotage.ts",
+        "script/qa/omo-native-eval-smoke.mjs",
+        "script/qa/omo-native-parity-smoke.mjs",
+        "script/qa/python-kernel-warmup.mjs",
+        "script/release-announce.ts",
+        "script/release-desktop-engine-target.ts",
+        "script/release-latest-flag.ts",
+        "script/release-version.mjs",
+        "script/remove-stale-self-package-tests.ts",
+        "script/senpi-worker-compile.ts",
+        "script/stamp-release-changelog.ts",
+        "script/stats.ts",
+        "script/sync-lazycodex-marketplace.ts",
+        "script/takeover-trace-summary.ts",
+        "script/test-fast.ts",
+        "script/verify-npm-payload.mjs",
+        "script/verify-omo-ai-payload.mjs",
+        "script/wait-registry-versions.mjs",
+      ],
+      "ignoreFiles": [
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/backfill-changelog.ts",
+        // type declarations for script/beta-follows-latest.mjs, which publish.yml runs by path and only a test imports
+        "script/beta-follows-latest.d.mts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/build-help-schemas.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/changelog-backfill-verify.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/changelog-fragments-cli.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/changelog-shipping-policy.d.mts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/check-gate-sync.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/check-temp-leak-report-only.d.mts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/ci-fast-path.d.mts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/ci-platform-invocations.d.mts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/fixtures/senpi-hooks-state-error-runner.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/fixtures/senpi-hooks-state-legacy-reader.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/fixtures/senpi-hooks-state-mode-runner.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/fixtures/vendored-lsp-build-owner.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/install-bunshin-desktop-capability.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/npm-invocation.d.mts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/npm-pack-paths.d.mts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/npm-payload-required-paths.d.mts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/preflight-trust.d.mts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/published-install-smoke.d.mts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/dependency-audit-capture.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/dependency-audit-compare.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/dependency-audit/changelog.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/dependency-audit/graph.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/dependency-audit/inventory.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/dependency-audit/model-server.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/dependency-audit/providers.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/dependency-audit/rpc.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/dependency-audit/session-cases.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/dependency-audit/startup.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/dependency-audit/webfetch.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/desktop/macos.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/desktop/macos/scenarios-input.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/desktop/macos/scenarios-safety.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/fixtures/dependency-audit/extension.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/fixtures/dependency-audit/helper.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/member-boot-profile.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/omo-native-parity-compare.d.mts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/omp-item2-admission.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/omp-item2-eval.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/omp-item2-invalid.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/omp-item2-measure-env.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/omp-item2-measure.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/omp-item2.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/omp-item6-denials.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/omp-item6-harness.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/omp-item6-kernel-cell.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/omp-item6-pool-stale.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/omp-item6-real.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/omp-item6-revive.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/omp-item6-scope-producer.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/omp-item6-scope.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/omp-item6.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/omp-item9.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/types/senpi-pi-tui.d.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/web-terminal-redaction.d.mts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/qa/xterm-live-terminal.d.mts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/release-version.d.mts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/review-claim-gate.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/update-frontend-upstreams.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "script/wait-registry-versions.d.mts",
+      ]
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) AGENT_COMMAND_RE, HUMAN_COMMAND_RE, BARE_BIN_RE, ALLOWLIST_RELATIVE_PATH, AUDIT_TEST_RELATIVE_PATH, SCAN_MODULE_RELATIVE_PATH, SCAN_TEST_RELATIVE_PATH, trackedSourceFiles
+    "script/agent-command-string-scan.ts": ["AGENT_COMMAND_RE", "HUMAN_COMMAND_RE", "BARE_BIN_RE", "ALLOWLIST_RELATIVE_PATH", "AUDIT_TEST_RELATIVE_PATH", "SCAN_MODULE_RELATIVE_PATH", "SCAN_TEST_RELATIVE_PATH", "trackedSourceFiles"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) generatedCodexInstallerPath, CODEX_INSTALL_BUILD_MARKER_PREFIX, buildCodexInstaller
+    "script/build-codex-install.ts": ["generatedCodexInstallerPath", "CODEX_INSTALL_BUILD_MARKER_PREFIX", "buildCodexInstaller"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) buildReleaseBinary
+    "script/build-omo-binary.ts": ["buildReleaseBinary"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) CATEGORY_COVERAGE_ENTRY, CATEGORY_COVERAGE_ARTIFACT, CATEGORY_COVERAGE_PRELUDE_ASSET, TASK_CONFIG_ENTRY, TASK_CONFIG_ARTIFACT
+    "script/build-omo-native.ts": ["CATEGORY_COVERAGE_ENTRY", "CATEGORY_COVERAGE_ARTIFACT", "CATEGORY_COVERAGE_PRELUDE_ASSET", "TASK_CONFIG_ENTRY", "TASK_CONFIG_ARTIFACT"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) getBackfillMarkerPattern
+    "script/changelog-backfill-index.ts": ["getBackfillMarkerPattern"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) fragmentPath
+    "script/changelog-fragments.ts": ["fragmentPath"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) getBackfillMarkerPattern
+    "script/changelog-marker.ts": ["getBackfillMarkerPattern"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) parseNotes, linkNotes
+    "script/changelog-release-assembly.ts": ["parseNotes", "linkNotes"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) currentSectionMarkers
+    "script/changelog-section.ts": ["currentSectionMarkers"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isTestOrGeneratedPath
+    "script/changelog-shipping-policy.mjs": ["isTestOrGeneratedPath"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) REPORT_ONLY_LIST_PATH
+    "script/check-temp-leak-report-only.mjs": ["REPORT_ONLY_LIST_PATH"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isRuntimePath, classifyCiMode
+    "script/ci-fast-path.mjs": ["isRuntimePath", "classifyCiMode"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) judgeLeg
+    "script/ci-leg-tests-guard.mjs": ["judgeLeg"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) platformOnlyStepTexts
+    "script/ci-platform-invocations.mjs": ["platformOnlyStepTexts"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) claudeCodePackageFor, lockfileIntegrity
+    "script/claude-code-pin.ts": ["claudeCodePackageFor", "lockfileIntegrity"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) proveStagedDesktopEngine
+    "script/desktop-engine-ci-proof.ts": ["proveStagedDesktopEngine"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) citedPaths
+    "script/docs-paths-exist.test.mjs": ["citedPaths"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) readSenpiPackageJson
+    "script/engine-build-defines.ts": ["readSenpiPackageJson"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ENGINE_OPTIONAL_SIDECAR_PACKAGES
+    "script/engine-sidecar-sources.ts": ["ENGINE_OPTIONAL_SIDECAR_PACKAGES"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) KEEP_BETAS
+    "script/installer/mirror-plan.ts": ["KEEP_BETAS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) RATCHET_RULES
+    "script/lint-ratchet.ts": ["RATCHET_RULES"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) normalizeCallText, THIRD_PARTY_EXCLUDED_BUNDLES, shippedRootEntries
+    "script/no-raw-tls-client-scan.ts": ["normalizeCallText", "THIRD_PARTY_EXCLUDED_BUNDLES", "shippedRootEntries"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DESKTOP_ENGINE_SOURCE_PATHS, desktopEngineFingerprint
+    "script/omob-desktop-engine.ts": ["DESKTOP_ENGINE_SOURCE_PATHS", "desktopEngineFingerprint"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) binaryIdentity
+    "script/omob-provenance.ts": ["binaryIdentity"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isOmobRuntimeDir, ProcessListUnavailableError
+    "script/omob-runtime-prune.ts": ["isOmobRuntimeDir", "ProcessListUnavailableError"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) resolveSenpiWorkspaceDirs
+    "script/omob-senpi-workspace-reset.ts": ["resolveSenpiWorkspaceDirs"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) parityDir
+    "script/oxlint/biome-parity.ts": ["parityDir"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "script/oxlint/biome-ports.ts": ["default"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) combineFragments
+    "script/package-log-blocks.ts": ["combineFragments"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) main
+    "script/preflight-trust.mjs": ["main"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) compareDirectories
+    "script/qa/dependency-audit/comparison.ts": ["compareDirectories"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) captureSchema, wireSchema, assistantSchema
+    "script/qa/dependency-audit/contracts.ts": ["captureSchema", "wireSchema", "assistantSchema"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) FIXTURES, requireSuccess, execute, hashFile, createRuntime, writeModels, normalized, disposeRuntime
+    "script/qa/dependency-audit/runtime.ts": ["FIXTURES", "requireSuccess", "execute", "hashFile", "createRuntime", "writeModels", "normalized", "disposeRuntime"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) STOP_CHORD
+    "script/qa/desktop/linux/engine.ts": ["STOP_CHORD"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) RUN_MARKER
+    "script/qa/desktop/linux/procs.ts": ["RUN_MARKER"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) PACKAGES, multiarch, which
+    "script/qa/desktop/linux/provision.ts": ["PACKAGES", "multiarch", "which"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isRecord, sandboxEnvironment, createSandbox, agentArgs, selfTestSandbox, selfTestBinary
+    "script/qa/desktop/macos/agent.ts": ["isRecord", "sandboxEnvironment", "createSandbox", "agentArgs", "selfTestSandbox", "selfTestBinary"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) quitTextEdit, openTextEdit, textEditText, textEditSelection, openKeySink, closeKeySink, countCanaryDialogs
+    "script/qa/desktop/macos/fixtures.ts": ["quitTextEdit", "openTextEdit", "textEditText", "textEditSelection", "openKeySink", "closeKeySink", "countCanaryDialogs"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) focusSnapshot, sameJson, launcherPermissions, topmostAt
+    "script/qa/desktop/macos/observer.ts": ["focusSnapshot", "sameJson", "launcherPermissions", "topmostAt"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "script/qa/desktop/macos/provider.ts": ["default"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) SCENARIOS, isScenarioName, onWindow, warmUp, clickCode, keyLands
+    "script/qa/desktop/macos/scenario.ts": ["SCENARIOS", "isScenarioName", "onWindow", "warmUp", "clickCode", "keyLands"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) tccDiagnostic
+    "script/qa/desktop/macos/tcc.ts": ["tccDiagnostic"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) INVALID_STOP_CHORD
+    "script/qa/desktop/windows/scenarios-guard.ts": ["INVALID_STOP_CHORD"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DOCTOR_EXPECTED_ONLY, sectionKey, compareLines, BINARY_ONLY_REQUIRED_STEPS, memoryReceiptFailures
+    "script/qa/omo-native-parity-compare.mjs": ["DOCTOR_EXPECTED_ONLY", "sectionKey", "compareLines", "BINARY_ONLY_REQUIRED_STEPS", "memoryReceiptFailures"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) GOVERNED_SURFACES
+    "script/retired-agent-names.test.ts": ["GOVERNED_SURFACES"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ROOT_TEST_SERIAL_QUARANTINE, POSIX_TEST_TIMEOUT_MS
+    "script/root-test-serial-quarantine.ts": ["ROOT_TEST_SERIAL_QUARANTINE", "POSIX_TEST_TIMEOUT_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) runStats
+    "script/stats.ts": ["runStats"],
+    // added on dev after the last merge (origin dev 2b5831715e): unused export(s) keyAssignments
+    "script/telemetry-ingest-key-gate.test.ts": ["keyAssignments"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) findTrackedEvidencePaths
+    "script/tracked-evidence-paths-audit.test.ts": ["findTrackedEvidencePaths"]
+  }
+}

@@ -1,5 +1,6 @@
 import { routingId, sessionPort } from "../tools/internals"
 import type { ThreadHostSession, ThreadToolSurfaceOptions } from "../tools/ports"
+import type { ThreadSummary } from "../contracts"
 import { refuse, type SessionControl } from "./port"
 
 const THINKING_LEVEL_UNSUPPORTED = "thinking_level_unsupported:"
@@ -10,12 +11,14 @@ export function createLocalControl(
   session: ThreadHostSession,
   threadId: string,
   title: string,
+  visible: () => readonly ThreadSummary[],
 ): SessionControl {
   const port = sessionPort(options, session)
   const routing = routingId(session)
   return {
     thread_id: threadId,
     title,
+    visible: async () => visible(),
     interrupt: async (turnId) => {
       const result = await port.interrupt(routing, turnId, threadId)
       return {
