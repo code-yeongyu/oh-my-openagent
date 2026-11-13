@@ -26,10 +26,11 @@ final class Host: NSObject, WKScriptMessageHandler {
         let number = windows.count + 1
         let content = WKUserContentController()
         content.addUserScript(WKUserScript(
-            source: "window.conformanceHost = { post: (json) => window.webkit.messageHandlers.report.postMessage(json) }",
+            source: "window.conformanceHost = { hideA11y: \(sabotage == "a11y"), post: (json) => window.webkit.messageHandlers.report.postMessage(json) }",
             injectionTime: .atDocumentStart, forMainFrameOnly: true))
         content.add(self, name: "report")
         let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
         configuration.userContentController = content
         let view = WKWebView(frame: NSRect(x: 0, y: 0, width: 640, height: 720), configuration: configuration)
         let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 640, height: 720),

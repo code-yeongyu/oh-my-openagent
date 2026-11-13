@@ -3,7 +3,8 @@
 // Electron host of the shared fixture page (../web). Usage: electron main.cjs --report <path>. Same report
 // and stdin control protocol as native-linux/fixture.py.
 const { app, BrowserWindow, Menu, ipcMain } = require("electron")
-const { createReadStream, readFileSync, renameSync, writeFileSync } = require("node:fs")
+const { createReadStream, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } = require("node:fs")
+const { tmpdir } = require("node:os")
 const { join } = require("node:path")
 const readline = require("node:readline")
 
@@ -17,6 +18,10 @@ const states = new Map()
 let initial = null
 
 app.setName(APP)
+// Chromium's profile lives in a temp dir removed on quit, never in the user's real config directory.
+const profileDir = mkdtempSync(join(tmpdir(), "conformance-fixture-electron-"))
+app.setPath("userData", profileDir)
+app.on("will-quit", () => rmSync(profileDir, { recursive: true, force: true }))
 // The baseline run (43237342972) found the page's controls absent from the accessibility tree: with no
 // assistive client detected, Chromium ships no renderer accessibility (Windows exposed only the frame plus
 // "Chrome Legacy Window"). Force the accessibility tree on so every control of the shared page is visible to

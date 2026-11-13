@@ -221,3 +221,6 @@ document.addEventListener("keydown", onKey, true)
 renderOrder()
 state.saved = documentState()
 changed()
+
+// Sabotage leg of the a11y check: the host asks the page to hide itself from assistive technology.
+if (window.conformanceHost?.hideA11y) document.body.setAttribute("aria-hidden", "true")

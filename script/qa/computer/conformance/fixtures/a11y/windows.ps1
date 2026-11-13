@@ -20,7 +20,10 @@ $deadline = (Get-Date).AddSeconds(20)
 function Find-Window {
     $pidCondition = New-Object System.Windows.Automation.PropertyCondition(
         [System.Windows.Automation.AutomationElement]::ProcessIdProperty, $script:TargetPid)
-    return $root.FindFirst([System.Windows.Automation.TreeScope]::Children, $pidCondition)
+    $nameCondition = New-Object System.Windows.Automation.PropertyCondition(
+        [System.Windows.Automation.AutomationElement]::NameProperty, $script:Title)
+    $both = New-Object System.Windows.Automation.AndCondition($pidCondition, $nameCondition)
+    return $root.FindFirst([System.Windows.Automation.TreeScope]::Children, $both)
 }
 
 $window = $null
@@ -28,7 +31,7 @@ while ($true) {
     try { $window = Find-Window } catch { }
     if ($null -ne $window) { break }
     if ((Get-Date) -ge $deadline) {
-        Write-Output "ENVIRONMENT: no UIA window for pid $TargetPid within 20s"
+        Write-Output "ENVIRONMENT: no UIA window titled '$Title' for pid $TargetPid within 20s"
         exit 3
     }
     Start-Sleep -Milliseconds 500
@@ -41,12 +44,20 @@ $editCondition = New-Object System.Windows.Automation.PropertyCondition(
     [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
     [System.Windows.Automation.ControlType]::Edit)
 
+# Count only controls inside the page (UIA Document elements): the title bar's Minimize/Maximize/Close are
+# named Buttons too and would satisfy the button condition with no page control visible at all.
+$documentCondition = New-Object System.Windows.Automation.PropertyCondition(
+    [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+    [System.Windows.Automation.ControlType]::Document)
+
 $deadline = (Get-Date).AddSeconds(20)
 do {
-    $buttons = $window.FindAll([System.Windows.Automation.TreeScope]::Descendants, $buttonCondition)
-    $edits = $window.FindAll([System.Windows.Automation.TreeScope]::Descendants, $editCondition)
-    $namedButtons = @($buttons | Where-Object { $_.Current.Name })
-    $namedEdits = @($edits | Where-Object { $_.Current.Name })
+    $namedButtons = @()
+    $namedEdits = @()
+    foreach ($document in $window.FindAll([System.Windows.Automation.TreeScope]::Descendants, $documentCondition)) {
+        $namedButtons += @($document.FindAll([System.Windows.Automation.TreeScope]::Descendants, $buttonCondition) | Where-Object { $_.Current.Name })
+        $namedEdits += @($document.FindAll([System.Windows.Automation.TreeScope]::Descendants, $editCondition) | Where-Object { $_.Current.Name })
+    }
     if ($namedButtons.Count -ge 1 -and $namedEdits.Count -ge 1) { break }
     Start-Sleep -Milliseconds 500
 } while ((Get-Date) -lt $deadline)

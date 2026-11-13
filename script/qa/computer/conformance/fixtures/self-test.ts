@@ -5,6 +5,7 @@ import { parseArgs } from "node:util"
 import { catalogFor, SESSIONS } from "../catalog.ts"
 import { type Action, OS_NAMES, type Oracle } from "../vocabulary.ts"
 import { FixtureProcess } from "./fixture-process.ts"
+import { fixtureDataEntries } from "./hermetic-check.ts"
 
 type Field = Oracle["field"]
 const MAIN_WINDOW = "Conformance Document"
@@ -100,24 +101,44 @@ function legs(command: readonly string[], sabotage: string, appKey: string, a11y
       }),
   }
   const savedFields = ["title", "savedDocuments"]
-  // The a11y leg proves the page's controls are visible to the OS accessibility tree; it pins no report
-  // field, so it cannot be a sabotage target and is skipped in sabotage runs (which stay field-scoped).
+  // The a11y leg proves the page's controls are visible to the OS accessibility tree. Its sabotage target
+  // "a11y" makes the page hide itself from assistive technology (aria-hidden on body), so the probe must go red.
+  // The hermetic leg (web-hosting fixtures, the ones given --a11y) fails when a run leaves fixture or Electron
+  // data in a user profile or temp location after the fixture exits.
+  const webHosted = a11yProbe !== undefined
   const a11y: Leg[] =
-    a11yProbe === undefined || sabotage !== ""
+    a11yProbe === undefined || (sabotage !== "" && sabotage !== "a11y")
       ? []
       : [
           {
             name: "a11y:controls-visible",
-            fields: [],
+            fields: ["a11y"],
             run: (dir) =>
               withFixture(command, sabotage, dir, async (fixture) => {
                 await runA11yProbe(a11yProbe, fixture.pid)
               }),
           },
         ]
+  const hermetic: Leg[] =
+    !webHosted || sabotage !== ""
+      ? []
+      : [
+          {
+            name: "hermetic:no-profile-data-left",
+            fields: [],
+            run: async (dir) => {
+              const before = fixtureDataEntries()
+              const text = await withFixture(command, sabotage, dir, async () => {})
+              const left = [...fixtureDataEntries()].filter((entry) => !before.has(entry))
+              check(left.map((entry) => `left ${entry}`), "after the fixture exited")
+              return text
+            },
+          },
+        ]
   return [
     ...actionLegs,
     ...a11y,
+    ...hermetic,
     windowTitles,
     { name: "document:save", fields: savedFields, run: saveDocument },
     {
