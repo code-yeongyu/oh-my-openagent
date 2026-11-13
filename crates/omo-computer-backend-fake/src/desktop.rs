@@ -10,6 +10,7 @@ use omo_computer_core::error::{EngineCode, Reason};
 use omo_computer_core::listing::{Rect, WindowInfo};
 use omo_computer_core::observation::ImageMime;
 use omo_computer_core::results::{DisplayInfo, PermissionState};
+use omo_computer_core::session_state::Tristate;
 use omo_computer_core::untrusted::UntrustedText;
 
 use crate::backend::{FakeBackend, StopPathScript};
@@ -140,7 +141,22 @@ fn capture_rect(state: &FakeState, target: &Target) -> BackendResult<(Rect, f64)
 
 impl Backend for FakeBackend {
     fn capabilities(&self) -> Capabilities {
-        fake_capabilities(self.persona, self.lock().displays.len(), self.stop_path)
+        let state = self.lock();
+        let mut capabilities =
+            fake_capabilities(self.persona, state.displays.len(), self.stop_path);
+        // Secure Input: scripted on (`secure_input_on`), or a scripted secure focus while its
+        // window is the focused, live one. Neither declared keeps today's value.
+        let input_on = state.scenario.secure_input_on;
+        let focused = state.scenario.secure_focus.as_ref().map(|secure| {
+            state.windows.iter().any(|window| {
+                window.focused && window.id == secure.window && !state.exited.contains(&window.id)
+            })
+        });
+        if input_on || focused.is_some() {
+            capabilities.session.secure_input_active =
+                Tristate::Known(input_on || focused == Some(true));
+        }
+        capabilities
     }
 
     fn windows(&mut self, filter: &WindowFilter) -> BackendResult<WindowList> {
