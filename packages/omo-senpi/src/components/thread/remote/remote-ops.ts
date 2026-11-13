@@ -195,6 +195,20 @@ const entryClientMessageIdOf = (entry: JsonObject): string | undefined => {
   return typeof id === "string" && id !== "" ? id : undefined
 }
 
+/** A stored entry's identity: its own `id`, or its whole record when it has none. */
+const entryKeyOf = (entry: JsonObject): string =>
+  typeof entry["id"] === "string" ? entry["id"] : JSON.stringify(entry)
+
+/** The user entries whose text carries `text`, exact or wrapped, in transcript order. */
+const textCarryingUserEntries = (entries: readonly JsonObject[], text: string): number[] => {
+  const found: number[] = []
+  for (let index = 0; index < entries.length; index++) {
+    if (!isUserEntry(entries[index])) continue
+    if (entryTextOf(entries[index])?.includes(text) === true) found.push(index)
+  }
+  return found
+}
+
 /**
  * The matches that can anchor a send's turn. The user entry carrying the send's own client message id wins outright:
  * senpi stores it on the entry it admits, whatever text a prompt template or skill expansion stored (#13272 review).
@@ -252,10 +266,12 @@ export async function followRemote(
   let newMessage = false
   let checking = false
   let pendingSignal = false
-  // This send's ordinal among identical-text entries, fixed at its first read: without a client message id, the count
-  // that read saw (its own entry assumed the newest); with an id the engine has not stamped yet, one past that count,
-  // since a queued entry is stored only when the queue drains (#13272 review).
+  // Without a client message id: this send's ordinal among identical-text entries, fixed at its first read (its own
+  // entry assumed the newest).
   let matchOrdinal: number | undefined
+  // With an id the engine has not stamped: the identities of the user entries carrying this send's text at its first
+  // read. A queued entry is stored only when the queue drains, so every one of them is an earlier send (#13272 review).
+  let earlierEntries: ReadonlySet<string> | undefined
   const check = async (settleSignal: boolean): Promise<void> => {
     const text = options?.text
     if (done || mode !== "transcript" || text === undefined) return
@@ -285,11 +301,17 @@ export async function followRemote(
           anchor = matches[Math.min(matchOrdinal, matches.length) - 1]
         } else {
           // senpi stores a queued send's entry only when the queue drains, so a send that carries an id and finds no
-          // entry with it has not been stored yet: every same-text entry its first read sees is an earlier send,
-          // and its own is the next one (#13272 review). It waits for that entry rather than print an older answer.
-          if (matchOrdinal === undefined) matchOrdinal = matches.length + 1
-          if (matches.length < matchOrdinal) return
-          anchor = matches[matchOrdinal - 1]
+          // entry with it has not been stored yet: every user entry carrying its text that its first read sees is an
+          // earlier send. Its own is the first one after those, exact or wrapped, keyed by entry identity so older
+          // entries scrolling out of the read window cannot shift it (#13272 review). It waits for that entry rather
+          // than print an older answer.
+          const carrying = textCarryingUserEntries(entries, text)
+          if (earlierEntries === undefined)
+            earlierEntries = new Set(carrying.map((index) => entryKeyOf(entries[index])))
+          const seen = earlierEntries
+          const fresh = carrying.find((index) => !seen.has(entryKeyOf(entries[index])))
+          if (fresh === undefined) return
+          anchor = fresh
         }
       }
       const answer: string[] = []

@@ -407,6 +407,60 @@ describe("#13272 review: the anchor survives a rewritten send and never takes an
     follow.stop()
   })
 
+  test("#given an engine that stores no id and older same-text entries that scroll out of the read window #when the send's own entry lands #then it still anchors its own entry", async () => {
+    const transcript = [
+      message("u0", "user", "ping"),
+      message("a0", "assistant", "oldest answer\n"),
+      message("u1", "user", "ping"),
+      message("a1", "assistant", "old answer\n"),
+      message("u2", "user", "blocker"),
+    ]
+    const { remote, deliver } = followSurface(transcript)
+    const printed: string[] = []
+    const follow = await followRemote(remote, ROW, (text) => printed.push(text), {
+      text: "ping",
+      clientMessageId: "cm-new",
+    })
+    if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
+    follow.aim("queued")
+    await flush()
+    expect(printed).toEqual([])
+    // The read window moves on: the two oldest entries scroll out as the blocker's answer and this send's entry land.
+    transcript.splice(0, 2)
+    transcript.push(
+      message("a2", "assistant", "blocker answer\n"),
+      message("u3", "user", "ping"),
+      message("a3", "assistant", "new answer\n"),
+    )
+    deliver([{ type: "agent_settled" }])
+    await withTimeout(follow.settled, 5_000, "a send whose older twins scrolled out never anchored its own entry")
+    expect(printed).toEqual(["new answer\n"])
+    follow.stop()
+  })
+
+  test("#given an engine that stores no id and an older exact same-text entry #when the send's own entry is stored wrapped #then the wrapped entry anchors", async () => {
+    const transcript = [
+      message("u1", "user", "ping"),
+      message("a1", "assistant", "old answer\n"),
+      message("u2", "user", "blocker"),
+    ]
+    const { remote, deliver } = followSurface(transcript)
+    const printed: string[] = []
+    const follow = await followRemote(remote, ROW, (text) => printed.push(text), {
+      text: "ping",
+      clientMessageId: "cm-new",
+    })
+    if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
+    follow.aim("queued")
+    await flush()
+    expect(printed).toEqual([])
+    transcript.push(message("u3", "user", "<context>\nping"), message("a3", "assistant", "new answer\n"))
+    deliver([{ type: "agent_settled" }])
+    await withTimeout(follow.settled, 5_000, "a wrapped own entry next to an older exact twin never anchored")
+    expect(printed).toEqual(["new answer\n"])
+    follow.stop()
+  })
+
   test("#given entries with no client message id #when the anchor is chosen #then an exact entry wins over a longer one containing the text, and a wrapped entry anchors only when no exact one exists", () => {
     const wrapped = message("u1", "user", "<context>\nping")
     const exact = message("u2", "user", "ping")
