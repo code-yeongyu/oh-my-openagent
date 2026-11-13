@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { createDynamicTruncator } from "../../shared/dynamic-truncator"
 import { resolveSessionEventID } from "../../shared/event-session-id"
+import { getApplyPatchTargetPaths } from "./apply-patch-paths"
 import { createSessionCacheStore, createSessionRuleScanCacheStore } from "./cache"
 import { clearParsedRuleCache, createRuleInjectionProcessor } from "./injector"
 import { getRuleInjectionFilePath } from "./output-path"
@@ -11,6 +12,7 @@ interface ToolExecuteInput {
   tool: string
   sessionID: string
   callID: string
+  args?: unknown
 }
 
 interface ToolExecuteOutput {
@@ -31,6 +33,7 @@ interface EventInput {
 }
 
 const TRACKED_TOOLS = ["read", "write", "edit", "multiedit"]
+const PATCH_TOOLS = ["apply_patch"]
 
 export function createRulesInjectorHook(
   ctx: PluginInput,
@@ -67,6 +70,13 @@ export function createRulesInjectorHook(
       if (!filePath) return
       await processFilePathForInjection(filePath, input.sessionID, output)
       return
+    }
+
+    if (PATCH_TOOLS.includes(toolName)) {
+      const filePaths = getApplyPatchTargetPaths(output.metadata, input.args)
+      for (const filePath of filePaths) {
+        await processFilePathForInjection(filePath, input.sessionID, output)
+      }
     }
   }
 
