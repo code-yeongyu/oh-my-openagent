@@ -37,6 +37,19 @@ const savedDocument = z
   })
   .strict()
 
+const rect = z.object({ x: z.number().int(), y: z.number().int(), width: z.number().int(), height: z.number().int() }).strict()
+
+/** Screen rects of the main window's widgets, keyed by accessible name (never a caption), logical points. */
+const geometry = z
+  .object({
+    space: z.literal("screen-logical"),
+    scale: z.number().positive(),
+    window: z.object({ client: rect, frame: rect }).strict(),
+    widgets: z.record(z.string(), z.object({ role: z.string().min(1), rect, hit: rect.optional() }).strict()),
+  })
+  .strict()
+export type FixtureGeometry = z.infer<typeof geometry>
+
 const fixtureReportSchema = z
   .object({
     schema: z.literal(FIXTURE_REPORT_SCHEMA),
@@ -46,6 +59,7 @@ const fixtureReportSchema = z
     appKey: z.string().min(1),
     fields: catalogFields,
     saved: savedDocument,
+    geometry: geometry.optional(),
   })
   .strict()
 export type FixtureReport = z.infer<typeof fixtureReportSchema>

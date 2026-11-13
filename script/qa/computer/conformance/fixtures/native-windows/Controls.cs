@@ -116,6 +116,11 @@ namespace ConformanceFixture
             this.changed = changed;
         }
 
+        public TextBox Widget(string label)
+        {
+            return widgets[label];
+        }
+
         public void Track(string label, TextBox box)
         {
             widgets[label] = box;
