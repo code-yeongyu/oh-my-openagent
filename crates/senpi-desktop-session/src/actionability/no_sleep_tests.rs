@@ -164,3 +164,33 @@ fn a_raw_identifier_does_not_hide_the_host_wait_after_it() {
     // Then: only the real call is reported.
     assert_eq!(offenders, ["probe.rs:2: sleep"]);
 }
+
+/// One test per host wait: `$source` holds exactly that one wait, `$token`.
+macro_rules! host_wait_probes {
+    ($($test:ident: $source:literal => $token:literal;)*) => {$(
+        #[test]
+        fn $test() {
+            assert_eq!(host_waits("probe.rs", $source), [concat!("probe.rs:1: ", $token)]);
+        }
+    )*};
+}
+
+host_wait_probes! {
+    a_channel_recv_timeout_is_a_host_wait: "rx.recv_timeout(d);" => "recv_timeout";
+    a_channel_recv_deadline_is_a_host_wait: "rx.recv_deadline(at);" => "recv_deadline";
+    a_channel_send_timeout_is_a_host_wait: "tx.send_timeout(v, d);" => "send_timeout";
+    a_condvar_wait_timeout_is_a_host_wait: "cv.wait_timeout(g, d);" => "wait_timeout";
+    a_condvar_wait_timeout_ms_is_a_host_wait: "cv.wait_timeout_ms(g, 5);" => "wait_timeout_ms";
+    a_condvar_wait_timeout_while_is_a_host_wait:
+        "cv.wait_timeout_while(g, d, f);" => "wait_timeout_while";
+    a_parking_lot_wait_for_is_a_host_wait: "cv.wait_for(&mut g, d);" => "wait_for";
+    a_parking_lot_wait_until_is_a_host_wait: "cv.wait_until(&mut g, at);" => "wait_until";
+    a_parking_lot_wait_while_for_is_a_host_wait:
+        "cv.wait_while_for(&mut g, f, d);" => "wait_while_for";
+    a_parking_lot_wait_while_until_is_a_host_wait:
+        "cv.wait_while_until(&mut g, f, at);" => "wait_while_until";
+    a_parking_lot_try_lock_for_is_a_host_wait: "m.try_lock_for(d);" => "try_lock_for";
+    a_parking_lot_try_lock_until_is_a_host_wait: "m.try_lock_until(at);" => "try_lock_until";
+    a_tokio_timeout_is_a_host_wait: "tokio::time::timeout(d, f).await;" => "timeout";
+    a_tokio_timeout_at_is_a_host_wait: "tokio::time::timeout_at(at, f).await;" => "timeout_at";
+}
