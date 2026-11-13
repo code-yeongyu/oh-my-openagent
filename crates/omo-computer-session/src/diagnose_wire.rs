@@ -73,4 +73,15 @@ mod tests {
         assert_eq!(states(&denied), [Granted, Denied, Unknown]);
         assert!(!denied.diagnose().ok, "a denial is not ready");
     }
+    #[test]
+    fn the_capabilities_reply_and_diagnose_agree_under_a_scripted_permissions_block() {
+        let scripted = FakeScenario::load(&fixtures_dir().join("v3-diagnose-denied.json")).expect("fixture");
+        let session = Session::new(Box::new(FakeBackend::new(scripted)));
+        let caps = serde_json::to_value(session.capabilities()).expect("caps");
+        let wire = |state| serde_json::to_value(state).expect("state").as_str().expect("str").to_lowercase();
+        let [capture, input, accessibility] = states(&session);
+        assert_eq!(caps["capturePermission"], wire(capture), "{caps}");
+        assert_eq!(caps["inputPermission"], wire(input), "{caps}");
+        assert_eq!(caps["axPermission"], wire(accessibility), "{caps}");
+    }
 }

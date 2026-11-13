@@ -32,12 +32,12 @@
                   "foreground"
                 ],
                 "capturePermission": "granted",
-                "inputPermission": "granted",
-                "axPermission": "granted",
-                "displayCount": 1,
+                "inputPermission": "denied",
+                "axPermission": "unknown",
+                "displayCount": 0,
                 "focusGuard": true,
                 "stopPath": "none",
-                "stopReason": null,
+                "stopReason": "no-global-listener",
                 "integrityLevel": null,
                 "screenLocked": false,
                 "displayAsleep": false
@@ -46,7 +46,6 @@
             }
           },
           "variable": [
-            "/result/capabilities",
             "/result/resumeToken"
           ]
         }
