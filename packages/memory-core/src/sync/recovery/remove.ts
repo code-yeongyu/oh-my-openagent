@@ -10,7 +10,11 @@ import { committedWrap, expectedHistory, loadServedChain } from "./served-chain.
 
 /** A passkey removal asks the person to delete the passkey; a phrase on paper cannot be deleted or signalled (F10). */
 type RemovedKey =
-  | { readonly removedKind: "passkey"; readonly platformSignal: "signalled" | "unsupported"; readonly deleteFromPasskeyManager: true }
+  | {
+      readonly removedKind: "passkey"
+      readonly platformSignal: "signalled" | "unsupported"
+      readonly deleteFromPasskeyManager: true
+    }
   | { readonly removedKind: "phrase"; readonly platformSignal: "unsupported" }
 
 export type RemoveOutcome =
@@ -62,7 +66,8 @@ const removedKey = async (input: RemoveInput, phrase: boolean): Promise<RemovedK
     ? { removedKind: "phrase", platformSignal: "unsupported" }
     : {
         removedKind: "passkey",
-        platformSignal: input.bridge === null ? "unsupported" : await input.bridge.signalRemoved(input.rpId, input.credentialId),
+        platformSignal:
+          input.bridge === null ? "unsupported" : await input.bridge.signalRemoved(input.rpId, input.credentialId),
         deleteFromPasskeyManager: true,
       }
 
