@@ -12,12 +12,12 @@ mod host;
 mod latch_tests;
 #[path = "common/live.rs"]
 mod live;
-#[path = "common/seam_tests.rs"]
-mod seam_tests;
 #[path = "common/peer.rs"]
 mod peer;
 #[path = "common/replay.rs"]
 mod replay;
+#[path = "common/seam_tests.rs"]
+mod seam_tests;
 
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
@@ -78,10 +78,17 @@ fn mcp_tools() {
 }
 
 fn live_with_slow_click() -> Live {
-    let mut live = Live::spawn(&["--stdio"], &scenario_with(&json!({"delay_ms": {"click": 2000}})));
+    let mut live = Live::spawn(
+        &["--stdio"],
+        &scenario_with(&json!({"delay_ms": {"click": 2000}})),
+    );
     let opened = live.call(1, "session.open", &json!({}));
     assert!(opened.get("result").is_some(), "{opened}");
-    let started = live.call(2, "stopPath.start", &json!({"chord": "ctrl+alt+shift+escape"}));
+    let started = live.call(
+        2,
+        "stopPath.start",
+        &json!({"chord": "ctrl+alt+shift+escape"}),
+    );
     assert!(started.get("result").is_some(), "{started}");
     let captured = live.call(3, "capture", &json!({"target": "101"}));
     assert!(captured["result"]["frameId"].is_string(), "{captured}");
@@ -96,12 +103,19 @@ fn click(id: i64) -> Value {
 fn late_reply_after_stop_is_dropped() {
     let mut live = live_with_slow_click();
     live.peer.send(&click(10));
-    live.peer.send(&request(11, "stopPath.stop", &json!({"source": "api"})));
+    live.peer
+        .send(&request(11, "stopPath.stop", &json!({"source": "api"})));
     let seen = live.until_reply(10);
-    let stopped = seen.iter().find(|m| m["id"] == json!(11)).unwrap_or_else(|| panic!("the stop answered first: {seen:?}"));
+    let stopped = seen
+        .iter()
+        .find(|m| m["id"] == json!(11))
+        .unwrap_or_else(|| panic!("the stop answered first: {seen:?}"));
     assert_eq!(stopped["result"]["suspended"], json!(true), "{stopped}");
     let late = seen.last().expect("until_reply ends at the reply");
-    assert!(late.get("result").is_none(), "a click reply that came back across the stop was delivered: {late}");
+    assert!(
+        late.get("result").is_none(),
+        "a click reply that came back across the stop was delivered: {late}"
+    );
     assert_eq!(late["error"]["message"], json!("Suspended"), "{late}");
 }
 
@@ -117,7 +131,11 @@ fn a_reply_before_the_stop_keeps_its_result() {
 
 #[cfg(unix)]
 fn alive(pid: &str) -> bool {
-    Command::new("kill").args(["-0", pid]).stderr(Stdio::null()).status().is_ok_and(|status| status.success())
+    Command::new("kill")
+        .args(["-0", pid])
+        .stderr(Stdio::null())
+        .status()
+        .is_ok_and(|status| status.success())
 }
 
 #[cfg(unix)]
@@ -132,8 +150,11 @@ fn presence_helper_exits_on_parent_death() {
         .spawn()
         .expect("the parent shell starts");
     let mut line = String::new();
-    std::io::BufRead::read_line(&mut std::io::BufReader::new(parent.stdout.take().expect("stdout")), &mut line)
-        .expect("the helper pid");
+    std::io::BufRead::read_line(
+        &mut std::io::BufReader::new(parent.stdout.take().expect("stdout")),
+        &mut line,
+    )
+    .expect("the helper pid");
     let helper = line.trim().to_owned();
     assert!(alive(&helper), "the helper runs while its parent lives");
     parent.kill().expect("SIGKILL the parent");

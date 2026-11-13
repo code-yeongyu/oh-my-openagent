@@ -27,7 +27,12 @@ impl Report {
         for delta in &self.deltas {
             println!("DELTA matched={} {}", delta.matched, delta.line);
         }
-        assert!(self.failures.is_empty(), "{} did not replay clean:\n{}", self.name, self.failures.join("\n"));
+        assert!(
+            self.failures.is_empty(),
+            "{} did not replay clean:\n{}",
+            self.name,
+            self.failures.join("\n")
+        );
     }
 }
 
@@ -37,7 +42,8 @@ fn plant_in(runtime: &Path, items: &[Plant]) {
         match &item.content {
             None => fs::create_dir_all(&target).expect("a planted dir"),
             Some(content) => {
-                fs::create_dir_all(target.parent().expect("a planted file has a parent")).expect("planted parents");
+                fs::create_dir_all(target.parent().expect("a planted file has a parent"))
+                    .expect("planted parents");
                 fs::write(&target, content).expect("a planted file");
                 set_mode(&target, item.mode.unwrap_or(0o600));
             }
@@ -75,9 +81,17 @@ fn env_for(case: &Case, runtime: &Path) -> Vec<(String, String)> {
         ("OMO_COMPUTER_RUNTIME_DIR".to_owned(), runtime_text.clone()),
     ];
     if let Some(scenario) = &case.scenario {
-        env.push(("OMO_COMPUTER_FAKE_SCENARIO".to_owned(), repo().join(scenario).to_string_lossy().into_owned()));
+        env.push((
+            "OMO_COMPUTER_FAKE_SCENARIO".to_owned(),
+            repo().join(scenario).to_string_lossy().into_owned(),
+        ));
     }
-    env.extend(case.env.iter().map(|(name, value)| (name.clone(), value.replace(RUNTIME_PLACEHOLDER, &runtime_text))));
+    env.extend(case.env.iter().map(|(name, value)| {
+        (
+            name.clone(),
+            value.replace(RUNTIME_PLACEHOLDER, &runtime_text),
+        )
+    }));
     env
 }
 
@@ -112,14 +126,19 @@ pub fn replay_case_in(case: &Case, runtime: &Path) -> Report {
             None => oneshot.insert(spawn()),
         };
         let send = match &token {
-            Some(token) => serde_json::from_str(&send.to_string().replace(TOKEN_PLACEHOLDER, token)).expect("a substituted send"),
+            Some(token) => {
+                serde_json::from_str(&send.to_string().replace(TOKEN_PLACEHOLDER, token))
+                    .expect("a substituted send")
+            }
             None => send.clone(),
         };
         target.send(&send);
         for (j, expectation) in expect.iter().enumerate() {
             let label = format!("step={} message={}", index + 1, j + 1);
             let Some(message) = target.next() else {
-                failures.push(format!("MISMATCH {label}: no message within the per-message wait"));
+                failures.push(format!(
+                    "MISMATCH {label}: no message within the per-message wait"
+                ));
                 break;
             };
             let mut ctx = Context {
@@ -131,7 +150,11 @@ pub fn replay_case_in(case: &Case, runtime: &Path) -> Report {
                 token = Some(seen.to_owned());
             }
             compare(&expectation.message, Some(&message), "", &mut ctx);
-            failures.extend(ctx.failures.into_iter().map(|f| format!("MISMATCH {label} {f}")));
+            failures.extend(
+                ctx.failures
+                    .into_iter()
+                    .map(|f| format!("MISMATCH {label} {f}")),
+            );
         }
         if let Some(done) = oneshot {
             failures.extend(done.close().into_iter().map(|m| format!("LEFTOVER {m}")));
@@ -139,14 +162,21 @@ pub fn replay_case_in(case: &Case, runtime: &Path) -> Report {
         if let Some(want) = sink {
             let found = sink_count(runtime);
             if found != *want {
-                failures.push(format!("MISMATCH step={} sink: expected {want} entries, found {found}", index + 1));
+                failures.push(format!(
+                    "MISMATCH step={} sink: expected {want} entries, found {found}",
+                    index + 1
+                ));
             }
         }
     }
     if let Some(peer) = peer {
         failures.extend(peer.close().into_iter().map(|m| format!("LEFTOVER {m}")));
     }
-    Report { name: case.name.clone(), failures, deltas }
+    Report {
+        name: case.name.clone(),
+        failures,
+        deltas,
+    }
 }
 
 pub fn replay(name: &str) -> Report {

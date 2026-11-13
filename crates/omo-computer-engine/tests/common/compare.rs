@@ -29,7 +29,11 @@ pub struct Delta {
 }
 
 fn segments(pointer: &str) -> Vec<String> {
-    pointer.split('/').skip(1).map(|seg| seg.replace("~1", "/").replace("~0", "~")).collect()
+    pointer
+        .split('/')
+        .skip(1)
+        .map(|seg| seg.replace("~1", "/").replace("~0", "~"))
+        .collect()
 }
 
 fn child(pointer: &str, key: &str) -> String {
@@ -37,13 +41,19 @@ fn child(pointer: &str, key: &str) -> String {
 }
 
 fn fits(pattern: &[String], path: &[String]) -> bool {
-    pattern.len() == path.len() && pattern.iter().zip(path).all(|(pat, seg)| pat == "*" || pat == seg)
+    pattern.len() == path.len()
+        && pattern
+            .iter()
+            .zip(path)
+            .all(|(pat, seg)| pat == "*" || pat == seg)
 }
 
 fn matches(pattern: &[String], pointer: &str) -> bool {
     let path = segments(pointer);
     match pattern.split_first() {
-        Some((first, rest)) if first == "**" => path.len() >= rest.len() && fits(rest, &path[path.len() - rest.len()..]),
+        Some((first, rest)) if first == "**" => {
+            path.len() >= rest.len() && fits(rest, &path[path.len() - rest.len()..])
+        }
         _ => fits(pattern, &path),
     }
 }
@@ -51,7 +61,8 @@ fn matches(pattern: &[String], pointer: &str) -> bool {
 fn parse_value(kind: Kind, text: &str, pointer: &str) -> Value {
     match kind {
         Kind::Additive => Value::Null,
-        Kind::Replaced => serde_json::from_str(text).unwrap_or_else(|error| panic!("replaced value of {pointer}: {error}")),
+        Kind::Replaced => serde_json::from_str(text)
+            .unwrap_or_else(|error| panic!("replaced value of {pointer}: {error}")),
     }
 }
 
@@ -72,7 +83,12 @@ pub fn load(name: &str) -> Vec<Delta> {
                 _ => return None,
             };
             let pointer = col(1);
-            let pattern = pointer.strip_prefix('/').unwrap_or(pointer).split('/').map(str::to_owned).collect();
+            let pattern = pointer
+                .strip_prefix('/')
+                .unwrap_or(pointer)
+                .split('/')
+                .map(str::to_owned)
+                .collect();
             Some(Delta {
                 line: line.to_owned(),
                 kind,
@@ -102,10 +118,9 @@ pub fn compare(expected: &Value, actual: Option<&Value>, pointer: &str, ctx: &mu
     if ctx.variable.contains(pointer) {
         return;
     }
-    let replaced = ctx
-        .deltas
-        .iter_mut()
-        .find(|d| d.kind == Kind::Replaced && matches(&d.pattern, pointer) && d.imported == *expected);
+    let replaced = ctx.deltas.iter_mut().find(|d| {
+        d.kind == Kind::Replaced && matches(&d.pattern, pointer) && d.imported == *expected
+    });
     let expected = match replaced {
         Some(delta) => {
             delta.matched += 1;
@@ -126,14 +141,24 @@ pub fn compare(expected: &Value, actual: Option<&Value>, pointer: &str, ctx: &mu
                 if ctx.variable.contains(at.as_str()) {
                     continue;
                 }
-                match ctx.deltas.iter_mut().find(|d| d.kind == Kind::Additive && matches(&d.pattern, &at)) {
+                match ctx
+                    .deltas
+                    .iter_mut()
+                    .find(|d| d.kind == Kind::Additive && matches(&d.pattern, &at))
+                {
                     Some(delta) => delta.matched += 1,
-                    None => ctx.fail(&at, format!("unexpected member {value} (no ORACLE-DELTAS line matches it)")),
+                    None => ctx.fail(
+                        &at,
+                        format!("unexpected member {value} (no ORACLE-DELTAS line matches it)"),
+                    ),
                 }
             }
         }
         (Value::Array(want), Value::Array(got)) if want.len() != got.len() => {
-            ctx.fail(pointer, format!("expected {} items, got {}", want.len(), got.len()));
+            ctx.fail(
+                pointer,
+                format!("expected {} items, got {}", want.len(), got.len()),
+            );
         }
         (Value::Array(want), Value::Array(got)) => {
             for (index, (item, actual)) in want.iter().zip(got).enumerate() {
