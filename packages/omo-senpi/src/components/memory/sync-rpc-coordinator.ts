@@ -225,8 +225,23 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
         if (account.signal.aborted || !(await account.isCurrent())) return unavailable()
         check(owner)
         const visible = records().filter((record) => ensureOwned(record, owner) && record.identity === identity)
-        const notice = await phraseNotice(account)
+        let notice = await phraseNotice(account)
         check(owner)
+        // Review LOW (#13336 @ 9f9734a8): an unresolved local read may be an enroll/rotate void notice; resolve it
+        // against the verified chain so the notice can show over RPC.
+        const verify = options.runtime.verifiedPhraseNoticeStatus
+        if (notice.phraseUnresolved === true && verify !== undefined) {
+          const verified = await this.read(owner, (ports, current) =>
+            verify({
+              pinDir: options.pinDir,
+              account: current.descriptor.accountId,
+              principalId: current.descriptor.syncPrincipalId,
+              chain: ports.chain,
+            }),
+          )
+          if (!("kind" in verified)) notice = verified
+          check(owner)
+        }
         const ownEnable = visible.find((record) => record.kind === "enable")?.enable ?? null
         return {
           ...(sync === undefined ? {} : { sync }),

@@ -158,6 +158,7 @@ describe("removal succeeds only once its rotation is stored (#10412 review M2)",
     expect(await remove(world, second, lying, events)).toEqual({
       ok: false,
       reason: "rotation-pending",
+      removedKind: "passkey",
       platformSignal: "unsupported",
       deleteFromPasskeyManager: true,
     })
@@ -195,6 +196,7 @@ describe("a removal completed by another member's rotation (#12280)", () => {
     expect(await remove(world, second, transportFor(world, world.owner), events)).toEqual({
       ok: true,
       epoch: 2,
+      removedKind: "passkey",
       platformSignal: "unsupported",
       deleteFromPasskeyManager: true,
     })

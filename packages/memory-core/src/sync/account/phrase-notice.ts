@@ -1,4 +1,10 @@
 import { loadTrustAnchor } from "../crypto/trust-pin.ts"
+import type { ChainState } from "../crypto/chain.ts"
+import type { TrustAnchor } from "../crypto/anchor.ts"
+import type { AccountHttp } from "./http.ts"
+import { acknowledgeEnrollVoid, enrollNoticeStatus } from "../recovery/enroll-phrase.ts"
+import { loadServedChain } from "../recovery/served-chain.ts"
+import { createRejectionCounter } from "../crypto/rejection.ts"
 import type { DeviceKeyring } from "../keyring-port.ts"
 import type { SyncOperationOptions } from "../operation-authority.ts"
 import { loadGenesisIntent, withGenesisLock } from "../genesis/intent-store.ts"
@@ -32,7 +38,10 @@ const pinnedDigest = async (pinDir: string, account: string): Promise<string | n
  * unseen poll cannot consume it. While a live process holds the genesis lock a ceremony is running, so
  * this reports in-progress and never a void that may still be saved.
  */
-export const phraseNoticeStatus = async (place: PhraseGenesisPlace): Promise<PhraseNoticeStatus> => {
+export const phraseNoticeStatus = async (
+  place: PhraseGenesisPlace,
+  verifiedChain?: ChainState | null,
+): Promise<PhraseNoticeStatus> => {
   if (await genesisLockHeldByLiveOwner(place)) return { inProgress: true }
   const state = await genesisPhraseState(place, {
     intentPresent: await genesisIntentPresent(place),
@@ -40,7 +49,23 @@ export const phraseNoticeStatus = async (place: PhraseGenesisPlace): Promise<Phr
   })
   if (state.kind === "void") return { phraseVoid: { purpose: "genesis" } }
   if (state.kind === "unresolved") return { phraseUnresolved: true }
-  return {}
+  // Enroll and rotate markers (review HIGH, #13336): resolved only against a verified chain the caller passes.
+  return enrollNoticeStatus(place, verifiedChain)
+}
+
+/**
+ * Status with enroll and rotate markers resolved against the verified chain (review LOW, #13336 @ 9f9734a8): the
+ * RPC status read calls this only when the local read is unresolved, so a delivered void notice can show.
+ */
+export const verifiedPhraseNoticeStatus = async (
+  input: PhraseGenesisPlace & { readonly chain: AccountHttp; readonly anchor?: TrustAnchor },
+): Promise<PhraseNoticeStatus> => {
+  const pinned =
+    input.anchor ??
+    (await loadTrustAnchor(input.pinDir, input.account).then((pin) => (pin.ok ? pin.anchor : undefined)))
+  const served =
+    pinned === undefined ? null : await loadServedChain(input.chain, input.account, createRejectionCounter(), pinned)
+  return phraseNoticeStatus(input, served !== null && served.ok ? served.state : null)
 }
 
 export type AcknowledgeInput = {
@@ -51,6 +76,10 @@ export type AcknowledgeInput = {
   readonly pinDir: string
   readonly purpose: PhraseVoidNotice["purpose"]
   readonly credentialId?: string
+  /** The signed-in account routes; an enroll or rotate notice is acknowledged only against the verified chain. */
+  readonly chain?: AccountHttp
+  /** The account's trust anchor; defaults to this device's pin. */
+  readonly anchor?: TrustAnchor
 } & SyncOperationOptions
 
 /**
@@ -61,8 +90,14 @@ export type AcknowledgeInput = {
  */
 export const acknowledgePhraseVoid = async (input: AcknowledgeInput): Promise<{ readonly ok: true }> =>
   withGenesisLock(input, async () => {
-    if (input.purpose !== "genesis") return { ok: true }
     const place = { pinDir: input.pinDir, account: input.account, principalId: input.keyring.principal().id }
+    if (input.purpose !== "genesis") {
+      // Review LOW (#13336 @ 9f9734a8): never report an acknowledge that could not check anything.
+      if (input.chain === undefined)
+        throw new TypeError("acknowledging an enroll or rotate notice needs the account chain")
+      await acknowledgeEnrollVoid(place, input.purpose, input.credentialId, input.chain, input.anchor)
+      return { ok: true }
+    }
     const state = await genesisPhraseState(place, {
       intentPresent: (await loadGenesisIntent(input)) !== null,
       pinnedGenesisDigest: await pinnedDigest(input.pinDir, input.account),
