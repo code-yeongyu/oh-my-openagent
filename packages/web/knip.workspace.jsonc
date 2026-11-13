@@ -1,0 +1,204 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/web": {
+      "includeEntryExports": true,
+      // Playwright is installed by this package's own install, which the root install does not run, so knip cannot load the
+      // playwright configs (its scripts pass them with --config); the configs and the ./e2e specs are listed as entries instead.
+      "playwright": false,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "playwright*.config.ts",
+        "e2e/**/*.spec.ts",
+        "scripts/generate-docs-content.mjs",
+        "scripts/prepare-build.mjs",
+        "scripts/retain-static-assets.mjs",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        // Every Next.js special file at any depth: these are the knip 6.43.0 Next.js plugin's own entry patterns
+        // (dist/plugins/next/index.js getEntryFilePatterns, this app has no src/ dir and the default pageExtensions), which it
+        // adds with exports unchecked, so they are listed here to be export-checked. Their route-segment config exports
+        // (revalidate, metadata, generateMetadata, ...) are dropped by name by script/knip-next-route-segment-exports.ts;
+        // the remaining framework-consumed ones (default, GET, ...) are named per symbol in preExistingExports.
+        "app/{,[(]*[)]/}{manifest,robots}.{js,ts}",
+        "app/**/sitemap.{js,ts}",
+        "app/**/{icon,apple-icon,opengraph-image,twitter-image}.{js,jsx,ts,tsx}",
+        "{,src/}{instrumentation,instrumentation-client,middleware,proxy}.{js,jsx,ts,tsx}",
+        "app/global-{error,not-found}.{js,jsx,ts,tsx}",
+        "app/**/{default,error,forbidden,loading,not-found,unauthorized}.{js,jsx,ts,tsx}",
+        "app/**/{layout,page,route,template}.{js,jsx,ts,tsx}",
+        "pages/**/*.{js,jsx,ts,tsx}",
+        "eslint.config.mjs",
+        "i18n/request.ts",
+        "next.config.ts",
+        "postcss.config.mjs",
+        "scripts/check-graph-budget.mjs",
+        "scripts/render-app-icons.mjs",
+        "scripts/render-graph-poster.mjs",
+      ],
+      "ignoreFiles": [
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "components/landing/agents-data.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "components/ui/card.tsx",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "components/ui/section.tsx",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "components/ui/separator.tsx",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "e2e/support/download-fixture-server.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "lib/og/graph-glyph.tsx",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "lib/og/omo-logo.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "lib/og/tagline.tsx",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "open-next.config.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/generate-og-fonts.mjs",
+      ],
+      "ignoreDependencies": [
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@biomejs/biome",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@opennextjs/cloudflare",
+        // pre-existing at origin dev 4686e425b5: a declared dependency nothing imports
+        "@radix-ui/react-separator",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@types/react-dom",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "eslint",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "eslint-plugin-prettier",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "globals",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "prettier",
+        // pre-existing at origin dev 4686e425b5: a declared dependency nothing imports
+        "react-dom",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "wrangler",
+      ],
+      // pre-existing at origin dev 4686e425b5: executables this package runs that it does not declare
+      "ignoreBinaries": ["eslint", "next", "opennextjs-cloudflare", "prettier", "wrangler"],
+      "ignoreIssues": {
+        // pre-existing at origin dev 4686e425b5: duplicate export(s) GraphHero, default
+        "components/landing/graph/graph-hero.tsx": ["duplicates"],
+        // pre-existing at origin dev 4686e425b5: imports of undeclared packages three-stdlib
+        "components/landing/graph/graph-scene.tsx": ["unlisted"],
+        // pre-existing at origin dev 4686e425b5: imports that do not resolve ./docs-content.generated
+        "lib/docs-page.test.ts": ["unresolved"],
+        // pre-existing at origin dev 4686e425b5: imports that do not resolve ./docs-content.generated
+        "lib/docs-source.ts": ["unresolved"],
+        // pre-existing at origin dev 4686e425b5: imports of undeclared packages postcss-load-config
+        "postcss.config.mjs": ["unlisted"],
+      },
+    }
+  },
+  "preExistingExports": {
+    // the home page has its own root layout (omo.dev renewal draft)
+    "packages/web/app/[locale]/(home)/layout.tsx": ["default"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "packages/web/app/[locale]/(home)/page.tsx": ["default"],
+    // added on dev after the last merge (origin dev 2b5831715e): unused export(s) default
+    "packages/web/app/[locale]/(site)/[...rest]/page.tsx": ["default"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "packages/web/app/[locale]/(site)/docs/[slug]/page.tsx": ["default"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "packages/web/app/[locale]/(site)/docs/install/page.tsx": ["default"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "packages/web/app/[locale]/(site)/docs/layout.tsx": ["default"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "packages/web/app/[locale]/(site)/docs/page.tsx": ["default"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "packages/web/app/[locale]/(site)/download/page.tsx": ["default"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "packages/web/app/[locale]/(site)/layout.tsx": ["default"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "packages/web/app/[locale]/(site)/manifesto/2026-01/layout.tsx": ["default"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "packages/web/app/[locale]/(site)/manifesto/2026-01/page.tsx": ["default"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "packages/web/app/[locale]/(site)/manifesto/layout.tsx": ["default"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "packages/web/app/[locale]/(site)/manifesto/page.tsx": ["default"],
+    // added on dev after the last merge (origin dev 2b5831715e): unused export(s) default
+    "packages/web/app/[locale]/(site)/not-found.tsx": ["default"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "packages/web/app/[locale]/(site)/support/page.tsx": ["default"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) GET
+    "packages/web/app/api/downloads/route.ts": ["GET"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) GET
+    "packages/web/app/api/npm-downloads/route.ts": ["GET"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) GET
+    "packages/web/app/api/stats/route.ts": ["GET"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "packages/web/app/design/graph/page.tsx": ["default"],
+    // added on dev after the last merge (origin dev 2b5831715e): unused export(s) default
+    // #11646 (origin dev 88a2b06e3f) named this file's revalidate here; nextRouteSegmentExports covers it, so that row is gone.
+    "packages/web/app/design/layout.tsx": ["default"],
+    // added on dev after the last merge (origin dev 2b5831715e): unused export(s) default
+    "packages/web/app/design/not-found.tsx": ["default"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "packages/web/app/design/page.tsx": ["default"],
+    // added on dev after the last merge (origin dev 2b5831715e): unused export(s) default
+    "packages/web/app/global-not-found.tsx": ["default"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) alt, size, contentType
+    "packages/web/app/opengraph-image.tsx": ["alt", "size", "contentType"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "packages/web/app/robots.ts": ["default"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "packages/web/app/sitemap.ts": ["default"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default, alt, size, contentType
+    "packages/web/app/twitter-image.tsx": ["default", "alt", "size", "contentType"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) findHashSectionId
+    "packages/web/components/docs/use-docs-navigation.ts": ["findHashSectionId"],
+    // re-exported as the home page's generateMetadata (app/[locale]/(home)/page.tsx), which knip does not follow
+    "packages/web/components/home/home-page.tsx": ["generateHomeMetadata"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ROW_GAP, WAVE_HEADER_HEIGHT
+    "packages/web/components/landing/dag/layout.ts": ["ROW_GAP", "WAVE_HEADER_HEIGHT"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) eventIndexAt
+    "packages/web/components/landing/dag/scenario.ts": ["eventIndexAt"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "packages/web/components/landing/graph/graph-hero.tsx": ["default"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) KIBITZER_STEP_COUNT
+    "packages/web/components/landing/story-data.ts": ["KIBITZER_STEP_COUNT"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) LEGACY_MANIFESTO_PATH
+    "packages/web/components/manifesto/reading/closing.tsx": ["LEGACY_MANIFESTO_PATH"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) READING_CLASS
+    "packages/web/components/manifesto/reading/paragraph.tsx": ["READING_CLASS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) Badge, badgeVariants, chipVariants
+    "packages/web/components/ui/badge.tsx": ["Badge", "badgeVariants", "chipVariants"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) buttonVariants
+    "packages/web/components/ui/button.tsx": ["buttonVariants"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "packages/web/eslint.config.mjs": ["default"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "packages/web/i18n/request.ts": ["default"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) redirect, useRouter, getPathname
+    "packages/web/i18n/routing.ts": ["redirect", "useRouter", "getPathname"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DOWNLOAD_HOST
+    "packages/web/lib/desktop-download.ts": ["DOWNLOAD_HOST"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DOC_SECTION_IDS
+    "packages/web/lib/docs-sections.ts": ["DOC_SECTION_IDS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) INSTALLER_STATS_URL
+    "packages/web/lib/installer-downloads.ts": ["INSTALLER_STATS_URL"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) PngDecodeError
+    "packages/web/lib/png-decode.ts": ["PngDecodeError"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "packages/web/playwright.config.ts": ["default"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "packages/web/playwright.flag-off.config.ts": ["default"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "packages/web/playwright.reading.config.ts": ["default"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "packages/web/postcss.config.mjs": ["default"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) config
+    "packages/web/proxy.ts": ["config"]
+  }
+}

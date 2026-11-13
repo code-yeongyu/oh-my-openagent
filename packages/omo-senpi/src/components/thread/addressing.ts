@@ -345,13 +345,7 @@ export function resolveTarget(
     )
   }
 
-  // An ended session on another device is reachable by id only, never by its title (it is not a live peer to talk to).
-  // A local resumable thread stays name-addressable (its contract today); making that one rule is #13012.
-  const matches = visible.filter(
-    (entry) =>
-      normalizeThreadName(entry.name) === guard.normalized &&
-      !(entry.transport !== undefined && entry.status === "resumable"),
-  )
+  const matches = visible.filter((entry) => normalizeThreadName(entry.name) === guard.normalized)
   if (matches.length === 1) return { kind: "ok", entry: matches[0], resolution: "name" }
   if (matches.length >= 2) {
     return addressError(
@@ -467,6 +461,19 @@ export function fuzzyMatch(entries: readonly ThreadAddressEntry[], query: string
     )
   }
   return { kind: "ok", entry: leader.entry, score: leader.score, basis: leader.basis }
+}
+
+/**
+ * The entries that can still change a `fuzzyMatch` outcome for `query`. An entry scoring below the accept floor minus the
+ * margin can neither lead nor sit within the margin of an accepted leader, so dropping it changes no accepted match and
+ * no ambiguity verdict. Callers use it to bound a large set (an account's ended history) before the candidate cap
+ * applies. An invalid or too-short query keeps nothing: `fuzzyMatch` reports that query on the rest of the set.
+ */
+export function fuzzyContenders(entries: readonly ThreadAddressEntry[], query: string): ThreadAddressEntry[] {
+  const guard = guardInput(query, "fuzzy query")
+  if (!guard.ok || guard.normalized.length < FUZZY_MIN_QUERY_LENGTH) return []
+  const queryGrams = trigrams(guard.normalized)
+  return entries.filter((entry) => scoreEntry(entry, queryGrams).score >= FUZZY_ACCEPT_SCORE - FUZZY_ACCEPT_MARGIN)
 }
 
 /**
