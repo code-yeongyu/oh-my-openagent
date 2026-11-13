@@ -49,6 +49,15 @@ impl HelperState {
         }
     }
 
+    /// The state after a spawn attempt: a refused spawn (`ERROR_ACCESS_DENIED` - a job that forbids
+    /// breakaway) is the measured no-breakaway case, so nothing can release a held input
+    /// (review L2 of #13349); otherwise the read-back decides.
+    #[must_use]
+    pub const fn from_spawn(refused: bool, in_job: Option<bool>) -> Self {
+        let _ = refused;
+        Self::from_read_back(in_job)
+    }
+
     /// `capabilities().releaseHelper`.
     #[must_use]
     pub const fn capability(self) -> ReleaseHelper {
