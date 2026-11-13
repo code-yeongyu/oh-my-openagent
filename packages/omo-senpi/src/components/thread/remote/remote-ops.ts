@@ -152,9 +152,10 @@ export type RemoteFollow = {
   readonly settled: Promise<string>
   readonly stop: () => void
   /**
-   * Names how the send's delivery answered, once its reply is known (#13267): `steered` prints stream deltas from
-   * the aim; `started` and `queued` read the answer from the session's own transcript, anchored on the send's user
-   * entry - the stream's arrival order can never prove which turn a record belongs to (a queued follow-up drains
+   * Names how the send's delivery answered, once its reply is known (#13267): `started` and `steered` print stream
+   * deltas from the aim (a `started` turn that already finished before the aim is read once from the transcript);
+   * `queued` reads the answer from the session's own transcript, anchored on the send's user entry - the stream's
+   * arrival order can never prove which turn a record belongs to (a queued follow-up drains
    * inside the same run with plain `turn_start`/`turn_end` markers, retries open extra `agent_start` pairs, and a
    * late replay lands after the aim), so the stream only signals that a run settled and the transcript decides
    * what prints.
@@ -187,8 +188,23 @@ export const isUserEntry = (entry: JsonObject): boolean => {
   return message["role"] === "user"
 }
 
-/** The matches that can anchor a send's turn: its user entries, by exact text first, else entries containing it. */
-export const anchorMatches = (entries: readonly JsonObject[], text: string): number[] => {
+/** The client message id senpi stamped on a stored user entry (`clientMessageId` on the message), if any. */
+const entryClientMessageIdOf = (entry: JsonObject): string | undefined => {
+  const message = isRecord(entry["message"]) ? entry["message"] : entry
+  const id = message["clientMessageId"]
+  return typeof id === "string" && id !== "" ? id : undefined
+}
+
+/**
+ * The matches that can anchor a send's turn. The user entry carrying the send's own client message id wins outright:
+ * senpi stores it on the entry it admits, whatever text a prompt template or skill expansion stored (#13272 review).
+ * An engine that stored no such id falls back to text: exact first, else entries containing it.
+ */
+export const anchorMatches = (entries: readonly JsonObject[], text: string, clientMessageId?: string): number[] => {
+  if (clientMessageId !== undefined) {
+    for (let index = 0; index < entries.length; index++)
+      if (isUserEntry(entries[index]) && entryClientMessageIdOf(entries[index]) === clientMessageId) return [index]
+  }
   const exact: number[] = []
   const contained: number[] = []
   for (let index = 0; index < entries.length; index++) {
@@ -203,10 +219,10 @@ export const anchorMatches = (entries: readonly JsonObject[], text: string): num
 }
 
 /**
- * Follows the answer to one send on another device's session. The send's user entry in the session's transcript
- * anchors the turn: its answer entries print once the turn is final - superseded by a later message's turn, or the
- * transcript's tail when a run settled - with the record stream as the completion signal. A steer rides an
- * already-running turn and prints its deltas from the aim on instead, settling with its run.
+ * Follows the answer to one send on another device's session. A queued send's user entry in the session's transcript
+ * anchors its turn: its answer entries print once the turn is final - superseded by a later message's turn, or the
+ * transcript's tail when a run settled - with the record stream as the completion signal. A started send or a steer
+ * prints its deltas from the aim on instead, settling with its run.
  */
 export async function followRemote(
   remote: RemoteThreadSurface,
@@ -215,6 +231,8 @@ export async function followRemote(
   options?: {
     /** The text the send delivered; its user entry in the transcript anchors a queued follow's answer. */
     readonly text?: string
+    /** The client message id the send carried; the entry senpi stamps with it anchors before any text match. */
+    readonly clientMessageId?: string
   },
 ): Promise<RemoteFollow | Failure> {
   const offline = await deviceOnline(remote, row.device)
@@ -251,7 +269,7 @@ export async function followRemote(
       const raw = page.response["entries"]
       if (!Array.isArray(raw)) return
       const entries = raw.filter(isRecord)
-      const matches = anchorMatches(entries, text)
+      const matches = anchorMatches(entries, text, options?.clientMessageId)
       if (matches.length === 0) return
       if (matchOrdinal === undefined) matchOrdinal = matches.length
       const anchor = matches[Math.min(matchOrdinal, matches.length) - 1]
@@ -326,7 +344,7 @@ export async function followRemote(
     const raw = page.response["entries"]
     if (!Array.isArray(raw)) return
     const entries = raw.filter(isRecord)
-    const matches = anchorMatches(entries, text)
+    const matches = anchorMatches(entries, text, options?.clientMessageId)
     if (matches.length === 0) return
     const anchor = matches[matches.length - 1]
     const answer: string[] = []

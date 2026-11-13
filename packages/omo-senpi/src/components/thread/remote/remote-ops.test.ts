@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { followRemote } from "./remote-ops"
+import { anchorMatches, followRemote } from "./remote-ops"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 
 // The adapter drops anything delivered before `live = true`, so records reach the listener only after watch()
@@ -300,5 +300,71 @@ describe("#13267: a follow prints only the answer to its own send's message", ()
     await withTimeout(follow.settled, 5_000, "the steered turn never completed")
     expect(printed).toEqual(["steered answer\n"])
     follow.stop()
+  })
+})
+
+describe("#13272 review: the anchor survives a rewritten send and never takes an older twin", () => {
+  const withId = (id: string, text: string, clientMessageId: string): JsonObject => ({
+    type: "message",
+    id,
+    parentId: null,
+    timestamp: "2026-11-12T13:00:00.000Z",
+    message: { role: "user", content: [{ type: "text", text }], clientMessageId },
+  })
+
+  test("#given a queued /template send whose stored entry holds the expanded text #when its run settles #then the entry carrying its client message id anchors and its answer prints", async () => {
+    const transcript = [
+      message("u1", "user", "count"),
+      message("a1", "assistant", "blocker answer\n"),
+      withId("u2", "Review the following diff carefully and list every defect.", "cm-1"),
+      message("a2", "assistant", "own answer\n"),
+    ]
+    const { remote, deliver } = followSurface(transcript)
+    const printed: string[] = []
+    const follow = await followRemote(remote, ROW, (text) => printed.push(text), {
+      text: "/review the diff",
+      clientMessageId: "cm-1",
+    })
+    if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
+    follow.aim("queued")
+    deliver([{ type: "agent_settled" }])
+    await withTimeout(follow.settled, 5_000, "a rewritten queued send never completed")
+    expect(printed).toEqual(["own answer\n"])
+    follow.stop()
+  })
+
+  test("#given an older verbatim send of the same text and this send's wrapped entry #when a started follow probes after the run settled #then it anchors on its own entry, never the older twin", async () => {
+    const transcript = [
+      message("u1", "user", "ping"),
+      message("a1", "assistant", "old answer\n"),
+      withId("u2", "<context>\nping", "cm-2"),
+      message("a2", "assistant", "new answer\n"),
+    ]
+    const { remote, deliver } = followSurface(transcript)
+    const printed: string[] = []
+    const follow = await followRemote(remote, ROW, (text) => printed.push(text), {
+      text: "ping",
+      clientMessageId: "cm-2",
+    })
+    if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
+    deliver([{ type: "agent_start" }, delta("new answer\n"), { type: "agent_end" }, { type: "agent_settled" }])
+    await flush()
+    follow.aim("started")
+    await withTimeout(follow.settled, 5_000, "the started send never ended its wait")
+    expect(printed).toEqual(["new answer\n"])
+    follow.stop()
+  })
+
+  test("#given entries with no client message id #when the anchor is chosen #then an exact entry wins over a longer one containing the text, and a wrapped entry anchors only when no exact one exists", () => {
+    const wrapped = message("u1", "user", "<context>\nping")
+    const exact = message("u2", "user", "ping")
+    const unrelated = message("u3", "user", "pong")
+    expect(anchorMatches([wrapped, exact, unrelated], "ping")).toEqual([1])
+    expect(anchorMatches([wrapped, unrelated], "ping")).toEqual([0])
+    expect(anchorMatches([unrelated], "ping")).toEqual([])
+  })
+
+  test("#given an id the engine stored on no entry #when the anchor is chosen #then the text match still anchors (an engine that keeps no client message id)", () => {
+    expect(anchorMatches([message("u1", "user", "ping")], "ping", "cm-missing")).toEqual([0])
   })
 })

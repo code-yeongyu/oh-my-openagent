@@ -62,13 +62,8 @@ describe("the engine's persisted prompt entry", () => {
           .map((line) => JSON.parse(line) as Record<string, unknown>)
           .find((parsed) => JSON.stringify(parsed).includes(text))
       }
-      // The engine's writer can outlive the main process by a moment; wait for the entry, bounded.
-      const deadline = Date.now() + 5_000
-      let entry = findEntry()
-      while (entry === undefined && Date.now() < deadline) {
-        await new Promise((resolve) => setTimeout(resolve, 100))
-        entry = findEntry()
-      }
+      // spawnSync returns after the engine process exits, so the entry it admitted is already on disk.
+      const entry = findEntry()
       if (entry === undefined)
         console.error("E2E no entry; status", run.status, "stderr:", (run.stderr?.toString() ?? "").slice(0, 400))
       expect(entry).toBeDefined()

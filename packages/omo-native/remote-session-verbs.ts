@@ -198,6 +198,8 @@ async function sendTo(
     relay: createRelayTransport({ remote, store, senderProvenance }),
   })
   const person = { kind: "person" as const, uid: process.getuid?.() ?? 0, user: userInfo().username }
+  // A waiting send names its prompt, so the follow finds the entry senpi stores for it whatever text it holds.
+  const clientMessageId = args.wait ? randomUUID() : undefined
   const deliver = async (): Promise<ThreadToolResult> => {
     const sent = await pipeline.deliver({
       sender: person,
@@ -206,6 +208,7 @@ async function sendTo(
       text: args.text,
       mode: args.delivery,
       idempotency_key: randomUUID(),
+      ...(clientMessageId === undefined ? {} : { client_message_id: clientMessageId }),
       args: { target: label, text: args.text, delivery: args.delivery },
     })
     if (sent.kind === "error") return sent
@@ -241,8 +244,9 @@ async function sendTo(
       return nothingToSteer(sent) ?? show(sent, label)
     }
     // Followed before the send, so no delta of the turn it starts can arrive unseen, and aimed once the send's own
-    // reply names its lane: the answer is read from the transcript anchored on this send's user entry, so only that
-    // turn's text prints and only its settle ends the wait (#13267).
+    // reply names its lane: a started or steered send streams its turn from the aim, a queued one is read from the
+    // transcript anchored on this send's user entry, so only that turn's text prints and only its end ends the wait
+    // (#13267).
     let reply = ""
     follow = await followRemote(
       remote,
@@ -251,7 +255,7 @@ async function sendTo(
         reply += text
         if (!json) dependencies.write(text)
       },
-      { text: args.text },
+      { text: args.text, ...(clientMessageId === undefined ? {} : { clientMessageId }) },
     )
     if ("kind" in follow) return show(follow, label)
     const sent = await deliver()
