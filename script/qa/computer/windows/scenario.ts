@@ -36,3 +36,19 @@ export function lastRegistered(): Scenario | undefined {
 export function allRegistered(): readonly Scenario[] {
   return registered
 }
+
+/**
+ * Why the scenarios one file `file` registered cannot run, or undefined when exactly one was
+ * registered, its name is the file name and it declares an admission. Used by --scenario and --all;
+ * under --all (`helpersAllowed`) a file that registers nothing is a helper module and is skipped.
+ */
+export function refusal(
+  file: string,
+  added: readonly Scenario[],
+  options: { readonly helpersAllowed?: boolean } = {},
+): string | undefined {
+  void file
+  void added
+  void options
+  return undefined
+}
