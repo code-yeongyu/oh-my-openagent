@@ -179,3 +179,20 @@ test("#given the bridge throws after the ceremony started #when enable fails #th
   expect(await s.marker()).toBe(true)
   expect(await phraseNoticeStatus(s.place)).toEqual({ phraseVoid: { purpose: "genesis" } })
 })
+
+test("#given the operation is refused at admission before the bridge runs #when enable fails #then no marker is left, so no void notice for a phrase never shown", async () => {
+  const s = await setup()
+  let refuse = false
+  const authority = {
+    signal: new AbortController().signal,
+    admit: <T>(begin: () => T): T => {
+      if (refuse) throw new Error("synthetic admission refusal")
+      return begin()
+    },
+  }
+  await expect(
+    enableSync({ ...s.input, method: "phrase", authority, onCeremony: () => void (refuse = true) }),
+  ).rejects.toThrow("synthetic admission refusal")
+  expect(await s.marker()).toBe(false)
+  expect(await phraseNoticeStatus(s.place)).toEqual({})
+})
