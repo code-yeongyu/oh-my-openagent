@@ -181,3 +181,34 @@ fn only_global_input_on_the_desktop_takes_the_lease_and_reserves_every_window() 
     let foreground = control.plan(&mut backend, (Method::AppsOpen, &TargetRef::Desktop, Route::ForegroundHid), 0);
     assert!(foreground.foreground, "a foreground route still needs the lease");
 }
+
+/// Review M3 of #13346: an app whose identity cannot be read is bound to its executable PATH.
+/// The funnel must observe that path (not None), refuse a different executable under the same
+/// app key, and carry `identity_unavailable` on the report of an admitted call.
+#[test]
+fn path_only_consent_binds_the_observed_executable_path() {
+    let view = json!({ "consent": { "apps": { "allow": [{ "appKey": "Notes", "path": "/usr/bin/notes" }] } } });
+    let mut moved = view.clone();
+    moved["executable_path"] = json!({ "4242": "/tmp/evil/notes" });
+    let mut same = view;
+    same["executable_path"] = json!({ "4242": "/usr/bin/notes" });
+
+    let sink = RecordingSink::default();
+    let mut s = session(&moved, &sink, None);
+    grant(&mut s);
+    capture(&mut s, "1");
+    let refused = s.click(params(json!({ "target": "1", "x": 5, "y": 5 }))).expect_err("another executable");
+    assert_eq!(
+        (refused.refusal.code.wire(), refused.refusal.reason),
+        ("ControlRequired", Some("identity_changed"))
+    );
+    assert!(sink.is_empty(), "nothing sent: {:?}", sink.lines());
+
+    let mut object = same;
+    object["object"] = json!(true);
+    let mut s = session(&object, &RecordingSink::default(), None);
+    grant(&mut s);
+    capture(&mut s, "1");
+    let reply = s.click(params(json!({ "target": "1", "x": 5, "y": 5 }))).expect("the approved path");
+    assert_eq!(serde_json::to_value(&reply).expect("report")["warning"], json!("identity_unavailable"));
+}

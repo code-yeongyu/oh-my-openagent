@@ -65,6 +65,10 @@ impl Backend for FakeBackend {
         FakeBackend::code_identity(self, pid)
     }
 
+    fn executable_path(&self, pid: u32) -> Option<String> {
+        FakeBackend::executable_path(self, pid)
+    }
+
     fn host_consent(&self) -> Option<serde_json::Value> {
         self.scripted_host_consent()
     }

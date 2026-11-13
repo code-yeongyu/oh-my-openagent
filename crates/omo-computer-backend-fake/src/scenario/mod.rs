@@ -95,6 +95,8 @@ pub struct FakeScenario {
     pub hand: Option<HandIdentity>,
     // --- Row 21: the fake host's consent view handed to the engine at `session.open`. ---
     pub consent: Option<serde_json::Value>,
+    // --- Row 21 (review M3): the executable path per pid a path-only consent binds to. ---
+    pub executable_path: BTreeMap<u32, String>,
 }
 
 impl FakeScenario {

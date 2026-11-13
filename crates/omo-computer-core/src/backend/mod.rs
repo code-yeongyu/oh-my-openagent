@@ -102,6 +102,13 @@ pub trait Backend: Send {
         None
     }
 
+    /// The executable path of `pid`, read without prompting. `None`: the path is unknown, and a
+    /// consent entry with no readable identity then has nothing to bind to.
+    fn executable_path(&self, pid: u32) -> Option<String> {
+        let _ = pid;
+        None
+    }
+
     /// The consent view the hand tool host hands the engine at `session.open`, as the host
     /// wrote it (`design/d-safety.md` '## Approval and consent'). `None`: no host view, and the
     /// session keeps its default view.

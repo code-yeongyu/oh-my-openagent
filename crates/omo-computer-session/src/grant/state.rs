@@ -101,7 +101,10 @@ impl Control {
             TargetRef::Window(id) => {
                 let app = windows.iter().find(|w| w.id == *id).map(|w| AppTarget {
                     app_key: w.app_key.clone(),
-                    bound: BoundIdentity::new(None, backend.code_identity(w.identity.pid)),
+                    bound: BoundIdentity::new(
+                        backend.executable_path(w.identity.pid),
+                        backend.code_identity(w.identity.pid),
+                    ),
                 });
                 (Some(*id), app)
             }

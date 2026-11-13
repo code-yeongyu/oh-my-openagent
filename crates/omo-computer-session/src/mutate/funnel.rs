@@ -63,7 +63,8 @@ impl Session {
             };
             return Err(self.refuse(record, Some("Lease".to_owned()), out));
         }
-        let result = self.admitted(mutation, record, (call_id, report_mode, tag));
+        let unbound = plan.identity_unavailable;
+        let result = self.admitted(mutation, record, (call_id, report_mode, tag), unbound);
         self.funnel.control.reported(&plan);
         result
     }
@@ -74,6 +75,7 @@ impl Session {
         mutation: Mutation<'_>,
         mut record: Record,
         (call_id, report_mode, tag): (String, omo_computer_core::params::ReportMode, u64),
+        identity_unavailable: bool,
     ) -> Result<ExecReply, Refused> {
         // `&mut Session` serialises a session's calls, so no exec permit free means one leaked:
         // refused with nothing sent, never sent without one.
@@ -170,7 +172,10 @@ impl Session {
                     of,
                     effect: read_back.effect,
                     user_moved_on: self.funnel.control.presence.take_ended().is_some(),
-                    warning: appended.is_err().then(|| "write_failed".to_owned()),
+                    // A lost audit line outranks the binding note: one warning slot, integrity first.
+                    warning: appended.is_err().then(|| "write_failed".to_owned()).or_else(|| {
+                        identity_unavailable.then(|| crate::consent::IDENTITY_UNAVAILABLE.to_owned())
+                    }),
                     audit_id: appended.ok(),
                 };
                 let reply =
