@@ -7,7 +7,7 @@ use omo_computer_core::backend::{
 };
 use omo_computer_core::capabilities::Capabilities;
 use omo_computer_core::error::{EngineCode, Reason};
-use omo_computer_core::listing::{Rect, WindowInfo};
+use omo_computer_core::listing::WindowInfo;
 use omo_computer_core::observation::ImageMime;
 use omo_computer_core::results::{DisplayInfo, PermissionState};
 use omo_computer_core::session_state::Tristate;
@@ -18,45 +18,19 @@ use crate::capabilities::fake_capabilities;
 use crate::frame::{pixels, Raster};
 use crate::handles::{FakeEpochSource, FakePresence, FakeStopListener};
 use crate::method::FakeMethod;
-use crate::scenario::{FakeDisplay, FakeWindow};
+use crate::scenario::FakeWindow;
 use crate::sink::quoted;
 use crate::state::FakeState;
+
+mod geometry;
+
+use geometry::{capture_rect, display_info, display_of};
 
 /// The most pixels one capture may hold: the composite cap of the design's
 /// `d-vision.md` '## Screenshot pipeline' (`MAX_COMPOSITE_PIXELS` = 268,435,456). Row 12's
 /// limits table carries no pixel cap, so the fake names it here; the frame row owns the
 /// engine's own copy.
 pub const MAX_COMPOSITE_PIXELS: u64 = 268_435_456;
-
-fn display_info(display: &FakeDisplay) -> DisplayInfo {
-    DisplayInfo {
-        id: display.id.clone(),
-        bounds: Rect {
-            x: display.x,
-            y: display.y,
-            width: display.width,
-            height: display.height,
-        },
-        scale: display.scale,
-        primary: display.is_primary,
-        truncated: None,
-    }
-}
-
-fn contains(display: &FakeDisplay, x: f64, y: f64) -> bool {
-    x >= display.x
-        && y >= display.y
-        && x < display.x + display.width
-        && y < display.y + display.height
-}
-
-fn display_of<'a>(state: &'a FakeState, window: &FakeWindow) -> Option<&'a FakeDisplay> {
-    state
-        .displays
-        .iter()
-        .find(|display| contains(display, window.x, window.y))
-        .or_else(|| state.displays.first())
-}
 
 fn matches(filter: &WindowFilter, window: &FakeWindow) -> bool {
     filter.app.as_ref().is_none_or(|app| &window.app == app)
@@ -101,39 +75,6 @@ impl FakeBackend {
             elevated: window.elevated.unwrap_or(false),
             z: u32::try_from(z).unwrap_or(u32::MAX),
             observation: UntrustedText,
-        }
-    }
-}
-
-fn capture_rect(state: &FakeState, target: &Target) -> BackendResult<(Rect, f64)> {
-    match target {
-        Target::Window(id) if state.exited.contains(id) => Err(Refusal::new(
-            EngineCode::CaptureUnavailable,
-            Reason::Unmapped.wire(),
-        )),
-        Target::Window(id) => {
-            let window = state
-                .live_window(id)
-                .ok_or(Refusal::bare(EngineCode::WindowNotFound))?;
-            Ok((
-                window.bounds(),
-                display_of(state, window).map_or(1.0, |d| d.scale),
-            ))
-        }
-        Target::Display(id) => {
-            let display = state
-                .displays
-                .iter()
-                .find(|d| &d.id == id)
-                .ok_or(Refusal::bare(EngineCode::InvalidTarget))?;
-            Ok((display_info(display).bounds, display.scale))
-        }
-        Target::Desktop => {
-            let display = state
-                .displays
-                .first()
-                .ok_or(Refusal::bare(EngineCode::CaptureUnavailable))?;
-            Ok((display_info(display).bounds, display.scale))
         }
     }
 }
