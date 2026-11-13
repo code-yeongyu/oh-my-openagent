@@ -159,7 +159,8 @@ fn inner_disposition(refusal: &Refusal, detail: Option<&Value>, data: &mut Value
 /// A funnel refusal: the refusal's members plus the `callId` it concerns, for a replay the
 /// stored `receipt` (`TransactionFailed{reason:"replayed", callId, receipt}`), and for a call
 /// whose send was interrupted its `disposition` (`delivery_uncertain/unsafe`): without it
-/// the code's own row would read `not_delivered/safe` and invite a resend.
+/// the code's own row would read `not_delivered/safe` and invite a resend; `warning:"write_failed"`
+/// when the refusal's own audit line could not be written.
 fn refused_call(refused: &Refused) -> Failure {
     let mut failure = self::refused(&refused.refusal);
     if let Some(data) = failure.data.as_mut() {
@@ -190,6 +191,9 @@ fn refused_call(refused: &Refused) -> Failure {
             for (key, value) in detail {
                 data.entry(key.clone()).or_insert_with(|| value.clone());
             }
+        }
+        if let Some(warning) = &refused.warning {
+            data["warning"] = json!(warning);
         }
     }
     failure
@@ -280,10 +284,12 @@ mod tests {
         let interrupted = omo_computer_session::Refused {
             call_id: Some("k-1".to_owned()),
             interrupted: Some(omo_computer_core::report::Disposition::UNCERTAIN_UNSAFE),
+            warning: Some("write_failed".to_owned()),
             ..Refusal::new(EngineCode::TransactionFailed, "recovery_required").into()
         };
         let Failure { data, .. } = refused_call(&interrupted);
         let data = data.expect("data");
+        assert_eq!(data["warning"], json!("write_failed"), "an unwritten audit line is surfaced");
         assert_eq!(data["callId"], json!("k-1"));
         assert_eq!(data["disposition"], json!({ "delivery": "delivery_uncertain", "retry": "unsafe" }));
         let plain = refused_call(&Refusal::new(EngineCode::TransactionFailed, "marker_unavailable").into());
