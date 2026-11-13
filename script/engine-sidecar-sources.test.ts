@@ -74,22 +74,23 @@ function writeEngine(hostDir: string, specifiers: readonly string[]): void {
   )
 }
 
+const installedLoaderPath = join(
+  realpathSync(join(repoRoot, "node_modules", "@code-yeongyu", "senpi")),
+  "dist",
+  "core",
+  "extensions",
+  "loader.js",
+)
+
 /**
- * The keys of the table the installed engine's loader passes to createBunExtensionImporter, read with the TypeScript
- * parser: independent of the oxc-based reader under test.
+ * The keys of the table a loader passes to createBunExtensionImporter, read with the TypeScript parser: independent of
+ * the oxc-based reader under test. It refuses, as that reader must, a table used anywhere other than its declaration,
+ * the importer's argument or a `virtualModules` option, since any other use could change its keys after declaration.
  */
-function installedLoaderTableByTypeScript(): string[] {
-  const loaderPath = join(
-    realpathSync(join(repoRoot, "node_modules", "@code-yeongyu", "senpi")),
-    "dist",
-    "core",
-    "extensions",
-    "loader.js",
-  )
+function loaderTableByTypeScript(loaderPath = installedLoaderPath): string[] {
   const source = ts.createSourceFile(loaderPath, readFileSync(loaderPath, "utf8"), ts.ScriptTarget.Latest, true)
   let tableName: string | undefined
-  let table: string[] | undefined
-  const visit = (node: ts.Node): void => {
+  const findImporter = (node: ts.Node): void => {
     if (
       ts.isCallExpression(node) &&
       ts.isIdentifier(node.expression) &&
@@ -98,29 +99,48 @@ function installedLoaderTableByTypeScript(): string[] {
       const first = node.arguments[0]
       if (first !== undefined && ts.isIdentifier(first)) tableName = first.text
     }
+    ts.forEachChild(node, findImporter)
+  }
+  findImporter(source)
+  if (tableName === undefined) throw new Error(`no table passed to createBunExtensionImporter in ${loaderPath}`)
+  let declaration: ts.VariableDeclaration | undefined
+  const uses: ts.Identifier[] = []
+  const visit = (node: ts.Node): void => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === tableName) declaration = node
+    if (ts.isIdentifier(node) && node.text === tableName) uses.push(node)
     ts.forEachChild(node, visit)
   }
   visit(source)
-  const findTable = (node: ts.Node): void => {
-    if (
-      ts.isVariableDeclaration(node) &&
-      ts.isIdentifier(node.name) &&
-      node.name.text === tableName &&
-      node.initializer &&
-      ts.isObjectLiteralExpression(node.initializer)
-    ) {
-      table = node.initializer.properties.map((property) => {
-        if (!ts.isPropertyAssignment(property))
-          throw new Error(`unexpected table entry kind ${ts.SyntaxKind[property.kind]}`)
-        if (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) return property.name.text
-        throw new Error("unexpected table key")
-      })
-    }
-    ts.forEachChild(node, findTable)
+  const initializer = declaration?.initializer
+  if (declaration === undefined || initializer === undefined || !ts.isObjectLiteralExpression(initializer)) {
+    throw new Error(`${tableName} is not declared as an object literal`)
   }
-  findTable(source)
-  if (table === undefined) throw new Error(`no table passed to createBunExtensionImporter in ${loaderPath}`)
-  return table
+  for (const use of uses) {
+    const parent = use.parent
+    const isDeclaration = parent === declaration
+    const isImporterArgument =
+      ts.isCallExpression(parent) &&
+      ts.isIdentifier(parent.expression) &&
+      parent.expression.text === "createBunExtensionImporter" &&
+      parent.arguments.includes(use)
+    const isVirtualModulesOption =
+      ts.isPropertyAssignment(parent) &&
+      parent.initializer === use &&
+      ts.isIdentifier(parent.name) &&
+      parent.name.text === "virtualModules"
+    const isMemberName = ts.isPropertyAccessExpression(parent) && parent.name === use
+    if (!isDeclaration && !isImporterArgument && !isVirtualModulesOption && !isMemberName) {
+      throw new Error(
+        `${tableName} is used at ${ts.SyntaxKind[parent.kind]} other than as the importer argument or a virtualModules option`,
+      )
+    }
+  }
+  return initializer.properties.map((property) => {
+    if (!ts.isPropertyAssignment(property))
+      throw new Error(`unexpected table entry kind ${ts.SyntaxKind[property.kind]}`)
+    if (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) return property.name.text
+    throw new Error("unexpected table key")
+  })
 }
 
 /**
@@ -382,12 +402,90 @@ describe("sidecar parity set", () => {
     },
   )
 
+  test.each([
+    [
+      "a computed member write",
+      loaderSource("    typebox: bundled,").replace(
+        "export async function createImporter",
+        `VIRTUAL_MODULES["ws"] = bundled;\nexport async function createImporter`,
+      ),
+    ],
+    [
+      "a dot member write",
+      loaderSource("    typebox: bundled,").replace(
+        "export async function createImporter",
+        `VIRTUAL_MODULES.ws = bundled;\nexport async function createImporter`,
+      ),
+    ],
+    [
+      "an Object.assign into it",
+      loaderSource("    typebox: bundled,").replace(
+        "export async function createImporter",
+        `Object.assign(VIRTUAL_MODULES, { ws: bundled });\nexport async function createImporter`,
+      ),
+    ],
+    [
+      "a reassignment",
+      loaderSource("    typebox: bundled,")
+        .replace("const VIRTUAL_MODULES", "let VIRTUAL_MODULES")
+        .replace(
+          "export async function createImporter",
+          "VIRTUAL_MODULES = { ws: bundled };\nexport async function createImporter",
+        ),
+    ],
+    [
+      "a delete from it",
+      loaderSource("    typebox: bundled,").replace(
+        "export async function createImporter",
+        `delete VIRTUAL_MODULES.typebox;\nexport async function createImporter`,
+      ),
+    ],
+  ] as const)(
+    "#given a loader whose table is changed after its declaration by %s #when its table is read #then both readers refuse it",
+    (_label, source) => {
+      // given
+      const host = join(tmpdir(), `omo-engine-written-table-${process.pid}-${crypto.randomUUID()}`)
+      try {
+        writeEngineLoader(host, source)
+        const loaderPath = join(host, "dist", "core", "extensions", "loader.js")
+
+        // when / then
+        expect(() => engineServedSpecifiers(host)).toThrow(
+          `cannot read the engine's extension module table from ${loaderPath}`,
+        )
+        expect(() => loaderTableByTypeScript(loaderPath)).toThrow("VIRTUAL_MODULES is ")
+      } finally {
+        rmSync(host, { recursive: true, force: true })
+      }
+    },
+  )
+
+  test("#given a loader that also passes its table as a virtualModules option #when its table is read #then both readers read it exactly", () => {
+    // given - the installed loader hands the same table to jiti as `virtualModules`
+    const host = join(tmpdir(), `omo-engine-option-table-${process.pid}-${crypto.randomUUID()}`)
+    try {
+      writeEngineLoader(
+        host,
+        loaderSource("    typebox: bundled,").replace(
+          "export async function createImporter",
+          "export const jitiOptions = { virtualModules: VIRTUAL_MODULES, tryNative: false };\nexport async function createImporter",
+        ),
+      )
+
+      // when / then
+      expect([...engineServedSpecifiers(host)]).toEqual(["typebox"])
+      expect(loaderTableByTypeScript(join(host, "dist", "core", "extensions", "loader.js"))).toEqual(["typebox"])
+    } finally {
+      rmSync(host, { recursive: true, force: true })
+    }
+  })
+
   // Release contract (senpi's binary copier reads the same table): the served set is the object the installed loader
   // actually hands to createBunExtensionImporter, not a sibling module nothing imports. That module lacks the two
   // @code-yeongyu/senpi entries, so reading it fails here.
   test("#given the installed engine #when its served set is read #then it equals the table its loader passes to createBunExtensionImporter", () => {
     // given
-    const loaderTable = installedLoaderTableByTypeScript()
+    const loaderTable = loaderTableByTypeScript()
 
     // when
     const served = engineServedSpecifiers()
@@ -512,7 +610,7 @@ describe("sidecar parity set", () => {
   // @earendil-works/pi-realm-registry, which the engine depends on but does not serve to extensions).
   test("#given the installed engine #when codemode's sidecars are staged #then every bare import of codemode and its staged dependencies resolves to an engine-served module or a staged package", () => {
     // given - what the installed engine's loader serves, read with an independent parser
-    const served = new Set(installedLoaderTableByTypeScript())
+    const served = new Set(loaderTableByTypeScript())
     const codemodeRoot = "node_modules/@code-yeongyu/senpi-codemode"
     const stage = join(tmpdir(), `omo-codemode-stage-${process.pid}-${crypto.randomUUID()}`)
     try {

@@ -109,6 +109,50 @@ function collectNodes(node: unknown, match: (candidate: AstNode) => boolean, fou
   return found
 }
 
+function visitWithParent(
+  node: unknown,
+  parent: AstNode | undefined,
+  visit: (candidate: AstNode, parent: AstNode | undefined) => void,
+): void {
+  if (Array.isArray(node)) {
+    for (const child of node) visitWithParent(child, parent, visit)
+    return
+  }
+  if (!isAstNode(node)) return
+  visit(node, parent)
+  for (const [field, child] of Object.entries(node)) {
+    if (field !== "type" && typeof child === "object") visitWithParent(child, node, visit)
+  }
+}
+
+/** Whether an identifier named like the table is a name in a non-reference position (a key or a member name). */
+function isNameOnly(node: AstNode, parent: AstNode | undefined): boolean {
+  if (parent === undefined) return false
+  if (parent.type === "MemberExpression") return parent["property"] === node && parent["computed"] !== true
+  if (parent.type === "Property" || parent.type === "PropertyDefinition" || parent.type === "MethodDefinition") {
+    return parent["key"] === node && parent["computed"] !== true && parent["shorthand"] !== true
+  }
+  return false
+}
+
+/**
+ * The table is read only where the loader hands it on: as createBunExtensionImporter's argument or as the value of a
+ * `virtualModules` option. Any other reference could write to it after its declaration (a member assignment,
+ * Object.assign, a reassignment, a delete), so its keys would no longer be the served set.
+ */
+function isKnownTableRead(node: AstNode, parent: AstNode | undefined, declarator: AstNode): boolean {
+  if (parent === declarator && declarator["id"] === node) return true
+  if (parent?.type === "CallExpression" && Array.isArray(parent["arguments"]) && parent["arguments"].includes(node)) {
+    const callee = parent["callee"]
+    return isAstNode(callee) && callee.type === "Identifier" && callee["name"] === EXTENSION_IMPORTER
+  }
+  if (parent?.type === "Property" && parent["value"] === node && parent["computed"] !== true) {
+    const key = parent["key"]
+    return isAstNode(key) && key.type === "Identifier" && key["name"] === "virtualModules"
+  }
+  return false
+}
+
 function propertyKey(property: AstNode, fail: (reason: string) => never): string {
   if (property.type !== "Property" || property["computed"] === true || property["kind"] !== "init") {
     return fail(`its table has a ${property.type === "SpreadElement" ? "spread" : "computed or non-plain"} entry`)
@@ -130,7 +174,8 @@ export function engineServedSpecifiers(hostPackageDir = senpiPackageDir): Readon
     throw new Error(`cannot read the engine's extension module table from ${loaderPath}: ${reason}`)
   }
   if (!existsSync(loaderPath)) return fail("the loader module does not exist")
-  const parsed = parseSync(loaderPath, readFileSync(loaderPath, "utf8"))
+  const source = readFileSync(loaderPath, "utf8")
+  const parsed = parseSync(loaderPath, source)
   if (parsed.errors.length > 0) return fail(`it does not parse (${parsed.errors[0]?.message ?? "unknown error"})`)
   const calls = collectNodes(parsed.program, (node) => {
     const callee = node["callee"]
@@ -154,10 +199,33 @@ export function engineServedSpecifiers(hostPackageDir = senpiPackageDir): Readon
     const id = node["id"]
     return node.type === "VariableDeclarator" && isAstNode(id) && id.type === "Identifier" && id["name"] === tableName
   })
-  const table = declarations.length === 1 ? declarations[0]?.["init"] : undefined
-  if (!isAstNode(table) || table.type !== "ObjectExpression" || !Array.isArray(table["properties"])) {
+  const declarator = declarations.length === 1 ? declarations[0] : undefined
+  const table = declarator?.["init"]
+  if (
+    declarator === undefined ||
+    !isAstNode(table) ||
+    table.type !== "ObjectExpression" ||
+    !Array.isArray(table["properties"])
+  ) {
     return fail(`${tableName} is not declared once as an object literal`)
   }
+  const kind = collectNodes(
+    parsed.program["body"],
+    (node) =>
+      node.type === "VariableDeclaration" &&
+      Array.isArray(node["declarations"]) &&
+      node["declarations"].includes(declarator),
+  )[0]?.["kind"]
+  if (kind !== "const") return fail(`${tableName} is not declared with const`)
+  visitWithParent(parsed.program, undefined, (node, parent) => {
+    if (node.type !== "Identifier" || node["name"] !== tableName || isNameOnly(node, parent)) return
+    if (isKnownTableRead(node, parent, declarator)) return
+    const start = typeof node["start"] === "number" ? node["start"] : 0
+    const line = source.slice(0, start).split("\n").length
+    fail(
+      `${tableName} is used at line ${line} other than as ${EXTENSION_IMPORTER}'s argument or a virtualModules option`,
+    )
+  })
   const specifiers = table["properties"].map((property: unknown) =>
     isAstNode(property) ? propertyKey(property, fail) : fail("its table has an unreadable entry"),
   )
