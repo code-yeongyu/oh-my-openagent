@@ -78,3 +78,12 @@ test("#given an acknowledge request #when it arrives #then only the named notice
     reason: "Invalid acknowledge request.",
   })
 })
+
+test("#given the engine refuses phrase creation with a reason #when enable answers over RPC #then the reason reaches the wire", async () => {
+  const f = await setup()
+  f.runtime.enableSync = async () => ({ kind: "phrase_unavailable", reason: "service-floor-off" })
+  expect(await f.call("enable", owner("a").context, { method: "phrase" })).toEqual({
+    kind: "phrase_unavailable",
+    reason: "service-floor-off",
+  })
+})

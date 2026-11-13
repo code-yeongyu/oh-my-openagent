@@ -51,19 +51,38 @@ export function openControllingTerminal(): PhraseTerminal | null {
   } catch {
     return null
   }
+  input.setRawMode(true)
+  return terminalFromStreams(input, output, () => {
+    input.setRawMode(false)
+    input.destroy()
+    output.end()
+  })
+}
+
+/**
+ * The line reader over a terminal's streams. Ctrl+C, Ctrl+D, end of input, a closed stream and a stream error
+ * all cancel: every pending and later `readLine` resolves null (review LOW, #13337; before, only Ctrl+C did and
+ * an EOF left the command hanging).
+ */
+export function terminalFromStreams(
+  input: NodeJS.ReadableStream,
+  output: { write(text: string): unknown },
+  release: () => void = () => undefined,
+): PhraseTerminal {
   let buffered = ""
   let echo = true
+  let closed = false
   const lines: string[] = []
   const waiting: ((line: string | null) => void)[] = []
-  let closed = false
+  const cancel = () => {
+    closed = true
+    buffered = ""
+    for (const wake of waiting.splice(0)) wake(null)
+  }
   input.setEncoding("utf8")
   input.on("data", (chunk: string) => {
     for (const char of chunk) {
-      if (char === "\u0003") {
-        closed = true
-        for (const wake of waiting.splice(0)) wake(null)
-        return
-      }
+      if (char === "\u0003" || char === "\u0004") return cancel()
       if (char === "\r" || char === "\n") {
         output.write("\r\n")
         const line = buffered
@@ -78,10 +97,12 @@ export function openControllingTerminal(): PhraseTerminal | null {
       }
     }
   })
-  input.setRawMode(true)
+  input.on("end", cancel)
+  input.on("close", cancel)
+  input.on("error", cancel)
   input.resume()
   return {
-    write: (text) => output.write(text),
+    write: (text) => void output.write(text),
     readLine: (secret) => {
       echo = !secret
       const queued = lines.shift()
@@ -90,12 +111,10 @@ export function openControllingTerminal(): PhraseTerminal | null {
       return new Promise((resolve) => waiting.push(resolve))
     },
     close: () => {
-      buffered = ""
+      cancel()
       lines.length = 0
-      input.setRawMode(false)
       input.pause()
-      input.destroy()
-      output.end()
+      release()
     },
   }
 }

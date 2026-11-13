@@ -6,6 +6,7 @@ import type { PhraseGate, ServiceFloor } from "../genesis/phrase-gate.ts"
 import { genesisIntentLocation } from "../genesis/intent-store.ts"
 import { createRecoveryBridge } from "./bridge.ts"
 import { enrollPhraseRecoveryKey, pendingPhraseVoid, rotateRecoveryPhrase } from "./enroll-phrase.ts"
+import { acknowledgePhraseVoid, phraseNoticeStatus } from "../account/phrase-notice.ts"
 import { generateRecoveryPhrase, TypedPhrase } from "./phrase.ts"
 import type { RecoveryBridge } from "./ports.ts"
 import { removeRecoveryKey } from "./remove.ts"
@@ -173,13 +174,15 @@ test("#given a bridge that returns another credential id #when the enrollment is
   expect((await verified(s.world, s.world.owner)).received.length).toBe(before)
 })
 
-test("#given a member rotates to a new phrase #when both the enrollment and the removal land #then the old key is out of the registry and the marker is cleared", async () => {
+test("#given a member rotates its phrase #when both the enrollment and the removal land #then the old phrase key is out of the registry and the marker is cleared", async () => {
   const s = await setup()
-  const rotated = await rotateRecoveryPhrase({ ...s.base, oldCredentialId: s.world.firstKey })
+  const first = await enrollPhraseRecoveryKey(s.base)
+  if (!first.ok) throw new Error("expected the first phrase enrollment to land")
+  const rotated = await rotateRecoveryPhrase({ ...s.base, oldCredentialId: first.credentialId })
   expect(rotated.ok).toBe(true)
   const state = await verified(s.world, s.world.owner)
-  expect(state.authority?.registry.has(s.world.firstKey)).toBe(false)
-  expect([...(state.authority?.registry.values() ?? [])].map((key) => key.survivable)).toEqual(["phrase"])
+  expect(state.authority?.registry.has(first.credentialId)).toBe(false)
+  expect([...(state.authority?.registry.values() ?? [])].map((key) => key.survivable).sort()).toEqual(["phrase", "synced"])
   expect(await pendingPhraseVoid(s.place, state)).toBeNull()
 })
 
@@ -203,4 +206,66 @@ test("#given a phrase key #when it is removed #then the outcome names the phrase
   expect(removed).toMatchObject({ ok: true, removedKind: "phrase", platformSignal: "unsupported" })
   expect("deleteFromPasskeyManager" in removed).toBe(false)
   expect(signals).toEqual([])
+})
+
+test("#given a shown enrollment phrase that never landed #when the void notice is acknowledged with the verified chain #then status clears and the next enrollment shows words again", async () => {
+  const s = await setup()
+  const refusing = { ...s.base, chain: chainOf(s.world, s.world.owner, { appendKeys: async () => ({ ok: false, reason: "refused" }) }) }
+  expect(await enrollPhraseRecoveryKey(refusing)).toEqual({ ok: false, reason: "refused" })
+  expect(await phraseNoticeStatus(s.place, await verified(s.world, s.world.owner))).toEqual({ phraseVoid: { purpose: "enroll" } })
+  expect(await phraseNoticeStatus(s.place)).toEqual({ phraseUnresolved: true })
+  const ack = { account: s.world.account, serviceDeviceId: "", keyring: s.world.owner.keyring, pinDir: s.base.pinDir, chain: s.base.chain, anchor: s.world.anchor }
+  expect(await acknowledgePhraseVoid({ ...ack, purpose: "enroll" })).toEqual({ ok: true })
+  expect(await phraseNoticeStatus(s.place, await verified(s.world, s.world.owner))).toEqual({})
+  const shown = s.who.calls.show
+  expect((await enrollPhraseRecoveryKey(s.base)).ok).toBe(true)
+  expect(s.who.calls.show).toBe(shown + 1)
+})
+
+for (const [label, oldCredentialId] of [
+  ["a credential id that was never enrolled", "AQEBAQEBAQEBAQEBAQEBAQ"],
+  ["a passkey credential", "PASSKEY"],
+] as const) {
+  test(`#given a rotation naming ${label} #when it is asked for #then it is refused as not-enrolled before any marker or word`, async () => {
+    const s = await setup()
+    const id = oldCredentialId === "PASSKEY" ? s.world.firstKey : oldCredentialId
+    expect(await rotateRecoveryPhrase({ ...s.base, oldCredentialId: id })).toMatchObject({ ok: false, reason: "not-enrolled" })
+    expect(s.who.calls.show).toBe(0)
+    expect(s.markers()).toBe(false)
+  })
+}
+
+test("#given the host signal is aborted while the words are shown #when enrollment continues #then it stops before the confirmation and nothing is appended", async () => {
+  const world = await createWorld()
+  const controller = new AbortController()
+  const asked: number[] = []
+  const bridge = createRecoveryBridge(fakeAuthenticator(world.provider), world.owner.keyring, {
+    signal: controller.signal,
+    phraseSurface: {
+      show: async () => {
+        controller.abort(new Error("host cancelled"))
+        return true
+      },
+      confirm: async () => {
+        asked.push(1)
+        return null
+      },
+      enter: async () => null,
+    },
+  })
+  const before = (await verified(world, world.owner)).received.length
+  await expect(
+    enrollPhraseRecoveryKey({
+      anchor: world.anchor,
+      account: world.account,
+      keyring: world.owner.keyring,
+      bridge,
+      chain: chainOf(world, world.owner),
+      rejections: createRejectionCounter(),
+      pinDir: freshStateDir(),
+      phraseGate: gate(true, "on").phraseGate,
+    }),
+  ).rejects.toThrow("host cancelled")
+  expect(asked).toEqual([])
+  expect((await verified(world, world.owner)).received.length).toBe(before)
 })

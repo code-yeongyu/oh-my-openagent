@@ -111,7 +111,11 @@ async function deliverVoidNotice(
   }
   try {
     terminal.write(`${text}\r\nPress Enter once you have read this.\r\n`)
-    if ((await terminal.readLine(false)) === null) return false
+    if ((await terminal.readLine(false)) === null) {
+      // Review LOW (#13337): a cancelled notice says why nothing happened instead of exiting silently.
+      dependencies.error("The notice was not confirmed, so nothing changed. Run the command again to read it.")
+      return false
+    }
   } finally {
     terminal.close()
   }
