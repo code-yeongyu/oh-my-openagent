@@ -57,7 +57,12 @@ export type ManifestObject = {
   readonly chunk?: { readonly index: number; readonly count: number }
   readonly created_at: number
   readonly sha256: string
-  readonly payload: ReadonlyArray<{ readonly type: 1 | 2 | 3; readonly space_id: string; readonly item_key: string; readonly body_base64url: string }>
+  readonly payload: ReadonlyArray<{
+    readonly type: 1 | 2 | 3
+    readonly space_id: string
+    readonly item_key: string
+    readonly body_base64url: string
+  }>
 }
 
 type ObjectsFixture = {
@@ -114,10 +119,15 @@ export const recoverySigningSeed = (key: "key1" | "key2"): Promise<Uint8Array<Ar
     new TextEncoder().encode("omo-sync/v1/recovery-sign"),
   )
 
-export type Signer = { readonly keyring: DeviceKeyring } | { readonly recoverySeed: Uint8Array<ArrayBuffer>; readonly credentialId: string }
+export type Signer =
+  | { readonly keyring: DeviceKeyring }
+  | { readonly recoverySeed: Uint8Array<ArrayBuffer>; readonly credentialId: string }
 
 /** Every device principal the fixture chain registers (genesis, approvals, joins), by id. */
-const registered = (): ReadonlyMap<string, { readonly sealing_public_key: string; readonly signing_public_key: string }> => {
+const registered = (): ReadonlyMap<
+  string,
+  { readonly sealing_public_key: string; readonly signing_public_key: string }
+> => {
   const found = new Map<string, { readonly sealing_public_key: string; readonly signing_public_key: string }>()
   for (const raw of Object.values(chain.records)) {
     const body = raw.body
@@ -150,7 +160,9 @@ const authorOf = (signer: Signer): SyncAuthor =>
     : { kind: "recovery", credential_id: signer.credentialId }
 
 const signFields = async (signer: Signer, fields: Parameters<typeof signRecord>[1]): Promise<string> =>
-  "keyring" in signer ? signRecord(signer.keyring, fields) : signFramed("omo-sync/v1/record", recordPayload(fields), signer.recoverySeed)
+  "keyring" in signer
+    ? signRecord(signer.keyring, fields)
+    : signFramed("omo-sync/v1/record", recordPayload(fields), signer.recoverySeed)
 
 const linkOrThrow = async (prior: string, digest: string): Promise<string> => {
   const link = await nextLink(prior, digest)
@@ -159,22 +171,56 @@ const linkOrThrow = async (prior: string, digest: string): Promise<string> => {
 }
 
 /** A keyring record appended after `head`, signed by `signer` exactly as a client would. */
-export const appendKeyring = async (head: Head, body: KeyringBody, signer: Signer, wraps: ReadonlyArray<WrapEntry> = []): Promise<KeyringEntry> => {
+export const appendKeyring = async (
+  head: Head,
+  body: KeyringBody,
+  signer: Signer,
+  wraps: ReadonlyArray<WrapEntry> = [],
+): Promise<KeyringEntry> => {
   const digest = await sha256B64(jcsBytes(body))
   const link = await linkOrThrow(head.link, digest)
   const keyringLink = await linkOrThrow(head.keyring_link, digest)
-  const fields = { account: body.account, base_seq: head.seq, digest, epoch: body.epoch, link, keyring_link: keyringLink }
-  return { ...fields, seq: head.seq + 1, kind: "keyring", author: authorOf(signer), body, record_sig: await signFields(signer, fields), wraps }
+  const fields = {
+    account: body.account,
+    base_seq: head.seq,
+    digest,
+    epoch: body.epoch,
+    link,
+    keyring_link: keyringLink,
+  }
+  return {
+    ...fields,
+    seq: head.seq + 1,
+    kind: "keyring",
+    author: authorOf(signer),
+    body,
+    record_sig: await signFields(signer, fields),
+    wraps,
+  }
 }
 
 /** A batch entry appended after `head`, its record_sig made through the author's DeviceKeyring. */
-export const appendBatch = async (head: Head, digest: string, epoch: number, keyring: DeviceKeyring): Promise<BatchEntry> => {
+export const appendBatch = async (
+  head: Head,
+  digest: string,
+  epoch: number,
+  keyring: DeviceKeyring,
+): Promise<BatchEntry> => {
   const link = await linkOrThrow(head.link, digest)
   const fields = { account: ACCOUNT, base_seq: head.seq, digest, epoch, link, keyring_link: null }
-  return { ...fields, seq: head.seq + 1, kind: "batch", author: { kind: "device", id: keyring.principal().id, ...principalKeys(keyring) }, record_sig: await signRecord(keyring, fields) }
+  return {
+    ...fields,
+    seq: head.seq + 1,
+    kind: "batch",
+    author: { kind: "device", id: keyring.principal().id, ...principalKeys(keyring) },
+    record_sig: await signRecord(keyring, fields),
+  }
 }
 
-export const headOf = (entry: { readonly seq: number; readonly link: string; readonly keyring_link: string | null }, keyringLink: string): Head => ({
+export const headOf = (
+  entry: { readonly seq: number; readonly link: string; readonly keyring_link: string | null },
+  keyringLink: string,
+): Head => ({
   seq: entry.seq,
   link: entry.link,
   keyring_link: entry.keyring_link ?? keyringLink,

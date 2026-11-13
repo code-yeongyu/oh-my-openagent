@@ -8,12 +8,21 @@ import { Command } from "commander"
  * to one layer and a refusal to the other.
  */
 export function withClosedDeviceLoginOptions(command: Command): Command {
-  return command.helpOption(false).allowUnknownOption().allowExcessArguments()
-    .option("--device").option("--no-browser").option("--api <url>")
+  return command
+    .helpOption(false)
+    .allowUnknownOption()
+    .allowExcessArguments()
+    .option("--device")
+    .option("--no-browser")
+    .option("--api <url>")
+    .option("--new-device")
 }
 
 /** The device flow runs only for `--device` or `--no-browser` with nothing else left over (no operand, no unknown option). */
-export function isClosedDeviceLogin(options: { readonly device?: unknown; readonly browser?: unknown }, leftover: readonly string[]): boolean {
+export function isClosedDeviceLogin(
+  options: { readonly device?: unknown; readonly browser?: unknown },
+  leftover: readonly string[],
+): boolean {
   return (options.device === true || options.browser === false) && leftover.length === 0
 }
 

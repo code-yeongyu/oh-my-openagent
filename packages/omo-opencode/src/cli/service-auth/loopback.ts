@@ -1,7 +1,16 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto"
 import { createServer } from "node:http"
 import { generateDeviceKeys } from "./device-keys"
-import { type ChooseDevice, grantSchema, jsonRequest, parseReply, type Platform, serviceOrigin, SignInError } from "./protocol"
+import {
+  ApiRefusal,
+  type ChooseDevice,
+  grantSchema,
+  jsonRequest,
+  parseReply,
+  type Platform,
+  serviceOrigin,
+  SignInError,
+} from "./protocol"
 import type { Session } from "./session"
 
 export class BrowserUnavailable extends SignInError {}
@@ -22,17 +31,28 @@ async function authorize(options: {
     response.setHeader("referrer-policy", "no-referrer")
     response.setHeader("content-type", "text/plain; charset=utf-8")
     const url = new URL(request.url ?? "/", origin)
-    if (request.method !== "GET" || request.headers.host !== new URL(origin).host || url.origin !== origin ||
-      url.pathname !== "/callback" || request.headers.forwarded || request.headers["x-forwarded-for"]) {
+    if (
+      request.method !== "GET" ||
+      request.headers.host !== new URL(origin).host ||
+      url.origin !== origin ||
+      url.pathname !== "/callback" ||
+      request.headers.forwarded ||
+      request.headers["x-forwarded-for"]
+    ) {
       response.writeHead(404).end("Not found")
       return
     }
     const code = url.searchParams.get("code")
     const suppliedState = Buffer.from(url.searchParams.get("state") ?? "")
     const expectedState = Buffer.from(state)
-    if (accepted || url.searchParams.getAll("state").length !== 1 ||
-      suppliedState.length !== expectedState.length || !timingSafeEqual(suppliedState, expectedState) ||
-      url.searchParams.getAll("code").length !== 1 || !code) {
+    if (
+      accepted ||
+      url.searchParams.getAll("state").length !== 1 ||
+      suppliedState.length !== expectedState.length ||
+      !timingSafeEqual(suppliedState, expectedState) ||
+      url.searchParams.getAll("code").length !== 1 ||
+      !code
+    ) {
       response.writeHead(400).end("Invalid sign-in response")
       return
     }
@@ -43,7 +63,10 @@ async function authorize(options: {
   try {
     await new Promise<void>((resolve, reject) => {
       server.once("error", reject)
-      server.listen(0, "127.0.0.1", () => { server.off("error", reject); resolve() })
+      server.listen(0, "127.0.0.1", () => {
+        server.off("error", reject)
+        resolve()
+      })
     })
     const address = server.address()
     if (!address || typeof address === "string") throw new SignInError("Unable to start the sign-in callback.")
@@ -52,7 +75,8 @@ async function authorize(options: {
     url.search = new URLSearchParams({
       redirect_uri: `${origin}/callback`,
       code_challenge: createHash("sha256").update(verifier).digest("base64url"),
-      code_challenge_method: "S256", state,
+      code_challenge_method: "S256",
+      state,
     }).toString()
     const timer = setTimeout(abort, 5 * 60_000)
     options.signal?.addEventListener("abort", abort, { once: true })
@@ -63,7 +87,7 @@ async function authorize(options: {
       }
       const [code] = await Promise.all([
         answer.promise,
-        options.open(url.href).then(opened => {
+        options.open(url.href).then((opened) => {
           if (!opened) openerFailed()
         }, openerFailed),
       ])
@@ -74,28 +98,46 @@ async function authorize(options: {
     }
   } finally {
     server.closeAllConnections()
-    await new Promise<void>(resolve => server.close(() => resolve()))
+    await new Promise<void>((resolve) => server.close(() => resolve()))
   }
 }
 
-export async function loginLoopback(session: Session, options: {
-  readonly accounts: string
-  readonly name: string
-  readonly platform: Platform
-  readonly open: (url: string) => Promise<boolean>
-  readonly chooseDevice: ChooseDevice
-}): Promise<void> {
+export async function loginLoopback(
+  session: Session,
+  options: {
+    readonly accounts: string
+    readonly name: string
+    readonly platform: Platform
+    readonly open: (url: string) => Promise<boolean>
+    readonly chooseDevice: ChooseDevice
+    /** This machine's hardware digest (#6503), sent only when the service advertises machine identity. */
+    readonly machineDigest?: string
+  },
+): Promise<void> {
   await session.ready()
   const keys = generateDeviceKeys()
   for (;;) {
     const authorization = await authorize({ accounts: options.accounts, open: options.open, signal: session.signal })
     try {
-      const grant = parseReply(grantSchema, await session.request("/v1/session/exchange", jsonRequest({
-        ...authorization, kind: "cli", deviceName: options.name, platform: options.platform, ...keys.public,
-      })))
+      const grant = parseReply(
+        grantSchema,
+        await session.request(
+          "/v1/session/exchange",
+          jsonRequest({
+            ...authorization,
+            kind: "cli",
+            deviceName: options.name,
+            platform: options.platform,
+            ...keys.public,
+            ...(options.machineDigest === undefined ? {} : { machineDigest: options.machineDigest }),
+          }),
+        ),
+      )
       await session.save({ ...grant, ...keys.private })
       return
     } catch (error) {
+      // #6503: this machine already has its device. Terminal: never retried, never a reason to remove or inherit that device.
+      if (error instanceof ApiRefusal && error.code === "machine_exists") throw error
       if (await session.removeForLimit(error, options.chooseDevice)) continue
       throw new SignInError("Sign-in cancelled. No device was removed.")
     }

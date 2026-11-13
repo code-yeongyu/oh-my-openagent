@@ -95,8 +95,8 @@ test("updateTaskStatus rejects a stale in_progress write after deletion wins the
 
       const staleTransition = updateTaskStatus(fixture.teamRunId, task.id, "in_progress", "member-a", fixture.config)
       const staleResult = staleTransition.then(
-        (updatedTask) => ({ kind: "fulfilled", updatedTask } as const),
-        (error: unknown) => ({ error, kind: "rejected" } as const),
+        (updatedTask) => ({ kind: "fulfilled", updatedTask }) as const,
+        (error: unknown) => ({ error, kind: "rejected" }) as const,
       )
 
       if (!(await Bun.file(lockPath).exists())) {

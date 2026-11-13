@@ -43,16 +43,18 @@ export class StatusTracker {
   failed(error: unknown): void {
     const failure = describeSyncFailure(error)
     const previous = this.failing
-    const failing = previous?.failure.kind === failure.kind
-      ? { failure, since: previous.since, attempts: previous.attempts + 1 }
-      : { failure, since: this.now(), attempts: 1 }
+    const failing =
+      previous?.failure.kind === failure.kind
+        ? { failure, since: previous.since, attempts: previous.attempts + 1 }
+        : { failure, since: this.now(), attempts: 1 }
     this.failing = failing
     // A failure below its threshold (an offline blip) never replaces or clears what is shown: only a
     // successful cycle clears a shown failure.
     if (!isFailureShown(failing.failure.kind, failing.attempts)) return
     const shown = this.shown
-    this.shown = shown !== null && shown.failure.kind === failure.kind && shown.failure.action === failure.action
-      ? { failure, since: shown.since, attempts: shown.attempts + 1 }
-      : failing
+    this.shown =
+      shown !== null && shown.failure.kind === failure.kind && shown.failure.action === failure.action
+        ? { failure, since: shown.since, attempts: shown.attempts + 1 }
+        : failing
   }
 }

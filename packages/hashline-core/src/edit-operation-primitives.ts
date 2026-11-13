@@ -20,7 +20,7 @@ export function applySetLine(
   lines: string[],
   anchor: string,
   newText: string | string[],
-  options?: EditApplyOptions
+  options?: EditApplyOptions,
 ): string[] {
   if (shouldValidate(options)) validateLineRef(lines, anchor)
   const { line } = parseLineRef(anchor)
@@ -40,7 +40,7 @@ export function applyReplaceLines(
   startAnchor: string,
   endAnchor: string,
   newText: string | string[],
-  options?: EditApplyOptions
+  options?: EditApplyOptions,
 ): string[] {
   if (shouldValidate(options)) {
     validateLineRef(lines, startAnchor)
@@ -51,9 +51,7 @@ export function applyReplaceLines(
   const { line: endLine } = parseLineRef(endAnchor)
 
   if (startLine > endLine) {
-    throw new Error(
-      `Invalid range: start line ${startLine} cannot be greater than end line ${endLine}`
-    )
+    throw new Error(`Invalid range: start line ${startLine} cannot be greater than end line ${endLine}`)
   }
 
   const result = [...lines]
@@ -72,7 +70,7 @@ export function applyInsertAfter(
   lines: string[],
   anchor: string,
   text: string | string[],
-  options?: EditApplyOptions
+  options?: EditApplyOptions,
 ): string[] {
   if (shouldValidate(options)) validateLineRef(lines, anchor)
   const { line } = parseLineRef(anchor)
@@ -89,7 +87,7 @@ export function applyInsertBefore(
   lines: string[],
   anchor: string,
   text: string | string[],
-  options?: EditApplyOptions
+  options?: EditApplyOptions,
 ): string[] {
   if (shouldValidate(options)) validateLineRef(lines, anchor)
   const { line } = parseLineRef(anchor)

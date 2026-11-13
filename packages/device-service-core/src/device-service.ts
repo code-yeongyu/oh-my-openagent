@@ -4,10 +4,18 @@ import { SOCKET_FILE } from "./local-api/access.ts"
 import { connectLocalApi, type ConnectOptions, type LocalApiClient } from "./local-api/client.ts"
 import { connectLocal, ENDPOINT_FILE } from "./local-api/transport.ts"
 import type { ListingResult, ListingRevision } from "./local-api/client-assembly.ts"
-import type { Capability, ControlAttachState, DeviceRef, DeviceRow, SessionFilter, Status } from "./local-api/protocol.ts"
+import type {
+  Capability,
+  ControlAttachState,
+  DeviceRef,
+  DeviceRow,
+  SessionFilter,
+  Status,
+} from "./local-api/protocol.ts"
 import { type CommandResult, openAttach, PROGRESS_STATES, type RemoteAttach } from "./remote-attach.ts"
 import { followDelegatedChannel } from "./delegated-channel.ts"
 import { LocalApiError } from "./local-api/errors.ts"
+import { newestRowsListing } from "./listing-rows.ts"
 import type { CommandRpc } from "./local-api/protocol.ts"
 import type { SessionCandidate } from "./local-api/protocol-delegated.ts"
 import { randomBytes } from "node:crypto"
@@ -17,7 +25,13 @@ import { compareVersions } from "./release/version.ts"
 // "Delegated commands"), so the client bounds its own wait.
 const ENDPOINT_COMMAND_WAIT_MS = 120_000
 
-function sendToEndpoint(client: LocalApiClient, device: string, endpoint: string, rpc: CommandRpc, locate: boolean): Promise<CommandResult> {
+function sendToEndpoint(
+  client: LocalApiClient,
+  device: string,
+  endpoint: string,
+  rpc: CommandRpc,
+  locate: boolean,
+): Promise<CommandResult> {
   return new Promise<CommandResult>((resolve, reject) => {
     // Minted before sending, so a state that arrives ahead of the answer is not missed.
     const commandId = randomBytes(16).toString("base64url")
@@ -34,24 +48,34 @@ function sendToEndpoint(client: LocalApiClient, device: string, endpoint: string
       settle()
       reject(error)
     }
-    const stop = client.onEvent(event => {
+    const stop = client.onEvent((event) => {
       channel.accept(event)
       if (done || event.kind !== "session.command_state" || event.command_id !== commandId) return
       if (PROGRESS_STATES.has(event.state)) return
       const response = channel.takeReply(commandId)
       const located = channel.takeLocated(commandId)
       settle()
-      resolve({ outcome: event, ...(response === undefined ? {} : { response }), ...(located === undefined ? {} : { located }) })
+      resolve({
+        outcome: event,
+        ...(response === undefined ? {} : { response }),
+        ...(located === undefined ? {} : { located }),
+      })
     })
-    const timer = setTimeout(() => fail(new Error(`no final state for endpoint command ${commandId} within ${ENDPOINT_COMMAND_WAIT_MS} ms`)), ENDPOINT_COMMAND_WAIT_MS)
+    const timer = setTimeout(
+      () => fail(new Error(`no final state for endpoint command ${commandId} within ${ENDPOINT_COMMAND_WAIT_MS} ms`)),
+      ENDPOINT_COMMAND_WAIT_MS,
+    )
     timer.unref?.()
     void client.closed.then(() => fail(new Error("the connection closed before the endpoint command settled")))
-    const send = (asked: boolean): Promise<unknown> => client.endpointCommand(device, endpoint, rpc, commandId, { locate: asked })
+    const send = (asked: boolean): Promise<unknown> =>
+      client.endpointCommand(device, endpoint, rpc, commandId, { locate: asked })
     // A service before decision 0018's 2026-11-06 amendment refuses the unknown `locate` field with invalid_request
     // before routing anything, so the command id is still unbound and the same command goes again without it; its
     // reply then names no `located` and the caller locates as before.
     send(locate).catch((error: unknown) =>
-      locate && error instanceof LocalApiError && error.code === "invalid_request" ? send(false).catch(fail) : fail(error),
+      locate && error instanceof LocalApiError && error.code === "invalid_request"
+        ? send(false).catch(fail)
+        : fail(error),
     )
   })
 }
@@ -129,7 +153,10 @@ export type DeviceService = {
   readonly thisDevice: () => Promise<DeviceRef | null>
   readonly devices: () => Promise<readonly DeviceRow[]>
   /** One listing round across the account's devices; `onRevision` sees each complete revision as it lands. */
-  readonly sessions: (filter?: SessionFilter, onRevision?: (revision: ListingRevision) => void) => Promise<ListingResult>
+  readonly sessions: (
+    filter?: SessionFilter,
+    onRevision?: (revision: ListingRevision) => void,
+  ) => Promise<ListingResult>
   readonly attach: (device: string, sessionId: string) => Promise<RemoteAttach>
   /**
    * Sends one session-less engine record (`open_session`, `list_sessions`, ...) to `device`'s engine endpoint with no
@@ -140,7 +167,11 @@ export type DeviceService = {
    * `session.command` is written (the `session.endpoints` lookup, whatever its code) is a `LocalApiError` with
    * `not_sent: true`; a `session.command` that times out after sending carries its `command_id` instead.
    */
-  readonly endpointCommand: (device: string, rpc: CommandRpc, options?: EndpointCommandOptions) => Promise<CommandResult>
+  readonly endpointCommand: (
+    device: string,
+    rpc: CommandRpc,
+    options?: EndpointCommandOptions,
+  ) => Promise<CommandResult>
   readonly close: () => void
   readonly closed: Promise<void>
   /**
@@ -199,8 +230,8 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
     capabilities: client.welcome.capabilities,
     initialStatus: client.welcome.state,
     status: () => client.request("status.get", {}),
-    watchStatus: async listener => {
-      const stop = client.onEvent(event => {
+    watchStatus: async (listener) => {
+      const stop = client.onEvent((event) => {
         if (event.kind === "status.changed") listener(event.status)
       })
       try {
@@ -211,9 +242,9 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
       }
       return stop
     },
-    setEnabled: async enabled => (await client.request("service.set_enabled", { enabled })).enabled,
+    setEnabled: async (enabled) => (await client.request("service.set_enabled", { enabled })).enabled,
     attachControl: () => client.request("control.attach.get", {}),
-    setAttachControl: attached => client.request("control.attach.set", { attached }),
+    setAttachControl: (attached) => client.request("control.attach.set", { attached }),
     registerRefresher: async (binaryPath, version) => {
       await client.request("refresher.register", { binary_path: binaryPath, version })
     },
@@ -226,7 +257,7 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
           ...(account !== undefined && acceptsAdoptAccount(client.welcome.service_version) ? { account } : {}),
         })
       ).device,
-    registerEndpoints: async agentDir => {
+    registerEndpoints: async (agentDir) => {
       await client.request("endpoints.register", { agent_dir: agentDir })
     },
     forget: async () => {
@@ -234,7 +265,7 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
     },
     thisDevice: async () => (await client.request("device.info", {})).device,
     devices: async () => (await client.request("devices.list", {})).devices,
-    sessions: (filter, onRevision) => client.list(filter, onRevision),
+    sessions: newestRowsListing(client),
     attach: (device, sessionId) => openAttach(client, device, sessionId),
     endpointCommand: async (device, rpc, options) => {
       // The endpoint lookup runs before any session.command is written, so whatever fails it (a timeout, a closed
@@ -245,7 +276,8 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
       } catch (error) {
         throw markNotSent(error)
       }
-      if (endpoint === undefined) throw new LocalApiError("unsupported", "the device lists no engine endpoint", { not_sent: true })
+      if (endpoint === undefined)
+        throw new LocalApiError("unsupported", "the device lists no engine endpoint", { not_sent: true })
       return await sendToEndpoint(client, device, endpoint, rpc, options?.locate === true)
     },
     close: () => client.close(),

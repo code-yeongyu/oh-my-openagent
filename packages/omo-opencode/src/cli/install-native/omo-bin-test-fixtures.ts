@@ -61,12 +61,25 @@ export function writeCodexLightRuntimeWrapper(options: {
   readonly marker?: string
 }): { readonly binDir: string; readonly binPath: string } {
   const binDir = join(options.root, ".local", "bin")
-  const cliPath = join(options.root, ".codex", "plugins", "cache", "sisyphuslabs", "omo", options.version, "dist", "cli", "index.js")
+  const cliPath = join(
+    options.root,
+    ".codex",
+    "plugins",
+    "cache",
+    "sisyphuslabs",
+    "omo",
+    options.version,
+    "dist",
+    "cli",
+    "index.js",
+  )
   mkdirSync(binDir, { recursive: true })
   const binPath = join(binDir, "omo")
   writeFileSync(
     binPath,
-    ["#!/bin/sh", `# ${options.marker ?? "OMO_GENERATED_RUNTIME_WRAPPER"}`, `exec bun "${cliPath}" "$@"`, ""].join("\n"),
+    ["#!/bin/sh", `# ${options.marker ?? "OMO_GENERATED_RUNTIME_WRAPPER"}`, `exec bun "${cliPath}" "$@"`, ""].join(
+      "\n",
+    ),
     { mode: 0o755 },
   )
   return { binDir, binPath }

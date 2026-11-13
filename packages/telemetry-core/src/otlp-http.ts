@@ -73,10 +73,14 @@ async function partialSuccess(signal: Signal, response: Response): Promise<Parti
     if (bytes.byteLength === 0) return undefined
     if (signal === "logs") {
       const partial = fromBinary(ExportLogsServiceResponseSchema, bytes).partialSuccess
-      return partial === undefined ? undefined : { rejected: Number(partial.rejectedLogRecords), message: partial.errorMessage }
+      return partial === undefined
+        ? undefined
+        : { rejected: Number(partial.rejectedLogRecords), message: partial.errorMessage }
     }
     const partial = fromBinary(ExportTraceServiceResponseSchema, bytes).partialSuccess
-    return partial === undefined ? undefined : { rejected: Number(partial.rejectedSpans), message: partial.errorMessage }
+    return partial === undefined
+      ? undefined
+      : { rejected: Number(partial.rejectedSpans), message: partial.errorMessage }
   } catch {
     return undefined
   }
@@ -98,7 +102,8 @@ async function exchange(deps: PostDeps, signal: Signal, body: Uint8Array, abort:
   if (response.status >= 200 && response.status < 300) {
     return { kind: "done", outcome: { kind: "accepted", partial: await partialSuccess(signal, response) } }
   }
-  if (NON_RETRYABLE.has(response.status)) return { kind: "done", outcome: { kind: "rejected", status: response.status } }
+  if (NON_RETRYABLE.has(response.status))
+    return { kind: "done", outcome: { kind: "rejected", status: response.status } }
   if (RETRYABLE.has(response.status)) {
     return {
       kind: "retry",
@@ -124,7 +129,9 @@ async function attempt(deps: PostDeps, signal: Signal, body: Uint8Array): Promis
   try {
     return await Promise.race([exchange(deps, signal, body, AbortSignal.any([deps.abort, timeout.signal])), timedOut])
   } catch {
-    return deps.abort.aborted ? { kind: "done", outcome: { kind: "aborted" } } : { kind: "retry", retryAfterMs: undefined }
+    return deps.abort.aborted
+      ? { kind: "done", outcome: { kind: "aborted" } }
+      : { kind: "retry", retryAfterMs: undefined }
   } finally {
     clearTimeout(timer)
   }

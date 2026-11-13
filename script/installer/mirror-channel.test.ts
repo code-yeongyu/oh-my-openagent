@@ -8,12 +8,21 @@ describe("mirrorChannel", () => {
     const scratchWrites: string[] = []
     const liveWrites: string[] = []
     const store = {
-      async readText(key: string) { return scratch.get(key) ?? null },
-      async write(key: string, body: string) { scratchWrites.push(body); scratch.set(key, body) },
+      async readText(key: string) {
+        return scratch.get(key) ?? null
+      },
+      async write(key: string, body: string) {
+        scratchWrites.push(body)
+        scratch.set(key, body)
+      },
     }
     const live = {
-      async readText() { return "5.1.47\n" },
-      async write(key: string) { liveWrites.push(key) },
+      async readText() {
+        return "5.1.47\n"
+      },
+      async write(key: string) {
+        liveWrites.push(key)
+      },
     }
     // when
     const pointer = await mirrorChannel(store, live, "channels/latest", "5.1.48", true, false, () => {})
@@ -28,8 +37,12 @@ describe("mirrorChannel", () => {
     // given
     const writes: string[] = []
     const store = {
-      async readText() { return "5.1.49\n" },
-      async write(key: string) { writes.push(key) },
+      async readText() {
+        return "5.1.49\n"
+      },
+      async write(key: string) {
+        writes.push(key)
+      },
     }
     // when
     const pointer = await mirrorChannel(store, store, "channels/latest", "5.1.48", false, false, () => {})
@@ -38,25 +51,34 @@ describe("mirrorChannel", () => {
     expect(writes).toEqual([])
   })
 
-  test.each([{ force: false }, { force: true }])("production force=$force writes and verifies the live pointer", async ({ force }) => {
-    // given
-    let pointer = force ? "5.1.49\n" : "5.1.47\n"
-    const store = {
-      async readText() { return pointer },
-      async write(_key: string, body: string) { pointer = body },
-    }
-    // when
-    const result = await mirrorChannel(store, store, "channels/latest", "5.1.48", false, force, () => {})
-    // then
-    expect(result).toBe("5.1.48")
-    expect(pointer).toBe("5.1.48\n")
-  })
+  test.each([{ force: false }, { force: true }])(
+    "production force=$force writes and verifies the live pointer",
+    async ({ force }) => {
+      // given
+      let pointer = force ? "5.1.49\n" : "5.1.47\n"
+      const store = {
+        async readText() {
+          return pointer
+        },
+        async write(_key: string, body: string) {
+          pointer = body
+        },
+      }
+      // when
+      const result = await mirrorChannel(store, store, "channels/latest", "5.1.48", false, force, () => {})
+      // then
+      expect(result).toBe("5.1.48")
+      expect(pointer).toBe("5.1.48\n")
+    },
+  )
 
   test.each([{ force: false }, { force: true }])("newer concurrent read-back force=$force", async ({ force }) => {
     let reads = 0
     const logs: string[] = []
     const store = {
-      async readText() { return ++reads === 1 ? "5.1.47\n" : "5.1.49\n" },
+      async readText() {
+        return ++reads === 1 ? "5.1.47\n" : "5.1.49\n"
+      },
       async write() {},
     }
     const result = mirrorChannel(store, store, "channels/latest", "5.1.48", false, force, (line) => logs.push(line))
@@ -71,12 +93,20 @@ describe("mirrorChannel", () => {
     const writes: string[] = []
     const logs: string[] = []
     const scratch = {
-      async readText() { return writes.at(-1) ?? null },
-      async write(_key: string, body: string) { writes.push(body) },
+      async readText() {
+        return writes.at(-1) ?? null
+      },
+      async write(_key: string, body: string) {
+        writes.push(body)
+      },
     }
     const live = {
-      async readText() { return "5.1.49\n" },
-      async write() { throw new Error("dry run touched production") },
+      async readText() {
+        return "5.1.49\n"
+      },
+      async write() {
+        throw new Error("dry run touched production")
+      },
     }
     await mirrorChannel(scratch, live, "channels/latest", "5.1.48", true, false, (line) => logs.push(line))
     expect(writes).toEqual(["5.1.49\n", "5.1.48\n"])
@@ -86,7 +116,9 @@ describe("mirrorChannel", () => {
   test("a mismatched scratch read-back fails the dry run", async () => {
     // given
     const store = {
-      async readText() { return null },
+      async readText() {
+        return null
+      },
       async write() {},
     }
     // when

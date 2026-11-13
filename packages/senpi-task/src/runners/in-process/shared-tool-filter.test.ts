@@ -2,11 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import { createReadToolDefinition, type ToolDefinition } from "@code-yeongyu/senpi"
 
-import {
-  filterSharedParentTools,
-  isTaskOrTeamFamilyTool,
-  mergeChildCustomTools,
-} from "./shared-tool-filter"
+import { filterSharedParentTools, isTaskOrTeamFamilyTool, mergeChildCustomTools } from "./shared-tool-filter"
 
 const sampleParameters = createReadToolDefinition(process.cwd()).parameters
 
@@ -33,7 +29,14 @@ describe("shared parent tool family filter", () => {
   })
 
   test("#given shared task, team, workflow, and ui-only entries #when filtered #then process-child task tools remain while lead-only and ui-only tools are removed", () => {
-    const shared = [makeTool("grep"), makeTool("task_create"), makeTool("workpool"), makeTool("team_create"), makeTool("workflow"), makeTool("render_widget")]
+    const shared = [
+      makeTool("grep"),
+      makeTool("task_create"),
+      makeTool("workpool"),
+      makeTool("team_create"),
+      makeTool("workflow"),
+      makeTool("render_widget"),
+    ]
 
     const filtered = filterSharedParentTools(shared, { uiOnlyToolNames: ["render_widget"], includeTaskTools: true })
 

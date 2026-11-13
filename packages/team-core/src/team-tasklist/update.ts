@@ -54,26 +54,30 @@ export async function updateTaskStatus(
   const claimLockPath = getTaskClaimLockPath(baseDirectory, teamRunId, taskId)
   await mkdir(getTaskClaimsDir(baseDirectory, teamRunId), { recursive: true, mode: 0o700 })
 
-  return withLock(claimLockPath, async () => {
-    const refreshedTask = await getTask(teamRunId, taskId, config)
+  return withLock(
+    claimLockPath,
+    async () => {
+      const refreshedTask = await getTask(teamRunId, taskId, config)
 
-    if (refreshedTask.status === newStatus) return refreshedTask
+      if (refreshedTask.status === newStatus) return refreshedTask
 
-    if (!isValidTransition(refreshedTask.status, newStatus)) {
-      throw new InvalidTaskTransitionError(refreshedTask.status, newStatus)
-    }
+      if (!isValidTransition(refreshedTask.status, newStatus)) {
+        throw new InvalidTaskTransitionError(refreshedTask.status, newStatus)
+      }
 
-    if (newStatus !== "deleted" && refreshedTask.owner !== memberName) {
-      throw new CrossOwnerUpdateError()
-    }
+      if (newStatus !== "deleted" && refreshedTask.owner !== memberName) {
+        throw new CrossOwnerUpdateError()
+      }
 
-    const updatedTask = TaskSchema.parse({
-      ...refreshedTask,
-      status: newStatus,
-      updatedAt: Date.now(),
-    })
+      const updatedTask = TaskSchema.parse({
+        ...refreshedTask,
+        status: newStatus,
+        updatedAt: Date.now(),
+      })
 
-    await atomicWrite(taskPath, `${JSON.stringify(updatedTask, null, 2)}\n`)
-    return updatedTask
-  }, { ownerTag: memberName })
+      await atomicWrite(taskPath, `${JSON.stringify(updatedTask, null, 2)}\n`)
+      return updatedTask
+    },
+    { ownerTag: memberName },
+  )
 }

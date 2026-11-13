@@ -27,7 +27,13 @@ async function createRepo() {
   return { dir, repo }
 }
 
-async function commitFile(dir: string, repo: GitMemoryRepo, path: string, body: string, message: string): Promise<void> {
+async function commitFile(
+  dir: string,
+  repo: GitMemoryRepo,
+  path: string,
+  body: string,
+  message: string,
+): Promise<void> {
   await mkdir(dirname(join(dir, path)), { recursive: true })
   await writeFile(join(dir, path), `---\ndescription: ${path}\n---\n${body}\n`)
   await repo.commitWrite([path], message, AUTHOR)
@@ -49,15 +55,31 @@ describe("projectedChangesBetween", () => {
     const changes = await projectedChangesBetween(repo, base, await repo.head())
 
     // then
-    expect(changes).toEqual({ added: ["reference/new.md"], updated: ["system/persona.md"], removed: ["reference/old.md"] })
+    expect(changes).toEqual({
+      added: ["reference/new.md"],
+      updated: ["system/persona.md"],
+      removed: ["reference/old.md"],
+    })
   })
 
   it("#given commits from the excluded session and from another writer #when summarized #then only the other writer's paths remain", async () => {
     // given
     const { dir, repo } = await createRepo()
     const base = await repo.head()
-    await commitFile(dir, repo, "reference/mine.md", "mine", "record\n\nOmo-Writer: memory-tool\nOmo-Session: session-a\nOmo-Turn: 1")
-    await commitFile(dir, repo, "reference/theirs.md", "theirs", "record\n\nOmo-Writer: memory-tool\nOmo-Session: session-b\nOmo-Turn: 3")
+    await commitFile(
+      dir,
+      repo,
+      "reference/mine.md",
+      "mine",
+      "record\n\nOmo-Writer: memory-tool\nOmo-Session: session-a\nOmo-Turn: 1",
+    )
+    await commitFile(
+      dir,
+      repo,
+      "reference/theirs.md",
+      "theirs",
+      "record\n\nOmo-Writer: memory-tool\nOmo-Session: session-b\nOmo-Turn: 3",
+    )
 
     // when
     const changes = await projectedChangesBetween(repo, base, await repo.head(), { excludeSessionId: "session-a" })
