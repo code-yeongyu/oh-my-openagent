@@ -126,7 +126,10 @@ async function desktopMain() {
     received,
     /** Hold main's answer to the next operationBegin; `answer` sends it later, with the handle it would have issued. */
     holdNextBegin() {
-      const hold = { arrived: Promise.withResolvers<number>() } as { arrived: PromiseWithResolvers<number>; id?: number }
+      const hold = { arrived: Promise.withResolvers<number>() } as {
+        arrived: PromiseWithResolvers<number>
+        id?: number
+      }
       held = hold
       return {
         arrived: hold.arrived.promise,
@@ -268,10 +271,12 @@ describe("an account rollover on a live desktop channel (#13325)", () => {
     const stale = hold.answer()
 
     // then: the Worker gets no handle from the old account, and the host never forwards that handle to main
-    expect(await begin.then(
-      () => "resolved",
-      (error: unknown) => (error instanceof Error ? error.name : String(error)),
-    )).toBe("DesktopSyncRefused")
+    expect(
+      await begin.then(
+        () => "resolved",
+        (error: unknown) => (error instanceof Error ? error.name : String(error)),
+      ),
+    ).toBe("DesktopSyncRefused")
     await main.signIn("account-2")
     expect(await selection.channel.request({ op: "service", handle: stale, data: {} }).catch(() => "refused")).toBe(
       "refused",
