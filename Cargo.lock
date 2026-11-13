@@ -2043,6 +2043,8 @@ dependencies = [
  "omo-computer-session",
  "serde",
  "serde_json",
+ "sha2",
+ "tempfile",
 ]
 
 [[package]]

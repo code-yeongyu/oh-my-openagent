@@ -42,6 +42,37 @@ fn redrive_after(tamper: impl FnOnce(&Path), restore: impl FnOnce(&Path)) {
     );
 }
 
+/// Gate review a3: any callId the wire admits can be poison-recorded, so a crashed call whose
+/// id is no plain path component never wedges its `(issuer, scope)`.
+#[test]
+fn a_crashed_call_id_that_is_no_path_component_never_wedges_the_scope() {
+    for odd in ["call/with a slash", &"x".repeat(65), ".."] {
+        let run = Run::new();
+        die_after_input(&run, odd, 1);
+        let mut session = run.session(Box::new(run.fake()));
+        let redrive = session
+            .click(click(odd))
+            .expect_err("the re-drive is refused");
+        assert_eq!(
+            redrive.interrupted,
+            Some(Disposition::UNCERTAIN_UNSAFE),
+            "{odd}"
+        );
+        session
+            .click(click("c-after"))
+            .unwrap_or_else(|refused| panic!("{odd}: the scope is wedged: {refused:?}"));
+        let again = session
+            .click(click(odd))
+            .expect_err("the crashed callId stays refused");
+        assert_eq!(
+            again.interrupted,
+            Some(Disposition::UNCERTAIN_UNSAFE),
+            "{odd}"
+        );
+        assert_eq!(run.sink.len(), 6, "{odd}: the crash once, c-after once");
+    }
+}
+
 #[cfg(unix)]
 #[test]
 fn unreadable_uncertain_dir_reads_as_poisoned() {

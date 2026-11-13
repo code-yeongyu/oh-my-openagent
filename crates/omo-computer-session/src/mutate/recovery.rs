@@ -55,6 +55,7 @@ impl Funnel {
             call_id: Some(marker.binding.call_id.clone()),
             receipt: None,
             interrupted,
+            warning: None,
         };
         Ok(match (marker.receipt.as_ref(), same) {
             (Some(receipt), true) => Verdict::Refuse {
@@ -66,9 +67,10 @@ impl Funnel {
                 warnings: Vec::new(),
             },
             (Some(_), false) => {
-                self.markers
-                    .clear(&issuer, &scope)
-                    .map_err(|_| Refused::from(super::MARKER_UNAVAILABLE))?;
+                if let Err(error) = self.markers.clear(&issuer, &scope) {
+                    self.warn(format!("completed marker not cleared: {error}"));
+                    return Err(super::MARKER_UNAVAILABLE.into());
+                }
                 Verdict::Proceed
             }
             (None, false) => Verdict::Refuse {
@@ -81,8 +83,17 @@ impl Funnel {
                 if marker.binding.generation != self.generation {
                     warnings.push(Warning::QuarantinedReply);
                 }
-                // The marker may go only once the callId stays refused without it.
-                let clear = self.poisoned.insert(&issuer, &scope, call_id).is_ok();
+                // The marker may go only once the callId stays refused without it; when the
+                // record fails the marker stays (fail-closed) and the log says why.
+                let clear = match self.poisoned.insert(&issuer, &scope, call_id) {
+                    Ok(()) => true,
+                    Err(error) => {
+                        self.warn(format!(
+                            "crashed callId {call_id} not poison-recorded, marker kept: {error}"
+                        ));
+                        false
+                    }
+                };
                 Verdict::Refuse {
                     refused: uncertain(call_id),
                     clear,
@@ -100,5 +111,6 @@ fn uncertain(call_id: &str) -> Refused {
         call_id: Some(call_id.to_owned()),
         receipt: None,
         interrupted: Some(Disposition::UNCERTAIN_UNSAFE),
+        warning: None,
     }
 }
