@@ -26,11 +26,7 @@ export type GrantAnswers = { readonly q6: Answer; readonly q7: Answer }
 
 type Legs = Record<string, Answer>
 
-export function uncontrolledNewWindows(
-  before: readonly string[],
-  after: readonly string[],
-  controlProcesses: readonly string[],
-): string[] {
+function appeared(before: readonly string[], after: readonly string[]): string[] {
   const remaining = [...before]
   const fresh: string[] = []
   for (const name of after) {
@@ -38,7 +34,15 @@ export function uncontrolledNewWindows(
     if (index >= 0) remaining.splice(index, 1)
     else fresh.push(name)
   }
-  return fresh.filter((name) => !controlProcesses.includes(name))
+  return fresh
+}
+
+export function uncontrolledNewWindows(
+  control: { readonly before: readonly string[]; readonly after: readonly string[] },
+  before: readonly string[],
+  after: readonly string[],
+): string[] {
+  return appeared(appeared(control.before, control.after), appeared(before, after))
 }
 
 async function subjectLegs(subject: Probe): Promise<Legs> {
@@ -148,7 +152,9 @@ async function askRemoved(subject: Probe, subjectPath: string, restarted: boolea
       5_000,
     )
   }
+  const controlWindowsBefore = dialogWindows()
   const baseline = await newDialogProcesses()
+  const controlWindowsAfter = dialogWindows()
   const windowsBefore = dialogWindows()
   const callStarted = Date.now()
   const read = subject.invoke(["trusted"])
@@ -159,15 +165,19 @@ async function askRemoved(subject: Probe, subjectPath: string, restarted: boolea
     Math.max(0, 5_000 - (Date.now() - callStarted)),
   )
   const windowsAfter = dialogWindows()
-  const newWindows = uncontrolledNewWindows(windowsBefore, windowsAfter, baseline)
-  const evidence = `rows removed, ${restart}; control window with no call: new dialog processes ${short(baseline)}; subject ${short(read)}; tap ${short(tap)}; new dialog processes within 5 s of the call ${short(appeared)}; dialog windows before ${short(windowsBefore)} after ${short(windowsAfter)} (windows of processes the no-call control also spawned are not counted); control q6=${granted.verdict}`
+  const newWindows = uncontrolledNewWindows(
+    { before: controlWindowsBefore, after: controlWindowsAfter },
+    windowsBefore,
+    windowsAfter,
+  )
+  const evidence = `rows removed, ${restart}; control window with no call: new dialog processes ${short(baseline)}; subject ${short(read)}; tap ${short(tap)}; new dialog processes within 5 s of the call ${short(appeared)}; control-period dialog windows before ${short(controlWindowsBefore)} after ${short(controlWindowsAfter)}; dialog windows before ${short(windowsBefore)} after ${short(windowsAfter)} (only windows the no-call control also saw appear are not counted); control q6=${granted.verdict}`
   if (typeof read.helperError === "string" || typeof tap.helperError === "string")
     return { verdict: "UNMEASURED", evidence: `helper call failed; ${evidence}` }
   const denied = read.axTrusted === false && read.screenCapturePreflight === false && tap.created === false
   if (newWindows.length > 0)
     return {
       verdict: "CONTRADICTS",
-      evidence: `a dialog window appeared from a process the no-call control did not spawn ${short(newWindows)}; ${evidence}`,
+      evidence: `a dialog window appeared that the no-call control did not see ${short(newWindows)}; ${evidence}`,
     }
   return { verdict: denied ? "CONFIRMS" : "CONTRADICTS", evidence }
 }

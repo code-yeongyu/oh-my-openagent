@@ -185,6 +185,11 @@ export async function askPidClick(probe: Probe): Promise<Answer> {
       `the app never read active while the events arrived, so activation is the blocker; ${notes.join("; ")}`,
     )
   const pidArrived = pidClicks.some((click) => typeof click !== "string" && click.delivered.length > 0)
+  const pidFailed = pidClicks.filter((click): click is string => typeof click === "string")
+  if (!pidArrived && pidFailed.length > 0)
+    return unmeasured(
+      `a pid route did not post (its helper call failed), so its silence proves nothing: ${pidFailed.join("; ")}; ${notes.join("; ")}`,
+    )
   if (!pidArrived)
     return contradicts(
       `pid-routed delivery refused: global clicks at the proven aim reached the window with the app active, while pid-routed events never reached the window; ${notes.join("; ")}`,
