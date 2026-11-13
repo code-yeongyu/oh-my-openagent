@@ -19,3 +19,7 @@ omo-computer-backend-macos = { path = "../omo-computer-backend-macos" }
 omo-computer-backend-x11 = { path = "../omo-computer-backend-x11" }
 omo-computer-backend-wayland = { path = "../omo-computer-backend-wayland" }
 omo-computer-backend-win32 = { path = "../omo-computer-backend-win32" }
+
+[dev-dependencies]
+sha2.workspace = true
+tempfile.workspace = true
