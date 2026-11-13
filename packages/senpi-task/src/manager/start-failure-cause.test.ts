@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { afterEach, describe, expect, spyOn, test } from "bun:test"
 
+import { SenpiEngineRestartRequiredError } from "../lazy/senpi-barrel"
 import { RunnerError } from "../runners/in-process"
 import { CTX, createFakeManager, makeDeps } from "../tools/task/__fixtures__/task-tool-fakes"
 import { buildTaskExecute } from "../tools/task/execute"
@@ -262,6 +263,36 @@ describe("task start failure cause", () => {
       "The child session could not be opened: no answer to the switch_session request in time (request_timeout).",
     )
     expect(event.payload).toMatchObject({ cause_class: "request_timeout", timed_out_command: "switch_session" })
+  })
+
+  test("#given a resumed child whose engine load was refused #when the start failure is recorded #then the session refusal names the restart instruction", async () => {
+    // given
+    const cause = new SenpiEngineRestartRequiredError(new Error("engine import refused"))
+
+    // when
+    const { result, event } = await startWithCause(cause, "session_unavailable")
+
+    // then
+    expect(result.error_message).toBe(
+      "The child session could not be opened: the engine refused to load because an incompatible engine copy is already loaded in this process (engine_restart_required); restart omo to start task children again.",
+    )
+    expect(event.payload).toMatchObject({ cause_class: "engine_restart_required" })
+  })
+
+  test("#given a resumed child whose engine load failed with the refusal code unwrapped #when the start failure is recorded #then the session refusal still names the restart instruction", async () => {
+    // given
+    const cause = Object.assign(new Error("engine import refused"), {
+      code: "SENPI_REDACTION_SLOT_INCOMPATIBLE",
+    })
+
+    // when
+    const { result, event } = await startWithCause(cause, "session_unavailable")
+
+    // then
+    expect(result.error_message).toBe(
+      "The child session could not be opened: the engine refused to load because an incompatible engine copy is already loaded in this process (engine_restart_required); restart omo to start task children again.",
+    )
+    expect(event.payload).toMatchObject({ cause_class: "engine_restart_required" })
   })
 
   test("#given the child process crashed before accepting its first prompt #when the start failure is recorded #then the message names the exit and keeps the stderr out", async () => {
