@@ -1,0 +1,44 @@
+name: Computer v3 guard (no legacy edge)
+
+on:
+  pull_request:
+    paths:
+      - 'packages/omo-computer-*/**'
+      - 'crates/omo-computer-*/**'
+      - 'script/computer-v3-guards*'
+      - 'script/knip*.ts'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  no-legacy-edge:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Run the no-legacy-edge guard
+        run: bun script/computer-v3-guards.ts --no-legacy-edge
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Computer v3 guard (no legacy edge)
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Runs `bun script/computer-v3-guards.ts --no-legacy-edge` on this pull request's tree.
+            - Fails when a computer-use v3 directory names or points into the old desktop package family.
+          JOB_SUMMARY_NEXT: Reword or remove each reported line so it names no old-family path; do not widen the guard's exclusions.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
