@@ -428,7 +428,8 @@ async function replay(argv: readonly string[]): Promise<number> {
 }
 
 async function replayCase(opts: Options, casePath: string): Promise<number> {
-  const rel = relative(ROOT, casePath)
+  // Case names print with forward slashes on every OS, so the output is the same on Windows.
+  const rel = relative(ROOT, casePath).replaceAll("\\", "/")
   const name = rel.startsWith("..") ? casePath : rel
   const spec = parseCase(
     parseJson(await readText(casePath, "case file"), "case file"),
