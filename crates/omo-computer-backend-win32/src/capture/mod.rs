@@ -14,6 +14,7 @@
 
 mod display;
 mod pixels;
+mod session;
 mod window;
 
 #[cfg(windows)]
@@ -28,6 +29,8 @@ pub(crate) mod os;
 mod tests;
 #[cfg(windows)]
 mod wgc;
+
+pub use session::SessionCondition;
 
 pub use pixels::{
     composite, crop, draw_crosshair, encode_png, is_blank, is_near_black, NEAR_BLACK_CHANNEL_MAX,
@@ -82,6 +85,8 @@ pub trait CaptureOs: Send {
     fn session_id(&self) -> u32;
     /// `GraphicsCaptureSession::IsSupported()`.
     fn wgc_supported(&mut self) -> bool;
+    /// The session facts of [`SessionCondition`]; the real OS reads unknown until row 60.
+    fn session(&mut self) -> SessionCondition;
     /// # Errors
     /// The monitors cannot be enumerated.
     fn monitors(&mut self) -> Result<Vec<Monitor>, Refusal>;

@@ -77,6 +77,11 @@ impl CaptureOs for Os {
         }
     }
 
+    fn session(&mut self) -> super::SessionCondition {
+        // No OS source in row 55: the SessionState probes are row 60's (design row N18).
+        super::SessionCondition::UNKNOWN
+    }
+
     fn wgc_supported(&mut self) -> bool {
         GraphicsCaptureSession::IsSupported().unwrap_or(false)
     }

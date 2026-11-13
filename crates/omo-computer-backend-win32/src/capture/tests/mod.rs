@@ -5,3 +5,4 @@ mod capture;
 mod elevated;
 mod kit;
 mod ocr;
+mod session;

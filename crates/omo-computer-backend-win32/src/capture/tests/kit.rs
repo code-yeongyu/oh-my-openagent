@@ -2,7 +2,7 @@
 
 use omo_computer_core::backend::{CaptureOptions, Target};
 
-use crate::capture::{CaptureFault, CaptureOs, RawFrame, WindowFacts};
+use crate::capture::{CaptureFault, CaptureOs, RawFrame, SessionCondition, WindowFacts};
 use crate::displays::{Monitor, PhysRect};
 use crate::ocr::OcrProbe;
 
@@ -15,6 +15,10 @@ pub(super) struct ScriptedOs {
     pub(super) window: Option<WindowFacts>,
     pub(super) wgc_window: Option<Result<RawFrame, CaptureFault>>,
     pub(super) print_window: Option<Result<RawFrame, CaptureFault>>,
+    /// The session facts the seam answers (unknown unless a test scripts them).
+    pub(super) session: SessionCondition,
+    /// The colour every display route paints, or the default mid-blue.
+    pub(super) monitor_bgra: Option<[u8; 4]>,
     pub(super) calls: Vec<&'static str>,
 }
 
@@ -63,6 +67,10 @@ impl CaptureOs for ScriptedOs {
     fn session_id(&self) -> u32 {
         self.session_id
     }
+    fn session(&mut self) -> SessionCondition {
+        self.calls.push("session");
+        self.session
+    }
     fn wgc_supported(&mut self) -> bool {
         self.calls.push("wgc_supported");
         self.wgc
@@ -81,7 +89,10 @@ impl CaptureOs for ScriptedOs {
     }
     fn wgc_monitor(&mut self, monitor: &Monitor, _cursor: bool) -> Result<RawFrame, CaptureFault> {
         self.calls.push("wgc_monitor");
-        Ok(solid(monitor.bounds, [0x30, 0x60, 0x90, 0xFF]))
+        Ok(solid(
+            monitor.bounds,
+            self.monitor_bgra.unwrap_or([0x30, 0x60, 0x90, 0xFF]),
+        ))
     }
     fn print_window(&mut self, _hwnd: isize, _cursor: bool) -> Result<RawFrame, CaptureFault> {
         self.calls.push("print_window");
@@ -95,7 +106,10 @@ impl CaptureOs for ScriptedOs {
         _cursor: bool,
     ) -> Result<RawFrame, CaptureFault> {
         self.calls.push("bitblt_monitor");
-        Ok(solid(monitor.bounds, [0x30, 0x60, 0x90, 0xFF]))
+        Ok(solid(
+            monitor.bounds,
+            self.monitor_bgra.unwrap_or([0x30, 0x60, 0x90, 0xFF]),
+        ))
     }
     fn ocr_probe(&mut self) -> OcrProbe {
         OcrProbe::unavailable("no_language_pack")
