@@ -113,5 +113,5 @@ pub struct WaitResult {
 #[serde(untagged)]
 pub enum ClipboardReadReply {
     Content(ClipboardContent),
-    Refused(crate::report::ActionReport),
+    Refused(Box<crate::report::ActionReport>),
 }
