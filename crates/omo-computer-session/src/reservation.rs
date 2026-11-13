@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::lease::{is_live, write_new, Holder, SessionToken};
+use crate::lease::{is_live, replace, Holder, SessionToken};
 
 /// How long a reservation outlives the report of the call that took it.
 pub const AFTER_REPORT_MS: u64 = 10_000;
@@ -58,6 +58,8 @@ impl Reservations {
     /// # Errors
     /// The first window another live session holds at `now_ms`; nothing is reserved then.
     pub fn admit(&mut self, token: &SessionToken, windows: &[String], now_ms: u64) -> Result<(), WindowBusy> {
+        // Check-then-take under the machine-wide record lock, so two sessions never both take one window.
+        let _locked = token.dir().and_then(|dir| crate::lease::dir_lock(dir).ok());
         self.check(token, windows, now_ms)?;
         for window in windows {
             self.put(token, window, None);
@@ -149,8 +151,7 @@ impl Reservations {
         if let Some(dir) = token.dir() {
             let path = record_path(dir, window);
             let _ = fs::create_dir_all(dir.join("windows"));
-            let _ = fs::remove_file(&path);
-            let _ = write_new(&path, &serde_json::to_vec(&record).unwrap_or_default());
+            let _ = replace(&path, &serde_json::to_vec(&record).unwrap_or_default());
         }
         self.memory.insert(window.to_owned(), record);
     }
