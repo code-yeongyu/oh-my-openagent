@@ -2341,8 +2341,6 @@
         "src/extension/wake-queue-source.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) omoSenpiAdapterPackageName
         "src/index.ts": ["exports"],
-        // pre-existing at origin dev 4686e425b5: unused export(s) localLauncherCmdPath
-        "src/install/local-launcher.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) findDirectNativeCaptureViolations
         "src/omo-native-capture-path.audit.test.ts": ["exports"],
       },
