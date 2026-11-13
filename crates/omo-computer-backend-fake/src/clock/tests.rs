@@ -40,6 +40,10 @@ fn the_fake_reads_no_environment() {
         concat!("let tmp = e", "nv::temp_dir();"),
         concat!("use std::{fs, e", "nv};"),
         concat!("use std::{fs, e", "nv as ambient};"),
+        // The same groups split across lines, as rustfmt lays out a long group.
+        concat!("use std::{\n    e", "nv as ambient,\n};\nlet home = ambient::var(\"HOME\");"),
+        concat!("use std::{\n    fs,\n    e", "nv,\n};"),
+        concat!("use std::{\n    io::{self, Read},\n    e", "nv::args,\n};"),
     ] {
         assert!(
             !scan_text("probe.rs", probe).is_empty(),
@@ -50,6 +54,7 @@ fn the_fake_reads_no_environment() {
         concat!("let dir = e", "nv!(\"CARGO_MANIFEST_DIR\");"),
         "let gate_env = 1;",
         concat!("use crate::gate_e", "nv::Seam;"),
+        "use std::{\n    fs,\n    io::{self, Read},\n};\nlet gate_env = 1;",
     ] {
         assert!(
             scan_text("probe.rs", clean).is_empty(),
