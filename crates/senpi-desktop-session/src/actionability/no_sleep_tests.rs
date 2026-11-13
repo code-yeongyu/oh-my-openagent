@@ -146,3 +146,14 @@ fn no_actionability_test_or_harness_file_waits_on_the_host_clock() {
         "host waits where time is not under test: {offenders:#?}"
     );
 }
+
+#[test]
+fn a_raw_identifier_does_not_hide_the_host_wait_after_it() {
+    // Given: raw strings that only mention a wait, then a raw identifier.
+    let source = r###"let s = r#"sleep(d)"#; let t = r##""# sleep(d)"##;
+        let r#type = 1; std::thread::sleep(d);"###;
+    // When
+    let offenders = host_waits("probe.rs", source);
+    // Then: only the real call is reported.
+    assert_eq!(offenders, ["probe.rs:2: sleep"]);
+}
