@@ -37,7 +37,6 @@ test("#given a phrase genesis and a refused one #when every sink is captured #th
     b64urlEncode(entropy),
     Buffer.from(entropy).toString("latin1"),
     words.join(" "),
-    ...words.filter((word) => word.length >= 5),
     Buffer.from(keys.sealPrivate).toString("hex"),
     b64urlEncode(keys.sealPrivate),
     Buffer.from(keys.signSeed).toString("hex"),
@@ -68,4 +67,7 @@ test("#given a phrase genesis and a refused one #when every sink is captured #th
     JSON.stringify(f.server.syncHeaders),
   ].join("\n")
   expect(canaries.filter((canary) => sinks.includes(canary))).toEqual([])
+  // Single words are matched as whole words: "cover" inside the non-secret "recovery" is not a leak.
+  const sinkWords = new Set(sinks.toLowerCase().split(/[^a-z]+/u))
+  expect(words.filter((word) => word.length >= 5 && sinkWords.has(word))).toEqual([])
 })

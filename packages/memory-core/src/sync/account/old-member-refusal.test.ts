@@ -6,7 +6,9 @@ import { jcsBytes, sha256B64 } from "../crypto/vendor/sync-format/jcs.ts"
 import { signedAppend } from "../recovery/keyring-append.ts"
 import { enableSync } from "./enable.ts"
 import { principalOf } from "./join.ts"
-import { openAccountSession } from "./session.ts"
+import { openAccountChain } from "./account-chain.ts"
+import { loadTrustAnchor } from "../crypto/trust-pin.ts"
+import { createRejectionCounter } from "../crypto/rejection.ts"
 import { ACCOUNT, fixture } from "./testing/genesis-enable.test-support.ts"
 
 const cleanups: (() => Promise<void>)[] = []
@@ -30,7 +32,7 @@ const snapshot = async (dir: string): Promise<ReadonlyArray<string>> => {
 // Contract r3 sec 8 / review M5: an engine whose parser does not know a recovery-key label (exactly a pre-phrase
 // engine meeting "phrase") must stop with an error and never re-create a genesis, overwrite its pin, append, store
 // an intent or touch the switches. An unknown label takes the same parseBody -> null -> bad_record path.
-test("#given a pinned member whose served chain gains a recovery-key record its parser refuses #when enable and the sync session open #then both stop with an error and nothing is written", async () => {
+test("#given a pinned member whose served chain gains a recovery-key record its parser refuses #when enable runs and the sync loop's chain reaches it #then both stop with an error and nothing is written", async () => {
   const f = await fixture()
   cleanups.push(f.close)
   expect(await enableSync(f.input)).toEqual({ kind: "joined", created: true })
@@ -70,17 +72,17 @@ test("#given a pinned member whose served chain gains a recovery-key record its 
   f.server.switches.length = 0
 
   await expect(enableSync(f.input)).rejects.toThrow()
-  const token = f.server.tokenFor(principalOf(f.keyring), "service-first")
-  expect(
-    await openAccountSession({
-      baseUrl: f.server.url,
-      token: () => token,
-      account: ACCOUNT,
-      keyring: f.keyring,
-      pinDir: f.input.pinDir,
-      spaceId: new Uint8Array(16).fill(3),
-    }),
-  ).toMatchObject({ ok: false })
+  // The sync loop's chain (what a session reads and writes against) refuses the record when it reaches it.
+  const pin = await loadTrustAnchor(f.input.pinDir, ACCOUNT)
+  if (!pin.ok) throw new Error("expected the creator's pin")
+  const chain = await openAccountChain({
+    account: ACCOUNT,
+    anchor: pin.anchor,
+    keyring: f.keyring,
+    http: f.input.chain,
+    rejections: createRejectionCounter(),
+  })
+  expect(await chain.reach(2)).toMatchObject({ kind: "refused" })
 
   expect(f.ceremonies()).toBe(1)
   expect(f.server.keyAppendsReceived).toBe(appendsBefore)
