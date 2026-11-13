@@ -70,9 +70,19 @@ export type BeforeKeysDiscarded = ((discarded: DiscardedCredential) => Promise<v
  * every path, forget, a session the service ended). Neither ever reads the credential store, and neither throws: a
  * device service that is down or refuses never fails a sign-in or a sign-out.
  */
+export type MachineDeviceState =
+  | { readonly kind: "absent" }
+  | { readonly kind: "held"; readonly device: { readonly id: string; readonly name: string } }
+  | { readonly kind: "unknown"; readonly reason: string }
+
 export type DeviceServiceHandoff = {
   readonly adopt: (credentials: Credentials) => Promise<void>
   readonly forget: () => Promise<void>
+  /**
+   * What this machine's device service holds (#6503): `absent` only when no service runs or it holds no device;
+   * `held` includes a parked device (sign_in_required); `unknown` is a service that exists but could not be read.
+   */
+  readonly machineDevice?: () => Promise<MachineDeviceState>
 }
 
 export const discardedOf = (
@@ -198,10 +208,7 @@ export function createSession(options: {
     async ready() {
       await store.read()
     },
-    /** The stored sign-in whose keys a machine-bound sign-in reuses; null when nothing readable is stored. */
-    stored: (): Promise<Credentials | null> => store.read().catch(() => null),
-    /** `adopt: false` when the device service already holds exactly these keys (one machine, one device). */
-    async save(value: Credentials, options: { readonly adopt?: boolean } = {}) {
+    async save(value: Credentials) {
       await locked(async () => {
         let stored: Credentials | null
         try {
@@ -219,7 +226,7 @@ export function createSession(options: {
       })
       // After the marker is gone, so a stale marker from an earlier sign-out cannot park this sign-in; from the value
       // in memory, never read back from the store.
-      if (options.adopt !== false) await deviceService?.adopt(value)
+      await deviceService?.adopt(value)
     },
     /** The marker an explicit `omo logout` left, or null; only an empty store makes it meaningful. */
     signedOutMarker: () => readSignedOutMarker(markerPath),

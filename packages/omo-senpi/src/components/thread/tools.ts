@@ -1,15 +1,9 @@
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import { threadToolFailure } from "./errors"
-import type { ThreadToolFailure } from "./errors"
+import type { ThreadErrorCode, ThreadToolFailure } from "./errors"
 import { type Static } from "typebox"
 import { toThreadAddressEntries } from "./address-book"
-import {
-  checkNameConflict,
-  fuzzyMatch,
-  normalizeThreadName,
-  workspaceEntries,
-  type ThreadAddressEntry,
-} from "./addressing"
+import { checkNameConflict, normalizeThreadName, type ThreadAddressEntry } from "./addressing"
 import { createLocalSessionHost } from "./control/local-session-host"
 import { checkInitialSkills } from "./initial-skills"
 import {
@@ -25,6 +19,7 @@ import {
   type ThreadSendInput,
   type ThreadSetModelInput,
   type ThreadSetReasoningInput,
+  type ThreadSummary,
   type ThreadToolName,
   type ThreadToolResult,
 } from "./contracts"
@@ -40,11 +35,11 @@ import { createGatewayServices } from "./tools/gateway-services"
 import { listThreads, readThread } from "./tools/read-ops"
 import { createRelayTools } from "./tools/relay-tools"
 import { isReplyToConsumedSender, threadSendPermission } from "./tools/reply-permission"
-import { listAcross, planCreate, renameAlias, withAlias } from "./remote/lazy-ops"
+import { claimCreatedAlias, listAcross, planCreate, renameAlias, withAlias } from "./remote/lazy-ops"
 import { locateControl } from "./control/locate"
 import { closeThread, interruptThread, setModelOn, setThinkingLevelOn } from "./control/operations"
 import { controlIdentity, controlRefusalOf } from "./control/port"
-import type { LocalExisting } from "./remote/cross-device"
+import type { LocalAliasReason, LocalExisting } from "./remote/cross-device"
 import { recordThreadCreator, registerExtensionTools, type ExtensionToolHost } from "./tools/extension-tools"
 export type { ThreadHost, ThreadHostSession, ThreadToolSurfaceOptions } from "./tools/ports"
 export { UNKNOWN_CALLER } from "./tools/ports"
@@ -315,9 +310,6 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
     return output(result)
   }
 
-  // Fuzzy candidates follow the exact ladder's scope: the caller's workspace unless all_scope.
-  const fuzzyCandidates = (entries: ThreadAddressEntry[], allScope: boolean | undefined) =>
-    allScope === true ? entries : workspaceEntries(entries, options.callerWorkspaceRoot())
   /**
    * One body for a new, an existing or a forked thread, here or on another device (#12884): the shape checks, then
    * placement (the only step that reads the device), then the name checked against the threads the target device
@@ -342,8 +334,10 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
           )
         const loaded = skills?.kind === "ok" ? skills.names : undefined
         const entries = resolveEntries(options, current)
+        const callerCwd = options.callerWorkspaceRoot()
         const plan = await planCreate(options.remote, value, {
           host: createLocalSessionHost(options.host, entries),
+          ...(callerCwd.trim() === "" ? {} : { callerCwd }),
           resolve: (address) => resolution(options, entries, address, callerId, true),
           // Decision 0027: an existing thread or a fork source is found by the same resolver every send uses, not by a second ladder.
           locate: async (address) => {
@@ -357,14 +351,17 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
           existing: (address) => existingHere(current, address, callerId),
         })
         if (plan.kind === "done") return await withAlias(options.remote, value.alias, plan.result, plan.device)
-        if (value.name !== undefined) {
-          const conflict = checkNameConflict(await plan.host.visible(), value.name)
+        // An alias no account holds names the thread on its device instead (#13104); a given name wins.
+        // Trimmed like thread_rename's alias-as-name, so " x " and "x" name the thread the same way.
+        const name = plan.localAlias === undefined ? value.name : (value.name ?? value.alias?.trim())
+        if (name !== undefined) {
+          const conflict = checkNameConflict(await plan.host.visible(), name)
           if (conflict.kind === "error") return { kind: "error", error: conflict } as ThreadToolResult
         }
         const preset = plan.creates ? options.remote?.permissionPreset?.() : undefined
         const opened = await plan.host.open({
           ...plan.request,
-          ...(plan.creates && value.name !== undefined ? { name: value.name } : {}),
+          ...(plan.creates && name !== undefined ? { name } : {}),
           ...(plan.creates && loaded !== undefined ? { initialSkills: loaded } : {}),
           ...(preset === undefined ? {} : { permissionPreset: preset }),
         })
@@ -374,13 +371,63 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
           thread: { ...opened.thread, ...(plan.creates && loaded !== undefined ? { requested_skills: loaded } : {}) },
           deduplicated: false,
         }
-        return await withAlias(
-          options.remote,
-          value.alias,
-          plan.creates ? await recordThreadCreator(options, current, callerId, created) : created,
-          plan.host.device,
-        )
+        const recorded = plan.creates ? await recordThreadCreator(options, current, callerId, created) : created
+        if (plan.localAlias !== undefined)
+          return recorded.kind === "ok"
+            ? ({ ...recorded, alias_scope: "local", alias_unavailable: plan.localAlias } as ThreadToolResult)
+            : recorded
+        if (!plan.creates) return await withAlias(options.remote, value.alias, recorded, plan.host.device)
+        const claimed = await claimCreatedAlias(options.remote, value.alias, recorded, plan.host.device)
+        if (!("local" in claimed)) return claimed
+        // The account was gone by the claim, after the create: the alias names the new thread here, as with no account.
+        if (recorded.kind !== "ok" || !("thread" in recorded) || value.alias === undefined) return recorded
+        const local = { alias_scope: "local", alias_unavailable: claimed.local } as const
+        if (value.name !== undefined) return { ...recorded, ...local } as ThreadToolResult
+        const localName = value.alias.trim()
+        const named = await nameCreatedThread(recorded.thread.thread_id, localName, await plan.host.visible(), callerId)
+        return (
+          named === undefined
+            ? {
+                ...recorded,
+                thread: {
+                  ...recorded.thread,
+                  name: localName,
+                  link: threadLink(recorded.thread.thread_id, localName),
+                },
+                ...local,
+              }
+            : { ...recorded, ...local, local_name_unavailable: named }
+        ) as ThreadToolResult
       }),
+  }
+  /**
+   * Names a thread thread_create already made, through the same path thread_rename takes (the create's name check against
+   * the device's threads, then the located control's setName). Answers the refusing code instead of failing, because the
+   * thread exists either way.
+   */
+  async function nameCreatedThread(
+    threadId: string,
+    name: string,
+    visible: readonly ThreadSummary[],
+    callerId: string,
+  ): Promise<ThreadErrorCode | undefined> {
+    const conflict = checkNameConflict(
+      visible.filter((thread) => thread.thread_id !== threadId),
+      name,
+    )
+    if (conflict.kind === "error") return conflict.code
+    const located = await locateControl(options, await view(), threadId, true, callerId)
+    if (located.kind === "not_live") return "not_resumable"
+    if (located.kind === "error")
+      return located.result.kind === "error" ? located.result.error.code : "host_unavailable"
+    try {
+      await located.control.setName(name)
+    } catch (error) {
+      const refusal = controlRefusalOf(error)
+      if (refusal === undefined) throw error
+      return refusal.code
+    }
+    return undefined
   }
   const list: AnyTool = {
     ...metadata("thread_list"),
@@ -439,36 +486,9 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
     ...metadata("thread_handoff"),
     parameters: threadToolParamSchemas.thread_handoff,
     execute: (id: string, args: ThreadHandoffInput, _signal, _onUpdate, ectx) =>
-      execute("thread_handoff", id, args, ectx, async (current, value, operationId, callerId) => {
-        if (value.match === "fuzzy" && value.all_scope !== true && options.callerWorkspaceRoot().trim() === "")
-          return failure(
-            "caller_context_missing",
-            "Scoping a fuzzy handoff needs the caller's workspace root, which this call did not provide.",
-            "Set all_scope to search every workspace, or hand off from a session that knows its workspace.",
-          )
-        if (value.match !== "fuzzy")
-          return await deliver(current, value.thread, value, operationId, callerId, "exact_name")
-        const entries =
-          value.match === "fuzzy"
-            ? fuzzyCandidates(resolveEntries(options, current), value.all_scope)
-            : toThreadAddressEntries(sendAddressBook(options, current, value.thread, value.all_scope))
-        const resolved =
-          value.match === "fuzzy"
-            ? fuzzyMatch(
-                entries.filter((entry) => entry.thread_id !== callerId),
-                value.thread,
-              )
-            : resolution(options, entries, value.thread, callerId, value.all_scope)
-        if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult
-        return deliver(
-          current,
-          resolved.entry.thread_id,
-          value,
-          operationId,
-          callerId,
-          value.match === "fuzzy" ? "fuzzy" : "exact_name",
-        )
-      }),
+      execute("thread_handoff", id, args, ectx, async (current, value, operationId, callerId) =>
+        deliver(current, value.thread, value, operationId, callerId, value.match === "fuzzy" ? "fuzzy" : "exact_name"),
+      ),
   }
   const rename: AnyTool = {
     ...metadata("thread_rename"),
@@ -481,36 +501,50 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
         // a thread with no live owner, a device that is offline), then the name checks.
         const located = await locateControl(options, current, value.thread, value.all_scope, callerId)
         if (located.kind === "error") return located.result
-        const name = value.name?.trim()
-        if (name !== undefined && located.kind === "not_live") return NOT_LIVE
         const thread = located.kind === "control" ? located.control : located
-        if (name !== undefined) {
+        // #13066: the name is checked on the target device's own listing, and only when a live owner holds the thread.
+        const nameRefusal = async (name: string): Promise<ThreadToolResult | undefined> => {
+          if (located.kind === "not_live") return NOT_LIVE
+          if (located.kind !== "control") return undefined
           if (name.length === 0)
             return failure("invalid_arguments", "The new thread name is empty.", "Pass a non-empty name.")
-          const entries = resolveEntries(options, current)
-          const visible = value.all_scope === true ? entries : workspaceEntries(entries, options.callerWorkspaceRoot())
+          const visible = await located.control.visible()
           const existing = visible.find(
             (entry) =>
               entry.thread_id !== thread.thread_id && normalizeThreadName(entry.name) === normalizeThreadName(name),
           )
-          if (existing !== undefined)
-            return failure(
-              "name_conflict",
-              `A thread named "${existing.name}" already exists.`,
-              "Call thread_list and choose another name.",
-            )
+          return existing === undefined
+            ? undefined
+            : failure(
+                "name_conflict",
+                `A thread named "${existing.name}" already exists.`,
+                "Call thread_list and choose another name.",
+              )
         }
+        let name = value.name?.trim()
+        const refusedName = name === undefined ? undefined : await nameRefusal(name)
+        if (refusedName !== undefined) return refusedName
+        let localAlias: LocalAliasReason | undefined
         if (value.alias !== undefined) {
           const refused = await renameAlias(options.remote, thread.thread_id, thread.device, value.alias, operationId)
-          if (refused !== undefined) return refused
+          if (refused !== undefined && "local" in refused) {
+            // No account holds the alias and nothing changed (#13104): it becomes the thread's name unless one was given.
+            localAlias = refused.local
+            if (name === undefined) {
+              name = value.alias.trim()
+              const refusedAlias = await nameRefusal(name)
+              if (refusedAlias !== undefined) return refusedAlias
+            }
+          } else if (refused !== undefined) return refused
         }
         if (name !== undefined && located.kind === "control") await located.control.setName(name)
-        return {
-          kind: "ok",
-          ...controlIdentity(thread),
-          name: name ?? thread.title,
-          ...(value.alias === undefined ? {} : { alias: value.alias }),
-        }
+        const aliasFields =
+          value.alias === undefined
+            ? {}
+            : localAlias === undefined
+              ? { alias: value.alias }
+              : { alias_scope: "local" as const, alias_unavailable: localAlias }
+        return { kind: "ok", ...controlIdentity(thread), name: name ?? thread.title, ...aliasFields }
       }),
   }
   const setModel: AnyTool = {
@@ -576,6 +610,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
     address: string,
     allScope: boolean | undefined,
     callerId: string,
+    match: "exact" | "fuzzy" = "exact",
   ): Promise<DeliveryTarget | { readonly kind: "error"; readonly result: ThreadToolResult }> {
     const scope = allScope
     if (current === PUBLISHED_SEND_VIEW) {
@@ -594,13 +629,11 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
     }
     // Decision 0027: ONE resolver over this device's book and the relay transport's book (the account's other devices);
     // the entry it returns says which transport carries the send. An unreachable relay leaves the local book alone.
-    const resolved = await resolveAcross(
-      options,
-      toThreadAddressEntries(sendAddressBook(options, current, address, true)),
-      address,
-      callerId,
-      scope,
-    )
+    const entries =
+      match === "fuzzy"
+        ? resolveEntries(options, current)
+        : toThreadAddressEntries(sendAddressBook(options, current, address, true))
+    const resolved = await resolveAcross(options, entries, address, callerId, scope, match)
     if (resolved.kind === "error")
       return { kind: "error", result: { kind: "error", error: resolved } as ThreadToolResult }
     // The allowance approved this send as a reply to a consumed delivery's sender (by id or stated name): deliver only when
@@ -619,7 +652,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
     callerId: string,
     resolvedBy?: "exact_name" | "fuzzy",
   ): Promise<ThreadToolResult> {
-    const target = await locate(current, address, value.all_scope, callerId)
+    const target = await locate(current, address, value.all_scope, callerId, resolvedBy === "fuzzy" ? "fuzzy" : "exact")
     if (target.kind === "error") return target.result
     return await deliverThrough(options, pipeline, current, target, value, idempotencyKey, callerId, resolvedBy)
   }
