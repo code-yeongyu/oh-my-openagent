@@ -64,6 +64,17 @@ fn without_a_compositing_manager_the_target_is_redirected_for_the_read() {
 }
 
 #[test]
+fn under_a_compositing_manager_the_target_is_still_redirected_for_the_read() {
+    let server = occluded();
+    assert!(server.compositor);
+    let capture = X11Capture::new(server, None);
+    let frame = capture.capture_frame(&Target::Window("7".into()), &options(false)).expect("frame");
+    assert_eq!(frame.route, CaptureRoute::Composite);
+    assert_eq!(count(&frame.image, GREEN), 120 * 80);
+    assert_eq!(capture.server().redirects.get(), 1);
+}
+
+#[test]
 fn refused_redirect_is_an_annotated_root_crop() {
     let mut server = occluded();
     server.compositor = false;
