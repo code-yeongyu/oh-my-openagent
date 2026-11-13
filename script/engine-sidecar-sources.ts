@@ -52,22 +52,30 @@ export function resolvePackageDir(packageName: string): string | undefined {
   return packageJsonPath === undefined ? undefined : dirname(packageJsonPath)
 }
 
-function readPackageDependencies(packageDir: string): readonly string[] {
-  const manifest: unknown = JSON.parse(readFileSync(join(packageDir, "package.json"), "utf8"))
-  if (typeof manifest !== "object" || manifest === null) {
-    throw new Error(`package manifest is not an object: ${join(packageDir, "package.json")}`)
-  }
-  const dependencies = Reflect.get(manifest, "dependencies")
-  if (dependencies === undefined) return []
-  if (typeof dependencies !== "object" || dependencies === null || Array.isArray(dependencies)) {
-    throw new Error(`package manifest dependencies are not an object: ${join(packageDir, "package.json")}`)
-  }
-  return Object.keys(dependencies).sort()
+interface PackageDependency {
+  readonly name: string
+  readonly optional: boolean
 }
 
-interface PackageIdentity {
-  readonly name: string
-  readonly version: string
+function readDependencyMap(manifest: object, field: string, manifestPath: string): readonly string[] {
+  const dependencies = Reflect.get(manifest, field)
+  if (dependencies === undefined || dependencies === null) return []
+  if (typeof dependencies !== "object" || Array.isArray(dependencies)) {
+    throw new Error(`package manifest ${field} are not an object: ${manifestPath}`)
+  }
+  return Object.keys(dependencies)
+}
+
+/** `dependencies` and `optionalDependencies`, as senpi's own codemode sidecar copier walks them. */
+function readPackageDependencies(packageDir: string): readonly PackageDependency[] {
+  const manifestPath = join(packageDir, "package.json")
+  const manifest: unknown = JSON.parse(readFileSync(manifestPath, "utf8"))
+  if (typeof manifest !== "object" || manifest === null) {
+    throw new Error(`package manifest is not an object: ${manifestPath}`)
+  }
+  const optional = new Set(readDependencyMap(manifest, "optionalDependencies", manifestPath))
+  const names = new Set([...readDependencyMap(manifest, "dependencies", manifestPath), ...optional])
+  return [...names].sort().map((name) => ({ name, optional: optional.has(name) }))
 }
 
 function dependencyManifestPath(packageDir: string, dependencyName: string): string {
@@ -75,37 +83,51 @@ function dependencyManifestPath(packageDir: string, dependencyName: string): str
   return packageRequire.resolve(`${dependencyName}/package.json`)
 }
 
-function readPackageIdentity(manifestPath: string): PackageIdentity {
-  const manifest: unknown = JSON.parse(readFileSync(manifestPath, "utf8"))
-  if (typeof manifest !== "object" || manifest === null) {
-    throw new Error(`package manifest is not an object: ${manifestPath}`)
-  }
-  const name = Reflect.get(manifest, "name")
-  const version = Reflect.get(manifest, "version")
-  if (typeof name !== "string" || typeof version !== "string") {
-    throw new Error(`package manifest has no string name and version: ${manifestPath}`)
-  }
-  return { name, version }
-}
+const VIRTUAL_MODULES_TABLE = join("dist", "core", "extensions", "virtual-modules.js")
 
-function resolveDependencyIdentity(packageDir: string, dependencyName: string): PackageIdentity | undefined {
-  try {
-    return readPackageIdentity(dependencyManifestPath(packageDir, dependencyName))
-  } catch (error) {
-    if (isUnresolvable(error)) return undefined
-    throw error
+/**
+ * The package roots the engine's extension loader serves to extensions (its VIRTUAL_MODULES table), read from the
+ * installed engine the way senpi's own copier reads it. Only these come from the compiled engine; every other
+ * package codemode imports must be staged beside it, even when the engine depends on the same package itself.
+ */
+export function engineServedPackages(hostPackageDir = senpiPackageDir): ReadonlySet<string> {
+  const tablePath = join(hostPackageDir, VIRTUAL_MODULES_TABLE)
+  const text = existsSync(tablePath) ? readFileSync(tablePath, "utf8") : ""
+  const table = text.match(/export const VIRTUAL_MODULES = \{([\s\S]*?)\n\};/)?.[1] ?? ""
+  const specifiers = Array.from(
+    table.matchAll(/^\s*(?:"([^"]+)"|([\w$]+)):\s*/gm),
+    (match) => match[1] ?? match[2] ?? "",
+  )
+  if (specifiers.length === 0) {
+    throw new Error(`cannot read the engine's extension VIRTUAL_MODULES table from ${tablePath}`)
   }
+  return new Set(
+    specifiers.map((specifier) =>
+      specifier
+        .split("/")
+        .slice(0, specifier.startsWith("@") ? 2 : 1)
+        .join("/"),
+    ),
+  )
 }
 
 function packageDependencySources(
   packageDir: string,
   targetRoot: string,
-  dependencyNames: readonly string[],
+  dependencies: readonly PackageDependency[],
+  served: ReadonlySet<string>,
   ancestors: ReadonlySet<string>,
 ): SidecarSource[] {
   const sources: SidecarSource[] = []
-  for (const dependencyName of dependencyNames) {
-    const dependencyManifest = dependencyManifestPath(packageDir, dependencyName)
+  for (const { name: dependencyName, optional } of dependencies) {
+    if (served.has(dependencyName)) continue
+    let dependencyManifest: string
+    try {
+      dependencyManifest = dependencyManifestPath(packageDir, dependencyName)
+    } catch (error) {
+      if (optional && isUnresolvable(error)) continue
+      throw error
+    }
     const dependencyDir = dirname(dependencyManifest)
     const realDependencyDir = realpathSync(dependencyDir)
     if (ancestors.has(realDependencyDir)) continue
@@ -122,6 +144,7 @@ function packageDependencySources(
         dependencyDir,
         dependencyTarget,
         readPackageDependencies(dependencyDir),
+        served,
         new Set([...ancestors, realDependencyDir]),
       ),
     )
@@ -129,23 +152,22 @@ function packageDependencySources(
   return sources
 }
 
+/**
+ * codemode's runtime dependency closure, staged beside it in the binary. A dependency is skipped only when the engine's
+ * extension loader serves it (engineServedPackages); an optional dependency that is not installed is skipped too.
+ */
 export function codemodeRuntimeDependencySources(
   codemodeDir: string,
   hostPackageDir = senpiPackageDir,
 ): SidecarSource[] {
-  const hostDependencies = new Set(readPackageDependencies(hostPackageDir))
-  const externalDependencies = readPackageDependencies(codemodeDir).filter((dependencyName) => {
-    if (!hostDependencies.has(dependencyName)) return true
-    const codemodeIdentity = resolveDependencyIdentity(codemodeDir, dependencyName)
-    if (codemodeIdentity === undefined) {
-      throw new Error(`codemode dependency is not installed: ${dependencyName}`)
-    }
-    const hostIdentity = resolveDependencyIdentity(hostPackageDir, dependencyName)
-    if (hostIdentity === undefined) return true
-    return codemodeIdentity.name !== hostIdentity.name || codemodeIdentity.version !== hostIdentity.version
-  })
   const targetRoot = "node_modules/@code-yeongyu/senpi-codemode"
-  return packageDependencySources(codemodeDir, targetRoot, externalDependencies, new Set([realpathSync(codemodeDir)]))
+  return packageDependencySources(
+    codemodeDir,
+    targetRoot,
+    readPackageDependencies(codemodeDir),
+    engineServedPackages(hostPackageDir),
+    new Set([realpathSync(codemodeDir)]),
+  )
 }
 
 /**
