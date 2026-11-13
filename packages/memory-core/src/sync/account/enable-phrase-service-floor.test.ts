@@ -20,6 +20,11 @@ afterEach(async () => {
 // A1.1-M1/M4.4: the service is the enforcement. A phrase append it refuses (`phrase_keys_not_accepted`,
 // its flag off) maps to phrase_unavailable{service-floor-off}; the intent is retired and the shown phrase
 // reads void, never created. A1.1-L3: with the client flag off, an existing phrase chain still joins.
+const OFF_AGAIN = [
+  '/v1/devices/service-first/sync {"enabled":false}',
+  '/v1/account/sync {"enabled":false}',
+]
+
 const phraseSetup = async () => {
   const f = await fixture()
   cleanups.push(f.close)
@@ -45,6 +50,7 @@ test("#given the service refuses phrase keys #when a fresh phrase genesis append
   s.f.server.phrase.accept = false
   expect(await enableSync(s.input)).toEqual({ kind: "phrase_unavailable", reason: "service-floor-off" })
   expect(s.f.entries).toEqual([])
+  expect(s.f.server.switches.slice(-2)).toEqual(OFF_AGAIN)
   expect(await s.intentExists()).toBe(false)
   expect(await phraseNoticeStatus(s.place)).toEqual({ phraseVoid: { purpose: "genesis" } })
 })
