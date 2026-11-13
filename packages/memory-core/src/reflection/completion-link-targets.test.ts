@@ -2,7 +2,16 @@ import { afterEach, describe, expect, it, setDefaultTimeout } from "bun:test"
 import { mkdir } from "node:fs/promises"
 import { join } from "node:path"
 import { validateCompletion } from "./completion-validation"
-import { LINK_TEST_TIMEOUT_MS, cleanupLinkFixtures, commitAll, git, linkFixture as fixture, note, put, read } from "./completion-links.test-support"
+import {
+  LINK_TEST_TIMEOUT_MS,
+  cleanupLinkFixtures,
+  commitAll,
+  git,
+  linkFixture as fixture,
+  note,
+  put,
+  read,
+} from "./completion-links.test-support"
 
 setDefaultTimeout(LINK_TEST_TIMEOUT_MS)
 afterEach(cleanupLinkFixtures)

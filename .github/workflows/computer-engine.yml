@@ -1,0 +1,112 @@
+name: Computer engine
+
+on:
+  push:
+    branches: [master, dev]
+    paths:
+      - "crates/omo-computer-*/**"
+      - "packages/omo-computer-*/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - ".github/workflows/computer-engine.yml"
+      - "package.json"
+      - "bun.lock"
+      - "script/check-cargo-pinned-deps.mjs"
+  pull_request:
+    branches: [master, dev]
+    paths:
+      - "crates/omo-computer-*/**"
+      - "packages/omo-computer-*/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - ".github/workflows/computer-engine.yml"
+      - "package.json"
+      - "bun.lock"
+      - "script/check-cargo-pinned-deps.mjs"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  native-contract:
+    name: computer native contract (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-26, rust_target: aarch64-apple-darwin }
+          - { os: macos-15, rust_target: aarch64-apple-darwin }
+          - { os: ubuntu-22.04, rust_target: x86_64-unknown-linux-gnu }
+          - { os: ubuntu-22.04-arm, rust_target: aarch64-unknown-linux-gnu }
+          - { os: windows-latest, rust_target: x86_64-pc-windows-msvc }
+          - { os: windows-11-arm, rust_target: aarch64-pc-windows-msvc }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Setup Rust
+        shell: bash
+        run: |
+          toolchain=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
+          rustup toolchain install "$toolchain" --profile minimal --component clippy
+          rustup default "$toolchain"
+          rustup target add "${{ matrix.rust_target }}"
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: computer-${{ matrix.rust_target }}
+
+      - name: Clippy (every omo-computer crate, warnings are errors)
+        shell: bash
+        run: |
+          cargo clippy -p omo-computer-core --all-targets --locked -- -D warnings
+          cargo clippy -p omo-computer-safety --all-targets --locked -- -D warnings
+          cargo clippy -p omo-computer-session --all-targets --locked -- -D warnings
+          cargo clippy -p omo-computer-backend-fake --all-targets --locked -- -D warnings
+          cargo clippy -p omo-computer-backend-atspi --all-targets --locked -- -D warnings
+          cargo clippy -p omo-computer-backend-macos --all-targets --locked -- -D warnings
+          cargo clippy -p omo-computer-backend-x11 --all-targets --locked -- -D warnings
+          cargo clippy -p omo-computer-backend-wayland --all-targets --locked -- -D warnings
+          cargo clippy -p omo-computer-backend-win32 --all-targets --locked -- -D warnings
+          cargo clippy -p omo-computer-engine --all-targets --locked -- -D warnings
+
+      - name: Crate tests (every omo-computer crate)
+        shell: bash
+        run: |
+          cargo test -p omo-computer-core --locked
+          cargo test -p omo-computer-safety --locked
+          cargo test -p omo-computer-session --locked
+          cargo test -p omo-computer-backend-fake --locked
+          cargo test -p omo-computer-backend-atspi --locked
+          cargo test -p omo-computer-backend-macos --locked
+          cargo test -p omo-computer-backend-x11 --locked
+          cargo test -p omo-computer-backend-wayland --locked
+          cargo test -p omo-computer-backend-win32 --locked
+          cargo test -p omo-computer-engine --locked
+
+      - name: Install JavaScript dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Package tests
+        shell: bash
+        run: bun run test:computer
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Computer engine native contract (${{ matrix.os }})
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Clippy (-D warnings) and cargo test for every crates/omo-computer-* crate.
+            - bun run test:computer: the Cargo pin check, then the packages/omo-computer-* vitest suites.
+          JOB_SUMMARY_NEXT: Start with the first clippy or test failure; a backend crate failing on one OS is usually a cfg-gated path.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

@@ -33,9 +33,15 @@ async function waitForRunState(
     // with no later event for the destination on Linux. Keep a bounded state recheck as fallback.
     const check = () => {
       if (settled) return
-      if (isReady()) { finish("present"); return }
+      if (isReady()) {
+        finish("present")
+        return
+      }
       const deadline = typeof deadlineAt === "number" ? deadlineAt : deadlineAt()
-      if (deadline !== undefined && deadline <= now()) { finish("timeout"); return }
+      if (deadline !== undefined && deadline <= now()) {
+        finish("timeout")
+        return
+      }
       if (deadline === armedDeadline) return
       clearTimeout(timeout)
       armedDeadline = deadline

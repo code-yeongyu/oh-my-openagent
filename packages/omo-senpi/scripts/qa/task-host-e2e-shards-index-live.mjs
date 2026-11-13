@@ -1,14 +1,46 @@
-import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync, realpathSync } from "node:fs"
+import {
+  chmodSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+  realpathSync,
+} from "node:fs"
 import { dirname, join } from "node:path"
 
 import { startMockCompletionsServer } from "./mock-completions-server.mjs"
 import { observeState, stopParent } from "./task-host-e2e-events.mjs"
 import { pidAlive, runBin, spawnParent } from "./task-host-e2e-process.mjs"
 import { HostClient } from "./task-host-e2e-shards-rpc.mjs"
-import { MOCK_ENTRY, awaitParent, endpointSockets, mainProject, newSandbox, startParent, supervisorPid, taskConfig, taskRecords, teardownSandbox } from "./task-host-e2e-shard-cost-support.mjs"
+import {
+  MOCK_ENTRY,
+  awaitParent,
+  endpointSockets,
+  mainProject,
+  newSandbox,
+  startParent,
+  supervisorPid,
+  taskConfig,
+  taskRecords,
+  teardownSandbox,
+} from "./task-host-e2e-shard-cost-support.mjs"
 import { continuationCount, endpointFacts } from "./task-host-e2e-shards-support.mjs"
 import { childSessionFiles, jsonlLines } from "./task-host-e2e-support.mjs"
-import { captureAtomicWriteFailure, crossEndpointHazardPassed, finishRow, idleGcIndexResumePassed, observeRegistrationBeforeEndpoint, storeIndexPreconditionPassed, taskScript, writeHttpModels, writeScript } from "./task-host-e2e-shards-index-live-support.mjs"
+import {
+  captureAtomicWriteFailure,
+  crossEndpointHazardPassed,
+  finishRow,
+  idleGcIndexResumePassed,
+  observeRegistrationBeforeEndpoint,
+  storeIndexPreconditionPassed,
+  taskScript,
+  writeHttpModels,
+  writeScript,
+} from "./task-host-e2e-shards-index-live-support.mjs"
 
 const IDLE_EXIT_MS = 3_000
 
@@ -26,9 +58,12 @@ export async function runCrossEndpointOpenHazard(current, artifacts) {
   try {
     cpSync(sandbox.cwd, duplicate, { recursive: true })
     mkdirSync(dirname(shard), { recursive: true })
-    const ensure = (socket) => runBin(sandbox, [
-      "host", "ensure", "--socket", socket, "--launch-spec", current.specPath, "--policy", "never", "--json",
-    ], { timeoutMs: 120_000 })
+    const ensure = (socket) =>
+      runBin(
+        sandbox,
+        ["host", "ensure", "--socket", socket, "--launch-spec", current.specPath, "--policy", "never", "--json"],
+        { timeoutMs: 120_000 },
+      )
     const shardEnsure = ensure(shard)
     const rpcEnsure = ensure(rpc)
     if (shardEnsure.status !== 0 || rpcEnsure.status !== 0) {
@@ -36,7 +71,14 @@ export async function runCrossEndpointOpenHazard(current, artifacts) {
     }
     shardClient = await HostClient.connect(shard, "hazard-shard")
     rpcClient = await HostClient.connect(rpc, "hazard-rpc")
-    const params = { cwd: duplicate, sessionPath, kind: "interactive", context: { role: "interactive" }, provider: "omo-mock", modelId: "mock-1" }
+    const params = {
+      cwd: duplicate,
+      sessionPath,
+      kind: "interactive",
+      context: { role: "interactive" },
+      provider: "omo-mock",
+      modelId: "mock-1",
+    }
     const first = await shardClient.openSession(params)
     const second = await rpcClient.openSession(params)
     facts = {
@@ -63,7 +105,9 @@ export async function runCrossEndpointOpenHazard(current, artifacts) {
 export async function runIdleGcIndexResume(current, beforeBin, artifacts) {
   const config = taskConfig({ host_idle_exit_ms: IDLE_EXIT_MS })
   config.categories.proc.model = "omo-http/mock-1"
-  const script = taskScript("idle-index-child", "idle index child", [{ type: "text", text: "interrupted child response" }])
+  const script = taskScript("idle-index-child", "idle index child", [
+    { type: "text", text: "interrupted child response" },
+  ])
   const sandbox = newSandbox(current, "idle-index", {
     omoConfig: config,
     script,
@@ -74,9 +118,18 @@ export async function runIdleGcIndexResume(current, beforeBin, artifacts) {
   let initialReleased = false
   let initialRequestArrived = false
   const initialProvider = startMockCompletionsServer({
-    steps: [{ type: "text", text: "interrupted child response", releaseWhen: () => initialReleased, releaseTimeoutMs: 120_000 }],
+    steps: [
+      {
+        type: "text",
+        text: "interrupted child response",
+        releaseWhen: () => initialReleased,
+        releaseTimeoutMs: 120_000,
+      },
+    ],
     requestLogPath: requestLog,
-    onRequest: () => { initialRequestArrived = true },
+    onRequest: () => {
+      initialRequestArrived = true
+    },
   })
   let parent
   let resumed
@@ -86,15 +139,24 @@ export async function runIdleGcIndexResume(current, beforeBin, artifacts) {
   let error
   try {
     writeHttpModels(sandbox, await initialProvider.ready)
-    const running = await observeState(sandbox.root, () => {
-      const record = taskRecords(project).find((entry) => entry.name === "idle-index-child")
-      return initialRequestArrived && record?.status === "running" ? record : undefined
-    }, { trigger: () => { parent = startParent(sandbox, project, "start idle index child", env) } })
+    const running = await observeState(
+      sandbox.root,
+      () => {
+        const record = taskRecords(project).find((entry) => entry.name === "idle-index-child")
+        return initialRequestArrived && record?.status === "running" ? record : undefined
+      },
+      {
+        trigger: () => {
+          parent = startParent(sandbox, project, "start idle index child", env)
+        },
+      },
+    )
     if (running === undefined) throw new Error("idle child never reached a running mid-turn state")
     const parentSessionId = parent.sessionId()
     if (typeof parentSessionId !== "string") throw new Error("parent session id missing")
-    const parentSessionName = readdirSync(sandbox.sessionDir)
-      .find((name) => name.endsWith(".jsonl") && name.includes(parentSessionId))
+    const parentSessionName = readdirSync(sandbox.sessionDir).find(
+      (name) => name.endsWith(".jsonl") && name.includes(parentSessionId),
+    )
     if (parentSessionName === undefined) throw new Error("parent session transcript missing")
     const socket = running.host_session?.socket
     const supervisor = typeof socket === "string" ? supervisorPid(sandbox, socket) : undefined
@@ -102,7 +164,7 @@ export async function runIdleGcIndexResume(current, beforeBin, artifacts) {
     await awaitParent(parent, 120_000)
     const host = endpointFacts(sandbox).find((entry) => entry.socket === socket)?.host
     if (host === null || host === undefined) throw new Error("idle child host process missing")
-    const exited = await observeState(sandbox.root, () => !pidAlive(supervisor) ? true : undefined, {
+    const exited = await observeState(sandbox.root, () => (!pidAlive(supervisor) ? true : undefined), {
       trigger: () => process.kill(host, "SIGSEGV"),
       timeoutMs: 60_000,
     })
@@ -147,21 +209,29 @@ export async function runIdleGcIndexResume(current, beforeBin, artifacts) {
       parentSteps: [{ type: "text", text: "R0 parent resumed" }],
       childSteps: [{ type: "text", text: "R0 continuation complete" }],
     })
-    const resumedRecord = await observeState(sandbox.root, () => {
-      const record = taskRecords(project).find((entry) => entry.task_id === running.task_id)
-      return record?.status === "completed" ? record : undefined
-    }, {
-      trigger: () => {
-        resumed = spawnParent(r0, MOCK_ENTRY, "resume after index rollback", {
-          capture: true, env, session: join(sandbox.sessionDir, parentSessionName),
-        })
+    const resumedRecord = await observeState(
+      sandbox.root,
+      () => {
+        const record = taskRecords(project).find((entry) => entry.task_id === running.task_id)
+        return record?.status === "completed" ? record : undefined
       },
-      timeoutMs: 180_000,
-    })
+      {
+        trigger: () => {
+          resumed = spawnParent(r0, MOCK_ENTRY, "resume after index rollback", {
+            capture: true,
+            env,
+            session: join(sandbox.sessionDir, parentSessionName),
+          })
+        },
+        timeoutMs: 180_000,
+      },
+    )
     await stopParent(resumed)
     resumed = undefined
     const indexAfterGc = JSON.parse(readFileSync(indexPath, "utf8"))
-    const userTurnsAfterR0 = readFileSync(transcriptPath, "utf8").split("\n").filter(Boolean)
+    const userTurnsAfterR0 = readFileSync(transcriptPath, "utf8")
+      .split("\n")
+      .filter(Boolean)
       .filter((line) => {
         const row = JSON.parse(line)
         return row.type === "message" && row.message?.role === "user"
@@ -205,12 +275,14 @@ export async function runIdleGcIndexResume(current, beforeBin, artifacts) {
 // `process` pins the host runner; `auto` (the default) first asks the execution-mode gate, which would
 // ensure the session's host, so the auto row proves the store is admitted before that ask too.
 export async function runStoreIndexRegistrationPrecondition(current, artifacts, executionMode = "process") {
-  const rowId = executionMode === "auto" ? "store_index_registration_precondition_auto" : "store_index_registration_precondition"
+  const rowId =
+    executionMode === "auto" ? "store_index_registration_precondition_auto" : "store_index_registration_precondition"
   const firstScript = taskScript("index-fail", "index failure child", [{ type: "text", text: "must not run" }])
   // The name is part of the agent dir path: a long one pushes the session's shard socket past
   // sun_path into a /tmp/omo-rpc-* fallback root that this row neither records nor removes.
   const sandbox = newSandbox(current, executionMode === "auto" ? "idx-auto" : "idx-proc", {
-    omoConfig: taskConfig({ default_execution_mode: executionMode }), script: firstScript,
+    omoConfig: taskConfig({ default_execution_mode: executionMode }),
+    script: firstScript,
   })
   const project = mainProject(sandbox, firstScript)
   const rpcDir = join(sandbox.agentDir, "rpc")
@@ -225,10 +297,18 @@ export async function runStoreIndexRegistrationPrecondition(current, artifacts, 
     const indexPath = join(rpcDir, "task-stores.json")
     const atomicFailure = captureAtomicWriteFailure(rpcDir, indexPath)
     if (!atomicFailure.failed) throw new Error("permission fixture is vacuous: atomic task-store index write succeeded")
-    const failed = await observeState(sandbox.root, () => {
-      const record = taskRecords(project).find((entry) => entry.name === "index-fail")
-      return record?.status === "error" ? record : undefined
-    }, { trigger: () => { first = startParent(sandbox, project, "fail before endpoint creation") } })
+    const failed = await observeState(
+      sandbox.root,
+      () => {
+        const record = taskRecords(project).find((entry) => entry.name === "index-fail")
+        return record?.status === "error" ? record : undefined
+      },
+      {
+        trigger: () => {
+          first = startParent(sandbox, project, "fail before endpoint creation")
+        },
+      },
+    )
     await awaitParent(first, 120_000)
     const endpointsBeforeRetry = endpointSockets(sandbox)
     const endpointStateRoot = join(sandbox.agentDir, "rpc-host-daemon")
@@ -239,10 +319,9 @@ export async function runStoreIndexRegistrationPrecondition(current, artifacts, 
     chmodSync(rpcDir, 0o755)
     const retryScript = taskScript("index-retry", "index retry child", [{ type: "text", text: "index retry complete" }])
     writeScript(project, retryScript)
-    const registrationFirst = await observeRegistrationBeforeEndpoint(
-      sandbox, indexPath, endpointStateRoot,
-      () => { retry = startParent(sandbox, project, "retry after index permissions restore") },
-    )
+    const registrationFirst = await observeRegistrationBeforeEndpoint(sandbox, indexPath, endpointStateRoot, () => {
+      retry = startParent(sandbox, project, "retry after index permissions restore")
+    })
     const opened = await observeState(sandbox.root, () => {
       const record = taskRecords(project).find((entry) => entry.name === "index-retry")
       return typeof record?.host_session?.socket === "string" ? record : undefined
@@ -264,7 +343,8 @@ export async function runStoreIndexRegistrationPrecondition(current, artifacts, 
       endpoint_birthtime_ms: socketStat.birthtimeMs,
       retry_status: opened?.status ?? null,
       retry_socket: opened?.host_session?.socket ?? null,
-      retry_socket_in_agent_dir: typeof opened?.host_session?.socket === "string" &&
+      retry_socket_in_agent_dir:
+        typeof opened?.host_session?.socket === "string" &&
         realpathSync(opened.host_session.socket).startsWith(`${realpathSync(sandbox.agentDir)}/`),
       store_registered_before_open: project.stateDir in (index.stores ?? {}),
     }
@@ -279,8 +359,10 @@ export async function runStoreIndexRegistrationPrecondition(current, artifacts, 
 
 export async function runIndexLiveMatrix(current, beforeBin, artifacts) {
   mkdirSync(artifacts, { recursive: true })
-  return { cross_endpoint_open_hazard: await runCrossEndpointOpenHazard(current, artifacts),
+  return {
+    cross_endpoint_open_hazard: await runCrossEndpointOpenHazard(current, artifacts),
     idle_gc_index_resume: await runIdleGcIndexResume(current, beforeBin, artifacts),
     store_index_registration_precondition: await runStoreIndexRegistrationPrecondition(current, artifacts),
-    store_index_registration_precondition_auto: await runStoreIndexRegistrationPrecondition(current, artifacts, "auto") }
+    store_index_registration_precondition_auto: await runStoreIndexRegistrationPrecondition(current, artifacts, "auto"),
+  }
 }

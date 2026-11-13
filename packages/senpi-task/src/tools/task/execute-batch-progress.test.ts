@@ -21,7 +21,12 @@ type Deferred<T> = { readonly promise: Promise<T>; resolve(value: T): void }
 
 function deferred<T>(): Deferred<T> {
   let resolve!: (value: T) => void
-  return { promise: new Promise<T>((done) => { resolve = done }), resolve }
+  return {
+    promise: new Promise<T>((done) => {
+      resolve = done
+    }),
+    resolve,
+  }
 }
 
 // Bounded wait on a signal: GREEN resolves through the event, RED fails with a named reason.
@@ -30,7 +35,9 @@ function withinBudget<T>(promise: Promise<T>, reason: string, budgetMs = 2_000):
   const deadline = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new Error(reason)), budgetMs)
   })
-  return Promise.race([promise, deadline]).finally(() => { if (timer !== undefined) clearTimeout(timer) })
+  return Promise.race([promise, deadline]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer)
+  })
 }
 
 function text(result: AgentToolResult<TaskToolDetails>): string {
@@ -56,12 +63,17 @@ describe("foreground batch progress", () => {
       subscribeChild: (taskId, next) => {
         listeners.set(taskId, next)
         if (listeners.size === IDS.length) subscribed.resolve()
-        return () => { unsubscribed.push(taskId) }
+        return () => {
+          unsubscribed.push(taskId)
+        }
       },
-      waitFor: (taskId) => completions.get(taskId)?.promise ?? Promise.reject(new Error(`unexpected wait for ${taskId}`)),
+      waitFor: (taskId) =>
+        completions.get(taskId)?.promise ?? Promise.reject(new Error(`unexpected wait for ${taskId}`)),
     })
     const updates: AgentToolResult<TaskToolDetails>[] = []
-    const onUpdate: AgentToolUpdateCallback<TaskToolDetails> = (update) => { updates.push(update) }
+    const onUpdate: AgentToolUpdateCallback<TaskToolDetails> = (update) => {
+      updates.push(update)
+    }
 
     // when
     const execution = buildTaskExecute(makeDeps(manager))(
@@ -95,7 +107,9 @@ describe("foreground batch progress", () => {
 
     // when: both children finish
     for (const taskId of IDS) {
-      completions.get(taskId)?.resolve(makeRecord({ task_id: taskId, status: "completed", final_response: `${taskId} done` }))
+      completions
+        .get(taskId)
+        ?.resolve(makeRecord({ task_id: taskId, status: "completed", final_response: `${taskId} done` }))
     }
     const result = await execution
 

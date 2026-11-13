@@ -2,11 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process"
 import { createInterface } from "node:readline"
 import type { OmoConfigEnv } from "@oh-my-opencode/omo-config-core"
 import { DesktopLaunchRefusal, type DesktopLaunchRefusalReason } from "@oh-my-opencode/senpi-desktop-engine"
-import {
-  ENGINE_ABI,
-  PROTOCOL_VERSION,
-  type DesktopCapabilities,
-} from "@oh-my-opencode/senpi-desktop-protocol"
+import { ENGINE_ABI, PROTOCOL_VERSION, type DesktopCapabilities } from "@oh-my-opencode/senpi-desktop-protocol"
 import * as z from "zod"
 
 export type EngineProbe = {
@@ -21,7 +17,13 @@ export type EngineProbe = {
 
 export type EngineProbeResult =
   | { readonly ok: true; readonly value: EngineProbe }
-  | { readonly ok: false; readonly code: "launch-context-unavailable"; readonly reason: DesktopLaunchRefusalReason; readonly message: string; readonly diagnostic: string }
+  | {
+      readonly ok: false
+      readonly code: "launch-context-unavailable"
+      readonly reason: DesktopLaunchRefusalReason
+      readonly message: string
+      readonly diagnostic: string
+    }
   | {
       readonly ok: false
       readonly code: "abi-mismatch" | "handshake-failed" | "timeout"
@@ -119,7 +121,9 @@ export function probeComputerUseEngine(
     const timer = setTimeout(() => {
       refusal.disable()
       const result: EngineProbeResult = settled ?? {
-        ok: false, code: "timeout", message: `desktop engine probe timed out after ${timeoutMs} ms at ${enginePath} (phase: ${phase()})`,
+        ok: false,
+        code: "timeout",
+        message: `desktop engine probe timed out after ${timeoutMs} ms at ${enginePath} (phase: ${phase()})`,
       }
       settle(result)
       resolveProbe(result)
@@ -130,7 +134,10 @@ export function probeComputerUseEngine(
       child.unref()
       if (child.pid === undefined) return
       if (process.platform === "win32") {
-        const killer = spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true })
+        const killer = spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], {
+          stdio: "ignore",
+          windowsHide: true,
+        })
         killer.once("error", () => child.kill("SIGKILL"))
         killer.unref()
       } else {
@@ -138,7 +145,8 @@ export function probeComputerUseEngine(
           process.kill(-child.pid, "SIGKILL")
         } catch (error) {
           // macOS reports EPERM, not ESRCH, for a group whose members exited but are not reaped yet.
-          if (!(error instanceof Error) || !("code" in error) || (error.code !== "ESRCH" && error.code !== "EPERM")) throw error
+          if (!(error instanceof Error) || !("code" in error) || (error.code !== "ESRCH" && error.code !== "EPERM"))
+            throw error
         }
       }
     }, timeoutMs)
@@ -149,11 +157,19 @@ export function probeComputerUseEngine(
       stderrTail = (stderrTail + chunk).slice(-STDERR_TAIL_CHARS)
     })
     child.stdin.on("error", (error) => {
-      settle({ ok: false, code: "handshake-failed", message: `desktop engine stdin failed at ${enginePath}: ${error.message}` })
+      settle({
+        ok: false,
+        code: "handshake-failed",
+        message: `desktop engine stdin failed at ${enginePath}: ${error.message}`,
+      })
     })
     child.on("error", (error) => {
       refusal.disable()
-      settle({ ok: false, code: "handshake-failed", message: `desktop engine spawn failed at ${enginePath}: ${error.message}` })
+      settle({
+        ok: false,
+        code: "handshake-failed",
+        message: `desktop engine spawn failed at ${enginePath}: ${error.message}`,
+      })
     })
     const lines = createInterface({ input: child.stdout }).on("line", (line) => {
       let value: unknown
@@ -162,7 +178,11 @@ export function probeComputerUseEngine(
       } catch (error) {
         if (!(error instanceof SyntaxError)) throw error
         refusal.disable()
-        settle({ ok: false, code: "handshake-failed", message: `desktop engine emitted non-JSON output at ${enginePath}` })
+        settle({
+          ok: false,
+          code: "handshake-failed",
+          message: `desktop engine emitted non-JSON output at ${enginePath}`,
+        })
         return
       }
       const parsed = RpcResponseSchema.safeParse(value)
@@ -183,16 +203,24 @@ export function probeComputerUseEngine(
       clearTimeout(timer)
       const launchError = refusal.finish(code, signal, stderrTail)
       if (launchError !== undefined) {
-        resolveProbe({ ok: false, code: launchError.code, reason: launchError.reason, message: launchError.message, diagnostic: launchError.diagnostic })
+        resolveProbe({
+          ok: false,
+          code: launchError.code,
+          reason: launchError.reason,
+          message: launchError.message,
+          diagnostic: launchError.diagnostic,
+        })
         return
       }
-      resolveProbe(settled ?? {
-        ok: false,
-        code: "handshake-failed",
-        message:
-          `desktop engine exited before the probe completed at ${enginePath} ` +
-          `(code ${code ?? "null"}, signal ${signal ?? "null"}); stderr: ${stderrTail.trim() || "<empty>"}`,
-      })
+      resolveProbe(
+        settled ?? {
+          ok: false,
+          code: "handshake-failed",
+          message:
+            `desktop engine exited before the probe completed at ${enginePath} ` +
+            `(code ${code ?? "null"}, signal ${signal ?? "null"}); stderr: ${stderrTail.trim() || "<empty>"}`,
+        },
+      )
     })
 
     child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "engine.hello", params: {} })}\n`)

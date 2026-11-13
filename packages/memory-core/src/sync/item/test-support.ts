@@ -45,7 +45,9 @@ export async function withDevices<T>(count: number, run: (devices: ItemDevice[])
   try {
     const devices: ItemDevice[] = []
     for (let i = 0; i < count; i++) {
-      devices.push(await openItemDevice({ stateDir: join(root, `d${i}`, "state"), memoryRoot: join(root, `d${i}`, "memory") }))
+      devices.push(
+        await openItemDevice({ stateDir: join(root, `d${i}`, "state"), memoryRoot: join(root, `d${i}`, "memory") }),
+      )
     }
     return await run(devices)
   } finally {

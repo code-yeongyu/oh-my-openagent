@@ -2,6 +2,7 @@ import { threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from 
 import type { ThreadTranscriptEntry } from "../reader"
 import type { ModelChoice } from "../tools/model-match"
 import type { ThreadCloseOutcome } from "../tools/ports"
+import type { ThreadSummary } from "../contracts"
 
 /**
  * One live thread's controls, wherever it is held: the session on this device's endpoint, or the session on another
@@ -15,6 +16,8 @@ export type SessionControl = {
   readonly device?: string
   /** The thread's title as its listing names it. */
   readonly title: string
+  /** Names on the target device that a rename must not take. */
+  readonly visible: () => Promise<readonly ThreadSummary[]>
   /** The engine's own `interrupt`: an idle session answers `interrupted: false`. */
   readonly interrupt: (turnId?: string) => Promise<{ readonly interrupted: boolean; readonly turn_id?: string }>
   /** The one close ladder (`close-ladder.ts`) on the thread's engine. */
@@ -24,7 +27,9 @@ export type SessionControl = {
    * The session's model catalog. `held`: answered from a copy the leg keeps (bounded in age), on which only an exact
    * provider/id is decided; `fresh` bypasses that copy.
    */
-  readonly getAvailableModels: (options?: { readonly fresh?: boolean }) => Promise<{ readonly models: readonly ModelChoice[]; readonly held: boolean }>
+  readonly getAvailableModels: (options?: {
+    readonly fresh?: boolean
+  }) => Promise<{ readonly models: readonly ModelChoice[]; readonly held: boolean }>
   readonly setModel: (provider: string, id: string) => Promise<{ readonly provider: string; readonly id: string }>
   readonly getAvailableThinkingLevels: () => Promise<readonly string[]>
   /** Refuses `thinking_level_unsupported` for a level the active model cannot run. */
@@ -45,15 +50,25 @@ export class ControlRefusal extends Error {
   }
 }
 
-export function refuse(code: ThreadErrorCode, message: string, next: string, details?: Readonly<Record<string, unknown>>): ControlRefusal {
+export function refuse(
+  code: ThreadErrorCode,
+  message: string,
+  next: string,
+  details?: Readonly<Record<string, unknown>>,
+): ControlRefusal {
   return new ControlRefusal(threadToolFailure(code, message, next, details))
 }
 
 export function controlRefusalOf(error: unknown): ThreadToolFailure | undefined {
-  return typeof error === "object" && error !== null && (error as { readonly [REFUSAL]?: unknown })[REFUSAL] === true ? (error as ControlRefusal).failure : undefined
+  return typeof error === "object" && error !== null && (error as { readonly [REFUSAL]?: unknown })[REFUSAL] === true
+    ? (error as ControlRefusal).failure
+    : undefined
 }
 
 /** The thread a result names: its id, and its device when it is on another one. */
-export function controlIdentity(control: Pick<SessionControl, "thread_id" | "device">): { readonly thread_id: string; readonly device?: string } {
+export function controlIdentity(control: Pick<SessionControl, "thread_id" | "device">): {
+  readonly thread_id: string
+  readonly device?: string
+} {
   return { thread_id: control.thread_id, ...(control.device === undefined ? {} : { device: control.device }) }
 }

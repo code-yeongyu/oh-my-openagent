@@ -1,10 +1,5 @@
 export { loadFactsPersona } from "./assets/assets"
-export {
-  FactsQueue,
-  type FactsEnqueueRequest,
-  type FactsEnqueueResult,
-  type FactsQueueOptions,
-} from "./queue"
+export { FactsQueue, type FactsEnqueueRequest, type FactsEnqueueResult, type FactsQueueOptions } from "./queue"
 export {
   applyFactsBatch,
   FactsExtractionValidationError,
@@ -38,11 +33,7 @@ export {
   type FactsFailureFilter,
   type FactsFailureTarget,
 } from "./failures-backoff"
-export {
-  FactsFailureStore,
-  type FactsFailureStoreOptions,
-  type RecordFailureRequest,
-} from "./failures-store"
+export { FactsFailureStore, type FactsFailureStoreOptions, type RecordFailureRequest } from "./failures-store"
 export {
   FACTS_STARVATION_MS,
   MAX_FACTS_PAYLOAD_BYTES,
@@ -66,11 +57,7 @@ export {
   type FactsApplyRecovery,
   type FactsRecoveryPath,
 } from "./mutation-plan"
-export {
-  applyFactsRecovery,
-  findFactsBatchReceipt,
-  type FactsRecoveryResult,
-} from "./recovery"
+export { applyFactsRecovery, findFactsBatchReceipt, type FactsRecoveryResult } from "./recovery"
 export {
   normalizeObservationText,
   planFactsRouting,

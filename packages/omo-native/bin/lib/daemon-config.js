@@ -40,7 +40,10 @@ function readLegacyConfig(path) {
 function loaderSettings(options) {
   try {
     const runtime = (options.loadRuntime ?? loadTaskConfigRuntime)(options.pluginRoot)
-    return { available: true, settings: runtime.resolveDaemonTaskSettings({ cwd: options.cwd ?? process.cwd(), env: options.env }) }
+    return {
+      available: true,
+      settings: runtime.resolveDaemonTaskSettings({ cwd: options.cwd ?? process.cwd(), env: options.env }),
+    }
   } catch {
     return { available: false, settings: {} }
   }
@@ -78,12 +81,15 @@ function migrationAdvice({ key, value }) {
   if (key === "host_engine_policy" && value === "never") {
     return '"never" is a command-line policy only (the config key accepts upgrade|fallback); pass --no-upgrade instead'
   }
-  if (key === "host_idle_exit_ms" && !Number.isInteger(value)) return "move it to ~/.omo/omo.jsonc as whole milliseconds"
+  if (key === "host_idle_exit_ms" && !Number.isInteger(value))
+    return "move it to ~/.omo/omo.jsonc as whole milliseconds"
   return "move it to ~/.omo/omo.jsonc"
 }
 
 /** One doctor line per key the deprecated file supplied; none when the loader supplies them or cannot run. */
 export function daemonConfigDoctorLines(options) {
   const { legacyPath, legacySources } = readDaemonConfig(options)
-  return legacySources.map((source) => `WARN task.${source.key}: read from deprecated ${legacyPath}; ${migrationAdvice(source)}`)
+  return legacySources.map(
+    (source) => `WARN task.${source.key}: read from deprecated ${legacyPath}; ${migrationAdvice(source)}`,
+  )
 }

@@ -5,9 +5,7 @@ import * as dispatchHookModule from "./dispatch-hook"
 import * as logger from "../../shared/logger"
 import { executeStopHooks } from "./stop"
 
-const mockDispatchHook = mock(() =>
-  Promise.resolve({ exitCode: 0, stdout: "", stderr: "" })
-)
+const mockDispatchHook = mock(() => Promise.resolve({ exitCode: 0, stdout: "", stderr: "" }))
 
 function createStopContext(overrides?: Partial<StopContext>): StopContext {
   return {
@@ -24,12 +22,10 @@ function createConfig(stopHooks: ClaudeHooksConfig["Stop"]): ClaudeHooksConfig {
 describe("executeStopHooks", () => {
   beforeEach(() => {
     mockDispatchHook.mockReset()
-    mockDispatchHook.mockImplementation(() =>
-      Promise.resolve({ exitCode: 0, stdout: "", stderr: "" })
-    )
+    mockDispatchHook.mockImplementation(() => Promise.resolve({ exitCode: 0, stdout: "", stderr: "" }))
 
     spyOn(dispatchHookModule, "dispatchHook").mockImplementation(
-      async (_hook, _stdinJson, _cwd) => await mockDispatchHook()
+      async (_hook, _stdinJson, _cwd) => await mockDispatchHook(),
     )
     spyOn(logger, "log").mockImplementation(() => {})
   })
@@ -40,9 +36,7 @@ describe("executeStopHooks", () => {
 
   it("#given parent session #when stop hooks called #then skips execution", async () => {
     const ctx = createStopContext({ parentSessionId: "parent-session" })
-    const config = createConfig([
-      { matcher: "*", hooks: [{ type: "command", command: "echo test" }] },
-    ])
+    const config = createConfig([{ matcher: "*", hooks: [{ type: "command", command: "echo test" }] }])
 
     const result = await executeStopHooks(ctx, config)
 
@@ -70,9 +64,7 @@ describe("executeStopHooks", () => {
 
   it("#given hook with exit code 2 #when stop hooks called #then blocks", async () => {
     const ctx = createStopContext()
-    const config = createConfig([
-      { matcher: "*", hooks: [{ type: "command", command: "exit 2" }] },
-    ])
+    const config = createConfig([{ matcher: "*", hooks: [{ type: "command", command: "exit 2" }] }])
     mockDispatchHook.mockResolvedValueOnce({
       exitCode: 2,
       stdout: "",
@@ -87,9 +79,7 @@ describe("executeStopHooks", () => {
 
   it("#given hook with CRLF block reason #when stop hooks called #then blocks with normalized reason and prompt", async () => {
     const ctx = createStopContext()
-    const config = createConfig([
-      { matcher: "*", hooks: [{ type: "command", command: "exit 2" }] },
-    ])
+    const config = createConfig([{ matcher: "*", hooks: [{ type: "command", command: "exit 2" }] }])
     mockDispatchHook.mockResolvedValueOnce({
       exitCode: 2,
       stdout: "",
@@ -105,9 +95,7 @@ describe("executeStopHooks", () => {
 
   it("#given hook with decision=block #when stop hooks called #then blocks", async () => {
     const ctx = createStopContext()
-    const config = createConfig([
-      { matcher: "*", hooks: [{ type: "command", command: "blocker" }] },
-    ])
+    const config = createConfig([{ matcher: "*", hooks: [{ type: "command", command: "blocker" }] }])
     mockDispatchHook.mockResolvedValueOnce({
       exitCode: 0,
       stdout: JSON.stringify({ decision: "block", reason: "must fix" }),

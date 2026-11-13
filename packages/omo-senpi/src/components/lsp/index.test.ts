@@ -78,11 +78,13 @@ function registerLsp(): TestContext {
 }
 
 function toolNames(pi: FakeExtensionAPI): string[] {
-  return pi.tools.map((tool) => {
-    const name = tool["name"]
-    if (typeof name !== "string") throw new TypeError("registered tool missing string name")
-    return name
-  }).sort()
+  return pi.tools
+    .map((tool) => {
+      const name = tool["name"]
+      if (typeof name !== "string") throw new TypeError("registered tool missing string name")
+      return name
+    })
+    .sort()
 }
 
 describe("omo-senpi lsp component", () => {
@@ -94,8 +96,13 @@ describe("omo-senpi lsp component", () => {
     for (const legacyTool of LEGACY_TOOL_DESCRIPTORS) {
       const registered = pi.tools.find((tool) => tool["name"] === legacyTool.name)
       expect(registered).toBeDefined()
-      const { exposure: _exposure, allowLazyActivation: _lazy, searchGroup: _group, searchKeywords: _keywords, ...registeredDescriptor } =
-        descriptorWithoutExecute(registered)
+      const {
+        exposure: _exposure,
+        allowLazyActivation: _lazy,
+        searchGroup: _group,
+        searchKeywords: _keywords,
+        ...registeredDescriptor
+      } = descriptorWithoutExecute(registered)
       const legacyDescriptor = descriptorWithoutExecute(legacyTool)
       expect(registeredDescriptor).toEqual(legacyDescriptor)
       expect(registered?.["execute"]).not.toBe(legacyTool.execute)
@@ -159,7 +166,6 @@ describe("omo-senpi lsp component", () => {
     ])
     expect(test.logger.warnings).toEqual([])
   })
-
 })
 
 function descriptorWithoutExecute(tool: Record<string, unknown> | undefined): Record<string, unknown> {

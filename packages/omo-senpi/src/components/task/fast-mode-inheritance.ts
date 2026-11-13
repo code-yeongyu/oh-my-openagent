@@ -28,9 +28,18 @@ function splitModelReference(reference: string): ModelReference | undefined {
   return { provider: reference.slice(0, slash), id: reference.slice(slash + 1) }
 }
 
-function asFastVariant(candidate: unknown, base: ModelReference, registry: PriorityPairingRegistry): FastVariant | undefined {
+function asFastVariant(
+  candidate: unknown,
+  base: ModelReference,
+  registry: PriorityPairingRegistry,
+): FastVariant | undefined {
   return isPriorityAliasOf(candidate, base, registry)
-    ? { provider: base.provider, id: `${base.id}${FAST_MODEL_SUFFIX}`, upstreamModelId: base.id, serviceTier: "priority" }
+    ? {
+        provider: base.provider,
+        id: `${base.id}${FAST_MODEL_SUFFIX}`,
+        upstreamModelId: base.id,
+        serviceTier: "priority",
+      }
     : undefined
 }
 

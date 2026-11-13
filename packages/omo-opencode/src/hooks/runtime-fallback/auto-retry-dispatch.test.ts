@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
-import { DEFAULT_PROMPT_QUEUE_RETRY_MS, releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
+import {
+  DEFAULT_PROMPT_QUEUE_RETRY_MS,
+  releaseAllPromptAsyncReservationsForTesting,
+} from "../../shared/prompt-async-gate"
 import { setPromptReservation } from "@oh-my-opencode/utils/prompt-async-gate/reservations"
 import { createAutoRetryHelpers } from "./auto-retry"
 import { createFallbackState } from "./fallback-state"
@@ -396,12 +399,7 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
     const clock = installRuntimeFallbackTestClock()
 
     // when
-    const outcome = await helpers.autoRetryWithFallback(
-      sessionID,
-      "openai/gpt-5.4",
-      "sisyphus",
-      "session.status",
-    )
+    const outcome = await helpers.autoRetryWithFallback(sessionID, "openai/gpt-5.4", "sisyphus", "session.status")
     assistantIsActive = false
     await flushPromptGateMicrotasks()
     await clock.advanceBy(DEFAULT_PROMPT_QUEUE_RETRY_MS)
@@ -433,14 +431,15 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
         })
       }
       return new Promise((resolve) => {
-        releaseMessages = () => resolve({
-          data: [
-            {
-              info: { role: "user" },
-              parts: [{ type: "text", text: "retry this" }],
-            },
-          ],
-        })
+        releaseMessages = () =>
+          resolve({
+            data: [
+              {
+                info: { role: "user" },
+                parts: [{ type: "text", text: "retry this" }],
+              },
+            ],
+          })
       })
     }
     const helpers = createAutoRetryHelpers(deps)
@@ -496,12 +495,7 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
     const clock = installRuntimeFallbackTestClock()
 
     // when
-    const outcome = await helpers.autoRetryWithFallback(
-      sessionID,
-      "openai/gpt-5.4",
-      undefined,
-      "session.error",
-    )
+    const outcome = await helpers.autoRetryWithFallback(sessionID, "openai/gpt-5.4", undefined, "session.error")
     expect(outcome).toEqual({ accepted: true, status: "queued" })
     const replacementState = createFallbackState("google/gemini-2.5-pro")
     deps.sessionStates.set(sessionID, replacementState)
@@ -534,14 +528,15 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
       if (messageCallCount === 1) {
         markLookupStarted?.()
         return new Promise((resolve) => {
-          releaseMessages = () => resolve({
-            data: [
-              {
-                info: { role: "user" },
-                parts: [{ type: "text", text: "retry this" }],
-              },
-            ],
-          })
+          releaseMessages = () =>
+            resolve({
+              data: [
+                {
+                  info: { role: "user" },
+                  parts: [{ type: "text", text: "retry this" }],
+                },
+              ],
+            })
         })
       }
       return Promise.resolve({
@@ -656,13 +651,17 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
     deps.ctx.client.session.messages = async () => {
       lookupCount += 1
       return {
-        data: [{
-          info: { id: "internal-message", role: "user" },
-          parts: [{
-            type: "text",
-            text: lookupCount === 1 ? internalPrompt : `${internalPrompt}\n${OMO_RUNTIME_FALLBACK_RETRY_MARKER}`,
-          }],
-        }],
+        data: [
+          {
+            info: { id: "internal-message", role: "user" },
+            parts: [
+              {
+                type: "text",
+                text: lookupCount === 1 ? internalPrompt : `${internalPrompt}\n${OMO_RUNTIME_FALLBACK_RETRY_MARKER}`,
+              },
+            ],
+          },
+        ],
       }
     }
     deps.ctx.client.session.promptAsync = async (input) => {
@@ -681,14 +680,18 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
     expect(promptBodies).toHaveLength(2)
     expect(promptBodies[0]?.messageID).toBe("internal-message")
     expect(promptBodies[1]?.messageID).toBe("internal-message")
-    expect(promptBodies[0]?.parts).toEqual([{
-      type: "text",
-      text: `${internalPrompt}\n${OMO_RUNTIME_FALLBACK_RETRY_MARKER}`,
-    }])
-    expect(promptBodies[1]?.parts).toEqual([{
-      type: "text",
-      text: `${internalPrompt}\n${OMO_RUNTIME_FALLBACK_RETRY_MARKER}`,
-    }])
+    expect(promptBodies[0]?.parts).toEqual([
+      {
+        type: "text",
+        text: `${internalPrompt}\n${OMO_RUNTIME_FALLBACK_RETRY_MARKER}`,
+      },
+    ])
+    expect(promptBodies[1]?.parts).toEqual([
+      {
+        type: "text",
+        text: `${internalPrompt}\n${OMO_RUNTIME_FALLBACK_RETRY_MARKER}`,
+      },
+    ])
   })
 
   test("#given the first hop had to send the synthetic continuation #when the second hop finds the real prompt beside it #then it retries the real prompt under its message ID", async () => {

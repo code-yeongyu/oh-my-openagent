@@ -1,5 +1,9 @@
 import { log } from "../logger"
-import type { InternalPromptDispatchResult, PromptAsyncReservation, PromptAsyncReservationReleaseOptions } from "./types"
+import type {
+  InternalPromptDispatchResult,
+  PromptAsyncReservation,
+  PromptAsyncReservationReleaseOptions,
+} from "./types"
 
 const promptAsyncReservations = new Map<string, PromptAsyncReservation>()
 let expiredReservationHandler: ((sessionID: string) => void) | undefined
