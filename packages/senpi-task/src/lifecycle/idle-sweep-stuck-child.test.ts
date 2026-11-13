@@ -3,7 +3,14 @@ import { EventEmitter, once } from "node:events"
 
 import type { TaskRecordStore } from "../store"
 import { createTaskLifecycle } from "./create"
-import { cleanupProjects, fakeHandle, FakeRegistry, seedRecord, settings, tempStore } from "./__fixtures__/lifecycle-fakes"
+import {
+  cleanupProjects,
+  fakeHandle,
+  FakeRegistry,
+  seedRecord,
+  settings,
+  tempStore,
+} from "./__fixtures__/lifecycle-fakes"
 import { NO_HOST_ENDPOINT } from "./host-session"
 import type { ResidentHandle } from "./port"
 import type { TeardownStep } from "./teardown-budget"
@@ -26,9 +33,18 @@ function stuckRpcHandle(taskId: string, calls: string[]): ResidentHandle {
     task_id: taskId,
     kind: "rpc",
     pid: 999_999_999,
-    abort: () => { calls.push(`abort:${taskId}`); return never() },
-    terminate: () => { calls.push(`terminate:${taskId}`); return never() },
-    dispose: () => { calls.push(`dispose:${taskId}`); return never() },
+    abort: () => {
+      calls.push(`abort:${taskId}`)
+      return never()
+    },
+    terminate: () => {
+      calls.push(`terminate:${taskId}`)
+      return never()
+    },
+    dispose: () => {
+      calls.push(`dispose:${taskId}`)
+      return never()
+    },
   }
 }
 
@@ -37,12 +53,15 @@ function manualDeadlines() {
   const waiting: { step: TeardownStep; expire: () => void }[] = []
   const arrived = new EventEmitter()
   return {
-    deadline: (step: TeardownStep) => new Promise<void>((resolve) => {
-      waiting.push({ step, expire: resolve })
-      arrived.emit("armed")
-    }),
+    deadline: (step: TeardownStep) =>
+      new Promise<void>((resolve) => {
+        waiting.push({ step, expire: resolve })
+        arrived.emit("armed")
+      }),
     armed: () => once(arrived, "armed", { signal: AbortSignal.timeout(3_000) }),
-    expireAll: () => { for (const entry of waiting.splice(0)) entry.expire() },
+    expireAll: () => {
+      for (const entry of waiting.splice(0)) entry.expire()
+    },
     pendingSteps: () => waiting.map((entry) => entry.step),
   }
 }
@@ -64,12 +83,15 @@ function watchEvents(store: TaskRecordStore) {
       return path
     },
   }
-  const next = (type: string, taskId: string) => once(events, `${type}:${taskId}`, { signal: AbortSignal.timeout(3_000) })
+  const next = (type: string, taskId: string) =>
+    once(events, `${type}:${taskId}`, { signal: AbortSignal.timeout(3_000) })
   return { watched, next }
 }
 
 function idleLifecycle(store: TaskRecordStore, registry: FakeRegistry, deadlines: ReturnType<typeof manualDeadlines>) {
-  let tick: () => void = () => { throw new Error("idle reclaimer was not scheduled") }
+  let tick: () => void = () => {
+    throw new Error("idle reclaimer was not scheduled")
+  }
   const lifecycle = createTaskLifecycle({
     hostEndpoint: NO_HOST_ENDPOINT,
     store,
@@ -77,13 +99,26 @@ function idleLifecycle(store: TaskRecordStore, registry: FakeRegistry, deadlines
     config: settings({ residency_max_children: 42 }),
     now: () => 1_000_000 + IDLE_MS + 1,
     teardownStepDeadline: deadlines.deadline,
-    idleReclaimerScheduler: { setInterval: (callback) => { tick = callback; return {} }, clearInterval: () => undefined },
+    idleReclaimerScheduler: {
+      setInterval: (callback) => {
+        tick = callback
+        return {}
+      },
+      clearInterval: () => undefined,
+    },
   })
   return { lifecycle, tick: () => tick() }
 }
 
 function seedIdle(store: TaskRecordStore, taskId: string, status: "completed" | "error", executionMode = "in-process") {
-  seedRecord(store, { task_id: taskId, status, residency_state: "resident", updated_at: new Date(1_000_000).toISOString(), host_pid: process.pid, execution_mode: executionMode })
+  seedRecord(store, {
+    task_id: taskId,
+    status,
+    residency_state: "resident",
+    updated_at: new Date(1_000_000).toISOString(),
+    host_pid: process.pid,
+    execution_mode: executionMode,
+  })
 }
 
 describe("idle resident sweep with a child that never exits (omo#9785)", () => {
@@ -173,7 +208,14 @@ describe("idle resident sweep with a child that never exits (omo#9785)", () => {
   test("#given a handle-less finished child of a sibling session in this process #when this session's engine sweeps #then it is left alone", async () => {
     // given
     const store = tempStore()
-    seedRecord(store, { task_id: STUCK, status: "completed", residency_state: "resident", updated_at: new Date(1_000_000).toISOString(), host_pid: process.pid, parent_session_id: "parent-2" })
+    seedRecord(store, {
+      task_id: STUCK,
+      status: "completed",
+      residency_state: "resident",
+      updated_at: new Date(1_000_000).toISOString(),
+      host_pid: process.pid,
+      parent_session_id: "parent-2",
+    })
     const { lifecycle } = idleLifecycle(store, new SessionRegistry(), manualDeadlines())
 
     // when

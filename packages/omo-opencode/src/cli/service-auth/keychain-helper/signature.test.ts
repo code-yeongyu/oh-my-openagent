@@ -49,7 +49,7 @@ describe("keychain helper signature check (#11262 design 1, Checking the helper)
     const path = join(dir, "omo-keychain")
     writeFileSync(path, "signed")
     let asked = 0
-    const check = createSignatureChecker(async file => {
+    const check = createSignatureChecker(async (file) => {
       asked++
       if (asked === 1) writeFileSync(file, "swapped during the check")
       return true
@@ -78,13 +78,16 @@ describe("keychain helper signature check (#11262 design 1, Checking the helper)
     rmSync(dir, { recursive: true, force: true })
   })
 
-  test.skipIf(process.platform !== "darwin")("#given an unsigned binary #when the real framework checks it #then it fails the Developer ID requirement", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "helper-signature-"))
-    const path = join(dir, "true-copy")
-    writeFileSync(path, await Bun.file("/usr/bin/true").bytes())
-    expect(await signatureBackend()).toBe("ffi")
-    expect(await createSignatureChecker()(path)).toBe("invalid")
-    expect(await createSignatureChecker()("/usr/bin/true")).toBe("invalid")
-    rmSync(dir, { recursive: true, force: true })
-  })
+  test.skipIf(process.platform !== "darwin")(
+    "#given an unsigned binary #when the real framework checks it #then it fails the Developer ID requirement",
+    async () => {
+      const dir = mkdtempSync(join(tmpdir(), "helper-signature-"))
+      const path = join(dir, "true-copy")
+      writeFileSync(path, await Bun.file("/usr/bin/true").bytes())
+      expect(await signatureBackend()).toBe("ffi")
+      expect(await createSignatureChecker()(path)).toBe("invalid")
+      expect(await createSignatureChecker()("/usr/bin/true")).toBe("invalid")
+      rmSync(dir, { recursive: true, force: true })
+    },
+  )
 })

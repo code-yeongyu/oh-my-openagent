@@ -35,7 +35,7 @@ export type ChildSession = RunHoldSession & {
   readonly sessionId: string
   readonly model?: CatalogModelIdentity
   readonly effectiveServiceTier?: string
-  prompt(text: string, options?: Partial<InputIdentity> & { readonly signal?: AbortSignal }): Promise<void>
+  prompt(text: string, options?: InputIdentity): Promise<void>
   steer(text: string, images?: undefined, options?: InputIdentity): Promise<QueuedInputDisposition>
   followUp(text: string, images?: undefined, options?: InputIdentity): Promise<QueuedInputDisposition>
   abort(): Promise<void>
@@ -176,10 +176,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 // Derive the settled turn's outcome from what it emitted. The session-level getLastAssistantText()
 // is only trusted when it CHANGED during this turn (baseline diff): on a revive, the previous run's
 // text must never masquerade as a fresh completion.
-function turnOutcome(session: ChildSession, observation: TurnObservation, completion: ChildCompletionPolicy): RunnerOutcome {
-  const provenance = observation.provider !== undefined && observation.model !== undefined
-    ? { model: `${observation.provider}/${observation.model}` }
-    : {}
+function turnOutcome(
+  session: ChildSession,
+  observation: TurnObservation,
+  completion: ChildCompletionPolicy,
+): RunnerOutcome {
+  const provenance =
+    observation.provider !== undefined && observation.model !== undefined
+      ? { model: `${observation.provider}/${observation.model}` }
+      : {}
   if (observation.stopReason === "error" || observation.stopReason === "aborted") {
     return {
       status: "error",
@@ -212,14 +217,13 @@ function turnOutcome(session: ChildSession, observation: TurnObservation, comple
 async function runTurn(
   session: ChildSession,
   text: string,
-  signal: AbortSignal,
   isAborted: () => boolean,
   observation: TurnObservation,
   completion: ChildCompletionPolicy,
   identity: InputIdentity | undefined,
 ): Promise<RunnerOutcome> {
   try {
-    await session.prompt(text, { ...identity, signal })
+    await session.prompt(text, identity)
   } catch (error) {
     if (isAborted()) return { status: "cancelled" }
     if (error instanceof Error) {
@@ -264,11 +268,15 @@ function createTrackedChildHandle(
   let aborted = false
   let disposed = false
   let turnActive = false
-  let promptAbort: AbortController | undefined
   // Seeded for the restored case; createChildHandle's beginTurn replaces it immediately.
   let running: Promise<RunnerOutcome> = Promise.resolve(settledSessionOutcome(session, completion))
   const observation: TurnObservation = {
-    text: undefined, stopReason: undefined, errorMessage: undefined, baseline: undefined, provider: undefined, model: undefined,
+    text: undefined,
+    stopReason: undefined,
+    errorMessage: undefined,
+    baseline: undefined,
+    provider: undefined,
+    model: undefined,
   }
   const unsubscribeObserver = session.subscribe((event) => observeTurnEvent(observation, event))
 
@@ -277,14 +285,13 @@ function createTrackedChildHandle(
   const beginTurn = (text: string, identity?: InputIdentity): void => {
     aborted = false
     turnActive = true
-    promptAbort = new AbortController()
     observation.text = undefined
     observation.stopReason = undefined
     observation.errorMessage = undefined
     observation.provider = undefined
     observation.model = undefined
     observation.baseline = session.getLastAssistantText()
-    running = runTurn(session, text, promptAbort.signal, () => aborted, observation, completion, identity)
+    running = runTurn(session, text, () => aborted, observation, completion, identity)
     void running.then(
       () => {
         turnActive = false
@@ -338,9 +345,6 @@ function createTrackedChildHandle(
     },
     abort: async () => {
       aborted = true
-      // abort() alone only reaches a turn that already owns session work. Fence a prompt still
-      // in preflight too, so it cannot start after cancellation and outlive child disposal.
-      promptAbort?.abort()
       await session.abort()
     },
     subscribe: (listener) => session.subscribe(listener),
@@ -364,7 +368,10 @@ export function createChildHandle(input: CreateChildHandleInput): ChildHandle {
 
 // A created child whose first prompt has not been sent: the launch decides, after creation, whether
 // to begin that turn or hold the prompt for the run's Resume.
-export function createStagedChildHandle(input: CreateChildHandleInput): { readonly handle: ChildHandle; begin(): void } {
+export function createStagedChildHandle(input: CreateChildHandleInput): {
+  readonly handle: ChildHandle
+  begin(): void
+} {
   const tracked = createTrackedChildHandle(input.taskId, input.session, input.completion)
   return { handle: tracked.handle, begin: () => tracked.beginTurn(input.promptText) }
 }
@@ -393,7 +400,8 @@ export async function discardUnstartedChildSession(session: ChildSession): Promi
 async function shutDownChildSession(session: ChildSession): Promise<void> {
   try {
     const runner = session.extensionRunner
-    if (runner?.hasHandlers("session_shutdown") === true) await runner.emit({ type: "session_shutdown", reason: "quit" })
+    if (runner?.hasHandlers("session_shutdown") === true)
+      await runner.emit({ type: "session_shutdown", reason: "quit" })
   } finally {
     session.dispose()
   }

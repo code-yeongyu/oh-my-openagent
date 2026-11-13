@@ -41,10 +41,17 @@ function formatIssuePath(path: readonly PropertyKey[]): string {
   return formatted.length > 0 ? formatted : "<root>"
 }
 
-function schemaMessages(configPath: string, rawConfig: Record<string, unknown>, issues: readonly z.core.$ZodIssue[]): readonly string[] {
-  const validationMessages = issues.map((issue) => `${shortPath(configPath)}: ${formatIssuePath(issue.path)}: ${issue.message}`)
-  const unknownKeyMessages = findUnknownKeyPaths(OhMyOpenCodeConfigSchema, rawConfig)
-    .map((path) => `${shortPath(configPath)}: Unknown config key: ${formatIssuePath(path)}`)
+function schemaMessages(
+  configPath: string,
+  rawConfig: Record<string, unknown>,
+  issues: readonly z.core.$ZodIssue[],
+): readonly string[] {
+  const validationMessages = issues.map(
+    (issue) => `${shortPath(configPath)}: ${formatIssuePath(issue.path)}: ${issue.message}`,
+  )
+  const unknownKeyMessages = findUnknownKeyPaths(OhMyOpenCodeConfigSchema, rawConfig).map(
+    (path) => `${shortPath(configPath)}: Unknown config key: ${formatIssuePath(path)}`,
+  )
   return [...validationMessages, ...unknownKeyMessages]
 }
 
@@ -77,18 +84,16 @@ function mergeViews(views: readonly LoadedConfigView[]): OhMyOpenCodeConfig {
   return config
 }
 
-function protectUserFields(
-  config: OhMyOpenCodeConfig,
-  userConfig: Partial<OhMyOpenCodeConfig>,
-): OhMyOpenCodeConfig {
+function protectUserFields(config: OhMyOpenCodeConfig, userConfig: Partial<OhMyOpenCodeConfig>): OhMyOpenCodeConfig {
   const userMcpEnvAllowlist = userConfig?.mcp_env_allowlist ?? []
   const userPlaywrightMcpArgs = userConfig?.browser_automation_engine?.playwright_mcp_args
-  const browserAutomationEngine = config.browser_automation_engine === undefined
-    ? undefined
-    : (() => {
-      const { playwright_mcp_args: _projectPlaywrightMcpArgs, ...browser } = config.browser_automation_engine
-      return browser
-    })()
+  const browserAutomationEngine =
+    config.browser_automation_engine === undefined
+      ? undefined
+      : (() => {
+          const { playwright_mcp_args: _projectPlaywrightMcpArgs, ...browser } = config.browser_automation_engine
+          return browser
+        })()
 
   return {
     ...config,
@@ -96,10 +101,11 @@ function protectUserFields(
     ...(browserAutomationEngine === undefined
       ? {}
       : {
-        browser_automation_engine: userPlaywrightMcpArgs === undefined
-          ? browserAutomationEngine
-          : { ...browserAutomationEngine, playwright_mcp_args: userPlaywrightMcpArgs },
-      }),
+          browser_automation_engine:
+            userPlaywrightMcpArgs === undefined
+              ? browserAutomationEngine
+              : { ...browserAutomationEngine, playwright_mcp_args: userPlaywrightMcpArgs },
+        }),
   }
 }
 
@@ -107,41 +113,43 @@ function materializeAgentModelChains(config: OhMyOpenCodeConfig): OhMyOpenCodeCo
   if (config.agents === undefined) return config
 
   let changed = false
-  const agents = Object.fromEntries(Object.entries(config.agents).map(([name, agent]) => {
-    if (agent?.models === undefined) return [name, agent]
+  const agents = Object.fromEntries(
+    Object.entries(config.agents).map(([name, agent]) => {
+      if (agent?.models === undefined) return [name, agent]
 
-    const [primary, ...fallbacks] = agent.models
-    const {
-      models: _models,
-      model: _model,
-      fallback_models: _fallbackModels,
-      reasoning: _reasoning,
-      variant: _variant,
-      reasoningEffort: _reasoningEffort,
-      temperature: _temperature,
-      top_p: _topP,
-      maxTokens: _maxTokens,
-      thinking: _thinking,
-      ...rest
-    } = agent
-    const primarySettings = primary === undefined
-      ? {}
-      : typeof primary === "string"
-        ? { model: primary }
-        : primary
-    changed = true
-    return [name, {
-      ...rest,
-      ...primarySettings,
-      fallback_models: fallbacks,
-      ...(agent.models_distribution === "round_robin" ? { models: agent.models } : {}),
-    }]
-  })) as typeof config.agents
+      const [primary, ...fallbacks] = agent.models
+      const {
+        models: _models,
+        model: _model,
+        fallback_models: _fallbackModels,
+        reasoning: _reasoning,
+        variant: _variant,
+        reasoningEffort: _reasoningEffort,
+        temperature: _temperature,
+        top_p: _topP,
+        maxTokens: _maxTokens,
+        thinking: _thinking,
+        ...rest
+      } = agent
+      const primarySettings = primary === undefined ? {} : typeof primary === "string" ? { model: primary } : primary
+      changed = true
+      return [
+        name,
+        {
+          ...rest,
+          ...primarySettings,
+          fallback_models: fallbacks,
+          ...(agent.models_distribution === "round_robin" ? { models: agent.models } : {}),
+        },
+      ]
+    }),
+  ) as typeof config.agents
 
   return changed ? { ...config, agents } : config
 }
 
-const START_WORK_DEPRECATION_MESSAGE = 'config key "start_work" is deprecated, rename to "ulw_execute" - will be removed next release'
+const START_WORK_DEPRECATION_MESSAGE =
+  'config key "start_work" is deprecated, rename to "ulw_execute" - will be removed next release'
 
 let deprecationWarningSink: (message: string) => void = log
 
@@ -172,7 +180,8 @@ function migrateRalphLoopConfig(config: OhMyOpenCodeConfig): OhMyOpenCodeConfig 
   if (legacy === undefined) return config
 
   const enabled = typeof legacy.enabled === "boolean" ? legacy.enabled : undefined
-  const defaultMaxIterations = typeof legacy.default_max_iterations === "number" ? legacy.default_max_iterations : undefined
+  const defaultMaxIterations =
+    typeof legacy.default_max_iterations === "number" ? legacy.default_max_iterations : undefined
   if (enabled === undefined && defaultMaxIterations === undefined) return config
 
   log("[config] ralph_loop is deprecated and will be removed in a future release. Use goal instead.")
@@ -197,19 +206,24 @@ export function validatePluginConfig(
   // A deprecated key still loads and still applies, so it is a notice, not a validation failure:
   // counting it here would make `valid` false and report a working config as invalid in doctor.
   // An ignored invalid value is the same: the rest of its file loads, so it is a warning.
-  const failing = chain.diagnostics.filter((diagnostic) => diagnostic.kind !== "deprecated-keys" && diagnostic.kind !== "invalid-value")
+  const failing = chain.diagnostics.filter(
+    (diagnostic) => diagnostic.kind !== "deprecated-keys" && diagnostic.kind !== "invalid-value",
+  )
   const chainMessages = failing.map((diagnostic) => `${shortPath(diagnostic.path)}: ${diagnostic.message}`)
   const messages = [...chainMessages, ...views.flatMap((view) => view.messages)]
   const warnings = [
-    ...omoConfigDiagnosticLines(chain.diagnostics.flatMap((diagnostic) => diagnostic.kind === "invalid-value" ? [diagnostic] : []), { homeDir }),
+    ...omoConfigDiagnosticLines(
+      chain.diagnostics.flatMap((diagnostic) => (diagnostic.kind === "invalid-value" ? [diagnostic] : [])),
+      { homeDir },
+    ),
     ...views.flatMap((view) => view.warnings),
   ]
   const firstFailingView = views.find((view) => view.messages.length > 0)
   const firstView = views[0]
-  const userConfig = parseConfig(prunePluginView({ config: chain.protectedUserView, homeDir, keyPrefix: "", path: "" }).config)
-  const config = applyDisabledProviders(materializeAgentModelChains(
-    protectUserFields(mergeViews(views), userConfig),
-  ))
+  const userConfig = parseConfig(
+    prunePluginView({ config: chain.protectedUserView, homeDir, keyPrefix: "", path: "" }).config,
+  )
+  const config = applyDisabledProviders(materializeAgentModelChains(protectUserFields(mergeViews(views), userConfig)))
   warnLegacyUlwExecuteKey(chain.views)
   if (config.skills) {
     const owner = chain.views.findLast((view) => Object.hasOwn(view.config, "skills"))
@@ -221,13 +235,20 @@ export function validatePluginConfig(
       for (const source of skills.sources ?? []) {
         const path = typeof source === "string" ? source : source.path
         if (/^https?:\/\//.test(path)) continue
-        userRoots.push(path.startsWith("~/") ? join(homeDir ?? "", path.slice(2)) : isAbsolute(path) ? path : join(dirname(view.path), path))
+        userRoots.push(
+          path.startsWith("~/")
+            ? join(homeDir ?? "", path.slice(2))
+            : isAbsolute(path)
+              ? path
+              : join(dirname(view.path), path),
+        )
       }
     }
     setSkillSourceProvenance(config.skills, {
       kind: owner?.scope === "user" ? "user" : "project-auto",
       selectedRoot: owner ? dirname(owner.path) : directory,
-      projectRoot: detectWorktreePath(directory) ?? directory, userRoots,
+      projectRoot: detectWorktreePath(directory) ?? directory,
+      userRoots,
     })
   }
   addIgnoredAgentOverrideWarnings(config)

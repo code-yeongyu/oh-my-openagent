@@ -42,14 +42,9 @@ export function resolveTelemetryStateDir(
     osProvider: options.osProvider,
   })
   const xdgStateDir =
-    options.env?.XDG_DATA_HOME === undefined
-      ? undefined
-      : join(options.env.XDG_DATA_HOME, product.cacheDirName)
+    options.env?.XDG_DATA_HOME === undefined ? undefined : join(options.env.XDG_DATA_HOME, product.cacheDirName)
 
-  if (
-    dataDir === xdgStateDir ||
-    (xdgStateDir === undefined && basename(dataDir) === product.cacheDirName)
-  ) {
+  if (dataDir === xdgStateDir || (xdgStateDir === undefined && basename(dataDir) === product.cacheDirName)) {
     return dataDir
   }
 
@@ -60,9 +55,7 @@ export function getTelemetryActivityStateFilePath(stateDir: string): string {
   return join(stateDir, POSTHOG_ACTIVITY_STATE_FILE)
 }
 
-export function getDailyActiveCaptureState(
-  input: DailyActiveCaptureStateInput,
-): PostHogActivityCaptureState {
+export function getDailyActiveCaptureState(input: DailyActiveCaptureStateInput): PostHogActivityCaptureState {
   const dayUTC = getUtcDayString(input.now ?? new Date())
   if (capturedDaysByStateDir.get(input.stateDir) === dayUTC) {
     return { dayUTC, captureDaily: false }
@@ -83,10 +76,14 @@ export function getDailyActiveCaptureState(
   // The claim already carries the decision, so the state file is advisory: it keeps the fast path
   // read-only, repairs a corrupt file, and lets a client predating claims keep deduping.
   if (claim === "claimed") {
-    writePostHogActivityState(input.stateDir, {
-      ...state,
-      lastActiveDayUTC: dayUTC,
-    }, input.diagnostics)
+    writePostHogActivityState(
+      input.stateDir,
+      {
+        ...state,
+        lastActiveDayUTC: dayUTC,
+      },
+      input.diagnostics,
+    )
   }
 
   return { dayUTC, captureDaily: true }

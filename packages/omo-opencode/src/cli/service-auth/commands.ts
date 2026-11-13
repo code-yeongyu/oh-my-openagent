@@ -5,6 +5,8 @@ import { isClosedDeviceLogin, withClosedDeviceLoginOptions } from "./closed-devi
 import { openSignInBrowser } from "./browser"
 import { deviceName, devicePlatform } from "./device-name"
 import { loginDevice } from "./device-flow"
+import { advertisesMachineIdentity, readMachineDigest } from "./machine-digest"
+import { refuseSecondMachineDevice } from "./machine-device"
 import { createCredentialStore, INTERACTIVE_READ_WAIT } from "./keystore"
 import { BrowserUnavailable, loginLoopback } from "./loopback"
 import { type ChooseDevice, type ListedDevice, RequestFailure, serviceOrigin, SignInError } from "./protocol"
@@ -16,30 +18,53 @@ import { terminalText } from "./terminal-text"
 
 // Probe the service before anything user-visible (a browser tab, a device code) so an
 // unreachable or unhealthy service fails at once instead of after a dead page and a wait.
-async function ensureServiceAvailable(session: Pick<Session, "request">, api: string): Promise<void> {
+async function ensureServiceAvailable(session: Pick<Session, "request">, api: string): Promise<unknown> {
   try {
-    await session.request("/v1/health", { method: "GET" })
+    return await session.request("/v1/health", { method: "GET" })
   } catch (error) {
     if (!(error instanceof SignInError)) throw error
     // No usable HTTP answer (DNS, refused, TLS, timeout, non-JSON body): the client can't tell a
     // service that hasn't launched from an offline network, so it names both.
     if (error instanceof RequestFailure) {
-      throw new SignInError(`Can't reach OmO accounts at ${api}. The service may not be available yet, or your network, proxy or certificate settings are blocking it.`)
+      throw new SignInError(
+        `Can't reach OmO accounts at ${api}. The service may not be available yet, or your network, proxy or certificate settings are blocking it.`,
+      )
     }
     throw new SignInError(`OmO accounts at ${api} aren't available right now. Try again later.`)
   }
 }
 
-type Options = { readonly api?: string; readonly accounts?: string; readonly device?: boolean; readonly browser?: boolean }
+/**
+ * Login order (#6503): refuse a second device from the stored sign-in and the machine's device service before
+ * `/v1/health`. A logged-out computer is the one that waits on accounts being reachable.
+ */
+export async function beginLogin(
+  session: Pick<Session, "accessSnapshot" | "request">,
+  deviceService: DeviceServiceHandoff | undefined,
+  api: string,
+  newDevice = false,
+): Promise<unknown> {
+  await refuseSecondMachineDevice(session, deviceService, { newDevice })
+  return ensureServiceAvailable(session, api)
+}
+
+type Options = {
+  readonly api?: string
+  readonly accounts?: string
+  readonly device?: boolean
+  readonly browser?: boolean
+  /** Register a new device even though the credential store could not be read (#6503: never silently). */
+  readonly newDevice?: boolean
+}
 
 /** What the host adds to the account commands: its device service for an API origin (design D r9 sections 4-5). */
 export type ServiceAuthHooks = { readonly deviceService?: (api: string) => DeviceServiceHandoff }
 
 export function deviceChoices(devices: readonly ListedDevice[]) {
-  return devices.map(device => ({ value: device.id, label: terminalText(device.name) }))
+  return devices.map((device) => ({ value: device.id, label: terminalText(device.name) }))
 }
 
-const chooseDevice: ChooseDevice = async devices => {
+const chooseDevice: ChooseDevice = async (devices) => {
   if (!process.stdin.isTTY || devices.length === 0) {
     console.error("Device limit reached. Run omo login in an interactive terminal to choose a device to remove.")
     return null
@@ -61,7 +86,11 @@ export function accountsOrigin(options: Pick<Options, "accounts">, env: Record<s
   return serviceOrigin(options.accounts ?? env.OMO_SERVICE_ACCOUNTS_URL ?? DEFAULT_ACCOUNTS_ORIGIN)
 }
 
-async function run(action: "login" | "logout" | "whoami", options: Options, hooks: ServiceAuthHooks = {}): Promise<void> {
+async function run(
+  action: "login" | "logout" | "whoami",
+  options: Options,
+  hooks: ServiceAuthHooks = {},
+): Promise<void> {
   const controller = new AbortController()
   const cancel = () => controller.abort()
   process.once("SIGINT", cancel)
@@ -71,13 +100,22 @@ async function run(action: "login" | "logout" | "whoami", options: Options, hook
     const store = createCredentialStore(api, { wait: INTERACTIVE_READ_WAIT })
     const deviceService = hooks.deviceService?.(api)
     const session = createSession({
-      api, store, signal: controller.signal, ...(deviceService === undefined ? {} : { deviceService }),
-      beforeKeysDiscarded: retireSyncPinOnDiscard({ pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())), log: (line) => console.error(line) }),
+      api,
+      store,
+      signal: controller.signal,
+      ...(deviceService === undefined ? {} : { deviceService }),
+      beforeKeysDiscarded: retireSyncPinOnDiscard({
+        pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())),
+        log: (line) => console.error(line),
+      }),
     })
     if (action === "logout") {
       const revoked = await session.logout()
       console.log("Signed out of OmO. Stored credentials and device keys were removed.")
-      if (!revoked) console.error("Server device revocation could not be confirmed. Remove this device from the Devices page of your OmO account when connected.")
+      if (!revoked)
+        console.error(
+          "Server device revocation could not be confirmed. Remove this device from the Devices page of your OmO account when connected.",
+        )
       return
     }
     if (action === "whoami") {
@@ -86,14 +124,22 @@ async function run(action: "login" | "logout" | "whoami", options: Options, hook
       console.log(saved ? `Signed in to ${api} as ${terminalText(saved.device.name)}.` : "Not signed in.")
       return
     }
-    await ensureServiceAvailable(session, api)
+    // Local sign-in and the device service first, so an already-signed-in computer is told to log out
+    // even when accounts are unreachable. A logged-out computer then hears a health failure as itself.
+    const health = await beginLogin(session, deviceService, api, options.newDevice === true)
+    const machineDigest = advertisesMachineIdentity(health) ? await readMachineDigest() : undefined
+    const digest = machineDigest === undefined ? {} : { machineDigest }
     const name = deviceName()
     const platform = devicePlatform()
     if (!options.device && options.browser !== false) {
       try {
         await loginLoopback(session, {
           accounts: accountsOrigin(options, process.env),
-          name, platform, open: openSignInBrowser, chooseDevice,
+          name,
+          platform,
+          open: openSignInBrowser,
+          chooseDevice,
+          ...digest,
         })
         console.log("Signed in to OmO.")
         return
@@ -102,8 +148,11 @@ async function run(action: "login" | "logout" | "whoami", options: Options, hook
       }
     }
     await loginDevice(session, {
-      name, platform, chooseDevice,
-      show: code => {
+      name,
+      platform,
+      chooseDevice,
+      ...digest,
+      show: (code) => {
         console.log(`Open ${code.verificationUri}`)
         console.log(`User code: ${code.userCode}`)
         console.log(`Matching code: ${code.matchingCode}`)
@@ -111,8 +160,13 @@ async function run(action: "login" | "logout" | "whoami", options: Options, hook
     })
     console.log("Signed in to OmO.")
   } catch (error) {
-    console.error(controller.signal.aborted ? "Sign-in cancelled."
-      : error instanceof SignInError ? error.message : "OmO sign-in stopped on an unexpected error. Run the command again, and report it with /bug if it keeps failing.")
+    console.error(
+      controller.signal.aborted
+        ? "Sign-in cancelled."
+        : error instanceof SignInError
+          ? error.message
+          : "OmO sign-in stopped on an unexpected error. Run the command again, and report it with /bug if it keeps failing.",
+    )
     process.exitCode = 1
   } finally {
     process.removeListener("SIGINT", cancel)
@@ -138,7 +192,11 @@ function configureClosedServiceAuthCommands(program: Command, hooks: ServiceAuth
       configureClosedDeviceLogin(program, hooks)
       continue
     }
-    const command = program.command(name, { hidden: true }).helpOption(false).allowUnknownOption().allowExcessArguments()
+    const command = program
+      .command(name, { hidden: true })
+      .helpOption(false)
+      .allowUnknownOption()
+      .allowExcessArguments()
       .action(() => {
         console.error(SERVICE_ACCOUNTS_CLOSED_MESSAGE)
         process.exitCode = 1
@@ -152,32 +210,43 @@ function configureClosedServiceAuthCommands(program: Command, hooks: ServiceAuth
 // (#12639). The approval page keeps the service's own access policy, so this admits nobody the service does not admit.
 // Every other closed argv (plain login, --accounts, a stray option or argument) refuses exactly as before.
 function configureClosedDeviceLogin(program: Command, hooks: ServiceAuthHooks): void {
-  const command = withClosedDeviceLoginOptions(program.command("login", { hidden: true }))
-    .action((options: Options) => {
+  const command = withClosedDeviceLoginOptions(program.command("login", { hidden: true })).action(
+    (options: Options) => {
       if (!isClosedDeviceLogin(options, command.args)) {
         console.error(SERVICE_ACCOUNTS_CLOSED_MESSAGE)
         process.exitCode = 1
         return
       }
       return run("login", { ...options, device: true }, hooks)
-    })
+    },
+  )
   command.help = refuseClosedServiceAuth
 }
 
-export function configureServiceAuthCommands(program: Command, open = serviceAccountsOpen(), hooks: ServiceAuthHooks = {}): void {
+export function configureServiceAuthCommands(
+  program: Command,
+  open = serviceAccountsOpen(),
+  hooks: ServiceAuthHooks = {},
+): void {
   if (!open) {
     configureClosedServiceAuthCommands(program, hooks)
     return
   }
-  program.command("login").description("Sign in to OmO using the OS credential store")
+  program
+    .command("login")
+    .description("Sign in to OmO using the OS credential store")
     .option("--device", "Use a device code instead of a browser callback")
     .option("--no-browser", "Sign in by device code without opening a browser")
+    .option("--new-device", "Register a new device even if this computer's stored sign-in cannot be read")
     .option("--api <url>", "OmO API origin (or OMO_SERVICE_API_URL)")
     .option("--accounts <url>", "OmO sign-in page origin (or OMO_SERVICE_ACCOUNTS_URL)")
     .action((options: Options) => run("login", options, hooks))
   for (const action of ["logout", "whoami"] as const) {
-    program.command(action)
-      .description(action === "logout" ? "Remove stored OmO credentials and device keys" : "Show the current OmO device sign-in")
+    program
+      .command(action)
+      .description(
+        action === "logout" ? "Remove stored OmO credentials and device keys" : "Show the current OmO device sign-in",
+      )
       .option("--api <url>", "OmO API origin (or OMO_SERVICE_API_URL)")
       .action((options: Options) => run(action, options, hooks))
   }

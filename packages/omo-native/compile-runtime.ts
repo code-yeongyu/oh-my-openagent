@@ -20,7 +20,15 @@ export type EmbeddedFile = Blob & {
   text?: () => Promise<string>
 }
 export type EmbeddedManifestEntry = { relPath: string; sha256: string; mode: number; size: number }
-export type EmbeddedManifest = { omoAiVersion: string; enginePin: string; manifestSha: string; entries: EmbeddedManifestEntry[]; buildInfo?: unknown; engineBuild?: unknown; releaseTarget?: unknown }
+export type EmbeddedManifest = {
+  omoAiVersion: string
+  enginePin: string
+  manifestSha: string
+  entries: EmbeddedManifestEntry[]
+  buildInfo?: unknown
+  engineBuild?: unknown
+  releaseTarget?: unknown
+}
 
 // One spelling per file. On Windows the JS realpath keeps 8.3 short names (RUNNER~1, which tmpdir()
 // and homedir() can return) while the running exe reports the long one, so only the native resolver
@@ -42,7 +50,9 @@ export function isProvisionedExecutable(
   platform: NodeJS.Platform = process.platform,
   realpath: (path: string) => string = realpathSync.native,
 ): boolean {
-  return canonicalExecutablePath(execPath, platform, realpath) === canonicalExecutablePath(expectedPath, platform, realpath)
+  return (
+    canonicalExecutablePath(execPath, platform, realpath) === canonicalExecutablePath(expectedPath, platform, realpath)
+  )
 }
 
 /**
@@ -128,14 +138,15 @@ export async function selectRuntimeManifest(embedded: EmbeddedFile[]): Promise<E
   return undefined
 }
 
-export async function provisionEmbeddedRuntime(manifest: EmbeddedManifest, embedded: EmbeddedFile[], runtimeDir: string): Promise<void> {
+export async function provisionEmbeddedRuntime(
+  manifest: EmbeddedManifest,
+  embedded: EmbeddedFile[],
+  runtimeDir: string,
+): Promise<void> {
   mkdirSync(runtimeDir, { recursive: true })
   const marker = join(runtimeDir, ".provisioned")
   if (readFileIfExists(marker)?.trim() === manifest.manifestSha) return
-  const byPath = new Map(embedded.map((file) => [
-    file.name.replace(/^\.\//, "").replace(/^omo-runtime\//, ""),
-    file,
-  ]))
+  const byPath = new Map(embedded.map((file) => [file.name.replace(/^\.\//, "").replace(/^omo-runtime\//, ""), file]))
   for (const entry of manifest.entries) {
     const file = byPath.get(entry.relPath.replace(/^\.\//, ""))
     if (!file) throw new Error(`embedded asset missing: ${entry.relPath}`)
@@ -152,5 +163,9 @@ export async function provisionEmbeddedRuntime(manifest: EmbeddedManifest, embed
 }
 
 function readFileIfExists(path: string): string | undefined {
-  try { return readFileSync(path, "utf8") } catch { return undefined }
+  try {
+    return readFileSync(path, "utf8")
+  } catch {
+    return undefined
+  }
 }

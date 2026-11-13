@@ -23,7 +23,7 @@ export function getOpenCodeCommandDirs(options: OpenCodeConfigDirOptions): strin
           ...(parentConfigDir ? [join(parentConfigDir, "commands"), join(parentConfigDir, "command")] : []),
         ]
       }),
-    ])
+    ]),
   )
 }
 
@@ -39,6 +39,6 @@ export function getOpenCodeSkillDirs(options: OpenCodeConfigDirOptions): string[
           ...(parentConfigDir ? [join(parentConfigDir, "skills"), join(parentConfigDir, "skill")] : []),
         ]
       }),
-    ])
+    ]),
   )
 }

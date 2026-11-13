@@ -1,6 +1,12 @@
-export { credentialLockPaths, withCredentialLock } from "./credential-lock"
+export { accountHome, credentialLockPaths, withCredentialLock } from "./credential-lock"
 export { currentServiceDevice } from "./protocol"
-export { CredentialIdentityChanged, type CredentialStore, createCredentialStore, KeychainApprovalPendingError, quietNotice } from "./keystore"
+export {
+  CredentialIdentityChanged,
+  type CredentialStore,
+  createCredentialStore,
+  KeychainApprovalPendingError,
+  quietNotice,
+} from "./keystore"
 export { type Credentials, SignInError, serviceOrigin } from "./protocol"
 export { type BeforeKeysDiscarded, createSession, type DiscardedCredential, type Session } from "./session"
 export { retireSyncPinOnDiscard } from "./sync-pin-retire"

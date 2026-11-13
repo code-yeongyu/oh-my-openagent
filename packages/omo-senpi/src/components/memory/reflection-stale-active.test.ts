@@ -32,7 +32,11 @@ describe("reconcileThroughStaleLockReaper", () => {
       },
       onLoadFailure: () => calls.push("load-failure"),
       loadRuntime: async () => ({
-        runStaleLockReaper: (async (options: { runtimeDir: string; settle?: () => Promise<void>; settleAlways?: boolean }) => {
+        runStaleLockReaper: (async (options: {
+          runtimeDir: string
+          settle?: () => Promise<void>
+          settleAlways?: boolean
+        }) => {
           seen.push({ runtimeDir: options.runtimeDir, settleAlways: options.settleAlways })
           await options.settle?.()
           return {} as never
