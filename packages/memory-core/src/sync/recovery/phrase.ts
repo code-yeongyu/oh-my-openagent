@@ -297,3 +297,36 @@ export const derivePhraseKeys = async (
     ikm.fill(0)
   }
 }
+/** Distinct 1-based word positions the person must type back, chosen uniformly at random and sorted. */
+export const confirmationPositions = (
+  count = 3,
+  fillRandom: (bytes: Uint32Array<ArrayBuffer>) => void = (bytes) => void crypto.getRandomValues(bytes),
+): ReadonlyArray<number> => {
+  const chosen = new Set<number>()
+  const draw = new Uint32Array(1)
+  while (chosen.size < count) {
+    fillRandom(draw)
+    const value = draw[0] ?? 0
+    // Rejection sampling keeps each of the 24 positions equally likely.
+    if (value < Math.floor(0x1_0000_0000 / WORD_COUNT) * WORD_COUNT) chosen.add((value % WORD_COUNT) + 1)
+  }
+  return Object.freeze([...chosen].sort((left, right) => left - right))
+}
+
+/** Whether the typed words equal the phrase's words at `positions`, normalised like `parseRecoveryPhrase`. */
+export const confirmationMatches = (
+  phrase: RecoveryPhrase,
+  positions: ReadonlyArray<number>,
+  typed: TypedPhrase,
+): boolean => {
+  const answer = typedTextOf(typed).normalize("NFKD").toLowerCase().trim().split(/\s+/u)
+  const indices = indicesOf(entropyOf(phrase))
+  try {
+    return (
+      answer.length === positions.length &&
+      positions.every((position, offset) => answer[offset] === WORDS[indices[position - 1] ?? -1])
+    )
+  } finally {
+    indices.fill(0)
+  }
+}

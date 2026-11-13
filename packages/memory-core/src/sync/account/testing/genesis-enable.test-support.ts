@@ -32,6 +32,7 @@ export const fixture = async (serverOptions: { readonly stream?: boolean } = {})
     rpId: "recovery.omo.dev",
     userName: "synthetic-user",
     roaming: false,
+    method: "passkey" as const,
     genesis: {
       prfSupported: true,
       createGenesis: async () => {
