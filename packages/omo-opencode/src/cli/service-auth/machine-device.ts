@@ -72,7 +72,7 @@ export async function refuseSecondMachineDevice(
   })
   if (stored !== null && stored !== DAMAGED) {
     throw new MachineAlreadySignedIn(
-      `This computer is already signed in to OmO as ${terminalText(stored.device.name)}, and omo uses that device.`,
+      `This computer is already signed in to OmO as ${terminalText(stored.device.name)}, and omo uses that device. Run omo logout first to sign in again.`,
     )
   }
   const held = (await deviceService?.machineDevice?.()) ?? { kind: "absent" as const }
@@ -92,7 +92,7 @@ export async function refuseSecondMachineDevice(
   }
   if (held.kind === "held") {
     throw new MachineAlreadySignedIn(
-      `This computer's OmO device service already holds its device, ${terminalText(held.device.name)}. omo uses that device instead of registering another one: sign in from the OmO desktop app to share it with omo.`,
+      `This computer's OmO device service already holds its device, ${terminalText(held.device.name)}. omo uses that device instead of registering another one: sign in from the OmO desktop app to share it with omo, or run omo logout first to sign this computer in again.`,
     )
   }
   if (held.kind === "unknown") {
