@@ -20,6 +20,7 @@ pub(super) static ROWS: &[ErrorRow] = &[
     e!(Internal, RequestTooLarge => InvalidArguments, NDS, Yes, INSPECT, "the same call with a smaller request"),
     e!(Internal, HoldDuration => InvalidArguments, NDS, Yes, INSPECT, "the same call with the arguments the message names"),
     e!(Internal, ScrollSteps => InvalidArguments, NDS, Yes, INSPECT, "the same call with the arguments the message names"),
+    e!(Internal, SpanInverted => InvalidArguments, NDS, Yes, INSPECT, "the same call with the arguments the message names"),
     e!(Internal, WaylandActivationToken => Unavailable, NDS, Yes, INSPECT, "computer.apps.open(target)"),
     e!(Internal, Clipboard => Unavailable, NDS, Yes, INSPECT, "win.type(text)"),
     e!(Internal, NoClipboardRoute => Unavailable, NDS, Yes, INSPECT, "win.type(text)"),
