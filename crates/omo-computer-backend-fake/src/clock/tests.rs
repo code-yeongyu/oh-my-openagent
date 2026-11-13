@@ -41,7 +41,10 @@ fn the_fake_reads_no_environment() {
         concat!("use std::{fs, e", "nv};"),
         concat!("use std::{fs, e", "nv as ambient};"),
         // The same groups split across lines, as rustfmt lays out a long group.
-        concat!("use std::{\n    e", "nv as ambient,\n};\nlet home = ambient::var(\"HOME\");"),
+        concat!(
+            "use std::{\n    e",
+            "nv as ambient,\n};\nlet home = ambient::var(\"HOME\");"
+        ),
         concat!("use std::{\n    fs,\n    e", "nv,\n};"),
         concat!("use std::{\n    io::{self, Read},\n    e", "nv::args,\n};"),
     ] {
