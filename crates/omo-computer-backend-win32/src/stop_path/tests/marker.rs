@@ -26,6 +26,29 @@ fn marker_acl_is_owner_only() {
     );
 }
 
+/// Review L2 (#13350): SDDL read-back writes well-known account SIDs as aliases ("LA" for the
+/// RID-500 local administrator, "LG" for RID-501), so the user's own ACE may read back as an alias.
+#[test]
+fn marker_acl_read_back_accepts_the_alias_of_the_users_own_sid() {
+    let admin = "S-1-5-21-1-2-3-500";
+    assert!(is_owner_only("D:P(A;;FA;;;LA)(A;;FA;;;SY)", admin));
+    assert!(is_owner_only(
+        "D:P(A;;FA;;;LG)(A;;FA;;;SY)",
+        "S-1-5-21-1-2-3-501"
+    ));
+    assert!(
+        !is_owner_only("D:P(A;;FA;;;LA)(A;;FA;;;SY)", USER),
+        "LA is not a RID-1001 user"
+    );
+    assert!(
+        !is_owner_only(
+            "D:P(A;;FA;;;LA)(A;;FA;;;S-1-5-21-1-2-3-500)(A;;FA;;;SY)(A;;FA;;;WD)",
+            admin
+        ),
+        "a third trustee still fails"
+    );
+}
+
 #[cfg(windows)]
 #[test]
 fn marker_acl_applies_and_reads_back_owner_only_on_a_real_file() {
