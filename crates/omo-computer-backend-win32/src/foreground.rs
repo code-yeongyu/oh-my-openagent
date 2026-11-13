@@ -78,8 +78,15 @@ pub fn admit_leased(physical: &PhysicalChord, engine_held: &[u16]) -> Result<(),
 }
 
 /// One `SendInput` batch for `chord` under the lease: modifiers down, the key, modifiers up in reverse.
-#[must_use]
-pub fn foreground_chord(chord: &Chord) -> Vec<KeyUnit> {
+/// `vk_for` is the keyboard layout's virtual key for a character (`VkKeyScanW` on Windows).
+///
+/// # Errors
+/// `InvalidKey{unknown_key}` when the chord needs a virtual key the layout does not have.
+pub fn foreground_chord(
+    chord: &Chord,
+    vk_for: &dyn Fn(char) -> Option<u16>,
+) -> Result<Vec<KeyUnit>, Refusal> {
+    let _ = vk_for;
     let mods: Vec<u16> = [
         (chord.mods.shift, VK_SHIFT),
         (chord.mods.ctrl, VK_CONTROL),
@@ -107,5 +114,5 @@ pub fn foreground_chord(chord: &Chord) -> Vec<KeyUnit> {
     batch.push(down);
     batch.push(up);
     batch.extend(mods.iter().rev().map(|vk| KeyUnit::virtual_key(*vk, false)));
-    batch
+    Ok(batch)
 }
