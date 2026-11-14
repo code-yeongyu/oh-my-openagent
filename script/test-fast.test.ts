@@ -510,11 +510,7 @@ describe("spawnInheritingStdio", () => {
       const { registry } = trackingRegistry()
 
       // when
-      void spawnInheritingStdio(
-        registry,
-        () => {},
-        spawner,
-      )(group)
+      void spawnInheritingStdio(registry, () => {}, spawner)(group)
 
       // then
       const argv = calls[0]?.args ?? []

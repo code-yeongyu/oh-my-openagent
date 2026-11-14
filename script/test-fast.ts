@@ -1,5 +1,9 @@
 import { spawn, type SpawnOptions } from "node:child_process"
-import { ROOT_TEST_SERIAL_QUARANTINE_PATHS, serialQuarantineArgs, testTimeoutArgs } from "./root-test-serial-quarantine.ts"
+import {
+  ROOT_TEST_SERIAL_QUARANTINE_PATHS,
+  serialQuarantineArgs,
+  testTimeoutArgs,
+} from "./root-test-serial-quarantine.ts"
 
 export interface TestFastGroup {
   readonly name: string
