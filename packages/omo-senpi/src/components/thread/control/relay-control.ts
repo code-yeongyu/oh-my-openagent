@@ -6,7 +6,7 @@ import { outcomeFailure } from "../remote/outcome"
 import { replyData } from "../remote/remote-ops"
 import type { ModelChoice } from "../tools/model-match"
 import { closeLadder, SESSION_GONE, type RecordAnswer } from "./close-ladder"
-import { ControlRefusal, refuse, type SessionControl } from "./port"
+import { ControlRefusal, refuse, SESSION_ONLY_THINKING_SCOPE, type SessionControl } from "./port"
 
 const isObject = (value: unknown): value is JsonObject =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -88,7 +88,8 @@ export function createRelayControl(remote: RemoteThreadSurface, row: RemoteSessi
       return { models: modelsOf(replyData(outcome.response)["models"]), held: outcome.local === true }
     },
     setModel: async (provider, id) => {
-      const reply = await command({ type: "set_model", provider, modelId: id })
+      // `scope: "session"` switches only this session; without it the engine persists the device's default model.
+      const reply = await command({ type: "set_model", provider, modelId: id, scope: "session" })
       const confirmedProvider = reply["provider"]
       const confirmedId = reply["id"]
       return {
@@ -100,12 +101,12 @@ export function createRelayControl(remote: RemoteThreadSurface, row: RemoteSessi
       const levels = (await command({ type: "get_available_thinking_levels" }))["levels"]
       return Array.isArray(levels) ? levels.filter((level): level is string => typeof level === "string") : []
     },
-    setThinkingLevel: async (level, scope) => {
+    setThinkingLevel: async (level) => {
       const outcome = await remote.sessions.sessionCommand(device, sessionId, {
         type: "set_thinking_level",
         sessionId,
         level,
-        ...(scope === "turn" ? { scope } : {}),
+        scope: SESSION_ONLY_THINKING_SCOPE,
       })
       if (outcome.kind === "refused" && THINKING_LEVEL_UNSUPPORTED.test(outcome.reason))
         throw refuse(

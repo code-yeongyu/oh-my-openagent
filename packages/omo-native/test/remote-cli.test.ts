@@ -656,9 +656,9 @@ describe("omo remote session verbs", () => {
       thread: { thread_id: "dur-new-on-b", device: "b" },
       model: { provider: "openai", id: "gpt-6" },
     })
-    expect(types(a.sent, "set_model").map((entry) => [entry.session, entry.rpc?.["modelId"]])).toEqual([
-      ["dur-new-on-b", "gpt-6"],
-    ])
+    expect(
+      types(a.sent, "set_model").map((entry) => [entry.session, entry.rpc?.["modelId"], entry.rpc?.["scope"]]),
+    ).toEqual([["dur-new-on-b", "gpt-6", "session"]])
   })
 
   test("send streams the answer's text deltas in order and returns once the turn settles", async () => {
