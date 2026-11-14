@@ -99,7 +99,7 @@ impl FakeBackend {
     /// Measures every node's `ready_after_ms` on `clock` instead of the
     /// host's time; set it before the first read.
     pub fn set_ax_clock(&mut self, clock: crate::clock::FakeClock) {
-        self.ax_tree.time = crate::ax_tree::AxTime::Fake(clock);
+        self.ax_tree.time = crate::ax_time::AxTime::Fake(clock);
     }
 
     /// A handle on the failure queues that stays valid after the backend is boxed.

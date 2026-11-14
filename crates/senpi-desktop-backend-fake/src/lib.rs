@@ -4,6 +4,7 @@
 //! a [`FakeClock`] for heartbeat tests. Touches no OS API.
 
 mod ax_impl;
+mod ax_time;
 mod ax_tree;
 mod clock;
 mod desktop_impl;

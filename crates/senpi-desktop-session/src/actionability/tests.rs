@@ -1,10 +1,12 @@
 //! The actionability battery, opened surfaces, refusal hints and dangerous
 //! chords over scripted fake windows.
 
+#[path = "auto_wait_tests.rs"]
+mod auto_wait_tests;
 #[path = "lock_tests.rs"]
 mod lock_tests;
-
-use std::time::{Duration, Instant};
+#[path = "no_sleep_tests.rs"]
+mod no_sleep_tests;
 
 use senpi_desktop_backend_fake::SinkOp;
 use senpi_desktop_core::error::{DesktopError, ErrorCode, ErrorReport};
@@ -15,7 +17,7 @@ use senpi_desktop_core::types::DesktopSessionOptions;
 use serde_json::{json, Value};
 
 use crate::request::{Op, Response};
-use crate::test_support::{harness_opened, Harness};
+use crate::test_support::{harness_on_fake_time, harness_opened, Harness};
 
 fn window(id: &str, title: &str) -> Value {
     json!({"id": id, "title": title, "app": "Notes", "pid": 4242, "x": 100, "y": 100,
@@ -66,39 +68,45 @@ fn action(response: Response) -> ActionReport {
     }
 }
 
-fn refused_fast(error: &DesktopError, started: Instant, reason: &str) {
+/// An object-mode harness on fake time.
+fn opened_on_fake_time(overlay: &Value) -> Harness {
+    let options = DesktopSessionOptions { report_mode: ReportMode::Object, trace: true, ..DesktopSessionOptions::default() };
+    harness_on_fake_time(overlay, crate::grant::ControlSlot::new(), options)
+}
+
+/// Refused with `reason`, nothing sent, and at once: no fake time passed.
+fn refused_fast(harness: &Harness, error: &DesktopError, reason: &str) {
     assert_eq!(error.code, ErrorCode::AxUnsupported, "{error}");
     let report = report(error);
     assert_eq!(report.reason.as_deref(), Some(reason));
     assert_eq!(report.disposition, Some(Disposition::NOT_DELIVERED_SAFE));
-    assert!(started.elapsed() < Duration::from_secs(1), "refused after {:?}", started.elapsed());
+    let waited = harness.fake_ms();
+    assert_eq!(waited, 0, "refused after {waited} ms of fake time");
 }
 
 #[test]
 fn the_battery_refuses_a_disabled_element_at_once_and_sends_nothing() {
     // Given: a visible, still, disabled button.
-    let mut harness = opened(&scene(button(&json!({"enabled": false})), &[]), ReportMode::Object);
+    let mut harness = opened_on_fake_time(&scene(button(&json!({"enabled": false})), &[]));
     let reference = harness.focused_ref();
     // When
-    let started = Instant::now();
     let error = press(&mut harness, reference).expect_err("refused");
     // Then: no auto-wait for a terminal state.
-    refused_fast(&error, started, "disabled");
+    refused_fast(&harness, &error, "disabled");
     assert_eq!(pressed(&harness), 0);
 }
 
 #[test]
 fn the_battery_refuses_an_action_the_element_does_not_offer_at_once() {
     // Given: a button that offers only `click`.
-    let mut harness = opened(&scene(button(&json!({"actions": ["click"]})), &[]), ReportMode::Object);
+    let mut harness = opened_on_fake_time(&scene(button(&json!({"actions": ["click"]})), &[]));
     let reference = harness.focused_ref();
     // When
-    let started = Instant::now();
     let error = harness
         .process(Op::AxPerform(AxPerformParams { ref_: reference, action: "increment".to_owned() }))
         .expect_err("refused");
     // Then
-    refused_fast(&error, started, "action_unsupported");
+    refused_fast(&harness, &error, "action_unsupported");
     assert_eq!(pressed(&harness), 0);
 }
 
@@ -119,38 +127,33 @@ fn press_is_supported_by_any_listed_action_and_other_actions_need_their_name() {
     }
 }
 
-/// Wall time a busy host takes from the test between two of its steps.
-const HOST_STALL: Duration = Duration::from_millis(200);
-
-/// The battery waits on the fake's clock: each poll moves it, nothing else.
-struct FakeTime(senpi_desktop_backend_fake::FakeClock);
-
-impl super::BatteryClock for FakeTime {
-    fn now(&self) -> Duration {
-        Duration::from_millis(self.0.now_ms())
-    }
-
-    fn sleep(&self, pause: Duration) {
-        self.0.advance(u64::try_from(pause.as_millis()).unwrap_or(u64::MAX));
-    }
-}
-
 #[test]
 fn the_battery_waits_for_an_element_that_appears_enabled_after_500_ms() {
     // Given: hidden and disabled until 500 ms after its first read.
-    let mut harness = opened(&scene(button(&json!({"ready_after_ms": 500})), &[]), ReportMode::Object);
-    harness.worker.battery_clock = Box::new(FakeTime(harness.ax_clock.clone()));
+    let mut harness = opened_on_fake_time(&scene(button(&json!({"ready_after_ms": 500})), &[]));
     let reference = harness.focused_ref();
-    // A loaded host deschedules this thread between the snapshot and the press:
-    // host time passes, the fake's does not.
-    std::thread::sleep(HOST_STALL);
     // When
     let report = action(press(&mut harness, reference).expect("delivered after the wait"));
     // Then: the press waited the full 500 ms of fake time, and not until AUTO_WAIT.
-    let waited = harness.ax_clock.now_ms();
+    let waited = harness.fake_ms();
     assert!((500..5_000).contains(&waited), "waited {waited} ms of fake time");
     assert!(report.timings.and_then(|timings| timings.ax_resolve).is_some(), "axResolve timed");
     assert_eq!(report.disposition, Disposition::DELIVERED_UNVERIFIED);
+    assert_eq!(pressed(&harness), 1);
+}
+
+#[test]
+fn a_harness_left_on_host_time_measures_ready_after_ms_on_host_time_too() {
+    // Given: a ready_after_ms element in a harness that never asked for fake time.
+    let mut harness = opened(&scene(button(&json!({"ready_after_ms": 50})), &[]), ReportMode::Object);
+    let reference = harness.focused_ref();
+    // When
+    let result = press(&mut harness, reference);
+    // Then: the fake and the battery read the same (host) time, so the wait ends.
+    assert!(
+        result.is_ok(),
+        "a harness without fake time must measure ready_after_ms on host time, as the battery does: {result:?}"
+    );
     assert_eq!(pressed(&harness), 1);
 }
 
