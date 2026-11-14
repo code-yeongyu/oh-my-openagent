@@ -107,14 +107,26 @@ describe("omo remote", () => {
     expect(JSON.parse(json.out.join(""))).toEqual(defaultWorld().status)
   })
 
-  test("devices lists each device with its presence", async () => {
+  test("devices lists this device first and then each peer with its presence (the service's roster leaves this device out, #13402)", async () => {
     const { code, out } = await run(["devices"])
     expect(code).toBe(REMOTE_EXIT.ok)
     expect(out[0]).toMatch(/^DEVICE\s+NAME\s+KIND\s+PLATFORM\s+SEEN$/)
-    expect(out[1]).toMatch(new RegExp(`^${PEER}\\s+Studio\\s+desktop\\s+darwin\\s+online$`))
-    expect(out[2]).toMatch(new RegExp(`^${OFFLINE_PEER}\\s+Laptop\\s+cli\\s+linux\\s+12d ago$`))
+    expect(out[1]).toMatch(new RegExp(`^dev-self\\s+This Mac\\s+this device\\s+${process.platform}\\s+online$`))
+    expect(out[2]).toMatch(new RegExp(`^${PEER}\\s+Studio\\s+desktop\\s+darwin\\s+online$`))
+    expect(out[3]).toMatch(new RegExp(`^${OFFLINE_PEER}\\s+Laptop\\s+cli\\s+linux\\s+12d ago$`))
     const json = await run(["devices", "--json"])
-    expect(JSON.parse(json.out.join(""))).toEqual(defaultWorld().devices)
+    expect(JSON.parse(json.out.join(""))).toEqual([
+      {
+        device: "dev-self",
+        label: "This Mac",
+        kind: "this device",
+        platform: process.platform,
+        last_seen_ms: null,
+        online: true,
+        this_device: true,
+      },
+      ...defaultWorld().devices.map((device) => ({ ...device, this_device: false })),
+    ])
   })
 
   test("sessions shows attach targets, marks cached rows and names devices that did not answer", async () => {
@@ -130,6 +142,15 @@ describe("omo remote", () => {
     const { out } = await run(["sessions", "--device", PEER, "--json"])
     const result = JSON.parse(out.join("")) as { rows: { device: string }[] }
     expect(result.rows.map((row) => row.device)).toEqual([PEER])
+  })
+
+  test("sessions --device naming no device of the account is a usage error, not an empty list (#13402)", async () => {
+    const typo = await run(["sessions", "--device", "no-such-device", "--json"])
+    expect(typo.code).toBe(REMOTE_EXIT.usage)
+    expect(typo.out).toEqual([])
+    expect(typo.err).toEqual(["omo remote sessions: no device no-such-device on this account (see omo remote devices)"])
+    const self = await run(["sessions", "--device", "dev-self", "--json"])
+    expect(self.code).toBe(REMOTE_EXIT.ok)
   })
 
   test("disable and enable report the switch the service answers with", async () => {

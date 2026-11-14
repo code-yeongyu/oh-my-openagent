@@ -4,6 +4,8 @@ import {
   type AccountShowResult,
   accountStateNotice,
   classifyAccountShow,
+  type DeviceRef,
+  type DeviceRow,
   type DeviceService,
   deviceServiceEndpointPath,
   LocalApiError,
@@ -16,6 +18,24 @@ import { serveRemoteAttach } from "./remote-attach"
 import { type BootstrapSetup, runBootstrapVerb } from "./remote-bootstrap"
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
 import { controlLines, deviceLines, sessionLines, statusLines } from "./remote-render"
+
+/** The account's devices with this one first: relayd's roster lists only the peers (#13402). */
+function withThisDevice(
+  roster: readonly DeviceRow[],
+  self: DeviceRef | null,
+): readonly (DeviceRow & { readonly this_device: boolean })[] {
+  const peers = roster.map((row) => ({ ...row, this_device: row.device === self?.id }))
+  if (self === null || roster.some((row) => row.device === self.id)) return peers
+  const here: DeviceRow = {
+    device: self.id,
+    label: self.name,
+    kind: "this device",
+    platform: process.platform,
+    last_seen_ms: null,
+    online: true,
+  }
+  return [{ ...here, this_device: true }, ...peers]
+}
 import { isSessionVerb, parseSession, SESSION_VERBS, type SessionArgs } from "./remote-session-args"
 import { runSession } from "./remote-session-verbs"
 
@@ -128,11 +148,21 @@ async function runOn(service: DeviceService, parsed: Parsed, dependencies: Remot
       return print(status, () => statusLines(status, service.serviceVersion))
     }
     case "devices": {
-      const devices = await service.devices()
+      const devices = withThisDevice(await service.devices(), await service.thisDevice())
       return print(devices, () => deviceLines(devices, dependencies.now()))
     }
     case "sessions": {
-      const [result, devices] = await Promise.all([service.sessions(parsed.filter), service.devices()])
+      const [result, devices, self] = await Promise.all([
+        service.sessions(parsed.filter),
+        service.devices(),
+        service.thisDevice(),
+      ])
+      // A typo in --device and a device with no sessions both list nothing: name the unknown device instead.
+      const wanted = parsed.filter.device
+      if (wanted !== undefined && wanted !== self?.id && !devices.some((device) => device.device === wanted)) {
+        dependencies.error(`omo remote sessions: no device ${wanted} on this account (see omo remote devices)`)
+        return REMOTE_EXIT.usage
+      }
       const labels = new Map(devices.map((device) => [device.device, device.label]))
       return print(result, () => sessionLines(result, labels, dependencies.now()))
     }
