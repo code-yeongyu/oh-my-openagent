@@ -83,7 +83,13 @@ impl MarkerStore for FileMarker {
             let _ = fs::remove_file(&temp);
             return Err(error);
         }
-        durable_rename(&temp, &self.path, dir)
+        let committed = durable_rename(&temp, &self.path, dir);
+        if committed.is_err() {
+            // A refused or failed commit leaves no temp file behind (after a rename that
+            // succeeded, the temp is already gone and this finds nothing).
+            let _ = fs::remove_file(&temp);
+        }
+        committed
     }
 
     fn path(&self) -> Option<&Path> {
@@ -202,8 +208,8 @@ fn durable_rename(temp: &Path, path: &Path, dir: &Path) -> io::Result<()> {
 
 /// Windows (amendment A-IS-60, its security read): the temp file was flushed before this call;
 /// the directory handle opens first (backup semantics, write access), so an access or
-/// filesystem failure surfaces before the marker changes (the flushed temp file stays in the
-/// state directory: fail-closed, the marker is untouched); the rename is write-through; then
+/// filesystem failure surfaces before the marker changes (`commit` then removes the temp
+/// file, so a refused commit leaves nothing behind); the rename is write-through; then
 /// the directory is flushed, which is the step that makes the entry durable. Ok only when
 /// every call succeeded; any failure is an error carrying its `GetLastError` code (no code
 /// reads as "unsupported, skip"); a flush that fails after the rename leaves the marker in
