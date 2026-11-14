@@ -1,0 +1,70 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  // Exported types are part of our contracts even before they have consumers.
+  "rules": { "types": "off", "nsTypes": "off" },
+  // pre-existing at origin dev 4686e425b5: executables root scripts and tests run that no package declares (OS and platform tools)
+  // busctl, hyprctl: Linux session tools run by script/qa/desktop/hyprland.ts
+  // kdotool: KWin window tool run by script/qa/desktop/kwin.ts
+  "ignoreBinaries": ["busctl", "file", "gdbus", "gnome-extensions", "hyprctl", "icacls", "kdotool", "notepad.exe", "tasklist"],
+  // Findings marked "pre-existing at origin dev 4686e425b5" were already present when this check was added. Each ignore is
+  // scoped to one file (and its issue types) or one dependency, so new dead code anywhere else still fails the check.
+  // Remove an entry when its finding is fixed. Root-workspace file ignores live at the top level (knip reads the root
+  // workspace's ignoreIssues only there).
+  // Third-party projects vendored as git submodules; the build materializes them, they are not this repository's code.
+  // The bunshin-ts build output, vendored with only its dependency imports rewritten (pinned by packages/omo-senpi/vendor/PIN.json) is upstream code too.
+  // The GNOME Shell extension entry runs inside gnome-shell's GJS (gi:// and resource:// imports, a default-exported
+  // Extension class the shell loads); its pure window-rects.js stays checked through window-rects.test.mjs.
+  // The omo 5.1.66 local API decoders, vendored byte for byte (git blob ids pinned in its PIN.json) so the old-client
+  // tests read a newer service's frames with a released client's decoders; their unused exports are that release's.
+  "ignore": ["packages/shared-skills/upstreams/**", "packages/omo-senpi/vendor/**", "packages/gnome-window-rects-extension/extension.js", "packages/device-service-core/vendor/omo-5.1.66-decoder/**"],
+  // Unused exports already present at origin dev 4686e425b5, named per symbol. knip has no per-symbol ignore and a file-wide
+  // ignoreIssues "exports" entry would also hide a new unused export in that file, so script/knip-preexisting-exports.ts
+  // (shared byte for byte with omo-relay-daemon, sha256-pinned by script/knip-coverage.test.ts) drops exactly these names, and
+  // every other export of these files stays checked. script/knip-coverage.test.ts fails if a row is no longer reported.
+  // script/knip-next-route-segment-exports.ts drops the Next.js route-segment config exports (read by name from the app
+  // directory's special files by the framework, so never dead) of the web app only, named below. It is scoped to those file
+  // names under that one directory, so every other export of those files - and every file elsewhere - stays checked.
+  "preprocessor": ["./script/knip-preexisting-exports.ts", "./script/knip-next-route-segment-exports.ts"],
+  "preprocessorOptions": {
+    // Next.js reads these exports by name from the app directory's special files (route segment config and the metadata
+    // exports): https://nextjs.org/docs/app/api-reference/file-conventions/route-segment-config. script/knip-next-route-segment.test.ts
+    // proves a new page's `revalidate` is not reported while an unrelated unused export of that same page still is.
+    "nextRouteSegmentExports": {
+      "dir": "packages/web/app",
+      "files": [
+        "layout",
+        "page",
+        "route",
+        "template",
+        "default",
+        "error",
+        "loading",
+        "not-found",
+        "forbidden",
+        "unauthorized",
+        "global-error",
+        "global-not-found",
+        "icon",
+        "apple-icon",
+        "opengraph-image",
+        "twitter-image",
+        "sitemap",
+        "robots",
+        "manifest"
+      ],
+      "names": [
+        "revalidate",
+        "dynamic",
+        "dynamicParams",
+        "fetchCache",
+        "runtime",
+        "preferredRegion",
+        "maxDuration",
+        "generateStaticParams",
+        "generateMetadata",
+        "metadata",
+        "viewport"
+      ]
+    }
+  }
+}

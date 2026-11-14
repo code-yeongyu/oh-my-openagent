@@ -1,0 +1,11 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    ".": {
+      "ignoreFiles": [
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        ".github/scripts/cla-first-signature-replay.mjs",
+      ]
+    }
+  }
+}

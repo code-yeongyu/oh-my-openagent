@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { registerSyncRpc } from "./sync-rpc-registration"
@@ -22,6 +22,7 @@ import { enableSync } from "../../../../memory-core/src/sync/account/enable"
 import { joinAccount } from "../../../../memory-core/src/sync/account/join"
 import { approveDevice } from "../../../../memory-core/src/sync/account/approve"
 import { startChainWireServer } from "../../../../memory-core/src/sync/account/testing/chain-wire-server.test-support"
+import { removeTree } from "../../../../../test-support/remove-tree"
 
 const cleanup: (() => Promise<unknown>)[] = []
 afterEach(async () => {
@@ -54,7 +55,9 @@ async function setup(empty = false) {
   const server = startChainWireServer(world.account, chain)
   cleanup.push(() => server.stop())
   const claimsRoot = await mkdtemp(join(tmpdir(), "g3-wire-"))
-  cleanup.push(() => rm(claimsRoot, { recursive: true, force: true }))
+  // The claims churn lease, lock and guard files here up to dispose; on Windows a just-unlinked one can still be
+  // listed, and Bun's recursive rm then reports success but leaves the root. removeTree checks it is gone.
+  cleanup.push(() => removeTree(claimsRoot))
   const joining = await newDevice()
   const memberPin = freshStateDir()
   if (!empty) {

@@ -70,9 +70,19 @@ export type BeforeKeysDiscarded = ((discarded: DiscardedCredential) => Promise<v
  * every path, forget, a session the service ended). Neither ever reads the credential store, and neither throws: a
  * device service that is down or refuses never fails a sign-in or a sign-out.
  */
+export type MachineDeviceState =
+  | { readonly kind: "absent" }
+  | { readonly kind: "held"; readonly device: { readonly id: string; readonly name: string } }
+  | { readonly kind: "unknown"; readonly reason: string; readonly endpoint?: string }
+
 export type DeviceServiceHandoff = {
   readonly adopt: (credentials: Credentials) => Promise<void>
   readonly forget: () => Promise<void>
+  /**
+   * What this machine's device service holds (#6503): `absent` only when no service runs or it holds no device;
+   * `held` includes a parked device (sign_in_required); `unknown` is a service that exists but could not be read.
+   */
+  readonly machineDevice?: () => Promise<MachineDeviceState>
 }
 
 export const discardedOf = (
@@ -191,6 +201,39 @@ export function createSession(options: {
       return refreshed(current)
     })
   }
+  // #13265: the signed-in account's email through the session's own token; undefined when the service does not say.
+  async function emailOf(access: string): Promise<string | undefined> {
+    const body = await request("/v1/me", { headers: { authorization: `Bearer ${access}` } }).catch(() => null)
+    const user =
+      typeof body === "object" && body !== null && "user" in body ? (body as { user?: unknown }).user : undefined
+    const email =
+      typeof user === "object" && user !== null && "email" in user ? (user as { email?: unknown }).email : undefined
+    return typeof email === "string" && email !== "" ? email : undefined
+  }
+  async function accessTokenImpl(expect?: (current: Credentials) => boolean): Promise<string> {
+    signal?.throwIfAborted()
+    const snapshot = await store.read()
+    signal?.throwIfAborted()
+    // Only an unjournaled token beyond the refresh path's 30s skew can avoid the writer lock.
+    // Account-bound callers compare their captured keys, account and generation through `expect`.
+    if (
+      snapshot !== null &&
+      snapshot.refreshState !== "uncertain" &&
+      snapshot.refreshAttempt === undefined &&
+      Date.parse(snapshot.accessTokenExpiresAt) > now() + 30_000 &&
+      (expect === undefined || expect(snapshot)) &&
+      // A value the keychain helper does not own yet takes the lock once, so its section can migrate it (3.3).
+      !(await store.migrationPending?.())
+    )
+      return snapshot.accessToken
+    return locked(async (view) => {
+      const current = await store.readAuthoritative()
+      if (current === null) throw new SignInError(`Not signed in. ${signInHint("first")}`)
+      if (expect !== undefined && !expect(current)) throw new CredentialIdentityChanged()
+      await view?.settle()
+      return (await refreshed(current)).accessToken
+    })
+  }
   return {
     request,
     signal,
@@ -198,10 +241,7 @@ export function createSession(options: {
     async ready() {
       await store.read()
     },
-    /** The stored sign-in whose keys a machine-bound sign-in reuses; null when nothing readable is stored. */
-    stored: (): Promise<Credentials | null> => store.read().catch(() => null),
-    /** `adopt: false` when the device service already holds exactly these keys (one machine, one device). */
-    async save(value: Credentials, options: { readonly adopt?: boolean } = {}) {
+    async save(value: Credentials) {
       await locked(async () => {
         let stored: Credentials | null
         try {
@@ -219,7 +259,7 @@ export function createSession(options: {
       })
       // After the marker is gone, so a stale marker from an earlier sign-out cannot park this sign-in; from the value
       // in memory, never read back from the store.
-      if (options.adopt !== false) await deviceService?.adopt(value)
+      await deviceService?.adopt(value)
     },
     /** The marker an explicit `omo logout` left, or null; only an empty store makes it meaningful. */
     signedOutMarker: () => readSignedOutMarker(markerPath),
@@ -250,6 +290,8 @@ export function createSession(options: {
       await deviceService?.forget()
     },
     accessSnapshot: snapshot,
+    // #13265: the signed-in account's email. accessTokenImpl, not the sibling property, so the same session reads it.
+    accountEmail: async (): Promise<string | undefined> => emailOf(await accessTokenImpl()),
     async logout(): Promise<boolean> {
       // Every path (revoked, uncertain, offline, nothing stored) ends the sign-in locally, so every path forgets.
       try {
@@ -302,30 +344,7 @@ export function createSession(options: {
       }
     },
     /** `expect` rejects a stored credential that is no longer the caller's captured identity before any refresh. */
-    async accessToken(expect?: (current: Credentials) => boolean): Promise<string> {
-      signal?.throwIfAborted()
-      const snapshot = await store.read()
-      signal?.throwIfAborted()
-      // Only an unjournaled token beyond the refresh path's 30s skew can avoid the writer lock.
-      // Account-bound callers compare their captured keys, account and generation through `expect`.
-      if (
-        snapshot !== null &&
-        snapshot.refreshState !== "uncertain" &&
-        snapshot.refreshAttempt === undefined &&
-        Date.parse(snapshot.accessTokenExpiresAt) > now() + 30_000 &&
-        (expect === undefined || expect(snapshot)) &&
-        // A value the keychain helper does not own yet takes the lock once, so its section can migrate it (3.3).
-        !(await store.migrationPending?.())
-      )
-        return snapshot.accessToken
-      return locked(async (view) => {
-        const current = await store.readAuthoritative()
-        if (current === null) throw new SignInError(`Not signed in. ${signInHint("first")}`)
-        if (expect !== undefined && !expect(current)) throw new CredentialIdentityChanged()
-        await view?.settle()
-        return (await refreshed(current)).accessToken
-      })
-    },
+    accessToken: (expect?: (current: Credentials) => boolean) => accessTokenImpl(expect),
     async removeForLimit(error: unknown, choose: ChooseDevice): Promise<boolean> {
       if (!(error instanceof ApiRefusal) || error.detail === undefined) throw error
       const headers = { authorization: `Bearer ${error.detail.managementToken}` }
