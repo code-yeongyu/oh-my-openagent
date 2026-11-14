@@ -15,6 +15,8 @@ export type ConsumerStartInput = {
   readonly minimumEngine: string | null | undefined
   readonly wake: (durableId: string) => Promise<void>
   readonly sameDevice: () => boolean
+  /** The consumer has been acknowledged as serving; fired before the startup pending sweep, which it must gate. */
+  readonly onServing?: () => void
   readonly log: (line: string) => void
 }
 
@@ -51,6 +53,7 @@ export async function startDeliveryConsumer(input: ConsumerStartInput): Promise<
     input.log(`thread wake: the device service serves no deliveries to this engine (${started})`)
     return undefined
   }
+  input.onServing?.()
   const admitIntake = async (device: string): Promise<IntakeAdmission> =>
     (await port.peerAdmitted(device)) ? "admitted" : "refused"
   await runPendingSweep({ store: input.store, admitIntake, wake: input.wake, sameDevice: input.sameDevice() })

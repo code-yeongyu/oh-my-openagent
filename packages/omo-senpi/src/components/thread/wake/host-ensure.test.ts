@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test"
-import { mkdtempSync, rmSync } from "node:fs"
+import { existsSync, mkdtempSync, rmSync } from "node:fs"
 import { createServer, type Server } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -16,6 +16,7 @@ import { connectCarrierHost } from "./carrier-connection"
 import type { ThreadWakeLatch } from "./runtime"
 import { startFakeEngineHost, type FakeEngineHost } from "./testing/fake-engine-host"
 import { writeSessionFile } from "./testing/fake-wake-host"
+import { engineHostEnsure } from "./host-ensure"
 
 // Owner ruling 2026-11-14: the device's daemon being up is enough. With no operator host running, the carrier asks the
 // engine's own `host ensure` for one (the engine CLI, as `host status --all` is asked), then opens the session on it.
@@ -50,16 +51,16 @@ function unusedHost(): ThreadHost {
 /** The engine CLI's side: each `host ensure` it is asked starts the operator host, which did not run before. */
 async function engineCliControl(): Promise<{
   readonly path: string
-  readonly calls: string[][]
+  readonly calls: { readonly argv: string[]; readonly env: Record<string, string> }[]
   readonly host: () => FakeEngineHost | undefined
 }> {
   const directory = mkdtempSync(join(tmpdir(), "engine-cli-"))
   const path = join(directory, "control.sock")
-  const calls: string[][] = []
+  const calls: { readonly argv: string[]; readonly env: Record<string, string> }[] = []
   let host: FakeEngineHost | undefined
   const server: Server = createServer((socket) => {
     socket.once("data", (chunk) => {
-      calls.push(JSON.parse(chunk.toString("utf8").trim()) as string[])
+      calls.push(JSON.parse(chunk.toString("utf8").trim()) as { readonly argv: string[]; readonly env: Record<string, string> })
       void (async () => {
         host ??= await startFakeEngineHost()
         socket.end(`${JSON.stringify({ line: { action: "start", reused: false }, exit: 0 })}\n`)
@@ -107,6 +108,8 @@ test("#given a pure-TUI engine and no operator host running #when its thread_sen
       latch,
       store,
       loadConfig: () => ({ config: {} }),
+      engineVersion: "2026.12.1",
+      minimumEngine: "2026.12.1",
       engineLaunch: () => ({ command: process.execPath, prefixArgs: [FAKE_CLI] }),
       launchSpecPath: "/plugin/daemon-launch-spec.json",
       connect: () => {
@@ -130,7 +133,7 @@ test("#given a pure-TUI engine and no operator host running #when its thread_sen
   expect(sent.details.result).toMatchObject({ kind: "ok", delivery: { kind: "queued", waiting_on: { kind: "wake" } } })
   expect(await outcome).toMatchObject({ kind: "open" })
 
-  expect(control.calls).toEqual([
+  expect(control.calls.map((call) => call.argv)).toEqual([
     [
       "host",
       "ensure",
@@ -166,4 +169,63 @@ test("#given a pure-TUI engine and no operator host running #when its thread_sen
   await drain.drain({ reason: "inbox" })
   const [row] = await store.list({ target_durable_id: TARGET })
   expect(runtime.enqueueCalls.map((call) => call.delivery_id)).toEqual([row?.delivery_id])
+})
+
+// #13456's LOW 3: from the source tree the packaged spec path is an unbuilt location; the ensure hands the CLI a spec
+// that exists (the plugin's tracked spec), as the sibling packaged-asset components resolve theirs.
+test("#given no launchSpecPath #when the carrier's ensure runs from the source tree #then the CLI is asked with a launch spec that exists on disk", async () => {
+  const control = await engineCliControl()
+  cleanups.push(async () => {
+    await control.host()?.close()
+  })
+  const ensure = engineHostEnsure({
+    env: { HOME: process.env.HOME, FAKE_ENGINE_CLI_CONTROL: control.path },
+    socket: "/tmp/omo-wake-ensure-spec.sock",
+    agentDir: "/tmp/omo-wake-ensure-agent",
+    launch: () => ({ command: process.execPath, prefixArgs: [FAKE_CLI] }),
+    warn: () => undefined,
+  })
+  await ensure()
+  const [call] = control.calls
+  expect(call).toBeDefined()
+  const spec = call?.argv[3]
+  expect(typeof spec).toBe("string")
+  expect(existsSync(spec ?? "")).toBe(true)
+})
+
+// #13456's LOW 4: a host the carrier ensures runs with `omo daemon`'s own host env: the agent dir is named, and the
+// user's configured host idle exit rides along instead of the launch spec's default.
+test("#given a configured task.host_idle_exit_ms #when the carrier's ensure starts a host #then the CLI runs with the agent dir and the configured idle exit", async () => {
+  const control = await engineCliControl()
+  cleanups.push(async () => {
+    await control.host()?.close()
+  })
+  const agentDir = mkdtempSync(join(tmpdir(), "omo-wake-ensure-agent-"))
+  cleanups.push(() => rmSync(agentDir, { recursive: true, force: true }))
+  const ensure = engineHostEnsure({
+    env: { HOME: process.env.HOME, FAKE_ENGINE_CLI_CONTROL: control.path },
+    socket: "/tmp/omo-wake-ensure-env.sock",
+    agentDir,
+    idleExitMs: () => 120_000,
+    launch: () => ({ command: process.execPath, prefixArgs: [FAKE_CLI] }),
+    warn: () => undefined,
+  })
+  await ensure()
+  expect(control.calls[0]?.env).toEqual({ OMO_AGENT_DIR: agentDir, SENPI_RPC_HOST_IDLE_EXIT_MS: "120000" })
+})
+
+test("#given no configured idle exit #when the carrier's ensure starts a host #then the CLI runs with the agent dir and the spec's own default idle exit", async () => {
+  const control = await engineCliControl()
+  cleanups.push(async () => {
+    await control.host()?.close()
+  })
+  const ensure = engineHostEnsure({
+    env: { HOME: process.env.HOME, FAKE_ENGINE_CLI_CONTROL: control.path },
+    socket: "/tmp/omo-wake-ensure-env.sock",
+    agentDir: "/tmp/omo-wake-ensure-agent",
+    launch: () => ({ command: process.execPath, prefixArgs: [FAKE_CLI] }),
+    warn: () => undefined,
+  })
+  await ensure()
+  expect(control.calls[0]?.env).toEqual({ OMO_AGENT_DIR: "/tmp/omo-wake-ensure-agent" })
 })

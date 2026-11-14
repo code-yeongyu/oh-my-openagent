@@ -29,6 +29,7 @@ import {
   processIntakeAdmission,
   processSameDeviceWake,
   startThreadWakeAtSession,
+  wakeHostIdleExitMs,
   wakeSettingsReader,
   type ThreadWakeOptions,
 } from "./wake/runtime"
@@ -564,6 +565,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
           sessionsDirectory,
           settings: wakeSettings,
           engineVersion: pi.hostVersion,
+          hostIdleExitMs: wakeHostIdleExitMs(wakeOptions, callerWorkspaceRoot),
           ensureHost: options.ensureHost,
           warn,
         })

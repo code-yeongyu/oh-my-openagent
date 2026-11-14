@@ -210,8 +210,11 @@ describe("the same-device wake through the registered thread component", () => {
     expect(await drainWoken(w.store, w.path)).toEqual([row?.delivery_id])
   })
 
+  // The default answer with no configuration override: nothing is set, so the schema default decides and the send
+  // wakes its target exactly as an explicit opt-in would.
   test("#given an omo configuration with no session_wake setting at all #when thread_send names a session that is not running #then the carrier opens it and its drain admits the delivery once", async () => {
-    const w = await wire({ loadConfig: () => ({ config: {} }) })
+    const noConfigHome = mkdtempSync("/tmp/omo-wake-no-config-")
+    const w = await wire({ ...ENGINE_AT_MINIMUM, env: { HOME: noConfigHome } })
     const pi = await w.start()
     const woken = w.woken()
     expect(await w.send(pi, "no setting needed")).toMatchObject({
@@ -290,21 +293,6 @@ describe("the same-device wake through the registered thread component", () => {
     }).register(pi as never, context() as never)
     await pi.dispatch("session_start", { type: "session_start" }, { mode: "child", agentDir: w.h.agentDir })
     expect(w.latch.running?.size ?? 0).toBe(0)
-  })
-
-  // The default answer with no configuration override: `session_wake.same_device` off (the schema default), so a send
-  // to a not-running session stays queued offline exactly as the engine answered it.
-  test("#given no session_wake configuration at all #when its thread_send names a session that is not running #then the delivery stays queued offline with no wake", async () => {
-    const noConfigHome = mkdtempSync("/tmp/omo-wake-no-config-")
-    const w = await wire({ ...ENGINE_AT_MINIMUM, env: { HOME: noConfigHome } })
-    const pi = await w.start()
-    const answer = (await w.send(pi, "nothing configured")) as {
-      readonly kind: string
-      readonly delivery: { readonly kind: string; readonly queue_position: number; readonly reason?: string }
-    }
-    expect(answer.kind).toBe("ok")
-    expect(answer.delivery).toEqual({ kind: "queued_offline", queue_position: expect.any(Number) })
-    expect(opens(w.fake)).toEqual([])
   })
 
   // The LOW of the #13455 review: `session_wake.same_device` is read for the TARGET session's cwd (its project's
@@ -387,8 +375,39 @@ describe("the delivery consumer through the registered thread component", () => 
     expect(opens(w.fake)).toEqual([expect.objectContaining({ sessionPath: w.path })])
   })
 
+  // #13456's LOW 1: a remote row the consumer's own STARTUP pending sweep wakes must read the carrier's gate as on.
+  test("#given a queued row from another device waiting before the engine starts #when the consumer's startup pending sweep wakes it #then the carrier opens it at once", async () => {
+    const service = createFakeDeliveryService({ admitted: true })
+    service.ackServe({ wake: true })
+    const w = await wire(consumerWake(service, { version: "2026.12.1", minimum: "2026.12.1" }))
+    expect(
+      (
+        await w.store.intake({
+          now: w.h.clock.now,
+          attested_device: "device-b",
+          record: {
+            sessionId: TARGET,
+            deliveryId: "d-early",
+            text: "OMO_GATEWAY v=1\nsource=peer_agent\nd-early",
+            displayText: "d-early",
+            sender: { kind: "agent", session_id: "sender-on-b" },
+            deliverAs: "followUp",
+            chainCount: 1,
+          },
+          provenance: { workspace: "remote", project: "remote" },
+          target_session_kind: "interactive",
+        })
+      ).kind,
+    ).toBe("queued")
+    const woken = w.woken()
+    await w.start()
+    expect(await woken).toMatchObject({ kind: "open" })
+    expect(opens(w.fake)).toHaveLength(1)
+  })
+
   // A8.1: below the engine release that drops a released session's retained record (senpi#6449), the consumer makes no
-  // wake registration with the device service. The minimum is null until that release exists, so nothing registers.
+  // wake registration with the device service, and no carrier starts at all. The minimum is null until that release
+  // exists, so nothing registers.
   test.each([
     ["the shipped minimum (none released)", { version: "2099.1.1", minimum: undefined }],
     ["an engine below the minimum", { version: "2026.11.13", minimum: "2026.12.1" }],
