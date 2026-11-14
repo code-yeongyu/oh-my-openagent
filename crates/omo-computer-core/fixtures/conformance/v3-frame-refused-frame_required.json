@@ -1,7 +1,7 @@
 {
   "description": "A click on a target that has no frame answers InvalidCoordinateFrame{frame_required} and sends nothing.",
   "transport": "stdio",
-  "scenario": "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/v3-two-displays-one-window-consent.json",
   "env": {
     "OMO_COMPUTER_FAKE_STOP_PATH": "live"
   },

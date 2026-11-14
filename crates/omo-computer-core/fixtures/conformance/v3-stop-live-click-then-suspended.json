@@ -1,7 +1,7 @@
 {
   "description": "With the fake stop path live, the first click is admitted and its events reach the sink (one click: pointer move, button down, button up), stopPath.stop latches, and the second click answers Suspended with nothing more in the sink.",
   "transport": "stdio",
-  "scenario": "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/v3-two-displays-one-window-consent.json",
   "env": {
     "OMO_COMPUTER_FAKE_STOP_PATH": "live"
   },
