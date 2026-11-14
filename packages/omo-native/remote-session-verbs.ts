@@ -30,7 +30,7 @@ import type { RemoteSessionRow, RemoteThreadSurface } from "../omo-senpi/src/com
 import { deviceOnline, followRemote, remoteAvailable } from "../omo-senpi/src/components/thread/remote/remote-ops"
 import type { RemoteCommandDependencies } from "./remote-cli"
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
-import { sessionVerbLines } from "./remote-render"
+import { sendWaitNotice, sessionVerbLines } from "./remote-render"
 import { localPermissionPreset } from "./remote-permission-preset"
 import type { SessionArgs } from "./remote-session-args"
 
@@ -263,6 +263,9 @@ async function sendTo(
     // The ok send always carries its delivery; without one the attach's own end still settles the follow below.
     if ("delivery" in sent)
       follow.aim(sent.delivery.kind === "started" ? "started" : sent.delivery.kind === "steered" ? "steered" : "queued")
+    // A send that waits behind a running turn says so at once (#13268); stdout stays the answer alone, so this is stderr.
+    const waitNotice = sendWaitNotice(label, sent)
+    if (waitNotice !== null && !json) dependencies.error(waitNotice)
     const end = await follow.settled
     if (!json && reply.length > 0 && !reply.endsWith("\n")) dependencies.write("\n")
     // --json: the send's typed result, with the answer it streamed.
