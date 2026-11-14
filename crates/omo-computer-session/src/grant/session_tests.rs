@@ -526,3 +526,37 @@ fn a_is_62_a_chord_the_backend_cannot_arm_reads_deaf() {
     let refused = s.click(params(json!({ "target": "1", "x": 5, "y": 5 }))).expect_err("deaf");
     assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("StopPathUnavailable", Some("deaf")));
 }
+
+fn busy_with_stop(stop: bool) -> Value {
+    let mut extra = json!({
+        "busy_timeline": [
+            { "t_ms": 0, "window": "1", "busy": true, "indicator": "spinner" },
+            { "t_ms": 400, "window": "1", "busy": false }
+        ]
+    });
+    if stop {
+        extra["stop_timeline"] = json!([{ "t_ms": 200 }]);
+    }
+    extra
+}
+
+/// R70s(1) twin on row 19's timed stop trigger: a stop pressed during the busy wait of a
+/// foreground call refuses it with nothing sent, ends the lease through the funnel and revokes
+/// the grant, so the next foreground call needs a new grant. Without the stop the call is sent.
+#[test]
+fn a_stop_during_the_busy_wait_ends_the_lease_and_revokes_the_grant() {
+    let sink = RecordingSink::default();
+    let mut s = session(&busy_with_stop(true), &sink, None);
+    grant(&mut s);
+    capture(&mut s, "1");
+    let refused = s.click(params(json!({ "target": "1", "x": 5, "y": 5, "delivery": "foreground" }))).expect_err("the stop refuses");
+    assert_eq!(refused.refusal.code.wire(), "Suspended");
+    assert!(sink.lines().iter().all(|line| !line.contains("click") && !line.contains("mouse")), "nothing sent: {:?}", sink.lines());
+    assert!(!s.holds_lease(), "the lease ended through the funnel");
+    assert!(!s.funnel.control.grant.is_held(), "the stop revoked the grant");
+    let control_sink = RecordingSink::default();
+    let mut control = session(&busy_with_stop(false), &control_sink, None);
+    grant(&mut control);
+    capture(&mut control, "1");
+    control.click(params(json!({ "target": "1", "x": 5, "y": 5, "delivery": "foreground" }))).expect("sent after the wait");
+}
