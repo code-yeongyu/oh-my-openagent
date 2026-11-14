@@ -350,7 +350,7 @@ function setTrustExitCode(action: "static" | "import-exec" | "ensure" | "usage" 
 const STATIC_HELP = `Usage: omo [options] [message...]
        omo <command> [args]
 
-Commands: setup, doctor, update, daemon, thread, login, logout, whoami, sync, account
+Commands: setup, doctor, update, daemon, thread, remote, login, logout, whoami, sync, account
 Options: --version, -v, --help, -p, --print, --mode <json|rpc>, --session <file>`
 
 const HELP_WITHOUT_ENGINE = `Usage: omo [options] [message...]
