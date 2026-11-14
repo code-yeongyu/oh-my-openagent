@@ -2,6 +2,8 @@
 // 'SET windows pass=<n> fail=<n> blocked=<n>' line. A scenario whose precondition refuses on this
 // host is BLOCKED with its reason, never a pass; pass counts only scenarios that ran their oracle.
 import { describe, expect, test } from "bun:test"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 
 import { gateSet, runAll, setLine } from "./set.ts"
 
@@ -79,6 +81,27 @@ describe("windows --all gate", () => {
     expect(gateSet(["SET windows pass=1 fail=0 blocked=0", "SET windows pass=1 fail=0 blocked=0"])).toEqual([
       "expected one SET windows line, found 2",
     ])
+  })
+
+  // Review L1 of #13443 at 3391e8d3b7: a precondition answering "" prints 'BLOCKED <name> ' with a
+  // trailing space; that names no reason.
+  test("a block whose reason is empty or blank fails the gate", () => {
+    expect(gateSet(["BLOCKED capture-session0-refused ", "SET windows pass=1 fail=0 blocked=1"])).toEqual([
+      "BLOCKED capture-session0-refused  names no reason",
+    ])
+    expect(gateSet(["BLOCKED capture-session0-refused   ", "SET windows pass=1 fail=0 blocked=1"])).toEqual([
+      "BLOCKED capture-session0-refused    names no reason",
+    ])
+  })
+
+  // Review L2 of #13443 at 3391e8d3b7: a change to the gate CLI alone must trigger the Windows QA run.
+  test("the Windows QA workflow's pull_request and push paths both cover the gate CLI", () => {
+    const workflow = readFileSync(
+      join(import.meta.dir, "../../../../.github/workflows/computer-windows-qa.yml"),
+      "utf8",
+    )
+    const listed = workflow.split("\n").filter((line) => line.trim() === '- "script/qa/computer/windows-set-gate.ts"')
+    expect(listed.length).toBe(2)
   })
 
   test("a block without a reason, or a count that does not match the BLOCKED lines, fails the gate", () => {
