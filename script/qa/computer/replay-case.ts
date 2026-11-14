@@ -3,7 +3,7 @@
 // supersedes; and whether ORACLE-PROVENANCE.tsv lists a case as an imported oracle case.
 import { constants } from "node:fs"
 import { access, chmod, mkdir, readdir, readFile, writeFile } from "node:fs/promises"
-import { basename, dirname, isAbsolute, join, resolve } from "node:path"
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path"
 
 export const ROOT = resolve(import.meta.dir, "../../..")
 const PROVENANCE = join(ROOT, "crates/omo-computer-core/parity/ORACLE-PROVENANCE.tsv")
@@ -183,13 +183,19 @@ export async function supersededBy(listed: readonly string[]): Promise<Map<strin
   return skips
 }
 
-/** The scenario SCENARIO-OVERRIDES.tsv names for the case file `casePath`, if any (R70bj). */
+/**
+ * The scenario the overrides table names for the case file `casePath`, if any (R70bj). The table
+ * keys on the case's repository-relative path (review L8), so a case of the same name in another
+ * tree is never redirected; a table that cannot be read is an error, never an empty table.
+ */
 export async function scenarioOverride(casePath: string, table = SCENARIO_OVERRIDES): Promise<string | undefined> {
-  const text = await readFile(table, "utf8").catch(() => "")
-  const name = basename(casePath)
+  const text = await readFile(table, "utf8").catch((error: unknown) => {
+    throw new InputError(`scenario_overrides_unreadable: ${table}: ${describe(error)}`)
+  })
+  const key = relative(ROOT, resolve(casePath)).replaceAll("\\", "/")
   for (const line of text.split("\n").slice(1)) {
     const [file, scenario] = line.split("\t")
-    if (file === name && scenario) return scenario
+    if (file === key && scenario) return scenario
   }
   return undefined
 }
