@@ -1,11 +1,16 @@
 //! `waitFor`: one predicate, waited for on the settle's observer events and bounded by the
 //! call's `timeout` (absent: the cap of the regime in force) on the backend's monotonic clock.
-//! No predicate lists windows or polls a tree; the call ends on an observation of its target.
+//! No predicate polls a tree. A gone wait and an event `window_closed` wait read the window
+//! listing: once to name the windows a gone wait tracks, once to confirm a gone event (an
+//! event is a hint, never the answer), and once to tell whether the target itself went away.
+//! The call ends on an observation of its target, or of nothing when the target is gone.
 
 use omo_computer_core::backend::{NotificationFingerprint, Refusal, WindowFilter};
 use omo_computer_core::error::EngineCode;
 use omo_computer_core::observation::{Observation, SettleOutcome};
-use omo_computer_core::params::{ElementState, EventKind, SurfaceState, WaitForParams, WindowState};
+use omo_computer_core::params::{
+    ElementState, EventKind, SurfaceState, WaitForParams, WindowState,
+};
 use omo_computer_core::requests::{read_wait_for, ReadRequest, WaitSpec};
 use omo_computer_core::results::{NotificationMatch, WaitOutcome, WaitResult};
 use omo_computer_core::untrusted::UntrustedText;
@@ -119,8 +124,12 @@ impl Session {
             // the target, so `window_opened` counts every new window.
             WaitSpec::Event(kind) => {
                 let only = (kind != EventKind::WindowOpened).then(|| vec![target.clone()]);
-                let outcome =
-                    self.wait_event_match(&EventMatch::Event(kind), only.as_deref(), false, timeout_ms)?;
+                let outcome = self.wait_event_match(
+                    &EventMatch::Event(kind),
+                    only.as_deref(),
+                    kind == EventKind::WindowClosed,
+                    timeout_ms,
+                )?;
                 target_gone = outcome == WaitOutcome::Matched
                     && kind == EventKind::WindowClosed
                     && !self.target_listed(&target)?;
@@ -176,7 +185,10 @@ impl Session {
             complete: true,
             nodes_observed: 0,
             cuts: Vec::new(),
-            generation: self.refs.latest(target).map_or(0, |generation| generation.number),
+            generation: self
+                .refs
+                .latest(target)
+                .map_or(0, |generation| generation.number),
             session: omo_computer_core::backend::unknown_session_state(),
             observation: UntrustedText,
             secure: None,
@@ -246,7 +258,10 @@ impl Session {
                         return Ok(WaitOutcome::Matched);
                     }
                     let listed = feed.backend().windows(&WindowFilter::default())?.windows;
-                    let still = only.unwrap_or_default().iter().any(|id| listed.iter().any(|w| &w.id == id));
+                    let still = only
+                        .unwrap_or_default()
+                        .iter()
+                        .any(|id| listed.iter().any(|w| &w.id == id));
                     if !still {
                         return Ok(WaitOutcome::Matched);
                     }
