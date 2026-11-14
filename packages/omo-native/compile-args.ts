@@ -24,7 +24,7 @@ export function launchOptions(args: readonly string[]): readonly string[] {
 /** Design 6.1: unknown argv remains long-lived; message text after -- is never a flag. */
 export function trustLaunchKind(
   args: readonly string[],
-): "static" | "long-lived" | "short-host-cli" | "one-shot-network" {
+): "static" | "long-lived" | "short-host-cli" | "one-shot-network" | "local-only" {
   if (args.length === 1 && ["--version", "-v", "--help"].includes(args[0] ?? "")) return "static"
   if (isSelfUpdate(args) && updateUsageAnswer(args) !== undefined) return "static"
   // While accounts are closed, a login argv that is neither the device form nor the bare form (#13265) refuses from
