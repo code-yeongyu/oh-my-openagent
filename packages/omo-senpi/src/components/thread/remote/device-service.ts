@@ -14,7 +14,14 @@ export type DeviceServiceSessionsOptions = {
   readonly connect?: () => Promise<DeviceService>
   /** Test seam: the wait between attaches of a just-created session while its device's listing catches up. */
   readonly retryDelay?: (ms: number) => Promise<void>
+  /** Test seam: the clock that ages a finished account listing. */
+  readonly now?: () => number
 }
+
+// An account listing waits on every device (0.5-2 s on a loaded fleet, measured 2026-11-14), and one thread op can read
+// it several times (the address book, the remote control, the session host). Calls that overlap share one round, and a
+// round that just ended answers the calls of the next moment instead of starting another.
+const LISTING_REUSE_MS = 2_000
 
 // A device lists a session it just created only after its next listing change, and session.attach resolves against
 // that listing: live runs saw 2.5 s to 6.6 s (2026-11-06). Past this bound the create still names the session's key.
@@ -169,7 +176,36 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     attaches.set(key, opened)
     return opened
   }
-  const listing = async (): Promise<RemoteListing> => {
+  const now = options.now ?? Date.now
+  let round: Promise<RemoteListing> | undefined
+  let kept: { readonly at: number; readonly listing: RemoteListing } | undefined
+  // A change on any device (create, open, close, a session command) bumps the generation: a round started before it is
+  // neither joined nor kept, so no read after a change is answered by a listing taken before it.
+  let generation = 0
+  const invalidate = (): void => {
+    generation += 1
+    kept = undefined
+    round = undefined
+  }
+  const listing = (): Promise<RemoteListing> => {
+    if (round !== undefined) return round
+    if (kept !== undefined && now() - kept.at < LISTING_REUSE_MS) return Promise.resolve(kept.listing)
+    const at = generation
+    const started = listOnce().then(
+      (listed) => {
+        if (at === generation) kept = { at: now(), listing: listed }
+        if (round === started) round = undefined
+        return listed
+      },
+      (error: unknown) => {
+        if (round === started) round = undefined
+        throw error
+      },
+    )
+    round = started
+    return started
+  }
+  const listOnce = async (): Promise<RemoteListing> => {
     const listed = await (await svc()).sessions()
     return {
       rows: listed.rows.map((row) => ({
@@ -185,7 +221,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       incomplete: listed.incomplete,
     }
   }
-  return {
+  const port: RemoteSessionsPort = {
     status: async () => ({ state: (await (await svc()).status()).state }),
     thisDevice: async () => (await (await svc()).thisDevice())?.id ?? null,
     thisDeviceName: async () => (await (await svc()).thisDevice())?.name ?? null,
@@ -332,5 +368,26 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       }
       return { kind: "ok", sessionId: key }
     },
+  }
+  // A command that changes what devices list is fenced on both sides: rounds before it and rounds that overlap it are
+  // never kept, so the next read after it settles lists again.
+  const fenced =
+    <A extends unknown[], R>(run: (...args: A) => Promise<R>) =>
+    async (...args: A): Promise<R> => {
+      invalidate()
+      try {
+        return await run(...args)
+      } finally {
+        invalidate()
+      }
+    }
+  return {
+    ...port,
+    endpointCommand: fenced(port.endpointCommand),
+    locate: fenced(port.locate),
+    sessionCommand: (device, sessionId, rpc, commandOptions) =>
+      READ_ONLY_RECORDS.has(String(rpc["type"]))
+        ? port.sessionCommand(device, sessionId, rpc, commandOptions)
+        : fenced(port.sessionCommand)(device, sessionId, rpc, commandOptions),
   }
 }

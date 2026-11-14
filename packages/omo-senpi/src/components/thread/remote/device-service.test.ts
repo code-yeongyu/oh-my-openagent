@@ -1049,3 +1049,121 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
     expect(l.calls.attach).toBe(2)
   })
 })
+
+describe("device-service adapter: the account listing is shared across the reads of one moment", () => {
+  function countingService() {
+    let calls = 0
+    let release: (() => void) | undefined
+    const service = {
+      status: async () => ({ state: "connected" }),
+      thisDevice: async () => ({ id: "here", name: "this mac" }),
+      devices: async () => [],
+      sessions: async () => {
+        calls += 1
+        await new Promise<void>((resolve) => {
+          release = resolve
+        })
+        return { rows: [], incomplete: [], revision: calls, query_id: "q", devices: {} }
+      },
+      endpointCommand: async () => {
+        throw new LocalApiError("unsupported", "no endpoint", { not_sent: true })
+      },
+      closed: new Promise(() => {}),
+    } as unknown as DeviceService
+    return { service, calls: () => calls, finish: () => release?.() }
+  }
+
+  test("#given three reads that overlap #when they run #then one listing round answers all three", async () => {
+    const s = countingService()
+    let clock = 0
+    const port = createDeviceServiceSessions({
+      version: "0.0.0-test",
+      connect: async () => s.service,
+      now: () => clock,
+    })
+    const reads = [port.sessions(), port.sessions(), port.listing?.()]
+    await Promise.resolve()
+    await Promise.resolve()
+    s.finish()
+    await Promise.all(reads)
+    expect(s.calls()).toBe(1)
+  })
+
+  test("#given a round that just ended #when a read comes within the reuse window, then after it #then the first reuses the round and the second lists again", async () => {
+    const s = countingService()
+    let clock = 0
+    const port = createDeviceServiceSessions({
+      version: "0.0.0-test",
+      connect: async () => s.service,
+      now: () => clock,
+    })
+    const first = port.sessions()
+    await Promise.resolve()
+    await Promise.resolve()
+    s.finish()
+    await first
+    clock = 1_000
+    await port.sessions()
+    expect(s.calls()).toBe(1)
+    clock = 2_500
+    const later = port.sessions()
+    await Promise.resolve()
+    await Promise.resolve()
+    s.finish()
+    await later
+    expect(s.calls()).toBe(2)
+  })
+
+  test("#given a round still running #when a session is closed before it ends #then that round is not kept, and the next read lists again", async () => {
+    const s = countingService()
+    const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: async () => s.service, now: () => 0 })
+    const inFlight = port.sessions()
+    await Promise.resolve()
+    await Promise.resolve()
+    await port.sessionCommand("b", "s1", { type: "unload_session" }).catch(() => undefined)
+    s.finish()
+    await inFlight
+    const next = port.sessions()
+    await Promise.resolve()
+    await Promise.resolve()
+    s.finish()
+    await next
+    expect(s.calls()).toBe(2)
+  })
+
+  test("#given a round that fails #when the next read comes within the reuse window #then it lists again instead of reusing the failure", async () => {
+    let calls = 0
+    const service = {
+      status: async () => ({ state: "connected" }),
+      thisDevice: async () => ({ id: "here", name: "this mac" }),
+      devices: async () => [],
+      sessions: async () => {
+        calls += 1
+        if (calls === 1) throw new Error("listing failed")
+        return { rows: [], incomplete: [], revision: calls, query_id: "q", devices: {} }
+      },
+      closed: new Promise(() => {}),
+    } as unknown as DeviceService
+    const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: async () => service, now: () => 0 })
+    await expect(port.sessions()).rejects.toThrow("listing failed")
+    expect(await port.sessions()).toEqual([])
+    expect(calls).toBe(2)
+  })
+
+  test("#given a round that just ended #when a create goes to a device #then the next read lists again, so the new session can be found", async () => {
+    const s = countingService()
+    const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: async () => s.service, now: () => 0 })
+    const first = port.sessions()
+    await Promise.resolve()
+    await Promise.resolve()
+    s.finish()
+    await first
+    await port.endpointCommand("b", { type: "open_session" })
+    const next = port.sessions()
+    await Promise.resolve()
+    await Promise.resolve()
+    s.finish()
+    await next
+    expect(s.calls()).toBe(2)
+  })
+})
