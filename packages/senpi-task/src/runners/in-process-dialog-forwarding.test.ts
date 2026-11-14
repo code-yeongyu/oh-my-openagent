@@ -49,7 +49,8 @@ async function runChild(
   })
   await handle.waitForIdle()
   await handle.abort()
-  parent?.dispose()
+  // The parent's barrier settles before the machine's root is removed in afterEach (#13520).
+  await parent?.dispose()
   return { machine, seen }
 }
 

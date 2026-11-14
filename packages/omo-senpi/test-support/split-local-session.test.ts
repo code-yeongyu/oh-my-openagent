@@ -4,9 +4,16 @@ import { expect, spyOn, test } from "bun:test"
 import { existsSync, rmSync } from "node:fs"
 import * as fs from "node:fs/promises"
 import { basename, dirname } from "node:path"
-import { setImmediate } from "node:timers/promises"
 
 import { openScriptedSession } from "./split-local-session"
+
+// Bounded event-loop turns, not a delay: every step close() can still take while the engine's writer is held is
+// synchronous or an already-settled promise, so these turns only let it finish the work it has.
+const SETTLE_TURNS = 200
+
+async function settleEventLoop(): Promise<void> {
+  for (let turn = 0; turn < SETTLE_TURNS; turn++) await new Promise((done) => setImmediate(done))
+}
 
 for (const placement of ["fused", "split-local"] as const) {
   test(`${placement} close waits for the real session's pending fallback-log writer before removing its root`, async () => {
@@ -30,14 +37,21 @@ for (const placement of ["fused", "split-local"] as const) {
     })
     let root: string | undefined
     let closing: Promise<void> | undefined
+    let closeSettled = false
     try {
       const session = await openScriptedSession(placement, () => {})
       root = dirname(session.cwd)
+      // The engine starts the writer with the session, so holding it here holds the whole shutdown ordering.
       await started.promise
 
-      closing = session.close()
-      // Let close reach its filesystem cleanup while the real SDK's first-start writer is held.
-      await setImmediate()
+      closing = Promise.resolve(session.close()).finally(() => {
+        closeSettled = true
+      })
+      // While the writer is held, close must neither settle nor reach its root removal.
+      await settleEventLoop()
+      expect(closeSettled).toBe(false)
+      expect(existsSync(root)).toBe(true)
+
       release.resolve()
       await written.promise
       await closing
@@ -45,11 +59,11 @@ for (const placement of ["fused", "split-local"] as const) {
       expect(existsSync(root)).toBe(false)
     } finally {
       release.resolve()
-      if (marker) await written.promise
+      if (marker !== undefined) await written.promise
       await closing
       accessSpy.mockRestore()
       writeSpy.mockRestore()
-      if (root) rmSync(root, { recursive: true, force: true })
+      if (root !== undefined) rmSync(root, { recursive: true, force: true })
     }
   })
 }

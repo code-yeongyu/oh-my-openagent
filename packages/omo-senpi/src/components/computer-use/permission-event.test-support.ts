@@ -117,6 +117,9 @@ export async function permissionSession(
       off()
       await session.extensionRunner?.emit({ type: "session_shutdown", reason: "quit" })
       session.dispose()
+      // dispose() only starts the engine's async first-start work; nothing under this directory is removed until the
+      // session's own barrier settles (#13520).
+      await session.whenToolChildClosed()
       await rm(home, { recursive: true, force: true })
     },
   }
