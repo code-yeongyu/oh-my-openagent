@@ -82,6 +82,79 @@ describe("#given disabled native skills in the registry skill context", () => {
   })
 })
 
+describe("#given skills.enable allows one native skill", () => {
+  const nativeSkills = [
+    {
+      name: "allowed-native-skill",
+      description: "Allowed",
+      location: "/native/allowed/SKILL.md",
+      content: "allowed body",
+    },
+    {
+      name: "blocked-native-skill",
+      description: "Blocked",
+      location: "/native/blocked/SKILL.md",
+      content: "blocked body",
+    },
+  ]
+
+  function registerWithSkillsConfig(skills: unknown) {
+    const createSkillTool = mock((options: SkillLoadOptions) => fakeTool)
+    const createDelegateTask = mock((options: Parameters<ToolRegistryFactories["createDelegateTask"]>[0]) => fakeTool)
+    createCoreTools({
+      ctx: unsafeTestValue({
+        directory: "/tmp/project",
+        skills: {
+          async all() {
+            return nativeSkills
+          },
+          async get(name: string) {
+            return nativeSkills.find((skill) => skill.name === name)
+          },
+          dirs() {
+            return []
+          },
+        },
+      }),
+      pluginConfig: unsafeTestValue({ disabled_agents: ["multimodal-looker"], skills }),
+      managers: unsafeTestValue({
+        backgroundManager: {},
+        tmuxSessionManager: {},
+        skillMcpManager: {},
+        modelFallbackControllerAccessor: {},
+      }),
+      skillContext: { mergedSkills: [], availableSkills: [], browserProvider: "playwright", disabledSkills: new Set() },
+      availableCategories: [],
+      factories: { ...createFactories(createSkillTool), createDelegateTask },
+    })
+    return {
+      skillNative: createSkillTool.mock.calls[0]?.[0].nativeSkills,
+      taskNative: createDelegateTask.mock.calls[0]?.[0].nativeSkills,
+    }
+  }
+
+  test("#when the object form lists the skill #then skill and task see only that native skill", async () => {
+    const { skillNative, taskNative } = registerWithSkillsConfig({ enable: ["allowed-native-skill"] })
+
+    expect(await skillNative!.all()).toEqual([nativeSkills[0]])
+    expect(await taskNative!.all()).toEqual([nativeSkills[0]])
+    expect(await skillNative!.get("blocked-native-skill")).toBeUndefined()
+    expect(await skillNative!.get("allowed-native-skill")).toEqual(nativeSkills[0])
+  })
+
+  test("#when the array form lists the skill #then the allowlist applies the same way", async () => {
+    const { skillNative } = registerWithSkillsConfig(["allowed-native-skill"])
+
+    expect(await skillNative!.all()).toEqual([nativeSkills[0]])
+  })
+
+  test("#when no allowlist is configured #then every native skill stays visible", async () => {
+    const { skillNative } = registerWithSkillsConfig({ enable: [] })
+
+    expect(await skillNative!.all()).toEqual(nativeSkills)
+  })
+})
+
 describe("#given core skill tools are registered", () => {
   test.each([
     { agents: false, expected: false },

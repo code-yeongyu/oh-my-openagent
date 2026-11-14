@@ -1,6 +1,7 @@
 import { OpencodeClient as V2OpencodeClient } from "@opencode-ai/sdk/v2"
 import type { Client as V2GeneratedClient } from "@opencode-ai/sdk/v2/gen/client"
 import { z } from "zod"
+import { normalizeSkillsConfig } from "../features/opencode-skill-loader/merger/skills-config-normalizer"
 import { log } from "../shared"
 import type { SkillLoadOptions } from "../tools/skill/types"
 import type { PluginContext } from "./types"
@@ -39,6 +40,27 @@ function getGeneratedClientFromPluginClient(client: PluginContext["client"]): un
 export function getPluginInputNativeSkills(ctx: PluginContext): NativeSkills | undefined {
   const value = getObjectProperty(ctx, "skills")
   return isNativeSkills(value) ? value : undefined
+}
+
+// `skills.enable` is an allowlist over every skill source, not only config-source skills (#8229); native skills
+// carry the same exact-name semantics as the config-source merge in skills-loader-core's mergeSkills.
+export function applySkillsEnableToNativeSkills(
+  nativeSkills: NativeSkills,
+  skillsConfig: Parameters<typeof normalizeSkillsConfig>[0],
+): NativeSkills {
+  const { enable } = normalizeSkillsConfig(skillsConfig)
+  if (enable.length === 0) return nativeSkills
+
+  const enabledNames = new Set(enable)
+  return {
+    async all() {
+      return (await nativeSkills.all()).filter((skill) => enabledNames.has(skill.name))
+    },
+    async get(name) {
+      return enabledNames.has(name) ? nativeSkills.get(name) : undefined
+    },
+    dirs: () => nativeSkills.dirs(),
+  }
 }
 
 export function createNativeSkills(input: {
