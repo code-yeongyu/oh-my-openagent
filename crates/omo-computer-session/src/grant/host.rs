@@ -222,7 +222,9 @@ impl Session {
         self.guard.set_allowed_apps(view.allowed_keys());
         self.close_control();
         self.funnel.control.grant.revoke();
-        self.funnel.control.consent = Consent::new(view, LOCAL_HAND, Os::host());
+        // R70al(2): the backend's OS (the fake's persona), never the host's.
+        let os = backend_os(self.backend.as_ref());
+        self.funnel.control.consent = Consent::new(view, LOCAL_HAND, os);
         Ok(())
     }
 

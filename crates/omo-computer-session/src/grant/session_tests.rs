@@ -560,3 +560,19 @@ fn a_stop_during_the_busy_wait_ends_the_lease_and_revokes_the_grant() {
     capture(&mut control, "1");
     control.click(params(json!({ "target": "1", "x": 5, "y": 5, "delivery": "foreground" }))).expect("sent after the wait");
 }
+
+/// R70al(2): the session's consent takes the backend's OS (the persona for the fake), never the
+/// host's: a macOS persona denies the macOS-only seed com.apple.keychainaccess on any host.
+#[test]
+fn the_consent_seeds_follow_the_persona_os() {
+    let backend = FakeBackend::with_parts(scenario(&json!({ "consent": {} })), FakeClock::default(), RecordingSink::default())
+        .with_persona(omo_computer_backend_fake::Persona::Macos);
+    let mut s = Session::new(Box::new(backend));
+    s.open(params(json!({ "reportMode": "null" }))).expect("open");
+    let app = crate::consent::AppTarget {
+        app_key: "com.apple.keychainaccess".to_owned(),
+        bound: crate::consent::BoundIdentity::new(None, None),
+    };
+    let denial = s.funnel.control.consent.admit_exec(Some(&app)).expect_err("a macOS seed");
+    assert_eq!(denial.refusal, omo_computer_safety::gate::verdicts::ConsentRefusal::DeniedApp);
+}
