@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde_json::Value;
 
 use super::crate_path;
-use super::read_sites::{reader_sites, sites_by_member, Site};
+use super::read_sites::{reader_sites, sites_by_member, source_sites, Site, REST};
 use crate::requests::READER_SOURCES;
 use crate::schema::engine_schema;
 use crate::settings::{GROUPED_KEYS, SETTINGS_TABLE};
@@ -116,9 +116,12 @@ fn describe(sites: &[Site]) -> String {
 /// `(members checked, problems)`: every schema member must have a reading site, and every
 /// reading site must name a schema member.
 fn unread_members(schema: &Value) -> (usize, Vec<String>) {
+    unread_in(schema, &reader_sites(&crate_path(READER_SOURCES)))
+}
+
+fn unread_in(schema: &Value, sites: &[Site]) -> (usize, Vec<String>) {
     let definitions = param_definitions(schema);
-    let sites = reader_sites(&crate_path(READER_SOURCES));
-    let by_member = sites_by_member(&sites, wire_name);
+    let by_member = sites_by_member(sites, wire_name);
     let mut problems = Vec::new();
     let mut checked = 0;
     for (definition, wire_members) in &definitions {
@@ -139,6 +142,13 @@ fn unread_members(schema: &Value) -> (usize, Vec<String>) {
             }
         }
         for (member, at) in &read_sites {
+            if member == REST {
+                problems.push(format!(
+                    "unread: {definition} destructured with `..` - {}",
+                    describe(at)
+                ));
+                continue;
+            }
             let positional = member.chars().all(|character| character.is_ascii_digit());
             if positional && !at.iter().all(|site| site.read) {
                 problems.push(format!(
@@ -222,4 +232,22 @@ fn reader_test_reports_zero_unread_fields() {
         keys.len()
     );
     assert!(problems.is_empty(), "{}", problems.join("\n"));
+}
+
+/// A reader that destructures its params with `..` and names no field fails the walk.
+#[test]
+fn a_rest_only_destructure_is_refused() {
+    let probe = source_sites(
+        "fn read_probe(params: ClickParams) -> u8 { let ClickParams { .. } = params; 0 }",
+        "probe.rs",
+    );
+    let mut sites = reader_sites(&crate_path(READER_SOURCES));
+    sites.extend(probe);
+    let (_, problems) = unread_in(&engine_schema(), &sites);
+    assert!(
+        problems
+            .iter()
+            .any(|problem| problem.contains("probe.rs::read_probe") && problem.contains("..")),
+        "the rest-only reader passed: {problems:?}"
+    );
 }

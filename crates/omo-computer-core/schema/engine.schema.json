@@ -437,7 +437,7 @@
       "effect": "exec",
       "exposure": "public",
       "params": {
-        "$ref": "#/$defs/AxRefParams"
+        "$ref": "#/$defs/AxFocusParams"
       },
       "result": {
         "$ref": "#/$defs/ExecReply"
@@ -1579,6 +1579,43 @@
       ],
       "description": "`{available, reason?}`."
     },
+    "AxFocusParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "ref"
+      ],
+      "description": "`ax.focus`: an exec verb, so it carries the exec members the read-tier ref params lack."
+    },
     "AxNode": {
       "type": "object",
       "additionalProperties": false,
@@ -1670,6 +1707,30 @@
         },
         "action": {
           "type": "string"
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -1773,6 +1834,30 @@
         },
         "text": {
           "type": "string"
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -2199,17 +2284,11 @@
           ]
         },
         "x": {
-          "type": [
-            "number",
-            "null"
-          ],
+          "type": "number",
           "format": "double"
         },
         "y": {
-          "type": [
-            "number",
-            "null"
-          ],
+          "type": "number",
           "format": "double"
         },
         "ref": {
@@ -2299,7 +2378,15 @@
           ]
         }
       },
-      "description": "`click`: a point (v1) or a ref; `consume` asks for a consumption receipt."
+      "description": "`click`: a point (v1) or a ref; `consume` asks for a consumption receipt. A lone\n`x` or `y` is refused.",
+      "dependentRequired": {
+        "x": [
+          "y"
+        ],
+        "y": [
+          "x"
+        ]
+      }
     },
     "ClipboardContent": {
       "type": "object",
@@ -3673,6 +3760,30 @@
           "type": "integer",
           "format": "uint64",
           "minimum": 0
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -3700,6 +3811,30 @@
           "type": "integer",
           "format": "uint64",
           "minimum": 0
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -3773,6 +3908,30 @@
           "items": {
             "type": "string"
           }
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -4425,17 +4584,11 @@
           ]
         },
         "x": {
-          "type": [
-            "number",
-            "null"
-          ],
+          "type": "number",
           "format": "double"
         },
         "y": {
-          "type": [
-            "number",
-            "null"
-          ],
+          "type": "number",
           "format": "double"
         },
         "frameId": {
@@ -4471,7 +4624,16 @@
       },
       "required": [
         "target"
-      ]
+      ],
+      "description": "`mouse.down`: a lone `x` or `y` is refused.",
+      "dependentRequired": {
+        "x": [
+          "y"
+        ],
+        "y": [
+          "x"
+        ]
+      }
     },
     "MouseUpParams": {
       "type": "object",
@@ -5012,6 +5174,30 @@
       "properties": {
         "kind": {
           "$ref": "#/$defs/SurfaceKind"
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -5230,6 +5416,30 @@
       "properties": {
         "windowId": {
           "type": "string"
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -6759,6 +6969,30 @@
         },
         "text": {
           "type": "string"
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [

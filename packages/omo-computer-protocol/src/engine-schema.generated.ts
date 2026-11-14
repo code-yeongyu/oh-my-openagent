@@ -2,7 +2,7 @@
 // Do not edit by hand; run `bun run --cwd packages/omo-computer-protocol generate`.
 
 /** sha256 of the schema file this module was generated from; the schema-drift test compares it. */
-export const SCHEMA_SHA256 = "61e82ab22e11ca3014190b4c1d976cd40d20657adaed5a82a8861a80cdbf7b0f" as const
+export const SCHEMA_SHA256 = "5876cd406a530a3235cdfd1d1b0fee95ed58f02b79bf566ea9fcf476c11c9b06" as const
 
 /** The wire protocol version `engine.hello` reports. */
 export const PROTOCOL_VERSION = "1" as const
@@ -480,6 +480,13 @@ export type Availability = {
 	reason?: string | null
 }
 
+export type AxFocusParams = {
+	ref: string
+	callId?: string | null
+	runGeneration?: number | null
+	observeAfter?: ObserveOptions | null
+}
+
 export type AxNode = {
 	ref: string
 	role: string
@@ -500,6 +507,9 @@ export type AxNode = {
 export type AxPerformParams = {
 	ref: string
 	action: string
+	callId?: string | null
+	runGeneration?: number | null
+	observeAfter?: ObserveOptions | null
 }
 
 export type AxRefParams = {
@@ -527,6 +537,9 @@ export type AxTargetParams = {
 export type AxTypeTextParams = {
 	ref: string
 	text: string
+	callId?: string | null
+	runGeneration?: number | null
+	observeAfter?: ObserveOptions | null
 }
 
 export type AxTypeTextReply = {
@@ -618,8 +631,6 @@ export type ChainRole = "host" | "launcher" | "engine" | "helper"
 
 export type ClickParams = {
 	target?: string | null
-	x?: number | null
-	y?: number | null
 	ref?: string | null
 	frameId?: string | null
 	button?: Button | null
@@ -631,7 +642,13 @@ export type ClickParams = {
 	callId?: string | null
 	runGeneration?: number | null
 	observeAfter?: ObserveOptions | null
-}
+} & ({
+	x: number
+	y: number
+} | {
+	x?: never
+	y?: never
+})
 
 export type ClipboardContent = {
 	text?: string | null
@@ -913,6 +930,9 @@ export type HoldKeysParams = {
 	target: string
 	keys: string[]
 	duration: number
+	callId?: string | null
+	runGeneration?: number | null
+	observeAfter?: ObserveOptions | null
 }
 
 export type HoldMouseParams = {
@@ -920,6 +940,9 @@ export type HoldMouseParams = {
 	x: number
 	y: number
 	duration: number
+	callId?: string | null
+	runGeneration?: number | null
+	observeAfter?: ObserveOptions | null
 }
 
 export type IdentityMatch = "match" | "mismatch" | "unknown"
@@ -938,6 +961,9 @@ export type Intervention = "continue" | "pause"
 export type KeyChordParams = {
 	target: string
 	keys: string[]
+	callId?: string | null
+	runGeneration?: number | null
+	observeAfter?: ObserveOptions | null
 }
 
 export type KeyDownParams = {
@@ -1075,13 +1101,17 @@ export type MenuSelectParams = {
 export type MouseDownParams = {
 	target: string
 	button?: Button | null
-	x?: number | null
-	y?: number | null
 	frameId?: string | null
 	callId?: string | null
 	runGeneration?: number | null
 	observeAfter?: ObserveOptions | null
-}
+} & ({
+	x: number
+	y: number
+} | {
+	x?: never
+	y?: never
+})
 
 export type MouseUpParams = {
 	target: string
@@ -1184,6 +1214,9 @@ export type OnOff = "on" | "off"
 
 export type OpenSystemSurfaceParams = {
 	kind: SurfaceKind
+	callId?: string | null
+	runGeneration?: number | null
+	observeAfter?: ObserveOptions | null
 }
 
 export type PasteFormat = "text" | "markdown" | "html"
@@ -1230,6 +1263,9 @@ export type PressParams = {
 
 export type RaiseWindowParams = {
 	windowId: string
+	callId?: string | null
+	runGeneration?: number | null
+	observeAfter?: ObserveOptions | null
 }
 
 export type Rect = {
@@ -1527,6 +1563,9 @@ export type TypeTextMethod = "inserted" | "keys"
 export type TypeTextParams = {
 	target: string
 	text: string
+	callId?: string | null
+	runGeneration?: number | null
+	observeAfter?: ObserveOptions | null
 }
 
 export type UnknownLiteral = "unknown"
@@ -1680,7 +1719,7 @@ export type MethodParams = {
 	"raiseWindow": RaiseWindowParams
 	"ax.setValue": AxSetValueParams
 	"ax.perform": AxPerformParams
-	"ax.focus": AxRefParams
+	"ax.focus": AxFocusParams
 	"ax.typeText": AxTypeTextParams
 	"ax.selectText": SelectTextParams
 	"menu.select": MenuSelectParams

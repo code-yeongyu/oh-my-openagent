@@ -147,7 +147,7 @@ pub fn read_drill(params: DrillParams) -> ReadRequest {
     ReadRequest::Drill { reference, depth }
 }
 
-/// `ax.node`, `ax.children` and the v1 `ax.focus` name one element by ref.
+/// `ax.node` and `ax.children` name one element by ref (`ax.focus` is an exec verb).
 #[must_use]
 pub fn read_ax_ref(params: AxRefParams) -> ReadRequest {
     let AxRefParams { reference } = params;

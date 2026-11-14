@@ -6,6 +6,8 @@
 use serde_json::Value;
 
 use super::crate_path;
+use super::ledger::{ledgered_additions, ledgered_replacements};
+use super::reply::reply_problem;
 use crate::methods::{notification_schemas, Method};
 use crate::schema::engine_schema;
 
@@ -57,78 +59,6 @@ fn cases() -> Vec<Case> {
         }
     }
     cases
-}
-
-/// `(file, member)` for every `additive` ledger line on a top-level result member.
-fn ledgered_additions() -> Vec<(String, String)> {
-    let ledger =
-        std::fs::read_to_string(crate_path("parity/ORACLE-DELTAS.tsv")).expect("ORACLE-DELTAS.tsv");
-    ledger
-        .lines()
-        .skip(1)
-        .map(|line| line.split('\t').map(str::to_owned).collect::<Vec<_>>())
-        .filter(|cells| cells.get(2).map(String::as_str) == Some("additive"))
-        .filter_map(|cells| {
-            Some((
-                cells.first()?.clone(),
-                cells.get(1)?.strip_prefix("/result/")?.to_owned(),
-            ))
-        })
-        .collect()
-}
-
-/// `(file, member, v3 value)` for every `replaced` ledger line on a top-level result member:
-/// the reply is compared with the v3 value the ledger names, not the imported one.
-fn ledgered_replacements() -> Vec<(String, String, Value)> {
-    let ledger =
-        std::fs::read_to_string(crate_path("parity/ORACLE-DELTAS.tsv")).expect("ORACLE-DELTAS.tsv");
-    ledger
-        .lines()
-        .skip(1)
-        .map(|line| line.split('\t').map(str::to_owned).collect::<Vec<_>>())
-        .filter(|cells| cells.get(2).map(String::as_str) == Some("replaced"))
-        .filter_map(|cells| {
-            Some((
-                cells.first()?.clone(),
-                cells.get(1)?.strip_prefix("/result/")?.to_owned(),
-                serde_json::from_str(cells.get(6)?).ok()?,
-            ))
-        })
-        .collect()
-}
-
-fn definition_name(reference: &Value) -> Option<&str> {
-    reference.as_str()?.strip_prefix("#/$defs/")
-}
-
-/// Every member the method's result definition requires that the reply does not carry. A
-/// nullable result (`anyOf: [null, $ref]`, the exec reply) is read through its object branch.
-fn missing_members(schema: &Value, method: &str, reply: &Value) -> Vec<String> {
-    let Some(mut name) = definition_name(&schema["methods"][method]["result"]["$ref"]) else {
-        return Vec::new();
-    };
-    if let Some(branch) = schema["$defs"][name]["anyOf"]
-        .as_array()
-        .and_then(|branches| {
-            branches
-                .iter()
-                .find_map(|branch| definition_name(&branch["$ref"]))
-        })
-    {
-        name = branch;
-    }
-    let (Some(required), Some(present)) = (
-        schema["$defs"][name]["required"].as_array(),
-        reply.as_object(),
-    ) else {
-        return Vec::new();
-    };
-    required
-        .iter()
-        .filter_map(Value::as_str)
-        .filter(|member| !present.contains_key(*member))
-        .map(str::to_owned)
-        .collect()
 }
 
 fn error_code(expect: &[Value]) -> Option<i64> {
@@ -198,33 +128,15 @@ fn corpus_requests_name_table_methods_and_fit_their_types() {
                         *slot = v3.clone();
                     }
                 }
-                let result = &result;
-                let missing = missing_members(&schema, method.spec().name, result);
-                let unledgered: Vec<&str> = missing
-                    .iter()
-                    .filter(|member| {
-                        !additions
-                            .iter()
-                            .any(|(file, added)| *file == case.path && added == *member)
-                    })
-                    .map(String::as_str)
-                    .collect();
-                if !unledgered.is_empty() {
-                    problems.push(format!(
-                        "{}: {name} result lacks {} member(s) no additive ledger line names: {}",
-                        case.name,
-                        unledgered.len(),
-                        unledgered.join(", ")
-                    ));
-                } else if !missing.is_empty() {
-                    ledgered += 1;
-                } else if let Err(error) = method.validate_result(result.clone()) {
-                    problems.push(format!("{}: {name} result: {error}", case.name));
+                match reply_problem(&schema, method, &case.path, &result, &additions) {
+                    Ok(true) => ledgered += 1,
+                    Ok(false) => {}
+                    Err(problem) => problems.push(format!("{}: {name} {problem}", case.name)),
                 }
             }
         }
     }
-    println!("corpus: {requests} requests, {replies} replies ({ledgered} lacking only a ledgered additive member), {pushed} notifications checked");
+    println!("corpus: {requests} requests, {replies} replies ({ledgered} lacking only a ledgered additive member, type-checked with it filled in), {pushed} notifications checked");
     assert!(
         requests > 100 && replies > 50,
         "the corpus walk read too little: {requests} requests, {replies} replies"
@@ -234,5 +146,47 @@ fn corpus_requests_name_table_methods_and_fit_their_types() {
         "{} corpus mismatches:\n{}",
         problems.len(),
         problems.join("\n")
+    );
+}
+
+/// A reply that lacks a ledgered member is still type-checked on every other member.
+#[test]
+fn a_ledgered_reply_is_still_type_checked() {
+    let schema = engine_schema();
+    let additions = ledgered_additions();
+    let hello = cases()
+        .into_iter()
+        .find(|case| case.name == "hello.json")
+        .expect("the hello case");
+    let mut reply = hello
+        .steps
+        .iter()
+        .flat_map(|step| step["expect"].as_array().cloned().unwrap_or_default())
+        .find_map(|entry| entry["message"].get("result").cloned())
+        .expect("the hello reply");
+    assert!(
+        matches!(
+            reply_problem(
+                &schema,
+                Method::EngineHello,
+                &hello.path,
+                &reply,
+                &additions
+            ),
+            Ok(true)
+        ),
+        "the imported hello reply lacks only ledgered members and fits"
+    );
+    reply["protocolVersion"] = serde_json::json!(7);
+    let checked = reply_problem(
+        &schema,
+        Method::EngineHello,
+        &hello.path,
+        &reply,
+        &additions,
+    );
+    assert!(
+        checked.is_err(),
+        "a hello reply with a numeric protocolVersion passed: {checked:?}"
     );
 }

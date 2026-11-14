@@ -24,7 +24,77 @@ function propertyKey(name: string): string {
   return /^[A-Za-z_$][\w$]*$/.test(name) ? name : JSON.stringify(name)
 }
 
+/** The schema without its `null` alternative: the type of a member that must be given. */
+function nonNull(schema: JsonSchema): JsonSchema {
+  if (!isRecord(schema)) return schema
+  if (Array.isArray(schema.type)) return { ...schema, type: schema.type.filter((name) => name !== "null") }
+  for (const key of ["anyOf", "oneOf"] as const) {
+    const alternatives = asSchemas(schema[key])
+    if (alternatives.length > 0)
+      return { ...schema, [key]: alternatives.filter((item) => !(isRecord(item) && item.type === "null")) }
+  }
+  return schema
+}
+
+/**
+ * The groups of members that `dependentRequired` ties together: each member of a group requires
+ * every other one. Only such closed groups are rendered; any other dependency is refused, so it
+ * can never come out as independent optional members.
+ */
+function dependentGroups(schema: Record<string, unknown>): readonly string[][] {
+  const dependencies = schema.dependentRequired
+  if (dependencies === undefined) return []
+  if (!isRecord(dependencies)) throw new Error("dependentRequired is not an object")
+  const groups: string[][] = []
+  const seen = new Set<string>()
+  for (const [name, needs] of Object.entries(dependencies)) {
+    if (seen.has(name)) continue
+    if (!Array.isArray(needs)) throw new Error(`dependentRequired.${name} is not an array`)
+    const group = [name, ...needs.map(String)]
+    for (const member of group) {
+      const others = dependencies[member]
+      const expected = group.filter((other) => other !== member).sort()
+      if (!Array.isArray(others) || JSON.stringify(others.map(String).sort()) !== JSON.stringify(expected))
+        throw new Error(`dependentRequired ${group.join(", ")} is not a closed group at ${member}`)
+      seen.add(member)
+    }
+    groups.push(group)
+  }
+  return groups
+}
+
+/** Whether a member's schema accepts `null` (a `null` type, or a null alternative). */
+function allowsNull(schema: JsonSchema): boolean {
+  if (typeof schema === "boolean") return schema
+  const type = schema.type
+  if (type === "null" || (Array.isArray(type) && type.includes("null"))) return true
+  return ["anyOf", "oneOf"].some((key) => asSchemas(schema[key]).some((item) => allowsNull(item)))
+}
+
 function objectType(schema: Record<string, unknown>, indent: string): string {
+  const groups = dependentGroups(schema)
+  if (groups.length === 0) return plainObjectType(schema, indent)
+  const properties = isRecord(schema.properties) ? schema.properties : {}
+  const grouped = new Set(groups.flat())
+  const base = plainObjectType(
+    { ...schema, properties: Object.fromEntries(Object.entries(properties).filter(([name]) => !grouped.has(name))) },
+    indent,
+  )
+  const inner = `${indent}\t`
+  const member = (name: string): JsonSchema => {
+    const value = properties[name]
+    return typeof value === "boolean" || isRecord(value) ? value : true
+  }
+  const alternatives = groups.map((group) => {
+    const given = group.map((name) => `${inner}${propertyKey(name)}: ${typeText(nonNull(member(name)), inner)}`)
+    // Absent is absent: a member whose schema allows null may also be null; one that does not may not.
+    const absent = group.map((name) => `${inner}${propertyKey(name)}?: ${allowsNull(member(name)) ? "null" : "never"}`)
+    return `({\n${given.join("\n")}\n${indent}} | {\n${absent.join("\n")}\n${indent}})`
+  })
+  return [base, ...alternatives].join(" & ")
+}
+
+function plainObjectType(schema: Record<string, unknown>, indent: string): string {
   const properties = isRecord(schema.properties) ? schema.properties : undefined
   const required = new Set(
     Array.isArray(schema.required) ? schema.required.filter((name) => typeof name === "string") : [],

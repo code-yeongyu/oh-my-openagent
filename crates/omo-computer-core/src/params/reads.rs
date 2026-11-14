@@ -12,4 +12,4 @@ params! { ZoomParams { target: String, region: Rect; } }
 params! { ElementAtParams { target: String, x: f64, y: f64; frame_id: String, } }
 params! { MenuItemsParams { target: String; path: Vec<String>, } }
 params! { SurfaceParams { kind: SurfaceKind; index: u32, } }
-params! { OpenSystemSurfaceParams { kind: SurfaceKind; } }
+exec_params! { OpenSystemSurfaceParams { kind: SurfaceKind; } }

@@ -76,13 +76,14 @@ params! {
     }
 }
 
-exec_params! {
-    /// `click`: a point (v1) or a ref; `consume` asks for a consumption receipt.
-    ClickParams {
+paired_exec_params! {
+    /// `click`: a point (v1) or a ref; `consume` asks for a consumption receipt. A lone
+    /// `x` or `y` is refused.
+    ClickParams via ClickWire = "ClickWire" pairs (x, y) {
         ;
         target: String,
-        x: f64,
-        y: f64,
+        #[serde(deserialize_with = "crate::params::present_number")] #[schemars(with = "f64")] x: f64,
+        #[serde(deserialize_with = "crate::params::present_number")] #[schemars(with = "f64")] y: f64,
         #[serde(rename = "ref")]
         reference: String,
         frame_id: String,
@@ -95,16 +96,20 @@ exec_params! {
     }
 }
 
-params! { TypeTextParams { target: String, text: String; } }
-params! { KeyChordParams { target: String, keys: Vec<String>; } }
-params! { HoldKeysParams { target: String, keys: Vec<String>, duration: u64; } }
-params! { HoldMouseParams { target: String, x: f64, y: f64, duration: u64; } }
-params! { RaiseWindowParams { window_id: String; } }
+exec_params! { TypeTextParams { target: String, text: String; } }
+exec_params! { KeyChordParams { target: String, keys: Vec<String>; } }
+exec_params! { HoldKeysParams { target: String, keys: Vec<String>, duration: u64; } }
+exec_params! { HoldMouseParams { target: String, x: f64, y: f64, duration: u64; } }
+exec_params! { RaiseWindowParams { window_id: String; } }
 params! { AxTargetParams { target: String; } }
 params! { AxRefParams { #[serde(rename = "ref")] reference: String; } }
-params! { AxPerformParams { #[serde(rename = "ref")] reference: String, action: String; } }
+exec_params! { AxPerformParams { #[serde(rename = "ref")] reference: String, action: String; } }
+exec_params! {
+    /// `ax.focus`: an exec verb, so it carries the exec members the read-tier ref params lack.
+    AxFocusParams { #[serde(rename = "ref")] reference: String; }
+}
 exec_params! { AxSetValueParams { #[serde(rename = "ref")] reference: String, value: String; } }
-params! { AxTypeTextParams { #[serde(rename = "ref")] reference: String, text: String; } }
+exec_params! { AxTypeTextParams { #[serde(rename = "ref")] reference: String, text: String; } }
 params! { ControlGrantParams { reason: String; confirmation_id: String, } }
 params! { StopPathStartParams { ; chord: String, } }
 params! { StopPathStopParams { ; source: String, } }
