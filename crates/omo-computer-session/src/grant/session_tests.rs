@@ -274,12 +274,14 @@ fn a_is_62_open_stop_hotkey_must_equal_the_consent_file() {
     assert_eq!((refused.code.wire(), refused.reason), ("ControlRequired", Some("tampered")));
     let (mut s, refused) = open_session_with(Some("ctrl+alt+shift+f12"), Some("ctrl+alt+shift+escape"));
     assert!(refused.is_err());
-    assert!(!s.funnel.control.consent.view().tampered, "the view is not marked tampered");
+    // A-IS-62 rev 5 (R70an C) reverses R70aj: the hand reads tampered at once.
+    assert!(s.funnel.control.consent.view().tampered, "the hand reads tampered");
     let path = crate::audit::AuditSink::path(s.funnel.audit()).map(std::path::Path::to_path_buf).expect("an audit file");
     let audit = std::fs::read_to_string(path).expect("audit");
     let lines: Vec<&str> = audit.lines().filter(|l| l.contains("\"stop_hotkey\"")).collect();
     assert_eq!(lines.len(), 1, "one audit line for the refused call: {audit}");
     assert!(lines[0].contains("\"tampered\""), "{}", lines[0]);
+    assert!(lines[0].contains("ctrl+alt+shift+f12") && lines[0].contains("ctrl+alt+shift+escape"), "both chords: {}", lines[0]);
     let status = s.stop_path_status();
     assert!(!status.global_live && !status.host_relay_live, "nothing armed: {status:?}");
     assert!(open_with(Some("ctrl+alt+shift+f12"), Some("ctrl+alt+shift+f12")).is_ok(), "equal");
@@ -333,4 +335,43 @@ fn a_is_62_the_fake_default_is_the_persona_os() {
     assert!(open(Persona::Macos, "ctrl+alt+shift+escape").is_err(), "the Linux default is not macOS's");
     assert!(open(Persona::X11, "ctrl+alt+shift+escape").is_ok());
     assert!(open(Persona::Win32, "ctrl+alt+shift+escape").is_ok());
+}
+
+/// A-IS-62 rev 5 (R70an C): after a refused chord the HAND reads tampered: every exec is refused
+/// before any mutate, reads continue. The mark survives session.close and a re-open of the SAME
+/// consent.
+#[test]
+fn a_is_62_a_refused_chord_leaves_the_hand_tampered() {
+    let backend = FakeBackend::with_parts(scenario(&json!({ "consent": { "stopHotkey": "ctrl+alt+shift+f12" } })), FakeClock::default(), RecordingSink::default())
+        .with_stop_path(StopPathScript::Live);
+    let mut s = Session::new(Box::new(backend));
+    let open = |s: &mut Session, chord: Option<&str>| {
+        let mut p = json!({ "reportMode": "null" });
+        if let Some(chord) = chord { p["settings"] = json!({ "stop_hotkey": chord }); }
+        s.open(params(p))
+    };
+    assert!(open(&mut s, Some("ctrl+alt+shift+escape")).is_err(), "a differing chord");
+    open(&mut s, None).expect("re-open with the same consent");
+    assert!(s.funnel.control.consent.view().tampered, "the hand reads tampered");
+    s.stop_path_start(params(json!({})));
+    capture(&mut s, "1");
+    let refused = s.click(params(json!({ "target": "1", "x": 5, "y": 5 }))).expect_err("exec refused");
+    assert_eq!(refused.refusal.reason, Some("tampered"));
+    s.close();
+    open(&mut s, None).expect("re-open after close");
+    assert!(s.funnel.control.consent.view().tampered, "survives close and a re-open of the same consent");
+}
+
+/// R70an C: the mark is cleared ONLY by an open whose fingerprinted consent differs from the one
+/// in force at the refusal.
+#[test]
+fn a_is_62_the_tampered_mark_clears_only_on_a_changed_fingerprint() {
+    let mut mark = crate::grant::ChordTamper::default();
+    let a = json!({ "stopHotkey": "ctrl+alt+shift+f12" });
+    let b = json!({ "stopHotkey": "ctrl+alt+shift+escape" });
+    mark.refused(Some(&a));
+    assert!(mark.holds(Some(&a)), "the same consent keeps it");
+    assert!(mark.holds(Some(&a)), "and keeps it again");
+    assert!(!mark.holds(Some(&b)), "a re-save clears it");
+    assert!(!mark.holds(Some(&a)), "and it stays cleared");
 }

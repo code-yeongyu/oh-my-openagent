@@ -40,6 +40,39 @@ pub struct Control {
     pub(crate) lease_epoch: Option<u64>,
     pub(crate) clock: MachineClock,
     pub(crate) lease_hook: Box<dyn LeaseHook>,
+    /// A-IS-62 rev 5 (R70an C): the hand reads tampered after a refused chord.
+    pub(crate) chord_tamper: ChordTamper,
+}
+
+/// The tampered mark a refused stop chord leaves on the hand (A-IS-62 rev 5, R70an C). It is held
+/// by the engine's session state: it survives session.close and a re-open of the same consent, and
+/// only a re-open whose fingerprinted consent differs from the one in force at the refusal clears it.
+#[derive(Debug, Default)]
+pub struct ChordTamper {
+    at: Option<String>,
+}
+
+impl ChordTamper {
+    fn fingerprint(view: Option<&Value>) -> String {
+        crate::audit::sha256_16(&serde_json::to_vec(&view).unwrap_or_default())
+    }
+
+    /// A chord was refused while `view` was the consent in force.
+    pub fn refused(&mut self, view: Option<&Value>) {
+        self.at = Some(Self::fingerprint(view));
+    }
+
+    /// Whether the hand still reads tampered under `view`; a different consent clears the mark.
+    pub fn holds(&mut self, view: Option<&Value>) -> bool {
+        match &self.at {
+            Some(at) if *at == Self::fingerprint(view) => true,
+            Some(_) => {
+                self.at = None;
+                false
+            }
+            None => false,
+        }
+    }
 }
 
 impl Default for Control {
@@ -60,6 +93,7 @@ impl Default for Control {
             lease_epoch: None,
             clock: wall_clock(),
             lease_hook: Box::new(NoLeaseHook),
+            chord_tamper: ChordTamper::default(),
         }
     }
 }

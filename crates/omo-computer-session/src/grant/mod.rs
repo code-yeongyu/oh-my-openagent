@@ -18,7 +18,7 @@ mod session_tests;
 mod tests;
 
 pub use lease_hook::{LeaseHook, NoLeaseHook};
-pub use state::{wall_clock, Control, MachineClock, Plan};
+pub use state::{wall_clock, ChordTamper, Control, MachineClock, Plan};
 pub use wire::HostCallError;
 
 use omo_computer_core::methods::Method;

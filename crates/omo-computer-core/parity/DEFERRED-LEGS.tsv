@@ -71,3 +71,6 @@ C24	the per-OS documented default stop chord is the backend's own (d-safety.md:8
 C24	the conformance consent fixture with the stopHotkey member and its four cases per OS (equal, differing, unparseable, unreadable) (A-IS-62 rev 5, R70al/R70am)	21	28	owed
 C24	the migration of computer.stop_hotkey into the hand's consent key stopHotkey (A-IS-62 rev 5, R70al/R70am)	21	37	owed
 C24	the release gate checks the one-source stop chord on every OS (A-IS-62 rev 5, R70al/R70am)	21	77	owed
+C24	an unreadable configured chord reads deaf chord-unarmable (supervisor Deaf slot, X11 and the fake), the call answers StopPathUnavailable{deaf} (A-IS-62 rev 5, R70an B)	21	50	owed
+C24	the tampered mark set by a refused chord is held by the hand host and survives an engine restart (A-IS-62 rev 5, R70an C)	21	37	owed
+C24	the host part writes stopHotkey into the handed consent view (null when the file has no key) (A-IS-62 rev 5, R70ao(2))	21	37	owed

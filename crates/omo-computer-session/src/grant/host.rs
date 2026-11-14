@@ -204,11 +204,12 @@ impl Session {
     /// `session.open`: the host's consent view (narrowed only), its scope bound to app keys, the
     /// allowed denied apps handed to the gate. A scope name that binds to nothing refuses.
     pub(crate) fn open_consent(&mut self) -> Result<(), Refusal> {
-        let mut view = self
-            .backend
-            .host_consent()
-            .map(ConsentView::from_host)
-            .unwrap_or_default();
+        let raw = self.backend.host_consent();
+        let mut view = raw.clone().map(ConsentView::from_host).unwrap_or_default();
+        // A-IS-62 rev 5 (R70an C): a refused chord left the hand tampered under this consent.
+        if self.funnel.control.chord_tamper.holds(raw.as_ref()) {
+            view.tampered = true;
+        }
         if let Some(names) = &view.scope {
             let known: Vec<String> = self
                 .backend
@@ -229,9 +230,14 @@ impl Session {
         self.funnel.set_session_id(session_id.to_owned());
         self.open_consent()?;
         let os = backend_os(self.backend.as_ref());
-        if let Err(refusal) = check_stop_hotkey(self.funnel.control.consent.view(), os, stop_hotkey) {
-            // One audit line for the refused call; the file is intact, so the view is NOT marked
-            // tampered (R70aj). The peer's pid and executable are owed by row 29's peer check.
+        let view = self.funnel.control.consent.view();
+        let configured = match view.stop_chord(os) {
+            crate::consent::StopChord::Chord(chord) | crate::consent::StopChord::Unparseable(chord) => chord,
+        };
+        if let Err(refusal) = check_stop_hotkey(view, os, stop_hotkey) {
+            // One audit line for the refused call, naming both chords; the hand then reads
+            // tampered at once (A-IS-62 rev 5, R70an C, reversing R70aj). The peer's pid and executable
+            // are owed by row 29's peer check.
             let _ = self.funnel.audit().append(crate::audit::AuditEvent {
                 action: "session.open".to_owned(),
                 target: "stop_hotkey".to_owned(),
@@ -243,8 +249,16 @@ impl Session {
                 },
                 status: crate::audit::Status::Refused,
                 primary_error: Some(refusal.code.wire().to_owned()),
+                evidence: vec![
+                    format!("configured={configured}"),
+                    format!("carried={}", stop_hotkey.unwrap_or_default()),
+                ],
                 ..crate::audit::AuditEvent::default()
             });
+            // The hand now reads tampered until the consent is re-saved (A-IS-62 rev 5, R70an C).
+            let raw = self.backend.host_consent();
+            self.funnel.control.chord_tamper.refused(raw.as_ref());
+            self.open_consent()?;
             return Err(refusal);
         }
         self.mint_token(session_id)
