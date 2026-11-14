@@ -275,6 +275,7 @@ async function main() {
   const receipt = evidenceReceipt(payload)
   writeEvidenceMaybe(outDir, receipt)
   console.log(JSON.stringify(receipt))
+  if (result === "FAIL") process.exitCode = 1
 }
 
 function evidenceReceipt(payload) {
