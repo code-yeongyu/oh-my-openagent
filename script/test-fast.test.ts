@@ -16,8 +16,10 @@ import {
   spawnInheritingStdio,
   type SpawnGroupOptions,
   testFastGroups,
+  testFastQuarantineGroup,
   type TestFastGroup,
 } from "./test-fast"
+import { ROOT_TEST_SERIAL_QUARANTINE_PATHS } from "./root-test-serial-quarantine.ts"
 
 describe("isReentry", () => {
   it("#given an env without the active marker #when the guard is asked #then it reports no re-entry", () => {
@@ -235,6 +237,9 @@ describe("partition tiling", () => {
   const quotedPatterns = (config: string): readonly string[] =>
     [...config.matchAll(/"([^"]+\/\*\*)"/g)].map((match) => match[1] ?? "")
 
+  const allQuotedPatterns = (config: string): readonly string[] =>
+    [...config.matchAll(/"([^"]+)"/g)].map((match) => match[1] ?? "")
+
   /**
    * Scopes are compared verbatim, never collapsed to their package dir: a win2
    * ignore of `packages/x/src/**` while a group runs all of `packages/x` is a
@@ -311,6 +316,32 @@ describe("partition tiling", () => {
 
     // then
     for (const pattern of quotedPatterns(base)) expect(win2Patterns).toContain(pattern)
+  })
+
+  it("#given the parallel config and the quarantine list #when the two are diffed #then the parallel config adds exactly the quarantine paths and nothing else", () => {
+    // given — win2 already tiles the three group scopes (the test above), so the only
+    // remaining question is whether the parallel config hides exactly the serial phase.
+    const win2 = readFileSync(new URL("../bunfig.win2.toml", import.meta.url), "utf8")
+    const parallel = readFileSync(new URL("../bunfig.win2.parallel.toml", import.meta.url), "utf8")
+    const win2Patterns = new Set(allQuotedPatterns(win2))
+
+    // when
+    const added = allQuotedPatterns(parallel).filter((pattern) => !win2Patterns.has(pattern))
+
+    // then — serial phase + three groups cover the default suite exactly once
+    expect(sorted(added)).toEqual(sorted(ROOT_TEST_SERIAL_QUARANTINE_PATHS))
+  })
+
+  it("#given the serial phase #when its arguments are read #then they carry the quarantine list from its own definition", () => {
+    // given
+    const quarantine = testFastQuarantineGroup()
+
+    // when
+    const paths = quarantine.args.filter((arg) => arg.endsWith(".test.ts"))
+
+    // then
+    expect(quarantine.name).toBe("serial-quarantine")
+    expect(paths).toEqual([...ROOT_TEST_SERIAL_QUARANTINE_PATHS])
   })
 
   it("#given each scope is owned by one group #when the sibling groups are listed #then no scope repeats", () => {
@@ -479,6 +510,7 @@ describe("runTestFast", () => {
     const running = new Set<string>()
     const spawnFailure = new Error("spawn ENOENT")
     const spawnGroup = async (group: TestFastGroup) => {
+      if (group.name === "serial-quarantine") return 0
       if (group.name === "root-rest") throw spawnFailure
       running.add(group.name)
       // Never settles: a detached sibling is still running when the failure lands.
@@ -515,6 +547,41 @@ describe("runTestFast", () => {
     expect(shutdowns).toEqual([])
   })
 
+  it("#given the serial quarantine #when the runner starts #then it completes before any parallel group starts", async () => {
+    // given
+    const order: string[] = []
+    const spawnGroup = async (group: TestFastGroup) => {
+      order.push(`start:${group.name}`)
+      await Promise.resolve()
+      order.push(`exit:${group.name}`)
+      return 0
+    }
+
+    // when
+    const exit = await runTestFast(spawnGroup, capturingLogger([]))
+
+    // then
+    expect(order[0]).toBe("start:serial-quarantine")
+    expect(order[1]).toBe("exit:serial-quarantine")
+    expect(exit).toBe(0)
+  })
+
+  it("#given a nonzero serial quarantine exit #when the runner aggregates #then it returns that code and starts no group", async () => {
+    // given
+    const started: string[] = []
+    const spawnGroup = async (group: TestFastGroup) => {
+      started.push(group.name)
+      return group.name === "serial-quarantine" ? 7 : 0
+    }
+
+    // when
+    const exit = await runTestFast(spawnGroup, capturingLogger([]))
+
+    // then
+    expect(exit).toBe(7)
+    expect(started).toEqual(["serial-quarantine"])
+  })
+
   it("#given an injected logger #when the runner starts #then the banner goes to the logger and never to stdout", async () => {
     // given
     const lines: string[] = []
@@ -533,7 +600,10 @@ describe("runTestFast", () => {
     }
 
     // then
-    expect(lines).toEqual(["[test-fast] running 3 groups in parallel: opencode-memory, root-rest, senpi"])
+    expect(lines).toEqual([
+      `[test-fast] serial quarantine first: ${ROOT_TEST_SERIAL_QUARANTINE_PATHS.length} files`,
+      "[test-fast] running 3 groups in parallel: opencode-memory, root-rest, senpi",
+    ])
     expect(stdoutWrites.join("")).not.toContain("[test-fast]")
   })
 })

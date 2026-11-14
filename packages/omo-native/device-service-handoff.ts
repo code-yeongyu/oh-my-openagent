@@ -71,15 +71,16 @@ export function cliDeviceServiceHandoff(options: {
     machineDevice: async () => {
       // No endpoint file: the service is not installed here. A leftover file that nothing answers is not absence.
       if (!existsSync(deviceServiceEndpointPath(stateDir))) return { kind: "absent" }
+      // Kept, not logged: the sign-in refuses with this reason, so a "treated as not running" line would contradict it.
       let failure: string | undefined
       const service = await connectOrNotRunning(connect, (line) => {
         failure = line
-        options.log(line)
       })
       if (service === "not_running") {
         return {
           kind: "unknown",
           reason: failure ?? "the device service endpoint is present but nothing answered",
+          endpoint: deviceServiceEndpointPath(stateDir),
         }
       }
       try {
