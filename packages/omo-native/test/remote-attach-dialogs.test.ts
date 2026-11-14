@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { randomUUID } from "node:crypto"
 
-import type { JsonObject } from "../../device-service-core/src/index.ts"
+import type { JsonObject, RemoteAttach, RemoteAttachEvent } from "../../device-service-core/src/index.ts"
 import { defaultWorld, SESSION_ID } from "../../device-service-core/test/local-api/conformance/world.ts"
-import { LOCAL_SESSION_ID } from "../remote-attach"
-import { cleanupAttachFixtures, endpointFor, type Line, ownerState, TuiPeer } from "./remote-attach-support"
+import { LOCAL_SESSION_ID, serveRemoteAttach } from "../remote-attach"
+import { cleanupAttachFixtures, endpointFor, type Line, ownerState, privateDir, TuiPeer } from "./remote-attach-support"
 
 // relayd sends a dialog's local shape (extension_ui_request) only on the delegated connection that raised it; every other
 // attach of the session sees the mirror, `ui_request_pending` and `ui_request_settled` (senpi snapshot-types.ts). The
@@ -113,6 +113,12 @@ describe.skipIf(process.platform === "win32")("omo remote attach: a dialog raise
     ])
   })
 
+  test("#given a replay with a dialog pending and then settled for the same id #when the attach TUI watches #then the dialog is shown and then dismissed", async () => {
+    const tui = await watcherOf([pending(confirm), settled(String(confirm.id), "answered")])
+    expect(dialogs(tui)).toEqual([{ ...confirm, sessionId: LOCAL_SESSION_ID }])
+    expect(tui.records.some((line) => line.type === "question_resolved")).toBe(true)
+  })
+
   test("#given a secret input or a grant selection raised elsewhere #when it is mirrored #then the TUI is not shown a dialog only its raiser may answer", async () => {
     const secret = {
       id: "sec-1",
@@ -134,3 +140,57 @@ describe.skipIf(process.platform === "win32")("omo remote attach: a dialog raise
     expect(dialogs(tui).map((line) => line.id)).toEqual(["dlg-1"])
   })
 })
+
+describe.skipIf(process.platform === "win32")("omo remote attach: a dialog that was already pending when the attach started", () => {
+  test("#given a dialog raised before the attach started #when the attach TUI watches #then it is shown and can be answered", async () => {
+    const base = defaultWorld()
+    const [session] = base.sessions
+    if (session === undefined) throw new Error("the default world has a session")
+    const state = { ...session.snapshot.state, pendingDialogs: [pending(confirm)] }
+    const endpoint = await endpointFor({
+      ...base,
+      sessions: [{ ...session, snapshot: { ...session.snapshot, state }, records: [MARKER] }],
+    })
+    const tui = await TuiPeer.connect(endpoint.socketPath)
+    await tui.request({ type: "subscribe_sessions", sessions: { ids: [LOCAL_SESSION_ID] }, mirror: "all" })
+    await tui.record((line) => line.type === "message_update", "the records after the attach")
+    expect(dialogs(tui)).toEqual([{ ...confirm, sessionId: LOCAL_SESSION_ID }])
+  })
+})
+
+describe.skipIf(process.platform === "win32")("omo remote attach: a dialog raised while the relay link was down", () => {
+  test("#given a dialog raised while the relay link was down #when the attach re-attaches #then it is shown after the reconnect", async () => {
+    const base = defaultWorld()
+    const [session] = base.sessions
+    if (session === undefined) throw new Error("the default world has a session")
+    const listeners = new Set<(event: RemoteAttachEvent) => void>()
+    const events: RemoteAttachEvent[] = [{ kind: "snapshot", snapshot: session.snapshot }]
+    const emit = (event: RemoteAttachEvent): void => {
+      events.push(event)
+      for (const listener of [...listeners]) listener(event)
+    }
+    const attach = {
+      device: "studio",
+      sessionId: SESSION_ID,
+      handle: "h-1",
+      snapshot: Promise.resolve(session.snapshot),
+      detached: new Promise(() => {}),
+      onEvent: (listener: (event: RemoteAttachEvent) => void) => {
+        for (const event of events) listener(event)
+        listeners.add(listener)
+        return () => listeners.delete(listener)
+      },
+      read: async () => ({ entries: [], next_before: null }),
+    } as unknown as RemoteAttach
+    const endpoint = await serveRemoteAttach(attach, { label: `Studio/${SESSION_ID}`, parent: privateDir("ra-ep-") })
+    const tui = await TuiPeer.connect(endpoint.socketPath)
+    await tui.request({ type: "subscribe_sessions", sessions: { ids: [LOCAL_SESSION_ID] }, mirror: "all" })
+    const state = { ...session.snapshot.state, pendingDialogs: [pending(confirm)] }
+    emit({ kind: "snapshot", snapshot: { ...session.snapshot, attach_id: session.snapshot.attach_id + 1, state } })
+    emit({ kind: "records", attach_id: session.snapshot.attach_id + 1, records: [MARKER] })
+    await tui.record((line) => line.type === "message_update", "the records after the reconnect")
+    expect(dialogs(tui)).toEqual([{ ...confirm, sessionId: LOCAL_SESSION_ID }])
+    await endpoint.close()
+  })
+})
+
