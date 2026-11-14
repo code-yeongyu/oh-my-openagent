@@ -42,10 +42,10 @@ describe("thread_interrupt: LOCAL and REMOTE are one implementation", () => {
       const result = await run("thread_interrupt", { thread, turn_id: "7" })
 
       const received =
-        leg === "LOCAL" ? interrupts : a.sent.flatMap((entry) => (entry.rpc?.["type"] === "interrupt" ? [entry.rpc] : []))
-      expect(received).toEqual([
-        expect.objectContaining({ type: "interrupt", turnId: "7", background: "stop" }),
-      ])
+        leg === "LOCAL"
+          ? interrupts
+          : a.sent.flatMap((entry) => (entry.rpc?.["type"] === "interrupt" ? [entry.rpc] : []))
+      expect(received).toEqual([expect.objectContaining({ type: "interrupt", turnId: "7", background: "stop" })])
       expect(comparable(result)).toEqual(EXPECTED)
     },
   )
@@ -56,7 +56,12 @@ describe("thread_interrupt: LOCAL and REMOTE are one implementation", () => {
     const { run } = surface(a.remote, { engine: legacy })
     const here = await run("thread_interrupt", { thread: "dur-local" })
     const there = await run("thread_interrupt", { thread: "dur-on-b" })
-    expect(comparable(here)).toEqual({ kind: "ok", turn_id: "7", interrupted: true, background: { status: "not_supported" } })
+    expect(comparable(here)).toEqual({
+      kind: "ok",
+      turn_id: "7",
+      interrupted: true,
+      background: { status: "not_supported" },
+    })
     expect(comparable(there)).toEqual(comparable(here))
   })
 })

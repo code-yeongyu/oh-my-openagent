@@ -10,7 +10,8 @@ export type InterruptOutcome = {
 
 type Reply = Readonly<Record<string, unknown>>
 
-const isObject = (value: unknown): value is Reply => typeof value === "object" && value !== null && !Array.isArray(value)
+const isObject = (value: unknown): value is Reply =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
 
 function jobOf(entry: unknown): ThreadInterruptBackgroundJob | undefined {
   if (!isObject(entry)) return undefined
