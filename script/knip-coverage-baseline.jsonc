@@ -2297,7 +2297,7 @@
         "src/components/thread/gateway/schema.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) recordThreadCreation, sessionCall
         "src/components/thread/gateway/store-extension-session-ops.ts": ["exports"],
-        // pre-existing at origin dev 4686e425b5: unused export(s) GatewayMigrationError, migrate, reconcile, claim, recordOutcome, refuseQueued, listDeliveries, isReferenced, journalMode, stats and 1 more
+        // pre-existing at origin dev 4686e425b5: unused export(s) migrate, reconcile, claim, recordOutcome, refuseQueued, listDeliveries, isReferenced, journalMode, stats, migrateLegacyMailboxes
         "src/components/thread/gateway/store-ops.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) registerIncarnation, clearEndpoint, sessionOwner
         "src/components/thread/gateway/store-ownership.ts": ["exports"],
@@ -2311,7 +2311,7 @@
         "src/components/thread/gateway/worker-reply-matchers.test.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) THREAD_TOOL_SEARCH_GROUP
         "src/components/thread/metadata.ts": ["exports"],
-        // pre-existing at origin dev 4686e425b5: unused export(s) messageText, parseSessionLines, summarizeSessionEntries
+        // pre-existing at origin dev 4686e425b5: unused export(s) messageText
         "src/components/thread/session-facts.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) THREAD_LINK_SCHEME
         "src/components/thread/thread-link.ts": ["exports"],
