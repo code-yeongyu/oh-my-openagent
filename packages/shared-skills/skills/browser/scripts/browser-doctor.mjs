@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { runBrowserDoctor } from "./browser-doctor-report.mjs"
 import { loadOmowright } from "./omowright.mjs"
+import { resolveConnectedBrowser } from "./browser-identity.mjs"
 
 const { entry, omowright } = await loadOmowright()
 const browserArg = process.argv.find((arg) => arg.startsWith("--browser="))
@@ -33,7 +34,17 @@ if (process.argv.includes("--json")) {
     `browsers detected: ${summary.browsersDetected.map((b) => `${b.id}${b.extensionRegistered ? " (extension registered)" : ""}`).join(", ") || "none"}`,
   )
   console.log(
-    `browsers connected: ${summary.browsersConnected.map((b) => `${b.name} ${b.version} [${b.instanceId}]${b.extensionVersion ? ` extension ${b.extensionVersion}` : ""}`).join(", ") || "none"}`,
+    `browsers connected: ${
+      summary.browsersConnected
+        .map((b) => {
+          const provenance =
+            b.daemonProduct && b.daemonProduct !== `${b.name} ${b.version}`.trim()
+              ? ` (daemon: ${b.daemonProduct})`
+              : ""
+          return `${b.name} ${b.version} [${b.instanceId}]${b.extensionVersion ? ` extension ${b.extensionVersion}` : ""}${provenance}`
+        })
+        .join(", ") || "none"
+    }`,
   )
   console.log(`\n${summary.remedy}`)
 }

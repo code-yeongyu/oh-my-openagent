@@ -81,7 +81,13 @@ test.skipIf(process.platform === "win32")(
     expect(summary.state).toBe("outdated-extension")
     expect(summary.remedy).toContain("0.4.1")
     expect(summary.browsersConnected).toEqual([
-      { instanceId: "abc12345", name: "chrome", version: "153", extensionVersion: "0.4.0" },
+      {
+        instanceId: "abc12345",
+        name: "chrome",
+        version: "153",
+        daemonProduct: "chrome 153",
+        extensionVersion: "0.4.0",
+      },
     ])
   },
 )
