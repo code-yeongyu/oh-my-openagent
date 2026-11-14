@@ -29,7 +29,8 @@ export async function runPendingSweep(options: PendingSweepOptions): Promise<voi
     return answer
   }
   for (const session of await store.intakeMarks.openSessions()) {
-    let wake = options.sameDevice(session.durable_id) && session.local
+    // Local first: a session that is not local can never wake this way, so its project's setting is never read.
+    let wake = session.local && options.sameDevice(session.durable_id)
     for (const device of session.devices) {
       const answer = await admission(device)
       if (answer === "admitted") wake = true

@@ -3,6 +3,7 @@ import { mkdtempSync } from "node:fs"
 import { join } from "node:path"
 
 import { createFakeDeliveryService } from "../consumer/testing/fake-delivery-service"
+import { createGatewayStore } from "../gateway/store"
 import { startThreadWakeAtSession, wakeHostIdleExitMs, type ThreadWakeLatch, type ThreadWakeOptions } from "./runtime"
 
 // A carrier that carries nothing arms no sweep timer (design A3.1.4; #13455's MEDIUM and its delta review), the
@@ -41,10 +42,12 @@ function start(
 }
 
 describe("a running wake over an empty wake table", () => {
-  test("#given an engine at the wake minimum and an empty wake table #when the wake starts #then no sweep timer is armed", async () => {
+  test("#given an engine at the wake minimum and an empty wake table #when the wake starts and its start read has settled #then no sweep timer is armed", async () => {
     const agentDir = mkdtempSync("/tmp/omo-wake-runtime-")
     const scheduled: number[] = []
+    const store = createGatewayStore({ agentDir })
     const running = start(agentDir, {
+      store,
       deliveries: async () => undefined,
       schedule: (_run, ms) => {
         scheduled.push(ms)
@@ -53,6 +56,9 @@ describe("a running wake over an empty wake table", () => {
     })
     expect(running).toBeDefined()
     await running?.ready
+    // The carrier's own start read queued before any list of ours, and the store serialises its reads, so once
+    // this one settles the start read has settled too - the assertion below can no longer race it.
+    await store.woken.list()
     expect(scheduled).toEqual([])
     await running?.stop()
   })
