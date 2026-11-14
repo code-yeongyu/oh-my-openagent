@@ -5,7 +5,7 @@
 use omo_computer_core::backend::{NotificationFingerprint, Refusal, WindowFilter};
 use omo_computer_core::error::EngineCode;
 use omo_computer_core::observation::{Observation, SettleOutcome};
-use omo_computer_core::params::{ElementState, EventKind, WaitForParams, WindowState};
+use omo_computer_core::params::{ElementState, EventKind, SurfaceState, WaitForParams, WindowState};
 use omo_computer_core::requests::{read_wait_for, ReadRequest, WaitSpec};
 use omo_computer_core::results::{NotificationMatch, WaitOutcome, WaitResult};
 use omo_computer_core::untrusted::UntrustedText;
@@ -67,6 +67,8 @@ impl Session {
         let timeout_ms = timeout_ms.unwrap_or(self.settle.regime.numbers().cap_ms);
         let mut settled = None;
         let mut notification = None;
+        // Whether the match is the target window going away: then there is nothing to observe.
+        let mut target_gone = false;
         let outcome = match predicate {
             WaitSpec::Settle(spec) => {
                 settled = self.settle_before_read(&target, Some(spec), Some(timeout_ms));
@@ -89,21 +91,40 @@ impl Session {
                 let only = (state == WindowState::Gone)
                     .then(|| self.tracked_windows(&target, title.as_deref(), app.as_deref()))
                     .transpose()?;
-                self.wait_event_match(
+                let outcome = self.wait_event_match(
                     &EventMatch::Window { state, title, app },
                     only.as_deref(),
                     state == WindowState::Gone,
                     timeout_ms,
-                )?
+                )?;
+                // A confirmed gone match on a set that held the target: it is no longer listed.
+                target_gone = outcome == WaitOutcome::Matched
+                    && only.as_deref().is_some_and(|ids| ids.contains(&target))
+                    && !self.target_listed(&target)?;
+                outcome
             }
             WaitSpec::Surface { kind, state } => {
-                self.wait_event_match(&EventMatch::Surface { kind, state }, None, false, timeout_ms)?
+                let outcome = self.wait_event_match(
+                    &EventMatch::Surface { kind, state },
+                    None,
+                    false,
+                    timeout_ms,
+                )?;
+                target_gone = outcome == WaitOutcome::Matched
+                    && state == SurfaceState::Gone
+                    && !self.target_listed(&target)?;
+                outcome
             }
             // An event wait counts events on its target window; a window that opens is never
             // the target, so `window_opened` counts every new window.
             WaitSpec::Event(kind) => {
                 let only = (kind != EventKind::WindowOpened).then(|| vec![target.clone()]);
-                self.wait_event_match(&EventMatch::Event(kind), only.as_deref(), false, timeout_ms)?
+                let outcome =
+                    self.wait_event_match(&EventMatch::Event(kind), only.as_deref(), false, timeout_ms)?;
+                target_gone = outcome == WaitOutcome::Matched
+                    && kind == EventKind::WindowClosed
+                    && !self.target_listed(&target)?;
+                outcome
             }
             WaitSpec::Text(text) => self.wait_observed(&target, timeout_ms, |_, o| {
                 o.tree.as_deref().is_some_and(|tree| tree.contains(&text))
@@ -114,13 +135,54 @@ impl Session {
             // The session-state sampler that would feed it is row 22's.
             WaitSpec::Session(_) => WaitOutcome::Unsupported,
         };
-        let mut observation = self.observe_now(&target)?;
+        let mut observation = if target_gone {
+            self.nothing_observed(&target)
+        } else {
+            self.observe_now(&target)?
+        };
         observation.settle = settled.as_ref().map(Settled::wire);
         Ok(WaitResult {
             outcome,
             observation: Box::new(observation),
             notification,
         })
+    }
+
+    /// Whether `target` is still in the window listing.
+    ///
+    /// # Errors
+    /// The listing's refusal.
+    fn target_listed(&mut self, target: &str) -> Result<bool, Refusal> {
+        Ok(self
+            .backend
+            .windows(&WindowFilter::default())?
+            .windows
+            .iter()
+            .any(|window| window.id == target))
+    }
+
+    /// The observation of a target the wait just confirmed gone (ruling R70bi): no frame, no
+    /// tree, nothing observed, complete, at the current generation. A closed window is never
+    /// observed, so it never answers `WindowNotFound`.
+    fn nothing_observed(&self, target: &str) -> Observation {
+        Observation {
+            frame: None,
+            tree: None,
+            diff: None,
+            diff_fallback: None,
+            baseline: None,
+            focused: None,
+            selected_text: None,
+            complete: true,
+            nodes_observed: 0,
+            cuts: Vec::new(),
+            generation: self.refs.latest(target).map_or(0, |generation| generation.number),
+            session: omo_computer_core::backend::unknown_session_state(),
+            observation: UntrustedText,
+            secure: None,
+            settle: None,
+            ocr: None,
+        }
     }
 
     fn observe_now(&mut self, target: &str) -> Result<Observation, Unresolved> {
