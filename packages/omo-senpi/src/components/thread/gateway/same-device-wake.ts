@@ -8,8 +8,11 @@ export type SameDeviceCarrier = { readonly wake: (durableId: string) => Promise<
 export type SameDeviceWakeOptions = {
   readonly store: GatewayStore
   readonly sessionsDirectory: string
-  /** `session_wake.same_device`, read per send; on unless the machine's omo configuration opts out. */
-  readonly enabled: () => boolean
+  /**
+   * `session_wake.same_device`, read per send for the TARGET session's cwd (its project's configuration); on unless
+   * the machine's omo configuration opts out.
+   */
+  readonly enabled: (cwd: string) => boolean
   readonly carrier?: SameDeviceCarrier
 }
 
@@ -21,9 +24,10 @@ export type SameDeviceWake = {
 export function createSameDeviceWake(options: SameDeviceWakeOptions): SameDeviceWake {
   return {
     afterSend: async (result) => {
-      if (result.kind !== "ok" || result.delivery.kind !== "queued_offline" || !options.enabled()) return result
+      if (result.kind !== "ok" || result.delivery.kind !== "queued_offline") return result
       const target = resolveWakeTarget(options.sessionsDirectory, result.thread_id)
       if (target.kind !== "found" || target.session_kind !== "interactive") return result
+      if (!options.enabled(target.cwd)) return result
       await options.store.woken.request({ durable_id: result.thread_id, session_file: target.session_path })
       const { queue_position } = result.delivery
       if (options.carrier === undefined)
