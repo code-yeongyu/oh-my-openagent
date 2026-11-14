@@ -1,7 +1,9 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { existsSync, readFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
+import { isImported, scenarioOverride } from "./replay-case"
 
 const ROOT = resolve(import.meta.dir, "../../..")
 const DRIVER = join(ROOT, "script/qa/computer/replay.ts")
@@ -538,4 +540,27 @@ describe("replay driver", () => {
     expect(run.stdout).toContain("sink")
     expect(run.code).toBe(1)
   }, 60_000)
+})
+
+describe("SCENARIO-OVERRIDES.tsv (R70bj)", () => {
+  const dir = join(ROOT, "crates/omo-computer-core/fixtures/conformance")
+  const rows = readFileSync(join(dir, "v3-scenario-overrides.tsv"), "utf8")
+    .split("\n")
+    .slice(1)
+    .filter(Boolean)
+    .map((line) => line.split("\t"))
+
+  test("every row names an existing imported case and an existing fixture", async () => {
+    expect(rows.length).toBe(9)
+    for (const [file, scenario] of rows) {
+      expect(existsSync(join(dir, file))).toBe(true)
+      expect(await isImported(join(dir, file))).toBe(true)
+      expect(existsSync(join(ROOT, scenario))).toBe(true)
+      expect(await scenarioOverride(join(dir, file))).toBe(scenario)
+    }
+  })
+
+  test("a case that is not in the table loads its own scenario", async () => {
+    expect(await scenarioOverride(join(dir, "v3-consent-identity-changed.json"))).toBeUndefined()
+  })
 })

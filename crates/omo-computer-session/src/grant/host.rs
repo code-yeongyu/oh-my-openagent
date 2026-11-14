@@ -317,8 +317,8 @@ impl Session {
                 status: crate::audit::Status::Refused,
                 primary_error: Some(refusal.code.wire().to_owned()),
                 evidence: vec![
-                    format!("configured={configured}"),
-                    format!("carried={}", stop_hotkey.unwrap_or_default()),
+                    format!("configured={}", cut_chord(&configured)),
+                    format!("carried={}", cut_chord(stop_hotkey.unwrap_or_default())),
                 ],
                 ..crate::audit::AuditEvent::default()
             });
@@ -358,7 +358,8 @@ fn check_stop_hotkey(view: &ConsentView, os: Os, requested: Option<&str>) -> Res
     let Some(requested) = requested else {
         return Ok(());
     };
-    if view.same_stop_chord(os, requested) {
+    // A-IS-62 rev 7: a carried chord longer than 256 bytes differs; it is never cut and compared.
+    if requested.len() <= MAX_CHORD_BYTES && view.same_stop_chord(os, requested) {
         Ok(())
     } else {
         Err(Refusal::new(
@@ -407,4 +408,16 @@ mod view_of_tests {
         assert!(consent.admit_exec(None).is_err(), "no exec is admitted");
         assert_eq!(super::view_of(Some(serde_json::json!({ "stopHotkey": null }))).grants.len(), 2, "a handed view is read as written");
     }
+}
+
+/// A-IS-62 rev 7: the longest chord compared or written; a peer-supplied chord cannot grow the line.
+const MAX_CHORD_BYTES: usize = 256;
+
+/// The first 256 bytes of a chord for the audit line (on a char boundary).
+fn cut_chord(chord: &str) -> &str {
+    let mut end = chord.len().min(MAX_CHORD_BYTES);
+    while !chord.is_char_boundary(end) {
+        end -= 1;
+    }
+    &chord[..end]
 }

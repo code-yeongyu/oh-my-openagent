@@ -1,6 +1,6 @@
 {
   "description": "No reportMode (protocol 1 default) after P1a: engine.hello carries features [\"action-report\"] with protocolVersion 1, a completed click still answers null, its audit has no id, and an error carries no disposition: replies stay byte-identical to the pre-P1a wire.",
-  "scenario": "crates/omo-computer-backend-fake/fixtures/v3-two-displays-one-window-explicit-stop-key.json",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json",
   "env": {
     "OMO_COMPUTER_FAKE_CLOCK": "1"
   },

@@ -1,7 +1,7 @@
 {
   "description": "On the local stdio transport a click whose callId already completed is a replay: it answers TransactionFailed{reason:\"replayed\", callId, receipt} (the stored null-mode reply) with nothing sent, also after the engine restarts over the same runtime root; a new callId is delivered.",
   "transport": "stdio",
-  "scenario": "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/v3-two-displays-one-window-consent.json",
   "env": {
     "OMO_COMPUTER_FAKE_STOP_PATH": "live"
   },

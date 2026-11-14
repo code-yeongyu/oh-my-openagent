@@ -1,7 +1,7 @@
 {
   "description": "A call that crashed between its pre-input marker and its reply is never delivered again. The runtime root this case names must hold that crash state before the run: a click with callId k-crash delivered by this engine, whose marker then lost its receipt (the QA command produces it). Every re-drive of k-crash, in one engine and after a restart, answers TransactionFailed{recovery_required, callId} with disposition delivery_uncertain/unsafe and sends nothing; another callId in the scope is delivered; k-crash stays refused after it. The driver counts sinks in its own temp dir, so the QA command counts the sink under this root: 3 lines from the crashed delivery plus 3 from k-next.",
   "transport": "stdio",
-  "scenario": "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/v3-two-displays-one-window-consent.json",
   "env": {
     "OMO_COMPUTER_FAKE_STOP_PATH": "live",
     "OMO_COMPUTER_RUNTIME_DIR": "target/qa-computer-v3/marker-crash-redrive"

@@ -7,6 +7,9 @@ import { basename, dirname, isAbsolute, join, resolve } from "node:path"
 
 export const ROOT = resolve(import.meta.dir, "../../..")
 const PROVENANCE = join(ROOT, "crates/omo-computer-core/parity/ORACLE-PROVENANCE.tsv")
+// R70bj: the scenario an imported (pinned) case is replayed with, so its bytes never change;
+// row 28 retires this table with the explicit-stop-key fixture copies.
+const SCENARIO_OVERRIDES = join(ROOT, "crates/omo-computer-core/fixtures/conformance/v3-scenario-overrides.tsv")
 export const TRANSPORT_ARGS = { stdio: ["--stdio"], mcp: ["--mcp"], oneshot: ["--oneshot"] } as const
 
 type Transport = keyof typeof TRANSPORT_ARGS
@@ -178,4 +181,15 @@ export async function supersededBy(listed: readonly string[]): Promise<Map<strin
     }
   }
   return skips
+}
+
+/** The scenario SCENARIO-OVERRIDES.tsv names for the case file `casePath`, if any (R70bj). */
+export async function scenarioOverride(casePath: string, table = SCENARIO_OVERRIDES): Promise<string | undefined> {
+  const text = await readFile(table, "utf8").catch(() => "")
+  const name = basename(casePath)
+  for (const line of text.split("\n").slice(1)) {
+    const [file, scenario] = line.split("\t")
+    if (file === name && scenario) return scenario
+  }
+  return undefined
 }

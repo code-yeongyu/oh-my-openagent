@@ -1,6 +1,6 @@
 {
   "description": "without allowHostRelayOnlyStop a live host relay alone never enables input: click fails StopPathUnavailable before and after stopPath.start.",
-  "scenario": "crates/omo-computer-backend-fake/fixtures/v3-two-displays-one-window-explicit-stop-key.json",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json",
   "env": {
     "OMO_COMPUTER_FAKE_CLOCK": "1"
   },

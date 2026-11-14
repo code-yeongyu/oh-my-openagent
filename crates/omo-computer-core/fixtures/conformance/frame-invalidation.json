@@ -1,6 +1,6 @@
 {
   "description": "with a live host-relay stop path, a click before any capture, or naming a frame that is not the target's latest capture, fails InvalidCoordinateFrame; a click on the latest frame succeeds. Every click is audited; desktop input needs the human-confirmed control grant (#10788), granted after the heartbeat.",
-  "scenario": "crates/omo-computer-backend-fake/fixtures/v3-two-displays-one-window-explicit-stop-key.json",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json",
   "env": {
     "OMO_COMPUTER_FAKE_CLOCK": "1"
   },

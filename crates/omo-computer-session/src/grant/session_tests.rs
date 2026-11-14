@@ -576,3 +576,20 @@ fn the_consent_seeds_follow_the_persona_os() {
     let denial = s.funnel.control.consent.admit_exec(Some(&app)).expect_err("a macOS seed");
     assert_eq!(denial.refusal, omo_computer_safety::gate::verdicts::ConsentRefusal::DeniedApp);
 }
+
+/// A-IS-62 rev 7 (R70bl): a carried chord longer than 256 bytes is refused as differing, never cut
+/// and then compared; in the audit line each chord is cut to its first 256 bytes.
+#[test]
+fn a_chord_longer_than_256_bytes_is_refused_and_cut_only_in_the_audit_line() {
+    let configured = "ctrl+alt+shift+f12";
+    let long = format!("{configured}{}", " ".repeat(300));
+    let (mut s, refused) = open_session_with(Some(configured), Some(&long));
+    let refusal = refused.expect_err("longer than 256 bytes differs, even if its first bytes equal the chord");
+    assert_eq!(refusal.reason, Some("tampered"));
+    let path = crate::audit::AuditSink::path(s.funnel.audit()).map(std::path::Path::to_path_buf).expect("an audit file");
+    let audit = std::fs::read_to_string(path).expect("audit");
+    let line = audit.lines().find(|l| l.contains("\"stop_hotkey\"")).expect("the refusal line");
+    let v: Value = serde_json::from_str(line).expect("json");
+    let carried = v["evidence"].as_array().and_then(|e| e.iter().find_map(|x| x.as_str()?.strip_prefix("carried="))).expect("carried");
+    assert_eq!(carried.len(), 256, "cut to 256 bytes in the audit line");
+}
