@@ -25,7 +25,8 @@ fn lines(path: &Path) -> Vec<Value> {
         .collect()
 }
 
-fn files_under(dir: &Path) -> Vec<String> {
+/// Every file under `dir`, as its path components below `dir` (the separator never matters).
+fn files_under(dir: &Path) -> Vec<Vec<String>> {
     let mut found = Vec::new();
     let mut stack = vec![dir.to_owned()];
     while let Some(next) = stack.pop() {
@@ -39,8 +40,9 @@ fn files_under(dir: &Path) -> Vec<String> {
                         .path()
                         .strip_prefix(dir)
                         .expect("under")
-                        .display()
-                        .to_string(),
+                        .components()
+                        .map(|part| part.as_os_str().to_string_lossy().into_owned())
+                        .collect(),
                 );
             }
         }
@@ -79,7 +81,11 @@ fn audit_is_one_file_per_hand_with_per_writer_segments() {
     first.append(event("click")).expect("append");
     assert_eq!(
         files_under(dir.path()),
-        vec!["computer/hand-1/audit.jsonl".to_owned()],
+        vec![vec![
+            "computer".to_owned(),
+            "hand-1".to_owned(),
+            "audit.jsonl".to_owned()
+        ]],
         "one file per hand"
     );
     let all = lines(first.path());
