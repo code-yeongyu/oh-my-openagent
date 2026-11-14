@@ -47,6 +47,8 @@ export type TrustStageResult =
 
 export interface TrustStageOptions {
   readonly args: readonly string[]
+  /** The launch kind of `args`; the launcher's classifier by default. */
+  readonly kind?: ReturnType<typeof trustLaunchKind>
   readonly env?: NodeJS.ProcessEnv
   readonly platform?: NodeJS.Platform
   readonly directory?: string
@@ -161,7 +163,7 @@ async function adoptionCheck(
 
 /** Design 5.2: hop is independent of marker classification, and only adoption bypasses it. */
 export async function runTrustStage(options: TrustStageOptions): Promise<TrustStageResult> {
-  const kind = trustLaunchKind(options.args)
+  const kind = options.kind ?? trustLaunchKind(options.args)
   if (kind === "static") return { action: "static" }
   const ensure = options.args[0] === "trust" ? parseTrustEnsure(options.args) : null
   if (ensure === undefined) {

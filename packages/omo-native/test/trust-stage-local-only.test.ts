@@ -2,15 +2,12 @@
 // before the engine trust stage, so the stage reaching one is a dispatch mistake. It refuses with the typed
 // `trust-kind-local-only` refusal (the launcher maps every refusal to exit 78) and records it in the diagnostics log,
 // and it neither acquires certificates nor execs. The classifier does not return `local-only` until the switch-on
-// change, so this file substitutes it for the stage's import of the classifier.
+// change, so the kind is passed in explicitly.
 import { afterAll, expect, mock, test } from "bun:test"
 import { mkdtemp, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import * as compileArgs from "../compile-args"
-
-mock.module("../compile-args", () => ({ ...compileArgs, trustLaunchKind: () => "local-only" }))
-const { runTrustStage } = await import("../trust-stage")
+import { runTrustStage } from "../trust-stage"
 
 const dirs: string[] = []
 afterAll(async () => {
@@ -28,6 +25,7 @@ test("#given a local-only argv #when the trust stage runs #then it refuses with 
   // when
   const result = await runTrustStage({
     args: ["remote", "status"],
+    kind: "local-only",
     env: { PATH: process.env.PATH ?? "" },
     directory: dir,
     executable: process.execPath,
