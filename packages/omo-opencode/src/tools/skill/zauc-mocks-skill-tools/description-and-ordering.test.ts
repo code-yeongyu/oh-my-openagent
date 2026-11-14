@@ -1,12 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, it } from "bun:test"
-import {
-  createMockCommand,
-  createMockSkill,
-  createSkillTool,
-  mockContext,
-} from "./test-support"
+import { createMockCommand, createMockSkill, createSkillTool, mockContext } from "./test-support"
 
 describe("skill tool - synchronous description", () => {
   it("omits pre-provided skills from available_items by default", () => {
@@ -19,11 +14,7 @@ describe("skill tool - synchronous description", () => {
   })
 
   it("includes all pre-provided skills in available_items when explicitly requested", () => {
-    const loadedSkills = [
-      createMockSkill("playwright"),
-      createMockSkill("frontend"),
-      createMockSkill("git-master"),
-    ]
+    const loadedSkills = [createMockSkill("playwright"), createMockSkill("frontend"), createMockSkill("git-master")]
 
     const tool = createSkillTool({
       skills: loadedSkills,
@@ -49,10 +40,7 @@ describe("skill tool - ordering and priority", () => {
       createMockSkill("builtin-skill", { scope: "builtin" }),
       createMockSkill("project-skill", { scope: "project" }),
     ]
-    const commands = [
-      createMockCommand("project-cmd", "project"),
-      createMockCommand("builtin-cmd", "builtin"),
-    ]
+    const commands = [createMockCommand("project-cmd", "project"), createMockCommand("builtin-cmd", "builtin")]
 
     const tool = createSkillTool({
       skills,
@@ -129,10 +117,7 @@ describe("skill tool - ordering and priority", () => {
 
 describe("skill tool - agent-restricted skill visibility in description", () => {
   it("excludes agent-restricted skill from description <available_items>", () => {
-    const loadedSkills = [
-      createMockSkill("public-skill"),
-      createMockSkill("oracle-only-skill", { agent: "oracle" }),
-    ]
+    const loadedSkills = [createMockSkill("public-skill"), createMockSkill("oracle-only-skill", { agent: "oracle" })]
 
     const tool = createSkillTool({
       skills: loadedSkills,

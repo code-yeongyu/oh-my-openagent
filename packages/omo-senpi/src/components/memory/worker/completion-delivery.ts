@@ -59,7 +59,8 @@ export async function deliverReflectionCompletion(
   live: ReflectionLiveSession,
 ): Promise<ReflectionCompletionRecord> {
   const delivered = await markDelivered(completionsDir, record, live.sessionId)
-  const recap = live.identityContext === undefined ? undefined : await readReflectionRecap(live.identityContext, delivered)
+  const recap =
+    live.identityContext === undefined ? undefined : await readReflectionRecap(live.identityContext, delivered)
   live.api.appendEntry(REFLECTION_COMPLETION_ENTRY_TYPE, recap === undefined ? delivered : { ...delivered, recap })
   return delivered
 }
@@ -93,7 +94,8 @@ function summarize(records: readonly ReflectionCompletionRecord[]): ReflectionCo
     failedCount: records.filter(isUnsuccessful).length,
     oldestISO: records.at(-1)?.finishedAt ?? "",
     newestISO: records[0]?.finishedAt ?? "",
-    dominantFingerprint: [...fingerprints].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0]?.[0] ?? "",
+    dominantFingerprint:
+      [...fingerprints].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0]?.[0] ?? "",
   }
 }
 
@@ -105,11 +107,7 @@ function isUnsuccessful(record: ReflectionCompletionRecord): boolean {
   return record.outcome !== "merged" && record.outcome !== "no_changes"
 }
 
-export function safeNotify(
-  live: ReflectionLiveSession,
-  message: string,
-  level: "info" | "warning" | "error",
-): void {
+export function safeNotify(live: ReflectionLiveSession, message: string, level: "info" | "warning" | "error"): void {
   if (!live.ui) return
   try {
     live.ui.notify(message, level)

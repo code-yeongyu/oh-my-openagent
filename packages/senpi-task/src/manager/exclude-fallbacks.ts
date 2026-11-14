@@ -16,17 +16,27 @@ export function withoutExcludedFallbacks(runner: ManagedRunner, patterns: Exclud
   const filter = (spec: ManagedStartSpec): ManagedStartSpec => {
     const current = typeof patterns === "function" ? patterns() : patterns
     if (spec.fallbackModels === undefined || current === undefined || current.length === 0) return spec
-    return { ...spec, fallbackModels: spec.fallbackModels.filter((model) => !isExcludedModel(`${model.provider}/${model.model_id}`, current)) }
+    return {
+      ...spec,
+      fallbackModels: spec.fallbackModels.filter(
+        (model) => !isExcludedModel(`${model.provider}/${model.model_id}`, current),
+      ),
+    }
   }
   const resume = runner.resume
   return {
     start: (spec) => runner.start(filter(spec)),
-    ...(resume === undefined ? {} : { resume: (spec: ManagedStartSpec, sessionPath: string) => resume.call(runner, filter(spec), sessionPath) }),
+    ...(resume === undefined
+      ? {}
+      : { resume: (spec: ManagedStartSpec, sessionPath: string) => resume.call(runner, filter(spec), sessionPath) }),
   }
 }
 
 /** The same filter over `provider/model[:level]` selectors, for a process child's rebuilt chain. */
-export function withoutExcludedSelectors(selectors: readonly string[], patterns: readonly string[] | undefined): readonly string[] {
+export function withoutExcludedSelectors(
+  selectors: readonly string[],
+  patterns: readonly string[] | undefined,
+): readonly string[] {
   if (patterns === undefined || patterns.length === 0) return selectors
   return selectors.filter((selector) => !isExcludedModel(splitModelDecorators(selector).base, patterns))
 }

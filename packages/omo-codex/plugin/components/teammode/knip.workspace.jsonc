@@ -1,0 +1,31 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/omo-codex/plugin/components/teammode": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+      ],
+      "ignoreDependencies": [
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@vitest/coverage-v8",
+      ],
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) LENSES, MEMBER_STATUSES, validateTeam, resolveTeamDir
+    "packages/omo-codex/plugin/components/teammode/skills/teammode/scripts/team-state.mjs": ["LENSES", "MEMBER_STATUSES", "validateTeam", "resolveTeamDir"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) TEAM_TRANSPORTS, DEFAULT_TEAM_TRANSPORT, isCodexApp
+    "packages/omo-codex/plugin/components/teammode/skills/teammode/scripts/team-transport.mjs": ["TEAM_TRANSPORTS", "DEFAULT_TEAM_TRANSPORT", "isCodexApp"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) deriveMemberBranch, memberWorktreePath, listWorktrees
+    "packages/omo-codex/plugin/components/teammode/skills/teammode/scripts/team-worktree.mjs": ["deriveMemberBranch", "memberWorktreePath", "listWorktrees"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) parsePostToolUsePayload
+    "packages/omo-codex/plugin/components/teammode/src/codex-hook.ts": ["parsePostToolUsePayload"]
+  }
+}

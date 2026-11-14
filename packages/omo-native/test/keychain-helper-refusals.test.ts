@@ -8,7 +8,7 @@ const refused = (reason: string) => ({ error: "refused", reason })
 const hexPlist = (partitions: readonly string[]): string =>
   Buffer.from(
     `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">` +
-      `<plist version="1.0"><dict><key>Partitions</key><array>${partitions.map(p => `<string>${p}</string>`).join("")}</array></dict></plist>`,
+      `<plist version="1.0"><dict><key>Partitions</key><array>${partitions.map((p) => `<string>${p}</string>`).join("")}</array></dict></plist>`,
   ).toString("hex")
 
 describe.skipIf(!isDarwin)("omo-keychain helper refusals (#11262 design 1, Refusals)", () => {
@@ -54,20 +54,29 @@ describe.skipIf(!isDarwin)("omo-keychain helper refusals (#11262 design 1, Refus
 
   test("accepts a value of exactly 64 KiB", async () => {
     const value = "x".repeat(MAX_VALUE)
-    expect((await harness.run({ v: 1, verb: "write", account: ACCOUNT, value })).reply).toEqual({ ok: true, created: true })
+    expect((await harness.run({ v: 1, verb: "write", account: ACCOUNT, value })).reply).toEqual({
+      ok: true,
+      created: true,
+    })
     expect((await harness.run({ v: 1, verb: "read", account: ACCOUNT })).reply).toMatchObject({ owned: true, value })
     expect((await harness.run({ v: 1, verb: "remove", account: ACCOUNT })).reply).toEqual({ ok: true })
   })
 
   test("refuses unknown argv in the test build", async () => {
-    const run = await harness.run({ v: 1, verb: "read", account: ACCOUNT }, { args: ["--keychain", harness.keychain, "--verbose"] })
+    const run = await harness.run(
+      { v: 1, verb: "read", account: ACCOUNT },
+      { args: ["--keychain", harness.keychain, "--verbose"] },
+    )
     expect(run.reply).toEqual(refused("argv"))
     expect(run.exitCode).toBe(2)
   })
 
   test("a release build takes no argv and carries none of the test-only flags", async () => {
     const release = await harness.buildFlavor("omo-keychain-release", { flavor: "release" })
-    const run = await harness.run({ v: 1, verb: "read", account: ACCOUNT }, { binary: release, args: ["--keychain", harness.keychain] })
+    const run = await harness.run(
+      { v: 1, verb: "read", account: ACCOUNT },
+      { binary: release, args: ["--keychain", harness.keychain] },
+    )
     expect(run.reply).toEqual(refused("argv"))
     expect(run.exitCode).toBe(2)
     // Only a request the helper refuses before any keychain call is sent to a release build: it would use the real keychain.
@@ -80,7 +89,9 @@ describe.skipIf(!isDarwin)("omo-keychain helper refusals (#11262 design 1, Refus
 
   test("Q5 switch: the default build serves root; the refuse-root build refuses it", async () => {
     const asRoot = ["--keychain", harness.keychain, "--no-ui", "--as-root"]
-    expect((await harness.run({ v: 1, verb: "read", account: ACCOUNT }, { args: asRoot })).reply).toMatchObject({ missing: true })
+    expect((await harness.run({ v: 1, verb: "read", account: ACCOUNT }, { args: asRoot })).reply).toMatchObject({
+      missing: true,
+    })
     const refusing = await harness.buildFlavor("omo-keychain-refuse-root", { flavor: "test", refuseRoot: true })
     const run = await harness.run({ v: 1, verb: "read", account: ACCOUNT }, { binary: refusing, args: asRoot })
     expect(run.reply).toEqual(refused("root"))

@@ -1,7 +1,13 @@
 import type { DagManager, DagRunRecordV1 } from "../../../../senpi-task/src/dag/manager"
 import type { DagNodeId, DagRunId, DagRunSnapshot } from "../../../../senpi-task/src/dag/types"
 import type { DagDefinition } from "@oh-my-opencode/senpi-task/dag"
-import { reenterDagRun, type DagNodeSendResult, type DagRunReentry, type DagScheduler, type DagSchedulerOptions } from "../../../../senpi-task/src/dag/scheduler"
+import {
+  reenterDagRun,
+  type DagNodeSendResult,
+  type DagRunReentry,
+  type DagScheduler,
+  type DagSchedulerOptions,
+} from "../../../../senpi-task/src/dag/scheduler"
 import { retryDagNodes } from "../../../../senpi-task/src/dag/node-retry"
 import { sendToDagNode } from "../../../../senpi-task/src/dag/node-send"
 import { applyPausedDagGuidance, type PausedDagGuideCommand } from "../../../../senpi-task/src/dag/paused-controls"
@@ -34,9 +40,10 @@ export function createDagRuntimeControls(ports: {
     const scheduler = controller(runId, sessionId).scheduler
     // Node ids arrive as untrusted tool JSON; the engine's branded id is a compile-time tag over the
     // same string, and the engine itself rejects an id no node carries.
-    const reentry = options?.prompt === undefined
-      ? scheduler.retryNode(runId, targets)
-      : scheduler.retryNode(runId, targets, { prompt: options.prompt })
+    const reentry =
+      options?.prompt === undefined
+        ? scheduler.retryNode(runId, targets)
+        : scheduler.retryNode(runId, targets, { prompt: options.prompt })
     if (reentry.record.pause?.reason !== "user_stop") adoptReentry(runId, reentry)
     return coreManager.snapshot(runId, sessionId)
   }
@@ -44,7 +51,8 @@ export function createDagRuntimeControls(ports: {
   const send = async (runId: DagRunId, nodeId: string, message: string): Promise<DagNodeSendResult> => {
     const sessionId = ports.sessionId()
     const record = coreManager.record(runId, sessionId)
-    if (record.pause?.reason === "user_stop") return sendToDagNode({ ...schedulerOptions, initialRecord: record }, runId, nodeId as DagNodeId, message)
+    if (record.pause?.reason === "user_stop")
+      return sendToDagNode({ ...schedulerOptions, initialRecord: record }, runId, nodeId as DagNodeId, message)
     return await controller(runId, sessionId).scheduler.sendToNode(runId, nodeId as DagNodeId, message)
   }
 
@@ -53,7 +61,8 @@ export function createDagRuntimeControls(ports: {
     const amended = await coreManager.amend({ runId, definition, parentSessionId: sessionId })
     clearAdmissionLatch(runId)
     schedulers.delete(runId)
-    if (amended.pause?.reason !== "user_stop") adoptReentry(runId, reenterDagRun({ ...schedulerOptions, initialRecord: amended }))
+    if (amended.pause?.reason !== "user_stop")
+      adoptReentry(runId, reenterDagRun({ ...schedulerOptions, initialRecord: amended }))
     return coreManager.snapshot(runId, sessionId)
   }
 

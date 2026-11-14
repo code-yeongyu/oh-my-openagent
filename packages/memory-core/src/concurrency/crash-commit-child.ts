@@ -4,12 +4,7 @@ import { spawn } from "node:child_process"
 
 import { GitMemoryRepo } from "../git"
 import { createNodeGitExec, type GitExec, type GitExecResult } from "../git/exec"
-import {
-  acquireLock,
-  createLockRecord,
-  memoryWriterLockPath,
-  releaseLock,
-} from "../locks"
+import { acquireLock, createLockRecord, memoryWriterLockPath, releaseLock } from "../locks"
 import { runMemoryTool } from "../tools/memory"
 import { windowsTreeKillArgs } from "./windows-process-tree.mjs"
 
@@ -64,11 +59,20 @@ function createInCommitKillExec(minDelayMs: number, maxDelayMs: number): GitExec
       // argument "commit" marks exactly the commit invocation; no other path command carries it.
       if (!argv.includes("commit")) return real.run(argv, options)
       return new Promise<GitExecResult>((resolve, reject) => {
-        const child = spawn("git", [...argv], { cwd: options.cwd, env: options.env ?? process.env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true })
+        const child = spawn("git", [...argv], {
+          cwd: options.cwd,
+          env: options.env ?? process.env,
+          stdio: ["ignore", "pipe", "pipe"],
+          windowsHide: true,
+        })
         let stdout = ""
         let stderr = ""
-        child.stdout.on("data", (chunk: Buffer) => { stdout += chunk.toString("utf8") })
-        child.stderr.on("data", (chunk: Buffer) => { stderr += chunk.toString("utf8") })
+        child.stdout.on("data", (chunk: Buffer) => {
+          stdout += chunk.toString("utf8")
+        })
+        child.stderr.on("data", (chunk: Buffer) => {
+          stderr += chunk.toString("utf8")
+        })
         child.once("error", reject)
         let killTimer: ReturnType<typeof setTimeout> | undefined
         child.once("spawn", () => {
@@ -92,7 +96,9 @@ function createInCommitKillExec(minDelayMs: number, maxDelayMs: number): GitExec
 async function gitStdout(args: readonly string[]): Promise<string> {
   const child = spawn("git", ["-C", repoPath, ...args], { stdio: ["ignore", "pipe", "inherit"], windowsHide: true })
   let out = ""
-  child.stdout.on("data", (chunk: Buffer) => { out += chunk.toString("utf8") })
+  child.stdout.on("data", (chunk: Buffer) => {
+    out += chunk.toString("utf8")
+  })
   await new Promise((resolve) => child.once("exit", resolve))
   return out.trim()
 }
@@ -127,7 +133,10 @@ function unreachable(message: string): never {
 async function strandIndexLockAndDie(): Promise<never> {
   // `git update-index --stdin` creates .git/index.lock at startup and holds it while it waits for
   // input, so the lock file's existence proves the git child is alive and holding it.
-  const git = spawn("git", ["-C", repoPath, "update-index", "--stdin"], { stdio: ["pipe", "ignore", "ignore"], windowsHide: true })
+  const git = spawn("git", ["-C", repoPath, "update-index", "--stdin"], {
+    stdio: ["pipe", "ignore", "ignore"],
+    windowsHide: true,
+  })
   const deadline = Date.now() + 10_000
   while (!existsSync(`${repoPath}/.git/index.lock`)) {
     if (Date.now() >= deadline) {
@@ -149,9 +158,14 @@ async function strandRefLockAndDie(): Promise<never> {
   // `git update-ref --stdin` takes refs/heads/main.lock during `prepare` and keeps holding it while
   // it waits for `commit` or `abort`; `prepare: ok` on stdout is git's own acknowledgement.
   const head = await gitStdout(["rev-parse", "HEAD"])
-  const git = spawn("git", ["-C", repoPath, "update-ref", "--stdin"], { stdio: ["pipe", "pipe", "ignore"], windowsHide: true })
+  const git = spawn("git", ["-C", repoPath, "update-ref", "--stdin"], {
+    stdio: ["pipe", "pipe", "ignore"],
+    windowsHide: true,
+  })
   let out = ""
-  git.stdout.on("data", (chunk: Buffer) => { out += chunk.toString("utf8") })
+  git.stdout.on("data", (chunk: Buffer) => {
+    out += chunk.toString("utf8")
+  })
   git.stdin.write(`start\nupdate refs/heads/main ${head}\nprepare\n`)
   const deadline = Date.now() + 10_000
   while (!out.includes("prepare: ok")) {

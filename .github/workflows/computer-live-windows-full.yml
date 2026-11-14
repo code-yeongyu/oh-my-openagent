@@ -1,0 +1,211 @@
+name: Computer live Windows full
+
+# The Windows live tier of the computer-use engine, part 1: the hosted runner's measurement of the five full legs
+# (elevated target, lock, disconnect, mixed DPI, secure desktop). `host` runs the legs that leave the session as it
+# was, `session` runs the disconnect and then the lock, last, on a VM of its own; `ledger` turns their facts into
+# crates/omo-computer-backend-win32/probes/hosted-windows-live.tsv and prints which tier would carry each leg.
+# Running the legs' scenarios (and the owned Windows guest for legs the hosted runner cannot carry) is part 2: it
+# lands with the Windows driver, so until then the row stays open (probes/hosted-windows-live.md).
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/computer-live-windows-full.yml"
+      - "crates/omo-computer-backend-win32/**"
+      - "script/qa/computer/probes/hosted-windows-live.ps1"
+      - "script/qa/computer/probes/hosted-windows-live/**"
+      - "script/qa/computer/pool/windows-full*.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PROBE: script/qa/computer/probes/hosted-windows-live.ps1
+  # VirtualDrivers/Virtual-Display-Driver 24.10.27, VirtualDisplayDriver-x64.zip (MIT); the leg refuses any other bytes.
+  VDD_SHA256: b7a36f341f2a0ce43cc2afe7894d30dd8fef7b6f60ef9491aab2ef77663a42fd
+
+jobs:
+  host:
+    name: computer live windows-full (host)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    outputs:
+      image: ${{ steps.image.outputs.image }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - id: image
+        shell: bash
+        run: echo "image=${ImageOS:-windows}-${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
+
+      - name: Interactive-desktop smoke
+        shell: powershell
+        run: ./script/qa/desktop/windows/interactive-desktop-smoke.ps1
+
+      - name: Host facts (session=interactive)
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\hwl" | Out-Null
+          & $env:PROBE -Leg facts -Out "$env:RUNNER_TEMP\hwl\host.jsonl"
+
+      # A leg that throws records its error as its fact (UNMEASURED in the ledger) and the step stays green; a leg
+      # that cannot write its fact fails the step.
+      - name: q1 elevated, run 1
+        shell: powershell
+        run: '& $env:PROBE -Leg elevated -Run 1 -Out "$env:RUNNER_TEMP\hwl\host.jsonl"'
+
+      - name: q1 elevated, run 2
+        shell: powershell
+        run: '& $env:PROBE -Leg elevated -Run 2 -Out "$env:RUNNER_TEMP\hwl\host.jsonl"'
+
+      - name: q5 secure desktop, run 1
+        shell: powershell
+        run: '& $env:PROBE -Leg secure-desktop -Run 1 -Out "$env:RUNNER_TEMP\hwl\host.jsonl"'
+
+      - name: q5 secure desktop, run 2
+        shell: powershell
+        run: '& $env:PROBE -Leg secure-desktop -Run 2 -Out "$env:RUNNER_TEMP\hwl\host.jsonl"'
+
+      - name: q4 mixed DPI (driver install, removed again)
+        shell: powershell
+        run: '& $env:PROBE -Leg mixed-dpi -Run 1 -VddSha256 $env:VDD_SHA256 -Out "$env:RUNNER_TEMP\hwl\host.jsonl"'
+
+      - name: Upload facts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-full-facts-host
+          path: ${{ runner.temp }}/hwl/host.jsonl
+          if-no-files-found: warn
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Computer live Windows full - host
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Interactive-desktop smoke and host facts (session id, input desktop, UAC policy values).
+            - q1 elevated (two runs), q5 secure desktop (two runs), q4 mixed DPI; each leg writes one JSON fact line, an errored leg its error.
+          JOB_SUMMARY_NEXT: Open the windows-full-facts-host artifact; the ledger job turns it into verdicts.
+        run: |
+          GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  session:
+    name: computer live windows-full (session)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Session facts
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\hwl" | Out-Null
+          & $env:PROBE -Leg facts -Out "$env:RUNNER_TEMP\hwl\session.jsonl"
+
+      - name: q3 disconnect and reconnect
+        shell: powershell
+        run: '& $env:PROBE -Leg disconnect -HoldMs 8000 -Out "$env:RUNNER_TEMP\hwl\session.jsonl"'
+
+      - name: Upload facts before the lock
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-full-facts-session
+          path: ${{ runner.temp }}/hwl/session.jsonl
+          if-no-files-found: warn
+
+      # Last: a locked session may not come back without credentials.
+      - name: q2 lock and unlock
+        shell: powershell
+        run: '& $env:PROBE -Leg lock -HoldMs 3000 -Out "$env:RUNNER_TEMP\hwl\lock.jsonl"'
+
+      - name: Upload lock facts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-full-facts-lock
+          path: ${{ runner.temp }}/hwl/lock.jsonl
+          if-no-files-found: warn
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Computer live Windows full - session
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - q3 disconnect and reconnect through a SYSTEM task, then q2 lock and unlock, last.
+          JOB_SUMMARY_NEXT: Open the windows-full-facts-session and windows-full-facts-lock artifacts.
+        run: |
+          GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  ledger:
+    name: computer live windows-full (ledger and plan)
+    needs: [host, session]
+    if: always()
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: windows-full-facts-*
+          path: ${{ runner.temp }}/facts
+          merge-multiple: true
+
+      - name: Ledger
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="${RUNNER_TEMP}/windows-full"
+          mkdir -p "$out"
+          bun script/qa/computer/pool/windows-full.ts --ledger "${RUNNER_TEMP}/facts/host.jsonl" "${RUNNER_TEMP}/facts/session.jsonl" "${RUNNER_TEMP}/facts/lock.jsonl" \
+            --out "$out/hosted-windows-live.tsv" --host "hosted windows-latest (${{ needs.host.outputs.image || 'image unknown' }})"
+          bun script/qa/computer/pool/windows-full.ts --validate "$out/hosted-windows-live.tsv"
+
+      - name: Plan the legs (no guest runner in part 1)
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="${RUNNER_TEMP}/windows-full"
+          bun script/qa/computer/pool/windows-full.ts --plan "$out/hosted-windows-live.tsv" --guest off --out "$out/plan.json"
+
+      - name: Upload ledger and plan
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-full-ledger
+          path: ${{ runner.temp }}/windows-full
+          if-no-files-found: warn
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Computer live Windows full - ledger
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds and validates hosted-windows-live.tsv from the facts and prints the tier of each leg (no guest runner in part 1).
+          JOB_SUMMARY_NEXT: Open the windows-full-ledger artifact; the row stays open until part 2 runs the legs' scenarios.
+        run: |
+          GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+          if test -f "${RUNNER_TEMP}/windows-full/hosted-windows-live.tsv"; then
+            { echo; echo '| leg | verdict |'; echo '|---|---|'; awk -F'\t' 'NR>1{print "| "$2" | "$3" |"}' "${RUNNER_TEMP}/windows-full/hosted-windows-live.tsv"; } >> "$GITHUB_STEP_SUMMARY"
+          fi

@@ -1,5 +1,11 @@
-import type { ControlAttachState, DeviceRow, ListingResult, Status, StatusState } from "../device-service-core/src/index.ts"
-import type { ThreadToolResult } from "../omo-senpi/src/components/thread/contracts"
+import type {
+  ControlAttachState,
+  DeviceRow,
+  ListingResult,
+  Status,
+  StatusState,
+} from "../device-service-core/src/index.ts"
+import type { ThreadDelivery, ThreadToolResult } from "../omo-senpi/src/components/thread/contracts"
 
 // The human forms of `omo remote`; every command also has a --json form that prints the SDK's typed value as is.
 const STATE_LABELS: Readonly<Record<StatusState, string>> = {
@@ -19,8 +25,12 @@ const STATE_LABELS: Readonly<Record<StatusState, string>> = {
 }
 
 function renderTable(header: readonly string[], rows: readonly (readonly string[])[]): string[] {
-  const widths = header.map((title, column) => Math.max(title.length, ...rows.map(row => (row[column] ?? "").length)))
-  const line = (cells: readonly string[]) => cells.map((cell, column) => cell.padEnd(widths[column] ?? 0)).join("  ").trimEnd()
+  const widths = header.map((title, column) => Math.max(title.length, ...rows.map((row) => (row[column] ?? "").length)))
+  const line = (cells: readonly string[]) =>
+    cells
+      .map((cell, column) => cell.padEnd(widths[column] ?? 0))
+      .join("  ")
+      .trimEnd()
   return [line(header), ...rows.map(line)]
 }
 
@@ -51,7 +61,13 @@ export function deviceLines(devices: readonly DeviceRow[], now: number): string[
   if (devices.length === 0) return ["No devices on this account yet."]
   return renderTable(
     ["DEVICE", "NAME", "KIND", "PLATFORM", "SEEN"],
-    devices.map(device => [device.device, device.label, device.kind, device.platform, device.online ? "online" : ago(device.last_seen_ms, now)]),
+    devices.map((device) => [
+      device.device,
+      device.label,
+      device.kind,
+      device.platform,
+      device.online ? "online" : ago(device.last_seen_ms, now),
+    ]),
   )
 }
 
@@ -61,7 +77,7 @@ export function sessionLines(result: ListingResult, labels: ReadonlyMap<string, 
       ? ["No sessions found."]
       : renderTable(
           ["SESSION", "TITLE", "STATE", "PROJECT", "DEVICE", "UPDATED"],
-          result.rows.map(row => [
+          result.rows.map((row) => [
             `${row.device}/${row.session_id}`,
             row.title,
             row.source === "cache" ? `${row.state} (cached)` : row.state,
@@ -71,27 +87,63 @@ export function sessionLines(result: ListingResult, labels: ReadonlyMap<string, 
           ]),
         )
   const missing = [
-    ...new Set([...result.incomplete, ...Object.entries(result.devices).filter(([, state]) => state !== "answered").map(([device]) => device)]),
+    ...new Set([
+      ...result.incomplete,
+      ...Object.entries(result.devices)
+        .filter(([, state]) => state !== "answered")
+        .map(([device]) => device),
+    ]),
   ]
   if (missing.length > 0)
-    lines.push("", `Not answered, rows may be missing or cached: ${missing.map(device => labels.get(device) ?? device).join(", ")}`)
+    lines.push(
+      "",
+      `Not answered, rows may be missing or cached: ${missing.map((device) => labels.get(device) ?? device).join(", ")}`,
+    )
   return lines
 }
 
+/**
+ * The queued-fate line shared by the send verb's human forms (#13268). A receiver parked on an approval its person must
+ * answer on that device holds the message behind it, and the line says so instead of reading as a plain queue.
+ */
+const queuedLine = (label: string, delivery: Extract<ThreadDelivery, { readonly queue_position: number }>): string => {
+  const waitingOn = "waiting_on" in delivery ? delivery.waiting_on : undefined
+  if (waitingOn?.kind === "approval")
+    return `Queued on ${label} at position ${delivery.queue_position}, waiting for an approval on ${waitingOn.device ?? "that device"}.`
+  return `Queued on ${label} at position ${delivery.queue_position}.`
+}
+
 /** The human answer of a session verb that succeeded; `label` is the `<device>/<session>` it named. */
-export function sessionVerbLines(verb: "open" | "send" | "model" | "interrupt" | "close", label: string, result: ThreadToolResult): string[] {
+export function sessionVerbLines(
+  verb: "open" | "send" | "model" | "interrupt" | "close",
+  label: string,
+  result: ThreadToolResult,
+): string[] {
   if (result.kind !== "ok") return []
   if (verb === "open" && "thread" in result) return [`${result.thread.device ?? ""}/${result.thread.thread_id}`]
   if (verb === "send" && "delivery" in result) {
     const { delivery } = result
-    if (delivery.kind === "queued" || delivery.kind === "queued_offline") return [`Queued on ${label} at position ${delivery.queue_position}.`]
+    if (delivery.kind === "queued" || delivery.kind === "queued_offline") return [queuedLine(label, delivery)]
     if (delivery.kind === "steered") return [`Steered turn ${delivery.turn_id} on ${label}.`]
     return [`Sent to ${label}: turn ${delivery.turn_id} started.`]
   }
   if (verb === "model" && "model" in result) return [`${label} now uses ${result.model.provider}/${result.model.id}.`]
-  if (verb === "interrupt" && "interrupted" in result) return [result.interrupted ? `Interrupted ${label}.` : `Nothing was running on ${label}.`]
+  if (verb === "interrupt" && "interrupted" in result)
+    return [result.interrupted ? `Interrupted ${label}.` : `Nothing was running on ${label}.`]
   if (verb === "close" && "closed" in result) return [result.closed ? `Closed ${label}.` : `${label} was not open.`]
   return []
+}
+
+/**
+ * The wait-mode status line for a send that waits behind a running turn (#13268): stdout stays the streamed answer
+ * alone, so the CLI writes this to stderr once, when the send's own reply names the position the message joined at (it
+ * is not updated as the queue drains). A send that started or steered a turn answers nothing here - its answer is
+ * already streaming.
+ */
+export function sendWaitNotice(label: string, result: ThreadToolResult): string | null {
+  if (result.kind !== "ok" || !("delivery" in result)) return null
+  const { delivery } = result
+  return delivery.kind === "queued" || delivery.kind === "queued_offline" ? queuedLine(label, delivery) : null
 }
 
 export function controlLines(state: ControlAttachState, now: number): string[] {

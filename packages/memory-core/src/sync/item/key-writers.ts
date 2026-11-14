@@ -14,7 +14,13 @@ import { newTag } from "./tag"
 
 export type FieldValue = Exclude<FmValue, { kind: "remove" }>
 
-export function applyKey(fork: LoroDoc, key: string, value: FieldValue, history: ItemHistory, unseen: ReadonlySet<string>): void {
+export function applyKey(
+  fork: LoroDoc,
+  key: string,
+  value: FieldValue,
+  history: ItemHistory,
+  unseen: ReadonlySet<string>,
+): void {
   const kh = history.keys.get(key)
   if (kh === undefined) {
     writeNatural(fork, key, value)
@@ -35,7 +41,11 @@ export function applyKey(fork: LoroDoc, key: string, value: FieldValue, history:
       const target = toRegister(value)
       // Canonical sources compare exactly, so retyping 3 as '3' is a real write (review r6 M2). Only
       // a multi-value join, rendered as one quoted string, compares by the string it holds.
-      if (combined?.kind === "reg" && (combined.text === target || (!combined.verbatim && combined.text === regText(target)))) return
+      if (
+        combined?.kind === "reg" &&
+        (combined.text === target || (!combined.verbatim && combined.text === regText(target)))
+      )
+        return
       const active = activeReg(state.reg)
       // A no-op only when every active entry already holds the target. Otherwise the user is
       // writing over what they saw (a hand resolution, r2 HIGH-2): supersede the seen entries.
@@ -86,7 +96,13 @@ export function clearKey(fork: LoroDoc, key: string, unseen: ReadonlySet<string>
 }
 
 /** Element-wise set edit: delete the seen tags of `removed`, add `added` elements not present. */
-export function editSet(fork: LoroDoc, key: string, removed: ReadonlySet<string>, added: readonly string[], unseen: ReadonlySet<string>): void {
+export function editSet(
+  fork: LoroDoc,
+  key: string,
+  removed: ReadonlySet<string>,
+  added: readonly string[],
+  unseen: ReadonlySet<string>,
+): void {
   const state = readKeyState(fork, key)
   const map = fork.getMap(fmName(key, "set"))
   for (const { tag, element } of state.set) if (removed.has(element) && !unseen.has(tag)) map.delete(tag)
@@ -108,7 +124,13 @@ function supersedeRegister(fork: LoroDoc, key: string, state: KeyState, unseen: 
   fork.getMap(fmName(key, "reg")).set(newTag(fork, "null"), { v: null, s: active.map((e) => e.tag) })
 }
 
-function syncSet(fork: LoroDoc, key: string, state: KeyState, target: readonly string[], unseen: ReadonlySet<string>): void {
+function syncSet(
+  fork: LoroDoc,
+  key: string,
+  state: KeyState,
+  target: readonly string[],
+  unseen: ReadonlySet<string>,
+): void {
   const wanted = new Set(target)
   const present = new Set(state.set.map((e) => e.element))
   const map = fork.getMap(fmName(key, "set"))

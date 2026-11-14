@@ -12,7 +12,8 @@ describe("ConcurrencyManager.cancelWaiter", () => {
     let taskAResolved = false
     let taskBResolved = false
     const taskAErrors: Error[] = []
-    const pA = manager.acquire("model-a", "task-a")
+    const pA = manager
+      .acquire("model-a", "task-a")
       .then(() => {
         taskAResolved = true
       })

@@ -1,0 +1,511 @@
+{
+  "$comment": "Data of the computer-use v3 clean reimplementation guards (plan row 2), read by script/computer-v3-guards.ts. The plan file is read at guard run time only for write scopes and Blocked-by lines; everything else the guards need lives here.",
+  "oldNamePattern": "senpi[-_]desktop",
+  "nameMap": {
+    "crates": {
+      "senpi-desktop-core": "omo-computer-core",
+      "senpi-desktop-safety": "omo-computer-safety",
+      "senpi-desktop-session": "omo-computer-session",
+      "senpi-desktop-engine": "omo-computer-engine",
+      "senpi-desktop-backend-fake": "omo-computer-backend-fake",
+      "senpi-desktop-backend-macos": "omo-computer-backend-macos",
+      "senpi-desktop-backend-x11": "omo-computer-backend-x11",
+      "senpi-desktop-backend-wayland": "omo-computer-backend-wayland",
+      "senpi-desktop-backend-atspi": "omo-computer-backend-atspi",
+      "senpi-desktop-backend-win32": "omo-computer-backend-win32"
+    },
+    "cratesNotRebuilt": [
+      "senpi-desktop-xpc",
+      "crates/desktop"
+    ],
+    "packages": {
+      "@oh-my-opencode/senpi-desktop-protocol": "@oh-my-opencode/omo-computer-protocol",
+      "@oh-my-opencode/senpi-desktop-engine": "@oh-my-opencode/omo-computer-engine",
+      "@oh-my-opencode/senpi-desktop-tool": "@oh-my-opencode/omo-computer-tool",
+      "@oh-my-opencode/senpi-desktop-prelude": "@oh-my-opencode/omo-computer-prelude",
+      "@oh-my-opencode/senpi-desktop-service": "@oh-my-opencode/omo-computer-sdk"
+    },
+    "packagesNewInDesign": {
+      "senpi-desktop-sdk": "omo-computer-sdk",
+      "senpi-desktop-hand": "omo-computer-hand",
+      "senpi-desktop-carriers": "omo-computer-carriers"
+    },
+    "engineBinary": {
+      "senpi-desktop-engine": "omo-computer-engine",
+      "senpi-desktop-engine.exe": "omo-computer-engine.exe"
+    },
+    "releaseAssets": {
+      "senpi-desktop-engine-<host>": "omo-computer-engine-<host>",
+      "senpi-desktop-engine-<host>.exe": "omo-computer-engine-<host>.exe",
+      "senpi-desktop-engine-checksums.txt": "omo-computer-engine-checksums.txt"
+    },
+    "macosHelperBundle": {
+      "from": "senpi-desktop-helper.app",
+      "to": "omo-computer-helper.app",
+      "bundleId": "ai.sisyphuslabs.omo-computer-helper",
+      "displayName": "OmO Computer Use"
+    },
+    "environmentSeams": {
+      "from": "SENPI_DESKTOP_*",
+      "to": "OMO_COMPUTER_*"
+    },
+    "wireIdentity": {
+      "senpi-desktop/1": "omo-computer/1",
+      "senpi-desktop-engine": "omo-computer-engine",
+      "SENPI_DESKTOP_LAUNCH_REFUSED": "OMO_COMPUTER_LAUNCH_REFUSED",
+      "protocolVersion": "1"
+    },
+    "runtimeDirectory": {
+      "<runtime>/senpi-desktop/<uid>/": "<runtime>/omo-computer/<uid>/"
+    },
+    "omoSenpiComponentDirectory": {
+      "components/computer-use/": "components/computer/",
+      "registeredComponentName": "computer-use"
+    },
+    "qaDrivers": {
+      "script/qa/desktop/**": "script/qa/computer/**",
+      "packages/omo-senpi/scripts/qa/computer-{use-e2e,control-*}.mjs": "packages/omo-senpi/scripts/qa/computer-v3-*.mjs"
+    },
+    "workflows": {
+      "desktop-engine.yml": "computer-engine.yml",
+      "desktop-linux-qa.yml": "computer-linux-qa.yml",
+      "desktop-windows-qa.yml": "computer-windows-qa.yml",
+      "macos-signing-canary.yml": "computer-signing-canary.yml",
+      "(new)": "computer-bench.yml"
+    },
+    "unchangedOnPurpose": [
+      "tool name computer",
+      "opt-in tool computer_actions",
+      "command /computer",
+      "settings keys computer.*",
+      "skill name computer-use and its materialization path prefix",
+      "wire protocol version \"1\"",
+      "one-shot call prefix desktop.<method>",
+      "audit file location",
+      "artifact file prefix"
+    ]
+  },
+  "oldDirectories": [
+    "crates/desktop",
+    "crates/senpi-desktop-core",
+    "crates/senpi-desktop-safety",
+    "crates/senpi-desktop-session",
+    "crates/senpi-desktop-engine",
+    "crates/senpi-desktop-xpc",
+    "crates/senpi-desktop-backend-fake",
+    "crates/senpi-desktop-backend-macos",
+    "crates/senpi-desktop-backend-x11",
+    "crates/senpi-desktop-backend-wayland",
+    "crates/senpi-desktop-backend-atspi",
+    "crates/senpi-desktop-backend-win32",
+    "packages/senpi-desktop-protocol",
+    "packages/senpi-desktop-engine",
+    "packages/senpi-desktop-service",
+    "packages/senpi-desktop-prelude",
+    "packages/senpi-desktop-tool"
+  ],
+  "newDirectories": [
+    "crates/omo-computer-*/",
+    "packages/omo-computer-*/",
+    "script/qa/computer/",
+    "packages/omo-senpi/src/components/computer/"
+  ],
+  "legacyNameExclusions": [
+    "CHANGELOG.md",
+    "**/changes.md",
+    "changes/**",
+    "crates/omo-computer-core/parity/**",
+    "crates/omo-computer-safety/src/legacy_marker.rs",
+    "script/computer-v3-name-map.json",
+    "script/computer-v3-guards.ts",
+    "script/computer-v3-guards.test.ts"
+  ],
+  "copy": {
+    "sourceExtensions": [
+      ".rs",
+      ".ts",
+      ".mjs",
+      ".js",
+      ".py",
+      ".m",
+      ".swift",
+      ".c",
+      ".h"
+    ],
+    "dataDirectories": [
+      "fixtures",
+      "testdata",
+      "goldens"
+    ],
+    "skipSuffixes": [
+      ".config.ts"
+    ],
+    "minLines": 20,
+    "similarity": 50
+  },
+  "scope": {
+    "sharedAppend": [
+      "Cargo.toml",
+      "Cargo.lock",
+      "bun.lock",
+      "package.json",
+      "knip.base.jsonc",
+      "knip.workspace.jsonc",
+      "**/knip.workspace.jsonc",
+      "script/knip-coverage-baseline.jsonc",
+      "packages/omo-senpi/bundle-inputs.json",
+      "packages/omo-senpi/plugin/extensions/*",
+      "assets/omo.schema.json",
+      "changes/unreleased/<pr>.md",
+      "crates/omo-computer-core/parity/*.tsv"
+    ],
+    "sharedAppendNewFilesOnly": [
+      "packages/omo-computer-sdk/scripts/qa-spawn/*.ts",
+      "packages/omo-computer-hand/scripts/qa-hand/*.ts",
+      "packages/omo-senpi/scripts/qa/computer-v3-e2e/*.mjs",
+      "script/qa/computer/macos/*.ts",
+      "script/qa/computer/linux/*.ts",
+      "script/qa/computer/windows/*.ts",
+      "packages/omo-computer-sdk/scripts/qa-fleet/*.ts",
+      "crates/omo-computer-core/fixtures/conformance/**/v3-*",
+      "crates/omo-computer-backend-fake/fixtures/**/v3-*"
+    ],
+    "unitRoot": "^((?:crates|packages)/omo-computer-[^/]+/)",
+    "wiringFiles": [
+      "Cargo.toml",
+      "package.json",
+      "src/lib.rs",
+      "src/main.rs",
+      "**/mod.rs",
+      "src/index.ts"
+    ],
+    "crateWiringFiles": [
+      "crates/omo-computer-engine/src/route.rs"
+    ],
+    "callPathFiles": {
+      "crates/omo-computer-session/": [
+        "src/session.rs",
+        "src/mutate/**"
+      ],
+      "crates/omo-computer-backend-*/": [
+        "src/backend.rs"
+      ]
+    },
+    "generated": [
+      "crates/omo-computer-core/schema/engine.schema.json",
+      "crates/omo-computer-core/docs/",
+      "packages/omo-computer-protocol/src/generated/",
+      "packages/omo-computer-protocol/src/engine-schema.generated.ts",
+      "packages/omo-computer-sdk/facade-manifest.json",
+      "packages/omo-computer-prelude/src/generated/",
+      "packages/omo-computer-tool/src/skill/"
+    ],
+    "driverEntryFiles": [
+      "script/qa/computer/replay.ts",
+      "packages/omo-computer-sdk/scripts/qa-spawn.ts",
+      "packages/omo-computer-tool/scripts/qa-tool.ts",
+      "packages/omo-computer-hand/scripts/qa-hand.ts",
+      "packages/omo-senpi/scripts/qa/computer-v3-e2e.mjs",
+      "script/qa/computer/macos.ts",
+      "script/qa/computer/linux.ts",
+      "script/qa/computer/windows.ts",
+      "packages/omo-computer-sdk/scripts/qa-fleet.ts"
+    ],
+    "outsideRepositoryPrefixes": [
+      "$CU_RUN/",
+      "<session working directory>/",
+      "GitHub"
+    ],
+    "outsideRepositoryInfix": " repository: ",
+    "removalInventoryEntry": "every path of the Removal inventory",
+    "blockerEdits": "evidence/task-<row>.blocker-edits.txt"
+  },
+  "parity": {
+    "manifest": "crates/omo-computer-core/parity/test-parity-manifest.tsv",
+    "manifestColumns": [
+      "unit",
+      "kind",
+      "test id",
+      "status",
+      "note"
+    ],
+    "deferredLegs": "crates/omo-computer-core/parity/DEFERRED-LEGS.tsv",
+    "deferredLegsColumns": [
+      "design row",
+      "leg",
+      "recorded by row",
+      "owed to row",
+      "status"
+    ],
+    "finalGateRow": 74
+  },
+  "oracle": {
+    "provenance": "crates/omo-computer-core/parity/ORACLE-PROVENANCE.tsv",
+    "provenanceColumns": [
+      "new path",
+      "old path",
+      "base sha",
+      "old sha256",
+      "new sha256",
+      "substitutions"
+    ],
+    "deltas": "crates/omo-computer-core/parity/ORACLE-DELTAS.tsv",
+    "deltasColumns": [
+      "file",
+      "pointer",
+      "kind",
+      "source",
+      "row",
+      "imported value",
+      "v3 value"
+    ],
+    "directories": [
+      "crates/omo-computer-core/fixtures/conformance/",
+      "crates/omo-computer-backend-fake/fixtures/",
+      "crates/omo-computer-engine/tests/fixtures/v1-consumers/",
+      "packages/omo-computer-tool/test/fixtures/"
+    ],
+    "parametersFixture": "packages/omo-computer-tool/test/fixtures/published-parameters.fixture.json",
+    "nullModeCases": [
+      "crates/omo-computer-core/fixtures/conformance/action-report-legacy.json",
+      "crates/omo-computer-engine/tests/fixtures/v1-consumers/"
+    ],
+    "newCasePrefix": "v3-"
+  },
+  "stubs": {
+    "patterns": [
+      {
+        "name": "unimplemented!",
+        "regexp": "unimplemented!"
+      },
+      {
+        "name": "todo!(",
+        "regexp": "todo!\\("
+      },
+      {
+        "name": "skipped or exclusive test",
+        "regexp": "\\b(it|test|describe)\\.(skip|only)\\("
+      },
+      {
+        "name": "skipped or exclusive test through a modifier",
+        "regexp": "\\b(?:it|test|describe)(?:(?:\\.[A-Za-z_$][\\w$]*)+\\.(?:skip|only)|\\.(?:skip|only)(?:\\.[A-Za-z_$][\\w$]*)+)\\s*\\("
+      },
+      {
+        "name": "todo test",
+        "regexp": "\\b(?:it|test|describe)(?:\\.[A-Za-z_$][\\w$]*)*\\.todo\\s*\\("
+      },
+      {
+        "name": "#[ignore] without a live: reason",
+        "regexp": "#\\[ignore(\\]|\\s*=\\s*\"(?!live: ))"
+      }
+    ],
+    "cfgAttrIgnore": "ignore through cfg_attr"
+  },
+  "removal": {
+    "oracleCommit": "d79bc6cc9abdeab4a93979089dbbdede0268078c",
+    "classA": [
+      "crates/desktop",
+      "crates/senpi-desktop-core",
+      "crates/senpi-desktop-safety",
+      "crates/senpi-desktop-session",
+      "crates/senpi-desktop-engine",
+      "crates/senpi-desktop-xpc",
+      "crates/senpi-desktop-backend-fake",
+      "crates/senpi-desktop-backend-macos",
+      "crates/senpi-desktop-backend-x11",
+      "crates/senpi-desktop-backend-wayland",
+      "crates/senpi-desktop-backend-atspi",
+      "crates/senpi-desktop-backend-win32",
+      "packages/senpi-desktop-protocol",
+      "packages/senpi-desktop-engine",
+      "packages/senpi-desktop-service",
+      "packages/senpi-desktop-prelude",
+      "packages/senpi-desktop-tool"
+    ],
+    "classB": [
+      {
+        "path": ".github/workflows/desktop-engine.yml",
+        "replacedBy": "computer-engine.yml (row 5)"
+      },
+      {
+        "path": ".github/workflows/desktop-linux-qa.yml",
+        "replacedBy": "computer-linux-qa.yml (row 47)"
+      },
+      {
+        "path": ".github/workflows/desktop-windows-qa.yml",
+        "replacedBy": "computer-windows-qa.yml (row 55)"
+      },
+      {
+        "path": ".github/workflows/macos-signing-canary.yml",
+        "replacedBy": "computer-signing-canary.yml (row 72)"
+      },
+      {
+        "path": "script/desktop-engine-ci-proof.ts",
+        "replacedBy": "none: the new CI legs run the crate tests directly"
+      },
+      {
+        "path": "script/desktop-engine-release.ts",
+        "replacedBy": "script/computer-engine-release.ts (row 72)"
+      },
+      {
+        "path": "script/desktop-engine-release.test.ts",
+        "replacedBy": "script/computer-engine-release.test.ts (row 72)"
+      },
+      {
+        "path": "script/release-desktop-engine-fixture.json",
+        "replacedBy": "the target table inside script/release-computer-engine-target.ts (row 72)"
+      },
+      {
+        "path": "script/release-desktop-engine-target.ts",
+        "replacedBy": "script/release-computer-engine-target.ts (row 72)"
+      },
+      {
+        "path": "script/release-desktop-engine-target.test.ts",
+        "replacedBy": "script/release-computer-engine-target.test.ts (row 72)"
+      },
+      {
+        "path": "script/omob-desktop-engine.ts",
+        "replacedBy": "the new prebuild staging in script/build-omo-binary.ts (row 72)"
+      },
+      {
+        "path": "script/omob-desktop-engine.test.ts",
+        "replacedBy": "script/build-omo-binary.test.ts cases (row 72)"
+      },
+      {
+        "path": "script/install-bunshin-desktop-capability.mjs",
+        "replacedBy": "script/install-bunshin-computer-capability.mjs (row 64)"
+      },
+      {
+        "path": "script/macos-capture-helper-workflow.test.ts",
+        "replacedBy": "script/publish-release-platform-workflow.test.ts cases for the new job (row 72)"
+      },
+      {
+        "path": "script/qa/desktop",
+        "replacedBy": "script/qa/computer (rows 15, 40, 47, 55, 69)"
+      },
+      {
+        "path": "packages/omo-senpi/scripts/qa/computer-control-live-macos.mjs",
+        "replacedBy": "script/qa/computer/macos.ts (rows 40, 69)"
+      },
+      {
+        "path": "packages/omo-senpi/scripts/qa/computer-control-rpc-e2e.mjs",
+        "replacedBy": "packages/omo-senpi/scripts/qa/computer-v3-e2e.mjs (row 39)"
+      },
+      {
+        "path": "packages/omo-senpi/scripts/qa/computer-use-e2e.mjs",
+        "replacedBy": "packages/omo-senpi/scripts/qa/computer-v3-e2e.mjs (row 39)"
+      },
+      {
+        "path": "packages/omo-senpi/src/components/computer-use",
+        "replacedBy": "packages/omo-senpi/src/components/computer (row 39)"
+      },
+      {
+        "path": "packages/omo-senpi/src/computer-use-lazy-runtime.test.ts",
+        "replacedBy": "the lazy-chunk test of row 39"
+      },
+      {
+        "path": "packages/omo-native/computer-use-doctor-runtime.ts",
+        "replacedBy": "packages/omo-native/computer-v3-doctor-runtime.ts (row 39)"
+      },
+      {
+        "path": "packages/omo-native/test/computer-use-doctor.test.ts",
+        "replacedBy": "the doctor tests of row 39"
+      },
+      {
+        "path": "packages/omo-native/test/computer-use-doctor-failures.test.ts",
+        "replacedBy": "the doctor tests of row 39"
+      },
+      {
+        "path": "packages/omo-native/computer-use-engine-probe.ts",
+        "replacedBy": "the engine probe inside packages/omo-native/computer-v3-doctor-runtime.ts (row 39)"
+      }
+    ],
+    "classC": [
+      ".github/workflows/ci.yml",
+      ".github/workflows/publish-platform.yml",
+      ".github/workflows/publish.yml",
+      ".gitignore",
+      "Cargo.toml",
+      "bunfig.root.toml",
+      "bunfig.toml",
+      "bunfig.win2.parallel.toml",
+      "bunfig.win2.parallel.windows.toml",
+      "bunfig.win2.toml",
+      "docs/guide/computer-use.md",
+      "docs/reference/computer-run-sandbox-threat-model.md",
+      "docs/reference/computer.md",
+      "docs/reference/desktop-attach-threat-model.md",
+      "knip.base.jsonc",
+      "knip.workspace.jsonc",
+      "**/knip.workspace.jsonc",
+      "package.json",
+      "packages/get-worker/src/release-names.ts",
+      "packages/get-worker/test/routes.test.ts",
+      "packages/omo-native/bin/lib/launcher.js",
+      "packages/omo-native/category-coverage-entry.ts",
+      "packages/omo-native/compiled-doctor.ts",
+      "packages/omo-native/engine-trust-helper-path.ts",
+      "packages/omo-senpi/.gitignore",
+      "packages/omo-senpi/AGENTS.md",
+      "packages/omo-senpi/package.json",
+      "packages/omo-senpi/plugin/AGENTS.md",
+      "packages/omo-senpi/plugin/package.json",
+      "packages/omo-senpi/plugin/scripts/AGENTS.md",
+      "packages/omo-senpi/plugin/scripts/build-extension-core.mjs",
+      "packages/omo-senpi/plugin/scripts/build-extension.test-support.mjs",
+      "packages/omo-senpi/plugin/scripts/build-extension.test.mjs",
+      "packages/omo-senpi/plugin/scripts/check-extension-current.mjs",
+      "packages/omo-senpi/plugin/scripts/install.mjs",
+      "packages/omo-senpi/scripts/qa/AGENTS.md",
+      "packages/omo-senpi/scripts/qa/fused-equivalence-e2e.mjs",
+      "packages/omo-senpi/scripts/qa/fused-equivalence-sandbox.mjs",
+      "packages/omo-senpi/scripts/qa/telemetry-opt-out-env.bypasses.mjs",
+      "packages/omo-senpi/src/bundle-lazy-barrel.test.ts",
+      "packages/omo-senpi/src/bundle-purity.test.ts",
+      "packages/omo-senpi/src/bundle-size.test.ts",
+      "packages/omo-senpi/src/components/telemetry/event-schemas.ts",
+      "packages/omo-senpi/src/extension/component-list.ts",
+      "packages/omo-senpi/src/install/cli-local.test.ts",
+      "packages/omo-senpi/src/install/install-test-fixture.ts",
+      "packages/omo-senpi/src/install/plugin-artifacts.ts",
+      "packages/web/lib/stats.test.ts",
+      "script/AGENTS.md",
+      "script/build-omo-binary.test.ts",
+      "script/build-omo-native.ts",
+      "script/build-omob.ts",
+      "script/changelog-shipping-policy.test.ts",
+      "script/ci-fast-path.full-matrix.test.ts",
+      "script/ci-fast-path.mjs",
+      "script/docs-paths-exist.test.mjs",
+      "script/engine-trust-helper-workflow.test.ts",
+      "script/installer/mirror-plan.test.ts",
+      "script/installer/mirror-plan.ts",
+      "script/knip-coverage-baseline.jsonc",
+      "script/knip-entry-exports.unchecked.json",
+      "script/lint-ratchet.test.ts",
+      "script/omo-native-parity-compare.test.ts",
+      "script/package-registration-audit.test.ts",
+      "script/publish-release-platform-workflow.test.ts",
+      "script/release-assets-verify-workflow.test.ts",
+      "script/release-keychain-helper-target.test.ts",
+      "script/senpi-test-script.test.ts",
+      "script/verify-omo-ai-payload.test.ts",
+      "test-temp-leak-report-only.json"
+    ],
+    "classD": [
+      "Cargo.lock",
+      "bun.lock",
+      "packages/omo-senpi/bundle-inputs.json",
+      "packages/omo-senpi/plugin/extensions/omo.js",
+      "packages/omo-senpi/plugin/extensions/omo-computer-use.js",
+      "packages/omo-senpi/scripts/qa/fused-equivalence-golden/darwin-arm64/E21.json",
+      "packages/omo-senpi/scripts/qa/fused-equivalence-golden/linux-x64/E21.json"
+    ]
+  },
+  "keptOnPurpose": [
+    "crates/omo-engine-trust-helper",
+    "crates/omo-git-job-helper",
+    ".github/workflows/engine-trust-helper.yml",
+    ".github/workflows/git-job-helper.yml"
+  ]
+}

@@ -5,17 +5,14 @@ import { join } from "node:path"
 import { rmSyncEfaultTolerant } from "./teardown.test-support"
 
 import { TRANSIENT_DIRNAME } from "./transient-identity"
-import {
-  TRANSIENT_IDENTITY_MAX_AGE_MS,
-  TRANSIENT_RUN_MAX_AGE_MS,
-  sweepTransientMemoryRuns,
-} from "./transient-sweep"
+import { TRANSIENT_IDENTITY_MAX_AGE_MS, TRANSIENT_RUN_MAX_AGE_MS, sweepTransientMemoryRuns } from "./transient-sweep"
 
 const roots: string[] = []
 const NOW = Date.parse("2026-09-10T12:00:00Z")
 
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0))
+    rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
 function memoryRoot(): string {
@@ -121,7 +118,9 @@ describe("transient memory sweep", () => {
 
     const result = await sweep(root)
 
-    expect(readFileSync(join(root, "agents", "project-1", "repo", "system", "persona.md"), "utf8")).toBe("rescued memory")
+    expect(readFileSync(join(root, "agents", "project-1", "repo", "system", "persona.md"), "utf8")).toBe(
+      "rescued memory",
+    )
     expect(existsSync(crashed)).toBe(false)
     expect(result.promoted).toBe(1)
   })
@@ -136,8 +135,12 @@ describe("transient memory sweep", () => {
 
     const result = await sweep(root, { warn: (message: string) => warnings.push(message) })
 
-    expect(readFileSync(join(root, "agents", "project-1", "repo", "system", "persona.md"), "utf8")).toBe("project-1 memory")
-    expect(readFileSync(join(crashed, "agents", "project-1", "repo", "system", "persona.md"), "utf8")).toBe("transient memory")
+    expect(readFileSync(join(root, "agents", "project-1", "repo", "system", "persona.md"), "utf8")).toBe(
+      "project-1 memory",
+    )
+    expect(readFileSync(join(crashed, "agents", "project-1", "repo", "system", "persona.md"), "utf8")).toBe(
+      "transient memory",
+    )
     expect(result.stranded).toBe(1)
     expect(warnings).toHaveLength(1)
   })
@@ -155,7 +158,10 @@ describe("transient memory sweep", () => {
     expect(existsSync(transient)).toBe(false)
     expect(readFileSync(join(durable, "repo", "system", "persona.md"), "utf8")).toBe("durable-1 memory")
     expect(existsSync(join(durable, "runtime", "transcripts", "stream-1", "transcript.jsonl"))).toBe(true)
-    expect({ removedIdentities: result.removedIdentities, kept: result.kept }).toEqual({ removedIdentities: 1, kept: 1 })
+    expect({ removedIdentities: result.removedIdentities, kept: result.kept }).toEqual({
+      removedIdentities: 1,
+      kept: 1,
+    })
   })
 
   test("#given a repo-less identity younger than the retention window #when the sweep runs #then it is kept", async () => {

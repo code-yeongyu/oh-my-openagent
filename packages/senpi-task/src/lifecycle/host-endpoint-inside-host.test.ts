@@ -16,10 +16,19 @@ describe("a lifecycle running inside a host never ensures a recorded endpoint wh
     const store = tempStore()
     const ensures: string[] = []
     const notices: string[] = []
-    const fixture = hostLifecycleDeps({ store, hostPid: 5_151, respawn: () => Promise.reject(new Error("must not respawn")) })
+    const fixture = hostLifecycleDeps({
+      store,
+      hostPid: 5_151,
+      respawn: () => Promise.reject(new Error("must not respawn")),
+    })
     const lifecycle = createTaskLifecycle({
       ...fixture.deps,
-      hostSessionProbe: { daemonAlive: () => Promise.resolve(false), sessionLive: () => Promise.resolve(false), sessionLiveness: () => Promise.resolve("gone"), refresh: () => undefined },
+      hostSessionProbe: {
+        daemonAlive: () => Promise.resolve(false),
+        sessionLive: () => Promise.resolve(false),
+        sessionLiveness: () => Promise.resolve("gone"),
+        refresh: () => undefined,
+      },
       hostEndpoint: createHostEndpointPort({
         agentDir: "/tmp/dh-t8n1/agent",
         env: {},

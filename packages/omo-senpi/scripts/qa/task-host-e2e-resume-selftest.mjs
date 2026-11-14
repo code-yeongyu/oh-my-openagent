@@ -10,18 +10,32 @@ export async function checkResumeReadbacks(root) {
   mkdirSync(join(cwd, ".omo"), { recursive: true })
   const ids = ["st_a", "st_b", "st_c", "st_d"]
   const rows = ids.map((task_id) => ({
-    message: { role: "toolResult", toolName: "task_output", details: {
-      kind: "status", snapshot: { task_id, parent_session_id: "parent", status: "running", residency_state: "resident" },
-    } },
+    message: {
+      role: "toolResult",
+      toolName: "task_output",
+      details: {
+        kind: "status",
+        snapshot: { task_id, parent_session_id: "parent", status: "running", residency_state: "resident" },
+      },
+    },
   }))
   for (const mutation of [
-    { task_id: "foreign" }, { parent_session_id: "foreign" },
-    { status: "completed" }, { residency_state: "rpc_detached" },
+    { task_id: "foreign" },
+    { parent_session_id: "foreign" },
+    { status: "completed" },
+    { residency_state: "rpc_detached" },
   ]) {
-    const changed = rows.map((row) => ({ message: { ...row.message, details: {
-      kind: "status", snapshot: { ...row.message.details.snapshot, ...mutation },
-    } } }))
-    if (reattachedTaskIds(changed, ids, "parent").length !== 0) throw new Error("invalid reattachment snapshot accepted")
+    const changed = rows.map((row) => ({
+      message: {
+        ...row.message,
+        details: {
+          kind: "status",
+          snapshot: { ...row.message.details.snapshot, ...mutation },
+        },
+      },
+    }))
+    if (reattachedTaskIds(changed, ids, "parent").length !== 0)
+      throw new Error("invalid reattachment snapshot accepted")
   }
   const session = join(cwd, "parent.jsonl")
   for (const id of ids) {
@@ -32,11 +46,22 @@ export async function checkResumeReadbacks(root) {
   const previousCwd = process.cwd()
   try {
     process.chdir(cwd)
-    writeFileSync(session, ids.map(() => JSON.stringify({
-      message: { role: "toolResult", toolName: "task_output", isError: true, details: { kind: "error" } },
-    })).join("\n") + "\n")
+    writeFileSync(
+      session,
+      ids
+        .map(() =>
+          JSON.stringify({
+            message: { role: "toolResult", toolName: "task_output", isError: true, details: { kind: "error" } },
+          }),
+        )
+        .join("\n") + "\n",
+    )
     let failure
-    try { await execute() } catch (error) { failure = error }
+    try {
+      await execute()
+    } catch (error) {
+      failure = error
+    }
     if (failure?.code !== "QA_REATTACH_READBACK" || existsSync(join(cwd, ".omo", "resume-release"))) {
       throw new Error("failed readbacks must prevent release even when all child records already say completed")
     }

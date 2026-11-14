@@ -30,11 +30,7 @@ import {
   createNativeEditionNudgeHook,
 } from "../../hooks"
 import { createGoalHook } from "../../hooks/goal"
-import {
-  detectExternalNotificationPlugin,
-  getNotificationConflictWarning,
-  log,
-} from "../../shared"
+import { detectExternalNotificationPlugin, getNotificationConflictWarning, log } from "../../shared"
 import { safeCreateHook } from "../../shared/safe-create-hook"
 import { sessionExists } from "../../tools"
 import { isTmuxIntegrationEnabled } from "../../create-runtime-tmux-config"
@@ -76,15 +72,21 @@ export function createSessionHooks(args: {
   isHookEnabled: (hookName: HookName) => boolean
   safeHookEnabled: boolean
 }): SessionHooks {
-  const { ctx, pluginConfig, modelCacheState, backgroundManager, modelFallbackControllerAccessor, isHookEnabled, safeHookEnabled } = args
+  const {
+    ctx,
+    pluginConfig,
+    modelCacheState,
+    backgroundManager,
+    modelFallbackControllerAccessor,
+    isHookEnabled,
+    safeHookEnabled,
+  } = args
   const safeHook = <T>(hookName: HookName, factory: () => T): T | null =>
     safeCreateHook(hookName, factory, { enabled: safeHookEnabled })
 
   const preemptiveCompaction =
-    isHookEnabled("preemptive-compaction") &&
-    pluginConfig.experimental?.preemptive_compaction
-      ? safeHook("preemptive-compaction", () =>
-          createPreemptiveCompactionHook(ctx, pluginConfig, modelCacheState))
+    isHookEnabled("preemptive-compaction") && pluginConfig.experimental?.preemptive_compaction
+      ? safeHook("preemptive-compaction", () => createPreemptiveCompactionHook(ctx, pluginConfig, modelCacheState))
       : null
 
   let sessionNotification: ReturnType<typeof createSessionNotification> | null = null
@@ -98,39 +100,38 @@ export function createSessionHooks(args: {
     }
   }
 
-  const thinkMode = isHookEnabled("think-mode")
-    ? safeHook("think-mode", () => createThinkModeHook())
-    : null
+  const thinkMode = isHookEnabled("think-mode") ? safeHook("think-mode", () => createThinkModeHook()) : null
 
   const enableFallbackTitle = pluginConfig.experimental?.model_fallback_title ?? false
-  const updateFallbackTitle = enableFallbackTitle
-    ? createModelFallbackTitleUpdater(ctx)
-    : undefined
+  const updateFallbackTitle = enableFallbackTitle ? createModelFallbackTitleUpdater(ctx) : undefined
 
   const isModelFallbackConfigEnabled = pluginConfig.model_fallback ?? false
-  const modelFallback = isModelFallbackConfigEnabled && isHookEnabled("model-fallback")
-    ? safeHook("model-fallback", () =>
-      createModelFallbackHook({
-        toast: async ({ title, message, variant, duration }) => {
-          await ctx.client.tui
-            .showToast({
-              body: {
-                title,
-                message,
-                variant: variant ?? "warning",
-                duration: duration ?? 5000,
-              },
-            })
-            .catch(() => {})
-        },
-        onApplied: enableFallbackTitle ? updateFallbackTitle : undefined,
-        controllerAccessor: modelFallbackControllerAccessor,
-      }))
-    : null
+  const modelFallback =
+    isModelFallbackConfigEnabled && isHookEnabled("model-fallback")
+      ? safeHook("model-fallback", () =>
+          createModelFallbackHook({
+            toast: async ({ title, message, variant, duration }) => {
+              await ctx.client.tui
+                .showToast({
+                  body: {
+                    title,
+                    message,
+                    variant: variant ?? "warning",
+                    duration: duration ?? 5000,
+                  },
+                })
+                .catch(() => {})
+            },
+            onApplied: enableFallbackTitle ? updateFallbackTitle : undefined,
+            controllerAccessor: modelFallbackControllerAccessor,
+          }),
+        )
+      : null
 
   const anthropicContextWindowLimitRecovery = isHookEnabled("anthropic-context-window-limit-recovery")
     ? safeHook("anthropic-context-window-limit-recovery", () =>
-        createAnthropicContextWindowLimitRecoveryHook(ctx, { experimental: pluginConfig.experimental, pluginConfig }))
+        createAnthropicContextWindowLimitRecoveryHook(ctx, { experimental: pluginConfig.experimental, pluginConfig }),
+      )
     : null
 
   const autoUpdateChecker = isHookEnabled("auto-update-checker")
@@ -140,7 +141,8 @@ export function createSessionHooks(args: {
           isSisyphusEnabled: pluginConfig.sisyphus_agent?.disabled !== true,
           autoUpdate: pluginConfig.auto_update ?? true,
           modelCapabilities: pluginConfig.model_capabilities,
-        }))
+        }),
+      )
     : null
 
   const astGrepSgProvision = isHookEnabled("ast-grep-sg-provision")
@@ -156,20 +158,21 @@ export function createSessionHooks(args: {
     : null
 
   const interactiveBashSession =
-    isHookEnabled("interactive-bash-session") &&
-    isTmuxIntegrationEnabled(pluginConfig)
-    ? safeHook("interactive-bash-session", () => createInteractiveBashSessionHook(ctx))
-    : null
+    isHookEnabled("interactive-bash-session") && isTmuxIntegrationEnabled(pluginConfig)
+      ? safeHook("interactive-bash-session", () => createInteractiveBashSessionHook(ctx))
+      : null
 
-  const goal = isHookEnabled("goal") && pluginConfig.goal?.enabled
-    ? safeHook("goal", () =>
-        createGoalHook(ctx, {
-          projectDir: ctx.directory,
-          autoStart: pluginConfig.goal?.auto_start ?? false,
-          ultrawork: pluginConfig.default_mode?.ultrawork ?? false,
-          getSessionExists: async (sessionId) => await sessionExists(sessionId),
-        }))
-    : null
+  const goal =
+    isHookEnabled("goal") && pluginConfig.goal?.enabled
+      ? safeHook("goal", () =>
+          createGoalHook(ctx, {
+            projectDir: ctx.directory,
+            autoStart: pluginConfig.goal?.auto_start ?? false,
+            ultrawork: pluginConfig.default_mode?.ultrawork ?? false,
+            getSessionExists: async (sessionId) => await sessionExists(sessionId),
+          }),
+        )
+      : null
 
   const editErrorRecovery = isHookEnabled("edit-error-recovery")
     ? safeHook("edit-error-recovery", () => createEditErrorRecoveryHook(ctx))
@@ -179,9 +182,7 @@ export function createSessionHooks(args: {
     ? safeHook("delegate-task-retry", () => createDelegateTaskRetryHook(ctx))
     : null
 
-  const ulwExecute = isHookEnabled("ulw-execute")
-    ? safeHook("ulw-execute", () => createUlwExecuteHook(ctx))
-    : null
+  const ulwExecute = isHookEnabled("ulw-execute") ? safeHook("ulw-execute", () => createUlwExecuteHook(ctx)) : null
 
   const prometheusMdOnly = isHookEnabled("prometheus-md-only")
     ? safeHook("prometheus-md-only", () => createPrometheusMdOnlyHook(ctx))
@@ -197,14 +198,14 @@ export function createSessionHooks(args: {
 
   const noHephaestusNonGpt = isHookEnabled("no-hephaestus-non-gpt")
     ? safeHook("no-hephaestus-non-gpt", () =>
-      createNoHephaestusNonGptHook(ctx, {
-        allowNonGptModel: pluginConfig.agents?.hephaestus?.allow_non_gpt_model,
-      }))
+        createNoHephaestusNonGptHook(ctx, {
+          allowNonGptModel: pluginConfig.agents?.hephaestus?.allow_non_gpt_model,
+        }),
+      )
     : null
 
   const hephaestusAgentsMdInjector = isHookEnabled("hephaestus-agents-md-injector")
-    ? safeHook("hephaestus-agents-md-injector", () =>
-      createHephaestusAgentsMdInjectorHook(ctx, modelCacheState))
+    ? safeHook("hephaestus-agents-md-injector", () => createHephaestusAgentsMdInjectorHook(ctx, modelCacheState))
     : null
 
   const questionLabelTruncator = isHookEnabled("question-label-truncator")
@@ -224,7 +225,8 @@ export function createSessionHooks(args: {
         createRuntimeFallbackHook(ctx, {
           config: runtimeFallbackConfig,
           pluginConfig,
-        }))
+        }),
+      )
     : null
 
   const legacyPluginToast = isHookEnabled("legacy-plugin-toast")

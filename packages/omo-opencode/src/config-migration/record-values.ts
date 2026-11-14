@@ -1,8 +1,12 @@
 const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"])
 
 export function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    && Object.prototype.toString.call(value) === "[object Object]"
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.prototype.toString.call(value) === "[object Object]"
+  )
 }
 
 function cloneValue(value: unknown): unknown {
@@ -28,9 +32,10 @@ export function mergeRecords(
   for (const [key, overrideValue] of Object.entries(override)) {
     if (UNSAFE_KEYS.has(key)) continue
     const baseValue = merged[key]
-    merged[key] = isPlainRecord(baseValue) && isPlainRecord(overrideValue)
-      ? mergeRecords(baseValue, overrideValue)
-      : cloneValue(overrideValue)
+    merged[key] =
+      isPlainRecord(baseValue) && isPlainRecord(overrideValue)
+        ? mergeRecords(baseValue, overrideValue)
+        : cloneValue(overrideValue)
   }
   return merged
 }

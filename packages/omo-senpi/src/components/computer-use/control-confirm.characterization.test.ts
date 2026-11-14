@@ -142,7 +142,10 @@ const ROWS: readonly Row[] = [
 async function settledWithin<T>(promise: Promise<T>, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const limit = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`waited out the test budget for ${label} to settle; it never did`)), remainingTestTime())
+    timer = setTimeout(
+      () => reject(new Error(`waited out the test budget for ${label} to settle; it never did`)),
+      remainingTestTime(),
+    )
   })
   try {
     return await Promise.race([promise, limit])
