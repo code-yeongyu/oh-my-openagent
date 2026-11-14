@@ -1,4 +1,5 @@
-import { SESSION_COMMAND_TEXT_MAX_BYTES, SESSION_BLOB_MAX } from "../../src/local-api/spec-proto.ts"
+import { SESSION_BLOB_MAX } from "../../src/local-api/spec-proto.ts"
+import { COMMAND_TEXT_MAX_BYTES } from "../../src/local-api/command-text.ts"
 import { describe, expect, test } from "bun:test"
 import { LOCAL_BLOB_MAX, LOCAL_CHUNK_MAX, LOCAL_INLINE_MAX, lineBytes } from "../../src/local-api/chunking.ts"
 import { LOCAL_LINE_MAX } from "../../src/local-api/framing.ts"
@@ -14,8 +15,8 @@ describe("LA19 chunk arithmetic", () => {
   test("a full chunk is 349,528 base64 characters and the part count covers the byte limit", () => {
     expect(fullChunk.length).toBe(4 * Math.ceil(LOCAL_CHUNK_MAX / 3))
     expect(fullChunk.length).toBe(349_528)
-    expect(LOCAL_UPLOAD_PARTS_MAX * LOCAL_CHUNK_MAX).toBeGreaterThanOrEqual(SESSION_COMMAND_TEXT_MAX_BYTES)
-    expect((LOCAL_UPLOAD_PARTS_MAX - 1) * LOCAL_CHUNK_MAX).toBeLessThan(SESSION_COMMAND_TEXT_MAX_BYTES)
+    expect(LOCAL_UPLOAD_PARTS_MAX * LOCAL_CHUNK_MAX).toBeGreaterThanOrEqual(COMMAND_TEXT_MAX_BYTES)
+    expect((LOCAL_UPLOAD_PARTS_MAX - 1) * LOCAL_CHUNK_MAX).toBeLessThan(COMMAND_TEXT_MAX_BYTES)
     expect(LOCAL_BLOB_MAX).toBe(6 * SESSION_BLOB_MAX)
   })
 

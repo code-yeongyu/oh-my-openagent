@@ -122,6 +122,7 @@ const endpointCommand = (
   conn: Conn,
   request: Extract<SessionCommand, { readonly device: string }>,
 ): Outcome => {
+  if (!("rpc" in request)) return refuse("unsupported", "this test owner takes endpoint commands inline only")
   const listed = state.world.endpoints?.[request.device]
   if (listed === undefined) return refuse("unsupported", "that device names no engine endpoints")
   const answer = state.world.endpointCommand
@@ -153,6 +154,7 @@ const endpointCommand = (
 
 const command = (state: OwnerState, conn: Conn, request: SessionCommand): Outcome => {
   if ("device" in request) return endpointCommand(state, conn, request)
+  if (!("attach" in request)) return refuse("unsupported", "this test owner takes attach and endpoint commands only")
   const session = state.attaches.get(request.attach)
   if (session === undefined || !conn.attaches.has(request.attach)) return refuse("not_attached", "attach first")
   const resolved = commandOf(state, request)
@@ -197,7 +199,7 @@ const sendCommandEvent = (conn: Conn, mint: () => string, device: string, body: 
 }
 
 const part = (state: OwnerState, conn: Conn, request: SessionCommandPart): Outcome => {
-  if (!conn.attaches.has(request.attach)) return refuse("not_attached", "attach first")
+  if (!("attach" in request) || !conn.attaches.has(request.attach)) return refuse("not_attached", "attach first")
   const accepted = state.uploads.accept(request)
   if (accepted.kind === "accepted") return ok({ received: request.index })
   const abort = (): void =>

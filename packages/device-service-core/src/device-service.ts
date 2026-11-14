@@ -2,7 +2,9 @@ import { homedir } from "node:os"
 import { join } from "node:path"
 import { SOCKET_FILE } from "./local-api/access.ts"
 import { connectLocalApi, type ConnectOptions, type LocalApiClient } from "./local-api/client.ts"
-import { connectLocal, ENDPOINT_FILE } from "./local-api/transport.ts"
+import { ENDPOINT_FILE } from "./local-api/transport.ts"
+import { connectLocalBackground } from "./background-transport.ts"
+import { markNotSent, NotSentError } from "./not-sent-error.ts"
 import type { ListingResult, ListingRevision } from "./local-api/client-assembly.ts"
 import type {
   Capability,
@@ -17,7 +19,7 @@ import { followDelegatedChannel } from "./delegated-channel.ts"
 import { LocalApiError } from "./local-api/errors.ts"
 import { newestRowsListing } from "./listing-rows.ts"
 import type { CommandRpc } from "./local-api/protocol.ts"
-import type { SessionCandidate } from "./local-api/protocol-delegated.ts"
+import type { SessionCandidate } from "./local-api/protocol-command.ts"
 import { randomBytes } from "node:crypto"
 import { compareVersions } from "./release/version.ts"
 
@@ -68,7 +70,7 @@ function sendToEndpoint(
     timer.unref?.()
     void client.closed.then(() => fail(new Error("the connection closed before the endpoint command settled")))
     const send = (asked: boolean): Promise<unknown> =>
-      client.endpointCommand(device, endpoint, rpc, commandId, { locate: asked })
+      client.commandTo({ device, endpoint }, rpc, commandId, asked ? { locate: true } : {})
     // A service before decision 0018's 2026-11-06 amendment refuses the unknown `locate` field with invalid_request
     // before routing anything, so the command id is still unbound and the same command goes again without it; its
     // reply then names no `located` and the caller locates as before.
@@ -80,18 +82,9 @@ function sendToEndpoint(
   })
 }
 
-const markNotSent = (error: unknown): unknown =>
-  error instanceof LocalApiError
-    ? new LocalApiError(error.code, error.reason, {
-        action: error.action,
-        ...(error.limit_chars === undefined ? {} : { limit_chars: error.limit_chars }),
-        ...(error.path_refusal === undefined ? {} : { path_refusal: error.path_refusal }),
-        not_sent: true,
-      })
-    : error
-
 export type { ListingResult, ListingRevision, ReadPage, ReadPageEntry } from "./local-api/client-assembly.ts"
 export { LocalApiError } from "./local-api/errors.ts"
+export { NotSentError } from "./not-sent-error.ts"
 export type {
   Capability,
   CommandRpc,
@@ -164,8 +157,8 @@ export type DeviceService = {
    * Settles like an attach's command: the first command state that is not a progress state, plus the engine's reply.
    * Rejects with the local API's refusal (`unsupported` when the device lists no endpoint, before anything is sent), or
    * when the connection closes or no final state arrives within ENDPOINT_COMMAND_WAIT_MS. Every failure before
-   * `session.command` is written (the `session.endpoints` lookup, whatever its code) is a `LocalApiError` with
-   * `not_sent: true`; a `session.command` that times out after sending carries its `command_id` instead.
+   * `session.command` is written (the `session.endpoints` lookup, whatever its code) is a `NotSentError` (a
+   * `LocalApiError` with `not_sent: true`); a `session.command` that times out after sending carries its `command_id` instead.
    */
   readonly endpointCommand: (
     device: string,
@@ -223,7 +216,7 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
   const client = await (options.connect ?? connectLocalApi)({
     stateDir,
     client: { name: "omo", version: options.version },
-    ...(options.background === true ? { transport: () => connectLocal(stateDir, { background: true }) } : {}),
+    ...(options.background === true ? { transport: () => connectLocalBackground(stateDir) } : {}),
   })
   return {
     serviceVersion: client.welcome.service_version,
@@ -276,8 +269,7 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
       } catch (error) {
         throw markNotSent(error)
       }
-      if (endpoint === undefined)
-        throw new LocalApiError("unsupported", "the device lists no engine endpoint", { not_sent: true })
+      if (endpoint === undefined) throw new NotSentError("unsupported", "the device lists no engine endpoint")
       return await sendToEndpoint(client, device, endpoint, rpc, options?.locate === true)
     },
     close: () => client.close(),

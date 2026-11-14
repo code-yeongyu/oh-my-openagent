@@ -2,6 +2,7 @@ import { outcomeOf } from "./outcome"
 import {
   connectDeviceService,
   LocalApiError,
+  NotSentError,
   type CommandResult,
   type DeviceService,
   type RemoteAttach,
@@ -205,7 +206,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       } catch (error) {
         // The SDK marks a failure before session.command was written (the endpoint lookup timing out or the connection
         // closing during it) not_sent: nothing ran, so it is refused. The same codes after sending stay uncertain.
-        if (error instanceof LocalApiError && error.not_sent === true) return { kind: "refused", reason: error.code }
+        if (error instanceof NotSentError) return { kind: "refused", reason: error.code }
         if (error instanceof LocalApiError && error.command_id === undefined && REFUSED_BEFORE_SENDING.has(error.code))
           return { kind: "refused", reason: error.code }
         return { kind: "uncertain", reason: "reply_lost" }

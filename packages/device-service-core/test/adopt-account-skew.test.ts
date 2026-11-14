@@ -10,6 +10,7 @@ import {
   type DeviceService,
 } from "../src/index.ts"
 import { validateRequest } from "../src/local-api/validate.ts"
+import { validateRequest as validateReleasedRequest } from "../vendor/omo-5.1.66-decoder/validate.ts"
 import { startFakeOwner, type FakeOwner } from "./local-api/conformance/fake-owner.ts"
 import { defaultWorld } from "./local-api/conformance/world.ts"
 
@@ -88,7 +89,8 @@ describe("device.adopt account, gated on welcome.service_version", () => {
     },
   )
 
-  test("control: the shipped validator refuses a device.adopt that carries an account", () => {
+  // The vendored validator is a newer relayd's, which takes `account`; the v5.1.66 decoders predate it like relayd 0.1.2.
+  test("control: a validator that predates account refuses a device.adopt that carries an account", () => {
     const { signingPrivateKey, sealingPrivateKey } = keys()
     const request = {
       id: "r1",
@@ -97,8 +99,8 @@ describe("device.adopt account, gated on welcome.service_version", () => {
       signing_private_key: signingPrivateKey,
       sealing_private_key: sealingPrivateKey,
     }
-    expect(validateRequest(request).ok).toBe(true)
-    expect(validateRequest({ ...request, account: "acct_42" }).ok).toBe(false)
+    expect(validateReleasedRequest(request).ok).toBe(true)
+    expect(validateReleasedRequest({ ...request, account: "acct_42" }).ok).toBe(false)
   })
 
   test("a credential that names no account sends none, even to a new relayd", async () => {

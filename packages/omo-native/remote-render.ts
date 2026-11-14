@@ -22,6 +22,7 @@ const STATE_LABELS: Readonly<Record<StatusState, string>> = {
   service_degraded: "Needs attention",
   update_required: "Update required",
   signed_out: "Signed out",
+  fail_closed: "Needs repair",
 }
 
 function renderTable(header: readonly string[], rows: readonly (readonly string[])[]): string[] {

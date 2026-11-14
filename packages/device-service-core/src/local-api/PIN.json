@@ -1,0 +1,289 @@
+{
+  "upstream": "sisyphuslabs/omo-relay-daemon",
+  "upstreamCommit": "4ed58920002306a95bf92fe99ca448be89d7103f",
+  "importRewrites": [
+    {
+      "from": "@sisyphuslabs/relay-spec/proto",
+      "to": "./spec-proto.ts"
+    },
+    {
+      "from": "@sisyphuslabs/relay-daemon/bytes-encoding",
+      "to": "./bytes-encoding.ts"
+    }
+  ],
+  "ported": {
+    "spec-proto.ts": "sisyphuslabs/omo-relay-spec@8ce4ec71bcb00ca9a0513db5a3aaffadeeec97dc packages/relay-proto/src (vendor/relay-spec/PIN.json at the commit above)"
+  },
+  "files": [
+    {
+      "upstreamPath": "packages/local-api/src/access.ts",
+      "sha256": "c7164f485ca8688f66192f452120484fd55b4174307e7c08ca5f9081226df05c",
+      "gitBlobSha1": "65dc77a54f148b1aee989abb8b4e87ca52dca7b3",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/local-api/src/chunking.ts",
+      "sha256": "15b13de50110991ce010a82aecc448350465451fc7fc75530576c4d75d9a702c",
+      "gitBlobSha1": "3f9e142bfb49a85e18b87f2131a185c80704a434",
+      "importRewrite": true
+    },
+    {
+      "upstreamPath": "packages/local-api/src/client-assembly.ts",
+      "sha256": "c64bc2211213f52062bf9a34b60c02ef01892cfc7b4880955bf23309dc6d0eb1",
+      "gitBlobSha1": "a1582e60c97a4d817920a378618d141d6df89a3e",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/local-api/src/client-connection.ts",
+      "sha256": "e5b31aef4c281b218d9241b9ec8090827742f12dacde55af0894305ff7f2166a",
+      "gitBlobSha1": "a2ca29c2627451f54a98ce8d6ee5596826442b18",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/local-api/src/client-listing.ts",
+      "sha256": "365eb058c8d27949bd20757d312b8f7cdab7246ddb539b53712864a3fce65248",
+      "gitBlobSha1": "eedecd0f7bc03edc66e653aea5d6ef2ce186acb3",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/local-api/src/client-open.ts",
+      "sha256": "5f571ecdd09501e3d73d47f3041795a777a2fbe2f7865438f564e22537874144",
+      "gitBlobSha1": "90d18d96932e65a462f59ddb8a42ec55df0c3c9b",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/local-api/src/client.ts",
+      "sha256": "71b2a03ae58f5df225309c4812cb5ea734a975e9a4b53a245d5e276de5433e0f",
+      "gitBlobSha1": "6000d0404f428580a05e71fb27b2b509e3384f8e",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/local-api/src/command-text.ts",
+      "sha256": "2992c9aedc79400fe3723db14d8f4fa4bc9df472f1dde4dac48e9eb1fb28cb77",
+      "gitBlobSha1": "26e9a8eacdebd45e2e56c77203acc96c2c2b0721",
+      "importRewrite": true
+    },
+    {
+      "upstreamPath": "packages/local-api/src/dacl.ts",
+      "sha256": "a38bfe1588db514782883f7d81d93d7c578dc741f54a3dc0d5d23b77ccfe9a8b",
+      "gitBlobSha1": "372ea6a5f9487d6cbb046dbb3022e9d700e8c1e7",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/local-api/src/errors.ts",
+      "sha256": "3b3635a207b86728461e78b9b960495063104fa45237d366a2d637c427274b08",
+      "gitBlobSha1": "e578f6690fbee4ce4ae872d9130dc01f004d81c7",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/local-api/src/framing.ts",
+      "sha256": "8e971837efcbe8bf899d5a40a89685025a0f0c464101582074f2909dbef773f7",
+      "gitBlobSha1": "d85a79e361ee470a083d809ee28e4857bfcb68e6",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/local-api/src/limits.ts",
+      "sha256": "f9fb83511eda907633b7f3718e2bacebbf4eacebc52b6fd2cb82793c99a4fc8b",
+      "gitBlobSha1": "ffc75b326875c3058454b646c3d79822529a8e62",
+      "importRewrite": true
+    },
+    {
+      "upstreamPath": "packages/local-api/src/listing.ts",
+      "sha256": "a863e9d953b19af2f836448560c9ffae61732dfb8b4cd2fec8c25d30c6e3a0d9",
+      "gitBlobSha1": "69fc6e14e246b05f8c8a4438632497a02f5cd3ad",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/local-api/src/proof.ts",
+      "sha256": "2a6232219a114a8370a19b20f27e516028b56f434ec19866ec7599373f3c3583",
+      "gitBlobSha1": "1ee2244d8503fd93b691fba30873adacdecdaa75",
+      "importRewrite": true
+    },
+    {
+      "upstreamPath": "packages/local-api/src/protocol-command.ts",
+      "sha256": "afa901ba586007eb9db776490029993c29abbe45d1afa42255aa83a05aec3f4b",
+      "gitBlobSha1": "905cf9e0e45b07e2e3366b2f2bffae4bdbaf32fd",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/local-api/src/protocol-control.ts",
+      "sha256": "5a5c4881ca407490a25a676e8ecbef8381d861a3618ff83d3cc6180245b2993a",
+      "gitBlobSha1": "ce344a9a59059bf0f1cfb78e008c8327f2900611",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/local-api/src/protocol-delegated.ts",
+      "sha256": "30ef198de3c849db5304d4c6a84186a2da4d8a662517cde16e6c93d197adee10",
+      "gitBlobSha1": "7ae190a29c6fcc546b4e6ab16d6c8a10287d481b",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/local-api/src/protocol-deliveries.ts",
+      "sha256": "2dc0dcb3e1b5338b6f62429579db9f5806cffe4ffc9ff2b0a351a72e675b8a55",
+      "gitBlobSha1": "7511674a3ca7203118e5d3802dec8ceee6ac799e",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/local-api/src/protocol-events.ts",
+      "sha256": "dd2319a17da64ac74557488caafce2902c688b5f131dc9eac585b88f80870785",
+      "gitBlobSha1": "51136f2c653ad38b92f03271c6c55246f52f6c34",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/local-api/src/protocol-machine.ts",
+      "sha256": "97665656075db35db50a036b2bcf24d6eac8387a48bcf8b85a22faeb63b26b00",
+      "gitBlobSha1": "6157beff86400d99d7b8d6d04e57ec9f85976ca3",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/local-api/src/protocol-presenter.ts",
+      "sha256": "c1381a5be7ed62d039c4dd065f675dd2c3d7fda65a15526f5480ad454695bf8f",
+      "gitBlobSha1": "59f1bca4ac94bf27777fdb163aedd454fba54bfd",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/local-api/src/protocol-status.ts",
+      "sha256": "6af194c9f40ba6d06f490a8993f1417e33c6f0d67e8dd341538a5d959365c3f8",
+      "gitBlobSha1": "f59e332510717b0aa20caf99a2edaf21d7a7d3bb",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/local-api/src/protocol.ts",
+      "sha256": "7e0838bbb24670310d53e8ce77744765d6ed72a8e7a3451bc6adf71b818e6b96",
+      "gitBlobSha1": "9d818bf28100c0e1a0fa4b24911ba42287857efa",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/local-api/src/session-ref.ts",
+      "sha256": "16d9950936e05eb4fab427c78a3d25a891f3e1735ee4a6bc3bed9e44e13b30aa",
+      "gitBlobSha1": "721e4d7cb727b3df35e11bd9e61b01145595a4aa",
+      "importRewrite": true
+    },
+    {
+      "upstreamPath": "packages/local-api/src/transport.ts",
+      "sha256": "f3f9be0e16c69eae7b0475822fd2c04aab92d89162a4535336029a566e028d6a",
+      "gitBlobSha1": "4fe9d9769154d42013e439b15e07dcff7a262d05",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/local-api/src/upload.ts",
+      "sha256": "52ec02ae26d269ba2b49609e1a07655557d2ec9811a911fc5bc6fad04f5d1858",
+      "gitBlobSha1": "68675ff5c37307bea88b1751b75083ebbb9c147d",
+      "importRewrite": true
+    },
+    {
+      "upstreamPath": "packages/local-api/src/validate-command.ts",
+      "sha256": "3e0100d885939c7bfc57f5b88333785010a189a45b31cf6a3973fa6523a10926",
+      "gitBlobSha1": "68ec4af87dbb47da7141a53a39091acf42c6d5f7",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/local-api/src/validate-delegated.ts",
+      "sha256": "a0076056bec22438cc7de8a123c1382bf6713ffb81235e9257377f14d265f40a",
+      "gitBlobSha1": "1bc564445c453a080d4ed5276eee4bb8729c0207",
+      "importRewrite": true
+    },
+    {
+      "upstreamPath": "packages/local-api/src/validate-deliveries.ts",
+      "sha256": "b4830ee965dd54b710f8f0792dc1a314d313de41c0ff4f4ef14e28d6970d10dd",
+      "gitBlobSha1": "534bd41c8db614d932b8cafada7d238375a29e1d",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/local-api/src/validate-events.ts",
+      "sha256": "f507cf0a715b6bede2b4aaa40ce64a2a0d2d5e2cf99d7552c5e0f125d8faf3f5",
+      "gitBlobSha1": "d52de48e4d114bbfdc2377f6974b7b48322ae81f",
+      "importRewrite": true
+    },
+    {
+      "upstreamPath": "packages/local-api/src/validate-fields.ts",
+      "sha256": "7bbc7c449808b621c2d29e4f4ec130f4330e33eb74ea75a366b030d9ff9b59c6",
+      "gitBlobSha1": "2bf4da1c3eacf3f04f3c710ce3a56665d0a1b926",
+      "importRewrite": true
+    },
+    {
+      "upstreamPath": "packages/local-api/src/validate-listing-row.ts",
+      "sha256": "3c75a9137cfa093ad8a9b55d0b24c1af274c9fa70a8ee0b7de8c7b97b7e7bed1",
+      "gitBlobSha1": "d144baba808a476d6ff60520fb1e65392cfaafda",
+      "importRewrite": true
+    },
+    {
+      "upstreamPath": "packages/local-api/src/validate-machine-events.ts",
+      "sha256": "14d6493fe7d04bb69adeddf29556edfd9c9c461bc15f9bd11fba6c71a78bc818",
+      "gitBlobSha1": "44ee49018a96daba0798ebd3355613569ab5d087",
+      "importRewrite": true
+    },
+    {
+      "upstreamPath": "packages/local-api/src/validate-machine.ts",
+      "sha256": "edcfc357af3bea0bdd88f5bcc5cb0cf76891d7b319641e0ef6bfb6fd37484fb1",
+      "gitBlobSha1": "96616390ad96b7e4f925af3c89960de392763d9a",
+      "importRewrite": true
+    },
+    {
+      "upstreamPath": "packages/local-api/src/validate-presenter.ts",
+      "sha256": "4a2bbee2374cf8b1c5e8a20c2ff81bb62e271eb928cf519cf7ad1c4cd5c5c685",
+      "gitBlobSha1": "d534d9564218cc95bb963940793341ec43765d6f",
+      "importRewrite": true
+    },
+    {
+      "upstreamPath": "packages/local-api/src/validate-requests.ts",
+      "sha256": "22f884888e397e09753ffc6802db816e770add4459df5a01d519c562c88ba394",
+      "gitBlobSha1": "f20db71946b36a7c5ce7f9c14306bd9bc2b7123b",
+      "importRewrite": true
+    },
+    {
+      "upstreamPath": "packages/local-api/src/validate-session-answer.ts",
+      "sha256": "c60ee43922b470b844e503fdf987bc39cb6d4ae18c61e6a0105dcdee32576023",
+      "gitBlobSha1": "7cfedf09d7a27ff76d8c8ecfa8727e24e229150d",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/local-api/src/validate-session-wake.ts",
+      "sha256": "bc629864e4b7e26e0ef8f3e1b99ae8cc194a17d9cf1a1da6667fa286a66b2974",
+      "gitBlobSha1": "e6da7231e9a60d858d1b579ba77ac50ac9c72570",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/local-api/src/validate-shapes.ts",
+      "sha256": "e699047cad97ecc03ae0a1c758aaccc6a1244060bb3f4abfbcabad03d64bc9c0",
+      "gitBlobSha1": "1b3a6b1e6b082eec820dec84e1028e3e6ca4fd65",
+      "importRewrite": true
+    },
+    {
+      "upstreamPath": "packages/local-api/src/validate-snapshot-from.ts",
+      "sha256": "1e52f76b1b9787d5f047db7047f9076d5ebeda3d029e4080f141338ba5a1448d",
+      "gitBlobSha1": "78f3c9b071e6189af3e4689a8bf911d64c7ac951",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/local-api/src/validate-stream-events.ts",
+      "sha256": "6829b9818656e5641164631ef7e9a01d3d0683daef65c53b47dfc3b94557398c",
+      "gitBlobSha1": "af11f1f726659dea80b133e3dde99f307418bbeb",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/local-api/src/validate-update.ts",
+      "sha256": "7d3f2973e3527af4fc84d2dbbde577aecaa33787cceac4666849d20ee2943ae3",
+      "gitBlobSha1": "67a0901bc9fcf4c3890cc9545c4dcc4b499ae2ef",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/local-api/src/validate.ts",
+      "sha256": "e9499955ead4f2e244866ee1571da41c053238410e79cc676b33e53ae6be7ff8",
+      "gitBlobSha1": "87cbe448326b9e492f977ac8e0961498a2352c06",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/local-api/src/vocabulary.ts",
+      "sha256": "9f47ef69624f87aba9e2168b39552ab8325416c75c9c867cfdafabd170addc4a",
+      "gitBlobSha1": "e6e551549ac9e184ede587d868cd7d1c561c901e",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/daemon/src/bytes-encoding.ts",
+      "sha256": "e572f4feeb7b779483c188955b87ded4af2da7e757dd7ec3a9eb9132289dbdd1",
+      "gitBlobSha1": "243f0cdd5593ad38d4710b21ed9689ab4dd6e122",
+      "importRewrite": false
+    }
+  ]
+}
