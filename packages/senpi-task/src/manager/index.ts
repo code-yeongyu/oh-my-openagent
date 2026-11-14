@@ -49,6 +49,7 @@ export type {
   ManagedStartSpec,
   ManagerStartSpec,
   PlanResolution,
+  PlanConfigError,
   PlanResolutionError,
   ResolvedChildPlan,
   TrustedRespawnLaunch,

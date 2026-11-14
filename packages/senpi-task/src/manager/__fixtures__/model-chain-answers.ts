@@ -10,10 +10,23 @@ const QUOTA_ERROR =
 const REFUSAL_ERROR =
   "400: This request was flagged as a possible cybersecurity risk and refused under the content policy."
 const AUTH_ERROR = "401: Unauthorized - invalid api key"
+// The route does not serve the model, carried on a 401 so a provider-wide credential reading would also match.
+const MODEL_NOT_FOUND_ERROR = '401 {"code":"model_not_found","message":"unknown provider for model primary"}'
 
-const ERRORS = { quota: QUOTA_ERROR, refusal: REFUSAL_ERROR, auth: AUTH_ERROR } as const
+// A limit whose wording names neither a model family nor the account (#11383).
+const WEEKLY_LIMIT_ERROR =
+  '{"type":"error","error":{"type":"rate_limit_error","message":"Weekly usage limit reached. Resets at 2099-10-29T04:27:07Z."}}'
 
-export type Step = keyof typeof ERRORS | "complete" | { readonly tool: string } | { readonly partialTool: string }
+const ERRORS = {
+  quota: QUOTA_ERROR,
+  refusal: REFUSAL_ERROR,
+  auth: AUTH_ERROR,
+  missing: MODEL_NOT_FOUND_ERROR,
+  weekly: WEEKLY_LIMIT_ERROR,
+} as const
+
+export type Step =
+  keyof typeof ERRORS | "complete" | "silent" | { readonly tool: string } | { readonly partialTool: string }
 
 // `claude-opus-5-5` and `claude-opus-5` are the ids senpi's shipped default chain names
 // (`claude-opus-5-5` -> `claude-opus-5:max`). The rung lives on another account, so a usage limit on the
@@ -55,6 +68,12 @@ export function answer(provider: string, model: string, step: Step) {
     timestamp: Date.now(),
   }
   const toolCall = (name: string) => ({ type: "toolCall" as const, id: `call-${name}`, name, arguments: {} })
+  // The provider accepted the call and never answers.
+  if (step === "silent")
+    return {
+      result: () => new Promise<never>(() => {}),
+      [Symbol.asyncIterator]: () => ({ next: () => new Promise<never>(() => {}) }),
+    }
   if (typeof step === "string" && step !== "complete")
     return stream([], { ...base, content: [], stopReason: "error" as const, errorMessage: ERRORS[step] })
   if (step === "complete") {

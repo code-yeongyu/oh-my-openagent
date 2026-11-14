@@ -31,6 +31,8 @@ export type { ExecutionMode, ExecutionModeGate } from "./execution-mode"
 // The unified spec both runner adapters accept. A superset: the rpc adapter uses the subset it
 // needs (task_id, cwd, state_dir, prompt); the in-process adapter also consumes model/tools/agent.
 export type ManagedStartSpec = {
+  readonly onProviderRequest?: () => void
+  readonly probeProviderRequest?: boolean
   readonly admission?: StartAdmission
   readonly taskId: string
   readonly cwd: string
@@ -135,9 +137,21 @@ export type ResolvedChildPlan = {
   readonly maxDepth?: number
 }
 
+/** An omo.json layer that exists but cannot be used: the spawn fails instead of routing on another config. */
+export type PlanConfigError =
+  | {
+      readonly kind: "parse" | "read" | "validation"
+      readonly path: string
+      readonly position?: { readonly line: number; readonly column: number }
+      readonly issue_paths?: readonly string[]
+    }
+  // A model catalog reference cycle, found after the layers merge: it names references, not a file.
+  | { readonly kind: "catalog"; readonly issue_paths?: readonly string[] }
+
 export type PlanResolutionError = {
-  readonly code: "unknown_target" | "model_unavailable" | "category_disabled" | "invalid_target"
+  readonly code: "unknown_target" | "model_unavailable" | "category_disabled" | "invalid_target" | "config_invalid"
   readonly message: string
+  readonly config_error?: PlanConfigError
   readonly availableAgents?: readonly string[]
   readonly availableCategories?: readonly string[]
   // Dead-chain spawn detail: the category whose builtin fallback chain had zero resolvable rungs,
@@ -294,6 +308,8 @@ export type TaskManagerOptions = {
   readonly config: OmoTaskSettings
   readonly cwd: string
   readonly now?: () => number
+  // How long the one same-provider rung an ambiguous usage limit hops onto may stay silent (#11383); default 60 s.
+  readonly limitProbeTimeoutMs?: number
   readonly scheduleExitConfirmation?: ExitConfirmationSchedule
   // Injected by lifecycle (todo 12). Steering-driven cancel delegates destruction here; defaults to
   // a no-op so the manager stays usable before lifecycle wiring lands.

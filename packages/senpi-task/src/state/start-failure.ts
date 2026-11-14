@@ -6,6 +6,7 @@ export const TASK_START_FAILURE_KINDS = [
   "session-create-failed",
   "depth-exceeded",
   "model_unavailable",
+  "usage_limit",
   "tools_unavailable",
   "session_unavailable",
   "host_unavailable",
