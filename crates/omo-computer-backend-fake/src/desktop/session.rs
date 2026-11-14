@@ -58,7 +58,15 @@ impl FakeBackend {
     /// Row 21: the scenario's `consent` view, with `fullAccess` set under the full-access preset.
     pub(super) fn scripted_host_consent(&self) -> Option<serde_json::Value> {
         let state = self.lock();
-        let mut view = state.scenario.consent.clone();
+        // R6-1: the fake always hands a view; a scenario without one hands the code-built default
+        // (stopHotkey null, absent in the file), so tests and fixtures keep today's behaviour.
+        let mut view = Some(
+            state
+                .scenario
+                .consent
+                .clone()
+                .unwrap_or_else(|| serde_json::json!({ "stopHotkey": null })),
+        );
         if state.scenario.full_access_preset {
             if let Some(map) = view.get_or_insert_with(|| serde_json::json!({})).as_object_mut() {
                 map.insert("fullAccess".to_owned(), serde_json::Value::Bool(true));

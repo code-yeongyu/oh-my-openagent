@@ -206,7 +206,7 @@ impl Session {
     /// allowed denied apps handed to the gate. A scope name that binds to nothing refuses.
     pub(crate) fn open_consent(&mut self) -> Result<(), Refusal> {
         let raw = self.backend.host_consent();
-        let mut view = raw.clone().map(ConsentView::from_host).unwrap_or_default();
+        let mut view = view_of(raw.clone());
         // A-IS-62 rev 5 (R70an C): a refused chord left the hand tampered under this consent.
         if self.funnel.control.chord_tamper.holds(raw.as_ref()) {
             view.tampered = true;
@@ -374,5 +374,35 @@ pub(crate) fn backend_os(backend: &dyn omo_computer_core::backend::Backend) -> O
         Some(Platform::X11 | Platform::Wayland) => Os::Linux,
         Some(Platform::Windows) => Os::Windows,
         None => Os::host(),
+    }
+}
+
+/// The view a session runs under. A backend that hands NO consent view is a real backend whose
+/// engine read no consent file (A-IS-62 rev 6, R6-1): the view is NOT carried - computer:read
+/// only, no exec admitted and no chord armed. The fake always hands a view (the code-built default
+/// stays for tests and the fake only).
+pub(crate) fn view_of(raw: Option<serde_json::Value>) -> ConsentView {
+    raw.map_or_else(
+        || ConsentView {
+            stop_hotkey: None,
+            grants: vec!["computer:read".to_owned()],
+            ..ConsentView::default()
+        },
+        ConsentView::from_host,
+    )
+}
+
+#[cfg(test)]
+mod view_of_tests {
+    /// R6-1: no consent file read means read-only, no exec and no chord.
+    #[test]
+    fn a_session_with_no_consent_file_is_read_only_and_arms_no_chord() {
+        use omo_computer_safety::protected::Os;
+        let view = super::view_of(None);
+        assert_eq!(view.stop_chord(Os::Linux), crate::consent::StopChord::Unreadable, "no chord is armed");
+        assert_eq!(view.grants, vec!["computer:read".to_owned()], "computer:read only");
+        let consent = crate::consent::Consent::new(view, crate::mutate::LOCAL_HAND, Os::Linux);
+        assert!(consent.admit_exec(None).is_err(), "no exec is admitted");
+        assert_eq!(super::view_of(Some(serde_json::json!({ "stopHotkey": null }))).grants.len(), 2, "a handed view is read as written");
     }
 }

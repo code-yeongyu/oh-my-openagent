@@ -150,6 +150,19 @@ impl Probe {
 }
 
 impl Backend for Probe {
+    // Row 21 (R70bc): forward the consent view, platform and stop chord to the wrapped fake.
+    fn host_consent(&self) -> Option<serde_json::Value> {
+        self.inner.host_consent()
+    }
+
+    fn platform(&self) -> Option<omo_computer_core::report::Platform> {
+        self.inner.platform()
+    }
+
+    fn set_stop_chord(&mut self, chord: Option<&str>) -> omo_computer_core::backend::BackendResult<()> {
+        self.inner.set_stop_chord(chord)
+    }
+
     fn capabilities(&self) -> Capabilities {
         self.inner.capabilities()
     }
