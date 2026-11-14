@@ -436,6 +436,18 @@ test("#given an error message carrying memory content #when enable fails #then t
   ])
 })
 
+test("#given an error whose code holds free text #when enable fails #then the warning logs the error name without that code", async () => {
+  const warnings: { message: string; fields: Record<string, unknown> }[] = []
+  const f = await setup({ warn: (message, fields) => warnings.push({ message, fields }) })
+  f.runtime.enableSync = async () => {
+    throw Object.assign(new Error("third-party failure"), { code: "private memory text: buy milk" })
+  }
+  expect(await f.call("enable", owner("a").context)).toMatchObject({ kind: "unavailable", code: "operation_failed" })
+  expect(warnings.map((warning) => warning.fields)).toEqual([
+    { path: "enable", code: "operation_failed", error: "Error" },
+  ])
+})
+
 test("#given a service error #when enable fails #then the warning keeps the service code and status", async () => {
   const warnings: { message: string; fields: Record<string, unknown> }[] = []
   const f = await setup({ warn: (message, fields) => warnings.push({ message, fields }) })
