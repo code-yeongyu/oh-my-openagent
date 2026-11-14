@@ -367,11 +367,15 @@ export async function followRemote(
   }
   // The stop reason of the run's last assistant message: an interrupted turn ends its run with "aborted" (#13272).
   let lastStopReason: unknown
+  // The stream printed text for this turn: the probe must not print the stored answer a second time (#13481).
+  let streamedThisTurn = false
   const streamRecord = (record: JsonObject): void => {
     if (record["type"] === "agent_settled") {
       if (record["reason"] === "session_closed") return end("session_closed")
       return end(lastStopReason === "aborted" ? "interrupted" : "settled")
     }
+    // Each run starts with no stop reason of its own (#13272 review).
+    if (record["type"] === "agent_start") lastStopReason = undefined
     if (record["type"] === "message_end") {
       const message = record["message"]
       if (isRecord(message) && message["role"] === "assistant") lastStopReason = message["stopReason"]
@@ -390,6 +394,7 @@ export async function followRemote(
     if (last !== undefined && !last.endsLine && (newMessage || event["contentIndex"] !== last.index)) onText("\n")
     newMessage = false
     last = { index: event["contentIndex"], endsLine: delta.endsWith("\n") }
+    streamedThisTurn = true
     onText(delta)
   }
   const probe = async (settleSignal: boolean): Promise<void> => {
@@ -425,6 +430,8 @@ export async function followRemote(
     // Final once a later message supersedes the turn, or once a run settled (the buffer's own trailing settle
     // counts: the turn finished before the aim) with this answer as the transcript's tail.
     const interrupted = stopReason === "aborted"
+    // A turn whose text the stream already printed is not printed again from the transcript (#13481).
+    if (streamedThisTurn && !interrupted) return
     if (!(superseded || (settleSignal && (answerAtTail || interrupted)))) return
     if (answer.length === 0 && !interrupted) return
     for (const [index, entryText] of answer.entries()) {
@@ -468,7 +475,9 @@ export async function followRemote(
     // The run's own records the buffer already holds (after its agent_start) still say how its last message ended:
     // a turn aborted before the aim and settled after it is interrupted, not settled (#13272 review L2).
     const runStart = buffer.findLastIndex((record) => record["type"] === "agent_start")
-    if (runStart >= 0)
+    // A run the buffer already saw settle is an earlier run, not this send's: its stop reason marks nothing (#13272 review).
+    const runSettled = runStart >= 0 && buffer.slice(runStart + 1).some((record) => record["type"] === "agent_settled")
+    if (runStart >= 0 && !runSettled)
       for (const record of buffer.slice(runStart + 1)) {
         const ended = record["message"]
         if (record["type"] === "message_end" && isRecord(ended) && ended["role"] === "assistant")
