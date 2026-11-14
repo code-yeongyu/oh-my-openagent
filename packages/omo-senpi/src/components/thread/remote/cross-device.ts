@@ -72,6 +72,12 @@ export type LocalExisting =
 /** This device's side of placement: its name ladder, what it knows of an existing thread, and its SessionHost. */
 export type LocalPlacement = {
   readonly host: SessionHost
+  /**
+   * The calling session's folder. A new thread this device creates with no `cwd` starts there, in its creator's scope
+   * (a project folder, or the desktop's own folder for a thread with no project), never in the folder the engine
+   * process happens to run in. Absent when the caller's folder is unknown.
+   */
+  readonly callerCwd?: string
   readonly resolve: (address: string) => LocalResolution
   /** Decision 0027: the ONE resolver (local + relay address books) for an existing thread or a fork source; omitted = local only. */
   readonly locate: (address: string) => Promise<CrossTarget>
@@ -133,12 +139,11 @@ export async function planCreate(
     request,
     creates,
   })
-  const create = (host: SessionHost): CreatePlan => ({
-    kind: "open",
-    host,
-    request: value.cwd === undefined ? {} : { cwd: value.cwd },
-    creates: true,
-  })
+  const create = (host: SessionHost): CreatePlan => {
+    // Another device never sees this caller's folder, so only a create here inherits it.
+    const cwd = value.cwd ?? (host === local.host ? local.callerCwd : undefined)
+    return { kind: "open", host, request: cwd === undefined ? {} : { cwd }, creates: true }
+  }
   const openHere = (address: string): CreatePlan => {
     const existing = local.existing(address)
     if (existing.kind === "error") return { kind: "done", result: existing.result }
@@ -274,6 +279,22 @@ export async function withAlias(
   result: ThreadToolResult,
   device?: string,
 ): Promise<ThreadToolResult> {
+  const claimed = await claimCreatedAlias(remote, alias, result, device, false)
+  return "local" in claimed ? result : claimed
+}
+
+/**
+ * withAlias for a thread this call just created: an account gone by the claim (`sign_in`, e.g. a token that expired
+ * after the resolve) answers `{ local: "sign_in" }` instead of a failure, so the caller names the thread by the alias
+ * on its device, exactly as when no account was there to begin with (#13104).
+ */
+export async function claimCreatedAlias(
+  remote: RemoteThreadSurface | undefined,
+  alias: string | undefined,
+  result: ThreadToolResult,
+  device?: string,
+  localWhenSignedOut = true,
+): Promise<ThreadToolResult | { readonly local: "sign_in" }> {
   if (remote?.aliases === undefined || alias === undefined || result.kind !== "ok" || !("thread" in result))
     return result
   let claimed: Awaited<ReturnType<AliasRegistry["claim"]>>
@@ -295,6 +316,7 @@ export async function withAlias(
     }
   }
   if (claimed.kind === "error") {
+    if (localWhenSignedOut && signedOut(claimed.error)) return { local: "sign_in" }
     const failed = aliasFailure(claimed.error)
     return {
       kind: "error",
@@ -329,7 +351,9 @@ export async function renameAlias(
           idempotency_key: key,
         })
       : await remote.aliases.rename({ session_id: threadId, from, to: alias, idempotency_key: key })
-  return changed.kind === "error" ? aliasFailure(changed.error) : undefined
+  if (changed.kind !== "error") return undefined
+  // The account can be gone by the claim or rename even when aliasesOf answered (a token that expired in between).
+  return signedOut(changed.error) ? { local: "sign_in" } : aliasFailure(changed.error)
 }
 
 /** thread_list with all_scope: this device's threads plus the account's other devices' (each with its device), with aliases. */
