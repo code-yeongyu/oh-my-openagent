@@ -32,10 +32,19 @@ export type SessionControl = {
   }) => Promise<{ readonly models: readonly ModelChoice[]; readonly held: boolean }>
   readonly setModel: (provider: string, id: string) => Promise<{ readonly provider: string; readonly id: string }>
   readonly getAvailableThinkingLevels: () => Promise<readonly string[]>
-  /** Refuses `thinking_level_unsupported` for a level the active model cannot run. */
-  readonly setThinkingLevel: (level: string, scope?: "turn") => Promise<void>
+  /**
+   * Changes only this session's level (`SESSION_ONLY_THINKING_SCOPE`), never the device's remembered level for the
+   * model. Refuses `thinking_level_unsupported` for a level the active model cannot run.
+   */
+  readonly setThinkingLevel: (level: string) => Promise<void>
   readonly getMessages: () => Promise<readonly ThreadTranscriptEntry[]>
 }
+
+/**
+ * The engine's `set_thinking_level` scope that changes only the addressed session (`setSessionThinkingLevel`). Any
+ * other scope also rewrites the device's remembered level for the model, which a thread tool never asks for.
+ */
+export const SESSION_ONLY_THINKING_SCOPE = "turn"
 
 // Keyed through the global symbol registry: the thread client sidecar and the extension bundle each carry their own
 // copy of this module, so an `instanceof` across them would not hold.

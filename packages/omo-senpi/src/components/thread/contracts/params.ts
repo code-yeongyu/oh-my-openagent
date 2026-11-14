@@ -227,7 +227,7 @@ export const ThreadSetReasoningParams = Type.Object({
   scope: Type.Optional(
     Type.Union([Type.Literal("session"), Type.Literal("turn")], {
       description:
-        "session (default) changes the thread's remembered level for its model; turn changes only the current session level without rewriting the model's remembered level.",
+        "session (default) or turn; either changes only this thread's level and never the level the device remembers for the model.",
     }),
   ),
   all_scope: AllScope,
