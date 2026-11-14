@@ -7,9 +7,17 @@ import { tlsTestCertificate } from "./tls-test-certificate"
 
 const expired = { ...grant, ...privateKeys, accessTokenExpiresAt: "2000-01-01T00:00:00Z" }
 
-async function logoutHarness(reply: () => Response | Promise<Response>, overrideApi?: string) {
+// #12000 review LOW: the journal write keeps the generation the store already held, so the fixture
+// states it before logout instead of reading the expected value back out of the object under assertion.
+const generationBeforeLogout = "generation-before-logout"
+
+async function logoutHarness(
+  reply: () => Response | Promise<Response>,
+  overrideApi?: string,
+  initial: Credentials = expired,
+) {
   const home = await temporaryHome()
-  let stored: string | null = JSON.stringify(expired)
+  let stored: string | null = JSON.stringify(initial)
   const writes: Credentials[] = []
   const calls: string[] = []
   const atRefresh: (Credentials | null)[] = []
@@ -87,9 +95,9 @@ test("native logout journals before refresh and persists rotated credentials bef
   expect(result.code).toBe(0)
   expect(result.stdout.length).toBeGreaterThan(0)
   expect(result.stderr).toBe("")
-  expect(h.atRefresh).toMatchObject([
-    { ...expired, refreshState: "uncertain", credentialGeneration: expect.any(String) },
-  ])
+  const credentialGeneration = h.writes[0]?.credentialGeneration
+  expect(typeof credentialGeneration).toBe("string")
+  expect(h.atRefresh).toEqual([{ ...expired, refreshState: "uncertain", credentialGeneration }])
   expect(h.atRevoke[0]).toMatchObject({ accessToken: "rotated-access", refreshToken: "rotated-refresh" })
   expect(h.atRevoke[0]).not.toHaveProperty("refreshState")
   expect(h.calls).toEqual(["POST /v1/session/refresh", "DELETE /v1/devices/device-1"])
@@ -179,27 +187,27 @@ for (const outcome of [
           })
         : null
     if (tlsServer) onTestFinished(() => tlsServer.stop(true))
-    const h = await logoutHarness(() => {
-      if (outcome === "500" || outcome === "500-terminal")
-        return refusal(outcome === "500" ? "internal" : "unauthorized", undefined, 500)
-      if (terminal)
-        return refusal(
-          outcome,
-          undefined,
-          outcome === "account_deleted" ? 410 : outcome === "invalid_grant" ? 400 : 401,
-        )
-      return Response.json({ ...grant, refreshToken: "rotated" })
-    }, tlsServer?.url.origin)
+    const h = await logoutHarness(
+      () => {
+        if (outcome === "500" || outcome === "500-terminal")
+          return refusal(outcome === "500" ? "internal" : "unauthorized", undefined, 500)
+        if (terminal)
+          return refusal(
+            outcome,
+            undefined,
+            outcome === "account_deleted" ? 410 : outcome === "invalid_grant" ? 400 : 401,
+          )
+        return Response.json({ ...grant, refreshToken: "rotated" })
+      },
+      tlsServer?.url.origin,
+      { ...expired, credentialGeneration: generationBeforeLogout },
+    )
     const fault =
       outcome === "network" ? "offline" : outcome === "lost-response" || outcome === "timeout" ? outcome : ""
     const result = await h.launch("logout", fault).result
     expect(result.code).toBe(0)
     expect(result.stdout.length).toBeGreaterThan(0)
-    expect(h.writes[0]).toMatchObject({
-      ...expired,
-      refreshState: "uncertain",
-      credentialGeneration: expect.any(String),
-    })
+    expect(h.writes[0]).toEqual({ ...expired, refreshState: "uncertain", credentialGeneration: generationBeforeLogout })
     expect(h.readStored()).toBeNull()
     expect(h.calls).toEqual(outcome === "network" || outcome === "tls" ? [] : ["POST /v1/session/refresh"])
     expect(tlsRequests).toBe(0)
@@ -233,7 +241,9 @@ test("crashed logout refresh is cleared by a fresh logout without replay, then w
       throw new Error("logout exited before its refresh was observed")
     }),
   ])
-  expect(journal).toMatchObject({ ...expired, refreshState: "uncertain", credentialGeneration: expect.any(String) })
+  const credentialGeneration = h.writes[0]?.credentialGeneration
+  expect(typeof credentialGeneration).toBe("string")
+  expect(journal).toEqual({ ...expired, refreshState: "uncertain", credentialGeneration })
   // Only this owned PID is killed; the held response cannot complete beforehand.
   process.kill(first.child.pid, "SIGKILL")
   await first.result
