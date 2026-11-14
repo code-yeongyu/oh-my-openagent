@@ -9,6 +9,7 @@ use omo_computer_core::capabilities::{
 };
 use omo_computer_core::error::EngineCode;
 use omo_computer_core::observation::ImageMime;
+use omo_computer_core::report::Platform;
 use omo_computer_core::results::DisplayInfo;
 
 use omo_computer_core::observation::Ocr;
@@ -18,6 +19,11 @@ use crate::ocr::{cap_lines, OcrProbe, ENGINE};
 
 /// The backend name `capabilities()` reports.
 pub const BACKEND: &str = "win32";
+
+/// The OS this backend acts on, a constant of the crate (A-IS-64 item 1): nothing a peer carries, no
+/// setting and no consent file changes it, and the per-OS safety tables follow it. The backend
+/// platform seam (row 21) returns this value.
+pub const PLATFORM: Platform = Platform::Windows;
 
 /// The Windows backend over a [`CaptureOs`].
 pub struct Win32Backend<O: CaptureOs> {
