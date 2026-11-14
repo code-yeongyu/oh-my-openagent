@@ -80,23 +80,19 @@ describe("SessionHost: a new thread starts in its creator's approval mode on bot
     }
   })
 
-  test("#given a creator in ask #when it forks a thread here and one on b #then both open_session frames name ask and forkFrom", async () => {
+  test("#given a creator in ask #when it forks a thread here and one on b #then both are refused unsupported (#13031) and no open_session frame is sent", async () => {
     const a = account()
     const { run, openSession } = surface({ ...a.remote, permissionPreset: () => "ask" })
     expect(await run("thread_create", { fork_from: "dur-local" })).toMatchObject({
-      kind: "ok",
-      thread: { thread_id: "dur-created-here" },
-      deduplicated: false,
+      kind: "error",
+      error: { code: "unsupported", details: { source: "dur-local" } },
     })
     expect(await run("thread_create", { fork_from: "dur-on-b" })).toMatchObject({
-      kind: "ok",
-      thread: { thread_id: "dur-new-on-b", device: "b" },
-      deduplicated: false,
+      kind: "error",
+      error: { code: "unsupported", details: { source: "dur-on-b", device: "b" } },
     })
-    expect(localOpenFrames(openSession)).toEqual([
-      expect.objectContaining({ forkFrom: "dur-local", permissionPreset: "ask" }),
-    ])
-    expect(openFrames(a.sent)).toEqual([expect.objectContaining({ forkFrom: "dur-on-b", permissionPreset: "ask" })])
+    expect(localOpenFrames(openSession)).toEqual([])
+    expect(openFrames(a.sent)).toEqual([])
   })
 
   test("#given a creator that names no preset #when it creates on both legs #then neither frame carries permissionPreset", async () => {

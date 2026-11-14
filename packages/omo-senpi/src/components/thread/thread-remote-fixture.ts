@@ -158,7 +158,7 @@ export function createRemoteThreadFixture() {
       }
       if (rpc["type"] === "open_session") {
         const opened = rpc["sessionPath"] === undefined ? "dur-new-on-b" : "dur-on-b"
-        live.add(opened)
+        for (const id of [opened, options.relayKeys?.get(opened) ?? opened]) live.add(id)
         return ok(options.openData ?? { sessionId: "rpc-9", state: { durableSessionId: opened } })
       }
       if (rpc["type"] === "get_state")

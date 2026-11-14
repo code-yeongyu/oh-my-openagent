@@ -784,3 +784,6 @@ export { deviceOnline } from "./remote/remote-ops"
 export { outcomeFailure } from "./remote/outcome"
 export { createRelayTransport } from "./remote/relay-transport"
 export { createRelayControl } from "./control/relay-control"
+// thread_create's folder and worktree code (#13450): the local open and the worktree request another device sends.
+export { openLocally } from "./control/local-open"
+export { answerWorktreeRequest } from "./worktree/worktree-rpc"

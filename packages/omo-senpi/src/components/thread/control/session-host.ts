@@ -1,5 +1,7 @@
 import type { ThreadDataError, ThreadSummary } from "../contracts"
+import type { ThreadToolFailure } from "../errors"
 import type { ThreadToolSummary } from "../tools/internals"
+import type { ThreadWorktree, WorktreeRequest } from "../worktree/thread-worktree"
 
 /**
  * One `open_session` as thread_create asks for it, on whichever device the host stands for: a new session (`cwd`),
@@ -14,10 +16,17 @@ export type SessionOpenRequest = {
   readonly name?: string
   readonly initialSkills?: readonly string[]
   readonly permissionPreset?: string
+  /** A new git worktree to create from the repository at `cwd` on the opening device; the session starts in it. */
+  readonly worktree?: WorktreeRequest
 }
 
 /** A thread as the tools report it, with `device` when it is on another of the account's devices. */
-export type HostedThread = ThreadToolSummary & { readonly device?: string }
+/** `warnings`: steps after the session was created that failed; the thread exists and is answered anyway. */
+export type HostedThread = ThreadToolSummary & {
+  readonly device?: string
+  readonly worktree?: ThreadWorktree
+  readonly warnings?: readonly ThreadToolFailure[]
+}
 
 /** The engine's reply state as the tools report a thread (`summary()`), with `device` when it is not this device's. */
 export type SessionOpenOutcome = { readonly kind: "ok"; readonly thread: HostedThread } | ThreadDataError
