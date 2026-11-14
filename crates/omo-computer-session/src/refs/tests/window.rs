@@ -147,3 +147,21 @@ fn heavy_drill_use_keeps_its_parent_observation_through_a_prune() {
     assert!(refs.generation("a", top).is_some(), "the parent stays");
     assert!(refs.generation("b", other).is_none(), "the least recently used observation went");
 }
+
+/// Review L1 of #13368 (at d8305695c6): the registry's owner map is pruned with the window's
+/// generations, so element churn cannot grow it past the numbers the kept generations hold.
+#[test]
+fn element_churn_keeps_the_owner_map_to_the_kept_numbers() {
+    let mut refs = RefRegistry::default();
+    for read in 0..40_u64 {
+        refs.mint(&root("w"), &flat_walk(50, 1_000 * (read + 1)), None);
+    }
+    let held: std::collections::HashSet<u64> = refs.windows["w"]
+        .generations
+        .values()
+        .flat_map(|g| g.entries.iter().map(|e| e.n))
+        .collect();
+    let owned: Vec<u64> = refs.owner.iter().filter(|(_, w)| w.as_str() == "w").map(|(n, _)| *n).collect();
+    assert_eq!(owned.len(), held.len(), "the owner map holds only kept numbers");
+    assert!(owned.iter().all(|n| held.contains(n)));
+}
