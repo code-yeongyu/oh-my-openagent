@@ -21,7 +21,9 @@ export function placeFolder(plan: CreatePlan, worktree: WorktreeRequest | undefi
     if (home === undefined && callerCwd === undefined)
       return {
         kind: "done",
-        result: folderFailure("relative_path", `cwd ${asked} is relative and the caller's folder is unknown.`, { path: asked }),
+        result: folderFailure("relative_path", `cwd ${asked} is relative and the caller's folder is unknown.`, {
+          path: asked,
+        }),
       }
     cwd = home ?? resolve(callerCwd ?? "", asked)
   }
@@ -46,6 +48,10 @@ export function placeFolder(plan: CreatePlan, worktree: WorktreeRequest | undefi
     }
   return {
     ...plan,
-    request: { ...plan.request, ...(cwd === undefined ? {} : { cwd }), ...(worktree === undefined ? {} : { worktree }) },
+    request: {
+      ...plan.request,
+      ...(cwd === undefined ? {} : { cwd }),
+      ...(worktree === undefined ? {} : { worktree }),
+    },
   }
 }

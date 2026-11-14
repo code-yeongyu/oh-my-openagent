@@ -7,7 +7,8 @@ import { createThreadWorktree, type GitRun } from "./thread-worktree"
 const kit = gitRepoKit()
 afterEach(kit.cleanup)
 
-const reasonOf = (outcome: unknown): unknown => (outcome as { error?: { code: string; details?: { reason?: string } } }).error
+const reasonOf = (outcome: unknown): unknown =>
+  (outcome as { error?: { code: string; details?: { reason?: string } } }).error
 
 describe("createThreadWorktree", () => {
   test("#given a repository and a new branch #when the worktree is created #then it is checked out on that branch at HEAD, in OmO's worktrees folder", async () => {
@@ -23,7 +24,11 @@ describe("createThreadWorktree", () => {
   })
 
   test("#given no branch #when the worktree is created #then a fresh omo/thread-* branch is generated", async () => {
-    const outcome = await createThreadWorktree({ repository: kit.repository(), request: {}, root: kit.folder("thread-wt-root-") })
+    const outcome = await createThreadWorktree({
+      repository: kit.repository(),
+      request: {},
+      root: kit.folder("thread-wt-root-"),
+    })
     if (outcome.kind !== "ok") throw new Error(JSON.stringify(outcome))
     expect(outcome.worktree.branch).toMatch(/^omo\/thread-\d{8}-\d{6}-[0-9a-f]{4}$/)
   })
@@ -36,17 +41,20 @@ describe("createThreadWorktree", () => {
     ["a base that names no commit", "repo", { base: "no-such-ref" }, "invalid_arguments", "base_not_found"],
     ["an invalid branch name", "repo", { branch: "bad..name" }, "invalid_arguments", "invalid_branch"],
     ["a branch name that looks like an option", "repo", { branch: "-x" }, "invalid_arguments", "invalid_branch"],
-  ] as const)("#given %s #when the worktree is created #then it is refused typed and nothing is created", async (_label, kind, request, code, reason) => {
-    const repo = kit.repository()
-    const root = kit.folder("thread-wt-root-")
-    const plain = kit.folder("thread-wt-plain-")
-    writeFileSync(join(plain, "f.txt"), "x")
-    const target = { repo, plain, missing: join(plain, "nope"), file: join(plain, "f.txt") }[kind]
-    const outcome = await createThreadWorktree({ repository: target, request, root })
-    expect(reasonOf(outcome)).toMatchObject({ code, details: { reason } })
-    expect((outcome as { error: { next_action: string } }).error.next_action.length).toBeGreaterThan(0)
-    expect(kit.git(repo, "worktree", "list").split("\n")).toHaveLength(1)
-  })
+  ] as const)(
+    "#given %s #when the worktree is created #then it is refused typed and nothing is created",
+    async (_label, kind, request, code, reason) => {
+      const repo = kit.repository()
+      const root = kit.folder("thread-wt-root-")
+      const plain = kit.folder("thread-wt-plain-")
+      writeFileSync(join(plain, "f.txt"), "x")
+      const target = { repo, plain, missing: join(plain, "nope"), file: join(plain, "f.txt") }[kind]
+      const outcome = await createThreadWorktree({ repository: target, request, root })
+      expect(reasonOf(outcome)).toMatchObject({ code, details: { reason } })
+      expect((outcome as { error: { next_action: string } }).error.next_action.length).toBeGreaterThan(0)
+      expect(kit.git(repo, "worktree", "list").split("\n")).toHaveLength(1)
+    },
+  )
 
   test("#given the worktree folder already exists #when the worktree is created #then it is name_conflict worktree_path_exists", async () => {
     const repo = kit.repository()
@@ -75,21 +83,49 @@ describe("createThreadWorktree", () => {
   )
 
   test.each([
-    ["git is not installed", { exit: "spawn_failed", stdout: "", stderr: "spawn git ENOENT" }, "unsupported", "git_unavailable"],
+    [
+      "git is not installed",
+      { exit: "spawn_failed", stdout: "", stderr: "spawn git ENOENT" },
+      "unsupported",
+      "git_unavailable",
+    ],
     ["git does not answer in time", { exit: "timeout", stdout: "", stderr: "" }, "host_unavailable", "git_timeout"],
-    ["the disk is full", { exit: 128, stdout: "", stderr: "fatal: could not write index: No space left on device" }, "host_unavailable", "no_space"],
-    ["the branch is checked out elsewhere", { exit: 128, stdout: "", stderr: "fatal: 'x' is already checked out at '/w'" }, "name_conflict", "branch_checked_out"],
-    ["git fails for another reason", { exit: 128, stdout: "", stderr: "fatal: something odd" }, "invalid_arguments", "git_failed"],
-  ] as const)("#given %s at git worktree add #when the worktree is created #then it is refused typed, never internal_error", async (_label, failure, code, reason) => {
-    const repo = kit.repository()
-    const git: GitRun = async (args, cwd) => {
-      if (args[0] === "worktree") return failure
-      const { runGit } = await import("./thread-worktree")
-      return runGit(args, cwd)
-    }
-    const outcome = await createThreadWorktree({ repository: repo, request: { branch: "z" }, root: kit.folder("thread-wt-root-"), git })
-    expect(reasonOf(outcome)).toMatchObject({ code, details: { reason } })
-  })
+    [
+      "the disk is full",
+      { exit: 128, stdout: "", stderr: "fatal: could not write index: No space left on device" },
+      "host_unavailable",
+      "no_space",
+    ],
+    [
+      "the branch is checked out elsewhere",
+      { exit: 128, stdout: "", stderr: "fatal: 'x' is already checked out at '/w'" },
+      "name_conflict",
+      "branch_checked_out",
+    ],
+    [
+      "git fails for another reason",
+      { exit: 128, stdout: "", stderr: "fatal: something odd" },
+      "invalid_arguments",
+      "git_failed",
+    ],
+  ] as const)(
+    "#given %s at git worktree add #when the worktree is created #then it is refused typed, never internal_error",
+    async (_label, failure, code, reason) => {
+      const repo = kit.repository()
+      const git: GitRun = async (args, cwd) => {
+        if (args[0] === "worktree") return failure
+        const { runGit } = await import("./thread-worktree")
+        return runGit(args, cwd)
+      }
+      const outcome = await createThreadWorktree({
+        repository: repo,
+        request: { branch: "z" },
+        root: kit.folder("thread-wt-root-"),
+        git,
+      })
+      expect(reasonOf(outcome)).toMatchObject({ code, details: { reason } })
+    },
+  )
 
   test("#given git is missing entirely #when the worktree is created #then the first git call answers unsupported git_unavailable", async () => {
     const git: GitRun = async () => ({ exit: "spawn_failed", stdout: "", stderr: "spawn git ENOENT" })

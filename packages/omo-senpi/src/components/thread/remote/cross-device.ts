@@ -4,7 +4,14 @@ import { listedThread } from "../control/relay-session-host"
 import { rowThreadId, type AliasRegistry, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
 import type { WorktreeRequest } from "../worktree/thread-worktree"
 import { placeFolder } from "./create-folder"
-import { planCreate as placeCreate, signedOut, type CreatePlan, type LocalAliasReason, type LocalPlacement } from "./plan-create"
+import { aliasFailure, remoteAvailable } from "./remote-ops"
+import {
+  planCreate as placeCreate,
+  signedOut,
+  type CreatePlan,
+  type LocalAliasReason,
+  type LocalPlacement,
+} from "./plan-create"
 
 /**
  * thread_create's placement (`plan-create.ts`: which device, which session) and then its folder (`create-folder.ts`:
@@ -38,12 +45,15 @@ export async function planCreate(
         "unsupported",
         "fork_from cannot fork yet: the engine opens a blank session instead of a fork, so no thread was created.",
         "Create the thread without fork_from and hand it the source's context with thread_send; thread_read reads the source.",
-        { reason: "fork_unsupported", source: plan.request.forkFrom, ...(plan.host.device === undefined ? {} : { device: plan.host.device }) },
+        {
+          reason: "fork_unsupported",
+          source: plan.request.forkFrom,
+          ...(plan.host.device === undefined ? {} : { device: plan.host.device }),
+        },
       ),
     },
   }
 }
-import { aliasFailure, remoteAvailable } from "./remote-ops"
 
 export {
   type CreatePlan,

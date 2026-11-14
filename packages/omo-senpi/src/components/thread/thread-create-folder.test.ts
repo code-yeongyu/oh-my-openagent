@@ -5,7 +5,8 @@ import { createRemoteThreadFixture } from "./thread-remote-fixture"
 const { account, surface, cleanup } = createRemoteThreadFixture()
 afterEach(cleanup)
 
-const failure = (result: unknown) => (result as { error?: { code: string; next_action: string; details?: object } }).error
+const failure = (result: unknown) =>
+  (result as { error?: { code: string; next_action: string; details?: object } }).error
 
 describe("thread_create: the folder a new thread starts in", () => {
   test("#given a relative cwd #when the thread is created on this device #then it starts in that folder under the caller's folder", async () => {
@@ -27,7 +28,10 @@ describe("thread_create: the folder a new thread starts in", () => {
     const a = account()
     const { run } = surface(a.remote)
     const result = await run("thread_create", { device: "studio", cwd: "sub/dir" })
-    expect(failure(result)).toMatchObject({ code: "invalid_arguments", details: { reason: "relative_path", device: "b" } })
+    expect(failure(result)).toMatchObject({
+      code: "invalid_arguments",
+      details: { reason: "relative_path", device: "b" },
+    })
     expect(a.sent).toEqual([])
   })
 
@@ -54,12 +58,15 @@ describe("thread_create: the folder a new thread starts in", () => {
     ["no relay connection", "studio", { plan: "disconnected" }, "host_unavailable"],
     ["a plan without relay", "studio", { plan: "plan_required" }, "relay_requires_paid_plan"],
     ["a device that never answers", "studio", { refuse: "request_timeout" }, "host_unavailable"],
-  ] as const)("#given %s #when thread_create names it #then a typed code with a next_action, never internal_error", async (_label, device, options, code) => {
-    const a = account(options)
-    const { run, openSession } = surface(a.remote)
-    const error = failure(await run("thread_create", { device }))
-    expect(error).toMatchObject({ code })
-    expect(error?.next_action.length).toBeGreaterThan(0)
-    expect(openSession).not.toHaveBeenCalled()
-  })
+  ] as const)(
+    "#given %s #when thread_create names it #then a typed code with a next_action, never internal_error",
+    async (_label, device, options, code) => {
+      const a = account(options)
+      const { run, openSession } = surface(a.remote)
+      const error = failure(await run("thread_create", { device }))
+      expect(error).toMatchObject({ code })
+      expect(error?.next_action.length).toBeGreaterThan(0)
+      expect(openSession).not.toHaveBeenCalled()
+    },
+  )
 })
