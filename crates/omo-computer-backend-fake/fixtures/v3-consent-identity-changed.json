@@ -74,6 +74,7 @@
     }
   },
   "consent": {
+    "stopHotkey": null,
     "computerUse": true,
     "foreground": "policy",
     "apps": {

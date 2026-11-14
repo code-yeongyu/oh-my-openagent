@@ -143,6 +143,11 @@ impl Consent {
         if self.view.tampered {
             return Err(Denial::bare(ConsentRefusal::Tampered));
         }
+        // A-IS-62 rev 5 (R70an B, interim shape): a view that does not carry stopHotkey leaves the
+        // configured chord unreadable, so every exec is refused, fail-closed.
+        if self.view.stop_hotkey.is_none() {
+            return Err(Denial::bare(ConsentRefusal::Tampered));
+        }
         if !self.view.computer_use {
             return Err(Denial::bare(ConsentRefusal::ConsentOff));
         }

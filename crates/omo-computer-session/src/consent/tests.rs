@@ -20,7 +20,12 @@ fn app(key: &str, cdhash: &str) -> AppTarget {
     }
 }
 
-fn consent(view: serde_json::Value) -> Consent {
+/// A host view in the contract's shape: the member stopHotkey is always carried (R70ao(2)); a test
+/// that does not name it gets null, "absent in the file".
+fn consent(mut view: serde_json::Value) -> Consent {
+    if let Some(map) = view.as_object_mut() {
+        map.entry("stopHotkey").or_insert(serde_json::Value::Null);
+    }
     Consent::new(ConsentView::from_host(view), LOCAL_HAND, Os::Macos)
 }
 
@@ -133,7 +138,7 @@ fn denied_app_seeds_exist_per_os_in_the_scope_stage_keys() {
         }
     }
     let allowed = Consent::new(
-        ConsentView::from_host(json!({ "apps": { "allow": [
+        ConsentView::from_host(json!({ "stopHotkey": null, "apps": { "allow": [
             { "appKey": "1Password.exe", "identity": { "teamId": "TEAM123456", "cdhash": "aa" } }
         ] } })),
         LOCAL_HAND,
@@ -142,7 +147,7 @@ fn denied_app_seeds_exist_per_os_in_the_scope_stage_keys() {
     assert!(allowed.admit_exec(Some(&app("1Password.exe", "aa"))).is_ok(), "unless explicitly allowed, bound at grant");
     // A-IS-61: an allow entry with neither identity nor path is no grant, so it lifts no seed.
     let unbound = Consent::new(
-        ConsentView::from_host(json!({ "apps": { "allow": [{ "appKey": "1Password.exe" }] } })),
+        ConsentView::from_host(json!({ "stopHotkey": null, "apps": { "allow": [{ "appKey": "1Password.exe" }] } })),
         LOCAL_HAND,
         Os::Windows,
     );

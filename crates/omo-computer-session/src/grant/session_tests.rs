@@ -17,6 +17,19 @@ const SCENARIO: &str = r#"{"displays":[{"id":"1","name":"Built-in Display","x":0
   {"id":"2","title":"u","app":"Mail","pid":4343,"x":200,"y":0,"width":100,"height":100,"focused":false,"elevated":null}]}"#;
 
 pub(super) fn scenario(extra: &Value) -> FakeScenario {
+    // A host view in the contract's shape always carries stopHotkey (R70ao(2)); a test that does
+    // not name it gets null. "stopHotkeyNotCarried": true keeps the member out (the unreadable path).
+    let mut extra = extra.clone();
+    let not_carried = extra.get("stopHotkeyNotCarried").is_some();
+    if let Some(map) = extra.as_object_mut() {
+        map.remove("stopHotkeyNotCarried");
+        if let Some(consent) = map.get_mut("consent").and_then(Value::as_object_mut) {
+            if !not_carried {
+                consent.entry("stopHotkey").or_insert(Value::Null);
+            }
+        }
+    }
+    let extra = &extra;
     let mut value: Value = serde_json::from_str(SCENARIO).expect("scenario json");
     if let (Some(base), Some(more)) = (value.as_object_mut(), extra.as_object()) {
         base.extend(more.iter().filter(|(key, _)| *key != "object").map(|(k, v)| (k.clone(), v.clone())));
@@ -101,7 +114,8 @@ fn foreground_lease_single_holder() {
 #[test]
 fn full_access_desktop_click_needs_no_prompt_and_a_window_target_stays_background() {
     let sink = RecordingSink::default();
-    let mut s = session(&json!({ "full_access_preset": true }), &sink, None);
+    // The fake builds its host view from scenario.consent; the contract's view carries stopHotkey.
+    let mut s = session(&json!({ "full_access_preset": true, "consent": {} }), &sink, None);
     capture(&mut s, "desktop");
     assert!(desktop_click(&mut s).is_ok());
     assert!(s.holds_lease());
@@ -247,10 +261,7 @@ fn open_session_with(
     file_hotkey: Option<&str>,
     settings_hotkey: Option<&str>,
 ) -> (Session, Result<omo_computer_core::results::SessionOpened, omo_computer_core::backend::Refusal>) {
-    let mut consent = json!({});
-    if let Some(chord) = file_hotkey {
-        consent["stopHotkey"] = json!(chord);
-    }
+    let consent = json!({ "stopHotkey": file_hotkey });
     let backend = FakeBackend::with_parts(scenario(&json!({ "consent": consent })), FakeClock::default(), RecordingSink::default())
         .with_stop_path(StopPathScript::Live);
     let dir = tempfile::tempdir().expect("tempdir");
@@ -297,7 +308,7 @@ fn a_is_62_open_stop_hotkey_must_equal_the_consent_file() {
 fn a_is_62_unparseable_file_chord_never_falls_back_to_the_default() {
     let view = crate::consent::ConsentView::from_host(json!({ "stopHotkey": "ctrl+" }));
     assert_eq!(view.stop_chord(omo_computer_safety::protected::Os::Linux), crate::consent::StopChord::Unparseable("ctrl+".to_owned()));
-    let absent = crate::consent::ConsentView::from_host(json!({}));
+    let absent = crate::consent::ConsentView::from_host(json!({ "stopHotkey": null }));
     assert_eq!(absent.stop_chord(omo_computer_safety::protected::Os::Linux), crate::consent::StopChord::Chord("ctrl+alt+shift+escape".to_owned()));
     let default = crate::consent::default_stop_hotkey(omo_computer_safety::protected::Os::host());
     assert!(open_with(Some("ctrl+"), Some(default)).is_err(), "the default never stands in for an unparseable chord");
@@ -309,7 +320,7 @@ fn a_is_62_unparseable_file_chord_never_falls_back_to_the_default() {
 #[test]
 fn a_is_62_chords_compare_through_the_one_parser() {
     use omo_computer_safety::protected::Os;
-    let view = crate::consent::ConsentView::from_host(json!({}));
+    let view = crate::consent::ConsentView::from_host(json!({ "stopHotkey": null }));
     assert!(view.same_stop_chord(Os::Macos, "ctrl+alt+cmd+escape"), "the measured macOS pair");
     assert!(view.same_stop_chord(Os::Macos, "CMD+Ctrl+Option+Esc"), "order, case and spelling fold");
     assert!(!view.same_stop_chord(Os::Macos, "ctrl+alt+shift+escape"));
@@ -374,4 +385,24 @@ fn a_is_62_the_tampered_mark_clears_only_on_a_changed_fingerprint() {
     assert!(mark.holds(Some(&a)), "and keeps it again");
     assert!(!mark.holds(Some(&b)), "a re-save clears it");
     assert!(!mark.holds(Some(&a)), "and it stays cleared");
+}
+
+/// R70ao(2): the handed view carries stopHotkey in three states: null is absent in the file (the
+/// OS default), a string is the configured chord, a missing member is NOT carried (unreadable:
+/// nothing equal, and every exec on the hand is refused, fail-closed; R70an B's interim shape).
+#[test]
+fn a_is_62_three_state_stop_hotkey() {
+    use omo_computer_safety::protected::Os;
+    use crate::consent::{ConsentView, StopChord};
+    assert_eq!(ConsentView::from_host(json!({ "stopHotkey": null })).stop_chord(Os::Linux), StopChord::Chord("ctrl+alt+shift+escape".to_owned()));
+    assert_eq!(ConsentView::from_host(json!({ "stopHotkey": "ctrl+alt+shift+f12" })).stop_chord(Os::Linux), StopChord::Chord("ctrl+alt+shift+f12".to_owned()));
+    let missing = ConsentView::from_host(json!({}));
+    assert_eq!(missing.stop_chord(Os::Linux), StopChord::Unreadable);
+    assert!(!missing.same_stop_chord(Os::Linux, "ctrl+alt+shift+escape"), "nothing is equal");
+    assert_eq!(ConsentView::default().stop_chord(Os::Linux), StopChord::Chord("ctrl+alt+shift+escape".to_owned()), "a view built in code is 'absent in the file'");
+    // A hand whose view does not carry the member refuses every exec.
+    let mut s = session(&json!({ "consent": { "apps": {} }, "stopHotkeyNotCarried": true }), &RecordingSink::default(), None);
+    capture(&mut s, "1");
+    let refused = s.click(params(json!({ "target": "1", "x": 5, "y": 5 }))).expect_err("unreadable chord");
+    assert_eq!(refused.refusal.code.wire(), "ControlRequired");
 }

@@ -48,8 +48,11 @@ pub struct ConsentView {
     /// The file differs from the host's last write: exec refused, reads continue.
     pub tampered: bool,
     pub foreground_input_lock: bool,
-    /// `stopHotkey` as written in the fingerprinted file (A-IS-62): the stop chord's ONE source.
-    pub stop_hotkey: Option<String>,
+    /// `stopHotkey` as carried by the handed view (A-IS-62 rev 5, R70ao(2)): `None` = the member is
+    /// NOT carried (unreadable), `Some(None)` = JSON null, absent in the file (the OS default),
+    /// `Some(Some(chord))` = the configured chord.
+    #[serde(default = "not_carried", deserialize_with = "carried")]
+    pub stop_hotkey: Option<Option<String>>,
 }
 
 impl Default for ConsentView {
@@ -63,9 +66,18 @@ impl Default for ConsentView {
             full_access: false,
             tampered: false,
             foreground_input_lock: false,
-            stop_hotkey: None,
+            // A view built in code models "absent in the file" (R70ao(2)).
+            stop_hotkey: Some(None),
         }
     }
+}
+
+const fn not_carried() -> Option<Option<String>> {
+    None
+}
+
+fn carried<'de, D: serde::Deserializer<'de>>(de: D) -> Result<Option<Option<String>>, D::Error> {
+    Option::<String>::deserialize(de).map(Some)
 }
 
 /// The stop chord the consent file names (A-IS-62).
@@ -75,6 +87,8 @@ pub enum StopChord {
     Chord(String),
     /// Not a chord: it never falls back to the default (the listener reads deaf on it).
     Unparseable(String),
+    /// The view did not carry the member: nothing is equal and every exec is refused (R70an B).
+    Unreadable,
 }
 
 /// The documented default `computer.stopHotkey` per OS (`design/d-safety.md`:84).
@@ -94,11 +108,12 @@ impl ConsentView {
     #[must_use]
     pub fn stop_chord(&self, os: omo_computer_safety::protected::Os) -> StopChord {
         match &self.stop_hotkey {
-            None => StopChord::Chord(default_stop_hotkey(os).to_owned()),
-            Some(text) if omo_computer_safety::protected::Chord::parse(text).is_some() => {
+            None => StopChord::Unreadable,
+            Some(None) => StopChord::Chord(default_stop_hotkey(os).to_owned()),
+            Some(Some(text)) if omo_computer_safety::protected::Chord::parse(text).is_some() => {
                 StopChord::Chord(text.trim().to_ascii_lowercase())
             }
-            Some(text) => StopChord::Unparseable(text.clone()),
+            Some(Some(text)) => StopChord::Unparseable(text.clone()),
         }
     }
 

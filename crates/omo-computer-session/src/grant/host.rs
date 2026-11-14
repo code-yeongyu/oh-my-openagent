@@ -233,6 +233,7 @@ impl Session {
         let view = self.funnel.control.consent.view();
         let configured = match view.stop_chord(os) {
             crate::consent::StopChord::Chord(chord) | crate::consent::StopChord::Unparseable(chord) => chord,
+            crate::consent::StopChord::Unreadable => "unreadable".to_owned(),
         };
         if let Err(refusal) = check_stop_hotkey(view, os, stop_hotkey) {
             // One audit line for the refused call, naming both chords; the hand then reads
