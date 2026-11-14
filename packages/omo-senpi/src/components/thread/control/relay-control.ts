@@ -6,6 +6,7 @@ import { outcomeFailure } from "../remote/outcome"
 import { replyData } from "../remote/remote-ops"
 import type { ModelChoice } from "../tools/model-match"
 import { closeLadder, SESSION_GONE, type RecordAnswer } from "./close-ladder"
+import { listedThread } from "./relay-session-host"
 import { ControlRefusal, refuse, type SessionControl } from "./port"
 
 const isObject = (value: unknown): value is JsonObject =>
@@ -119,6 +120,15 @@ export function createRelayControl(remote: RemoteThreadSurface, row: RemoteSessi
     getMessages: async () => {
       const listed = (await command({ type: "get_messages" }))["messages"]
       return Array.isArray(listed) ? (listed as ThreadTranscriptEntry[]) : []
+    },
+    running: async () => row.state === "running" || (await command({ type: "get_state" }))["isStreaming"] === true,
+    setArchived: async (archived) => {
+      await command({ type: "set_session_archived", archived })
+    },
+    listed: async (archived) => {
+      const { archived: _was, ...rest } = row
+      const { sessionId: _key, ...thread } = listedThread(archived ? { ...rest, archived: true } : rest)
+      return thread
     },
   }
 }

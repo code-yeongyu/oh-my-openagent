@@ -102,6 +102,16 @@ export const ThreadListParams = Type.Object({
         "List this machine's threads from every workspace; the default returns only the caller's workspace here. The account's other devices' threads are always listed.",
     }),
   ),
+  state: Type.Optional(
+    Type.Array(
+      Type.Union([Type.Literal("running"), Type.Literal("idle"), Type.Literal("inactive"), Type.Literal("archived")]),
+      {
+        minItems: 1,
+        description:
+          "Thread states to list: running, idle, inactive (no engine holds it) or archived; the default lists every state but archived.",
+      },
+    ),
+  ),
 })
 
 export const ThreadReadParams = Type.Object({
@@ -427,6 +437,18 @@ export const ThreadAnswerParams = Type.Object({
   answer: RelayText,
 })
 
+const ThreadArchiveParams = Type.Object({
+  thread: ThreadAddress,
+  archived: Type.Optional(
+    Type.Boolean({
+      description:
+        "true (the default) archives the thread, so thread_list hides it unless state includes archived; false unarchives it.",
+    }),
+  ),
+  all_scope: AllScope,
+  idempotency_key: IdempotencyKey,
+})
+
 export type ThreadCreateInput = Static<typeof ThreadCreateParams>
 export type ThreadListInput = Static<typeof ThreadListParams>
 export type ThreadReadInput = Static<typeof ThreadReadParams>
@@ -437,6 +459,7 @@ export type ThreadHandoffInput = Static<typeof ThreadHandoffParams>
 export type ThreadRenameInput = Static<typeof ThreadRenameParams>
 export type ThreadSetModelInput = Static<typeof ThreadSetModelParams>
 export type ThreadSetReasoningInput = Static<typeof ThreadSetReasoningParams>
+export type ThreadArchiveInput = Static<typeof ThreadArchiveParams>
 export type ThreadBindInput = Static<typeof ThreadBindParams>
 export type ThreadUnbindInput = Static<typeof ThreadUnbindParams>
 export type ThreadRebindInput = Static<typeof ThreadRebindParams>
@@ -457,6 +480,7 @@ export const threadToolParamSchemas = {
   thread_rename: ThreadRenameParams,
   thread_set_model: ThreadSetModelParams,
   thread_set_reasoning: ThreadSetReasoningParams,
+  thread_archive: ThreadArchiveParams,
   thread_bind: ThreadBindParams,
   thread_unbind: ThreadUnbindParams,
   thread_rebind: ThreadRebindParams,

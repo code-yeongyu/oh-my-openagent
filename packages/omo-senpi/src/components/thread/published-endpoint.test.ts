@@ -216,7 +216,7 @@ async function listSendSteer(
   ])
   const listed =
     list.kind === "ok" && "threads" in list
-      ? (list.threads as ReadonlyArray<{ readonly thread_id: string; readonly alive?: boolean }>).find(
+      ? (list.threads as ReadonlyArray<{ readonly thread_id: string; readonly state?: string }>).find(
           (thread) => thread.thread_id === "target",
         )
       : undefined
@@ -230,7 +230,7 @@ test("a busy RPC owner that lists after 1.8 s is live to thread_list, send and s
   target.runtime.beginUserTurn()
   target.listing.delayMs = 1800
   const { listed, send, steer } = await listSendSteer(w, target)
-  expect(listed).toMatchObject({ alive: true })
+  expect(listed?.state === "running" || listed?.state === "idle").toBe(true)
   expect(send).toMatchObject({ kind: "ok", endpoint_kind: "rpc_host", delivery: { kind: "queued" } })
   expect(steer).toMatchObject({ kind: "ok", endpoint_kind: "rpc_host", delivery: { kind: "steered" } })
   expect(target.runtime.enqueueCalls.map((call) => call.lane).sort()).toEqual(["followUp", "steer"])
@@ -243,7 +243,7 @@ test("a published listener that never answers is not live to thread_list, send o
   target.runtime.beginUserTurn()
   target.listing.answer = false
   const { listed, send, steer } = await listSendSteer(w, target)
-  expect(listed?.alive).not.toBe(true)
+  expect(listed === undefined || listed.state === "inactive").toBe(true)
   expect(send).toMatchObject({ kind: "ok", delivery: { kind: "queued_offline" } })
   expect(steer).toMatchObject({ kind: "error", error: { code: "turn_conflict" } })
   expect(target.runtime.enqueueCalls).toHaveLength(0)
@@ -311,7 +311,7 @@ test("a terminal the engine still reports dead is offline to thread_list, send a
     return (
       result.threads as ReadonlyArray<{
         readonly thread_id: string
-        readonly alive?: boolean
+        readonly state?: string
         readonly error_note?: string
       }>
     ).find((thread) => thread.thread_id === "target")
@@ -322,8 +322,8 @@ test("a terminal the engine still reports dead is offline to thread_list, send a
     w.sdk.send({ thread: "target", text: "busy steer", mode: "steer", expected_turn_id: target.runtime.epoch }),
   ])
   const after = await listed()
-  expect(before).toMatchObject({ alive: false, error_note: "live_unresponsive" })
-  expect(after).toMatchObject({ alive: false, error_note: "live_unresponsive" })
+  expect(before).toMatchObject({ state: "inactive", error_note: "live_unresponsive" })
+  expect(after).toMatchObject({ state: "inactive", error_note: "live_unresponsive" })
   expect(send).toMatchObject({ kind: "ok", delivery: { kind: "queued_offline" } })
   expect(steer).toMatchObject({ kind: "error", error: { code: "turn_conflict" } })
   expect(target.runtime.enqueueCalls).toHaveLength(0)

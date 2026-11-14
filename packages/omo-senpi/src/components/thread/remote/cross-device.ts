@@ -1,6 +1,7 @@
 import { AMBIGUOUS_CANDIDATE_LIMIT, normalizeThreadName, type ThreadCandidate } from "../addressing"
-import type { ThreadDevice, ThreadLocalAliasNote, ThreadStatus, ThreadToolResult } from "../contracts"
+import type { ThreadDevice, ThreadLocalAliasNote, ThreadState, ThreadStatus, ThreadToolResult } from "../contracts"
 import { createRelaySessionHost, listedThread } from "../control/relay-session-host"
+import { listedStates, rowState } from "../tools/internals"
 import type { HostedThread, SessionHost, SessionOpenRequest } from "../control/session-host"
 import { threadToolFailure } from "../errors"
 import {
@@ -407,12 +408,15 @@ function deviceRows(
 /**
  * thread_list: this device's threads (scoped by `all_scope` as before) merged with the account's other devices' threads
  * (each with its device, any workspace), with aliases, and the account's devices with their listing state. A device
- * whose rows this listing could not include is named `incomplete` in `devices`, never silently left out.
+ * whose rows this listing could not include is named `incomplete` in `devices`, never silently left out. `states` filters
+ * the other devices' rows as `listThreads` filters this device's (the default leaves archived threads out), and a device
+ * counts only the threads listed.
  */
 export async function listAcross(
   remote: RemoteThreadSurface | undefined,
   local: ThreadToolResult,
   allScope: boolean,
+  states?: readonly ThreadState[],
 ): Promise<ThreadToolResult> {
   if (remote === undefined || local.kind !== "ok" || !("threads" in local)) return local
   const ids = local.threads.map((thread) => thread.thread_id)
@@ -437,7 +441,10 @@ export async function listAcross(
   ])
   if (!listed.ok) return withAliases(remote, { ...local, remote_unavailable: "host_unavailable" }, ids)
   const listing = listed.listing
-  const others = listing.rows.filter((row) => row.device !== here && !known.has(rowThreadId(row)))
+  const shown = listedStates(states)
+  const others = listing.rows.filter(
+    (row) => row.device !== here && !known.has(rowThreadId(row)) && shown.has(rowState(row)),
+  )
   const threads = [
     ...local.threads,
     ...others.map((row) => {

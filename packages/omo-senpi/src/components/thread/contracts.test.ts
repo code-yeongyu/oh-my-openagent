@@ -26,6 +26,7 @@ const VALID_SAMPLES: Record<keyof typeof threadToolParamSchemas, unknown> = {
   thread_rename: { thread: "019233a1-7c2e-7bbb", name: "payments-lane-2" },
   thread_set_model: { thread: "019233a1-7c2e-7bbb", model: "claude-opus-4" },
   thread_set_reasoning: { thread: "019233a1-7c2e-7bbb", level: "high" },
+  thread_archive: { thread: "019233a1-7c2e-7bbb", archived: false },
   thread_bind: {
     platform: "custom",
     account_id: "qa",
@@ -72,6 +73,7 @@ describe("thread tool param schemas", () => {
       "thread_rename",
       "thread_set_model",
       "thread_set_reasoning",
+      "thread_archive",
       "thread_bind",
       "thread_unbind",
       "thread_rebind",
@@ -262,6 +264,7 @@ describe("thread error taxonomy", () => {
       "foreign_live_owner",
       "no_active_turn",
       "turn_conflict",
+      "turn_active",
       "not_steerable",
       "message_too_large",
       "queue_full",

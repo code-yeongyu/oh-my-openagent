@@ -12,6 +12,10 @@ export type RemoteSessionRow = {
   readonly path: string
   readonly state: string
   readonly updated_ms: number
+  /** Rows 4 (omo-relay-spec#295): the session's current model as its engine names it; absent when unknown. */
+  readonly model?: { readonly provider: string; readonly id: string }
+  /** Rows 4: the engine archived the session; absent means not archived. */
+  readonly archived?: true
 }
 
 export type RemoteDevice = {

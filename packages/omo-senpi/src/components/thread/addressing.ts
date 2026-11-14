@@ -27,12 +27,12 @@ import type { RemoteSessionRow } from "./remote/ports"
 import { realpathSync } from "node:fs"
 import { basename } from "node:path"
 
-import type { ThreadStatus, ThreadSummary } from "./contracts"
+import type { ThreadIdentity, ThreadStatus } from "./contracts"
 import { threadToolFailure, type ThreadErrorCode } from "./errors"
 
 // A thread as the addressing layer sees it: the shared summary plus the
 // optional last-message preview the discovery layer may already have loaded.
-export type ThreadAddressEntry = ThreadSummary & {
+export type ThreadAddressEntry = ThreadIdentity & {
   readonly preview?: string
   /** The account device holding the thread when it is not this one (decision 0027: one address book across transports). */
   readonly device?: string
@@ -482,7 +482,7 @@ export function fuzzyContenders(entries: readonly ThreadAddressEntry[], query: s
  * collision surfaces as data so the caller picks a new name or reuses the
  * existing thread by id.
  */
-export function checkNameConflict(entries: readonly ThreadSummary[], name: string): ThreadNameConflictResult {
+export function checkNameConflict(entries: readonly ThreadIdentity[], name: string): ThreadNameConflictResult {
   const guard = guardInput(name, "thread name")
   if (!guard.ok) return guard.error
 

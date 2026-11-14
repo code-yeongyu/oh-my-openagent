@@ -2,7 +2,8 @@ import type { ThreadToolResult } from "../contracts"
 import { workspaceEntries } from "../addressing"
 import { rowThreadId } from "../remote/ports"
 import { createRelayControl, deviceOnline } from "../remote/lazy-ops"
-import { resolution, resolveEntries, targetSession, resolveAcross } from "../tools/internals"
+import { toThreadAddressEntries } from "../address-book"
+import { resolution, sendAddressBook, targetSession, resolveAcross } from "../tools/internals"
 import type { ThreadHostView, ThreadToolSurfaceOptions } from "../tools/ports"
 import { createLocalControl } from "./local-control"
 import type { SessionControl } from "./port"
@@ -26,8 +27,9 @@ export async function locateControl(
   allScope: boolean | undefined,
   callerId: string,
 ): Promise<LocatedControl> {
-  // Decision 0027: one resolver over this device's entries and the relay transport's address book.
-  const entries = resolveEntries(options, current)
+  // Decision 0027: one resolver over this device's entries and the relay transport's address book. This device's entries
+  // include the session file the address names when no engine lists it (closed), so it resolves as not live.
+  const entries = toThreadAddressEntries(sendAddressBook(options, current, address, true))
   const resolved = await resolveAcross(options, entries, address, callerId, allScope)
   if (resolved.kind === "ok" && resolved.entry.transport?.kind === "relay" && options.remote !== undefined) {
     const row = resolved.entry.transport.row

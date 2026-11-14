@@ -1,45 +1,76 @@
-import { workspaceEntries } from "../addressing"
-import type { ThreadReadInput, ThreadToolResult } from "../contracts"
+import { listDiskSessions, toThreadAddressEntries } from "../address-book"
+import { workspaceDirectories, workspaceEntries } from "../addressing"
+import type { ThreadReadInput, ThreadState, ThreadToolResult } from "../contracts"
 import { locateControl } from "../control/locate"
 import { controlIdentity } from "../control/port"
 import { readTranscript, type ThreadTranscriptEntry } from "../reader"
 import { threadLink } from "../thread-link"
-import { addressBook, degradedSummary, failure, resolveEntries, summary, transcriptRole } from "./internals"
+import {
+  addressBook,
+  degradedSummary,
+  failure,
+  listedStates,
+  sendAddressBook,
+  summary,
+  transcriptRole,
+} from "./internals"
 import type { ThreadHostSession, ThreadHostView, ThreadToolSurfaceOptions } from "./ports"
 
 /**
  * `thread_list` over one host view. Default scope is the caller's workspace, the same test
  * thread_send applies before it delivers; the address book itself spans every workspace the host
- * knows. A session whose endpoint stopped answering is still a thread: it is listed from its JSONL
- * as resumable, with the endpoint's failure in error_note, instead of silently vanishing.
+ * knows. A session no engine holds is still a thread, listed `inactive` from its JSONL: one whose
+ * endpoint stopped answering (with the endpoint's failure in error_note), and one whose session file
+ * is in the scanned session directories (the caller's workspace, every workspace with `all_scope`;
+ * the newest `DISK_LIST_MAX_SESSIONS` files, `inactive_truncated` when more were there) after its
+ * engine closed it. `states` filters the rows; the default lists every state but archived.
  */
 export function listThreads(
   options: ThreadToolSurfaceOptions,
   current: ThreadHostView,
   allScope: boolean | undefined,
+  states?: readonly ThreadState[],
 ): ThreadToolResult {
-  const scoped = workspaceEntries(resolveEntries(options, current), options.callerWorkspaceRoot())
+  const root = options.callerWorkspaceRoot()
+  const sessionsDirectory = options.sessionsDirectory?.()
+  const scanned =
+    sessionsDirectory === undefined
+      ? { sessions: [], truncated: false }
+      : listDiskSessions(sessionsDirectory, { all_scope: allScope, workspaceRoots: workspaceDirectories(root) })
+  const book = addressBook(options, current, scanned.sessions)
+  const scoped = workspaceEntries(toThreadAddressEntries(book), root)
   const inScope = (threadId: string) => allScope === true || scoped.some((entry) => entry.thread_id === threadId)
   const visible = current.sessions.filter((session) => inScope(session.durableSessionId ?? session.sessionId))
-  const book = addressBook(options, current)
+  const listed = new Set(visible.map((session) => session.durableSessionId ?? session.sessionId))
   const entryOf = (session: ThreadHostSession) =>
     book.find(
       (entry) =>
         entry.thread_id === (session.durableSessionId ?? session.sessionId) &&
         entry.source_host === (session.socket ?? entry.source_host),
     )
-  const degraded = book.filter(
-    (entry) => entry.error_note !== undefined && entry.status !== "live" && inScope(entry.thread_id),
+  const scannedIds = new Set(scanned.sessions.map((session) => session.durable_id))
+  const inactive = book.filter(
+    (entry) =>
+      entry.status !== "live" &&
+      (entry.error_note !== undefined || scannedIds.has(entry.thread_id)) &&
+      !listed.has(entry.thread_id) &&
+      inScope(entry.thread_id),
   )
   const order = new Map(book.map((entry, index) => [entry.thread_id, index]))
-  const threads = [
-    ...visible.map((session) => summary(session, entryOf(session))),
-    ...degraded.map(degradedSummary),
-  ].sort(
-    (left, right) =>
-      (order.get(left.thread_id) ?? Number.MAX_SAFE_INTEGER) - (order.get(right.thread_id) ?? Number.MAX_SAFE_INTEGER),
-  )
-  return { kind: "ok", threads, scope: allScope === true ? "all" : "workspace" }
+  const shown = listedStates(states)
+  const threads = [...visible.map((session) => summary(session, entryOf(session))), ...inactive.map(degradedSummary)]
+    .filter((thread) => shown.has(thread.state))
+    .sort(
+      (left, right) =>
+        (order.get(left.thread_id) ?? Number.MAX_SAFE_INTEGER) -
+        (order.get(right.thread_id) ?? Number.MAX_SAFE_INTEGER),
+    )
+  return {
+    kind: "ok",
+    threads,
+    scope: allScope === true ? "all" : "workspace",
+    ...(scanned.truncated ? { inactive_truncated: true } : {}),
+  }
 }
 
 /**
@@ -90,9 +121,9 @@ export function liveReadResult(
 }
 
 /**
- * A thread with no live owner is read from its JSONL only when its ENDPOINT is dead: the address
- * book then carries the durable path and the endpoint's failure. Any other non-live thread stays
- * `not_resumable`, as before endpoints were enumerated.
+ * A thread with no live owner is read from its JSONL: one whose endpoint is dead (the address book
+ * carries the durable path and the endpoint's failure) or one an engine closed, whose session file
+ * the address book finds. A thread with no session file stays `not_resumable`.
  */
 function readDegraded(
   options: ThreadToolSurfaceOptions,
@@ -100,8 +131,8 @@ function readDegraded(
   threadId: string,
   value: ThreadReadInput,
 ): ThreadToolResult {
-  const entry = addressBook(options, current).find((candidate) => candidate.thread_id === threadId)
-  if (entry === undefined || entry.error_note === undefined || entry.session_path === null)
+  const entry = sendAddressBook(options, current, threadId, true).find((candidate) => candidate.thread_id === threadId)
+  if (entry === undefined || entry.status === "live" || entry.session_path === null)
     return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live.")
   const durable = readTranscript(
     { kind: "jsonl", path: entry.session_path, live_host_present: false },
@@ -129,6 +160,6 @@ function readDegraded(
     ...(durable.next_cursor === null ? {} : { next_cursor: durable.next_cursor }),
     source: durable.source,
     source_incomplete: durable.source_incomplete,
-    error_note: entry.error_note,
+    ...(entry.error_note === undefined ? {} : { error_note: entry.error_note }),
   }
 }

@@ -1,4 +1,4 @@
-import { readdirSync } from "node:fs"
+import { readdirSync, statSync } from "node:fs"
 import { basename, join, resolve } from "node:path"
 
 import { normalizeThreadName, type ThreadAddressEntry } from "./addressing"
@@ -86,6 +86,8 @@ export type DiskSession = {
   readonly source_host: string | null
   /** Text of the first user message, when the session has one; the title of an unnamed thread. */
   readonly first_user_text?: string
+  /** The session file's archived flag, read like its name (`readSessionFacts`). */
+  readonly archived?: true
 }
 
 /**
@@ -109,10 +111,15 @@ export type AddressEntry = {
   /** The endpoint that serves (or last served) the thread; `null` for a session no endpoint names. */
   readonly endpoint: AddressEndpoint | null
   readonly surface: ThreadSurface | null
-  /** The endpoint's liveness verdict: `true` only while an endpoint that answered lists the session. */
+  /**
+   * The endpoint's liveness verdict: `true` only while an endpoint that answered lists the session. Internal to routing
+   * (the gateway's `liveness`, `omo daemon adopt`); a listed thread reports `state` instead.
+   */
   readonly alive: boolean
   /** What a listing shows: the name, else the first user message's opening, never the durable id. */
   readonly title: string | null
+  /** Only on an entry read from its session file: that file's archived flag. */
+  readonly archived?: true
 }
 
 export type AssembleAddressBookOptions = {
@@ -191,6 +198,7 @@ function fromDisk(session: DiskSession, host: AddressBookHost | undefined, failu
     surface: endpoint === null ? null : deriveSurface(endpoint.kind, undefined, endpoint.socket),
     alive: false,
     title: threadTitle(session.name, session.first_user_text),
+    ...(session.archived === true ? { archived: true as const } : {}),
   }
 }
 
@@ -344,6 +352,7 @@ function diskSessionFromFacts(path: string): DiskSession | null {
     session_path: path,
     source_host: null,
     ...(facts.first_user_text === null ? {} : { first_user_text: facts.first_user_text }),
+    ...(facts.archived === true ? { archived: true as const } : {}),
   }
 }
 
@@ -406,6 +415,62 @@ export function findDiskSessions(
       return session !== null && session.name !== null && normalizeThreadName(session.name) === wanted ? [session] : []
     }),
   )
+}
+
+/** How many session files one `thread_list` reads for its inactive rows: the newest by file time. */
+const DISK_LIST_MAX_SESSIONS = 200
+
+export type ListDiskSessionsOptions = {
+  /** Every workspace's session directories; otherwise only those of `workspaceRoots`. */
+  readonly all_scope?: boolean
+  readonly workspaceRoots?: readonly string[]
+  readonly limit?: number
+}
+
+/**
+ * The session files a listing shows as inactive threads: the session directories of the caller's workspace (every
+ * workspace with `all_scope`), newest file first by modification time, at most `limit` (DISK_LIST_MAX_SESSIONS) of them
+ * read, each through `readSessionFacts` (two bounded windows). `truncated` says more files were there.
+ */
+export function listDiskSessions(
+  sessionsDir: string,
+  opts: ListDiskSessionsOptions = {},
+): { readonly sessions: DiskSession[]; readonly truncated: boolean } {
+  let projectDirs: string[]
+  try {
+    projectDirs = readdirSync(sessionsDir, { withFileTypes: true })
+      .filter((entry) => (entry.isDirectory() || entry.isSymbolicLink()) && /^--.*--$/.test(entry.name))
+      .map((entry) => entry.name)
+  } catch {
+    return { sessions: [], truncated: false }
+  }
+  const prefixes = opts.all_scope === true ? undefined : (opts.workspaceRoots ?? []).map(sessionDirectoryPrefix)
+  const files = projectDirs
+    .filter((dir) => prefixes === undefined || prefixes.some((prefix) => dir.startsWith(prefix)))
+    .flatMap((dir) => {
+      try {
+        return readdirSync(join(sessionsDir, dir))
+          .filter((name) => name.endsWith(".jsonl"))
+          .flatMap((name) => {
+            const path = join(sessionsDir, dir, name)
+            try {
+              const stat = statSync(path)
+              return stat.isFile() ? [{ path, modified: stat.mtimeMs }] : []
+            } catch {
+              return []
+            }
+          })
+      } catch {
+        return []
+      }
+    })
+    .sort((left, right) => right.modified - left.modified || left.path.localeCompare(right.path))
+  const limit = opts.limit ?? DISK_LIST_MAX_SESSIONS
+  const sessions = files.slice(0, limit).flatMap((file) => {
+    const session = readDiskSession(file.path, null)
+    return session === null ? [] : [session]
+  })
+  return { sessions, truncated: files.length > limit }
 }
 
 /**

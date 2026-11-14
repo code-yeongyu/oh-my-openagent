@@ -1,6 +1,7 @@
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import type { ThreadResolveResult } from "../addressing"
 import { relayAddressBook, type RelayAddressBook } from "../remote/address-book"
+import type { RemoteSessionRow } from "../remote/ports"
 import {
   assembleAddressBook,
   findDiskSessions,
@@ -18,7 +19,14 @@ import {
   workspaceEntries,
   type ThreadAddressEntry,
 } from "../addressing"
-import type { ThreadToolName, ThreadToolResult, ThreadTranscriptItem } from "../contracts"
+import {
+  THREAD_STATES,
+  type ThreadModel,
+  type ThreadState,
+  type ThreadToolName,
+  type ThreadToolResult,
+  type ThreadTranscriptItem,
+} from "../contracts"
 import { threadToolFailure, type ThreadErrorCode } from "../errors"
 import { THREAD_TOOL_EXPOSURE, THREAD_TOOL_METADATA } from "../metadata"
 import { readSessionFacts, threadTitle } from "../session-facts"
@@ -52,18 +60,54 @@ export function output(result: ThreadToolResult): ToolOutput {
 
 export type ThreadToolSummary = Omit<
   ThreadHostSession,
-  "name" | "status" | "createdAt" | "updatedAt" | "created_at" | "updated_at"
+  "name" | "status" | "createdAt" | "updatedAt" | "created_at" | "updated_at" | "archived" | "activity" | "model"
 > & {
   readonly thread_id: string
   readonly name: string
+  /** Deprecated beside `state`: `resumable` when no engine holds the thread, else `live`. */
   readonly status: "live" | "resumable"
+  readonly state: ThreadState
+  readonly model?: ThreadModel
   readonly created_at: string
   readonly updated_at: string | null
   readonly endpoint?: AddressEndpoint | null
   readonly surface?: ThreadSurface | null
-  readonly alive?: boolean
   /** `[title](omo-thread://v1/<thread_id>)` (`thread-link.ts`): paste it when telling the user about this thread. */
   readonly link: string
+}
+
+/**
+ * The one state rule (#13403, #13407): the archived flag wins; a thread no engine holds (closed, its endpoint dead or
+ * degraded, known only from disk) is `inactive`; otherwise the engine's activity. A field an older engine does not
+ * report reads as not archived and idle.
+ */
+function threadState(facts: {
+  readonly archived?: unknown
+  readonly held: boolean
+  readonly activity?: unknown
+}): ThreadState {
+  if (facts.archived === true) return "archived"
+  if (!facts.held) return "inactive"
+  return facts.activity === "running" ? "running" : "idle"
+}
+
+/** A reported model, when it is exactly a non-empty provider and id. */
+export function threadModel(value: unknown): { readonly model?: ThreadModel } {
+  if (typeof value !== "object" || value === null) return {}
+  const { provider, id } = value as { readonly provider?: unknown; readonly id?: unknown }
+  return typeof provider === "string" && provider !== "" && typeof id === "string" && id !== ""
+    ? { model: { provider, id } }
+    : {}
+}
+
+/** Another device's listing row: an ended row is inactive, the archived flag wins, else the row's own running or idle. */
+export function rowState(row: RemoteSessionRow): ThreadState {
+  return threadState({ archived: row.archived, held: row.state !== "ended", activity: row.state })
+}
+
+/** The states a `thread_list` returns: the ones asked for, else every state but `archived`. */
+export function listedStates(asked: readonly ThreadState[] | undefined): ReadonlySet<ThreadState> {
+  return new Set(asked ?? THREAD_STATES.filter((state) => state !== "archived"))
 }
 
 export type ThreadToolMetadata = {
@@ -92,17 +136,23 @@ export function summary(session: ThreadHostSession, entry?: AddressEntry): Threa
     updatedAt: _updatedAt,
     created_at: _created,
     updated_at: _updated,
+    archived,
+    activity,
+    model,
     ...rest
   } = session
   const created = entry?.created_at ?? session.created_at ?? session.createdAt ?? new Date().toISOString()
+  const held = session.status !== "closed" && entry?.alive !== false
   return {
     ...rest,
     thread_id: id,
     name: entry?.title ?? threadTitle(session.name, null) ?? "",
-    status: session.status === "closed" ? "resumable" : "live",
+    status: held ? "live" : "resumable",
+    state: threadState({ archived, held, activity }),
+    ...threadModel(model),
     created_at: created,
     updated_at: entry === undefined ? (session.updated_at ?? session.updatedAt ?? created) : entry.updated_at,
-    ...(entry === undefined ? {} : { endpoint: entry.endpoint, surface: entry.surface, alive: entry.alive }),
+    ...(entry === undefined ? {} : { endpoint: entry.endpoint, surface: entry.surface }),
     link: threadLink(id, entry?.title ?? threadTitle(session.name, null)),
   }
 }
@@ -203,11 +253,11 @@ export function degradedSummary(entry: AddressEntry): ThreadToolSummary & { read
     thread_id: entry.thread_id,
     name: entry.title ?? "",
     status: "resumable",
+    state: threadState({ archived: entry.archived, held: false }),
     created_at: entry.created_at,
     updated_at: entry.updated_at,
     endpoint: entry.endpoint,
     surface: entry.surface,
-    alive: entry.alive,
     link: threadLink(entry.thread_id, entry.title),
     ...(entry.error_note === undefined ? {} : { error_note: entry.error_note }),
   }

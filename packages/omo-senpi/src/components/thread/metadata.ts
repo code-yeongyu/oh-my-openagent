@@ -110,6 +110,13 @@ export const THREAD_TOOL_METADATA: readonly ThreadToolEntry[] = [
     exposure: THREAD_TOOL_EXPOSURE,
   },
   {
+    name: "thread_archive",
+    label: "Archive session",
+    description:
+      "Archives or unarchives a session so the session list hides or shows it again, for when the user is finished with a session but wants to keep it",
+    exposure: THREAD_TOOL_EXPOSURE,
+  },
+  {
     name: "thread_bind",
     label: "Bind session to chat thread",
     description:

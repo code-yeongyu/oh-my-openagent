@@ -54,10 +54,11 @@ export type LocalApiClient = {
     filter?: SessionFilter,
     onRevision?: (revision: ListingRevision) => void,
     /**
-     * `rows: 2` asks for each row's kind and parent link (#316), `rows: 3` for those and its durable_id (#12996); a
+     * `rows: 2` asks for each row's kind and parent link (#316), `rows: 3` for those and its durable_id (#12996),
+     * `rows: 4` for those and its model and archived flag (omo-relay-spec#295); a
      * service before either answers invalid_request.
      */
-    rows?: 2 | 3,
+    rows?: 2 | 3 | 4,
   ) => Promise<ListingResult>
   readonly read: (attach: string, options?: ReadOptions) => Promise<ReadPage>
   readonly oversizedLines: () => number

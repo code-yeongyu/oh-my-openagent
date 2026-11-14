@@ -181,6 +181,8 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         path: row.path,
         state: row.state,
         updated_ms: row.updated_ms,
+        ...(row.model === undefined ? {} : { model: { provider: row.model.provider, id: row.model.id } }),
+        ...(row.archived === true ? { archived: true as const } : {}),
       })),
       incomplete: listed.incomplete,
     }

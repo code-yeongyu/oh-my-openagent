@@ -128,9 +128,9 @@ export type SessionsList = {
   readonly filter?: SessionFilter
   /**
    * 2: this query's rows may carry `kind`, `parent` and `parent_listed` (#316); 3: those and `durable_id` (#12996);
-   * absent, they never do.
+   * 4: those and `model` and `archived` (omo-relay-spec#295); absent, they never do.
    */
-  readonly rows?: 2 | 3
+  readonly rows?: 2 | 3 | 4
 }
 export type SessionAttach = {
   readonly id: string

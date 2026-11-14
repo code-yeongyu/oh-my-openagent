@@ -7,7 +7,7 @@ import type { GatewayEndpointRef, ReleaseSessionRequest } from "./gateway/adapte
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import type { RemoteThreadSurface } from "./remote/ports"
 import { createThreadSdk, type ThreadSdk } from "./sdk"
-import { createRemoteThreadFixture } from "./thread-remote-fixture"
+import { B_ROW, createRemoteThreadFixture } from "./thread-remote-fixture"
 import type { ThreadHost, ThreadHostSession } from "./tools"
 import type { ThreadHostViewRequest } from "./tools/ports"
 import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
@@ -234,6 +234,15 @@ describe("thread SDK: read reaches the account like the agent tools (#12833)", (
     expect(listed.kind === "ok" && "threads" in listed && listed.threads.find((t) => t.device === "b")).toMatchObject({
       thread_id: "dur-on-b",
     })
+  })
+
+  test("#given an archived thread on b #when omo thread list runs with and without a state filter #then the default hides it and state archived lists only it", async () => {
+    const account = remoteFixture.account({ rows: [{ ...B_ROW, archived: true }] })
+    const { sdk } = fixture({ remote: account.remote })
+    const ids = (result: Awaited<ReturnType<ThreadSdk["list"]>>) =>
+      result.kind === "ok" && "threads" in result ? result.threads.map((thread) => thread.thread_id) : []
+    expect(ids(await sdk.list({}))).toEqual(["dur-host", "dur-tui"])
+    expect(ids(await sdk.list({ state: ["archived"] }))).toEqual(["dur-on-b"])
   })
 
   test("#given aliases held by a thread here and by one on b #when omo thread read names each alias #then the first reads this device's transcript and the second b's", async () => {

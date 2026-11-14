@@ -3,7 +3,7 @@ import { userInfo } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 
-import { integerOption, parseArgs, THREAD_EXIT } from "./thread-args.js"
+import { integerOption, parseArgs, stateOption, THREAD_EXIT, THREAD_STATES } from "./thread-args.js"
 import { humanLines } from "./thread-output.js"
 
 export { THREAD_EXIT } from "./thread-args.js"
@@ -18,7 +18,7 @@ export { THREAD_EXIT } from "./thread-args.js"
 const USAGE = [
   "usage: omo thread <list|send|read|bind|unbind|rebind|bindings|report|answer|outbox|ack> [options] [--json]",
   "",
-  "  list      [--all-scope]",
+  "  list      [--all-scope] [--state running|idle|inactive|archived[,...]]  (repeatable; default: all but archived)",
   "  send      <target> <text> [--mode auto|steer|follow_up] [--expected-turn <n>] [--idempotency-key <k>]",
   "  send      --binding <id> [<target>] <text> [--idempotency-key <event-id>] [--mode auto|follow_up]",
   "            [--author-id <platform-user-id> --author-name <display> [--author-user-id <id>]]",
@@ -43,7 +43,16 @@ const COMMON = ["--json", "--all-scope"]
 const AUTHOR_FLAGS = ["--author-id", "--author-name", "--author-user-id"]
 
 const COMMANDS = {
-  list: { values: [], booleans: [], arity: [0, 0], call: (sdk, _p, _o, scope) => sdk.list(scope) },
+  list: {
+    values: ["--state"],
+    repeatable: ["--state"],
+    booleans: [],
+    arity: [0, 0],
+    call: (sdk, _p, o, scope) => {
+      const state = stateOption(o)
+      return sdk.list(state === undefined ? scope : { ...scope, state })
+    },
+  },
   send: {
     values: ["--mode", "--expected-turn", "--binding", "--idempotency-key", ...AUTHOR_FLAGS],
     booleans: [],
@@ -267,6 +276,8 @@ function validate(name, parsed) {
     if (author !== undefined) return author
   }
   if (name === "ack" && !/^\d+$/.test(parsed.positionals[1])) return "<cursor> must be a non-negative integer"
+  const unknownState = (stateOption(parsed.options) ?? []).find((state) => !THREAD_STATES.includes(state))
+  if (unknownState !== undefined) return `--state must be one of ${THREAD_STATES.join(", ")}, got '${unknownState}'`
   return undefined
 }
 
@@ -416,7 +427,11 @@ export async function runThreadCommand(args, options) {
     return THREAD_EXIT.unsupported
   }
   const command = COMMANDS[name]
-  const parsed = parseArgs(args.slice(1), { booleans: [...COMMON, ...command.booleans], values: command.values })
+  const parsed = parseArgs(args.slice(1), {
+    booleans: [...COMMON, ...command.booleans],
+    values: command.values,
+    repeatable: command.repeatable ?? [],
+  })
   const problem = parsed.error ?? validate(name, parsed)
   if (problem !== undefined) {
     refuse(

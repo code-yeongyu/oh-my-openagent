@@ -19,11 +19,13 @@ afterEach(async () => {
 
 const DURABLE_ID = "01a1c608-a959-7764-a0db-94773c516e26"
 
-function worldKnowing(rowsNewest: 1 | 2 | 3): World {
+const MODEL = { provider: "anthropic", id: "claude-opus-5-5" }
+
+function worldKnowing(rowsNewest: 1 | 2 | 3 | 4): World {
   const world = defaultWorld()
   const base = world.listing.revisions[1]?.rows[0]
   if (base === undefined) throw new Error("the default world lists no row")
-  const row: ListingRow = { ...base, kind: "interactive", durable_id: DURABLE_ID }
+  const row: ListingRow = { ...base, kind: "interactive", durable_id: DURABLE_ID, model: MODEL, archived: true }
   return { ...world, listing: { revisions: [{ rows: [row], incomplete: [] }], devices: {}, rowsNewest } }
 }
 
@@ -41,11 +43,20 @@ async function serviceFor(world: World): Promise<{ owner: FakeOwner; service: De
 const listCalls = (owner: FakeOwner): number => owner.state.log.filter((type) => type === "sessions.list").length
 
 describe("DeviceService.sessions asks the newest listing row version (#13045, part of #12996)", () => {
-  test("#given a service that serves rows 3 #when sessions lists #then each row carries its durable_id", async () => {
+  test("#given a service that serves rows 4 #when sessions lists #then each row carries its durable_id, model and archived flag, asked once", async () => {
+    const { owner, service } = await serviceFor(worldKnowing(4))
+    const [row] = (await service.sessions()).rows
+    expect(row).toMatchObject({ durable_id: DURABLE_ID, kind: "interactive", model: MODEL, archived: true })
+    expect(listCalls(owner)).toBe(1)
+  })
+
+  test("#given a service that serves rows 3 #when sessions lists #then each row carries its durable_id and neither model nor archived", async () => {
     const { service } = await serviceFor(worldKnowing(3))
     const [row] = (await service.sessions()).rows
     expect(row?.durable_id).toBe(DURABLE_ID)
     expect(row?.kind).toBe("interactive")
+    expect(row).not.toHaveProperty("model")
+    expect(row).not.toHaveProperty("archived")
   })
 
   test("#given a service that predates rows 3 #when sessions lists #then it steps down to rows 2 and keeps listing", async () => {
@@ -60,8 +71,8 @@ describe("DeviceService.sessions asks the newest listing row version (#13045, pa
     const [row] = (await service.sessions()).rows
     expect(row?.kind).toBeUndefined()
     expect(row?.durable_id).toBeUndefined()
-    expect(listCalls(owner)).toBe(3)
-    await service.sessions()
     expect(listCalls(owner)).toBe(4)
+    await service.sessions()
+    expect(listCalls(owner)).toBe(5)
   })
 })

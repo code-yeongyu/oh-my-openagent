@@ -132,6 +132,29 @@ describe("device-service adapter of the thread tools' account surface", () => {
     })
   })
 
+  test("#given rows 4 listing rows #when the account is listed #then each row's model and archived flag reach the port, and a row without them carries neither", async () => {
+    const base = fakeService([], [])
+    const row = { device: "b", title: "t", project: "/p", path: "/p/s.jsonl", state: "idle", updated_ms: 2 }
+    const port = createDeviceServiceSessions({
+      version: "0.0.0-test",
+      connect: async () =>
+        ({
+          ...base,
+          sessions: async () => ({
+            rows: [
+              { ...row, session_id: "s1", source: "live", as_of: 2, model: { provider: "p", id: "m" }, archived: true },
+              { ...row, session_id: "s2", source: "live", as_of: 2 },
+            ],
+            incomplete: [],
+          }),
+        }) as unknown as DeviceService,
+    })
+    expect(await port.sessions()).toEqual([
+      { ...row, session_id: "s1", model: { provider: "p", id: "m" }, archived: true },
+      { ...row, session_id: "s2" },
+    ])
+  })
+
   test("#given b's engine endpoint #when create/open/fork send a session-less record to b #then it goes through the device service's endpoint command and its outcome maps to the port", async () => {
     const sent: unknown[] = []
     const answers: Array<() => Promise<CommandResult>> = [

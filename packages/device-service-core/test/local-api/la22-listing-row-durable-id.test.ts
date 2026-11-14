@@ -20,16 +20,30 @@ const rowsEvent = (rows: readonly unknown[]) => ({
 })
 
 describe("LA22 listing rows carry an optional durable_id (#12996), asked for with rows: 3", () => {
-  test("sessions.list accepts rows 2 and 3 and refuses any other rows version", () => {
-    for (const rows of [2, 3])
+  test("sessions.list accepts rows 2, 3 and 4 and refuses any other rows version", () => {
+    for (const rows of [2, 3, 4])
       expect(validateRequest({ id: "1", type: "sessions.list", rows })).toMatchObject({
         ok: true,
         request: { rows },
       })
-    for (const rows of [1, 4, "3"])
+    for (const rows of [1, 5, "3"])
       expect(validateRequest({ id: "1", type: "sessions.list", rows }), String(rows)).toMatchObject({
         ok: false,
       })
+  })
+
+  test("a rows 4 row with model and archived validates and survives a serialize round trip; a bad model or archived false is refused", () => {
+    const event = rowsEvent([
+      { ...withDurable, model: { provider: "anthropic", id: "claude-opus-5-5" }, archived: true },
+    ])
+    expect<unknown>(validateEvent(JSON.parse(JSON.stringify(event)))).toEqual(event)
+    for (const bad of [
+      { model: { provider: "", id: "m" } },
+      { model: { provider: "p", id: "m".repeat(129) } },
+      { model: { provider: "p", id: "m", extra: 1 } },
+      { archived: false },
+    ])
+      expect(() => validateEvent(rowsEvent([{ ...base, ...bad }])), JSON.stringify(bad)).toThrow()
   })
 
   test("a row with durable_id validates and survives a serialize round trip", () => {
