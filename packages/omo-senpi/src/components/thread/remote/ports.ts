@@ -16,6 +16,11 @@ export type RemoteSessionRow = {
   readonly model?: { readonly provider: string; readonly id: string }
   /** Rows 4: the engine archived the session; absent means not archived. */
   readonly archived?: true
+  /**
+   * Set when the row comes from the device's cached listing (it did not answer this round): when that listing was
+   * taken (epoch ms). A cached row is the device's last word, so it never reads as running now.
+   */
+  readonly cached_as_of?: number
 }
 
 export type RemoteDevice = {

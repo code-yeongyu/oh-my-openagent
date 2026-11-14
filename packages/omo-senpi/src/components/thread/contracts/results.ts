@@ -54,6 +54,11 @@ export type ThreadSummary = ThreadIdentity & {
   readonly state: ThreadState
   /** The thread's current model; absent when its engine does not report one (an older engine, an inactive thread). */
   readonly model?: ThreadModel
+  /**
+   * Set when the row comes from another device's cached listing (it did not answer this round): when that listing was
+   * taken. Such a row is the device's last word, so its state is never `running`.
+   */
+  readonly as_of?: string
 }
 
 /**

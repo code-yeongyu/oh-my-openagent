@@ -233,6 +233,21 @@ describe("thread state on another device's rows", () => {
     ).toEqual(["r-ended", "r-running"])
   })
 
+  test("#given an offline device's cached rows (measured: 7 of an offline device's 90 rows read running) #when listed #then none reads running, each carries as_of, and archived still wins", async () => {
+    const asOf = Date.UTC(2026, 10, 14, 9, 0, 0)
+    const cached = REMOTE_ROWS.map((row) => ({ ...row, cached_as_of: asOf }))
+    const { remote } = remoteFixture.account({ rows: cached })
+    const { run } = remoteFixture.surface(remote, { sessions: [] })
+    const result = await run("thread_list", { state: ["running", "idle", "inactive", "archived"] })
+    expect(table(result)).toMatchObject({
+      "r-running": { state: "idle" },
+      "r-idle": { state: "idle" },
+      "r-ended": { state: "inactive" },
+      "r-archived": { state: "archived" },
+    })
+    for (const row of rows(result)) expect(row).toMatchObject({ as_of: new Date(asOf).toISOString() })
+  })
+
   test("#given a state that is not one of the four #when listed #then invalid_arguments", async () => {
     const { remote } = remoteFixture.account({ rows: REMOTE_ROWS })
     const { run } = remoteFixture.surface(remote, { sessions: [] })

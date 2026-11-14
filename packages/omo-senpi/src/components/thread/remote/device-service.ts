@@ -183,6 +183,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         updated_ms: row.updated_ms,
         ...(row.model === undefined ? {} : { model: { provider: row.model.provider, id: row.model.id } }),
         ...(row.archived === true ? { archived: true as const } : {}),
+        ...(row.source === "cache" ? { cached_as_of: row.as_of } : {}),
       })),
       incomplete: listed.incomplete,
     }

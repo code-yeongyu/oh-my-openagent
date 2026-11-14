@@ -31,6 +31,7 @@ export function listedThread(row: RemoteSessionRow): HostedThread {
     created_at: seen,
     updated_at: seen,
     device: row.device,
+    ...(row.cached_as_of === undefined ? {} : { as_of: new Date(row.cached_as_of).toISOString() }),
     link: threadLink(rowThreadId(row), row.title),
   }
 }

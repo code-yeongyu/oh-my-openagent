@@ -102,7 +102,9 @@ export function threadModel(value: unknown): { readonly model?: ThreadModel } {
 
 /** Another device's listing row: an ended row is inactive, the archived flag wins, else the row's own running or idle. */
 export function rowState(row: RemoteSessionRow): ThreadState {
-  return threadState({ archived: row.archived, held: row.state !== "ended", activity: row.state })
+  // A row from a device's cached listing (the device did not answer) is its last word: never running now.
+  const activity = row.cached_as_of === undefined ? row.state : "idle"
+  return threadState({ archived: row.archived, held: row.state !== "ended", activity })
 }
 
 /** The states a `thread_list` returns: the ones asked for, else every state but `archived`. */
