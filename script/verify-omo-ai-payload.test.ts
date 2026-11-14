@@ -478,7 +478,9 @@ describe("omo-ai payload verifier", () => {
       expect(errorLines(run.output)).toHaveLength(1)
     })
 
-    test.each(["", ".*"])(
+    // ".", "[^]" and "packages/" cannot match "" yet match every packed path; "^packages/omo-native/" matches every path
+    // under a shipped root.
+    test.each(["", ".*", ".", "[^]", "packages/", "^packages/omo-native/"])(
       "#when a generated entry's source %p matches every path #then one line names the helper and that label",
       (source) => {
         const helperOutput = JSON.stringify({
@@ -503,6 +505,28 @@ describe("omo-ai payload verifier", () => {
       expect(run.output).toContain("first stderr line")
       expect(run.output).not.toContain("    at ")
       expect(errorLines(run.output)).toHaveLength(1)
+    })
+  })
+
+  describe("#given a generated output the payload lacks, whose source still matches other packed paths", () => {
+    test("#when --release runs #then it fails naming that output", () => {
+      const helperOutput = JSON.stringify({
+        pluginOutputs: ["extensions/omo.js"],
+        generated: [
+          { label: "packages/omo-native/bin/lib/never-built.generated.js", source: "^packages\\/omo-native\\/bin\\/" },
+        ],
+      })
+      const run = runVerifierOnPayload(
+        [...PACKED_ARTIFACTS, ...skillPaths(PACKED_SKILL_COUNT), KEYCHAIN_HELPER],
+        {},
+        {
+          args: ["--release"],
+          modes: { [KEYCHAIN_HELPER]: 0o755 },
+          requirementsHelper: `console.log(${JSON.stringify(helperOutput)})\n`,
+        },
+      )
+      expect(run.output).toContain("missing artifact: bin/lib/never-built.generated.js")
+      expect(run.exitCode).toBe(1)
     })
   })
 
