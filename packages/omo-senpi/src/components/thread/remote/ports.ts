@@ -174,6 +174,15 @@ export type RemoteThreadSurface = {
 export const rowThreadId = (row: RemoteSessionRow): string => row.durable_id ?? ""
 
 /**
+ * The one rule for a probe-built `ended` row (#13238 review): a probe may build one only while this device's service
+ * can carry the wake, since an ended row goes down the wake path; with the wake off it would go down the live path and
+ * attach to a key no engine runs. Every probe site (holderTarget, replyOnDevice, lookupAcross) asks this first.
+ */
+export async function probeMayBuildEndedRow(sessions: Pick<RemoteSessionsPort, "canWake">): Promise<boolean> {
+  return (await sessions.canWake?.().catch(() => false)) === true
+}
+
+/**
  * A session a device holds on disk but no engine runs (omo#13037 A4.2): built from that device's own probe answer, its
  * stable key and the durable id. It carries no name and no folder, and its state `ended` sends a delivery down the wake path.
  */

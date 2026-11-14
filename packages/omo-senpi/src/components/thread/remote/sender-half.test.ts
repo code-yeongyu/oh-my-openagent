@@ -214,6 +214,33 @@ describe("#13037 the sender half reaches a session on another device that is not
     })
   })
 
+  // #13238 review: one rule for every probe that may build an `ended` row - only while this device's service can carry
+  // the wake. With the single probe on and the wake off, a probe-built row would go down the live path instead.
+  describe("lookup on with wake off: no probe builds an ended row", () => {
+    test("#given a reply to a sender on b that b no longer lists #when the run replies by id #then it is not_found naming b, with no probe and nothing sent", async () => {
+      const a = account({ rows: [B_ROW], ended: { b: { [GONE]: "rk-gone" } }, noWake: true })
+      const { run } = fixture.surface(a.remote, {
+        callerReplyTargets: () => [GONE],
+        callerReplySenders: () => [{ session_id: GONE, device: "b" }],
+      })
+      expect(await run("thread_send", { thread: GONE, message: "reply" })).toMatchObject({
+        kind: "error",
+        error: { code: "not_found", details: { device: "b" } },
+      })
+      expect({ lookups: a.lookups, sent: a.sent }).toEqual({ lookups: [], sent: [] })
+    })
+
+    test("#given a session id no listing holds and c holds it ended #when it is sent to #then the answer is today's not_found, with no probe and nothing sent", async () => {
+      const a = account({ rows: [B_ROW, C_ROW], ended: { c: { [GONE]: "rk-c-gone" } }, noWake: true })
+      const { run } = fixture.surface(a.remote)
+      expect(await run("thread_send", { thread: GONE, message: "hi" })).toMatchObject({
+        kind: "error",
+        error: { code: "not_found" },
+      })
+      expect({ lookups: a.lookups, sent: a.sent }).toEqual({ lookups: [], sent: [] })
+    })
+  })
+
   describe("5.4 the relay transport for an ended row", () => {
     const endedOnC = (extra: Parameters<Fixture["account"]>[0] = {}) =>
       account({ rows: [B_ROW, C_ROW], ended: { c: { [GONE]: "rk-c-gone" } }, ...extra })
