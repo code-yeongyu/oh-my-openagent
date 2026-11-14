@@ -1976,6 +1976,8 @@ name = "omo-computer-backend-fake"
 version = "0.0.0"
 dependencies = [
  "omo-computer-core",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -2033,7 +2035,10 @@ dependencies = [
  "omo-computer-backend-wayland",
  "omo-computer-backend-win32",
  "omo-computer-backend-x11",
+ "omo-computer-core",
  "omo-computer-session",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -2050,6 +2055,8 @@ dependencies = [
  "omo-computer-backend-fake",
  "omo-computer-core",
  "omo-computer-safety",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -42,6 +42,8 @@
         "script/qa/computer/conformance/run.ts",
         "script/qa/computer/pool/windows-full.ts",
         "script/qa/computer/pool/xorg-uinput-probe.ts",
+        // run by path as the computer-use v3 corpus replay driver
+        "script/qa/computer/replay.ts",
         // run by path as the live GNOME Wayland window-input QA (docs/guide/computer-use.md)
         "script/qa/desktop/gnome.ts",
         "script/qa/desktop/hyprland.ts",
