@@ -687,15 +687,29 @@ describe("thread session controls", () => {
     expect(f.prompt).not.toHaveBeenCalled()
   })
 
-  test("thread_list returns host failures as data rather than rejecting", async () => {
+  test("thread_list returns host failures as data, flagged isError so the caller's tool result reads as failed", async () => {
     const f = fixture()
+    const list = (callId: string) => {
+      const [tool] = createThreadTools({
+        ...f,
+        callerSessionId: () => "unknown-caller",
+        callerWorkspaceRoot: () => process.cwd(),
+      }).filter((candidate) => candidate.name === "thread_list")
+      if (tool === undefined) throw new Error("thread_list must be registered")
+      return tool.execute(callId, {}, undefined, undefined, undefined as never)
+    }
+    const ok = await list("call-ok")
+    expect(ok.details.result).toMatchObject({ kind: "ok" })
+    expect(ok.isError).toBeUndefined()
     f.host = {
       ...f.host,
       listSessions: async () => {
         throw new Error("host_unavailable:/missing.sock")
       },
     }
-    expect(await runner(f)("thread_list", {})).toMatchObject({ kind: "error", error: { code: "host_unavailable" } })
+    const failed = await list("call-failed")
+    expect(failed.details.result).toMatchObject({ kind: "error", error: { code: "host_unavailable" } })
+    expect(failed.isError).toBe(true)
   })
 })
 
