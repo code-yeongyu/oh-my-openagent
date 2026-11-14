@@ -103,28 +103,33 @@ describe("compiled omo __kill-guard dispatch", () => {
     expect(listTree(home)).toEqual(before)
   }, 120_000)
 
-  test("#given a TERM aimed at the agent itself (rule R2 PROTECTED_TARGET) #when the compiled binary judges it #then it refuses with exit 126", async () => {
-    // given: a live process stands in for the agent
-    const agent = Bun.spawn(["sleep", "120"], { stdout: "ignore", stderr: "ignore" })
-    const home = freshHome("home-refuse")
-    try {
-      // when
-      const result = await run(
-        ["__kill-guard", "check", "--vantage", String(process.pid), "--", "kill", "-TERM", String(agent.pid)],
-        home,
-        { SENPI_KILL_GUARD_AGENT_PID: String(agent.pid) },
-      )
+  // The refuse case runs on Linux and macOS.
+  test.skipIf(process.platform === "win32")(
+    "#given a TERM aimed at the agent itself (rule R2 PROTECTED_TARGET) #when the compiled binary judges it #then it refuses with exit 126",
+    async () => {
+      // given: a live process stands in for the agent
+      const agent = Bun.spawn(["sleep", "120"], { stdout: "ignore", stderr: "ignore" })
+      const home = freshHome("home-refuse")
+      try {
+        // when
+        const result = await run(
+          ["__kill-guard", "check", "--vantage", String(process.pid), "--", "kill", "-TERM", String(agent.pid)],
+          home,
+          { SENPI_KILL_GUARD_AGENT_PID: String(agent.pid) },
+        )
 
-      // then
-      expect(result.output).not.toContain("Unknown option")
-      expect(result.stderr).toContain("refused (R2 PROTECTED_TARGET)")
-      expect(result.code).toBe(126)
-      expect(agent.killed).toBe(false)
-    } finally {
-      agent.kill()
-      await agent.exited
-    }
-  }, 120_000)
+        // then
+        expect(result.output).not.toContain("Unknown option")
+        expect(result.stderr).toContain("refused (R2 PROTECTED_TARGET)")
+        expect(result.code).toBe(126)
+        expect(agent.killed).toBe(false)
+      } finally {
+        agent.kill()
+        await agent.exited
+      }
+    },
+    120_000,
+  )
 
   test("#given the same binary #when it is asked for --version #then the normal boot still answers with the embedded version", async () => {
     // given
