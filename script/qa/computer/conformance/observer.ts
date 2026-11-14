@@ -1,0 +1,56 @@
+import { existsSync } from "node:fs"
+import { resolve } from "node:path"
+
+import { type Check, repoPath } from "./preflight.ts"
+import type { OsName } from "./vocabulary.ts"
+
+export type ObserverStatus = { readonly kind: "records" } | { readonly kind: "unavailable"; readonly reason: string }
+
+type RecordsOn = (os: OsName) => boolean
+
+const REPO = resolve(import.meta.dir, "../../../..")
+
+function recordsOnOf(loaded: unknown): RecordsOn | undefined {
+  if (typeof loaded !== "object" || loaded === null || !("recordsOn" in loaded)) return undefined
+  const recordsOn = loaded.recordsOn
+  if (typeof recordsOn !== "function") return undefined
+  return (os) => recordsOn(os) === true
+}
+
+/**
+ * A missing sentinel module, one that cannot be loaded, or one that cannot say which OSes it records (no recordsOn, or
+ * a recordsOn that throws) is an environment fault. A sentinel
+ * that exists but records no signal on this OS lets the run go on: its cells read every signal as not_observed.
+ */
+export async function observerCheck(sentinel: string, os: OsName): Promise<{ check: Check; status: ObserverStatus }> {
+  if (!existsSync(sentinel)) {
+    const detail = `${repoPath(REPO, sentinel)} (row 3) is not on this checkout`
+    return { check: { name: "desktop-observer", ok: false, detail }, status: { kind: "unavailable", reason: detail } }
+  }
+  const shown = repoPath(REPO, sentinel)
+  let loaded: unknown
+  try {
+    loaded = await import(sentinel)
+  } catch (error) {
+    const detail = `${shown} could not be loaded: ${error instanceof Error ? error.message : String(error)}`
+    return { check: { name: "desktop-observer", ok: false, detail }, status: { kind: "unavailable", reason: detail } }
+  }
+  const recordsOn = recordsOnOf(loaded)
+  if (recordsOn === undefined) {
+    const detail = `${shown} does not export recordsOn(os)`
+    return { check: { name: "desktop-observer", ok: false, detail }, status: { kind: "unavailable", reason: detail } }
+  }
+  let records: boolean
+  try {
+    records = recordsOn(os)
+  } catch (error) {
+    const detail = `${shown} recordsOn(${os}) threw: ${error instanceof Error ? error.message : String(error)}`
+    return { check: { name: "desktop-observer", ok: false, detail }, status: { kind: "unavailable", reason: detail } }
+  }
+  if (records) return { check: { name: "desktop-observer", ok: true, detail: shown }, status: { kind: "records" } }
+  const reason = `no ${os} recorder in the sentinel yet`
+  return {
+    check: { name: "desktop-observer", ok: true, detail: `unavailable: ${reason}` },
+    status: { kind: "unavailable", reason },
+  }
+}

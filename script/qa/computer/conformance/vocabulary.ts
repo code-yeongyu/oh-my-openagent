@@ -86,7 +86,7 @@ export interface Cell {
 }
 
 const signalSummary = z.object({
-  signal: z.enum(["none", "happened"]),
+  signal: z.enum(["none", "happened", "not_observed"]),
   firstAt: z.number().nullable(),
   count: z.number().int().nonnegative(),
 })
@@ -104,6 +104,8 @@ const cellResultSchema = z.object({
   observed,
   oracle: z.object({ observed: z.unknown() }),
   durationMs: z.number().nonnegative(),
+  /** Why no observer read this cell's signals (they read `not_observed`), e.g. no recorder for this OS yet. */
+  observerUnavailable: z.string().optional(),
   journal: z.object({
     key_focus: signalSummary,
     window_raised: signalSummary,
