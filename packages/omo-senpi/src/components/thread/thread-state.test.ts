@@ -162,7 +162,7 @@ describe("thread state on this device's rows", () => {
     expect(archived.sort()).toEqual(["d-archived", "l-archived"])
   })
 
-  test("#given live and degraded rows #when listed #then no row carries alive or the engine's raw activity/archived fields", () => {
+  test("#given live and degraded rows #when listed #then no row carries alive or the raw archived field, and only a held thread carries activity", () => {
     const directory = scratch()
     const result = listThreads(surfaceOptions(directory), localView(directory), true, [
       "running",
@@ -172,9 +172,53 @@ describe("thread state on this device's rows", () => {
     ])
     for (const row of rows(result)) {
       expect(row).not.toHaveProperty("alive")
-      expect(row).not.toHaveProperty("activity")
       expect(row).not.toHaveProperty("archived")
+      if (row.state === "inactive" || row.state === "archived") expect(row).not.toHaveProperty("activity")
     }
+  })
+
+  test("#given an engine reporting senpi#6688's activity detail #when listed #then each held row carries it, state folds it, and error_code rides only with errored", () => {
+    const cases = [
+      { id: "a-running", activity: "running", turn_id: "4", state: "running" },
+      { id: "a-queued", activity: "queued", turn_id: "5", state: "running" },
+      { id: "a-approval", activity: "awaiting_approval", turn_id: "6", state: "running" },
+      { id: "a-errored", activity: "errored", error_code: "rate_limit", turn_id: "7", state: "idle" },
+      { id: "a-idle", activity: "idle", error_code: "ignored", state: "idle" },
+    ] as const
+    const expected: Record<string, unknown> = {}
+    const sessions = cases.map((entry) => {
+      expected[entry.id] = {
+        state: entry.state,
+        activity: entry.activity,
+        ...(entry.activity === "errored" ? { error_code: "rate_limit" } : {}),
+        ...("turn_id" in entry ? { turn_id: entry.turn_id } : {}),
+      }
+      return {
+        sessionId: entry.id,
+        durableSessionId: entry.id,
+        name: entry.id,
+        status: "open" as const,
+        activity: entry.activity,
+        ...("error_code" in entry ? { error_code: entry.error_code } : {}),
+        ...("turn_id" in entry ? { turn_id: entry.turn_id } : {}),
+      }
+    })
+    const directory = scratch()
+    const result = listThreads(surfaceOptions(directory), { sessions, hosts: [], disk: [] } as never, true, [
+      "running",
+      "idle",
+    ])
+    const seen: Record<string, unknown> = {}
+    for (const row of rows(result)) {
+      const detail = row as { state: string; activity?: string; error_code?: string; turn_id?: string }
+      seen[row.thread_id] = {
+        state: detail.state,
+        activity: detail.activity,
+        ...(detail.error_code === undefined ? {} : { error_code: detail.error_code }),
+        ...(detail.turn_id === undefined ? {} : { turn_id: detail.turn_id }),
+      }
+    }
+    expect(seen).toEqual(expected)
   })
 })
 

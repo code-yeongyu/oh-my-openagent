@@ -2,6 +2,7 @@ import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import type { ThreadResolveResult } from "../addressing"
 import { relayAddressBook, type RelayAddressBook } from "../remote/address-book"
 import type { RemoteSessionRow } from "../remote/ports"
+import type { ThreadActivity } from "../contracts/results"
 import {
   assembleAddressBook,
   findDiskSessions,
@@ -88,7 +89,27 @@ function threadState(facts: {
 }): ThreadState {
   if (facts.archived === true) return "archived"
   if (!facts.held) return "inactive"
-  return facts.activity === "running" ? "running" : "idle"
+  // A queued or approval-waiting thread is mid-turn: running. A failed turn has ended: idle (its detail says errored).
+  return facts.activity === "running" || facts.activity === "queued" || facts.activity === "awaiting_approval"
+    ? "running"
+    : "idle"
+}
+
+const ACTIVITIES: ReadonlySet<unknown> = new Set(["idle", "running", "awaiting_approval", "queued", "errored"])
+
+/** A held thread's activity detail as its engine reports it; nothing for an older engine or a thread no engine holds. */
+function activityDetail(
+  held: boolean,
+  activity: unknown,
+  errorCode: unknown,
+  turnId: unknown,
+): { readonly activity?: ThreadActivity; readonly error_code?: string; readonly turn_id?: string } {
+  if (!held || !ACTIVITIES.has(activity)) return {}
+  return {
+    activity: activity as ThreadActivity,
+    ...(activity === "errored" && typeof errorCode === "string" && errorCode !== "" ? { error_code: errorCode } : {}),
+    ...(typeof turnId === "string" && turnId !== "" ? { turn_id: turnId } : {}),
+  }
 }
 
 /** A reported model, when it is exactly a non-empty provider and id. */
@@ -140,6 +161,8 @@ export function summary(session: ThreadHostSession, entry?: AddressEntry): Threa
     updated_at: _updated,
     archived,
     activity,
+    error_code,
+    turn_id,
     model,
     ...rest
   } = session
@@ -152,6 +175,7 @@ export function summary(session: ThreadHostSession, entry?: AddressEntry): Threa
     status: held ? "live" : "resumable",
     state: threadState({ archived, held, activity }),
     ...threadModel(model),
+    ...activityDetail(held && archived !== true, activity, error_code, turn_id),
     created_at: created,
     updated_at: entry === undefined ? (session.updated_at ?? session.updatedAt ?? created) : entry.updated_at,
     ...(entry === undefined ? {} : { endpoint: entry.endpoint, surface: entry.surface }),

@@ -1,4 +1,5 @@
 import type { AddressBookHost, DiskSession } from "../address-book"
+import type { ThreadActivity } from "../contracts/results"
 import type { ThreadControl } from "../endpoint-controls"
 import type { EndpointKind } from "../endpoint-registry"
 import type {
@@ -23,8 +24,16 @@ export type ThreadHostSession = {
   readonly kind?: string
   /** The session file's archived flag; an engine from before `set_session_archived` lists none (not archived). */
   readonly archived?: boolean
-  /** `running` while a turn is in flight; an older engine lists none (idle). */
-  readonly activity?: "running" | "idle"
+  /**
+   * What the session is doing (senpi#6688): `running` while a turn is in flight, `queued` with steering or follow-up
+   * waiting, `awaiting_approval` on a pending question, `errored` after a turn failed. An older engine lists only
+   * `running` | `idle`, or none (idle).
+   */
+  readonly activity?: ThreadActivity
+  /** With `errored`: the failed turn's category (`auth`, `rate_limit`, `quota`, `network`, ...). */
+  readonly error_code?: string
+  /** The current or most recent turn's id, as the prompt response names it. */
+  readonly turn_id?: string
   /** The session's current model; absent while unknown or on an older engine. */
   readonly model?: { readonly provider: string; readonly id: string }
   readonly createdAt?: string
