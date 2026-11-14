@@ -87,7 +87,8 @@ impl Session {
                 // A closed window cannot be read, so a gone wait names the windows it tracks
                 // up front: the target, or the windows the title and app pick (one listing).
                 let only = (state == WindowState::Gone)
-                    .then(|| self.tracked_windows(&target, title.as_deref(), app.as_deref()));
+                    .then(|| self.tracked_windows(&target, title.as_deref(), app.as_deref()))
+                    .transpose()?;
                 self.wait_event_match(
                     &EventMatch::Window { state, title, app },
                     only.as_deref(),
@@ -126,7 +127,6 @@ impl Session {
         observe(&mut self.refs, reader, &Request::of(target))
     }
 
-    /// Waits for an observer event that `wanted` matches.
     /// The windows a gone wait tracks: `target` when neither title nor app is named, else every
     /// listed window whose title contains `title` and whose app is `app`.
     fn tracked_windows(
@@ -134,21 +134,22 @@ impl Session {
         target: &str,
         title: Option<&str>,
         app: Option<&str>,
-    ) -> Vec<String> {
+    ) -> Result<Vec<String>, Refusal> {
         if title.is_none() && app.is_none() {
-            return vec![target.to_owned()];
+            return Ok(vec![target.to_owned()]);
         }
-        self.backend
-            .windows(&WindowFilter::default())
-            .map(|list| list.windows)
-            .unwrap_or_default()
+        // A failed listing is answered: an empty set would wait the whole timeout for nothing.
+        Ok(self
+            .backend
+            .windows(&WindowFilter::default())?
+            .windows
             .into_iter()
             .filter(|window| {
                 title.is_none_or(|wanted| window.title.contains(wanted))
                     && app.is_none_or(|wanted| window.app == wanted)
             })
             .map(|window| window.id)
-            .collect()
+            .collect())
     }
 
     /// Waits for an event `wanted` matches, on one of the windows in `only` when it is given.
