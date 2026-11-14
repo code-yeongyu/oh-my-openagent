@@ -18,7 +18,8 @@ function recordsOnOf(loaded: unknown): RecordsOn | undefined {
 }
 
 /**
- * A missing sentinel module, or one that cannot say which OSes it records, is an environment fault. A sentinel
+ * A missing sentinel module, one that cannot be loaded, or one that cannot say which OSes it records (no recordsOn, or
+ * a recordsOn that throws) is an environment fault. A sentinel
  * that exists but records no signal on this OS lets the run go on: its cells read every signal as not_observed.
  */
 export async function observerCheck(sentinel: string, os: OsName): Promise<{ check: Check; status: ObserverStatus }> {
@@ -39,8 +40,14 @@ export async function observerCheck(sentinel: string, os: OsName): Promise<{ che
     const detail = `${shown} does not export recordsOn(os)`
     return { check: { name: "desktop-observer", ok: false, detail }, status: { kind: "unavailable", reason: detail } }
   }
-  if (recordsOn(os))
-    return { check: { name: "desktop-observer", ok: true, detail: shown }, status: { kind: "records" } }
+  let records: boolean
+  try {
+    records = recordsOn(os)
+  } catch (error) {
+    const detail = `${shown} recordsOn(${os}) threw: ${error instanceof Error ? error.message : String(error)}`
+    return { check: { name: "desktop-observer", ok: false, detail }, status: { kind: "unavailable", reason: detail } }
+  }
+  if (records) return { check: { name: "desktop-observer", ok: true, detail: shown }, status: { kind: "records" } }
   const reason = `no ${os} recorder in the sentinel yet`
   return {
     check: { name: "desktop-observer", ok: true, detail: `unavailable: ${reason}` },
