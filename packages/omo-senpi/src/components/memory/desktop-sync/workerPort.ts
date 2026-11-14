@@ -47,7 +47,13 @@ function serveDesktopWorker(channel: DesktopSyncEngineWire, port: MessagePort, c
     if (!closed.aborted) port.postMessage(message)
   }
   const stopEvents = channel.onEvent((event) => {
-    if (event.event !== "retired" && owned.has(event.handle)) post({ kind: "event", event })
+    if (event.event !== "retired") {
+      if (owned.has(event.handle)) post({ kind: "event", event })
+      return
+    }
+    // Main's account retired, not the channel (#13325): every Worker's account on it ends, and its handles with it.
+    owned.clear()
+    post({ kind: "event", event })
   })
   closed.addEventListener(
     "abort",
