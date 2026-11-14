@@ -1,4 +1,5 @@
-// With `Xft.dpi: 192` the reported scale is 2, the frame is twice the logical size, and
+// With `Xft.dpi: 192` (and the fixture at GDK_SCALE=2, as a desktop's settings daemon sets the
+// GTK window scale beside that dpi) the reported scale is 2, the frame is twice the logical size, and
 // the fixture's marker pixel sits at the scaled coordinate the independent oracle
 // (`xwd -root` decoded) reports. No input is sent in this scenario.
 import { writeFile } from "node:fs/promises"
@@ -29,7 +30,7 @@ export const xftDpiScale: Scenario = {
         background: "white",
         markers: [`${LOGICAL.marker[0]},${LOGICAL.marker[1]}@red`],
       }),
-      stage.env,
+      { ...stage.env, GDK_SCALE: "2", GDK_DPI_SCALE: "0.5" },
     )
     const id = await windowId(ctx, TITLE, fixture)
     await procs.stdout(["xdotool", "windowmove", id, String(WINDOW_AT.x), String(WINDOW_AT.y)], stage.env)
