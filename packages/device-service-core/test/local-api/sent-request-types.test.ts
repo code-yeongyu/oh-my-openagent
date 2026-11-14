@@ -5,7 +5,7 @@ import { OMO_SENT_REQUEST_TYPES, scanSentRequestTypes } from "./sent-request-typ
 // Protocol coverage contract: LA21's reply rows and the fake owner's served set must follow what omo actually sends.
 describe("the request types omo sends through this package's client", () => {
   test("OMO_SENT_REQUEST_TYPES is exactly what src/ sends, so LA21's exhaustive reply map follows a new send", () => {
-    expect([...OMO_SENT_REQUEST_TYPES].toSorted()).toEqual([...scanSentRequestTypes().sent])
+    expect([...scanSentRequestTypes().sent]).toEqual([...OMO_SENT_REQUEST_TYPES].toSorted())
   })
 
   test("every send names its type literally except the vendored client's generic passthrough", () => {
