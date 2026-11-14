@@ -20,6 +20,7 @@ export type FolderFailureReason =
   | "git_unavailable"
   | "git_timeout"
   | "git_failed"
+  | "worktree_left_behind"
 
 const TABLE: Readonly<Record<FolderFailureReason, { readonly code: ThreadErrorCode; readonly next: string }>> = {
   folder_missing: { code: "invalid_arguments", next: "Pass an existing folder as cwd; nothing was created." },
@@ -60,6 +61,10 @@ const TABLE: Readonly<Record<FolderFailureReason, { readonly code: ThreadErrorCo
   git_unavailable: { code: "unsupported", next: "Install git on that device, or drop worktree." },
   git_timeout: { code: "host_unavailable", next: "git did not answer in time on that device; retry once it is idle." },
   git_failed: { code: "invalid_arguments", next: "Read details.stderr, fix the repository state, then retry." },
+  worktree_left_behind: {
+    code: "partial_commit",
+    next: "Remove what details.left names: git worktree remove --force <details.path> and git branch -D <details.branch> in details.repository; then retry.",
+  },
 }
 
 export function folderFailure(

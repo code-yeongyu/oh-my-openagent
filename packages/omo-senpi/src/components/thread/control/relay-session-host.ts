@@ -5,7 +5,7 @@ import { INITIAL_SKILLS_CONTEXT_KEY } from "../initial-skills"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "../remote/ports"
 import { outcomeFailure } from "../remote/outcome"
 import { deviceOnline, replyData } from "../remote/remote-ops"
-import { prepareRemoteWorktree } from "../worktree/remote-worktree"
+import { prepareRemoteWorktree, removeRemoteWorktree } from "../worktree/remote-worktree"
 import { openedEngineId, openRefusal } from "./open-reply"
 import { threadLink } from "../thread-link"
 import type { ThreadHostSession } from "../tools/ports"
@@ -68,7 +68,8 @@ export function createRelaySessionHost(
       const offline = await deviceOnline(remote, device)
       if (offline !== undefined) return offline
       const { name, initialSkills, permissionPreset, worktree, ...asked } = request
-      const made = worktree === undefined ? undefined : await prepareRemoteWorktree(remote, device, asked.cwd ?? "", worktree)
+      const made =
+        worktree === undefined ? undefined : await prepareRemoteWorktree(remote, device, asked.cwd ?? "", worktree)
       if (made?.kind === "error") return made
       const open = made === undefined ? asked : { ...asked, cwd: made.worktree.path }
       const frame: JsonObject = {
@@ -82,7 +83,18 @@ export function createRelaySessionHost(
       }
       const reopens = request.sessionPath !== undefined
       const outcome = await remote.sessions.endpointCommand(device, frame, reopens ? undefined : { locate: true })
-      if (outcome.kind !== "ok") return openRefusal(outcome, device, open.cwd)
+      if (outcome.kind !== "ok") {
+        const refused = openRefusal(outcome, device, open.cwd)
+        // A refused open ran nothing on b: undo the worktree this call made there. An uncertain one may have opened in
+        // it, so the worktree stays and the failure names it.
+        if (made === undefined) return refused
+        const left = outcome.kind === "refused" ? await removeRemoteWorktree(remote, device, made.worktree) : undefined
+        const keep =
+          left === undefined && outcome.kind === "refused"
+            ? {}
+            : { worktree: made.worktree, ...(left === undefined ? {} : { cleanup: left.error }) }
+        return { ...refused, error: { ...refused.error, details: { ...refused.error.details, ...keep } } }
+      }
       const data = replyData(outcome.response)
       const state = recordOf(data["state"])
       let threadId: string
@@ -121,7 +133,10 @@ export function createRelaySessionHost(
         if (named.kind !== "ok") {
           applied = undefined
           const failed = outcomeFailure(named, device).error
-          warnings.push({ ...failed, details: { ...failed.details, reason: "name_not_applied", cause: failed.details?.["reason"] } })
+          warnings.push({
+            ...failed,
+            details: { ...failed.details, reason: "name_not_applied", cause: failed.details?.["reason"] },
+          })
         }
       }
       // The reply's state keyed by the id the device lists the session under; the far engine's own routing id and
@@ -149,7 +164,10 @@ export function createRelaySessionHost(
         cwd: nonEmpty(state["cwd"]) ?? open.cwd ?? listed?.project ?? "",
         name: applied ?? nonEmpty(state["sessionName"]) ?? listed?.title ?? null,
       }
-      const extras = { ...(made === undefined ? {} : { worktree: made.worktree }), ...(warnings.length === 0 ? {} : { warnings }) }
+      const extras = {
+        ...(made === undefined ? {} : { worktree: made.worktree }),
+        ...(warnings.length === 0 ? {} : { warnings }),
+      }
       return { kind: "ok", thread: { ...openedThread(session), device, ...extras } }
     },
   }
