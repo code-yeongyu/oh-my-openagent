@@ -109,6 +109,12 @@ pub trait Backend: Send {
         None
     }
 
+    /// The platform this backend drives (A-IS-62 rev 5, R70an): its OS's documented defaults
+    /// apply. `None` (the default) is the host's OS; the fake answers its persona.
+    fn platform(&self) -> Option<crate::report::Platform> {
+        None
+    }
+
     /// The consent view the hand tool host hands the engine at `session.open`, as the host
     /// wrote it (`design/d-safety.md` '## Approval and consent'). `None`: no host view, and the
     /// session keeps its default view.

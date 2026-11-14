@@ -69,6 +69,16 @@ impl Backend for FakeBackend {
         FakeBackend::executable_path(self, pid)
     }
 
+    fn platform(&self) -> Option<omo_computer_core::report::Platform> {
+        use omo_computer_core::report::Platform;
+        Some(match self.persona {
+            crate::Persona::Macos => Platform::Macos,
+            crate::Persona::X11 => Platform::X11,
+            crate::Persona::Wayland => Platform::Wayland,
+            crate::Persona::Win32 => Platform::Windows,
+        })
+    }
+
     fn host_consent(&self) -> Option<serde_json::Value> {
         self.scripted_host_consent()
     }

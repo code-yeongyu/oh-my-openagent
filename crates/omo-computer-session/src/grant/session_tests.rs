@@ -315,3 +315,22 @@ fn a_is_62_chords_compare_through_the_one_parser() {
     let bad = crate::consent::ConsentView::from_host(json!({ "stopHotkey": "ctrl+" }));
     assert!(!bad.same_stop_chord(Os::Linux, "ctrl+"), "nothing equals an unparseable file chord");
 }
+
+/// A-IS-62 rev 5 (R70an A): with the fake backend the documented default is the PERSONA's OS,
+/// never the host's: a macOS persona accepts the macOS default (and the v1 macOS spelling) on any host.
+#[test]
+fn a_is_62_the_fake_default_is_the_persona_os() {
+    let open = |persona, chord: &str| {
+        let backend = FakeBackend::with_parts(scenario(&json!({})), FakeClock::default(), RecordingSink::default())
+            .with_persona(persona)
+            .with_stop_path(StopPathScript::Live);
+        let mut s = Session::new(Box::new(backend));
+        s.open(params(json!({ "reportMode": "null", "settings": { "stop_hotkey": chord } })))
+    };
+    use omo_computer_backend_fake::Persona;
+    assert!(open(Persona::Macos, "ctrl+opt+cmd+escape").is_ok(), "the pin's macOS default");
+    assert!(open(Persona::Macos, "ctrl+alt+cmd+escape").is_ok(), "the v1 macOS host's spelling");
+    assert!(open(Persona::Macos, "ctrl+alt+shift+escape").is_err(), "the Linux default is not macOS's");
+    assert!(open(Persona::X11, "ctrl+alt+shift+escape").is_ok());
+    assert!(open(Persona::Win32, "ctrl+alt+shift+escape").is_ok());
+}

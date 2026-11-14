@@ -228,7 +228,8 @@ impl Session {
     pub(crate) fn open_control(&mut self, session_id: &str, stop_hotkey: Option<&str>) -> Result<(), Refusal> {
         self.funnel.set_session_id(session_id.to_owned());
         self.open_consent()?;
-        if let Err(refusal) = check_stop_hotkey(self.funnel.control.consent.view(), stop_hotkey) {
+        let os = backend_os(self.backend.as_ref());
+        if let Err(refusal) = check_stop_hotkey(self.funnel.control.consent.view(), os, stop_hotkey) {
             // One audit line for the refused call; the file is intact, so the view is NOT marked
             // tampered (R70aj). The peer's pid and executable are owed by row 29's peer check.
             let _ = self.funnel.audit().append(crate::audit::AuditEvent {
@@ -272,16 +273,27 @@ impl Session {
 /// encoded as the tampered-file refusal is today: `ControlRequired{reason:"tampered"}` (R70aj; the
 /// `permission_changed` marker rides the wire with row 27's data member). An unparseable file chord
 /// equals nothing, so any requested chord differs.
-fn check_stop_hotkey(view: &ConsentView, requested: Option<&str>) -> Result<(), Refusal> {
+fn check_stop_hotkey(view: &ConsentView, os: Os, requested: Option<&str>) -> Result<(), Refusal> {
     let Some(requested) = requested else {
         return Ok(());
     };
-    if view.same_stop_chord(Os::host(), requested) {
+    if view.same_stop_chord(os, requested) {
         Ok(())
     } else {
         Err(Refusal::new(
             omo_computer_core::error::EngineCode::ControlRequired,
             omo_computer_core::error::Reason::Tampered.wire(),
         ))
+    }
+}
+
+/// The OS whose documented defaults apply: the backend's platform, else the host's (R70an A).
+pub(crate) fn backend_os(backend: &dyn omo_computer_core::backend::Backend) -> Os {
+    use omo_computer_core::report::Platform;
+    match backend.platform() {
+        Some(Platform::Macos) => Os::Macos,
+        Some(Platform::X11 | Platform::Wayland) => Os::Linux,
+        Some(Platform::Windows) => Os::Windows,
+        None => Os::host(),
     }
 }
