@@ -110,3 +110,23 @@ fn window_gone_and_event_waits_ignore_an_unrelated_destroyed_element() {
         rig.clock.now_ms()
     );
 }
+
+/// Review L2 of #13370 (at c72fac7d86): a gone wait that names its window by title cannot know
+/// which windows it tracks when the listing fails; it answers the listing's refusal instead of
+/// waiting the whole timeout for nothing.
+#[test]
+fn a_gone_wait_whose_listing_fails_refuses_instead_of_timing_out() {
+    let mut rig = Rig::new(json!({
+        "fail_next": [{"method": "windows", "code": "Internal"}]
+    }));
+    let refused = rig
+        .session
+        .wait_for(params(json!({
+            "target": "101",
+            "predicate": {"window": {"state": "gone", "title": "Save"}},
+            "timeout": 1000
+        })))
+        .expect_err("the failed listing is answered, not waited out");
+    assert_eq!(refused.refusal.code, omo_computer_core::error::EngineCode::Internal);
+    assert!(rig.clock.now_ms() < 1_000, "no wait ran: {}", rig.clock.now_ms());
+}
