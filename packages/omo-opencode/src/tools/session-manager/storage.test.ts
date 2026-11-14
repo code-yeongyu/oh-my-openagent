@@ -6,6 +6,8 @@ import { randomUUID } from "node:crypto"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
 // Named, not a namespace spread: a spread counts every export as used and hides dead ones from knip.
+// satisfies flags a missing or extra key in the editor; no gate typechecks test files, so the export-list test below is
+// the enforced check that the restore set matches the module.
 const {
   MESSAGE_STORAGE,
   PART_STORAGE,
@@ -27,7 +29,7 @@ const realConstants = {
   SESSION_READ_DESCRIPTION,
   SESSION_SEARCH_DESCRIPTION,
   SESSION_INFO_DESCRIPTION,
-}
+} satisfies Record<keyof typeof import("./constants"), unknown>
 
 const TEST_DIR = join(tmpdir(), `omo-test-session-manager-${randomUUID()}`)
 const TEST_MESSAGE_STORAGE = join(TEST_DIR, "message")
@@ -75,6 +77,14 @@ mock.module("../../shared/opencode-message-dir", () => ({
     return null
   },
 }))
+
+test("#given the ./constants restore set #then it names every export the real module declares", async () => {
+  // The real module's export list, read by Bun's parser from its source: unlike a namespace import, this does not count
+  // the exports as used, so knip still reports dead ones.
+  const source = await Bun.file(join(import.meta.dir, "constants.ts")).text()
+  const declared = new Bun.Transpiler({ loader: "ts" }).scan(source).exports
+  expect(Object.keys(realConstants).sort()).toEqual([...declared].sort())
+})
 
 afterAll(async () => {
   // ./constants re-exports the storage roots from ../../shared, so this restore also puts the real paths back
