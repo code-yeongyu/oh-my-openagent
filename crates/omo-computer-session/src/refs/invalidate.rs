@@ -63,6 +63,17 @@ impl RefRegistry {
     pub fn expire(&mut self, window: &str, why: Expiry) {
         let Some(refs) = self.windows.get_mut(window) else { return };
         let released: usize = refs.generations.values().map(|g| g.entries.len()).sum();
+        // Only the latest expiry's numbers keep an owner (ruling R70bx): the previous expiry's
+        // tokens become pruned tokens, so repeated expiries cannot grow the owner map.
+        let wiped: Vec<u64> =
+            refs.generations.values().flat_map(|g| g.entries.iter().map(|entry| entry.n)).collect();
+        let previous = std::mem::replace(&mut refs.wiped_numbers, wiped);
+        for n in previous {
+            if self.owner.get(&n).is_some_and(|owner| owner == window) {
+                self.owner.remove(&n);
+            }
+        }
+        let Some(refs) = self.windows.get_mut(window) else { return };
         refs.generations.clear();
         refs.by_object.clear();
         refs.by_native_id.clear();
