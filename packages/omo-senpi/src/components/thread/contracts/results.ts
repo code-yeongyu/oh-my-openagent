@@ -91,12 +91,19 @@ export type ThreadLocalAliasNote = {
   readonly local_name_unavailable?: ThreadErrorCode
 }
 
+/**
+ * Set when a thread this device opened is in a folder outside the caller's workspace: every thread tool answers it
+ * `scope_denied` from the caller unless `all_scope` is set, which `scope_next_action` says.
+ */
+export type ThreadWorkspaceNote = { readonly workspace_scope?: "outside"; readonly scope_next_action?: string }
+
 export type ThreadCreateResult =
   | ({
       readonly kind: "ok"
       readonly thread: ThreadResultSummary
       readonly deduplicated: boolean
-    } & ThreadLocalAliasNote)
+    } & ThreadLocalAliasNote &
+      ThreadWorkspaceNote)
   | ThreadDataError
 
 export type ThreadListResult =

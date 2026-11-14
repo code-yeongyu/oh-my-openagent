@@ -167,7 +167,7 @@ describe("thread tools across host endpoints", () => {
     expect(w.dialed.filter((path) => path === shard).length).toBeGreaterThanOrEqual(3)
   })
 
-  test("#given two live endpoints #when thread_create runs #then open_session is sent to the legacy socket and the created thread names it", async () => {
+  test("#given two live endpoints #when thread_create runs #then open_session is sent to the legacy socket and the created thread is its session, without the endpoint facts", async () => {
     // given
     const dir = tempDir("thr-ep-")
     const legacy = join(dir, "rpc.sock")
@@ -180,7 +180,8 @@ describe("thread tools across host endpoints", () => {
     const created = await w.run("thread_create", {})
 
     // then
-    expect(created).toMatchObject({ kind: "ok", thread: { sessionId: "rpc-2", socket: legacy } })
+    expect(created).toMatchObject({ kind: "ok", thread: { sessionId: "rpc-2" } })
+    expect((created as { thread?: object }).thread).not.toHaveProperty("socket")
     expect(legacyHost.frames.some((frame) => frame.type === "open_session")).toBe(true)
     expect(shardHost.frames.some((frame) => frame.type === "open_session")).toBe(false)
   })

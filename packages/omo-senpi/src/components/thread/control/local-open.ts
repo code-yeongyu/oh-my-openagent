@@ -1,9 +1,8 @@
-import { summary } from "../tools/internals"
 import type { ThreadHost } from "../tools/ports"
 import { folderFailure } from "../worktree/failures"
 import { discardWorktree } from "../worktree/discard-worktree"
 import { checkFolder, createThreadWorktree, runGit } from "../worktree/thread-worktree"
-import type { SessionOpenOutcome, SessionOpenRequest } from "./session-host"
+import { openedThread, type SessionOpenOutcome, type SessionOpenRequest } from "./session-host"
 
 /**
  * The open of a thread on this device: the folder it names is checked and, when asked, the worktree is created in it.
@@ -19,7 +18,7 @@ export async function openLocally(
     const refused = await checkFolder(request.cwd)
     if (refused !== undefined) return refused
   }
-  if (worktree === undefined) return { kind: "ok", thread: summary(await host.openSession(request)) }
+  if (worktree === undefined) return { kind: "ok", thread: openedThread(await host.openSession(request)) }
   if (request.cwd === undefined)
     return folderFailure("relative_path", "A worktree needs the repository folder; pass cwd.")
   const made = await createThreadWorktree({ repository: request.cwd, request: worktree, root: worktreeRoot() })
@@ -35,5 +34,5 @@ export async function openLocally(
     if (left === undefined) throw error
     return { ...left, error: { ...left.error, details: { ...left.error.details, cause: String(error) } } }
   }
-  return { kind: "ok", thread: { ...summary(opened), worktree: made.worktree } }
+  return { kind: "ok", thread: { ...openedThread(opened), worktree: made.worktree } }
 }

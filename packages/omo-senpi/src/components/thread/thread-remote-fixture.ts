@@ -379,6 +379,8 @@ export function createRemoteThreadFixture() {
       caller?: string
       diskSessions?: readonly string[]
       closeOutcome?: ThreadCloseOutcome
+      /** Look session files up where senpi writes them, `<agentDir>/sessions`, as the component does. */
+      sessionsDirectory?: boolean
     } = {},
   ) {
     const engine = extra.engine ?? ENGINE
@@ -444,6 +446,7 @@ export function createRemoteThreadFixture() {
       store,
       stateDirectory: join(agentDir, "state"),
       diskSessions: () => disk,
+      ...(extra.sessionsDirectory === true ? { sessionsDirectory: () => join(agentDir, "sessions") } : {}),
       callerSessionId: () => caller,
       callerWorkspaceRoot: () => process.cwd(),
       remote,
