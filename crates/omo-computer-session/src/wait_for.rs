@@ -92,17 +92,18 @@ impl Session {
                 self.wait_event_match(
                     &EventMatch::Window { state, title, app },
                     only.as_deref(),
+                    state == WindowState::Gone,
                     timeout_ms,
-                )
+                )?
             }
             WaitSpec::Surface { kind, state } => {
-                self.wait_event_match(&EventMatch::Surface { kind, state }, None, timeout_ms)
+                self.wait_event_match(&EventMatch::Surface { kind, state }, None, false, timeout_ms)?
             }
             // An event wait counts events on its target window; a window that opens is never
             // the target, so `window_opened` counts every new window.
             WaitSpec::Event(kind) => {
                 let only = (kind != EventKind::WindowOpened).then(|| vec![target.clone()]);
-                self.wait_event_match(&EventMatch::Event(kind), only.as_deref(), timeout_ms)
+                self.wait_event_match(&EventMatch::Event(kind), only.as_deref(), false, timeout_ms)?
             }
             WaitSpec::Text(text) => self.wait_observed(&target, timeout_ms, |_, o| {
                 o.tree.as_deref().is_some_and(|tree| tree.contains(&text))
@@ -153,24 +154,39 @@ impl Session {
     }
 
     /// Waits for an event `wanted` matches, on one of the windows in `only` when it is given.
+    /// A gone match (`confirm_gone`) is a hint, never the answer: it is confirmed by the same
+    /// window listing the title and app branch tracks from, and a window still listed keeps
+    /// the wait going (a destroyed child raises the same event as the window closing).
+    ///
+    /// # Errors
+    /// The confirming listing's refusal.
     fn wait_event_match(
         &mut self,
         wanted: &EventMatch,
         only: Option<&[String]>,
+        confirm_gone: bool,
         timeout_ms: u64,
-    ) -> WaitOutcome {
+    ) -> Result<WaitOutcome, Refusal> {
         let Some(mut feed) = feed(self.backend.as_mut()) else {
-            return WaitOutcome::Unsupported;
+            return Ok(WaitOutcome::Unsupported);
         };
         let deadline = feed.now_ms().saturating_add(timeout_ms);
         loop {
             match feed.wait_event(deadline) {
-                Err(_) => return WaitOutcome::Unsupported,
-                Ok(None) => return WaitOutcome::Timeout,
+                Err(_) => return Ok(WaitOutcome::Unsupported),
+                Ok(None) => return Ok(WaitOutcome::Timeout),
                 Ok(Some(event)) => {
                     let on_tracked = only.is_none_or(|ids| ids.contains(&event.window));
-                    if on_tracked && wanted.matches(&event, feed.backend().ax_reader()) {
-                        return WaitOutcome::Matched;
+                    if !(on_tracked && wanted.matches(&event, feed.backend().ax_reader())) {
+                        continue;
+                    }
+                    if !confirm_gone {
+                        return Ok(WaitOutcome::Matched);
+                    }
+                    let listed = feed.backend().windows(&WindowFilter::default())?.windows;
+                    let still = only.unwrap_or_default().iter().any(|id| listed.iter().any(|w| &w.id == id));
+                    if !still {
+                        return Ok(WaitOutcome::Matched);
                     }
                 }
             }
