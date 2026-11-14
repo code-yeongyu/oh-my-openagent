@@ -12,6 +12,10 @@ pub struct AxNotification {
     pub window: String,
     /// The OS notification name (`AXValueChanged`, `object:children-changed`, ...).
     pub kind: String,
+    /// The window leaves the listing when this event fires (it closed). A destroyed child of a
+    /// window raises the same notification on macOS and leaves the window listed.
+    #[serde(default)]
+    pub closes: bool,
 }
 
 /// From `t_ms` on, the window shows (or stops showing) a loading indicator.

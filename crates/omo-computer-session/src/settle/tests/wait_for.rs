@@ -106,7 +106,7 @@ fn window_gone_and_event_waits_ignore_an_unrelated_destroyed_element() {
     let related = json!({"ax_notification_timeline": [
         {"t_ms": 100, "window": "101", "kind": "AXUIElementDestroyed"},
         {"t_ms": 200, "window": "101", "kind": "AXValueChanged"},
-        {"t_ms": 300, "window": "102", "kind": "AXUIElementDestroyed"}
+        {"t_ms": 300, "window": "102", "kind": "AXUIElementDestroyed", "closes": true}
     ]});
     let mut rig = Rig::new(related.clone());
     let result = rig.session.wait_for(params(gone)).expect("waitFor");
@@ -152,4 +152,36 @@ fn a_gone_wait_whose_listing_fails_refuses_instead_of_timing_out() {
         "no wait ran: {}",
         rig.clock.now_ms()
     );
+}
+
+/// Review L1 of #13370 (at c72fac7d86, ruling R70bg): a gone event is a hint, never the answer.
+/// A child destroyed in the tracked window does not end a gone wait; the window closing does; a
+/// listing that fails answers its refusal. (The tracked window is the Save dialog 102, so the
+/// observation of the target 101 that every waitFor returns can still be read.)
+#[test]
+fn a_gone_wait_is_confirmed_by_the_listing() {
+    let gone = json!({
+        "target": "101",
+        "predicate": {"window": {"state": "gone", "title": "Save"}},
+        "timeout": 1000
+    });
+    let mut child = Rig::new(json!({"ax_notification_timeline": [
+        {"t_ms": 100, "window": "102", "kind": "AXUIElementDestroyed"}
+    ]}));
+    let result = child.session.wait_for(params(gone.clone())).expect("waitFor");
+    assert_eq!(result.outcome, WaitOutcome::Timeout, "a destroyed child is not the window closing");
+    let mut closed = Rig::new(json!({"ax_notification_timeline": [
+        {"t_ms": 100, "window": "102", "kind": "AXUIElementDestroyed"},
+        {"t_ms": 300, "window": "102", "kind": "AXUIElementDestroyed", "closes": true}
+    ]}));
+    let result = closed.session.wait_for(params(gone.clone())).expect("waitFor");
+    assert_eq!(result.outcome, WaitOutcome::Matched);
+    assert!((300..1_000).contains(&closed.clock.now_ms()), "matched at the close: {}", closed.clock.now_ms());
+    // The tracking read (the first listing) succeeds; the confirming read (the second) fails.
+    let mut failing = Rig::new(json!({"ax_notification_timeline": [
+        {"t_ms": 100, "window": "102", "kind": "AXUIElementDestroyed", "closes": true}
+    ]}));
+    failing.fail_listings_after(2);
+    let refused = failing.session.wait_for(params(gone)).expect_err("a failed confirming read is answered");
+    assert_eq!(refused.refusal.code, omo_computer_core::error::EngineCode::Internal);
 }
