@@ -25,6 +25,13 @@ import { createDefaultRemoteSurface } from "./remote/default-remote"
 import { createOmoNativeProductConfig } from "../telemetry/product-identity"
 import { defaultThreadStateDirectory } from "./live-surface-paths"
 import { stampThisDevice } from "./remote/this-device"
+import {
+  processIntakeAdmission,
+  processSameDeviceWake,
+  startThreadWakeAtSession,
+  wakeSettingsReader,
+  type ThreadWakeOptions,
+} from "./wake/runtime"
 
 /**
  * The longest the `agent_settled` handler waits for an armed completion's store write. senpi waits
@@ -61,6 +68,8 @@ export type ThreadComponentOptions = Partial<
   readonly agentDir?: () => string
   readonly store?: GatewayStore
   readonly controlEndpointTest?: ControlEndpointRegistrantOptions["_test"]
+  /** Test seams of the session wake (#13037): the carrier, the consumer and their switches. */
+  readonly wake?: ThreadWakeOptions
 }
 
 /**
@@ -281,6 +290,7 @@ function registerControlEndpoint(
   store: GatewayStore,
   agentDir: () => string,
   onCommandWake: (durableId: string) => Promise<void>,
+  admitIntake: NonNullable<ControlEndpointRegistrantOptions["admitIntake"]>,
 ) {
   const control = options.sessionControl === undefined ? sessionControlOf(pi) : (options.sessionControl ?? undefined)
   if (control === undefined) return undefined
@@ -290,6 +300,7 @@ function registerControlEndpoint(
     agentDir,
     store,
     onCommandWake,
+    admitIntake,
     ...(runtimeInstance === undefined ? {} : { runtimeInstance }),
     log: (line) => ctx.logger.warn(line),
     ...(options.controlEndpointTest === undefined ? {} : { _test: options.controlEndpointTest }),
@@ -410,6 +421,10 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
             ),
         },
       )
+      const sessionsDirectory = options.sessionsDirectory ?? (() => join(agentDir(), "sessions"))
+      const wakeOptions = options.wake ?? {}
+      const warn = (line: string) => ctx.logger.warn(line)
+      const wakeSettings = wakeSettingsReader(wakeOptions, callerWorkspaceRoot, warn)
       const tools = registerThreadTools(
         pi,
         {
@@ -420,8 +435,15 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
           loadProvenanceWorkspaces,
           onProvenanceWarning,
           diskSessions: options.diskSessions,
-          sessionsDirectory: options.sessionsDirectory ?? (() => join(agentDir(), "sessions")),
+          sessionsDirectory,
           ensureHost: options.ensureHost,
+          sameDeviceWake: processSameDeviceWake({
+            options: wakeOptions,
+            store,
+            agentDir,
+            sessionsDirectory,
+            settings: wakeSettings,
+          }),
           callerSessionId: options.callerSessionId ?? (() => UNKNOWN_CALLER),
           callerWorkspaceRoot,
           callerTurnId: () => (run.turn === 0 ? undefined : `turn-${run.turn}`),
@@ -452,7 +474,15 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
           )
         }
       }
-      const registrant = registerControlEndpoint(pi, ctx, options, store, agentDir, pickUpArms)
+      const registrant = registerControlEndpoint(
+        pi,
+        ctx,
+        options,
+        store,
+        agentDir,
+        pickUpArms,
+        processIntakeAdmission(wakeOptions, agentDir),
+      )
       // A question this session relayed to a chat thread and then closed itself (answered here, timed out,
       // cancelled) is closed in the store too, so the connector stops holding that thread's later rows behind
       // it. Only a session that relayed a question touches the store for it; an answer that came through
@@ -526,6 +556,15 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         }
       }
       pi.on("session_start", (_event, eventCtx) => {
+        startThreadWakeAtSession(eventCtx, {
+          options: wakeOptions,
+          agentDir,
+          sessionsDirectory,
+          settings: wakeSettings,
+          engineVersion: pi.hostVersion,
+          ensureHost: options.ensureHost,
+          warn,
+        })
         void importLegacyMailbox()
         const durableId = durableIdOf(eventCtx)
         if (durableId !== undefined) void pickUpArms(durableId)
