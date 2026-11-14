@@ -54,6 +54,14 @@ function namedStep(jobName: string, name: string): Step {
   return value
 }
 
+function namedStepAnywhere(name: string): Step {
+  const found = Object.values(workflow.jobs ?? {})
+    .flatMap((j) => j.steps ?? [])
+    .filter((step) => step.name === name)
+  if (found.length !== 1) throw new Error("expected exactly one step named " + name + ", found " + found.length)
+  return found[0] as Step
+}
+
 function mapOmoAiVersion(rootVersion: string): string {
   const prereleaseIndex = rootVersion.indexOf("-")
   return prereleaseIndex === -1
@@ -94,6 +102,17 @@ describe("omo-ai publish workflow shape", () => {
     expect(versionRun).toContain("DIST_TAG=$(printf '%s\\n' \"$METADATA\" | awk -F= '$1 == \"dist_tag\" { print $2 }')")
     expect(resolveReleaseVersion("5.0.0", false).distTag).toBe("")
     expect(resolveReleaseVersion("5.0.0-rc.1", false).distTag).toBe("rc")
+  })
+
+  test("pins the release-notes deny list and its fail-closed flag on both notes steps", () => {
+    const notesSteps = [
+      namedStepAnywhere("Verify the release notes exist on the prepared source"),
+      namedStepAnywhere("Generate changelog"),
+    ]
+    for (const step of notesSteps) {
+      expect(step.env?.RELEASE_NOTES_PRIVATE_NAMES).toBe("${{ secrets.RELEASE_NOTES_PRIVATE_NAMES }}")
+      expect(step.env?.CI_RELEASE_NOTES_REQUIRE_DENY).toBe("1")
+    }
   })
 })
 

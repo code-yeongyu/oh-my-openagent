@@ -1,6 +1,11 @@
 #!/usr/bin/env bun
 /** Release step: print the GitHub release body for <version>, fail-closed. */
-import { composeReleaseBody, extractReleaseNotes } from "./changelog-release-notes"
+import {
+  assertDenyListConfigured,
+  composeReleaseBody,
+  extractReleaseNotes,
+  PrivateNameLeakError,
+} from "./changelog-release-notes"
 
 /** The install line for the released channel: bare `omo-ai` for a stable version, `omo-ai@beta` for a prerelease. */
 export function installFooter(version: string): string {
@@ -9,6 +14,7 @@ export function installFooter(version: string): string {
 }
 
 async function main(): Promise<void> {
+  assertDenyListConfigured()
   const version = process.argv[2]
   if (!version) {
     console.error("usage: bun script/print-release-notes.ts <version> [contributors-file]")
@@ -18,7 +24,13 @@ async function main(): Promise<void> {
   const notes = extractReleaseNotes(await Bun.file(path).text(), version)
   const contributorsFile = process.argv[3]
   const contributors = contributorsFile ? await Bun.file(contributorsFile).text() : ""
-  process.stdout.write(composeReleaseBody(notes, contributors, installFooter(version)))
+  try {
+    process.stdout.write(composeReleaseBody(notes, contributors, installFooter(version)))
+  } catch (error) {
+    if (!(error instanceof PrivateNameLeakError)) throw error
+    console.error(error.message)
+    process.exit(1)
+  }
 }
 
 if (import.meta.main) await main()

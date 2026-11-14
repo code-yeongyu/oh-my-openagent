@@ -1,7 +1,15 @@
 #!/usr/bin/env bun
 
 import { $ } from "bun"
+import {
+  assertDenyListConfigured,
+  assertNoPrivateNames,
+  neutralizeCrossRepoReferences,
+  PrivateNameLeakError,
+} from "./changelog-release-notes"
 import { RELEASE_VERSION_PATTERN } from "./release-latest-flag"
+
+export { neutralizeCrossRepoReferences }
 
 const TEAM = ["actions-user", "github-actions[bot]", "code-yeongyu", "sisyphus-dev-ai"]
 
@@ -64,20 +72,48 @@ async function getLatestReleasedTag(currentVersion: string): Promise<string | nu
   }
 }
 
+export function formatCommitNotes(log: string): string[] {
+  const commits = log.split("\n").filter((line) => line && !isExcludedReleaseNoteSubject(line.replace(/^\w+ /, "")))
+  return commits.map((commit) => `- ${neutralizeCrossRepoReferences(commit)}`)
+}
+
 async function generateChangelog(previousTag: string): Promise<string[]> {
   const notes: string[] = []
 
   try {
     const log = await $`git log ${previousTag}..HEAD --oneline --format="%h %s"`.text()
-    const commits = log.split("\n").filter((line) => line && !isExcludedReleaseNoteSubject(line.replace(/^\w+ /, "")))
-
-    if (commits.length > 0) {
-      for (const commit of commits) {
-        notes.push(`- ${commit}`)
-      }
-    }
+    notes.push(...formatCommitNotes(log))
   } catch {
     // No previous tags found
+  }
+
+  return notes
+}
+
+export function formatContributorNotes(compare: string): string[] {
+  const notes: string[] = []
+  const contributors = new Map<string, string[]>()
+
+  for (const line of compare.split("\n").filter(Boolean)) {
+    const { login, message } = JSON.parse(line) as { login: string | null; message: string }
+    const title = message.split("\n")[0] ?? ""
+    if (isExcludedReleaseNoteSubject(title)) continue
+
+    if (login && isCommunityContributor(login)) {
+      if (!contributors.has(login)) contributors.set(login, [])
+      contributors.get(login)?.push(neutralizeCrossRepoReferences(title))
+    }
+  }
+
+  if (contributors.size > 0) {
+    notes.push("")
+    notes.push(`**Thank you to ${contributors.size} community contributor${contributors.size > 1 ? "s" : ""}:**`)
+    for (const [username, userCommits] of contributors) {
+      notes.push(`- @${username}:`)
+      for (const commit of userCommits) {
+        notes.push(`  - ${commit}`)
+      }
+    }
   }
 
   return notes
@@ -89,29 +125,7 @@ async function getContributors(previousTag: string): Promise<string[]> {
   try {
     const compare =
       await $`gh api "/repos/code-yeongyu/oh-my-openagent/compare/${previousTag}...HEAD" --jq '.commits[] | {login: .author.login, message: .commit.message}'`.text()
-    const contributors = new Map<string, string[]>()
-
-    for (const line of compare.split("\n").filter(Boolean)) {
-      const { login, message } = JSON.parse(line) as { login: string | null; message: string }
-      const title = message.split("\n")[0] ?? ""
-      if (isExcludedReleaseNoteSubject(title)) continue
-
-      if (login && isCommunityContributor(login)) {
-        if (!contributors.has(login)) contributors.set(login, [])
-        contributors.get(login)?.push(title)
-      }
-    }
-
-    if (contributors.size > 0) {
-      notes.push("")
-      notes.push(`**Thank you to ${contributors.size} community contributor${contributors.size > 1 ? "s" : ""}:**`)
-      for (const [username, userCommits] of contributors) {
-        notes.push(`- @${username}:`)
-        for (const commit of userCommits) {
-          notes.push(`  - ${commit}`)
-        }
-      }
-    }
+    notes.push(...formatContributorNotes(compare))
   } catch {
     // Failed to fetch contributors
   }
@@ -120,6 +134,7 @@ async function getContributors(previousTag: string): Promise<string[]> {
 }
 
 async function main() {
+  assertDenyListConfigured()
   const packageJson: unknown = await Bun.file(new URL("../package.json", import.meta.url)).json()
   if (
     typeof packageJson !== "object" ||
@@ -143,7 +158,15 @@ async function main() {
   if (notes.length === 0) {
     console.log("No notable changes")
   } else {
-    console.log(notes.join("\n"))
+    const body = notes.join("\n")
+    try {
+      assertNoPrivateNames(body)
+    } catch (error) {
+      if (!(error instanceof PrivateNameLeakError)) throw error
+      console.error(error.message)
+      process.exit(1)
+    }
+    console.log(body)
   }
 }
 
