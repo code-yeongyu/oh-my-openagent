@@ -47,6 +47,14 @@ const base64url = (base64: string): string => Buffer.from(base64, "base64").toSt
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
 
+/** One sign-in: its device, both private keys and the generation the store minted for them (#12945). */
+const sameIdentity = (current: Credentials | null, held: Credentials): current is Credentials =>
+  current !== null &&
+  current.device.id === held.device.id &&
+  current.signingPrivateKey === held.signingPrivateKey &&
+  current.sealingPrivateKey === held.sealingPrivateKey &&
+  current.credentialGeneration === held.credentialGeneration
+
 export async function signedInSyncContext(options: SyncContextOptions): Promise<SyncContext> {
   const api = serviceOrigin(options.env.OMO_SERVICE_API_URL ?? "https://api.omo.dev")
   const store = options.store ?? createCredentialStore(api, { wait: INTERACTIVE_READ_WAIT })
@@ -73,17 +81,17 @@ export async function signedInSyncContext(options: SyncContextOptions): Promise<
   const account = isRecord(body) && isRecord(body["account"]) ? body["account"]["id"] : undefined
   if (typeof account !== "string" || account === "")
     throw new SignInError("The service named no account for this sign-in.")
+  // The sign-in this context holds. Only its own account write below can move its generation.
+  let held = credentials
   // Every credential that can earn a sync pin names its account, so discarding its keys can retire the pin (#12280).
   await session.update(async (current) => {
-    if (current !== null && current.device.id === credentials.device.id && current.accountId === undefined)
-      await store.write({ ...current, accountId: account })
+    if (!sameIdentity(current, held) || current.accountId !== undefined) return
+    await store.write({ ...current, accountId: account })
+    // A credential stored before generations existed gets its generation from this write.
+    held = (await store.readAuthoritative()) ?? held
   })
   const http = { baseUrl: api, token, ...(options.fetch === undefined ? {} : { fetch: options.fetch }) }
   const retired = new AbortController()
-  const captured = (current: Credentials | null) =>
-    current !== null &&
-    current.device.id === credentials.device.id &&
-    current.signingPrivateKey === credentials.signingPrivateKey
   const authority: SyncOperationAuthority = {
     signal: retired.signal,
     admit: (dispatch) => {
@@ -93,7 +101,7 @@ export async function signedInSyncContext(options: SyncContextOptions): Promise<
     boundary: async (dispatch) =>
       (
         await session.update(async (current) => {
-          if (!captured(current)) retired.abort(new Error("The signed-in device is no longer current."))
+          if (!sameIdentity(current, held)) retired.abort(new Error("The signed-in device is no longer current."))
           retired.signal.throwIfAborted()
           // Box the value: the lock is released after the synchronous dispatch, not an in-flight request.
           return { value: dispatch() }
