@@ -100,6 +100,10 @@ export function createRemoteThreadFixture() {
       live?: readonly string[]
       records?: readonly JsonObject[]
       rows?: readonly RemoteSessionRow[]
+      /** Devices the account listing names as not answering this round. */
+      incomplete?: readonly string[]
+      /** Extra devices the account lists beyond this one and b. */
+      devices?: readonly RemoteDevice[]
       registryDown?: "refused" | "throws" | "signed_out"
       /** Only the claim fails (resolve and aliasesOf still answer): a token that expired between the two calls. */
       claimDown?: "refused" | "signed_out"
@@ -225,6 +229,7 @@ export function createRemoteThreadFixture() {
     const devices: RemoteDevice[] = [
       { device: "here", label: "this mac", online: true },
       { device: "b", label: "studio", online: options.online ?? true },
+      ...(options.devices ?? []),
     ]
     for (const row of options.rows ?? [])
       if (!devices.some((known) => known.device === row.device))
@@ -308,6 +313,13 @@ export function createRemoteThreadFixture() {
         sessions: async () => {
           if (options.failSessionsList === true) throw new Error("account list failed")
           return options.rows ?? [{ ...B_ROW, state: options.rowState ?? B_ROW.state }]
+        },
+        listing: async () => {
+          if (options.failSessionsList === true) throw new Error("account list failed")
+          return {
+            rows: options.rows ?? [{ ...B_ROW, state: options.rowState ?? B_ROW.state }],
+            incomplete: options.incomplete ?? [],
+          }
         },
         endpointCommand: async (device, rpc) => {
           sent.push({ via: "endpoint", device, rpc })

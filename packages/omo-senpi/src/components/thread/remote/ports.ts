@@ -14,7 +14,17 @@ export type RemoteSessionRow = {
   readonly updated_ms: number
 }
 
-export type RemoteDevice = { readonly device: string; readonly label: string; readonly online: boolean }
+export type RemoteDevice = {
+  readonly device: string
+  readonly label: string
+  readonly online: boolean
+  readonly platform?: string
+  readonly kind?: string
+  readonly last_seen_ms?: number | null
+}
+
+/** One account listing: its rows, and the devices whose rows this listing could not include (timed out, unanswered). */
+export type RemoteListing = { readonly rows: readonly RemoteSessionRow[]; readonly incomplete: readonly string[] }
 
 /**
  * How a command sent to another device ended. `refused` carries the receiving side's reason
@@ -51,6 +61,8 @@ export type RemoteSessionsPort = {
   readonly thisDevice: () => Promise<string | null>
   readonly devices: () => Promise<readonly RemoteDevice[]>
   readonly sessions: () => Promise<readonly RemoteSessionRow[]>
+  /** The same listing as `sessions`, with the devices it could not include. Absent: every device counts as listed. */
+  readonly listing?: () => Promise<RemoteListing>
   /**
    * A session-less engine record (`open_session`, `list_sessions`) on `device`'s engine endpoint, with no
    * attach: the attach-less `session.command {device, endpoint, rpc}` shape (relay daemon #393). `locate` asks a

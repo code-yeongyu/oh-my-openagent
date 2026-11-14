@@ -6,7 +6,7 @@ import {
   type DeviceService,
   type RemoteAttach,
 } from "@oh-my-opencode/device-service-core"
-import type { JsonObject, RemoteCommandOutcome, RemoteSessionsPort } from "./ports"
+import type { JsonObject, RemoteCommandOutcome, RemoteListing, RemoteSessionsPort } from "./ports"
 
 export type DeviceServiceSessionsOptions = {
   readonly version: string
@@ -169,13 +169,10 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     attaches.set(key, opened)
     return opened
   }
-  return {
-    status: async () => ({ state: (await (await svc()).status()).state }),
-    thisDevice: async () => (await (await svc()).thisDevice())?.id ?? null,
-    devices: async () =>
-      (await (await svc()).devices()).map((row) => ({ device: row.device, label: row.label, online: row.online })),
-    sessions: async () =>
-      (await (await svc()).sessions()).rows.map((row) => ({
+  const listing = async (): Promise<RemoteListing> => {
+    const listed = await (await svc()).sessions()
+    return {
+      rows: listed.rows.map((row) => ({
         device: row.device,
         session_id: row.session_id,
         ...durableIdOf(row),
@@ -185,6 +182,23 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         state: row.state,
         updated_ms: row.updated_ms,
       })),
+      incomplete: listed.incomplete,
+    }
+  }
+  return {
+    status: async () => ({ state: (await (await svc()).status()).state }),
+    thisDevice: async () => (await (await svc()).thisDevice())?.id ?? null,
+    devices: async () =>
+      (await (await svc()).devices()).map((row) => ({
+        device: row.device,
+        label: row.label,
+        online: row.online,
+        platform: row.platform,
+        kind: row.kind,
+        last_seen_ms: row.last_seen_ms,
+      })),
+    sessions: async () => (await listing()).rows,
+    listing,
     // create / open / fork on another device: relay daemon #393's attach-less `session.command {device, endpoint, rpc}`.
     // The endpoint lookup and every refusal answered before sending ran nothing; anything after sending may have.
     endpointCommand: async (device, rpc, endpointOptions) => {

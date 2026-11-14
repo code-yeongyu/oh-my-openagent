@@ -78,6 +78,7 @@ function fakeService(results: CommandResult[], sent: unknown[]): DeviceService {
           as_of: 2,
         },
       ],
+      incomplete: ["c"],
     }),
     attach: async () => attach,
     closed: new Promise(() => {}),
@@ -106,7 +107,10 @@ describe("device-service adapter of the thread tools' account surface", () => {
         ),
     })
     expect(await port.thisDevice()).toBe("here")
-    expect(await port.devices()).toEqual([{ device: "b", label: "studio", online: true }])
+    expect(await port.devices()).toEqual([
+      { device: "b", label: "studio", online: true, platform: "darwin", kind: "desktop", last_seen_ms: 1 },
+    ])
+    expect((await port.listing?.())?.incomplete).toEqual(["c"])
     expect(await port.sessions()).toEqual([
       { device: "b", session_id: "s1", title: "t", project: "/p", path: "/p/s1.jsonl", state: "idle", updated_ms: 2 },
     ])

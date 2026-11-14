@@ -99,7 +99,7 @@ export const ThreadListParams = Type.Object({
   all_scope: Type.Optional(
     Type.Boolean({
       description:
-        "List threads from every workspace on this machine; the default scope returns only the caller's workspace.",
+        "List this machine's threads from every workspace; the default returns only the caller's workspace here. The account's other devices' threads are always listed.",
     }),
   ),
 })

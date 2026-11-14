@@ -53,19 +53,82 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     expect(openSession).not.toHaveBeenCalled()
   })
 
-  test("#given a thread on b #when thread_list runs with all_scope #then b's thread is listed with its device, and the default scope lists only this device's threads", async () => {
+  test("#given a thread on b #when thread_list runs with or without all_scope #then both list this device's thread and b's thread with its device (the merged account list)", async () => {
     const a = account()
     const { run } = surface(a.remote)
-    const all = await run("thread_list", { all_scope: true })
-    expect(
-      all.kind === "ok" && "threads" in all && all.threads.map((thread) => [thread.thread_id, thread.device ?? "here"]),
-    ).toEqual([
-      ["dur-local", "here"],
-      ["dur-on-b", "b"],
-    ])
-    const scoped = await run("thread_list", {})
-    expect(scoped.kind === "ok" && "threads" in scoped && scoped.threads.map((thread) => thread.thread_id)).toEqual([
-      "dur-local",
+    for (const args of [{ all_scope: true }, {}]) {
+      const listed = await run("thread_list", args)
+      expect(
+        listed.kind === "ok" &&
+          "threads" in listed &&
+          listed.threads.map((thread) => [thread.thread_id, thread.device ?? "here"]),
+      ).toEqual([
+        ["dur-local", "here"],
+        ["dur-on-b", "b"],
+      ])
+    }
+  })
+
+  test("#given an ended thread on b #when thread_list runs #then it is listed resumable, as every other path reports an ended row, never live", async () => {
+    const a = account({ rowState: "ended" })
+    const { run } = surface(a.remote)
+    const listed = await run("thread_list", {})
+    expect(listed.kind === "ok" && "threads" in listed && listed.threads.find((t) => t.device === "b")).toMatchObject({
+      thread_id: "dur-on-b",
+      status: "resumable",
+    })
+  })
+
+  test("#given the account's devices, one of them not answering this listing round and one offline #when thread_list runs #then devices names each with its metadata and listing state, and the unanswered device is incomplete, not silently absent", async () => {
+    const a = account({
+      incomplete: ["c"],
+      devices: [
+        {
+          device: "c",
+          label: "laptop",
+          online: true,
+          platform: "darwin",
+          kind: "desktop",
+          last_seen_ms: 1_700_000_000_000,
+        },
+        { device: "d", label: "old box", online: false, platform: "linux", kind: "cli", last_seen_ms: null },
+      ],
+    })
+    const { run } = surface(a.remote)
+    const listed = await run("thread_list", {})
+    expect(listed.kind === "ok" && "devices" in listed && listed.devices).toEqual([
+      {
+        device: "here",
+        name: "this mac",
+        online: true,
+        last_seen: null,
+        this_device: true,
+        listing: "listed",
+        threads: 1,
+      },
+      { device: "b", name: "studio", online: true, last_seen: null, this_device: false, listing: "listed", threads: 1 },
+      {
+        device: "c",
+        name: "laptop",
+        platform: "darwin",
+        kind: "desktop",
+        online: true,
+        last_seen: "2023-11-14T22:13:20.000Z",
+        this_device: false,
+        listing: "incomplete",
+        threads: 0,
+      },
+      {
+        device: "d",
+        name: "old box",
+        platform: "linux",
+        kind: "cli",
+        online: false,
+        last_seen: null,
+        this_device: false,
+        listing: "offline",
+        threads: 0,
+      },
     ])
   })
 
