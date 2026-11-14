@@ -25,12 +25,29 @@ export type DeviceAccountRuntimeModule = Pick<
 >
 
 const importDeviceAccountRuntime = (): Promise<DeviceAccountRuntimeModule> => import("#omo-device-account-runtime")
-let memorySyncHost: HostMemorySync | undefined
+// The host this process provided to senpi's worker-data registry. It lives on globalThis beside the host selection it
+// guards: senpi's registry is process-wide, and an extension hot reload re-evaluates this module, so a module-local
+// guard would provide the same name a second time.
+const PROVIDED_HOST_KEY = Symbol.for("omo.memory-sync.worker-data-provided.v1")
+type ProvidedHostGlobal = typeof globalThis & { [PROVIDED_HOST_KEY]?: HostMemorySync }
 
 /**
  * The thread's one account source: on the main thread it selects once per process and provides the Worker port; in a
  * session Worker it reads the port the host issued. The CLI credential source is built only for a CLI selection.
  */
+/**
+ * The name is omo's own, so a provider registered before this module's guard existed is most often an earlier omo build
+ * in this same process (an in-place update hot-reloaded omo.js) and only a restart replaces it. It stays a bootstrap
+ * failure either way: the message names the likely cause and the remedy, and keeps the original text (#13101 review).
+ */
+function providerConflict(error: unknown): unknown {
+  if (!(error instanceof Error) || !error.message.includes("already provided")) return error
+  return new Error(
+    `${error.message}. If omo was just updated in place, an earlier omo build in this process already registered memory sync: restart the session to load the new one.`,
+    { cause: error },
+  )
+}
+
 export function selectedDeviceAccountSource(
   options: Parameters<DeviceAccountRuntimeModule["selectedAccountSource"]>[1],
   importRuntime: () => Promise<DeviceAccountRuntimeModule> = importDeviceAccountRuntime,
@@ -44,16 +61,21 @@ export function selectedDeviceAccountSource(
     }))
   let selection: () => Promise<MemorySyncSelection>
   if (isMainThread) {
+    const provided = globalThis as ProvidedHostGlobal
     const host =
-      memorySyncHost ??
+      provided[PROVIDED_HOST_KEY] ??
       selectHostMemorySyncSource({
         declared: launchCarriedPrivateTable,
         sidecar: runtime,
       })
-    // A duplicate/late provider is a bootstrap failure, not an unavailable account.
-    if (memorySyncHost === undefined) {
-      provideSessionWorkerData(MEMORY_SYNC_WORKER_DATA, host.workerData)
-      memorySyncHost = host
+    // A duplicate/late provider from anyone else is a bootstrap failure, not an unavailable account.
+    if (provided[PROVIDED_HOST_KEY] === undefined) {
+      try {
+        provideSessionWorkerData(MEMORY_SYNC_WORKER_DATA, host.workerData)
+      } catch (error) {
+        throw providerConflict(error)
+      }
+      provided[PROVIDED_HOST_KEY] = host
     }
     selection = () => host.selection
   } else {
