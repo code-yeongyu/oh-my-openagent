@@ -10,7 +10,9 @@
 // record: one inherited from the parent environment is dropped first, so it can never vouch for a
 // HERDR_AGENT the user set.
 
-const NON_INTERACTIVE_FLAGS = new Set(["-p", "--print", "--mode"])
+import { ENGINE_PROTOCOL_MODE_FLAGS } from "./mode-flags.js"
+
+const NON_INTERACTIVE_FLAGS = new Set(["-p", "--print", "--mode", ...ENGINE_PROTOCOL_MODE_FLAGS])
 
 export const HERDR_AGENT_LABEL = "pi"
 export const HERDR_AGENT_MARKER = "OMO_HERDR_AGENT_HINT"
