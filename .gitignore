@@ -12,6 +12,13 @@ node_modules/
 dist/
 .vitest/
 packages/omo-codex/plugin/skills/
+# Build outputs, never tracked (#13192): bun run build:codex-install and the bin/lib generators write them. They are listed
+# here, not in packages/omo-native/.gitignore, because build-omo-native.ts rewrites that file. The hand-written
+# brand-logo.generated.d.ts stays tracked.
+packages/omo-codex/scripts/install-dist/install-local.mjs
+packages/omo-native/bin/lib/service-auth.generated.js
+packages/omo-native/bin/lib/reflection-lock.generated.js
+packages/omo-native/bin/lib/brand-logo.generated.js
 
 # Platform binaries (built, not committed)
 packages/*/bin/oh-my-opencode

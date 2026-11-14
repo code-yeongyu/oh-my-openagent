@@ -10,7 +10,6 @@
         "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "scripts/install-local.mjs",
-        "scripts/install-dist/install-local.mjs",
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
       ],
@@ -43,8 +42,6 @@
     }
   },
   "preExistingExports": {
-    // pre-existing at origin dev 4686e425b5: unused export(s) PASSTHROUGH_COMMANDS, buildDelegatedOmoInvocation, formatLazyCodexInstallHelp, installMarketplaceLocally, parseLazyCodexInstallCliArgs, resolveCodexInstallerBinDir, resolveDefaultRepoRoot, resolveDefaultRepoRootForEntrypoint, runDelegatedOmoCommand, runLazyCodexInstallLocalCli
-    "packages/omo-codex/scripts/install-dist/install-local.mjs": ["PASSTHROUGH_COMMANDS", "buildDelegatedOmoInvocation", "formatLazyCodexInstallHelp", "installMarketplaceLocally", "parseLazyCodexInstallCliArgs", "resolveCodexInstallerBinDir", "resolveDefaultRepoRoot", "resolveDefaultRepoRootForEntrypoint", "runDelegatedOmoCommand", "runLazyCodexInstallLocalCli"],
     // pre-existing at origin dev 4686e425b5: unused export(s) writePlugin
     "packages/omo-codex/scripts/install-test-fixtures.mjs": ["writePlugin"],
     // pre-existing at origin dev 4686e425b5: unused export(s) installedMarketplaceRoot

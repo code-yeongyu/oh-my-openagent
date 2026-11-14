@@ -1,20 +1,19 @@
 /// <reference types="bun-types" />
 
-import { afterEach, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
 
-import { runSenpiInstaller } from "./install-senpi"
+import { createInstallSandbox, type InstallSandbox } from "./install-test-fixture"
 
 const repoRoot = resolve(import.meta.dir, "../../../..")
 const pluginPath = join(repoRoot, "packages", "omo-senpi", "plugin")
 const tempDirs: string[] = []
 
+// Installs run in a sandbox (#13192, #13253): these temp dirs are inside its root, and it refuses an install whose
+// launcher or settings path would land outside.
 async function tempDir(prefix: string): Promise<string> {
-  const directory = await mkdtemp(join(tmpdir(), prefix))
-  tempDirs.push(directory)
-  return directory
+  return sandbox.tempDir(prefix)
 }
 
 async function settingsPackages(agentDir: string): Promise<readonly string[]> {
@@ -27,7 +26,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
+let sandbox: InstallSandbox
+beforeEach(async () => {
+  sandbox = await createInstallSandbox()
+})
+
 afterEach(async () => {
+  await sandbox.dispose()
   await Promise.all(tempDirs.splice(0).map((directory) => rm(directory, { recursive: true, force: true })))
 })
 
@@ -38,7 +43,7 @@ describe("runSenpiInstaller source refresh", () => {
     const calls: Array<{ readonly command: string; readonly args: readonly string[]; readonly cwd: string }> = []
 
     // when
-    await runSenpiInstaller({
+    await sandbox.install({
       agentDir,
       homeDir: await tempDir("omo-senpi-source-refresh-home-"),
       repoRoot,
@@ -69,7 +74,7 @@ describe("runSenpiInstaller source refresh", () => {
     await writeFile(join(agentDir, "settings.json"), JSON.stringify({ packages: ["keep-me", stalePlugin] }))
 
     // when
-    await runSenpiInstaller({
+    await sandbox.install({
       agentDir,
       homeDir: await tempDir("omo-senpi-package-replace-home-"),
       repoRoot,
@@ -93,7 +98,7 @@ describe("runSenpiInstaller source refresh", () => {
     )
 
     // when
-    await runSenpiInstaller({
+    await sandbox.install({
       agentDir,
       homeDir: await tempDir("omo-senpi-package-cleanup-home-"),
       repoRoot,
@@ -120,7 +125,7 @@ describe("runSenpiInstaller source refresh", () => {
     )
 
     // when
-    await runSenpiInstaller({ agentDir, homeDir: await tempDir("omo-senpi-package-order-home-"), repoRoot, pluginPath })
+    await sandbox.install({ agentDir, homeDir: await tempDir("omo-senpi-package-order-home-"), repoRoot, pluginPath })
 
     // then
     expect(await settingsPackages(agentDir)).toEqual(["before", pluginPath, "after"])
