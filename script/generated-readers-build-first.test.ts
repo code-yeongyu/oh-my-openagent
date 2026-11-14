@@ -121,6 +121,12 @@ const READS_NOTHING: Readonly<Record<string, string>> = {
     "reaches plugin/scripts/install.mjs only as a path string; passes on an unbuilt tree",
   "computer-live-linux.yml xorg-uinput":
     "runs script/qa/computer/pool/xorg-uinput-probe.ts, whose import closure (6 pool files) reaches only node builtins and bun:ffi",
+  "computer-live-windows-full.yml host":
+    "runs two PowerShell probes (interactive-desktop-smoke.ps1, hosted-windows-live.ps1); no install step and no JavaScript",
+  "computer-live-windows-full.yml ledger":
+    "runs script/qa/computer/pool/windows-full.ts with no install, whose import closure (3 pool files) reaches only node:fs",
+  "computer-live-windows-full.yml session":
+    "runs the hosted-windows-live.ps1 PowerShell probe only; no install step and no JavaScript",
   "get-worker-ci.yml worker":
     "packages/get-worker is its own project (own bun.lock, not a root workspace) and imports no output",
   "bot-merge.yml merge": NO_READER,
