@@ -992,6 +992,13 @@ jobs:
         if: needs.release-metadata.outputs.already_published != 'true' && inputs.lazycodex_only != true
         run: node script/verify-omo-ai-payload.mjs --release
 
+      # Refs #13062: an omo release must not publish while DEVICE_SERVICE_VERSION names a version
+      # get.omo.dev does not serve with a valid signature (5.1.61-5.1.68 shipped pins 0.1.0/0.1.3
+      # the origin 404d, so every CLI warned on start). Runs before the first npm publish below.
+      - name: Verify pinned device service is served
+        if: needs.release-metadata.outputs.already_published != 'true' && inputs.lazycodex_only != true
+        run: bun run script/verify-device-service-pin.ts
+
       - name: Strip token auth from .npmrc to force OIDC
         if: >-
           steps.check.outputs.skip != 'true' ||
