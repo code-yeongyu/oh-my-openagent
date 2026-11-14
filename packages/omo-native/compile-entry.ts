@@ -326,10 +326,10 @@ export { reexecProvisionedRuntime } from "./provisioned-handoff"
  * Never a static answer or self-update (the installers run `omo --version`), never the launcher
  * that is about to hand off, and never the engine's own re-runs of the runtime copy (no launcher).
  */
-export function launchPrunesRuntimes(
+export function launchPrunesRuntimes<L extends Pick<ProvisionedLaunch, "handOff" | "launcher">>(
   args: readonly string[],
-  launch: Pick<ProvisionedLaunch, "handOff" | "launcher">,
-): boolean {
+  launch: L,
+): launch is L & { readonly launcher: string } {
   if (launch.launcher === undefined || launch.handOff) return false
   return trustLaunchKind(args) !== "static" && !isSelfUpdate([...args])
 }
@@ -507,7 +507,7 @@ async function main(): Promise<void> {
     return
   }
   if (answerCompiledFastPath(process.argv.slice(2), manifest)) return
-  if (launchPrunesRuntimes(process.argv.slice(2), launch) && launch.launcher !== undefined) {
+  if (launchPrunesRuntimes(process.argv.slice(2), launch)) {
     reportRuntimePrune(pruneProvisionedRuntimes({ root: dirname(dirname(expected)), current: manifest.omoAiVersion }))
     removeReplacedLauncher(launch.launcher)
   }
