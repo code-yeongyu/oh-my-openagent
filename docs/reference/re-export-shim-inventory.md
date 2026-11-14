@@ -10,7 +10,7 @@ Generated command:
 git ls-files packages/omo-opencode/src packages/omo-codex/src | grep '\.ts$' | sort | xargs awk 'FNR==1 && /^export (\*|\{).*from ["'"'"']@oh-my-opencode\// { print FILENAME }'
 ```
 
-Snapshot date: 2026-08-31. Total shim exports found: 226.
+Snapshot date: 2026-08-31. Total shim exports found: 225.
 
 ## Aggregate By Target Package
 
@@ -115,7 +115,6 @@ Snapshot date: 2026-08-31. Total shim exports found: 226.
 | `packages/omo-opencode/src/features/opencode-skill-loader/index.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/features/opencode-skill-loader/loaded-skill-from-path.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/features/opencode-skill-loader/loaded-skill-template-extractor.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/opencode-skill-loader/loader.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/features/opencode-skill-loader/merger.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/features/opencode-skill-loader/merger/builtin-skill-converter.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/features/opencode-skill-loader/merger/scope-priority.ts` | `@oh-my-opencode/skills-loader-core` |
