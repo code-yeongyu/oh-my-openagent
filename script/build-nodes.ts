@@ -10,6 +10,7 @@ const OPENTUI_EXTERNALS = ["@opentui/core", "@opentui/keymap", "@opentui/solid"]
 export const BUILD_NODES: BuildNode[] = [
   { id: "service-auth", command: "bun", args: ["script/build-service-auth.ts"], deps: [] },
   { id: "reflection-lock", command: "bun", args: ["script/build-reflection-lock.ts"], deps: [] },
+  { id: "brand-logo", command: "bun", args: ["script/build-brand-logo.ts"], deps: [] },
   { id: "git-bash-mcp", command: "bun", args: ["run", "build:git-bash-mcp"], deps: [] },
   { id: "ast-grep-mcp", command: "bun", args: ["run", "build:ast-grep-mcp"], deps: [] },
   { id: "lsp-tools-mcp", command: "bun", args: ["run", "build:lsp-tools-mcp"], deps: [] },
@@ -24,7 +25,8 @@ export const BUILD_NODES: BuildNode[] = [
     id: "senpi-plugin",
     command: "bun",
     args: ["run", "build:senpi-plugin:stage"],
-    deps: ["ast-grep-mcp", "lsp-daemon", "codex-plugin"],
+    // Its build-install step also writes the brand logo module; waiting keeps the two writers apart.
+    deps: ["ast-grep-mcp", "lsp-daemon", "codex-plugin", "brand-logo"],
   },
   {
     id: "index",
@@ -75,9 +77,10 @@ export const BUILD_NODES: BuildNode[] = [
       "--format",
       "esm",
     ],
-    deps: [],
+    // The CLI bundles the local launcher, which imports the generated bin/lib/brand-logo.generated.js.
+    deps: ["brand-logo"],
   },
-  { id: "cli-node", command: "bun", args: ["run", "build:cli-node"], deps: [] },
+  { id: "cli-node", command: "bun", args: ["run", "build:cli-node"], deps: ["brand-logo"] },
   { id: "codex-install", command: "bun", args: ["run", "build:codex-install"], deps: [] },
   { id: "schema", command: "bun", args: ["run", "build:schema"], deps: [] },
   { id: "omo-schema", command: "bun", args: ["run", "build:omo-schema"], deps: [] },
@@ -96,7 +99,7 @@ export const BUILD_NODES: BuildNode[] = [
  * binary build.
  */
 export const BUILD_PROFILES: Record<string, readonly string[]> = {
-  "omo-native": ["lsp-daemon", "ast-grep-mcp", "service-auth"],
+  "omo-native": ["lsp-daemon", "ast-grep-mcp", "service-auth", "reflection-lock", "brand-logo"],
 }
 
 export function selectBuildNodes(

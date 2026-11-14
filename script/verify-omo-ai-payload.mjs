@@ -6,6 +6,7 @@ import { dirname, posix, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { npmSpawnOptions } from "./npm-invocation.mjs"
+import { spawnSync } from "node:child_process"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(scriptDir, "..")
@@ -13,6 +14,9 @@ const pkgDir = resolve(repoRoot, "packages", "omo-native")
 
 const REQUIRED_ARTIFACTS = [
   "bin/omo.js",
+  // bin/omo.js imports it for omo auth, sync, account and remote; it is a generated output (#9903), so a payload
+  // packed without the generated build lacks it.
+  "bin/lib/service-auth.generated.js",
   "plugin/package.json",
   "plugin/CHANGELOG.md",
   "plugin/extensions/omo.js",
@@ -46,6 +50,109 @@ const REQUIRED_ARTIFACTS = [
 // only, so its execute bit is read from the file system.
 const RELEASE_EXECUTABLE_ARTIFACTS = ["bin/darwin/omo-keychain"]
 const releaseMode = process.argv.slice(2).includes("--release")
+// The release build preflight packs before publish-platform builds the keychain helper, so it requires the generated
+// modules below without the helper.
+const preflightMode = process.argv.slice(2).includes("--release-preflight")
+
+// Build outputs git does not track (#13192): only a build writes them, so a release that skipped one would publish
+// without it. "Every output the plugin needs" is defined once, in plugin-required-outputs.ts: the installer's
+// REQUIRED_PLUGIN_ARTIFACTS plus the packed plugin's import-map targets, and every output script/generated-bundles.json
+// lists under a directory this package ships, per output (a pattern is never met by any one matching file).
+const PLUGIN_SOURCE_ROOT = "packages/omo-senpi/plugin/"
+const SHIPPED_ROOTS = [
+  ["packages/omo-native/", ""],
+  [PLUGIN_SOURCE_ROOT, "plugin/"],
+]
+const toRepoPath = (packed) =>
+  packed.startsWith("plugin/") ? PLUGIN_SOURCE_ROOT + packed.slice(7) : `packages/omo-native/${packed}`
+const toPackedPath = (repoPath) => {
+  const root = SHIPPED_ROOTS.find(([source]) => repoPath.startsWith(source))
+  return root === undefined ? undefined : root[1] + repoPath.slice(root[0].length)
+}
+
+// The list lives in TypeScript behind a workspace alias, so this node process reads it through one call of the job's
+// pinned bun (setup-bun in every job that runs this gate); a missing bun is an error line, not a stack trace.
+const HELPER_NAME = "script/plugin-required-outputs.ts"
+
+function readPluginRequirements() {
+  const result = spawnSync(
+    "bun",
+    [resolve(scriptDir, "plugin-required-outputs.ts"), resolve(pkgDir, "plugin", "package.json")],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+    },
+  )
+  if (result.error !== undefined)
+    throw new Error(`reading REQUIRED_PLUGIN_ARTIFACTS needs bun: ${result.error.message}`)
+  // Every failure of the helper ends in ONE line that names it and the cause, never a stack trace or a raw parser error.
+  if (result.status !== 0) {
+    const lines = (result.stderr ?? "").trim().split("\n")
+    const firstLine = lines.find((line) => /^\s*error:/i.test(line))?.trim() ?? lines[0] ?? ""
+    throw new Error(`${HELPER_NAME} exited ${result.status}: ${firstLine}`)
+  }
+  let read
+  try {
+    read = JSON.parse(result.stdout)
+  } catch {
+    throw new Error(`${HELPER_NAME} printed output that is not JSON: ${result.stdout.trim().split("\n")[0] ?? ""}`)
+  }
+  if (read?.manifestError !== undefined) return read
+  const strings = (value) => Array.isArray(value) && value.length > 0 && value.every((v) => typeof v === "string")
+  const entries = (value) =>
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every((v) => typeof v?.label === "string" && typeof v?.source === "string")
+  // A release check with nothing to check, or one whose entries are malformed, must not pass.
+  const empty = (value) => Array.isArray(value) && value.length === 0
+  if (empty(read?.pluginOutputs) || empty(read?.generated)) {
+    throw new Error("the plugin requirement list is empty: refusing to pass a release check with nothing to check")
+  }
+  if (!strings(read?.pluginOutputs)) {
+    throw new Error(`${HELPER_NAME} gave no usable "pluginOutputs": expected a non-empty array of strings`)
+  }
+  if (!entries(read?.generated)) {
+    throw new Error(
+      `${HELPER_NAME} gave no usable "generated": expected a non-empty array of { label: string, source: string }`,
+    )
+  }
+  for (const entry of read.generated) {
+    try {
+      new RegExp(entry.source)
+    } catch {
+      throw new Error(
+        `${HELPER_NAME} gave a "generated" entry whose source is not a regular expression: ${entry.label}`,
+      )
+    }
+  }
+  return read
+}
+
+function releaseRequirements() {
+  const read = readPluginRequirements()
+  // An absent manifest is already a missing artifact of REQUIRED_ARTIFACTS; an unparsable one is reported here.
+  if (read.manifestError !== undefined) {
+    return [{ label: `plugin/package.json (unreadable: ${read.manifestError})`, met: () => false }]
+  }
+  const pluginOutputs = read.pluginOutputs
+  const requirements = pluginOutputs.map((path) => {
+    const packed = `plugin/${path}`
+    return { label: packed, met: (paths) => paths.includes(packed) }
+  })
+  for (const { label, source } of read.generated) {
+    const regex = new RegExp(source)
+    const packedLabel = label.startsWith("a path matching") ? label : toPackedPath(label)
+    if (
+      packedLabel === undefined ||
+      (!label.startsWith("a path matching") && pluginOutputs.includes(packedLabel.slice(7)))
+    )
+      continue
+    if (label.startsWith("a path matching") && !SHIPPED_ROOTS.some(([source]) => regex.source.startsWith(`^${source}`)))
+      continue
+    requirements.push({ label: packedLabel, met: (paths) => paths.some((path) => regex.test(toRepoPath(path))) })
+  }
+  return requirements
+}
 
 // A bundle that reads `join(dirname(fileURLToPath(import.meta.url)), "<file>")` needs <file> packed
 // next to it; minified bundles keep this shape with renamed helpers, so the helper names are not matched.
@@ -103,6 +210,21 @@ const pathSet = new Set(paths)
 for (const artifact of REQUIRED_ARTIFACTS) {
   if (!pathSet.has(artifact)) {
     errors.push(`missing artifact: ${artifact}`)
+  }
+}
+
+let requirements = []
+if (releaseMode || preflightMode) {
+  try {
+    requirements = releaseRequirements()
+  } catch (error) {
+    // No stack trace: name the cause, e.g. bun missing from the job.
+    errors.push(error.message)
+  }
+}
+for (const requirement of requirements) {
+  if (!requirement.met(paths)) {
+    errors.push(`missing artifact: ${requirement.label}`)
   }
 }
 

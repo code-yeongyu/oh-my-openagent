@@ -75,6 +75,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-bun-
 
+      # Generated outputs are built with node scripts; pin the major the release preflight proves (#13192).
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
       # Build local oh-my-opencode
       - name: Build oh-my-opencode
         run: |
