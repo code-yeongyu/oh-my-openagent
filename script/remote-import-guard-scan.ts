@@ -34,7 +34,7 @@ const SKIPPED_PATHS = [
   "packages/omo-codex/scripts/install-dist/",
 ]
 
-export function listSourceFiles(repoRoot: string): string[] {
+function listSourceFiles(repoRoot: string): string[] {
   const files: string[] = []
   const walk = (relativeDir: string): void => {
     for (const entry of readdirSync(join(repoRoot, relativeDir), { withFileTypes: true })) {
@@ -89,7 +89,7 @@ function exportDeclarationEdge(node: ts.ExportDeclaration, specifier: string): I
   return { kind: "export-from", specifier, typeOnly: node.isTypeOnly, names, whole: clause === undefined }
 }
 
-export function scanSource(file: string, text: string): FileFacts {
+function scanSource(file: string, text: string): FileFacts {
   const kind = file.endsWith(".tsx") ? ts.ScriptKind.TSX : /\.[cm]?js$/.test(file) ? ts.ScriptKind.JS : ts.ScriptKind.TS
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, false, kind)
   const edges: ImportEdge[] = []

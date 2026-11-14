@@ -21,7 +21,7 @@ const world = defaultWorld()
 const KEY = "RVBFUEVQRVBFUEVQRVBFUA"
 const SHA = "ab".repeat(32)
 const COMMAND_ID = "Y29tbWFuZC1pZC0wMDAwMQ"
-const NEWER = { environments: [{ environment_id: "env-1", revoked: false, closed: false }] }
+const NEWER = { added_later: { rows: [1, "two"] } }
 const deviceRow = world.devices[0]
 if (deviceRow === undefined) throw new Error("the world lists a device")
 const attachState = { attached: true, changedAt: "2026-11-09T12:00:00.000Z" }
@@ -57,6 +57,12 @@ const answerRows = Object.entries(answers) as [RequestType, unknown][]
 const response = (data: unknown) => ({ id: "r1", type: "response", ok: true, data })
 const decode = (type: RequestType, data: unknown) => validateResponse(response(data), type)
 const withExtra = (v: object, extra: object = NEWER): object => ({ ...v, ...extra })
+// Optional fields an example carries (protocol-events.ts): dropping one leaves a valid event (upstream LA26).
+const OPTIONAL: { readonly [kind: string]: readonly string[] } = {
+  "host.update_notice": ["deadline_ms", "update_id"],
+  "session.records": ["seqs"],
+  "machine.op_state": ["timing"],
+}
 
 const welcome = {
   type: "welcome",
@@ -189,7 +195,9 @@ describe("LA21 a reply the client reads still refuses a missing required field",
       expect(() => validateResponse(rest, "authenticate"), name).toThrow("protocol_violation")
     }
     for (const event of Object.values(eventExamples) as LocalEvent[])
-      for (const name of Object.keys(event).filter((key) => key !== "type" && key !== "kind")) {
+      for (const name of Object.keys(event).filter(
+        (key) => key !== "type" && key !== "kind" && !(OPTIONAL[event.kind] ?? []).includes(key),
+      )) {
         const { [name]: _dropped, ...rest } = event as Record<string, unknown>
         expect(() => validateEvent(withExtra(rest)), `${event.kind} without ${name}`).toThrow("protocol_violation")
       }
@@ -267,6 +275,7 @@ describe("LA21 what a peer sends to be acted on keeps refusing unknown fields", 
 describe("LA21 mixed client and service versions on session.endpoints", () => {
   const unasked = { endpoints: [KEY] }
   const carryingAField = { endpoints: [KEY], ...NEWER }
+  const carryingEnvironments = { endpoints: [KEY], environments: [KEY] }
   const strictClient = (data: unknown) => ({ endpoints: exactly(data, ["endpoints"], [], "data")["endpoints"] })
   const newClient = (data: unknown) => {
     const verdict = decode("session.endpoints", data)
@@ -288,9 +297,15 @@ describe("LA21 mixed client and service versions on session.endpoints", () => {
       { endpoints: [KEY] },
     ],
     [
+      "new client, a 0.1.24 service answering environments: decoded",
+      newClient,
+      carryingEnvironments,
+      { endpoints: [KEY], environments: [KEY] },
+    ],
+    [
       "5.1.65 client, a reply carrying environments unasked (the build rolled 2026-11-09)",
       strictClient,
-      carryingAField,
+      carryingEnvironments,
       "data has an unknown field",
     ],
   ]
