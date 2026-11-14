@@ -23,8 +23,8 @@ use objc2_app_kit::{NSApplicationActivationOptions, NSRunningApplication};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 
 use self::psn::{
-    front_process, post_focus_record, process_psn, FocusMarker, ProcessSerialNumber,
-    SET_FRONT_NO_WINDOWS,
+    front_process, post_focus_record, post_key_window_records, process_psn, FocusMarker,
+    ProcessSerialNumber, SET_FRONT_NO_WINDOWS,
 };
 pub(crate) use self::focus_records::post_key_records;
 pub(crate) use self::partial::{mark_sent, reporting_partial};
@@ -149,6 +149,47 @@ pub(crate) fn activate_without_raise(pid: libc::pid_t, wid: u32) -> CoreResult<(
     Ok(())
 }
 
+/// Gives `(pid, wid)` back what [`activate_without_raise`] took from it while
+/// it stayed the front process: the focus record makes the process active in
+/// AppKit again, and the key-window pair makes `wid` its key window. AppKit
+/// activation does neither for a process WindowServer still lists as front,
+/// so an Electron window would otherwise stay without a focused element.
+/// `still_front` is asked right before each post; once it says no (the user
+/// switched to another application), nothing more is posted.
+///
+/// # Errors
+/// `InputFailed` when the process cannot be resolved or a record is refused.
+pub(crate) fn rekey_without_raise(
+    pid: libc::pid_t,
+    wid: u32,
+    still_front: &dyn Fn() -> bool,
+) -> CoreResult<()> {
+    let spi = required()?;
+    let psn = process_psn(spi.psn, pid, wid).ok_or_else(|| {
+        DesktopError::input_failed(format!(
+            "window {wid} could not resolve its process serial number to give key focus back"
+        ))
+    })?;
+    if !still_front() {
+        return Ok(());
+    }
+    if !post_focus_record(&psn, wid, FocusMarker::Focus) {
+        return Err(DesktopError::input_failed(format!(
+            "window {wid} rejected the focus record that gives key focus back"
+        )));
+    }
+    thread::sleep(Duration::from_millis(50));
+    if !still_front() {
+        return Ok(());
+    }
+    if !post_key_window_records(&psn, wid) {
+        return Err(DesktopError::input_failed(format!(
+            "window {wid} rejected the key-window records that give key focus back"
+        )));
+    }
+    Ok(())
+}
+
 /// Runs `action` with `pid` as the active application, restoring the previous
 /// front application after it. Activation goes through AppKit: a process
 /// fronted only through SkyLight (`_SLPSSetFrontProcessWithOptions`) is front to
@@ -258,7 +299,7 @@ fn await_active(pid: libc::pid_t) -> CoreResult<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::psn::focus_record;
+    use super::psn::{focus_record, key_window_record};
     use super::spi::{env_disables, skylight_available};
     use super::*;
 
@@ -281,5 +322,17 @@ mod tests {
         assert_eq!(&record[0x3c..0x40], &0x0a0b0c0d_u32.to_le_bytes());
         assert_eq!(record[0x8a], 0x01);
         assert_eq!(focus_record(7, FocusMarker::Defocus)[0x8a], 0x02);
+    }
+
+    #[test]
+    fn key_window_record_encodes_kind_window_flag_and_unset_location() {
+        let record = key_window_record(0x0a0b0c0d, 0x01);
+        assert_eq!(record[0x04], 0xf8);
+        assert_eq!(record[0x08], 0x01);
+        assert!(record[0x20..0x30].iter().all(|&byte| byte == 0xff));
+        assert_eq!(record[0x3a], 0x10);
+        assert_eq!(&record[0x3c..0x40], &0x0a0b0c0d_u32.to_le_bytes());
+        assert_eq!(record[0x8a], 0x00);
+        assert_eq!(key_window_record(7, 0x02)[0x08], 0x02);
     }
 }
