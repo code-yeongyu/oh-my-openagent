@@ -145,13 +145,13 @@ async function graph(root: string): Promise<Record<string, Input>> {
   if (inputs === undefined || Object.keys(inputs).length === 0)
     throw new Error(`the bundler returned no module graph for ${root}`);
   return Object.fromEntries(
-    Object.entries(inputs).map(([file, input]) => [relative(repoRoot, at(file)), input]),
+    Object.entries(inputs).map(([file, input]) => [relative(repoRoot, at(file)).replaceAll("\\", "/"), input]),
   );
 }
 
 const importersOf = (inputs: Record<string, Input>, matches: (path: string) => boolean): string[] =>
   Object.entries(inputs)
-    .filter(([, input]) => input.imports.some((entry) => matches(entry.path)))
+    .filter(([, input]) => input.imports.some((entry) => matches(entry.path.replaceAll("\\", "/"))))
     .map(([file]) => file)
     .sort();
 const builtin = (name: string) => (path: string) => path.replace(/^node:/, "") === name;

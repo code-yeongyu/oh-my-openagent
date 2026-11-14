@@ -112,9 +112,8 @@ function parseFile(repoRoot: string, file: string): ParsedFile {
   const moduleOf = (specifier: string): string => {
     if (specifier.startsWith("node:") || PROCESS_MODULES.has(specifier)) return specifier
     const resolved = realpathSync(Bun.resolveSync(specifier, dirname(absolute)))
-    return resolved.startsWith(`${repoRoot}/`) && !resolved.includes("/node_modules/")
-      ? relative(repoRoot, resolved)
-      : specifier
+    const inRepo = relative(repoRoot, resolved).replaceAll("\\", "/")
+    return inRepo.startsWith("../") || inRepo.includes("node_modules/") ? specifier : inRepo
   }
   const imports = new Map<string, Binding>()
   const exports = new Map<string, string | Binding>()
