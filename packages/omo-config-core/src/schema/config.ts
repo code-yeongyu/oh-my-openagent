@@ -16,6 +16,7 @@ import { OmoTelemetrySettingsLayerSchema, OmoTelemetrySettingsSchema } from "./t
 import { OmoDeviceServiceSettingsLayerSchema, OmoDeviceServiceSettingsSchema } from "./device-service"
 import { OmoFormatOnMutationLayerSchema, OmoFormatOnMutationSchema } from "./format-on-mutation"
 import { OmoProvenanceSettingsSchema } from "./provenance"
+import { OmoSessionWakeSettingsSchema } from "./session-wake"
 
 export type { OmoHarnessId }
 export { OmoHarnessIdSchema }
@@ -38,6 +39,7 @@ export const OmoExcludedModelsSchema = z.array(z.string())
 export const OmoTypedHarnessConfigSchema = z
   .object({
     provenance: OmoProvenanceSettingsSchema.optional(),
+    session_wake: OmoSessionWakeSettingsSchema.optional(),
     formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
     categories: OmoCategoriesConfigSchema.optional(),
     agents: OmoAgentsConfigSchema.optional(),
@@ -61,6 +63,7 @@ export const OmoTypedHarnessConfigSchema = z
 export const OmoConfigProfileSchema = z
   .object({
     provenance: OmoProvenanceSettingsSchema.optional(),
+    session_wake: OmoSessionWakeSettingsSchema.optional(),
     formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
     categories: OmoCategoriesConfigSchema.optional(),
     agents: OmoAgentsConfigSchema.optional(),
@@ -88,6 +91,7 @@ export const OmoConfigProfileSchema = z
 export const OmoConfigSchema = z
   .object({
     provenance: OmoProvenanceSettingsSchema.optional(),
+    session_wake: OmoSessionWakeSettingsSchema.optional(),
     formatOnMutation: OmoFormatOnMutationSchema.optional(),
     $schema: z.string().optional(),
     categories: OmoCategoriesConfigSchema.optional(),
@@ -119,6 +123,7 @@ export const OmoConfigSchema = z
 export const OmoConfigLayerSchema = z
   .object({
     provenance: OmoProvenanceSettingsSchema.optional(),
+    session_wake: OmoSessionWakeSettingsSchema.optional(),
     formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
     $schema: z.string().optional(),
     categories: OmoCategoriesConfigSchema.optional(),

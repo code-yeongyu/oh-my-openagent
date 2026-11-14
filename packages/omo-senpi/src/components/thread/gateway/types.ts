@@ -6,7 +6,7 @@ export type DeliveryState = "queued" | "admitting" | "admitted" | "applied" | "r
 
 export type EffectiveLane = "steer" | "follow_up"
 
-export type RefusalReason = "not_steerable" | "turn_conflict" | "expired" | "binding_closed"
+export type RefusalReason = "not_steerable" | "turn_conflict" | "expired" | "binding_closed" | "sender_not_admitted"
 
 export type ProcessIdentity = {
   readonly pid: number
@@ -98,7 +98,50 @@ export type DeliveryRow = {
   readonly binding_id: string | null
   readonly binding_revision: number | null
   readonly actor_user_id: string | null
+  /** The engine ledger key of a delivery taken in from another device (`device:<attested device>/<sender's id>`); null on every other row. */
+  readonly ledger_id?: string | null
+  /** The sender's rendered text and display text of such a delivery, handed to the engine unrendered; null on every other row. */
+  readonly verbatim_text?: string | null
+  readonly verbatim_display_text?: string | null
 }
+
+/** A delivery record another device's service attested, as the sender's relay leg writes it (`remote/relay-transport.ts`). */
+export type IntakeRecord = {
+  readonly sessionId: string
+  readonly deliveryId: string
+  readonly text: string
+  readonly displayText: string
+  readonly sender: { readonly kind: string; readonly session_id?: string; readonly name?: string }
+  readonly deliverAs: "followUp" | "steer"
+  readonly chainCount: number
+}
+
+/**
+ * Takes a record in for a session on this device that is not running (#13037). `attested_device` comes from the receiving
+ * device service, never from the record; `target_session_kind` and `chain_count_limit` are this device's facts.
+ */
+export type IntakeRequest = {
+  readonly now: number
+  readonly attested_device: string
+  readonly record: IntakeRecord
+  readonly provenance: Pick<Provenance, "workspace" | "project" | "lane" | "session">
+  readonly target_session_kind: "interactive" | "worker" | "child"
+  /** The machine's chain limit setting; absent when the user set none. */
+  readonly chain_count_limit?: number
+}
+
+export type IntakeOutcome =
+  | {
+      readonly kind: "queued"
+      /** The sender's own delivery id. */
+      readonly delivery_id: string
+      readonly row_id: string
+      readonly ledger_id: string
+      readonly queue_position: number
+      readonly deduplicated: boolean
+    }
+  | StoreRefusal
+  | { readonly kind: "busy" }
 
 /**
  * Who is sending. Every kind maps to one receipt/budget principal and one causal-graph node:
@@ -219,7 +262,9 @@ export type RecordOutcomeRequest = {
 
 export type GatewayDeliveryDelivery =
   | { readonly kind: "started" | "steered"; readonly turn_id: string }
-  | { readonly kind: "queued" | "queued_offline"; readonly queue_position: number; readonly waiting_on?: DeliveryWait }
+  | { readonly kind: "queued"; readonly queue_position: number; readonly waiting_on?: DeliveryWait }
+  /** `reason: wake_unavailable`: the same-device switch is on and the target was asked to wake, but no carrier runs (#13037). */
+  | { readonly kind: "queued_offline"; readonly queue_position: number; readonly reason?: "wake_unavailable" }
 
 /**
  * What the receiver is parked on while the delivery waits: an approval (a tool permission or question) a human must answer on
