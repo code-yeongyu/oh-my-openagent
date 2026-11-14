@@ -22,6 +22,14 @@ describe("desktop observer at preflight (P-17)", () => {
     expect(status).toEqual({ kind: "unavailable", reason: check.detail })
   })
 
+  test("a sentinel whose recordsOn throws when asked is an environment fault, not a crash of the run", async () => {
+    const path = sentinel("asks-throw", 'export const recordsOn = () => { throw new Error("boom at ask") }\n')
+    const { check, status } = await observerCheck(path, "windows")
+    expect(check.ok).toBe(false)
+    expect(check.detail).toContain("recordsOn(windows) threw: boom at ask")
+    expect(status).toEqual({ kind: "unavailable", reason: check.detail })
+  })
+
   test("a missing sentinel module is an environment fault", async () => {
     const { check } = await observerCheck(join(dir, "absent.ts"), "x11")
     expect(check.ok).toBe(false)
