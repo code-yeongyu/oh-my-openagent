@@ -3,7 +3,7 @@
 // host is BLOCKED with its reason, never a pass; pass counts only scenarios that ran their oracle.
 import { describe, expect, test } from "bun:test"
 
-import { runAll, setLine } from "./set.ts"
+import { gateSet, runAll, setLine } from "./set.ts"
 
 type Fake = { readonly name: string; readonly blocked?: string; readonly result?: boolean | Error }
 
@@ -54,5 +54,37 @@ describe("windows --all", () => {
     const { lines } = await run([{ name: "a", result: true }])
     expect(lines.filter((line) => line.startsWith("SET "))).toEqual(["SET windows pass=1 fail=0 blocked=0"])
     expect(setLine({ pass: 3, fail: 0, blocked: 2 })).toBe("SET windows pass=3 fail=0 blocked=2")
+  })
+})
+
+// R70br(3): the Windows QA job is green only when the one SET line reads pass >= 1 and fail=0, and
+// every block is a named precondition (the scenario's own admission rule) counted in that line.
+describe("windows --all gate", () => {
+  const blocked = "BLOCKED capture-session0-refused session 2 is not session 0"
+
+  test("one pass, no fail, and a named block pass the gate", () => {
+    expect(gateSet(["{...}", blocked, "SET windows pass=1 fail=0 blocked=1"])).toEqual([])
+  })
+
+  test("no scenario that ran and passed fails the gate", () => {
+    expect(gateSet([blocked, "SET windows pass=0 fail=0 blocked=1"])).toEqual(["pass=0: no scenario ran and passed"])
+  })
+
+  test("a failure fails the gate", () => {
+    expect(gateSet(["SET windows pass=1 fail=1 blocked=0"])).toEqual(["fail=1"])
+  })
+
+  test("a missing or repeated SET line fails the gate", () => {
+    expect(gateSet(["PASS x"])).toEqual(["expected one SET windows line, found 0"])
+    expect(gateSet(["SET windows pass=1 fail=0 blocked=0", "SET windows pass=1 fail=0 blocked=0"])).toEqual([
+      "expected one SET windows line, found 2",
+    ])
+  })
+
+  test("a block without a reason, or a count that does not match the BLOCKED lines, fails the gate", () => {
+    expect(gateSet(["BLOCKED capture-session0-refused", "SET windows pass=1 fail=0 blocked=1"])).toEqual([
+      "BLOCKED capture-session0-refused names no reason",
+    ])
+    expect(gateSet(["SET windows pass=1 fail=0 blocked=1"])).toEqual(["blocked=1 but 0 BLOCKED lines"])
   })
 })
