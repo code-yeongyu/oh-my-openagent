@@ -4,6 +4,7 @@ import type { IntakeAdmission } from "../gateway/intake-admission"
 import type { GatewayStore } from "../gateway/store"
 import { engineDropsRetainedRecord } from "./engine-minimum"
 import { runPendingSweep } from "./pending-sweep"
+import { resolveWakeTarget } from "./session-target"
 
 export type ConsumerStartInput = {
   readonly store: GatewayStore
@@ -14,7 +15,8 @@ export type ConsumerStartInput = {
   readonly engineVersion: string | undefined
   readonly minimumEngine: string | null | undefined
   readonly wake: (durableId: string) => Promise<void>
-  readonly sameDevice: () => boolean
+  /** `session_wake.same_device`, read per swept session for ITS own cwd (its project's configuration). */
+  readonly sameDevice: (cwd?: string) => boolean
   /** The consumer had a port and died (its start failed, or its serving connection ended): it may be started again. */
   readonly onDied?: () => void
   readonly log: (line: string) => void
@@ -75,13 +77,36 @@ export async function startDeliveryConsumer(input: ConsumerStartInput): Promise<
   const admitIntake = async (device: string): Promise<IntakeAdmission> =>
     (await port.peerAdmitted(device)) ? "admitted" : "refused"
   let ended = false
-  void port.closed?.then(() => {
-    ended = true
+  let died = false
+  const die = (): void => {
+    if (died) return
+    died = true
     consumer.stop()
     input.onDied?.()
+  }
+  void port.closed?.then(() => {
+    ended = true
+    die()
     input.onClosed?.()
   })
-  await runPendingSweep({ store: input.store, admitIntake, wake: input.wake, sameDevice: input.sameDevice() })
+  try {
+    await runPendingSweep({
+      store: input.store,
+      admitIntake,
+      wake: input.wake,
+      sameDevice: (durableId) => {
+        const target = resolveWakeTarget(input.sessionsDirectory, durableId)
+        return input.sameDevice(target.kind === "found" ? target.cwd : undefined)
+      },
+    })
+  } catch (error) {
+    // The sweep failed after the consumer was already acknowledged: it is stopped and reported dead here, or its
+    // subscriptions would outlive a start its caller sees as failed (#13456's delta review).
+    ended = true
+    die()
+    port.close?.()
+    throw error
+  }
   // The connection ended while the sweep ran: the service is gone, so this consumer is not returned as serving.
   if (ended) return undefined
   return {

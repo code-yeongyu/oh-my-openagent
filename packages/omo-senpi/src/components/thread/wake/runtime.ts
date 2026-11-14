@@ -119,13 +119,17 @@ export function wakeSettingsReader(
 export function wakeHostIdleExitMs(
   options: ThreadWakeOptions,
   cwd: () => string,
+  warn: (line: string) => void,
 ): () => number | undefined {
   const env = options.env ?? process.env
   const load = options.loadConfig ?? ((input) => loadOmoConfig({ cwd: input.cwd, env, harness: "senpi" }))
   return () => {
     try {
       return load({ cwd: cwd() }).config.task?.host_idle_exit_ms
-    } catch {
+    } catch (error) {
+      warn(
+        `thread wake: the task.host_idle_exit_ms setting was not read, the ensured host runs the launch spec's default: ${error instanceof Error ? error.message : String(error)}`,
+      )
       return undefined
     }
   }
@@ -245,17 +249,26 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart): Runni
     options.onWake?.(durableId, outcome)
   }
   // #13457's MEDIUM: the consumer is started again after every death - a connect failure, a refused declaration, a
-  // service restart - so a device whose daemon is up keeps its remote wake whatever the startup order was.
+  // service restart - so a device whose daemon is up keeps its remote wake whatever the startup order was. Its delta
+  // review's MEDIUM: the loop is silent while it keeps failing - one warning per change of state, so a device without
+  // the service is not warned at every retry tick.
   let consumerStopped = false
   let cancelConsumerRetry: (() => void) | undefined
+  let consumerDown = false
+  const reportConsumerFailure = (line: string): void => {
+    if (consumerDown) return
+    consumerDown = true
+    input.warn(line)
+  }
+  let starting: Promise<void> = Promise.resolve()
   const armConsumerRetry = (): void => {
     if (consumerStopped) return
     cancelConsumerRetry?.()
     cancelConsumerRetry = (options.schedule ?? unrefSchedule)(() => {
       cancelConsumerRetry = undefined
-      void startConsumer().catch((error: unknown) =>
-        input.warn(`thread wake: the delivery consumer did not start: ${String(error)}`),
-      )
+      starting = startConsumer().catch((error: unknown) => {
+        reportConsumerFailure(`thread wake: the delivery consumer did not start: ${String(error)}`)
+      })
     }, CONSUMER_RETRY_MS)
   }
   const startConsumer = async (): Promise<void> => {
@@ -269,7 +282,7 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart): Runni
           connectDeliveryServicePort({
             version: createOmoNativeProductConfig().packageVersion,
             ...(options.deviceServiceStateDir === undefined ? {} : { stateDir: options.deviceServiceStateDir }),
-            log: input.warn,
+            log: reportConsumerFailure,
             onUnavailable: armConsumerRetry,
           })),
       onConsumer: (created) => {
@@ -282,16 +295,21 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart): Runni
       engineVersion: options.engineVersion ?? input.engineVersion,
       minimumEngine: options.minimumEngine,
       wake,
-      sameDevice: () => input.settings().sameDevice,
-      log: input.warn,
+      sameDevice: (cwd) => input.settings(cwd).sameDevice,
+      log: reportConsumerFailure,
     }).catch((error: unknown) => {
-      input.warn(`thread wake: the delivery consumer did not start: ${String(error)}`)
+      // A rejected start (an injected deliveries that throws) is a death like the others: reported once and retried
+      // (#13457's delta review, LOW).
+      reportConsumerFailure(`thread wake: the delivery consumer did not start: ${String(error)}`)
+      armConsumerRetry()
       return undefined
     })
     serving = attempt
     consumer = attempt?.consumer
+    if (attempt !== undefined) consumerDown = false
   }
-  const ready = startConsumer().then(
+  starting = startConsumer()
+  const ready = starting.then(
     () => undefined,
     () => undefined,
   )
@@ -299,14 +317,18 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart): Runni
     carrier,
     wake,
     admitIntake: async (device) => {
-      await ready
+      // The settled truth of this process's consumer: a restart in flight is awaited, so the answer is never a stale
+      // unknown from the moment before it.
+      await Promise.allSettled([ready, starting])
       return serving === undefined ? "unknown" : await serving.admitIntake(device)
     },
     ready,
     stop: async () => {
       consumerStopped = true
       cancelConsumerRetry?.()
-      await ready
+      // An in-flight retry settles `serving` only after this wait, so its consumer is closed too (the delta review's
+      // LOW), never left open by a start that raced the stop.
+      await Promise.allSettled([ready, starting])
       serving?.close()
       await carrier.stop()
       if (options.store === undefined) await store.dispose().catch(() => undefined)
