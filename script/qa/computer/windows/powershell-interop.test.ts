@@ -1,5 +1,6 @@
 // The Windows QA PowerShell scripts declare their Win32 calls in inline C#. A wide ("...W") Win32
-// function takes UTF-16 strings, so its DllImport must say CharSet = CharSet.Unicode: without it a
+// function (by method name or EntryPoint), or any import that marshals a string, needs
+// CharSet = CharSet.Unicode: without it a
 // StringBuilder is marshalled as ANSI and a UTF-16 answer reads back as its first character
 // (the interactive-desktop smoke read the input desktop "Default" as "D" on a hosted runner).
 import { describe, expect, test } from "bun:test"
@@ -10,9 +11,14 @@ const DIR = import.meta.dir
 
 function wideImportsWithoutUnicode(source: string): string[] {
   const missing: string[] = []
-  for (const match of source.matchAll(/\[DllImport\(([^\]]*)\)\][^;(]*?\b(\w+W)\s*\(/g)) {
-    const [, attributes = "", name = ""] = match
-    if (!/CharSet\s*=\s*CharSet\.Unicode/.test(attributes)) missing.push(name)
+  // Every import: its method name, its EntryPoint and its parameter list decide whether it is wide
+  // (a ...W method or entry point) or marshals a string (string / StringBuilder parameter).
+  for (const match of source.matchAll(/\[DllImport\(([^\]]*)\)\][^;(]*?\b(\w+)\s*\(([^)]*)\)/g)) {
+    const [, attributes = "", name = "", parameters = ""] = match
+    const entryPoint = /EntryPoint\s*=\s*"(\w+)"/.exec(attributes)?.[1] ?? ""
+    const wide = name.endsWith("W") || entryPoint.endsWith("W")
+    const marshalsString = /\b(string|StringBuilder)\b/.test(parameters)
+    if ((wide || marshalsString) && !/CharSet\s*=\s*CharSet\.Unicode/.test(attributes)) missing.push(name)
   }
   return missing
 }
