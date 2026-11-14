@@ -429,8 +429,9 @@ test("#given the caller creates a child with thread_create #when it opens a thre
 test("#given a store at the previous schema version with data #when it opens #then it migrates to the new tables and keeps every existing row", async () => {
   const agentDir = tempDir("extension-tools-migrate-")
   const path = gatewayDatabasePath(agentDir)
-  // Back to the store before v10 (toolkit_replay_receipts), v11 (deliveries.wait_kind) and v12 (the intake columns): all re-run on open.
-  const previous = GATEWAY_MIGRATIONS.length - 3
+  // Back to the store before v10 (toolkit_replay_receipts), v11 (deliveries.wait_kind), v12 (the intake columns) and v13
+  // (woken_sessions, idempotent so its table can stay): all re-run on open.
+  const previous = GATEWAY_MIGRATIONS.length - 4
   {
     const seed = storeAt(agentDir)
     await seed.identity()
