@@ -102,33 +102,44 @@ fn definition_name(reference: &Value) -> Option<&str> {
 }
 
 /// Every member the method's result definition requires that the reply does not carry. A
-/// nullable result (`anyOf: [null, $ref]`, the exec reply) is read through its object branch.
+/// nullable result (`anyOf: [null, $ref]`, the exec reply) is read through its object branch;
+/// an untagged union of objects (`observe`: the v1 capture or the object-mode `Observation`)
+/// through the branch the reply lacks the fewest members of.
 fn missing_members(schema: &Value, method: &str, reply: &Value) -> Vec<String> {
-    let Some(mut name) = definition_name(&schema["methods"][method]["result"]["$ref"]) else {
+    let Some(name) = definition_name(&schema["methods"][method]["result"]["$ref"]) else {
         return Vec::new();
     };
-    if let Some(branch) = schema["$defs"][name]["anyOf"]
+    let branches: Vec<&str> = schema["$defs"][name]["anyOf"]
         .as_array()
-        .and_then(|branches| {
+        .map(|branches| {
             branches
                 .iter()
-                .find_map(|branch| definition_name(&branch["$ref"]))
+                .filter_map(|branch| definition_name(&branch["$ref"]))
+                .collect()
         })
-    {
-        name = branch;
-    }
-    let (Some(required), Some(present)) = (
-        schema["$defs"][name]["required"].as_array(),
-        reply.as_object(),
-    ) else {
+        .filter(|branches: &Vec<&str>| !branches.is_empty())
+        .unwrap_or_else(|| vec![name]);
+    let Some(present) = reply.as_object() else {
         return Vec::new();
     };
-    required
-        .iter()
-        .filter_map(Value::as_str)
-        .filter(|member| !present.contains_key(*member))
-        .map(str::to_owned)
-        .collect()
+    let lacking = |name: &str| -> Vec<String> {
+        schema["$defs"][name]["required"]
+            .as_array()
+            .map(|required| {
+                required
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .filter(|member| !present.contains_key(*member))
+                    .map(str::to_owned)
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    branches
+        .into_iter()
+        .map(lacking)
+        .min_by_key(Vec::len)
+        .unwrap_or_default()
 }
 
 fn error_code(expect: &[Value]) -> Option<i64> {

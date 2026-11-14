@@ -9,3 +9,17 @@ crate-type = ["rlib"]
 
 [dependencies]
 omo-computer-core = { path = "../omo-computer-core" }
+serde.workspace = true
+serde_json.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { workspace = true, features = ["Win32_Foundation", "Win32_Storage_FileSystem"] }
+
+[dev-dependencies]
+omo-computer-backend-fake = { path = "../omo-computer-backend-fake" }
+omo-computer-session = { path = "../omo-computer-session" }
+sha2.workspace = true
+tempfile.workspace = true

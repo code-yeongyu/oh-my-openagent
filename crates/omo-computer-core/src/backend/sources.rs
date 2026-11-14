@@ -33,6 +33,13 @@ pub trait Presence: Send {
     fn hide(&mut self) -> BackendResult<()>;
 }
 
+/// A backend's monotonic clock in milliseconds, and its wait.
+pub trait BackendClock {
+    fn now_ms(&self) -> u64;
+    /// Waits `ms` on this clock (a fake clock just advances).
+    fn wait_ms(&self, ms: u64);
+}
+
 /// The accessibility observer events the settle and `waitFor` consume.
 pub trait AxEventSource: Send {
     /// The next event, or `None` when none is pending.

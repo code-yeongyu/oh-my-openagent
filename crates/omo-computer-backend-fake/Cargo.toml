@@ -9,3 +9,5 @@ crate-type = ["rlib"]
 
 [dependencies]
 omo-computer-core = { path = "../omo-computer-core" }
+serde.workspace = true
+serde_json.workspace = true
