@@ -206,7 +206,7 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart): Runni
     engineVersion: options.engineVersion ?? input.engineVersion,
     minimumEngine: options.minimumEngine,
     wake,
-    sameDevice: () => input.settings().sameDevice,
+    sameDevice: (cwd) => input.settings(cwd).sameDevice,
     log: input.warn,
   }).then(
     (started) => {

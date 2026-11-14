@@ -4,6 +4,7 @@ import type { IntakeAdmission } from "../gateway/intake-admission"
 import type { GatewayStore } from "../gateway/store"
 import { engineDropsRetainedRecord } from "./engine-minimum"
 import { runPendingSweep } from "./pending-sweep"
+import { resolveWakeTarget } from "./session-target"
 
 export type ConsumerStartInput = {
   readonly store: GatewayStore
@@ -14,7 +15,8 @@ export type ConsumerStartInput = {
   readonly engineVersion: string | undefined
   readonly minimumEngine: string | null | undefined
   readonly wake: (durableId: string) => Promise<void>
-  readonly sameDevice: () => boolean
+  /** `session_wake.same_device`, read per swept session for ITS own cwd (its project's configuration). */
+  readonly sameDevice: (cwd?: string) => boolean
   readonly log: (line: string) => void
 }
 
@@ -53,6 +55,14 @@ export async function startDeliveryConsumer(input: ConsumerStartInput): Promise<
   }
   const admitIntake = async (device: string): Promise<IntakeAdmission> =>
     (await port.peerAdmitted(device)) ? "admitted" : "refused"
-  await runPendingSweep({ store: input.store, admitIntake, wake: input.wake, sameDevice: input.sameDevice() })
+  await runPendingSweep({
+    store: input.store,
+    admitIntake,
+    wake: input.wake,
+    sameDevice: (durableId) => {
+      const target = resolveWakeTarget(input.sessionsDirectory, durableId)
+      return input.sameDevice(target.kind === "found" ? target.cwd : undefined)
+    },
+  })
   return { consumer, admitIntake }
 }

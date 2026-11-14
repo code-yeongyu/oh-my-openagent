@@ -1,12 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdtempSync } from "node:fs"
+import { mkdtempSync } from "node:fs"
 import { join } from "node:path"
 
-import { gatewayDatabasePath } from "../gateway/paths"
 import { startThreadWakeAtSession, type ThreadWakeLatch, type ThreadWakeOptions } from "./runtime"
 
-// #13455's second MEDIUM: a carrier that carries nothing arms no sweep timer and opens no store of its own (design
-// A3.1.4: an empty wake table leaves no timer; the component's own store serves the carrier when there is work).
+// #13455's MEDIUM and its delta review: a carrier that carries nothing arms no sweep timer (design A3.1.4: an empty
+// wake table leaves no timer), and the one read it makes at its start to learn that arms nothing either.
 
 const latches: ThreadWakeLatch[] = []
 afterEach(() => {
@@ -14,7 +13,7 @@ afterEach(() => {
 })
 
 describe("a running wake over an empty wake table", () => {
-  test("#given an engine at the wake minimum and no store handed to it #when the wake starts #then no store is opened and no timer is armed", async () => {
+  test("#given an engine at the wake minimum and an empty wake table #when the wake starts #then no sweep timer is armed", async () => {
     const agentDir = mkdtempSync("/tmp/omo-wake-runtime-")
     const latch: ThreadWakeLatch = {}
     latches.push(latch)
@@ -43,7 +42,6 @@ describe("a running wake over an empty wake table", () => {
     expect(running).toBeDefined()
     await running?.ready
     expect(scheduled).toEqual([])
-    expect(existsSync(gatewayDatabasePath(agentDir))).toBe(false)
     await running?.stop()
   })
 })
