@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { dirname, join } from "node:path"
+import { dirname, join, relative } from "node:path"
+
+import { generatedPath as protocolGeneratedPath } from "../packages/omo-computer-protocol/scripts/generate-protocol.ts"
 
 import { parseWriteScope, runGuard } from "./computer-v3-guards.ts"
 
@@ -395,6 +397,20 @@ describe("computer-v3-guards --scope <row> <ref> --plan <file>", () => {
     })
   })
 
+  test("scope_accepts_the_protocol_generators_output_path_as_generated", () => {
+    withRepo((repo) => {
+      const scope = scopeRepo(repo)
+
+      // given the path the protocol generator writes, taken from the generator itself
+      const output = relative(join(import.meta.dir, ".."), protocolGeneratedPath)
+      repo.write({ [output]: "export {}\n" })
+      repo.commit("regenerated protocol")
+
+      // then a row that does not own it may still regenerate it
+      expectPass(scope("2"))
+    })
+  })
+
   test("scope_accepts_a_listed_path_owned_by_a_transitive_blocker_and_refuses_an_unlisted_one_or_one_owned_by_a_non_blocker", () => {
     withRepo((repo) => {
       const scope = scopeRepo(repo)
@@ -458,14 +474,16 @@ describe("computer-v3-guards --scope <row> <ref> --plan <file>", () => {
         "crates/senpi-desktop-core/src/lib.rs": "old\n",
         ".github/workflows/desktop-engine.yml": "old\n",
         "script/qa/desktop/a.ts": "old\n",
-        "knip.jsonc": "{}\n",
+        "knip.base.jsonc": "{}\n",
+        "script/knip.workspace.jsonc": "{}\n",
       })
       const scope = scopeRepo(repo)
 
       // given row 80 deleting class A and B paths and editing class C and D files
       repo.remove("crates/senpi-desktop-core", ".github/workflows/desktop-engine.yml", "script/qa/desktop")
       repo.write({
-        "knip.jsonc": "{ }\n",
+        "knip.base.jsonc": "{ }\n",
+        "script/knip.workspace.jsonc": "{ }\n",
         "script/ci-fast-path.mjs": "// re-pointed\n",
         "packages/omo-senpi/scripts/qa/fused-equivalence-golden/linux-x64/E21.json": "{}\n",
         "changes/unreleased/80.md": "removed\n",

@@ -1,0 +1,781 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/omo-opencode": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/cli/index.ts",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "src/cli/service-auth/test-support.ts",
+        "src/features/team-mode/team-tasklist/test-support.ts",
+        "src/hooks/runtime-fallback/test-timeout-clock.test-support.ts",
+        "src/tools/skill/zauc-mocks-skill-tools/test-support.ts",
+        "test/fixtures/config-migration/opencode-side-effect-import.ts",
+        // Test fixtures run as their own process by path (`bun run <dir>/fixtures/<name>.ts`), so nothing imports them.
+        "src/hooks/prometheus-md-only/fixtures/*.ts",
+      ],
+      "ignoreFiles": [
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/__tests__/perf/fixtures/in-tree/packages/pkg-one/src/file-16.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/__tests__/perf/fixtures/in-tree/packages/pkg-one/src/file-17.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/__tests__/perf/fixtures/in-tree/packages/pkg-one/src/file-18.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/__tests__/perf/fixtures/in-tree/packages/pkg-one/src/file-19.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/__tests__/perf/fixtures/in-tree/packages/pkg-one/src/file-20.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/__tests__/perf/fixtures/in-tree/src/app/file-01.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/__tests__/perf/fixtures/in-tree/src/app/file-02.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/__tests__/perf/fixtures/in-tree/src/app/file-03.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/__tests__/perf/fixtures/in-tree/src/app/file-04.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/__tests__/perf/fixtures/in-tree/src/app/file-05.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/__tests__/perf/fixtures/in-tree/src/app/file-06.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/__tests__/perf/fixtures/in-tree/src/app/file-07.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/__tests__/perf/fixtures/in-tree/src/app/file-08.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/__tests__/perf/fixtures/in-tree/src/app/file-09.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/__tests__/perf/fixtures/in-tree/src/app/file-10.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/__tests__/perf/fixtures/in-tree/src/lib/file-11.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/__tests__/perf/fixtures/in-tree/src/lib/file-12.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/__tests__/perf/fixtures/in-tree/src/lib/file-13.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/__tests__/perf/fixtures/in-tree/src/lib/file-14.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/__tests__/perf/fixtures/in-tree/src/lib/file-15.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/codex-cache-bins.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/codex-cache-bundled-mcps.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/codex-cache-command-shim.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/codex-cache-fs.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/codex-cache-install.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/codex-cache-legacy-bins.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/codex-cache-local-dependencies.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/codex-cache-mcp-manifest.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/codex-cache-paths.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/codex-cache-prune.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/codex-cache.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/codex-cached-marketplace-manifest.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/codex-cleanup-config.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/codex-config-agents.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/codex-config-features.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/codex-config-marketplaces.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/codex-config-permissions.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/codex-config-plugins.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/codex-config-reasoning.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/codex-config-toml.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/codex-hook-trust.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/codex-installation-detection.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/codex-installer-bin-dir.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/codex-marketplace-snapshot.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/codex-marketplace.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/codex-model-catalog.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/codex-multi-agent-v2-config.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/codex-package-layout.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/codex-process.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/codex-project-local-cleanup-best-effort.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/codex-project-local-cleanup.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/git-bash.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/install-codex-test-fixtures.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/lazycodex-version-stamp.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/link-cached-plugin-agents.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/lsp-daemon-reaper.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/toml-section-editor.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/install-codex/types.ts",
+        // a child-process fixture: refresh-process.test.ts runs it under a scratch HOME, nothing imports it (#12978)
+        "src/cli/service-auth/account-home.fixture.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/service-auth/accounts-closed.fixture.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/service-auth/cli-keystore.fixture.ts",
+        // a --preload fixture: closed-device-login.test.ts runs it in a launcher child, nothing imports it (#12639)
+        "src/cli/service-auth/closed-device-login.fixture.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/cli/service-auth/refresh-child.fixture.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/claude-code-agent-loader/agent-definitions-loader.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/claude-code-agent-loader/claude-model-mapper.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/claude-code-agent-loader/json-agent-loader.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/claude-code-agent-loader/loader.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/claude-code-agent-loader/types.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/claude-code-mcp-loader/loader.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/claude-code-mcp-loader/scope-filter.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/claude-code-mcp-loader/transformer.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/mcp-oauth/oauth-authorization-flow.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/mcp-oauth/refresh-mutex.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/opencode-runtime-skills/skill-markdown.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/opencode-runtime-skills/source-server.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/opencode-skill-loader/allowed-tools-parser.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/opencode-skill-loader/loaded-skill-from-path.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/opencode-skill-loader/loaded-skill-template-extractor.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/opencode-skill-loader/merger.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/opencode-skill-loader/merger/scope-priority.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/opencode-skill-loader/merger/skill-definition-merger.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/opencode-skill-loader/merger/skills-config-normalizer.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/opencode-skill-loader/skill-deduplication.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/opencode-skill-loader/skill-definition-record.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/opencode-skill-loader/skill-directory-loader.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/opencode-skill-loader/skill-mcp-config.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/opencode-skill-loader/skill-resolution-options.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/opencode-skill-loader/skill-template-resolver.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/skill-mcp-manager/connection-type.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/skill-mcp-manager/error-redaction.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/team-mode/index.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/team-mode/member-parser.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/team-mode/team-layout-tmux/index.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/team-mode/team-layout-tmux/rebalance-team-window.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/team-mode/team-mailbox/index.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/team-mode/team-registry/index.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/team-mode/team-registry/validator.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/team-mode/team-runtime/index.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/team-mode/team-state-store/active-resume.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/team-mode/team-state-store/creating-resume.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/team-mode/team-state-store/deleting-resume.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/team-mode/team-state-store/error-normalization.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/team-mode/team-state-store/reservation-reconciliation.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/team-mode/team-state-store/resume-report.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/team-mode/team-state-store/runtime-cleanup.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/team-mode/team-state-store/session-liveness.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/team-mode/team-state-store/worker-resume-status.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/team-mode/team-worktree/cleanup.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/team-mode/team-worktree/index.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/team-mode/tools/index.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/tmux-subagent/cleanup.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/tmux-subagent/session-deleted-handler.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/features/tui-sidebar/config-validator.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/help/schema/acp.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/help/schema/doctor.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/help/schema/sandbox.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/help/schema/status.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/hooks/comment-checker/__fixtures__/download-probe.fixture.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/hooks/interactive-bash-session/parser.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/openclaw/daemon.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/openclaw/reply-listener-discord.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/openclaw/reply-listener-log.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/openclaw/reply-listener-paths.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/openclaw/reply-listener-poll-loop.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/openclaw/reply-listener-process.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/openclaw/reply-listener-signature.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/openclaw/reply-listener-sleep.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/openclaw/reply-listener-spawn.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/openclaw/reply-listener-startup.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/openclaw/reply-listener-state.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/openclaw/reply-listener-status.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/openclaw/reply-listener-stop.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/openclaw/reply-listener-telegram.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/openclaw/reply-listener.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/openclaw/session-registry-lock.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/openclaw/session-registry-paths.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/openclaw/session-registry-storage.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/openclaw/session-registry-types.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/openclaw/types.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/plugin-config/agent-order-warnings.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/shared/command-executor/embedded-commands.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/shared/command-executor/execute-command.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/shared/command-executor/home-directory.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/shared/command-executor/shell-path.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/shared/git-worktree/format-file-changes.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/shared/git-worktree/parse-diff-numstat.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/shared/git-worktree/parse-status-porcelain.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/shared/git-worktree/types.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/shared/migration/agent-category.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/shared/migration/hook-names.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/shared/migration/model-versions.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/shared/tmux/tmux-utils/index.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/shared/tmux/tmux-utils/spawn-process.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/shared/zip-entry-listing/python-zip-entry-listing.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/shared/zip-entry-listing/read-zip-symlink-target.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/tools/hashline-edit/autocorrect-replacement-lines.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/tools/hashline-edit/edit-deduplication.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/tools/hashline-edit/edit-operation-primitives.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/tools/hashline-edit/edit-ordering.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/tools/hashline-edit/edit-text-normalization.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/tools/hashline-edit/hashline-chunk-formatter.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/tools/hashline-edit/hashline-edit-diff.ts",
+      ],
+      // pre-existing at origin dev 4686e425b5: executables this package runs that it does not declare
+      "ignoreBinaries": ["dbus-run-session", "gdbus", "nonexistent-binary-that-does-not-exist-12345", "sips"],
+      "ignoreIssues": {
+        // pre-existing at origin dev 4686e425b5: imports of undeclared packages @code-yeongyu/comment-checker
+        "src/cli/doctor/checks/dependencies.ts": ["unlisted"],
+        // pre-existing at origin dev 4686e425b5: duplicate export(s) checkModels, checkModelResolution
+        "src/cli/doctor/checks/model-resolution.ts": ["duplicates"],
+        // pre-existing at origin dev 4686e425b5: duplicate export(s) BuiltinAgentNameSchema, AgentNameSchema
+        "src/config/schema/agent-names.ts": ["duplicates"],
+        // pre-existing at origin dev 4686e425b5: duplicate export(s) TaskObjectSchema, TaskSchema
+        "src/tools/task/types.ts": ["duplicates"],
+      },
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) buildToolCallFormatSection
+    "packages/omo-opencode/src/agents/dynamic-agent-policy-sections.ts": ["buildToolCallFormatSection"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) buildToolCallFormatSection
+    "packages/omo-opencode/src/agents/dynamic-agent-prompt-builder.ts": ["buildToolCallFormatSection"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) hephaestusPromptMetadata
+    "packages/omo-opencode/src/agents/hephaestus/agent.ts": ["hephaestusPromptMetadata"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) hephaestusPromptMetadata
+    "packages/omo-opencode/src/agents/hephaestus/index.ts": ["hephaestusPromptMetadata"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) createSisyphusJuniorAgentWithOverrides, SISYPHUS_JUNIOR_DEFAULTS
+    "packages/omo-opencode/src/agents/index.ts": ["createSisyphusJuniorAgentWithOverrides", "SISYPHUS_JUNIOR_DEFAULTS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) MOMUS_SYSTEM_PROMPT
+    "packages/omo-opencode/src/agents/momus.ts": ["MOMUS_SYSTEM_PROMPT"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) PROMETHEUS_SYSTEM_PROMPT
+    "packages/omo-opencode/src/agents/prometheus/index.ts": ["PROMETHEUS_SYSTEM_PROMPT"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) SISYPHUS_PROMPT_METADATA
+    "packages/omo-opencode/src/agents/sisyphus.ts": ["SISYPHUS_PROMPT_METADATA"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isClaudeFableOrMythosModel, isClaudeOpus46Model, isKimiK27Model, isKimiK28Model
+    "packages/omo-opencode/src/agents/types.ts": ["isClaudeFableOrMythosModel", "isClaudeOpus46Model", "isKimiK27Model", "isKimiK28Model"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ACCOUNT_KEYS_RECORD_NAME, runAccountKeysCommand
+    "packages/omo-opencode/src/cli/account-keys/commands.ts": ["ACCOUNT_KEYS_RECORD_NAME", "runAccountKeysCommand"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ULW_LOOP_DELEGATION_SENTINEL
+    "packages/omo-opencode/src/cli/codex-ulw-loop.ts": ["ULW_LOOP_DELEGATION_SENTINEL"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) getConfigContext, runBunInstall, checkVersionCompatibility, extractVersionFromPluginEntry, backupConfigFile
+    "packages/omo-opencode/src/cli/config-manager.ts": ["getConfigContext", "runBunInstall", "checkVersionCompatibility", "extractVersionFromPluginEntry", "backupConfigFile"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) runBunInstall
+    "packages/omo-opencode/src/cli/config-manager/bun-install.ts": ["runBunInstall"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) getConfigContext
+    "packages/omo-opencode/src/cli/config-manager/config-context.ts": ["getConfigContext"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) extractSemverFromOutput, getDesktopAppPaths, getBinaryLookupCommand, parseBinaryPaths, selectBinaryPath, buildVersionCommand, findDesktopBinary
+    "packages/omo-opencode/src/cli/doctor/checks/system-binary.ts": ["extractSemverFromOutput", "getDesktopAppPaths", "getBinaryLookupCommand", "parseBinaryPaths", "selectBinaryPath", "buildVersionCommand", "findDesktopBinary"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) detectConfigPath, findPluginEntry
+    "packages/omo-opencode/src/cli/doctor/checks/system-plugin.ts": ["detectConfigPath", "findPluginEntry"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isTuiPluginEntry, isNamedTuiPluginEntry, detectServerPluginRegistration, detectTuiPluginRegistration
+    "packages/omo-opencode/src/cli/doctor/checks/tui-plugin-config.ts": ["isTuiPluginEntry", "isNamedTuiPluginEntry", "detectServerPluginRegistration", "detectTuiPluginRegistration"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) runDoctor, formatDoctorOutput, formatJsonOutput
+    "packages/omo-opencode/src/cli/doctor/index.ts": ["runDoctor", "formatDoctorOutput", "formatJsonOutput"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) runCheck, calculateSummary, determineExitCode
+    "packages/omo-opencode/src/cli/doctor/runner.ts": ["runCheck", "calculateSummary", "determineExitCode"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) formatNativeInstallCommand, NATIVE_PACKAGE_SPEC, firstOmoBinOnPath, LEGACY_OMO_BIN_PACKAGES, legacyOmoBins, NATIVE_OMO_PACKAGE, nativeOmoBin, resolveOmoBinEnvironment, scanOmoBins, removeFileCommand and 4 more
+    "packages/omo-opencode/src/cli/install-native/index.ts": ["formatNativeInstallCommand", "NATIVE_PACKAGE_SPEC", "firstOmoBinOnPath", "LEGACY_OMO_BIN_PACKAGES", "legacyOmoBins", "NATIVE_OMO_PACKAGE", "nativeOmoBin", "resolveOmoBinEnvironment", "scanOmoBins", "removeFileCommand", "repairLegacyOmoBins", "pathOrderFix", "verifyOmoCommand", "nativeSetupStartLine"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) NATIVE_OMO_PACKAGE, LEGACY_OMO_BIN_PACKAGES
+    "packages/omo-opencode/src/cli/install-native/legacy-omo-bin.ts": ["NATIVE_OMO_PACKAGE", "LEGACY_OMO_BIN_PACKAGES"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) nativeSetupStartLine
+    "packages/omo-opencode/src/cli/install-native/offer-native-setup.ts": ["nativeSetupStartLine"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) pathOrderFix
+    "packages/omo-opencode/src/cli/install-native/verify-omo-command.ts": ["pathOrderFix"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) login, logout, status
+    "packages/omo-opencode/src/cli/mcp-oauth/index.ts": ["login", "logout", "status"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) resolveRunAgent, resolveRunModel, createServerConnection, resolveSession, createJsonOutputManager, executeOnCompleteHook, createEventState, processEvents, serializeError
+    "packages/omo-opencode/src/cli/run/index.ts": ["resolveRunAgent", "resolveRunModel", "createServerConnection", "resolveSession", "createJsonOutputManager", "executeOnCompleteHook", "createEventState", "processEvents", "serializeError"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) UnknownRunAgentError
+    "packages/omo-opencode/src/cli/run/runnable-agent-resolver.ts": ["UnknownRunAgentError"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) platformSchema
+    "packages/omo-opencode/src/cli/service-auth/protocol.ts": ["platformSchema"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) expandHome
+    "packages/omo-opencode/src/cli/worktree-sweep/classify.ts": ["expandHome"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) runGit
+    "packages/omo-opencode/src/cli/worktree-sweep/git.ts": ["runGit"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) classifyWorktree, DEFAULT_EXCLUDE_PREFIXES, isExcludedPath, formatClassification, formatResult, formatSummary, parseOlderThanDays, parseWorktreeList, linkedWorktrees, sweepWorktrees
+    "packages/omo-opencode/src/cli/worktree-sweep/index.ts": ["classifyWorktree", "DEFAULT_EXCLUDE_PREFIXES", "isExcludedPath", "formatClassification", "formatResult", "formatSummary", "parseOlderThanDays", "parseWorktreeList", "linkedWorktrees", "sweepWorktrees"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) CONFIG_FILE_NAMES
+    "packages/omo-opencode/src/config-migration/discovery-paths.ts": ["CONFIG_FILE_NAMES"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) transformReasoningUnification
+    "packages/omo-opencode/src/config-migration/index.ts": ["transformReasoningUnification"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) AnyMcpNameSchema, McpNameSchema
+    "packages/omo-opencode/src/config/schema.ts": ["AnyMcpNameSchema", "McpNameSchema"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) AgentDefinitionPathSchema
+    "packages/omo-opencode/src/config/schema/agent-definitions.ts": ["AgentDefinitionPathSchema"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) AgentNameSchema
+    "packages/omo-opencode/src/config/schema/agent-names.ts": ["AgentNameSchema"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) FallbackModelStringArraySchema, FallbackModelObjectArraySchema, FallbackModelMixedArraySchema
+    "packages/omo-opencode/src/config/schema/fallback-models.ts": ["FallbackModelStringArraySchema", "FallbackModelObjectArraySchema", "FallbackModelMixedArraySchema"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) PermissionValueSchema
+    "packages/omo-opencode/src/config/schema/internal/permission.ts": ["PermissionValueSchema"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) KeywordTypeSchema
+    "packages/omo-opencode/src/config/schema/keyword-detector.ts": ["KeywordTypeSchema"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) OpenClawGatewaySchema, OpenClawHookSchema, OpenClawReplyListenerConfigSchema
+    "packages/omo-opencode/src/config/schema/openclaw.ts": ["OpenClawGatewaySchema", "OpenClawHookSchema", "OpenClawReplyListenerConfigSchema"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) RalphLoopConfigSchema
+    "packages/omo-opencode/src/config/schema/ralph-loop.ts": ["RalphLoopConfigSchema"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) SisyphusTasksConfigSchema
+    "packages/omo-opencode/src/config/schema/sisyphus.ts": ["SisyphusTasksConfigSchema"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) SkillSourceSchema, SkillDefinitionSchema, SkillEntrySchema
+    "packages/omo-opencode/src/config/schema/skills.ts": ["SkillSourceSchema", "SkillDefinitionSchema", "SkillEntrySchema"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) TmuxLayoutSchema
+    "packages/omo-opencode/src/config/schema/tmux.ts": ["TmuxLayoutSchema"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) TuiSidebarConfigSchema
+    "packages/omo-opencode/src/config/schema/tui.ts": ["TuiSidebarConfigSchema"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) WebsearchProviderSchema
+    "packages/omo-opencode/src/config/schema/websearch.ts": ["WebsearchProviderSchema"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isInteractiveBashEnabled
+    "packages/omo-opencode/src/create-runtime-tmux-config.ts": ["isInteractiveBashEnabled"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) projectTaskFromCurrentAttempt
+    "packages/omo-opencode/src/features/background-agent/attempt-lifecycle.ts": ["projectTaskFromCurrentAttempt"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) MIN_STABILITY_TIME_MS, TMUX_CALLBACK_DELAY_MS
+    "packages/omo-opencode/src/features/background-agent/constants.ts": ["MIN_STABILITY_TIME_MS", "TMUX_CALLBACK_DELAY_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) waitForTaskSessionID
+    "packages/omo-opencode/src/features/background-agent/index.ts": ["waitForTaskSessionID"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) getNewListener
+    "packages/omo-opencode/src/features/background-agent/process-cleanup.test-helpers.ts": ["getNewListener"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) extractSessionActivityDate
+    "packages/omo-opencode/src/features/background-agent/session-activity.ts": ["extractSessionActivityDate"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) hasParentWakeOutputSignalFromPart
+    "packages/omo-opencode/src/features/background-agent/session-stream-activity.ts": ["hasParentWakeOutputSignalFromPart"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_MAX_LIVE_DESCENDANTS_PER_ROOT
+    "packages/omo-opencode/src/features/background-agent/subagent-spawn-limits.ts": ["DEFAULT_MAX_LIVE_DESCENDANTS_PER_ROOT"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) BTW_BOUNDARY_SENTINEL, BTW_SIDE_METADATA_KEY, BTW_SIDE_METADATA_VERSION, createBtwSideMetadata, parseBtwSideMetadata, createBtwSideController, isBtwCommandDraft, markBtwSideSession, resetBtwSideSessionRegistryForTesting
+    "packages/omo-opencode/src/features/btw-side/index.ts": ["BTW_BOUNDARY_SENTINEL", "BTW_SIDE_METADATA_KEY", "BTW_SIDE_METADATA_VERSION", "createBtwSideMetadata", "parseBtwSideMetadata", "createBtwSideController", "isBtwCommandDraft", "markBtwSideSession", "resetBtwSideSessionRegistryForTesting"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) BTW_SIDE_METADATA_VERSION, parseBtwSideMetadata
+    "packages/omo-opencode/src/features/btw-side/metadata.ts": ["BTW_SIDE_METADATA_VERSION", "parseBtwSideMetadata"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) expandEnvVars, expandEnvVarsInObject
+    "packages/omo-opencode/src/features/claude-code-mcp-loader/env-expander.ts": ["expandEnvVars", "expandEnvVarsInObject"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ensureDir, resolveLockWaitTimeoutMs
+    "packages/omo-opencode/src/features/claude-tasks/storage.ts": ["ensureDir", "resolveLockWaitTimeoutMs"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) injectPendingContext
+    "packages/omo-opencode/src/features/context-injector/injector.ts": ["injectPendingContext"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) OPENCODE_STORAGE
+    "packages/omo-opencode/src/features/hook-message-injector/constants.ts": ["OPENCODE_STORAGE"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) injectHookMessage, findMessageContextFromSDK
+    "packages/omo-opencode/src/features/hook-message-injector/index.ts": ["injectHookMessage", "findMessageContextFromSDK"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) loadMonitorSessionMessages, getMessageRole, getMessageCreatedAt, monitorMessageHasOutput, monitorMessageContainsBatch
+    "packages/omo-opencode/src/features/monitor/output-injector-session-inspect.ts": ["loadMonitorSessionMessages", "getMessageRole", "getMessageCreatedAt", "monitorMessageHasOutput", "monitorMessageContainsBatch"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) applyNativeEditionNudgeAction, NATIVE_NUDGE_DIALOG_TITLE, NATIVE_NUDGE_OPTIONS
+    "packages/omo-opencode/src/features/native-edition-nudge/index.ts": ["applyNativeEditionNudgeAction", "NATIVE_NUDGE_DIALOG_TITLE", "NATIVE_NUDGE_OPTIONS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) NATIVE_NUDGE_DIALOG_TITLE
+    "packages/omo-opencode/src/features/native-edition-nudge/tui.ts": ["NATIVE_NUDGE_DIALOG_TITLE"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) TaskToastManager
+    "packages/omo-opencode/src/features/task-toast-manager/index.ts": ["TaskToastManager"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) unregisterTeamRunForSessionCleanup
+    "packages/omo-opencode/src/features/team-mode/team-runtime/session-cleanup.ts": ["unregisterTeamRunForSessionCleanup"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) createConfig, createSpec
+    "packages/omo-opencode/src/features/team-mode/team-runtime/shutdown-test-fixtures.ts": ["createConfig", "createSpec"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) TEAM_CREATE_USAGE, TeamCreateArgsSchema
+    "packages/omo-opencode/src/features/team-mode/tools/lifecycle-inline-spec.ts": ["TEAM_CREATE_USAGE", "TeamCreateArgsSchema"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) parseToolResult
+    "packages/omo-opencode/src/features/team-mode/tools/lifecycle-test-fixture.ts": ["parseToolResult"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) computeGridPlan, mapPaneToSlot, findMinimalEvictions, getColumnCount, getColumnWidth, isSplittableAtCount
+    "packages/omo-opencode/src/features/tmux-subagent/decision-engine.ts": ["computeGridPlan", "mapPaneToSlot", "findMinimalEvictions", "getColumnCount", "getColumnWidth", "isSplittableAtCount"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) coerceSessionCreatedEvent
+    "packages/omo-opencode/src/features/tmux-subagent/event-handlers.ts": ["coerceSessionCreatedEvent"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) getColumnCount, getColumnWidth
+    "packages/omo-opencode/src/features/tmux-subagent/pane-split-availability.ts": ["getColumnCount", "getColumnWidth"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) createSessionPollingController
+    "packages/omo-opencode/src/features/tmux-subagent/polling.ts": ["createSessionPollingController"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) coerceSessionCreatedEvent
+    "packages/omo-opencode/src/features/tmux-subagent/session-created-event.ts": ["coerceSessionCreatedEvent"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) parseSessionStatusMap
+    "packages/omo-opencode/src/features/tmux-subagent/session-status-parser.ts": ["parseSessionStatusMap"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) MAIN_PANE_RATIO, MIN_SPLIT_WIDTH, getMainPaneSizePercent
+    "packages/omo-opencode/src/features/tmux-subagent/tmux-grid-constants.ts": ["MAIN_PANE_RATIO", "MIN_SPLIT_WIDTH", "getMainPaneSizePercent"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) resolveToolCallID, buildTaskMetadataBlock, parseTaskMetadataBlock
+    "packages/omo-opencode/src/features/tool-metadata-store/index.ts": ["resolveToolCallID", "buildTaskMetadataBlock", "parseTaskMetadataBlock"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) parseAnthropicTokenLimitError, executeCompact, getLastAssistant
+    "packages/omo-opencode/src/hooks/anthropic-context-window-limit-recovery/index.ts": ["parseAnthropicTokenLimitError", "executeCompact", "getLastAssistant"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) getMessageDir
+    "packages/omo-opencode/src/hooks/anthropic-context-window-limit-recovery/message-storage-directory.ts": ["getMessageDir"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) CHARS_PER_TOKEN
+    "packages/omo-opencode/src/hooks/anthropic-context-window-limit-recovery/pruning-types.ts": ["CHARS_PER_TOKEN"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) createMockContext
+    "packages/omo-opencode/src/hooks/anthropic-context-window-limit-recovery/recovery-hook.test-support.ts": ["createMockContext"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) MESSAGE_STORAGE_DIR
+    "packages/omo-opencode/src/hooks/anthropic-context-window-limit-recovery/storage-paths.ts": ["MESSAGE_STORAGE_DIR"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) countTruncatedResults, findLargestToolResult, findToolResultsBySize, getTotalToolOutputSize, countTruncatedResultsFromSDK, findToolResultsBySizeFromSDK, getTotalToolOutputSizeFromSDK, truncateToolResultAsync
+    "packages/omo-opencode/src/hooks/anthropic-context-window-limit-recovery/storage.ts": ["countTruncatedResults", "findLargestToolResult", "findToolResultsBySize", "getTotalToolOutputSize", "countTruncatedResultsFromSDK", "findToolResultsBySizeFromSDK", "getTotalToolOutputSizeFromSDK", "truncateToolResultAsync"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) hasContent
+    "packages/omo-opencode/src/hooks/anthropic-context-window-limit-recovery/storage/part-content.ts": ["hasContent"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) readPartsFromSDK
+    "packages/omo-opencode/src/hooks/anthropic-context-window-limit-recovery/storage/parts-reader.ts": ["readPartsFromSDK"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) findToolResultsBySizeFromSDK, countTruncatedResultsFromSDK, getTotalToolOutputSizeFromSDK
+    "packages/omo-opencode/src/hooks/anthropic-context-window-limit-recovery/tool-result-storage-sdk.ts": ["findToolResultsBySizeFromSDK", "countTruncatedResultsFromSDK", "getTotalToolOutputSizeFromSDK"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) findLargestToolResult, getTotalToolOutputSize, countTruncatedResults
+    "packages/omo-opencode/src/hooks/anthropic-context-window-limit-recovery/tool-result-storage.ts": ["findLargestToolResult", "getTotalToolOutputSize", "countTruncatedResults"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ATLAS_SESSION_STATE_TTL_MS, ATLAS_SESSION_PRUNE_INTERVAL_MS
+    "packages/omo-opencode/src/hooks/atlas/atlas-lifecycle-store.ts": ["ATLAS_SESSION_STATE_TTL_MS", "ATLAS_SESSION_PRUNE_INTERVAL_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) HOOK_NAME
+    "packages/omo-opencode/src/hooks/atlas/index.ts": ["HOOK_NAME"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) resolveRecentModelForSession
+    "packages/omo-opencode/src/hooks/atlas/recent-model-resolver.ts": ["resolveRecentModelForSession"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) invalidateCache
+    "packages/omo-opencode/src/hooks/auto-update-checker/cache.ts": ["invalidateCache"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) getLocalDevPath, updatePinnedVersion, checkForUpdate, compareSemverVersions, isStrictlyNewerVersion, scheduleOpenCodeSandboxRefreshOnExit
+    "packages/omo-opencode/src/hooks/auto-update-checker/checker.ts": ["getLocalDevPath", "updatePinnedVersion", "checkForUpdate", "compareSemverVersions", "isStrictlyNewerVersion", "scheduleOpenCodeSandboxRefreshOnExit"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) checkForUpdate
+    "packages/omo-opencode/src/hooks/auto-update-checker/checker/check-for-update.ts": ["checkForUpdate"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) CACHE_ROOT_DIR, VERSION_FILE, INSTALLED_PACKAGE_JSON
+    "packages/omo-opencode/src/hooks/auto-update-checker/constants.ts": ["CACHE_ROOT_DIR", "VERSION_FILE", "INSTALLED_PACKAGE_JSON"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) checkForUpdate, invalidatePackage, invalidateCache
+    "packages/omo-opencode/src/hooks/auto-update-checker/index.ts": ["checkForUpdate", "invalidatePackage", "invalidateCache"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) getClaudeSettingsPaths
+    "packages/omo-opencode/src/hooks/claude-code-hooks/config.ts": ["getClaudeSettingsPaths"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) loadTodoFile, saveTodoFile, deleteTodoFile
+    "packages/omo-opencode/src/hooks/claude-code-hooks/todo.ts": ["loadTodoFile", "saveTodoFile", "deleteTodoFile"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) TRANSCRIPT_CACHE_TTL_MS
+    "packages/omo-opencode/src/hooks/claude-code-hooks/transcript.ts": ["TRANSCRIPT_CACHE_TTL_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) resolveCommentCheckerPathFromPath, getCommentCheckerPathSync, isCliAvailable, ensureCliAvailable
+    "packages/omo-opencode/src/hooks/comment-checker/cli.ts": ["resolveCommentCheckerPathFromPath", "getCommentCheckerPathSync", "isCliAvailable", "ensureCliAvailable"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) HOOK_NAME
+    "packages/omo-opencode/src/hooks/compaction-context-injector/constants.ts": ["HOOK_NAME"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) AGENTS_FILENAME
+    "packages/omo-opencode/src/hooks/directory-agents-injector/constants.ts": ["AGENTS_FILENAME"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) resolveFilePath
+    "packages/omo-opencode/src/hooks/directory-agents-injector/finder.ts": ["resolveFilePath"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) goalStatusForTui
+    "packages/omo-opencode/src/hooks/goal/controller.ts": ["goalStatusForTui"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ensureGoalStoreDir
+    "packages/omo-opencode/src/hooks/goal/store.ts": ["ensureGoalStoreDir"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) createGoalTool, updateGoalTool, getGoalTool
+    "packages/omo-opencode/src/hooks/goal/tools.ts": ["createGoalTool", "updateGoalTool", "getGoalTool"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) GOAL_STATUS_VALUES, GoalStatusSchema, GoalSchema, GoalToolSnapshotSchema
+    "packages/omo-opencode/src/hooks/goal/types.ts": ["GOAL_STATUS_VALUES", "GoalStatusSchema", "GoalSchema", "GoalToolSnapshotSchema"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) createInteractiveBashSessionTracker, parseTmuxCommand
+    "packages/omo-opencode/src/hooks/interactive-bash-session/index.ts": ["createInteractiveBashSessionTracker", "parseTmuxCommand"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) getUltraworkMessage, TEAM_PATTERN, TEAM_MESSAGE, HYPERPLAN_PATTERN, HYPERPLAN_MESSAGE, HYPERPLAN_ULTRAWORK_PATTERN, getHyperplanUltraworkMessage
+    "packages/omo-opencode/src/hooks/keyword-detector/constants.ts": ["getUltraworkMessage", "TEAM_PATTERN", "TEAM_MESSAGE", "HYPERPLAN_PATTERN", "HYPERPLAN_MESSAGE", "HYPERPLAN_ULTRAWORK_PATTERN", "getHyperplanUltraworkMessage"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) removeCodeBlocks
+    "packages/omo-opencode/src/hooks/keyword-detector/detector.ts": ["removeCodeBlocks"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ULTRAWORK_DEFAULT_MESSAGE
+    "packages/omo-opencode/src/hooks/keyword-detector/ultrawork/default.ts": ["ULTRAWORK_DEFAULT_MESSAGE"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ULTRAWORK_GEMINI_MESSAGE
+    "packages/omo-opencode/src/hooks/keyword-detector/ultrawork/gemini.ts": ["ULTRAWORK_GEMINI_MESSAGE"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ULTRAWORK_GLM_MESSAGE
+    "packages/omo-opencode/src/hooks/keyword-detector/ultrawork/glm.ts": ["ULTRAWORK_GLM_MESSAGE"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ULTRAWORK_GPT_MESSAGE
+    "packages/omo-opencode/src/hooks/keyword-detector/ultrawork/gpt.ts": ["ULTRAWORK_GPT_MESSAGE"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isGptModel, isGeminiModel, isGlmModel, ULTRAWORK_PLANNER_SECTION, getPlannerUltraworkMessage, ULTRAWORK_GPT_MESSAGE, getGptUltraworkMessage, ULTRAWORK_GEMINI_MESSAGE, getGeminiUltraworkMessage, ULTRAWORK_GLM_MESSAGE and 3 more
+    "packages/omo-opencode/src/hooks/keyword-detector/ultrawork/index.ts": ["isGptModel", "isGeminiModel", "isGlmModel", "ULTRAWORK_PLANNER_SECTION", "getPlannerUltraworkMessage", "ULTRAWORK_GPT_MESSAGE", "getGptUltraworkMessage", "ULTRAWORK_GEMINI_MESSAGE", "getGeminiUltraworkMessage", "ULTRAWORK_GLM_MESSAGE", "getGlmUltraworkMessage", "ULTRAWORK_DEFAULT_MESSAGE", "getDefaultUltraworkMessage"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ULTRAWORK_PLANNER_SECTION
+    "packages/omo-opencode/src/hooks/keyword-detector/ultrawork/planner.ts": ["ULTRAWORK_PLANNER_SECTION"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isGptModel, isGeminiModel, isGlmModel
+    "packages/omo-opencode/src/hooks/keyword-detector/ultrawork/source-detector.ts": ["isGptModel", "isGeminiModel", "isGlmModel"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) getSessionFallbackChain, getNextFallback, hasPendingModelFallback, getFallbackState
+    "packages/omo-opencode/src/hooks/model-fallback/hook.ts": ["getSessionFallbackChain", "getNextFallback", "hasPendingModelFallback", "getFallbackState"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) snoozedState, decidedState
+    "packages/omo-opencode/src/hooks/native-edition-nudge/decide.ts": ["snoozedState", "decidedState"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) detectNativeEdition
+    "packages/omo-opencode/src/hooks/native-edition-nudge/hook.ts": ["detectNativeEdition"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) decideNativeEditionNudge, detectNativeEdition, NATIVE_NUDGE_TOAST_MESSAGE, NATIVE_NUDGE_TOAST_TITLE, NUDGE_STATE_FILE, parseNudgeState
+    "packages/omo-opencode/src/hooks/native-edition-nudge/index.ts": ["decideNativeEditionNudge", "detectNativeEdition", "NATIVE_NUDGE_TOAST_MESSAGE", "NATIVE_NUDGE_TOAST_TITLE", "NUDGE_STATE_FILE", "parseNudgeState"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) HephaestusRequiresGptError
+    "packages/omo-opencode/src/hooks/no-hephaestus-non-gpt/hook.ts": ["HephaestusRequiresGptError"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isNonInteractive
+    "packages/omo-opencode/src/hooks/non-interactive-env/detector.ts": ["isNonInteractive"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) PLAN_EFFORT_BANDS, effortBandForDuration, normalizePlanEffort
+    "packages/omo-opencode/src/hooks/plan-format-validator/hook.ts": ["PLAN_EFFORT_BANDS", "effortBandForDuration", "normalizePlanEffort"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isStepOnlyNoTextParts
+    "packages/omo-opencode/src/hooks/preemptive-compaction-no-text-tail.ts": ["isStepOnlyNoTextParts"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ALLOWED_PATH_PREFIX, PLANNING_CONTEXT_CLOSE
+    "packages/omo-opencode/src/hooks/prometheus-md-only/constants.ts": ["ALLOWED_PATH_PREFIX", "PLANNING_CONTEXT_CLOSE"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isRalphLoopResumeArgument
+    "packages/omo-opencode/src/hooks/ralph-loop/command-arguments.ts": ["isRalphLoopResumeArgument"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) COMPLETION_TAG_PATTERN
+    "packages/omo-opencode/src/hooks/ralph-loop/constants.ts": ["COMPLETION_TAG_PATTERN"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) readState, writeState, clearState, incrementIteration
+    "packages/omo-opencode/src/hooks/ralph-loop/index.ts": ["readState", "writeState", "clearState", "incrementIteration"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) getStateFilePath
+    "packages/omo-opencode/src/hooks/ralph-loop/storage.ts": ["getStateFilePath"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) GITHUB_INSTRUCTIONS_PATTERN, OPENCODE_USER_RULE_DIRS, PROJECT_MARKERS, PROJECT_RULE_FILES, PROJECT_RULE_SUBDIRS, RULE_EXTENSIONS, USER_RULE_DIR
+    "packages/omo-opencode/src/hooks/rules-injector/constants.ts": ["GITHUB_INSTRUCTIONS_PATTERN", "OPENCODE_USER_RULE_DIRS", "PROJECT_MARKERS", "PROJECT_RULE_FILES", "PROJECT_RULE_SUBDIRS", "RULE_EXTENSIONS", "USER_RULE_DIR"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) calculateDistance
+    "packages/omo-opencode/src/hooks/rules-injector/finder.ts": ["calculateDistance"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) calculateDistance, findProjectRoot, findRuleFiles
+    "packages/omo-opencode/src/hooks/rules-injector/index.ts": ["calculateDistance", "findProjectRoot", "findRuleFiles"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) calculateDistance
+    "packages/omo-opencode/src/hooks/rules-injector/rule-distance.ts": ["calculateDistance"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) safeRealpathSync
+    "packages/omo-opencode/src/hooks/rules-injector/rule-file-scanner.ts": ["safeRealpathSync"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) AGENT_NAMES
+    "packages/omo-opencode/src/hooks/runtime-fallback/agent-resolver.ts": ["AGENT_NAMES"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) extractRetryableSignal
+    "packages/omo-opencode/src/hooks/runtime-fallback/error-classifier.ts": ["extractRetryableSignal"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) hasVisibleAssistantResponse
+    "packages/omo-opencode/src/hooks/runtime-fallback/message-update-handler.ts": ["hasVisibleAssistantResponse"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) HOOK_NAME
+    "packages/omo-opencode/src/hooks/tasks-todowrite-disabler/constants.ts": ["HOOK_NAME"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isRecord, UNKNOWN_TOOL_STATUS
+    "packages/omo-opencode/src/hooks/tool-pair-validator/tool-part-ids.ts": ["isRecord", "UNKNOWN_TOOL_STATUS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) HOOK_NAME, detectWorktreePath, listWorktrees, parseWorktreeListPorcelain, parseUserRequest
+    "packages/omo-opencode/src/hooks/ulw-execute/index.ts": ["HOOK_NAME", "detectWorktreePath", "listWorktrees", "parseWorktreeListPorcelain", "parseUserRequest"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) NOTEPAD_FILES
+    "packages/omo-opencode/src/hooks/ulw-execute/notepad-scaffold.ts": ["NOTEPAD_FILES"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) buildReminder, extractMessages, getMessageInfo, getMessageParts, isUnstableTask, THINKING_SUMMARY_MAX_CHARS
+    "packages/omo-opencode/src/hooks/unstable-agent-babysitter/index.ts": ["buildReminder", "extractMessages", "getMessageInfo", "getMessageParts", "isUnstableTask", "THINKING_SUMMARY_MAX_CHARS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) createContext7Config
+    "packages/omo-opencode/src/mcp/context7.ts": ["createContext7Config"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) McpNameSchema
+    "packages/omo-opencode/src/mcp/index.ts": ["McpNameSchema"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) McpNameSchema
+    "packages/omo-opencode/src/mcp/types.ts": ["McpNameSchema"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) websearch
+    "packages/omo-opencode/src/mcp/websearch.ts": ["websearch"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) normalizeProtectedAgentName
+    "packages/omo-opencode/src/plugin-handlers/agent-override-protection.ts": ["normalizeProtectedAgentName"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) resolveCategoryConfig
+    "packages/omo-opencode/src/plugin-handlers/config-handler.ts": ["resolveCategoryConfig"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isUlwExecuteHookOutput, isUlwExecuteFallbackTemplate, clearStoppedContinuationBeforeUlwExecute
+    "packages/omo-opencode/src/plugin/chat-message/ulw-execute-message.ts": ["isUlwExecuteHookOutput", "isUlwExecuteFallbackTemplate", "clearStoppedContinuationBeforeUlwExecute"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isCompactionAgent
+    "packages/omo-opencode/src/plugin/event-session-lifecycle.ts": ["isCompactionAgent"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) detectUltrawork
+    "packages/omo-opencode/src/plugin/ultrawork-model-override.ts": ["detectUltrawork"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) validateAgentOrder
+    "packages/omo-opencode/src/shared/agent-ordering.ts": ["validateAgentOrder"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) createConnectedProvidersCacheStore, findProviderModelMetadata
+    "packages/omo-opencode/src/shared/connected-providers-cache.ts": ["createConnectedProvidersCacheStore", "findProviderModelMetadata"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) containsPath
+    "packages/omo-opencode/src/shared/contains-path.ts": ["containsPath"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) getCacheDir
+    "packages/omo-opencode/src/shared/data-path.ts": ["getCacheDir"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isPlainObject
+    "packages/omo-opencode/src/shared/deep-merge.ts": ["isPlainObject"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_CONTEXT_WINDOW_USAGE_FETCH_TIMEOUT_MS
+    "packages/omo-opencode/src/shared/dynamic-truncator.ts": ["DEFAULT_CONTEXT_WINDOW_USAGE_FETCH_TIMEOUT_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isSymbolicLink, resolveSymlinkAsync
+    "packages/omo-opencode/src/shared/file-utils.ts": ["isSymbolicLink", "resolveSymlinkAsync"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) normalizeModel, normalizeFallbackModels, flattenToFallbackModelStrings, SessionCategoryRegistry
+    "packages/omo-opencode/src/shared/index.ts": ["normalizeModel", "normalizeFallbackModels", "flattenToFallbackModelStrings", "SessionCategoryRegistry"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) detectConfigFile, readJsoncFile
+    "packages/omo-opencode/src/shared/jsonc-parser.ts": ["detectConfigFile", "readJsoncFile"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isLiveParentWakeRoutingDisabled
+    "packages/omo-opencode/src/shared/live-server-route.ts": ["isLiveParentWakeRoutingDisabled"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) BUILTIN_AGENT_NAMES, MODEL_TO_CATEGORY_MAP, shouldDeleteAgentConfig, HOOK_NAME_MAP, getSidecarPath, readAppliedMigrations, writeAppliedMigrations, MODEL_VERSION_MAP
+    "packages/omo-opencode/src/shared/migration.ts": ["BUILTIN_AGENT_NAMES", "MODEL_TO_CATEGORY_MAP", "shouldDeleteAgentConfig", "HOOK_NAME_MAP", "getSidecarPath", "readAppliedMigrations", "writeAppliedMigrations", "MODEL_VERSION_MAP"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) buildModelCapabilitiesSnapshotFromModelsDev, readModelCapabilitiesCache, hasModelCapabilitiesCache, writeModelCapabilitiesCache
+    "packages/omo-opencode/src/shared/model-capabilities-cache.ts": ["buildModelCapabilitiesSnapshotFromModelsDev", "readModelCapabilitiesCache", "hasModelCapabilitiesCache", "writeModelCapabilitiesCache"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) getBundledModelCapabilitiesSnapshotForRuntime, getBundledModelCapabilitiesSnapshotForShared, getBundledModelCapabilitiesSnapshot
+    "packages/omo-opencode/src/shared/model-capabilities/index.ts": ["getBundledModelCapabilitiesSnapshotForRuntime", "getBundledModelCapabilitiesSnapshotForShared", "getBundledModelCapabilitiesSnapshot"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) selectFallbackProviderWithCache
+    "packages/omo-opencode/src/shared/model-error-classifier.ts": ["selectFallbackProviderWithCache"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) _setModelResolutionLogImplementationForTesting
+    "packages/omo-opencode/src/shared/model-resolution-pipeline.ts": ["_setModelResolutionLogImplementationForTesting"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) parseVariantFromModelID
+    "packages/omo-opencode/src/shared/model-string-parser.ts": ["parseVariantFromModelID"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) sweepOrphanedLspDaemonProxiesBestEffort, sweepStaleLspDaemonVersionsBestEffort
+    "packages/omo-opencode/src/shared/omo-process-sweep.ts": ["sweepOrphanedLspDaemonProxiesBestEffort", "sweepStaleLspDaemonVersionsBestEffort"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) openCodeShellName
+    "packages/omo-opencode/src/shared/opencode-shell.ts": ["openCodeShellName"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) resetSqliteBackendCache
+    "packages/omo-opencode/src/shared/opencode-storage-detection.ts": ["resetSqliteBackendCache"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) parseToolsConfig
+    "packages/omo-opencode/src/shared/parse-tools-config.ts": ["parseToolsConfig"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) findAvailablePort
+    "packages/omo-opencode/src/shared/port-utils.ts": ["findAvailablePort"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) __setOsProviderForTesting, createPluginPostHog
+    "packages/omo-opencode/src/shared/posthog.ts": ["__setOsProviderForTesting", "createPluginPostHog"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) findProjectAgentsSkillDirs
+    "packages/omo-opencode/src/shared/project-discovery-dirs.ts": ["findProjectAgentsSkillDirs"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) LIVE_ROUTE_DISPATCH_LOG, LIVE_ROUTE_UNAVAILABLE_LOG
+    "packages/omo-opencode/src/shared/prompt-async-gate.ts": ["LIVE_ROUTE_DISPATCH_LOG", "LIVE_ROUTE_UNAVAILABLE_LOG"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) routeSessionPrompt, routePromptSyncRetry, routeSessionMessages, promptSyncWithRetryInDirectory
+    "packages/omo-opencode/src/shared/session-route.ts": ["routeSessionPrompt", "routePromptSyncRetry", "routeSessionMessages", "promptSyncWithRetryInDirectory"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) shellSingleQuote
+    "packages/omo-opencode/src/shared/shell-env.ts": ["shellSingleQuote"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) camelToSnake, objectToCamelCase, snakeToCamel, transformObjectKeys
+    "packages/omo-opencode/src/shared/snake-case.ts": ["camelToSnake", "objectToCamelCase", "snakeToCamel", "transformObjectKeys"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isServerRunning, resetServerCheck, markServerRunningInProcess, getPaneDimensions, sweepTmuxSessionsWith, buildTmuxAttachCommand, buildTmuxPlaceholderCommand
+    "packages/omo-opencode/src/shared/tmux/tmux-utils.ts": ["isServerRunning", "resetServerCheck", "markServerRunningInProcess", "getPaneDimensions", "sweepTmuxSessionsWith", "buildTmuxAttachCommand", "buildTmuxPlaceholderCommand"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) paneDimensionsDeps, mainPaneWidthDeps, sessionKillDeps
+    "packages/omo-opencode/src/shared/tmux/tmux-utils/adapter-deps.ts": ["paneDimensionsDeps", "mainPaneWidthDeps", "sessionKillDeps"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) resetServerCheck
+    "packages/omo-opencode/src/shared/tmux/tmux-utils/server-health.ts": ["resetServerCheck"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) createBackgroundTask
+    "packages/omo-opencode/src/tools/background-task/index.ts": ["createBackgroundTask"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) createBackgroundTask
+    "packages/omo-opencode/src/tools/background-task/tools.ts": ["createBackgroundTask"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_BACKGROUND_OUTPUT_FETCH_TIMEOUT_MS, BackgroundOutputFetchTimeoutError
+    "packages/omo-opencode/src/tools/background-task/with-sdk-call-timeout.ts": ["DEFAULT_BACKGROUND_OUTPUT_FETCH_TIMEOUT_MS", "BackgroundOutputFetchTimeoutError"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) BUILTIN_CATEGORY_REQUIRES_MODEL
+    "packages/omo-opencode/src/tools/delegate-task/builtin-categories.ts": ["BUILTIN_CATEGORY_REQUIRES_MODEL"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) BUILTIN_CATEGORY_REQUIRES_MODEL, PLAN_AGENT_SYSTEM_PREPEND_STATIC_BEFORE_SKILLS, PLAN_AGENT_SYSTEM_PREPEND_STATIC_AFTER_SKILLS, buildPlanAgentSkillsSection, PLAN_DELIVERABLE_TAG
+    "packages/omo-opencode/src/tools/delegate-task/constants.ts": ["BUILTIN_CATEGORY_REQUIRES_MODEL", "PLAN_AGENT_SYSTEM_PREPEND_STATIC_BEFORE_SKILLS", "PLAN_AGENT_SYSTEM_PREPEND_STATIC_AFTER_SKILLS", "buildPlanAgentSkillsSection", "PLAN_DELIVERABLE_TAG"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) resolveCategoryConfig, buildSystemContent, buildTaskPrompt
+    "packages/omo-opencode/src/tools/delegate-task/index.ts": ["resolveCategoryConfig", "buildSystemContent", "buildTaskPrompt"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isTaskCallableAgentMode
+    "packages/omo-opencode/src/tools/delegate-task/subagent-discovery.ts": ["isTaskCallableAgentMode"],
+    // added on dev after the last merge (origin dev 4e6328d8df): unused export(s) isDefiniteSessionNotFound
+    "packages/omo-opencode/src/tools/delegate-task/sync-session-existence.ts": ["isDefiniteSessionNotFound"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) resolveCategoryConfig
+    "packages/omo-opencode/src/tools/delegate-task/tools.ts": ["resolveCategoryConfig"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_CONTEXT
+    "packages/omo-opencode/src/tools/grep/constants.ts": ["DEFAULT_CONTEXT"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) NIBBLE_STR, HASHLINE_DICT, HASHLINE_REF_PATTERN, HASHLINE_OUTPUT_PATTERN
+    "packages/omo-opencode/src/tools/hashline-edit/constants.ts": ["NIBBLE_STR", "HASHLINE_DICT", "HASHLINE_REF_PATTERN", "HASHLINE_OUTPUT_PATTERN"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) toHashlineContent
+    "packages/omo-opencode/src/tools/hashline-edit/diff-utils.ts": ["toHashlineContent"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) applyHashlineEdits
+    "packages/omo-opencode/src/tools/hashline-edit/edit-operations.ts": ["applyHashlineEdits"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) computeLegacyLineHash, formatHashLine, formatHashLines, streamHashLinesFromUtf8, streamHashLinesFromLines
+    "packages/omo-opencode/src/tools/hashline-edit/hash-computation.ts": ["computeLegacyLineHash", "formatHashLine", "formatHashLines", "streamHashLinesFromUtf8", "streamHashLinesFromLines"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) computeLineHash, formatHashLine, formatHashLines, streamHashLinesFromLines, streamHashLinesFromUtf8, parseLineRef, validateLineRef, NIBBLE_STR, HASHLINE_DICT, HASHLINE_REF_PATTERN and 2 more
+    "packages/omo-opencode/src/tools/hashline-edit/index.ts": ["computeLineHash", "formatHashLine", "formatHashLines", "streamHashLinesFromLines", "streamHashLinesFromUtf8", "parseLineRef", "validateLineRef", "NIBBLE_STR", "HASHLINE_DICT", "HASHLINE_REF_PATTERN", "HASHLINE_OUTPUT_PATTERN", "applyHashlineEdits"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) parseLineRef, validateLineRef, validateLineRefs, normalizeLineRef
+    "packages/omo-opencode/src/tools/hashline-edit/validation.ts": ["parseLineRef", "validateLineRef", "validateLineRefs", "normalizeLineRef"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) startTmuxCheck, createTeamSendMessageTool
+    "packages/omo-opencode/src/tools/index.ts": ["startTmuxCheck", "createTeamSendMessageTool"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isHardcodedMultimodalFallbackModel
+    "packages/omo-opencode/src/tools/look-at/multimodal-fallback-chain.ts": ["isHardcodedMultimodalFallbackModel"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) OPENCODE_STORAGE, SESSION_DELETE_DESCRIPTION, TOOL_NAME_PREFIX
+    "packages/omo-opencode/src/tools/session-manager/constants.ts": ["OPENCODE_STORAGE", "SESSION_DELETE_DESCRIPTION", "TOOL_NAME_PREFIX"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) getSdkSessionMessagePage
+    "packages/omo-opencode/src/tools/session-manager/sdk-storage.ts": ["getSdkSessionMessagePage"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) readSessionTranscript
+    "packages/omo-opencode/src/tools/session-manager/storage.ts": ["readSessionTranscript"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) Semaphore
+    "packages/omo-opencode/src/tools/shared/semaphore.ts": ["Semaphore"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) SKILL_MCP_TOOL_NAME
+    "packages/omo-opencode/src/tools/skill-mcp/constants.ts": ["SKILL_MCP_TOOL_NAME"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) TOOL_NAME
+    "packages/omo-opencode/src/tools/skill/constants.ts": ["TOOL_NAME"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) skill
+    "packages/omo-opencode/src/tools/skill/index.ts": ["skill"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) skill
+    "packages/omo-opencode/src/tools/skill/tools.ts": ["skill"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) formatCommandList
+    "packages/omo-opencode/src/tools/slashcommand/command-output-formatter.ts": ["formatCommandList"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) syncTaskToTodo, syncAllTasksToTodos
+    "packages/omo-opencode/src/tools/task/index.ts": ["syncTaskToTodo", "syncAllTasksToTodos"]
+  }
+}

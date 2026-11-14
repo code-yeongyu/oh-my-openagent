@@ -1,4 +1,4 @@
-import type { ThreadToolFailure } from "../errors"
+import type { ThreadErrorCode, ThreadToolFailure } from "../errors"
 import type { BindingRecord, OutboxRow } from "../gateway/bindings"
 
 // Discriminated result unions. The error branch is shared data, never an exception: a caller
@@ -87,6 +87,12 @@ export type ThreadTranscriptItem = {
 export type ThreadLocalAliasNote = {
   readonly alias_scope?: "local"
   readonly alias_unavailable?: "sign_in" | "no_registry" | "no_remote"
+  /**
+   * Set only when the account was gone by the alias claim, after thread_create had made the thread: the alias could
+   * not become its local name (`name_conflict` with another thread, or the code that refused the rename), so the
+   * thread keeps the name it was created with.
+   */
+  readonly local_name_unavailable?: ThreadErrorCode
 }
 
 export type ThreadCreateResult =
