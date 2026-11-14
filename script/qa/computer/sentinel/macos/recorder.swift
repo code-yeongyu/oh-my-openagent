@@ -33,6 +33,8 @@ final class Recorder: NSObject {
   // pids whose window observer is registered, and pids whose registration is still being retried
   var registered: Set<pid_t> = []
   var registering: Set<pid_t> = []
+  // when an app failed registration while it was not regular: its gap is carried into the activation re-registration
+  var failedSince: [pid_t: Double] = [:]
   var stopping = false
 
   init(userPid: pid_t, targetPids: [pid_t], fieldIdentifier: String) {
@@ -115,63 +117,13 @@ final class Recorder: NSObject {
 
     center.addObserver(self, selector: #selector(launched(_:)), name: NSWorkspace.didLaunchApplicationNotification, object: nil)
     for app in NSWorkspace.shared.runningApplications where app.processIdentifier != getpid() {
-      watchWindows(of: app.processIdentifier)
+      watchWindows(of: app.processIdentifier, origin: "arm")
     }
     if windowsListed { armed("dialog", "notification+sample") } else { fault("dialog", "window list unreadable") }
   }
 
-  // A just-launched app often refuses registration until its AX server is up. It is retried for up to 2 s while its
-  // activation policy is regular or not yet decided (.prohibited, which a launching app can still leave); a
-  // background agent (.accessory) is tried once and never costs the main thread a retry round. The policy is re-read
-  // at every attempt, so an app that turns regular mid-retry is reported as regular, and an app that turns regular
-  // later is registered again when it activates. Every gap is reported with the moment it began (`since`): a
-  // registration that came late as observer_late, one that never came as observer_failed. The reducer judges the
-  // gap's overlap with the recording, and does not judge the target's own apps or apps without a UI. A registration
-  // still being retried is counted in `registering`, which `stop` waits for and reports. An app that has quit is not
-  // reported.
-  func watchWindows(of pid: pid_t, attempt: Int = 1, since: Double = uptimeMs()) {
-    if attempt == 1 && registering.contains(pid) { return }
-    let error = observe(pid, AXUIElementCreateApplication(pid), [kAXWindowCreatedNotification, kAXSheetCreatedNotification])
-    guard let app = NSRunningApplication(processIdentifier: pid), !app.isTerminated else {
-      registering.remove(pid)
-      return
-    }
-    let regular = app.activationPolicy == .regular
-    if error == .success {
-      registered.insert(pid)
-      registering.remove(pid)
-      if attempt > 1 {
-        emit(["kind": "observer_late", "pid": Int(pid), "attempts": attempt, "regular": regular, "since": since])
-      }
-      return
-    }
-    if app.activationPolicy != .accessory && attempt < 10 {
-      registering.insert(pid)
-      return after(0.2) { self.watchWindows(of: pid, attempt: attempt + 1, since: since) }
-    }
-    registering.remove(pid)
-    emit([
-      "kind": "observer_failed", "pid": Int(pid), "app": app.bundleIdentifier ?? app.localizedName ?? "unknown",
-      "policy": policyName(app.activationPolicy), "axError": axErrorName(error), "attempts": attempt,
-      "regular": regular, "since": since,
-    ])
-  }
-
   @objc func spaceChanged() {
     send("space", ["kind": "space", "via": "notification", "value": activeSpaceId().map { String($0) } ?? "unknown"])
-  }
-
-  @objc func activated(_ note: Notification) {
-    let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
-    send("activation", ["kind": "activation", "via": "notification", "pid": Int(app?.processIdentifier ?? -1)])
-    // An app that was a background agent at launch and turned regular since gets its window observer now.
-    if let pid = app?.processIdentifier, !registered.contains(pid) { watchWindows(of: pid) }
-  }
-
-  @objc func launched(_ note: Notification) {
-    if let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication {
-      watchWindows(of: app.processIdentifier)
-    }
   }
 
   func onAccessibility(_ element: AXUIElement, _ notification: String) {

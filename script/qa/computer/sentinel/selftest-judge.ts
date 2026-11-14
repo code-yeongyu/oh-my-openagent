@@ -52,8 +52,18 @@ export function observerFailureLines(events: readonly SentinelEvent[]): string[]
   return events.flatMap((event) =>
     event.kind === "observer_failed"
       ? [
-          `SENTINEL_OBSERVER_FAILED pid=${event.pid} app=${event.app} policy=${event.policy} attempts=${event.attempts} ax=${event.axError}`,
+          `SENTINEL_OBSERVER_FAILED pid=${event.pid} app=${event.app} policy=${event.policy} origin=${event.origin} attempts=${event.attempts} ax=${event.axError}`,
         ]
+      : [],
+  )
+}
+
+// An app already running when the recorder armed is past its launch, so its registration is tried once: a crowd of
+// refusing background agents must not run retry chains on the main thread into the sampler's tick gap.
+export function observerRetryProblems(events: readonly SentinelEvent[]): string[] {
+  return events.flatMap((event) =>
+    (event.kind === "observer_failed" || event.kind === "observer_late") && event.origin === "arm" && event.attempts > 1
+      ? [`window observer for pid ${event.pid} was retried ${event.attempts} times although it was found at arm time`]
       : [],
   )
 }

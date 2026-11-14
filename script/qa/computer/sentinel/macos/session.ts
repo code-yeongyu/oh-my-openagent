@@ -23,9 +23,10 @@ type SessionOptions = {
 
 const HELLO_MS = 15_000
 const MARKER_MS = 3_000
-// The recorder's stop waits up to RECORDER_DRAIN_MS for new-window reads still running and its final field read
-// retries for up to RECORDER_FINAL_MS; both budgets are sent with the command, and the harness waits for each marker
-// at least that long plus its own marker allowance, so a slow drain ends in the recorder's pendingReads fact.
+// The recorder's stop waits up to RECORDER_DRAIN_MS for new-window reads and window-observer registrations still
+// running, and its final field read retries for up to RECORDER_FINAL_MS. Both budgets are sent with the command, and
+// the harness waits for each marker at least that long plus its own marker allowance, so a slow drain ends in the
+// stop marker's pendingReads and pendingRegistrations facts, never in the harness's own timeout.
 const RECORDER_DRAIN_MS = 4_000
 const RECORDER_FINAL_MS = 1_000
 const KEYSTROKE_MS = 2_500

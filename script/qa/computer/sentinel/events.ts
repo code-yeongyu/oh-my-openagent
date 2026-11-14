@@ -47,6 +47,8 @@ export type SentinelEvent = { readonly t: number } & (
       // A window observer that was not registered from `since` (the app's launch or the first attempt) until `t`
       // (observer_late) or ever (observer_failed): a sheet in that gap is invisible to every branch.
       readonly kind: "observer_failed"
+      // where the registration started: an app running when the recorder armed, a launch, or an activation
+      readonly origin: "arm" | "launch" | "activation"
       readonly pid: number
       // bundle id, else the process name; and the activation policy at the last attempt
       readonly app: string
@@ -58,6 +60,7 @@ export type SentinelEvent = { readonly t: number } & (
     }
   | {
       readonly kind: "observer_late"
+      readonly origin: "arm" | "launch" | "activation"
       readonly pid: number
       readonly attempts: number
       readonly regular: boolean
@@ -112,6 +115,7 @@ const SHAPES: Readonly<Record<SentinelEvent["kind"], Readonly<Record<string, Che
     axReads: optional(num),
   },
   observer_failed: {
+    origin: oneOf("arm", "launch", "activation"),
     pid: num,
     app: str,
     policy: oneOf("regular", "accessory", "prohibited", "unknown"),
@@ -120,7 +124,7 @@ const SHAPES: Readonly<Record<SentinelEvent["kind"], Readonly<Record<string, Che
     regular: bool,
     since: num,
   },
-  observer_late: { pid: num, attempts: num, regular: bool, since: num },
+  observer_late: { origin: oneOf("arm", "launch", "activation"), pid: num, attempts: num, regular: bool, since: num },
   leak: { what: oneOf("key", "mouse") },
 }
 
