@@ -1,4 +1,5 @@
 import type { ResolvedModelRecord, TaskRecord } from "../state"
+import type { UsageLimitMemory } from "./usage-limit-memory"
 
 // A provider answer that no other model on the SAME provider can fix: the stored credential is
 // rejected (401, an invalid key, a lapsed subscription), has expired with only a fresh /login to renew it
@@ -34,18 +35,38 @@ const ACCOUNT_SCOPED_403 = /account|credential|token|api[ _-]?key|organization|s
 const MODEL_SCOPED = /\bmodels?\b/i
 
 // A spent usage, quota or billing limit. Scoped to one model when the text names a model, a model family
-// or premium models (a Fable-only weekly cap, Copilot premium requests); otherwise the whole account is
-// spent, so its other rungs fail the same way and go last.
+// or premium models (a Fable-only weekly cap, Copilot premium requests); account-wide only when the text
+// proves it (money, the provider naming the account or organization, a session window every model shares);
+// any other limit is ambiguous: a weekly limit that names no family may still bind one family (#11383).
 const USAGE_LIMIT =
   /quota|usage[_ ]limit|\bhit\s+your\b[^.]*\blimit\b|\b(?:session|weekly|monthly|daily|hourly|\d+[- ]hour)\s+limit\b|limit\s+exhausted|insufficient[_ ](?:quota|credits?|balance)|credit[_ ]balance|credits?[_ ]required|billing|blocking_limit/i
 // A `/model` command hint (senpi's own limit text says "Switch to another provider with /model") names no model.
 const MODEL_SCOPED_LIMIT = /(?<!\/)\bmodels?\b|\bpremium\b|\b(?:opus|sonnet|haiku|fable|mythos)\b/i
+const ACCOUNT_SCOPED_LIMIT =
+  /insufficient[_ ](?:quota|credits?|balance)|credit[_ ]balance|credits?[_ ]required|billing|\bsession\s+limit\b|\baccount\b|\borgani[sz]ation\b/i
+// senpi writes "The <provider> account usage limit has been reached" for EVERY limit whose body names no model, so
+// that wording proves nothing about scope.
+const ENGINE_ACCOUNT_REWRITE = /\baccount usage limit has been reached\b/i
 
-export type UsageLimitScope = "model" | "account"
+// The route does not serve the configured model id (#11355): the OpenAI-compatible `model_not_found` code and OpenAI's
+// "The model `<id>` does not exist" prose, a gateway's "unknown provider for model", Anthropic's not_found_error whose
+// message names the model ("model: <id>"; any other not_found_error is not one), and Google's "models/<id> is not found".
+// The same shapes as senpi's matcher (senpi#4283). The answer is about that one model, like a usage limit scoped to it,
+// so the next entry of the record's own chain takes over (a same-provider sibling included); it wins over every other
+// class, a 401 in the same answer included.
+const MODEL_NOT_FOUND =
+  /\bmodel_not_found\b|\bunknown provider for model\b|\bthe model\s+[`'"]?[\w.:/-]+[`'"]?\s+does not exist\b|\bnot_found_error\b[^}]{0,120}?\bmodel:\s*[\w.:/-]|\bmodels\/[\w.:-]+ is not found\b/i
+
+export function isModelNotFound(message: string): boolean {
+  return MODEL_NOT_FOUND.test(message)
+}
+
+export type UsageLimitScope = "model" | "account" | "ambiguous"
 
 export function usageLimitScope(message: string): UsageLimitScope | undefined {
   if (!USAGE_LIMIT.test(message)) return undefined
-  return MODEL_SCOPED_LIMIT.test(message) ? "model" : "account"
+  if (MODEL_SCOPED_LIMIT.test(message)) return "model"
+  return ACCOUNT_SCOPED_LIMIT.test(message.replace(ENGINE_ACCOUNT_REWRITE, "")) ? "account" : "ambiguous"
 }
 
 function namesModel(message: string, modelId?: string): boolean {
@@ -84,7 +105,7 @@ function modelIdOf(record: TaskRecord): string | undefined {
  */
 export function terminalFailureMessage(record: TaskRecord | null | undefined, failureMessage: string): string {
   const provider = record == null ? undefined : providerOf(record)
-  if (provider === undefined || record == null) return failureMessage
+  if (provider === undefined || record == null || isModelNotFound(failureMessage)) return failureMessage
   if (isCredentialFailure(failureMessage, modelIdOf(record))) {
     const missing = !CREDENTIAL_REJECTED.test(failureMessage) && isMissingCredential(failureMessage, modelIdOf(record))
     const cause = missing
@@ -107,28 +128,49 @@ export type RuntimeFallbackCandidates = {
   readonly limit?: UsageLimitScope
 }
 
+/** A same-provider hop proves scope only when the previous rung itself hit a usage limit or is the active probe. */
+function previousRungOnProvider(record: TaskRecord, provider: string, limits?: UsageLimitMemory): boolean {
+  const attempts = record.fallback_attempts ?? []
+  const previous = attempts[attempts.length - 2]
+  return (
+    limits?.probeOf(record.task_id)?.provider === provider ||
+    (previous?.provider === provider && limits?.familySpent(provider, previous.model_id) === true)
+  )
+}
+
 /**
- * The designated fallback list to walk after a failed turn: a dead credential drops the failed provider's
- * rungs, an account-wide usage limit moves them last. Only the record's own chain is ever walked.
+ * The designated fallback list to walk after a failed turn: a dead credential or an account-wide usage limit drops
+ * the failed provider's rungs (#9711). An ambiguous limit walks in list order, so the next rung on the same provider
+ * is tried once; when that rung hits a limit too, the provider counts as spent and its other rungs drop (#11383).
+ * A rung whose account or family limit is already remembered spent is skipped. Only the record's own chain is ever
+ * walked: every candidate comes from `record.fallback_models`.
  */
-export function runtimeFallbackCandidates(record: TaskRecord, failureMessage: string): RuntimeFallbackCandidates {
-  const fallbacks = record.fallback_models ?? []
+export function runtimeFallbackCandidates(
+  record: TaskRecord,
+  failureMessage: string,
+  limits?: UsageLimitMemory,
+): RuntimeFallbackCandidates {
+  const all = record.fallback_models ?? []
+  const known = all.filter((model) => limits?.familySpent(model.provider, model.model_id) === true)
+  const fallbacks = all.filter((model) => !known.includes(model))
+  if (isModelNotFound(failureMessage)) return { remaining: fallbacks, skipped: known }
   const provider = providerOf(record)
   if (provider !== undefined && isCredentialFailure(failureMessage, modelIdOf(record))) {
     return {
       remaining: fallbacks.filter((model) => model.provider !== provider),
-      skipped: fallbacks.filter((model) => model.provider === provider),
+      skipped: [...known, ...fallbacks.filter((model) => model.provider === provider)],
     }
   }
   const limit = usageLimitScope(failureMessage)
-  if (limit === undefined) return { remaining: fallbacks, skipped: [] }
-  if (limit === "model" || provider === undefined) return { remaining: fallbacks, skipped: [], limit }
+  const accountSpent = provider !== undefined && limits?.accountSpent(provider) === true
+  if (limit === undefined && !accountSpent) return { remaining: fallbacks, skipped: known }
+  if (limit === "model" || provider === undefined)
+    return { remaining: fallbacks, skipped: known, ...(limit === undefined ? {} : { limit }) }
+  if (limit === "ambiguous" && !accountSpent && !previousRungOnProvider(record, provider, limits))
+    return { remaining: fallbacks, skipped: known, limit }
   return {
-    remaining: [
-      ...fallbacks.filter((model) => model.provider !== provider),
-      ...fallbacks.filter((model) => model.provider === provider),
-    ],
-    skipped: [],
-    limit,
+    remaining: fallbacks.filter((model) => model.provider !== provider),
+    skipped: [...known, ...fallbacks.filter((model) => model.provider === provider)],
+    limit: "account",
   }
 }

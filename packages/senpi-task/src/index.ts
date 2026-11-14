@@ -364,6 +364,7 @@ export type {
   NameRegistration,
   ParentModelRegistryResolver,
   PlanResolution,
+  PlanConfigError,
   PlanResolutionError,
   ResolvedChildPlan,
   RpcRunnerLike,

@@ -12,6 +12,7 @@ export type AdmissionResult =
 export type ReconcileOutcomeKind = "resumed" | "lost" | "lost_and_terminated" | "foreign_live_owner" | "deferred"
 
 export type ReconcileDeferredReason =
+  | "usage_limit"
   | "capacity"
   | "lock_contended"
   | "foreign_live_owner"
