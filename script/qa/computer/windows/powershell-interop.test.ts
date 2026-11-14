@@ -13,8 +13,24 @@ function wideImportsWithoutUnicode(source: string): string[] {
   const missing: string[] = []
   // Every import: its method name, its EntryPoint and its parameter list decide whether it is wide
   // (a ...W method or entry point) or marshals a string (string / StringBuilder parameter).
-  for (const match of source.matchAll(/\[DllImport\(([^\]]*)\)\][^;(]*?\b(\w+)\s*\(([^)]*)\)/g)) {
-    const [, attributes = "", name = "", parameters = ""] = match
+  // The method is the name before the first '(' after 'extern' (a [return: ...] attribute comes
+  // before it), and its parameter list is read with balanced parentheses (a parameter may carry
+  // its own [MarshalAs(...)] attribute).
+  for (const match of source.matchAll(/\[DllImport\(([^\]]*)\)\]/g)) {
+    const attributes = match[1] ?? ""
+    const rest = source.slice((match.index ?? 0) + match[0].length)
+    const method = /\bextern\b[^(;]*?\b(\w+)\s*\(/.exec(rest)
+    if (method === null) continue
+    const name = method[1] ?? ""
+    const open = method.index + method[0].length
+    let depth = 1
+    let end = open
+    while (end < rest.length && depth > 0) {
+      if (rest[end] === "(") depth += 1
+      else if (rest[end] === ")") depth -= 1
+      end += 1
+    }
+    const parameters = rest.slice(open, end - 1)
     const entryPoint = /EntryPoint\s*=\s*"(\w+)"/.exec(attributes)?.[1] ?? ""
     const wide = name.endsWith("W") || entryPoint.endsWith("W")
     const marshalsString = /\b(string|StringBuilder)\b/.test(parameters)
