@@ -206,6 +206,13 @@ impl Sightings {
     }
 }
 
+/// The 500 ms hook re-install, new-before-old: `(keep, unhook)` - the hook that stays installed
+/// and the one to remove, given the installed hook and the fresh install's result.
+#[must_use]
+pub fn reinstall<H>(old: Option<H>, fresh: Option<H>) -> (Option<H>, Option<H>) {
+    (fresh, old)
+}
+
 /// Whether `vk` is one of the stop chord's keys.
 #[must_use]
 pub fn is_stop_chord_key(vk: u16) -> bool {

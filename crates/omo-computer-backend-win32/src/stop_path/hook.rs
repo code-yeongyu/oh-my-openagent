@@ -25,7 +25,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 
 use super::{
-    is_chord, key_held, liveness, HookEvent, HotkeyVerdict, Liveness, Origin, PhysicalChord,
+    is_chord, key_held, liveness, reinstall, HookEvent, HotkeyVerdict, Liveness, Origin, PhysicalChord,
     Sightings, StopCursor, VK_ESCAPE,
 };
 
@@ -190,12 +190,13 @@ fn run(ready: &mpsc::Sender<()>) {
         while unsafe { PeekMessageW(&mut message, None, 0, 0, PM_REMOVE) }.as_bool() {
             match message.message {
                 WM_TIMER => {
-                    let fresh = install();
-                    if let Some(old) = hook.take() {
+                    // The fresh install runs before anything is removed.
+                    let (keep, unhook) = reinstall(hook.take(), install());
+                    if let Some(old) = unhook {
                         // SAFETY: the hook installed by this thread.
                         let _ = unsafe { UnhookWindowsHookEx(old) };
                     }
-                    hook = fresh;
+                    hook = keep;
                     SHARED.hook_ok.store(hook.is_some(), Ordering::Release);
                 }
                 WM_HOTKEY if message.wParam.0 == usize::try_from(HOTKEY_ID).unwrap_or(0) => {

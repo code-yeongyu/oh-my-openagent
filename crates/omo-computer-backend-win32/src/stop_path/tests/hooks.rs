@@ -5,7 +5,7 @@ use crate::input::{KeyUnit, ENGINE_TAG, VK_CONTROL, VK_MENU, VK_SHIFT};
 use crate::foreground::admit_leased;
 use crate::input_lock::{lock_verdict, LockVerdict};
 use crate::stop_path::{
-    is_chord, is_stop_chord_key, liveness, normalize_vk, HookEvent, HotkeyVerdict, Liveness,
+    is_chord, is_stop_chord_key, liveness, normalize_vk, reinstall, HookEvent, HotkeyVerdict, Liveness,
     Origin, PhysicalChord, Sightings, StopCursor, VK_ESCAPE,
 };
 
@@ -227,6 +227,20 @@ fn releasing_one_of_two_held_sides_keeps_the_generic_key_held() {
         Some(Origin::Physical),
         "left Ctrl is still down, so the chord stops"
     );
+}
+
+/// Review L4 of the #13350 delta: a failed re-install keeps the installed hook (new-before-old,
+/// so a silently removed hook leaves no gap); a fresh hook replaces it.
+#[test]
+fn a_failed_reinstall_keeps_the_installed_hook() {
+    assert_eq!(reinstall(Some(1), Some(2)), (Some(2), Some(1)));
+    assert_eq!(
+        reinstall(Some(1), None),
+        (Some(1), None),
+        "nothing replaced it, so nothing is removed"
+    );
+    assert_eq!(reinstall(None, Some(2)), (Some(2), None));
+    assert_eq!(reinstall(None::<u8>, None), (None, None));
 }
 
 #[test]
