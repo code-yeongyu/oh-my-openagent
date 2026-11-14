@@ -1,0 +1,1 @@
+RESULT=INCONCLUSIVE parent_assistant_messages=3 parent_tool_call_turns=2 terminal_stops=1 child_task_sessions=1 plugin_inits=0 WAKE_DISPATCHED_DURING_PARENT_TURN=false route_live_dispatch=false branch_counts=parent-tool-call:1,parent-hold:1,child:1,wake:0,default:1
