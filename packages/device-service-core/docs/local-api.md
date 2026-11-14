@@ -246,8 +246,12 @@ not know, kept as reported); absent means unknown, not interactive. `parent` is 
 was started from, on the same `device`, and `parent_listed` says whether that row is in this listing (false: show the
 link unresolved). `rows: 3` (#12996) gets the `rows: 2` fields and may also carry `durable_id`, the durable engine
 session id of the listed session (1-128 characters, as `session.locate`'s `engine_id`); a row without it comes from a
-host that does not report it. Below `rows: 3` a row never carries `durable_id`. A service before `rows` answers it
-`invalid_request`, and a service before `rows: 3` answers `rows: 3` the same way. `detached` reasons:
+host that does not report it. Below `rows: 3` a row never carries `durable_id`. `rows: 4` (omo-relay-spec#295) gets
+the `rows: 3` fields and may also carry `model` (`{provider, id}`, 1-64 and 1-128 characters: the session's current
+model as its engine names it; absent when the host does not report one) and `archived: true` (the engine archived the
+session; absent means not archived). Below `rows: 4` a row never carries either. A service before `rows` answers it
+`invalid_request`, and a service before `rows: 3` (or `rows: 4`) answers that version the same way; a client steps
+down one version and keeps listing. `detached` reasons:
 `authorization_expired`, `activation_pending`, `service_disabled`, `owner_transfer`, `peer_revoked`,
 `stream_key_pending`, `peer_detached`, `blob_failed`, `session_closed`, `session_replaced`. `session_closed` and
 `session_replaced` (decision 0013 amendment 2026-11-03) mean the host's engine closed the attached session, or now

@@ -1,4 +1,4 @@
-import type { ThreadSummary } from "../contracts"
+import type { ThreadIdentity } from "../contracts"
 import { rowThreadId } from "../remote/ports"
 import { threadToolFailure } from "../errors"
 import { INITIAL_SKILLS_CONTEXT_KEY } from "../initial-skills"
@@ -6,7 +6,7 @@ import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "../remot
 import { outcomeFailure } from "../remote/outcome"
 import { deviceOnline, replyData } from "../remote/remote-ops"
 import { threadLink } from "../thread-link"
-import { summary } from "../tools/internals"
+import { rowState, summary, threadModel } from "../tools/internals"
 import type { ThreadHostSession } from "../tools/ports"
 import type { HostedThread, SessionHost, SessionOpenOutcome, SessionOpenRequest } from "./session-host"
 
@@ -25,10 +25,13 @@ export function listedThread(row: RemoteSessionRow): HostedThread {
     thread_id: rowThreadId(row),
     name: row.title,
     status: row.state === "ended" ? "resumable" : "live",
+    state: rowState(row),
+    ...threadModel(row.model),
     cwd: row.project,
     created_at: seen,
     updated_at: seen,
     device: row.device,
+    ...(row.cached_as_of === undefined ? {} : { as_of: new Date(row.cached_as_of).toISOString() }),
     link: threadLink(rowThreadId(row), row.title),
   }
 }
@@ -64,7 +67,7 @@ export function createRelaySessionHost(
   ): SessionOpenOutcome => ({ kind: "error", error: threadToolFailure(code, message, next, details) })
   return {
     device,
-    visible: async (): Promise<readonly ThreadSummary[]> =>
+    visible: async (): Promise<readonly ThreadIdentity[]> =>
       (await remote.sessions.sessions())
         .filter((row) => row.device === device && row.state !== "ended")
         .map(listedThread),

@@ -21,6 +21,12 @@ export type ThreadHostSession = {
   readonly status?: "opening" | "open" | "closing" | "closed"
   /** senpi session kind (`interactive` | `worker`). */
   readonly kind?: string
+  /** The session file's archived flag; an engine from before `set_session_archived` lists none (not archived). */
+  readonly archived?: boolean
+  /** `running` while a turn is in flight; an older engine lists none (idle). */
+  readonly activity?: "running" | "idle"
+  /** The session's current model; absent while unknown or on an older engine. */
+  readonly model?: { readonly provider: string; readonly id: string }
   readonly createdAt?: string
   readonly updatedAt?: string
   /** A terminal control endpoint reports its timestamps snake-cased. */
@@ -46,6 +52,7 @@ export type ThreadSessionPort = Pick<
   | "prompt"
   | "interrupt"
   | "setSessionName"
+  | "setSessionArchived"
   | "setModel"
   | "getAvailableModels"
   | "setThinkingLevel"
@@ -101,6 +108,8 @@ export type ThreadHost = {
     durable_session_id?: string,
   ) => Promise<{ readonly interrupted?: boolean; readonly turnId?: string }>
   readonly setSessionName: (sessionId: string, name: string, durable_session_id?: string) => Promise<void>
+  /** senpi `set_session_archived`: writes the flag into the session file. Absent on a port that cannot send it. */
+  readonly setSessionArchived?: (sessionId: string, archived: boolean, durable_session_id?: string) => Promise<void>
   readonly setModel: (
     sessionId: string,
     provider: string,

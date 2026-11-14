@@ -19,7 +19,8 @@ import {
   type ThreadSendInput,
   type ThreadSetModelInput,
   type ThreadSetReasoningInput,
-  type ThreadSummary,
+  type ThreadArchiveInput,
+  type ThreadIdentity,
   type ThreadToolName,
   type ThreadToolResult,
 } from "./contracts"
@@ -66,6 +67,7 @@ import {
   type AnyTool,
   type ToolOutput,
   resolveAcross,
+  rowState,
 } from "./tools/internals"
 
 /** How many keys a tool surface keeps for recovering receipts whose admission reply was lost. */
@@ -408,7 +410,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
   async function nameCreatedThread(
     threadId: string,
     name: string,
-    visible: readonly ThreadSummary[],
+    visible: readonly ThreadIdentity[],
     callerId: string,
   ): Promise<ThreadErrorCode | undefined> {
     const conflict = checkNameConflict(
@@ -439,7 +441,12 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
         args,
         ectx,
         async (current, value) =>
-          await listAcross(options.remote, listThreads(options, current, value.all_scope), value.all_scope === true),
+          await listAcross(
+            options.remote,
+            listThreads(options, current, value.all_scope, value.state),
+            value.all_scope === true,
+            value.state,
+          ),
       ),
   }
   const read: AnyTool = {
@@ -569,6 +576,37 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
         return await setThinkingLevelOn(located.control, value.level, value.scope)
       }),
   }
+  /**
+   * Sets the archived flag in the thread's session file (senpi `set_session_archived`) and nothing else: the session keeps
+   * running and stays open. The caller's own thread is refused `turn_active` while its turn runs, so nothing is archived
+   * mid-turn; the desktop's `thread_organize` archive also unloads the session.
+   */
+  const archive: AnyTool = {
+    ...metadata("thread_archive"),
+    parameters: threadToolParamSchemas.thread_archive,
+    execute: (id: string, args: ThreadArchiveInput, _signal, _onUpdate, ectx) =>
+      execute("thread_archive", id, args, ectx, async (current, value, _operationId, callerId) => {
+        const archived = value.archived ?? true
+        const located = await locateControl(options, current, value.thread, value.all_scope, callerId)
+        if (located.kind === "error") return located.result
+        if (located.kind === "not_live")
+          return failure(
+            "not_resumable",
+            `Thread ${located.thread_id} has no engine holding it, so its session file cannot be ${archived ? "archived" : "unarchived"} now.`,
+            "Open it with thread_create { thread }, then retry.",
+          )
+        const { control } = located
+        if (archived && control.device === undefined && control.thread_id === callerId && (await control.running()))
+          return failure(
+            "turn_active",
+            "This is the calling thread and its turn is still running; archiving it mid-turn is refused.",
+            "Archive it from another thread, or after this turn ends.",
+            { thread_id: control.thread_id },
+          )
+        await control.setArchived(archived)
+        return { kind: "ok", thread: await control.listed(archived), archived, ...controlIdentity(control) }
+      }),
+  }
   /** An existing thread this device is asked to open: live in the view, a session file the address book names, or neither. */
   function existingHere(current: ThreadHostView, address: string, callerId: string): LocalExisting {
     const book = sendAddressBook(options, current, address, true)
@@ -596,7 +634,20 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
     relay.dispose()
   }
   return {
-    tools: [create, list, read, send, interrupt, close, handoff, rename, setModel, setReasoning, ...relayTools],
+    tools: [
+      create,
+      list,
+      read,
+      send,
+      interrupt,
+      close,
+      handoff,
+      rename,
+      setModel,
+      setReasoning,
+      archive,
+      ...relayTools,
+    ],
     dispose,
   }
 
@@ -731,6 +782,8 @@ async function deliverThrough(
         thread_id: sent.thread_id,
         name: row.title,
         status: "live",
+        state: rowState(row),
+        ...(row.model === undefined ? {} : { model: row.model }),
         cwd: row.project,
         created_at: seen,
         updated_at: seen,
@@ -779,7 +832,7 @@ async function deliverThrough(
 }
 
 /**
- * Registers the eighteen tools, and with `pi.on` the store extensions' session tools at each `session_start`
+ * Registers the nineteen tools, and with `pi.on` the store extensions' session tools at each `session_start`
  * (`tools/extension-tools.ts`); `dispose` (shutdown) cancels the relay's background retries and drops the receipt-recovery keys.
  */
 export function registerThreadTools(

@@ -12,6 +12,15 @@ export type RemoteSessionRow = {
   readonly path: string
   readonly state: string
   readonly updated_ms: number
+  /** Rows 4 (omo-relay-spec#295): the session's current model as its engine names it; absent when unknown. */
+  readonly model?: { readonly provider: string; readonly id: string }
+  /** Rows 4: the engine archived the session; absent means not archived. */
+  readonly archived?: true
+  /**
+   * Set when the row comes from the device's cached listing (it did not answer this round): when that listing was
+   * taken (epoch ms). A cached row is the device's last word, so it never reads as running now.
+   */
+  readonly cached_as_of?: number
 }
 
 export type RemoteDevice = {

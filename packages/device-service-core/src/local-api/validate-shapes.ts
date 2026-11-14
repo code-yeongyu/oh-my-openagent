@@ -2,6 +2,8 @@ import {
   SESSION_DEVICE_MAX_CHARS,
   SESSION_ID_MAX_CHARS,
   SESSION_KIND_MAX_CHARS,
+  SESSION_MODEL_ID_MAX_CHARS,
+  SESSION_MODEL_PROVIDER_MAX_CHARS,
   SESSION_SUMMARY_PATH_MAX_CHARS,
   SESSION_SUMMARY_PROJECT_MAX_CHARS,
   SESSION_SUMMARY_TITLE_MAX_CHARS,
@@ -136,12 +138,25 @@ const rowLinks = (m: { readonly [key: string]: unknown }): Pick<ListingRow, "kin
         }),
   }
 }
+const rowModel = (v: unknown): Pick<ListingRow, "model"> => {
+  if (v === undefined) return {}
+  const m = exactly(v, ["provider", "id"], [], "model")
+  return {
+    model: {
+      provider: text(m["provider"], SESSION_MODEL_PROVIDER_MAX_CHARS, "model provider"),
+      id: text(m["id"], SESSION_MODEL_ID_MAX_CHARS, "model id"),
+    },
+  }
+}
 export const listingRowOf = (v: unknown): ListingRow => {
-  const m = known(v, ROW_FIELDS, ["kind", "parent", "parent_listed", "durable_id"], "listing row")
+  const m = known(v, ROW_FIELDS, ["kind", "parent", "parent_listed", "durable_id", "model", "archived"], "listing row")
   const durable = m["durable_id"]
+  const archived = m["archived"]
   return {
     ...rowLinks(m),
     ...(durable === undefined ? {} : { durable_id: text(durable, SESSION_ID_MAX_CHARS, "durable_id") }),
+    ...rowModel(m["model"]),
+    ...(archived === undefined ? {} : { archived: archived === true ? true : fail("archived") }),
     device: deviceId(m["device"]),
     session_id: sessionId(m["session_id"]),
     title: text(m["title"], SESSION_SUMMARY_TITLE_MAX_CHARS, "title", 0),

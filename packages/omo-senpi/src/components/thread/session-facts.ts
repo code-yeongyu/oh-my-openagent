@@ -17,7 +17,12 @@ export type SessionFacts = {
   /** The last `session_info` name (`/name`, `set_session_name`), or `null` when none was set or it was cleared. */
   readonly name: string | null
   readonly first_user_text: string | null
+  /** The newest `session_archived` entry (senpi `set_session_archived`) archived the thread. */
+  readonly archived?: true
 }
+
+/** senpi's `custom` entry type that carries a session's archived flag (`core/session-archived.ts`). */
+const SESSION_ARCHIVED_CUSTOM_TYPE = "session_archived"
 
 export type JsonRecord = Record<string, unknown>
 
@@ -68,6 +73,8 @@ export type SessionEntrySummary = {
   readonly first_user_text: string | null
   /** The newest entry timestamp, `""` when no entry carries one. */
   readonly newest_timestamp: string
+  /** The last `session_archived` entry's flag; false when none was written. */
+  readonly archived: boolean
 }
 
 /** One pass over session entries in file order: the rules every reader of a session file shares. */
@@ -76,7 +83,10 @@ export function summarizeSessionEntries(entries: readonly JsonRecord[]): Session
   let name: string | null = null
   let firstUserText: string | null = null
   let newest = ""
+  let archived = false
   for (const entry of entries) {
+    if (entry.type === "custom" && entry.customType === SESSION_ARCHIVED_CUSTOM_TYPE)
+      archived = isRecord(entry.data) && entry.data.archived === true
     if (header === null && entry.type === "session" && typeof entry.id === "string") header = entry
     if (entry.type === "session_info")
       name = typeof entry.name === "string" && entry.name.trim().length > 0 ? entry.name.trim() : null
@@ -91,7 +101,7 @@ export function summarizeSessionEntries(entries: readonly JsonRecord[]): Session
     }
     if (typeof entry.timestamp === "string" && entry.timestamp > newest) newest = entry.timestamp
   }
-  return { header, name, first_user_text: firstUserText, newest_timestamp: newest }
+  return { header, name, first_user_text: firstUserText, newest_timestamp: newest, archived }
 }
 
 function finalEntryTimestamp(line: Buffer | null): string | null {
@@ -128,8 +138,8 @@ function finalCompleteLine(fd: number, size: number, read: SessionRead): Buffer 
 /**
  * Name, timestamps and first user message of one session JSONL, read from its first and last
  * SESSION_FACTS_WINDOW_BYTES plus a bounded scan for the final complete line. A rename recorded only
- * in the unread middle of a very long file is missed here; a live endpoint reports the current name
- * itself. `updated_at` is null when the final line is partial, malformed, or larger than
+ * in the unread middle of a very long file is missed here, and so is an archive flag; a live endpoint
+ * reports the current name and flag itself. `updated_at` is null when the final line is partial, malformed, or larger than
  * SESSION_FACTS_LAST_LINE_MAX_BYTES, because an older timestamp must never be reported as newest.
  * `null` when the file is unreadable or has no session header.
  */
@@ -178,6 +188,7 @@ export function readSessionFacts(path: string, read: SessionRead = readSync): Se
       updated_at: updatedAt,
       name: summary.name,
       first_user_text: summary.first_user_text,
+      ...(summary.archived ? { archived: true as const } : {}),
     }
   } catch {
     return null

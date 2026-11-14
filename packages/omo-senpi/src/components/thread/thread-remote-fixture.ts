@@ -398,6 +398,8 @@ export function createRemoteThreadFixture() {
       caller?: string
       diskSessions?: readonly string[]
       closeOutcome?: ThreadCloseOutcome
+      /** How this device's engine takes `set_session_archived`: `absent` = a host port without it, `refused` = an older engine. */
+      archive?: "absent" | "refused"
     } = {},
   ) {
     const engine = extra.engine ?? ENGINE
@@ -422,6 +424,11 @@ export function createRemoteThreadFixture() {
     })
     const closed: Array<readonly [string, string | undefined]> = []
     const setSessionName = mock(async (_sessionId: string, _name: string) => {})
+    const archived: Array<readonly [string, boolean, string | undefined]> = []
+    const setSessionArchived = async (sessionId: string, value: boolean, durableId?: string) => {
+      if (extra.archive === "refused") throw new Error("unsupported:set_session_archived")
+      archived.push([sessionId, value, durableId])
+    }
     const host: ThreadHost = {
       socket: "/tmp/thread-remote-test.sock",
       listSessions: async () => sessions,
@@ -442,6 +449,7 @@ export function createRemoteThreadFixture() {
         closed.push([sessionId, durableId])
         return extra.closeOutcome ?? "closed"
       },
+      ...(extra.archive === "absent" ? {} : { setSessionArchived }),
     }
     const agentDir = mkdtempSync(join(tmpdir(), "thread-remote-"))
     directories.push(agentDir)
@@ -488,7 +496,7 @@ export function createRemoteThreadFixture() {
       if (parse === undefined) throw new Error("thread_send declares no permission parser")
       return parse(args, process.cwd())
     }
-    return { run, permission, openSession, setSessionName, store, closed, agentDir }
+    return { run, permission, openSession, setSessionName, store, closed, archived, agentDir }
   }
 
   return { account, surface, cleanup }

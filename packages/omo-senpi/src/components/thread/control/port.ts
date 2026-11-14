@@ -2,7 +2,7 @@ import { threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from 
 import type { ThreadTranscriptEntry } from "../reader"
 import type { ModelChoice } from "../tools/model-match"
 import type { ThreadCloseOutcome } from "../tools/ports"
-import type { ThreadSummary } from "../contracts"
+import type { ThreadIdentity, ThreadResultSummary } from "../contracts"
 
 /**
  * One live thread's controls, wherever it is held: the session on this device's endpoint, or the session on another
@@ -17,7 +17,7 @@ export type SessionControl = {
   /** The thread's title as its listing names it. */
   readonly title: string
   /** Names on the target device that a rename must not take. */
-  readonly visible: () => Promise<readonly ThreadSummary[]>
+  readonly visible: () => Promise<readonly ThreadIdentity[]>
   /** The engine's own `interrupt`: an idle session answers `interrupted: false`. */
   readonly interrupt: (turnId?: string) => Promise<{ readonly interrupted: boolean; readonly turn_id?: string }>
   /** The one close ladder (`close-ladder.ts`) on the thread's engine. */
@@ -35,6 +35,15 @@ export type SessionControl = {
   /** Refuses `thinking_level_unsupported` for a level the active model cannot run. */
   readonly setThinkingLevel: (level: string, scope?: "turn") => Promise<void>
   readonly getMessages: () => Promise<readonly ThreadTranscriptEntry[]>
+  /** Whether a turn is in flight: the listing's activity, else the engine's own `get_state`. */
+  readonly running: () => Promise<boolean>
+  /**
+   * senpi `set_session_archived`: the archived flag in the session file, nothing else (the desktop's `thread_organize`
+   * archive also unloads the session). Refuses `unsupported` when the engine does not know the command.
+   */
+  readonly setArchived: (archived: boolean) => Promise<void>
+  /** The thread as `thread_list` lists it, with the archived flag set to `archived`. */
+  readonly listed: (archived: boolean) => Promise<ThreadResultSummary>
 }
 
 // Keyed through the global symbol registry: the thread client sidecar and the extension bundle each carry their own

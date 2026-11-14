@@ -38,6 +38,13 @@ export type ListingRow = {
    * (1-128 characters, as `session.locate`'s `engine_id`). Absent when the host does not report it.
    */
   readonly durable_id?: string
+  /**
+   * Only on rows of a `sessions.list` with `rows: 4` (omo-relay-spec#295): the model the session runs as its engine names
+   * it (`provider` 1-64 and `id` 1-128 characters), absent when the host does not report one; and `archived: true` when
+   * the engine archived the session (absent: not archived).
+   */
+  readonly model?: { readonly provider: string; readonly id: string }
+  readonly archived?: true
 }
 export type StatusChanged = EventOf<"status.changed", { readonly status: Status }>
 export type SessionsRound = EventOf<

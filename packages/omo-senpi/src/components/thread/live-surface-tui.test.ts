@@ -314,7 +314,7 @@ describe("thread tools over a terminal (tui) endpoint", () => {
     expect(threads.find((thread) => thread.thread_id === "dur-tui")).toMatchObject({
       name: "my-tui",
       surface: "tui",
-      alive: true,
+      state: "idle",
       status: "live",
       created_at: "2026-09-28T04:19:00.000Z",
       endpoint: { kind: "tui", socket: tui, routing_id: "dur-tui", durable_session_id: "dur-tui" },
@@ -441,7 +441,7 @@ describe("thread tools over a terminal (tui) endpoint", () => {
     expect(terminal.frames.filter((frame) => frame.type === "get_protocol_info")).toHaveLength(1)
   })
 
-  test("#given the engine reports a stopped terminal live_unresponsive #when thread_list runs #then the terminal is not dialed and its thread shows alive false with error_note live_unresponsive from disk", async () => {
+  test("#given the engine reports a stopped terminal live_unresponsive #when thread_list runs #then the terminal is not dialed and its thread shows inactive with error_note live_unresponsive from disk", async () => {
     // given
     const dir = tempDir("thr-tui-")
     const legacy = join(dir, "rpc.sock")
@@ -482,7 +482,7 @@ describe("thread tools over a terminal (tui) endpoint", () => {
     // then
     expect(threads.find((thread) => thread.thread_id === "dur-tui")).toMatchObject({
       status: "resumable",
-      alive: false,
+      state: "inactive",
       error_note: "live_unresponsive",
       name: "my-tui",
       created_at: "2026-09-28T04:19:00.000Z",
@@ -512,7 +512,7 @@ describe("thread tools over a terminal (tui) endpoint", () => {
 
     // then
     const gone = threads.find((thread) => thread.thread_id === "dur-gone")
-    expect(gone).toMatchObject({ status: "resumable", alive: false, error_note: "dead", surface: "tui" })
+    expect(gone).toMatchObject({ status: "resumable", state: "inactive", error_note: "dead", surface: "tui" })
     expect(JSON.stringify(gone)).not.toContain("host_unavailable")
     expect(w.dialed).not.toContain(tui)
   })

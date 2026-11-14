@@ -1,4 +1,4 @@
-import type { ThreadDataError, ThreadSummary } from "../contracts"
+import type { ThreadDataError, ThreadIdentity } from "../contracts"
 import type { ThreadToolSummary } from "../tools/internals"
 
 /**
@@ -32,6 +32,6 @@ export type SessionHost = {
   /** The device that opens; absent when it is this one. */
   readonly device?: string
   /** The threads visible on that device: this device's address book, or the account listing's live rows of that device. */
-  readonly visible: () => Promise<readonly ThreadSummary[]>
+  readonly visible: () => Promise<readonly ThreadIdentity[]>
   readonly open: (request: SessionOpenRequest) => Promise<SessionOpenOutcome>
 }
