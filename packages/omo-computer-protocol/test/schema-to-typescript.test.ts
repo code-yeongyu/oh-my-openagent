@@ -17,6 +17,16 @@ test("members that require each other (dependentRequired) come together or not a
   expect(text).toBe("{\n\ttarget: string\n} & ({\n\tx: number\n\ty: number\n} | {\n\tx?: null\n\ty?: null\n})")
 })
 
+test("a pair whose members do not allow null renders its absent arm as never", () => {
+  const text = typeText({
+    type: "object",
+    properties: { target: { type: "string" }, x: { type: "number" }, y: { type: "number" } },
+    required: ["target"],
+    dependentRequired: { x: ["y"], y: ["x"] },
+  })
+  expect(text).toBe("{\n\ttarget: string\n} & ({\n\tx: number\n\ty: number\n} | {\n\tx?: never\n\ty?: never\n})")
+})
+
 test("a one-way dependentRequired is refused, not rendered as independent members", () => {
   expect(() =>
     typeText({

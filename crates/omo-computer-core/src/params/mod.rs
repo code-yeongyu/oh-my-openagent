@@ -86,6 +86,16 @@ macro_rules! paired_exec_params {
     };
 }
 
+/// A paired coordinate given on the wire: a number. Absent decodes as `None` (the member's
+/// `default`); an explicit `null` is refused, so the decoder, the published schema (`number`)
+/// and the generated types (absent or a number) agree on every case.
+pub(crate) fn present_number<'de, D>(deserializer: D) -> Result<Option<f64>, D::Error>
+where
+    D: ::serde::Deserializer<'de>,
+{
+    <f64 as ::serde::Deserialize>::deserialize(deserializer).map(Some)
+}
+
 mod common;
 mod reads;
 mod v1;

@@ -82,8 +82,8 @@ paired_exec_params! {
     ClickParams via ClickWire = "ClickWire" pairs (x, y) {
         ;
         target: String,
-        x: f64,
-        y: f64,
+        #[serde(deserialize_with = "crate::params::present_number")] #[schemars(with = "f64")] x: f64,
+        #[serde(deserialize_with = "crate::params::present_number")] #[schemars(with = "f64")] y: f64,
         #[serde(rename = "ref")]
         reference: String,
         frame_id: String,

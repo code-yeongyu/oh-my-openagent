@@ -2284,17 +2284,11 @@
           ]
         },
         "x": {
-          "type": [
-            "number",
-            "null"
-          ],
+          "type": "number",
           "format": "double"
         },
         "y": {
-          "type": [
-            "number",
-            "null"
-          ],
+          "type": "number",
           "format": "double"
         },
         "ref": {
@@ -4590,17 +4584,11 @@
           ]
         },
         "x": {
-          "type": [
-            "number",
-            "null"
-          ],
+          "type": "number",
           "format": "double"
         },
         "y": {
-          "type": [
-            "number",
-            "null"
-          ],
+          "type": "number",
           "format": "double"
         },
         "frameId": {

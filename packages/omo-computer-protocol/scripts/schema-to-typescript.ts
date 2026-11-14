@@ -63,6 +63,14 @@ function dependentGroups(schema: Record<string, unknown>): readonly string[][] {
   return groups
 }
 
+/** Whether a member's schema accepts `null` (a `null` type, or a null alternative). */
+function allowsNull(schema: JsonSchema): boolean {
+  if (typeof schema === "boolean") return schema
+  const type = schema.type
+  if (type === "null" || (Array.isArray(type) && type.includes("null"))) return true
+  return ["anyOf", "oneOf"].some((key) => asSchemas(schema[key]).some((item) => allowsNull(item)))
+}
+
 function objectType(schema: Record<string, unknown>, indent: string): string {
   const groups = dependentGroups(schema)
   if (groups.length === 0) return plainObjectType(schema, indent)
@@ -79,7 +87,8 @@ function objectType(schema: Record<string, unknown>, indent: string): string {
   }
   const alternatives = groups.map((group) => {
     const given = group.map((name) => `${inner}${propertyKey(name)}: ${typeText(nonNull(member(name)), inner)}`)
-    const absent = group.map((name) => `${inner}${propertyKey(name)}?: null`)
+    // Absent is absent: a member whose schema allows null may also be null; one that does not may not.
+    const absent = group.map((name) => `${inner}${propertyKey(name)}?: ${allowsNull(member(name)) ? "null" : "never"}`)
     return `({\n${given.join("\n")}\n${indent}} | {\n${absent.join("\n")}\n${indent}})`
   })
   return [base, ...alternatives].join(" & ")

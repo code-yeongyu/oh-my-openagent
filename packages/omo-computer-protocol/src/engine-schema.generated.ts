@@ -2,7 +2,7 @@
 // Do not edit by hand; run `bun run --cwd packages/omo-computer-protocol generate`.
 
 /** sha256 of the schema file this module was generated from; the schema-drift test compares it. */
-export const SCHEMA_SHA256 = "41c141c212f24d84a9a49ad6bd068fbbad65df8895a58147d4715b629852eb54" as const
+export const SCHEMA_SHA256 = "5876cd406a530a3235cdfd1d1b0fee95ed58f02b79bf566ea9fcf476c11c9b06" as const
 
 /** The wire protocol version `engine.hello` reports. */
 export const PROTOCOL_VERSION = "1" as const
@@ -646,8 +646,8 @@ export type ClickParams = {
 	x: number
 	y: number
 } | {
-	x?: null
-	y?: null
+	x?: never
+	y?: never
 })
 
 export type ClipboardContent = {
@@ -1109,8 +1109,8 @@ export type MouseDownParams = {
 	x: number
 	y: number
 } | {
-	x?: null
-	y?: null
+	x?: never
+	y?: never
 })
 
 export type MouseUpParams = {
