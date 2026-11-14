@@ -65,6 +65,26 @@ describe("Windows QA PowerShell interop", () => {
     ).toEqual([])
   })
 
+  // Review L1 (#13348 at 7f5cb94cf0): an attribute between the import and the method, and an
+  // attribute inside the parameter list, must not hide the import or a later string parameter.
+  test("the check reads past a [return: ...] attribute and past an attribute inside the parameter list", () => {
+    expect(
+      wideImportsWithoutUnicode(
+        '[DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static extern bool GetUserObjectInformationW(IntPtr o, int i, StringBuilder s, int l, out int n);',
+      ),
+    ).toEqual(["GetUserObjectInformationW"])
+    expect(
+      wideImportsWithoutUnicode(
+        '[DllImport("user32.dll")] public static extern int GetClassName([MarshalAs(UnmanagedType.SysInt)] IntPtr h, StringBuilder name, int n);',
+      ),
+    ).toEqual(["GetClassName"])
+    expect(
+      wideImportsWithoutUnicode(
+        '[DllImport("user32.dll", CharSet = CharSet.Unicode)] [return: MarshalAs(UnmanagedType.Bool)] public static extern bool GetWindowTextW([MarshalAs(UnmanagedType.SysInt)] IntPtr h, StringBuilder s, int n);',
+      ),
+    ).toEqual([])
+  })
+
   for (const file of readdirSync(DIR)
     .filter((name) => name.endsWith(".ps1"))
     .sort()) {
