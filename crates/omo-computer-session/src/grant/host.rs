@@ -110,7 +110,11 @@ impl Session {
         if let Some(holder) = self.funnel.control.slot.holder(&self.funnel.control.token) {
             return Err(busy(&holder));
         }
-        self.funnel.control.slot.acquire(&self.funnel.control.token).map_err(|holder| busy(&holder))?;
+        self.funnel.control.slot.acquire(&self.funnel.control.token).map_err(|refused| match refused {
+            crate::lease::AcquireRefused::Held(holder) => busy(&holder),
+            // Review L10 (A-IS-65 L2): an unusable lock is TransactionFailed, never InputBusy.
+            crate::lease::AcquireRefused::LockUnusable => Refused::from(crate::mutate::TRANSACTION_FAILED),
+        })?;
         if let Err(refusal) = self.funnel.control.presence.begin(self.backend.as_mut()) {
             self.funnel.control.slot.release(&self.funnel.control.token);
             return Err(refusal.refusal().into());

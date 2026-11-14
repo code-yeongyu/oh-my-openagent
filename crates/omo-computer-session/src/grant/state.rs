@@ -223,21 +223,28 @@ impl Control {
         backend: &mut dyn Backend,
         plan: &Plan,
         stop_epoch: u64,
-    ) -> Result<(), (LeaseRefusal, Option<Value>)> {
+    ) -> Result<(), (omo_computer_core::backend::Refusal, Option<Value>)> {
         if plan.foreground && !self.slot.is_mine(&self.token) {
-            self.slot
-                .acquire(&self.token)
-                .map_err(|holder| (LeaseRefusal::InputBusy, Some(holder_detail(&holder))))?;
+            self.slot.acquire(&self.token).map_err(|refused| match refused {
+                crate::lease::AcquireRefused::Held(holder) => {
+                    (LeaseRefusal::InputBusy.refusal(), Some(holder_detail(&holder)))
+                }
+                // Review L10 (A-IS-65 L2): an unusable lock is TransactionFailed, nothing sent.
+                crate::lease::AcquireRefused::LockUnusable => (crate::mutate::TRANSACTION_FAILED, None),
+            })?;
             if let Err(refusal) = self.presence.begin(backend) {
                 self.slot.release(&self.token);
-                return Err((refusal, None));
+                return Err((refusal.refusal(), None));
             }
             self.lease_epoch = Some(stop_epoch);
         }
         let now = self.now_ms();
         self.reservations
             .admit(&self.token, &plan.windows, now)
-            .map_err(|busy| (LeaseRefusal::Window, Some(busy.detail())))
+            .map_err(|refused| match refused {
+                crate::reservation::AdmitRefused::Busy(busy) => (LeaseRefusal::Window.refusal(), Some(busy.detail())),
+                crate::reservation::AdmitRefused::LockUnusable => (crate::mutate::TRANSACTION_FAILED, None),
+            })
     }
 
     /// The call's report went out.

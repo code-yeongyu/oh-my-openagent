@@ -71,7 +71,7 @@ impl Session {
         if let Err((refusal, detail)) = self.funnel.control.commit(self.backend.as_mut(), &plan, epoch) {
             let out = Refused {
                 detail: detail.map(Box::new),
-                ..refusal.refusal().into()
+                ..refusal.into()
             };
             return Err(self.refuse(record, Some("Lease".to_owned()), out));
         }

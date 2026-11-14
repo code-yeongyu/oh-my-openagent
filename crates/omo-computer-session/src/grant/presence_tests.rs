@@ -244,3 +244,23 @@ fn acquire_refuses_a_tampered_or_consent_less_hand() {
         assert!(!sink.lines().iter().any(|line| line.contains("presence show")), "{consent}: {:?}", sink.lines());
     }
 }
+
+/// Review L10 at f7482d3 (R70ct; A-IS-65 L2): a records lock that cannot be taken is an
+/// unusable-lock refusal (TransactionFailed, nothing sent), never an InputBusy that names the
+/// calling session as the holder - for a window exec and for control.acquire alike.
+#[test]
+fn an_unusable_records_lock_refuses_transaction_failed_never_input_busy() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let sink = RecordingSink::default();
+    let mut s = session(&json!({ "object": true }), &sink, Some((dir.path(), "s")));
+    s.control_grant(params(json!({ "reason": "r" })));
+    capture(&mut s, "1");
+    let runtime = s.funnel.control.token.dir().expect("a machine-wide token").to_owned();
+    std::fs::create_dir_all(runtime.join("records.lock")).expect("a lock path that cannot be opened");
+    let refused = s.click(params(json!({ "target": "1", "x": 5, "y": 5 }))).expect_err("no lock, no reservation");
+    assert_eq!(refused.refusal.code.wire(), "TransactionFailed", "a window exec");
+    assert!(sink.lines().iter().all(|line| !line.contains("click") && !line.contains("mouse")), "nothing sent: {:?}", sink.lines());
+    let refused = s.control_acquire().expect_err("no lock, no slot");
+    assert_eq!(refused.refusal.code.wire(), "TransactionFailed", "control.acquire");
+    assert!(!s.holds_lease(), "no slot taken");
+}

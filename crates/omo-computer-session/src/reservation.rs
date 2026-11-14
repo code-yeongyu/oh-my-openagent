@@ -46,6 +46,15 @@ impl WindowBusy {
     }
 }
 
+/// Why a window reservation was not taken (review L10, A-IS-65 L2).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AdmitRefused {
+    /// Another live session holds a window.
+    Busy(WindowBusy),
+    /// The records lock cannot be taken: an unusable lock, never another session's hold.
+    LockUnusable,
+}
+
 /// The reservations of one session's view of the machine.
 #[derive(Debug, Default)]
 pub struct Reservations {
@@ -56,26 +65,27 @@ impl Reservations {
     /// Reserves every window in `windows` for this session until its report.
     ///
     /// # Errors
-    /// The first window another live session holds at `now_ms`; nothing is reserved then.
+    /// The first window another live session holds at `now_ms`, or a records lock that cannot be
+    /// taken; nothing is reserved then.
     pub fn admit(
         &mut self,
         token: &SessionToken,
         windows: &[String],
         now_ms: u64,
-    ) -> Result<(), WindowBusy> {
+    ) -> Result<(), AdmitRefused> {
+        // A call that reserves no window takes no lock (review L10).
+        if windows.is_empty() {
+            return Ok(());
+        }
         // Check-then-take under the machine-wide record lock, so two sessions never both take one
-        // window. A lock that cannot be taken refuses (fail closed, as the control slot; review L4).
-        let _locked = match token.dir().map(crate::lease::dir_lock).transpose() {
-            Ok(locked) => locked,
-            Err(_) => {
-                return Err(WindowBusy {
-                    window: windows.first().cloned().unwrap_or_default(),
-                    holder: token.holder().clone(),
-                    retry_after_ms: AFTER_REPORT_MS,
-                })
-            }
-        };
-        self.check(token, windows, now_ms)?;
+        // window. A lock that cannot be taken refuses as an unusable lock (review L4, L10).
+        let _locked = token
+            .dir()
+            .map(crate::lease::dir_lock)
+            .transpose()
+            .map_err(|_| AdmitRefused::LockUnusable)?;
+        self.check(token, windows, now_ms)
+            .map_err(AdmitRefused::Busy)?;
         for window in windows {
             self.put(token, window, None);
         }
