@@ -1,4 +1,5 @@
 import type { ThreadTranscriptEntry } from "../reader"
+import { escapeForDisplay } from "@oh-my-opencode/utils"
 import { relayAddressEntry } from "../remote/address-book"
 import { rowThreadId } from "../remote/ports"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "../remote/ports"
@@ -48,7 +49,8 @@ export function createRelayControl(remote: RemoteThreadSurface, row: RemoteSessi
   return {
     thread_id: rowThreadId(row),
     device,
-    title: row.title,
+    // #13304: printed by thread_read; another device's own text.
+    title: escapeForDisplay(row.title),
     visible: async () => {
       try {
         return (await remote.sessions.sessions())

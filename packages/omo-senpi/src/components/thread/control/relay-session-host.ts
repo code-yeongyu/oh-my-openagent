@@ -1,4 +1,5 @@
 import type { ThreadSummary } from "../contracts"
+import { escapeForDisplay } from "@oh-my-opencode/utils"
 import { rowThreadId } from "../remote/ports"
 import { threadToolFailure } from "../errors"
 import { INITIAL_SKILLS_CONTEXT_KEY } from "../initial-skills"
@@ -16,7 +17,20 @@ const recordOf = (value: unknown): JsonObject =>
   typeof value === "object" && value !== null && !Array.isArray(value) ? (value as JsonObject) : {}
 
 /** A listing row as the tools report a thread on another device (thread_list with all_scope shows the same). */
-export function listedThread(row: RemoteSessionRow): HostedThread {
+/** #13304: the listing row as it is printed - another device's title and project escaped; matching keeps listedThread's raw values. */
+const remoteName = (text: string | undefined): string | null => (text === undefined ? null : escapeForDisplay(text))
+
+export function displayedThread(row: RemoteSessionRow): HostedThread {
+  const listed = listedThread(row)
+  return {
+    ...listed,
+    name: escapeForDisplay(row.title),
+    cwd: escapeForDisplay(row.project),
+    link: threadLink(listed.thread_id, escapeForDisplay(row.title)),
+  }
+}
+
+function listedThread(row: RemoteSessionRow): HostedThread {
   const seen = new Date(row.updated_ms).toISOString()
   // D2 (decision 0027): the id a caller sees and may pass back is the durable id; the listing key stays inside sessionId
   // for the relay transport. A device that publishes no durable id lists an empty id: address its threads by name.
@@ -101,9 +115,9 @@ export function createRelaySessionHost(
         if (located.kind !== "ok")
           return fail(
             "unsupported",
-            `Device ${device} created a session but its id there could not be found (${located.reason}).`,
+            `Device ${device} created a session but its id there could not be found (${escapeForDisplay(located.reason)}).`,
             "Call thread_list with all_scope to find the new thread, or update omo on that device.",
-            { device, reason: located.reason },
+            { device, reason: escapeForDisplay(located.reason) },
           )
         threadId = located.sessionId
       }
@@ -132,8 +146,8 @@ export function createRelaySessionHost(
         ...facts,
         sessionId: threadId,
         ...(durable === undefined ? {} : { durableSessionId: durable }),
-        cwd: nonEmpty(state["cwd"]) ?? request.cwd ?? listed?.project ?? "",
-        name: name ?? nonEmpty(state["sessionName"]) ?? listed?.title ?? null,
+        cwd: escapeForDisplay(nonEmpty(state["cwd"]) ?? request.cwd ?? listed?.project ?? ""),
+        name: name ?? remoteName(nonEmpty(state["sessionName"]) ?? listed?.title),
       }
       return { kind: "ok", thread: { ...summary(session), device } }
     },
