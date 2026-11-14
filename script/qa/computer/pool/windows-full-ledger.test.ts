@@ -1,6 +1,15 @@
 import { describe, expect, test } from "bun:test"
 
-import { decideTier, LEGS, ledgerRows, ledgerTsv, parseFacts, planLegs, validateLedger } from "./windows-full-ledger.ts"
+import {
+  compareLedgers,
+  decideTier,
+  LEGS,
+  ledgerRows,
+  ledgerTsv,
+  parseFacts,
+  planLegs,
+  validateLedger,
+} from "./windows-full-ledger.ts"
 import { combineRuns, type Facts } from "./windows-full-verdicts.ts"
 
 const elevated = (run: number): Facts => ({
@@ -11,6 +20,35 @@ const elevated = (run: number): Facts => ({
   fixtureLabel: "S-1-16-12288",
   control: { postLanded: true, sendLanded: true },
   medium: { postOk: false, postError: 5, sendCount: 1, postLanded: false, sendLanded: false },
+})
+
+describe("[ADP-26] committed ledger against a fresh measurement", () => {
+  const tsv = (lock: "CONTRADICTS" | "UNMEASURED", dpi: "CONFIRMS" | "UNMEASURED") =>
+    ledgerTsv(
+      ledgerRows([elevated(1)], { host: "h", measuredAt: "t" }).map((r) =>
+        r.leg === "lock" ? { ...r, verdict: lock } : r.leg === "mixed-dpi" ? { ...r, verdict: dpi } : r,
+      ),
+    )
+
+  test("equal verdicts with different evidence are no drift", () => {
+    const committed = tsv("CONTRADICTS", "CONFIRMS")
+    expect(compareLedgers(committed, committed.replaceAll("no facts", "other facts"))).toEqual([])
+  })
+
+  test("a verdict that moved is named with both values", () => {
+    expect(compareLedgers(tsv("CONTRADICTS", "CONFIRMS"), tsv("CONTRADICTS", "UNMEASURED"))).toEqual([
+      "leg mixed-dpi: committed CONFIRMS, measured UNMEASURED",
+    ])
+  })
+
+  test("a leg missing from the fresh ledger is drift, not a match", () => {
+    const committed = tsv("CONTRADICTS", "CONFIRMS")
+    const fresh = committed
+      .split("\n")
+      .filter((l) => !l.includes("\tlock\t"))
+      .join("\n")
+    expect(compareLedgers(committed, fresh)).toEqual(["leg lock: committed CONTRADICTS, measured absent"])
+  })
 })
 
 describe("[ADP-26] runs, ledger and validation", () => {

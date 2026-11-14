@@ -187,6 +187,12 @@ jobs:
           out="${RUNNER_TEMP}/windows-full"
           bun script/qa/computer/pool/windows-full.ts --plan "$out/hosted-windows-live.tsv" --guest off --out "$out/plan.json"
 
+      - name: Compare with the committed ledger
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun script/qa/computer/pool/windows-full.ts --compare crates/omo-computer-backend-win32/probes/hosted-windows-live.tsv "${RUNNER_TEMP}/windows-full/hosted-windows-live.tsv"
+
       - name: Upload ledger and plan
         if: always()
         uses: actions/upload-artifact@v7
@@ -203,6 +209,7 @@ jobs:
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
             - Builds and validates hosted-windows-live.tsv from the facts and prints the tier of each leg (no guest runner in part 1).
+            - Fails when a leg's verdict differs from the committed ledger; the plan is written first, so the artifact still holds it.
           JOB_SUMMARY_NEXT: Open the windows-full-ledger artifact; the row stays open until part 2 runs the legs' scenarios.
         run: |
           GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
