@@ -113,6 +113,20 @@ const queuedLine = (label: string, delivery: Extract<ThreadDelivery, { readonly 
   return `Queued on ${label} at position ${delivery.queue_position}.`
 }
 
+/** What an interrupt did to the interrupted turn's background jobs, one line per outcome a person needs to see. */
+function backgroundLines(result: ThreadToolResult): string[] {
+  if (!("background" in result) || result.background === undefined) return []
+  const { background } = result
+  if (background.status === "not_supported")
+    return ["Its background jobs were left running: that device's engine cannot stop them."]
+  const job = (entry: { readonly id: string; readonly description?: string }): string =>
+    entry.description === undefined ? entry.id : `${entry.id} (${entry.description})`
+  return [
+    ...(background.stopped.length > 0 ? [`Stopped background jobs: ${background.stopped.map(job).join(", ")}.`] : []),
+    ...background.failed.map((entry) => `Could not stop background job ${job(entry)}: ${entry.reason}.`),
+  ]
+}
+
 /** The human answer of a session verb that succeeded; `label` is the `<device>/<session>` it named. */
 export function sessionVerbLines(
   verb: "open" | "send" | "model" | "interrupt" | "close",
@@ -129,7 +143,9 @@ export function sessionVerbLines(
   }
   if (verb === "model" && "model" in result) return [`${label} now uses ${result.model.provider}/${result.model.id}.`]
   if (verb === "interrupt" && "interrupted" in result)
-    return [result.interrupted ? `Interrupted ${label}.` : `Nothing was running on ${label}.`]
+    return result.interrupted
+      ? [`Interrupted ${label}.`, ...backgroundLines(result)]
+      : [`Nothing was running on ${label}.`]
   if (verb === "close" && "closed" in result) return [result.closed ? `Closed ${label}.` : `${label} was not open.`]
   return []
 }
