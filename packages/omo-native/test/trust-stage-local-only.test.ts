@@ -41,7 +41,10 @@ test("#given a local-only argv #when the trust stage runs #then it refuses with 
   expect(acquire).not.toHaveBeenCalled()
   expect(exec).not.toHaveBeenCalled()
   expect(stderr.join("")).toContain("omo: trust-kind-local-only;")
-  const records = (await readFile(join(dir, "diagnostics.jsonl"), "utf8")).trim().split("\n").map((line) => JSON.parse(line))
+  const records = (await readFile(join(dir, "diagnostics.jsonl"), "utf8"))
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line))
   expect(records).toEqual([
     expect.objectContaining({ kind: "local-only", action: "refuse", codes: [{ code: "trust-kind-local-only" }] }),
   ])

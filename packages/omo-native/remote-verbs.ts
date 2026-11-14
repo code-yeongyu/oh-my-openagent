@@ -1,7 +1,16 @@
 import { SESSION_VERBS } from "./remote-session-args"
 
 /** Every `omo remote` verb the CLI dispatches; `attach` launches the engine and is dispatched before this table. */
-export const VERBS = ["status", "devices", "sessions", "enable", "disable", "control", "bootstrap", ...SESSION_VERBS] as const
+export const VERBS = [
+  "status",
+  "devices",
+  "sessions",
+  "enable",
+  "disable",
+  "control",
+  "bootstrap",
+  ...SESSION_VERBS,
+] as const
 
 /**
  * The verbs whose whole call path is the account read plus the local API (omo#13440): they open no network connection

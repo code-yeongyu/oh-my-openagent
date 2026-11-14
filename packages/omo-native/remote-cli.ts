@@ -1,9 +1,6 @@
 import { existsSync } from "node:fs"
 
-import {
-  type DeviceService,
-  deviceServiceEndpointPath,
-} from "../device-service-core/src/index.ts"
+import { type DeviceService, deviceServiceEndpointPath } from "../device-service-core/src/index.ts"
 import { serveRemoteAttach } from "./remote-attach"
 import { type BootstrapSetup, runBootstrapVerb } from "./remote-bootstrap"
 import { REMOTE_EXIT, UsageError } from "./remote-exit"

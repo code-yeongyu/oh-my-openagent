@@ -184,7 +184,8 @@ function parseFile(repoRoot: string, file: string): ParsedFile {
     if (node.type === "AssignmentPattern") {
       const left = child(node, "left")
       const right = child(node, "right")
-      if (left?.type === "Identifier" && right?.type === "Identifier") aliases.push([nameOf(left) ?? "", nameOf(right) ?? ""])
+      if (left?.type === "Identifier" && right?.type === "Identifier")
+        aliases.push([nameOf(left) ?? "", nameOf(right) ?? ""])
     }
   })
   return { file, source, program, imports, functions, exports, starExports, aliases, bunHandles }
@@ -253,7 +254,8 @@ export function spawnCallSites(repoRoot: string, files: readonly string[]): stri
         if (PROCESS_MODULES.has(binding.module)) return `node:child_process#${member}`
         if (isExported(binding.module, member)) return `${binding.module}#${member}`
       }
-      if (HANDLE_SPAWNERS.has(member) || methods.get(file.file)?.has(member)) return `${render(object, file.source)}.${member}`
+      if (HANDLE_SPAWNERS.has(member) || methods.get(file.file)?.has(member))
+        return `${render(object, file.source)}.${member}`
     }
     return undefined
   }
@@ -263,7 +265,8 @@ export function spawnCallSites(repoRoot: string, files: readonly string[]): stri
       const isCall = inner.type === "CallExpression"
       if (!isCall && inner.type !== "TaggedTemplateExpression") return
       const label = labelOf(file, child(inner, isCall ? "callee" : "tag"))
-      if (label !== undefined) sites.push({ label, args: isCall ? children(inner, "arguments") : [child(inner, "quasi")] })
+      if (label !== undefined)
+        sites.push({ label, args: isCall ? children(inner, "arguments") : [child(inner, "quasi")] })
     })
     return sites
   }
@@ -286,7 +289,8 @@ export function spawnCallSites(repoRoot: string, files: readonly string[]): stri
           add(method ? methodNames : locals, name)
       }
       for (const [alias, target] of file.aliases)
-        if (labelOf(file, { type: "Identifier", start: 0, end: 0, name: target } as AstNode) !== undefined) add(locals, alias)
+        if (labelOf(file, { type: "Identifier", start: 0, end: 0, name: target } as AstNode) !== undefined)
+          add(locals, alias)
       const exportedHere = exported.get(file.file) ?? new Set<string>()
       exported.set(file.file, exportedHere)
       for (const [name, target] of file.exports) {
@@ -307,7 +311,8 @@ export function spawnCallSites(repoRoot: string, files: readonly string[]): stri
       const entry = parsed.get(file)
       if (entry === undefined) return []
       return sitesIn(entry, entry.program).map(
-        (site) => `${file}: ${site.label}(${render(site.args[0], entry.source)}; ${render(site.args[1], entry.source)})`,
+        (site) =>
+          `${file}: ${site.label}(${render(site.args[0], entry.source)}; ${render(site.args[1], entry.source)})`,
       )
     })
     .sort()

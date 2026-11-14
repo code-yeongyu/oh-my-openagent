@@ -96,7 +96,6 @@ function engineVersionOrUnresolved(senpi) {
 const ENGINE_MARKERS = ["senpi/dist/cli.js", "senpi/dist/bundle/cli.js"]
 const MANAGED_MODE_FLAG = "--mode"
 
-
 // A standalone binary runs its engine as the provisioned runtime executable itself. The same
 // executable also serves omo's own commands, internal hosts and bundled scripts, so only a bare launch
 // or engine flags count; those other roles are never engines.

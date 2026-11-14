@@ -1,6 +1,10 @@
 import { existsSync } from "node:fs"
 
-import { type AccountShowResult, accountStateNotice, classifyAccountShow } from "../device-service-core/src/account-state.ts"
+import {
+  type AccountShowResult,
+  accountStateNotice,
+  classifyAccountShow,
+} from "../device-service-core/src/account-state.ts"
 import {
   connectDeviceService,
   type DeviceService,
@@ -211,4 +215,3 @@ export function reportFailure(dependencies: RemoteCommandDependencies, error: un
   dependencies.error(error instanceof Error ? `omo remote: ${error.message}` : "omo remote: the operation failed")
   return REMOTE_EXIT.failed
 }
-
