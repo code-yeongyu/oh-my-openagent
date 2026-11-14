@@ -178,7 +178,20 @@ host.openWindow {
                 print(answer)
                 fflush(stdout)
             }
-            DispatchQueue.main.async { NSApp.terminate(nil) }
+            DispatchQueue.main.async {
+                for entry in host.windows { entry.window.close() }
+                host.windows.removeAll()
+                DispatchQueue.global().async {
+                    let outcome = WebKitTempCleanup.run(bound: 20)
+                    DispatchQueue.main.async {
+                        if case .failed(let reason) = outcome {
+                            FileHandle.standardError.write(Data("HERMETIC_CLEANUP_FAILED \(reason)\n".utf8))
+                            exit(4)
+                        }
+                        NSApp.terminate(nil)
+                    }
+                }
+            }
         }.start()
     }
 }

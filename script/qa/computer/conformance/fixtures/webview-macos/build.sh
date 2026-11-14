@@ -6,7 +6,7 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 bundle="$out/Conformance Fixture Web.app"
 mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources"
 swiftc -swift-version 5 -O -warnings-as-errors -framework AppKit -framework WebKit \
-  -o "$bundle/Contents/MacOS/Conformance Fixture" "$here/main.swift"
+  -o "$bundle/Contents/MacOS/Conformance Fixture" "$here/main.swift" "$here/webkit-temp-cleanup.swift"
 cp "$here/../web/index.html" "$here/../web/page.js" "$bundle/Contents/Resources/"
 cat > "$bundle/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
