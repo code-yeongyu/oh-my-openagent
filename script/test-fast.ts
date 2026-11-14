@@ -100,6 +100,7 @@ export function createChildRegistry(platform: NodeJS.Platform): ChildRegistry {
   const live = new Set<ChildHandle>()
   const retainedGroups = new Set<number>()
   const isPosix = platform !== "win32"
+  let shuttingDown = false
   return {
     add: (child) => {
       live.add(child)
@@ -108,10 +109,16 @@ export function createChildRegistry(platform: NodeJS.Platform): ChildRegistry {
     remove: (child) => void live.delete(child),
     release: (child) => {
       live.delete(child)
-      if (child.pid !== undefined) retainedGroups.delete(child.pid)
+      if (child.pid === undefined) return
+      // A group is released when its phase finished normally. During a shutdown the leader's
+      // exit is the signal landing, not the work ending, so the PGID must survive for the
+      // SIGKILL escalation to reach a descendant that ignored it.
+      if (shuttingDown) return
+      retainedGroups.delete(child.pid)
     },
     hasSignalTargets: () => (isPosix ? retainedGroups.size > 0 : live.size > 0),
     killAll: (signal, kill) => {
+      shuttingDown = true
       if (!isPosix) {
         for (const child of live) if (child.pid !== undefined) child.kill(signal)
         return

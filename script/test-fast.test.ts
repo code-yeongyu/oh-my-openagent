@@ -130,6 +130,25 @@ describe("child registry", () => {
     expect(groupKills).toEqual([-101, -202])
   })
 
+  it("#given a shutdown in progress #when the released child exits #then its group is still signalled on escalation", () => {
+    // given — a serial phase interrupted by a signal: the leader exits from that signal, and a
+    // descendant that ignored it must still be reachable by the SIGKILL escalation
+    const registry = createChildRegistry("linux")
+    const groupKills: number[] = []
+    const selfKills: string[] = []
+    const serial = fakeChild(777, selfKills)
+    registry.add(serial)
+
+    // when
+    registry.killAll("SIGINT", (pid) => groupKills.push(pid))
+    registry.release(serial)
+
+    // then
+    expect(registry.hasSignalTargets()).toBe(true)
+    registry.killAll("SIGKILL", (pid) => groupKills.push(pid))
+    expect(groupKills).toEqual([-777, -777])
+  })
+
   it("#given a released POSIX group #when the registry kills all #then the finished group is not signalled", () => {
     // given — a serial phase that completed has no descendant left to escalate to, and its
     // PGID may already belong to an unrelated process by the time a later signal is sent
