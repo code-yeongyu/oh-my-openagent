@@ -65,7 +65,7 @@ const repoRoot = resolve(scriptDir, "..")
 const compileEntry = join(repoRoot, "packages", "omo-native", "compile-entry.ts")
 
 /**
- * Hard per-binary size budget (210 MiB). It exists to keep the download and install of one
+ * Hard per-binary size budget (260 MiB). It exists to keep the download and install of one
  * platform binary small: every install, `omo update` and CI smoke fetches the full binary, so
  * growth is a user-facing cost, not just a storage one. A release that crosses it fails loud
  * rather than shipping a quietly larger download. Raised from 150 MiB for 5.1.26, when linux-x64
@@ -82,8 +82,21 @@ const compileEntry = join(repoRoot, "packages", "omo-native", "compile-entry.ts"
  * 209,889,456 bytes (5.1.66's linux-x64: 209,664,176), +225,280 in one release and 174,256 bytes (0.08%)
  * over 200 MiB. 210 MiB keeps a hard ceiling with about 5% headroom over that size.
  * `reportBinaryHeadroom` warns well before the next crossing.
+ * Raised to 260 MiB for the bytecode build (#13440; Q 2026-11-14: a modest increase is fine). Full release builds of
+ * one head, plain vs `--bytecode-depth=1`: linux-x64 212,482,224 -> 255,277,232 bytes (+42.8 MB), darwin-arm64
+ * 180,917,090 -> 224,046,434. Full-depth bytecode was 288,950,448 on linux-x64, over this budget, for almost no extra
+ * speed (darwin-arm64 `--version` p50: plain 214 ms, depth 1 33 ms, full 31 ms).
  */
-export const MAX_BINARY_BYTES = 210 * 1024 * 1024
+export const MAX_BINARY_BYTES = 260 * 1024 * 1024
+
+/**
+ * `--bytecode` stores the precompiled bytecode of the bundled graph, so a launch skips parsing it (#13440): a boot
+ * took 880 ms p50 on Linux x64 and 214 ms on darwin-arm64 before, 202 ms and 33 ms after. Depth 1 compiles only the
+ * outermost function level ahead of time; it keeps nearly all of the gain at about half the size of full depth, which
+ * cannot fit the budget because the senpi worker entries in the same compile get bytecode too. ESM output is required:
+ * the entry awaits at the top level.
+ */
+const BYTECODE_COMPILE_ARGS = ["--bytecode", "--format=esm", "--bytecode-depth=1"] as const
 
 /** Below this much headroom under the budget, the build warns so growth is seen a release ahead. */
 export const BINARY_HEADROOM_WARN_BYTES = 5 * 1024 * 1024
@@ -689,7 +702,7 @@ export async function buildReleaseBinary(
       )
     }
 
-    // Flags mirror senpi's own scripts.build:binary (node_modules/@code-yeongyu/senpi/package.json).
+    // Flags mirror senpi's own scripts.build:binary (node_modules/@code-yeongyu/senpi/package.json), plus bytecode.
     // A binary that fails post-compile verification must not survive on disk.
     let compileOutput: string
     try {
@@ -700,6 +713,7 @@ export async function buildReleaseBinary(
           "--compile",
           `--target=${target.bunTarget}`,
           "--minify-whitespace",
+          ...BYTECODE_COMPILE_ARGS,
           "--compile-autoload-package-json",
           "--no-compile-autoload-dotenv",
           "--no-compile-autoload-bunfig",

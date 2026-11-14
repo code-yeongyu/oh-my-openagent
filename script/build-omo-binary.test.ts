@@ -402,7 +402,7 @@ describe("size budget", () => {
     // then
     expect(oversize).toThrow(/darwin-arm64/)
     expect(withinBudget).not.toThrow()
-    expect(MAX_BINARY_BYTES).toBe(210 * 1024 * 1024)
+    expect(MAX_BINARY_BYTES).toBe(260 * 1024 * 1024)
     rmSync(stageDir, { recursive: true, force: true })
   })
 
@@ -747,6 +747,35 @@ describe("embedded manifest parity (darwin-arm64)", () => {
       // then
       expect(size).toBeLessThanOrEqual(MAX_BINARY_BYTES)
     },
+  )
+
+  // #13440: a plain build parses the whole bundled graph on every launch. Measured --version, plain vs bytecode depth 1:
+  // Linux x64 827-1027 ms vs 182-235 ms (load1 ~30), darwin-arm64 211-236 ms vs 33-34 ms. Each bound sits between the two
+  // with room for a loaded runner, so the plain build fails it and the bytecode build passes.
+  const hostBinary = join(
+    repoRoot,
+    ".omo",
+    "release-binaries",
+    `omo-${process.platform === "win32" ? "windows" : process.platform}-${process.arch}${process.platform === "win32" ? ".exe" : ""}`,
+  )
+  test.skipIf(!existsSync(hostBinary))(
+    "#given the built binary for this host #when it answers --version #then the fastest of three starts is under the bytecode bound",
+    () => {
+      // given
+      const starts: number[] = []
+
+      // when
+      for (let run = 0; run < 3; run++) {
+        const started = performance.now()
+        const answered = spawnSync(hostBinary, ["--version"], { encoding: "utf8" })
+        starts.push(performance.now() - started)
+        expect(answered.status).toBe(0)
+      }
+
+      // then
+      expect(Math.min(...starts)).toBeLessThan(process.platform === "darwin" ? 120 : 450)
+    },
+    30_000,
   )
 })
 
