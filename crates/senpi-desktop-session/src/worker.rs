@@ -152,7 +152,7 @@ impl Worker {
             .ok()
             .map_or((None, None), |backend| (backend.epoch_source(), backend.screen_probe()));
         self.epochs.arm(options.report_mode == ReportMode::Object, source, screen);
-        self.registry = AxRegistry::with_report_mode(options.report_mode);
+        self.registry = AxRegistry::with_report_mode(options.report_mode).with_explicit_mode(options.report_mode_explicit);
         self.frames = FrameCache::with_report_mode(options.report_mode);
         self.options = Some(options);
         self.session_id = ulid::Ulid::generate().to_string();

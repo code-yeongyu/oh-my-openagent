@@ -92,7 +92,7 @@ pub struct AxSnapshotOptions {
     pub max_nodes: Option<u32>,
     pub all: Option<bool>,
     pub timeout_ms: Option<u64>,
-    /// Only nodes changed since this generation.
+    /// Reserved: no snapshot implements it, so any value fails with `AxUnsupported` (#13175).
     pub since: Option<u64>,
     /// Roles and refs only, no values.
     pub skeleton: Option<bool>,

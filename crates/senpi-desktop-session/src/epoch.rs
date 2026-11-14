@@ -184,7 +184,10 @@ impl Worker {
         }
         self.frames.supersede_all();
         self.registry
-            .restore(AxRegistry::with_report_mode(self.registry.report_mode()));
+            .restore(
+                AxRegistry::with_report_mode(self.registry.report_mode())
+                    .with_explicit_mode(self.registry.report_mode_explicit()),
+            );
     }
 }
 

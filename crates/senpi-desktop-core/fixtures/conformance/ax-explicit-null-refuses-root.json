@@ -1,0 +1,148 @@
+{
+  "description": "#13175: a session that NAMED reportMode \"null\" gets a typed AxUnsupported for ax.snapshot root/skeleton (it asked for them), and every session gets it for since; contrast ax-drill-v1-control, where a protocol-1 session that never named reportMode keeps byte-equal replies.",
+  "scenario": "crates/senpi-desktop-backend-fake/fixtures/v2-ax-web.json",
+  "env": {},
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session.open",
+        "params": {
+          "reportMode": "null"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "cursorOverlay": false,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "granted",
+                "axPermission": "granted",
+                "displayCount": 1,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": "no-global-listener",
+                "integrityLevel": null,
+                "screenLocked": false,
+                "displayAsleep": false
+              },
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "ax.snapshot",
+        "params": {
+          "target": "101",
+          "opts": {
+            "maxNodes": 6
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "text": "- window \"Docs - Browser\" [ref=e1] app=Browser (focused)\n  - toolbar [ref=e2]\n    - button \"Back\" [ref=e3]\n    - button \"Forward\" [ref=e4]\n    - button \"Reload\" [ref=e5]\n  - webarea \"Docs\" [ref=e6]\n\u2026 truncated (6 nodes)",
+              "nodeCount": 6,
+              "truncated": true
+            }
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "ax.snapshot",
+        "params": {
+          "target": "101",
+          "opts": {
+            "maxNodes": 6,
+            "skeleton": true,
+            "root": "e2"
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "error": {
+              "code": -32009,
+              "message": "",
+              "data": {
+                "code": "AxUnsupported",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "ax.snapshot",
+        "params": {
+          "target": "101",
+          "opts": {
+            "since": 1
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "error": {
+              "code": -32009,
+              "message": "",
+              "data": {
+                "code": "AxUnsupported",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    }
+  ]
+}

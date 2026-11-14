@@ -189,3 +189,20 @@ fn delivered_observation_commits_matching_frame_and_live_ax_refs() {
         assert_eq!(h.worker.registry.target(&reference).unwrap(), "101");
     }
 }
+
+#[test]
+fn an_observation_asking_for_since_fails_with_ax_unsupported_instead_of_the_full_tree() {
+    // Given: `since` is reserved; no read implements it (#13175).
+    let mut h = harness(&json!({}));
+    let params = ObserveParams {
+        ax: Some(senpi_desktop_core::types::AxSnapshotOptions {
+            since: Some(1),
+            ..senpi_desktop_core::types::AxSnapshotOptions::default()
+        }),
+        ..params()
+    };
+    // When
+    let error = h.process(Op::Observe(params)).unwrap_err();
+    // Then: the whole observation fails loudly; it never answers with the full tree.
+    assert_eq!(error.code, ErrorCode::AxUnsupported);
+}
