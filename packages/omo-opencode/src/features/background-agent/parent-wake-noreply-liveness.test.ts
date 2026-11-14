@@ -184,7 +184,10 @@ describe("parent wake noReply admission liveness (issues #4874/#5086)", () => {
       // then: exactly one reply-producing resume is dispatched
       expect(promptAsyncCalls).toHaveLength(2)
       expect(promptAsyncCalls[1]?.body.noReply).toBe(false)
-      expect(JSON.stringify(promptAsyncCalls[1]?.body.parts)).toContain("ALL BACKGROUND TASKS COMPLETE")
+      // the admit-only deposit carried the notice; the owed reply points at it instead of repeating it
+      expect(JSON.stringify(promptAsyncCalls[0]?.body.parts)).toContain("ALL BACKGROUND TASKS COMPLETE")
+      expect(JSON.stringify(promptAsyncCalls[1]?.body.parts)).toContain("[BACKGROUND TASK RESULTS ABOVE]")
+      expect(JSON.stringify(promptAsyncCalls[1]?.body.parts)).not.toContain("ALL BACKGROUND TASKS COMPLETE")
       expect(notifier.getPendingParentWakes().has("parent-1")).toBe(false)
     } finally {
       Date.now = originalDateNow
@@ -653,7 +656,10 @@ describe("BackgroundManager parent wake recent-activity admission liveness", () 
       // then: the parent resumes exactly once with a reply-producing wake
       expect(promptAsyncCalls).toHaveLength(2)
       expect(promptAsyncCalls[1]?.body.noReply).toBe(false)
-      expect(JSON.stringify(promptAsyncCalls[1]?.body.parts)).toContain("ALL BACKGROUND TASKS COMPLETE")
+      // the admit-only deposit carried the notice; the owed reply points at it instead of repeating it
+      expect(JSON.stringify(promptAsyncCalls[0]?.body.parts)).toContain("ALL BACKGROUND TASKS COMPLETE")
+      expect(JSON.stringify(promptAsyncCalls[1]?.body.parts)).toContain("[BACKGROUND TASK RESULTS ABOVE]")
+      expect(JSON.stringify(promptAsyncCalls[1]?.body.parts)).not.toContain("ALL BACKGROUND TASKS COMPLETE")
       expect(parentWakeNotifier.getPendingParentWakes().has("parent-1")).toBe(false)
     } finally {
       Date.now = originalDateNow

@@ -156,7 +156,7 @@ describe("BackgroundManager subagent failure parent isolation", () => {
     // then
     expect(promptAsyncCalls).toHaveLength(1)
     expect(promptAsyncCalls[0]?.path.id).toBe("subagent-session")
-    expect(JSON.stringify(promptAsyncCalls[0]?.body.parts)).toContain("[ALL BACKGROUND TASKS FINISHED - 1 FAILED]")
+    expect(JSON.stringify(promptAsyncCalls[0]?.body.parts)).toContain("[BACKGROUND TASK ERROR]")
     expect(outerTask.status).toBe("running")
     expect(getPendingParentWakes(manager).has("main-session")).toBe(false)
   })

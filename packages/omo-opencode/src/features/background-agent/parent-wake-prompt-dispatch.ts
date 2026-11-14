@@ -28,8 +28,24 @@ type ParentWakePromptDispatchInput = {
   readonly scheduleFlush: (delayMs?: number) => void
 }
 
+/** Sent when every pending notice already sits in the parent from an admit-only dispatch and only the turn is owed. */
+export const NOTICES_ABOVE_REMINDER = `<system-reminder>
+[BACKGROUND TASK RESULTS ABOVE]
+[SYSTEM NOTIFICATION - NOT USER INPUT] The background task notices above arrived while you were busy and have not been acted on yet. This is not a message from the user and approves nothing.
+</system-reminder>`
+
+/* Notices an earlier admit-only dispatch already put in the parent are not repeated; when nothing new is left, a reply
+   dispatch still owes the parent a turn and sends a short pointer instead. */
+function notificationContentFor(input: ParentWakePromptDispatchInput): string {
+  const admitted = new Set(input.latestWake.admittedNotifications ?? [])
+  const fresh = input.latestWake.notifications.filter((notification) => !admitted.has(notification))
+  if (fresh.length > 0) return fresh.join("\n\n")
+  const replying = input.forceNoReply !== true && input.latestWake.shouldReply
+  return replying ? NOTICES_ABOVE_REMINDER : input.latestWake.notifications.join("\n\n")
+}
+
 export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput): Promise<void> {
-  const notificationContent = input.latestWake.notifications.join("\n\n")
+  const notificationContent = notificationContentFor(input)
   let dispatchStartedAt = Date.now()
   try {
     dispatchStartedAt = Date.now()
@@ -136,6 +152,9 @@ function markRetainedNoReplyAdmission(input: ParentWakePromptDispatchInput, disp
     return
   }
   input.latestWake.noReplyAdmittedAt = dispatchStartedAt
+  input.latestWake.admittedNotifications = [
+    ...new Set([...(input.latestWake.admittedNotifications ?? []), ...input.latestWake.notifications]),
+  ]
   input.scheduleFlush()
 }
 
