@@ -54,12 +54,9 @@ export type CarrierOptions = {
   readonly connect: () => Promise<CarrierHostConnection>
   /** `session_wake.wake_limit`; 0 means no bound (A3.5.3). */
   readonly wakeLimit?: () => number
-  /** `session_wake.same_device`, read at the moment of the open; off unless the machine's configuration turns it on. */
+  /** `session_wake.same_device`, read at the moment of the open; the caller passes the resolved setting (on by default). */
   readonly sameDevice?: () => boolean
-  /**
-   * The receiving device's wake switch as the consumer was told it on its own serving connection (A7.2.3): the gate
-   * for a row from another device. Off unless a consumer is serving and was told on.
-   */
+  /** The gate for a row from another device: production allows it while this process's delivery consumer serves. */
   readonly remoteWake?: () => boolean
   readonly schedule: (run: () => void, ms: number) => () => void
   readonly onEvent?: (event: CarrierEvent) => void

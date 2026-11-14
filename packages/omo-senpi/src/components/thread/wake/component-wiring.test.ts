@@ -193,6 +193,20 @@ describe("the same-device wake through the registered thread component", () => {
     expect(await drainWoken(w.store, w.path)).toEqual([row?.delivery_id])
   })
 
+  test("#given an omo configuration with no session_wake setting at all #when thread_send names a session that is not running #then the carrier opens it and its drain admits the delivery once", async () => {
+    const w = await wire({ loadConfig: () => ({ config: {} }) })
+    const pi = await w.start()
+    const woken = w.woken()
+    expect(await w.send(pi, "no setting needed")).toMatchObject({
+      kind: "ok",
+      delivery: { kind: "queued", waiting_on: { kind: "wake" } },
+    })
+    expect(await woken).toMatchObject({ kind: "open" })
+    expect(opens(w.fake)).toEqual([expect.objectContaining({ sessionPath: w.path })])
+    const [row] = await w.store.list({ target_durable_id: TARGET })
+    expect(await drainWoken(w.store, w.path)).toEqual([row?.delivery_id])
+  })
+
   test("#given two sessions of one engine process register the thread component #when both start #then one carrier serves the agent directory", async () => {
     const w = await wire({ loadConfig: () => ({ config: { session_wake: { same_device: true } } }) })
     await w.start()
@@ -251,6 +265,23 @@ describe("the delivery consumer through the registered thread component", () => 
     expect(ledger).toBe("device:device-b/d-from-b")
     expect(await drainWoken(w.store, w.path, running?.admitIntake)).toEqual([ledger])
     expect(service.calls).toContainEqual({ type: "peer.admitted", device: "device-b" })
+  })
+
+  test("#given a serving consumer whose device service names no wake switch #when another device hands a delivery for a session that is not running #then the carrier opens it all the same", async () => {
+    const service = createFakeDeliveryService({ admitted: true })
+    service.ackServe({})
+    const w = await wire(consumerWake(service, { version: "2026.12.1", minimum: "2026.12.1" }))
+    await w.start()
+    const woken = w.woken()
+    const answer = await service.inbound({
+      command_id: "c-2",
+      sender_device: "device-b",
+      durable_id: TARGET,
+      record: inboundRecord("d-no-switch"),
+    })
+    expect(answer.data).toMatchObject({ kind: "queued" })
+    expect(await woken).toMatchObject({ kind: "open" })
+    expect(opens(w.fake)).toEqual([expect.objectContaining({ sessionPath: w.path })])
   })
 
   // A8.1: below the engine release that drops a released session's retained record (senpi#6449), the consumer makes no

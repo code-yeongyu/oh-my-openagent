@@ -8,7 +8,7 @@ export type SameDeviceCarrier = { readonly wake: (durableId: string) => Promise<
 export type SameDeviceWakeOptions = {
   readonly store: GatewayStore
   readonly sessionsDirectory: string
-  /** `session_wake.same_device`, read per send; off unless the machine's omo configuration turns it on. */
+  /** `session_wake.same_device`, read per send; on unless the machine's omo configuration opts out. */
   readonly enabled: () => boolean
   readonly carrier?: SameDeviceCarrier
 }

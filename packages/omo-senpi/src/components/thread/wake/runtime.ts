@@ -177,7 +177,8 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart): Runni
         })),
     wakeLimit: () => input.settings().wakeLimit,
     sameDevice: () => input.settings().sameDevice,
-    remoteWake: () => serving?.consumer.wakeAllowed() ?? false,
+    // Owner ruling 2026-11-14: a device whose service serves this engine's consumer wakes; no switch has to be told on.
+    remoteWake: () => serving !== undefined,
     schedule: options.schedule ?? unrefSchedule,
     onEvent: (event) => {
       if (ENDED.has(event.outcome.kind))

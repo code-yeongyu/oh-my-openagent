@@ -2,7 +2,7 @@ import * as z from "zod"
 
 /**
  * Waking a session that is not running (#13037). `same_device`: a send from this machine to a session here that is not
- * running starts it (default off). `wake_limit`: at most this many consecutive wakes of a session nobody attends, 0 (the
+ * running starts it (default on; owner ruling 2026-11-14: no setting is needed, and `false` is only an explicit opt-out). `wake_limit`: at most this many consecutive wakes of a session nobody attends, 0 (the
  * default) meaning no bound.
  */
 export const OmoSessionWakeSettingsSchema = z
@@ -20,7 +20,7 @@ export function resolveSessionWakeSettings(config: {
   readonly session_wake?: OmoSessionWakeSettings | undefined
 }): ResolvedSessionWakeSettings {
   return {
-    sameDevice: config.session_wake?.same_device ?? false,
+    sameDevice: config.session_wake?.same_device ?? true,
     wakeLimit: config.session_wake?.wake_limit ?? 0,
   }
 }
