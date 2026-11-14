@@ -102,7 +102,8 @@ export type ThreadCreateResult =
 /**
  * One of the account's devices as `thread_list` reports it. `online` is the device's, never a thread's. `listing`:
  * `listed` when this listing holds the device's threads, `incomplete` when the device did not answer this round (its
- * threads are missing, not gone), `offline` when the device is not connected.
+ * threads are missing, not gone), `offline` when the device is not connected. `threads` counts the threads this result
+ * lists on the device (this device's are the caller's scoped threads). This device's row is always present.
  */
 export type ThreadDevice = {
   readonly device: string
@@ -123,7 +124,10 @@ export type ThreadListResult =
       readonly scope: "workspace" | "all"
       /** The account's devices, this one included, when the account's devices could be listed. */
       readonly devices?: readonly ThreadDevice[]
-      /** Set when the account's other devices could not be listed (A5: `relay_requires_paid_plan`, or the device service is unreachable). */
+      /**
+       * Set when the account's other devices could not be listed (A5: `relay_requires_paid_plan`, or the device service is
+       * unreachable), or `devices_unavailable` when only the device roster failed (the threads are still merged).
+       */
       readonly remote_unavailable?: string
     }
   | ThreadDataError

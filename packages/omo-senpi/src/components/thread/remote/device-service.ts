@@ -188,6 +188,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
   return {
     status: async () => ({ state: (await (await svc()).status()).state }),
     thisDevice: async () => (await (await svc()).thisDevice())?.id ?? null,
+    thisDeviceName: async () => (await (await svc()).thisDevice())?.name ?? null,
     devices: async () =>
       (await (await svc()).devices()).map((row) => ({
         device: row.device,

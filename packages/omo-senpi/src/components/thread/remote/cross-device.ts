@@ -364,15 +364,31 @@ async function accountListing(remote: RemoteThreadSurface): Promise<RemoteListin
   return { rows: await remote.sessions.sessions(), incomplete: [] }
 }
 
+// `threads` counts the threads THIS result lists on the device, so it reads the same for every row: this device's are
+// the caller's scoped local threads, another device's are its rows merged into the result.
 function deviceRows(
-  devices: readonly RemoteDevice[],
-  here: string | null,
-  listing: RemoteListing,
-  localCount: number,
+  roster: readonly RemoteDevice[],
+  self: { readonly id: string | null; readonly name: string | null },
+  incomplete: readonly string[],
+  threads: readonly { readonly device?: string }[],
 ): readonly ThreadDevice[] {
-  const missing = new Set(listing.incomplete)
+  const missing = new Set(incomplete)
+  // The account roster leaves this device out (relayd lists only peers), so this device's row is made here.
+  const devices: readonly RemoteDevice[] =
+    self.id === null || roster.some((row) => row.device === self.id)
+      ? roster
+      : [
+          {
+            device: self.id,
+            label: self.name ?? self.id,
+            online: true,
+            platform: process.platform,
+            last_seen_ms: null,
+          },
+          ...roster,
+        ]
   return devices.map((row) => {
-    const thisDevice = row.device === here
+    const thisDevice = row.device === self.id
     return {
       device: row.device,
       name: row.label,
@@ -383,7 +399,7 @@ function deviceRows(
         row.last_seen_ms === undefined || row.last_seen_ms === null ? null : new Date(row.last_seen_ms).toISOString(),
       this_device: thisDevice,
       listing: thisDevice ? "listed" : !row.online ? "offline" : missing.has(row.device) ? "incomplete" : "listed",
-      threads: thisDevice ? localCount : listing.rows.filter((listed) => listed.device === row.device).length,
+      threads: threads.filter((thread) => (thread.device ?? self.id) === row.device).length,
     }
   })
 }
@@ -406,26 +422,36 @@ export async function listAcross(
       unavailable.error.code === "host_unavailable" && remoteNotSetUp(unavailable.error.details?.["state"])
     return !allScope && notSetUp ? local : { ...local, remote_unavailable: unavailable.error.code }
   }
-  const here = await remote.sessions.thisDevice()
   const known = new Set(ids)
-  let listing: RemoteListing
-  try {
-    listing = await accountListing(remote)
-  } catch {
-    return withAliases(remote, { ...local, remote_unavailable: "host_unavailable" }, ids)
-  }
-  const devices = await remote.sessions.devices().catch(() => undefined)
+  const [here, hereName, listed, roster] = await Promise.all([
+    remote.sessions.thisDevice(),
+    remote.sessions.thisDeviceName?.().catch(() => null) ?? Promise.resolve(null),
+    accountListing(remote).then(
+      (listing) => ({ ok: true as const, listing }),
+      () => ({ ok: false as const }),
+    ),
+    remote.sessions.devices().then(
+      (devices) => ({ ok: true as const, devices }),
+      () => ({ ok: false as const }),
+    ),
+  ])
+  if (!listed.ok) return withAliases(remote, { ...local, remote_unavailable: "host_unavailable" }, ids)
+  const listing = listed.listing
   const others = listing.rows.filter((row) => row.device !== here && !known.has(rowThreadId(row)))
+  const threads = [
+    ...local.threads,
+    ...others.map((row) => {
+      const { sessionId: _routing, ...thread } = listedThread(row)
+      return thread
+    }),
+  ]
+  // A roster that fails is said, never silently dropped: the threads stay merged and remote_unavailable names it.
   const merged: ThreadToolResult = {
     ...local,
-    threads: [
-      ...local.threads,
-      ...others.map((row) => {
-        const { sessionId: _routing, ...thread } = listedThread(row)
-        return thread
-      }),
-    ],
-    ...(devices === undefined ? {} : { devices: deviceRows(devices, here, listing, local.threads.length) }),
+    threads,
+    ...(roster.ok
+      ? { devices: deviceRows(roster.devices, { id: here, name: hereName }, listing.incomplete, threads) }
+      : { remote_unavailable: "devices_unavailable" }),
   }
   return withAliases(remote, merged, [...ids, ...others.map(rowThreadId).filter((id) => id !== "")])
 }

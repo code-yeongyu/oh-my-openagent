@@ -31,6 +31,7 @@ export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThrea
   const sessions: RemoteSessionsPort = {
     status: async () => await (await load()).status(),
     thisDevice: async () => await (await load()).thisDevice(),
+    thisDeviceName: async () => (await (await load()).thisDeviceName?.()) ?? null,
     devices: async () => await (await load()).devices(),
     sessions: async () => await (await load()).sessions(),
     listing: async () => {

@@ -59,6 +59,8 @@ export type RemoteSessionsPort = {
   /** The device service state; `plan_required` means the account's plan has no relay (A5: paid only). */
   readonly status: () => Promise<RemoteServiceState>
   readonly thisDevice: () => Promise<string | null>
+  /** This device's own name. The account roster (`devices`) leaves this device out. Absent: the id stands in for it. */
+  readonly thisDeviceName?: () => Promise<string | null>
   readonly devices: () => Promise<readonly RemoteDevice[]>
   readonly sessions: () => Promise<readonly RemoteSessionRow[]>
   /** The same listing as `sessions`, with the devices it could not include. Absent: every device counts as listed. */

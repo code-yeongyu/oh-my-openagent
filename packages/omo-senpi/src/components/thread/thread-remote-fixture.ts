@@ -104,6 +104,9 @@ export function createRemoteThreadFixture() {
       incomplete?: readonly string[]
       /** Extra devices the account lists beyond this one and b. */
       devices?: readonly RemoteDevice[]
+      /** The roster as relayd answers it: without this device (its row then comes from thisDeviceName). */
+      rosterWithoutSelf?: boolean
+      failDevices?: boolean
       registryDown?: "refused" | "throws" | "signed_out"
       /** Only the claim fails (resolve and aliasesOf still answer): a token that expired between the two calls. */
       claimDown?: "refused" | "signed_out"
@@ -227,7 +230,7 @@ export function createRemoteThreadFixture() {
       return ok({})
     }
     const devices: RemoteDevice[] = [
-      { device: "here", label: "this mac", online: true },
+      ...(options.rosterWithoutSelf === true ? [] : [{ device: "here", label: "this mac", online: true }]),
       { device: "b", label: "studio", online: options.online ?? true },
       ...(options.devices ?? []),
     ]
@@ -309,7 +312,11 @@ export function createRemoteThreadFixture() {
       sessions: {
         status: async () => ({ state: options.plan ?? "connected" }),
         thisDevice: async () => "here",
-        devices: async () => devices,
+        thisDeviceName: async () => "this mac",
+        devices: async () => {
+          if (options.failDevices === true) throw new Error("devices.list failed")
+          return devices
+        },
         sessions: async () => {
           if (options.failSessionsList === true) throw new Error("account list failed")
           return options.rows ?? [{ ...B_ROW, state: options.rowState ?? B_ROW.state }]

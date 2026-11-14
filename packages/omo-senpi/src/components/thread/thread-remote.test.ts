@@ -69,6 +69,31 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     }
   })
 
+  test.each([
+    ["plan_required", "relay_requires_paid_plan"],
+    ["connecting", "host_unavailable"],
+    ["signed_out", undefined],
+    ["disabled", undefined],
+  ] as const)(
+    "#given the device service reads %s #when a plain thread_list runs #then remote_unavailable is %s (a relay that is not set up is no error)",
+    async (plan, expected) => {
+      const { run } = surface(account({ plan }).remote)
+      const listed = await run("thread_list", {})
+      expect(listed.kind === "ok" && "threads" in listed && listed.remote_unavailable).toBe(expected ?? undefined)
+    },
+  )
+
+  test("#given the account roster fails #when thread_list runs #then the threads stay merged and remote_unavailable names the missing devices, never a silent drop", async () => {
+    const { run } = surface(account({ failDevices: true }).remote)
+    const listed = await run("thread_list", {})
+    expect(listed).toMatchObject({ kind: "ok", remote_unavailable: "devices_unavailable" })
+    expect(listed.kind === "ok" && "threads" in listed && listed.threads.map((t) => t.thread_id)).toEqual([
+      "dur-local",
+      "dur-on-b",
+    ])
+    expect("devices" in listed).toBe(false)
+  })
+
   test("#given an ended thread on b #when thread_list runs #then it is listed resumable, as every other path reports an ended row, never live", async () => {
     const a = account({ rowState: "ended" })
     const { run } = surface(a.remote)
@@ -82,6 +107,7 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
   test("#given the account's devices, one of them not answering this listing round and one offline #when thread_list runs #then devices names each with its metadata and listing state, and the unanswered device is incomplete, not silently absent", async () => {
     const a = account({
       incomplete: ["c"],
+      rosterWithoutSelf: true,
       devices: [
         {
           device: "c",
@@ -100,6 +126,7 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
       {
         device: "here",
         name: "this mac",
+        platform: process.platform,
         online: true,
         last_seen: null,
         this_device: true,
