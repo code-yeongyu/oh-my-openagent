@@ -78,6 +78,7 @@ function fakeService(results: CommandResult[], sent: unknown[]): DeviceService {
           as_of: 2,
         },
       ],
+      incomplete: ["c"],
     }),
     attach: async () => attach,
     closed: new Promise(() => {}),
@@ -106,7 +107,10 @@ describe("device-service adapter of the thread tools' account surface", () => {
         ),
     })
     expect(await port.thisDevice()).toBe("here")
-    expect(await port.devices()).toEqual([{ device: "b", label: "studio", online: true }])
+    expect(await port.devices()).toEqual([
+      { device: "b", label: "studio", online: true, platform: "darwin", kind: "desktop", last_seen_ms: 1 },
+    ])
+    expect((await port.listing?.())?.incomplete).toEqual(["c"])
     expect(await port.sessions()).toEqual([
       { device: "b", session_id: "s1", title: "t", project: "/p", path: "/p/s1.jsonl", state: "idle", updated_ms: 2 },
     ])
@@ -1044,4 +1048,18 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
     await port.sessionCommand("b", "s1", { type: "abort" })
     expect(l.calls.attach).toBe(2)
   })
+})
+
+test("#given thread_list asks for this device's id and name together #when both run in parallel #then device.info is read once (#13394 review LOW)", async () => {
+  let reads = 0
+  const service = {
+    thisDevice: async () => {
+      reads += 1
+      return { id: "here", name: "this mac" }
+    },
+    closed: new Promise(() => {}),
+  } as unknown as DeviceService
+  const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: async () => service })
+  expect(await Promise.all([port.thisDevice(), port.thisDeviceName?.()])).toEqual(["here", "this mac"])
+  expect(reads).toBe(1)
 })

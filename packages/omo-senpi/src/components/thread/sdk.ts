@@ -36,6 +36,7 @@ import {
 } from "./tools/internals"
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "./tools/ports"
 import { listThreads, readThread } from "./tools/read-ops"
+import { listAcross } from "./remote/cross-device"
 import type { RemoteThreadSurface } from "./remote/ports"
 import { stampThisDevice } from "./remote/this-device"
 
@@ -349,7 +350,10 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     registerStoreExtension: store.registerStoreExtension,
     extensionCall: store.extensionCall,
     principal,
-    list: (request) => guarded(async () => listThreads(surface, await view(), request.all_scope)),
+    list: (request) =>
+      guarded(async () =>
+        listAcross(options.remote, listThreads(surface, await view(), request.all_scope), request.all_scope === true),
+      ),
     read: (request) =>
       guarded(async () =>
         readThread(

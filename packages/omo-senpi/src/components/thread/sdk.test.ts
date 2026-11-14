@@ -227,6 +227,15 @@ describe("thread SDK: read reaches the account like the agent tools (#12833)", (
   const remoteFixture = createRemoteThreadFixture()
   afterEach(remoteFixture.cleanup)
 
+  test("#given a thread on b #when omo thread list runs #then b's thread is listed with its device beside this device's, as the agent's thread_list lists it", async () => {
+    const account = remoteFixture.account()
+    const { sdk } = fixture({ remote: account.remote })
+    const listed = await sdk.list({})
+    expect(listed.kind === "ok" && "threads" in listed && listed.threads.find((t) => t.device === "b")).toMatchObject({
+      thread_id: "dur-on-b",
+    })
+  })
+
   test("#given aliases held by a thread here and by one on b #when omo thread read names each alias #then the first reads this device's transcript and the second b's", async () => {
     const account = remoteFixture.account({
       aliases: new Map([

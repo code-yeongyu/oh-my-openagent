@@ -24,7 +24,7 @@ export function listedThread(row: RemoteSessionRow): HostedThread {
     sessionId: row.session_id,
     thread_id: rowThreadId(row),
     name: row.title,
-    status: "live",
+    status: row.state === "ended" ? "resumable" : "live",
     cwd: row.project,
     created_at: seen,
     updated_at: seen,
