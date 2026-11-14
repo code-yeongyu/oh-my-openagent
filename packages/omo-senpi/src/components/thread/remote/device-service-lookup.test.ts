@@ -14,7 +14,7 @@ function portFor(lookup: "timeout" | "closed" | "answers") {
       if (lookup === "closed") throw new LocalApiError("closed", "the connection closed")
       return { endpoints: ["ZW5kcG9pbnQta2V5LTAwMD"] }
     },
-    endpointCommand: async (_device: string, _endpoint: string, _rpc: unknown, commandId: string) => {
+    commandTo: async (_target: unknown, _rpc: unknown, commandId: string) => {
       calls.endpointCommand += 1
       throw new LocalApiError("request_timeout", `command ${commandId} may have been dispatched`, {
         command_id: commandId,

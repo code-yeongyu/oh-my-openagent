@@ -56,6 +56,7 @@ export const READ_UNCERTAIN: Readonly<Record<UncertainReason, "retry" | "too_lar
   hand_restarted: "retry",
   result_expired: "retry",
   record_too_large: "too_large",
+  result_undecodable: "retry",
 }
 
 // Refusals after which this call changed nothing on the other device: a command that never reached its engine (a lost

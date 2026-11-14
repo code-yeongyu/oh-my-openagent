@@ -232,7 +232,7 @@ export function openAttach(client: LocalApiClient, device: string, sessionId: st
               resolve(response === undefined ? { outcome: event } : { outcome: event, response })
             })
             commands.add(end)
-            client.command(attach, rpc, commandId, { delegated: true }).catch((error: unknown) => {
+            client.commandTo({ attach }, rpc, commandId, { delegated: true }).catch((error: unknown) => {
               settle()
               reject(error)
             })

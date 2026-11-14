@@ -9,6 +9,7 @@ import {
   validateWelcome,
 } from "../../src/local-api/validate.ts"
 import { exactly } from "../../src/local-api/validate-fields.ts"
+import { validateRequest as validateReleasedRequest } from "../../vendor/omo-5.1.66-decoder/validate.ts"
 import { PEER, defaultWorld } from "./conformance/world.ts"
 import { eventExamples } from "./event-examples.ts"
 
@@ -25,8 +26,9 @@ const deviceRow = world.devices[0]
 if (deviceRow === undefined) throw new Error("the world lists a device")
 const attachState = { attached: true, changedAt: "2026-11-09T12:00:00.000Z" }
 
-// One answer per request type; a new request type without a row fails typecheck here.
-const answers: { readonly [T in RequestType]: ResponseData[T] } = {
+// One answer per request type omo sends; the machine, delivery, presenter, wake and update-commit requests the
+// vendored client added are covered by its upstream suite.
+const answers = {
   authenticate: {},
   "status.get": world.status,
   "status.subscribe": {},
@@ -50,7 +52,7 @@ const answers: { readonly [T in RequestType]: ResponseData[T] } = {
   "session.locate": { device: PEER, key: KEY, session: `${PEER}.${KEY}` },
   "control.attach.get": attachState,
   "control.attach.set": attachState,
-}
+} satisfies { readonly [T in RequestType]?: ResponseData[T] }
 const answerRows = Object.entries(answers) as [RequestType, unknown][]
 const response = (data: unknown) => ({ id: "r1", type: "response", ok: true, data })
 const decode = (type: RequestType, data: unknown) => validateResponse(response(data), type)
@@ -235,7 +237,8 @@ describe("LA21 a reply the client reads still refuses a missing required field",
 
 describe("LA21 what a peer sends to be acted on keeps refusing unknown fields", () => {
   test("a request with an unknown field is invalid_request", () => {
-    expect(validateRequest({ id: "r2", type: "session.endpoints", device: PEER, ...NEWER })).toEqual({
+    // `environments` is a defined request field since device-service 0.1.24; a field no version defines stays refused.
+    expect(validateRequest({ id: "r2", type: "session.endpoints", device: PEER, undefined_field: true })).toEqual({
       ok: false,
       id: "r2",
       code: "invalid_request",
@@ -298,7 +301,7 @@ describe("LA21 mixed client and service versions on session.endpoints", () => {
     })
 
   test("pre-0.1.24 service refuses session.endpoints {device, environments: true}, so this version never sends it", () => {
-    expect(validateRequest({ id: "r3", type: "session.endpoints", device: PEER, environments: true })).toEqual({
+    expect(validateReleasedRequest({ id: "r3", type: "session.endpoints", device: PEER, environments: true })).toEqual({
       ok: false,
       id: "r3",
       code: "invalid_request",

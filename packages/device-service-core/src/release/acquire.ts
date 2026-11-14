@@ -2,7 +2,8 @@ import { createHash } from "node:crypto"
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { posixSecureFile, type SecureFile } from "../local-api/access.ts"
-import { currentUserSid, windowsSecureFile } from "../local-api/dacl.ts"
+import { currentUserSid } from "../local-api/dacl.ts"
+import { windowsSecureFile } from "./windows-dacl.ts"
 import {
   BINARY_MAX_BYTES,
   CHECKSUMS,
