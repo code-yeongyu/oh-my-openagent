@@ -3,6 +3,7 @@ import type { TaskRunStats } from "../state/types"
 import { countDagNodes as countNodes } from "./counts"
 import { subscribeDagJournal, type DagJournalListener } from "./journal"
 import type { DagRunRecordV1 } from "./manager"
+import { withDefinitionFields } from "./snapshot-definition-fields"
 import type { DagFileStore } from "./store"
 import type { DagNode, DagNodeCounts, DagNodeError, DagNodeId, DagRunId, DagRunSnapshot, DagRunStatus } from "./types"
 import { TERMINAL_DAG_RUN_STATUSES } from "./types"
@@ -252,7 +253,7 @@ function projectSnapshot(record: DagRunRecordV1): DagRunSnapshot {
     ...(record.completedAt === undefined ? {} : { completedAt: record.completedAt }),
     definitionFingerprint: record.definitionFingerprint,
     lastSeq: record.checkpointSeq,
-    nodes: record.nodes,
+    nodes: withDefinitionFields(record.nodes, record.definition.nodes),
     edges: record.edges,
     waves: record.waves,
     criticalPath: record.criticalPath,
