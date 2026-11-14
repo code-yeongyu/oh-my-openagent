@@ -15,7 +15,7 @@ import { copyRepo, isObject, knipConfig, REPO_ROOT, repoFiles, runKnip, unusedEx
 // config with `--reporter json`, and a file is checked when its probe is reported.
 //
 // Pre-existing unused exports are named per symbol in each directory's knip.workspace.jsonc `preExistingExports` and dropped by
-// script/knip-preexisting-exports.ts, shared byte for byte with sisyphuslabs/omo-relay-daemon (scripts/ there; its header
+// script/knip-preexisting-exports.ts, shared byte for byte with the device service repository (scripts/ there; its header
 // comment names that repo's test path). The sha256 pin below keeps the copies equal; update both repos together.
 
 const SOURCE = /\.[cm]?[jt]sx?$/

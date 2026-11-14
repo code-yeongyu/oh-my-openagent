@@ -1,5 +1,5 @@
 // Ported from pingdotgg/t3code at d7f3b72 (t3code#16294). MIT; see LICENSE.
-// Plain-JS port via sisyphuslabs/omo-relay; TypeScript types and defineRule removed.
+// Plain-JS port of the TypeScript rule; TypeScript types and defineRule removed.
 const DIRECTIVE_PATTERN =
   /^\s*\*?\s*(?:(?:oxlint|eslint)-(?:disable|enable)|@ts-(?:expect-error|ignore|nocheck)|@effect-diagnostics)/u;
 const TS_DIRECTIVE_PATTERN = /^\s*\*?\s*@ts-(?:expect-error|ignore|nocheck)(?![\w-])(.*)$/su;

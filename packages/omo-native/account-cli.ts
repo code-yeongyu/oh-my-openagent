@@ -158,7 +158,7 @@ async function token(dependencies: AccountCommandDependencies): Promise<number> 
       )
     const after = await dependencies.store.read()
     dependencies.error(error instanceof Error ? error.message : "omo account token: the refresh failed")
-    // The refusal code tells the desktop why the sign-in ended (desktop#3522); the message never leaves stderr.
+    // The refusal code tells the desktop why the sign-in ended (the desktop app's account handoff); the message never leaves stderr.
     // Any other error with the item gone means another process signed out (forget/logout) meanwhile.
     if (after === null) return signedOut(dependencies, session)
     if (after.refreshState === "uncertain")

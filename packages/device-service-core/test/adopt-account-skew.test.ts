@@ -69,7 +69,7 @@ describe("device.adopt account, gated on welcome.service_version", () => {
     },
   )
 
-  // 0.1.2 shipped without omo-relay-daemon#730: it must get today's exact request.
+  // 0.1.2 shipped without the device service's account-adopt change: it must get today's exact request.
   test.each(["0.1.0", "0.1.1", "0.1.2", "0.1.3-rc.1"])(
     "new client + old relayd %s: no account field, and the shipped validator accepts the adopt",
     async (version) => {

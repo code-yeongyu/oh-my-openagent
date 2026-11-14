@@ -1,6 +1,6 @@
 name: Cutover target deploy (Sisyphus Labs, manual)
 
-# The account move's manual path to the Sisyphus Labs account (plan: sisyphuslabs/common-infra
+# The account move's manual path to the Sisyphus Labs account (plan: the shared infrastructure repository
 # docs/cutover-workers.md), with the short-lived cutover token. Since the move the default configs ARE the
 # Sisyphus Labs configs, so this deploys exactly what web-deploy.yml / get-worker-deploy.yml deploy. It stays
 # until those two are proven on their own long-lived token, then it is removed. Run by hand only. No D1

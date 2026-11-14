@@ -13,7 +13,7 @@ import {
 } from "./creator-handoff"
 import { runtimeDeclaresKeychainHandoff } from "./runtime-capabilities"
 
-// The desktop's installed layout, written out literally and shared with no product code (RULING-74; desktop#5057
+// The desktop's installed layout, written out literally and shared with no product code (RULING-74; the desktop app's keychain helper
 // keychain-helper.ts installs the runtime, its keychain helper and the capability file side by side here).
 const RUNTIME_DIR = "Applications/OmO.app/Contents/Resources/omo-runtime/darwin-arm64"
 const CAPABILITY_FILE = "omo-runtime-capabilities.json"

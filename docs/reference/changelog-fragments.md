@@ -48,7 +48,7 @@ The `changelog-gate` workflow runs `script/check-pr-changelog.ts` from the base 
   fails. A merged fragment cannot be edited, so this is checked before merge.
 
 The rules live in `script/changelog-gate-rules.ts`, vendored byte-identical from
-`sisyphuslabs/common-infra` (`bun script/check-gate-sync.ts` compares them).
+the shared infrastructure repository (`bun script/check-gate-sync.ts` compares them).
 
 ## Release
 

@@ -201,7 +201,7 @@ export const startFakeOwner = async (options: FakeOwnerOptions): Promise<FakeOwn
 }
 
 // A relayd at or above 0.1.3 (relay-spec ADOPT_ACCOUNT_MIN_SERVICE_VERSION) accepts device.adopt's optional `account`
-// (omo-relay-daemon#730); an older one runs the shipped strict validator, which refuses any unknown field. Every
+// (the device service's account-adopt change); an older one runs the shipped strict validator, which refuses any unknown field. Every
 // raw device.adopt is recorded as sent, so a test can see exactly which fields went over the wire.
 const acceptAdoptAccount = (state: OwnerState, message: unknown): unknown => {
   if (typeof message !== "object" || message === null || Reflect.get(message, "type") !== "device.adopt") return message

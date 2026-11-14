@@ -18,7 +18,7 @@ describe("compiled binary: the keychain helper beside it serves every command (#
       process.exitCode = exitCode ?? 0
     }
     expect(keychainProcessState().entryCandidates[0]).toBe(compiledKeychainHelper(execDir))
-    // RULING-74, desktop#5057: omo-keychain directly beside the runtime binary.
+    // RULING-74, the desktop app's keychain helper: omo-keychain directly beside the runtime binary.
     expect(compiledKeychainHelper(join("/opt", "omo"))).toBe(join("/opt", "omo", "omo-keychain"))
   })
 })

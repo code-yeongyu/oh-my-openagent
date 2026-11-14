@@ -54,7 +54,7 @@ describe("parseLockedReply", () => {
 })
 
 describe.skipIf(!canRun)(
-  "probeSecretServiceLock against a fake Secret Service on a private D-Bus (desktop#3509)",
+  "probeSecretServiceLock against a fake Secret Service on a private D-Bus (the desktop app's credential sharing)",
   () => {
     const probeIn = (fake: "locked" | "unlocked" | "none"): string => {
       const dir = mkdtempSync(join(tmpdir(), "omo-secret-service-"))
