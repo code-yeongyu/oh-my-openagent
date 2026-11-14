@@ -271,3 +271,26 @@ fn an_event_window_closed_wait_is_confirmed_by_the_listing() {
         real.clock.now_ms()
     );
 }
+
+/// Ruling R70ca: a failed confirming read answers THAT READ'S OWN refusal unchanged (code,
+/// reason), never matched, never timeout, never re-mapped. A listing refused because its
+/// permission was revoked arrives as `PermissionDenied{revoked}`.
+#[test]
+fn a_failed_confirming_read_answers_its_own_refusal_unchanged() {
+    use omo_computer_core::backend::Refusal;
+    use omo_computer_core::error::{EngineCode, Reason};
+    let mut rig = Rig::new(json!({"ax_notification_timeline": [
+        {"t_ms": 100, "window": "102", "kind": "AXUIElementDestroyed", "closes": true}
+    ]}));
+    let revoked = Refusal::new(EngineCode::PermissionDenied, Reason::Revoked.wire());
+    rig.refuse_listings_after(2, revoked.clone());
+    let refused = rig
+        .session
+        .wait_for(params(json!({
+            "target": "101",
+            "predicate": {"window": {"state": "gone", "title": "Save"}},
+            "timeout": 1000
+        })))
+        .expect_err("the refused confirming read is answered");
+    assert_eq!(refused.refusal, revoked, "the listing's refusal, unchanged");
+}
