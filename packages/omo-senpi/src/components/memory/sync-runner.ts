@@ -292,11 +292,11 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
         })
         return
       }
-      // At the cap every pass is silent; one reminder per 15 minutes says the keychain is still unanswered.
+      // At the cap every pass is silent; one reminder per 15 minutes says what sync still waits for.
       nextQuietMs = quietMs + retryMs
       if (nextQuietMs >= DEFERRED_STILL_WAITING_MS) {
         nextQuietMs = 0
-        logger.warn("memory sync is still waiting for keychain approval.", {
+        logger.warn(`memory sync is still waiting: ${message}`, {
           identity,
           code: SYNC_SESSION_DEFERRED,
           retryMs,

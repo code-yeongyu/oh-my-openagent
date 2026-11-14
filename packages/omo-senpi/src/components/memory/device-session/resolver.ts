@@ -4,6 +4,8 @@
 // session that later loses its sign-in (sign-out, revoked device) tells the runner, which closes
 // the engine and goes idle.
 
+import { existsSync } from "node:fs"
+import { join } from "node:path"
 import type {
   AccountSessionOutcome,
   AccountSessionOptions,
@@ -14,7 +16,11 @@ import type {
 import type { DeviceKeyMaterial, DeviceKeyring } from "@oh-my-opencode/memory-core/keyring"
 
 import type { SyncSessionRequest, SyncSessionResolution } from "../sync-runner"
+import { SyncSessionDeferredError } from "../sync-session-deferred"
 import type { DeviceAccountSource } from "./account-source"
+
+const REPO_NOT_CREATED =
+  "the memory repository is not created yet; sync starts after the first memory write."
 
 export interface DeviceSessionRuntime {
   readonly openAccountSession: (options: AccountSessionOptions) => Promise<AccountSessionOutcome>
@@ -37,6 +43,9 @@ export function createDeviceSessionResolver(options: {
     if (account.kind === "unavailable") return { idle: account.reason }
     const runtime = await options.loadRuntime()
     if (account.kind === "desktop" && (account.signal.aborted || !(await account.isCurrent()))) return null
+    // The space binding lives in the repository's git config, and the repository is created at the first memory write,
+    // never by a read or a session start (#13486). Until then the session is deferred and the runner retries it.
+    if (!existsSync(join(paths.repo, ".git"))) throw new SyncSessionDeferredError(REPO_NOT_CREATED, undefined)
     const resolved = runtime.resolveSpace(new runtime.GitSpaceConfig(paths.repo), {
       profile: space.profile,
       remotes: runtime.listRemotes(space.projectDir),
