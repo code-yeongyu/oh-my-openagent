@@ -318,6 +318,41 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
     "INSERT OR IGNORE INTO extension_objects (type, name, owner) VALUES ('table', 'woken_sessions', NULL)",
     "INSERT OR IGNORE INTO extension_objects (type, name, owner) VALUES ('index', 'woken_sessions_state', NULL)",
   ],
+
+  // v14 (#13037): what the carrier and the consumer keep beside the woken row. `session_wait`: a session found held or
+  // waiting for a person, with its hold kinds and the size of its file then (a changed size allows one new probe).
+  // `wake_counts`: consecutive wakes per session, and the input revision they were counted at; it outlives the row.
+  // `intake_marks`: per sender device and session, the newest command that committed a new intake row; `intake_commands`:
+  // the command id each intake row was committed under (A5.3: an answer names it, a deduplicated repeat included). Idempotent.
+  [
+    `CREATE TABLE IF NOT EXISTS session_wait (
+      durable_id TEXT PRIMARY KEY,
+      wait TEXT NOT NULL CHECK (wait IN ('held', 'waiting')),
+      hold_kinds TEXT NOT NULL,
+      file_size INTEGER NOT NULL,
+      written_at INTEGER NOT NULL
+    )`,
+    `CREATE TABLE IF NOT EXISTS wake_counts (
+      durable_id TEXT PRIMARY KEY,
+      count INTEGER NOT NULL,
+      human_input_revision INTEGER
+    )`,
+    `CREATE TABLE IF NOT EXISTS intake_marks (
+      sender_device TEXT NOT NULL,
+      session_id TEXT NOT NULL,
+      last_command_id TEXT NOT NULL,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (sender_device, session_id)
+    )`,
+    "INSERT OR IGNORE INTO extension_objects (type, name, owner) VALUES ('table', 'session_wait', NULL)",
+    "INSERT OR IGNORE INTO extension_objects (type, name, owner) VALUES ('table', 'wake_counts', NULL)",
+    `CREATE TABLE IF NOT EXISTS intake_commands (
+      ledger_id TEXT PRIMARY KEY,
+      command_id TEXT NOT NULL
+    )`,
+    "INSERT OR IGNORE INTO extension_objects (type, name, owner) VALUES ('table', 'intake_marks', NULL)",
+    "INSERT OR IGNORE INTO extension_objects (type, name, owner) VALUES ('table', 'intake_commands', NULL)",
+  ],
 ]
 
 export const GATEWAY_TABLES = [
@@ -338,4 +373,8 @@ export const GATEWAY_TABLES = [
   "extension_registrations",
   "toolkit_replay_receipts",
   "woken_sessions",
+  "session_wait",
+  "wake_counts",
+  "intake_marks",
+  "intake_commands",
 ] as const

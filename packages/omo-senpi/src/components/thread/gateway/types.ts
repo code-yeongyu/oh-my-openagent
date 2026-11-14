@@ -6,7 +6,7 @@ export type DeliveryState = "queued" | "admitting" | "admitted" | "applied" | "r
 
 export type EffectiveLane = "steer" | "follow_up"
 
-export type RefusalReason = "not_steerable" | "turn_conflict" | "expired" | "binding_closed"
+export type RefusalReason = "not_steerable" | "turn_conflict" | "expired" | "binding_closed" | "sender_not_admitted"
 
 export type ProcessIdentity = {
   readonly pid: number
@@ -262,13 +262,15 @@ export type RecordOutcomeRequest = {
 
 export type GatewayDeliveryDelivery =
   | { readonly kind: "started" | "steered"; readonly turn_id: string }
-  | { readonly kind: "queued" | "queued_offline"; readonly queue_position: number; readonly waiting_on?: DeliveryWait }
+  | { readonly kind: "queued"; readonly queue_position: number; readonly waiting_on?: DeliveryWait }
+  /** `reason: wake_unavailable`: the same-device switch is on and the target was asked to wake, but no carrier runs (#13037). */
+  | { readonly kind: "queued_offline"; readonly queue_position: number; readonly reason?: "wake_unavailable" }
 
 /**
  * What the receiver is parked on while the delivery waits: an approval (a tool permission or question) a human must answer on
  * that device. `device` is the account device it waits on; absent when this install has no device identity (#13014).
  */
-export type DeliveryWait = { readonly kind: "approval"; readonly device?: string }
+export type DeliveryWait = { readonly kind: "approval" | "hold" | "wake"; readonly device?: string }
 
 export type GatewayDeliverySuccess = {
   readonly kind: "ok"

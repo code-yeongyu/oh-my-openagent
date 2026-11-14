@@ -24,8 +24,9 @@ function tableColumns(db: Database, table: string): string[] {
   return (db.query(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((column) => column.name)
 }
 
-test("#given the schema #when the woken-session step is looked up #then it is the newest step", () => {
-  expect(WOKEN_STEP).toBe(GATEWAY_MIGRATIONS.length - 1)
+test("#given the schema #when the woken-session step is looked up #then it is a step of its own after the intake columns", () => {
+  const intakeStep = GATEWAY_MIGRATIONS.findIndex((step) => step.some((statement) => statement.includes("ledger_id")))
+  expect(WOKEN_STEP).toBe(intakeStep + 1)
 })
 
 test("#given a store at the previous schema holding an intake row #when this build opens it #then it reaches the current version, keeps the row, and records woken sessions", async () => {

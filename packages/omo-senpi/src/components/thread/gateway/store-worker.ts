@@ -24,6 +24,7 @@ import { ExtensionTransactionEndedError } from "./extension-transaction"
 import type { GatewayResolution, GatewayResolve } from "./engine"
 import type { StoreExtensionRegistration } from "./store-extensions"
 import type {
+  DeliveryRow,
   GatewayStoreConfig,
   GatewayStoreEvent,
   IntakeOutcome,
@@ -32,6 +33,14 @@ import type {
   Provenance,
   StoreRefusal,
 } from "./types"
+import type {
+  IntakeMark,
+  IntakePair,
+  OpenIntakeSession,
+  QueuedWaitingOn,
+  SessionWaitState,
+  SessionWork,
+} from "./session-wait-types"
 import type {
   LostLease,
   WakeRequestOutcome,
@@ -79,34 +88,43 @@ function argsHash(value: unknown): string {
 }
 
 /**
- * Takes in a record another device's service attested, for a session on this device that is not running (#13037, design
- * 5.5). Every refusal here happens before the commit; an accepted record is the enqueue transaction's row, receipt, budgets
- * and inbox marker in one commit, its receipt completed with the answer so a repeat from the same device replays it.
+ * A repeat of a delivery whose row is still stored after its receipt expired: answered from that row as the first answer
+ * was, with `deduplicated` set, when it carries what the row holds; any other content is an `idempotency_conflict`, as
+ * the receipt's argument hash would have answered (the review LOWs of #13212).
  */
-/** A row already taken in under this ledger id, answered as the first answer was, with `deduplicated` set. */
 function answerFromLedgerRow(
-  ctx: ops.StoreContext,
+  row: DeliveryRow,
+  queuePosition: number,
   ledgerId: string,
   record: IntakeRequest["record"],
-): IntakeOutcome | undefined {
-  const found = ctx.sql.one(["delivery_id"], "SELECT delivery_id FROM deliveries WHERE ledger_id = ?", [ledgerId])
-  if (found === undefined) return undefined
-  const view = ops.deliveryView(ctx, String(found.delivery_id))
-  if (view === null) return undefined
-  if (view.row.target_durable_id !== record.sessionId)
-    return refusal("idempotency_conflict", "This delivery id was already taken in for another session.", {
+): IntakeOutcome {
+  const sameContent =
+    row.target_durable_id === record.sessionId &&
+    row.verbatim_text === record.text &&
+    row.verbatim_display_text === record.displayText &&
+    row.hop === record.chainCount &&
+    row.envelope.origin !== undefined &&
+    "session" in row.envelope.origin &&
+    row.envelope.origin.session === (record.sender.kind === "agent" ? record.sender.session_id : undefined)
+  if (!sameContent)
+    return refusal("idempotency_conflict", "This delivery id was already taken in with other content.", {
       ledger_id: ledgerId,
     })
   return {
     kind: "queued",
     delivery_id: record.deliveryId,
-    row_id: view.row.delivery_id,
+    row_id: row.delivery_id,
     ledger_id: ledgerId,
-    queue_position: view.queue_position,
+    queue_position: queuePosition,
     deduplicated: true,
   }
 }
 
+/**
+ * Takes in a record another device's service attested, for a session on this device that is not running (#13037, design
+ * 5.5). Every refusal here happens before the commit; an accepted record is the enqueue transaction's row, receipt, budgets
+ * and inbox marker in one commit, its receipt completed with the answer so a repeat from the same device replays it.
+ */
 async function intake(ctx: ops.StoreContext, request: IntakeRequest): Promise<IntakeOutcome> {
   const record = request.record
   const device = request.attested_device
@@ -194,16 +212,17 @@ async function intake(ctx: ops.StoreContext, request: IntakeRequest): Promise<In
           ledger_id: ledgerId,
           queue_position: position,
         }),
+        existing: (row, position) => ({ kind: "replay", result: answerFromLedgerRow(row, position, ledgerId, record) }),
       },
     )
   } catch (error) {
-    // The receipt is only the fast path: once it expired (30 days) the row can still be here, and two consumers can race
-    // past the receipt check. Either way the insert meets the unique index on ledger_id; the repeat is answered from the
-    // row that holds it, never with the raw constraint error (the base's review LOW).
+    // The ledger row is looked up inside the same transaction before the insert, so the unique index on ledger_id is
+    // never met here; if it is, intake still answers from the row rather than let the raw constraint error out.
     if (!(error instanceof Error && /UNIQUE constraint failed: deliveries\.ledger_id/.test(error.message))) throw error
-    const raced = answerFromLedgerRow(ctx, ledgerId, record)
-    if (raced === undefined) throw error
-    return raced
+    const held = ctx.sql.one(["delivery_id"], "SELECT delivery_id FROM deliveries WHERE ledger_id = ?", [ledgerId])
+    const view = held === undefined ? null : ops.deliveryView(ctx, String(held.delivery_id))
+    if (view === null) throw error
+    return answerFromLedgerRow(view.row, view.queue_position, ledgerId, record)
   }
   if (outcome.kind === "inserted") {
     return {
@@ -215,8 +234,10 @@ async function intake(ctx: ops.StoreContext, request: IntakeRequest): Promise<In
       deduplicated: false,
     }
   }
-  if (outcome.kind === "replay")
-    return { ...(outcome.result as Extract<IntakeOutcome, { kind: "queued" }>), deduplicated: true }
+  if (outcome.kind === "replay") {
+    const result = outcome.result as IntakeOutcome
+    return result.kind === "queued" ? { ...result, deduplicated: true } : result
+  }
   return outcome
 }
 
@@ -569,6 +590,262 @@ function listWoken(ctx: ops.StoreContext): WokenSessionRow[] {
     .map(wokenRowFrom)
 }
 
+async function clearWaiting(
+  ctx: ops.StoreContext,
+  request: Timed<WokenSessionFence>,
+): Promise<{ readonly kind: "ok" } | LostLease> {
+  return await ops.transaction(ctx, "woken_clear_waiting", () =>
+    fenced(ctx, request, "first_waiting_at = NULL", []) ? { kind: "ok" as const } : LOST_LEASE,
+  )
+}
+
+// What the carrier and the consumer keep beside the woken row (#13037 A2.6, A3.2.8, A3.5.3, A5.3), kept inside the worker
+// like the woken ops so no module is reachable only from the worker entry.
+type WaitKey = { readonly durable_id: string; readonly now: number }
+
+function waitStateFrom(record: SqlRow): SessionWaitState {
+  const kinds: unknown = JSON.parse(String(record.hold_kinds))
+  return {
+    durable_id: String(record.durable_id),
+    wait: record.wait === "held" ? "held" : "waiting",
+    hold_kinds: Array.isArray(kinds) ? kinds.map(String) : [],
+    file_size: Number(record.file_size),
+    written_at: Number(record.written_at),
+  }
+}
+
+function readWait(ctx: ops.StoreContext, request: WaitKey): SessionWaitState | null {
+  const found = ctx.sql.one(
+    ["durable_id", "wait", "hold_kinds", "file_size", "written_at"],
+    "SELECT durable_id, wait, hold_kinds, file_size, written_at FROM session_wait WHERE durable_id = ?",
+    [request.durable_id],
+  )
+  return found === undefined ? null : waitStateFrom(found)
+}
+
+async function writeWait(
+  ctx: ops.StoreContext,
+  request: Omit<SessionWaitState, "written_at"> & WaitKey,
+): Promise<void> {
+  await ops.transaction(ctx, "wait_write", () => {
+    ops.write(
+      ctx,
+      `INSERT INTO session_wait (durable_id, wait, hold_kinds, file_size, written_at) VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT (durable_id) DO UPDATE SET wait = excluded.wait, hold_kinds = excluded.hold_kinds,
+         file_size = excluded.file_size, written_at = excluded.written_at`,
+      [request.durable_id, request.wait, JSON.stringify(request.hold_kinds), request.file_size, request.now],
+    )
+  })
+}
+
+async function clearWait(ctx: ops.StoreContext, request: WaitKey): Promise<void> {
+  await ops.transaction(ctx, "wait_clear", () => {
+    ops.write(ctx, "DELETE FROM session_wait WHERE durable_id = ?", [request.durable_id])
+  })
+}
+
+/** A hold is reported before the wake, and a person's wait reads as approval (A2.6). */
+function waitingOn(ctx: ops.StoreContext, request: WaitKey): QueuedWaitingOn | null {
+  const wait = readWait(ctx, request)
+  if (wait !== null) return { kind: wait.wait === "held" ? "hold" : "approval" }
+  const woken = ctx.sql.one(["n"], "SELECT COUNT(*) AS n FROM woken_sessions WHERE durable_id = ?", [
+    request.durable_id,
+  ])
+  return Number(woken?.n ?? 0) > 0 ? { kind: "wake" } : null
+}
+
+async function countWake(
+  ctx: ops.StoreContext,
+  request: WaitKey & { readonly human_input_revision: number | null },
+): Promise<{ readonly count: number }> {
+  return await ops.transaction(ctx, "wake_count", () => {
+    const found = ctx.sql.one(
+      ["count", "human_input_revision"],
+      "SELECT count, human_input_revision FROM wake_counts WHERE durable_id = ?",
+      [request.durable_id],
+    )
+    const stored = found?.human_input_revision ?? null
+    const moved =
+      found === undefined || (request.human_input_revision !== null && Number(stored) !== request.human_input_revision)
+    const count = moved ? 1 : Number(found?.count ?? 0) + 1
+    ops.write(
+      ctx,
+      `INSERT INTO wake_counts (durable_id, count, human_input_revision) VALUES (?, ?, ?)
+       ON CONFLICT (durable_id) DO UPDATE SET count = excluded.count, human_input_revision = excluded.human_input_revision`,
+      [request.durable_id, count, request.human_input_revision ?? (stored === null ? null : Number(stored))],
+    )
+    return { count }
+  })
+}
+
+function wakeCount(ctx: ops.StoreContext, request: WaitKey): number {
+  return Number(
+    ctx.sql.one(["count"], "SELECT count FROM wake_counts WHERE durable_id = ?", [request.durable_id])?.count ?? 0,
+  )
+}
+
+async function resetCount(ctx: ops.StoreContext, request: WaitKey): Promise<void> {
+  await ops.transaction(ctx, "wake_count_reset", () => {
+    ops.write(ctx, "DELETE FROM wake_counts WHERE durable_id = ?", [request.durable_id])
+  })
+}
+
+function sessionWorkOf(ctx: ops.StoreContext, request: WaitKey): SessionWork {
+  const count = (state: string): number =>
+    Number(
+      ctx.sql.one(["n"], "SELECT COUNT(*) AS n FROM deliveries WHERE target_durable_id = ? AND state = ?", [
+        request.durable_id,
+        state,
+      ])?.n ?? 0,
+    )
+  return { queued: count("queued"), claimed: count("admitting"), unapplied: count("admitted") }
+}
+
+type MarkNow = { readonly now: number }
+
+const MARK_DEVICE = "json_extract(envelope, '$.provenance.device')"
+/** The intake rows of one (sender device, session) pair: their ledger id is `device:<attested device>/<sender's id>`. */
+const MARK_PAIR_ROWS = `target_durable_id = ? AND ledger_id IS NOT NULL AND substr(ledger_id, 1, length(?)) = ?`
+const markPairParams = (pair: IntakePair): readonly string[] => {
+  const prefix = `device:${pair.sender_device}/`
+  return [pair.session_id, prefix, prefix]
+}
+
+async function recordIntakeCommand(
+  ctx: ops.StoreContext,
+  request: IntakePair & MarkNow & { readonly command_id: string; readonly ledger_id?: string },
+): Promise<void> {
+  await ops.transaction(ctx, "intake_mark", () => {
+    if (request.ledger_id !== undefined)
+      ops.write(ctx, "INSERT OR IGNORE INTO intake_commands (ledger_id, command_id) VALUES (?, ?)", [
+        request.ledger_id,
+        request.command_id,
+      ])
+    ops.write(
+      ctx,
+      `INSERT INTO intake_marks (sender_device, session_id, last_command_id, updated_at) VALUES (?, ?, ?, ?)
+       ON CONFLICT (sender_device, session_id) DO UPDATE SET last_command_id = excluded.last_command_id,
+         updated_at = excluded.updated_at`,
+      [request.sender_device, request.session_id, request.command_id, request.now],
+    )
+  })
+}
+
+function openMarkRows(ctx: ops.StoreContext, pair: IntakePair): number {
+  return Number(
+    ctx.sql.one(["n"], `SELECT COUNT(*) AS n FROM deliveries WHERE ${MARK_PAIR_ROWS} AND state IN ${ops.OPEN_STATES}`, [
+      ...markPairParams(pair),
+    ])?.n ?? 0,
+  )
+}
+
+function markedPairs(ctx: ops.StoreContext): IntakePair[] {
+  return ctx.sql
+    .all(
+      ["sender_device", "session_id"],
+      "SELECT sender_device, session_id FROM intake_marks",
+      [],
+      "sender_device, session_id",
+    )
+    .map((row) => ({ sender_device: String(row.sender_device), session_id: String(row.session_id) }))
+}
+
+function pendingMarks(ctx: ops.StoreContext): IntakeMark[] {
+  return ctx.sql
+    .all(
+      ["sender_device", "session_id", "last_command_id"],
+      "SELECT sender_device, session_id, last_command_id FROM intake_marks",
+      [],
+      "sender_device, session_id",
+    )
+    .map((row) => ({
+      sender_device: String(row.sender_device),
+      session_id: String(row.session_id),
+      last_command_id: String(row.last_command_id),
+    }))
+    .filter((mark) => openMarkRows(ctx, mark) > 0)
+}
+
+async function drainedMark(
+  ctx: ops.StoreContext,
+  request: IntakePair & MarkNow,
+): Promise<{ readonly drained: true; readonly last_command_id: string } | { readonly drained: false }> {
+  return await ops.transaction(ctx, "intake_drained", () => {
+    if (openMarkRows(ctx, request) > 0) return { drained: false as const }
+    const mark = ctx.sql.one(
+      ["last_command_id"],
+      "SELECT last_command_id FROM intake_marks WHERE sender_device = ? AND session_id = ?",
+      [request.sender_device, request.session_id],
+    )
+    if (mark === undefined) return { drained: false as const }
+    ops.write(ctx, "DELETE FROM intake_marks WHERE sender_device = ? AND session_id = ?", [
+      request.sender_device,
+      request.session_id,
+    ])
+    return { drained: true as const, last_command_id: String(mark.last_command_id) }
+  })
+}
+
+/**
+ * Sessions a sweep may wake (5.4 step 6): intake rows that are queued, or claimed by a claimant that is dead, and
+ * whether same-device rows are queued for the session too. Claimants are probed outside any transaction.
+ */
+async function openIntakeSessions(ctx: ops.StoreContext): Promise<OpenIntakeSession[]> {
+  const rows = ctx.sql.all(
+    ["target_durable_id", "device", "state", "admitted_by"],
+    `SELECT target_durable_id, ${MARK_DEVICE} AS device, state, admitted_by FROM deliveries
+     WHERE ledger_id IS NOT NULL AND state IN ${ops.OPEN_STATES}`,
+    [],
+    "target_durable_id",
+  )
+  const sessions = new Map<string, Set<string>>()
+  for (const row of rows) {
+    if (row.state !== "queued") {
+      const claimant = row.admitted_by === null ? null : (JSON.parse(String(row.admitted_by)) as ProcessIdentity)
+      if (claimant !== null && !(await isClaimantDead(claimant))) continue
+    }
+    const devices = sessions.get(String(row.target_durable_id)) ?? new Set<string>()
+    if (row.device !== null) devices.add(String(row.device))
+    sessions.set(String(row.target_durable_id), devices)
+  }
+  const local = new Set(
+    ctx.sql
+      .all(
+        ["target_durable_id"],
+        "SELECT DISTINCT target_durable_id FROM deliveries WHERE ledger_id IS NULL AND state = 'queued'",
+      )
+      .map((row) => String(row.target_durable_id)),
+  )
+  for (const id of local) if (!sessions.has(id)) sessions.set(id, new Set())
+  return [...sessions.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([durable_id, devices]) => ({ durable_id, devices: [...devices], local: local.has(durable_id) }))
+}
+
+function commandForRow(ctx: ops.StoreContext, request: { readonly ledger_id: string }): string | null {
+  const found = ctx.sql.one(["command_id"], "SELECT command_id FROM intake_commands WHERE ledger_id = ?", [
+    request.ledger_id,
+  ])
+  return found === undefined ? null : String(found.command_id)
+}
+
+function openForMarkCommand(
+  ctx: ops.StoreContext,
+  request: { readonly sender_device: string; readonly command_id: string },
+): boolean {
+  const prefix = `device:${request.sender_device}/`
+  return (
+    Number(
+      ctx.sql.one(
+        ["n"],
+        `SELECT COUNT(*) AS n FROM intake_commands c JOIN deliveries d ON d.ledger_id = c.ledger_id
+         WHERE c.command_id = ? AND substr(c.ledger_id, 1, length(?)) = ? AND d.state IN ${ops.OPEN_STATES}`,
+        [request.command_id, prefix, prefix],
+      )?.n ?? 0,
+    ) > 0
+  )
+}
+
 type WokenRequest<K extends keyof WokenSessionStore> = Parameters<WokenSessionStore[K]>[0] & { readonly now: number }
 
 /** The woken-session ops (#13037 A3.1): kept inside the worker, like the intake op, so no module gains worker-only exports. */
@@ -590,6 +867,38 @@ async function dispatchWoken(ctx: ops.StoreContext, op: string, args: unknown): 
       return await retryWakeLater(ctx, args as WokenRequest<"retryLater">)
     case "woken_end":
       return await endWake(ctx, args as WokenRequest<"end">)
+    case "woken_clear_waiting":
+      return await clearWaiting(ctx, args as WokenRequest<"clearWaiting">)
+    case "woken_count_wake":
+      return await countWake(ctx, args as WokenRequest<"countWake">)
+    case "woken_wake_count":
+      return wakeCount(ctx, args as WokenRequest<"wakeCount">)
+    case "woken_reset_count":
+      return await resetCount(ctx, args as WokenRequest<"resetCount">)
+    case "woken_session_work":
+      return sessionWorkOf(ctx, args as WokenRequest<"sessionWork">)
+    case "woken_wait_write":
+      return await writeWait(ctx, args as Parameters<typeof writeWait>[1])
+    case "woken_wait_read":
+      return readWait(ctx, args as Parameters<typeof readWait>[1])
+    case "woken_wait_clear":
+      return await clearWait(ctx, args as Parameters<typeof clearWait>[1])
+    case "woken_waiting_on":
+      return waitingOn(ctx, args as Parameters<typeof waitingOn>[1])
+    case "woken_mark_record":
+      return await recordIntakeCommand(ctx, args as Parameters<typeof recordIntakeCommand>[1])
+    case "woken_mark_marked":
+      return markedPairs(ctx)
+    case "woken_mark_pending":
+      return pendingMarks(ctx)
+    case "woken_mark_drained":
+      return await drainedMark(ctx, args as Parameters<typeof drainedMark>[1])
+    case "woken_command_for":
+      return commandForRow(ctx, args as Parameters<typeof commandForRow>[1])
+    case "woken_open_for_command":
+      return openForMarkCommand(ctx, args as Parameters<typeof openForMarkCommand>[1])
+    case "woken_open_sessions":
+      return await openIntakeSessions(ctx)
     case "woken_gated":
       return isGated(ctx, args as WokenRequest<"gated">)
     case "woken_list":

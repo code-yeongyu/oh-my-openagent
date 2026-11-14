@@ -146,6 +146,8 @@ export function createGatewayHarness(
       durableId: id,
       sessionPath: () => runtime.sessionPath,
       now,
+      // The harness's device service admits every sending device; a test of a refused or silent device builds its own drain.
+      admitIntake: async () => "admitted",
     })
     const engine = engineFor(sessionStore, cwd)
     const created: HarnessSession = {
