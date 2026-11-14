@@ -2,7 +2,7 @@
 // Do not edit by hand; run `bun run --cwd packages/omo-computer-protocol generate`.
 
 /** sha256 of the schema file this module was generated from; the schema-drift test compares it. */
-export const SCHEMA_SHA256 = "61e82ab22e11ca3014190b4c1d976cd40d20657adaed5a82a8861a80cdbf7b0f" as const
+export const SCHEMA_SHA256 = "7a923554315400abb22677f71a5f54ad1d04e396a23fb3934c8c31df6c425155" as const
 
 /** The wire protocol version `engine.hello` reports. */
 export const PROTOCOL_VERSION = "1" as const
@@ -604,7 +604,7 @@ export type CapturePolicyRow = {
 
 export type CaptureReply = LegacyFrame | Frame
 
-export type CaptureRoute = "composite" | "root_crop" | "screencast" | "screencast_crop" | "screenshot_portal"
+export type CaptureRoute = "composite" | "root_crop" | "screencast" | "screencast_crop" | "screenshot_portal" | "wgc" | "printwindow" | "bitblt"
 
 export type ChainLink = {
 	role: ChainRole
@@ -719,6 +719,8 @@ export type Diagnosis = {
 	releaseHelper?: ReleaseHelper | null
 	observation: UntrustedText
 }
+
+export type DiffFallback = "baseline_incomplete" | "current_incomplete" | "since_expired" | "window_changed" | "menu_root" | "reordered" | "not_shorter" | "query_projection"
 
 export type DisplayAwake = {
 	state: DisplayAwakeState
@@ -1110,6 +1112,8 @@ export type Observation = {
 	frame?: Frame | null
 	tree?: string | null
 	diff?: string | null
+	diffFallback?: DiffFallback | null
+	baseline?: number | null
 	focused?: ElementInfo | null
 	selectedText?: string | null
 	complete: boolean

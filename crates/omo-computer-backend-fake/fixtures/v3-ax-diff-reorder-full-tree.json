@@ -1,0 +1,198 @@
+{
+  "windows": [
+    {
+      "id": "101",
+      "title": "Untitled - Notes",
+      "app": "Notes",
+      "pid": 4242,
+      "x": 100,
+      "y": 120,
+      "width": 800,
+      "height": 600,
+      "focused": true,
+      "elevated": null
+    }
+  ],
+  "ax": {
+    "101": {
+      "role": "window",
+      "title": "Untitled - Notes",
+      "object": 1,
+      "native_role": "AXWindow",
+      "children": [
+        {
+          "role": "toolbar",
+          "title": "Formatting",
+          "object": 2,
+          "children": [
+            {
+              "role": "button",
+              "title": "Bold",
+              "object": 3,
+              "actions": [
+                "press"
+              ]
+            },
+            {
+              "role": "button",
+              "title": "Italic",
+              "object": 4,
+              "actions": [
+                "press"
+              ]
+            },
+            {
+              "role": "button",
+              "title": "Underline",
+              "object": 5,
+              "actions": [
+                "press"
+              ]
+            }
+          ]
+        },
+        {
+          "role": "textarea",
+          "title": "Body",
+          "object": 6,
+          "value": "Dear Ms. Park,",
+          "focused": true,
+          "native_id": "body",
+          "actions": [
+            "set_value",
+            "type_text"
+          ]
+        },
+        {
+          "role": "group",
+          "title": "Sidebar",
+          "object": 7,
+          "children": [
+            {
+              "role": "statictext",
+              "title": "Notes",
+              "object": 8
+            },
+            {
+              "role": "button",
+              "title": "New note",
+              "object": 9,
+              "actions": [
+                "press"
+              ]
+            },
+            {
+              "role": "button",
+              "title": "Delete",
+              "object": 10,
+              "actions": [
+                "press"
+              ]
+            }
+          ]
+        },
+        {
+          "role": "button",
+          "title": "Share",
+          "object": 11,
+          "actions": [
+            "press",
+            "showMenu"
+          ]
+        }
+      ]
+    }
+  },
+  "ax_versions": {
+    "101": [
+      {
+        "role": "window",
+        "title": "Untitled - Notes",
+        "object": 1,
+        "native_role": "AXWindow",
+        "children": [
+          {
+            "role": "toolbar",
+            "title": "Formatting",
+            "object": 2,
+            "children": [
+              {
+                "role": "button",
+                "title": "Italic",
+                "object": 4,
+                "actions": [
+                  "press"
+                ]
+              },
+              {
+                "role": "button",
+                "title": "Bold",
+                "object": 3,
+                "actions": [
+                  "press"
+                ]
+              },
+              {
+                "role": "button",
+                "title": "Underline",
+                "object": 5,
+                "actions": [
+                  "press"
+                ]
+              }
+            ]
+          },
+          {
+            "role": "textarea",
+            "title": "Body",
+            "object": 6,
+            "value": "Dear Ms. Park,",
+            "focused": true,
+            "native_id": "body",
+            "actions": [
+              "set_value",
+              "type_text"
+            ]
+          },
+          {
+            "role": "group",
+            "title": "Sidebar",
+            "object": 7,
+            "children": [
+              {
+                "role": "statictext",
+                "title": "Notes",
+                "object": 8
+              },
+              {
+                "role": "button",
+                "title": "New note",
+                "object": 9,
+                "actions": [
+                  "press"
+                ]
+              },
+              {
+                "role": "button",
+                "title": "Delete",
+                "object": 10,
+                "actions": [
+                  "press"
+                ]
+              }
+            ]
+          },
+          {
+            "role": "button",
+            "title": "Share",
+            "object": 11,
+            "actions": [
+              "press",
+              "showMenu"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

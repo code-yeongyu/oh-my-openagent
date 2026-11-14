@@ -3,6 +3,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::ax::DiffFallback;
 use crate::listing::{ElementInfo, Rect};
 use crate::session_state::SessionState;
 use crate::untrusted::UntrustedText;
@@ -119,6 +120,12 @@ pub struct Observation {
     pub tree: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub diff: Option<String>,
+    /// Why a read that named `since` answered the full tree.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub diff_fallback: Option<DiffFallback>,
+    /// The generation `diff` is against.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub baseline: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub focused: Option<ElementInfo>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
