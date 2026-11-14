@@ -6,6 +6,7 @@ import { join } from "node:path"
 
 import {
   checkNameConflict,
+  fuzzyContenders,
   fuzzyMatch,
   normalizeThreadName,
   resolveTarget,
@@ -438,6 +439,30 @@ describe("fuzzyMatch scan cap", () => {
     expect(result.kind).toBe("ok")
     if (result.kind !== "ok") throw new Error("expected ok")
     expect(result.entry.thread_id).toBe("t-hit")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// fuzzyContenders: the accept floor minus the margin
+// ---------------------------------------------------------------------------
+
+describe("fuzzyContenders contender floor", () => {
+  // Unique-trigram ascii runs again, so set and multiset dice agree. The floor is 0.72 - 0.08 = 0.64.
+  // q        = "abcdefghijklmnopqrstuv"            (20 trigrams)
+  // atFloor  = "abcdefghijklmnopqr" + 14 new chars  (30 trigrams, 16 shared -> 32/50 = 0.64)
+  // below    = "abcdefghijklmnopq" + 12 new chars   (27 trigrams, 15 shared -> 30/47 = 0.6383)
+  // above    = "abcdefghijklmnopqwxyza"            (20 trigrams, 15 shared -> 0.75)
+  const QUERY = "abcdefghijklmnopqrstuv"
+  const entries = [
+    thread({ thread_id: "t-below", name: "abcdefghijklmnopqwxyz01234567" }),
+    thread({ thread_id: "t-floor", name: "abcdefghijklmnopqrwxyz0123456789" }),
+    thread({ thread_id: "t-above", name: "abcdefghijklmnopqwxyza" }),
+  ]
+
+  test("#given rows at 0.6383, exactly 0.64 and 0.75 #when filtered #then the floor row is kept, the row just below it is dropped, and input order holds on every call", () => {
+    const first = fuzzyContenders(entries, QUERY).map((entry) => entry.thread_id)
+    expect(first).toStrictEqual(["t-floor", "t-above"])
+    expect(fuzzyContenders(entries, QUERY).map((entry) => entry.thread_id)).toStrictEqual(first)
   })
 })
 

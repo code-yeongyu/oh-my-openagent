@@ -464,10 +464,13 @@ export function fuzzyMatch(entries: readonly ThreadAddressEntry[], query: string
 }
 
 /**
- * The entries that can still change a `fuzzyMatch` outcome for `query`. An entry scoring below the accept floor minus the
- * margin can neither lead nor sit within the margin of an accepted leader, so dropping it changes no accepted match and
- * no ambiguity verdict. Callers use it to bound a large set (an account's ended history) before the candidate cap
- * applies. An invalid or too-short query keeps nothing: `fuzzyMatch` reports that query on the rest of the set.
+ * The entries that can still change a `fuzzyMatch` verdict for `query`: those scoring at least the accept floor minus the
+ * margin (0.64). An entry below that can neither lead nor sit within the margin of an accepted leader, so dropping it
+ * changes no accepted match and no runner-up `ambiguous_target` verdict. It does change what that verdict lists: the
+ * candidates `fuzzyMatch` returns with it (up to `AMBIGUOUS_CANDIDATE_LIMIT`) no longer include a dropped entry.
+ * Callers use it to bound a large set (an account's ended history) before the scan cap applies, so dropped entries do
+ * not count toward that cap. An invalid or too-short query keeps nothing: `fuzzyMatch` reports that query on the rest of
+ * the set.
  */
 export function fuzzyContenders(entries: readonly ThreadAddressEntry[], query: string): ThreadAddressEntry[] {
   const guard = guardInput(query, "fuzzy query")
