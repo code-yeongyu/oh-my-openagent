@@ -1,6 +1,6 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@dab363aa3a9aa51936149d05b416310d429b61e0 packages/local-api/src/validate-session-wake.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@5bcdcc296c16a4c9af6f0618d5995e1e7ca0354e packages/local-api/src/validate-session-wake.ts
 import { requestFields, type RequestValidators } from "./validate-command.ts";
-import { bool, exactly, fail } from "./validate-fields.ts";
+import { bool, fail, known } from "./validate-fields.ts";
 
 // omo#13037 A7.2.1: the saved wake switch's two requests. `null` removes the stored value (the build default applies).
 export const SESSION_WAKE_VALIDATORS: RequestValidators<
@@ -23,7 +23,7 @@ export const SESSION_WAKE_VALIDATORS: RequestValidators<
 const storedOf = (v: unknown): boolean | null | "unreadable" =>
   v === null || v === "unreadable" || typeof v === "boolean" ? v : fail("stored");
 export const sessionWakeState = (v: unknown) => {
-  const m = exactly(v, ["enabled", "stored", "changedAt", "overridden"], [], "data");
+  const m = known(v, ["enabled", "stored", "changedAt", "overridden"], [], "data");
   const stored = m["stored"];
   const changedAt = m["changedAt"];
   return {

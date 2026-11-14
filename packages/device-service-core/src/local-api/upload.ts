@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@dab363aa3a9aa51936149d05b416310d429b61e0 packages/local-api/src/upload.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@08905c110bb10ab2ba725ff8b8c642a64fbd1652 packages/local-api/src/upload.ts
 import { fromBase64 } from "./bytes-encoding.ts";
 import { ProtoError } from "./spec-proto.ts";
 import {

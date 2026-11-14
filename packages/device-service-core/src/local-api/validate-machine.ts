@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@dab363aa3a9aa51936149d05b416310d429b61e0 packages/local-api/src/validate-machine.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@5bcdcc296c16a4c9af6f0618d5995e1e7ca0354e packages/local-api/src/validate-machine.ts
 import { methodOf, ProtoError, SESSION_BLOB_MAX } from "./spec-proto.ts";
 import { LOCAL_CHUNK_MAX, LOCAL_INLINE_MAX, lineBytes } from "./limits.ts";
 import type { MachineOp, MachineResponseData, MachineRow } from "./protocol-machine.ts";
@@ -12,6 +12,7 @@ import {
   type Fields,
   isRecord,
   jsonObject,
+  known,
   LABEL_MAX_CHARS,
   localId,
   oneOf,
@@ -166,19 +167,19 @@ export const MACHINE_REQUEST_VALIDATORS: RequestValidators<MachineType> = {
 };
 
 const empty = (v: unknown): MachineResponseData["machine.cancel"] => {
-  exactly(v, [], [], "data");
+  known(v, [], [], "data");
   return {};
 };
-const fields = (v: unknown, names: readonly string[]): Fields => exactly(v, names, [], "data");
+const fields = (v: unknown, names: readonly string[]): Fields => known(v, names, [], "data");
 const LEGACY_MACHINE_ROUTE_KINDS = ["internet", "lan"] as const;
 const legacyRouteOf = (v: unknown): (typeof LEGACY_MACHINE_ROUTE_KINDS)[number] => {
-  const r = exactly(v, ["kind", "online"], [], "machine route");
+  const r = known(v, ["kind", "online"], [], "machine route");
   const kind = oneOf(LEGACY_MACHINE_ROUTE_KINDS, r["kind"], "machine route kind");
   bool(r["online"], "online");
   return kind;
 };
 const machineRowOf = (v: unknown): MachineRow => {
-  const m = exactly(v, ["device", "label", "state"], ["routes"], "machine row");
+  const m = known(v, ["device", "label", "state"], ["routes"], "machine row");
   const routes = m["routes"];
   if (
     routes !== undefined &&

@@ -5,9 +5,9 @@ import { join } from "node:path"
 
 import pin from "../../src/local-api/PIN.json" with { type: "json" }
 
-// Every vendored file under src/local-api is the omo-relay-daemon local-API client at the pinned commit, byte for byte
-// after its provenance line, except the import specifiers PIN.json rewrites. A local edit, or a refresh that forgets
-// PIN.json, fails here instead of drifting from the service's own client.
+// Every vendored file under src/local-api is the omo-relay-daemon local-API client at the pinned commit (or the file's own
+// upstreamCommit when PIN.json names one), byte for byte after its provenance line, except the import specifiers PIN.json
+// rewrites. A local edit, or a refresh that forgets PIN.json, fails here instead of drifting from the service's own client.
 const SRC = join(import.meta.dir, "..", "..", "src", "local-api")
 const NOT_VENDORED = ["PIN.json", ...Object.keys(pin.ported)]
 
@@ -19,7 +19,8 @@ describe("vendored device-service local-API client", () => {
     for (const file of pin.files) {
       const name = file.upstreamPath.split("/").at(-1) ?? ""
       const text = readFileSync(join(SRC, name), "utf8")
-      const provenance = `// Vendored from ${pin.upstream}@${pin.upstreamCommit} ${file.upstreamPath}\n`
+      const commit = "upstreamCommit" in file ? file.upstreamCommit : pin.upstreamCommit
+      const provenance = `// Vendored from ${pin.upstream}@${commit} ${file.upstreamPath}\n`
       expect(text.startsWith(provenance)).toBe(true)
       const vendored = text.slice(provenance.length)
       const upstream = upstreamBytes(vendored)

@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@dab363aa3a9aa51936149d05b416310d429b61e0 packages/local-api/src/validate-listing-row.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@5bcdcc296c16a4c9af6f0618d5995e1e7ca0354e packages/local-api/src/validate-listing-row.ts
 import {
   SESSION_ID_MAX_CHARS,
   SESSION_KIND_MAX_CHARS,
@@ -7,7 +7,7 @@ import {
   SESSION_SUMMARY_TITLE_MAX_CHARS,
 } from "./spec-proto.ts";
 import type { ListingRow } from "./protocol.ts";
-import { bool, exactly, fail, oneOf, text } from "./validate-fields.ts";
+import { bool, fail, known, oneOf, text } from "./validate-fields.ts";
 import { deviceId, millis, sessionId } from "./validate-shapes.ts";
 import { LISTING_SOURCES, SESSION_ROW_STATES } from "./vocabulary.ts";
 
@@ -43,12 +43,7 @@ const rowLinks = (m: {
   };
 };
 export const listingRowOf = (v: unknown): ListingRow => {
-  const m = exactly(
-    v,
-    ROW_FIELDS,
-    ["kind", "parent", "parent_listed", "durable_id"],
-    "listing row",
-  );
+  const m = known(v, ROW_FIELDS, ["kind", "parent", "parent_listed", "durable_id"], "listing row");
   const durable = m["durable_id"];
   return {
     ...rowLinks(m),

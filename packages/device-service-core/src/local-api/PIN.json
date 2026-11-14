@@ -1,6 +1,7 @@
 {
   "upstream": "sisyphuslabs/omo-relay-daemon",
-  "upstreamCommit": "dab363aa3a9aa51936149d05b416310d429b61e0",
+  "upstreamCommit": "08905c110bb10ab2ba725ff8b8c642a64fbd1652",
+  "repin": "upstreamCommit is omo-relay-daemon main after #1115 merged (08905c11). sisyphuslabs/omo-relay-daemon#1130 (read-side tolerance) is still open and does not contain #1115, so the files its diff touches are vendored from its head (5bcdcc29, per-file upstreamCommit); every file equals the clean merge of the two. Re-pin to the merge commit once #1130 merges.",
   "importRewrites": [
     {
       "from": "@sisyphuslabs/relay-spec/proto",
@@ -47,8 +48,8 @@
     },
     {
       "upstreamPath": "packages/local-api/src/client-open.ts",
-      "sha256": "eb391aa87651f7263b2352583570551fb929f74cb8d8b24d2311261419c266ea",
-      "gitBlobSha1": "267d34b15e14455935f210f0ebe42fcc475cc247",
+      "sha256": "5f571ecdd09501e3d73d47f3041795a777a2fbe2f7865438f564e22537874144",
+      "gitBlobSha1": "90d18d96932e65a462f59ddb8a42ec55df0c3c9b",
       "importRewrite": false
     },
     {
@@ -179,14 +180,16 @@
     },
     {
       "upstreamPath": "packages/local-api/src/validate-delegated.ts",
-      "sha256": "8fbc8f48cb5bfe8f07232e925b1871c82cae30fbe64260180487b2d4c909224d",
-      "gitBlobSha1": "039224b6ace68b65d8f22f496d2dff3faa9457da",
+      "upstreamCommit": "5bcdcc296c16a4c9af6f0618d5995e1e7ca0354e",
+      "sha256": "a0076056bec22438cc7de8a123c1382bf6713ffb81235e9257377f14d265f40a",
+      "gitBlobSha1": "1bc564445c453a080d4ed5276eee4bb8729c0207",
       "importRewrite": true
     },
     {
       "upstreamPath": "packages/local-api/src/validate-deliveries.ts",
-      "sha256": "b1235365d98eeaae9f7fd7c4f3e2129fbf6fe07b1ddd3ac92472fe8304c29ccf",
-      "gitBlobSha1": "1a8fe7e7e592f13c7fec745481ae7fbd80a2937b",
+      "upstreamCommit": "5bcdcc296c16a4c9af6f0618d5995e1e7ca0354e",
+      "sha256": "b4830ee965dd54b710f8f0792dc1a314d313de41c0ff4f4ef14e28d6970d10dd",
+      "gitBlobSha1": "534bd41c8db614d932b8cafada7d238375a29e1d",
       "importRewrite": false
     },
     {
@@ -197,26 +200,30 @@
     },
     {
       "upstreamPath": "packages/local-api/src/validate-fields.ts",
-      "sha256": "3c6350a29ec486cb930a85485b5c3ca40d434574c4c338e8fb120e0f852a737e",
-      "gitBlobSha1": "61526c00e5954f71b6c9310f857b8386bffac556",
+      "upstreamCommit": "5bcdcc296c16a4c9af6f0618d5995e1e7ca0354e",
+      "sha256": "7bbc7c449808b621c2d29e4f4ec130f4330e33eb74ea75a366b030d9ff9b59c6",
+      "gitBlobSha1": "2bf4da1c3eacf3f04f3c710ce3a56665d0a1b926",
       "importRewrite": true
     },
     {
       "upstreamPath": "packages/local-api/src/validate-listing-row.ts",
-      "sha256": "c247694a1d4674c066705cb73af5702df2cf11d3d2174a9f3853f93b44d1072b",
-      "gitBlobSha1": "2f238fee7ea954268c210e681839a043c8cc313d",
+      "upstreamCommit": "5bcdcc296c16a4c9af6f0618d5995e1e7ca0354e",
+      "sha256": "3c75a9137cfa093ad8a9b55d0b24c1af274c9fa70a8ee0b7de8c7b97b7e7bed1",
+      "gitBlobSha1": "d144baba808a476d6ff60520fb1e65392cfaafda",
       "importRewrite": true
     },
     {
       "upstreamPath": "packages/local-api/src/validate-machine-events.ts",
-      "sha256": "ac9d2fcc595a91a0c37529f9216e282a046352a6d11a1895c672e2a630507719",
-      "gitBlobSha1": "ea82f3653c1a20e69750b8c2f970bdd6f648c7b2",
+      "upstreamCommit": "5bcdcc296c16a4c9af6f0618d5995e1e7ca0354e",
+      "sha256": "14d6493fe7d04bb69adeddf29556edfd9c9c461bc15f9bd11fba6c71a78bc818",
+      "gitBlobSha1": "44ee49018a96daba0798ebd3355613569ab5d087",
       "importRewrite": true
     },
     {
       "upstreamPath": "packages/local-api/src/validate-machine.ts",
-      "sha256": "b3fe3955b1f7af7c0c4f14b7d5b75b55098d5dbed7a5c8cdcebf0f277192af68",
-      "gitBlobSha1": "5039a08689e88067c85152259b7dc8aba7dfa775",
+      "upstreamCommit": "5bcdcc296c16a4c9af6f0618d5995e1e7ca0354e",
+      "sha256": "edcfc357af3bea0bdd88f5bcc5cb0cf76891d7b319641e0ef6bfb6fd37484fb1",
+      "gitBlobSha1": "96616390ad96b7e4f925af3c89960de392763d9a",
       "importRewrite": true
     },
     {
@@ -233,44 +240,51 @@
     },
     {
       "upstreamPath": "packages/local-api/src/validate-session-answer.ts",
-      "sha256": "3b1ac098ff6c81014c3c1efad70b5e6e9e044e3034f0c8a1ac9d31128aa6dd00",
-      "gitBlobSha1": "41fcb9fc99ca335f15448bf6b7bb3833e1d89e37",
+      "upstreamCommit": "5bcdcc296c16a4c9af6f0618d5995e1e7ca0354e",
+      "sha256": "c60ee43922b470b844e503fdf987bc39cb6d4ae18c61e6a0105dcdee32576023",
+      "gitBlobSha1": "7cfedf09d7a27ff76d8c8ecfa8727e24e229150d",
       "importRewrite": false
     },
     {
       "upstreamPath": "packages/local-api/src/validate-session-wake.ts",
-      "sha256": "e1a85c059314f6accc5886682e820897f2c32ac35078bcfef0ae9573a9f4f47d",
-      "gitBlobSha1": "dd6ed7b85663200679ad2d3ac32d7f59b948b9a8",
+      "upstreamCommit": "5bcdcc296c16a4c9af6f0618d5995e1e7ca0354e",
+      "sha256": "bc629864e4b7e26e0ef8f3e1b99ae8cc194a17d9cf1a1da6667fa286a66b2974",
+      "gitBlobSha1": "e6da7231e9a60d858d1b579ba77ac50ac9c72570",
       "importRewrite": false
     },
     {
       "upstreamPath": "packages/local-api/src/validate-shapes.ts",
-      "sha256": "897bc3bd70d8fca9e2667032a04b127876d97fb5f25c1be4f16a96f30f0553bb",
-      "gitBlobSha1": "57670e667884997d44d68e9eca954182cc4bb049",
+      "upstreamCommit": "5bcdcc296c16a4c9af6f0618d5995e1e7ca0354e",
+      "sha256": "e699047cad97ecc03ae0a1c758aaccc6a1244060bb3f4abfbcabad03d64bc9c0",
+      "gitBlobSha1": "1b3a6b1e6b082eec820dec84e1028e3e6ca4fd65",
       "importRewrite": true
     },
     {
       "upstreamPath": "packages/local-api/src/validate-snapshot-from.ts",
-      "sha256": "c7064f4b9b504f0be6fd22a49f35bfc48ff8bc61918c594b0cdcddac4536ef99",
-      "gitBlobSha1": "91627d65c5e82bfd862dcfc8ac3de54b59f44c26",
+      "upstreamCommit": "5bcdcc296c16a4c9af6f0618d5995e1e7ca0354e",
+      "sha256": "1e52f76b1b9787d5f047db7047f9076d5ebeda3d029e4080f141338ba5a1448d",
+      "gitBlobSha1": "78f3c9b071e6189af3e4689a8bf911d64c7ac951",
       "importRewrite": false
     },
     {
       "upstreamPath": "packages/local-api/src/validate-stream-events.ts",
-      "sha256": "65abe3ae13ff1612e6977713e08188c0a7e417bb333924abbb4d99a5b6a9c1f4",
-      "gitBlobSha1": "5b6db313fba246d6912105017ecc8bf3a74eb220",
+      "upstreamCommit": "5bcdcc296c16a4c9af6f0618d5995e1e7ca0354e",
+      "sha256": "6829b9818656e5641164631ef7e9a01d3d0683daef65c53b47dfc3b94557398c",
+      "gitBlobSha1": "af11f1f726659dea80b133e3dde99f307418bbeb",
       "importRewrite": false
     },
     {
       "upstreamPath": "packages/local-api/src/validate-update.ts",
-      "sha256": "f919b4fd9f9c2aabf9cf88f8d3736d3648e19120081bbbc5a8daf92231520454",
-      "gitBlobSha1": "b6d1f28f76b6cf327eb964378263ea201feb1d0a",
+      "upstreamCommit": "5bcdcc296c16a4c9af6f0618d5995e1e7ca0354e",
+      "sha256": "7d3f2973e3527af4fc84d2dbbde577aecaa33787cceac4666849d20ee2943ae3",
+      "gitBlobSha1": "67a0901bc9fcf4c3890cc9545c4dcc4b499ae2ef",
       "importRewrite": false
     },
     {
       "upstreamPath": "packages/local-api/src/validate.ts",
-      "sha256": "7b1ec8c3781e99f25d0ff827181974298fd03eb46221cfbbb1dc948c027e59fb",
-      "gitBlobSha1": "c63b56bb47b2b4c1b6b1bce406a0b99919929589",
+      "upstreamCommit": "5bcdcc296c16a4c9af6f0618d5995e1e7ca0354e",
+      "sha256": "e9499955ead4f2e244866ee1571da41c053238410e79cc676b33e53ae6be7ff8",
+      "gitBlobSha1": "87cbe448326b9e492f977ac8e0961498a2352c06",
       "importRewrite": false
     },
     {

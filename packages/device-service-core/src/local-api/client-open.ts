@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@dab363aa3a9aa51936149d05b416310d429b61e0 packages/local-api/src/client-open.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@08905c110bb10ab2ba725ff8b8c642a64fbd1652 packages/local-api/src/client-open.ts
 import {
   EventAssembler,
   type ListingResult,
@@ -44,6 +44,16 @@ export type OpenOptions = {
 // Arms `expire` to run after `ms` and returns its cancel; tests inject one to fire the expiry without waiting.
 export type HandshakeTimer = DeadlineTimer;
 export type ReadOptions = { readonly before_entry_id?: string; readonly tail?: number };
+/**
+ * The delegated route (decision 0018) a target takes, as the owner validates it (validate-command.ts): an attach may be
+ * delegated or name an endpoint, a device endpoint may be delegated or ask locate, and a session, alias or wake target
+ * is always delegated and takes no route.
+ */
+export type CommandRouteFor<T extends CommandTarget> = T extends { readonly attach: string }
+  ? Pick<DelegatedRoute, "delegated" | "endpoint">
+  : T extends { readonly endpoint: string }
+    ? Pick<DelegatedRoute, "delegated" | "locate">
+    : { readonly [K in keyof DelegatedRoute]?: never };
 export type LocalApiClient = {
   readonly welcome: Welcome;
   readonly request: <T extends RequestType>(
@@ -58,11 +68,11 @@ export type LocalApiClient = {
    * `route` (decision 0018) opts the command into the delegated channel or asks an open for its located key; it rides
    * the closing session.command only, never an upload part.
    */
-  readonly commandTo: (
-    target: CommandTarget,
+  readonly commandTo: <T extends CommandTarget>(
+    target: T,
     rpc: CommandRpc,
     command_id?: string,
-    route?: DelegatedRoute,
+    route?: CommandRouteFor<T>,
   ) => Promise<string>;
   readonly list: (
     filter?: SessionFilter,
@@ -134,8 +144,16 @@ const sendCommand = async (
   target: CommandTarget,
   rpc: CommandRpc,
   command_id: string | undefined,
-  route: DelegatedRoute = {},
+  given: DelegatedRoute = {},
 ): Promise<string> => {
+  // Only the three route fields reach the wire, and a route endpoint never replaces a device target's endpoint.
+  const route: DelegatedRoute = {
+    ...(given.delegated === true && ("attach" in target || "endpoint" in target)
+      ? { delegated: true }
+      : {}),
+    ...(given.endpoint !== undefined && "attach" in target ? { endpoint: given.endpoint } : {}),
+    ...(given.locate === true && "endpoint" in target ? { locate: true } : {}),
+  };
   // Always sent, minted here when the caller gave none: a command whose answer times out may still have been
   // dispatched, and its outcome arrives as session.command_state for this id. A retry of the same record to the same
   // target session under this id dispatches nothing more; anything else under it is command_id_conflict.

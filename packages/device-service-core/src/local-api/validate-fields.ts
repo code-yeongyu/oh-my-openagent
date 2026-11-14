@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@dab363aa3a9aa51936149d05b416310d429b61e0 packages/local-api/src/validate-fields.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@5bcdcc296c16a4c9af6f0618d5995e1e7ca0354e packages/local-api/src/validate-fields.ts
 import { posix, win32 } from "node:path";
 import { fromBase64, toBase64 } from "./bytes-encoding.ts";
 import type { JsonObject, JsonValue } from "./protocol.ts";
@@ -49,6 +49,22 @@ export const exactly = (
   for (const key of Object.keys(v))
     if (!required.includes(key) && !optional.includes(key)) fail(`${what} has an unknown field`);
   return v;
+};
+export type FieldCheck = typeof exactly;
+
+// What this client READS from the service (welcome, refused, response, event, blob payload): a required field must be
+// present, and a field this version does not define is dropped, so a newer service that adds one keeps an installed
+// client working (#914, #1129). The result holds only the named fields, so `exactly` on it still refuses a field another
+// variant of the same message defines. What a peer SENDS to be acted on (hello, request) stays `exactly`.
+export const known: FieldCheck = (v, required, optional = [], what = "message") => {
+  if (!isRecord(v)) return fail(`${what} must be an object`);
+  const out: { [key: string]: unknown } = {};
+  for (const name of required) {
+    if (!Object.hasOwn(v, name)) fail(`${what} misses ${name}`);
+    out[name] = v[name];
+  }
+  for (const name of optional) if (Object.hasOwn(v, name)) out[name] = v[name];
+  return out;
 };
 
 export const oneOf = <T extends string>(list: readonly T[], v: unknown, what: string): T =>

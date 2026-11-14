@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@dab363aa3a9aa51936149d05b416310d429b61e0 packages/local-api/src/validate-delegated.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@5bcdcc296c16a4c9af6f0618d5995e1e7ca0354e packages/local-api/src/validate-delegated.ts
 import { SESSION_ID_MAX_CHARS } from "./spec-proto.ts";
 import { LOCAL_BLOB_MAX, LOCAL_CHUNK_MAX, LOCAL_INLINE_MAX, lineBytes } from "./limits.ts";
 import type { EndpointsRegister, EndpointsUnregister } from "./protocol.ts";
@@ -8,7 +8,7 @@ import type {
   CommandLocated,
   SessionEndpointsData,
 } from "./protocol-delegated.ts";
-import { isStreamSessionKey, parseSessionRef } from "./session-ref.ts";
+import { isStreamSessionKey } from "./session-ref.ts";
 import {
   absolutePath,
   base64Bytes,
@@ -17,6 +17,7 @@ import {
   fail,
   type Fields,
   jsonObject,
+  known,
   localId,
   oneOf,
   sha256Field,
@@ -76,7 +77,7 @@ const keysOf = (v: unknown, max: number, what: string): readonly string[] => {
   return new Set(keys).size === keys.length ? keys : fail(what);
 };
 export const endpointsData = (v: unknown): SessionEndpointsData => {
-  const m = exactly(v, ["endpoints"], ["environments", "primary"], "data");
+  const m = known(v, ["endpoints"], ["environments", "primary"], "data");
   const endpoints = keysOf(m["endpoints"], ENDPOINTS_MAX, "endpoints");
   const primary = m["primary"] === undefined ? undefined : endpointKey(m["primary"], "primary");
   if (primary !== undefined && !endpoints.includes(primary)) return fail("primary");
@@ -126,42 +127,49 @@ type DelegatedKind =
   | "session.channel_closed";
 const blobId = (m: Fields): string => localId(m["id"], "blob id");
 const blobRefOf = (v: unknown): CommandBlobRef => {
-  const m = exactly(v, ["id", "bytes", "sha256"], [], "blob");
+  const m = known(v, ["id", "bytes", "sha256"], [], "blob");
   return {
     id: blobId(m),
     bytes: uint(m["bytes"], 1, LOCAL_BLOB_MAX, "blob bytes"),
     sha256: sha256Field(m["sha256"], "blob sha256"),
   };
 };
-// 0018 amendment 2026-11-06 (5B): {key, session}, the same pair session.locate answers.
-const locatedOf = (v: unknown): CommandLocated => {
-  const m = exactly(v, ["key", "session"], [], "located");
+// 0018 amendment 2026-11-06 (5B): {key, session}, the same pair session.locate answers for the event's own device, so
+// the session is `<device>.<key>` of that device and never another's (#1129).
+const locatedOf = (device: string, v: unknown): CommandLocated => {
+  const m = known(v, ["key", "session"], [], "located");
   const key = m["key"];
-  const session = m["session"];
   if (typeof key !== "string" || !isStreamSessionKey(key)) return fail("located key");
-  return typeof session === "string" && parseSessionRef(session)?.key === key
-    ? { key, session }
+  return m["session"] === `${device}.${key}`
+    ? { key, session: `${device}.${key}` }
     : fail("located session");
 };
+// The three shapes of a command event are told apart by which of their fields is present, so a field one shape defines
+// stays refused on another: only a field none of them defines is dropped.
+const COMMAND_EVENT_FIELDS = ["blob", "frame", "command_id", "response", "located"];
 const commandEventOf = (v: Fields): CommandEvent => {
   const head = { type: "event", kind: "session.command_event" } as const;
-  if (Object.hasOwn(v, "blob")) {
-    const m = eventFields(v, ["device", "blob"]);
+  const all = eventFields(v, ["device"], COMMAND_EVENT_FIELDS);
+  const shape = (names: readonly string[], optional: readonly string[] = []): Fields =>
+    exactly(all, ["type", "kind", "device", ...names], optional, "event");
+  if (Object.hasOwn(all, "blob")) {
+    const m = shape(["blob"]);
     return { ...head, device: deviceId(m["device"]), blob: blobRefOf(m["blob"]) };
   }
   if (lineBytes(v) > LOCAL_INLINE_MAX)
     return fail("an inline command event over LOCAL_INLINE_MAX is a blob");
-  if (Object.hasOwn(v, "frame")) {
-    const m = eventFields(v, ["device", "frame"]);
+  if (Object.hasOwn(all, "frame")) {
+    const m = shape(["frame"]);
     return { ...head, device: deviceId(m["device"]), frame: jsonObject(m["frame"], "frame") };
   }
-  const m = eventFields(v, ["device", "command_id", "response"], ["located"]);
+  const m = shape(["command_id", "response"], ["located"]);
+  const device = deviceId(m["device"]);
   return {
     ...head,
-    device: deviceId(m["device"]),
+    device,
     command_id: commandId(m["command_id"]),
     response: jsonObject(m["response"], "response"),
-    ...(m["located"] === undefined ? {} : { located: locatedOf(m["located"]) }),
+    ...(m["located"] === undefined ? {} : { located: locatedOf(device, m["located"]) }),
   };
 };
 

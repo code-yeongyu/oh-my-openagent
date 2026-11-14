@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@dab363aa3a9aa51936149d05b416310d429b61e0 packages/local-api/src/validate-deliveries.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@5bcdcc296c16a4c9af6f0618d5995e1e7ca0354e packages/local-api/src/validate-deliveries.ts
 import type { DeliveriesResponseData, PendingPair } from "./protocol-deliveries.ts";
 import { requestFields, type RequestValidators } from "./validate-command.ts";
 import {
@@ -9,6 +9,7 @@ import {
   fail,
   type Fields,
   jsonObject,
+  known,
   localId,
   uint,
 } from "./validate-fields.ts";
@@ -85,27 +86,27 @@ export const DELIVERIES_REQUEST_VALIDATORS: RequestValidators<
 };
 
 const empty = (v: unknown) => {
-  exactly(v, [], [], "data");
+  known(v, [], [], "data");
   return {};
 };
 export const DELIVERIES_DATA: {
   readonly [T in keyof DeliveriesResponseData]: (v: unknown) => DeliveriesResponseData[T];
 } = {
   "deliveries.serve": (v) => {
-    const m = exactly(v, ["wake"], [], "data");
+    const m = known(v, ["wake"], [], "data");
     return { wake: bool(m["wake"], "wake") };
   },
   "delivery.answer": empty,
   "delivery.held": empty,
   "delivery.pending": empty,
   "delivery.drained": (v) => {
-    const m = exactly(v, ["kept"], ["expecting"], "data");
+    const m = known(v, ["kept"], ["expecting"], "data");
     const kept = bool(m["kept"], "kept");
     if (!kept) return m["expecting"] === undefined ? { kept } : fail("expecting");
     return { kept, expecting: commandId(m["expecting"]) };
   },
   "peer.admitted": (v) => ({
-    admitted: bool(exactly(v, ["admitted"], [], "data")["admitted"], "admitted"),
+    admitted: bool(known(v, ["admitted"], [], "data")["admitted"], "admitted"),
   }),
 };
 

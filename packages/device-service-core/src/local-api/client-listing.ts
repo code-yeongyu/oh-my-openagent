@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@dab363aa3a9aa51936149d05b416310d429b61e0 packages/local-api/src/client-listing.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@08905c110bb10ab2ba725ff8b8c642a64fbd1652 packages/local-api/src/client-listing.ts
 import { type LocalApiError, protocolViolation } from "./errors.ts";
 import type { ListingRow, LocalEvent, RoundDeviceState } from "./protocol.ts";
 import { assertNever } from "./validate-fields.ts";

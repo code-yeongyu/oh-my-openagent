@@ -1,8 +1,8 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@dab363aa3a9aa51936149d05b416310d429b61e0 packages/local-api/src/validate-update.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@5bcdcc296c16a4c9af6f0618d5995e1e7ca0354e packages/local-api/src/validate-update.ts
 import type { StatusUpdate, UpdateCommitted } from "./protocol-control.ts";
 import {
   bool,
-  exactly,
+  known,
   localId,
   nullable,
   oneOf,
@@ -16,7 +16,7 @@ import { STATUS_UPDATE_PHASES } from "./vocabulary.ts";
 const READY_REASON_MAX_CHARS = 64;
 
 export const statusUpdateOf = (v: unknown): StatusUpdate => {
-  const m = exactly(
+  const m = known(
     v,
     ["update_id", "phase", "target_version", "ready", "ready_reason"],
     [],

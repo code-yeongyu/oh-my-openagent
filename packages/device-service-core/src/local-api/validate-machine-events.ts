@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@dab363aa3a9aa51936149d05b416310d429b61e0 packages/local-api/src/validate-machine-events.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@5bcdcc296c16a4c9af6f0618d5995e1e7ca0354e packages/local-api/src/validate-machine-events.ts
 import { STREAM_INLINE_MAX } from "./spec-proto.ts";
 import { LOCAL_BLOB_MAX, LOCAL_CHUNK_MAX, LOCAL_INLINE_MAX, lineBytes } from "./limits.ts";
 import type { MachineBlobRef, MachineOpResult, MachineOpTiming } from "./protocol-machine.ts";
@@ -8,6 +8,7 @@ import {
   fail,
   type Fields,
   jsonObject,
+  known,
   localId,
   oneOf,
   sha256Field,
@@ -35,7 +36,7 @@ export const MACHINE_OUTPUT_MAX_BYTES = STREAM_INLINE_MAX;
 
 const blobId = (m: Fields): string => localId(m["id"], "blob id");
 const blobRefOf = (v: unknown): MachineBlobRef => {
-  const m = exactly(v, ["id", "bytes", "sha256"], [], "blob");
+  const m = known(v, ["id", "bytes", "sha256"], [], "blob");
   return {
     id: blobId(m),
     bytes: uint(m["bytes"], 1, LOCAL_BLOB_MAX, "blob bytes"),
@@ -56,7 +57,7 @@ const TIMING_FIELDS = [
   "applied_ms",
 ] as const;
 const timingOf = (v: unknown): MachineOpTiming => {
-  const m = exactly(v, [], TIMING_FIELDS, "timing");
+  const m = known(v, [], TIMING_FIELDS, "timing");
   return Object.fromEntries(
     TIMING_FIELDS.flatMap((k) =>
       m[k] === undefined ? [] : [[k, uint(m[k], 0, Number.MAX_SAFE_INTEGER, k)]],
@@ -64,13 +65,17 @@ const timingOf = (v: unknown): MachineOpTiming => {
   );
 };
 
+// A result is a blob or an inline response, told apart by which is present, so one never rides beside the other.
 const opResultOf = (v: Fields): MachineOpResult => {
   const head = { type: "event", kind: "machine.op_result" } as const;
-  if (Object.hasOwn(v, "blob")) {
-    const m = eventFields(v, ["op_id", "blob"]);
+  const all = eventFields(v, ["op_id"], ["blob", "response"]);
+  const shape = (name: string): Fields =>
+    exactly(all, ["type", "kind", "op_id", name], [], "event");
+  if (Object.hasOwn(all, "blob")) {
+    const m = shape("blob");
     return { ...head, op_id: machineId(m["op_id"], "op_id"), blob: blobRefOf(m["blob"]) };
   }
-  const m = eventFields(v, ["op_id", "response"]);
+  const m = shape("response");
   if (lineBytes(v) > LOCAL_INLINE_MAX)
     return fail("an inline result over LOCAL_INLINE_MAX is a blob");
   return {

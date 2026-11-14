@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@dab363aa3a9aa51936149d05b416310d429b61e0 packages/local-api/src/validate.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@5bcdcc296c16a4c9af6f0618d5995e1e7ca0354e packages/local-api/src/validate.ts
 import { LocalApiError } from "./errors.ts";
 import type {
   Empty,
@@ -23,6 +23,7 @@ import {
   fail,
   InvalidMessage,
   isRecord,
+  known,
   localId,
   nonce,
   nullable,
@@ -104,7 +105,7 @@ export const validateHello = (v: unknown): HelloVerdict => {
 export const validateWelcome = (v: unknown): Welcome | Refused =>
   asViolation(() => {
     if (isRecord(v) && v["type"] === "refused") {
-      const m = exactly(v, ["type", "reason"], [], "refused");
+      const m = known(v, ["type", "reason"], [], "refused");
       return { type: "refused", reason: oneOf(REFUSED_REASONS, m["reason"], "refused reason") };
     }
     if (isRecord(v) && v["type"] === "welcome" && v["v"] !== LOCAL_API_VERSION)
@@ -119,7 +120,7 @@ export const validateWelcome = (v: unknown): Welcome | Refused =>
       "capabilities",
       "state",
     ];
-    const m = exactly(v, fields, [], "welcome");
+    const m = known(v, fields, [], "welcome");
     const capabilities = m["capabilities"];
     if (m["type"] !== "welcome" || m["owner"] !== "service") return fail("welcome");
     if (!Array.isArray(capabilities) || new Set(capabilities).size !== capabilities.length)
@@ -165,12 +166,12 @@ export const validateRequest = (v: unknown): RequestVerdict => {
 };
 
 const empty = (v: unknown): Empty => {
-  exactly(v, [], [], "data");
+  known(v, [], [], "data");
   return {};
 };
-const one = (v: unknown, name: string): unknown => exactly(v, [name], [], "data")[name];
+const one = (v: unknown, name: string): unknown => known(v, [name], [], "data")[name];
 const attachState = (v: unknown) => {
-  const m = exactly(v, ["attached", "changedAt"], [], "data");
+  const m = known(v, ["attached", "changedAt"], [], "data");
   const changedAt = m["changedAt"];
   return {
     attached: bool(m["attached"], "attached"),
@@ -178,7 +179,7 @@ const attachState = (v: unknown) => {
   };
 };
 const remoteCommandsState = (v: unknown) => {
-  const m = exactly(v, ["enabled", "changedAt", "overridden"], [], "data");
+  const m = known(v, ["enabled", "changedAt", "overridden"], [], "data");
   const changedAt = m["changedAt"];
   return {
     enabled: bool(m["enabled"], "enabled"),
@@ -192,9 +193,11 @@ const DATA: { readonly [T in RequestType]: (v: unknown) => ResponseData[T] } = {
   "status.subscribe": empty,
   "service.set_enabled": (v) => ({ enabled: bool(one(v, "enabled"), "enabled") }),
   "refresher.register": empty,
-  "device.adopt": (v) => ({ device: deviceRef(one(v, "device")) }),
+  "device.adopt": (v) => ({ device: deviceRef(one(v, "device"), "device", known) }),
   "device.forget": empty,
-  "device.info": (v) => ({ device: nullable(one(v, "device"), (d) => deviceRef(d)) }),
+  "device.info": (v) => ({
+    device: nullable(one(v, "device"), (d) => deviceRef(d, "device", known)),
+  }),
   "endpoints.register": empty,
   "endpoints.unregister": empty,
   "session.presenter_open": empty,
@@ -232,7 +235,7 @@ export type ValidResponse<T extends RequestType> =
   | { readonly id: string; readonly ok: false; readonly error: ErrorBody };
 export const validateResponse = <T extends RequestType>(v: unknown, type: T): ValidResponse<T> =>
   asViolation(() => {
-    const m = exactly(v, ["id", "type", "ok"], ["data", "error"], "response");
+    const m = known(v, ["id", "type", "ok"], ["data", "error"], "response");
     const id = requestId(m["id"]) ?? fail("response id");
     if (m["type"] !== "response") return fail("response type");
     if (m["ok"] === true) {
