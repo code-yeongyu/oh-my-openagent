@@ -13,6 +13,7 @@ import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { readDiskSession, type AddressBookHost, type DiskSession } from "./address-book"
 import { INITIAL_SKILLS_CONTEXT_KEY } from "./initial-skills"
 import {
+  claimedSessionPaths,
   controlSocketSecretPath,
   endpointKindOf,
   isTuiControlSocket,
@@ -249,6 +250,8 @@ type EndpointVerdict = { readonly alive?: boolean; readonly reason?: "live_unres
 type KnownEndpoint = {
   readonly socket: string
   readonly paths: readonly string[]
+  /** Registry directories whose `reservations/` claims are read when the endpoint does not answer. */
+  readonly claimDirs: readonly string[]
   readonly kind: EndpointKind
   readonly verdict: EndpointVerdict
 }
@@ -372,7 +375,15 @@ export function createLiveThreadSurface(
         ? recorded.flatMap((entry) =>
             entry.socket === null
               ? []
-              : [{ socket: entry.socket, paths: [] as readonly string[], kind: entry.endpoint_kind, verdict: {} }],
+              : [
+                  {
+                    socket: entry.socket,
+                    paths: [] as readonly string[],
+                    claimDirs: [entry.dir],
+                    kind: entry.endpoint_kind,
+                    verdict: {},
+                  },
+                ],
           )
         : reports.flatMap((report) =>
             report.socket === null
@@ -381,6 +392,7 @@ export function createLiveThreadSurface(
                   {
                     socket: report.socket,
                     paths: report.session_paths,
+                    claimDirs: [] as readonly string[],
                     kind: report.endpoint_kind ?? endpointKindOf(report.socket, recorded),
                     verdict: {
                       ...(report.alive === undefined ? {} : { alive: report.alive }),
@@ -393,15 +405,22 @@ export function createLiveThreadSurface(
     // the only record of its threads when it stops answering.
     const isLegacy = (endpoint: KnownEndpoint) => resolve(endpoint.socket) === resolve(legacy)
     const legacyPaths = [...new Set(found.filter(isLegacy).flatMap((endpoint) => endpoint.paths))]
+    const legacyDirs = [...new Set(found.filter(isLegacy).flatMap((endpoint) => endpoint.claimDirs))]
     return [
-      { socket: legacy, paths: legacyPaths, kind: endpointKindOf(legacy, recorded), verdict: {} },
+      {
+        socket: legacy,
+        paths: legacyPaths,
+        claimDirs: legacyDirs,
+        kind: endpointKindOf(legacy, recorded),
+        verdict: {},
+      },
       ...found.filter((endpoint) => !isLegacy(endpoint)),
     ]
   }
 
   const endpoints = async (): Promise<readonly KnownEndpoint[]> => {
-    // One enumeration at a time, and its window starts when it answers: a host whose `status --all` takes longer
-    // than the window shares the running one and reuses its answer, instead of enumerating once per view (#12989).
+    // One enumeration at a time, and its window starts when it answers: an enumeration that takes longer than the
+    // window (a slow registry read, or a supplied `status --all` report) is shared, not repeated per view (#12989).
     if (enumeration === undefined || (enumeration.expiresAt !== undefined && enumeration.expiresAt <= now())) {
       const started: Enumeration = { expiresAt: undefined, endpoints: enumerate() }
       enumeration = started
@@ -424,7 +443,11 @@ export function createLiveThreadSurface(
     error: unknown,
     reason: "live_unresponsive" | "dead" | null,
   ): EndpointListing => {
-    const known = new Set([...endpoint.paths, ...(lastListed.get(endpoint.socket) ?? [])])
+    const known = new Set([
+      ...endpoint.paths,
+      ...endpoint.claimDirs.flatMap((dir) => claimedSessionPaths(dir)),
+      ...(lastListed.get(endpoint.socket) ?? []),
+    ])
     const disk = [...known].flatMap((path) => {
       const session = readDiskSession(path, endpoint.socket)
       return session === null ? [] : [session]
@@ -594,7 +617,13 @@ export function createLiveThreadSurface(
    */
   const routingIdOf = async (endpoint: GatewayEndpointRef): Promise<string | null> => {
     if (endpoint.routing_id !== null) return endpoint.routing_id
-    const listed = await listEndpoint({ socket: endpoint.socket, paths: [], kind: endpoint.kind, verdict: {} })
+    const listed = await listEndpoint({
+      socket: endpoint.socket,
+      paths: [],
+      claimDirs: [],
+      kind: endpoint.kind,
+      verdict: {},
+    })
     if (listed.failure !== undefined) throw listed.failure
     return (
       listed.sessions.find(
@@ -672,6 +701,7 @@ export function createLiveThreadSurface(
       const listed = await listEndpoint({
         socket: endpoint.socket,
         paths: [],
+        claimDirs: [],
         kind: endpoint.kind,
         verdict: cached ?? {},
       })
