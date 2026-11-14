@@ -166,7 +166,7 @@ impl X11Connection {
         Ok(false)
     }
 
-    fn read_pixmap(&self, window: u32, placement: &WindowPlacement, redirected: bool) -> Result<PixmapRead, XError> {
+    fn read_pixmap(&self, window: u32, placement: &WindowPlacement) -> Result<PixmapRead, XError> {
         let damage_id = if self.damage {
             let id = self.conn.generate_id()?;
             self.conn.damage_create(id, window, damage::ReportLevel::NON_EMPTY)?.check()?;
@@ -174,15 +174,12 @@ impl X11Connection {
         } else {
             None
         };
-        let mut repainted = true;
-        if redirected {
-            self.conn.clear_area(true, window, 0, 0, 0, 0)?;
-            self.conn.flush()?;
-            repainted = match damage_id {
-                Some(id) => self.wait_damage(id)?,
-                None => false,
-            };
-        }
+        self.conn.clear_area(true, window, 0, 0, 0, 0)?;
+        self.conn.flush()?;
+        let repainted = match damage_id {
+            Some(id) => self.wait_damage(id)?,
+            None => false,
+        };
         if !repainted {
             if let Some(id) = damage_id {
                 self.conn.damage_destroy(id)?;
@@ -316,21 +313,17 @@ impl XServer for X11Connection {
         Ok(self.conn.get_selection_owner(selection)?.reply()?.owner != x11rb::NONE)
     }
 
-    fn window_pixmap(&self, window: u32, placement: &WindowPlacement, redirect: bool) -> Result<PixmapRead, XError> {
+    fn window_pixmap(&self, window: u32, placement: &WindowPlacement) -> Result<PixmapRead, XError> {
         if !self.composite {
             return Ok(PixmapRead::RedirectRefused);
         }
-        if redirect {
-            match self.conn.composite_redirect_window(window, composite::Redirect::AUTOMATIC)?.check() {
-                Ok(()) => {}
-                Err(error) if is_x11_error(&error) => return Ok(PixmapRead::RedirectRefused),
-                Err(error) => return Err(error.into()),
-            }
+        match self.conn.composite_redirect_window(window, composite::Redirect::AUTOMATIC)?.check() {
+            Ok(()) => {}
+            Err(error) if is_x11_error(&error) => return Ok(PixmapRead::RedirectRefused),
+            Err(error) => return Err(error.into()),
         }
-        let read = self.read_pixmap(window, placement, redirect);
-        if redirect {
-            self.conn.composite_unredirect_window(window, composite::Redirect::AUTOMATIC)?.check()?;
-        }
+        let read = self.read_pixmap(window, placement);
+        self.conn.composite_unredirect_window(window, composite::Redirect::AUTOMATIC)?.check()?;
         read
     }
 

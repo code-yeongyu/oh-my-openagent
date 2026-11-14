@@ -210,15 +210,9 @@ impl XServer for FakeX {
         &self,
         window: u32,
         _placement: &WindowPlacement,
-        redirect: bool,
     ) -> Result<PixmapRead, XError> {
         if !self.composite_extension {
             return Ok(PixmapRead::RedirectRefused);
-        }
-        if !redirect {
-            // ProcCompositeNameWindowPixmap answers BadMatch for a window that is not itself
-            // redirected; a compositing manager redirects only the window manager's frames.
-            return Ok(PixmapRead::Unmapped);
         }
         self.redirects.set(self.redirects.get() + 1);
         if !self.repaints {

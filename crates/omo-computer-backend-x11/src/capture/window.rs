@@ -61,7 +61,7 @@ impl<S: XServer> X11Capture<S> {
         }
         let read = self
             .server()
-            .window_pixmap(xid, &placement, true)
+            .window_pixmap(xid, &placement)
             .map_err(|error| failed(&error))?;
         let (mut image, route, occluders_visible) = match read {
             PixmapRead::Image(raw) => (decode(&raw).map_err(|error| failed(&error))?, CaptureRoute::Composite, false),

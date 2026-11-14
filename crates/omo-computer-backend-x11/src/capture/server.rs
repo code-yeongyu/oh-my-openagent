@@ -168,8 +168,8 @@ pub trait XServer: Send {
     /// The request failed.
     fn compositor_present(&self) -> Result<bool, XError>;
 
-    /// The window's own pixmap after one Damage round trip. With `redirect` the window is
-    /// redirected `CompositeRedirectAutomatic` for the read and unredirected after.
+    /// The window's own pixmap after one Damage round trip; the window is redirected
+    /// `CompositeRedirectAutomatic` for the read and unredirected after.
     ///
     /// # Errors
     /// The request failed.
@@ -177,7 +177,6 @@ pub trait XServer: Send {
         &self,
         window: u32,
         placement: &WindowPlacement,
-        redirect: bool,
     ) -> Result<PixmapRead, XError>;
 
     /// `_NET_CLIENT_LIST_STACKING` (else `_NET_CLIENT_LIST`), topmost first; a client that
