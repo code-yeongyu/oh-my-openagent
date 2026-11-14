@@ -1,11 +1,19 @@
 {
   "source": {
     "repo": "sisyphuslabs/omo-service",
-    "commit": "5de1455489ea972ef2912e90b88f50628db09359",
+    "commit": "e39e23ad1fbe19a39ffd9f5d8d9a867f372c997c",
     "paths": [
       "packages/contract/src/sync-format/",
       "fixtures/sync-v1/ (data only)"
-    ]
+    ],
+    "held_at": {
+      "commit": "5de1455489ea972ef2912e90b88f50628db09359",
+      "files": [
+        "sync-format/index.ts",
+        "sync-format/keys.ts"
+      ],
+      "reason": "upstream now imports ../vendored/strict-ed25519.ts, outside the vendored set; memory-core keeps crypto/strict-ed25519"
+    }
   },
   "files": {
     "fixtures/sync-v1/README.md": "uaTmarrk5-y9Unha-S6XW_LlkiIcaFcTQaa6vcz_VSo",
@@ -39,10 +47,10 @@
     "fixtures/sync-v1/snapshot.json": "oAXFc26vM_1cg2g1zeJ5BRZqUGXHHJbpuVe76YCv8AM",
     "fixtures/sync-v1/vectors.jsonl": "LTtISRTqU22fOagLILkdqkHn0pOLnlEb72I9uWLMlw8",
     "fixtures/sync-v1/wraps.json": "P-1N4Te6uXEj9i2VS69JZ14mTEwEgAkc4SAG04rYRZU",
-    "sync-format/authority.ts": "Az9CSSSZLuQRVkgqrE9Nu5rH78kjTHqTnvFyoxZZ4c8",
+    "sync-format/authority.ts": "LMBOkd-XUdCvuR8d5EEBa_axBSXNZQJSnwX9-J8pzaE",
     "sync-format/canonical.ts": "hE9i6kK9OT3XJ7mYzc2c-9p0KXuOfitQFXvzgeUC0iM",
-    "sync-format/chain.ts": "VZ9qTvuqMz7rLS2_6FS0-6QHIriTPjGvwt9U3H65mbY",
-    "sync-format/fold.ts": "xwG6OdPJUdqKtLELHvgYFF4MfwqtwvoxEQqzmo9LgY8",
+    "sync-format/chain.ts": "8pCvtjzr3K85nG9iNwH06VblcHXmCzynOQo7yijk_8Y",
+    "sync-format/fold.ts": "ca6zipn2RBdVbWJmyOlnK13h5qbeBqguFUqu0nU2rJ8",
     "sync-format/fork-evidence.ts": "dWsYw2YEUCRuvWmF67mCt9lisJAB5P04POJbLWW0md8",
     "sync-format/fork-set.ts": "bEIbWVd4vyirBY3Y9YHN8cwRHKMSzGoqaxAME5SCQnY",
     "sync-format/fork-state.ts": "UvO-eLPaWC_9HUwm1V2v5ACacSVSYTXtbUbfCD8VJog",
@@ -52,7 +60,7 @@
     "sync-format/keys.ts": "uZLYIGa2HR6B4Kl_6C9d42Jpx4D9G1wYWrfPm1XuaU0",
     "sync-format/object-types.ts": "mFbOoe_Yf7ghD3SVZwD_PUR7-HppSDYgfMpgbrFbAyw",
     "sync-format/object.ts": "TaXakpdQYQgONE2mydXWGmIJqY4Kjwkk7GzaXmJ6lhc",
-    "sync-format/receive.ts": "Q5A41QzJMvqdDAzq9n7KeNY1hBLVr6CbRM3XzBr2XVM",
+    "sync-format/receive.ts": "Mo7ItDRlDv4snQ-HFuBDQWwUYpYj-8tQ44LOAFvo_rg",
     "sync-format/snapshot.ts": "vXS-7u5IFSszGy8pg6ZZMn7egnAITBLQ809vRK_y2Io",
     "sync-format/stream.ts": "avw4e_O-qc9p0JZEHAbMA5HJrhxwjlCBUJUsPnRLfck"
   }

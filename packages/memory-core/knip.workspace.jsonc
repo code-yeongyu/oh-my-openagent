@@ -169,8 +169,6 @@
     "packages/memory-core/src/sync/engine/index.ts": ["createHttpTransport", "SyncHttpError", "SyncEngine"],
     // pre-existing at origin dev 4686e425b5: unused export(s) MAX_RECEIPTS
     "packages/memory-core/src/sync/item/capture-receipts.ts": ["MAX_RECEIPTS"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) x25519PublicKey
-    "packages/memory-core/src/sync/recovery/derive.ts": ["x25519PublicKey"],
     // pre-existing at origin dev 4686e425b5: unused export(s) VETO_WINDOW_MS
     "packages/memory-core/src/sync/recovery/index.ts": ["VETO_WINDOW_MS"],
     // pre-existing at origin dev 4686e425b5: unused export(s) VETO_WINDOW_MS
