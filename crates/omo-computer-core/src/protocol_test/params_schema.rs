@@ -84,3 +84,55 @@ fn paired_coordinates_are_published_as_dependent_required() {
         );
     }
 }
+
+/// Review L1 (#13140): the decoder, the published schema and the generated types agree on a
+/// paired coordinate. This table is checked against the decoder and against the schema's own
+/// keywords for the pair (each member's type and `dependentRequired`); the generated types
+/// carry the same table as type-level cases in packages/omo-computer-protocol's test.
+#[test]
+fn paired_coordinates_decoder_and_schema_agree_on_every_case() {
+    use serde_json::{json, Value};
+    let schema = engine_schema();
+    // What the published schema says about one object's x and y.
+    let schema_accepts = |name: &str, params: &Value| -> bool {
+        let def = &schema["$defs"][name];
+        let allows = |member: &str, value: &Value| -> bool {
+            let types: Vec<&str> = match &def["properties"][member]["type"] {
+                Value::String(one) => vec![one.as_str()],
+                Value::Array(many) => many.iter().filter_map(Value::as_str).collect(),
+                _ => Vec::new(),
+            };
+            match value {
+                Value::Null => types.contains(&"null"),
+                Value::Number(_) => types.contains(&"number"),
+                _ => false,
+            }
+        };
+        let present = |member: &str| params.get(member).is_some();
+        let typed = ["x", "y"].iter().all(|m| params.get(*m).is_none_or(|v| allows(m, v)));
+        let paired = def["dependentRequired"]
+            .as_object()
+            .is_none_or(|deps| deps.iter().all(|(k, needs)| !present(k) || needs.as_array().is_some_and(|n| n.iter().filter_map(Value::as_str).all(present))));
+        typed && paired
+    };
+    let cases: [(&str, Value, bool); 5] = [
+        ("x and y given", json!({"x": 5, "y": 6}), true),
+        ("neither", json!({}), true),
+        ("x given, y null", json!({"x": 5, "y": null}), false),
+        ("x null alone", json!({"x": null}), false),
+        ("x alone", json!({"x": 5}), false),
+    ];
+    for name in ["ClickParams", "MouseDownParams"] {
+        for (case, coordinates, expected) in &cases {
+            let mut params = json!({"target": "101"});
+            params.as_object_mut().expect("object").extend(coordinates.as_object().expect("object").clone());
+            let decoded = if name == "ClickParams" {
+                serde_json::from_value::<crate::params::ClickParams>(params.clone()).is_ok()
+            } else {
+                serde_json::from_value::<crate::params::MouseDownParams>(params.clone()).is_ok()
+            };
+            assert_eq!(decoded, *expected, "{name} decoder, {case}");
+            assert_eq!(schema_accepts(name, &params), *expected, "{name} schema, {case}");
+        }
+    }
+}

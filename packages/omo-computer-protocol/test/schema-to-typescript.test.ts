@@ -34,5 +34,9 @@ test("the generated click and mouse.down params refuse a lone coordinate at type
   const loneX: ClickParams = { target: "101", x: 5 }
   // @ts-expect-error a lone y is not a MouseDownParams
   const loneY: MouseDownParams = { target: "101", y: 5 }
-  expect([both, neither, loneX, loneY]).toHaveLength(4)
+  // @ts-expect-error a null y beside a given x is not a ClickParams (review L1 of #13140)
+  const nullY: ClickParams = { target: "101", x: 5, y: null }
+  // @ts-expect-error an explicit null coordinate is not a MouseDownParams: absent means absent
+  const nullX: MouseDownParams = { target: "101", x: null }
+  expect([both, neither, loneX, loneY, nullY, nullX]).toHaveLength(6)
 })
