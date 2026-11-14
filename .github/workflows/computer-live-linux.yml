@@ -75,6 +75,6 @@ jobs:
           JOB_SUMMARY_DETAILS: |
             - Probe, three runs: uinput module, uinput writable by the job user, real Xorg with the dummy driver, libinput hotplug of a uinput keyboard, XI 2.1+, XI2 raw key events from that keyboard (XTEST positive control).
             - Graded ledger: every row must read CONFIRMS on every run.
-            - Teardown: Xorg processes, uinput devices, X sockets and the uinput ACL grant removed.
+            - Teardown: the probe's Xorg processes, uinput devices, X sockets and X lock files (displays :90-:99), its workdirs in the runner temp dir, and the uinput ACL grant removed.
           JOB_SUMMARY_NEXT: Open the computer-live-linux-xorg-uinput artifact for the ledger TSV and the probe log.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
