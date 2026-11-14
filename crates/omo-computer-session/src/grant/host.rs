@@ -395,6 +395,19 @@ pub(crate) fn view_of(raw: Option<serde_json::Value>) -> ConsentView {
     )
 }
 
+
+/// A-IS-62 rev 7: the longest chord compared or written; a peer-supplied chord cannot grow the line.
+const MAX_CHORD_BYTES: usize = 256;
+
+/// The first 256 bytes of a chord for the audit line (on a char boundary).
+fn cut_chord(chord: &str) -> &str {
+    let mut end = chord.len().min(MAX_CHORD_BYTES);
+    while !chord.is_char_boundary(end) {
+        end -= 1;
+    }
+    &chord[..end]
+}
+
 #[cfg(test)]
 mod view_of_tests {
     /// R6-1: no consent file read means read-only, no exec and no chord.
@@ -408,16 +421,4 @@ mod view_of_tests {
         assert!(consent.admit_exec(None).is_err(), "no exec is admitted");
         assert_eq!(super::view_of(Some(serde_json::json!({ "stopHotkey": null }))).grants.len(), 2, "a handed view is read as written");
     }
-}
-
-/// A-IS-62 rev 7: the longest chord compared or written; a peer-supplied chord cannot grow the line.
-const MAX_CHORD_BYTES: usize = 256;
-
-/// The first 256 bytes of a chord for the audit line (on a char boundary).
-fn cut_chord(chord: &str) -> &str {
-    let mut end = chord.len().min(MAX_CHORD_BYTES);
-    while !chord.is_char_boundary(end) {
-        end -= 1;
-    }
-    &chord[..end]
 }

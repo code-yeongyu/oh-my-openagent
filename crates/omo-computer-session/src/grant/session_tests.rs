@@ -241,7 +241,7 @@ fn audit_line_records_the_binding_of_an_admitted_call() {
         capture(&mut s, "1");
         s.click(params(json!({ "target": "1", "x": 5, "y": 5 }))).expect("admitted");
         let text = std::fs::read_to_string(dir.path().join("a/audit/computer/local/audit.jsonl")).expect("audit");
-        let last = text.lines().filter(|l| l.contains("\"click\"") || l.contains("click")).last().expect("a click line").to_owned();
+        let last = text.lines().rfind(|l| l.contains("\"click\"") || l.contains("click")).expect("a click line").to_owned();
         serde_json::from_str(&last).expect("json")
     };
     let path = run(json!({ "appKey": "Notes", "path": "/usr/bin/notes" }), json!({ "executable_path": { "4242": "/usr/bin/notes" } }));
