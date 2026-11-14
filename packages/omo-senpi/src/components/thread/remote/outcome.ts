@@ -110,6 +110,15 @@ export function outcomeFailure(
       "Retry; nothing needs to be checked first.",
       { device, reason: outcome.reason },
     )
+  // The session ended on that device after it was listed (its terminal closed, its host exited): nothing there runs it, and
+  // no update changes that. Same code a control tool answers for a thread with no live owner.
+  if (outcome.reason === "unknown_session" || outcome.reason === "session_not_found")
+    return fail(
+      "not_resumable",
+      `The thread is not running on device ${device} (${outcome.reason}).`,
+      "Call thread_list to see the thread's current state, then retry when it runs again.",
+      { device, reason: outcome.reason },
+    )
   if (outcome.reason === "record_too_large")
     return fail(
       "unsupported",
