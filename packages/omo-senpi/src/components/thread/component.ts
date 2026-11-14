@@ -25,13 +25,9 @@ import { createDefaultRemoteSurface } from "./remote/default-remote"
 import { createOmoNativeProductConfig } from "../telemetry/product-identity"
 import { defaultThreadStateDirectory } from "./live-surface-paths"
 import { stampThisDevice } from "./remote/this-device"
-import {
-  processIntakeAdmission,
-  processSameDeviceWake,
-  startThreadWakeAtSession,
-  wakeSettingsReader,
-  type ThreadWakeOptions,
-} from "./wake/runtime"
+import type { IntakeAdmission } from "./gateway/intake-admission"
+import type { SameDeviceWake } from "./gateway/same-device-wake"
+import type { ThreadWakeOptions } from "./wake/runtime"
 
 /**
  * The longest the `agent_settled` handler waits for an armed completion's store write. senpi waits
@@ -426,7 +422,24 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
       // store of this agent directory, whose worker the sweep would keep from retiring (#13455, design A3.1.4).
       const wakeOptions: ThreadWakeOptions = { store, ...options.wake }
       const warn = (line: string) => ctx.logger.warn(line)
-      const wakeSettings = wakeSettingsReader(wakeOptions, callerWorkspaceRoot, warn)
+      // The wake's runtime (the carrier and its host connection, the delivery consumer and its device-service client)
+      // lives in its own sidecar (#omo-wake-runtime -> extensions/omo-wake.js): the main bundle carries only the lazy
+      // shells below, and a load that fails answers as if no wake exists rather than taking the send down with it.
+      const wakeRuntime = (): Promise<typeof import("#omo-wake-runtime")> => import("#omo-wake-runtime")
+      let sameDeviceBuilt: Promise<SameDeviceWake> | undefined
+      const sameDeviceWake: SameDeviceWake = {
+        afterSend: async (result) => {
+          sameDeviceBuilt ??= wakeRuntime().then((module) =>
+            module.createSameDeviceWake({ options: wakeOptions, store, agentDir, sessionsDirectory, cwd: callerWorkspaceRoot, warn }),
+          )
+          return await sameDeviceBuilt.then((wake) => wake.afterSend(result), () => result)
+        },
+      }
+      let admissionBuilt: Promise<(device: string) => Promise<IntakeAdmission>> | undefined
+      const wakeAdmission = async (device: string): Promise<IntakeAdmission> => {
+        admissionBuilt ??= wakeRuntime().then((module) => module.intakeAdmission(wakeOptions, agentDir))
+        return await admissionBuilt.then((ask) => ask(device), () => "unknown")
+      }
       const tools = registerThreadTools(
         pi,
         {
@@ -439,13 +452,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
           diskSessions: options.diskSessions,
           sessionsDirectory,
           ensureHost: options.ensureHost,
-          sameDeviceWake: processSameDeviceWake({
-            options: wakeOptions,
-            store,
-            agentDir,
-            sessionsDirectory,
-            settings: wakeSettings,
-          }),
+          sameDeviceWake,
           callerSessionId: options.callerSessionId ?? (() => UNKNOWN_CALLER),
           callerWorkspaceRoot,
           callerTurnId: () => (run.turn === 0 ? undefined : `turn-${run.turn}`),
@@ -476,15 +483,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
           )
         }
       }
-      const registrant = registerControlEndpoint(
-        pi,
-        ctx,
-        options,
-        store,
-        agentDir,
-        pickUpArms,
-        processIntakeAdmission(wakeOptions, agentDir),
-      )
+      const registrant = registerControlEndpoint(pi, ctx, options, store, agentDir, pickUpArms, wakeAdmission)
       // A question this session relayed to a chat thread and then closed itself (answered here, timed out,
       // cancelled) is closed in the store too, so the connector stops holding that thread's later rows behind
       // it. Only a session that relayed a question touches the store for it; an answer that came through
@@ -558,15 +557,23 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         }
       }
       pi.on("session_start", (_event, eventCtx) => {
-        startThreadWakeAtSession(eventCtx, {
-          options: wakeOptions,
-          agentDir,
-          sessionsDirectory,
-          settings: wakeSettings,
-          engineVersion: pi.hostVersion,
-          ensureHost: options.ensureHost,
-          warn,
-        })
+        void wakeRuntime()
+          .then((module) =>
+            module.startWakeAtSession(eventCtx, {
+              options: wakeOptions,
+              agentDir,
+              sessionsDirectory,
+              cwd: callerWorkspaceRoot,
+              engineVersion: pi.hostVersion,
+              ensureHost: options.ensureHost,
+              warn,
+            }),
+          )
+          .catch((error: unknown) =>
+            warn(
+              `thread gateway: the session wake runtime could not be loaded: ${error instanceof Error ? error.message : String(error)}`,
+            ),
+          )
         void importLegacyMailbox()
         const durableId = durableIdOf(eventCtx)
         if (durableId !== undefined) void pickUpArms(durableId)
