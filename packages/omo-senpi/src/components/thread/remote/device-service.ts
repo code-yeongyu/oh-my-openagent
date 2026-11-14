@@ -2,6 +2,7 @@ import { outcomeOf } from "./outcome"
 import {
   connectDeviceService,
   LocalApiError,
+  WAKE_ACCEPTS,
   type CommandResult,
   type DeviceService,
   type RemoteAttach,
@@ -12,6 +13,8 @@ export type DeviceServiceSessionsOptions = {
   readonly version: string
   /** Test seam: the proven local API connection (the device service SDK by default). */
   readonly connect?: () => Promise<DeviceService>
+  /** Test seam: the client's own cap on one single-probe locate (LOOKUP_CAP_MS). */
+  readonly lookupCapMs?: number
   /** Test seam: the wait between attaches of a just-created session while its device's listing catches up. */
   readonly retryDelay?: (ms: number) => Promise<void>
 }
@@ -86,6 +89,13 @@ const sessionReason = (code: string): string => (code === "session_not_found" ? 
 // Like the port's read, every failure of one is a typed refusal: there is nothing that may have run.
 const READ_ONLY_RECORDS: ReadonlySet<string> = new Set(["get_state", "get_messages"])
 
+// omo#13037 A6: only a peer delivery carries the wake mark, and only through a service that carries it.
+const MARKED_RECORDS: ReadonlySet<string> = new Set(["admit_external_message"])
+
+// A single-probe locate that ran and found nothing: the device answered and holds no such session. Any other failure
+// means the device did not answer within the bound (or could not be reached), so the lookup counts it as silent.
+const LOOKUP_NONE: ReadonlySet<string> = new Set(["session_not_found", "peer_not_found", "peer_not_session_client"])
+
 // The one read a session's attach holds: its model catalog (`get_available_models`). The catalog does not change with
 // what the session does, so it is held until the attach shows a new snapshot (the host re-established it) or ends, and
 // is bounded in age; it only decides an exact provider/id that set_model then confirms (remote-controls.ts). Status and
@@ -128,6 +138,10 @@ function durableIdOf(row: object): { readonly durable_id?: string } {
   const value = Reflect.get(row, "durable_id")
   return typeof value === "string" && value !== "" ? { durable_id: value } : {}
 }
+
+// omo#13037 A4.3.3: the service bounds a single-probe locate at 3 s; the client holds its own cap so a send's bound does
+// not rest on the service honouring it. A device past the cap counts as silent.
+const LOOKUP_CAP_MS = 3_500
 
 export function createDeviceServiceSessions(options: DeviceServiceSessionsOptions): RemoteSessionsPort {
   let service: Promise<DeviceService> | undefined
@@ -174,17 +188,19 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     thisDevice: async () => (await (await svc()).thisDevice())?.id ?? null,
     devices: async () =>
       (await (await svc()).devices()).map((row) => ({ device: row.device, label: row.label, online: row.online })),
-    sessions: async () =>
-      (await (await svc()).sessions()).rows.map((row) => ({
-        device: row.device,
-        session_id: row.session_id,
-        ...durableIdOf(row),
-        title: row.title,
-        project: row.project,
-        path: row.path,
-        state: row.state,
-        updated_ms: row.updated_ms,
-      })),
+    sessions: async (filter) =>
+      (await (await svc()).sessions(filter?.device === undefined ? undefined : { device: filter.device })).rows.map(
+        (row) => ({
+          device: row.device,
+          session_id: row.session_id,
+          ...durableIdOf(row),
+          title: row.title,
+          project: row.project,
+          path: row.path,
+          state: row.state,
+          updated_ms: row.updated_ms,
+        }),
+      ),
     // create / open / fork on another device: relay daemon #393's attach-less `session.command {device, endpoint, rpc}`.
     // The endpoint lookup and every refusal answered before sending ran nothing; anything after sending may have.
     endpointCommand: async (device, rpc, endpointOptions) => {
@@ -235,8 +251,12 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         if (held !== undefined) return { kind: "ok", response: held, local: true }
       }
       const sentAt = catalog.snapshots()
+      // The gate is this connection's: a reconnect to an older service stops the mark.
+      const carries =
+        MARKED_RECORDS.has(String(rpc["type"])) && (await svc().catch(() => undefined))?.carriesWakeMark === true
+      const marked = carries ? { accepts: WAKE_ACCEPTS } : undefined
       try {
-        const outcome = outcomeOf(await attached.command(record))
+        const outcome = outcomeOf(await attached.command(record, marked))
         if (isCatalog && outcome.kind === "ok") catalog.keep(key, outcome.response, sentAt)
         return readOnly && outcome.kind === "uncertain" ? { kind: "refused", reason: outcome.reason } : outcome
       } catch (error) {
@@ -279,6 +299,55 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       })
       live = true
       return { kind: "ok", watch: { ended: attached.detached, stop } }
+    },
+    lookup: async (device, durableId) => {
+      let connected: DeviceService
+      try {
+        connected = await svc()
+      } catch (error) {
+        return { kind: "silent", reason: notSentReason(error) }
+      }
+      if (!connected.takesSingleLocate) return { kind: "unavailable" }
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const capped = new Promise<"timeout">((resolve) => {
+        timer = setTimeout(() => resolve("timeout"), options.lookupCapMs ?? LOOKUP_CAP_MS)
+        timer.unref?.()
+      })
+      try {
+        const answer = await Promise.race([connected.locate(device, durableId, { single: true }), capped])
+        if (answer === "timeout") return { kind: "silent", reason: "lookup_timeout" }
+        return { kind: "found", key: answer.key }
+      } catch (error) {
+        const code = error instanceof LocalApiError ? error.code : "locate_failed"
+        return LOOKUP_NONE.has(code) ? { kind: "none" } : { kind: "silent", reason: code }
+      } finally {
+        clearTimeout(timer)
+      }
+    },
+    canWake: async () => (await svc().catch(() => undefined))?.carriesWakeMark === true,
+    canLookup: async () => (await svc().catch(() => undefined))?.takesSingleLocate === true,
+    wake: async (device, durableId, rpc) => {
+      let record: WireRpc
+      try {
+        record = wireRecord(rpc)
+      } catch {
+        return { kind: "refused", reason: "invalid_record" }
+      }
+      let connected: DeviceService
+      try {
+        connected = await svc()
+      } catch (error) {
+        return { kind: "refused", reason: notSentReason(error) }
+      }
+      if (!connected.carriesWakeMark) return { kind: "unavailable" }
+      try {
+        return outcomeOf(await connected.wakeCommand(device, durableId, record))
+      } catch (error) {
+        if (error instanceof LocalApiError && error.not_sent === true) return { kind: "refused", reason: error.code }
+        if (error instanceof LocalApiError && error.command_id === undefined && REFUSED_BEFORE_SENDING.has(error.code))
+          return { kind: "refused", reason: error.code }
+        return { kind: "uncertain", reason: "reply_lost" }
+      }
     },
     close: async () => {
       const open = service

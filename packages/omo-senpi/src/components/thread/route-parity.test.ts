@@ -72,14 +72,14 @@ describe("#13006: a send answers the same shape and the same refusals whichever 
     const a = fixture.account({ rows, live: rows.map((row) => row.session_id) })
     const extra =
       sender === undefined ? {} : { callerReplyTargets: () => [sender.session_id], callerReplySenders: () => [sender] }
-    const { run, permission, prompts, agentDir } = fixture.surface(a.remote, {
+    const { run, permission, prompts, agentDir, enqueuedFor } = fixture.surface(a.remote, {
       sessions: twinsOn === "local" ? [LOCAL, ...TWINS] : [LOCAL],
       ...extra,
     })
     const admits = () => a.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message")
     // A delivery to a session on this device leaves a marker in its gateway inbox: none means nothing reached it.
     const reachedLocally = (durableId: string) => existsSync(gatewayInboxDirectory(agentDir, durableId))
-    return { run, permission, admits, prompts, reachedLocally }
+    return { run, permission, admits, prompts, reachedLocally, enqueuedFor }
   }
 
   /**
@@ -143,7 +143,7 @@ describe("#13006: a send answers the same shape and the same refusals whichever 
     "#given a run woken by a sender that stated the %s thread's name but is another session #when it replies by that name #then the ask is approved from the delivery, and the send never reaches the thread carrying that name",
     async (leg) => {
       const other = TARGET[leg].other
-      const { run, permission, admits, prompts, reachedLocally } = legs({
+      const { run, permission, admits, prompts, reachedLocally, enqueuedFor } = legs({
         sender: { session_id: other.id, name: TARGET[leg].name, ...(other.id === "dur-on-b" ? { device: "b" } : {}) },
       })
       expect(permission({ thread: TARGET[leg].name, message: "reply" })).toEqual(approved(TARGET[leg].name))
@@ -152,7 +152,9 @@ describe("#13006: a send answers the same shape and the same refusals whichever 
         expect(result).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
         expect(admits()).toHaveLength(1)
         // The local namesake ("local peer", dur-local) received nothing: no prompt and no gateway delivery.
-        expect({ prompts: prompts(), reached: reachedLocally("dur-local") }).toEqual({ prompts: 0, reached: false })
+        expect(prompts()).toBe(0)
+        expect(enqueuedFor("dur-local")).toBe(0)
+        expect(reachedLocally("dur-local")).toBe(false)
       } else {
         expect(result).toMatchObject({ kind: "error", error: { code: "not_found" } })
         expect(admits()).toHaveLength(0)
@@ -188,4 +190,53 @@ describe("#13006: a send answers the same shape and the same refusals whichever 
       expect(again).toMatchObject({ ...rest, deduplicated: true })
     },
   )
+  // #13037 5.8: the not-running row on both legs, and a live relayed delivery against a woken one, field by field.
+  const NOT_RUNNING = "0195f0c2-1a2b-7c3d-8e4f-00000000b001"
+
+  test.each(LEGS)(
+    "#13037: #given a thread on the %s leg that no process runs #when it is sent to #then it is queued (offline here, waiting on the wake there) with the same result keys",
+    async (leg) => {
+      const a = fixture.account({ rows: [B_ROW], ended: { b: { [NOT_RUNNING]: "rk-not-running" } }, wakeFeature: true })
+      const { run } = fixture.surface(a.remote, leg === "local" ? { diskSessions: [NOT_RUNNING] } : {})
+      const result = await run("thread_send", { thread: NOT_RUNNING, message: "while you were away" })
+      expect(result).toMatchObject(
+        leg === "local"
+          ? { kind: "ok", delivery: { kind: "queued_offline" } }
+          : { kind: "ok", device: "b", delivery: { kind: "queued", waiting_on: { kind: "wake", device: "b" } } },
+      )
+      expect(sharedKeys(result as object)).toEqual([
+        "deduplicated",
+        "delivery",
+        "delivery_id",
+        "effective_mode",
+        "kind",
+      ])
+    },
+  )
+
+  test("#13037 5.8: #given the same message relayed to a live session and woken to one that is not running #when the two records are compared #then they differ only in the recorded fields", async () => {
+    const a = fixture.account({ rows: [B_ROW], ended: { b: { [NOT_RUNNING]: "rk-not-running" } }, wakeFeature: true })
+    const { run } = fixture.surface(a.remote)
+    await run("thread_send", { thread: "dur-on-b", message: "same text", delivery: "follow_up" })
+    await run("thread_send", { thread: NOT_RUNNING, message: "same text", delivery: "follow_up" })
+    const records = a.sent
+      .filter((entry) => entry.rpc?.["type"] === "admit_external_message")
+      .map((entry) => entry.rpc ?? {})
+    const [live, woken] = records
+    if (live === undefined || woken === undefined) throw new Error("expected one live and one woken record")
+    expect(Object.keys(woken).sort()).toEqual(Object.keys(live).sort())
+    const same = (field: string) => [
+      field,
+      JSON.stringify(live[field]) === JSON.stringify(woken[field]) ? "equal" : "different",
+    ]
+    expect(["type", "deliverAs", "sender", "chainCount", "displayText", "sessionId"].map(same)).toEqual([
+      ["type", "equal"],
+      ["deliverAs", "equal"],
+      ["sender", "equal"],
+      ["chainCount", "equal"],
+      ["displayText", "equal"],
+      ["sessionId", "different"],
+    ])
+    expect(woken["sessionId"]).toBe(NOT_RUNNING)
+  })
 })

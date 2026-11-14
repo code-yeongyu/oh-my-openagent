@@ -13,6 +13,7 @@ import type {
   SessionFilter,
   Welcome,
 } from "./protocol.ts"
+import type { WakeAccepts } from "./protocol-command.ts"
 import { connectLocal, type Transport } from "./transport.ts"
 import { checkCommandText, MESSAGE_LIMIT_CHARS, uploadParts } from "./upload.ts"
 import { validateWelcome } from "./validate.ts"
@@ -39,7 +40,17 @@ export type LocalApiClient = {
   readonly onEvent: (listener: (event: LocalEvent) => void) => () => void
   // omo addition over the vendored client: `route` opts the command into the delegated channel (decision 0018), on
   // the inline line and on the upload's closing session.command alike.
-  readonly command: (attach: string, rpc: CommandRpc, command_id?: string, route?: DelegatedRoute) => Promise<string>
+  // `accepts` (omo#13037 A6) marks the command as understanding the wake answer; omitted, the bytes are as before.
+  readonly command: (
+    attach: string,
+    rpc: CommandRpc,
+    command_id?: string,
+    route?: DelegatedRoute,
+    options?: { readonly accepts?: WakeAccepts },
+  ) => Promise<string>
+  // omo#13037: `session.command {wake: {device, durable_id}, rpc}`, always delegated and inline only, for a session of
+  // `device` that no listing maps. The wake target implies the mark.
+  readonly wakeCommand: (device: string, durableId: string, rpc: CommandRpc, command_id?: string) => Promise<string>
   // omo addition (relay daemon #393): the attach-less endpoint command `session.command {device, endpoint, rpc}`,
   // always delegated. Inline only: a record over the inline line limit is refused message_too_long before sending.
   // `locate` asks for an open's new session on its reply (decision 0018 amendment 2026-11-06, `located`).
@@ -118,7 +129,9 @@ const sendCommand = async (
   rpc: CommandRpc,
   command_id: string | undefined,
   route: DelegatedRoute,
+  accepts: WakeAccepts | undefined,
 ): Promise<string> => {
+  const marked = accepts === undefined ? {} : { accepts }
   // Always sent, minted here when the caller gave none: a command whose answer times out may still have been
   // dispatched, and its outcome arrives as session.command_state for this id. A retry of the same record to the same
   // target session under this id dispatches nothing more; anything else under it is command_id_conflict.
@@ -153,10 +166,36 @@ const sendCommand = async (
     // A part that times out leaves session.command unsent, so the command was never dispatched: that timeout is
     // reported as it is, with no command_id, and a fresh retry is safe.
     await Promise.all(parts)
-    return (await connection.request("session.command", { attach, ...id, ...route, upload_id }).catch(timedOut))
-      .command_id
+    return (
+      await connection.request("session.command", { attach, ...id, ...marked, ...route, upload_id }).catch(timedOut)
+    ).command_id
   }
-  return (await connection.request("session.command", { attach, ...id, ...route, rpc }).catch(timedOut)).command_id
+  return (await connection.request("session.command", { attach, ...id, ...marked, ...route, rpc }).catch(timedOut))
+    .command_id
+}
+
+const sendWakeCommand = async (
+  connection: ClientConnection,
+  device: string,
+  durableId: string,
+  rpc: CommandRpc,
+  command_id: string | undefined,
+): Promise<string> => {
+  const sent = command_id ?? mintId()
+  const params = { wake: { device, durable_id: durableId }, command_id: sent, rpc }
+  if (lineBytes({ id: "x".repeat(REQUEST_ID_MAX_CHARS), type: "session.command", ...params }) > LOCAL_INLINE_MAX)
+    throw new LocalApiError("message_too_long", "a wake command travels inline only", {
+      limit_chars: MESSAGE_LIMIT_CHARS,
+    })
+  try {
+    return (await connection.request("session.command", params)).command_id
+  } catch (error) {
+    if (error instanceof LocalApiError && error.code === "request_timeout")
+      throw new LocalApiError("request_timeout", `command ${sent} may have been dispatched; follow its command state`, {
+        command_id: sent,
+      })
+    throw error
+  }
 }
 
 const sendEndpointCommand = async (
@@ -206,7 +245,10 @@ export const connectLocalApi = async (options: ConnectOptions): Promise<LocalApi
         listeners.delete(listener)
       }
     },
-    command: (attach, rpc, command_id, route = {}) => sendCommand(connection, attach, rpc, command_id, route),
+    command: (attach, rpc, command_id, route = {}, options) =>
+      sendCommand(connection, attach, rpc, command_id, route, options?.accepts),
+    wakeCommand: (device, durableId, rpc, command_id) =>
+      sendWakeCommand(connection, device, durableId, rpc, command_id),
     endpointCommand: (device, endpoint, rpc, command_id, options) =>
       sendEndpointCommand(connection, device, endpoint, rpc, command_id, options?.locate === true),
     list: (filter, onRevision, rows) =>

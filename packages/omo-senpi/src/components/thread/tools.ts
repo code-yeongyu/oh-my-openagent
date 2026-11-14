@@ -3,7 +3,7 @@ import { threadToolFailure } from "./errors"
 import type { ThreadErrorCode, ThreadToolFailure } from "./errors"
 import { type Static } from "typebox"
 import { toThreadAddressEntries } from "./address-book"
-import { checkNameConflict, normalizeThreadName, type ThreadAddressEntry, type ThreadResolveResult } from "./addressing"
+import { checkNameConflict, normalizeThreadName, type ThreadResolveResult } from "./addressing"
 import { createLocalSessionHost } from "./control/local-session-host"
 import { checkInitialSkills } from "./initial-skills"
 import {
@@ -348,6 +348,23 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
             const found = await resolveAcross(options, entries, address, callerId, true)
             if (found.kind === "error")
               return { kind: "error", result: { kind: "error", error: found } as ThreadToolResult }
+            // A session found only by a probe (no file path: its device holds it but runs it nowhere) is no existing thread to
+            // open (omo#13037 A4.4): today's answer for a holder that cannot be reached, and no open is sent. A listed ended
+            // thread still opens from its file, as before.
+            if (
+              found.entry.transport?.kind === "relay" &&
+              found.entry.transport.row.state === "ended" &&
+              found.entry.transport.row.path === ""
+            )
+              return {
+                kind: "error",
+                result: failure(
+                  "not_found",
+                  `Thread ${found.entry.thread_id} on device ${found.entry.transport.row.device} is not running there.`,
+                  "Call thread_list with all_scope to find the live thread.",
+                  { device: found.entry.transport.row.device, thread_id: found.entry.thread_id },
+                ),
+              }
             return found.entry.transport?.kind === "relay"
               ? { kind: "remote", row: found.entry.transport.row }
               : { kind: "local", address: found.entry.thread_id, accountWide: true }
@@ -663,7 +680,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
     // A reply to a sender on this device resolves among this device's entries only (A4.3.1).
     const resolved: ThreadResolveResult & { readonly all_scope?: boolean | undefined } =
       replyTo === undefined
-        ? await resolveAcross(options, entries, address, callerId, scope, match)
+        ? await resolveAcross(options, entries, address, callerId, scope, match, true)
         : resolution(options, entries, address, callerId, scope)
     if (resolved.kind === "error")
       return { kind: "error", result: { kind: "error", error: resolved } as ThreadToolResult }

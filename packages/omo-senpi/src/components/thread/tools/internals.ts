@@ -1,7 +1,7 @@
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import type { ThreadResolveResult } from "../addressing"
 import { relayAddressBook, relayAddressEntry, type RelayAddressBook } from "../remote/address-book"
-import { rowThreadId, type RemoteSessionRow } from "../remote/ports"
+import { endedRow, rowThreadId, type RemoteSessionRow } from "../remote/ports"
 import { remoteAvailable } from "../remote/remote-ops"
 import {
   assembleAddressBook,
@@ -267,8 +267,10 @@ export function targetSession(view: ThreadHostView, durableId: string): ThreadHo
 }
 
 /**
- * Amendment A4.3.1 of #13037: an approved reply to a sender whose delivery came from another device resolves to the
- * account listing's row for that session id on THAT device, and nowhere else; no row there is not_found naming the device.
+ * Amendment A4.3.1 of #13037: an approved reply to a sender whose delivery came from another device resolves on THAT
+ * device and nowhere else: its listing row for that id when it lists one (a read of that one device, never the whole
+ * account), else one probe of that device, which finds a session it holds but does not run as an `ended` row (A4.2).
+ * No row there is not_found naming the device; a probe that got no answer is host_unavailable naming it.
  */
 export async function replyOnDevice(
   options: ThreadToolSurfaceOptions,
@@ -290,7 +292,7 @@ export async function replyOnDevice(
   if (unavailable !== undefined) return { kind: "error", ...unavailable.error } as ThreadResolveResult
   let rows: readonly RemoteSessionRow[]
   try {
-    rows = await remote.sessions.sessions()
+    rows = await remote.sessions.sessions({ device: sender.device })
   } catch (error) {
     return {
       kind: "error",
@@ -305,7 +307,25 @@ export async function replyOnDevice(
   const row = rows.find(
     (candidate) => candidate.device === sender.device && rowThreadId(candidate) === sender.session_id,
   )
-  return row === undefined ? missing() : { kind: "ok", entry: relayAddressEntry(row), resolution: "id" }
+  if (row !== undefined) return { kind: "ok", entry: relayAddressEntry(row), resolution: "id" }
+  const probed = await remote.sessions.lookup?.(sender.device, sender.session_id)
+  if (probed?.kind === "found")
+    return {
+      kind: "ok",
+      entry: relayAddressEntry(endedRow(sender.device, probed.key, sender.session_id)),
+      resolution: "id",
+    }
+  if (probed?.kind === "silent")
+    return {
+      kind: "error",
+      ...threadToolFailure(
+        "host_unavailable",
+        `Device ${sender.device}, where the sender's delivery came from, did not answer whether it holds ${sender.session_id}.`,
+        "Retry when that device answers.",
+        { thread_id: sender.session_id, device: sender.device, reason: probed.reason },
+      ),
+    } as ThreadResolveResult
+  return missing()
 }
 
 /**
@@ -323,6 +343,7 @@ export async function resolveAcross(
   callerId: string,
   allScope: boolean | undefined,
   match: "exact" | "fuzzy" = "exact",
+  lookup = false,
 ): Promise<ThreadResolveResult & { readonly all_scope?: boolean | undefined }> {
   if (match === "fuzzy" && allScope !== true && options.callerWorkspaceRoot().trim() === "")
     return {
@@ -394,5 +415,87 @@ export async function resolveAcross(
   if (book.aliasFailure !== undefined) return { kind: "error", ...book.aliasFailure } as ThreadResolveResult
   if (book.unavailable !== undefined && here.kind === "error" && here.code === "not_found")
     return { kind: "error", ...book.unavailable } as ThreadResolveResult
+  if (lookup && across.code === "not_found" && SESSION_ID.test(address)) {
+    const looked = await lookupAcross(options.remote, address)
+    if (looked !== undefined) return looked.kind === "ok" ? { ...looked, all_scope: true } : looked
+  }
   return across
+}
+
+/** A durable session id: the only address the account-wide lookup of A4.3.3 is made for. */
+const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * omo#13037 A4.3.3: a session id that this device and the account listing both miss is looked up with one single-probe
+ * query to each ONLINE device of the account other than this one, in parallel (the device service bounds each at 3 s).
+ * One device holds it: its ended row. None and every device answered: not_found. None and a device stayed silent:
+ * host_unavailable naming it. Several: ambiguous_target naming the devices. Undefined when this device's service makes
+ * no single probe: the caller answers as before. Never a background scan; nothing is cached.
+ */
+async function lookupAcross(
+  remote: NonNullable<ThreadToolSurfaceOptions["remote"]>,
+  address: string,
+): Promise<ThreadResolveResult | undefined> {
+  // The capability first, from this device's own connection: with the probe off nothing is read for a lookup and the
+  // answer stays today's. A device round that fails leaves today's answer too.
+  const probe = remote.sessions.lookup
+  if (probe === undefined || (await remote.sessions.canLookup?.().catch(() => false)) !== true) return undefined
+  let online: readonly { readonly device: string; readonly online: boolean }[]
+  try {
+    const here = await remote.sessions.thisDevice()
+    online = (await remote.sessions.devices()).filter((device) => device.online && device.device !== here)
+  } catch {
+    return undefined
+  }
+  const answers = await Promise.all(
+    online.map(async (device) => ({ device: device.device, answer: await probe(device.device, address) })),
+  )
+  if (answers.some(({ answer }) => answer.kind === "unavailable")) return undefined
+  const holders = answers.flatMap(({ device, answer }) =>
+    answer.kind === "found" ? [{ device, key: answer.key }] : [],
+  )
+  const [only] = holders
+  if (holders.length === 1 && only !== undefined)
+    return { kind: "ok", entry: relayAddressEntry(endedRow(only.device, only.key, address)), resolution: "id" }
+  if (holders.length > 1) {
+    const candidates = holders.map((holder) => ({
+      id: address,
+      name: "",
+      cwd: "",
+      preview: "",
+      updatedAt: null,
+      state: "resumable" as const,
+      device: holder.device,
+    }))
+    return {
+      kind: "error",
+      ...threadToolFailure(
+        "ambiguous_target",
+        `Session ${address} is held on more than one device; none was picked.`,
+        "Address the session on one device with <device>/<session id>.",
+        { candidates },
+      ),
+      candidates,
+    } as ThreadResolveResult
+  }
+  const silent = answers.flatMap(({ device, answer }) => (answer.kind === "silent" ? [device] : []))
+  if (silent.length > 0)
+    return {
+      kind: "error",
+      ...threadToolFailure(
+        "host_unavailable",
+        `No device that answered holds session ${address}, and ${silent.join(", ")} did not answer.`,
+        "Retry when that device answers.",
+        { thread_id: address, devices: silent },
+      ),
+    } as ThreadResolveResult
+  return {
+    kind: "error",
+    ...threadToolFailure(
+      "not_found",
+      `No online device of this account holds session ${address}.`,
+      "The session may live on a device that is offline: retry when that device is online, or call thread_list.",
+      { thread_id: address },
+    ),
+  } as ThreadResolveResult
 }
