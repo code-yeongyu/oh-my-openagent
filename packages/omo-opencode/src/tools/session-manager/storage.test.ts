@@ -12,12 +12,24 @@ const TEST_SESSION_STORAGE = join(TEST_DIR, "session")
 const TEST_TODO_DIR = join(TEST_DIR, "todos")
 const TEST_TRANSCRIPT_DIR = join(TEST_DIR, "transcripts")
 let sqliteBackend = false
+// Tags this file's fixture functions so a later file can prove none of them is still reachable (#13286).
+const FIXTURE_TAG = { __sessionManagerFixture: true }
+
+// mock.restore() does not reach the modules that re-export a mocked one (the shared barrel, session-manager/index.ts),
+// so they kept this file's fixture paths for every later file in the process. afterAll re-mocks each module with the
+// real exports captured here, which bun carries to the re-exports too. The storage paths are mocked only in
+// opencode-storage-paths, the module that owns them, and restored last (#13286).
+const STORAGE_PATH_KEYS = new Set(["OPENCODE_STORAGE", "MESSAGE_STORAGE", "PART_STORAGE", "SESSION_STORAGE"])
+const realModules: Record<string, Record<string, unknown>> = {
+  "./constants": Object.fromEntries(
+    Object.entries(await import("./constants")).filter(([key]) => !STORAGE_PATH_KEYS.has(key)),
+  ),
+  "../../shared/opencode-storage-detection": { ...(await import("../../shared/opencode-storage-detection")) },
+  "../../shared/opencode-message-dir": { ...(await import("../../shared/opencode-message-dir")) },
+  "../../shared/opencode-storage-paths": { ...(await import("../../shared/opencode-storage-paths")) },
+}
 
 mock.module("./constants", () => ({
-  OPENCODE_STORAGE: TEST_DIR,
-  MESSAGE_STORAGE: TEST_MESSAGE_STORAGE,
-  PART_STORAGE: TEST_PART_STORAGE,
-  SESSION_STORAGE: TEST_SESSION_STORAGE,
   TODO_DIR: TEST_TODO_DIR,
   TRANSCRIPT_DIR: TEST_TRANSCRIPT_DIR,
   SESSION_LIST_DESCRIPTION: "test",
@@ -29,7 +41,7 @@ mock.module("./constants", () => ({
 }))
 
 mock.module("../../shared/opencode-storage-detection", () => ({
-  isSqliteBackend: () => sqliteBackend,
+  isSqliteBackend: Object.assign(() => sqliteBackend, FIXTURE_TAG),
   resetSqliteBackendCache: () => {},
 }))
 
@@ -41,7 +53,7 @@ mock.module("../../shared/opencode-storage-paths", () => ({
 }))
 
 mock.module("../../shared/opencode-message-dir", () => ({
-  getMessageDir: (sessionID: string) => {
+  getMessageDir: Object.assign((sessionID: string) => {
     if (!sessionID.startsWith("ses_")) return null
     if (/[/\\]|\.\./.test(sessionID)) return null
     if (!existsSync(TEST_MESSAGE_STORAGE)) return null
@@ -59,11 +71,12 @@ mock.module("../../shared/opencode-message-dir", () => ({
     }
 
     return null
-  },
+  }, FIXTURE_TAG),
 }))
 
 afterAll(() => {
   mock.restore()
+  for (const [specifier, exports] of Object.entries(realModules)) mock.module(specifier, () => exports)
 })
 
 const { getAllSessions, getMessageDir, sessionExists, readSessionMessages, readSessionTodos, getSessionInfo } =
