@@ -122,7 +122,9 @@ describe("compiled omo __kill-guard dispatch", () => {
         expect(result.output).not.toContain("Unknown option")
         expect(result.stderr).toContain("refused (R2 PROTECTED_TARGET)")
         expect(result.code).toBe(126)
-        expect(agent.killed).toBe(false)
+        expect(agent.exitCode).toBeNull()
+        expect(agent.signalCode).toBeNull()
+        expect(() => process.kill(agent.pid, 0)).not.toThrow()
       } finally {
         agent.kill()
         await agent.exited

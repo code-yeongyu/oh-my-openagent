@@ -392,9 +392,9 @@ async function answerUnderRefusedTrust(args: string[]): Promise<boolean> {
 
 async function main(): Promise<void> {
   // #13449: in a compiled binary the kill guard's shims ask THIS executable `__kill-guard check ...` before every kill,
-  // so the engine's judge answers it before any boot step: no handoff, no migration, no agent-dir write (the judge's own
-  // contract). It is the one exception to the #10697 line below; every other start still runs it. The literal path is
-  // load-bearing for the same reason as the engine import (see the note above).
+  // so this branch hands it to the engine's judge before any boot step: on this route there is no handoff, no
+  // migration and no agent-dir write. It is the one exception to the #10697 line below; every other start still runs
+  // it. The literal path is load-bearing for the same reason as the engine import (see the note above).
   if (process.argv[2] === "__kill-guard") {
     const { dispatchKillGuardCommand } =
       await import("../../node_modules/@code-yeongyu/senpi/dist/cli/kill-guard-command.js")
