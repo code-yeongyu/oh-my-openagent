@@ -57,6 +57,11 @@ export function parseSession(
   const { values: valueFlags, switches: switchFlags } = SESSION_FLAGS[verb]
   for (let index = 0; index < rest.length; index++) {
     const arg = rest[index] ?? ""
+    // `--` ends option parsing, as in `omo thread send`: a text or a value that starts with `--` can still be given.
+    if (arg === "--") {
+      positional.push(...rest.slice(index + 1))
+      break
+    }
     if (arg === "--json") json = true
     else if (valueFlags.includes(arg)) {
       const value = rest[++index]
