@@ -148,7 +148,7 @@ export function replyData(response: JsonObject): JsonObject {
 type RemoteFollowLane = "started" | "queued" | "steered"
 
 export type RemoteFollow = {
-  /** "settled" once the turn this send started settles, "session_closed" when its close cut the run short, else the reason its attach ended first. */
+  /** "settled" once the turn this send started settles, "interrupted" when that turn was stopped before it finished, "session_closed" when its close cut the run short, else the reason its attach ended first. */
   readonly settled: Promise<string>
   readonly stop: () => void
   /**
@@ -360,9 +360,17 @@ export async function followRemote(
       }
     }
   }
+  // The stop reason of the run's last assistant message: an interrupted turn ends its run with "aborted" (#13272).
+  let lastStopReason: unknown
   const streamRecord = (record: JsonObject): void => {
-    if (record["type"] === "agent_settled")
-      return end(record["reason"] === "session_closed" ? "session_closed" : "settled")
+    if (record["type"] === "agent_settled") {
+      if (record["reason"] === "session_closed") return end("session_closed")
+      return end(lastStopReason === "aborted" ? "interrupted" : "settled")
+    }
+    if (record["type"] === "message_end") {
+      const message = record["message"]
+      if (isRecord(message) && message["role"] === "assistant") lastStopReason = message["stopReason"]
+    }
     if (record["type"] === "message_start" || record["type"] === "message_end") newMessage = true
     const event = record["assistantMessageEvent"]
     if (

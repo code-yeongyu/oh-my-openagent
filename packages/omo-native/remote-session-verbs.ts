@@ -270,6 +270,10 @@ async function sendTo(
     if (!json && reply.length > 0 && !reply.endsWith("\n")) dependencies.write("\n")
     // --json: the send's typed result, with the answer it streamed.
     if (json && end === "settled") dependencies.output(JSON.stringify({ ...sent, reply }))
+    if (end === "interrupted") {
+      dependencies.error(`omo remote: the turn on ${label} was interrupted before it finished.`)
+      return REMOTE_EXIT.failed
+    }
     if (end !== "settled") {
       dependencies.error(`omo remote: the session on ${row.device} ended before its turn settled (${end}).`)
       return REMOTE_EXIT.failed
