@@ -125,9 +125,24 @@ fn remove_with_drills(window: &mut WindowRefs, number: u64) -> usize {
         .filter(|g| g.number == number || g.parent == Some(number))
         .map(|g| g.number)
         .collect();
-    doomed
+    let released = doomed
         .iter()
         .filter_map(|n| window.generations.remove(n))
         .map(|g| g.entries.len())
-        .sum()
+        .sum();
+    forget_unheld(window);
+    released
+}
+
+/// Drops the per-window map entries of numbers no kept generation holds: the maps shrink with
+/// the generations they index, so element churn cannot grow them past the retained cap.
+fn forget_unheld(window: &mut WindowRefs) {
+    let held: std::collections::HashSet<u64> =
+        window.generations.values().flat_map(|g| g.entries.iter().map(|entry| entry.n)).collect();
+    window.last_entry.retain(|n, _| held.contains(n));
+    window.by_object.retain(|_, n| held.contains(n));
+    window.by_native_id.retain(|_, numbers| {
+        numbers.retain(|n| held.contains(n));
+        !numbers.is_empty()
+    });
 }
