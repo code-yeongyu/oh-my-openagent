@@ -20,10 +20,14 @@ import { createCarrier, type Carrier, type CarrierEvaluation, type CarrierWakeOu
 import { connectCarrierHost, type CarrierHostConnection } from "./carrier-connection"
 import { startDeliveryConsumer, type ServingConsumer } from "./consumer-start"
 import { engineDropsRetainedRecord } from "./engine-minimum"
+import { engineHostEnsure, type EngineLauncher } from "./host-ensure"
 
 type Env = Readonly<Record<string, string | undefined>>
 
-export type WakeConfigView = { readonly session_wake?: OmoSessionWakeSettings | undefined }
+export type WakeConfigView = {
+  readonly session_wake?: OmoSessionWakeSettings | undefined
+  readonly task?: { readonly host_idle_exit_ms?: number | undefined } | undefined
+}
 
 /** Every field is a seam; production passes none of them. */
 export type ThreadWakeOptions = {
@@ -32,6 +36,10 @@ export type ThreadWakeOptions = {
   /** The store the carrier and the consumer share; absent, the running wake opens its own under the agent dir. */
   readonly store?: GatewayStore
   readonly connect?: () => Promise<CarrierHostConnection>
+  /** Replaces the engine's `host ensure` altogether. */
+  readonly ensureHost?: () => Promise<void>
+  readonly engineLaunch?: () => EngineLauncher
+  readonly launchSpecPath?: string
   readonly loadConfig?: (options: { readonly cwd: string }) => { readonly config: WakeConfigView }
   /**
    * The device service's delivery protocol (`deliveries.serve`, design 5.4). The device service's local API v1 does
@@ -101,6 +109,26 @@ export function wakeSettingsReader(
   }
 }
 
+/** `task.host_idle_exit_ms` as the machine's omo configuration says it, for the host the carrier ensures. */
+export function wakeHostIdleExitMs(
+  options: ThreadWakeOptions,
+  cwd: () => string,
+  warn: (line: string) => void,
+): () => number | undefined {
+  const env = options.env ?? process.env
+  const load = options.loadConfig ?? ((input) => loadOmoConfig({ cwd: input.cwd, env, harness: "senpi" }))
+  return () => {
+    try {
+      return load({ cwd: cwd() }).config.task?.host_idle_exit_ms
+    } catch (error) {
+      warn(
+        `thread wake: the task.host_idle_exit_ms setting was not read, the ensured host runs the launch spec's default: ${error instanceof Error ? error.message : String(error)}`,
+      )
+      return undefined
+    }
+  }
+}
+
 /** The local transport's same-device wake: the process's running carrier takes the wake when there is one. */
 export function processSameDeviceWake(input: {
   readonly options: ThreadWakeOptions
@@ -138,6 +166,8 @@ export type ThreadWakeStart = {
   readonly sessionsDirectory: () => string
   readonly settings: (cwd?: string) => ResolvedSessionWakeSettings
   readonly engineVersion: string | undefined
+  /** `task.host_idle_exit_ms` for the host the carrier ensures; absent, the launch spec's default runs. */
+  readonly hostIdleExitMs?: () => number | undefined
   readonly ensureHost: (() => Promise<void>) | undefined
   readonly warn: (line: string) => void
 }
@@ -171,11 +201,26 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart): Runni
   const { options } = input
   const store = options.store ?? createGatewayStore({ agentDir })
   const sessionsDirectory = input.sessionsDirectory()
+  const ensureHost =
+    options.ensureHost ??
+    input.ensureHost ??
+    engineHostEnsure({
+      env,
+      socket: resolveThreadSocket(env),
+      agentDir,
+      ...(input.hostIdleExitMs === undefined ? {} : { idleExitMs: input.hostIdleExitMs }),
+      ...(options.launchSpecPath === undefined ? {} : { launchSpecPath: options.launchSpecPath }),
+      ...(options.engineLaunch === undefined ? {} : { launch: options.engineLaunch }),
+      warn: input.warn,
+    })
   let serving: ServingConsumer | undefined
+  // True from the consumer's serving acknowledgement, before its startup pending sweep: a remote row that sweep wakes
+  // must not read the carrier's gate as off (#13456 review).
+  let servingAcked = false
   const carrier = createCarrier({
     store,
     sessionsDirectory,
-    ensureHost: input.ensureHost ?? (async () => undefined),
+    ensureHost,
     connect:
       options.connect ??
       (() =>
@@ -186,7 +231,8 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart): Runni
         })),
     wakeLimit: () => input.settings().wakeLimit,
     sameDevice: (cwd) => input.settings(cwd).sameDevice,
-    remoteWake: () => serving?.consumer.wakeAllowed() ?? false,
+    // Owner ruling 2026-11-14: a device whose service serves this engine's consumer wakes; no switch has to be told on.
+    remoteWake: () => servingAcked || serving !== undefined,
     schedule: options.schedule ?? unrefSchedule,
     onEvent: (event) => {
       if (ENDED.has(event.outcome.kind))
@@ -207,12 +253,19 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart): Runni
     minimumEngine: options.minimumEngine,
     wake,
     sameDevice: (cwd) => input.settings(cwd).sameDevice,
+    onServing: () => {
+      servingAcked = true
+    },
     log: input.warn,
   }).then(
     (started) => {
       serving = started
     },
-    (error: unknown) => input.warn(`thread wake: the delivery consumer did not start: ${String(error)}`),
+    (error: unknown) => {
+      serving = undefined
+      servingAcked = false
+      input.warn(`thread wake: the delivery consumer did not start: ${String(error)}`)
+    },
   )
   return {
     carrier,

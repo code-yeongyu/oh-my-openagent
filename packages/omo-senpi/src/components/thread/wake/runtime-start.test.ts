@@ -3,7 +3,7 @@ import { mkdtempSync } from "node:fs"
 import { join } from "node:path"
 
 import { createGatewayStore } from "../gateway/store"
-import { startThreadWakeAtSession, type ThreadWakeLatch, type ThreadWakeOptions } from "./runtime"
+import { startThreadWakeAtSession, wakeHostIdleExitMs, type ThreadWakeLatch, type ThreadWakeOptions } from "./runtime"
 
 // #13455's MEDIUM and its delta review: a carrier that carries nothing arms no sweep timer (design A3.1.4: an empty
 // wake table leaves no timer), and the one read it makes at its start to learn that arms nothing either.
@@ -11,6 +11,30 @@ import { startThreadWakeAtSession, type ThreadWakeLatch, type ThreadWakeOptions 
 const latches: ThreadWakeLatch[] = []
 afterEach(() => {
   latches.splice(0)
+})
+
+describe("the ensured host's idle-exit setting", () => {
+  test("#given a configuration the loader cannot read #when the idle exit is asked for #then the failure is warned once per read and the spec's default runs", async () => {
+    let broken = true
+    const warnings: string[] = []
+    const read = wakeHostIdleExitMs(
+      {
+        loadConfig: () => {
+          if (broken) throw new Error("the configuration is broken")
+          return { config: { task: { host_idle_exit_ms: 120_000 } } }
+        },
+      },
+      () => process.cwd(),
+      (line) => {
+        warnings.push(line)
+      },
+    )
+    expect(read()).toBeUndefined()
+    expect(warnings).toHaveLength(1)
+    broken = false
+    expect(read()).toBe(120_000)
+    expect(warnings).toHaveLength(1)
+  })
 })
 
 describe("a running wake over an empty wake table", () => {

@@ -4,6 +4,7 @@ import {
   processIntakeAdmission,
   processSameDeviceWake,
   startThreadWakeAtSession,
+  wakeHostIdleExitMs,
   wakeSettingsReader,
   type ThreadWakeOptions,
 } from "./runtime"
@@ -33,6 +34,7 @@ export function startWakeAtSession(eventCtx: unknown, input: WakeAtSessionInput)
     sessionsDirectory: input.sessionsDirectory,
     settings: wakeSettingsReader(input.options, input.cwd, input.warn),
     engineVersion: input.engineVersion,
+    hostIdleExitMs: wakeHostIdleExitMs(input.options, input.cwd, input.warn),
     ensureHost: input.ensureHost,
     warn: input.warn,
   })

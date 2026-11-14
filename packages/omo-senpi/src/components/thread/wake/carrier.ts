@@ -56,13 +56,10 @@ export type CarrierOptions = {
   readonly wakeLimit?: () => number
   /**
    * `session_wake.same_device`, read at the moment of the open for the TARGET session's cwd (its project's
-   * configuration); off unless the machine's configuration turns it on.
+   * configuration); the caller passes the resolved setting (on by default).
    */
   readonly sameDevice?: (cwd: string) => boolean
-  /**
-   * The receiving device's wake switch as the consumer was told it on its own serving connection (A7.2.3): the gate
-   * for a row from another device. Off unless a consumer is serving and was told on.
-   */
+  /** The gate for a row from another device: production allows it while this process's delivery consumer serves. */
   readonly remoteWake?: () => boolean
   readonly schedule: (run: () => void, ms: number) => () => void
   readonly onEvent?: (event: CarrierEvent) => void
