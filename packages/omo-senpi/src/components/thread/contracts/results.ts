@@ -85,8 +85,8 @@ export type ThreadLocalAliasNote = {
   readonly alias_unavailable?: "sign_in" | "no_registry" | "no_remote"
   /**
    * Set only when the account was gone by the alias claim, after thread_create had made the thread: the alias could
-   * not become its local name (`name_conflict` with another thread, or the code that refused the rename), so the
-   * thread keeps the name it was created with.
+   * not become its local name (`name_conflict` with another thread, the code that refused the rename, or
+   * `host_unavailable` when the rename failed with no typed refusal), so the thread keeps the name it was created with.
    */
   readonly local_name_unavailable?: ThreadErrorCode
 }
