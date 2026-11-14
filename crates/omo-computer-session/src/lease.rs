@@ -250,4 +250,59 @@ mod race_tests {
             assert_eq!(winners.iter().filter(|w| **w).count(), 1, "round {round}: {winners:?}");
         }
     }
+
+    /// Review L4 at a07dff9 (R70cl): when the machine-wide record lock cannot be taken, a window
+    /// reservation is refused (fail closed, as the control slot), never taken unlocked.
+    #[test]
+    fn a_window_admit_whose_lock_cannot_be_taken_is_refused() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let holder = Holder { session_id: "l4".to_owned(), agent: "a".to_owned() };
+        let token = SessionToken::under(dir.path(), holder).expect("token");
+        let runtime = token.dir().expect("a machine-wide token").to_owned();
+        std::fs::create_dir_all(runtime.join("records.lock")).expect("a lock path that cannot be opened");
+        let refused = crate::reservation::Reservations::default().admit(&token, &["7".to_owned()], 0);
+        assert!(refused.is_err(), "no reservation is taken without the lock");
+    }
+
+    /// Review L4: release and report run under the same lock as admit, so a session whose
+    /// reservation expired never deletes or overwrites the fresh record another session took.
+    #[test]
+    fn release_and_report_never_undo_another_sessions_locked_admit() {
+        use crate::reservation::Reservations;
+        let window = ["7".to_owned()];
+        for round in 0..300 {
+            let dir = tempfile::tempdir().expect("tempdir");
+            let make = |name: &str| {
+                SessionToken::under(dir.path(), Holder { session_id: format!("{name}{round}"), agent: "a".to_owned() }).expect("token")
+            };
+            let (a, b, c) = (make("a"), make("b"), make("c"));
+            let mut mine = Reservations::default();
+            mine.admit(&a, &window, 0).expect("a takes the window");
+            mine.report(&a, &window, 0);
+            let barrier = Arc::new(Barrier::new(2));
+            let (late, racer) = (barrier.clone(), barrier);
+            let after = 20_000;
+            let (a, b, w) = (&a, &b, &window);
+            let ended = std::thread::scope(|scope| {
+                let old = scope.spawn(move || {
+                    late.wait();
+                    if round % 2 == 0 {
+                        mine.release(a, "7");
+                    } else {
+                        mine.report(a, w, after);
+                    }
+                });
+                let new = scope.spawn(move || {
+                    racer.wait();
+                    Reservations::default().admit(b, w, after).is_ok()
+                });
+                old.join().expect("old");
+                new.join().expect("new")
+            });
+            if ended {
+                let holder = Reservations::default().check(&c, &window, after).err().map(|busy| busy.holder.session_id);
+                assert_eq!(holder, Some(format!("b{round}")), "round {round}: b's fresh record survives");
+            }
+        }
+    }
 }
