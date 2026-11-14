@@ -12,6 +12,7 @@ const repoRoot = join(import.meta.dir, "..", "..", "..");
 const at = (path: string) => join(repoRoot, path);
 
 const ROOTS = [
+  "packages/omo-native/remote-local.ts",
   "packages/omo-native/account-show.ts",
   "packages/omo-native/remote-session-verbs.ts",
   "packages/omo-senpi/src/components/thread/remote/device-service.ts",
