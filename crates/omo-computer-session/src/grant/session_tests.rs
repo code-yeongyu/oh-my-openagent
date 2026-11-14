@@ -593,3 +593,15 @@ fn a_chord_longer_than_256_bytes_is_refused_and_cut_only_in_the_audit_line() {
     let carried = v["evidence"].as_array().and_then(|e| e.iter().find_map(|x| x.as_str()?.strip_prefix("carried="))).expect("carried");
     assert_eq!(carried.len(), 256, "cut to 256 bytes in the audit line");
 }
+
+/// The chord-refusal audit line names the call that carried the chord: session.open or stopPath.start.
+#[test]
+fn the_refusal_line_names_the_call_that_carried_the_chord() {
+    let (mut s, opened) = open_session_with(Some("ctrl+alt+shift+f12"), None);
+    opened.expect("open");
+    assert!(s.stop_path_start_checked(params(json!({ "chord": "ctrl+alt+shift+escape" }))).is_err());
+    let path = crate::audit::AuditSink::path(s.funnel.audit()).map(std::path::Path::to_path_buf).expect("an audit file");
+    let audit = std::fs::read_to_string(path).expect("audit");
+    let line = audit.lines().find(|l| l.contains("\"stop_hotkey\"")).expect("the refusal line");
+    assert!(line.contains("\"action\":\"stopPath.start\""), "{line}");
+}

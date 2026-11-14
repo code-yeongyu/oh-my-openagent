@@ -232,7 +232,7 @@ impl Session {
     pub(crate) fn open_control(&mut self, session_id: &str, stop_hotkey: Option<&str>) -> Result<(), Refusal> {
         self.funnel.set_session_id(session_id.to_owned());
         self.open_consent()?;
-        self.refuse_carried_chord(stop_hotkey)?;
+        self.refuse_carried_chord(stop_hotkey, "session.open")?;
         self.mint_token(session_id)
     }
 
@@ -294,7 +294,7 @@ impl Session {
         ))
     }
 
-    pub(crate) fn refuse_carried_chord(&mut self, stop_hotkey: Option<&str>) -> Result<(), Refusal> {
+    pub(crate) fn refuse_carried_chord(&mut self, stop_hotkey: Option<&str>, call: &str) -> Result<(), Refusal> {
         let os = backend_os(self.backend.as_ref());
         let view = self.funnel.control.consent.view();
         let configured = match view.stop_chord(os) {
@@ -306,7 +306,7 @@ impl Session {
             // tampered at once (A-IS-62 rev 5, R70an C, reversing R70aj). The peer's pid and executable
             // are owed by row 29's peer check.
             let _ = self.funnel.audit().append(crate::audit::AuditEvent {
-                action: "session.open".to_owned(),
+                action: call.to_owned(),
                 target: "stop_hotkey".to_owned(),
                 gate: crate::audit::Gate {
                     outcome: crate::audit::GateOutcome::Refused,

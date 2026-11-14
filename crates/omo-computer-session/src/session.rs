@@ -123,7 +123,7 @@ impl Session {
         // R70as(3): an unreadable configured chord arms NOTHING and refuses.
         self.refuse_unreadable_chord()?;
         let status = self.arm_configured_chord();
-        self.refuse_carried_chord(chord.as_deref())?;
+        self.refuse_carried_chord(chord.as_deref(), "stopPath.start")?;
         Ok(status)
     }
 
