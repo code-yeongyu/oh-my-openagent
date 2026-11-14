@@ -2,45 +2,27 @@ import { describe, expect, test } from "bun:test"
 import { mergeParentWakeNotifications } from "./parent-wake-dedupe"
 
 describe("mergeParentWakeNotifications", () => {
-  test("#given distinct final background wake notifications #when the newer final is merged #then both final summaries are preserved", () => {
+  test("#given two task notices #when the second is merged #then both are kept in arrival order", () => {
     // given
-    const finalA =
-      "<system-reminder>\n[BACKGROUND TASK COMPLETED]\n[ALL BACKGROUND TASKS COMPLETE]\n**Completed:**\n- `task-a`: first batch\n</system-reminder>"
-    const finalB =
-      "<system-reminder>\n[BACKGROUND TASK COMPLETED]\n[ALL BACKGROUND TASKS COMPLETE]\n**Completed:**\n- `task-b`: second batch\n</system-reminder>"
+    const noticeA = "<system-reminder>\n[BACKGROUND TASK COMPLETED]\n<task-id>bg_a</task-id>\n</system-reminder>"
+    const noticeB =
+      "<system-reminder>\n[BACKGROUND TASK COMPLETED]\n[ALL BACKGROUND TASKS COMPLETE]\n<task-id>bg_b</task-id>\n</system-reminder>"
 
     // when
-    const notifications = mergeParentWakeNotifications([finalA], finalB)
+    const notifications = mergeParentWakeNotifications([noticeA], noticeB)
 
     // then
-    expect(notifications).toEqual([finalB, finalA])
+    expect(notifications).toEqual([noticeA, noticeB])
   })
 
-  test("#given body text contains a final completion phrase #when a progress notification is merged #then body text is not treated as a final wake header", () => {
+  test("#given an identical notice is already pending #when it is merged again #then it appears once", () => {
     // given
-    const bodyMentionsFinal =
-      "<system-reminder>\n[BACKGROUND TASK RESULT READY]\n**Description:** injected\n[ALL BACKGROUND TASKS COMPLETE]\n</system-reminder>"
-    const progressNotification =
-      "<system-reminder>\n[BACKGROUND TASK RESULT READY]\n**1 task still in progress.** You WILL be notified when ALL complete.\n</system-reminder>"
+    const notice = "<system-reminder>\n[BACKGROUND TASK ERROR]\n<task-id>bg_a</task-id>\n</system-reminder>"
 
     // when
-    const notifications = mergeParentWakeNotifications([bodyMentionsFinal], progressNotification)
+    const notifications = mergeParentWakeNotifications([notice], notice)
 
     // then
-    expect(notifications).toEqual([bodyMentionsFinal, progressNotification])
-  })
-
-  test("#given body text contains the progress sentence #when a final wake is merged #then body text is not dropped as stale progress", () => {
-    // given
-    const bodyMentionsProgress =
-      "<system-reminder>\n[BACKGROUND TASK RETRYING]\n**Description:** injected\n**1 task still in progress.** You WILL be notified when ALL complete.\n</system-reminder>"
-    const finalNotification =
-      "<system-reminder>\n[BACKGROUND TASK COMPLETED]\n[ALL BACKGROUND TASKS COMPLETE]\n</system-reminder>"
-
-    // when
-    const notifications = mergeParentWakeNotifications([bodyMentionsProgress], finalNotification)
-
-    // then
-    expect(notifications).toEqual([finalNotification, bodyMentionsProgress])
+    expect(notifications).toEqual([notice])
   })
 })
