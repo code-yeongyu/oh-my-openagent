@@ -102,7 +102,7 @@ All 11 package manifests that declare `bun-types` or `@types/bun` now pin 1.4.4,
 
 Every `oven-sh/setup-bun` step in `.github/workflows` installs Bun 1.4.4 instead of 1.4.3, and the Bun install-cache keys move from `bun-1.4.3-` to `bun-1.4.4-`, so no job restores a cache built by 1.4.3. `.devcontainer/Dockerfile` installs `bun-v1.4.4`, `script/agent/setup.sh` expects 1.4.4, and AGENTS.md, CONTRIBUTING.md and the devcontainer README name 1.4.4. `bun-types` and `@types/bun` stay at 1.4.3: moving them regenerates the lockfiles and the committed Codex installer bundle, which inlines `packages/omo-codex/package.json`. `bun install --frozen-lockfile` under 1.4.4 leaves every lockfile unchanged.
 
-## 2026-10-23 - Inside OmO Desktop the browser skill is the terminal's, plus the app's built-in browser (a desktop app change)
+## 2026-10-23 - Inside OmO Desktop the browser skill is the terminal's, plus the app's built-in browser (sisyphuslabs/omo-desktop-app#4227)
 
 Under `OMO_BROWSER_ENGINE` (the desktop sets it for every session) `loadOmowright()` used to return a guarded library: on the default engine (`builtin`) it refused `connectBrowserSkill()` and every owned creator (`connectPipe`, `connectCloakProfile`, `connect`), refused every export outside an allowlist, and wrapped the user's-browser session with state events, Stop and an ask-before-irreversible question (#9486). An agent on default settings had no browser unless it knew to call `connectBuiltinBrowser()`, the app showed nothing, and agents went looking for a way around it. Product direction (2026-10-23): inside the app the agent's browser path is the same as in the terminal, and the app's built-in browser is offered in addition.
 
@@ -491,7 +491,7 @@ The environment variable table lists `PI_CACHE_RETENTION`.
 
 ## 2026-10-08 - OpenCode never migrates `.sisyphus` into the home `~/.omo`; `~/.omo/desktop*` is reserved for the OmO desktop app (#9727)
 
-The OmO desktop app is moving its data home (a live SQLite database and worktrees) to `~/.omo/desktop`, with a transient `~/.omo/desktop.init-*` while it prepares (a desktop app change). The OpenCode plugin's legacy workspace migration (`packages/omo-opencode/src/shared/legacy-workspace-migration.ts`, run on every plugin load) copied missing entries of `<cwd>/.sisyphus` into `<cwd>/.omo`. When OpenCode started in the home folder, that target was the OmO home itself, so a stray `~/.sisyphus/desktop/` could drop files into the desktop app's database folder. The migration now:
+The OmO desktop app is moving its data home (a live SQLite database and worktrees) to `~/.omo/desktop`, with a transient `~/.omo/desktop.init-*` while it prepares (code-yeongyu/omo-desktop-app#1829). The OpenCode plugin's legacy workspace migration (`packages/omo-opencode/src/shared/legacy-workspace-migration.ts`, run on every plugin load) copied missing entries of `<cwd>/.sisyphus` into `<cwd>/.omo`. When OpenCode started in the home folder, that target was the OmO home itself, so a stray `~/.sisyphus/desktop/` could drop files into the desktop app's database folder. The migration now:
 - **Refuses the home target:** it does nothing when the directory is the user's home, in any of its spellings: `HOME`/`USERPROFILE` (the config loader's user layer), `os.homedir()`, and the account home. `.sisyphus` was always a per-project workspace, and the only home-level legacy entry, `~/.sisyphus/rules`, is still read in place by the rules engine.
 - **Never overwrites:** it decides whether a target exists with `lstat` and copies with `COPYFILE_EXCL`, so an existing file is never overwritten and a dangling symlink at the target is never written through.
 
@@ -824,7 +824,7 @@ v0.99.1 sync, so `provider-map.json` gains the new builtin providers `meta` (OAu
 `bun` phantom-turn fix (#9362, senpi#2494) and per-session permission presets (senpi#2461).
 
 
-## 2026-10-01 - Repeat macOS permission denials name the earlier pane (a desktop app change)
+## 2026-10-01 - Repeat macOS permission denials name the earlier pane (omo-desktop-app#1437)
 
 macOS permission guidance now says the privacy pane has been opened only when the current denial opened it. Repeat denials refer to the pane opened earlier, or tell the user to open it when the initial attempt failed, while retaining the turn-on and fully quit/relaunch instructions and the responsible-process TCC identity.
 
