@@ -9,8 +9,8 @@
 ## HOW IT WORKS
 
 ```
-tool.execute.after (read/write/edit/multiedit)
-  → Extract file path from tool output
+tool.execute.after (read/write/edit/multiedit, apply_patch)
+  → Extract file path(s) from tool output (apply_patch: every added, updated or moved-to file)
   → Find rule files near that path (finder.ts)
   → Already injected this session? (cache.ts)
   → Inject rule content into tool output (injector.ts)
@@ -18,7 +18,7 @@ tool.execute.after (read/write/edit/multiedit)
 
 ## TRACKED TOOLS
 
-`["read", "write", "edit", "multiedit"]` — triggers only on file manipulation tools.
+`["read", "write", "edit", "multiedit"]` plus `apply_patch` — triggers only on file manipulation tools. apply_patch paths come from its result `metadata.files`, else from the patch's `*** Add File:` / `*** Update File:` / `*** Move to:` headers; deleted files are skipped.
 
 ## KEY FILES
 
@@ -33,6 +33,7 @@ tool.execute.after (read/write/edit/multiedit)
 | `rule-distance.ts` | Calculate path distance between file and rule file |
 | `project-root-finder.ts` | Find project root (stops at .git, package.json) |
 | `output-path.ts` | Extract file paths from tool output text |
+| `apply-patch-paths.ts` | Files an apply_patch call left in place (metadata first, patch headers as fallback) |
 | `cache.ts` | `createSessionCacheStore()` — per-session injection dedup |
 | `storage.ts` | Persist injected paths across tool calls |
 | `parser.ts` | Parse rule file content |
