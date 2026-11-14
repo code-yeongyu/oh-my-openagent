@@ -268,10 +268,12 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart): Runni
   // the service is not warned at every retry tick.
   let consumerStopped = false
   let cancelConsumerRetry: (() => void) | undefined
-  let consumerDown = false
+  // Keyed on the failure itself, not on being down: a service that first answers nothing and then refuses the
+  // declaration is a NEW state and warns again (the loop stays silent only while the same failure repeats).
+  let consumerFailure: string | undefined
   const reportConsumerFailure = (line: string): void => {
-    if (consumerDown) return
-    consumerDown = true
+    if (line === consumerFailure) return
+    consumerFailure = line
     input.warn(line)
   }
   let starting: Promise<void> = Promise.resolve()
@@ -324,7 +326,7 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart): Runni
     })
     serving = attempt
     consumer = attempt?.consumer
-    if (attempt !== undefined) consumerDown = false
+    if (attempt !== undefined) consumerFailure = undefined
   }
   starting = startConsumer()
   const ready = starting.then(
