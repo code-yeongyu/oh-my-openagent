@@ -185,10 +185,22 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       incomplete: listed.incomplete,
     }
   }
+  // thread_list asks for this device's id and name in parallel: overlapping asks share one device.info read.
+  let info: ReturnType<DeviceService["thisDevice"]> | undefined
+  const deviceInfo = (): ReturnType<DeviceService["thisDevice"]> => {
+    if (info !== undefined) return info
+    const asked = svc().then((connected) => connected.thisDevice())
+    info = asked
+    const clear = () => {
+      if (info === asked) info = undefined
+    }
+    asked.then(clear, clear)
+    return asked
+  }
   return {
     status: async () => ({ state: (await (await svc()).status()).state }),
-    thisDevice: async () => (await (await svc()).thisDevice())?.id ?? null,
-    thisDeviceName: async () => (await (await svc()).thisDevice())?.name ?? null,
+    thisDevice: async () => (await deviceInfo())?.id ?? null,
+    thisDeviceName: async () => (await deviceInfo())?.name ?? null,
     devices: async () =>
       (await (await svc()).devices()).map((row) => ({
         device: row.device,

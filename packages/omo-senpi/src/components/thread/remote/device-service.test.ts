@@ -1049,3 +1049,17 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
     expect(l.calls.attach).toBe(2)
   })
 })
+
+test("#given thread_list asks for this device's id and name together #when both run in parallel #then device.info is read once (#13394 review LOW)", async () => {
+  let reads = 0
+  const service = {
+    thisDevice: async () => {
+      reads += 1
+      return { id: "here", name: "this mac" }
+    },
+    closed: new Promise(() => {}),
+  } as unknown as DeviceService
+  const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: async () => service })
+  expect(await Promise.all([port.thisDevice(), port.thisDeviceName?.()])).toEqual(["here", "this mac"])
+  expect(reads).toBe(1)
+})

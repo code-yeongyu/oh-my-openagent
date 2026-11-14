@@ -72,11 +72,12 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
   test.each([
     ["plan_required", "relay_requires_paid_plan"],
     ["connecting", "host_unavailable"],
-    ["signed_out", undefined],
-    ["disabled", undefined],
+    ["signed_out", "absent"],
+    ["disabled", "absent"],
   ] as const)(
     "#given the device service reads %s #when a plain thread_list runs #then remote_unavailable is %s (a relay that is not set up is no error)",
-    async (plan, expected) => {
+    async (plan, named) => {
+      const expected = named === "absent" ? undefined : named
       const { run } = surface(account({ plan }).remote)
       const listed = await run("thread_list", {})
       expect(listed.kind === "ok" && "threads" in listed && listed.remote_unavailable).toBe(expected ?? undefined)
