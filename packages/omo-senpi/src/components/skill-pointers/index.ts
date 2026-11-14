@@ -158,11 +158,16 @@ const TARGETS: readonly SkillPointerTarget[] = [
   {
     skillName: "bunshin",
     customType: BUNSHIN_CUSTOM_TYPE,
-    pattern: skillNamePattern(String.raw`(?:bunshin|fleet|machine[\s-]*mesh)`),
+    // `fleet` alone is an ordinary word (a vehicle fleet, a "fleet dashboard"), so it counts only with a device
+    // sense: owned by the user (`my fleet`, `our fleet`) or naming its machines (`fleet hosts`) (#13446).
+    pattern: skillNamePattern(
+      String.raw`(?:bunshin|(?:my|our)\s+fleet|fleet[\s-]+(?:machines?|devices?|hosts?|nodes?|boxes)|machine[\s-]*mesh)`,
+    ),
     expandedBlockPattern: /<skill\s+name="bunshin"/i,
     instruction: "",
-    // The SDK ships inside the plugin, so the pointer teaches the eval import instead of a skill read.
-    pointer: `<omo-bunshin-pointer>${BUNSHIN_TS_CELL_HINT}</omo-bunshin-pointer>`,
+    // The SDK ships inside the plugin, so the pointer teaches the eval import instead of a skill read; it carries
+    // the same only-discussed guard as every other conditional pointer.
+    pointer: `<omo-bunshin-pointer>This message mentions bunshin device operations. If the user of this session is asking to run work on their machines: ${BUNSHIN_TS_CELL_HINT} ${ignoreWhenOnlyDiscussed("bunshin")}</omo-bunshin-pointer>`,
   },
 ]
 
@@ -282,7 +287,12 @@ function ulwLoopToolSentence(sessionScope: string | null): string {
 function skillPointer(target: SkillPointerTarget, sessionScope: string | null): string {
   const skillsRoot = getBuiltinSkillsRoot()
   const extra = target.extra?.(sessionScope) ?? ""
-  return `<omo-${target.skillName}-pointer>This message mentions ${target.skillName}. If the user of this session is asking to run ${target.skillName}, read the ${target.skillName} skill at ${skillsRoot}${target.skillName}/SKILL.md with the read tool and follow it: ${target.instruction}. If ${target.skillName} is only being discussed, quoted, or relayed from another session, ignore this pointer.${extra}</omo-${target.skillName}-pointer>`
+  return `<omo-${target.skillName}-pointer>This message mentions ${target.skillName}. If the user of this session is asking to run ${target.skillName}, read the ${target.skillName} skill at ${skillsRoot}${target.skillName}/SKILL.md with the read tool and follow it: ${target.instruction}. ${ignoreWhenOnlyDiscussed(target.skillName)}${extra}</omo-${target.skillName}-pointer>`
+}
+
+// The guard every conditional pointer ends with: a keyword proves a mention, so a mention that is only talk is ignored.
+function ignoreWhenOnlyDiscussed(subject: string): string {
+  return `If ${subject} is only being discussed, quoted, or relayed from another session, ignore this pointer.`
 }
 
 // Reached only for a binding form (see `bindingForms`) in text that survived the quote, relay, negation,
@@ -310,7 +320,7 @@ function companionPointer(parent: SkillPointerTarget, companion: SkillCompanion,
   if (binding) {
     return `<omo-${companion.skillName}-pointer>${parent.skillName} ${companion.role}. Read the ${companion.skillName} skill at ${skillsRoot}${companion.skillName}/SKILL.md with the read tool in the same turn as the ${parent.skillName} skill and ${companion.instruction}.</omo-${companion.skillName}-pointer>`
   }
-  return `<omo-${companion.skillName}-pointer>${parent.skillName} ${companion.role}. If the user of this session is asking to run ${parent.skillName}, read the ${companion.skillName} skill at ${skillsRoot}${companion.skillName}/SKILL.md with the read tool in the same turn as the ${parent.skillName} skill and ${companion.instruction}. If ${parent.skillName} is only being discussed, quoted, or relayed from another session, ignore this pointer.</omo-${companion.skillName}-pointer>`
+  return `<omo-${companion.skillName}-pointer>${parent.skillName} ${companion.role}. If the user of this session is asking to run ${parent.skillName}, read the ${companion.skillName} skill at ${skillsRoot}${companion.skillName}/SKILL.md with the read tool in the same turn as the ${parent.skillName} skill and ${companion.instruction}. ${ignoreWhenOnlyDiscussed(parent.skillName)}</omo-${companion.skillName}-pointer>`
 }
 
 function skillCommandName(text: string): string | undefined {
