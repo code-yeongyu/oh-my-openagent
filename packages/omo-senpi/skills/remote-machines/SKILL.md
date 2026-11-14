@@ -31,13 +31,11 @@ Read `state` and `unsupported` from the row before calling: an offline or unsupp
 | `m.exec_command({ cmd, workdir?, yield_ms? })` | `{ handleId, output, state, exitCode?, ... }` | Command that may still be running when `yield_ms` passes; poll with `m.wait_for_command`, feed with `m.write_stdin`, stop with `m.kill_terminal`. |
 | `m.spawn(cmd, { cwd? })` | `CommandHandle`: `await h.wait()` -> `{ exitCode, output, durationMs, truncated }`; `h.status()`, `h.output()` (async iterable), `h.write(data)`, `h.kill()` | A job that outlives one call (builds, test runs). |
 | `m.write(path, text \| Uint8Array, { createParentDirs? })` | `{ path, writtenBytes }` | File transfer to the machine. Absolute path inside the device's scope root (its home directory). |
-| `m.readText(path)` / `m.read(path)` | `string` / `Uint8Array` | File transfer from the machine. See the version note below. |
+| `m.readText(path)` / `m.read(path)` | `string` / `Uint8Array` | File transfer from the machine. |
 | `m.glob(pattern, { limit? })` | `{ entries, truncated }` | Find files; a relative pattern resolves against the scope root. |
 | `m.grep(path, pattern, { limit? })` | matches | Search file contents. |
 | `m.processInfo({ pid? \| handleId? })` | `{ pid, startedAtMs, cpuTimeMs, rssBytes, command }` | Check on a process or a spawned handle. |
 | `bunshin.fanout(targets, async (m, { signal }) => ..., { concurrency?, timeoutMs? })` | `{ fulfilled: [{ machine, value }], rejected: [{ machine, error }], skipped?: [{ machine, reason }] }` | Same callback on many machines. `targets` is an array of ids/aliases/machines, `{ tag }`, or `"all"`. |
-
-Version note: on omo 5.1.69 `read` and `readText` fail with `invalid fs.read result: truncated must be a boolean for byte results`; it is fixed in 5.1.70. On 5.1.69 read a text file with `(await m.shell("cat " + path)).stdout` (pipe through `base64` for binary).
 
 `pushTree` / `pullTree` are not part of the relay surface; copy a tree with `write` per file, or pack it (`tar` + `base64`) and unpack it with `shell`.
 
