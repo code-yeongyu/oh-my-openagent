@@ -513,3 +513,21 @@ describe("followRemote: an interrupted turn whose last message ended before the 
     follow.stop()
   })
 })
+
+describe("followRemote: an earlier run's stop reason does not mark this send's run", () => {
+  test("a finished, aborted earlier run in the buffer leaves this send's run settled (#13272 review L1 at 1dce1f00aa)", async () => {
+    const { remote, deliver } = followSurface([message("u1", "user", "ping")])
+    const follow = await followRemote(remote, ROW, () => {}, { text: "ping" })
+    if ("kind" in follow) throw new Error("follow refused")
+    deliver([
+      { type: "agent_start" },
+      { type: "message_end", message: { role: "assistant", stopReason: "aborted" } },
+      { type: "agent_settled" },
+    ])
+    follow.aim("started")
+    deliver([{ type: "agent_start" }, { type: "agent_settled" }])
+    await flush()
+    expect(await withTimeout(follow.settled, 2000, "the follow never settled")).toBe("settled")
+    follow.stop()
+  })
+})

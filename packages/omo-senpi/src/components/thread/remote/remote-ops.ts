@@ -372,6 +372,8 @@ export async function followRemote(
       if (record["reason"] === "session_closed") return end("session_closed")
       return end(lastStopReason === "aborted" ? "interrupted" : "settled")
     }
+    // Each run starts with no stop reason of its own (#13272 review).
+    if (record["type"] === "agent_start") lastStopReason = undefined
     if (record["type"] === "message_end") {
       const message = record["message"]
       if (isRecord(message) && message["role"] === "assistant") lastStopReason = message["stopReason"]
@@ -468,7 +470,9 @@ export async function followRemote(
     // The run's own records the buffer already holds (after its agent_start) still say how its last message ended:
     // a turn aborted before the aim and settled after it is interrupted, not settled (#13272 review L2).
     const runStart = buffer.findLastIndex((record) => record["type"] === "agent_start")
-    if (runStart >= 0)
+    // A run the buffer already saw settle is an earlier run, not this send's: its stop reason marks nothing (#13272 review).
+    const runSettled = runStart >= 0 && buffer.slice(runStart + 1).some((record) => record["type"] === "agent_settled")
+    if (runStart >= 0 && !runSettled)
       for (const record of buffer.slice(runStart + 1)) {
         const ended = record["message"]
         if (record["type"] === "message_end" && isRecord(ended) && ended["role"] === "assistant")
