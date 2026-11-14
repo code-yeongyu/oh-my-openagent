@@ -96,6 +96,8 @@ export function createMemoryReflectionLiveWiring(
     resolveContext: (sessionId) => options.sessions.get(sessionId)?.context,
     isActive: (identity) => activeRuns.isActive(identity),
     ...(options.footerTimers === undefined ? {} : { timers: options.footerTimers }),
+    ...(options.now === undefined ? {} : { now: options.now }),
+    ...(options.createGitRepo === undefined ? {} : { createGitRepo: options.createGitRepo }),
     ...(options.syncStatus === undefined ? {} : { syncStatus: options.syncStatus }),
   })
   const syncNotifier = options.syncStatus === undefined ? undefined : createSyncStatusNotifier(options.syncStatus)
@@ -158,11 +160,14 @@ export function createMemoryReflectionLiveWiring(
               sessionId,
             }),
           )
-          footerLive.syncActive(sessionId, ui)
-          await footerLive.refresh(sessionId, ui)
         } catch (error) {
           options.logger?.warn("memory reflection completion drain failed", { error: describe(error) })
         }
+        // The footer publish is the one thing a bind must not lose to a drain failure: a throw from
+        // consumePendingReflectionCompletions (e.g. a non-ENOENT readdir error) must still leave the
+        // session with its footer, so sync/refresh run after the try instead of inside it.
+        footerLive.syncActive(sessionId, ui)
+        await footerLive.refresh(sessionId, ui)
       }
       await rpcBridge.current?.sync()
     },
@@ -243,13 +248,18 @@ function refreshInitialStatus(
 ): Promise<unknown> | undefined {
   if (ui === undefined) return undefined
   const settings = resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory)
+  // The footer publish is owned by the footer-live segment path; this pass keeps only its
+  // advisory duties (pressure dream + notify), so a bind publishes exactly one memory line.
+  const repo = options.createGitRepo?.(identity.identityPaths.repo)
   return refreshMemoryStatus({
     context: identity,
     ui,
     compileWarnTokens: settings.compile_warn_tokens,
     alreadyNotified: false,
+    showFooter: false,
     requestPressureDream,
     sessionId,
+    ...(repo === undefined ? {} : { gitRepo: repo }),
     ...(options.syncStatus === undefined ? {} : { syncStatus: options.syncStatus }),
   })
 }
