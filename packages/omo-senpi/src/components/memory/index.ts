@@ -113,6 +113,7 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
                   syncSessionId === undefined ? undefined : sessions.get(syncSessionId)?.context?.identityPaths.repo
                 return repo === undefined ? undefined : readMemoryRpcSync((path) => syncRunner.status(path), repo)
               },
+              warn: (message, fields) => ctx.logger.warn(message, fields),
             })
       primeMemoryPersonaAssets({ logger: ctx.logger })
       // Reclaim runs an abnormal exit left behind (#7765): once per memory root per day in this
