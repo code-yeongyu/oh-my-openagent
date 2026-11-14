@@ -127,31 +127,31 @@ describe("#given skills.enable allows one native skill", () => {
       availableCategories: [],
       factories: { ...createFactories(createSkillTool), createDelegateTask },
     })
-    return {
-      skillNative: createSkillTool.mock.calls[0]?.[0].nativeSkills,
-      taskNative: createDelegateTask.mock.calls[0]?.[0].nativeSkills,
-    }
+    const skillNative = createSkillTool.mock.calls[0]?.[0].nativeSkills
+    const taskNative = createDelegateTask.mock.calls[0]?.[0].nativeSkills
+    if (!skillNative || !taskNative) throw new Error("native skills were not passed to the skill and task tools")
+    return { skillNative, taskNative }
   }
 
   test("#when the object form lists the skill #then skill and task see only that native skill", async () => {
     const { skillNative, taskNative } = registerWithSkillsConfig({ enable: ["allowed-native-skill"] })
 
-    expect(await skillNative!.all()).toEqual([nativeSkills[0]])
-    expect(await taskNative!.all()).toEqual([nativeSkills[0]])
-    expect(await skillNative!.get("blocked-native-skill")).toBeUndefined()
-    expect(await skillNative!.get("allowed-native-skill")).toEqual(nativeSkills[0])
+    expect(await skillNative.all()).toEqual([nativeSkills[0]])
+    expect(await taskNative.all()).toEqual([nativeSkills[0]])
+    expect(await skillNative.get("blocked-native-skill")).toBeUndefined()
+    expect(await skillNative.get("allowed-native-skill")).toEqual(nativeSkills[0])
   })
 
   test("#when the array form lists the skill #then the allowlist applies the same way", async () => {
     const { skillNative } = registerWithSkillsConfig(["allowed-native-skill"])
 
-    expect(await skillNative!.all()).toEqual([nativeSkills[0]])
+    expect(await skillNative.all()).toEqual([nativeSkills[0]])
   })
 
   test("#when no allowlist is configured #then every native skill stays visible", async () => {
     const { skillNative } = registerWithSkillsConfig({ enable: [] })
 
-    expect(await skillNative!.all()).toEqual(nativeSkills)
+    expect(await skillNative.all()).toEqual(nativeSkills)
   })
 })
 
