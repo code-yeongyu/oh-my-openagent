@@ -1,6 +1,6 @@
 {
   "description": "typeText into a window that shows a remote screen (Screen Sharing: key events, modifiers from the physical keyboard; iPhone Mirroring: HID reports): every character is mapped to a key of the layout before anything is sent, so a character no key types is refused InvalidKey with nothing typed; in the background a Screen Sharing window refuses text that needs Shift (BackgroundUnavailable, nothing sent) while unshifted text and iPhone Mirroring text go out as keys; the audit carries length, delivered count and hash.",
-  "scenario": "crates/omo-computer-backend-fake/fixtures/remote-typing.json",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/remote-typing-explicit-stop-key.json",
   "env": {
     "OMO_COMPUTER_FAKE_CLOCK": "1"
   },

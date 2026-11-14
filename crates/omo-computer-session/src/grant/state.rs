@@ -44,9 +44,10 @@ pub struct Control {
     pub(crate) chord_tamper: ChordTamper,
 }
 
-/// The tampered mark a refused stop chord leaves on the hand (A-IS-62 rev 5, R70an C). It is held
-/// by the engine's session state: it survives session.close and a re-open of the same consent, and
-/// only a re-open whose fingerprinted consent differs from the one in force at the refusal clears it.
+/// The tampered mark a refused stop chord leaves on the hand (A-IS-62 rev 5, R70an C, R70as(2)).
+/// It is held by the engine's session state, survives session.close and every re-open, and is
+/// NEVER cleared in-process: a same-uid rewrite of the consent must not clear it, so only row 37's
+/// audited consent_save will (the fingerprint at the refusal is kept for that row).
 #[derive(Debug, Default)]
 pub struct ChordTamper {
     at: Option<String>,
@@ -62,16 +63,10 @@ impl ChordTamper {
         self.at = Some(Self::fingerprint(view));
     }
 
-    /// Whether the hand still reads tampered under `view`; a different consent clears the mark.
+    /// Whether the hand reads tampered: once refused, always, whatever consent is in force.
     pub fn holds(&mut self, view: Option<&Value>) -> bool {
-        match &self.at {
-            Some(at) if *at == Self::fingerprint(view) => true,
-            Some(_) => {
-                self.at = None;
-                false
-            }
-            None => false,
-        }
+        let _ = view;
+        self.at.is_some()
     }
 }
 

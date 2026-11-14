@@ -373,18 +373,18 @@ fn a_is_62_a_refused_chord_leaves_the_hand_tampered() {
     assert!(s.funnel.control.consent.view().tampered, "survives close and a re-open of the same consent");
 }
 
-/// R70an C: the mark is cleared ONLY by an open whose fingerprinted consent differs from the one
-/// in force at the refusal.
+/// R70as(2): the mark is NEVER cleared in-process, not even by an open whose consent differs (a
+/// same-uid rewrite of the file must not clear it); only row 37's audited consent_save will.
 #[test]
-fn a_is_62_the_tampered_mark_clears_only_on_a_changed_fingerprint() {
+fn a_is_62_the_tampered_mark_is_never_cleared_in_process() {
     let mut mark = crate::grant::ChordTamper::default();
     let a = json!({ "stopHotkey": "ctrl+alt+shift+f12" });
     let b = json!({ "stopHotkey": "ctrl+alt+shift+escape" });
+    assert!(!mark.holds(Some(&a)), "no refusal, no mark");
     mark.refused(Some(&a));
     assert!(mark.holds(Some(&a)), "the same consent keeps it");
-    assert!(mark.holds(Some(&a)), "and keeps it again");
-    assert!(!mark.holds(Some(&b)), "a re-save clears it");
-    assert!(!mark.holds(Some(&a)), "and it stays cleared");
+    assert!(mark.holds(Some(&b)), "a rewritten consent keeps it too");
+    assert!(mark.holds(None), "and no consent keeps it");
 }
 
 /// R70ao(2): the handed view carries stopHotkey in three states: null is absent in the file (the
@@ -404,5 +404,66 @@ fn a_is_62_three_state_stop_hotkey() {
     let mut s = session(&json!({ "consent": { "apps": {} }, "stopHotkeyNotCarried": true }), &RecordingSink::default(), None);
     capture(&mut s, "1");
     let refused = s.click(params(json!({ "target": "1", "x": 5, "y": 5 }))).expect_err("unreadable chord");
-    assert_eq!(refused.refusal.code.wire(), "ControlRequired");
+    // R70as(3): stopPath.start armed nothing, so the stop-path gate refuses first.
+    assert_eq!(refused.refusal.code.wire(), "StopPathUnavailable");
+}
+
+/// A-IS-62 rev 5 (R70aq): stopPath.start arms the configured chord FIRST, then compares the carried
+/// one. No chord or an equal one answers exactly as before; a differing chord is refused (one audit
+/// line, the hand reads tampered) and still leaves the configured chord armed.
+#[test]
+fn a_is_62_stop_path_start_carried_chord() {
+    let start = |carried: Option<&str>| {
+        let backend = FakeBackend::with_parts(scenario(&json!({ "consent": { "stopHotkey": "ctrl+alt+shift+f12" } })), FakeClock::default(), RecordingSink::default())
+            .with_stop_path(StopPathScript::Live);
+        let mut s = Session::new(Box::new(backend));
+        s.open(params(json!({ "reportMode": "null" }))).expect("open");
+        let p = carried.map_or_else(|| json!({}), |c| json!({ "chord": c }));
+        let answer = s.stop_path_start_checked(params(p));
+        (s, answer)
+    };
+    let (_, none) = start(None);
+    let (_, equal) = start(Some("CTRL+Alt+Shift+F12"));
+    assert_eq!(none.as_ref().ok(), equal.as_ref().ok(), "an equal chord answers as no chord");
+    assert!(none.expect("no chord").global_live);
+    let (s, refused) = start(Some("ctrl+alt+shift+escape"));
+    let refusal = refused.expect_err("a differing chord");
+    assert_eq!((refusal.code.wire(), refusal.reason), ("ControlRequired", Some("tampered")));
+    let status = s.stop_path_status();
+    assert!(status.global_live && status.stop_path == "global", "the configured chord stays armed: {status:?}");
+    assert!(s.funnel.control.consent.view().tampered, "the hand reads tampered");
+    let (_, unparseable) = start(Some("ctrl+"));
+    assert!(unparseable.is_err(), "an unparseable carried chord differs");
+}
+
+/// R70ar: each explicit-stop-key scenario is its base plus ONLY consent.stopHotkey equal to the
+/// chord its cases record, so a copy can never drift from its base.
+#[test]
+fn explicit_stop_key_fixtures_equal_their_base_plus_one_member() {
+    let dir = omo_computer_backend_fake::fixtures_dir();
+    let read = |name: &str| -> Value {
+        serde_json::from_str(&std::fs::read_to_string(dir.join(name)).expect("fixture")).expect("json")
+    };
+    for base in ["two-displays-one-window", "ax-type-text", "ax-unconfirmed", "remote-typing", "user-intervened"] {
+        let mut copy = read(&format!("{base}-explicit-stop-key.json"));
+        let consent = copy.as_object_mut().and_then(|map| map.remove("consent"));
+        assert_eq!(consent, Some(json!({ "stopHotkey": "ctrl+alt+shift+escape" })), "{base}: only the recorded chord");
+        assert_eq!(copy, read(&format!("{base}.json")), "{base}: the copy equals its base");
+    }
+}
+
+/// R70as(3): where the engine cannot read the configured chord, stopPath.start arms NOTHING and is
+/// refused; no chord is compared or accepted as equal.
+#[test]
+fn a_is_62_an_unreadable_chord_arms_nothing() {
+    for carried in [None, Some("ctrl+alt+shift+escape")] {
+        let backend = FakeBackend::with_parts(scenario(&json!({ "consent": { "apps": {} }, "stopHotkeyNotCarried": true })), FakeClock::default(), RecordingSink::default())
+            .with_stop_path(StopPathScript::Live);
+        let mut s = Session::new(Box::new(backend));
+        s.open(params(json!({ "reportMode": "null" }))).expect("open");
+        let p = carried.map_or_else(|| json!({}), |c| json!({ "chord": c }));
+        assert!(s.stop_path_start_checked(params(p)).is_err(), "{carried:?}: refused");
+        let status = s.stop_path_status();
+        assert!(!status.global_live, "{carried:?}: nothing armed: {status:?}");
+    }
 }

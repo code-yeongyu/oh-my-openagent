@@ -1,6 +1,6 @@
 {
   "description": "an AX write the app received but did not answer (kAXErrorCannotComplete on macOS; the fake's ax_cannot_complete) is AxUnconfirmed: ax.perform, ax.setValue and ax.focus each land and report -32025, ax.node reads the value the unanswered write set, and the next answered press succeeds.",
-  "scenario": "crates/omo-computer-backend-fake/fixtures/ax-unconfirmed.json",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/ax-unconfirmed-explicit-stop-key.json",
   "env": {
     "OMO_COMPUTER_FAKE_CLOCK": "1"
   },

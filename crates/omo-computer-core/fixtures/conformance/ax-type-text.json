@@ -1,6 +1,6 @@
 {
   "description": "ax.typeText types into an element without taking focus: a native text field takes the text by AX insertion (-32025 AxUnconfirmed when the app never answers the write, which still lands), a non-text element is focused first and takes keys, and the result names the delivery method (inserted | keys); the audit carries the text length, delivered count and hash.",
-  "scenario": "crates/omo-computer-backend-fake/fixtures/ax-type-text.json",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/ax-type-text-explicit-stop-key.json",
   "env": {
     "OMO_COMPUTER_FAKE_CLOCK": "1"
   },

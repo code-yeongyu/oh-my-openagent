@@ -229,6 +229,30 @@ impl Session {
     pub(crate) fn open_control(&mut self, session_id: &str, stop_hotkey: Option<&str>) -> Result<(), Refusal> {
         self.funnel.set_session_id(session_id.to_owned());
         self.open_consent()?;
+        self.refuse_carried_chord(stop_hotkey)?;
+        self.mint_token(session_id)
+    }
+
+    /// A-IS-62 rev 5: a chord carried by `session.open{settings}` or `stopPath.start` is compared
+    /// with the configured one through the one parser; a differing or unparseable chord refuses the
+    /// call (one audit line naming both chords) and leaves the hand tampered (R70an C).
+    /// R70as(3): where the engine cannot read the configured chord nothing is compared or armed;
+    /// the call is refused (the deaf chord-unarmable reading is row 50's or the LEAD's).
+    ///
+    /// # Errors
+    /// `ControlRequired{tampered}` when the view did not carry stopHotkey.
+    pub(crate) fn refuse_unreadable_chord(&self) -> Result<(), Refusal> {
+        let os = backend_os(self.backend.as_ref());
+        match self.funnel.control.consent.view().stop_chord(os) {
+            crate::consent::StopChord::Unreadable => Err(Refusal::new(
+                omo_computer_core::error::EngineCode::ControlRequired,
+                omo_computer_core::error::Reason::Tampered.wire(),
+            )),
+            _ => Ok(()),
+        }
+    }
+
+    pub(crate) fn refuse_carried_chord(&mut self, stop_hotkey: Option<&str>) -> Result<(), Refusal> {
         let os = backend_os(self.backend.as_ref());
         let view = self.funnel.control.consent.view();
         let configured = match view.stop_chord(os) {
@@ -262,7 +286,7 @@ impl Session {
             self.open_consent()?;
             return Err(refusal);
         }
-        self.mint_token(session_id)
+        Ok(())
     }
 
     /// `stopPath.stop`: the grant is revoked and the lease ends (`user_moved_on`, nothing more).

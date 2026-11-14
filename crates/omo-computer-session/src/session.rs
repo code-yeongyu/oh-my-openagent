@@ -104,8 +104,25 @@ impl Session {
 
     /// `stopPath.start`: arms (or re-arms a parked) stop listener.
     pub fn stop_path_start(&mut self, params: StopPathStartParams) -> StopPathStatus {
-        let StopPathStartParams { chord: _ } = params;
-        self.guard.start_on(self.backend.as_mut())
+        // Row 21 (A-IS-62 rev 5, R70aq): the wire entry is `stop_path_start_checked`; this form
+        // keeps its callers' shape and answers the status either way.
+        self.stop_path_start_checked(params)
+            .unwrap_or_else(|_| self.stop_path_status())
+    }
+
+    /// `stopPath.start{chord?}` as the engine answers it: the configured chord is armed FIRST, as
+    /// before, then a carried chord is compared through the one parser.
+    ///
+    /// # Errors
+    /// Row 21 (A-IS-62 rev 5, R70aq): a carried chord that differs from the consent file's or does
+    /// not parse: the call is refused, nothing is disarmed, and the hand reads tampered.
+    pub fn stop_path_start_checked(&mut self, params: StopPathStartParams) -> Result<StopPathStatus, Refusal> {
+        let StopPathStartParams { chord } = params;
+        // R70as(3): an unreadable configured chord arms NOTHING and refuses.
+        self.refuse_unreadable_chord()?;
+        let status = self.guard.start_on(self.backend.as_mut());
+        self.refuse_carried_chord(chord.as_deref())?;
+        Ok(status)
     }
 
     /// `stopPath.stop{source}`: latches and commits the stop.
