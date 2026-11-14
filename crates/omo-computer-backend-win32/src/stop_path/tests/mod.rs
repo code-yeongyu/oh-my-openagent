@@ -7,4 +7,5 @@ mod awake;
 mod foreground;
 mod hooks;
 mod marker;
+mod platform;
 mod readers;
