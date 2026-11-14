@@ -101,7 +101,7 @@ export async function setThinkingLevelOn(
   scope: ThreadSetReasoningInput["scope"],
 ): Promise<ThreadToolResult> {
   try {
-    await control.setThinkingLevel(level, scope === "turn" ? "turn" : undefined)
+    await control.setThinkingLevel(level)
   } catch (error) {
     if (controlRefusalOf(error)?.code !== "thinking_level_unsupported") throw error
     const supported = await control.getAvailableThinkingLevels()
