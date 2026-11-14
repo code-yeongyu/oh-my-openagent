@@ -63,6 +63,7 @@ const SHIPPED_ROOTS = [
   ["packages/omo-native/", ""],
   [PLUGIN_SOURCE_ROOT, "plugin/"],
 ]
+const NON_OUTPUT_PATHS = SHIPPED_ROOTS.map(([source]) => `${source}.omo-payload-sentinel/not-a-generated-output`)
 const toRepoPath = (packed) =>
   packed.startsWith("plugin/") ? PLUGIN_SOURCE_ROOT + packed.slice(7) : `packages/omo-native/${packed}`
 const toPackedPath = (repoPath) => {
@@ -106,7 +107,9 @@ function readPluginRequirements() {
   // A release check with nothing to check, or one whose entries are malformed, must not pass.
   const empty = (value) => Array.isArray(value) && value.length === 0
   if (empty(read?.pluginOutputs) || empty(read?.generated)) {
-    throw new Error("the plugin requirement list is empty: refusing to pass a release check with nothing to check")
+    throw new Error(
+      `${HELPER_NAME} gave an empty list: the plugin requirement list is empty: refusing to pass a release check with nothing to check`,
+    )
   }
   if (!strings(read?.pluginOutputs)) {
     throw new Error(`${HELPER_NAME} gave no usable "pluginOutputs": expected a non-empty array of strings`)
@@ -123,6 +126,12 @@ function readPluginRequirements() {
       throw new Error(
         `${HELPER_NAME} gave a "generated" entry whose source is not a regular expression: ${entry.label}`,
       )
+    }
+    // A source that matches the empty string ("", ".*") or a path no build writes under a shipped root (".", "[^]",
+    // "packages/", "^packages/omo-native/") is met by any packed file, so its check could never fail.
+    const regex = new RegExp(entry.source)
+    if (regex.test("") || NON_OUTPUT_PATHS.some((path) => regex.test(path))) {
+      throw new Error(`${HELPER_NAME} gave a "generated" entry whose source matches every path: ${entry.label}`)
     }
   }
   return read
@@ -149,7 +158,11 @@ function releaseRequirements() {
       continue
     if (label.startsWith("a path matching") && !SHIPPED_ROOTS.some(([source]) => regex.source.startsWith(`^${source}`)))
       continue
-    requirements.push({ label: packedLabel, met: (paths) => paths.some((path) => regex.test(toRepoPath(path))) })
+    // A named output is met only by that exact packed path; a pattern by any packed file it matches.
+    const met = label.startsWith("a path matching")
+      ? (paths) => paths.some((path) => regex.test(toRepoPath(path)))
+      : (paths) => paths.includes(packedLabel)
+    requirements.push({ label: packedLabel, met })
   }
   return requirements
 }
