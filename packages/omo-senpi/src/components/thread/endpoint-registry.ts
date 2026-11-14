@@ -8,8 +8,8 @@ import { basename, dirname, join } from "node:path"
  * `modes/rpc/host-endpoints.ts`). Every endpoint an agent directory holds - multi-session hosts,
  * their `p-*`/`i-*` shards, and the control endpoints of terminals running the OmO extension - is
  * one directory there, named by the canonical socket it serves. Nothing here writes, unlinks or
- * connects; the engine's `host status --all` stays the primary enumeration, and this reader is what
- * classifies a socket's kind and what enumerates when the engine cannot.
+ * connects; this reader is the thread tools' enumeration (a supplied `host status --all` report takes
+ * its place) and what classifies a socket's kind.
  */
 
 export type EndpointKind = "rpc_host" | "tui"

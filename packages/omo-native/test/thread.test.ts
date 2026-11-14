@@ -482,8 +482,7 @@ describe("omo thread: SDK loading", () => {
     expect(result.stderr).toContain("worker gone")
   })
 
-  test("#given the plugin SDK #when loaded #then it gets the agent dir, cwd, cli identity, and an engine status reader over host status --all", async () => {
-    const engineCalls: { args: readonly string[]; env: Record<string, string> }[] = []
+  test("#given the plugin SDK #when loaded #then it gets the agent dir, cwd and cli identity, and no engine status reader: endpoints come from the registry", async () => {
     let received: Record<string, unknown> = {}
     const loaded = await loadThreadSdk({
       pluginRoot: "/plugin",
@@ -492,12 +491,6 @@ describe("omo thread: SDK loading", () => {
       cwd: "/work",
       stderr: { write: () => {} },
       reinstall: "Reinstall omo, then retry.",
-      engine: {
-        run: (args: string[], options: { env: Record<string, string> }) => {
-          engineCalls.push({ args, env: options.env })
-          return { exitCode: 0, stdout: '{"endpoints":[]}', stderr: "" }
-        },
-      },
       loadSqlite: async () => ({}),
       importSdk: async () => ({
         createThreadSdk: (options: Record<string, unknown>) => {
@@ -515,11 +508,7 @@ describe("omo thread: SDK loading", () => {
       uid: 501,
       user: "qa",
     })
-    const statusAll = received.engineStatusAll as () => Promise<string>
-    expect(await statusAll()).toBe('{"endpoints":[]}')
-    expect(engineCalls).toEqual([
-      { args: ["host", "status", "--json", "--all", "--include-workers"], env: { KEEP: "1", OMO_AGENT_DIR: "/agent" } },
-    ])
+    expect("engineStatusAll" in received).toBe(false)
     expect("remote" in received).toBe(false)
   })
 
@@ -534,7 +523,6 @@ describe("omo thread: SDK loading", () => {
       cwd: "/work",
       stderr: { write: () => {} },
       reinstall: "Reinstall omo, then retry.",
-      engine: { run: () => ({ exitCode: 0, stdout: "", stderr: "" }) },
       loadSqlite: async () => ({}),
       importSdk: async () => ({
         createThreadSdk: (options: Record<string, unknown>) => {
