@@ -1,11 +1,29 @@
-import { describe, expect, test } from "bun:test"
+import { afterAll, describe, expect, test } from "bun:test"
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { buildIdentityPaths } from "@oh-my-opencode/memory-core"
 import type { AccountSessionOptions, SyncSession } from "@oh-my-opencode/memory-core/sync-engine"
 import type { DesktopSyncAccount } from "./account-source"
 import * as syncRuntime from "../sync-runtime"
 import { createDeviceSessionResolver, type DeviceSessionRuntime } from "./resolver"
 
+const memoryRoots: string[] = []
+afterAll(() => {
+  for (const root of memoryRoots.splice(0)) rmSync(root, { recursive: true, force: true })
+})
+
+// The resolver binds a space only once the memory repository exists (#13486).
+function existingMemoryRepo() {
+  const root = mkdtempSync(join(tmpdir(), "omo-desktop-account-"))
+  memoryRoots.push(root)
+  const paths = buildIdentityPaths(root, "fixture")
+  mkdirSync(join(paths.repo, ".git"), { recursive: true })
+  return paths
+}
+
 function fixture() {
+  const paths = existingMemoryRepo()
   const lifetime = new AbortController()
   const principal = { kind: "device" as const, id: "main-principal" }
   const publicKeys = { signing: "public-signing", sealing: "public-sealing" }
@@ -103,7 +121,7 @@ function fixture() {
       loadRuntime,
     })({
       identity: "fixture",
-      paths: buildIdentityPaths("/unused-memory", "fixture"),
+      paths,
       space: { profile: "personal", projectDir: "/unused-project" },
     })
   return { account, lifetime, runtime, calls, resolve, factoryCalls: () => factoryCalls }
