@@ -12,7 +12,7 @@ pub fn owner_only_sddl(user_sid: &str) -> String {
 
 /// Whether SDDL trustee `trustee` is `user_sid`: the SID itself, or the alias SDDL read-back writes
 /// for a well-known account SID (`LA` = the domain's RID-500 administrator, `LG` = RID-501 guest).
-fn is_user(trustee: &str, user_sid: &str) -> bool {
+fn is_user(trustee: &str, user_sid: &str, _resolve: &dyn Fn(&str) -> Option<String>) -> bool {
     let alias_rid = match trustee {
         "LA" => "500",
         "LG" => "501",
@@ -22,8 +22,13 @@ fn is_user(trustee: &str, user_sid: &str) -> bool {
 }
 
 /// Whether `dacl_sddl` is protected and grants exactly the user and SYSTEM, both present.
+/// `resolve` turns an SDDL alias trustee (`LA`, `LG`) into the SID it stands for on this machine.
 #[must_use]
-pub fn is_owner_only(dacl_sddl: &str, user_sid: &str) -> bool {
+pub fn is_owner_only(
+    dacl_sddl: &str,
+    user_sid: &str,
+    resolve: &dyn Fn(&str) -> Option<String>,
+) -> bool {
     let Some(rest) = dacl_sddl.strip_prefix("D:") else {
         return false;
     };
@@ -36,9 +41,10 @@ pub fn is_owner_only(dacl_sddl: &str, user_sid: &str) -> bool {
         .filter(|ace| !ace.is_empty())
         .filter_map(|ace| ace.trim_start_matches('(').rsplit(';').next())
         .collect();
-    let allowed = |sid: &&str| is_user(sid, user_sid) || *sid == "SY" || *sid == "S-1-5-18";
+    let allowed =
+        |sid: &&str| is_user(sid, user_sid, resolve) || *sid == "SY" || *sid == "S-1-5-18";
     trustees.iter().all(allowed)
-        && trustees.iter().any(|sid| is_user(sid, user_sid))
+        && trustees.iter().any(|sid| is_user(sid, user_sid, resolve))
         && trustees
             .iter()
             .any(|sid| *sid == "SY" || *sid == "S-1-5-18")
@@ -174,7 +180,7 @@ mod os {
             )?;
             let sddl = text.to_string().unwrap_or_default();
             let _ = LocalFree(Some(HLOCAL(text.0.cast())));
-            Ok(is_owner_only(&sddl, &user_sid()?))
+            Ok(is_owner_only(&sddl, &user_sid()?, &|_| None))
         }
     }
 }
