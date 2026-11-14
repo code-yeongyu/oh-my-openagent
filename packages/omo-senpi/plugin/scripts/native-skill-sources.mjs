@@ -52,6 +52,10 @@ export function createNativeSkillSources(repoRoot) {
       source: join(nativeSkillsRoot, "onboarding"),
     },
     {
+      name: "remote-machines",
+      source: join(nativeSkillsRoot, "remote-machines"),
+    },
+    {
       name: "ultrawork",
       source: join(nativeSkillsRoot, "ultrawork"),
     },

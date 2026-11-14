@@ -3058,6 +3058,7 @@
           "onboarding",
           "programming",
           "refactor",
+          "remote-machines",
           "remove-ai-slops",
           "review-work",
           "ulw-execute",
@@ -3857,5 +3858,5 @@
       }
     }
   },
-  "sha256": "5fcab698598e7966621d16af1b5dac9fbb7700f59bb67817fa8606b901215e55"
+  "sha256": "fe6054b118ae4f682f19203f26f4a064b1ed8817e899023d61af6aeff84f9adb"
 }

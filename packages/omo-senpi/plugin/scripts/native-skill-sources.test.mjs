@@ -21,6 +21,7 @@ describe("createNativeSkillSources", () => {
     "init-deep",
     "mass-ulw",
     "onboarding",
+    "remote-machines",
     "ultrawork",
     "ulw-plan",
     "ulw-research",

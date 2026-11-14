@@ -50,6 +50,7 @@ export const BUILTIN_SKILL_NAMES = Object.freeze([
   "onboarding",
   "programming",
   "refactor",
+  "remote-machines",
   "remove-ai-slops",
   "review-work",
   "ulw-execute",
