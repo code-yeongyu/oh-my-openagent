@@ -1,0 +1,118 @@
+{
+  "description": "With the markers directory under the runtime root this case names made read-only (chmod 500) before the run, a click answers TransactionFailed{reason:\"marker_unavailable\"} and nothing is sent: the fake sink file under that root stays empty. Without the read-only directory the click is delivered and this case mismatches. The QA scenario creates that directory (the fake sink file is created in it at engine start) and its markers directory with mode 0500, and restores the mode after the run.",
+  "transport": "stdio",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json",
+  "env": {
+    "OMO_COMPUTER_FAKE_STOP_PATH": "live",
+    "OMO_COMPUTER_RUNTIME_DIR": "target/qa-computer-v3/marker-unavailable"
+  },
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session.open",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "cursorOverlay": false,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "granted",
+                "axPermission": "granted",
+                "displayCount": 2,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": null,
+                "integrityLevel": null,
+                "screenLocked": false,
+                "displayAsleep": false
+              },
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "stopPath.start",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "suspended": false,
+              "globalLive": true,
+              "hostRelayLive": false,
+              "heartbeatFresh": true,
+              "stopPath": "global",
+              "reason": null
+            }
+          },
+          "variable": [
+            "/result/globalLive",
+            "/result/heartbeatFresh",
+            "/result/stopPath",
+            "/result/hostRelayLive"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "click",
+        "params": {
+          "target": "101",
+          "x": 10,
+          "y": 10,
+          "callId": "qa-marker-unavailable"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "error": {
+              "code": -32020,
+              "message": "TransactionFailed",
+              "data": {
+                "code": "TransactionFailed",
+                "hint": null,
+                "reason": "marker_unavailable"
+              }
+            }
+          },
+          "variable": []
+        }
+      ]
+    }
+  ]
+}
