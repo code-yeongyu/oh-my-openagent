@@ -1,0 +1,177 @@
+name: Computer Windows QA
+
+# Live Windows QA of the computer-use v3 engine on a hosted runner. The interactive job proves an
+# interactive desktop first (interactive-desktop-smoke.ps1), then runs ONLY the Windows backend's
+# live (#[ignore]d) tests - computer-engine.yml already runs its other tests on Windows - and the
+# live driver's scenarios against the release engine;
+# every scenario's JSON line is kept as the run's evidence artifact. The session0 job runs the one
+# Session 0 scenario as SYSTEM from a one-shot scheduled task (Windows starts it in Session 0) and
+# fails unless the recorded session id is 0. The screen-locked scenario, when one exists, is the
+# last step of the interactive job.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/computer-windows-qa.yml"
+      - "crates/omo-computer-backend-win32/**"
+      - "script/qa/computer/windows.ts"
+      - "script/qa/computer/windows/**"
+  push:
+    branches: [dev]
+    paths:
+      - ".github/workflows/computer-windows-qa.yml"
+      - "crates/omo-computer-backend-win32/**"
+      - "script/qa/computer/windows.ts"
+      - "script/qa/computer/windows/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  RUST_TARGET: x86_64-pc-windows-msvc
+  ENGINE: target/x86_64-pc-windows-msvc/release/omo-computer-engine.exe
+
+jobs:
+  interactive:
+    name: Windows interactive-desktop QA
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      # Capture and input need an interactive window station; fail fast without one.
+      - name: Windows interactive-desktop smoke
+        shell: powershell
+        run: ./script/qa/computer/windows/interactive-desktop-smoke.ps1
+
+      - name: Setup Rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          toolchain=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
+          rustup toolchain install "$toolchain" --profile minimal
+          rustup default "$toolchain"
+          rustup target add "${RUST_TARGET}"
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: computer-windows-qa-${{ env.RUST_TARGET }}
+
+      - name: Windows backend live tests (the ignored ones only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa-evidence
+          cargo test -p omo-computer-backend-win32 --target "${RUST_TARGET}" --locked -- --ignored --test-threads=1 2>&1 | tee qa-evidence/backend-win32-live-tests.txt
+
+      - name: Build engine (msvc x64, release)
+        shell: bash
+        run: cargo build -p omo-computer-engine --release --target "${RUST_TARGET}" --locked
+
+      - name: Scenario capture-marker-pixels
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun script/qa/computer/windows.ts --scenario capture-marker-pixels --engine "${ENGINE}" --json | tee qa-evidence/capture-marker-pixels.jsonl
+
+      - name: Keep the engine for the Session 0 job
+        uses: actions/upload-artifact@v7
+        with:
+          name: computer-windows-engine
+          path: ${{ env.ENGINE }}
+          retention-days: 1
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: computer-windows-qa-interactive
+          path: qa-evidence/
+          if-no-files-found: warn
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### Computer Windows QA (interactive)"
+            for file in qa-evidence/*.jsonl; do
+              [ -f "$file" ] || continue
+              echo "- \`$(basename "$file" .jsonl)\`: $(grep -o '"verdict":"[A-Z]*"' "$file" | head -1)"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  session0:
+    name: Windows Session 0 QA
+    needs: interactive
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: computer-windows-engine
+          path: target/x86_64-pc-windows-msvc/release
+
+      # A one-shot scheduled task running as SYSTEM starts in Session 0; it runs the scenario and
+      # writes its JSON line beside the session id the driver read.
+      - name: Scenario capture-session0-refused (SYSTEM, Session 0)
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force qa-evidence | Out-Null
+          $out = Join-Path $PWD 'qa-evidence\capture-session0-refused.jsonl'
+          $bun = (Get-Command bun).Source
+          $cmd = Join-Path $env:RUNNER_TEMP 'session0.cmd'
+          Set-Content -Encoding ascii $cmd "@echo off`r`ncd /d `"$PWD`"`r`n`"$bun`" script\qa\computer\windows.ts --scenario capture-session0-refused --engine `"$PWD\$env:ENGINE`" --json > `"$out`" 2>&1`r`necho done>> `"$out.done`""
+          schtasks /Create /TN omo-cu-session0 /TR "`"$cmd`"" /SC ONCE /ST 23:59 /RU SYSTEM /F | Out-Null
+          schtasks /Run /TN omo-cu-session0 | Out-Null
+          $deadline = (Get-Date).AddMinutes(5)
+          while (-not (Test-Path "$out.done")) {
+            if ((Get-Date) -gt $deadline) { schtasks /Delete /TN omo-cu-session0 /F | Out-Null; throw 'the Session 0 task did not finish in 5 minutes' }
+            Start-Sleep -Seconds 2
+          }
+          schtasks /Delete /TN omo-cu-session0 /F | Out-Null
+          Get-Content $out
+          $line = Get-Content $out | Where-Object { $_ -like '{*' } | Select-Object -First 1
+          $result = $line | ConvertFrom-Json
+          if ($result.sessionId -ne 0) { throw "the scenario ran in session $($result.sessionId), not Session 0" }
+          if ($result.verdict -ne 'PASS') { throw "verdict $($result.verdict)" }
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: computer-windows-qa-session0
+          path: qa-evidence/
+          if-no-files-found: warn
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### Computer Windows QA (Session 0)"
+            if [ -f qa-evidence/capture-session0-refused.jsonl ]; then
+              echo "- \`capture-session0-refused\`: $(grep -o '"verdict":"[A-Z]*"' qa-evidence/capture-session0-refused.jsonl | head -1), $(grep -o '"sessionId":[0-9]*' qa-evidence/capture-session0-refused.jsonl | head -1)"
+            else
+              echo "- no scenario output"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

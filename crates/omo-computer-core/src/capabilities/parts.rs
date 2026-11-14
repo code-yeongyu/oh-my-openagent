@@ -23,6 +23,12 @@ pub enum CaptureRoute {
     Screencast,
     ScreencastCrop,
     ScreenshotPortal,
+    // Row 55 (R34): the Windows routes of d-windows.md:87.
+    Wgc,
+    #[serde(rename = "printwindow")]
+    PrintWindow,
+    #[serde(rename = "bitblt")]
+    BitBlt,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

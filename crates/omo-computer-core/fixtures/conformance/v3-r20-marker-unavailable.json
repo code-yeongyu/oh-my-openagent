@@ -1,0 +1,167 @@
+{
+  "description": "Row 20 replacement of v3-r17-marker-unavailable.json (it supersedes that case: frame_required, row 20): the same assertions and planted state with a capture of window 101 before the clicks of each engine process, since a click needs a frame. With the markers directory of the case's fresh runtime dir planted read-only (0500) before the engine starts, a click answers TransactionFailed{reason:\"marker_unavailable\"} and nothing is sent.",
+  "supersedes": [
+    "v3-r17-marker-unavailable.json"
+  ],
+  "transport": "stdio",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json",
+  "env": {
+    "OMO_COMPUTER_FAKE_STOP_PATH": "live"
+  },
+  "runtime": {
+    "plant": [
+      {
+        "path": "markers",
+        "dir": true,
+        "mode": "0500"
+      }
+    ]
+  },
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session.open",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "cursorOverlay": false,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "granted",
+                "axPermission": "granted",
+                "displayCount": 2,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": null,
+                "integrityLevel": null,
+                "screenLocked": false,
+                "displayAsleep": false
+              },
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "stopPath.start",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "suspended": false,
+              "globalLive": true,
+              "hostRelayLive": false,
+              "heartbeatFresh": true,
+              "stopPath": "global",
+              "reason": null
+            }
+          },
+          "variable": [
+            "/result/globalLive",
+            "/result/heartbeatFresh",
+            "/result/stopPath",
+            "/result/hostRelayLive"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 91,
+        "method": "capture",
+        "params": {
+          "target": "101"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 91,
+            "result": {
+              "mode": "inline-png",
+              "data": "png-base64",
+              "mimeType": "image/png",
+              "artifactPath": null,
+              "width": 800,
+              "height": 600,
+              "sourceWidth": 800,
+              "sourceHeight": 600,
+              "coordinateWidth": 800,
+              "coordinateHeight": 600,
+              "region": null,
+              "scale": 1.0,
+              "target": "101",
+              "frameId": "frame-1",
+              "note": null
+            }
+          },
+          "variable": [
+            "/result/data"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "click",
+        "params": {
+          "target": "101",
+          "x": 10,
+          "y": 10,
+          "callId": "qa-marker-unavailable"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "error": {
+              "code": -32020,
+              "message": "TransactionFailed",
+              "data": {
+                "code": "TransactionFailed",
+                "hint": null,
+                "reason": "marker_unavailable"
+              }
+            }
+          },
+          "variable": []
+        }
+      ]
+    }
+  ]
+}
