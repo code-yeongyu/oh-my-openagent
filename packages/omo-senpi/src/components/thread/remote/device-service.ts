@@ -14,7 +14,14 @@ export type DeviceServiceSessionsOptions = {
   readonly connect?: () => Promise<DeviceService>
   /** Test seam: the wait between attaches of a just-created session while its device's listing catches up. */
   readonly retryDelay?: (ms: number) => Promise<void>
+  /** Test seam: the clock that ages a finished account listing. */
+  readonly now?: () => number
 }
+
+// An account listing waits on every device (0.5-2 s on a loaded fleet, measured 2026-11-14), and one thread op can read
+// it several times (the address book, the remote control, the session host). Calls that overlap share one round, and a
+// round that just ended answers the calls of the next moment instead of starting another.
+const LISTING_REUSE_MS = 2_000
 
 // A device lists a session it just created only after its next listing change, and session.attach resolves against
 // that listing: live runs saw 2.5 s to 6.6 s (2026-11-06). Past this bound the create still names the session's key.
@@ -169,7 +176,27 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     attaches.set(key, opened)
     return opened
   }
-  const listing = async (): Promise<RemoteListing> => {
+  const now = options.now ?? Date.now
+  let round: Promise<RemoteListing> | undefined
+  let kept: { readonly at: number; readonly listing: RemoteListing } | undefined
+  const listing = (): Promise<RemoteListing> => {
+    if (round !== undefined) return round
+    if (kept !== undefined && now() - kept.at < LISTING_REUSE_MS) return Promise.resolve(kept.listing)
+    const started = listOnce().then(
+      (listed) => {
+        kept = { at: now(), listing: listed }
+        round = undefined
+        return listed
+      },
+      (error: unknown) => {
+        round = undefined
+        throw error
+      },
+    )
+    round = started
+    return started
+  }
+  const listOnce = async (): Promise<RemoteListing> => {
     const listed = await (await svc()).sessions()
     return {
       rows: listed.rows.map((row) => ({
@@ -203,6 +230,8 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     // create / open / fork on another device: relay daemon #393's attach-less `session.command {device, endpoint, rpc}`.
     // The endpoint lookup and every refusal answered before sending ran nothing; anything after sending may have.
     endpointCommand: async (device, rpc, endpointOptions) => {
+      // A create/open/fork changes what the account lists: the next read lists again.
+      kept = undefined
       let record: WireRpc
       try {
         record = wireRecord(rpc)
@@ -243,6 +272,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       }
       const { attached, catalog } = session
       const readOnly = READ_ONLY_RECORDS.has(String(rpc["type"]))
+      if (!readOnly) kept = undefined
       const isCatalog = rpc["type"] === CATALOG_RECORD
       const key = recordKey(record)
       if (isCatalog && commandOptions?.fresh !== true) {
@@ -302,6 +332,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       if (open !== undefined) (await open.catch(() => undefined))?.close()
     },
     locate: async (device, engineId, knownKey) => {
+      kept = undefined
       let connected: DeviceService
       try {
         connected = await svc()
