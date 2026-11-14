@@ -101,6 +101,8 @@ export function createRemoteThreadFixture() {
       records?: readonly JsonObject[]
       rows?: readonly RemoteSessionRow[]
       registryDown?: "refused" | "throws" | "signed_out"
+      /** Only the claim fails (resolve and aliasesOf still answer): a token that expired between the two calls. */
+      claimDown?: "refused" | "signed_out"
       chainCountLimit?: number
       relayKeys?: ReadonlyMap<string, string>
       /** omo#13037: sessions a device holds on disk but runs nowhere, by device then durable id, with that device's key. */
@@ -269,6 +271,15 @@ export function createRemoteThreadFixture() {
       claim: async ({ alias, holder }) => {
         registryCalls.push("claim")
         if (options.registryDown !== undefined) return await down()
+        if (options.claimDown !== undefined)
+          return {
+            kind: "error",
+            error: {
+              code: "alias_registry_unavailable",
+              message: "the alias registry refused the claim",
+              details: { reason: options.claimDown === "signed_out" ? "sign_in" : "network" },
+            },
+          }
         if (options.failClaim === true) throw new Error("alias registry failed")
         const held = aliases.get(alias)
         if (held !== undefined && held.session_id !== holder.session_id)

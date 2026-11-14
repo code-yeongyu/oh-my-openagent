@@ -48,8 +48,6 @@ export const dispatch = (state: OwnerState, conn: Conn, request: LocalRequest): 
       return ok({}, () => setStatus(state, deviceStatus(state, null)))
     case "device.info":
       return ok({ device: state.status.device })
-    case "device.machine_binding":
-      return ok({ machine_hash: null, device: null, merge_device_ids: [] })
     case "endpoints.register":
       state.endpoints.add(request.agent_dir)
       return ok()
