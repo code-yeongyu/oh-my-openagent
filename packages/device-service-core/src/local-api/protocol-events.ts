@@ -1,5 +1,6 @@
 import type { EventOf, JsonObject, JsonValue, Status } from "./protocol.ts"
 import type { DelegatedEvent } from "./protocol-delegated.ts"
+import type { DeliveryEvent } from "./protocol-deliveries.ts"
 import type {
   AttachPendingReason,
   BlobAbortReason,
@@ -175,4 +176,5 @@ export type LocalEvent =
   | ReadResult
   | UploadAbort
   | DelegatedEvent
+  | DeliveryEvent
 export type EventKind = LocalEvent["kind"]

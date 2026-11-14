@@ -98,6 +98,10 @@ export class EventAssembler {
       case "session.command_blob_chunk":
       case "session.command_blob_done":
       case "session.channel_closed":
+      // omo#13037: a delivery consumer answers what it is handed and asked itself.
+      case "delivery.inbound":
+      case "delivery.holds":
+      case "delivery.wake":
         return
       default:
         return assertNever(event)

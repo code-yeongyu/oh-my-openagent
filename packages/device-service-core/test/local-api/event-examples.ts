@@ -142,4 +142,14 @@ export const eventExamples: { readonly [K in EventKind]: Extract<LocalEvent, { k
     upload_id: "u1",
     reason: "parts_conflict",
   },
+  "delivery.inbound": {
+    type: "event",
+    kind: "delivery.inbound",
+    command_id: "Y29tbWFuZC1pZC0wMDAwMQ",
+    sender_device: PEER,
+    durable_id: "dur-1",
+    record: { type: "admit_external_message" },
+  },
+  "delivery.holds": { type: "event", kind: "delivery.holds", ask_id: "ask-1", durable_id: "dur-1" },
+  "delivery.wake": { type: "event", kind: "delivery.wake", enabled: true },
 }

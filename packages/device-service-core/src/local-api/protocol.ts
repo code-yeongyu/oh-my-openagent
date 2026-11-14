@@ -13,6 +13,8 @@ import type {
 export * from "./vocabulary.ts"
 export * from "./protocol-events.ts"
 export type * from "./protocol-delegated.ts"
+export * from "./protocol-deliveries.ts"
+import type { DeliveriesRequest, DeliveriesResponseData } from "./protocol-deliveries.ts"
 import type { SessionCandidate, SessionEndpoints, SessionEndpointsData, SessionLocate } from "./protocol-delegated.ts"
 import type { SessionCommand, SessionCommandPart } from "./protocol-command.ts"
 export type * from "./protocol-command.ts"
@@ -196,6 +198,7 @@ export type LocalRequest =
   | ControlAttachSet
   | ControlSessionWakeGet
   | ControlSessionWakeSet
+  | DeliveriesRequest
 export type RequestType = LocalRequest["type"]
 
 export type DeviceRow = {
@@ -206,7 +209,7 @@ export type DeviceRow = {
   readonly last_seen_ms: number | null
   readonly online: boolean
 }
-export type ResponseData = {
+export type ResponseData = DeliveriesResponseData & {
   readonly authenticate: Empty
   readonly "status.get": Status
   readonly "status.subscribe": Empty

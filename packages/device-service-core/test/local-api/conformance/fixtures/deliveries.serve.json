@@ -1,0 +1,149 @@
+{
+  "request": "deliveries.serve",
+  "cases": [
+    {
+      "name": "an omo client declares a consumer for a registered, checked agent dir",
+      "outcome": "ok",
+      "world": {
+        "deliveries": {
+          "agent_dirs": ["/agents/a"]
+        }
+      },
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "deliveries.serve",
+            "agent_dir": "/agents/a",
+            "v": 1
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "wake": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a protocol version this service does not know is refused unsupported",
+      "outcome": "refusal",
+      "world": {
+        "deliveries": {
+          "agent_dirs": ["/agents/a"]
+        }
+      },
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "deliveries.serve",
+            "agent_dir": "/agents/a",
+            "v": 2
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "unsupported"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "an agent dir that is not registered is refused forbidden",
+      "outcome": "refusal",
+      "world": {
+        "deliveries": {
+          "agent_dirs": ["/agents/a"]
+        }
+      },
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "deliveries.serve",
+            "agent_dir": "/agents/other",
+            "v": 1
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "forbidden"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a client that is not omo is refused forbidden",
+      "outcome": "refusal",
+      "client": {
+        "name": "sdk",
+        "version": "1.0.0"
+      },
+      "world": {
+        "deliveries": {
+          "agent_dirs": ["/agents/a"]
+        }
+      },
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "deliveries.serve",
+            "agent_dir": "/agents/a",
+            "v": 1
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "forbidden"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a service that serves no deliveries answers unsupported",
+      "outcome": "refusal",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "deliveries.serve",
+            "agent_dir": "/agents/a",
+            "v": 1
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "unsupported"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

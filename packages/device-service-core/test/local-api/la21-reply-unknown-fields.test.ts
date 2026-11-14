@@ -53,6 +53,12 @@ const answers: { readonly [T in RequestType]: ResponseData[T] } = {
   "control.session_wake.set": wakeState,
   "control.attach.get": attachState,
   "control.attach.set": attachState,
+  "deliveries.serve": { wake: false },
+  "delivery.answer": {},
+  "delivery.held": {},
+  "delivery.pending": {},
+  "delivery.drained": { kept: false },
+  "peer.admitted": { admitted: true },
 }
 const answerRows = Object.entries(answers) as [RequestType, unknown][]
 const response = (data: unknown) => ({ id: "r1", type: "response", ok: true, data })

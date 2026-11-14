@@ -11,6 +11,7 @@ import { OMO_SENPI_TASK_RPC_CHILD } from "@oh-my-opencode/senpi-task/rpc-spawn"
 
 import { resolveAgentHome } from "../../agent-home/resolve-agent-home"
 import { isCi } from "../../device-service/registrant-start"
+import type { DeliveryConsumer } from "../consumer/consumer"
 import type { DeliveryServicePort } from "../consumer/port"
 import type { IntakeAdmission } from "../gateway/intake-admission"
 import { createSameDeviceWake, type SameDeviceWake } from "../gateway/same-device-wake"
@@ -18,9 +19,15 @@ import { createGatewayStore, type GatewayStore } from "../gateway/store"
 import { resolveThreadSocket } from "../live-surface-paths"
 import { createCarrier, type Carrier, type CarrierEvaluation, type CarrierWakeOutcome } from "./carrier"
 import { connectCarrierHost, type CarrierHostConnection } from "./carrier-connection"
+import { createOmoNativeProductConfig } from "../../telemetry/product-identity"
+import { connectDeliveryServicePort } from "../consumer/device-service-port"
 import { startDeliveryConsumer, type ServingConsumer } from "./consumer-start"
 import { engineDropsRetainedRecord } from "./engine-minimum"
 import { engineHostEnsure, type EngineLauncher } from "./host-ensure"
+
+/** How long a dead delivery consumer waits before it is started again (#13457's MEDIUM: never restarting left remote
+ * wake off for the engine's life whenever the service was late or restarted). */
+const CONSUMER_RETRY_MS = 20_000
 
 type Env = Readonly<Record<string, string | undefined>>
 
@@ -41,11 +48,10 @@ export type ThreadWakeOptions = {
   readonly engineLaunch?: () => EngineLauncher
   readonly launchSpecPath?: string
   readonly loadConfig?: (options: { readonly cwd: string }) => { readonly config: WakeConfigView }
-  /**
-   * The device service's delivery protocol (`deliveries.serve`, design 5.4). The device service's local API v1 does
-   * not carry it yet (it is in no relay-spec fixture), so production has no port and serves no consumer.
-   */
+  /** Replaces the device service's delivery port (design 5.4), which production opens through device-service-core. */
   readonly deliveries?: () => Promise<DeliveryServicePort | undefined>
+  /** The device service's state directory the production port connects to; absent, the service's default. */
+  readonly deviceServiceStateDir?: string
   readonly engineVersion?: string
   readonly minimumEngine?: string | null
   readonly schedule?: (run: () => void, ms: number) => () => void
@@ -214,9 +220,7 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart): Runni
       warn: input.warn,
     })
   let serving: ServingConsumer | undefined
-  // True from the consumer's serving acknowledgement, before its startup pending sweep: a remote row that sweep wakes
-  // must not read the carrier's gate as off (#13456 review).
-  let servingAcked = false
+  let consumer: DeliveryConsumer | undefined
   const carrier = createCarrier({
     store,
     sessionsDirectory,
@@ -232,7 +236,7 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart): Runni
     wakeLimit: () => input.settings().wakeLimit,
     sameDevice: (cwd) => input.settings(cwd).sameDevice,
     // Owner ruling 2026-11-14: a device whose service serves this engine's consumer wakes; no switch has to be told on.
-    remoteWake: () => servingAcked || serving !== undefined,
+    remoteWake: () => consumer?.serving() ?? false,
     schedule: options.schedule ?? unrefSchedule,
     onEvent: (event) => {
       if (ENDED.has(event.outcome.kind))
@@ -244,40 +248,90 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart): Runni
     if (outcome.kind === "failed") input.warn(`thread wake: ${durableId} was not started after ${outcome.attempts} attempts`)
     options.onWake?.(durableId, outcome)
   }
-  const ready = startDeliveryConsumer({
-    store,
-    agentDir,
-    sessionsDirectory,
-    deliveries: options.deliveries,
-    engineVersion: options.engineVersion ?? input.engineVersion,
-    minimumEngine: options.minimumEngine,
-    wake,
-    sameDevice: (cwd) => input.settings(cwd).sameDevice,
-    onServing: () => {
-      servingAcked = true
-    },
-    log: input.warn,
-  }).then(
-    (started) => {
-      serving = started
-    },
-    (error: unknown) => {
-      serving = undefined
-      servingAcked = false
-      input.warn(`thread wake: the delivery consumer did not start: ${String(error)}`)
-    },
+  // #13457's MEDIUM: the consumer is started again after every death - a connect failure, a refused declaration, a
+  // service restart - so a device whose daemon is up keeps its remote wake whatever the startup order was. Its delta
+  // review's MEDIUM: the loop is silent while it keeps failing - one warning per change of state, so a device without
+  // the service is not warned at every retry tick.
+  let consumerStopped = false
+  let cancelConsumerRetry: (() => void) | undefined
+  // Keyed on the failure itself, not on being down: a service that first answers nothing and then refuses the
+  // declaration is a NEW state and warns again (the loop stays silent only while the same failure repeats).
+  let consumerFailure: string | undefined
+  const reportConsumerFailure = (line: string): void => {
+    if (line === consumerFailure) return
+    consumerFailure = line
+    input.warn(line)
+  }
+  let starting: Promise<void> = Promise.resolve()
+  const armConsumerRetry = (): void => {
+    if (consumerStopped) return
+    cancelConsumerRetry?.()
+    cancelConsumerRetry = (options.schedule ?? unrefSchedule)(() => {
+      cancelConsumerRetry = undefined
+      starting = startConsumer().catch((error: unknown) => {
+        reportConsumerFailure(`thread wake: the delivery consumer did not start: ${String(error)}`)
+      })
+    }, CONSUMER_RETRY_MS)
+  }
+  const startConsumer = async (): Promise<void> => {
+    const attempt = await startDeliveryConsumer({
+      store,
+      agentDir,
+      sessionsDirectory,
+      deliveries:
+        options.deliveries ??
+        (() =>
+          connectDeliveryServicePort({
+            version: createOmoNativeProductConfig().packageVersion,
+            ...(options.deviceServiceStateDir === undefined ? {} : { stateDir: options.deviceServiceStateDir }),
+            log: reportConsumerFailure,
+            onUnavailable: armConsumerRetry,
+          })),
+      onConsumer: (created) => {
+        consumer = created
+      },
+      onDied: armConsumerRetry,
+      onClosed: () => {
+        serving = undefined
+      },
+      engineVersion: options.engineVersion ?? input.engineVersion,
+      minimumEngine: options.minimumEngine,
+      wake,
+      sameDevice: (cwd) => input.settings(cwd).sameDevice,
+      log: reportConsumerFailure,
+    }).catch((error: unknown) => {
+      // A rejected start (an injected deliveries that throws) is a death like the others: reported once and retried
+      // (#13457's delta review, LOW).
+      reportConsumerFailure(`thread wake: the delivery consumer did not start: ${String(error)}`)
+      armConsumerRetry()
+      return undefined
+    })
+    serving = attempt
+    consumer = attempt?.consumer
+    if (attempt !== undefined) consumerFailure = undefined
+  }
+  starting = startConsumer()
+  const ready = starting.then(
+    () => undefined,
+    () => undefined,
   )
   return {
     carrier,
     wake,
     admitIntake: async (device) => {
-      await ready
+      // The settled truth of this process's consumer: a restart in flight is awaited, so the answer is never a stale
+      // unknown from the moment before it.
+      await Promise.allSettled([ready, starting])
       return serving === undefined ? "unknown" : await serving.admitIntake(device)
     },
     ready,
     stop: async () => {
-      await ready
-      serving?.consumer.stop()
+      consumerStopped = true
+      cancelConsumerRetry?.()
+      // An in-flight retry settles `serving` only after this wait, so its consumer is closed too (the delta review's
+      // LOW), never left open by a start that raced the stop.
+      await Promise.allSettled([ready, starting])
+      serving?.close()
       await carrier.stop()
       if (options.store === undefined) await store.dispose().catch(() => undefined)
     },
