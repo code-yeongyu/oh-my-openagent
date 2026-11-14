@@ -465,6 +465,15 @@ export async function followRemote(
     // review). A started turn may also have already finished before this aim: the probe reads the transcript and
     // prints a superseded answer at once.
     mode = "stream"
+    // The run's own records the buffer already holds (after its agent_start) still say how its last message ended:
+    // a turn aborted before the aim and settled after it is interrupted, not settled (#13272 review L2).
+    const runStart = buffer.findLastIndex((record) => record["type"] === "agent_start")
+    if (runStart >= 0)
+      for (const record of buffer.slice(runStart + 1)) {
+        const ended = record["message"]
+        if (record["type"] === "message_end" && isRecord(ended) && ended["role"] === "assistant")
+          lastStopReason = ended["stopReason"]
+      }
     if (lane === "started") {
       // A run whose settle the buffer already holds ended before this aim: its settle is the probe's signal.
       const settledAlready = buffer.length > 0 && buffer[buffer.length - 1]?.["type"] === "agent_settled"

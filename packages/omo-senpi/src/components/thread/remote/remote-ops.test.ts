@@ -498,3 +498,18 @@ describe("#13272 review: the anchor survives a rewritten send and never takes an
     expect(anchorMatches([message("u1", "user", "ping")], "ping", "cm-missing")).toEqual([0])
   })
 })
+
+describe("followRemote: an interrupted turn whose last message ended before the aim", () => {
+  test("a started turn aborted before the aim, settled after it, ends interrupted (#13272 review L2)", async () => {
+    const { remote, deliver } = followSurface([message("u1", "user", "ping")])
+    const texts: string[] = []
+    const follow = await followRemote(remote, ROW, (text) => texts.push(text), { text: "ping" })
+    if ("kind" in follow) throw new Error("follow refused")
+    deliver([{ type: "agent_start" }, { type: "message_end", message: { role: "assistant", stopReason: "aborted" } }])
+    follow.aim("started")
+    deliver([{ type: "agent_settled" }])
+    await flush()
+    expect(await withTimeout(follow.settled, 2000, "the follow never settled")).toBe("interrupted")
+    follow.stop()
+  })
+})
