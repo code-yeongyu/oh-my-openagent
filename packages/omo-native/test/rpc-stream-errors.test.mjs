@@ -74,6 +74,10 @@ function engineFixture(source = rpcSource) {
 }
 
 function patch(root) {
+  writeFileSync(
+    join(root, "dist", "main.js"),
+    "created.session.setSessionThinkingLevel(created.session.thinkingLevel);\n",
+  )
   const result = spawnSync("node", [patchScript], {
     env: { ...process.env, OMO_SENPI_PATCH_ROOT: root },
     encoding: "utf8",
