@@ -1,4 +1,5 @@
 import type { AddressBookHost, DiskSession } from "../address-book"
+import type { InterruptRequest } from "../control/interrupt"
 import type { ThreadControl } from "../endpoint-controls"
 import type { EndpointKind } from "../endpoint-registry"
 import type {
@@ -95,11 +96,12 @@ export type ThreadHost = {
     options?: { readonly streamingBehavior?: "steer" | "followUp" },
     durable_session_id?: string,
   ) => Promise<{ readonly turnId?: string }>
+  /** The engine's `interrupt` record with `request`'s fields (`control/interrupt.ts`); answers the engine's reply data. */
   readonly interrupt: (
     sessionId: string,
-    turnId?: string,
+    request: InterruptRequest,
     durable_session_id?: string,
-  ) => Promise<{ readonly interrupted?: boolean; readonly turnId?: string }>
+  ) => Promise<Readonly<Record<string, unknown>>>
   readonly setSessionName: (sessionId: string, name: string, durable_session_id?: string) => Promise<void>
   readonly setModel: (
     sessionId: string,
