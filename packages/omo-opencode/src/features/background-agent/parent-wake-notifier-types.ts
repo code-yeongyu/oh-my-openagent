@@ -47,4 +47,6 @@ export type ParentWakeNotifierOptions = {
    */
   readonly userMessageInProgressWindowMs: number
   readonly parentSessionActivityInProgressWindowMs?: number
+  /** How long a wake for a busy parent waits before it is stored in the running turn anyway (default 60000). */
+  readonly busyParentWakeDelayMs?: number
 }

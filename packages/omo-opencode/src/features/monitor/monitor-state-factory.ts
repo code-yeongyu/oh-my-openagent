@@ -157,6 +157,7 @@ export function createMonitorInjector(
   pluginContext: Pick<PluginInput, "client" | "directory">,
   record: MonitorRecord,
   scheduleFlush: (monitorId: string, delayMs: number, operation: () => Promise<void>) => void,
+  busyParentWakeDelayMs?: number,
 ): MonitorInjector {
   if (deps?.createInjector) {
     return deps.createInjector(record, scheduleFlush)
@@ -169,7 +170,7 @@ export function createMonitorInjector(
     acceptedMessageSkewMs: MONITOR_OUTPUT_ACCEPTED_MESSAGE_SKEW_MS,
     userMessageInProgressWindowMs: MONITOR_OUTPUT_USER_MESSAGE_IN_PROGRESS_WINDOW_MS,
     postDispatchHoldMs: MONITOR_OUTPUT_POST_DISPATCH_HOLD_MS,
-    maxActiveDeferMs: MONITOR_OUTPUT_MAX_ACTIVE_DEFER_MS,
+    maxActiveDeferMs: busyParentWakeDelayMs ?? MONITOR_OUTPUT_MAX_ACTIVE_DEFER_MS,
     scheduleFlush,
   })
 }

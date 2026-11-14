@@ -66,6 +66,7 @@ function createHarness(
     dispatchResults?: InternalPromptDispatchResult[]
     now?: number
     beforeDispatchReturns?: (call: DispatchCall) => Promise<void>
+    maxActiveDeferMs?: number
   } = {},
 ): {
   injector: MonitorOutputInjector
@@ -99,6 +100,7 @@ function createHarness(
     acceptedMessageSkewMs: 50,
     userMessageInProgressWindowMs: 500,
     postDispatchHoldMs: 250,
+    ...(opts.maxActiveDeferMs !== undefined ? { maxActiveDeferMs: opts.maxActiveDeferMs } : {}),
     now: () => opts.now ?? 1_000,
     settleAfterSessionIdle: async () => {},
     dispatchInternalPrompt: async (args) => {
@@ -329,6 +331,43 @@ describe("MonitorOutputInjector", () => {
 
       // then
       expect(calls).toHaveLength(1)
+    })
+  })
+
+  describe("#given a monitor's final batch while the parent runs a tool", () => {
+    const busyTurn: FakeMessage[] = [
+      { info: { role: "user", time: { created: 100 } }, parts: [{ type: "text", text: "go" }] },
+      {
+        info: { role: "assistant", finish: "tool-calls", time: { created: 200 } },
+        parts: [{ type: "tool", state: { status: "running" } }],
+      },
+    ]
+
+    test("#when the busy-parent delay is 0 #then the final batch goes into the running turn at once", async () => {
+      // given
+      const record = createRecord()
+      const { injector, calls } = createHarness({ active: true, messages: busyTurn, now: 10_000, maxActiveDeferMs: 0 })
+      injector.queueBatch(record, { ...createBatch(31), stillRunning: false })
+
+      // when
+      await injector.flushMonitor(record.id)
+
+      // then
+      expect(calls).toHaveLength(1)
+      expect(calls[0]).toMatchObject({ checkStatus: false, checkToolState: false })
+    })
+
+    test("#when no busy-parent delay is set #then the final batch waits", async () => {
+      // given
+      const record = createRecord()
+      const { injector, calls } = createHarness({ active: true, messages: busyTurn, now: 10_000 })
+      injector.queueBatch(record, { ...createBatch(32), stillRunning: false })
+
+      // when
+      await injector.flushMonitor(record.id)
+
+      // then
+      expect(calls).toHaveLength(0)
     })
   })
 
