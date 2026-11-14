@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { once } from "node:events"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { createConnection, createServer, type Server, type Socket } from "node:net"
 import { join } from "node:path"
 import { fakeHostTransport } from "../../../../senpi-task/src/runners/rpc-host/__fixtures__/fake-host-transport"
@@ -194,6 +194,7 @@ describe("thread tools across host endpoints", () => {
     const shard = join(dir, "i-0123456789abcdef.sock")
     const engineHome = join(dir, "home")
     const scratchFolder = join(engineHome, ".omo", "desktop", "scratch", "2026-11-11-qa-thread-chip-check-use-01a1ca0d")
+    mkdirSync(scratchFolder, { recursive: true })
     const terminal = hostWith("dur-terminal", "terminal", join(dir, "terminal.jsonl"))
     const legacyHost = await endpoint(legacy, (frame) => frame.type === "open_session"
       ? { data: { sessionId: "rpc-2", state: { cwd: typeof frame.cwd === "string" ? frame.cwd : engineHome } } }
