@@ -278,7 +278,10 @@ fn durable_rename(temp: &Path, path: &Path, dir: &Path) -> io::Result<()> {
     let filesystem = if read == 0 {
         Err(io::Error::last_os_error())
     } else {
-        let end = name.iter().position(|unit| *unit == 0).unwrap_or(name.len());
+        let end = name
+            .iter()
+            .position(|unit| *unit == 0)
+            .unwrap_or(name.len());
         Ok(String::from_utf16_lossy(&name[..end]))
     };
     admit_filesystem(filesystem)?;

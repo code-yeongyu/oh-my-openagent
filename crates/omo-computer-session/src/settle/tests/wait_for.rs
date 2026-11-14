@@ -250,13 +250,24 @@ fn an_event_window_closed_wait_is_confirmed_by_the_listing() {
     let mut child = Rig::new(json!({"ax_notification_timeline": [
         {"t_ms": 100, "window": "101", "kind": "AXUIElementDestroyed"}
     ]}));
-    let result = child.session.wait_for(params(closed.clone())).expect("waitFor");
-    assert_eq!(result.outcome, WaitOutcome::Timeout, "a destroyed child is not the window closing");
+    let result = child
+        .session
+        .wait_for(params(closed.clone()))
+        .expect("waitFor");
+    assert_eq!(
+        result.outcome,
+        WaitOutcome::Timeout,
+        "a destroyed child is not the window closing"
+    );
     let mut real = Rig::new(json!({"ax_notification_timeline": [
         {"t_ms": 100, "window": "101", "kind": "AXUIElementDestroyed"},
         {"t_ms": 300, "window": "101", "kind": "AXUIElementDestroyed", "closes": true}
     ]}));
     let result = real.session.wait_for(params(closed)).expect("waitFor");
     assert_eq!(result.outcome, WaitOutcome::Matched);
-    assert!((300..1_000).contains(&real.clock.now_ms()), "matched at the close: {}", real.clock.now_ms());
+    assert!(
+        (300..1_000).contains(&real.clock.now_ms()),
+        "matched at the close: {}",
+        real.clock.now_ms()
+    );
 }

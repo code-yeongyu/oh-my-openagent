@@ -179,15 +179,23 @@ fn a_stop_pressed_while_another_holder_keeps_the_lock_refuses_the_waiting_exec()
         // only then is the lock released. Bounded: a session that never admits fails here.
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
         while remote.stop_polls() <= before {
-            assert!(std::time::Instant::now() < deadline, "the session never reached admission");
+            assert!(
+                std::time::Instant::now() < deadline,
+                "the session never reached admission"
+            );
             std::thread::yield_now();
         }
         remote.press_stop_chord();
         drop(held);
     });
-    let refused = session.click(click("c-locked")).expect_err("the stop pressed while waiting refuses");
+    let refused = session
+        .click(click("c-locked"))
+        .expect_err("the stop pressed while waiting refuses");
     presser.join().expect("presser");
     assert_eq!(wire(&refused).0, "Suspended");
     assert!(run.sink.is_empty(), "nothing sent: {:?}", run.sink.lines());
-    assert!(other.try_acquire().expect("try").is_some(), "the refused exec released the lock");
+    assert!(
+        other.try_acquire().expect("try").is_some(),
+        "the refused exec released the lock"
+    );
 }
