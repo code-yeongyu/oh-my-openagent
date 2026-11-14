@@ -388,6 +388,7 @@ describe("checkExtensionCurrent", () => {
       "/components/thread/wake/carrier-connection.ts",
       "/components/thread/wake/consumer-start.ts",
       "/components/thread/consumer/consumer.ts",
+      "/components/thread/consumer/device-service-port.ts",
       "/components/thread/gateway/same-device-wake.ts",
     ]) {
       expect(

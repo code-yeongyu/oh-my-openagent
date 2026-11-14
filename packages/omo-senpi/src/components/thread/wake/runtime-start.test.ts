@@ -89,6 +89,76 @@ describe("the ensured host's idle-exit setting", () => {
 })
 
 describe("the consumer retry loop's warnings", () => {
+  test("#given a failure whose kind changes without a recovery #when each retry fails #then each new failure is warned once and a repeating one stays silent", async () => {
+    const agentDir = mkdtempSync("/tmp/omo-wake-runtime-")
+    const refusing = createFakeDeliveryService({ admitted: true })
+    refusing.refuseServe("internal_error")
+    let broken = true
+    let refusals = 0
+    let secondRefusal: () => void = () => undefined
+    const refusedTwice = new Promise<void>((resolve, reject) => {
+      secondRefusal = resolve
+      const timer = setTimeout(() => reject(new Error("waited 5s for the second refused declaration")), 5_000)
+      timer.unref?.()
+      const original = secondRefusal
+      secondRefusal = () => {
+        clearTimeout(timer)
+        original()
+      }
+    })
+    const warnings: string[] = []
+    let secondWarning: () => void = () => undefined
+    const warnedTwice = new Promise<void>((resolve, reject) => {
+      secondWarning = resolve
+      const timer = setTimeout(() => reject(new Error("waited 5s for the changed failure's warning")), 5_000)
+      timer.unref?.()
+      const original = secondWarning
+      secondWarning = () => {
+        clearTimeout(timer)
+        original()
+      }
+    })
+    const timers: (() => void)[] = []
+    const running = start(
+      agentDir,
+      {
+        deliveries: async () => {
+          if (broken) {
+            broken = false
+            throw new Error("the seam is broken")
+          }
+          return {
+            ...refusing.port,
+            serve: async (request: { readonly agent_dir: string; readonly v: number }) => {
+              try {
+                return await refusing.port.serve(request)
+              } finally {
+                refusals += 1
+                if (refusals === 2) secondRefusal()
+              }
+            },
+          }
+        },
+        schedule: (run) => {
+          timers.push(run)
+          return () => undefined
+        },
+      },
+      (line) => {
+        warnings.push(line)
+        if (warnings.length === 2) secondWarning()
+      },
+    )
+    await running?.ready
+    expect(warnings).toHaveLength(1)
+    timers.at(-1)?.()
+    await warnedTwice
+    expect(warnings).toHaveLength(2)
+    timers.at(-1)?.()
+    await refusedTwice
+    expect(warnings).toHaveLength(2)
+    await running?.stop()
+  })
   test("#given a service that stays refused across retries #when three attempts fail and the service then recovers and fails again #then exactly one warning is written per stretch of failure", async () => {
     const agentDir = mkdtempSync("/tmp/omo-wake-runtime-")
     const warnings: string[] = []
@@ -171,20 +241,30 @@ describe("the consumer retry loop's warnings", () => {
 })
 
 describe("the consumer's stop against an in-flight retry", () => {
-  test("#given a retry whose port has not answered yet #when stop() runs before it settles #then the consumer that retry produces is closed, not left open", async () => {
+  test("#given a retry that opens a fresh service #when stop() runs before it settles #then the consumer that retry produces is closed, not left open", async () => {
     const agentDir = mkdtempSync("/tmp/omo-wake-runtime-")
-    const service = createFakeDeliveryService({ admitted: true })
-    service.ackServe({ wake: true })
+    const first = createFakeDeliveryService({ admitted: true })
+    first.ackServe({ wake: true })
     const timers: (() => void)[] = []
     let calls = 0
     let releasePort: () => void = () => undefined
+    let fresh: ReturnType<typeof createFakeDeliveryService> | undefined
+    // The store is handed over so stop() cannot dispose it: a disposed store would kill the racing retry on its
+    // own (its first store call throws), closing the port without the fix and hiding the leak this test pins.
+    const store = createGatewayStore({ agentDir })
     const running = start(agentDir, {
+      store,
       deliveries: async () => {
         calls += 1
-        if (calls === 2) await new Promise<void>((resolve) => {
+        if (calls === 1) return first.port
+        await new Promise<void>((resolve) => {
           releasePort = resolve
         })
-        return service.port
+        // A FRESH open service, never dropped: a consumer left open by the racing retry keeps it open forever,
+        // so its closed promise settling is the discriminator a reused port could not give.
+        fresh = createFakeDeliveryService({ admitted: true })
+        fresh.ackServe({ wake: true })
+        return fresh.port
       },
       schedule: (run) => {
         timers.push(run)
@@ -192,15 +272,22 @@ describe("the consumer's stop against an in-flight retry", () => {
       },
     })
     await running?.ready
-    service.drop()
-    await service.port.closed
+    first.drop()
+    await first.port.closed
     timers.at(-1)?.()
     const stopped = running?.stop()
     releasePort()
     await stopped
-    expect(await (service.port.closed ?? Promise.resolve()).then(() => true)).toBe(true)
+    const closedInTime = await Promise.race([
+      (fresh?.port.closed ?? Promise.resolve()).then(() => true),
+      new Promise<false>((resolve) => {
+        const timer = setTimeout(() => resolve(false), 5_000)
+        timer.unref?.()
+      }),
+    ])
+    expect(closedInTime).toBe(true)
     await expect(
-      service.inbound({
+      fresh?.inbound({
         command_id: "c-x",
         sender_device: "device-b",
         durable_id: "dur-anyone",
