@@ -69,6 +69,11 @@ async function removeRequested(record: Record<string, unknown>, root: string, gi
         branch,
       },
     )
+  // Nothing ties a far request to the worktree its create made, so a worktree with work in it (a hand-made one, or one
+  // a thread is using) is never removed: the one a failed open left is fresh and clean (#13450 re-review L2).
+  const status = await git(["status", "--porcelain"], path)
+  if (status.exit !== 0 || status.stdout.trim() !== "")
+    return folderFailure("worktree_left_behind", `${path} has uncommitted work; it was not removed.`, { path, branch })
   const commonDir = common.stdout.trim()
   const repository = basename(commonDir) === ".git" ? dirname(commonDir) : commonDir
   return (await discardWorktree({ repository, path, branch, root, git })) ?? { kind: "removed" }
