@@ -203,6 +203,7 @@ describe("AX observer registration gaps", () => {
     ({
       t: 3_500,
       kind: "observer_failed",
+      origin: "launch",
       app: "com.example.app",
       policy: "regular",
       pid: 300,
@@ -213,7 +214,16 @@ describe("AX observer registration gaps", () => {
       ...fields,
     }) as const
   const late = (fields: Gap = {}) =>
-    ({ t: 2_100, kind: "observer_late", pid: 300, attempts: 4, regular: true, since: 1_500, ...fields }) as const
+    ({
+      t: 2_100,
+      kind: "observer_late",
+      origin: "launch",
+      pid: 300,
+      attempts: 4,
+      regular: true,
+      since: 1_500,
+      ...fields,
+    }) as const
 
   test("an app launched inside the recording that never registered is a fault, even when it was reported after stop", () => {
     const summary = summarize(cleanRun([failed()]))
