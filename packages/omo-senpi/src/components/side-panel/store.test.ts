@@ -128,6 +128,39 @@ describe("panel store child spend", () => {
     expect(store.state().childSpend).toBeCloseTo(0.3, 6)
   })
 
+  test("#given more costed finished children than the cap #when every record is upserted again #then each cost is still counted once and nothing changes", () => {
+    // given
+    const store = createPanelStore(clock())
+    const records = Array.from({ length: AGENT_ROW_CAP + 3 }, (_, index) => ({
+      id: `c${index}`,
+      status: "finished" as const,
+      startedAt: index,
+      finishedAt: index + 1,
+      cost: 1,
+    }))
+    for (const record of records) store.upsertChild(record)
+
+    // when
+    const changes = [1, 2].flatMap(() => records.map((record) => store.upsertChild(record)))
+
+    // then
+    expect(store.state().childSpend).toBe(AGENT_ROW_CAP + 3)
+    expect(store.state().children).toHaveLength(AGENT_ROW_CAP)
+    expect(changes.filter(Boolean)).toHaveLength(0)
+  })
+
+  test("#given a finished child #when a later record revises its cost #then the revised cost replaces the first", () => {
+    // given
+    const store = createPanelStore(clock())
+    store.upsertChild({ id: "a", status: "finished", startedAt: 1, finishedAt: 2, cost: 0.25 })
+
+    // when
+    store.upsertChild({ id: "a", cost: 0.4 })
+
+    // then
+    expect(store.state().childSpend).toBeCloseTo(0.4, 6)
+  })
+
   test("#given a running child carrying a cost #when it has not stopped #then nothing is counted yet", () => {
     // given
     const store = createPanelStore(clock())
