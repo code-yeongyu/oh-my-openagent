@@ -83,7 +83,7 @@ pub fn admit_leased(physical: &PhysicalChord, engine_held: &[u16]) -> Result<(),
 }
 
 /// One `SendInput` batch for `chord` under the lease: modifiers down, the key, modifiers up in reverse.
-/// `vk_for` is the keyboard layout's virtual key for a character (`VkKeyScanW` on Windows).
+/// `vk_for` is the keyboard layout's virtual key for a character ([`layout_vk`] on Windows).
 ///
 /// # Errors
 /// `InvalidKey{unknown_key}` when the chord needs a virtual key the layout does not have.
@@ -141,25 +141,29 @@ pub fn foreground_chord(
     Ok(batch)
 }
 
-/// The keyboard layout's virtual key for `c` (`VkKeyScanW`), when typing it needs no modifier
-/// of its own; `None` otherwise, so a chord never guesses a key.
+/// The virtual key for `c` in the keyboard layout of the window that receives the chord - the
+/// foreground window's thread, not the calling thread, whose layout can differ (review L3 of the
+/// #13350 delta) - when typing it needs no modifier of its own; `None` otherwise, so a chord never
+/// guesses a key.
 #[cfg(windows)]
 #[must_use]
 pub fn layout_vk(c: char) -> Option<u16> {
-    let unit = u16::try_from(u32::from(c)).ok()?;
-    // SAFETY: a pure lookup in the calling thread's keyboard layout.
-    let scan = unsafe { windows::Win32::UI::Input::KeyboardAndMouse::VkKeyScanW(unit) };
-    let bits = u16::from_ne_bytes(scan.to_ne_bytes());
-    (scan != -1 && bits >> 8 == 0).then_some(bits & 0xFF)
+    use windows::Win32::UI::Input::KeyboardAndMouse::GetKeyboardLayout;
+    use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
+
+    // SAFETY: plain reads of the foreground window, its thread and that thread's layout.
+    let layout = unsafe { GetKeyboardLayout(GetWindowThreadProcessId(GetForegroundWindow(), None)) };
+    layout_vk_in(c, layout)
 }
 
-/// The virtual key for `c` in keyboard layout `layout`, when typing it needs no modifier of its
-/// own; `None` otherwise.
+/// The virtual key for `c` in keyboard layout `layout` (`VkKeyScanExW`), when typing it needs no
+/// modifier of its own; `None` otherwise.
 #[cfg(windows)]
 #[must_use]
-pub fn layout_vk_in(
-    c: char,
-    _layout: windows::Win32::UI::Input::KeyboardAndMouse::HKL,
-) -> Option<u16> {
-    layout_vk(c)
+pub fn layout_vk_in(c: char, layout: windows::Win32::UI::Input::KeyboardAndMouse::HKL) -> Option<u16> {
+    let unit = u16::try_from(u32::from(c)).ok()?;
+    // SAFETY: a pure lookup in the given keyboard layout.
+    let scan = unsafe { windows::Win32::UI::Input::KeyboardAndMouse::VkKeyScanExW(unit, layout) };
+    let bits = u16::from_ne_bytes(scan.to_ne_bytes());
+    (scan != -1 && bits >> 8 == 0).then_some(bits & 0xFF)
 }
