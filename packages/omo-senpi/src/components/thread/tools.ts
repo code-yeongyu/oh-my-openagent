@@ -642,6 +642,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
     // this device's own entries and before any other listing match, whether the sender is named by id or by stated name.
     const senders = match === "exact" ? consumedSendersOf(options, address) : []
     const here = await thisDeviceOf(options, senders)
+    if (typeof here === "object") return refuse(here)
     const replyTo = replySender(address, senders, here)
     if (replyTo !== undefined && "code" in replyTo) return refuse(replyTo)
     if (replyTo?.device !== undefined) {
@@ -846,20 +847,37 @@ export function registerThreadTools(
 
 type ConsumedSender = { readonly session_id: string; readonly device?: string }
 
-/** This device's own id, read only when a consumed sender names a device: a sender naming it is a sender on this device. */
+/**
+ * This device's own id, read only when a consumed sender names a device: a sender naming it is a sender on this device.
+ * A failed read is a typed host_unavailable, never undefined: without the id a sender on this device cannot be told from
+ * one on another device, and guessing "another device" would route a local reply through the relay (#13218 review).
+ */
 async function thisDeviceOf(
   options: ThreadToolSurfaceOptions,
   senders: readonly ConsumedSender[],
-): Promise<string | undefined> {
+): Promise<string | undefined | ThreadToolFailure> {
   if (options.remote === undefined || !senders.some((sender) => sender.device !== undefined)) return undefined
-  return (await options.remote.sessions.thisDevice().catch(() => undefined)) ?? undefined
+  try {
+    return (await options.remote.sessions.thisDevice()) ?? undefined
+  } catch (error) {
+    const devices = [...new Set(senders.flatMap((sender) => (sender.device === undefined ? [] : [sender.device])))]
+    return threadToolFailure(
+      "host_unavailable",
+      "This device's id could not be read, so a reply to a sender named by its device cannot be routed; nothing was sent.",
+      "Retry when the device service is reachable.",
+      { devices, reason: error instanceof Error ? error.message : String(error) },
+    )
+  }
 }
 
 /** True when `address` is an approved reply to a consumed sender on another device, or names such senders ambiguously. */
 async function replyLeavesThisDevice(options: ThreadToolSurfaceOptions, address: string): Promise<boolean> {
   const senders = consumedSendersOf(options, address)
   if (!senders.some((sender) => sender.device !== undefined)) return false
-  const replyTo = replySender(address, senders, await thisDeviceOf(options, senders))
+  const here = await thisDeviceOf(options, senders)
+  // An unreadable device id takes no local listing either: the send answers that failure (sendTarget) before any route.
+  if (typeof here === "object") return true
+  const replyTo = replySender(address, senders, here)
   return replyTo !== undefined && ("code" in replyTo || replyTo.device !== undefined)
 }
 

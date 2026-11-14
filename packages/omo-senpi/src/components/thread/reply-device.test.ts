@@ -71,12 +71,28 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
     await fixture.cleanup()
   })
 
-  async function consumed(deliveries: readonly Delivery[], rows: readonly RemoteSessionRow[]) {
+  async function consumed(
+    deliveries: readonly Delivery[],
+    rows: readonly RemoteSessionRow[],
+    options: { readonly thisDeviceFails?: boolean } = {},
+  ) {
     const agentDir = mkdtempSync(join(tmpdir(), "thr-reply-device-"))
     directories.push(agentDir)
     const store = createGatewayStore({ agentDir })
     stores.push(store)
     const account = fixture.account({ rows, live: rows.map((row) => row.session_id) })
+    const remote =
+      options.thisDeviceFails === true
+        ? {
+            ...account.remote,
+            sessions: {
+              ...account.remote.sessions,
+              thisDevice: async (): Promise<string> => {
+                throw new Error("device.info failed")
+              },
+            },
+          }
+        : account.remote
     const handlers = new Map<string, Handler[]>()
     const tools: CapturedTool[] = []
     const pi = {
@@ -113,7 +129,7 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
       stateDirectory: join(agentDir, "state"),
       agentDir: () => agentDir,
       store,
-      remote: account.remote,
+      remote,
     }).register(pi as never, { logger, config: { getFlag: () => undefined } } as never)
     const ctx = { sessionManager: { getSessionId: () => "dur-caller" } }
     const dispatch = async (event: string, payload: Record<string, unknown> = {}) => {
@@ -199,6 +215,19 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
     expect(prompts()).toBe(0)
     expect(listings() - listedBefore).toBe(0)
     expect(reachedLocally("dur-local")).toBe(false)
+  })
+
+  test("#given a delivery from this device's own id and this device's id cannot be read #when the run replies #then it is host_unavailable naming why, and nothing is sent anywhere", async () => {
+    const { reply, admittedOn, prompts, reachedLocally } = await consumed(
+      [{ id: "device:here/d-1", session_id: "dur-local", name: "local peer" }],
+      [B_ROW],
+      { thisDeviceFails: true },
+    )
+    expect(await reply("dur-local")).toMatchObject({
+      kind: "error",
+      error: { code: "host_unavailable", details: { reason: "device.info failed", devices: ["here"] } },
+    })
+    expect([admittedOn(), prompts(), reachedLocally("dur-local")]).toEqual([[], 0, false])
   })
 
   test("#given deliveries from b and from c that state one session id #when the run replies by that id #then it is ambiguous_target and nothing is sent", async () => {
