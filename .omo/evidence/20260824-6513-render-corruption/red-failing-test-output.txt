@@ -1,0 +1,20 @@
+(fail) handleMessagePartUpdated > does not reprint a text part snapshot after an interleaved tool result [0.75ms]
+231 |       state,
+232 |     )
+233 | 
+234 |     //#then
+235 |     const output = joinWriteCalls(stdoutSpy.mock.calls)
+236 |     expect(output).toContain("second part body")
+                         ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "second part body"
+Received: "  AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6513/packages/omo-opencode/src/cli/run/event-message-handlers.test.ts:236:20)
+(fail) handleMessagePartUpdated > renders a new text part whose snapshot is shorter than the previous part accumulator [0.39ms]
+
+ 9 pass
+ 2 fail
+ 29 expect() calls
+Ran 11 tests across 1 file. [655.00ms]

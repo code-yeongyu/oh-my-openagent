@@ -1,0 +1,6 @@
+  ⚙ read_file filePath=/src/index.ts  
+
+ 200 pass
+ 0 fail
+ 406 expect() calls
+Ran 200 tests across 28 files. [4.80s]
