@@ -88,6 +88,14 @@ impl Session {
         if let Some(latch) = self.guard.supervisor().latch() {
             return Err(latch.refusal().into());
         }
+        // Review L7: the hand's consent as the exec path checks it - a tampered hand, a view that
+        // does not carry its stop chord (R6-1: no consent file read) or computer use off never
+        // takes the foreground slot.
+        self.funnel
+            .control
+            .consent
+            .admit_exec(None)
+            .map_err(|denial| Refused::from(denial.refusal.refusal()))?;
         // The grant's own checks, as a foreground call runs them: `foreground: never`, a remote
         // hand (`headless_host`), then a live grant.
         let control = &self.funnel.control;

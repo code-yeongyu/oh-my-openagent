@@ -221,3 +221,26 @@ fn acquire_runs_the_grant_and_latch_checks_before_taking_the_slot() {
     assert!(!latched.holds_lease(), "no slot taken while latched");
     assert!(!sink.lines().iter().any(|line| line.contains("presence show")), "{:?}", sink.lines());
 }
+
+/// Review L7 at a07dff9 (R70cl): control.acquire checks the hand's consent as the exec path does:
+/// a tampered hand and a hand whose engine read no consent file (R6-1, read-only) are refused
+/// with no slot taken and no presence shown.
+#[test]
+fn acquire_refuses_a_tampered_or_consent_less_hand() {
+    // The second view does not carry stopHotkey: the state R6-1 gives a hand whose engine read no
+    // consent file (grant/host.rs view_of(None)).
+    for (consent, not_carried) in [(json!({ "stopHotkey": 5 }), false), (json!({ "apps": {} }), true)] {
+        let sink = RecordingSink::default();
+        let mut extra = json!({ "object": true, "consent": consent });
+        if not_carried {
+            extra["stopHotkeyNotCarried"] = json!(true);
+        }
+        let mut s = session(&extra, &sink, None);
+        s.control_grant(params(json!({ "reason": "r" })));
+        let refused = s.control_acquire().expect_err("the hand may not take the foreground slot");
+        assert_eq!(refused.refusal.code.wire(), "ControlRequired", "{consent}");
+        assert_eq!(refused.refusal.reason, Some("tampered"), "{consent}");
+        assert!(!s.holds_lease(), "{consent}: no slot taken");
+        assert!(!sink.lines().iter().any(|line| line.contains("presence show")), "{consent}: {:?}", sink.lines());
+    }
+}
