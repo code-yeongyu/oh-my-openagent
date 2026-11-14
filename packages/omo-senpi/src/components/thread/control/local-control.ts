@@ -1,7 +1,7 @@
 import { routingId, sessionPort } from "../tools/internals"
 import type { ThreadHostSession, ThreadToolSurfaceOptions } from "../tools/ports"
 import type { ThreadSummary } from "../contracts"
-import { refuse, type SessionControl } from "./port"
+import { refuse, SESSION_ONLY_THINKING_SCOPE, type SessionControl } from "./port"
 
 const THINKING_LEVEL_UNSUPPORTED = "thinking_level_unsupported:"
 
@@ -50,9 +50,9 @@ export function createLocalControl(
       return { provider: selected.provider, id: selected.id }
     },
     getAvailableThinkingLevels: () => port.getAvailableThinkingLevels(routing),
-    setThinkingLevel: async (level, scope) => {
+    setThinkingLevel: async (level) => {
       try {
-        await port.setThinkingLevel(routing, level, scope, threadId)
+        await port.setThinkingLevel(routing, level, SESSION_ONLY_THINKING_SCOPE, threadId)
       } catch (error) {
         if (!(error instanceof Error) || !error.message.startsWith(THINKING_LEVEL_UNSUPPORTED)) throw error
         throw refuse(

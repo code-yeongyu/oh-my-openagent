@@ -472,20 +472,21 @@ describe("thread session controls", () => {
     expect(f.setModel.mock.calls).toEqual([["route-other", "openai", "gpt-x", "dur-other"]])
   })
 
-  test.each([undefined, "session", "turn"] as const)("set_reasoning passes and echoes scope %s", async (scope) => {
-    const f = fixture()
-    expect(
-      await runner(f)("thread_set_reasoning", {
-        thread: "peer",
-        level: "high",
-        ...(scope === undefined ? {} : { scope }),
-      }),
-    ).toEqual({ kind: "ok", thread_id: "dur-peer", level: "high", scope: scope ?? "session" })
-    expect(f.setThinkingLevel.mock.calls).toEqual([
-      ["route-peer", "high", scope === "turn" ? "turn" : undefined, "dur-peer"],
-    ])
-    expect(f.getAvailableThinkingLevels).not.toHaveBeenCalled()
-  })
+  test.each([undefined, "session", "turn"] as const)(
+    "set_reasoning sends the session-only engine scope and echoes scope %s",
+    async (scope) => {
+      const f = fixture()
+      expect(
+        await runner(f)("thread_set_reasoning", {
+          thread: "peer",
+          level: "high",
+          ...(scope === undefined ? {} : { scope }),
+        }),
+      ).toEqual({ kind: "ok", thread_id: "dur-peer", level: "high", scope: scope ?? "session" })
+      expect(f.setThinkingLevel.mock.calls).toEqual([["route-peer", "high", "turn", "dur-peer"]])
+      expect(f.getAvailableThinkingLevels).not.toHaveBeenCalled()
+    },
+  )
 
   test("set_reasoning classifies unsupported levels with the host's supported list and replays the rejection", async () => {
     const f = fixture()
