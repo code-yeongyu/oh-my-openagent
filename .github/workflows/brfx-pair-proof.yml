@@ -1,0 +1,139 @@
+# NEVER MERGE. Temporary own-head proof for omo#13216 (bundle-rootfix pair), LEAD ruling 2026-11-13 (draft route).
+# Replays, byte-for-byte, the run: text of the release jobs the pair widens, read from the workflow files AT RUN TIME
+# (.github/proof/proof-step.ts), on the same runner images. Read-only: no secrets, no publish, no upload.
+name: brfx-pair-proof
+on:
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: brfx-pair-proof-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  preflight:
+    name: release-build-preflight replay (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - name: Install dependencies (replay)
+        run: |
+          set -euo pipefail
+          cmd="$(bun .github/proof/proof-step.ts publish.yml release-build-preflight "Install dependencies")"
+          printf 'PROOF_STEP publish.yml release-build-preflight :: %s\n%s\n' "Install dependencies" "$cmd"
+          bash -euo pipefail -c "$cmd"
+      - name: Build generated files (replay)
+        run: |
+          set -euo pipefail
+          cmd="$(bun .github/proof/proof-step.ts publish.yml release-build-preflight "Build generated files")"
+          printf 'PROOF_STEP publish.yml release-build-preflight :: %s\n%s\n' "Build generated files" "$cmd"
+          bash -euo pipefail -c "$cmd"
+      - name: Build omo-ai payload (replay)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          cmd="$(bun .github/proof/proof-step.ts publish.yml release-build-preflight "Build omo-ai payload")"
+          printf 'PROOF_STEP publish.yml release-build-preflight :: %s\n%s\n' "Build omo-ai payload" "$cmd"
+          bash -euo pipefail -c "$cmd"
+      - name: Verify omo-ai payload (replay)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          cmd="$(bun .github/proof/proof-step.ts publish.yml release-build-preflight "Verify omo-ai payload carries every generated module")"
+          printf 'PROOF_STEP publish.yml release-build-preflight :: %s\n%s\n' "Verify omo-ai payload carries every generated module" "$cmd"
+          bash -euo pipefail -c "$cmd"
+      - name: Build the release job's CLI bundles (replay)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          cmd="$(bun .github/proof/proof-step.ts publish.yml release-build-preflight "Build the release job's CLI bundles")"
+          printf 'PROOF_STEP publish.yml release-build-preflight :: %s\n%s\n' "Build the release job's CLI bundles" "$cmd"
+          bash -euo pipefail -c "$cmd"
+  publish-main-build:
+    name: publish-main Build generated files replay + pack dry run
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - name: Install dependencies (same as preflight)
+        run: |
+          set -euo pipefail
+          cmd="$(bun .github/proof/proof-step.ts publish.yml release-build-preflight "Install dependencies")"
+          printf 'PROOF_STEP publish.yml release-build-preflight :: %s\n%s\n' "Install dependencies" "$cmd"
+          bash -euo pipefail -c "$cmd"
+      - name: Build generated files (publish-main replay)
+        run: |
+          set -euo pipefail
+          cmd="$(bun .github/proof/proof-step.ts publish.yml publish-main "Build generated files")"
+          printf 'PROOF_STEP publish.yml publish-main :: %s\n%s\n' "Build generated files" "$cmd"
+          bash -euo pipefail -c "$cmd"
+      - name: Build omo-ai payload (preflight replay)
+        run: |
+          set -euo pipefail
+          cmd="$(bun .github/proof/proof-step.ts publish.yml release-build-preflight "Build omo-ai payload")"
+          printf 'PROOF_STEP publish.yml release-build-preflight :: %s\n%s\n' "Build omo-ai payload" "$cmd"
+          bash -euo pipefail -c "$cmd"
+      - name: npm pack --dry-run of the omo-ai payload
+        run: |
+          set -euo pipefail
+          cd packages/omo-native && npm pack --dry-run --ignore-scripts 2>&1 | tee "$RUNNER_TEMP/pack.txt"
+          for f in bin/lib/service-auth.generated.js bin/lib/reflection-lock.generated.js bin/lib/brand-logo.generated.js; do grep -q "$f" "$RUNNER_TEMP/pack.txt" || { echo "PACK_MISSING $f"; exit 1; }; done
+          echo "PACK_OK"
+  publish-platform-build:
+    name: publish-platform build Build generated files replay (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - name: Install dependencies (same as preflight)
+        run: |
+          set -euo pipefail
+          cmd="$(bun .github/proof/proof-step.ts publish.yml release-build-preflight "Install dependencies")"
+          printf 'PROOF_STEP publish.yml release-build-preflight :: %s\n%s\n' "Install dependencies" "$cmd"
+          bash -euo pipefail -c "$cmd"
+      - name: Build generated files (publish-platform replay)
+        run: |
+          set -euo pipefail
+          cmd="$(bun .github/proof/proof-step.ts publish-platform.yml build "Build generated files")"
+          printf 'PROOF_STEP publish-platform.yml build :: %s\n%s\n' "Build generated files" "$cmd"
+          bash -euo pipefail -c "$cmd"
+      - name: Tree check after the build
+        run: bun script/check-generated-tree.ts

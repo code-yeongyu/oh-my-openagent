@@ -1,13 +1,24 @@
-import { describe, expect, test } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { installLocalLauncher, localLauncherPath, renderLocalLauncher, uninstallLocalLauncher } from "./local-launcher"
+import { createInstallSandbox, type InstallSandbox } from "./install-test-fixture"
+import { localLauncherPath, renderLocalLauncher } from "./local-launcher"
+
+// Launcher writes and spawns run in a sandbox (#13192, #13253): the launcher defaults to the real home and reads its
+// engine, plugin and agent dir from the environment, so every case gets a scratch home and an explicit spawn env.
+let sandbox: InstallSandbox
+beforeEach(() => {
+  sandbox = createInstallSandbox()
+})
+afterEach(async () => {
+  await sandbox.dispose()
+})
 
 function makeHome(): string {
-  return mkdtempSync(join(tmpdir(), "omo-local-launcher-"))
+  return sandbox.home
 }
 
 // Compared over LF: a Windows checkout may hand the asset back with CRLF.
@@ -79,7 +90,7 @@ describe("local omo launcher", () => {
     describe("#when it is installed", () => {
       test("#then it lands executable on the user's PATH directory", () => {
         const home = makeHome()
-        const path = installLocalLauncher({ ...BASE, homeDir: home })
+        const path = sandbox.installLauncher(BASE)
 
         expect(path).toBe(localLauncherPath(home))
         expect(existsSync(path ?? "")).toBe(true)
@@ -90,8 +101,8 @@ describe("local omo launcher", () => {
 
       test("#then reinstalling is idempotent", () => {
         const home = makeHome()
-        installLocalLauncher({ ...BASE, homeDir: home })
-        const second = installLocalLauncher({ ...BASE, homeDir: home })
+        sandbox.installLauncher(BASE)
+        const second = sandbox.installLauncher(BASE)
 
         expect(second).toBe(localLauncherPath(home))
 
@@ -104,21 +115,66 @@ describe("local omo launcher", () => {
         mkdirSync(dirname(path), { recursive: true })
         writeFileSync(path, "#!/bin/sh\necho mine\n")
 
-        expect(installLocalLauncher({ ...BASE, homeDir: home })).toBeUndefined()
+        expect(sandbox.installLauncher(BASE)).toBeUndefined()
         expect(readFileSync(path, "utf8")).toContain("echo mine")
 
         rmSync(home, { recursive: true, force: true })
       })
     })
 
+    describe("#when the checkout's plugin is not built", () => {
+      test("#then the launcher exits 1 naming the build command instead of starting the engine", () => {
+        const home = makeHome()
+        const pluginPath = join(home, "plugin")
+        const engine = join(home, "engine.mjs")
+        mkdirSync(join(pluginPath, "extensions"), { recursive: true })
+        writeFileSync(engine, "process.stdout.write('ENGINE STARTED')\n")
+        const launcher = join(home, "omo.mjs")
+        writeFileSync(launcher, renderLocalLauncher({ ...BASE, pluginPath, senpiCliPath: engine }))
+
+        const unbuilt = sandbox.spawnSync(process.execPath, [launcher, "--version"])
+        writeFileSync(join(pluginPath, "extensions", "omo.js"), "")
+        const built = sandbox.spawnSync(process.execPath, [launcher, "--version"])
+        rmSync(home, { recursive: true, force: true })
+
+        expect(unbuilt.status).toBe(1)
+        expect(unbuilt.stdout).not.toContain("ENGINE STARTED")
+        expect(unbuilt.stderr).toContain("bun run build:senpi-plugin")
+        expect(built.status).toBe(0)
+        expect(built.stdout).toContain("ENGINE STARTED")
+      })
+    })
+
+    describe("#when a spawn would reach outside the sandbox", () => {
+      test("#then an engine path outside it is refused before the spawn", () => {
+        expect(() =>
+          sandbox.spawnSync(process.execPath, ["--version"], { OMO_SENPI_CLI_PATH: join(tmpdir(), "engine.mjs") }),
+        ).toThrow("outside")
+      })
+
+      test("#then an agent dir outside it is refused before the spawn", () => {
+        expect(() => sandbox.spawnSync(process.execPath, ["--version"], { OMO_CODING_AGENT_DIR: tmpdir() })).toThrow(
+          "outside",
+        )
+      })
+
+      test("#then the spawn env carries the scratch home and agent dir, not the caller's", () => {
+        const probe = sandbox.spawnSync(process.execPath, [
+          "-e",
+          "console.log(JSON.stringify([process.env.HOME, process.env.OMO_CODING_AGENT_DIR, process.env.OMO_SENPI_CLI_PATH ?? null]))",
+        ])
+        expect(JSON.parse(probe.stdout)).toEqual([sandbox.home, sandbox.agentDir, null])
+      })
+    })
+
     describe("#when it is uninstalled", () => {
       test("#then only a generated launcher is removed", () => {
         const home = makeHome()
-        installLocalLauncher({ ...BASE, homeDir: home })
+        sandbox.installLauncher(BASE)
 
-        expect(uninstallLocalLauncher(home)).toBe(true)
+        expect(sandbox.uninstallLauncher()).toBe(true)
         expect(existsSync(localLauncherPath(home))).toBe(false)
-        expect(uninstallLocalLauncher(home)).toBe(false)
+        expect(sandbox.uninstallLauncher()).toBe(false)
 
         rmSync(home, { recursive: true, force: true })
       })
@@ -129,7 +185,7 @@ describe("local omo launcher", () => {
         mkdirSync(dirname(path), { recursive: true })
         writeFileSync(path, "#!/bin/sh\necho mine\n")
 
-        expect(uninstallLocalLauncher(home)).toBe(false)
+        expect(sandbox.uninstallLauncher()).toBe(false)
         expect(existsSync(path)).toBe(true)
 
         rmSync(home, { recursive: true, force: true })

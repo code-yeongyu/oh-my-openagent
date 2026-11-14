@@ -25,6 +25,7 @@ import { dirname, join, relative, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 import { z } from "zod"
 import { engineSidecarSources, resolvePackageDir, senpiPackageDir, type SidecarSource } from "./engine-sidecar-sources"
+import { assertBuiltPluginStaged } from "./built-plugin-payload"
 import { CLAUDE_CODE_PIN_REL_PATH, claudeCodePinFor } from "./claude-code-pin"
 import nativeFixture from "./release-binary-native-fixture.json"
 import { senpiWorkerCompileArgs } from "./senpi-worker-compile"
@@ -510,12 +511,26 @@ export function assertEngineGraphBundled(bunBuildOutput: string): number {
   return modules
 }
 
-function stagePluginPayload(stageDir: string, staged: Set<string>): void {
+/** Stages the plugin tree build-omo-native wrote and fails when the generated plugin files are not in it (#13192). */
+export function stageBuiltPluginTree(pluginStage: string, stageDir: string, staged: Set<string>): void {
+  stageSource({ from: pluginStage, to: "plugin", required: true }, stageDir, staged)
+  assertBuiltPluginStaged(staged)
+}
+
+export function stagePluginPayload(
+  stageDir: string,
+  staged: Set<string>,
+  dependencies: { readonly runCommand?: typeof runCommand } = {},
+): void {
   const pluginStageRoot = mkdtempSync(join(tmpdir(), "omo-plugin-stage-"))
   try {
     const pluginStage = join(pluginStageRoot, "plugin")
-    runCommand("bun", ["run", "script/build-omo-native.ts", "--output", pluginStage], repoRoot)
-    stageSource({ from: pluginStage, to: "plugin", required: true }, stageDir, staged)
+    ;(dependencies.runCommand ?? runCommand)(
+      "bun",
+      ["run", "script/build-omo-native.ts", "--output", pluginStage],
+      repoRoot,
+    )
+    stageBuiltPluginTree(pluginStage, stageDir, staged)
   } finally {
     rmSync(pluginStageRoot, { recursive: true, force: true })
   }

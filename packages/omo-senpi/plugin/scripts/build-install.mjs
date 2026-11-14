@@ -15,9 +15,22 @@ const outputPath =
     ? join(pluginRoot, "scripts", "install.mjs")
     : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "scripts", "install.mjs")
 
+// The installer bundles the local launcher, which imports the generated brand logo module. It is a build output, not
+// tracked (#13192), and every build:senpi-plugin chain ends here, so generate it first.
+function buildBrandLogo() {
+  const result = spawnSync("bun", [join("script", "build-brand-logo.ts")], {
+    cwd: repoRoot,
+    shell: process.platform === "win32",
+    stdio: "inherit",
+  })
+  if (result.error !== undefined) throw result.error
+  if (result.status !== 0) process.exit(result.status ?? 1)
+}
+
 export async function buildInstallCli(options = {}) {
   const output = options.outputPath ?? outputPath
   await mkdir(dirname(output), { recursive: true })
+  buildBrandLogo()
   const result = spawnSync(
     "bun",
     [

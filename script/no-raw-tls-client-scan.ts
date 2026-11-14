@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs"
+import { generatedOutputRequirements, importMapTargets, pluginRequiredOutputs } from "./plugin-required-outputs"
 import { execFileSync } from "node:child_process"
 import path from "node:path"
 import { findRawTlsClients, normalizeCallText } from "./no-raw-tls-client"
@@ -122,7 +123,77 @@ export const KNOWN_BUILT_RUNTIMES = [
 export const THIRD_PARTY_EXCLUDED_BUNDLES: string[] = []
 
 export function isKnownBuiltRuntime(relativePath: string): boolean {
-  return KNOWN_BUILT_RUNTIMES.includes(relativePath)
+  return KNOWN_BUILT_RUNTIMES.includes(relativePath) || isGeneratedOutput(relativePath)
+}
+
+// The shipped bundles are build outputs that git does not track (#13192), and bundled third-party code enters what we
+// ship only through them, so the scan reads them from the built tree. The set is derived from
+// script/generated-bundles.json: every scannable file under a pattern's fixed directory that the pattern matches. A
+// literal pattern names one output that must exist in CI; a pattern with a wildcard must match at least one file.
+const GENERATED_PATTERNS: readonly string[] = (
+  JSON.parse(readFileSync(path.join(WORKSPACE_ROOT, "script", "generated-bundles.json"), "utf8")) as {
+    patterns: string[]
+  }
+).patterns
+
+function isGeneratedOutput(relativePath: string): boolean {
+  return GENERATED_PATTERNS.some((pattern) => new RegExp(pattern).test(relativePath))
+}
+
+function patternDirectory(pattern: string): string {
+  const body = pattern.replace(/^\^/, "")
+  const meta = body.search(/[\\[\](){}*+?|$]/)
+  const fixed = meta < 0 ? body : body.slice(0, meta)
+  return fixed.slice(0, fixed.lastIndexOf("/"))
+}
+
+export function discoverGeneratedOutputs(): string[] {
+  const found = new Set<string>()
+  const walk = (relative: string): void => {
+    let entries: Array<{ name: string; isDirectory(): boolean }>
+    try {
+      entries = readdirSync(path.join(WORKSPACE_ROOT, relative), { withFileTypes: true })
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return
+      throw error
+    }
+    for (const entry of entries) {
+      const rel = relative + "/" + entry.name
+      if (entry.isDirectory()) walk(rel)
+      else if (isGeneratedOutput(rel) && isScannedSourceFile(rel)) found.add(rel)
+    }
+  }
+  for (const directory of new Set(GENERATED_PATTERNS.map(patternDirectory))) walk(directory)
+  return [...found].sort()
+}
+
+// Every output the plugin needs (plugin-required-outputs.ts, the same definition the omo-ai payload gate uses), per
+// output: a list pattern is never met by any one built file. Outputs that are not scannable source (wasm, text,
+// personas) are the payload gate's to require, not this scan's.
+export function generatedOutputScanRequirements(
+  pluginOutputs: readonly string[] = pluginRequiredOutputs(
+    importMapTargets(path.join(WORKSPACE_ROOT, "packages", "omo-senpi", "plugin", "package.json")),
+  ),
+): { label: string; regex: RegExp }[] {
+  return generatedOutputRequirements(GENERATED_PATTERNS, pluginOutputs).filter(
+    (requirement) => requirement.label.startsWith("a path matching") || isScannedSourceFile(requirement.label),
+  )
+}
+
+export function evaluateGeneratedOutputProbe(input: {
+  requirements: readonly { label: string; regex: RegExp }[]
+  discovered: readonly string[]
+  ci: string | undefined
+}): string[] {
+  if (input.ci === undefined) return []
+  return input.requirements
+    .filter((requirement) => !input.discovered.some((file) => requirement.regex.test(file)))
+    .map(
+      (requirement) =>
+        "CI: built output missing: " +
+        requirement.label +
+        " (script/generated-bundles.json). The job must build the generated outputs before this scan so it reads what ships.",
+    )
 }
 
 export type BuiltRuntimeProbeVerdict = { scanned: string[]; failures: string[] }
@@ -259,9 +330,19 @@ export function collectShippedSourceFiles(): string[] {
     discovered: discoverPluginBuiltRuntimes(),
     ci: process.env.CI,
   })
-  if (probe.failures.length > 0) {
-    throw new Error(probe.failures.join("\n"))
+  const generated = discoverGeneratedOutputs()
+  const failures = [
+    ...probe.failures,
+    ...evaluateGeneratedOutputProbe({
+      requirements: generatedOutputScanRequirements(),
+      discovered: generated,
+      ci: process.env.CI,
+    }),
+  ]
+  if (failures.length > 0) {
+    throw new Error(failures.join("\n"))
   }
+  files.push(...generated)
   for (const runtime of probe.scanned) {
     if (isScannedSourceFile(runtime)) files.push(runtime)
   }

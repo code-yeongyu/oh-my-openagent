@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtempSync, readFileSync, rmSync } from "node:fs"
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -29,6 +29,30 @@ describe("OmO brand logo", () => {
     // Generated-artifact contract: the committed module is exactly what the generator writes from the asset.
     test("#then it matches what the generator writes from the asset", async () => {
       await buildBrandLogo(true)
+    })
+
+    // Build contract (#13192): build-install.mjs regenerates the module while the root build's CLI bundles may read it.
+    test("#when the module is already current #then a rebuild leaves the file untouched", async () => {
+      const root = mkdtempSync(join(tmpdir(), "omo-brand-logo-build-"))
+      roots.push(root)
+      const output = join(root, "brand-logo.generated.js")
+      await buildBrandLogo(false, output)
+      const before = statSync(output)
+      await buildBrandLogo(false, output)
+      const after = statSync(output)
+      expect({ ino: after.ino, mtimeMs: after.mtimeMs }).toEqual({ ino: before.ino, mtimeMs: before.mtimeMs })
+    })
+
+    test("#when the module is stale #then it is replaced through a rename and no temporary file remains", async () => {
+      const root = mkdtempSync(join(tmpdir(), "omo-brand-logo-build-"))
+      roots.push(root)
+      const output = join(root, "brand-logo.generated.js")
+      writeFileSync(output, "stale\n")
+      const staleInode = statSync(output).ino
+      await buildBrandLogo(false, output)
+      expect(readFileSync(output, "utf8")).toBe(MODULE)
+      expect(statSync(output).ino).not.toBe(staleInode)
+      expect(readdirSync(root)).toEqual(["brand-logo.generated.js"])
     })
 
     test("#then a CRLF checkout of the icon generates the same module", () => {

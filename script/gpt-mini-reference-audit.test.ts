@@ -5,14 +5,15 @@ import { tmpdir } from "node:os"
 import { join, sep } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
+import { isGeneratedBundlePath, loadGeneratedBundlePatterns } from "./generated-bundles.ts"
+
 const REPOSITORY_ROOT = repositoryRootFromMetaUrl(import.meta.url)
 const OLD_MODEL_ID = ["gpt-5.4", "mini"].join("-")
 const OLD_DISPLAY_NAME = ["GPT 5.4", "Mini"].join(" ")
-// Models LazyCodex once bundled, matched only to move pre-receipt installs off them (#5245); the bundle inlines it.
-const HISTORICAL_MODEL_RECORDS = new Set([
-  "packages/omo-codex/src/install/managed-agent-model-defaults.ts",
-  "packages/omo-codex/scripts/install-dist/install-local.mjs",
-])
+// Models LazyCodex once bundled, matched only to move pre-receipt installs off them (#5245).
+const HISTORICAL_MODEL_RECORDS = new Set(["packages/omo-codex/src/install/managed-agent-model-defaults.ts"])
+// Generated outputs are built from files this audit already reads (#9903), and the installer bundle inlines the record above.
+const GENERATED_BUNDLE_PATTERNS = loadGeneratedBundlePatterns()
 
 describe("GPT Mini reference audit", () => {
   test("repository root decodes a platform-native file URL", () => {
@@ -34,7 +35,7 @@ describe("GPT Mini reference audit", () => {
     // when
     const matches: string[] = []
     for (const file of files) {
-      if (HISTORICAL_MODEL_RECORDS.has(file)) continue
+      if (HISTORICAL_MODEL_RECORDS.has(file) || isGeneratedBundlePath(file, GENERATED_BUNDLE_PATTERNS)) continue
       const path = `${REPOSITORY_ROOT}${file}`
       if (!existsSync(path)) continue
       if (!(await stat(path)).isFile()) continue
