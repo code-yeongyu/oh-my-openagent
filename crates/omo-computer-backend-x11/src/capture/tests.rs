@@ -6,6 +6,7 @@ use omo_computer_core::listing::Rect;
 use omo_computer_core::observation::CursorMode;
 use omo_computer_core::params::Point;
 
+use super::damage_wait::{after_notify, DamageWait};
 use super::fake::{FakeX, GREEN, MAGENTA, RED};
 use super::server::PixelRect;
 use super::X11Capture;
@@ -171,4 +172,10 @@ fn crosshair_is_drawn_at_the_frame_point() {
     let gray = Rgba([0x80, 0x80, 0x80, 0xFF]);
     assert_eq!(*frame.image.get_pixel(50, 42), gray);
     assert_eq!(*frame.image.get_pixel(58, 50), gray);
+}
+
+#[test]
+fn the_server_background_paint_is_not_the_client_repainting() {
+    assert_eq!(after_notify(1), DamageWait::SubtractAndWait, "ClearArea's own background paint");
+    assert_eq!(after_notify(2), DamageWait::Repainted, "the client painted after its Expose");
 }
