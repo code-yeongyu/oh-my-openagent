@@ -48,6 +48,8 @@ pub struct ConsentView {
     /// The file differs from the host's last write: exec refused, reads continue.
     pub tampered: bool,
     pub foreground_input_lock: bool,
+    /// `stopHotkey` as written in the fingerprinted file (A-IS-62): the stop chord's ONE source.
+    pub stop_hotkey: Option<String>,
 }
 
 impl Default for ConsentView {
@@ -61,11 +63,45 @@ impl Default for ConsentView {
             full_access: false,
             tampered: false,
             foreground_input_lock: false,
+            stop_hotkey: None,
+        }
+    }
+}
+
+/// The stop chord the consent file names (A-IS-62).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StopChord {
+    /// A parseable chord, or the documented OS default when the key is absent.
+    Chord(String),
+    /// Not a chord: it never falls back to the default (the listener reads deaf on it).
+    Unparseable(String),
+}
+
+/// The documented default `computer.stopHotkey` per OS (`design/d-safety.md`:84).
+#[must_use]
+pub const fn default_stop_hotkey(os: omo_computer_safety::protected::Os) -> &'static str {
+    match os {
+        omo_computer_safety::protected::Os::Macos => "ctrl+opt+cmd+escape",
+        omo_computer_safety::protected::Os::Linux | omo_computer_safety::protected::Os::Windows => {
+            "ctrl+alt+shift+escape"
         }
     }
 }
 
 impl ConsentView {
+    /// The stop chord this view names on `os`: absent is the OS default; an unparseable value is
+    /// not a chord and never the default (A-IS-62).
+    #[must_use]
+    pub fn stop_chord(&self, os: omo_computer_safety::protected::Os) -> StopChord {
+        match &self.stop_hotkey {
+            None => StopChord::Chord(default_stop_hotkey(os).to_owned()),
+            Some(text) if omo_computer_safety::protected::Chord::parse(text).is_some() => {
+                StopChord::Chord(text.trim().to_ascii_lowercase())
+            }
+            Some(text) => StopChord::Unparseable(text.clone()),
+        }
+    }
+
     /// The view a host wrote; a view that does not parse is treated as tampered.
     #[must_use]
     pub fn from_host(value: serde_json::Value) -> Self {

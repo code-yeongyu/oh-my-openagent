@@ -91,7 +91,9 @@ impl Session {
             tag: random_u64(),
         });
         let resume_token = format!("{:016x}{:016x}", random_u64(), random_u64());
-        self.open_control(&resume_token[..16])?;
+        // Row 21 (A-IS-62, R70ai): the open request's stop_hotkey is compared with the consent file's.
+        let stop_hotkey = request.config.as_ref().and_then(|config| config.stop.stop_hotkey.as_deref());
+        self.open_control(&resume_token[..16], stop_hotkey)?;
         self.funnel.sweep(SweepTrigger::Open);
         self.open_trace(request.trace, &resume_token[..16]);
         Ok(SessionOpened {

@@ -225,9 +225,10 @@ impl Session {
     }
 
     /// `session.open` after the gate: the session id, the consent view and the session token.
-    pub(crate) fn open_control(&mut self, session_id: &str) -> Result<(), Refusal> {
+    pub(crate) fn open_control(&mut self, session_id: &str, stop_hotkey: Option<&str>) -> Result<(), Refusal> {
         self.funnel.set_session_id(session_id.to_owned());
         self.open_consent()?;
+        check_stop_hotkey(self.funnel.control.consent.view(), stop_hotkey)?;
         self.mint_token(session_id)
     }
 
@@ -243,5 +244,29 @@ impl Session {
     pub(crate) fn close_control(&mut self) {
         self.control_release();
         self.funnel.control.reservations.release_all(&self.funnel.control.token);
+    }
+}
+
+/// A-IS-62: the stop chord has ONE source, the consent file's `stopHotkey`. A `stop_hotkey` in
+/// `session.open{settings}` that differs from it is refused before anything is armed.
+///
+/// # Errors
+/// `ControlRequired{permission_changed}` when `requested` is not the file's chord (an unparseable
+/// file chord equals nothing, so any requested chord differs).
+fn check_stop_hotkey(view: &ConsentView, requested: Option<&str>) -> Result<(), Refusal> {
+    let Some(requested) = requested else {
+        return Ok(());
+    };
+    let same = match view.stop_chord(Os::host()) {
+        crate::consent::StopChord::Chord(chord) => chord == requested.trim().to_ascii_lowercase(),
+        crate::consent::StopChord::Unparseable(_) => false,
+    };
+    if same {
+        Ok(())
+    } else {
+        Err(Refusal::new(
+            omo_computer_core::error::EngineCode::ControlRequired,
+            omo_computer_core::error::Reason::PermissionChanged.wire(),
+        ))
     }
 }

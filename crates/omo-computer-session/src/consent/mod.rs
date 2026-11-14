@@ -18,7 +18,7 @@ pub use identity::{Binding, BoundIdentity, IdentityChanged, IDENTITY_UNAVAILABLE
 pub use memory::{Memory, Part};
 pub use scope::bind_scope;
 pub use tier::{covers, Tier};
-pub use view::{AppEntry, Apps, ConsentView, ForegroundPolicy};
+pub use view::{default_stop_hotkey, AppEntry, Apps, ConsentView, ForegroundPolicy, StopChord};
 
 use omo_computer_safety::gate::verdicts::ConsentRefusal;
 use omo_computer_safety::protected::Os;

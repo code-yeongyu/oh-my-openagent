@@ -238,3 +238,56 @@ fn audit_line_records_the_binding_of_an_admitted_call() {
     assert_eq!(id["appBinding"]["binding"], "identity", "{id}");
     assert_eq!(id["appBinding"]["identitySha256_16"].as_str().map(str::len), Some(16), "{id}");
 }
+
+fn open_with(file_hotkey: Option<&str>, settings_hotkey: Option<&str>) -> Result<omo_computer_core::results::SessionOpened, omo_computer_core::backend::Refusal> {
+    open_session_with(file_hotkey, settings_hotkey).1
+}
+
+fn open_session_with(
+    file_hotkey: Option<&str>,
+    settings_hotkey: Option<&str>,
+) -> (Session, Result<omo_computer_core::results::SessionOpened, omo_computer_core::backend::Refusal>) {
+    let mut consent = json!({});
+    if let Some(chord) = file_hotkey {
+        consent["stopHotkey"] = json!(chord);
+    }
+    let backend = FakeBackend::with_parts(scenario(&json!({ "consent": consent })), FakeClock::default(), RecordingSink::default())
+        .with_stop_path(StopPathScript::Live);
+    let mut s = Session::new(Box::new(backend));
+    let mut open = json!({ "reportMode": "null" });
+    if let Some(chord) = settings_hotkey {
+        open["settings"] = json!({ "stop_hotkey": chord });
+    }
+    let opened = s.open(params(open));
+    (s, opened)
+}
+
+/// A-IS-62 (R70ah/R70ai): the stop chord has ONE source, the consent file's stopHotkey. A
+/// session.open stop_hotkey that differs from it is refused ControlRequired{permission_changed}
+/// before anything is armed; an equal one or none is accepted.
+#[test]
+fn a_is_62_open_stop_hotkey_must_equal_the_consent_file() {
+    let refused = open_with(Some("ctrl+alt+shift+f12"), Some("ctrl+alt+shift+escape")).expect_err("differs");
+    assert_eq!((refused.code.wire(), refused.reason), ("ControlRequired", Some("permission_changed")));
+    let (s, refused) = open_session_with(Some("ctrl+alt+shift+f12"), Some("ctrl+alt+shift+escape"));
+    assert!(refused.is_err());
+    let status = s.stop_path_status();
+    assert!(!status.global_live && !status.host_relay_live, "nothing armed: {status:?}");
+    assert!(open_with(Some("ctrl+alt+shift+f12"), Some("ctrl+alt+shift+f12")).is_ok(), "equal");
+    assert!(open_with(Some("ctrl+alt+shift+f12"), None).is_ok(), "absent");
+    // An absent file key is the OS default; the same chord passed explicitly is accepted.
+    let default = crate::consent::default_stop_hotkey(omo_computer_safety::protected::Os::host());
+    assert!(open_with(None, Some(default)).is_ok(), "the documented default");
+    assert!(open_with(None, Some("ctrl+alt+shift+f12")).is_err(), "differs from the default");
+}
+
+/// A-IS-62: an unparseable stopHotkey in the file is not a chord and never falls back to the default.
+#[test]
+fn a_is_62_unparseable_file_chord_never_falls_back_to_the_default() {
+    let view = crate::consent::ConsentView::from_host(json!({ "stopHotkey": "ctrl+" }));
+    assert_eq!(view.stop_chord(omo_computer_safety::protected::Os::Linux), crate::consent::StopChord::Unparseable("ctrl+".to_owned()));
+    let absent = crate::consent::ConsentView::from_host(json!({}));
+    assert_eq!(absent.stop_chord(omo_computer_safety::protected::Os::Linux), crate::consent::StopChord::Chord("ctrl+alt+shift+escape".to_owned()));
+    let default = crate::consent::default_stop_hotkey(omo_computer_safety::protected::Os::host());
+    assert!(open_with(Some("ctrl+"), Some(default)).is_err(), "the default never stands in for an unparseable chord");
+}
