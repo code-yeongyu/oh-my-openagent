@@ -7,6 +7,9 @@ use std::fs::{File, OpenOptions};
 use std::io;
 use std::path::{Path, PathBuf};
 
+#[cfg(test)]
+mod process;
+
 /// The lock file's name under the RUNTIME root.
 pub const LOCK_FILE: &str = "interaction.lock";
 

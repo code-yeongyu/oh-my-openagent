@@ -7,6 +7,8 @@ pub mod lock;
 pub mod marker;
 pub mod mutate;
 mod session;
+#[cfg(test)]
+mod test_process;
 
 pub use mutate::{Binding, Mutation, Refused, SecureInputProbe, SecureProbe};
 pub use session::{legacy_capabilities, Session, NOT_OPEN, NO_GLOBAL_LISTENER, POINT_REQUIRED};
