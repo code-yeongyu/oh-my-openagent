@@ -1,13 +1,11 @@
 import { realpath } from "node:fs/promises"
 import { basename, dirname, isAbsolute } from "node:path"
-import type { SenpiExtensionAPI } from "../../../extension/types"
 import type { ThreadDataError } from "../contracts"
 import { discardWorktree, insideRoot } from "./discard-worktree"
 import { folderFailure } from "./failures"
 import { createThreadWorktree, runGit, type GitRun, type WorktreeOutcome } from "./thread-worktree"
 
-/** The `extension_request` another device's thread_create sends this device's omo to create (or undo) a worktree here. */
-export const THREAD_WORKTREE_RPC = "omo.thread.worktree"
+export { THREAD_WORKTREE_RPC } from "./worktree-rpc-name"
 
 export type WorktreeRemoval = { readonly kind: "removed" } | ThreadDataError
 
@@ -71,6 +69,11 @@ async function removeRequested(record: Record<string, unknown>, root: string, gi
         branch,
       },
     )
+  // Nothing ties a far request to the worktree its create made, so a worktree with work in it (a hand-made one, or one
+  // a thread is using) is never removed: the one a failed open left is fresh and clean (#13450 re-review L2).
+  const status = await git(["status", "--porcelain"], path)
+  if (status.exit !== 0 || status.stdout.trim() !== "")
+    return folderFailure("worktree_left_behind", `${path} has uncommitted work; it was not removed.`, { path, branch })
   const commonDir = common.stdout.trim()
   const repository = basename(commonDir) === ".git" ? dirname(commonDir) : commonDir
   return (await discardWorktree({ repository, path, branch, root, git })) ?? { kind: "removed" }
@@ -93,8 +96,4 @@ export async function answerWorktreeRequest(
     root,
     git,
   })
-}
-
-export function registerThreadWorktreeRpc(pi: SenpiExtensionAPI, root: () => string): void {
-  pi.rpc?.handle?.(THREAD_WORKTREE_RPC, (data) => answerWorktreeRequest(data, root()))
 }
