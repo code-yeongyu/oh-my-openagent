@@ -3,6 +3,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::ax::DiffFallback;
 use crate::listing::{ElementInfo, Rect};
 use crate::session_state::SessionState;
 use crate::untrusted::UntrustedText;
@@ -88,6 +89,9 @@ pub struct ObservationSettle {
     pub indicator: Option<BusyIndicator>,
     pub quiet_ms: u64,
     pub waited_ms: u64,
+    /// The regime of `settle_profile` the engine picked.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub regime: Option<crate::settle_profile::SettleRegime>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -119,6 +123,12 @@ pub struct Observation {
     pub tree: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub diff: Option<String>,
+    /// Why a read that named `since` answered the full tree.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub diff_fallback: Option<DiffFallback>,
+    /// The generation `diff` is against.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub baseline: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub focused: Option<ElementInfo>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

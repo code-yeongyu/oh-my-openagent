@@ -2,7 +2,7 @@
 // Do not edit by hand; run `bun run --cwd packages/omo-computer-protocol generate`.
 
 /** sha256 of the schema file this module was generated from; the schema-drift test compares it. */
-export const SCHEMA_SHA256 = "61e82ab22e11ca3014190b4c1d976cd40d20657adaed5a82a8861a80cdbf7b0f" as const
+export const SCHEMA_SHA256 = "59f83ecc7bc90b03257f90538e6f3f4213b5bf56275a83fc629142b1cb6ec4f8" as const
 
 /** The wire protocol version `engine.hello` reports. */
 export const PROTOCOL_VERSION = "1" as const
@@ -398,6 +398,7 @@ export type ActionReport = {
 	warning?: string | null
 	auditIds?: string[]
 	timings?: Timings | null
+	settle?: ObservationSettle | null
 	evidence: Evidence[]
 	observation: UntrustedText
 }
@@ -719,6 +720,8 @@ export type Diagnosis = {
 	releaseHelper?: ReleaseHelper | null
 	observation: UntrustedText
 }
+
+export type DiffFallback = "baseline_incomplete" | "current_incomplete" | "since_expired" | "window_changed" | "menu_root" | "reordered" | "not_shorter" | "query_projection"
 
 export type DisplayAwake = {
 	state: DisplayAwakeState
@@ -1101,6 +1104,14 @@ export type MoveParams = {
 	observeAfter?: ObserveOptions | null
 }
 
+export type NotificationMatch = {
+	app: string
+	title: string
+	bodyHash: string
+	arrivedAt: number
+	observation: UntrustedText
+}
+
 export type NotificationPredicate = {
 	app?: string | null
 	title?: string | null
@@ -1110,6 +1121,8 @@ export type Observation = {
 	frame?: Frame | null
 	tree?: string | null
 	diff?: string | null
+	diffFallback?: DiffFallback | null
+	baseline?: number | null
 	focused?: ElementInfo | null
 	selectedText?: string | null
 	complete: boolean
@@ -1128,6 +1141,7 @@ export type ObservationSettle = {
 	indicator?: BusyIndicator | null
 	quietMs: number
 	waitedMs: number
+	regime?: SettleRegime | null
 }
 
 export type ObserveAx = boolean | {
@@ -1418,6 +1432,8 @@ export type SettleOptions = {
 
 export type SettleOutcome = "settled" | "pending" | "unsupported" | "timeout"
 
+export type SettleRegime = "changed" | "unchanged" | "navigation"
+
 export type SpawnPath = "open_a" | "disclaim"
 
 export type SshHost = {
@@ -1498,6 +1514,7 @@ export type Timings = {
 	dispatch?: number | null
 	verify?: number | null
 	restore?: number | null
+	settleMs?: number | null
 }
 
 export type ToolkitClass = "canvas_gl" | "chromium_electron" | "pointer_hw" | "qt_xcb"
@@ -1572,6 +1589,7 @@ export type WaitPredicate = {
 export type WaitResult = {
 	outcome: WaitOutcome
 	observation: Observation
+	notification?: NotificationMatch | null
 }
 
 export type WindowFrameParams = {
