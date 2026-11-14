@@ -10,7 +10,8 @@ import {
   type RemoteSessionRow,
   type RemoteThreadSurface,
 } from "./ports"
-import { aliasFailure, deviceOnline, remoteAvailable } from "./remote-ops"
+import { resolveDevice } from "./devices"
+import { aliasFailure, remoteAvailable } from "./remote-ops"
 
 type LocalEntry = {
   readonly thread_id: string
@@ -49,18 +50,10 @@ async function targetDevice(
   device: string,
 ): Promise<{ readonly id?: string } | { readonly result: ThreadToolResult }> {
   const here = await remote.sessions.thisDevice()
-  const row = (await remote.sessions.devices()).find(
-    (candidate) => candidate.device === device || candidate.label === device,
-  )
-  if (row !== undefined && row.device === here) return {}
-  if (row === undefined) {
-    const missing = await deviceOnline(remote, device)
-    return {
-      result:
-        missing ?? invalid(`No device ${device}.`, "Call thread_list with all_scope to see the account's devices."),
-    }
-  }
-  return { id: row.device }
+  const match = await resolveDevice(remote, device)
+  if (match.kind === "error") return { result: match }
+  if (match.row.device === here) return {}
+  return { id: match.row.device }
 }
 
 /** What this device answers for an existing thread named to thread_create: it is live here, or its session file is here, or neither. */

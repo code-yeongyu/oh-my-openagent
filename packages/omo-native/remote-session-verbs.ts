@@ -27,6 +27,7 @@ import { threadLink } from "../omo-senpi/src/components/thread/thread-link"
 import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { packageRoot } from "./bin/lib/package-paths.js"
 import type { RemoteSessionRow, RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
+import { resolveDevice, withOneDeviceListing } from "../omo-senpi/src/components/thread/remote/devices"
 import { deviceOnline, followRemote, remoteAvailable } from "../omo-senpi/src/components/thread/remote/remote-ops"
 import type { RemoteCommandDependencies } from "./remote-cli"
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
@@ -69,7 +70,7 @@ export async function runSession(
   json: boolean,
   dependencies: RemoteCommandDependencies,
 ): Promise<number> {
-  const remote = (dependencies.remote ?? deviceServiceSurface)(service)
+  const remote = withOneDeviceListing((dependencies.remote ?? deviceServiceSurface)(service))
   const show: Show = (result, label) => {
     if (json) dependencies.output(JSON.stringify(result))
     if (result.kind === "error") {
@@ -88,12 +89,15 @@ export async function runSession(
   const unavailable = await remoteAvailable(remote)
   if (unavailable !== undefined) return show(unavailable, "")
   if (args.verb === "open") return await openOn(remote, args, { json, show }, dependencies)
-  const label = `${args.target.device}/${args.target.session}`
+  // The device as the table prints it - id, name or a unique prefix - through the thread tools' one resolver (#13432).
+  const device = await resolveDevice(remote, args.target.device)
+  if (device.kind === "error") return show(device, "")
+  const label = `${device.row.device}/${args.target.session}`
   // Addressed directly, as the SDK does: its device refuses a session it does not hold (unknown_session). The
   // account listing settles only with the slowest device (seconds) and lags a session just opened.
   // The id a caller types is the id above the port (decision 0027 D2); the relay address book turns the device-named
   // address into its transport reference.
-  const row = namedDeviceRow(args.target.device, args.target.session)
+  const row = namedDeviceRow(device.row.device, args.target.session)
   if (args.verb === "send") return sendTo(remote, row, args, { label, json, show }, dependencies)
   // The device is found online once, before its control is used, as the thread tools' locate does (A3).
   const offline = await deviceOnline(remote, row.device)
@@ -123,16 +127,18 @@ async function openOn(
     dependencies.error(error.message)
     return REMOTE_EXIT.usage
   }
-  const open = await createRelaySessionHost(remote, args.device).open({
+  const device = await resolveDevice(remote, args.device)
+  if (device.kind === "error") return show(device, "")
+  const open = await createRelaySessionHost(remote, device.row.device).open({
     permissionPreset: mode,
     ...(args.project === undefined ? {} : { cwd: args.project }),
   })
   const opened: ThreadToolResult = open.kind === "ok" ? { kind: "ok", thread: open.thread, deduplicated: false } : open
   const wanted = args.model
   if (opened.kind !== "ok" || !("thread" in opened) || wanted === undefined) return show(opened, "")
-  const label = `${args.device}/${opened.thread.thread_id}`
+  const label = `${device.row.device}/${opened.thread.thread_id}`
   const created: RemoteSessionRow = {
-    ...namedDeviceRow(args.device, opened.thread.thread_id),
+    ...namedDeviceRow(device.row.device, opened.thread.thread_id),
     title: opened.thread.name,
     project: opened.thread.cwd,
   }
