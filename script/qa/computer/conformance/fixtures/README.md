@@ -71,7 +71,9 @@ The web-hosting apps (Electron and the web views) also get `--a11y <probe comman
   against a snapshot taken before the first leg, so a folder with the same name on every run is caught too.
 
 The driver passes `CONFORMANCE_FIXTURE_DATA_DIR`, a directory inside the run's own folder that it removes with the run;
-the Electron app keeps its profile there. Without it the Electron app makes its own temporary profile and removes it on
+the Electron app keeps its profile there. It also points `XDG_DATA_HOME`, `XDG_CACHE_HOME`, `XDG_CONFIG_HOME` and
+`CFFIXED_USER_HOME` into that directory, so WebKitGTK's data and cache homes and the AppKit defaults plist land there
+too. Without it the Electron app makes its own temporary profile and removes it on
 quit.
 
 With `--sabotage <target>` the self-test passes only if it turns red on that target's checks and nowhere else. A

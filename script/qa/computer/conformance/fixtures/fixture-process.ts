@@ -17,8 +17,19 @@ export class FixtureProcess {
   }
 
   static async start(command: readonly string[], reportPath: string, sabotage: string): Promise<FixtureProcess> {
-    // Profile data of a web-hosting fixture lives in this run's directory, which the self-test removes.
-    const env = { ...process.env, CONFORMANCE_FIXTURE_SABOTAGE: sabotage, CONFORMANCE_FIXTURE_DATA_DIR: join(dirname(reportPath), "profile") }
+    // Profile data of a fixture lives in this run's directory, which the self-test removes. WebKitGTK keys its data and
+    // cache homes on the program name even when ephemeral, and AppKit writes the bundle's defaults plist through
+    // CoreFoundation, so the XDG homes and CFFIXED_USER_HOME (CoreFoundation's home override) move there too.
+    const profile = join(dirname(reportPath), "profile")
+    const env = {
+      ...process.env,
+      CONFORMANCE_FIXTURE_SABOTAGE: sabotage,
+      CONFORMANCE_FIXTURE_DATA_DIR: profile,
+      XDG_DATA_HOME: join(profile, "data"),
+      XDG_CACHE_HOME: join(profile, "cache"),
+      XDG_CONFIG_HOME: join(profile, "config"),
+      CFFIXED_USER_HOME: join(profile, "home"),
+    }
     const child = Bun.spawn([...command, "--report", reportPath], {
       stdin: "pipe",
       stdout: "pipe",
