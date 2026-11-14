@@ -97,6 +97,8 @@ pub struct FakeScenario {
     pub consent: Option<serde_json::Value>,
     // --- Row 21 (review M3): the executable path per pid a path-only consent binds to. ---
     pub executable_path: BTreeMap<u32, String>,
+    // --- Row 21 (R70av): chords the fake's set_stop_chord refuses (default: none). ---
+    pub unarmable_stop_chords: Vec<String>,
 }
 
 impl FakeScenario {

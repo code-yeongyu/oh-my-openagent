@@ -249,8 +249,11 @@ impl Session {
     /// stop path then reads deaf at once, never live or stale.
     pub(crate) fn arm_configured_chord(&mut self) -> omo_computer_core::results::StopPathStatus {
         if let Some(chord) = self.configured_chord() {
-            self.funnel.control.armed_chord = Some(chord);
-            return self.guard.start_on(self.backend.as_mut());
+            // R70av: the one chord seam; a chord the backend cannot arm reads deaf at once.
+            if self.backend.set_stop_chord(Some(&chord)).is_ok() {
+                self.funnel.control.armed_chord = Some(chord);
+                return self.guard.start_on(self.backend.as_mut());
+            }
         }
         self.funnel.control.armed_chord = Some(String::new());
         self.guard.start(
