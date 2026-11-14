@@ -1,0 +1,39 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/senpi-desktop-service": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "test/control-harness.ts",
+        "test/fake-desktop.mjs",
+        "test/fake-engine.mjs",
+        "test/global-input-harness.ts",
+        "test/harness.ts",
+        // run by path as a Worker by test/sandbox.test.ts, never imported
+        "test/fixtures/quickjs-crash-worker.mjs",
+        // run by path as the computer.run QuickJS sandbox Worker (src/run/sandbox/quickjs.ts), never imported
+        "src/run/sandbox/worker.ts",
+        "vitest.config.ts",
+      ],
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) ComputerRunError, RunOutput, createDesktopFacade, ElementHandle, WindowHandle, DesktopNotificationError, CAPABILITIES_TIMEOUT_MS, CLOSE_TIMEOUT_MS, GRACE_MS, HEARTBEAT_MS and 4 more
+    "packages/senpi-desktop-service/src/index.ts": ["ComputerRunError", "RunOutput", "createDesktopFacade", "ElementHandle", "WindowHandle", "DesktopNotificationError", "CAPABILITIES_TIMEOUT_MS", "CLOSE_TIMEOUT_MS", "GRACE_MS", "HEARTBEAT_MS", "RESTART_MESSAGE", "REVOKE_TIMEOUT_MS", "START_TIMEOUT_MESSAGE", "START_TIMEOUT_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) guardRun
+    "packages/senpi-desktop-service/src/run/context.ts": ["guardRun"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) FULL_ACCESS_GRANT_REASON
+    "packages/senpi-desktop-service/src/service/global-input.ts": ["FULL_ACCESS_GRANT_REASON"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DesktopNotificationError
+    "packages/senpi-desktop-service/src/service/notifications.ts": ["DesktopNotificationError"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "packages/senpi-desktop-service/vitest.config.ts": ["default"]
+  }
+}

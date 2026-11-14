@@ -1,0 +1,38 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/isolation-core": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "src/backend.ts",
+        "src/backends/apfs.ts",
+        "src/backends/block-clone.ts",
+        "src/backends/btrfs.ts",
+        "src/backends/overlayfs.ts",
+        "src/backends/rcopy.ts",
+        "src/backends/reflink.ts",
+        "src/backends/zfs.ts",
+        "src/base-dir.ts",
+        "src/ensure.ts",
+        "src/git/baseline.ts",
+        "src/git/delta.ts",
+        "src/git/detach-git-dir.ts",
+        "src/git/synthetic-tree.ts",
+        "src/index.ts",
+        "src/merge/index.ts",
+        "src/merge/shared.ts",
+        "src/owner.ts",
+        "src/process-identity.ts",
+        "src/sweep.ts",
+        "src/test-fixture.ts",
+      ],
+    }
+  }
+}
