@@ -36,24 +36,30 @@ impl BoundIdentity {
         self.identity.is_none()
     }
 
-    /// Compares the approved binding with what a target reads now.
+    /// An entry carrying neither an identity nor a path: no grant (A-IS-61). It is never honoured
+    /// and never bound, removed or rewritten by the engine; only the user's re-approval binds it.
+    #[must_use]
+    pub fn is_unbound(&self) -> bool {
+        self.path.is_none() && self.identity.as_ref().is_none_or(is_empty)
+    }
+
+    /// Admission at use (A-IS-61, d-safety.md:413): an entry bound to an identity admits only a
+    /// target whose identity was read in full and is equal in every member, and never falls back to
+    /// the path; an entry bound to the path alone admits only a target whose path was read and is
+    /// equal (`identity_unavailable`); an unbound entry admits nothing.
     ///
     /// # Errors
-    /// [`IdentityChanged`] when the two name different code: a readable identity on both
-    /// sides compares the identity; otherwise the entry is bound to its path alone and the
-    /// paths compare. A stored path is satisfied only by a path that was read and is equal
-    /// (R70ab); an entry stored without a path admits as path-only.
+    /// [`IdentityChanged`] in every other case, `observed` naming what could not be read.
     pub fn check(&self, observed: &Self) -> Result<Binding, Box<IdentityChanged>> {
-        match (&self.identity, &observed.identity) {
-            (Some(approved), Some(seen)) if !same_code(approved, seen) => Err(self.changed(observed)),
-            (Some(_), Some(_)) => Ok(Binding::Identity),
-            _ => match (&self.path, &observed.path) {
-                (Some(approved), Some(seen)) if approved != seen => Err(self.changed(observed)),
-                // R70ab: a binding to the path is satisfied only by a path that was READ and is
-                // equal; an unreadable identity AND path against a stored path is a change.
-                (Some(_), None) if observed.identity.is_none() => Err(self.changed(observed)),
-                _ => Ok(Binding::PathOnly),
-            },
+        if let Some(approved) = self.identity.as_ref().filter(|id| !is_empty(id)) {
+            return match &observed.identity {
+                Some(seen) if same_code(approved, seen) => Ok(Binding::Identity),
+                _ => Err(self.changed(observed)),
+            };
+        }
+        match (&self.path, &observed.path) {
+            (Some(approved), Some(seen)) if approved == seen => Ok(Binding::PathOnly),
+            _ => Err(self.changed(observed)),
         }
     }
 
@@ -92,6 +98,11 @@ pub enum Binding {
 pub struct IdentityChanged {
     pub approved: BoundIdentity,
     pub observed: BoundIdentity,
+}
+
+/// An identity with no member read is no identity.
+const fn is_empty(id: &CodeIdentity) -> bool {
+    id.team_id.is_none() && id.cdhash.is_none() && id.signer.is_none() && id.hash.is_none()
 }
 
 fn same_code(approved: &CodeIdentity, seen: &CodeIdentity) -> bool {

@@ -206,11 +206,15 @@ impl Consent {
         let Some(approved) = approved else {
             return Ok(None);
         };
+        let unbound = approved.bound.is_unbound();
         approved.bound.check(&app.bound).map(Some).map_err(|changed| Denial {
             refusal: ConsentRefusal::IdentityChanged,
             detail: Some(json!({
                 "app": app.app_key,
-                "identity": { "approved": changed.approved, "observed": changed.observed },
+                "identity": {
+                    "approved": if unbound { json!("unbound") } else { json!(changed.approved) },
+                    "observed": changed.observed,
+                },
             })),
         })
     }
