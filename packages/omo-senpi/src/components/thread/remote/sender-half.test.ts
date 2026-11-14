@@ -532,5 +532,30 @@ describe("#13037 the sender half reaches a session on another device that is not
       expect(error.details?.reason).toBe("unrecognised")
       expect(error.message).toBe("Device c refused the message (unrecognised reason).")
     })
+
+    // #13277 review: the device service's own refusal of the wake (not the consumer's envelope) goes through outcomeFailure,
+    // and its reason can be the other device's free-form response.error. The same allowlist applies there.
+    const serviceRefusalOf = async (reason: string) => {
+      const a = account({
+        rows: [B_ROW, C_ROW],
+        ended: { c: { [GONE]: "rk-c-gone" } },
+        wakeOutcome: { kind: "refused", reason },
+      })
+      const result = await fixture.surface(a.remote).run("thread_send", { thread: GONE, message: "hi" })
+      if (result.kind !== "error") throw new Error(JSON.stringify(result))
+      return result.error
+    }
+
+    test("#given the device service refuses the wake with free-form text #then the reason is the constant and the text is shown nowhere", async () => {
+      const raw = "Error: ENOENT /home/someone/private/session.jsonl"
+      const error = await serviceRefusalOf(raw)
+      expect(error.details?.reason).toBe("unrecognised")
+      expect(JSON.stringify(error).includes(raw)).toBe(false)
+    })
+
+    test("unchanged: #given the device service refuses the wake with a machine code #then that code keeps its own mapping", async () => {
+      const error = await serviceRefusalOf("host_detached")
+      expect([error.code, error.details?.reason]).toEqual(["host_unavailable", "host_detached"])
+    })
   })
 })
