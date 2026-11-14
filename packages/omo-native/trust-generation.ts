@@ -17,9 +17,25 @@ const bootAtMs = Date.now() - uptime() * 1000
 
 export class TrustStorageError extends Error {
   constructor(
-    readonly code: "trust-user-extras-unrecoverable" | "trust-path-unrepresentable" | "trust-userns-unattested",
+    readonly code:
+      | "trust-user-extras-unrecoverable"
+      | "trust-path-unrepresentable"
+      | "trust-userns-unattested"
+      | "trust-tmpdir-unsafe",
+    /** For `trust-tmpdir-unsafe`: the first unsafe directory and what is wrong with it. */
+    readonly unsafe?: UnsafeTrustAncestor,
   ) {
     super(code)
+  }
+}
+
+/** An ancestor that fails the check: what is wrong with it, for a message a person or an agent can act on. */
+export class UnsafeTrustAncestor extends Error {
+  constructor(
+    readonly path: string,
+    readonly problem: "group-writable" | "world-writable" | "owned by another user" | "a symbolic link or not a directory",
+  ) {
+    super(problem === "a symbolic link or not a directory" ? "unsafe trust directory" : "unsafe trust ancestor")
   }
 }
 
@@ -118,8 +134,14 @@ async function ancestors(path: string): Promise<void> {
       process.getuid?.(),
       process.platform,
     )
-    if (verdict === "unsafe-directory") throw new Error("unsafe trust directory")
-    if (verdict === "unsafe-ancestor") throw new Error("unsafe trust ancestor")
+    if (verdict === "unsafe-directory") throw new UnsafeTrustAncestor(current, "a symbolic link or not a directory")
+    if (verdict === "unsafe-ancestor") {
+      const mode = Number(stat.mode)
+      throw new UnsafeTrustAncestor(
+        current,
+        (mode & 0o002) !== 0 ? "world-writable" : (mode & 0o020) !== 0 ? "group-writable" : "owned by another user",
+      )
+    }
     if (verdict === "unattested") throw new TrustStorageError("trust-userns-unattested")
     const parent = dirname(current)
     if (parent === current) return
@@ -151,7 +173,16 @@ async function createPrivateDirectory(path: string): Promise<void> {
 export async function temporaryTrustDirectory(platform: NodeJS.Platform): Promise<string> {
   const directory = await fs.mkdtemp(join(await fs.realpath(tmpdir()), "omo-engine-trust-"))
   await fs.chmod(directory, 0o700)
-  await privateDirectory(directory)
+  try {
+    await privateDirectory(directory)
+  } catch (error) {
+    // #13503: the fallback has nowhere else to go, so an unsafe ancestor of TMPDIR is a refusal the user can act on.
+    if (error instanceof UnsafeTrustAncestor) {
+      await fs.rmdir(directory).catch(() => {})
+      throw new TrustStorageError("trust-tmpdir-unsafe", error)
+    }
+    throw error
+  }
   if (directory.includes(platform === "win32" ? ";" : ":")) throw new TrustStorageError("trust-path-unrepresentable")
   return directory
 }
