@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import type { AliasRegistry } from "./ports"
+import type { AliasRegistry } from "../../thread/remote/ports"
 import { createLazyRemoteSurface } from "./lazy-remote"
-import { createRemoteThreadFixture } from "../thread-remote-fixture"
+import { createRemoteThreadFixture } from "../../thread/thread-remote-fixture"
 
 const { account, surface, cleanup } = createRemoteThreadFixture()
 afterEach(cleanup)
@@ -10,7 +10,7 @@ function lazySurface(loadAliasRegistry: () => Promise<AliasRegistry>) {
   const a = account()
   const remote = createLazyRemoteSurface({
     version: "0.0.0",
-    loadRuntime: async () => ({ createDeviceServiceSessions: () => a.remote.sessions }),
+    loadRuntime: async () => ({ remoteSessionsPort: () => a.remote.sessions }),
     loadAliasRegistry,
   })
   return { a, remote }

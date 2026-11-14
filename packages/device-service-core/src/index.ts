@@ -10,4 +10,5 @@ export { handDeviceKeys, type HeldDeviceCredential } from "./hand-device-keys.ts
 export { installDeviceService } from "./install.ts"
 export { DEVICE_SERVICE_VERSION } from "./pin.ts"
 export { type AgentDirRegistrant, type RegistrantEvent, startAgentDirRegistrant } from "./registrant.ts"
+export { realTimers, type Timers } from "./timers.ts"
 export { deviceServiceHost } from "./release/acquire.ts"
