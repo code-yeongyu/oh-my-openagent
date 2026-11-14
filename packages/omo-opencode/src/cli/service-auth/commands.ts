@@ -225,6 +225,8 @@ const CLOSED_WHOAMI_HELP = `Show the current OmO device sign-in.
 
 This runs while OmO accounts are closed.`
 
+const CLOSED_AUTH_HELP = { login: CLOSED_LOGIN_HELP, logout: CLOSED_LOGOUT_HELP, whoami: CLOSED_WHOAMI_HELP } as const
+
 function refuseClosedServiceAuth(): never {
   console.error(CLOSED_LOGIN_MESSAGE)
   process.exit(1)
@@ -232,7 +234,7 @@ function refuseClosedServiceAuth(): never {
 
 function describeClosedAuthCommand(name: "login" | "logout" | "whoami") {
   return () => {
-    console.log(name === "login" ? CLOSED_LOGIN_HELP : name === "logout" ? CLOSED_LOGOUT_HELP : CLOSED_WHOAMI_HELP)
+    console.log(CLOSED_AUTH_HELP[name])
     process.exit(0)
   }
 }
@@ -250,7 +252,7 @@ function configureClosedServiceAuthCommands(program: Command, hooks: ServiceAuth
       .action((options: Options) => {
         // #13461: `--help` describes the command, as `login --help` does; any other argument still refuses.
         if (options.help === true) {
-          console.log(name === "logout" ? CLOSED_LOGOUT_HELP : CLOSED_WHOAMI_HELP)
+          console.log(CLOSED_AUTH_HELP[name])
           return
         }
         if (command.args.length !== 0) refuseClosedServiceAuth()
