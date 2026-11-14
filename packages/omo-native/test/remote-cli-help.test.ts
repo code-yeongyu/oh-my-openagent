@@ -50,7 +50,7 @@ async function usagePrintedOnError(): Promise<string> {
 function usageVerbs(usage: string): string[] {
   return usage
     .split("\n")
-    .filter((line) => /^  [a-z]/.test(line))
+    .filter((line) => /^ {2}[a-z]/.test(line))
     .flatMap(
       (line) =>
         line
