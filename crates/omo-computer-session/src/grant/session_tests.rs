@@ -803,3 +803,23 @@ fn a_respelled_chord_is_armed_in_the_parsers_canonical_spelling() {
     s.click(params(json!({ "target": "1", "x": 5, "y": 5 }))).expect("sent");
     assert_eq!(s.funnel.control.armed_chord.as_deref(), Some("ctrl+alt+shift+escape"));
 }
+
+/// Review L9 at f7482d3 (R70ct): on a macOS persona the documented default is also sent in the
+/// parser's canonical spelling, so "key absent" and the default written out are one chord: the
+/// same armed chord, and nothing re-arms when the file switches between them.
+#[test]
+fn the_macos_default_is_armed_in_its_canonical_spelling() {
+    let backend = FakeBackend::with_parts(scenario(&json!({ "consent": { "stopHotkey": null } })), FakeClock::default(), RecordingSink::default())
+        .with_persona(omo_computer_backend_fake::Persona::Macos)
+        .with_stop_path(StopPathScript::Live);
+    let consent = backend.consent_handle();
+    let mut s = Session::new(Box::new(backend));
+    s.open(params(json!({ "reportMode": "null" }))).expect("open");
+    s.stop_path_start_checked(params(json!({}))).expect("the default arms");
+    assert_eq!(s.funnel.control.armed_chord.as_deref(), Some("ctrl+alt+cmd+escape"), "the canonical spelling of the macOS default");
+    consent.set(json!({ "stopHotkey": "ctrl+opt+cmd+escape" }));
+    s.open(params(json!({ "reportMode": "null" }))).expect("re-open with the default written out");
+    let before = s.funnel.control.armed_chord.clone();
+    s.reconcile_stop();
+    assert_eq!(s.funnel.control.armed_chord, before, "the same chord: nothing re-arms");
+}
