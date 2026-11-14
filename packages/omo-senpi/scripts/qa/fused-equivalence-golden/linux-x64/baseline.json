@@ -1,15 +1,15 @@
 {
  "repo": {
-  "head": "4f3298ef46ce5b5ae0cc5a184246316157217e7e",
+  "head": "8b65c5945e13d4144459101d81f4de93f2f30333",
   "harness": "5ab795e3392325c961596d7944a1740f4d0a9e20"
  },
  "platform": "linux-x64",
  "runtimes": {
   "harness": "node@24.22.0",
-  "child": "bun@1.4.4 @code-yeongyu/senpi@2026.11.5-1 (pinned)"
+  "child": "bun@1.4.4 @code-yeongyu/senpi@2026.11.13 (pinned)"
  },
  "hashes": {
-  "driver": "sha256:460098de5bf255f44ad99575470b7c1f4dff160a2c454bdbf28d4082420e3a39",
+  "driver": "sha256:73cd2846c1b5675582e8e64df9c9a086d681e6bd7530ca8687a17c85a8fdc9f2",
   "normalizer": "sha256:7d676cd57a4ba44323a5997bb81b7ffb7e70b0d1df7de05d08325c6901ca2dd9",
   "fakeModelServer": "sha256:cab5b6866b7854287218de51d1fafcc242a8602b2c83fb85572abe332f9f6560",
   "collectors": "sha256:f084a278fe05fa9e3603e95ab86bd3988e4a2c500a3174a2e72521a0d4038bdd"

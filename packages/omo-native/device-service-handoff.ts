@@ -6,9 +6,8 @@ import {
   deviceServiceStateDir,
   forgetDeviceService,
   handDeviceKeys,
-  LocalApiError,
 } from "../device-service-core/src/index.ts"
-import type { MachineDeviceService } from "../omo-opencode/src/cli/service-auth/machine-binding"
+import { connectOrNotRunning } from "../device-service-core/src/hand-device-keys.ts"
 import type { Credentials } from "../omo-opencode/src/cli/service-auth/protocol"
 import type { DeviceServiceHandoff } from "../omo-opencode/src/cli/service-auth/session"
 import packageJson from "./package.json" with { type: "json" }
@@ -69,6 +68,30 @@ export function cliDeviceServiceHandoff(options: {
         report("handing this sign-in to it")(error)
       }
     },
+    machineDevice: async () => {
+      // No endpoint file: the service is not installed here. A leftover file that nothing answers is not absence.
+      if (!existsSync(deviceServiceEndpointPath(stateDir))) return { kind: "absent" }
+      // Kept, not logged: the sign-in refuses with this reason, so a "treated as not running" line would contradict it.
+      let failure: string | undefined
+      const service = await connectOrNotRunning(connect, (line) => {
+        failure = line
+      })
+      if (service === "not_running") {
+        return {
+          kind: "unknown",
+          reason: failure ?? "the device service endpoint is present but nothing answered",
+          endpoint: deviceServiceEndpointPath(stateDir),
+        }
+      }
+      try {
+        const status = await service.status()
+        return status.device === null ? { kind: "absent" } : { kind: "held", device: status.device }
+      } catch (error) {
+        return { kind: "unknown", reason: error instanceof Error ? error.message : String(error) }
+      } finally {
+        service.close()
+      }
+    },
     forget: async () => {
       try {
         await forgetDeviceService({ stateDir, connect, log: options.log })
@@ -76,63 +99,5 @@ export function cliDeviceServiceHandoff(options: {
         report("forgetting this device")(error)
       }
     },
-  }
-}
-
-// A device service in either state holds no live identity a sign-in could collide with: it was told to forget, or its
-// session ended and it waits for a sign-in (the key-proven re-bind path).
-const NOT_HOLDING = new Set(["signed_out", "sign_in_required"])
-
-/**
- * This machine's device service as a CLI sign-in binds to it (omo-service#1016): the machine hash for the account's
- * salt and the identity it already holds. Answers undefined when no service runs, when it predates
- * device.machine_binding, or when it cannot be reached; the sign-in then binds from its own read of the machine id.
- */
-export function cliMachineDeviceService(options: {
-  readonly log: (line: string) => void
-  readonly stateDir?: string
-  readonly connect?: () => Promise<DeviceService>
-}): MachineDeviceService {
-  const stateDir = options.stateDir ?? deviceServiceStateDir()
-  const connect = options.connect ?? (() => connectDeviceService({ version: packageJson.version, stateDir }))
-  const withService = async <T>(what: string, use: (service: DeviceService) => Promise<T>): Promise<T | undefined> => {
-    if (!existsSync(deviceServiceEndpointPath(stateDir))) return undefined
-    let service: DeviceService | undefined
-    try {
-      service = await connect()
-      return await use(service)
-    } catch (error) {
-      const older = error instanceof LocalApiError && (error.code === "unknown_type" || error.code === "unsupported")
-      if (!older)
-        options.log(
-          `OmO device service: ${what} did not complete (${error instanceof Error ? error.message : String(error)}).`,
-        )
-      return undefined
-    } finally {
-      service?.close()
-    }
-  }
-  return {
-    binding: (machineSalt) =>
-      withService("binding this sign-in to the machine", async (service) => {
-        const answer = await service.machineBinding(machineSalt)
-        return {
-          machineHash: answer.machine_hash,
-          device:
-            answer.device === null
-              ? null
-              : {
-                  id: answer.device.id,
-                  signingKey: answer.device.signing_public_key,
-                  sealingKey: answer.device.sealing_public_key,
-                },
-          mergeDeviceIds: answer.merge_device_ids,
-        }
-      }),
-    heldDevice: () =>
-      withService("reading its device", async (service) => {
-        const status = await service.status()
-        return status.device === null || NOT_HOLDING.has(status.state) ? null : status.device.id
-      }),
   }
 }
