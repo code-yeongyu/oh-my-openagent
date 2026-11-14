@@ -201,6 +201,8 @@ test("#given accounts are closed #when a bare omo login is approved #then the su
   expect(result.code).toBe(0)
   expect(result.stdout).toContain("User code: ")
   expect(result.stdout).toContain("Signed in to OmO as ykim@example.com.")
+  // The injected store was used, positively: the grant landed in it (A3 / #13281 review LOW 1).
+  expect(result.stderr).toContain("KEYSTORE_WRITE")
 }, 60_000)
 
 test("#given the account read fails after the grant #then the success line says so and points at omo whoami", async () => {
