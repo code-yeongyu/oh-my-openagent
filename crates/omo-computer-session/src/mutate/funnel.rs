@@ -63,8 +63,8 @@ impl Session {
             };
             return Err(self.refuse(record, Some("Lease".to_owned()), out));
         }
-        let unbound = plan.identity_unavailable;
-        let result = self.admitted(mutation, record, (call_id, report_mode, tag), unbound);
+        let binding = plan.audit_binding.clone();
+        let result = self.admitted(mutation, record, (call_id, report_mode, tag), binding);
         self.funnel.control.reported(&plan);
         result
     }
@@ -75,8 +75,12 @@ impl Session {
         mutation: Mutation<'_>,
         mut record: Record,
         (call_id, report_mode, tag): (String, omo_computer_core::params::ReportMode, u64),
-        identity_unavailable: bool,
+        binding: Option<(bool, Option<Vec<u8>>)>,
     ) -> Result<ExecReply, Refused> {
+        let identity_unavailable = binding.as_ref().is_some_and(|(by_identity, _)| !by_identity);
+        if let Some((by_identity, observed)) = &binding {
+            record.event.bind_app(*by_identity, observed.as_deref());
+        }
         // `&mut Session` serialises a session's calls, so no exec permit free means one leaked:
         // refused with nothing sent, never sent without one.
         let Some(_permit) = self.funnel.permits.try_take(PermitKind::Exec) else {

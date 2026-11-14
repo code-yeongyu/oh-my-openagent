@@ -76,6 +76,8 @@ pub struct Plan {
     pub windows: Vec<String>,
     /// The app entry has no readable identity: the reason rides the report.
     pub identity_unavailable: bool,
+    /// How the app entry was bound, and the identity observed at use (A-IS-61 Q5 audit members).
+    pub audit_binding: Option<(bool, Option<Vec<u8>>)>,
 }
 
 impl Control {
@@ -113,6 +115,10 @@ impl Control {
             Ok(admission) => {
                 plan.identity_unavailable = app.is_some()
                     && admission.binding == Some(crate::consent::Binding::PathOnly);
+                plan.audit_binding = admission.binding.zip(app.as_ref()).map(|(binding, app)| {
+                    let observed = app.bound.identity.as_ref().and_then(|id| serde_json::to_vec(id).ok());
+                    (binding == crate::consent::Binding::Identity, observed)
+                });
             }
             Err(denial) => {
                 plan.stages.consent = Some(denial.refusal);

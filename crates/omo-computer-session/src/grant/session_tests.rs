@@ -212,3 +212,29 @@ fn path_only_consent_binds_the_observed_executable_path() {
     let reply = s.click(params(json!({ "target": "1", "x": 5, "y": 5 }))).expect("the approved path");
     assert_eq!(serde_json::to_value(&reply).expect("report")["warning"], json!("identity_unavailable"));
 }
+
+/// A-IS-61 Q5 through the funnel: an admitted call's audit line records how its entry was bound.
+#[test]
+fn audit_line_records_the_binding_of_an_admitted_call() {
+    let run = |entry: Value, extra: Value| -> Value {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let mut scenario = json!({ "consent": { "apps": { "allow": [entry] } } });
+        if let (Some(base), Some(more)) = (scenario.as_object_mut(), extra.as_object()) {
+            base.extend(more.clone());
+        }
+        let mut s = session(&scenario, &RecordingSink::default(), Some((dir.path(), "a")));
+        grant(&mut s);
+        capture(&mut s, "1");
+        s.click(params(json!({ "target": "1", "x": 5, "y": 5 }))).expect("admitted");
+        let text = std::fs::read_to_string(dir.path().join("a/audit/computer/local/audit.jsonl")).expect("audit");
+        let last = text.lines().filter(|l| l.contains("\"click\"") || l.contains("click")).last().expect("a click line").to_owned();
+        serde_json::from_str(&last).expect("json")
+    };
+    let path = run(json!({ "appKey": "Notes", "path": "/usr/bin/notes" }), json!({ "executable_path": { "4242": "/usr/bin/notes" } }));
+    assert_eq!(path["appBinding"]["binding"], "path", "{path}");
+    assert!(path["warnings"].as_array().is_some_and(|w| w.contains(&json!("identity_unavailable"))), "{path}");
+    let ident = json!({ "teamId": "T1", "cdhash": "aa" });
+    let id = run(json!({ "appKey": "Notes", "identity": ident }), json!({ "code_identity": { "4242": ident } }));
+    assert_eq!(id["appBinding"]["binding"], "identity", "{id}");
+    assert_eq!(id["appBinding"]["identitySha256_16"].as_str().map(str::len), Some(16), "{id}");
+}

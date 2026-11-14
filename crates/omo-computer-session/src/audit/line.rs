@@ -128,6 +128,8 @@ pub enum Warning {
     MarkerRecovered,
     ChainBroken,
     MirrorMismatch,
+    /// Row 21 (A-IS-61 Q5): the entry was bound to its path alone.
+    IdentityUnavailable,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -179,6 +181,66 @@ pub struct AuditEvent {
     pub primary_error: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub warnings: Vec<Warning>,
+    // --- Row 21 (A-IS-61 Q5, R70ah): what the consent entry was bound to for this call. Optional
+    // and omitted when unset, so no existing line changes. ---
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub app_binding: Option<AppBinding>,
+}
+
+impl AuditEvent {
+    /// Records how the admitted call's app entry was bound (A-IS-61 Q5): a path-only binding also
+    /// adds the `identity_unavailable` warning.
+    pub fn bind_app(&mut self, by_identity: bool, observed_identity: Option<&[u8]>) {
+        self.app_binding = Some(AppBinding {
+            binding: if by_identity { BindingKind::Identity } else { BindingKind::Path },
+            identity_sha256_16: observed_identity.map(super::chain::sha256_16),
+        });
+        if !by_identity && !self.warnings.contains(&Warning::IdentityUnavailable) {
+            self.warnings.push(Warning::IdentityUnavailable);
+        }
+    }
+}
+
+#[cfg(test)]
+mod app_binding_tests {
+    use super::{AuditEvent, Warning};
+
+    /// A-IS-61 Q5: the two members are omitted when unset, so no existing audit line changes.
+    #[test]
+    fn app_binding_is_omitted_when_unset_and_written_when_set() {
+        let plain = serde_json::to_value(AuditEvent::default()).expect("json");
+        assert!(plain.get("appBinding").is_none(), "{plain}");
+        let mut path = AuditEvent::default();
+        path.bind_app(false, None);
+        let wire = serde_json::to_value(&path).expect("json");
+        assert_eq!(wire["appBinding"], serde_json::json!({ "binding": "path" }));
+        assert_eq!(wire["warnings"], serde_json::json!(["identity_unavailable"]));
+        assert_eq!(path.warnings, vec![Warning::IdentityUnavailable]);
+        let mut identity = AuditEvent::default();
+        identity.bind_app(true, Some(b"{\"cdhash\":\"aa\"}"));
+        let wire = serde_json::to_value(&identity).expect("json");
+        assert_eq!(wire["appBinding"]["binding"], "identity");
+        assert_eq!(wire["appBinding"]["identitySha256_16"].as_str().map(str::len), Some(16));
+        assert!(wire.get("warnings").is_none(), "an identity binding adds no warning");
+    }
+}
+
+/// How an admitted call's app entry was bound (A-IS-61 Q5): by its code identity, or by its path
+/// alone (`identity_unavailable`), with a digest of the identity observed when one was read.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppBinding {
+    pub binding: BindingKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "identitySha256_16")]
+    pub identity_sha256_16: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum BindingKind {
+    Identity,
+    Path,
 }
 
 /// Milliseconds since the Unix epoch.
