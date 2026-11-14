@@ -6,6 +6,7 @@ import { outcomeFailure } from "../remote/outcome"
 import { replyData } from "../remote/remote-ops"
 import type { ModelChoice } from "../tools/model-match"
 import { closeLadder, SESSION_GONE, type RecordAnswer } from "./close-ladder"
+import { interruptOver } from "./interrupt"
 import { ControlRefusal, refuse, type SessionControl } from "./port"
 
 const isObject = (value: unknown): value is JsonObject =>
@@ -63,14 +64,7 @@ export function createRelayControl(remote: RemoteThreadSurface, row: RemoteSessi
         )
       }
     },
-    interrupt: async (turnId) => {
-      const reply = await command({ type: "interrupt", ...(turnId === undefined ? {} : { turnId }) })
-      const reported = reply["turnId"]
-      return {
-        interrupted: reply["interrupted"] === true,
-        ...(typeof reported === "string" ? { turn_id: reported } : {}),
-      }
-    },
+    interrupt: (turnId) => interruptOver((request) => command({ type: "interrupt", ...request }), turnId),
     close: async () => {
       try {
         return await closeLadder(sessionId, answer)

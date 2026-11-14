@@ -26,6 +26,7 @@ export async function interruptThread(control: SessionControl, turnId: string | 
     ...controlIdentity(control),
     ...(result.turn_id === undefined ? {} : { turn_id: result.turn_id }),
     interrupted: result.interrupted,
+    background: result.background,
   }
 }
 

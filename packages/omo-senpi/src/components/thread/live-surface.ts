@@ -552,8 +552,7 @@ export function createLiveThreadSurface(
       (await send<{ messages: ThreadTranscriptEntry[] }>("get_messages", { sessionId })).messages,
     getState: (sessionId) => send("get_state", { sessionId }),
     prompt: (sessionId, message, options, durableId) => send("prompt", { sessionId, message, ...options }, durableId),
-    interrupt: (sessionId, turnId, durableId) =>
-      send("interrupt", { sessionId, ...(turnId === undefined ? {} : { turnId }) }, durableId),
+    interrupt: (sessionId, request, durableId) => send("interrupt", { sessionId, ...request }, durableId),
     setSessionName: async (sessionId, name, durableId) => {
       await send("set_session_name", { sessionId, name }, durableId)
     },

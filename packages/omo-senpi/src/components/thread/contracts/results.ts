@@ -138,12 +138,31 @@ export type ThreadSendResult =
     } & ThreadGatewayDeliveryFacts)
   | ThreadDataError
 
+export type ThreadInterruptBackgroundJob = {
+  readonly kind: string
+  readonly id: string
+  readonly description?: string
+}
+
+/**
+ * The background jobs the interrupted turn started (background bash sessions): `stopped` ended them, so none of them
+ * wakes the thread later; `not_supported` is an engine that predates the stop, where they were left running.
+ */
+export type ThreadInterruptBackground =
+  | {
+      readonly status: "stopped"
+      readonly stopped: readonly ThreadInterruptBackgroundJob[]
+      readonly failed: readonly (ThreadInterruptBackgroundJob & { readonly reason: string })[]
+    }
+  | { readonly status: "not_supported" }
+
 export type ThreadInterruptResult =
   | {
       readonly kind: "ok"
       readonly thread_id: string
       readonly turn_id?: string
       readonly interrupted: boolean
+      readonly background: ThreadInterruptBackground
       readonly device?: string
     }
   | ThreadDataError

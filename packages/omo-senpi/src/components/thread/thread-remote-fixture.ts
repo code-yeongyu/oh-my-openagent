@@ -402,6 +402,8 @@ export function createRemoteThreadFixture() {
       return created
     })
     const closed: Array<readonly [string, string | undefined]> = []
+    // The interrupt records this device's endpoint received, as b's engine's arrive in `sent`.
+    const interrupts: JsonObject[] = []
     const setSessionName = mock(async (_sessionId: string, _name: string) => {})
     const host: ThreadHost = {
       socket: "/tmp/thread-remote-test.sock",
@@ -410,7 +412,10 @@ export function createRemoteThreadFixture() {
       getMessages: async () => [...engine.messages],
       getState: async () => ({ isStreaming: false }),
       prompt: async () => ({ turnId: "turn-local" }),
-      interrupt: async () => engine.interrupt,
+      interrupt: async (_sessionId, request) => {
+        interrupts.push({ type: "interrupt", ...request })
+        return engine.interrupt
+      },
       setSessionName,
       setModel: async (_s, provider, id) => ({ provider, id }),
       getAvailableModels: async () => [],
@@ -469,7 +474,7 @@ export function createRemoteThreadFixture() {
       if (parse === undefined) throw new Error("thread_send declares no permission parser")
       return parse(args, process.cwd())
     }
-    return { run, permission, openSession, setSessionName, store, closed, agentDir }
+    return { run, permission, openSession, setSessionName, store, closed, interrupts, agentDir }
   }
 
   return { account, surface, cleanup }

@@ -885,6 +885,7 @@ describe("omo remote session verbs", () => {
       thread_id: "dur-on-b",
       turn_id: "turn-b",
       interrupted: true,
+      background: { status: "not_supported" },
       device: "b",
     })
   })
