@@ -19,7 +19,7 @@ import {
   testFastQuarantineGroup,
   type TestFastGroup,
 } from "./test-fast"
-import { ROOT_TEST_SERIAL_QUARANTINE_PATHS } from "./root-test-serial-quarantine.ts"
+import { POSIX_TEST_TIMEOUT_MS, ROOT_TEST_SERIAL_QUARANTINE_PATHS } from "./root-test-serial-quarantine.ts"
 
 describe("isReentry", () => {
   it("#given an env without the active marker #when the guard is asked #then it reports no re-entry", () => {
@@ -479,6 +479,31 @@ describe("spawnInheritingStdio", () => {
     expect(added.map((child) => child.pid)).toEqual([4242])
     expect(released.map((child) => child.pid)).toEqual([4242])
     expect(removed).toEqual([])
+  })
+
+  it("#given every group #when it is spawned #then its argv carries the canonical timeout from the shared source in Bun's flag order", () => {
+    // given — the budget must come from the same definition the serial phase and the full
+    // command use, and it must sit where Bun accepts it for each invocation shape
+    const expected = ["--timeout", String(POSIX_TEST_TIMEOUT_MS)]
+
+    for (const group of testFastGroups()) {
+      const { calls, spawner } = recordingSpawner()
+      const { registry } = trackingRegistry()
+
+      // when
+      void spawnInheritingStdio(
+        registry,
+        () => {},
+        spawner,
+      )(group)
+
+      // then
+      const argv = calls[0]?.args ?? []
+      const at = argv.findIndex((arg) => arg === "--timeout")
+      expect(`${group.name}: ${argv.slice(at, at + 2).join(" ")}`).toBe(`${group.name}: ${expected.join(" ")}`)
+      expect(argv.indexOf("test")).toBeLessThan(at)
+      if (group.name === "root-rest") expect(argv[0]).toBe("--config=bunfig.win2.parallel.toml")
+    }
   })
 
   it("#given a spawned group #when the child starts #then it is registered and deregistered on exit", async () => {

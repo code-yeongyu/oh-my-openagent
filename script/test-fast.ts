@@ -1,5 +1,5 @@
 import { spawn, type SpawnOptions } from "node:child_process"
-import { ROOT_TEST_SERIAL_QUARANTINE_PATHS, serialQuarantineArgs } from "./root-test-serial-quarantine.ts"
+import { ROOT_TEST_SERIAL_QUARANTINE_PATHS, serialQuarantineArgs, testTimeoutArgs } from "./root-test-serial-quarantine.ts"
 
 export interface TestFastGroup {
   readonly name: string
@@ -26,10 +26,10 @@ export function testFastGroups(): TestFastGroup[] {
   return [
     {
       name: "opencode-memory",
-      args: ["test", "packages/omo-opencode", "packages/memory-core"],
+      args: ["test", ...testTimeoutArgs(), "packages/omo-opencode", "packages/memory-core"],
     },
-    { name: "root-rest", args: ["--config=bunfig.win2.parallel.toml", "test"] },
-    { name: "senpi", args: ["test", "packages/omo-senpi"] },
+    { name: "root-rest", args: ["--config=bunfig.win2.parallel.toml", "test", ...testTimeoutArgs()] },
+    { name: "senpi", args: ["test", ...testTimeoutArgs(), "packages/omo-senpi"] },
   ]
 }
 
