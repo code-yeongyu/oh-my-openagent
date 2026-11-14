@@ -402,25 +402,54 @@ fn a_is_62_the_tampered_mark_is_never_cleared_in_process() {
     assert!(mark.holds(None), "and no consent keeps it");
 }
 
-/// R70ao(2): the handed view carries stopHotkey in three states: null is absent in the file (the
-/// OS default), a string is the configured chord, a missing member is NOT carried (unreadable:
-/// nothing equal, and every exec on the hand is refused, fail-closed; R70an B's interim shape).
+// R70ao(2), R70bs(1): the handed view's stopHotkey is `Option<Option<String>>`
+// (consent/view.rs, ConsentView::stop_hotkey): null = absent in the file (the OS default is the
+// configured chord), a string = the configured chord, a missing member = NOT carried. One test
+// per state; a file value that is not a chord never falls back to the default.
+
+/// State 1: null is absent in the file, so the persona OS's default is the configured chord (a
+/// view built in code is this state too).
 #[test]
-fn a_is_62_three_state_stop_hotkey() {
-    use omo_computer_safety::protected::Os;
+fn a_is_62_stop_hotkey_null_is_the_os_default() {
     use crate::consent::{ConsentView, StopChord};
+    use omo_computer_safety::protected::Os;
     assert_eq!(ConsentView::from_host(json!({ "stopHotkey": null })).stop_chord(Os::Linux), StopChord::Chord("ctrl+alt+shift+escape".to_owned()));
+    assert_eq!(ConsentView::default().stop_chord(Os::Linux), StopChord::Chord("ctrl+alt+shift+escape".to_owned()), "a view built in code is 'absent in the file'");
+}
+
+/// State 2: a string is the configured chord.
+#[test]
+fn a_is_62_stop_hotkey_string_is_the_configured_chord() {
+    use crate::consent::{ConsentView, StopChord};
+    use omo_computer_safety::protected::Os;
     assert_eq!(ConsentView::from_host(json!({ "stopHotkey": "ctrl+alt+shift+f12" })).stop_chord(Os::Linux), StopChord::Chord("ctrl+alt+shift+f12".to_owned()));
+}
+
+/// State 3: a view without the member does not carry it: unreadable, nothing equal, and every
+/// exec on the hand is refused, fail-closed (R70an B's interim shape).
+#[test]
+fn a_is_62_stop_hotkey_missing_is_not_carried_and_refuses_every_exec() {
+    use crate::consent::{ConsentView, StopChord};
+    use omo_computer_safety::protected::Os;
     let missing = ConsentView::from_host(json!({}));
     assert_eq!(missing.stop_chord(Os::Linux), StopChord::Unreadable);
     assert!(!missing.same_stop_chord(Os::Linux, "ctrl+alt+shift+escape"), "nothing is equal");
-    assert_eq!(ConsentView::default().stop_chord(Os::Linux), StopChord::Chord("ctrl+alt+shift+escape".to_owned()), "a view built in code is 'absent in the file'");
-    // A hand whose view does not carry the member refuses every exec.
     let mut s = session(&json!({ "consent": { "apps": {} }, "stopHotkeyNotCarried": true }), &RecordingSink::default(), None);
     capture(&mut s, "1");
     let refused = s.click(params(json!({ "target": "1", "x": 5, "y": 5 }))).expect_err("unreadable chord");
     // R70as(3): stopPath.start armed nothing, so the stop-path gate refuses first.
     assert_eq!(refused.refusal.code.wire(), "StopPathUnavailable");
+}
+
+/// A file value that is not a chord is neither the configured chord nor the default: it never
+/// falls back.
+#[test]
+fn a_is_62_stop_hotkey_non_chord_never_falls_back_to_the_default() {
+    use crate::consent::{ConsentView, StopChord};
+    use omo_computer_safety::protected::Os;
+    let view = ConsentView::from_host(json!({ "stopHotkey": "ctrl+" }));
+    assert_eq!(view.stop_chord(Os::Linux), StopChord::Unparseable("ctrl+".to_owned()));
+    assert!(!view.same_stop_chord(Os::Linux, "ctrl+alt+shift+escape"), "never the default");
 }
 
 /// A-IS-62 rev 5 (R70aq): stopPath.start arms the configured chord FIRST, then compares the carried
@@ -635,6 +664,25 @@ fn the_code_built_default_consent_admits_no_exec_and_arms_no_chord() {
     assert!(sink.lines().is_empty(), "nothing sent: {:?}", sink.lines());
     assert!(!s.stop_path_status().global_live, "no chord armed");
     assert!(s.funnel.control.armed_chord.is_none(), "no chord armed");
+    // Past session.open the host's file replaces the code-built default: a file that switches
+    // computer use off and configures its own chord refuses the exec (ControlRequired, consent_off) and arms that
+    // chord. A session that kept Consent::default() (computer use on, the exec tier, the OS
+    // default chord) would admit the exec and arm the default instead.
+    let sink = RecordingSink::default();
+    let file = json!({ "consent": { "computerUse": false, "stopHotkey": "ctrl+alt+shift+f12" } });
+    let backend = FakeBackend::with_parts(scenario(&file), FakeClock::default(), sink.clone())
+        .with_persona(omo_computer_backend_fake::Persona::X11)
+        .with_stop_path(StopPathScript::Live);
+    let mut s = Session::new(Box::new(backend));
+    s.open(params(json!({ "reportMode": "null" }))).expect("open");
+    assert_ne!(s.funnel.control.consent.view(), crate::consent::Consent::default().view(), "open replaced the code-built consent");
+    s.stop_path_start_checked(params(json!({}))).expect("the file's chord arms");
+    assert_eq!(s.funnel.control.armed_chord.as_deref(), Some("ctrl+alt+shift+f12"), "the file's chord, never the default");
+    grant(&mut s);
+    capture(&mut s, "1");
+    let refused = s.click(params(json!({ "target": "1", "x": 5, "y": 5 }))).expect_err("computer use is off in the file");
+    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("ControlRequired", Some("consent_off")));
+    assert!(sink.lines().iter().all(|line| !line.contains("click") && !line.contains("mouse")), "nothing sent: {:?}", sink.lines());
 }
 
 /// #13391 merged into row 21 (R70bg(2) with R70s(1)): a stop pressed while another holder keeps
