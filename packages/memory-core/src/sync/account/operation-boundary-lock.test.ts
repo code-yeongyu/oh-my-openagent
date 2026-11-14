@@ -1,11 +1,14 @@
 import { afterEach, expect, spyOn, test } from "bun:test"
+import type { Subprocess } from "bun"
 import { readFileSync, writeFileSync } from "node:fs"
 import * as fs from "node:fs"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { isAbsolute, join, relative } from "node:path"
+import { settlesWithin } from "../../git/settles-within.test-support.ts"
 import { withLock } from "../../locks/acquire.ts"
 import { createLockRecord } from "../../locks/lock-record.ts"
+import { pidAlive } from "../../locks/process-liveness.test-support.ts"
 import { pinTrustAnchor } from "../crypto/trust-pin.ts"
 import { walk } from "../genesis/vector.test-support.ts"
 import { ACCOUNT, fixture } from "./testing/genesis-enable.test-support.ts"
@@ -18,87 +21,234 @@ const landsIn = (dir: string, to: fs.PathLike): boolean => {
   const rel = relative(dir, String(to))
   return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel)
 }
-afterEach(async () => {
+
+// #12036: an unbounded wait here once reached the 15 s test timeout, bun killed the writer, and the
+// leaked `expect(...).rejects` of the timed-out body held the file open for 20 minutes. Every wait is
+// therefore a named step under one deadline that ends before the test timeout, and no async matcher
+// is ever left pending: a stall fails one case with the step's name and leaves nothing running.
+// The test timeout is the canonical 20 s runner budget, stated here so the step deadline stays under
+// it even when the file runs without `--timeout 20000`.
+const TEST_TIMEOUT_MS = 20_000
+const STEP_BUDGET_MS = 16_000
+const REAP_BOUND_MS = 2_000
+// Cleanup waits at most once for a reap and once for a publication to settle. The hook's own timeout is
+// stated above their sum: without `--timeout 20000` the runner would give it 5 s, less than those bounds.
+const SETTLE_BOUND_MS = 5_000
+const CLEANUP_TIMEOUT_MS = 10_000
+
+const closeAll = async (): Promise<void> => {
   for (const close of cleanup.splice(0).reverse()) await close()
-})
+}
+afterEach(closeAll, CLEANUP_TIMEOUT_MS)
+
+class StepStalled extends Error {
+  constructor(
+    readonly step: string,
+    state: string,
+  ) {
+    super(`step '${step}' did not settle before the test's step deadline (${state})`)
+  }
+}
+
+const stepsWithin = (budgetMs: number, state: () => string) => {
+  const deadline = Date.now() + budgetMs
+  return async <T>(step: string, promise: Promise<T>): Promise<T> => {
+    const settled = await settlesWithin(promise, Math.max(0, deadline - Date.now()))
+    if (settled.kind === "still-waiting") throw new StepStalled(step, state())
+    return settled.value
+  }
+}
+
+type Outcome = { readonly ok: true } | { readonly ok: false; readonly error: unknown }
+// Handled from creation, so a promise the test stops waiting on can never surface as unhandled.
+const outcomeOf = (promise: Promise<unknown>): Promise<Outcome> =>
+  promise.then(
+    (): Outcome => ({ ok: true }),
+    (error: unknown): Outcome => ({ ok: false, error }),
+  )
+
+// A publication still running when a step fails keeps polling the credential lock inside the fixture
+// directory, and that poll's recursive mkdir brings the directory back after the fixture is closed: an
+// empty `genesis-enable-*` entry that the run's temp-root check then reports on top of the real failure.
+// A fixture a publication writes into is therefore closed only once every such publication has settled.
+// Closers run in reverse, so this one, registered first, runs after the writer is reaped and its lock is free.
+const closedAfterPublications = (f: { readonly close: () => Promise<void> }) => {
+  const publications: Promise<Outcome>[] = []
+  cleanup.push(async () => {
+    const step = stepsWithin(SETTLE_BOUND_MS, () => "fixture closed regardless")
+    try {
+      await step("publication settled", Promise.all(publications))
+    } finally {
+      await f.close()
+    }
+  })
+  return (publication: Promise<unknown>): Promise<Outcome> => {
+    const outcome = outcomeOf(publication)
+    publications.push(outcome)
+    return outcome
+  }
+}
+
+const writerState = (child: Subprocess | undefined) => () =>
+  child === undefined
+    ? "writer not spawned"
+    : `writer pid ${child.pid} exitCode ${String(child.exitCode)} signal ${String(child.signalCode)} alive ${String(pidAlive(child.pid))}`
+
+// Bounded even when the exit notification is lost: a pid that is gone counts as reaped.
+const reap = async (child: Subprocess): Promise<void> => {
+  if (child.exitCode !== null || child.signalCode !== null) return
+  child.kill("SIGKILL")
+  if ((await settlesWithin(child.exited, REAP_BOUND_MS)).kind === "settled" || !pidAlive(child.pid)) return
+  throw new Error(`writer ${child.pid} survived SIGKILL for ${REAP_BOUND_MS} ms`)
+}
+
+const spawnWriter = (credentials: string, mode: string, onMessage: (message: unknown) => void): Subprocess => {
+  const child = Bun.spawn(
+    [process.execPath, join(import.meta.dir, "testing/credential-writer.test-support.ts"), credentials, mode],
+    {
+      stdout: "inherit",
+      stderr: "inherit",
+      ipc: onMessage,
+    },
+  )
+  cleanup.push(() => reap(child))
+  return child
+}
+
+const sendWrite = (child: Subprocess): void => {
+  try {
+    child.send("write")
+  } catch (error) {
+    throw new StepStalled("write sent", `${writerState(child)()}: ${String(error)}`)
+  }
+}
+
+const exitedEarly = (child: Subprocess): Promise<never> =>
+  child.exited.then((code) => {
+    throw new Error(`writer exited early: ${code}`)
+  })
+
+// #12050 review LOW: the writer sends "written" and disconnects in the same turn, so its clean exit can
+// be reported before the IPC callback runs. The message is still required: a non-zero exit fails at
+// once, while a clean exit only keeps waiting for the message the writer says it sent, bounded by the
+// step deadline that wraps this call.
+const wroteMessage = async (child: Subprocess, written: Promise<void>): Promise<void> => {
+  const message = written.then(() => "written" as const)
+  const first = await Promise.race([message, child.exited])
+  if (first === "written") return
+  if (first !== 0) throw new Error(`writer exited early: ${first}`)
+  await message
+}
 
 for (const change of ["replacement", "aba", "refresh", "signing", "sealing"] as const) {
-  test(`pin boundary serializes a sibling credential ${change} without notification`, async () => {
-    const f = await fixture()
-    cleanup.push(f.close)
-    const verified = await walk(f.built.request, f.keyring)
-    if (!verified.ok || verified.state.pin === null) throw new Error("fixture pin")
-    const credentials = join(f.input.pinDir, "synthetic-credentials.json")
-    writeFileSync(
-      credentials,
-      JSON.stringify({ identity: "A", generation: 1, token: 1, signingKey: "signing-1", sealingKey: "sealing-1" }),
-    )
-    const locked = Promise.withResolvers<void>()
-    const child = Bun.spawn(
-      [process.execPath, join(import.meta.dir, "testing/credential-writer.test-support.ts"), credentials, change],
-      {
-        stdout: "inherit",
-        stderr: "inherit",
-        ipc(message) {
-          if (message === "locked") locked.resolve()
+  test(
+    `pin boundary serializes a sibling credential ${change} without notification`,
+    async () => {
+      let child: Subprocess | undefined
+      const step = stepsWithin(STEP_BUDGET_MS, () => writerState(child)())
+      const f = await step("fixture", fixture())
+      const published = closedAfterPublications(f)
+      const verified = await step("bootstrap walk", walk(f.built.request, f.keyring))
+      if (!verified.ok || verified.state.pin === null) throw new Error("fixture pin")
+      const credentials = join(f.input.pinDir, "synthetic-credentials.json")
+      writeFileSync(
+        credentials,
+        JSON.stringify({ identity: "A", generation: 1, token: 1, signingKey: "signing-1", sealingKey: "sealing-1" }),
+      )
+      const locked = Promise.withResolvers<void>()
+      const written = Promise.withResolvers<void>()
+      const writer = spawnWriter(credentials, change, (message) => {
+        if (message === "locked") locked.resolve()
+        if (message === "written") written.resolve()
+      })
+      child = writer
+      await step("writer locked", Promise.race([locked.promise, exitedEarly(writer)]))
+      const entered = Promise.withResolvers<void>()
+      const controller = new AbortController()
+      let boundaries = 0
+      const authority = {
+        signal: controller.signal,
+        admit<T>(effect: () => T): T {
+          controller.signal.throwIfAborted()
+          return effect()
         },
-      },
-    )
-    cleanup.push(async () => {
-      if (child.exitCode === null) child.kill()
-      await child.exited
-    })
-    await Promise.race([
-      locked.promise,
-      child.exited.then((code) => {
-        throw new Error(`writer exited early: ${code}`)
-      }),
-    ])
-    const entered = Promise.withResolvers<void>()
-    const controller = new AbortController()
-    let boundaries = 0
-    const authority = {
-      signal: controller.signal,
-      admit<T>(effect: () => T): T {
-        controller.signal.throwIfAborted()
-        return effect()
-      },
-      async boundary<T>(dispatch: () => T): Promise<T> {
-        boundaries++
-        entered.resolve()
-        return withLock(
-          `${credentials}.lock`,
-          await createLockRecord("credential-test-pin"),
-          async () => {
-            const state = JSON.parse(readFileSync(credentials, "utf8")) as { generation: number }
-            if (state.generation !== 1) throw new DOMException("Generation retired", "AbortError")
-            return dispatch()
-          },
-          { waitTimeoutMs: 10_000 },
-        )
-      },
-    }
-    let renames = 0
-    const original = fs.renameSync
-    const spy = spyOn(fs, "renameSync").mockImplementation((from, to) => {
-      if (landsIn(f.input.pinDir, to)) renames++
-      original(from, to)
-    })
-    cleanup.push(() => spy.mockRestore())
-    const result = pinTrustAnchor(f.input.pinDir, ACCOUNT, verified.state.pin, { authority })
-    const first = await Promise.race([entered.promise.then(() => "boundary"), result.then(() => "published")])
-    child.send("write")
-    const writerExit = await child.exited
-    expect(first).toBe("boundary")
-    if (first !== "boundary") return
-    if (change === "refresh") await result
-    else await expect(result).rejects.toMatchObject({ name: "AbortError" })
-    expect(controller.signal.aborted).toBe(false)
-    expect(boundaries).toBe(1)
-    expect(renames).toBe(change === "refresh" ? 1 : 0)
-    expect(writerExit).toBe(0)
-  })
+        async boundary<T>(dispatch: () => T): Promise<T> {
+          boundaries++
+          entered.resolve()
+          return withLock(
+            `${credentials}.lock`,
+            await createLockRecord("credential-test-pin"),
+            async () => {
+              const state = JSON.parse(readFileSync(credentials, "utf8")) as { generation: number }
+              if (state.generation !== 1) throw new DOMException("Generation retired", "AbortError")
+              return dispatch()
+            },
+            { waitTimeoutMs: 10_000 },
+          )
+        },
+      }
+      let renames = 0
+      const original = fs.renameSync
+      const spy = spyOn(fs, "renameSync").mockImplementation((from, to) => {
+        if (landsIn(f.input.pinDir, to)) renames++
+        original(from, to)
+      })
+      cleanup.push(() => spy.mockRestore())
+      const result = published(pinTrustAnchor(f.input.pinDir, ACCOUNT, verified.state.pin, { authority }))
+      const first = await step(
+        "boundary entry",
+        Promise.race([entered.promise.then(() => "boundary"), result.then(() => "published")]),
+      )
+      sendWrite(writer)
+      await step("writer wrote", wroteMessage(writer, written.promise))
+      const writerExit = await step("writer exit", writer.exited)
+      expect(first).toBe("boundary")
+      if (first !== "boundary") return
+      const outcome = await step("pin result", result)
+      if (change === "refresh") expect(outcome).toEqual({ ok: true })
+      else expect(outcome.ok ? undefined : outcome.error).toMatchObject({ name: "AbortError" })
+      expect(controller.signal.aborted).toBe(false)
+      expect(boundaries).toBe(1)
+      expect(renames).toBe(change === "refresh" ? 1 : 0)
+      expect(writerExit).toBe(0)
+    },
+    TEST_TIMEOUT_MS,
+  )
 }
+
+test(
+  "a writer that holds the lock and never writes fails the named step and leaves no writer running",
+  async () => {
+    let child: Subprocess | undefined
+    const step = stepsWithin(5_000, () => writerState(child)())
+    const f = await step("fixture", fixture())
+    cleanup.push(f.close)
+    const credentials = join(f.input.pinDir, "synthetic-credentials.json")
+    writeFileSync(credentials, JSON.stringify({ identity: "A", generation: 1, token: 1 }))
+    const locked = Promise.withResolvers<void>()
+    const written = Promise.withResolvers<void>()
+    const writer = spawnWriter(credentials, "hang", (message) => {
+      if (message === "locked") locked.resolve()
+      if (message === "written") written.resolve()
+    })
+    child = writer
+    await step("writer locked", Promise.race([locked.promise, exitedEarly(writer)]))
+
+    // given: a writer that took the lock and stalls; when: the test waits for its write under a short budget
+    sendWrite(writer)
+    const stalled = await stepsWithin(500, writerState(writer))("writer wrote", written.promise).then(
+      () => null,
+      (error: unknown) => error,
+    )
+
+    // then: the case fails with that step's name, and reaping leaves no writer process behind
+    expect(stalled).toBeInstanceOf(StepStalled)
+    expect(stalled).toMatchObject({ step: "writer wrote" })
+    await reap(writer)
+    expect(pidAlive(writer.pid)).toBe(false)
+  },
+  TEST_TIMEOUT_MS,
+)
 
 const lockedBoundary = (credentials: string, onHeld: () => Promise<void>) => {
   const controller = new AbortController()
@@ -130,99 +280,154 @@ const lockedBoundary = (credentials: string, onHeld: () => Promise<void>) => {
   }
 }
 
-test("pin boundary taken first publishes once, and a sibling replacement waiting on the lock lands only after it", async () => {
-  const f = await fixture()
-  cleanup.push(f.close)
-  const verified = await walk(f.built.request, f.keyring)
-  if (!verified.ok || verified.state.pin === null) throw new Error("fixture pin")
-  const credentials = join(f.input.pinDir, "synthetic-credentials.json")
-  writeFileSync(credentials, JSON.stringify({ identity: "A", generation: 1, token: 1 }))
-  const order: string[] = []
-  const held = Promise.withResolvers<void>()
-  const trying = Promise.withResolvers<void>()
-  const locked = Promise.withResolvers<void>()
-  const { authority, entries } = lockedBoundary(credentials, async () => {
-    held.resolve()
-    await trying.promise
-  })
-  let renames = 0
-  const original = fs.renameSync
-  const spy = spyOn(fs, "renameSync").mockImplementation((from, to) => {
-    if (landsIn(f.input.pinDir, to)) {
+test(
+  "pin boundary taken first publishes once, and a sibling replacement waiting on the lock lands only after it",
+  async () => {
+    let child: Subprocess | undefined
+    const step = stepsWithin(STEP_BUDGET_MS, () => writerState(child)())
+    const f = await step("fixture", fixture())
+    const published = closedAfterPublications(f)
+    const verified = await step("bootstrap walk", walk(f.built.request, f.keyring))
+    if (!verified.ok || verified.state.pin === null) throw new Error("fixture pin")
+    const credentials = join(f.input.pinDir, "synthetic-credentials.json")
+    writeFileSync(credentials, JSON.stringify({ identity: "A", generation: 1, token: 1 }))
+    const order: string[] = []
+    const held = Promise.withResolvers<void>()
+    const trying = Promise.withResolvers<void>()
+    // The publication parks on this gate while it holds the lock; cleanup opens it, so a failed step
+    // cannot leave the publication parked when the fixture closes.
+    cleanup.push(() => trying.resolve())
+    const locked = Promise.withResolvers<void>()
+    const written = Promise.withResolvers<void>()
+    const { authority, entries } = lockedBoundary(credentials, async () => {
+      held.resolve()
+      await trying.promise
+    })
+    let renames = 0
+    const original = fs.renameSync
+    const spy = spyOn(fs, "renameSync").mockImplementation((from, to) => {
+      if (landsIn(f.input.pinDir, to)) {
+        renames++
+        order.push("rename")
+      }
+      original(from, to)
+    })
+    cleanup.push(() => spy.mockRestore())
+
+    // given: the pin boundary holds the credential lock before the sibling writer starts
+    const result = published(pinTrustAnchor(f.input.pinDir, ACCOUNT, verified.state.pin, { authority }))
+    await step("boundary entry", Promise.race([held.promise, result]))
+    const writer = spawnWriter(credentials, "replacement", (message) => {
+      if (message === "trying") trying.resolve()
+      if (message === "locked") {
+        order.push("writer-locked")
+        locked.resolve()
+      }
+      if (message === "written") written.resolve()
+    })
+    child = writer
+
+    // when: the writer is already contending for the lock while the publication proceeds,
+    // and an unrelated file elsewhere in this process is renamed in the same window (#11963)
+    const unrelated = await step("unrelated dir", mkdtemp(join(tmpdir(), "boundary-unrelated-")))
+    cleanup.push(() => rm(unrelated, { recursive: true, force: true }))
+    writeFileSync(join(unrelated, "a.tmp"), "x")
+    fs.renameSync(join(unrelated, "a.tmp"), join(unrelated, "a.json"))
+    expect(await step("pin result", result)).toEqual({ ok: true })
+    order.push("published")
+    await step("writer locked", Promise.race([locked.promise, exitedEarly(writer)]))
+    sendWrite(writer)
+    await step("writer wrote", wroteMessage(writer, written.promise))
+    const writerExit = await step("writer exit", writer.exited)
+
+    // then: publication won the lock, renamed once at generation 1, and the replacement followed it
+    expect(entries).toEqual([1])
+    expect(renames).toBe(1)
+    expect(order.indexOf("rename")).toBeLessThan(order.indexOf("writer-locked"))
+    expect(JSON.parse(readFileSync(credentials, "utf8"))).toMatchObject({ identity: "B", generation: 3 })
+    expect(writerExit).toBe(0)
+  },
+  TEST_TIMEOUT_MS,
+)
+
+test(
+  "an EINTR retry of the pin rename re-enters the boundary and cannot publish after the generation changed",
+  async () => {
+    const step = stepsWithin(STEP_BUDGET_MS, () => "no writer")
+    const f = await step("fixture", fixture())
+    const published = closedAfterPublications(f)
+    const verified = await step("bootstrap walk", walk(f.built.request, f.keyring))
+    if (!verified.ok || verified.state.pin === null) throw new Error("fixture pin")
+    const credentials = join(f.input.pinDir, "synthetic-credentials.json")
+    writeFileSync(credentials, JSON.stringify({ identity: "A", generation: 1, token: 1 }))
+    const { authority, entries, controller } = lockedBoundary(credentials, async () => undefined)
+    let renames = 0
+    const original = fs.renameSync
+    const spy = spyOn(fs, "renameSync").mockImplementation((from, to) => {
+      if (!landsIn(f.input.pinDir, to)) return original(from, to)
       renames++
-      order.push("rename")
-    }
-    original(from, to)
-  })
-  cleanup.push(() => spy.mockRestore())
+      // given: the first raw rename is interrupted, and a credential replacement lands before the retry
+      writeFileSync(credentials, JSON.stringify({ identity: "B", generation: 2, token: 1 }))
+      throw Object.assign(new Error("interrupted"), { code: "EINTR" })
+    })
+    cleanup.push(() => spy.mockRestore())
 
-  // given: the pin boundary holds the credential lock before the sibling writer starts
-  const result = pinTrustAnchor(f.input.pinDir, ACCOUNT, verified.state.pin, { authority })
-  await held.promise
-  const child = Bun.spawn(
-    [process.execPath, join(import.meta.dir, "testing/credential-writer.test-support.ts"), credentials, "replacement"],
-    {
-      stdout: "inherit",
-      stderr: "inherit",
-      ipc(message) {
-        if (message === "trying") trying.resolve()
-        if (message === "locked") {
-          order.push("writer-locked")
-          locked.resolve()
-        }
+    // when: the publication retries the interrupted rename
+    const outcome = await step(
+      "pin result",
+      published(pinTrustAnchor(f.input.pinDir, ACCOUNT, verified.state.pin, { authority })),
+    )
+
+    // then: the retry re-entered the boundary, saw generation 2, and made no second rename
+    expect(outcome.ok ? undefined : outcome.error).toMatchObject({ name: "AbortError" })
+    expect(entries).toEqual([1, 2])
+    expect(renames).toBe(1)
+    expect(controller.signal.aborted).toBe(false)
+  },
+  TEST_TIMEOUT_MS,
+)
+
+test(
+  "a step that fails while the pin publication waits on the credential lock leaves no fixture directory behind",
+  async () => {
+    let child: Subprocess | undefined
+    const step = stepsWithin(STEP_BUDGET_MS, () => writerState(child)())
+    const f = await step("fixture", fixture())
+    const published = closedAfterPublications(f)
+    const verified = await step("bootstrap walk", walk(f.built.request, f.keyring))
+    if (!verified.ok || verified.state.pin === null) throw new Error("fixture pin")
+    const credentials = join(f.input.pinDir, "synthetic-credentials.json")
+    writeFileSync(credentials, JSON.stringify({ identity: "A", generation: 1, token: 1 }))
+    const locked = Promise.withResolvers<void>()
+    const writer = spawnWriter(credentials, "hang", (message) => {
+      if (message === "locked") locked.resolve()
+    })
+    child = writer
+    await step("writer locked", Promise.race([locked.promise, exitedEarly(writer)]))
+    const entered = Promise.withResolvers<void>()
+    const { authority } = lockedBoundary(credentials, async () => undefined)
+    const waiting = {
+      ...authority,
+      boundary<T>(dispatch: () => T): Promise<T> {
+        entered.resolve()
+        return authority.boundary(dispatch)
       },
-    },
-  )
-  cleanup.push(async () => {
-    if (child.exitCode === null) child.kill()
-    await child.exited
-  })
+    }
 
-  // when: the writer is already contending for the lock while the publication proceeds,
-  // and an unrelated file elsewhere in this process is renamed in the same window (#11963)
-  const unrelated = await mkdtemp(join(tmpdir(), "boundary-unrelated-"))
-  cleanup.push(() => rm(unrelated, { recursive: true, force: true }))
-  writeFileSync(join(unrelated, "a.tmp"), "x")
-  fs.renameSync(join(unrelated, "a.tmp"), join(unrelated, "a.json"))
-  await result
-  order.push("published")
-  await locked.promise
-  child.send("write")
-  const writerExit = await child.exited
+    // given: a publication inside its boundary, polling for the credential lock a stalled writer holds
+    const result = published(pinTrustAnchor(f.input.pinDir, ACCOUNT, verified.state.pin, { authority: waiting }))
+    const first = await step(
+      "boundary entry",
+      Promise.race([entered.promise.then(() => "boundary"), result.then(() => "published")]),
+    )
+    expect(first).toBe("boundary")
 
-  // then: publication won the lock, renamed once at generation 1, and the replacement followed it
-  expect(entries).toEqual([1])
-  expect(renames).toBe(1)
-  expect(order.indexOf("rename")).toBeLessThan(order.indexOf("writer-locked"))
-  expect(JSON.parse(readFileSync(credentials, "utf8"))).toMatchObject({ identity: "B", generation: 3 })
-  expect(writerExit).toBe(0)
-})
+    // when: a step fails at this point, so the test's cleanup runs, as afterEach runs it
+    await step("cleanup", closeAll())
 
-test("an EINTR retry of the pin rename re-enters the boundary and cannot publish after the generation changed", async () => {
-  const f = await fixture()
-  cleanup.push(f.close)
-  const verified = await walk(f.built.request, f.keyring)
-  if (!verified.ok || verified.state.pin === null) throw new Error("fixture pin")
-  const credentials = join(f.input.pinDir, "synthetic-credentials.json")
-  writeFileSync(credentials, JSON.stringify({ identity: "A", generation: 1, token: 1 }))
-  const { authority, entries, controller } = lockedBoundary(credentials, async () => undefined)
-  let renames = 0
-  const original = fs.renameSync
-  const spy = spyOn(fs, "renameSync").mockImplementation((from, to) => {
-    if (!landsIn(f.input.pinDir, to)) return original(from, to)
-    renames++
-    // given: the first raw rename is interrupted, and a credential replacement lands before the retry
-    writeFileSync(credentials, JSON.stringify({ identity: "B", generation: 2, token: 1 }))
-    throw Object.assign(new Error("interrupted"), { code: "EINTR" })
-  })
-  cleanup.push(() => spy.mockRestore())
-
-  // when: the publication retries the interrupted rename
-  const result = pinTrustAnchor(f.input.pinDir, ACCOUNT, verified.state.pin, { authority })
-
-  // then: the retry re-entered the boundary, saw generation 2, and made no second rename
-  await expect(result).rejects.toMatchObject({ name: "AbortError" })
-  expect(entries).toEqual([1, 2])
-  expect(renames).toBe(1)
-  expect(controller.signal.aborted).toBe(false)
-})
+    // then: the publication settled before its directory was removed, so nothing brought the directory back
+    await step("pin result", result)
+    expect(fs.existsSync(f.input.pinDir)).toBe(false)
+  },
+  TEST_TIMEOUT_MS,
+)
