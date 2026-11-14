@@ -15,9 +15,11 @@ function state(): { marked: boolean } {
 
 export class LocalOnlyNetworkRefused extends Error {
   readonly code = "local_only_network_refused"
+  readonly site: string
 
-  constructor(readonly site: string) {
+  constructor(site: string) {
     super(`a local-only omo remote command reached the network at ${site}`)
+    this.site = site
   }
 }
 
