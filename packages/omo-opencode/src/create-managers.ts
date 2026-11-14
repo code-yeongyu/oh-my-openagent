@@ -89,7 +89,7 @@ export function createManagers(args: {
     ctx,
     tmuxConfig,
     {
-      isInsideTmux: selectTmuxManagerEnvironmentPredicate(tmuxConfig.isolation),
+      isInsideTmux: selectTmuxManagerEnvironmentPredicate(tmuxConfig.isolation, tmuxConfig.multiplexer),
     },
     {
       // Team-mode members get their tmux panes from team-layout-tmux, which

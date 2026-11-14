@@ -1,8 +1,18 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import type { TmuxConfig } from "../../config/schema"
+import type { MultiplexerBackend, TmuxConfig } from "../../config/schema"
 import type { TrackedSession, CapacityConfig, WindowState } from "./types"
 import * as sharedModule from "../../shared"
 import { resolveSessionEventID } from "../../shared/event-session-id"
+import {
+  defaultHerdrOpsDeps,
+  getHerdrAgentsWorkspaceLabel,
+  herdrClosePaneIfExists,
+  herdrCloseWorkspace,
+  herdrListAgents,
+  spawnHerdrSubagentTab,
+  sweepStaleHerdrAgentsWorkspaces,
+  type HerdrOpsDeps,
+} from "@oh-my-opencode/tmux-core"
 import {
   isInsideTmux as defaultIsInsideTmux,
   getCurrentPaneId as defaultGetCurrentPaneId,
@@ -51,6 +61,12 @@ export interface TmuxUtilDeps {
   executeActions: typeof executeActions
   executeAction: typeof executeAction
   log: typeof sharedModule.log
+  /**
+   * Herdr ops override. The herdr backend routes pane spawn/close through
+   * these (defaults hit the real herdr CLI; tests inject a fake
+   * runHerdrCommand and assert argv).
+   */
+  herdrOps?: HerdrOpsDeps
 }
 
 /**
@@ -129,6 +145,7 @@ export class TmuxSessionManager {
   private staleSweepCompleted = false
   private staleSweepInProgress = false
   private isolatedSessionManagerId = createIsolatedSessionManagerId()
+  private herdrWorkspaceId: string | undefined
   constructor(
     ctx: PluginInput,
     tmuxConfig: TmuxConfig,
@@ -149,14 +166,17 @@ export class TmuxSessionManager {
     this.ctxServerUrl = rawServerUrl
     this.serverUrl = resolveServerUrl(rawServerUrl, process.env, this.deps.log)
     this.sourcePaneId = this.deps.getCurrentPaneId()
+    // On herdr the attach command is delivered at spawn time, so the
+    // focus-activation pass (a tmux window-state concept) is disabled.
+    const herdrBackend = this.isHerdrBackend()
     this.pollingManager = new TmuxPollingManager(
       this.client,
       this.sessions,
       this.closeSessionFromPolling.bind(this),
       this.retryPendingCloses.bind(this),
-      this.queryWindowStateSafely.bind(this),
-      this.activateTrackedSessionPane.bind(this),
-      this.canAutoActivatePane.bind(this),
+      herdrBackend ? undefined : this.queryWindowStateSafely.bind(this),
+      herdrBackend ? undefined : this.activateTrackedSessionPane.bind(this),
+      herdrBackend ? undefined : this.canAutoActivatePane.bind(this),
     )
     this.deps.log("[tmux-session-manager] initialized", {
       configEnabled: this.tmuxConfig.enabled,
@@ -168,6 +188,26 @@ export class TmuxSessionManager {
   }
   private isEnabled(): boolean {
     return this.tmuxConfig.enabled && this.deps.isInsideTmux()
+  }
+
+  /**
+   * The resolved visualization backend. The manager is constructed with the
+   * fully resolved runtime tmux config (config chain + OMO_TMUX_MULTIPLEXER
+   * override), so this is the one source of truth for callers that must gate
+   * herdr-only work - e.g. team-mode's stale-workspace sweep, which must
+   * never spawn herdr on a default tmux install.
+   */
+  get multiplexer(): MultiplexerBackend {
+    return this.tmuxConfig.multiplexer
+  }
+
+  /** Subagent panes render through the herdr backend instead of tmux. */
+  private isHerdrBackend(): boolean {
+    return this.tmuxConfig.multiplexer === "herdr"
+  }
+
+  private get herdrOps(): HerdrOpsDeps {
+    return this.deps.herdrOps ?? defaultHerdrOpsDeps
   }
 
   private isIsolated(): boolean {
@@ -238,6 +278,127 @@ export class TmuxSessionManager {
     }
     this.deps.log("[tmux-session-manager] failed to create isolated container", { isolation, sessionId })
     return null
+  }
+
+  /**
+   * Spawn one subagent tab in the manager's herdr workspace and deliver the
+   * attach command. Every isolation mode maps to this tab shape on herdr -
+   * there is no caller-window arithmetic. Returns the pane id, or null to
+   * defer.
+   */
+  private async trySpawnHerdrSubagentTab(sessionId: string, title: string): Promise<string | null> {
+    const result = await spawnHerdrSubagentTab(
+      {
+        sessionId,
+        description: title,
+        cwd: this.projectDirectory,
+        serverUrl: this.serverUrl,
+        workspaceId: this.herdrWorkspaceId,
+        workspaceLabel: getHerdrAgentsWorkspaceLabel(process.pid, this.isolatedSessionManagerId),
+      },
+      this.herdrOps,
+    )
+    if (result.success && result.paneId) {
+      if (result.workspaceId) {
+        this.herdrWorkspaceId = result.workspaceId
+      }
+      return result.paneId
+    }
+    this.deps.log("[tmux-session-manager] herdr subagent tab spawn failed", {
+      sessionId,
+      error: result.error,
+    })
+    return null
+  }
+
+  private trackHerdrSubagentPane(sessionId: string, title: string, paneId: string, stage: SpawnStage): void {
+    this.sessions.set(
+      sessionId,
+      // Attach is delivered at spawn on herdr (no placeholder phase), so the
+      // pane is attach-activated from the start and polling's
+      // never-activated hard timeout never applies.
+      createTrackedSession({ sessionId, paneId, description: title, attachActivated: true }),
+    )
+    this.pollingManager.startPolling()
+    this.deps.log("[tmux-session-manager] subagent pane spawned in herdr workspace", {
+      sessionId,
+      paneId,
+      stage,
+    })
+  }
+
+  /**
+   * Close a tracked herdr pane. Both "closed" and provably "gone" panes
+   * finalize the tracked session; real failures return false so callers can
+   * mark it close-pending for the retry loop.
+   */
+  private async closeHerdrTrackedSession(tracked: TrackedSession): Promise<boolean> {
+    try {
+      const outcome = await herdrClosePaneIfExists(tracked.paneId, this.herdrOps)
+      this.deps.log("[tmux-session-manager] herdr pane closed", {
+        sessionId: tracked.sessionId,
+        paneId: tracked.paneId,
+        outcome,
+      })
+      this.removeTrackedSession(tracked.sessionId)
+      return true
+    } catch (error) {
+      this.deps.log("[tmux-session-manager] herdr pane close failed", {
+        sessionId: tracked.sessionId,
+        paneId: tracked.paneId,
+        error: String(error),
+      })
+      return false
+    }
+  }
+
+  /**
+   * Herdr counterpart of the window-state close verification: the live-agent
+   * inventory is herdr's liveness authority (names clear when agents exit),
+   * so an attached pane absent from the list is provably dead and the tracked
+   * close finalizes. A pane that never attached is not agent-scoped, so its
+   * liveness is unknown - arm the retry cooldown and let a later pass try
+   * again, mirroring the tmux zombie-pane cooldown semantics.
+   */
+  private async finalizeHerdrForceRemoveCandidate(tracked: TrackedSession, source: string): Promise<boolean> {
+    if (tracked.attachActivated) {
+      try {
+        const agents = await herdrListAgents(this.herdrOps)
+        if (!agents.some((agent) => agent.paneId === tracked.paneId)) {
+          this.deps.log(
+            "[tmux-session-manager] herdr pane already gone after max close retries; finalizing tracked close",
+            {
+              sessionId: tracked.sessionId,
+              paneId: tracked.paneId,
+              source,
+            },
+          )
+          this.removeTrackedSession(tracked.sessionId)
+          return true
+        }
+      } catch (error) {
+        this.deps.log("[tmux-session-manager] herdr liveness probe failed after max close retries", {
+          sessionId: tracked.sessionId,
+          paneId: tracked.paneId,
+          error: String(error),
+        })
+      }
+    }
+
+    this.deps.log(
+      "[tmux-session-manager] herdr pane still alive after max close retries; arming retry cooldown for next attempt",
+      {
+        sessionId: tracked.sessionId,
+        paneId: tracked.paneId,
+        cooldownMs: CLOSE_RETRY_COOLDOWN_MS,
+        source,
+      },
+    )
+    const currentTracked = this.sessions.get(tracked.sessionId)
+    if (currentTracked) {
+      currentTracked.closeRetryCooldownUntil = new Date(Date.now() + CLOSE_RETRY_COOLDOWN_MS)
+    }
+    return false
   }
 
   private getCapacityConfig(): CapacityConfig {
@@ -380,6 +541,10 @@ export class TmuxSessionManager {
   }
 
   private async finalizeForceRemoveCandidate(tracked: TrackedSession, source: string): Promise<boolean> {
+    if (this.isHerdrBackend()) {
+      return this.finalizeHerdrForceRemoveCandidate(tracked, source)
+    }
+
     const state = await this.queryWindowStateSafely()
     if (!state) {
       this.deps.log("[tmux-session-manager] unable to verify pane after max close retries; keeping session tracked", {
@@ -478,6 +643,10 @@ export class TmuxSessionManager {
   }
 
   private async closeTrackedSession(tracked: TrackedSession): Promise<boolean> {
+    if (this.isHerdrBackend()) {
+      return this.closeHerdrTrackedSession(tracked)
+    }
+
     const state = await this.queryWindowStateSafely()
     if (!state) return false
 
@@ -733,6 +902,16 @@ export class TmuxSessionManager {
 
     this.failedReadinessCache.clear(sessionId)
 
+    if (this.isHerdrBackend()) {
+      const herdrPaneId = await this.trySpawnHerdrSubagentTab(sessionId, title)
+      if (herdrPaneId) {
+        this.trackHerdrSubagentPane(sessionId, title, herdrPaneId, stage)
+        return
+      }
+      this.enqueueDeferredSession(sessionId, title)
+      return
+    }
+
     const isolatedPaneId = await this.spawnInIsolatedContainer(sessionId, title)
     if (isolatedPaneId) {
       this.sessions.set(
@@ -953,6 +1132,20 @@ export class TmuxSessionManager {
         return
       }
 
+      if (this.isHerdrBackend()) {
+        const readyForHerdrAttach = await this.ensureSessionReadyBeforeSpawn(sessionId, "deferred.attach")
+        if (!readyForHerdrAttach) {
+          this.removeDeferredSession(sessionId)
+          return
+        }
+        const herdrPaneId = await this.trySpawnHerdrSubagentTab(sessionId, deferred.title)
+        if (herdrPaneId) {
+          this.trackHerdrSubagentPane(sessionId, deferred.title, herdrPaneId, "deferred.attach")
+          this.removeDeferredSession(sessionId)
+        }
+        return
+      }
+
       if (deferred.retryIsolatedContainer) {
         const readyForIsolatedContainer = await this.ensureSessionReadyBeforeSpawn(
           sessionId,
@@ -1101,7 +1294,9 @@ export class TmuxSessionManager {
 
     const title = info.title ?? "Subagent"
 
-    if (!this.sourcePaneId) {
+    // On herdr subagent panes are tabs in the manager's own workspace - no
+    // caller pane is required. On tmux the source pane anchors the grid.
+    if (!this.isHerdrBackend() && !this.sourcePaneId) {
       this.deps.log("[tmux-session-manager] no source pane id")
       return
     }
@@ -1154,12 +1349,20 @@ export class TmuxSessionManager {
     this.failedReadinessCache.clear(event.sessionID)
     this.removeDeferredSession(event.sessionID)
 
-    if (!this.getEffectiveSourcePaneId()) return
+    if (!this.isHerdrBackend() && !this.getEffectiveSourcePaneId()) return
 
     const tracked = this.sessions.get(event.sessionID)
     if (!tracked) return
 
     this.deps.log("[tmux-session-manager] onSessionDeleted", { sessionId: event.sessionID })
+
+    if (this.isHerdrBackend()) {
+      const closed = await this.closeHerdrTrackedSession(tracked)
+      if (!closed) {
+        this.markSessionClosePending(event.sessionID)
+      }
+      return
+    }
 
     const state = await this.queryWindowStateSafely()
     if (!state) {
@@ -1297,7 +1500,26 @@ export class TmuxSessionManager {
     this.isolatedContainerPaneId = undefined
     this.isolatedWindowPaneId = undefined
 
-    if (this.tmuxConfig.isolation === "session") {
+    if (this.isHerdrBackend()) {
+      // The workspace owns the root tab plus any straggler subagent tabs;
+      // closing it is the herdr counterpart of the tmux isolated-session
+      // teardown below.
+      const workspaceId = this.herdrWorkspaceId
+      this.herdrWorkspaceId = undefined
+      if (workspaceId) {
+        try {
+          await herdrCloseWorkspace(workspaceId, this.herdrOps)
+          this.deps.log("[tmux-session-manager] herdr agents workspace teardown", {
+            workspaceId,
+          })
+        } catch (error) {
+          this.deps.log("[tmux-session-manager] herdr agents workspace teardown failed", {
+            workspaceId,
+            error: String(error),
+          })
+        }
+      }
+    } else if (this.tmuxConfig.isolation === "session") {
       const isolatedSessionName = getIsolatedSessionName(process.pid, this.isolatedSessionManagerId)
       try {
         const killed = await killTmuxSessionIfExists(isolatedSessionName)
@@ -1327,14 +1549,19 @@ export class TmuxSessionManager {
     try {
       const report = await sweepStaleTmuxResources({
         isolation: this.tmuxConfig.isolation,
+        multiplexer: this.tmuxConfig.multiplexer,
         sweepStaleOmoAgentSessions,
         sweepStaleOmoAttachPanes,
+        ...(this.isHerdrBackend()
+          ? { sweepStaleHerdrAgentsWorkspaces: () => sweepStaleHerdrAgentsWorkspaces(process.pid, this.herdrOps) }
+          : {}),
       })
       if (report.killed > 0) {
         this.deps.log("[tmux-session-manager] stale tmux resources swept", {
           killed: report.killed,
           killedAttachPanes: report.killedAttachPanes,
           killedIsolatedSessions: report.killedIsolatedSessions,
+          killedHerdrWorkspaces: report.killedHerdrWorkspaces,
         })
       }
       this.staleSweepCompleted = true
