@@ -127,6 +127,9 @@ async function wire(wake: Partial<ThreadWakeOptions> = {}, targetCwd: string = p
       wake: options,
     }).register(pi as never, context() as never)
     await pi.dispatch("session_start", { type: "session_start" }, { mode: "tui", agentDir: h.agentDir })
+    // The wake runtime is a lazy sidecar: awaiting the same (cached) module lets the component's start callback run
+    // first, so the latch below is settled, never a race with the import.
+    await import("#omo-wake-runtime")
     await latch.running?.get(h.agentDir)?.ready
     return pi
   }

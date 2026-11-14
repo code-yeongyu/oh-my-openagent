@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtempSync } from "node:fs"
+import { mkdtempSync, rmSync } from "node:fs"
 import { join } from "node:path"
 
 import { createFakeDeliveryService } from "../consumer/testing/fake-delivery-service"
@@ -16,7 +16,9 @@ import { writeSessionFile } from "./testing/fake-wake-host"
 
 const TARGET = "dur-target"
 let harness: GatewayHarness | undefined
+const tempDirs: string[] = []
 afterEach(async () => {
+  for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true })
   await harness?.dispose()
   harness = undefined
 })
@@ -113,6 +115,7 @@ describe("startDeliveryConsumer", () => {
     const store = h.store()
     const dirOn = mkdtempSync("/tmp/omo-wake-sweep-on-")
     const dirOff = mkdtempSync("/tmp/omo-wake-sweep-off-")
+    tempDirs.push(dirOn, dirOff)
     writeSessionFile(join(h.agentDir, "sessions"), "t-on", { cwd: dirOn })
     writeSessionFile(join(h.agentDir, "sessions"), "t-off", { cwd: dirOff })
     const sender = h.session("a")
