@@ -1194,12 +1194,16 @@ describe("thread component production registration", () => {
   })
 
   test("registers the family regardless of the context flag", () => {
-    const f = api()
-    createThreadComponent({ host: host(), stateDirectory: "/tmp/thread-test-state" }).register(
-      f.pi as never,
-      context([]) as never,
-    )
-    expect(f.tools.map((tool) => tool.name)).toEqual(EIGHTEEN)
+    for (const flagValue of [true, false]) {
+      const f = api()
+      const pi = { ...f.pi, getFlag: () => flagValue }
+      const ctx = { ...context([]), config: { getFlag: () => flagValue } }
+      createThreadComponent({ host: host(), stateDirectory: "/tmp/thread-test-state" }).register(
+        pi as never,
+        ctx as never,
+      )
+      expect(f.tools.map((tool) => tool.name)).toEqual(EIGHTEEN)
+    }
   })
 
   test("registers all eighteen tools when a test host is supplied and no host flag exists", () => {

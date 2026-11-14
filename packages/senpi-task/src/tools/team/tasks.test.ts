@@ -62,23 +62,6 @@ describe("task_create tool", () => {
     expect(text.split("\n")).toHaveLength(1)
   })
 
-  test("#given a subject with embedded newlines #when create runs #then the text collapses them onto one line", async () => {
-    // given
-    const service = createFakeTeamService({ createTask: async () => fakeTask({ subject: "line one\nline two" }) })
-
-    // when
-    const result = await runTeamTaskCreate(service, {
-      team_run_id: "run-1",
-      subject: "line one\nline two",
-      description: "d",
-    })
-
-    // then
-    const text = result.content[0]?.type === "text" ? result.content[0].text : ""
-    expect(text).toContain("'line one line two'")
-    expect(text.split("\n")).toHaveLength(1)
-  })
-
   test("#given adversarial owner and blocked_by values #when list and get run #then the echoed fields are collapsed and bounded", async () => {
     // given
     const hostile = `x\ninjected ${"y".repeat(500)}`

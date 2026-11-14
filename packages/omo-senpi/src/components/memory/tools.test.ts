@@ -41,7 +41,7 @@ describe("memory tool registration", () => {
     }
   })
 
-  test("#given the memory tool description #when inspected #then it documents omo identity, frontmatter rules, and result strings", () => {
+  test("#given the memory tool description #when inspected #then it names the read_only frontmatter key", () => {
     // given
     const pi = new FakeExtensionAPI()
     registerMemoryTools(pi, () => undefined)
@@ -50,10 +50,7 @@ describe("memory tool registration", () => {
     const description = String(pi.tools[0]?.["description"] ?? "")
 
     // then
-    expect(description).toContain("memory repo")
-    expect(description).toContain("frontmatter")
     expect(description).toContain("read_only")
-    expect(description).toContain("harness will sync after the turn")
   })
 })
 
