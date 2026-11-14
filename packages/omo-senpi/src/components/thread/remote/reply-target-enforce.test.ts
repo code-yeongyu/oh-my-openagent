@@ -9,7 +9,9 @@ describe("a reply approved from a consumed delivery delivers only to that sender
 
   test("#given the delivery stated sender dur-on-b named 'on b' #when the run replies by that name #then it resolves to b's row and is delivered there", async () => {
     const a = fixture.account({ rows: [B_ROW] })
-    const { run } = fixture.surface(a.remote, { callerReplySenders: () => [{ session_id: "dur-on-b", name: "on b" }] })
+    const { run } = fixture.surface(a.remote, {
+      callerReplySenders: () => [{ session_id: "dur-on-b", name: "on b", device: "b" }],
+    })
     expect(await run("thread_send", { thread: "on b", message: "reply" })).toMatchObject({
       kind: "ok",
       thread_id: "dur-on-b",

@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { existsSync } from "node:fs"
+import { gatewayInboxDirectory } from "./gateway/paths"
 import type { RemoteSessionRow } from "./remote/ports"
 import type { ThreadHostSession } from "./tools"
 import { B_ROW, createRemoteThreadFixture } from "./thread-remote-fixture"
@@ -60,19 +62,24 @@ describe("#13006: a send answers the same shape and the same refusals whichever 
    * `twinsOn` adds two threads named "twin" to that leg.
    */
   function legs(
-    options: { readonly sender?: { readonly session_id: string; readonly name?: string }; readonly twinsOn?: Leg } = {},
+    options: {
+      readonly sender?: { readonly session_id: string; readonly name?: string; readonly device?: string }
+      readonly twinsOn?: Leg
+    } = {},
   ) {
     const { sender, twinsOn } = options
     const rows = twinsOn === "remote" ? [B_ROW, ...B_TWINS] : [B_ROW]
     const a = fixture.account({ rows, live: rows.map((row) => row.session_id) })
     const extra =
       sender === undefined ? {} : { callerReplyTargets: () => [sender.session_id], callerReplySenders: () => [sender] }
-    const { run, permission } = fixture.surface(a.remote, {
+    const { run, permission, prompts, agentDir } = fixture.surface(a.remote, {
       sessions: twinsOn === "local" ? [LOCAL, ...TWINS] : [LOCAL],
       ...extra,
     })
     const admits = () => a.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message")
-    return { run, permission, admits }
+    // A delivery to a session on this device leaves a marker in its gateway inbox: none means nothing reached it.
+    const reachedLocally = (durableId: string) => existsSync(gatewayInboxDirectory(agentDir, durableId))
+    return { run, permission, admits, prompts, reachedLocally }
   }
 
   /**
@@ -114,7 +121,9 @@ describe("#13006: a send answers the same shape and the same refusals whichever 
   test.each(LEGS)(
     "#given a run woken by the %s thread's delivery #when it replies by that sender's id and by its stated name #then both are approved without a prompt and both deliver to that sender",
     async (leg) => {
-      const { run, permission } = legs({ sender: { session_id: TARGET[leg].id, name: TARGET[leg].name } })
+      const { run, permission } = legs({
+        sender: { session_id: TARGET[leg].id, name: TARGET[leg].name, ...(leg === "remote" ? { device: "b" } : {}) },
+      })
       expect(permission({ thread: TARGET[leg].id, message: "reply" })).toEqual(approved(TARGET[leg].id))
       expect(permission({ thread: TARGET[leg].name, message: "reply" })).toEqual(approved(TARGET[leg].name))
       expect(await run("thread_send", { thread: TARGET[leg].id, message: "reply" })).toMatchObject({
@@ -128,16 +137,26 @@ describe("#13006: a send answers the same shape and the same refusals whichever 
     },
   )
 
+  // A4.3.1 of #13037: a reply resolves on the device the consumed delivery came from, so a name another thread carries
+  // never redirects it: the sender on b is reached on b, and a sender on this device that stated b's name is not found here.
   test.each(LEGS)(
-    "#given a run woken by a sender that stated the %s thread's name but is another session #when it replies by that name #then the ask is approved from the delivery, and the send refuses reply_target_mismatch without sending",
+    "#given a run woken by a sender that stated the %s thread's name but is another session #when it replies by that name #then the ask is approved from the delivery, and the send never reaches the thread carrying that name",
     async (leg) => {
-      const { run, permission, admits } = legs({ sender: { session_id: TARGET[leg].other.id, name: TARGET[leg].name } })
-      expect(permission({ thread: TARGET[leg].name, message: "reply" })).toEqual(approved(TARGET[leg].name))
-      expect(await run("thread_send", { thread: TARGET[leg].name, message: "reply" })).toMatchObject({
-        kind: "error",
-        error: { code: "reply_target_mismatch", details: { resolved_thread_id: TARGET[leg].id } },
+      const other = TARGET[leg].other
+      const { run, permission, admits, prompts, reachedLocally } = legs({
+        sender: { session_id: other.id, name: TARGET[leg].name, ...(other.id === "dur-on-b" ? { device: "b" } : {}) },
       })
-      expect(admits()).toHaveLength(0)
+      expect(permission({ thread: TARGET[leg].name, message: "reply" })).toEqual(approved(TARGET[leg].name))
+      const result = await run("thread_send", { thread: TARGET[leg].name, message: "reply" })
+      if (leg === "local") {
+        expect(result).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
+        expect(admits()).toHaveLength(1)
+        // The local namesake ("local peer", dur-local) received nothing: no prompt and no gateway delivery.
+        expect({ prompts: prompts(), reached: reachedLocally("dur-local") }).toEqual({ prompts: 0, reached: false })
+      } else {
+        expect(result).toMatchObject({ kind: "error", error: { code: "not_found" } })
+        expect(admits()).toHaveLength(0)
+      }
     },
   )
 

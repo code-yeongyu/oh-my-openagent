@@ -28,15 +28,37 @@ export function threadSendPermission(
  * the name it stated - never from a listing. The send step then delivers only when the address resolves to that sender
  * (`replyTargetMismatch` in tools.ts), so a name that happens to match another session is never reached unapproved.
  */
-export function isReplyToConsumedSender(
+function isReplyToConsumedSender(
   options: Pick<ThreadToolSurfaceOptions, "callerReplyTargets" | "callerReplySenders">,
   target: string,
 ): boolean {
   if (SESSION_ID.test(target) && (options.callerReplyTargets?.() ?? []).includes(target)) return true
+  return sendersNamedBy(options, target).length > 0
+}
+
+type ReplySender = { readonly session_id: string; readonly name?: string; readonly device?: string }
+
+function sendersNamedBy(
+  options: Pick<ThreadToolSurfaceOptions, "callerReplySenders">,
+  target: string,
+): readonly ReplySender[] {
   const wanted = normalizeThreadName(target)
-  return (options.callerReplySenders?.() ?? []).some(
+  return (options.callerReplySenders?.() ?? []).filter(
     (sender) =>
       sender.session_id === target ||
       (sender.name !== undefined && wanted !== "" && normalizeThreadName(sender.name) === wanted),
   )
+}
+
+/**
+ * The consumed senders an approved reply addresses, each with the device its delivery came from (absent = this device):
+ * empty when `target` is not a reply. A target approved by a consumed sender id alone is that sender on this device.
+ */
+export function consumedSendersOf(
+  options: Pick<ThreadToolSurfaceOptions, "callerReplyTargets" | "callerReplySenders">,
+  target: string,
+): readonly ReplySender[] {
+  if (!isReplyToConsumedSender(options, target)) return []
+  const named = sendersNamedBy(options, target)
+  return named.length > 0 ? named : [{ session_id: target }]
 }

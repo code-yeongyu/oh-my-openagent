@@ -89,7 +89,7 @@ type RunContext = {
   chainHop: number
   consumed: string[]
   replyTo: string[]
-  replySenders: { session_id: string; name?: string }[]
+  replySenders: { session_id: string; name?: string; device?: string }[]
   local: boolean
   answered: boolean
 }
@@ -119,6 +119,7 @@ function deliveryOf(message: EngineMessage):
       readonly chainCount: number
       readonly agentSender: string | undefined
       readonly senderName: string | undefined
+      readonly device: string | undefined
     }
   | undefined {
   if (message.role !== "custom" || message.customType !== SESSION_CONTROL_DELIVERY_TYPE) return undefined
@@ -137,6 +138,24 @@ function deliveryOf(message: EngineMessage):
       typeof details?.sender?.name === "string" && details.sender.name.trim() !== ""
         ? details.sender.name.trim()
         : undefined,
+    device: deliveryDevice(id),
+  }
+}
+
+/**
+ * The device a delivery came from, as the receiving side attested it in the delivery's id: `device:<device>/<id>` names
+ * it (URI-encoded); `rpc:local/<id>` and a bare row id mean this device (amendment A4.3.1 of #13037).
+ */
+function deliveryDevice(id: string): string | undefined {
+  if (!id.startsWith("device:")) return undefined
+  const rest = id.slice("device:".length)
+  const slash = rest.indexOf("/")
+  const part = slash === -1 ? rest : rest.slice(0, slash)
+  // A device part that is not valid URI encoding is kept as written: it names no listed device, so a reply to it is not_found.
+  try {
+    return decodeURIComponent(part)
+  } catch {
+    return part
   }
 }
 
@@ -182,10 +201,16 @@ function noteInput(run: RunContext, message: EngineMessage): void {
   if (!run.consumed.includes(delivery.id)) run.consumed.push(delivery.id)
   if (delivery.agentSender !== undefined && !run.replyTo.includes(delivery.agentSender))
     run.replyTo.push(delivery.agentSender)
-  if (delivery.agentSender !== undefined && !run.replySenders.some((s) => s.session_id === delivery.agentSender))
+  if (
+    delivery.agentSender !== undefined &&
+    !run.replySenders.some(
+      (s) => s.session_id === delivery.agentSender && s.device === delivery.device && s.name === delivery.senderName,
+    )
+  )
     run.replySenders.push({
       session_id: delivery.agentSender,
       ...(delivery.senderName === undefined ? {} : { name: delivery.senderName }),
+      ...(delivery.device === undefined ? {} : { device: delivery.device }),
     })
 }
 
