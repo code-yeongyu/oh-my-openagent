@@ -160,3 +160,34 @@ fn the_grep_zero_walk_fails_on_a_file_it_cannot_read() {
         "an unreadable file must fail the walk, not be skipped"
     );
 }
+
+/// Review L3 of #13370 (at c72fac7d86, ruling R70bg): the admission runs again after the
+/// interaction lock is held. A second holder keeps the lock while a stop is pressed after the
+/// session's admission ran; when the lock comes free the waiting exec is refused `Suspended`,
+/// nothing sent, and the lock is released.
+#[test]
+fn a_stop_pressed_while_another_holder_keeps_the_lock_refuses_the_waiting_exec() {
+    let run = Run::new();
+    let fake = run.fake();
+    let remote = fake.handle();
+    let mut session = run.session(Box::new(fake));
+    let other = InteractionLock::under(run.dir.path());
+    let held = other.acquire().expect("the other holder takes the lock");
+    let before = remote.stop_polls();
+    let presser = std::thread::spawn(move || {
+        // The session's admission polls the stop listener; once it has, the stop is pressed and
+        // only then is the lock released. Bounded: a session that never admits fails here.
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        while remote.stop_polls() <= before {
+            assert!(std::time::Instant::now() < deadline, "the session never reached admission");
+            std::thread::yield_now();
+        }
+        remote.press_stop_chord();
+        drop(held);
+    });
+    let refused = session.click(click("c-locked")).expect_err("the stop pressed while waiting refuses");
+    presser.join().expect("presser");
+    assert_eq!(wire(&refused).0, "Suspended");
+    assert!(run.sink.is_empty(), "nothing sent: {:?}", run.sink.lines());
+    assert!(other.try_acquire().expect("try").is_some(), "the refused exec released the lock");
+}

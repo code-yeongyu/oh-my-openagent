@@ -142,6 +142,27 @@ impl Session {
                 ));
             }
         };
+        // Time passes between the first gate and here (the busy wait, another holder of the
+        // interaction lock): on every path the gate runs again once the lock is held, and
+        // nothing is taken or sent before it. A refusal drops the lock with nothing sent.
+        // Row 21 on #13391's re-admit (R70bg(2)): the stop is reconciled through the funnel, the
+        // epoch is read fresh and the gate runs on a fresh plan's stages, so a stop or a consent
+        // change while another holder kept the lock refuses here too.
+        self.reconcile_stop();
+        let epoch = self.guard.supervisor().stop_epoch();
+        let call = (mutation.method, &mutation.call.target, mutation.route);
+        let fresh = self.funnel.control.plan(self.backend.as_mut(), call, epoch);
+        if let Err(refused) = self
+            .guard
+            .admit_on_with(self.backend.as_mut(), &mutation.call, fresh.stages)
+        {
+            drop(lock);
+            return Err(self.refuse(
+                record,
+                Some(format!("{:?}", refused.gate)),
+                refused.refusal.into(),
+            ));
+        }
         if let Err(error) = self.funnel.markers.create(&record.marker) {
             self.funnel.warn(format!("marker not written: {error}"));
             return Err(self.refuse(record, Some("Marker".to_owned()), MARKER_UNAVAILABLE.into()));

@@ -636,3 +636,47 @@ fn the_code_built_default_consent_admits_no_exec_and_arms_no_chord() {
     assert!(!s.stop_path_status().global_live, "no chord armed");
     assert!(s.funnel.control.armed_chord.is_none(), "no chord armed");
 }
+
+/// #13391 merged into row 21 (R70bg(2) with R70s(1)): a stop pressed while another holder keeps
+/// the interaction lock refuses the waiting foreground exec `Suspended` with nothing sent
+/// (#13391's re-admit after the lock), AND row 21's lease ends through the funnel and the grant is
+/// revoked (row 21's reconcile at that re-admit), and the lock comes free.
+#[test]
+fn a_stop_while_another_holder_keeps_the_lock_ends_the_lease_and_revokes_the_grant() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let sink = RecordingSink::default();
+    let backend = FakeBackend::with_parts(scenario(&json!({})), FakeClock::default(), sink.clone())
+        .with_stop_path(StopPathScript::Live);
+    let remote = backend.handle();
+    let runtime = dir.path().join("run");
+    let mut s = Session::for_roots(Box::new(backend), &Roots { state: dir.path().join("s"), runtime: runtime.clone() });
+    s.open(params(json!({ "reportMode": "null" }))).expect("open");
+    s.stop_path_start(params(json!({})));
+    grant(&mut s);
+    capture(&mut s, "1");
+    let other = crate::lock::InteractionLock::under(&runtime);
+    let held = other.acquire().expect("the other holder takes the lock");
+    let seen = sink.clone();
+    let presser = std::thread::spawn(move || {
+        // The lease is taken (its presence shows) before the exec waits on the lock; only then is
+        // the stop pressed and the lock released. Bounded: a session that never takes it fails here.
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        while !seen.lines().iter().any(|line| line == "presence show") {
+            assert!(std::time::Instant::now() < deadline, "the session never took the lease");
+            std::thread::yield_now();
+        }
+        remote.press_stop_chord();
+        drop(held);
+    });
+    let refused = s
+        .click(params(json!({ "target": "1", "x": 5, "y": 5, "delivery": "foreground" })))
+        .expect_err("the stop pressed while waiting refuses");
+    presser.join().expect("presser");
+    assert_eq!(refused.refusal.code.wire(), "Suspended");
+    // The lease's own presence lines (show, then hide at its end) are not input.
+    assert!(sink.lines().iter().all(|line| !line.contains("click") && !line.contains("mouse")), "nothing sent: {:?}", sink.lines());
+    assert!(sink.lines().iter().any(|line| line == "presence hide"), "the lease ended: {:?}", sink.lines());
+    assert!(!s.holds_lease(), "the lease ended through the funnel");
+    assert!(!s.funnel.control.grant.is_held(), "the stop revoked the grant");
+    assert!(other.try_acquire().expect("try").is_some(), "the refused exec released the lock");
+}

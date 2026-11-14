@@ -36,7 +36,9 @@ fn wait_for_settle_is_bounded_by_the_call_timeout() {
     let mut rig = Rig::new(json!({ "ax_notification_timeline": events }));
     let result = rig
         .session
-        .wait_for(params(json!({"target": "101", "predicate": {"settle": {}}, "timeout": 300})))
+        .wait_for(params(
+            json!({"target": "101", "predicate": {"settle": {}}, "timeout": 300}),
+        ))
         .expect("waitFor");
     let settle = result.observation.settle.expect("the settle it ran");
     assert_eq!(
@@ -57,7 +59,9 @@ fn wait_for_settle_is_bounded_by_the_call_timeout() {
     }));
     let result = rig
         .session
-        .wait_for(params(json!({"target": "101", "predicate": {"settle": {}}})))
+        .wait_for(params(
+            json!({"target": "101", "predicate": {"settle": {}}}),
+        ))
         .expect("waitFor");
     let settle = result.observation.settle.expect("the settle it ran");
     assert_eq!(
@@ -76,21 +80,33 @@ fn window_gone_and_event_waits_ignore_an_unrelated_destroyed_element() {
         "predicate": {"window": {"state": "gone", "title": "Save"}},
         "timeout": 1000
     });
-    let property = json!({"target": "101", "predicate": {"event": {"kind": "property"}}, "timeout": 1000});
+    let property =
+        json!({"target": "101", "predicate": {"event": {"kind": "property"}}, "timeout": 1000});
     let unrelated = json!({"ax_notification_timeline": [
         {"t_ms": 100, "window": "101", "kind": "AXUIElementDestroyed"},
         {"t_ms": 200, "window": "102", "kind": "AXValueChanged"}
     ]});
     let mut rig = Rig::new(unrelated.clone());
     let result = rig.session.wait_for(params(gone.clone())).expect("waitFor");
-    assert_eq!(result.outcome, WaitOutcome::Timeout, "an element of 101 is not the Save window");
+    assert_eq!(
+        result.outcome,
+        WaitOutcome::Timeout,
+        "an element of 101 is not the Save window"
+    );
     let mut rig = Rig::new(unrelated);
-    let result = rig.session.wait_for(params(property.clone())).expect("waitFor");
-    assert_eq!(result.outcome, WaitOutcome::Timeout, "the change was on 102, not 101");
+    let result = rig
+        .session
+        .wait_for(params(property.clone()))
+        .expect("waitFor");
+    assert_eq!(
+        result.outcome,
+        WaitOutcome::Timeout,
+        "the change was on 102, not 101"
+    );
     let related = json!({"ax_notification_timeline": [
         {"t_ms": 100, "window": "101", "kind": "AXUIElementDestroyed"},
         {"t_ms": 200, "window": "101", "kind": "AXValueChanged"},
-        {"t_ms": 300, "window": "102", "kind": "AXUIElementDestroyed"}
+        {"t_ms": 300, "window": "102", "kind": "AXUIElementDestroyed", "closes": true}
     ]});
     let mut rig = Rig::new(related.clone());
     let result = rig.session.wait_for(params(gone)).expect("waitFor");
@@ -109,4 +125,119 @@ fn window_gone_and_event_waits_ignore_an_unrelated_destroyed_element() {
         "matched on the change of 101 at 200 ms: {}",
         rig.clock.now_ms()
     );
+}
+
+/// Review L2 of #13370 (at c72fac7d86): a gone wait that names its window by title cannot know
+/// which windows it tracks when the listing fails; it answers the listing's refusal instead of
+/// waiting the whole timeout for nothing.
+#[test]
+fn a_gone_wait_whose_listing_fails_refuses_instead_of_timing_out() {
+    let mut rig = Rig::new(json!({
+        "fail_next": [{"method": "windows", "code": "Internal"}]
+    }));
+    let refused = rig
+        .session
+        .wait_for(params(json!({
+            "target": "101",
+            "predicate": {"window": {"state": "gone", "title": "Save"}},
+            "timeout": 1000
+        })))
+        .expect_err("the failed listing is answered, not waited out");
+    assert_eq!(
+        refused.refusal.code,
+        omo_computer_core::error::EngineCode::Internal
+    );
+    assert!(
+        rig.clock.now_ms() < 1_000,
+        "no wait ran: {}",
+        rig.clock.now_ms()
+    );
+}
+
+/// Review L1 of #13370 (at c72fac7d86, ruling R70bg): a gone event is a hint, never the answer.
+/// A child destroyed in the tracked window does not end a gone wait; the window closing does; a
+/// listing that fails answers its refusal. (The tracked window is the Save dialog 102, so the
+/// observation of the target 101 that every waitFor returns can still be read.)
+#[test]
+fn a_gone_wait_is_confirmed_by_the_listing() {
+    let gone = json!({
+        "target": "101",
+        "predicate": {"window": {"state": "gone", "title": "Save"}},
+        "timeout": 1000
+    });
+    let mut child = Rig::new(json!({"ax_notification_timeline": [
+        {"t_ms": 100, "window": "102", "kind": "AXUIElementDestroyed"}
+    ]}));
+    let result = child
+        .session
+        .wait_for(params(gone.clone()))
+        .expect("waitFor");
+    assert_eq!(
+        result.outcome,
+        WaitOutcome::Timeout,
+        "a destroyed child is not the window closing"
+    );
+    let mut closed = Rig::new(json!({"ax_notification_timeline": [
+        {"t_ms": 100, "window": "102", "kind": "AXUIElementDestroyed"},
+        {"t_ms": 300, "window": "102", "kind": "AXUIElementDestroyed", "closes": true}
+    ]}));
+    let result = closed
+        .session
+        .wait_for(params(gone.clone()))
+        .expect("waitFor");
+    assert_eq!(result.outcome, WaitOutcome::Matched);
+    assert!(
+        (300..1_000).contains(&closed.clock.now_ms()),
+        "matched at the close: {}",
+        closed.clock.now_ms()
+    );
+    // The tracking read (the first listing) succeeds; the confirming read (the second) fails.
+    let mut failing = Rig::new(json!({"ax_notification_timeline": [
+        {"t_ms": 100, "window": "102", "kind": "AXUIElementDestroyed", "closes": true}
+    ]}));
+    failing.fail_listings_after(2);
+    let refused = failing
+        .session
+        .wait_for(params(gone))
+        .expect_err("a failed confirming read is answered");
+    assert_eq!(
+        refused.refusal.code,
+        omo_computer_core::error::EngineCode::Internal
+    );
+}
+
+/// Item 11 of the follow-up (ruling R70bi): when a wait matches because its target window is
+/// gone, the reply is `matched` with an observation of nothing (no frame, no tree, 0 nodes, no
+/// cuts, complete): the engine does not observe a window it just confirmed gone, and never
+/// answers `WindowNotFound` for it.
+#[test]
+fn a_wait_that_matches_on_its_target_closing_answers_an_empty_observation() {
+    let closes = json!({"ax_notification_timeline": [
+        {"t_ms": 200, "window": "101", "kind": "AXUIElementDestroyed", "closes": true}
+    ]});
+    for predicate in [
+        json!({"window": {"state": "gone"}}),
+        json!({"event": {"kind": "window_closed"}}),
+    ] {
+        let mut rig = Rig::new(closes.clone());
+        let result = rig
+            .session
+            .wait_for(params(
+                json!({"target": "101", "predicate": predicate.clone(), "timeout": 1000}),
+            ))
+            .unwrap_or_else(|refused| panic!("{predicate}: matched, not {refused:?}"));
+        assert_eq!(result.outcome, WaitOutcome::Matched, "{predicate}");
+        let observed = &result.observation;
+        assert_eq!(
+            (
+                observed.frame.is_none(),
+                observed.tree.is_none(),
+                observed.nodes_observed,
+                observed.cuts.is_empty(),
+                observed.complete
+            ),
+            (true, true, 0, true, true),
+            "{predicate}: an observation of nothing"
+        );
+    }
 }
