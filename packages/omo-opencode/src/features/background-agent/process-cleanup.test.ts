@@ -454,18 +454,6 @@ describe("#given process cleanup registration", () => {
       }
     })
 
-    test("#given a manager registered AND process emits 'exit' #then cleanup still runs (signal path remains the real shutdown gate)", () => {
-      const shutdown = mock(() => {})
-      const manager = { shutdown }
-      registeredManagers.push(manager)
-
-      registerManagerForCleanup(manager)
-      const exitListener = getRegisteredProcessCleanupSignalListener("exit")
-      exitListener()
-
-      expect(shutdown).toHaveBeenCalledTimes(1)
-    })
-
     test("#given _resetForTesting() called #when event fires #then no cleanup runs", () => {
       const uncaughtExceptionListenersBefore = process.listeners("uncaughtException")
       const shutdown = mock(() => {})

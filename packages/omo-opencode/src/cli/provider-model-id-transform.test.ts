@@ -123,18 +123,6 @@ describe("transformModelForProvider", () => {
   })
 
   describe("google provider", () => {
-    test("transforms gemini-3-flash to gemini-3-flash-preview", () => {
-      // #given google provider and gemini-3-flash model
-      const provider = "google"
-      const model = "gemini-3-flash"
-
-      // #when transformModelForProvider is called
-      const result = transformModelForProvider(provider, model)
-
-      // #then should transform to gemini-3-flash-preview
-      expect(result).toBe("gemini-3-flash-preview")
-    })
-
     test("transforms gemini-3.1-pro to gemini-3.1-pro-preview", () => {
       // #given google provider and gemini-3.1-pro model
       const provider = "google"

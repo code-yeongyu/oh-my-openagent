@@ -281,7 +281,16 @@ describe("createTeamRun", () => {
     const firstPrompt = (launchMock.mock.calls as Array<[LaunchInput]>)[0]?.[0].prompt ?? ""
 
     // then
-    expect(firstPrompt).toContain("Lead-only tools you must NOT call")
+    const forbiddenSection = firstPrompt.slice(firstPrompt.indexOf("## Lead-only tools"))
+    for (const leadOnlyTool of [
+      "team_shutdown_request",
+      "team_delete",
+      "team_approve_shutdown",
+      "team_reject_shutdown",
+    ]) {
+      expect(forbiddenSection).toContain(`\`${leadOnlyTool}\``)
+    }
+    expect(firstPrompt.slice(0, firstPrompt.indexOf("## Lead-only tools"))).not.toContain("team_delete")
   })
 
   test("rolls back launched members in reverse order when a later spawn fails", async () => {

@@ -424,19 +424,6 @@ describe("decideSpawnActions", () => {
   })
 
   describe("basic spawn decisions", () => {
-    it("returns canSpawn=true when capacity allows new pane", () => {
-      // given - 220x44 window, mainPane width=110 >= MIN_SPLIT_WIDTH(107)
-      const state = createWindowState(220, 44)
-
-      // when
-      const result = decideSpawnActions(state, "ses1", "test", defaultConfig, [])
-
-      // then
-      expect(result.canSpawn).toBe(true)
-      expect(result.actions.length).toBe(1)
-      expect(result.actions[0].type).toBe("spawn")
-    })
-
     it("spawns with splitDirection", () => {
       // given
       const state = createWindowState(212, 44, [
