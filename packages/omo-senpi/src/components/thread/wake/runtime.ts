@@ -19,6 +19,7 @@ import { resolveThreadSocket } from "../live-surface-paths"
 import { createCarrier, type Carrier, type CarrierEvaluation, type CarrierWakeOutcome } from "./carrier"
 import { connectCarrierHost, type CarrierHostConnection } from "./carrier-connection"
 import { startDeliveryConsumer, type ServingConsumer } from "./consumer-start"
+import { engineHostEnsure, type EngineLauncher } from "./host-ensure"
 
 type Env = Readonly<Record<string, string | undefined>>
 
@@ -31,6 +32,10 @@ export type ThreadWakeOptions = {
   /** The store the carrier and the consumer share; absent, the running wake opens its own under the agent dir. */
   readonly store?: GatewayStore
   readonly connect?: () => Promise<CarrierHostConnection>
+  /** Replaces the engine's `host ensure` altogether. */
+  readonly ensureHost?: () => Promise<void>
+  readonly engineLaunch?: () => EngineLauncher
+  readonly launchSpecPath?: string
   readonly loadConfig?: (options: { readonly cwd: string }) => { readonly config: WakeConfigView }
   /**
    * The device service's delivery protocol (`deliveries.serve`, design 5.4). The device service's local API v1 does
@@ -162,11 +167,21 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart): Runni
   const { options } = input
   const store = options.store ?? createGatewayStore({ agentDir })
   const sessionsDirectory = input.sessionsDirectory()
+  const ensureHost =
+    options.ensureHost ??
+    input.ensureHost ??
+    engineHostEnsure({
+      env,
+      socket: resolveThreadSocket(env),
+      ...(options.launchSpecPath === undefined ? {} : { launchSpecPath: options.launchSpecPath }),
+      ...(options.engineLaunch === undefined ? {} : { launch: options.engineLaunch }),
+      warn: input.warn,
+    })
   let serving: ServingConsumer | undefined
   const carrier = createCarrier({
     store,
     sessionsDirectory,
-    ensureHost: input.ensureHost ?? (async () => undefined),
+    ensureHost,
     connect:
       options.connect ??
       (() =>

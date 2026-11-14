@@ -92,6 +92,7 @@ async function wire(wake: Partial<ThreadWakeOptions> = {}): Promise<Wired> {
     latch,
     store,
     connect: () => connectCarrierHost({ socket: fake.socketPath, keyRoot: () => h.agentDir }),
+    ensureHost: async () => undefined,
     schedule: () => () => undefined,
     onWake: (durableId, outcome) => {
       if (durableId !== TARGET) return
