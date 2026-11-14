@@ -96,7 +96,7 @@ export const MAX_BINARY_BYTES = 260 * 1024 * 1024
  * cannot fit the budget because the senpi worker entries in the same compile get bytecode too. ESM output is required:
  * the entry awaits at the top level.
  */
-const BYTECODE_COMPILE_ARGS = ["--bytecode", "--format=esm", "--bytecode-depth=1"] as const
+export const BYTECODE_COMPILE_ARGS = ["--bytecode", "--format=esm", "--bytecode-depth=1"] as const
 
 /** Below this much headroom under the budget, the build warns so growth is seen a release ahead. */
 export const BINARY_HEADROOM_WARN_BYTES = 5 * 1024 * 1024
