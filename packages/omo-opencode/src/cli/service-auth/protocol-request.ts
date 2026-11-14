@@ -1,3 +1,4 @@
+import { refuseIfLocalOnly } from "@oh-my-opencode/device-service-core/local-only"
 import { z } from "zod"
 import { ApiRefusal, limitSchema, nonempty, RequestFailure, SignInError } from "./protocol"
 
@@ -21,6 +22,7 @@ const envelopeSchema = z.object({
 })
 
 export async function requestApi(api: string, path: string, init: RequestInit, signal?: AbortSignal): Promise<unknown> {
+  refuseIfLocalOnly("service-auth/protocol-request.ts requestApi")
   let response: Response
   let body: unknown
   try {

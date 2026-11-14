@@ -40,6 +40,7 @@ type Refusal =
   | "trust-user-extras-unrecoverable"
   | "trust-path-unrepresentable"
   | "trust-userns-unattested"
+  | "trust-kind-local-only"
 export type TrustStageResult =
   | { readonly action: "static" | "adopt" | "import-exec" | "ensure" | "usage" }
   | { readonly action: "refuse"; readonly code: Refusal; readonly check: Check | null }
@@ -194,12 +195,17 @@ export async function runTrustStage(options: TrustStageOptions): Promise<TrustSt
           ? "set TMPDIR to a writable private path without the directory-list separator and start omo again"
           : code === "trust-userns-unattested"
             ? "omo cannot see who owns the directories above its trust directory inside this user namespace (bwrap, flatpak or a rootless container); start omo outside that sandbox, or through omo's own memory sandbox"
-            : "if SENPI_ENGINE_TRUST or SENPI_ENGINE_TRUST_HOP is saved in an environment you reuse, remove both and start omo again"
+            : code === "trust-kind-local-only"
+              ? "a local-only omo remote command never reaches the engine trust stage; run it again with OMO_REMOTE_STAGED=1 and report this"
+              : "if SENPI_ENGINE_TRUST or SENPI_ENGINE_TRUST_HOP is saved in an environment you reuse, remove both and start omo again"
     ;(options.stderr ?? ((line) => process.stderr.write(line)))(
       `omo: ${code}${check ? ` (${check})` : ""}; ${action}\n`,
     )
     return { action: "refuse", code, check }
   }
+  // Design v7 section 2 (M6): a local-only argv is dispatched before this stage, so reaching it is a dispatch mistake;
+  // refuse instead of importing and exec'ing.
+  if (kind === "local-only") return refuse("trust-kind-local-only")
   // Create only the diagnostic sink before refusing; a hop never acquires or executes.
   const prepare = async (): Promise<Refusal | null> => {
     try {

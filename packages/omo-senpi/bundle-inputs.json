@@ -74,6 +74,7 @@
     "packages/device-service-core/src/local-api/validate-stream-events.ts",
     "packages/device-service-core/src/local-api/validate.ts",
     "packages/device-service-core/src/local-api/vocabulary.ts",
+    "packages/device-service-core/src/local-only.ts",
     "packages/device-service-core/src/pin.ts",
     "packages/device-service-core/src/registrant-watch.ts",
     "packages/device-service-core/src/registrant.ts",

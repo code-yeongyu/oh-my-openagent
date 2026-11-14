@@ -1,4 +1,5 @@
 import { homedir } from "node:os"
+import { refuseIfLocalOnly } from "@oh-my-opencode/device-service-core/local-only"
 import { heldCredentialLease, withCredentialLock } from "./credential-lock"
 import { signInHint } from "./accounts-gate"
 import type { CredentialOwner } from "./credential-owner"
@@ -152,6 +153,7 @@ export function createSession(options: {
       )
     }
     if (Date.parse(current.accessTokenExpiresAt) > now() + 30_000) return current
+    refuseIfLocalOnly("service-auth/session.ts refresh")
     await store.write({ ...current, refreshState: "uncertain" })
     try {
       const tokens = parseReply(
