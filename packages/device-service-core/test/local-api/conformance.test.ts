@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { REQUEST_TYPES } from "../../src/local-api/validate.ts"
 import { UNSERVED_REQUEST_TYPES } from "./conformance/fake-owner-handlers.ts"
 import { fakeOwnerTarget, loadFixtures, runConformance } from "./conformance/runner.ts"
+import { scanSentRequestTypes } from "./sent-request-types.ts"
 
 runConformance(fakeOwnerTarget)
 
@@ -20,5 +21,9 @@ describe("conformance fixtures", () => {
     })
     expect(covered.filter((c) => !c.ok || !c.refusal)).toEqual([])
     expect(fixtures.map((f) => f.request).toSorted()).toEqual([...served, "hello"].toSorted())
+  })
+
+  test("a request type omo sends drops off the unserved list, so this owner serves it and fixtures cover it", () => {
+    expect(scanSentRequestTypes().sent.filter((type) => UNSERVED_REQUEST_TYPES.includes(type))).toEqual([])
   })
 })
