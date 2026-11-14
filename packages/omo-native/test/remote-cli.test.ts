@@ -770,6 +770,58 @@ describe("omo remote session verbs", () => {
     expect([code, written.join("")]).toEqual([REMOTE_EXIT.ok, "OK\nDone.\n"])
   })
 
+  // The engine stores a queued send only when the queue drains (#13272): the follow anchors on that entry, not on an older one.
+  const QUEUED_HI_STORED = [
+    { role: "user", content: "hi" },
+    { role: "assistant", content: "queued answer" },
+  ]
+
+  test("a waiting send whose turn is interrupted fails with a typed line instead of exiting 0 with no output", async () => {
+    const a = fixture.account({
+      records: [
+        {
+          type: "message_update",
+          message: null,
+          assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "part" },
+        },
+        { type: "message_end", message: { role: "assistant", stopReason: "aborted" } },
+        { type: "agent_settled" },
+      ],
+    })
+    const { code, err } = await run(["send", "b/dur-on-b", "hi"], undefined, SIGNED_IN, testBootstrap(), a.remote)
+    expect(code).toBe(REMOTE_EXIT.failed)
+    expect(err.join("\n")).toContain("interrupted")
+  })
+
+  test("a waiting send queued behind a running turn whose own turn is interrupted fails with a typed line (transcript mode)", async () => {
+    const engine = { ...ENGINE, streaming: true, pending: 2 }
+    const a = fixture.account({
+      engine,
+      records: [{ type: "agent_settled" }],
+      entriesAfterAnswer: [
+        { role: "user", content: "hi" },
+        { role: "assistant", content: "part", stopReason: "aborted" },
+      ],
+    })
+    const { code, err } = await run(["send", "b/dur-on-b", "hi"], undefined, SIGNED_IN, testBootstrap(), a.remote)
+    expect(code).toBe(REMOTE_EXIT.failed)
+    expect(err.join("\n")).toContain("was interrupted before it finished")
+  })
+
+  test("a waiting send whose started turn was interrupted and finished before the send caught up fails with a typed line (probe)", async () => {
+    const a = fixture.account({
+      records: [{ type: "agent_settled" }],
+      recordsBeforeReply: true,
+      entriesAfterAnswer: [
+        { role: "user", content: "hi" },
+        { role: "assistant", content: "part", stopReason: "aborted" },
+      ],
+    })
+    const { code, err } = await run(["send", "b/dur-on-b", "hi"], undefined, SIGNED_IN, testBootstrap(), a.remote)
+    expect(code).toBe(REMOTE_EXIT.failed)
+    expect(err.join("\n")).toContain("was interrupted before it finished")
+  })
+
   test("#13268: a waiting send queued behind a running turn names its position on stderr at once, never on stdout, and --json carries it only in the typed result", async () => {
     const engine = { ...ENGINE, streaming: true, pending: 2 }
     const human = await run(
@@ -777,7 +829,7 @@ describe("omo remote session verbs", () => {
       undefined,
       SIGNED_IN,
       testBootstrap(),
-      fixture.account({ engine, records: [{ type: "agent_settled" }] }).remote,
+      fixture.account({ engine, records: [{ type: "agent_settled" }], entriesAfterAnswer: QUEUED_HI_STORED }).remote,
     )
     expect(human.code).toBe(REMOTE_EXIT.ok)
     expect(human.err).toEqual(["Queued on b/dur-on-b at position 2."])
@@ -787,7 +839,7 @@ describe("omo remote session verbs", () => {
       undefined,
       SIGNED_IN,
       testBootstrap(),
-      fixture.account({ engine, records: [{ type: "agent_settled" }] }).remote,
+      fixture.account({ engine, records: [{ type: "agent_settled" }], entriesAfterAnswer: QUEUED_HI_STORED }).remote,
     )
     expect(json.code).toBe(REMOTE_EXIT.ok)
     expect(json.err).toEqual([])
