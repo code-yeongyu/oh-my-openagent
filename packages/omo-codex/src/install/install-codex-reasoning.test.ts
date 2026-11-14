@@ -1,19 +1,21 @@
 /// <reference path="../../../../bun-test.d.ts" />
 /// <reference types="bun-types" />
 
-import { expect, test } from "bun:test"
+import { afterEach, expect, test } from "bun:test"
 import { mkdir, mkdtemp, readFile, readlink, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { runCodexInstaller } from "./install-codex"
+import { createCodexInstallSandbox, disposeCodexInstallSandboxes } from "../../scripts/codex-install-sandbox"
 
 const skipAstGrepInstall = async () => ({ kind: "skipped" as const, reason: "test" })
 
 test("#given a canonical reasoning level #when the Codex installer runs #then config.toml carries the mapped model_reasoning_effort", async () => {
   // given
   const repoRoot = await mkdtemp(join(tmpdir(), "omo-codex-packaged-root-"))
-  const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-packaged-home-"))
-  const binDir = await mkdtemp(join(tmpdir(), "omo-codex-packaged-bin-"))
+  const sandbox = createCodexInstallSandbox("reasoning")
+  const codexHome = sandbox.codexHome
+  const binDir = sandbox.binDir
   const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
   const pluginRoot = join(codexPackageRoot, "plugin")
   const lspRuntimeRoot = join(repoRoot, "packages", "lsp-daemon")
@@ -94,20 +96,22 @@ test("#given a canonical reasoning level #when the Codex installer runs #then co
   await writeFile(join(lspRuntimeRoot, "dist", "cli.js"), "#!/usr/bin/env node\n")
 
   // when
-  const result = await runCodexInstaller({
-    codexHome,
-    binDir,
-    repoRoot,
-    platform: "linux",
-    reasoning: "off",
-    astGrepInstaller: skipAstGrepInstall,
-    runCommand: async (command, args, options) => {
-      commands.push([command, args.join(" "), options.cwd])
-    },
-  })
+  const result = await runCodexInstaller(
+    sandbox.options({
+      repoRoot,
+      platform: "linux",
+      reasoning: "off",
+      astGrepInstaller: skipAstGrepInstall,
+      runCommand: async (command, args, options) => {
+        commands.push([command, args.join(" "), options.cwd])
+      },
+    }),
+  )
 
   // then
   const configToml = await readFile(join(codexHome, "config.toml"), "utf8")
   expect(configToml).toContain('model_reasoning_effort = "none"')
   expect(configToml).not.toContain('model_reasoning_effort = "high"')
 })
+
+afterEach(disposeCodexInstallSandboxes)

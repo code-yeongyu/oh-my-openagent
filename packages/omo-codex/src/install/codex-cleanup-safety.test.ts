@@ -6,6 +6,7 @@ import { lstat, mkdir, mkdtemp, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join, parse } from "node:path"
 import { removeManagedPathBestEffort } from "./codex-cleanup"
+import { codexHomeResolvesToFilesystemRoot } from "./codex-cleanup-safety"
 import type { SkippedCleanupPath } from "./codex-cleanup"
 
 describe("codex cleanup safety", () => {
@@ -104,3 +105,17 @@ async function pathExists(path: string): Promise<boolean> {
     throw error
   }
 }
+
+// #13253: cleanup asks this before it scans the installer bin dir, because a codexHome that resolves to a filesystem
+// root would point the scan at a shared system directory. The decision is tested here, on strings, so no test has to
+// run cleanup against a real root path.
+describe("a codex home that resolves to a filesystem root", () => {
+  test("#given a filesystem root #when the bin scan is decided #then it is refused", () => {
+    expect(codexHomeResolvesToFilesystemRoot(parse(process.cwd()).root)).toBe(true)
+  })
+
+  test("#given a path inside a root #when the bin scan is decided #then it is allowed", () => {
+    expect(codexHomeResolvesToFilesystemRoot(join(parse(process.cwd()).root, "codex-home"))).toBe(false)
+    expect(codexHomeResolvesToFilesystemRoot(join(tmpdir(), "omo-codex-home"))).toBe(false)
+  })
+})

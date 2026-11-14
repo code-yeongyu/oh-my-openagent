@@ -3,16 +3,21 @@ import { execFileSync } from "node:child_process"
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
-import test from "node:test"
+import test, { afterEach } from "node:test"
 import { fileURLToPath, pathToFileURL } from "node:url"
+
+import { createCodexInstallSandbox, disposeCodexInstallSandboxes } from "./install-test-fixtures.mjs"
+
+afterEach(disposeCodexInstallSandboxes)
 
 test(
   "#given direct bun global lazycodex bin #when running update dry-run #then prints bun global update command",
   { skip: process.platform === "win32" },
   () => {
     // given
+    const sandbox = createCodexInstallSandbox("bun-global")
     const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url))
-    const tempHome = mkdtempSync(join(tmpdir(), "lazycodex-bun-global-bin-"))
+    const tempHome = sandbox.dir("lazycodex-bun-global-bin-home")
     const binDir = join(tempHome, ".bun", "bin")
     const binPath = join(binDir, "lazycodex-ai")
     mkdirSync(binDir, { recursive: true })
@@ -24,7 +29,7 @@ test(
       const output = execFileSync(process.execPath, [binPath, "--dry-run", "update"], {
         encoding: "utf8",
         env: {
-          ...process.env,
+          ...sandbox.spawnEnv(),
           HOME: tempHome,
           LAZYCODEX_CURRENT_VERSION: "1.0.0",
           LAZYCODEX_LATEST_VERSION: "1.0.1",

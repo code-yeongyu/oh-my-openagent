@@ -3,10 +3,13 @@ import { execFileSync } from "node:child_process"
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
-import test from "node:test"
+import test, { afterEach } from "node:test"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { resolveDefaultRepoRoot } from "./install-local.mjs"
+import { createCodexInstallSandbox, disposeCodexInstallSandboxes } from "./install-test-fixtures.mjs"
+
+afterEach(disposeCodexInstallSandboxes)
 
 test("#given published lazycodex bin runs outside the package #when resolving default repo root #then uses installer location", () => {
   // given
@@ -21,6 +24,7 @@ test("#given published lazycodex bin runs outside the package #when resolving de
 
 test("#given lazycodex version flag #when running the Node installer entrypoint #then prints the package version", () => {
   // given
+  const sandbox = createCodexInstallSandbox("entrypoint")
   const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url))
   const manifestPath = fileURLToPath(new URL("../../../package.json", import.meta.url))
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"))
@@ -28,6 +32,7 @@ test("#given lazycodex version flag #when running the Node installer entrypoint 
   // when
   const output = execFileSync(process.execPath, [scriptPath, "--version"], {
     encoding: "utf8",
+    env: sandbox.spawnEnv(),
   }).trim()
 
   // then
@@ -39,10 +44,11 @@ test(
   { skip: process.platform === "win32" },
   () => {
     // given
+    const sandbox = createCodexInstallSandbox("entrypoint")
     const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url))
     const manifestPath = fileURLToPath(new URL("../../../package.json", import.meta.url))
     const manifest = JSON.parse(readFileSync(manifestPath, "utf8"))
-    const tempDir = mkdtempSync(join(tmpdir(), "lazycodex-bin-"))
+    const tempDir = sandbox.dir("lazycodex-bin-dir")
     const binPath = join(tempDir, "lazycodex-ai")
 
     try {
@@ -51,6 +57,7 @@ test(
       // when
       const output = execFileSync(process.execPath, [binPath, "--version"], {
         encoding: "utf8",
+        env: sandbox.spawnEnv(),
       }).trim()
 
       // then
@@ -63,11 +70,13 @@ test(
 
 test("#given dry-run install flags #when running the Node installer entrypoint #then prints delegated autonomous codex install command", () => {
   // given
+  const sandbox = createCodexInstallSandbox("entrypoint")
   const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url))
 
   // when
   const output = execFileSync(process.execPath, [scriptPath, "--dry-run", "install", "--no-tui"], {
     encoding: "utf8",
+    env: sandbox.spawnEnv(),
   }).trim()
 
   // then
@@ -76,13 +85,14 @@ test("#given dry-run install flags #when running the Node installer entrypoint #
 
 test("#given dry-run install opt-out #when running the Node installer entrypoint #then preserves existing Codex permission settings", () => {
   // given
+  const sandbox = createCodexInstallSandbox("entrypoint")
   const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url))
 
   // when
   const output = execFileSync(
     process.execPath,
     [scriptPath, "--dry-run", "install", "--no-tui", "--no-codex-autonomous"],
-    { encoding: "utf8" },
+    { encoding: "utf8", env: sandbox.spawnEnv() },
   ).trim()
 
   // then
@@ -91,6 +101,7 @@ test("#given dry-run install opt-out #when running the Node installer entrypoint
 
 test("#given explicit non-Codex dry-run platform #when running the Node installer entrypoint #then rejects it", () => {
   // given
+  const sandbox = createCodexInstallSandbox("entrypoint")
   const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url))
 
   // when/then
@@ -98,6 +109,7 @@ test("#given explicit non-Codex dry-run platform #when running the Node installe
     () =>
       execFileSync(process.execPath, [scriptPath, "--dry-run", "install", "--platform=gemini", "--no-tui"], {
         encoding: "utf8",
+        env: sandbox.spawnEnv(),
       }),
     /lazycodex-ai installs the Codex Light edition only/,
   )
@@ -105,11 +117,13 @@ test("#given explicit non-Codex dry-run platform #when running the Node installe
 
 test("#given dry-run doctor #when running the Node installer entrypoint #then prints Codex LazyCodex doctor workflow command", () => {
   // given
+  const sandbox = createCodexInstallSandbox("entrypoint")
   const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url))
 
   // when
   const output = execFileSync(process.execPath, [scriptPath, "--dry-run", "doctor", "--json"], {
     encoding: "utf8",
+    env: sandbox.spawnEnv(),
   }).trim()
 
   // then
@@ -127,6 +141,7 @@ test("#given dry-run doctor #when running the Node installer entrypoint #then pr
 
 test("#given recursive doctor env #when running the Node installer entrypoint #then refuses to re-enter doctor", () => {
   // given
+  const sandbox = createCodexInstallSandbox("entrypoint")
   const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url))
 
   // when/then
@@ -135,7 +150,7 @@ test("#given recursive doctor env #when running the Node installer entrypoint #t
       execFileSync(process.execPath, [scriptPath, "--dry-run", "doctor"], {
         encoding: "utf8",
         env: {
-          ...process.env,
+          ...sandbox.spawnEnv(),
           LAZYCODEX_DOCTOR_LCX_ACTIVE: "1",
         },
       }),
@@ -145,13 +160,14 @@ test("#given recursive doctor env #when running the Node installer entrypoint #t
 
 test("#given dry-run cleanup path needs quoting #when running the Node installer entrypoint #then prints shell-safe command", () => {
   // given
+  const sandbox = createCodexInstallSandbox("entrypoint")
   const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url))
 
   // when
   const output = execFileSync(
     process.execPath,
     [scriptPath, "--dry-run", "cleanup", "--project", "/tmp/lazy codex's qa"],
-    { encoding: "utf8" },
+    { encoding: "utf8", env: sandbox.spawnEnv() },
   ).trim()
 
   // then
@@ -163,13 +179,14 @@ test("#given dry-run cleanup path needs quoting #when running the Node installer
 
 test("#given dry-run cleanup #when running the Node installer entrypoint #then prints delegated codex cleanup command", () => {
   // given
+  const sandbox = createCodexInstallSandbox("entrypoint")
   const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url))
 
   // when
   const output = execFileSync(
     process.execPath,
     [scriptPath, "--dry-run", "cleanup", "--project", "/tmp/lazycodex-qa"],
-    { encoding: "utf8" },
+    { encoding: "utf8", env: sandbox.spawnEnv() },
   ).trim()
 
   // then
@@ -181,13 +198,14 @@ test("#given dry-run cleanup #when running the Node installer entrypoint #then p
 
 test("#given dry-run uninstall #when running the Node installer entrypoint #then prints delegated codex cleanup command", () => {
   // given
+  const sandbox = createCodexInstallSandbox("entrypoint")
   const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url))
 
   // when
   const output = execFileSync(
     process.execPath,
     [scriptPath, "--dry-run", "uninstall", "--project", "/tmp/lazycodex-qa"],
-    { encoding: "utf8" },
+    { encoding: "utf8", env: sandbox.spawnEnv() },
   ).trim()
 
   // then
@@ -199,13 +217,14 @@ test("#given dry-run uninstall #when running the Node installer entrypoint #then
 
 test("#given stale lazycodex version #when running update dry-run #then prints the latest installer command", () => {
   // given
+  const sandbox = createCodexInstallSandbox("entrypoint")
   const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url))
 
   // when
   const output = execFileSync(process.execPath, [scriptPath, "--dry-run", "update"], {
     encoding: "utf8",
     env: {
-      ...process.env,
+      ...sandbox.spawnEnv(),
       LAZYCODEX_CURRENT_VERSION: "1.0.0",
       LAZYCODEX_LATEST_VERSION: "1.0.1",
     },
@@ -220,8 +239,9 @@ test(
   { skip: process.platform === "win32" },
   () => {
     // given
+    const sandbox = createCodexInstallSandbox("entrypoint")
     const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url))
-    const tempHome = mkdtempSync(join(tmpdir(), "lazycodex-bun-global-dry-run-"))
+    const tempHome = sandbox.dir("lazycodex-bun-global-dry-run-home")
     const binPath = createBunGlobalLazyCodexSymlink(tempHome, scriptPath)
 
     try {
@@ -229,7 +249,7 @@ test(
       const output = execFileSync(process.execPath, [binPath, "--dry-run", "update"], {
         encoding: "utf8",
         env: {
-          ...process.env,
+          ...sandbox.spawnEnv(),
           HOME: tempHome,
           LAZYCODEX_CURRENT_VERSION: "1.0.0",
           LAZYCODEX_LATEST_VERSION: "1.0.1",
@@ -252,9 +272,10 @@ test(
   { skip: process.platform === "win32" },
   () => {
     // given
+    const sandbox = createCodexInstallSandbox("entrypoint")
     const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url))
-    const tempHome = mkdtempSync(join(tmpdir(), "lazycodex-bun-global-trust-"))
-    const tempBin = mkdtempSync(join(tmpdir(), "lazycodex-bun-bin-"))
+    const tempHome = sandbox.dir("lazycodex-bun-global-trust-home")
+    const tempBin = sandbox.dir("lazycodex-bun-bin-bin")
     const commandLogPath = join(tempHome, "commands.log")
     const binPath = createBunGlobalLazyCodexSymlink(tempHome, scriptPath)
     writeFakeBunCommand(tempBin)
@@ -265,7 +286,7 @@ test(
       const output = execFileSync(process.execPath, [binPath, "update"], {
         encoding: "utf8",
         env: {
-          ...process.env,
+          ...sandbox.spawnEnv(),
           HOME: tempHome,
           LAZYCODEX_CURRENT_VERSION: "1.0.0",
           LAZYCODEX_LATEST_VERSION: "1.0.1",
@@ -291,13 +312,14 @@ test(
 
 test("#given current lazycodex version #when running update dry-run #then reports already current", () => {
   // given
+  const sandbox = createCodexInstallSandbox("entrypoint")
   const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url))
 
   // when
   const output = execFileSync(process.execPath, [scriptPath, "--dry-run", "update"], {
     encoding: "utf8",
     env: {
-      ...process.env,
+      ...sandbox.spawnEnv(),
       LAZYCODEX_CURRENT_VERSION: "1.0.1",
       LAZYCODEX_LATEST_VERSION: "1.0.1",
     },
@@ -354,11 +376,13 @@ exit 0
 
 test("#given dry-run ulw-loop #when running the Node installer entrypoint #then prints delegated ulw-loop command", () => {
   // given
+  const sandbox = createCodexInstallSandbox("entrypoint")
   const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url))
 
   // when
   const output = execFileSync(process.execPath, [scriptPath, "--dry-run", "ulw-loop", "help"], {
     encoding: "utf8",
+    env: sandbox.spawnEnv(),
   }).trim()
 
   // then
@@ -367,8 +391,9 @@ test("#given dry-run ulw-loop #when running the Node installer entrypoint #then 
 
 test("#given the invoking argv path disappears #when importing the Node installer module #then the entrypoint guard does not throw", () => {
   // given
+  const sandbox = createCodexInstallSandbox("entrypoint")
   const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url))
-  const tempDir = mkdtempSync(join(tmpdir(), "lazycodex-import-"))
+  const tempDir = sandbox.dir("lazycodex-import-dir")
   const missingArgvPath = join(tempDir, "missing-entrypoint.mjs")
   const probePath = join(tempDir, "probe.mjs")
 
@@ -384,6 +409,7 @@ test("#given the invoking argv path disappears #when importing the Node installe
     // when
     const output = execFileSync(process.execPath, [probePath], {
       encoding: "utf8",
+      env: sandbox.spawnEnv(),
     }).trim()
 
     // then

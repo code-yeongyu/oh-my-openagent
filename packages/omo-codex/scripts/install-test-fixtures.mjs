@@ -56,3 +56,5 @@ export async function writePluginAt(pluginRoot, name, version) {
     dependencies: {},
   })
 }
+
+export { createCodexInstallSandbox, disposeCodexInstallSandboxes } from "./codex-install-sandbox.ts"
