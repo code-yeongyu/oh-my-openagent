@@ -1,9 +1,12 @@
 import type { DrainWakeEvent, GatewayAdmissionKind, SessionRuntimePort, WakeReason } from "./adapter"
 import { decideDelivery } from "./decision"
+import { intakeAdmissionPass, type IntakeAdmission } from "./intake-admission"
 import { isLockWaitExceeded } from "./lock-wait"
 import { deliveryProvenanceLine, deliverySender, renderDeliveryText } from "./provenance"
 import type { GatewayStore } from "./store"
 import type { DeliveryRow, ProcessIdentity } from "./types"
+
+export type { IntakeAdmission } from "./intake-admission"
 
 export type InboxDrainResult = {
   readonly admitted: readonly { readonly delivery_id: string; readonly kind: GatewayAdmissionKind }[]
@@ -20,6 +23,10 @@ export type InboxDrainOptions = {
   readonly notify?: (text: string) => void
   /** A delivery this drain started, steered or queued into the session, with how it was admitted; runs on every pass, including a busy retry. */
   readonly onAdmitted?: (deliveryId: string, kind: "started" | "steered" | "queued") => void
+  /** Asks the device service whether an intake row's sending device is admitted now (#13037 5.6); absent, no intake row is admitted. */
+  readonly admitIntake?: (device: string) => Promise<IntakeAdmission>
+  /** True while a woken session's row is opening under a live lease (A3.1.5): the pass admits nothing. */
+  readonly wakeGated?: () => Promise<boolean>
   /** Test seams: act as another process, or stop between the two phases of an admission. */
   readonly _test?: {
     readonly identity?: ProcessIdentity
@@ -82,6 +89,11 @@ export function createInboxDrain(options: InboxDrainOptions): InboxDrain {
       options.log?.(`dual_runtime: delivery ${id} is claimed by another live process for ${options.durableId}`)
     const admitted: { delivery_id: string; kind: GatewayAdmissionKind }[] = []
     for (const id of held.keys()) if (!reconciled.queued.some((row) => row.delivery_id === id)) held.delete(id)
+    if ((await options.wakeGated?.()) === true) {
+      for (const row of reconciled.queued) admitted.push({ delivery_id: row.delivery_id, kind: "held_draft" })
+      return { admitted }
+    }
+    const admission = intakeAdmissionPass(options.admitIntake)
     for (const row of reconciled.queued) {
       const gate = runtime.admissionGate()
       const heldRevision = held.get(row.delivery_id)
@@ -96,6 +108,13 @@ export function createInboxDrain(options: InboxDrainOptions): InboxDrain {
         break
       }
       held.delete(row.delivery_id)
+      const verdict = await admission(row)
+      if (verdict === "skip") continue
+      if (verdict === "refuse") {
+        await options.store.refuseQueued({ now: now(), delivery_id: row.delivery_id, reason: "sender_not_admitted" })
+        admitted.push({ delivery_id: row.delivery_id, kind: "sender_not_admitted" })
+        continue
+      }
       const decision = decideDelivery(runtime.phase(), row.mode_requested, row.expected_turn_id, gate.turn_epoch)
       if (decision.kind !== "admit") {
         const reason = decision.kind === "refuse" ? decision.reason : "turn_conflict"
@@ -111,13 +130,20 @@ export function createInboxDrain(options: InboxDrainOptions): InboxDrain {
       })
       if (claimed.kind !== "claimed") continue
       options._test?.afterClaim?.(claimed.row)
+      // A row taken in from another device is admitted under the engine's ledger key with the sender's text as written,
+      // so the engine's own dedupe also covers the same delivery arriving live (#13037, design 5.5).
+      const ledgerId = claimed.row.ledger_id ?? null
+      const engineId = ledgerId ?? row.delivery_id
       let result: ReturnType<SessionRuntimePort["admitExternalMessage"]>
       try {
         result = runtime.admitExternalMessage({
-          delivery_id: row.delivery_id,
-          text: renderDeliveryText(claimed.row),
+          delivery_id: engineId,
+          text: ledgerId === null ? renderDeliveryText(claimed.row) : (claimed.row.verbatim_text ?? claimed.row.body),
           sender: deliverySender(claimed.row),
-          display_text: `${deliveryProvenanceLine(claimed.row.envelope.provenance)}\n${claimed.row.body}`,
+          display_text:
+            ledgerId === null
+              ? `${deliveryProvenanceLine(claimed.row.envelope.provenance)}\n${claimed.row.body}`
+              : (claimed.row.verbatim_display_text ?? claimed.row.body),
           deliverAs: decision.deliverAs,
           ...(decision.expected_turn_id === undefined ? {} : { expected_turn_id: decision.expected_turn_id }),
         })
@@ -156,7 +182,7 @@ export function createInboxDrain(options: InboxDrainOptions): InboxDrain {
         })
       } else {
         const written =
-          result.kind === "already_admitted" && runtime.listAdmittedDeliveries().emitted.includes(row.delivery_id)
+          result.kind === "already_admitted" && runtime.listAdmittedDeliveries().emitted.includes(engineId)
         await options.store.recordOutcome({
           now: now(),
           delivery_id: row.delivery_id,
