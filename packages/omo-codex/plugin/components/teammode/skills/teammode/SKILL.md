@@ -50,6 +50,14 @@ Inspect your active tool list and select:
    communicate with, and observe plain workers, announce that exact mechanism and use it for
    non-overlapping scopes. Otherwise continue serially and report the capability limitation;
    never promise or imply plain subagents that this session cannot create.
+   When the session exposes `multi_agent_v1.*`, the missing V2 set is a per-session surface
+   choice, not a missing install: Codex picks the surface when the session starts, from the
+   active model's catalog `multi_agent_version`. Tell the user once that a NEW session gets
+   the V2 transport after that model's entry is pinned to `multi_agent_version = "v2"` in a
+   user-owned catalog that `model_catalog_json` names; Codex's fetched `models_cache.json`
+   is overwritten on refresh, so it is no place to pin. This session cannot switch. Do not
+   suggest `codex features enable multi_agent_v2`: on a v1 model LazyCodex's SessionStart
+   migration disables that flag again, and enabling it there fails turns (openai/codex#26753).
 
 Then, BEFORE running `init` (or instead of it in case 4), tell the user in one line what this
 environment provides and which route you picked:
