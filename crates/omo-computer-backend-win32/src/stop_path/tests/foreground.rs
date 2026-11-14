@@ -187,3 +187,31 @@ fn a_held_right_win_key_is_refused_like_the_left() {
     let both = admit_leased(&held(&[crate::input::VK_LWIN, 0x5C]), &[]).expect_err("both Win keys");
     assert_eq!(both.keys, vec!["win"], "named once");
 }
+
+/// Review L3 of the #13350 delta: the chord's key comes from the layout of the window that receives
+/// it, not the calling thread's. On French AZERTY the key that types 'a' is the one US calls Q.
+#[cfg(windows)]
+#[test]
+fn layout_vk_reads_the_given_layout_not_the_calling_threads() {
+    use windows::core::w;
+    use windows::Win32::UI::Input::KeyboardAndMouse::{
+        GetKeyboardLayoutList, LoadKeyboardLayoutW, UnloadKeyboardLayout, HKL, KLF_NOTELLSHELL,
+    };
+
+    use crate::foreground::layout_vk_in;
+
+    let mut before = [HKL::default(); 64];
+    // SAFETY: fills at most `before.len()` handles.
+    let count = usize::try_from(unsafe { GetKeyboardLayoutList(Some(&mut before)) }).unwrap_or(0);
+    // SAFETY: loads (does not activate) installed layouts by KLID.
+    let azerty = unsafe { LoadKeyboardLayoutW(w!("0000040C"), KLF_NOTELLSHELL) }.expect("AZERTY");
+    // SAFETY: as above.
+    let us = unsafe { LoadKeyboardLayoutW(w!("00000409"), KLF_NOTELLSHELL) }.expect("US");
+    assert_eq!(layout_vk_in('a', azerty), Some(0x51), "AZERTY types 'a' on VK_Q");
+    assert_eq!(layout_vk_in('a', us), Some(0x41), "US types 'a' on VK_A");
+    // Unload AZERTY only when this test loaded it, so a developer's own layout stays.
+    if !before[..count.min(before.len())].contains(&azerty) {
+        // SAFETY: the layout this test loaded.
+        let _ = unsafe { UnloadKeyboardLayout(azerty) };
+    }
+}

@@ -152,3 +152,14 @@ pub fn layout_vk(c: char) -> Option<u16> {
     let bits = u16::from_ne_bytes(scan.to_ne_bytes());
     (scan != -1 && bits >> 8 == 0).then_some(bits & 0xFF)
 }
+
+/// The virtual key for `c` in keyboard layout `layout`, when typing it needs no modifier of its
+/// own; `None` otherwise.
+#[cfg(windows)]
+#[must_use]
+pub fn layout_vk_in(
+    c: char,
+    _layout: windows::Win32::UI::Input::KeyboardAndMouse::HKL,
+) -> Option<u16> {
+    layout_vk(c)
+}
