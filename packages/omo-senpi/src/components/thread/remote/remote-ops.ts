@@ -367,6 +367,8 @@ export async function followRemote(
   }
   // The stop reason of the run's last assistant message: an interrupted turn ends its run with "aborted" (#13272).
   let lastStopReason: unknown
+  // The stream printed text for this turn: the probe must not print the stored answer a second time (#13481).
+  let streamedThisTurn = false
   const streamRecord = (record: JsonObject): void => {
     if (record["type"] === "agent_settled") {
       if (record["reason"] === "session_closed") return end("session_closed")
@@ -392,6 +394,7 @@ export async function followRemote(
     if (last !== undefined && !last.endsLine && (newMessage || event["contentIndex"] !== last.index)) onText("\n")
     newMessage = false
     last = { index: event["contentIndex"], endsLine: delta.endsWith("\n") }
+    streamedThisTurn = true
     onText(delta)
   }
   const probe = async (settleSignal: boolean): Promise<void> => {
@@ -427,6 +430,8 @@ export async function followRemote(
     // Final once a later message supersedes the turn, or once a run settled (the buffer's own trailing settle
     // counts: the turn finished before the aim) with this answer as the transcript's tail.
     const interrupted = stopReason === "aborted"
+    // A turn whose text the stream already printed is not printed again from the transcript (#13481).
+    if (streamedThisTurn && !interrupted) return
     if (!(superseded || (settleSignal && (answerAtTail || interrupted)))) return
     if (answer.length === 0 && !interrupted) return
     for (const [index, entryText] of answer.entries()) {
