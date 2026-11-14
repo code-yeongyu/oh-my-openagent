@@ -31,8 +31,7 @@
     "relay": "differs (draft code reading, not measured)"
   },
   "prompt": {
-    "relay": "differs (draft code reading, not measured; #13011)",
-    "test": "packages/omo-senpi/src/components/thread/route-parity.test.ts (fakes)"
+    "relay": "differs (draft code reading, not measured; #13011)"
   },
   "read_project_file": {
     "relay": "differs (draft code reading, not measured)"
