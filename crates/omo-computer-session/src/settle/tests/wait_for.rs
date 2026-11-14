@@ -168,20 +168,76 @@ fn a_gone_wait_is_confirmed_by_the_listing() {
     let mut child = Rig::new(json!({"ax_notification_timeline": [
         {"t_ms": 100, "window": "102", "kind": "AXUIElementDestroyed"}
     ]}));
-    let result = child.session.wait_for(params(gone.clone())).expect("waitFor");
-    assert_eq!(result.outcome, WaitOutcome::Timeout, "a destroyed child is not the window closing");
+    let result = child
+        .session
+        .wait_for(params(gone.clone()))
+        .expect("waitFor");
+    assert_eq!(
+        result.outcome,
+        WaitOutcome::Timeout,
+        "a destroyed child is not the window closing"
+    );
     let mut closed = Rig::new(json!({"ax_notification_timeline": [
         {"t_ms": 100, "window": "102", "kind": "AXUIElementDestroyed"},
         {"t_ms": 300, "window": "102", "kind": "AXUIElementDestroyed", "closes": true}
     ]}));
-    let result = closed.session.wait_for(params(gone.clone())).expect("waitFor");
+    let result = closed
+        .session
+        .wait_for(params(gone.clone()))
+        .expect("waitFor");
     assert_eq!(result.outcome, WaitOutcome::Matched);
-    assert!((300..1_000).contains(&closed.clock.now_ms()), "matched at the close: {}", closed.clock.now_ms());
+    assert!(
+        (300..1_000).contains(&closed.clock.now_ms()),
+        "matched at the close: {}",
+        closed.clock.now_ms()
+    );
     // The tracking read (the first listing) succeeds; the confirming read (the second) fails.
     let mut failing = Rig::new(json!({"ax_notification_timeline": [
         {"t_ms": 100, "window": "102", "kind": "AXUIElementDestroyed", "closes": true}
     ]}));
     failing.fail_listings_after(2);
-    let refused = failing.session.wait_for(params(gone)).expect_err("a failed confirming read is answered");
-    assert_eq!(refused.refusal.code, omo_computer_core::error::EngineCode::Internal);
+    let refused = failing
+        .session
+        .wait_for(params(gone))
+        .expect_err("a failed confirming read is answered");
+    assert_eq!(
+        refused.refusal.code,
+        omo_computer_core::error::EngineCode::Internal
+    );
+}
+
+/// Item 11 of the follow-up (ruling R70bi): when a wait matches because its target window is
+/// gone, the reply is `matched` with an observation of nothing (no frame, no tree, 0 nodes, no
+/// cuts, complete): the engine does not observe a window it just confirmed gone, and never
+/// answers `WindowNotFound` for it.
+#[test]
+fn a_wait_that_matches_on_its_target_closing_answers_an_empty_observation() {
+    let closes = json!({"ax_notification_timeline": [
+        {"t_ms": 200, "window": "101", "kind": "AXUIElementDestroyed", "closes": true}
+    ]});
+    for predicate in [
+        json!({"window": {"state": "gone"}}),
+        json!({"event": {"kind": "window_closed"}}),
+    ] {
+        let mut rig = Rig::new(closes.clone());
+        let result = rig
+            .session
+            .wait_for(params(
+                json!({"target": "101", "predicate": predicate.clone(), "timeout": 1000}),
+            ))
+            .unwrap_or_else(|refused| panic!("{predicate}: matched, not {refused:?}"));
+        assert_eq!(result.outcome, WaitOutcome::Matched, "{predicate}");
+        let observed = &result.observation;
+        assert_eq!(
+            (
+                observed.frame.is_none(),
+                observed.tree.is_none(),
+                observed.nodes_observed,
+                observed.cuts.is_empty(),
+                observed.complete
+            ),
+            (true, true, 0, true, true),
+            "{predicate}: an observation of nothing"
+        );
+    }
 }
