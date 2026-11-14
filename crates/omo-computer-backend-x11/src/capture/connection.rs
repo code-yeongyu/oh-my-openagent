@@ -7,6 +7,8 @@ use x11rb::connection::{Connection, RequestConnection};
 use x11rb::errors::{ConnectError, ConnectionError, ReplyError, ReplyOrIdError};
 use x11rb::protocol::composite::{self, ConnectionExt as _};
 use x11rb::protocol::damage::{self, ConnectionExt as _};
+
+use super::damage_wait::{after_notify, DamageWait};
 use x11rb::protocol::randr::{self, ConnectionExt as _};
 use x11rb::protocol::xfixes::{self, ConnectionExt as _};
 use x11rb::protocol::xproto::{AtomEnum, ConnectionExt as _, ImageFormat, ImageOrder, MapState};
@@ -141,13 +143,22 @@ impl X11Connection {
         Ok(states.value32().is_some_and(|mut values| values.any(|atom| atom == hidden)))
     }
 
-    /// Whether the window repainted (a `DamageNotify` arrived) before the deadline.
+    /// Whether the client repainted before the deadline: the first `DamageNotify` is the server's
+    /// own background paint from `ClearArea`, so it is subtracted and a second one is awaited.
     fn wait_damage(&self, damage_id: u32) -> Result<bool, XError> {
         let deadline = Instant::now() + DAMAGE_WAIT;
+        let mut seen = 0;
         while Instant::now() < deadline {
             while let Some(event) = self.conn.poll_for_event()? {
                 if matches!(event, Event::DamageNotify(notify) if notify.damage == damage_id) {
-                    return Ok(true);
+                    seen += 1;
+                    match after_notify(seen) {
+                        DamageWait::Repainted => return Ok(true),
+                        DamageWait::SubtractAndWait => {
+                            self.conn.damage_subtract(damage_id, x11rb::NONE, x11rb::NONE)?;
+                            self.conn.flush()?;
+                        }
+                    }
                 }
             }
             std::thread::sleep(DAMAGE_POLL);

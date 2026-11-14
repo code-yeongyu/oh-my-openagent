@@ -2,6 +2,7 @@
 //! frames from the window's own Composite pixmap (occluders excluded), and the XFixes
 //! cursor composited in device pixels. A root crop is the annotated last tier only.
 
+pub(crate) mod damage_wait;
 mod connection;
 mod ewmh;
 mod pixels;
