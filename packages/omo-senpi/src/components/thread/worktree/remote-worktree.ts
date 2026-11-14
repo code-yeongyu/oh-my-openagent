@@ -41,9 +41,9 @@ type FarAnswer = { readonly kind: "answered"; readonly data: JsonObject; readonl
 
 /**
  * One worktree request to another device. The relay carries only engine records, so the device's own omo does the work:
- * a short-lived session opens in \`cwd\` there, its \`extension_request\` (\`omo.thread.worktree\`, \`worktree-rpc.ts\`) runs,
- * and the session is closed again (\`leftOpen\` names it when it would not close). A device whose omo predates the
- * request answers \`unsupported\` naming the update; a folder that is not there answers \`folder_missing\`.
+ * a short-lived session opens in `cwd` there, its `extension_request` (`omo.thread.worktree`, `worktree-rpc.ts`) runs,
+ * and the session is closed again (`leftOpen` names it when it would not close). A device whose omo predates the
+ * request answers `unsupported` naming the update; a folder that is not there answers `folder_missing`.
  */
 async function farWorktreeRequest(remote: RemoteThreadSurface, device: string, cwd: string, request: JsonObject): Promise<FarAnswer> {
   const opened = await remote.sessions.endpointCommand(
@@ -82,7 +82,7 @@ async function farWorktreeRequest(remote: RemoteThreadSurface, device: string, c
   return { ...result, leftOpen: `${key} (${closed})` }
 }
 
-/** Creates a thread's worktree on another device (\`farWorktreeRequest\`). */
+/** Creates a thread's worktree on another device (`farWorktreeRequest`). */
 export async function prepareRemoteWorktree(
   remote: RemoteThreadSurface,
   device: string,
@@ -97,8 +97,8 @@ export async function prepareRemoteWorktree(
 }
 
 /**
- * Removes the worktree \`prepareRemoteWorktree\` made on \`device\` for a thread whose open then failed (#13450 review).
- * Answers undefined once that device confirms it removed the worktree and its branch; otherwise a \`partial_commit\`
+ * Removes the worktree `prepareRemoteWorktree` made on `device` for a thread whose open then failed (#13450 review).
+ * Answers undefined once that device confirms it removed the worktree and its branch; otherwise a `partial_commit`
  * failure naming the path and branch left there.
  */
 export async function removeRemoteWorktree(

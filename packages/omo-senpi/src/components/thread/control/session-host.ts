@@ -21,7 +21,7 @@ export type SessionOpenRequest = {
 }
 
 /** A thread as the tools report it, with `device` when it is on another of the account's devices. */
-/** \`warnings\`: steps after the session was created that failed; the thread exists and is answered anyway. */
+/** `warnings`: steps after the session was created that failed; the thread exists and is answered anyway. */
 export type HostedThread = ThreadToolSummary & {
   readonly device?: string
   readonly worktree?: ThreadWorktree

@@ -6,7 +6,7 @@ import { discardWorktree, insideRoot } from "./discard-worktree"
 import { folderFailure } from "./failures"
 import { createThreadWorktree, runGit, type GitRun, type WorktreeOutcome } from "./thread-worktree"
 
-/** The \`extension_request\` another device's thread_create sends this device's omo to create (or undo) a worktree here. */
+/** The `extension_request` another device's thread_create sends this device's omo to create (or undo) a worktree here. */
 export const THREAD_WORKTREE_RPC = "omo.thread.worktree"
 
 export type WorktreeRemoval = { readonly kind: "removed" } | ThreadDataError

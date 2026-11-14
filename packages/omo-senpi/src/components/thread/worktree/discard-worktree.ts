@@ -19,10 +19,10 @@ export async function insideRoot(root: string, path: string): Promise<boolean> {
 }
 
 /**
- * Undoes a worktree THIS call created (#13450 review): \`git worktree remove --force\` (a locked worktree stays), the
+ * Undoes a worktree THIS call created (#13450 review): `git worktree remove --force` (a locked worktree stays), the
  * folder only when git does not know it as a worktree (a checkout git abandoned mid-add) and it lies in the worktrees
  * root, then the branch, then the per-repository folder when this call made it and it is empty. What remains is named
- * in a \`partial_commit\` failure (\`worktree_left_behind\`) so the agent can remove it; nothing else is touched.
+ * in a `partial_commit` failure (`worktree_left_behind`) so the agent can remove it; nothing else is touched.
  */
 export async function discardWorktree(options: {
   readonly repository: string
