@@ -1,4 +1,5 @@
 import { spawn, type SpawnOptions } from "node:child_process"
+import { ROOT_TEST_SERIAL_QUARANTINE_PATHS, serialQuarantineArgs } from "./root-test-serial-quarantine.ts"
 
 export interface TestFastGroup {
   readonly name: string
@@ -27,9 +28,17 @@ export function testFastGroups(): TestFastGroup[] {
       name: "opencode-memory",
       args: ["test", "packages/omo-opencode", "packages/memory-core"],
     },
-    { name: "root-rest", args: ["--config=bunfig.win2.toml", "test"] },
+    { name: "root-rest", args: ["--config=bunfig.win2.parallel.toml", "test"] },
     { name: "senpi", args: ["test", "packages/omo-senpi"] },
   ]
+}
+
+/**
+ * The serial phase every local full run starts with. It runs the quarantine list CI
+ * already enforces, from that list's own definition, before anything parallel starts.
+ */
+export function testFastQuarantineGroup(): TestFastGroup {
+  return { name: "serial-quarantine", args: serialQuarantineArgs() }
 }
 
 /** Minimal view of a spawned child the registry needs; keeps fakes cheap in tests. */
@@ -164,16 +173,25 @@ export function spawnInheritingStdio(
 }
 
 /**
- * Runs every group in parallel. A rejected group (a failed spawn) aborts the
- * `Promise.all` while its detached siblings are still running, so the failure
- * path shuts the survivors down before the error propagates and the parent
- * exits; otherwise those siblings outlive the run as orphans.
+ * Runs the serial quarantine to completion, then every group in parallel. A
+ * failed serial phase returns its own exit code and starts no group; a rejected
+ * group (a failed spawn) aborts the `Promise.all` while its detached siblings
+ * are still running, so the failure path shuts the survivors down before the
+ * error propagates and the parent exits; otherwise those siblings outlive the
+ * run as orphans.
  */
 export async function runTestFast(
   spawnGroup: SpawnTestGroup,
   log: LogLine = console.log,
   shutdownSurvivors: () => void | Promise<void> = () => {},
 ): Promise<number> {
+  const quarantine = testFastQuarantineGroup()
+  log(`[test-fast] serial quarantine first: ${ROOT_TEST_SERIAL_QUARANTINE_PATHS.length} files`)
+  const quarantineExit = await spawnGroup(quarantine)
+  if (quarantineExit !== 0) {
+    log(`[test-fast] ${quarantine.name}: exit ${quarantineExit}; no parallel group starts`)
+    return quarantineExit
+  }
   const groups = testFastGroups()
   log(`[test-fast] running ${groups.length} groups in parallel: ${groups.map((group) => group.name).join(", ")}`)
   try {
