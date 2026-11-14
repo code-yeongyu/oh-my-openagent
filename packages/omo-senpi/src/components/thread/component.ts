@@ -422,7 +422,9 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         },
       )
       const sessionsDirectory = options.sessionsDirectory ?? (() => join(agentDir(), "sessions"))
-      const wakeOptions = options.wake ?? {}
+      // The carrier and the consumer share the component's own store: a running wake never opens a second gateway
+      // store of this agent directory, whose worker the sweep would keep from retiring (#13455, design A3.1.4).
+      const wakeOptions: ThreadWakeOptions = { store, ...options.wake }
       const warn = (line: string) => ctx.logger.warn(line)
       const wakeSettings = wakeSettingsReader(wakeOptions, callerWorkspaceRoot, warn)
       const tools = registerThreadTools(

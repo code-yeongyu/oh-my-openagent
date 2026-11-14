@@ -54,8 +54,11 @@ export type CarrierOptions = {
   readonly connect: () => Promise<CarrierHostConnection>
   /** `session_wake.wake_limit`; 0 means no bound (A3.5.3). */
   readonly wakeLimit?: () => number
-  /** `session_wake.same_device`, read at the moment of the open; off unless the machine's configuration turns it on. */
-  readonly sameDevice?: () => boolean
+  /**
+   * `session_wake.same_device`, read at the moment of the open for the TARGET session's cwd (its project's
+   * configuration); off unless the machine's configuration turns it on.
+   */
+  readonly sameDevice?: (cwd: string) => boolean
   /**
    * The receiving device's wake switch as the consumer was told it on its own serving connection (A7.2.3): the gate
    * for a row from another device. Off unless a consumer is serving and was told on.
@@ -320,7 +323,7 @@ export function createCarrier(options: CarrierOptions): Carrier {
     if (target.session_kind !== "interactive") return { kind: "not_wakeable", session_kind: target.session_kind }
     const wait = await store.sessionWait.read({ durable_id: durableId })
     if (wait?.wait === "held" && wait.file_size === fileSize(target.session_path)) return { kind: "held" }
-    const allowance = await openAllowance(durableId)
+    const allowance = await openAllowance(durableId, target.cwd)
     if (allowance !== "open") {
       if (allowance === "nothing_queued") {
         // Only a record that is still `requested` is ended, compared on its generation: another carrier's record that
@@ -409,10 +412,10 @@ export function createCarrier(options: CarrierOptions): Carrier {
    * The one rule of A7.2.3 (A7R-10), the reviewer's LOW and A7's row-from-another-device rule in one place: a carrier
    * opens a session only when the session holds a queued row whose own switch allows the open. A row from another
    * device (it carries the intake's ledger id) reads the wake the consumer was told; a same-device row reads
-   * `session_wake.same_device`. Both are read here, at the moment of the open.
+   * `session_wake.same_device` for the TARGET session's cwd. Both are read here, at the moment of the open.
    */
-  const openAllowance = async (durableId: string): Promise<"open" | "switched_off" | "nothing_queued"> => {
-    const sameDevice = options.sameDevice?.() ?? false
+  const openAllowance = async (durableId: string, cwd: string): Promise<"open" | "switched_off" | "nothing_queued"> => {
+    const sameDevice = options.sameDevice?.(cwd) ?? false
     const remoteWake = options.remoteWake?.() ?? false
     let queued = false
     for (const row of await store.list({ target_durable_id: durableId })) {
@@ -424,9 +427,15 @@ export function createCarrier(options: CarrierOptions): Carrier {
   }
 
   const sweep = async (): Promise<void> => {
-    if (stopped) return
+    await sweepNow()
+  }
+
+  /** Whether the timer still has work to tend: a woken row or a carried session (A3.1.4). */
+  const sweepNow = async (): Promise<boolean> => {
+    if (stopped) return false
     const now = store.now()
-    for (const row of await store.woken.list()) {
+    const rows = await store.woken.list()
+    for (const row of rows) {
       if (carried.has(row.durable_id)) {
         await evaluate(row.durable_id).catch(() => undefined)
         continue
@@ -439,21 +448,34 @@ export function createCarrier(options: CarrierOptions): Carrier {
       if (row.lease_expires_at !== null && row.lease_expires_at <= now)
         await serial(row.durable_id, () => takeOver(row.durable_id)).catch(() => undefined)
     }
+    return rows.length > 0 || carried.size > 0
   }
 
+  let timerArmed = false
   const arm = (): void => {
-    if (stopped) return
+    if (stopped || timerArmed) return
+    timerArmed = true
     cancelTimer = options.schedule(
       () => {
-        void sweep().finally(arm)
+        timerArmed = false
+        void sweepNow().then(
+          (hasWork) => {
+            if (hasWork) arm()
+          },
+          () => undefined,
+        )
       },
       Math.min(CARRIER_RENEW_MS, WAKE_LEASE_MS / 3),
     )
   }
-  arm()
 
   return {
-    wake: (durableId) => serial(durableId, () => wakeNow(durableId)),
+    wake: (durableId) =>
+      serial(durableId, async () => {
+        // A wake leaves a row the timer must tend (a retry, a carried session's lease); an empty table disarms it again.
+        arm()
+        return await wakeNow(durableId)
+      }),
     evaluate,
     sweep,
     stop: async () => {

@@ -19,6 +19,7 @@ import { resolveThreadSocket } from "../live-surface-paths"
 import { createCarrier, type Carrier, type CarrierEvaluation, type CarrierWakeOutcome } from "./carrier"
 import { connectCarrierHost, type CarrierHostConnection } from "./carrier-connection"
 import { startDeliveryConsumer, type ServingConsumer } from "./consumer-start"
+import { engineDropsRetainedRecord } from "./engine-minimum"
 
 type Env = Readonly<Record<string, string | undefined>>
 
@@ -78,17 +79,21 @@ const unrefSchedule = (run: () => void, ms: number): (() => void) => {
 /** A carry that ended: the session is no longer this carrier's, so its intake marks may now be drained. */
 const ENDED: ReadonlySet<CarrierEvaluation["kind"]> = new Set(["released", "handed_over", "closed_waiting", "held"])
 
-/** `session_wake` as the machine's omo configuration says it now, read at each send and each open. */
+/**
+ * `session_wake` as the machine's omo configuration says it now, read at each send and each open. The `same_device`
+ * switch is read for the TARGET session's cwd (its project's configuration); every other read (such as `wake_limit`)
+ * falls back to the caller's workspace root, the first registering session's.
+ */
 export function wakeSettingsReader(
   options: ThreadWakeOptions,
   cwd: () => string,
   warn: (line: string) => void,
-): () => ResolvedSessionWakeSettings {
+): (cwd?: string) => ResolvedSessionWakeSettings {
   const env = options.env ?? process.env
   const load = options.loadConfig ?? ((input) => loadOmoConfig({ cwd: input.cwd, env, harness: "senpi" }))
-  return () => {
+  return (at?: string) => {
     try {
-      return resolveSessionWakeSettings(load({ cwd: cwd() }).config)
+      return resolveSessionWakeSettings(load({ cwd: at ?? cwd() }).config)
     } catch (error) {
       warn(`thread wake: the session_wake settings were not read: ${error instanceof Error ? error.message : String(error)}`)
       return resolveSessionWakeSettings({})
@@ -102,7 +107,7 @@ export function processSameDeviceWake(input: {
   readonly store: GatewayStore
   readonly agentDir: () => string
   readonly sessionsDirectory: () => string
-  readonly settings: () => ResolvedSessionWakeSettings
+  readonly settings: (cwd?: string) => ResolvedSessionWakeSettings
 }): SameDeviceWake {
   const latch = input.options.latch ?? processLatch()
   return {
@@ -111,7 +116,7 @@ export function processSameDeviceWake(input: {
       return await createSameDeviceWake({
         store: input.store,
         sessionsDirectory: input.sessionsDirectory(),
-        enabled: () => input.settings().sameDevice,
+        enabled: (cwd) => input.settings(cwd).sameDevice,
         ...(running === undefined ? {} : { carrier: { wake: running.wake } }),
       }).afterSend(result)
     },
@@ -131,7 +136,7 @@ export type ThreadWakeStart = {
   readonly options: ThreadWakeOptions
   readonly agentDir: () => string
   readonly sessionsDirectory: () => string
-  readonly settings: () => ResolvedSessionWakeSettings
+  readonly settings: (cwd?: string) => ResolvedSessionWakeSettings
   readonly engineVersion: string | undefined
   readonly ensureHost: (() => Promise<void>) | undefined
   readonly warn: (line: string) => void
@@ -141,6 +146,8 @@ export type ThreadWakeStart = {
  * Starts the process's carrier (#13037 A3.1.3) for this agent directory on the first `session_start` of a `tui` or `rpc`
  * engine, never in a task child or under CI, and at most once per process: the operator host it opens woken sessions on
  * is the one `thread_create` opens on (`resolveThreadSocket`). The delivery consumer starts beside it (`consumer-start.ts`).
+ * The same engine minimum the consumer reads (A8.1) gates the whole wake: below it no carrier starts, so a send to a
+ * session that is not running answers as it did before the wake existed (`queued_offline`, reason `wake_unavailable`).
  */
 export function startThreadWakeAtSession(eventCtx: unknown, input: ThreadWakeStart): void {
   const mode = (eventCtx as { readonly mode?: unknown } | null | undefined)?.mode
@@ -149,6 +156,8 @@ export function startThreadWakeAtSession(eventCtx: unknown, input: ThreadWakeSta
   if (isCi(env) || env[OMO_SENPI_TASK_RPC_CHILD] === "1") return
   const agentDir = input.agentDir()
   if (!isAbsolute(agentDir)) return
+  if (!engineDropsRetainedRecord(input.options.engineVersion ?? input.engineVersion, input.options.minimumEngine))
+    return
   const latch = input.options.latch ?? processLatch()
   const running = (latch.running ??= new Map())
   if (running.has(agentDir)) return
@@ -176,7 +185,7 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart): Runni
           background: true,
         })),
     wakeLimit: () => input.settings().wakeLimit,
-    sameDevice: () => input.settings().sameDevice,
+    sameDevice: (cwd) => input.settings(cwd).sameDevice,
     remoteWake: () => serving?.consumer.wakeAllowed() ?? false,
     schedule: options.schedule ?? unrefSchedule,
     onEvent: (event) => {
