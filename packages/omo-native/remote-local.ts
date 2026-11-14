@@ -2,14 +2,18 @@ import { existsSync } from "node:fs"
 
 import { type AccountShowResult, accountStateNotice, classifyAccountShow } from "../device-service-core/src/account-state.ts"
 import {
+  connectDeviceService,
   type DeviceService,
   deviceServiceEndpointPath,
+  deviceServiceStateDir,
   LocalApiError,
   SESSION_ROW_STATES,
 } from "../device-service-core/src/device-service.ts"
 import type { SessionFilter } from "../device-service-core/src/local-api/protocol.ts"
 import type { SessionRowState } from "../device-service-core/src/local-api/vocabulary.ts"
 import type { RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
+import { readAccountInProcess } from "./account-show"
+import packageJson from "./package.json" with { type: "json" }
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
 import { controlLines, deviceLines, sessionLines, statusLines } from "./remote-render"
 import { isSessionVerb, parseSession, type SessionArgs } from "./remote-session-args"
@@ -39,6 +43,21 @@ export interface RemoteCommandDependencies {
    * module paths sit inside the executable and resolve to nothing on disk.
    */
   readonly packageRoot?: string
+}
+
+/** This device's real account read, local API and stdio: every dependency the local verbs need. */
+export function localRemoteDependencies(packageRoot?: string): RemoteCommandDependencies {
+  const stateDir = deviceServiceStateDir()
+  return {
+    accountShow: readAccountInProcess,
+    stateDir,
+    ...(packageRoot === undefined ? {} : { packageRoot }),
+    connect: () => connectDeviceService({ version: packageJson.version, stateDir }),
+    now: () => Date.now(),
+    output: (line) => process.stdout.write(`${line}\n`),
+    write: (text) => process.stdout.write(text),
+    error: (line) => process.stderr.write(`${line}\n`),
+  }
 }
 
 const CONTROL_VALUES = ["on", "off"] as const

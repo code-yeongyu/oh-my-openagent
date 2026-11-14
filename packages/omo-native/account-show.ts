@@ -1,13 +1,18 @@
 import { homedir } from "node:os"
+import type { AccountShowResult } from "../device-service-core/src/account-state.ts"
+import { resolveMemoryRoot } from "../memory-core/src/identity/layout"
 import { loadTrustAnchor } from "../memory-core/src/sync/crypto/trust-pin.ts"
+import { syncPinDir } from "../memory-core/src/sync/pin-dir"
 import {
   type CredentialStore,
   CredentialStoreError,
+  createCredentialStore,
   credentialId,
   KeychainLockedError,
+  SESSION_READ_WAIT,
   SecretServiceUnavailableError,
 } from "../omo-opencode/src/cli/service-auth/keystore"
-import { type Credentials, SignInError } from "../omo-opencode/src/cli/service-auth/protocol"
+import { type Credentials, SignInError, serviceOrigin } from "../omo-opencode/src/cli/service-auth/protocol"
 import { readSignedOutMarker, signedOutMarkerPath } from "../omo-opencode/src/cli/service-auth/signed-out-marker"
 
 // `omo account show`, apart from the verbs that sign in, refresh or hand keys over: it reads the stored credential, the
@@ -93,10 +98,31 @@ export function accountStoreFailure(dependencies: AccountShowDependencies, error
 }
 
 /** `omo account show` with the account verbs' error mapping, without the modules that reach the account service. */
-export async function runAccountShow(dependencies: AccountShowDependencies, flags: readonly string[]): Promise<number> {
+async function runAccountShow(dependencies: AccountShowDependencies, flags: readonly string[]): Promise<number> {
   try {
     return await showAccount(dependencies, flags)
   } catch (error) {
     return accountStoreFailure(dependencies, error)
   }
+}
+
+/** `omo account show` run in this process with no arguments, for the remote verbs' first step: exit code and stdout. */
+export async function readAccountInProcess(): Promise<AccountShowResult> {
+  const api = serviceOrigin(process.env.OMO_SERVICE_API_URL ?? "https://api.omo.dev")
+  const lines: string[] = []
+  let store: CredentialStore | undefined
+  const exitCode = await runAccountShow(
+    {
+      api,
+      get store() {
+        store ??= createCredentialStore(api, { wait: SESSION_READ_WAIT })
+        return store
+      },
+      pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())),
+      output: (line) => lines.push(line),
+      error: () => {},
+    },
+    [],
+  )
+  return { exitCode, stdout: lines.join("\n") }
 }
