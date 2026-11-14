@@ -129,11 +129,22 @@ impl ConsentView {
         matches!((parse(&configured), parse(requested)), (Some(a), Some(b)) if a == b)
     }
 
-    /// The view a host wrote; a view that does not parse is treated as tampered.
+    /// The view a host wrote; a view that does not parse is treated as tampered. Its stopHotkey
+    /// keeps the member's own state (review L2, A-IS-62): missing is not carried, null is the OS
+    /// default, and any other value that is not a string is "not a chord", never the default.
     #[must_use]
     pub fn from_host(value: serde_json::Value) -> Self {
+        let stop_hotkey = match value.get("stopHotkey") {
+            None => None,
+            Some(serde_json::Value::Null) => Some(None),
+            Some(serde_json::Value::String(text)) => Some(Some(text.clone())),
+            // The raw text alone could parse (`5` is a key), so it ends in an empty key segment,
+            // which the engine's one parser refuses: the value is kept as "not a chord".
+            Some(other) => Some(Some(format!("{other}+"))),
+        };
         serde_json::from_value(value).unwrap_or_else(|_| Self {
             tampered: true,
+            stop_hotkey,
             ..Self::default()
         })
     }

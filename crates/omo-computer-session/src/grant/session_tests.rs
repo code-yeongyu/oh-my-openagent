@@ -728,3 +728,25 @@ fn a_stop_while_another_holder_keeps_the_lock_ends_the_lease_and_revokes_the_gra
     assert!(!s.funnel.control.grant.is_held(), "the stop revoked the grant");
     assert!(other.try_acquire().expect("try").is_some(), "the refused exec released the lock");
 }
+
+/// Review L2 at a07dff9 (R70cl): a stopHotkey of the wrong type is "not a chord": the view still
+/// reads tampered, its chord is never the OS default, and stopPath.start arms nothing that hears.
+#[test]
+fn a_is_62_stop_hotkey_of_the_wrong_type_never_falls_back_to_the_default() {
+    use crate::consent::{ConsentView, StopChord};
+    use omo_computer_safety::protected::Os;
+    for value in [json!(5), json!(true), json!(["ctrl+alt+shift+escape"]), json!({ "chord": "ctrl+alt+shift+escape" })] {
+        let view = ConsentView::from_host(json!({ "stopHotkey": value.clone() }));
+        assert!(view.tampered, "{value}: a view that does not parse reads tampered");
+        assert!(matches!(view.stop_chord(Os::Linux), StopChord::Unparseable(_)), "{value}: not a chord, never the default");
+        assert!(!view.same_stop_chord(Os::Linux, "ctrl+alt+shift+escape"), "{value}: never equal to the default");
+    }
+    let backend = FakeBackend::with_parts(scenario(&json!({ "consent": { "stopHotkey": 5 } })), FakeClock::default(), RecordingSink::default())
+        .with_persona(omo_computer_backend_fake::Persona::X11)
+        .with_stop_path(StopPathScript::Live);
+    let mut s = Session::new(Box::new(backend));
+    s.open(params(json!({ "reportMode": "null" }))).expect("open");
+    s.stop_path_start(params(json!({})));
+    assert!(s.funnel.control.armed_chord.as_deref() != Some("ctrl+alt+shift+escape"), "the OS default is never armed");
+    assert!(!s.stop_path_status().global_live, "nothing that hears is armed");
+}
