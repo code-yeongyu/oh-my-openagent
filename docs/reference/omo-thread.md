@@ -579,3 +579,29 @@ try {
 CLI's JSON; nothing throws for a refusal. Pass `engineStatusAll` (a function returning the stdout of
 `omo host status --all --include-workers --json`) to choose how the engine is run; without it the SDK runs
 the engine CLI itself, and when no engine can enumerate it falls back to the endpoint registry on disk.
+
+The SDK also controls threads, with the same arguments and results as the agent tools of the same name:
+
+| Method | Tool | Arguments |
+| --- | --- | --- |
+| `create` | `thread_create` | `{ thread?, device?, alias?, name?, cwd?, fork_from?, skills?, idempotency_key? }` |
+| `interrupt` | `thread_interrupt` | `{ thread, turn_id?, all_scope? }` |
+| `close` | `thread_close` | `{ thread, all_scope?, idempotency_key? }` |
+| `rename` | `thread_rename` | `{ thread, name?, alias?, all_scope?, idempotency_key? }` |
+| `set_model` | `thread_set_model` | `{ thread, model, provider?, all_scope?, idempotency_key? }` |
+
+Each reaches the thread wherever it runs, on this device or another device of the account, through the
+same code as the tool. Invalid arguments answer `invalid_arguments`, a thread no session holds answers
+`not_resumable` (`close` answers `closed: false`), and every other refusal is the tool's error code. A
+script acts as itself, never as a session: `self` answers `caller_context_missing`, and a thread it creates
+records no creator session. `rename` passes `idempotency_key` to the alias registry; the other methods
+accept it for parity with the tools but keep no receipt, so a repeated call runs again.
+
+```js
+const created = await sdk.create({ name: "nightly-build" })
+if (created.kind === "ok") {
+  await sdk.set_model({ thread: created.thread.thread_id, model: "opus" })
+  await sdk.interrupt({ thread: "nightly-build" })
+  await sdk.close({ thread: "nightly-build" })
+}
+```
