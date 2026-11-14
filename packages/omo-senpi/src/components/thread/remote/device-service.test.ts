@@ -249,7 +249,7 @@ describe("device-service adapter: a session created on another device is address
     },
   }
 
-  test("#given open_session answers the engine id and the listing lags the new key #when create then get_state run on that thread #then create names the listing key and the get_state succeeds", async () => {
+  test("#given open_session answers the engine id and the listing lags the new key #when create then get_state run on that thread #then create names the durable id, keeps the listing key as sessionId, and the get_state succeeds", async () => {
     const attached: string[] = []
     let listed = false
     const service = {
@@ -296,16 +296,16 @@ describe("device-service adapter: a session created on another device is address
       "b",
     ).open({})
     if (created.kind !== "ok" || !("thread" in created)) throw new Error(`create failed: ${JSON.stringify(created)}`)
-    expect(created.thread.thread_id).toBe(KEY)
-    const status = await port.sessionCommand("b", created.thread.thread_id, {
+    expect([created.thread.thread_id, created.thread.sessionId]).toEqual([ENGINE_ID, KEY])
+    const status = await port.sessionCommand("b", created.thread.sessionId, {
       type: "get_state",
-      sessionId: created.thread.thread_id,
+      sessionId: created.thread.sessionId,
     })
     expect(status.kind).toBe("ok")
     expect(attached.every((id) => id === KEY)).toBe(true)
   })
 
-  test("#given the create reply carries the located session #when the session is created #then no session.locate is sent and the thread is that key", async () => {
+  test("#given the create reply carries the located session #when the session is created #then no session.locate is sent and the thread is the durable id addressed by that key", async () => {
     const located: string[] = []
     const service = {
       ...fakeService([], []),
@@ -331,7 +331,7 @@ describe("device-service adapter: a session created on another device is address
       "b",
     ).open({})
     if (created.kind !== "ok" || !("thread" in created)) throw new Error(`create failed: ${JSON.stringify(created)}`)
-    expect(created.thread.thread_id).toBe(KEY)
+    expect([created.thread.thread_id, created.thread.sessionId]).toEqual([ENGINE_ID, KEY])
     expect(located).toEqual([])
   })
 })
@@ -720,7 +720,7 @@ describe("device-service adapter: relay round trips per thread op", () => {
       const w = relayWorld(relayd)
       const created = await createRelaySessionHost(w.surface, "b").open({})
       if (created.kind !== "ok" || !("thread" in created)) throw new Error(`create failed: ${JSON.stringify(created)}`)
-      expect(created.thread.thread_id).toBe(CREATED_KEY)
+      expect([created.thread.thread_id, created.thread.sessionId]).toEqual([CREATED_ENGINE_ID, CREATED_KEY])
       expect(w.take()).toEqual([...frames])
       expect(w.locateAsked).toEqual([...asked])
     },

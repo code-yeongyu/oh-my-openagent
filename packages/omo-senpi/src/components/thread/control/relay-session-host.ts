@@ -125,9 +125,14 @@ export function createRelaySessionHost(
         controls: _controls,
         ...facts
       } = state
-      // D2: the id the caller gets back is the durable id (the engine names it on open; a listed row carries it), never
-      // the listing key, which stays in sessionId for the relay transport.
-      const durable = nonEmpty(state["durableSessionId"]) ?? nonEmpty(data["durableSessionId"]) ?? listed?.durable_id
+      // D2: the id the caller gets back is the durable id, never the listing key, which stays in sessionId for the relay
+      // transport. The engine's open reply names it as state.sessionId (data.sessionId is its routing id); a listed row
+      // carries it too. Without it the caller would get the listing key, which no thread tool resolves.
+      const durable =
+        nonEmpty(state["durableSessionId"]) ??
+        nonEmpty(data["durableSessionId"]) ??
+        nonEmpty(state["sessionId"]) ??
+        listed?.durable_id
       const session: ThreadHostSession = {
         ...facts,
         sessionId: threadId,
