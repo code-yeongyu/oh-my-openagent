@@ -158,7 +158,7 @@ describe("live thread session-control RPCs", () => {
     })
   })
 
-  test("setModel writes provider and modelId and reads the full model response", async () => {
+  test("setModel writes provider, modelId and the session scope, and reads the full model response", async () => {
     await withRpc(
       { success: true, data: { provider: "openai", id: "gpt-x", name: "GPT X", contextWindow: 1234 } },
       async (surface, frames) => {
@@ -169,7 +169,14 @@ describe("live thread session-control RPCs", () => {
           name: "GPT X",
         })
         expect(frames).toEqual([
-          { id: expect.any(String), type: "set_model", sessionId: "route-peer", provider: "openai", modelId: "gpt-x" },
+          {
+            id: expect.any(String),
+            type: "set_model",
+            sessionId: "route-peer",
+            provider: "openai",
+            modelId: "gpt-x",
+            scope: "session",
+          },
         ])
       },
     )
