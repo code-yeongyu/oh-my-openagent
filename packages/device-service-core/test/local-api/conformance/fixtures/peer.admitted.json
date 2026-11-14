@@ -1,0 +1,81 @@
+{
+  "request": "peer.admitted",
+  "cases": [
+    {
+      "name": "a consumer asks whether a device is admitted with the grant now",
+      "outcome": "ok",
+      "world": {
+        "deliveries": {
+          "agent_dirs": ["/agents/a"],
+          "admitted": ["dev-peer-1"]
+        }
+      },
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "deliveries.serve",
+            "agent_dir": "/agents/a",
+            "v": 1
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "wake": false
+            }
+          }
+        },
+        {
+          "send": {
+            "id": "2",
+            "type": "peer.admitted",
+            "device": "dev-peer-1"
+          }
+        },
+        {
+          "expect": {
+            "id": "2",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "admitted": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a connection that serves no deliveries may not ask",
+      "outcome": "refusal",
+      "world": {
+        "deliveries": {
+          "agent_dirs": ["/agents/a"],
+          "admitted": ["dev-peer-1"]
+        }
+      },
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "peer.admitted",
+            "device": "dev-peer-1"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "forbidden"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

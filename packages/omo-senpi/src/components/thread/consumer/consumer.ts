@@ -28,6 +28,8 @@ export type DeliveryConsumer = {
    * another device.
    */
   readonly wakeAllowed: () => boolean
+  /** From this start's acknowledgement until the consumer stops: the service hands this consumer its deliveries. */
+  readonly serving: () => boolean
   /** One `delivery.drained` report per marked pair whose intake rows are all applied (the newest answered command id). */
   readonly reportDrained: () => Promise<void>
   readonly idle: () => Promise<void>
@@ -72,6 +74,7 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
   const follow = new Set<Promise<void>>()
   let marksKept = true
   let wakeAllowed = false
+  let serving = false
   let unsubscribe: (() => void)[] = []
 
   const track = (work: Promise<void>): void => {
@@ -168,6 +171,7 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
 
   return {
     wakeAllowed: () => wakeAllowed,
+    serving: () => serving,
     start: async () => {
       // A start is a new connection: the wake reads off until this start's own acknowledgement names it.
       wakeAllowed = false
@@ -177,18 +181,12 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
         if (error instanceof GatewayMigrationError || /schema/i.test(String(error))) return "schema_too_new"
         throw error
       }
-      let ack: unknown
-      try {
-        ack = await port.serve({ agent_dir: options.agentDir, v: DELIVERY_PROTOCOL_VERSION })
-      } catch (error) {
-        if (UNKNOWN_SHAPE.has(refusalCode(error) ?? "")) return "unsupported"
-        throw error
-      }
-      const decoded = decodeServeAck(ack)
-      if (decoded === undefined) return "unsupported"
-      wakeAllowed = decoded.wake ?? false
+      // The service hands its waiting records right after the acknowledgement, on the same connection, so the listeners
+      // are in place before the declaration is sent; a wake event that lands before the acknowledgement is read wins.
+      let toldSinceServe = false
       unsubscribe = [
         port.onWake((enabled) => {
+          toldSinceServe = true
           wakeAllowed = enabled === true
         }),
         port.onInbound((event) => track(onInbound(event))),
@@ -197,6 +195,26 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
           track(port.held(event.ask_id, holds))
         }),
       ]
+      const unsubscribeAll = (): void => {
+        for (const off of unsubscribe) off()
+        unsubscribe = []
+        wakeAllowed = false
+      }
+      let ack: unknown
+      try {
+        ack = await port.serve({ agent_dir: options.agentDir, v: DELIVERY_PROTOCOL_VERSION })
+      } catch (error) {
+        unsubscribeAll()
+        if (UNKNOWN_SHAPE.has(refusalCode(error) ?? "")) return "unsupported"
+        throw error
+      }
+      const decoded = decodeServeAck(ack)
+      if (decoded === undefined) {
+        unsubscribeAll()
+        return "unsupported"
+      }
+      if (!toldSinceServe) wakeAllowed = decoded.wake ?? false
+      serving = true
       await reportPending()
       return "serving"
     },
@@ -230,6 +248,7 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
       for (const off of unsubscribe) off()
       unsubscribe = []
       wakeAllowed = false
+      serving = false
     },
   }
 }

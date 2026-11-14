@@ -1,4 +1,9 @@
 export * from "./device-service.ts"
+export {
+  type ConnectDeliveryConsumerOptions,
+  connectDeliveryConsumer,
+  type DeliveryConsumerClient,
+} from "./delivery-consumer.ts"
 export { type AccountShowResult, type AccountState, accountStateNotice, classifyAccountShow } from "./account-state.ts"
 export {
   type BootstrapDependencies,

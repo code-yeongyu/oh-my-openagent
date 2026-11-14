@@ -11,6 +11,7 @@ import { OMO_SENPI_TASK_RPC_CHILD } from "@oh-my-opencode/senpi-task/rpc-spawn"
 
 import { resolveAgentHome } from "../../agent-home/resolve-agent-home"
 import { isCi } from "../../device-service/registrant-start"
+import type { DeliveryConsumer } from "../consumer/consumer"
 import type { DeliveryServicePort } from "../consumer/port"
 import type { IntakeAdmission } from "../gateway/intake-admission"
 import { createSameDeviceWake, type SameDeviceWake } from "../gateway/same-device-wake"
@@ -18,6 +19,8 @@ import { createGatewayStore, type GatewayStore } from "../gateway/store"
 import { resolveThreadSocket } from "../live-surface-paths"
 import { createCarrier, type Carrier, type CarrierEvaluation, type CarrierWakeOutcome } from "./carrier"
 import { connectCarrierHost, type CarrierHostConnection } from "./carrier-connection"
+import { createOmoNativeProductConfig } from "../../telemetry/product-identity"
+import { connectDeliveryServicePort } from "../consumer/device-service-port"
 import { startDeliveryConsumer, type ServingConsumer } from "./consumer-start"
 import { engineHostEnsure, type EngineLauncher } from "./host-ensure"
 
@@ -37,11 +40,10 @@ export type ThreadWakeOptions = {
   readonly engineLaunch?: () => EngineLauncher
   readonly launchSpecPath?: string
   readonly loadConfig?: (options: { readonly cwd: string }) => { readonly config: WakeConfigView }
-  /**
-   * The device service's delivery protocol (`deliveries.serve`, design 5.4). The device service's local API v1 does
-   * not carry it yet (it is in no relay-spec fixture), so production has no port and serves no consumer.
-   */
+  /** Replaces the device service's delivery port (design 5.4), which production opens through device-service-core. */
   readonly deliveries?: () => Promise<DeliveryServicePort | undefined>
+  /** The device service's state directory the production port connects to; absent, the service's default. */
+  readonly deviceServiceStateDir?: string
   readonly engineVersion?: string
   readonly minimumEngine?: string | null
   readonly schedule?: (run: () => void, ms: number) => () => void
@@ -178,6 +180,7 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart): Runni
       warn: input.warn,
     })
   let serving: ServingConsumer | undefined
+  let consumer: DeliveryConsumer | undefined
   const carrier = createCarrier({
     store,
     sessionsDirectory,
@@ -193,7 +196,7 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart): Runni
     wakeLimit: () => input.settings().wakeLimit,
     sameDevice: () => input.settings().sameDevice,
     // Owner ruling 2026-11-14: a device whose service serves this engine's consumer wakes; no switch has to be told on.
-    remoteWake: () => serving !== undefined,
+    remoteWake: () => consumer?.serving() ?? false,
     schedule: options.schedule ?? unrefSchedule,
     onEvent: (event) => {
       if (ENDED.has(event.outcome.kind))
@@ -209,7 +212,19 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart): Runni
     store,
     agentDir,
     sessionsDirectory,
-    deliveries: options.deliveries,
+    deliveries:
+      options.deliveries ??
+      (() =>
+        connectDeliveryServicePort({
+          version: createOmoNativeProductConfig().packageVersion,
+          ...(options.deviceServiceStateDir === undefined ? {} : { stateDir: options.deviceServiceStateDir }),
+        })),
+    onConsumer: (created) => {
+      consumer = created
+    },
+    onClosed: () => {
+      serving = undefined
+    },
     engineVersion: options.engineVersion ?? input.engineVersion,
     minimumEngine: options.minimumEngine,
     wake,
@@ -231,7 +246,7 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart): Runni
     ready,
     stop: async () => {
       await ready
-      serving?.consumer.stop()
+      serving?.close()
       await carrier.stop()
       if (options.store === undefined) await store.dispose().catch(() => undefined)
     },

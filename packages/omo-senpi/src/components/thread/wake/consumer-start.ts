@@ -16,6 +16,10 @@ export type ConsumerStartInput = {
   readonly wake: (durableId: string) => Promise<void>
   readonly sameDevice: () => boolean
   readonly log: (line: string) => void
+  /** The serving connection ended: the consumer stopped and serves nothing until a new start. */
+  readonly onClosed?: () => void
+  /** The consumer, as soon as it exists: it may wake a session before its start has returned. */
+  readonly onConsumer?: (consumer: DeliveryConsumer) => void
 }
 
 /**
@@ -27,6 +31,7 @@ export type ServingConsumer = {
   readonly consumer: DeliveryConsumer
   /** The device service's answer to whether a device is admitted now (5.6), for a woken session's drain. */
   readonly admitIntake: (device: string) => Promise<IntakeAdmission>
+  readonly close: () => void
 }
 
 export async function startDeliveryConsumer(input: ConsumerStartInput): Promise<ServingConsumer | undefined> {
@@ -45,14 +50,27 @@ export async function startDeliveryConsumer(input: ConsumerStartInput): Promise<
     sessionsDirectory: input.sessionsDirectory,
     wake: input.wake,
   })
+  input.onConsumer?.(consumer)
   const started = await consumer.start()
   if (started !== "serving") {
     consumer.stop()
+    port.close?.()
     input.log(`thread wake: the device service serves no deliveries to this engine (${started})`)
     return undefined
   }
   const admitIntake = async (device: string): Promise<IntakeAdmission> =>
     (await port.peerAdmitted(device)) ? "admitted" : "refused"
+  void port.closed?.then(() => {
+    consumer.stop()
+    input.onClosed?.()
+  })
   await runPendingSweep({ store: input.store, admitIntake, wake: input.wake, sameDevice: input.sameDevice() })
-  return { consumer, admitIntake }
+  return {
+    consumer,
+    admitIntake,
+    close: () => {
+      consumer.stop()
+      port.close?.()
+    },
+  }
 }

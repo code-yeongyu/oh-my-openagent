@@ -175,6 +175,8 @@ export const ERROR_CODES = [
   "host_not_answering",
   // #267: this service defines the request but does not serve it yet (machine operations before their executor).
   "unsupported",
+  // omo#13037 A5.1: a delivery.answer whose (sender_device, command_id) pair no waiting hand-off has; nothing is applied.
+  "unknown_delivery",
 ] as const
 export type ErrorCode = (typeof ERROR_CODES)[number]
 // Errors the client library raises itself, before or instead of a server answer.
