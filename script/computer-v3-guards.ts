@@ -158,6 +158,25 @@ function readInput(absolute: string, label: string): string | undefined {
 
 const readText = (cwd: string, path: string): string | undefined => readInput(join(cwd, path), path)
 
+/** A removal path's own entry: there, absent, or not checkable (the lstat error code). */
+type EntryState =
+  { readonly kind: "present" } | { readonly kind: "absent" } | { readonly kind: "unreadable"; readonly code: string }
+
+/**
+ * Whether a path's own entry exists (lstat: an empty directory or a dangling symlink counts). A parent component that is
+ * a file means the path cannot exist (ENOTDIR); any other failure (no permission, a symlink loop) is reported as
+ * unreadable, so one bad path never ends the run and every one of them is named.
+ */
+function entryState(absolute: string): EntryState {
+  try {
+    return lstatSync(absolute, { throwIfNoEntry: false }) === undefined ? { kind: "absent" } : { kind: "present" }
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code
+    if (code === "ENOTDIR") return { kind: "absent" }
+    return { kind: "unreadable", code: code ?? String(error) }
+  }
+}
+
 // ---------------------------------------------------------------------------------------------------------
 // --residue, --no-legacy-edge, --copy, --old-frozen, --stubs
 
@@ -165,10 +184,15 @@ function residue(git: Git, cwd: string): string[] {
   const findings = grepOldName(git, ["."]).map((line) => `residue: ${line}`)
   // Absent means absent on disk: an empty directory, one holding only ignored files, or a dangling symlink is still
   // there. lstat sees the entry itself; existsSync follows a symlink and calls a dangling one absent.
-  const remaining = [...nameMap.removal.classA, ...nameMap.removal.classB.map((entry) => entry.path)].filter(
-    (path) => lstatSync(join(cwd, path), { throwIfNoEntry: false }) !== undefined,
-  )
+  const states = [...nameMap.removal.classA, ...nameMap.removal.classB.map((entry) => entry.path)].map((path) => ({
+    path,
+    state: entryState(join(cwd, path)),
+  }))
+  const remaining = states.filter(({ state }) => state.kind === "present").map(({ path }) => path)
   findings.push(...remaining.map((path) => `residue: ${path} still exists`))
+  // An entry that cannot be checked fails the run closed, and every such path is named, beside the other findings.
+  for (const { path, state } of states)
+    if (state.kind === "unreadable") findings.push(`residue: ${path} cannot be checked (${state.code})`)
   // Path names: every tracked file and every untracked one on disk, ignored included; a remaining removal path is reported once above.
   const oldName = new RegExp(nameMap.oldNamePattern, "i")
   const isRemaining = (path: string): boolean => remaining.some((root) => path === root || path.startsWith(`${root}/`))
