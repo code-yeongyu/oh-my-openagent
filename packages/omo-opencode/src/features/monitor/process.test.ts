@@ -213,13 +213,13 @@ describe("spawnMonitoredProcess", () => {
       // when
       spawnMonitoredProcess(
         { command: "printf 'ok'", cwd: "/tmp", env: { OMO_TEST: "1" }, maxRuntimeMs: 60_000 },
-        { spawn: createFakeSpawn([subprocess], spawnCalls), ...clock.deps },
+        { spawn: createFakeSpawn([subprocess], spawnCalls), shell: "/bin/bash", ...clock.deps },
       )
 
       // then
       expect(spawnCalls).toEqual([
         {
-          command: ["printf", "ok"],
+          command: ["/bin/bash", "-c", "printf 'ok'"],
           options: {
             cwd: "/tmp",
             env: { OMO_TEST: "1" },
@@ -272,6 +272,22 @@ describe("spawnMonitoredProcess real subprocess smoke", () => {
         groupExists = false
       }
       expect(groupExists).toBe(false)
+    },
+  )
+
+  test.skipIf(process.platform === "win32")(
+    "#given a for loop piped into grep #when monitored #then the shell runs it and every matching line arrives",
+    async () => {
+      // when
+      const monitored = spawnMonitoredProcess(
+        { command: "for i in 1 2 3; do echo tick $i; echo noise; done | grep tick", maxRuntimeMs: 60_000 },
+        { setTimer: (fn, ms) => setTimeout(fn, ms), clearTimer: (handle) => clearTimeout(handle) },
+      )
+      const [stdout, exit] = await Promise.all([readProcessStream(monitored.stdout), monitored.exited])
+
+      // then
+      expect(stdout.split("\n").filter(Boolean)).toEqual(["tick 1", "tick 2", "tick 3"])
+      expect(exit.code).toBe(0)
     },
   )
 })
