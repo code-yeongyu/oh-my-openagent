@@ -72,8 +72,6 @@ pub struct FakeScenario {
     pub busy_timeline: Vec<BusyMark>,
     /// Stop-chord presses by fake-clock time.
     pub stop_timeline: Vec<StopPress>,
-    // --- The hand's consent view as a host hands it; row 21 hands it to the engine at `session.open`.
-    pub consent: Option<serde_json::Value>,
     /// Notifications by fake-clock time; absent scripts a host with no notification surface.
     pub notification_timeline: Option<Vec<NotificationPost>>,
     pub secure_focus: Option<SecureFocus>,
@@ -94,12 +92,14 @@ pub struct FakeScenario {
     pub window_reservation: BTreeMap<String, String>,
     /// Signed code identity per pid.
     pub code_identity: BTreeMap<u32, CodeIdentity>,
-    /// The hand identity the fleet harness reads.
-    pub hand: Option<HandIdentity>,
     // --- Row 21 (review M3): the executable path per pid a path-only consent binds to. ---
     pub executable_path: BTreeMap<u32, String>,
     // --- Row 21 (R70av): chords the fake's set_stop_chord refuses (default: none). ---
     pub unarmable_stop_chords: Vec<String>,
+    /// The hand identity the fleet harness reads.
+    pub hand: Option<HandIdentity>,
+    // --- Row 21: the fake host's consent view handed to the engine at `session.open`. ---
+    pub consent: Option<serde_json::Value>,
 }
 
 impl FakeScenario {
