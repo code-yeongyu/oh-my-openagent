@@ -120,8 +120,8 @@ export async function createFallbackSessionHarness(errorMessage: string): Promis
     calls,
     events,
     session,
-    // dispose() only starts the engine's async first-start work; the session's own barrier is what says the agent dir
-    // under this root can no longer be written, so the root goes only after it settles (#13520).
+    // The engine starts its fallback-log first-start step when the session is created; dispose() only folds that step
+    // into the session's barrier, which is what says this root's agent dir can no longer be written (#13520).
     async dispose() {
       unsubscribe()
       session.dispose()
