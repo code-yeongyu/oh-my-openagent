@@ -27,7 +27,7 @@ Tools registered via [`createToolRegistry()`](../plugin/tool-registry.ts) in `sr
 | `look_at` | not in `disabled_agents` for `multimodal-looker` | `look-at/` |
 | `interactive_bash` | `isInteractiveBashEnabled(config)` (tmux config) | `interactive-bash/` |
 | `task_create`, `task_get`, `task_list`, `task_update` | `experimental.task_system` | `task/` |
-| `monitor_start`, `monitor_stop`, `monitor_list`, `monitor_output` | `monitor.enabled` | `monitor/` (watcher engine: `../features/monitor/`) |
+| `monitor` (stopped with `background_cancel`) | `monitor.enabled` | `monitor/` (watcher engine: `../features/monitor/`) |
 | `edit` (hashline-edit) | `hashline_edit: true` | `hashline-edit/` |
 | `create_goal`, `update_goal`, `get_goal` | `goal.enabled` | [`../hooks/goal/tools.ts`](../hooks/goal/tools.ts) (registered in `tool-registry-core-tools.ts`) |
 | 12 `team_*` tools | `team_mode.enabled: true` | `../features/team-mode/tools/` |
@@ -79,7 +79,7 @@ tools/
 ├── hashline-edit/        # edit — hash-anchored line edits with LINE#ID validation
 ├── interactive-bash/     # interactive_bash — tmux session control
 ├── look-at/              # look_at — image/PDF analysis
-├── monitor/              # monitor_start, monitor_stop, monitor_list, monitor_output (engine in features/monitor)
+├── monitor/              # monitor (engine in features/monitor)
 ├── session-manager/      # 4 session_* tools
 ├── skill/                # skill — load skill or run command
 ├── skill-mcp/            # skill_mcp — call skill-embedded MCP servers

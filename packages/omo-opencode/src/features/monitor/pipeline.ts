@@ -12,6 +12,8 @@ interface MonitorPipelineComponents {
   filter: MonitorFilter
   ring: MonitorRingBuffer
   batcher: MonitorBatcher
+  /** Receives every line of both streams, e.g. the monitor's output file. */
+  sink?: { write(line: OutputLine): void; close(): void }
 }
 
 interface MonitorPipelineDeps {
@@ -53,7 +55,9 @@ export function createMonitorPipeline(
       outputLine.truncated = true
     }
 
-    const matched = components.filter.matches(outputLine.text)
+    components.sink?.write(outputLine)
+    // Only stdout lines are events; stderr is kept for the output file and the ring.
+    const matched = stream === "stdout" && components.filter.matches(outputLine.text)
     components.ring.push(outputLine, matched)
     if (matched) {
       components.batcher.push(outputLine)
@@ -88,6 +92,7 @@ export function createMonitorPipeline(
 
     components.batcher.flushNow()
     stopped = true
+    components.sink?.close()
   }
 
   function stopReading(): void {
@@ -98,6 +103,7 @@ export function createMonitorPipeline(
     flushAllLineStreams()
     components.batcher.flushNow()
     stopped = true
+    components.sink?.close()
     cancelReaders()
   }
 

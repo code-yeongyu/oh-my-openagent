@@ -19,7 +19,13 @@ type DispatchCall = {
 }
 
 type FakeMessage = {
-  info?: { role?: string; finish?: string; time?: { created?: unknown } }
+  info?: {
+    role?: string
+    finish?: string
+    time?: { created?: unknown }
+    agent?: string
+    model?: { providerID: string; modelID: string }
+  }
   role?: string
   finish?: string
   time?: { created?: unknown }
@@ -272,7 +278,7 @@ describe("MonitorOutputInjector", () => {
       const record = createRecord()
       const batch = createBatch(7)
       const acceptedText =
-        "[OMO MONITOR OUTPUT]\nmonitor_id: mon_1\nbatch: 7\n<!-- OMO_INTERNAL_INITIATOR -->\n<!-- OMO_INTERNAL_NOREPLY -->"
+        "<system-reminder>\n[MONITOR EVENT]\n<task-notification>\n<task-id>mon_1</task-id>\n<batch>7</batch>\n</task-notification>\n</system-reminder>\n<!-- OMO_INTERNAL_INITIATOR -->"
       const { injector, calls } = createHarness({
         dispatchResults: [{ status: "failed", error: new Error("unexpected eof"), dispatchAttempted: true }],
         messages: [{ role: "user", time: { created: 1_000 }, parts: [{ type: "text", text: acceptedText }] }],
@@ -291,8 +297,42 @@ describe("MonitorOutputInjector", () => {
     })
   })
 
-  describe("#given dev's prompt-async-gate blocks trailing non-no-reply internal user messages", () => {
-    test("#when a batch dispatches #then the injected message text carries the internal no-reply marker", async () => {
+  describe("#given a running monitor's batch", () => {
+    test("#when it dispatches #then it carries the parent's agent and model, so the parent's turn keeps them", async () => {
+      // given
+      const record = createRecord()
+      const { injector, calls } = createHarness({
+        messages: [
+          {
+            info: {
+              role: "user",
+              agent: "sisyphus",
+              model: { providerID: "openai", modelID: "gpt-parent" },
+              time: { created: 100 },
+            },
+            parts: [{ type: "text", text: "go" }],
+          },
+          {
+            info: { role: "assistant", finish: "stop", time: { created: 200 } },
+            parts: [{ type: "text", text: "ok" }],
+          },
+        ],
+        now: 10_000,
+      })
+      injector.queueBatch(record, createBatch(21))
+
+      // when
+      await injector.flushMonitor(record.id)
+
+      // then
+      expect(calls).toHaveLength(1)
+      expect(calls[0]?.input.body).toMatchObject({
+        agent: "sisyphus",
+        model: { providerID: "openai", modelID: "gpt-parent" },
+      })
+    })
+
+    test("#when it dispatches #then it wakes the parent: no no-reply flag and no no-reply marker", async () => {
       // given
       const record = createRecord()
       const batch = createBatch(11)
@@ -304,7 +344,8 @@ describe("MonitorOutputInjector", () => {
 
       // then
       expect(calls).toHaveLength(1)
-      expect(JSON.stringify(calls[0]?.input ?? {})).toContain("OMO_INTERNAL_NOREPLY")
+      expect(calls[0]?.input.body.noReply).toBe(false)
+      expect(JSON.stringify(calls[0]?.input ?? {})).not.toContain("OMO_INTERNAL_NOREPLY")
     })
 
     test("#when a prior no-reply monitor message is the latest history entry #then a fresh batch is NOT blocked", async () => {
@@ -316,7 +357,7 @@ describe("MonitorOutputInjector", () => {
         parts: [
           {
             type: "text",
-            text: "[OMO MONITOR OUTPUT]\nmonitor_id: mon_1\nbatch: 1\n<!-- OMO_INTERNAL_INITIATOR -->\n<!-- OMO_INTERNAL_NOREPLY -->",
+            text: "<system-reminder>\n[MONITOR EVENT]\n<task-id>mon_1</task-id>\n<batch>1</batch>\n</system-reminder>\n<!-- OMO_INTERNAL_INITIATOR -->\n<!-- OMO_INTERNAL_NOREPLY -->",
           },
         ],
       }

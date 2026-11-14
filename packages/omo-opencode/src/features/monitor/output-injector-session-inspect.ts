@@ -111,13 +111,13 @@ export function monitorMessageContainsBatch(message: MonitorSessionMessage, outp
   if (getMessageRole(message) !== "user") {
     return false
   }
-  const monitorMarker = `monitor_id: ${output.record.id}`
-  const batchMarker = `batch: ${output.batch.batchSeq}`
+  const monitorMarker = `<task-id>${output.record.id}</task-id>`
+  const batchMarker = `<batch>${output.batch.batchSeq}</batch>`
   return (
     message.parts?.some(
       (part) =>
         typeof part.text === "string" &&
-        part.text.includes("[OMO MONITOR OUTPUT]") &&
+        /^<system-reminder>\n\[MONITOR [A-Z]+\]/.test(part.text) &&
         part.text.includes(monitorMarker) &&
         part.text.includes(batchMarker),
     ) ?? false

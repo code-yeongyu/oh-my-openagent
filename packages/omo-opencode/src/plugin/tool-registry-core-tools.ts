@@ -22,14 +22,22 @@ export function createCoreTools(args: {
   readonly pluginConfig: OhMyOpenCodeConfig
   readonly managers: Pick<
     Managers,
-    "backgroundManager" | "tmuxSessionManager" | "skillMcpManager" | "modelFallbackControllerAccessor"
+    | "backgroundManager"
+    | "tmuxSessionManager"
+    | "skillMcpManager"
+    | "modelFallbackControllerAccessor"
+    | "monitorManager"
   >
   readonly skillContext: SkillContext
   readonly availableCategories: AvailableCategory[]
   readonly factories: ToolRegistryFactories
 }): Record<string, ToolDefinition> {
   const { ctx, pluginConfig, managers, skillContext, availableCategories, factories } = args
-  const backgroundTools = factories.createBackgroundTools(managers.backgroundManager, ctx.client)
+  const backgroundTools = factories.createBackgroundTools(
+    managers.backgroundManager,
+    ctx.client,
+    managers.monitorManager,
+  )
   const callOmoAgent = factories.createCallOmoAgent(
     ctx,
     managers.backgroundManager,

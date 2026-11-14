@@ -182,7 +182,7 @@ describe("createMonitorPipeline", () => {
   })
 
   describe("#given an ERROR filter", () => {
-    test("#when matched and unmatched lines arrive #then only matched lines batch and unmatched lines stay in the ring", async () => {
+    test("#when matched and unmatched lines arrive #then only matched stdout lines batch and everything else stays in the ring", async () => {
       // given
       const harness = createPipelineHarness("ERROR")
 
@@ -195,15 +195,16 @@ describe("createMonitorPipeline", () => {
 
       // then
       expect(harness.batches).toHaveLength(1)
-      expect(harness.batches[0]?.lines.map((line) => line.text)).toEqual(["ERROR boom", "ERROR stderr"])
+      expect(harness.batches[0]?.lines.map((line) => line.text)).toEqual(["ERROR boom"])
       expect(harness.ring.query({ stream: "unmatched" }).lines.map((line) => line.text)).toEqual([
         "INFO boot",
         "WARN ignored",
+        "ERROR stderr",
       ])
       expect(harness.pipeline.counters()).toMatchObject({
         totalLines: 4,
-        matchedLines: 2,
-        unmatchedLines: 2,
+        matchedLines: 1,
+        unmatchedLines: 3,
       })
       expect(harness.scheduler.activeTimerCount()).toBe(0)
     })

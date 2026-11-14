@@ -1,9 +1,4 @@
-import {
-  createInternalAgentTextPart,
-  isAmbiguousPostDispatchPromptFailure,
-  log,
-  withInternalNoReplyMarker,
-} from "../../shared"
+import { createInternalAgentTextPart, isAmbiguousPostDispatchPromptFailure, log } from "../../shared"
 import { isSessionActive as isOpenCodeSessionActive, settleAfterSessionIdle } from "../../shared/session-idle-settle"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../shared/prompt-async-gate"
 import type {
@@ -12,6 +7,7 @@ import type {
   PromptAsyncInput,
 } from "@oh-my-opencode/utils/prompt-async-gate/types"
 import { formatMonitorBatch } from "./envelope"
+import { resolveMonitorParentPromptContext } from "./parent-prompt-context"
 import {
   hasAcceptedMessageAfterDispatchedMonitorOutput,
   isUserMessageInProgress,
@@ -162,8 +158,12 @@ export class MonitorOutputInjector {
   ): Promise<boolean> {
     const sessionID = record.parentSessionId
     const content = formatMonitorBatch(record, batch, record.counters)
+    const promptContext = await (this.deps.resolvePromptContext ?? resolveMonitorParentPromptContext)(
+      this.deps.client,
+      this.deps.directory,
+      sessionID,
+    )
     const dispatchStartedAt = this.now()
-    const shouldReply = this.isTerminalBatch(batch)
 
     try {
       const promptResult = await this.dispatchInternalPrompt({
@@ -179,12 +179,9 @@ export class MonitorOutputInjector {
         input: {
           path: { id: sessionID },
           body: {
-            noReply: !shouldReply,
-            parts: [
-              shouldReply
-                ? createInternalAgentTextPart(content)
-                : withInternalNoReplyMarker(createInternalAgentTextPart(content)),
-            ],
+            noReply: false,
+            ...promptContext,
+            parts: [createInternalAgentTextPart(content)],
           },
           query: { directory: this.deps.directory },
         },
@@ -247,7 +244,6 @@ export class MonitorOutputInjector {
         sessionID,
         monitorId: record.id,
         batchSeq: batch.batchSeq,
-        shouldReply,
         forceActiveDispatch,
       })
       return true
@@ -283,10 +279,6 @@ export class MonitorOutputInjector {
     this.pendingOutputs.set(record.id, { record, batches: [batch] })
   }
 
-  private isTerminalBatch(batch: OutputBatch): boolean {
-    return !batch.stillRunning
-  }
-
   private hasTerminalBatchOverActiveDeferCeiling(pending: PendingMonitorOutput): boolean {
     return pending.batches.some((batch) => this.shouldForceActiveDispatch(pending.record, batch))
   }
@@ -296,7 +288,7 @@ export class MonitorOutputInjector {
     if (maxActiveDeferMs === undefined || maxActiveDeferMs <= 0) {
       return false
     }
-    return this.isTerminalBatch(batch) && this.getQueuedAgeMs(this.createSource(record, batch)) >= maxActiveDeferMs
+    return this.getQueuedAgeMs(this.createSource(record, batch)) >= maxActiveDeferMs
   }
 
   private rememberQueuedAt(source: string): void {

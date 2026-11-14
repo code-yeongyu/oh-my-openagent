@@ -26,6 +26,8 @@ export interface OutputBatch {
   batchSeq: number
   lines: OutputLine[]
   stillRunning: boolean
+  /** Events dropped by the rate limit since the previous delivered batch. */
+  suppressedEvents?: number
 }
 
 export interface MonitorRecord {
@@ -39,6 +41,12 @@ export interface MonitorRecord {
   exitCode?: number
   signal?: string
   counters: MonitorCounters
+  /** How long it may run before it is stopped; undefined runs until its source ends. */
+  timeoutMs?: number
+  /** Every stdout and stderr line, for `read`. */
+  outputFile?: string
+  /** Events (stdout lines) delivered to the parent so far. */
+  eventsDelivered: number
 }
 
 export interface MonitorManager {
@@ -59,6 +67,8 @@ export interface MonitorStartOpts {
   matchPattern?: string
   parentSessionId: string
   parentMessageId?: string
+  /** Per-call runtime limit; capped by monitor.max_runtime_ms. Undefined or 0: until the source ends (still capped). */
+  timeoutMs?: number
 }
 
 export interface MonitorOutputQuery {
