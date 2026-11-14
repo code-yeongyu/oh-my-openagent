@@ -13,6 +13,7 @@ import { createAccountHttp } from "./http.ts"
 import { principalOf } from "./join.ts"
 import { ACCOUNT } from "./testing/genesis-enable.test-support.ts"
 import { revokeWorld, within, type World, type WorldDevice } from "./testing/revoke-world.test-support.ts"
+import { useTestTimeout } from "../../../../../test-support/test-deadline"
 
 const TIMEOUT = GIT_TEST_TIMEOUT * 4
 
@@ -179,6 +180,7 @@ test(
 test(
   "R-A9 (idle member) #given C frozen with nothing pending and the stream up #when A's rotation is admitted #then C leaves frozen after the keyring event, with no local edit",
   async () => {
+    useTestTimeout(TIMEOUT)
     const w = await revokeWorld({ stream: true })
     try {
       const b = await w.join("b", 20)

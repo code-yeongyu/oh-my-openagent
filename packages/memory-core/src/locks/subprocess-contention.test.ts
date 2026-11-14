@@ -17,13 +17,12 @@ import {
   readPidFileWhenWritten,
 } from "./process-liveness.test-support"
 import { removeTree } from "../../../../test-support/remove-tree"
+import { remainingTestTime, useTestTimeout } from "../../../../test-support/test-deadline"
 
 const workerPath = fileURLToPath(new URL("./subprocess-worker.ts", import.meta.url))
 const temporaryDirectories: string[] = []
 const children = new Set<ChildProcess>()
 
-const READY_TIMEOUT_MS = 10_000
-const EXIT_TIMEOUT_MS = 5_000
 const TEARDOWN_GRACE_MS = 2_000
 
 function track<T extends ChildProcess>(child: T): T {
@@ -49,7 +48,7 @@ function waitForOutput(child: ChildProcessWithoutNullStreams, expected: string):
     let output = ""
     const timeout = setTimeout(
       () => reject(new Error(`timed out waiting for ${expected}; stderr=${child.stderr.read() ?? ""}`)),
-      5_000,
+      remainingTestTime(),
     )
     const onData = (chunk: Buffer): void => {
       output += chunk.toString("utf8")
@@ -70,7 +69,7 @@ function waitForExit(
   child: ChildProcessWithoutNullStreams,
 ): Promise<{ code: number | null; signal: NodeJS.Signals | null }> {
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error("timed out waiting for child exit")), 5_000)
+    const timeout = setTimeout(() => reject(new Error("timed out waiting for child exit")), remainingTestTime())
     child.once("exit", (code, signal) => {
       clearTimeout(timeout)
       resolve({ code, signal })
@@ -189,6 +188,7 @@ describe("subprocess lock holder lifecycle", () => {
   // parked on an unsettled top-level await busy-polls one core under Bun forever (#7335).
 
   test("#given a hold-mode worker that reported entered #when the parent ends its stdin #then the worker exits by itself within the bound", async () => {
+    useTestTimeout(30_000)
     // #given
     const fixture = await createFixture()
     const holder = spawnWorker(["hold", fixture.lockPath, fixture.counterPath, fixture.logPath, "orphan"])
@@ -207,6 +207,7 @@ describe("subprocess lock holder lifecycle", () => {
   }, 30_000)
 
   test("#given a wrapper that spawns the hold-mode worker and SIGKILLs itself once entered #when the wrapper dies #then the ORIGINAL worker is terminal within the bound", async () => {
+    useTestTimeout(30_000)
     // #given: a wrapper that spawns the real worker with a wrapper-owned stdin pipe, records the
     // worker's own pid once it holds the lock, waits for this test to acknowledge that it has
     // snapshotted the worker's identity, then SIGKILLs itself. The test observes THAT original
@@ -257,7 +258,7 @@ process.stdin.resume()
     const wrapperExit = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve, reject) => {
       const timer = setTimeout(
         () => reject(new Error("wrapper did not terminate after worker readiness")),
-        READY_TIMEOUT_MS,
+        remainingTestTime(),
       )
       wrapper.once("exit", (code, signal) => {
         clearTimeout(timer)
@@ -267,7 +268,7 @@ process.stdin.resume()
     let workerIdentity: ProcessIdentity | null = null
     let workerPid: number | null = null
     try {
-      workerPid = await readPidFileWhenWritten(workerPidPath, READY_TIMEOUT_MS)
+      workerPid = await readPidFileWhenWritten(workerPidPath, remainingTestTime())
       // The wrapper is still alive here (it dies only after our acknowledgement) and holds the
       // worker's stdin open, so the worker is alive too; the snapshot doubles as the fail-safe's
       // PID-reuse guard.
@@ -285,7 +286,7 @@ process.stdin.resume()
       // #then: the ORIGINAL worker is terminal on every platform. Termination is awaited with a
       // zombie-aware liveness probe against the captured identity rather than asserted from a
       // single point-in-time probe, because the worker's death trails the wrapper's by a beat.
-      expect(await pidTerminalWithin(workerIdentity, EXIT_TIMEOUT_MS)).toBe(true)
+      expect(await pidTerminalWithin(workerIdentity, remainingTestTime())).toBe(true)
     } finally {
       await killAndAwait(wrapper)
       // Identity-guarded: never signal a pid that has since been reused by another process.
@@ -300,6 +301,7 @@ process.stdin.resume()
   let teardownProbe: ChildProcessWithoutNullStreams | null = null
 
   test("#given a hold-mode worker still holding the lock when its test ends #when the test returns #then it is handed to afterEach", async () => {
+    useTestTimeout(30_000)
     // #given
     const fixture = await createFixture()
     const holder = spawnWorker(["hold", fixture.lockPath, fixture.counterPath, fixture.logPath, "teardown"])

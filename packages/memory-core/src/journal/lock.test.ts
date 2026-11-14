@@ -7,6 +7,7 @@ import { getProcessStartIdentity } from "../locks"
 
 import { withLocalJournalLock } from "./lock"
 import { removeTreeSync } from "../../../../test-support/remove-tree"
+import { remainingTestTime } from "../../../../test-support/test-deadline"
 
 const dirs: string[] = []
 afterEach(() => {
@@ -51,7 +52,7 @@ describe("withLocalJournalLock", () => {
       const result = await Promise.race([
         cancelled,
         new Promise<never>((_, reject) => {
-          timer = setTimeout(() => reject(new Error("FIFO cancellation did not settle")), 2_000)
+          timer = setTimeout(() => reject(new Error("FIFO cancellation did not settle")), remainingTestTime())
         }),
       ])
       expect(result).toBe(reason)
