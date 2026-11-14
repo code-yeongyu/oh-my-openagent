@@ -17,6 +17,8 @@ const NON_WORKSPACE_TEST_RUNNERS = [
   // own bun.lock and CI install
   "packages/web",
   "packages/get-worker",
+  // private opt-in package with its own lockfile; it does not depend on PostHog
+  "packages/mobius-loop",
   // Codex plugin bundle: installed by the plugin's own npm install and shipped to users
   "packages/omo-codex/plugin/components/bootstrap",
   "packages/omo-codex/plugin/components/git-bash",

@@ -25,6 +25,8 @@
     "packages/memory-core/src/recall/bm25-persist.ts",
     "packages/memory-core/src/reflection/completion-links.ts",
     "packages/memory-core/src/sync/keyring-port.ts",
+    "packages/mobius-loop/test/artifact-fixture.ts",
+    "packages/mobius-loop/test/artifact-payload.ts",
     "packages/omo-codex/scripts/install-local.mjs",
     "packages/omo-native/test/fixtures/linux-trust-containers/probe.mjs",
     "packages/omo-senpi/plugin/extensions/omo-claim-receipt.js",

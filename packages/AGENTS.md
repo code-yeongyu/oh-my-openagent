@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-45 sibling packages across 6 roles. `omo-opencode` is the **build entry** for the main npm dist (`packages/omo-opencode/src/index.ts` → bundled into root `dist/`). The root `package.json` `files` array ships `dist/` + `bin/` + `postinstall.mjs` plus selected sibling artifacts (`lsp-tools-mcp`, `lsp-daemon`, `git-bash-mcp` `dist/`; `shared-skills`; the `omo-codex` plugin bundle; and `.opencode`/`.agents` command+skill dirs). Everything else is a sibling with its own package boundary; check the package docs before assuming a publication, deployment, or local-install surface.
+46 sibling packages across 7 roles. `omo-opencode` is the **build entry** for the main npm dist (`packages/omo-opencode/src/index.ts` → bundled into root `dist/`). The root `package.json` `files` array ships `dist/` + `bin/` + `postinstall.mjs` plus selected sibling artifacts (`lsp-tools-mcp`, `lsp-daemon`, `git-bash-mcp` `dist/`; `shared-skills`; the `omo-codex` plugin bundle; and `.opencode`/`.agents` command+skill dirs). Everything else is a sibling with its own package boundary; check the package docs before assuming a publication, deployment, or local-install surface.
 
 ## ROLE MAP
 
@@ -15,6 +15,7 @@
 | **Core packages** | 20 | `utils`, `model-core`, `prompts-core`, `rules-engine` (was `rules-core`), `agents-md-core`, `comment-checker-core`, `hashline-core`, `boulder-state`, `telemetry-core`, `lsp-core`, `mcp-stdio-core`, `tmux-core`, `claude-code-compat-core`, `skills-loader-core`, `mcp-client-core`, `openclaw-core`, `team-core`, `delegate-core`, `omo-config-core`, `memory-core` |
 | **Adapters** | 3 (+2 adapter-support) | `omo-opencode` (OpenCode Ultimate edition; the former root `src/`, build entry for the main npm dist) + `omo-codex` (Codex CLI Light edition; live npm alias `lazycodex-ai`, repository/bin identity `lazycodex`; Codex marketplace `sisyphuslabs` / plugin `omo`) + `omo-senpi` (Senpi native TypeScript extension adapter; local-path Pi package under `packages/omo-senpi/plugin`). Adapter-support: `senpi-task` (Senpi-coupled task engine consumed only by `omo-senpi`; not harness-neutral, so not a `*-core` package) + `omo-native` (npm `omo-ai` distribution launcher staging the `omo-senpi` plugin payload). See [`packages/omo-opencode/src/AGENTS.md`](omo-opencode/src/AGENTS.md), [`packages/omo-codex/AGENTS.md`](omo-codex/AGENTS.md), [`packages/omo-senpi/AGENTS.md`](omo-senpi/AGENTS.md), [`packages/senpi-task/AGENTS.md`](senpi-task/AGENTS.md) |
 | **Skills** | 1 | [`shared-skills`](shared-skills/AGENTS.md) (cross-harness SKILL.md bundle shared between OMO and Codex; shipped via root `files` array) |
+| **Optional local skills** | 1 | [`mobius-loop`](mobius-loop/README.md) (private standalone skill package; install explicitly from a local path, outside default adapter staging and root npm payload) |
 | **Web** | 1 | `web` |
 
 ## PLATFORM LAUNCHER PACKAGES (12)
@@ -65,6 +66,11 @@ Each contains only a `bin/oh-my-opencode.js` launcher and a `package.json`. [`sc
 - **`omo-native`** is the npm `omo-ai` distribution package (BETA channel only): `bin/` launcher that spawns the exact-pinned `@code-yeongyu/senpi` CLI with the staged omo-senpi plugin payload, owns `canonicalAgentDir()` (`~/.omo/agent`), and answers `--version`/self-update under the omo brand. Full breakdown in [`packages/omo-native/AGENTS.md`](omo-native/AGENTS.md).
 
 ## CONVENTIONS
+
+- **Mobius opt-in package:** For development, packaging or local installation of
+  `mobius-loop`, read [`mobius-loop/README.md`](mobius-loop/README.md). Its Node
+  engine belongs to the skill; it has no public SDK export or default loader
+  wiring. Run its package-local checks as well as the relevant repository gates.
 
 - **No new package without explicit need.** Adding a sibling package complicates publish + CI. Justify the boundary first.
 - **Platform launcher packages** are generated. Do NOT edit their launcher payloads by hand. Modify [`script/build-binaries.ts`](../script/build-binaries.ts).
