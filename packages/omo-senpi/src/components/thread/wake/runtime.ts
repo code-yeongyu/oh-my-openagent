@@ -221,6 +221,19 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart): Runni
     })
   let serving: ServingConsumer | undefined
   let consumer: DeliveryConsumer | undefined
+  // The port the last consumer attempt runs on, seen by the carrier's admission ask (#13456's noted follow-up): while a
+  // port is live the ask is answered on it (through the startup pending sweep too), and a port that died answers
+  // unknown, failing the open closed until the consumer is back.
+  let livePort: DeliveryServicePort | undefined
+  const carrierAdmission = async (device: string): Promise<IntakeAdmission> => {
+    const port = livePort
+    if (port === undefined) return "unknown"
+    try {
+      return (await port.peerAdmitted(device)) ? "admitted" : "refused"
+    } catch {
+      return "unknown"
+    }
+  }
   const carrier = createCarrier({
     store,
     sessionsDirectory,
@@ -237,6 +250,7 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart): Runni
     sameDevice: (cwd) => input.settings(cwd).sameDevice,
     // Owner ruling 2026-11-14: a device whose service serves this engine's consumer wakes; no switch has to be told on.
     remoteWake: () => consumer?.serving() ?? false,
+    admitIntake: carrierAdmission,
     schedule: options.schedule ?? unrefSchedule,
     onEvent: (event) => {
       if (ENDED.has(event.outcome.kind))
@@ -278,15 +292,19 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart): Runni
       store,
       agentDir,
       sessionsDirectory,
-      deliveries:
-        options.deliveries ??
-        (() =>
-          connectDeliveryServicePort({
-            version: createOmoNativeProductConfig().packageVersion,
-            ...(options.deviceServiceStateDir === undefined ? {} : { stateDir: options.deviceServiceStateDir }),
-            log: reportConsumerFailure,
-            onUnavailable: armConsumerRetry,
-          })),
+      deliveries: async () => {
+        const port = await (options.deliveries ??
+          (() =>
+            connectDeliveryServicePort({
+              version: createOmoNativeProductConfig().packageVersion,
+              ...(options.deviceServiceStateDir === undefined ? {} : { stateDir: options.deviceServiceStateDir }),
+              log: reportConsumerFailure,
+              onUnavailable: armConsumerRetry,
+            })))()
+        livePort = port
+        return port
+      },
+
       onConsumer: (created) => {
         consumer = created
       },
