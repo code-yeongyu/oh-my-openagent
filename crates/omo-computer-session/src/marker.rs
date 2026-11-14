@@ -8,6 +8,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 
+use omo_computer_safety::durable::{durable_rename, sync_dir};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -147,7 +148,7 @@ impl MarkerStore for MarkerDir {
         private_dir(&self.root)?;
         private_dir(dir)?;
         write_new(&path, &serde_json::to_vec(marker)?)?;
-        File::open(dir)?.sync_all()
+        sync_dir(dir)
     }
 
     fn record_receipt(&mut self, marker: &PreInputMarker) -> io::Result<()> {
@@ -160,8 +161,7 @@ impl MarkerStore for MarkerDir {
         ));
         discard(&temp);
         write_new(&temp, &serde_json::to_vec(marker)?)?;
-        fs::rename(&temp, &path)?;
-        File::open(dir)?.sync_all()
+        durable_rename(&temp, &path, dir)
     }
 
     fn clear(&mut self, issuer: &str, scope: &str) -> io::Result<()> {
@@ -169,7 +169,7 @@ impl MarkerStore for MarkerDir {
         match fs::remove_file(&path) {
             Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
             Err(error) => Err(error),
-            Ok(()) => File::open(parent(&path)?)?.sync_all(),
+            Ok(()) => sync_dir(parent(&path)?),
         }
     }
 }

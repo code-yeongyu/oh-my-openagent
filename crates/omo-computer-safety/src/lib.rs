@@ -9,6 +9,7 @@ mod refusal;
 pub mod gate;
 pub mod guard;
 pub mod latch;
+pub mod durable;
 pub mod marker;
 pub mod protected;
 pub mod rearm;

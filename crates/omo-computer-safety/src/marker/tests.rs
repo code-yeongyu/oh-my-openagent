@@ -80,7 +80,7 @@ fn a_world_readable_directory_is_narrowed_to_the_owner() {
 /// makes the real call on the runner's volume.
 #[test]
 fn the_marker_filesystem_is_ntfs_or_refs_and_anything_else_refuses_naming_it() {
-    use super::{admit_filesystem, UnsupportedFilesystem};
+    use crate::durable::{admit_filesystem, UnsupportedFilesystem};
     let named = |name: &str| admit_filesystem(Ok(name.to_owned()));
     assert!(named("NTFS").is_ok(), "NTFS");
     assert!(named("ReFS").is_ok(), "ReFS");
