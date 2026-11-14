@@ -36,6 +36,7 @@ type Calls = {
 async function spiedService(
   minimums?: { readonly wakeMark: string | null; readonly singleLocate: string | null },
   serviceVersion?: string,
+  wakeError: LocalApiError = new LocalApiError("unsupported", "the stand-in owner takes no wake target"),
 ) {
   const stateDir = mkdtempSync(join(tmpdir(), "dsc-wake-"))
   chmodSync(stateDir, 0o700)
@@ -62,7 +63,7 @@ async function spiedService(
         },
         wakeCommand: async (...args) => {
           calls.wakes.push(args)
-          throw new LocalApiError("unsupported", "the stand-in owner takes no wake target")
+          throw wakeError
         },
         request: (type, params) => {
           if (type === "session.locate") calls.locates.push(params)
@@ -120,6 +121,25 @@ describe("omo#13037: the wake mark and the single-probe locate are gated on the 
     const attach = await later.service.attach(PEER, SESSION_ID)
     await attach.command(ADMIT, { accepts: ["session-wake:v1"] }).catch(() => undefined)
     expect(later.calls.commands).toEqual([[ADMIT, undefined]])
+  })
+
+  // #13238 review: only a code that refuses before sending marks a wake not_sent. `closed` and `protocol_violation` can
+  // end a wake already written, so they keep not_sent unset (the thread side then reports it uncertain, never refused).
+  test.each([
+    ["closed", undefined],
+    ["protocol_violation", undefined],
+    ["forbidden", true],
+  ] as const)("#given the wake request fails with %s and no command_id #then not_sent is %p", async (code, notSent) => {
+    const { service } = await spiedService(
+      { wakeMark: "1.4.0", singleLocate: "1.4.0" },
+      undefined,
+      new LocalApiError(code, "the wake failed"),
+    )
+    const failed = await service.wakeCommand(PEER, "dur-1", ADMIT).catch((error: unknown) => error)
+    expect({ code: (failed as LocalApiError).code, not_sent: (failed as LocalApiError).not_sent }).toEqual({
+      code,
+      not_sent: notSent,
+    })
   })
 
   test("#given a service below the minimum #then neither the mark nor the single probe is sent", async () => {
