@@ -18,7 +18,7 @@ pub use types::{
 };
 
 use crate::capabilities::Capabilities;
-use crate::error::EngineCode;
+use crate::error::{EngineCode, Reason};
 use crate::results::{DisplayInfo, PermissionState};
 
 /// The desktop backend of one OS (or the fake).
@@ -121,6 +121,21 @@ pub trait Backend: Send {
     fn host_consent(&self) -> Option<serde_json::Value> {
         None
     }
+
+    /// The chord the next `stop_listener` arms, `None` the backend's own. Fed only by the consent
+    /// view's `stopHotkey` (A-IS-62). By default only [`DEFAULT_STOP_CHORD`] is taken.
+    ///
+    /// # Errors
+    /// `StopPathUnavailable{deaf}` by default for any other chord, nothing armed (A-IS-62).
+    fn set_stop_chord(&mut self, chord: Option<&str>) -> BackendResult<()> {
+        match chord {
+            Some(chord) if !chord.eq_ignore_ascii_case(DEFAULT_STOP_CHORD) => Err(Refusal::new(
+                EngineCode::StopPathUnavailable,
+                Reason::Deaf.wire(),
+            )),
+            _ => Ok(()),
+        }
+    }
 }
 
 /// The accessibility half of a backend.
@@ -164,3 +179,35 @@ pub trait AxBackend {
 /// The refusal a missing presence surface reads as.
 pub const PRESENCE_UNAVAILABLE: Refusal =
     Refusal::new(EngineCode::ControlRequired, "no_presence_surface");
+
+/// The stop chord a backend on the `set_stop_chord` default listens for: the X11, Wayland and
+/// Windows default `computer.stopHotkey` (`design/d-safety.md` '1. The physical stop chord').
+pub const DEFAULT_STOP_CHORD: &str = "ctrl+alt+shift+escape";
+
+#[cfg(test)]
+mod stop_chord_tests {
+    use super::{Backend, Refusal, DEFAULT_STOP_CHORD};
+    use crate::error::{EngineCode, Reason};
+
+    /// A backend on every default.
+    struct Defaults;
+
+    impl Backend for Defaults {}
+
+    #[test]
+    fn a_default_backend_refuses_a_foreign_stop_chord_and_takes_its_own() {
+        let mut backend = Defaults;
+        assert_eq!(
+            backend.set_stop_chord(Some("ctrl+alt+a")),
+            Err(Refusal::new(EngineCode::StopPathUnavailable, Reason::Deaf.wire())),
+            "A-IS-62: a chord it cannot arm reads deaf, never a bare or other refusal"
+        );
+        assert_eq!(
+            backend.stop_listener().err(),
+            Some(Refusal::new(EngineCode::StopPathUnavailable, "no_listener")),
+            "no listener is armed for the refused chord"
+        );
+        assert_eq!(backend.set_stop_chord(Some(DEFAULT_STOP_CHORD)), Ok(()));
+        assert_eq!(backend.set_stop_chord(None), Ok(()), "none: its own");
+    }
+}
