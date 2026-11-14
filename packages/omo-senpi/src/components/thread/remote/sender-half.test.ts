@@ -448,23 +448,62 @@ describe("#13037 the sender half reaches a session on another device that is not
     )
   })
 
-  describe("review: a receiving side's free-form refusal reason is bounded before it reaches the person", () => {
-    test("#given a long multi-line reason with control characters #then the message is one bounded line", async () => {
-      // The format characters come first, inside the shown length, so the cut cannot hide them.
-      const reason = `\u202Eevil\u2066\u200B${"x".repeat(600)}\nsecond line\u0007\u001b[31m`
+  describe("review: a receiving side's refusal reason is shown only when it is a machine code", () => {
+    const refusalOf = async (reason: string) => {
       const a = account({
         rows: [B_ROW, C_ROW],
         ended: { c: { [GONE]: "rk-c-gone" } },
         wakeOutcome: queuedEnvelope({ kind: "refused", reason }),
       })
       const result = await fixture.surface(a.remote).run("thread_send", { thread: GONE, message: "hi" })
-      const error = (result as { error: { message: string; details?: { reason?: string } } }).error
-      for (const text of [error.message, error.details?.reason ?? ""]) {
-        expect(/[\u0000-\u001f\u007f]/.test(text)).toBe(false)
-        // Format characters (bidi overrides and isolates, zero-width marks) would reorder how the reason reads.
-        expect(/\p{Cf}/u.test(text)).toBe(false)
-        expect(text.length).toBeLessThanOrEqual(300)
-      }
+      return (result as { error: { code: string; message: string; details?: { reason?: string } } }).error
+    }
+
+    test.each([
+      "session_gone",
+      "ambiguous_session",
+      "not_wakeable",
+      "sender_not_admitted",
+      "queue_full",
+      "overloaded",
+      "wake_limit_reached",
+      "wake_unavailable",
+      "wake_unsupported",
+    ])("#given the known code %s #then its reason is the code itself", async (code) => {
+      expect((await refusalOf(code)).details?.reason).toBe(code)
+    })
+
+    test.each(["some_new_code", "v2.busy-now"])(
+      "#given an unknown code of the machine shape %s #then it is shown verbatim",
+      async (code) => {
+        const error = await refusalOf(code)
+        expect(error.code).toBe("unsupported")
+        expect(error.details?.reason).toBe(code)
+        expect(error.message.includes(code)).toBe(true)
+      },
+    )
+
+    test.each([
+      ["a joiner after a run of marks", `a${"\u0300\u0301\u0302\u0303\u0304\u0305\u200D".repeat(40)}`],
+      ["a joiner between two invisibles", "a\u034F\u200D\uFE0Fb"],
+      ["a bidi override", "\u202Eesrever"],
+      ["tag characters", "\u{E0041}\u{E0042}\u{E007F}"],
+      ["a combining grapheme joiner", "busy\u034F"],
+      ["a variation selector", "busy\uFE0F"],
+      ["Hindi prose", "नहीं, यह सत्र बंद है"],
+      ["Arabic prose", "الجلسة مغلقة"],
+      ["Korean prose", "세션을 깨울 수 없습니다"],
+      ["an emoji", "\u{1F600}"],
+      ["a string with a space", "turn active"],
+      ["an upper-case word", "Busy"],
+      ["an empty string", ""],
+      ["65 characters", "a".repeat(65)],
+      ["a string with a newline", "busy\nnow"],
+      ["a code with a trailing newline", "busy\n"],
+    ] as const)("#given %s #then the reason is the constant and the text is not shown", async (_label, reason) => {
+      const error = await refusalOf(reason)
+      expect(error.details?.reason).toBe("unrecognised")
+      expect(error.message).toBe("Device c refused the message (unrecognised reason).")
     })
   })
 })

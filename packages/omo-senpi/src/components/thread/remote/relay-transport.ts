@@ -109,16 +109,12 @@ function engineStateOf(reply: JsonObject): EngineState {
 
 const WAITS: ReadonlySet<string> = new Set(["wake", "hold", "approval"])
 
-// A reason the receiving side wrote: one line, no control or format characters, at most REASON_SHOWN_MAX characters.
-const REASON_SHOWN_MAX = 120
-const shownReason = (reason: string): string =>
-  reason
-    .replace(/[\u0000-\u001f\u007f-\u009f]+/g, " ")
-    // Format characters (bidi overrides and isolates, zero-width marks) would reorder how the line reads.
-    .replace(/\p{Cf}+/gu, "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, REASON_SHOWN_MAX)
+// A refusal reason the receiving side sent. Every reason a receiving side produces is a lowercase machine code (the
+// consumer's and carrier's refusals, and the table below), so a reason is shown only when it has that shape; any other text
+// from that device becomes UNRECOGNISED_REASON and is never shown, in the message or in details.reason.
+const REASON_CODE = /^[a-z0-9][a-z0-9_.-]{0,63}$/
+const UNRECOGNISED_REASON = "unrecognised"
+const shownReason = (reason: string): string => (REASON_CODE.test(reason) ? reason : UNRECOGNISED_REASON)
 
 /**
  * omo#13037 section 5.1: what a session that is not running answers, from the receiving consumer (`data.kind` "refused")
@@ -183,7 +179,7 @@ function wakeRefusal(received: string, device: string, data: JsonObject = {}): F
     default:
       return fail(
         "unsupported",
-        `Device ${device} refused the message (${reason}).`,
+        `Device ${device} refused the message (${reason === UNRECOGNISED_REASON ? "unrecognised reason" : reason}).`,
         "Address another thread.",
         details,
       )
