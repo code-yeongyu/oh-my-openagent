@@ -15,7 +15,7 @@ omo remote devices [--json]      # the devices on this account
 omo remote sessions [--device D] [--project P] [--state running|idle|ended] [--json]
 omo remote enable | disable [--json]   # turn remote sessions on or off for this device
 omo remote control [on|off]      # whether your other devices may view and command this device's sessions
-omo remote bootstrap [--json]    # set up the device service for your sign-in (every omo start runs it)
+omo remote bootstrap [--json]    # set up the device service for your sign-in (every interactive omo start runs it)
 omo remote attach <device>/<session>   # watch a session on another device
 ```
 
@@ -27,7 +27,10 @@ for every stop, including a failed verification or install.
 
 - The same OmO account signed in on every device you want to reach. `omo remote` has no pairing
   command: it reaches the devices signed in to your account.
-- The OmO device service set up and running on each device (see [Install and update](#install-and-update)).
+- The OmO device service set up and running on each device. Either route sets it up: `omo remote
+  bootstrap`, which every interactive `omo` start runs (see [Install and update](#install-and-update)),
+  or the OmO desktop app. When the service is missing, `omo remote` names both routes
+  (`packages/omo-native/remote-cli.ts`, `runRemoteVerb`).
 - A plan that includes remote sessions. Without one, `omo remote status` shows `Plan required`.
 
 ## Before any command runs

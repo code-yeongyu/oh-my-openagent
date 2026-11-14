@@ -31,7 +31,7 @@ const REMOTE_USAGE = `usage: omo remote <command> [--json]
   enable | disable                         turn remote sessions on or off for this device
   control [on|off]                         whether your other signed-in devices can view and command this
                                            device's sessions (on unless you turn it off)
-  bootstrap                                set up this device's service for your sign-in (every omo start runs it)
+  bootstrap                                set up this device's service for your sign-in (every interactive omo start runs it)
   attach <device>/<session>                open a session on another device in the terminal UI, to watch and type
   open <device> [--project P] [--model M] [--permission-preset MODE]
                                            start a session on another device; prints <device>/<session>; it runs
@@ -198,7 +198,9 @@ export async function runRemoteVerb(dependencies: RemoteVerbDependencies, args: 
   const signedOut = await accountNotice(dependencies)
   if (signedOut !== undefined) return signedOut
   if (!existsSync(dependencies.stateDir)) {
-    dependencies.error("The OmO device service is not set up on this device. Install the OmO desktop app to set it up.")
+    dependencies.error(
+      "The OmO device service is not set up on this device. Run `omo remote bootstrap` (every interactive `omo` start runs it), or install the OmO desktop app, to set it up.",
+    )
     return REMOTE_EXIT.unavailable
   }
   if (!existsSync(deviceServiceEndpointPath(dependencies.stateDir))) {
