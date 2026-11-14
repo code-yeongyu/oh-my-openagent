@@ -246,7 +246,13 @@ function configureClosedServiceAuthCommands(program: Command, hooks: ServiceAuth
       .allowUnknownOption()
       .allowExcessArguments()
       .option("--api <url>")
+      .option("--help")
       .action((options: Options) => {
+        // #13461: `--help` describes the command, as `login --help` does; any other argument still refuses.
+        if (options.help === true) {
+          console.log(name === "logout" ? CLOSED_LOGOUT_HELP : CLOSED_WHOAMI_HELP)
+          return
+        }
         if (command.args.length !== 0) refuseClosedServiceAuth()
         return run(name, options, hooks)
       })
