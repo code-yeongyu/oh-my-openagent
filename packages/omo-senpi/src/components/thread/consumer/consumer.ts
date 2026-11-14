@@ -16,6 +16,8 @@ export type DeliveryConsumerOptions = {
   readonly sessionsDirectory: string
   /** Starts the session (the carrier's wake); called only after the sender passed the admission check. */
   readonly wake: (durableId: string) => Promise<void>
+  /** A tracked step that failed (a wake, an answer, a held reply): reported here, never left as an unhandled rejection. */
+  readonly onError?: (error: unknown) => void
 }
 
 export type DeliveryConsumer = {
@@ -73,8 +75,9 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
   let unsubscribe: (() => void)[] = []
 
   const track = (work: Promise<void>): void => {
-    follow.add(work)
-    void work.finally(() => follow.delete(work))
+    const settled = work.catch((error: unknown) => options.onError?.(error))
+    follow.add(settled)
+    void settled.finally(() => follow.delete(settled))
   }
 
   const settleAfterAnswer = async (event: DeliveryInboundEvent, rowId: string): Promise<void> => {
