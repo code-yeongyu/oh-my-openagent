@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import { realpathSync } from "node:fs"
+import { readdirSync, readFileSync, realpathSync } from "node:fs"
 import { readdir, readFile } from "node:fs/promises"
 import { basename, dirname, join } from "node:path"
 
@@ -8,8 +8,8 @@ import { basename, dirname, join } from "node:path"
  * `modes/rpc/host-endpoints.ts`). Every endpoint an agent directory holds - multi-session hosts,
  * their `p-*`/`i-*` shards, and the control endpoints of terminals running the OmO extension - is
  * one directory there, named by the canonical socket it serves. Nothing here writes, unlinks or
- * connects; the engine's `host status --all` stays the primary enumeration, and this reader is what
- * classifies a socket's kind and what enumerates when the engine cannot.
+ * connects; this reader is the thread tools' enumeration (a supplied `host status --all` report takes
+ * its place) and what classifies a socket's kind.
  */
 
 export type EndpointKind = "rpc_host" | "tui"
@@ -129,6 +129,32 @@ async function identify(dir: string): Promise<RegistryEndpoint> {
       }
   }
   return { socket: null, dir, identity: "unknown", endpoint_kind: "rpc_host", registry_version: null }
+}
+
+/**
+ * The session files an endpoint directory's `reservations/` still claims (senpi `readSessionPathClaims`: one
+ * `<16hex>.json` per claim, `sessionPath` naming the file). A host that died holding sessions leaves these behind, so
+ * they are the record of its threads in a process that never listed it alive. Unreadable claims are skipped.
+ */
+export function claimedSessionPaths(dir: string): readonly string[] {
+  let names: string[]
+  try {
+    names = readdirSync(join(dir, "reservations"))
+  } catch {
+    return []
+  }
+  return names
+    .filter((name) => name.endsWith(".json"))
+    .sort()
+    .flatMap((name) => {
+      try {
+        const claim: unknown = JSON.parse(readFileSync(join(dir, "reservations", name), "utf8"))
+        const path = typeof claim === "object" && claim !== null ? Reflect.get(claim, "sessionPath") : undefined
+        return typeof path === "string" && path !== "" ? [path] : []
+      } catch {
+        return []
+      }
+    })
 }
 
 /** Every endpoint directory under `agentDir`, sorted by directory name; `[]` before layout 2. */

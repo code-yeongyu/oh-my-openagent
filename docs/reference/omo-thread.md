@@ -5,8 +5,8 @@
 a cron job or a chat connector talks to running OmO sessions: terminal sessions (`tui`),
 Desktop threads and task children on their hosts (`rpc_host`).
 
-It never starts a host. Sessions are listed from what the engine enumerates
-(`host status --all`), and bindings, the outbox and delivery receipts live in the gateway store
+It never starts a host. Sessions are listed from the endpoints the engine's registry names
+(`<agent dir>/rpc-host-daemon/`, read in-process; each endpoint's `list_sessions` says whether it is live), and bindings, the outbox and delivery receipts live in the gateway store
 (`<agent dir>/gateway/`). Every call runs as the principal `cli:<uid>`: receipts, loop budgets
 and bindingless sends are keyed by it, and a delivered message carries the provenance header
 `source=external`, `actor=<os user>`.
@@ -576,6 +576,7 @@ try {
 ```
 
 `pluginRoot` is `<omo-ai install>/plugin`. Every method resolves to the same data union as the
-CLI's JSON; nothing throws for a refusal. Pass `engineStatusAll` (a function returning the stdout of
-`omo host status --all --include-workers --json`) to choose how the engine is run; without it the SDK runs
-the engine CLI itself, and when no engine can enumerate it falls back to the endpoint registry on disk.
+CLI's JSON; nothing throws for a refusal. Endpoints come from the endpoint registry on disk; pass
+`engineStatusAll` (a function returning the stdout of `omo host status --all --include-workers --json`) only to
+enumerate from that report instead. Neither the SDK nor `omo thread` runs that command itself: it is a full
+diagnostic pass that took 8-9 s on a host with about 50 endpoints.

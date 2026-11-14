@@ -1,4 +1,3 @@
-import { execFile } from "node:child_process"
 import { createConnection, type Socket } from "node:net"
 import { existsSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
@@ -11,10 +10,10 @@ import {
 import { resolveThreadSocket } from "./live-surface-paths"
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
-import { resolveSenpiLaunch, withoutForeignPackageDirEnv } from "../memory/worker/senpi-command"
 import { readDiskSession, type AddressBookHost, type DiskSession } from "./address-book"
 import { INITIAL_SKILLS_CONTEXT_KEY } from "./initial-skills"
 import {
+  claimedSessionPaths,
   controlSocketSecretPath,
   endpointKindOf,
   isTuiControlSocket,
@@ -72,10 +71,8 @@ export const ENDPOINT_LIST_TIMEOUT_MS = 10_000
  * most this long, the same bound senpi's `status --all` probes a `tui` row under (TUI_PROBE_TIMEOUT_MS).
  */
 export const TUI_REQUEST_TIMEOUT_MS = 1_500
-/** How long one `host status --all` enumeration is reused before the engine is asked again. */
+/** How long one endpoint enumeration is reused before it is read again. */
 export const HOST_ENDPOINTS_CACHE_TTL_MS = 5_000
-const HOST_STATUS_ALL_TIMEOUT_MS = 30_000
-export const HOST_STATUS_ALL_ARGS = ["host", "status", "--all", "--include-workers", "--json"] as const
 /**
  * Marks a read-only listing as an observation (senpi `OBSERVE_REQUEST_FIELD`): without it the supervisor
  * counts the connection as an attachment, so every thread tool call would reset each shard's idle window
@@ -171,7 +168,7 @@ export type HostEndpointReport = {
   readonly reason?: "live_unresponsive" | "dead" | null
 }
 
-/** `undefined` means the engine cannot enumerate (a pre-release engine's usage error, no CLI): the registry on disk is read instead. */
+/** `undefined` means the runner cannot enumerate: the registry on disk is read instead. */
 export type HostStatusAllRunner = () => Promise<readonly HostEndpointReport[] | undefined>
 
 function stringsAt(rows: unknown, field: string): string[] {
@@ -230,43 +227,18 @@ export function parseHostStatusAll(stdout: string | undefined): readonly HostEnd
   )
 }
 
-/**
- * Asks the engine CLI that runs this session. The exit code is not the verdict: `status --all` exits
- * 3 when no endpoint answers and still prints its line, while a pre-release engine rejects `--all`
- * as a usage error with no line at all - both are read from stdout alone.
- */
-function engineHostStatusAll(env: Readonly<Record<string, string | undefined>>): HostStatusAllRunner {
-  return async () => {
-    let launch: ReturnType<typeof resolveSenpiLaunch>
-    try {
-      launch = resolveSenpiLaunch({ ...env })
-    } catch {
-      return undefined
-    }
-    const stdout = await new Promise<string | undefined>((done) => {
-      execFile(
-        launch.command,
-        [...launch.prefixArgs, ...HOST_STATUS_ALL_ARGS],
-        {
-          env: withoutForeignPackageDirEnv({ ...env }, launch),
-          timeout: HOST_STATUS_ALL_TIMEOUT_MS,
-          maxBuffer: 16 * 1024 * 1024,
-          windowsHide: true,
-        },
-        (_error, out) => done(typeof out === "string" ? out : undefined),
-      )
-    })
-    return parseHostStatusAll(stdout)
-  }
-}
-
 export type LiveThreadSurfaceOptions = {
   readonly keyRoot?: string
   /** Socket already resolved by a synchronous registrar before the runtime is loaded. */
   readonly socket?: string
   readonly env?: Readonly<Record<string, string | undefined>>
   readonly exists?: (path: string) => boolean
-  /** Replaces the engine CLI enumeration; tests answer it without spawning anything. */
+  /**
+   * An engine `host status --all` report to enumerate from instead of the registry (the thread SDK's `engineStatusAll`).
+   * The default never runs it: that command is a full diagnostic pass (a /proc walk per endpoint) that took 8.4-8.7 s
+   * on a 49-endpoint host, paid by every thread tool call. The registry names the same sockets, and each
+   * endpoint's own `list_sessions` answers whether it is live.
+   */
   readonly statusAll?: HostStatusAllRunner
   readonly registry?: () => Promise<readonly RegistryEndpoint[]>
   readonly readSecret?: (socket: string) => Uint8Array
@@ -278,6 +250,8 @@ type EndpointVerdict = { readonly alive?: boolean; readonly reason?: "live_unres
 type KnownEndpoint = {
   readonly socket: string
   readonly paths: readonly string[]
+  /** Registry directories whose `reservations/` claims are read when the endpoint does not answer. */
+  readonly claimDirs: readonly string[]
   readonly kind: EndpointKind
   readonly verdict: EndpointVerdict
 }
@@ -299,8 +273,8 @@ function isConnectRefusal(error: unknown): boolean {
 /**
  * The thread tools' client for every endpoint this agent dir holds: the legacy socket
  * (`resolveThreadSocket`, the operator endpoint `thread_create` opens on), every host shard (`i-*`, `p-*`)
- * and every terminal control endpoint (`tui`) the engine enumerates - or, when the engine cannot
- * enumerate, the registry on disk names. It never starts or replaces a host. Each call lists every
+ * and every terminal control endpoint (`tui`) the endpoint registry on disk names (or a supplied
+ * `statusAll` report). It never starts or replaces a host. Each call lists every
  * endpoint live; a session is reached on the endpoint that listed it, because routing ids are
  * per-host counters. `thread_create` opens on the legacy endpoint. A terminal is only ever sent the
  * commands in TUI_ENDPOINT_COMMANDS, with its secret first.
@@ -313,7 +287,7 @@ export function createLiveThreadSurface(
   const exists = options.exists ?? existsSync
   const connect = options.connect ?? ((path: string) => createConnection(path))
   const now = options.now ?? Date.now
-  const statusAll = options.statusAll ?? engineHostStatusAll(env)
+  const statusAll = options.statusAll ?? (async () => undefined)
   const registry = options.registry ?? (() => listRegistryEndpoints(resolveAgentHome({ env })))
   const readSecret = options.readSecret ?? ((socket: string) => readFileSync(controlSocketSecretPath(socket)))
   const legacy = options.socket ?? resolveThreadSocket(options.env)
@@ -401,7 +375,15 @@ export function createLiveThreadSurface(
         ? recorded.flatMap((entry) =>
             entry.socket === null
               ? []
-              : [{ socket: entry.socket, paths: [] as readonly string[], kind: entry.endpoint_kind, verdict: {} }],
+              : [
+                  {
+                    socket: entry.socket,
+                    paths: [] as readonly string[],
+                    claimDirs: [entry.dir],
+                    kind: entry.endpoint_kind,
+                    verdict: {},
+                  },
+                ],
           )
         : reports.flatMap((report) =>
             report.socket === null
@@ -410,6 +392,7 @@ export function createLiveThreadSurface(
                   {
                     socket: report.socket,
                     paths: report.session_paths,
+                    claimDirs: [] as readonly string[],
                     kind: report.endpoint_kind ?? endpointKindOf(report.socket, recorded),
                     verdict: {
                       ...(report.alive === undefined ? {} : { alive: report.alive }),
@@ -422,15 +405,22 @@ export function createLiveThreadSurface(
     // the only record of its threads when it stops answering.
     const isLegacy = (endpoint: KnownEndpoint) => resolve(endpoint.socket) === resolve(legacy)
     const legacyPaths = [...new Set(found.filter(isLegacy).flatMap((endpoint) => endpoint.paths))]
+    const legacyDirs = [...new Set(found.filter(isLegacy).flatMap((endpoint) => endpoint.claimDirs))]
     return [
-      { socket: legacy, paths: legacyPaths, kind: endpointKindOf(legacy, recorded), verdict: {} },
+      {
+        socket: legacy,
+        paths: legacyPaths,
+        claimDirs: legacyDirs,
+        kind: endpointKindOf(legacy, recorded),
+        verdict: {},
+      },
       ...found.filter((endpoint) => !isLegacy(endpoint)),
     ]
   }
 
   const endpoints = async (): Promise<readonly KnownEndpoint[]> => {
-    // One enumeration at a time, and its window starts when it answers: a host whose `status --all` takes longer
-    // than the window shares the running one and reuses its answer, instead of enumerating once per view (#12989).
+    // One enumeration at a time, and its window starts when it answers: an enumeration that takes longer than the
+    // window (a slow registry read, or a supplied `status --all` report) is shared, not repeated per view (#12989).
     if (enumeration === undefined || (enumeration.expiresAt !== undefined && enumeration.expiresAt <= now())) {
       const started: Enumeration = { expiresAt: undefined, endpoints: enumerate() }
       enumeration = started
@@ -453,7 +443,11 @@ export function createLiveThreadSurface(
     error: unknown,
     reason: "live_unresponsive" | "dead" | null,
   ): EndpointListing => {
-    const known = new Set([...endpoint.paths, ...(lastListed.get(endpoint.socket) ?? [])])
+    const known = new Set([
+      ...endpoint.paths,
+      ...endpoint.claimDirs.flatMap((dir) => claimedSessionPaths(dir)),
+      ...(lastListed.get(endpoint.socket) ?? []),
+    ])
     const disk = [...known].flatMap((path) => {
       const session = readDiskSession(path, endpoint.socket)
       return session === null ? [] : [session]
@@ -623,7 +617,13 @@ export function createLiveThreadSurface(
    */
   const routingIdOf = async (endpoint: GatewayEndpointRef): Promise<string | null> => {
     if (endpoint.routing_id !== null) return endpoint.routing_id
-    const listed = await listEndpoint({ socket: endpoint.socket, paths: [], kind: endpoint.kind, verdict: {} })
+    const listed = await listEndpoint({
+      socket: endpoint.socket,
+      paths: [],
+      claimDirs: [],
+      kind: endpoint.kind,
+      verdict: {},
+    })
     if (listed.failure !== undefined) throw listed.failure
     return (
       listed.sessions.find(
@@ -701,6 +701,7 @@ export function createLiveThreadSurface(
       const listed = await listEndpoint({
         socket: endpoint.socket,
         paths: [],
+        claimDirs: [],
         kind: endpoint.kind,
         verdict: cached ?? {},
       })
