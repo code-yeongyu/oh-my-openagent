@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { execFileSync, spawnSync } from "node:child_process"
+import { spawnSync } from "node:child_process"
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -8,6 +8,10 @@ import { removeTempRoot } from "./remove-temp-root.ts"
 
 // Each case spawns git and bun several times (about 4 s alone), so it gets a budget above bun's 5 s default.
 const SPAWN_TIMEOUT_MS = 30_000
+// One git or bun step is bounded below the case budget, so a stuck child is killed and reaped by the spawn itself, the case
+// fails naming that step and its time (never passes on a killed child's null status), and afterEach can still remove its
+// directory (#13366).
+const STEP_TIMEOUT_MS = 20_000
 const SCRIPT_DIR = import.meta.dir
 const LOG = "packages/omo-senpi/changes.md"
 const ENV = {
@@ -18,13 +22,34 @@ const ENV = {
   GIT_COMMITTER_EMAIL: "t@t",
 }
 
-const git = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8", env: ENV })
+/** Runs one step; a step that could not run to its own exit (a spawn error, a timeout, a signal) fails the case by name. */
+const step = <T extends { error?: Error; signal: NodeJS.Signals | null }>(name: string, run: () => T): T => {
+  const started = performance.now()
+  const result = run()
+  if (result.error !== undefined || result.signal !== null) {
+    const ms = Math.round(performance.now() - started)
+    const cause = result.error?.message ?? `killed by ${result.signal}`
+    throw new Error(`step '${name}' did not finish on its own after ${ms} ms (limit ${STEP_TIMEOUT_MS} ms): ${cause}`)
+  }
+  return result
+}
+
+const git = (cwd: string, ...args: string[]) => {
+  const result = step(`git ${args.join(" ")}`, () =>
+    spawnSync("git", args, { cwd, encoding: "utf8", env: ENV, timeout: STEP_TIMEOUT_MS }),
+  )
+  if (result.status !== 0)
+    throw new Error(`step 'git ${args.join(" ")}' exited ${result.status}: ${result.stderr.trim()}`)
+  return result.stdout
+}
 const commit = (cwd: string, message: string) => {
   git(cwd, "add", "-A")
   git(cwd, "commit", "-q", "-m", message)
 }
 const bun = (cwd: string, args: string[], env: Record<string, string> = {}) =>
-  spawnSync("bun", args, { cwd, encoding: "utf8", env: { ...ENV, ...env } })
+  step(`bun ${args.join(" ")}`, () =>
+    spawnSync("bun", args, { cwd, encoding: "utf8", env: { ...ENV, ...env }, timeout: STEP_TIMEOUT_MS }),
+  )
 
 const scratchDirs: string[] = []
 // A timed-out or aborted test never reaches a finally block, and scratch() itself runs git and bun after the
@@ -40,6 +65,9 @@ const scratch = () => {
   git(dir, "init", "-q", "-b", "dev")
   // A runner's global core.autocrlf=true (windows-latest) would check files out with CRLF; the expectations are bytes.
   git(dir, "config", "core.autocrlf", "false")
+  // The commands run from this copy of script/ (500+ files); none of them reads it through git, and staging it made the
+  // base commit take most of the case's budget on windows-latest (#13366), so the copy stays out of the index.
+  writeFileSync(join(dir, ".git", "info", "exclude"), "/script/\n")
   cpSync(SCRIPT_DIR, join(dir, "script"), { recursive: true, filter: (p) => !p.includes("node_modules") })
   mkdirSync(join(dir, "packages/omo-senpi"), { recursive: true })
   mkdirSync(join(dir, "changes/unreleased"), { recursive: true })
@@ -108,7 +136,7 @@ describe("stamp-release-changelog.ts with package-log blocks", () => {
       writeFileSync(join(dir, "changes/unreleased/9.md"), `${markerLine(LOG)}\n## 2026-10-20 - nine (#9)\n`)
       const before = readFileSync(join(dir, LOG), "utf8")
       const result = bun(dir, ["script/stamp-release-changelog.ts", "9.9.9", "2026-10-20"])
-      expect(result.status).not.toBe(0)
+      expect(result.status).toBe(1)
       expect(readFileSync(join(dir, LOG), "utf8")).toBe(before)
     },
     SPAWN_TIMEOUT_MS,
