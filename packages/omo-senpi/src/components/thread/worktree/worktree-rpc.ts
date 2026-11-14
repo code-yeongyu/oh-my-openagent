@@ -1,13 +1,11 @@
 import { realpath } from "node:fs/promises"
 import { basename, dirname, isAbsolute } from "node:path"
-import type { SenpiExtensionAPI } from "../../../extension/types"
 import type { ThreadDataError } from "../contracts"
 import { discardWorktree, insideRoot } from "./discard-worktree"
 import { folderFailure } from "./failures"
 import { createThreadWorktree, runGit, type GitRun, type WorktreeOutcome } from "./thread-worktree"
 
-/** The `extension_request` another device's thread_create sends this device's omo to create (or undo) a worktree here. */
-export const THREAD_WORKTREE_RPC = "omo.thread.worktree"
+export { THREAD_WORKTREE_RPC } from "./worktree-rpc-name"
 
 export type WorktreeRemoval = { readonly kind: "removed" } | ThreadDataError
 
@@ -93,8 +91,4 @@ export async function answerWorktreeRequest(
     root,
     git,
   })
-}
-
-export function registerThreadWorktreeRpc(pi: SenpiExtensionAPI, root: () => string): void {
-  pi.rpc?.handle?.(THREAD_WORKTREE_RPC, (data) => answerWorktreeRequest(data, root()))
 }
