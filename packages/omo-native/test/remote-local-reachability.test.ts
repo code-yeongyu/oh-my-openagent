@@ -13,6 +13,7 @@ const at = (path: string) => join(repoRoot, path);
 
 const ROOTS = [
   "packages/omo-native/remote-local.ts",
+  "packages/omo-native/runtime-prune.ts",
   "packages/omo-native/account-show.ts",
   "packages/omo-native/remote-session-verbs.ts",
   "packages/omo-senpi/src/components/thread/remote/device-service.ts",
@@ -27,6 +28,7 @@ const NETWORK_MODULES = new Set(["tls", "https", "http", "http2", "dgram", "dns"
 
 // Local tools only, each reviewed: the keyring and home lookups, the Windows access list, git provenance, and ps.
 const CHILD_PROCESS_IMPORTERS = [
+  "packages/omo-native/bin/lib/process-list.js",
   "packages/device-service-core/src/local-api/dacl.ts",
   "packages/omo-opencode/src/cli/service-auth/account-home.ts",
   "packages/omo-opencode/src/cli/service-auth/secret-service-lock.ts",
