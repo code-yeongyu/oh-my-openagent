@@ -114,6 +114,10 @@ impl RefRegistry {
                     let anchor = self.generation(&window, top).map(|g| g.entries[0].identity.clone());
                     if let Some(anchor) = anchor {
                         let drilled = Drilled { top, from: top, index: 0, identity: &anchor };
+                        // Under the STORED window key, as observe's drill does: a drill mint skips
+                        // the identity check, so the live key must never rebind the window here.
+                        let stored = self.generation(&window, top).map(|g| g.window.clone());
+                        let root = RootRead { window: stored.unwrap_or(root.window), ..root };
                         let sub = self.mint(&root, &walk, Some(drilled)).generation;
                         for candidate in &mut candidates {
                             candidate.at = candidate.node.map(|node| (sub, node));
