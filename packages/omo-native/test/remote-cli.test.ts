@@ -144,6 +144,15 @@ describe("omo remote", () => {
     expect(result.rows.map((row) => row.device)).toEqual([PEER])
   })
 
+  test("sessions --device naming no device of the account is a usage error, not an empty list (#13402)", async () => {
+    const typo = await run(["sessions", "--device", "no-such-device", "--json"])
+    expect(typo.code).toBe(REMOTE_EXIT.usage)
+    expect(typo.out).toEqual([])
+    expect(typo.err).toEqual(["omo remote sessions: no device no-such-device on this account (see omo remote devices)"])
+    const self = await run(["sessions", "--device", "dev-self", "--json"])
+    expect(self.code).toBe(REMOTE_EXIT.ok)
+  })
+
   test("disable and enable report the switch the service answers with", async () => {
     const off = await run(["disable"])
     expect(off.out).toEqual(["Remote sessions are off for this device."])
