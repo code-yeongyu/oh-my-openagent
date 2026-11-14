@@ -103,6 +103,7 @@ export async function createThreadWorktree(options: {
       branch,
       root: options.root,
       git,
+      removeUnregisteredFolder: true,
       ...(createdFolder === undefined ? {} : { createdFolder: dirname(path) }),
     })
     return left ?? failedGit(added, { path, branch, repository })

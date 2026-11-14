@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { existsSync } from "node:fs"
+import { existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { createLocalSessionHost } from "../control/local-session-host"
 import type { ThreadHost } from "../tools/ports"
@@ -169,6 +169,36 @@ describe("the remove request another device sends removes only a worktree OmO ma
     const outcome = await answerWorktreeRequest({ remove }, root)
     expect(outcome.kind).toBe("error")
     expect([existsSync(made.worktree.path), existsSync(outside), worktreeCount(repo)]).toEqual([true, true, 3])
+  })
+
+  test("#given a live worktree with uncommitted work in a subfolder #when removal names that subfolder and the worktree's branch #then it is refused and the subfolder, the worktree and the branch stay", async () => {
+    const repo = kit.repository()
+    const root = kit.folder("thread-wt-root-")
+    const made = await createThreadWorktree({ repository: repo, request: { branch: "feat/live" }, root })
+    if (made.kind !== "ok") throw new Error(JSON.stringify(made))
+    const src = join(made.worktree.path, "src")
+    mkdirSync(src)
+    writeFileSync(join(src, "precious.txt"), "uncommitted\n")
+    const outcome = await answerWorktreeRequest({ remove: { path: src, branch: "feat/live" } }, root)
+    expect(errorOf(outcome)).toMatchObject({ details: { reason: "worktree_left_behind", path: src } })
+    expect([existsSync(join(src, "precious.txt")), branchExists(repo, "feat/live"), worktreeCount(repo)]).toEqual([
+      true,
+      true,
+      2,
+    ])
+  })
+
+  test("#given the agent dir lies inside an enclosing git repository #when removal names a per-repository folder with the enclosing repository's branch #then it is refused and the worktrees inside stay", async () => {
+    const home = kit.repository()
+    const root = join(home, "agent", "worktrees")
+    mkdirSync(root, { recursive: true })
+    const repo = kit.repository()
+    const made = await createThreadWorktree({ repository: repo, request: { branch: "inner" }, root })
+    if (made.kind !== "ok") throw new Error(JSON.stringify(made))
+    const perRepo = dirname(made.worktree.path)
+    const outcome = await answerWorktreeRequest({ remove: { path: perRepo, branch: "main" } }, root)
+    expect(errorOf(outcome)).toMatchObject({ details: { reason: "worktree_left_behind", path: perRepo } })
+    expect([existsSync(made.worktree.path), branchExists(repo, "inner"), worktreeCount(repo)]).toEqual([true, true, 2])
   })
 
   test("#given the worktree a failed open left #when removal is requested with its path and branch #then it and its branch are removed", async () => {

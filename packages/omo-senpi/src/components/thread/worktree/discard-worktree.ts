@@ -31,6 +31,8 @@ export async function discardWorktree(options: {
   readonly root: string
   readonly git: GitRun
   readonly createdFolder?: string
+  /** Only a create that checked `path` was absent before its add may delete a folder git does not know as a worktree. */
+  readonly removeUnregisteredFolder?: boolean
 }): Promise<ThreadDataError | undefined> {
   const { repository, path, branch, root, git } = options
   if (!(await insideRoot(root, path)))
@@ -42,7 +44,8 @@ export async function discardWorktree(options: {
     return list.exit !== 0 || list.stdout.split("\n").some((line) => spellings.has(line.slice("worktree ".length)))
   }
   if (await exists(path)) await git(["worktree", "remove", "--force", path], repository)
-  if ((await exists(path)) && !(await registered())) await rm(path, { recursive: true, force: true }).catch(() => {})
+  if (options.removeUnregisteredFolder === true && (await exists(path)) && !(await registered()))
+    await rm(path, { recursive: true, force: true }).catch(() => {})
   await git(["worktree", "prune"], repository)
   const hasBranch = async () => (await git(["show-ref", "--verify", "--quiet", `refs/heads/${branch}`], repository)).exit === 0
   if ((await hasBranch()) && !(await registered())) await git(["branch", "-D", branch], repository)
