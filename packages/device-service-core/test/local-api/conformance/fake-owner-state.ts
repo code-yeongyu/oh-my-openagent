@@ -25,6 +25,8 @@ export type OwnerState = {
   readonly conns: Set<Conn>
   readonly log: RequestType[]
   adoptions: number
+  /** The device service's attach-on-adopt rule: an adopt naming another device id while a live device is held attaches to it (opt-in per test). */
+  attachHeldOnAdopt?: boolean
   /** Every device.adopt exactly as it arrived, before validation (the account field included when sent). */
   readonly adoptRequests: Record<string, unknown>[]
   readonly attaches: Map<string, WorldSession>

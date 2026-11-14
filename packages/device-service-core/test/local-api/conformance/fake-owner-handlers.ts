@@ -41,9 +41,15 @@ export const dispatch = (state: OwnerState, conn: Conn, request: LocalRequest): 
     case "refresher.register":
       state.refresher = { binary_path: request.binary_path, version: request.version }
       return ok()
-    case "device.adopt":
+    case "device.adopt": {
+      // The device service's attach-on-adopt rule (opt-in): while it holds a live device, an adopt naming ANOTHER device id attaches to the held one: it
+      // answers ok with the held device and adopts nothing.
+      const held = state.status.device
+      const live = held !== null && state.status.state !== "sign_in_required" && state.status.state !== "signed_out"
+      if (state.attachHeldOnAdopt === true && live && held.id !== request.device.id) return ok({ device: held })
       state.adoptions += 1
       return ok({ device: request.device }, () => setStatus(state, deviceStatus(state, request.device)))
+    }
     case "device.forget":
       return ok({}, () => setStatus(state, deviceStatus(state, null)))
     case "device.info":
