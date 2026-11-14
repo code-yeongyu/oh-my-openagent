@@ -20,6 +20,7 @@ import type { CommandRpc } from "./local-api/protocol.ts"
 import type { SessionCandidate } from "./local-api/protocol-delegated.ts"
 import { randomBytes } from "node:crypto"
 import { compareVersions } from "./release/version.ts"
+import { deadlineTimerOf, realTimers, type Timers } from "./timers.ts"
 
 // A host sends no command state at all for a route it does not list toward a sender it does not grant (docs/local-api.md
 // "Delegated commands"), so the client bounds its own wait.
@@ -31,6 +32,7 @@ function sendToEndpoint(
   endpoint: string,
   rpc: CommandRpc,
   locate: boolean,
+  timers: Timers,
 ): Promise<CommandResult> {
   return new Promise<CommandResult>((resolve, reject) => {
     // Minted before sending, so a state that arrives ahead of the answer is not missed.
@@ -41,7 +43,7 @@ function sendToEndpoint(
       done = true
       stop()
       channel.stop()
-      clearTimeout(timer)
+      cancelTimer()
     }
     const fail = (error: unknown): void => {
       if (done) return
@@ -61,11 +63,9 @@ function sendToEndpoint(
         ...(located === undefined ? {} : { located }),
       })
     })
-    const timer = setTimeout(
-      () => fail(new Error(`no final state for endpoint command ${commandId} within ${ENDPOINT_COMMAND_WAIT_MS} ms`)),
-      ENDPOINT_COMMAND_WAIT_MS,
+    const cancelTimer = timers.after(ENDPOINT_COMMAND_WAIT_MS, () =>
+      fail(new Error(`no final state for endpoint command ${commandId} within ${ENDPOINT_COMMAND_WAIT_MS} ms`)),
     )
-    timer.unref?.()
     void client.closed.then(() => fail(new Error("the connection closed before the endpoint command settled")))
     const send = (asked: boolean): Promise<unknown> =>
       client.endpointCommand(device, endpoint, rpc, commandId, { locate: asked })
@@ -215,14 +215,22 @@ export type ConnectDeviceServiceOptions = {
   readonly background?: boolean
   /** Test seam: the local API connection (the vendored v1 client by default). */
   readonly connect?: (options: ConnectOptions) => Promise<LocalApiClient>
+  /**
+   * Test seam: the clock every wait of this connection runs on, the local API's handshake and request bounds included.
+   * Real timers by default; the local API then keeps its own.
+   */
+  readonly timers?: Timers
 }
 
 /** Opens a proven connection to this device's service (mutual proof before any request) and returns the typed SDK. */
 export async function connectDeviceService(options: ConnectDeviceServiceOptions): Promise<DeviceService> {
   const stateDir = options.stateDir ?? deviceServiceStateDir()
+  const timers = options.timers ?? realTimers
+  const deadline = options.timers === undefined ? undefined : deadlineTimerOf(options.timers)
   const client = await (options.connect ?? connectLocalApi)({
     stateDir,
     client: { name: "omo", version: options.version },
+    ...(deadline === undefined ? {} : { handshakeTimer: deadline, requestTimer: deadline }),
     ...(options.background === true ? { transport: () => connectLocal(stateDir, { background: true }) } : {}),
   })
   return {
@@ -266,7 +274,7 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
     thisDevice: async () => (await client.request("device.info", {})).device,
     devices: async () => (await client.request("devices.list", {})).devices,
     sessions: newestRowsListing(client),
-    attach: (device, sessionId) => openAttach(client, device, sessionId),
+    attach: (device, sessionId) => openAttach(client, device, sessionId, timers),
     endpointCommand: async (device, rpc, options) => {
       // The endpoint lookup runs before any session.command is written, so whatever fails it (a timeout, a closed
       // connection, a refusal) dispatched nothing: it is marked not_sent, unlike a timeout after sending.
@@ -278,7 +286,7 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
       }
       if (endpoint === undefined)
         throw new LocalApiError("unsupported", "the device lists no engine endpoint", { not_sent: true })
-      return await sendToEndpoint(client, device, endpoint, rpc, options?.locate === true)
+      return await sendToEndpoint(client, device, endpoint, rpc, options?.locate === true, timers)
     },
     close: () => client.close(),
     closed: client.closed,
