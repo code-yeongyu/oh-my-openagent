@@ -9,6 +9,10 @@ import type { DeliveryServicePort } from "./port"
 export async function connectDeliveryServicePort(options: {
   readonly version: string
   readonly stateDir?: string
+  /** Reports why no port could be opened, so a service that is up but refuses the hello is not silent. */
+  readonly log?: (line: string) => void
+  /** A service that answered nothing may come up later: fired once per failed connect. */
+  readonly onUnavailable?: () => void
 }): Promise<DeliveryServicePort | undefined> {
   let client: Awaited<ReturnType<typeof connectDeliveryConsumer>>
   try {
@@ -16,7 +20,9 @@ export async function connectDeliveryServicePort(options: {
       version: options.version,
       stateDir: options.stateDir ?? deviceServiceStateDir(),
     })
-  } catch {
+  } catch (error) {
+    options.log?.(`thread wake: the device service answered no delivery connection: ${error instanceof Error ? error.message : String(error)}`)
+    options.onUnavailable?.()
     return undefined
   }
   return {

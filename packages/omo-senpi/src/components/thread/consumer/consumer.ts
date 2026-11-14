@@ -22,12 +22,6 @@ export type DeliveryConsumerOptions = {
 
 export type DeliveryConsumer = {
   readonly start: () => Promise<ConsumerStart>
-  /**
-   * The receiving device's wake switch as this consumer was told it on its own connection (A7.2.3): off until an
-   * acknowledgement names it, off again when the connection is dropped, and the carrier's gate for a row from
-   * another device.
-   */
-  readonly wakeAllowed: () => boolean
   /** From this start's acknowledgement until the consumer stops: the service hands this consumer its deliveries. */
   readonly serving: () => boolean
   /** One `delivery.drained` report per marked pair whose intake rows are all applied (the newest answered command id). */
@@ -73,7 +67,6 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
   const { store, port } = options
   const follow = new Set<Promise<void>>()
   let marksKept = true
-  let wakeAllowed = false
   let serving = false
   let unsubscribe: (() => void)[] = []
 
@@ -170,11 +163,8 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
   }
 
   return {
-    wakeAllowed: () => wakeAllowed,
     serving: () => serving,
     start: async () => {
-      // A start is a new connection: the wake reads off until this start's own acknowledgement names it.
-      wakeAllowed = false
       try {
         await store.identity()
       } catch (error) {
@@ -182,13 +172,8 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
         throw error
       }
       // The service hands its waiting records right after the acknowledgement, on the same connection, so the listeners
-      // are in place before the declaration is sent; a wake event that lands before the acknowledgement is read wins.
-      let toldSinceServe = false
+      // are in place before the declaration is sent.
       unsubscribe = [
-        port.onWake((enabled) => {
-          toldSinceServe = true
-          wakeAllowed = enabled === true
-        }),
         port.onInbound((event) => track(onInbound(event))),
         port.onHolds((event) => {
           const holds = findDiskSessions(options.sessionsDirectory, event.durable_id, { id_only: true }).length > 0
@@ -198,7 +183,6 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
       const unsubscribeAll = (): void => {
         for (const off of unsubscribe) off()
         unsubscribe = []
-        wakeAllowed = false
       }
       let ack: unknown
       try {
@@ -213,7 +197,6 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
         unsubscribeAll()
         return "unsupported"
       }
-      if (!toldSinceServe) wakeAllowed = decoded.wake ?? false
       serving = true
       await reportPending()
       return "serving"
@@ -247,7 +230,6 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
     stop: () => {
       for (const off of unsubscribe) off()
       unsubscribe = []
-      wakeAllowed = false
       serving = false
     },
   }

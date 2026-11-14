@@ -6,9 +6,10 @@ import { join } from "node:path"
 import {
   startFakeOwner,
   type FakeOwner,
-} from "../../../../../device-service-core/test/local-api/conformance/fake-owner.ts"
-import { defaultWorld } from "../../../../../device-service-core/test/local-api/conformance/world.ts"
+} from "@oh-my-opencode/device-service-core/conformance/fake-owner"
+import { defaultWorld } from "@oh-my-opencode/device-service-core/conformance/world"
 import { FakeExtensionAPI } from "../../../../test-support/fake-extension-api"
+import { connectDeliveryServicePort } from "./device-service-port"
 import { createThreadComponent } from "../component"
 import { createGatewayHarness, type GatewayHarness } from "../gateway/testing/harness"
 import type { ThreadHost } from "../tools"
@@ -135,4 +136,25 @@ test("#given an engine at the wake minimum and no delivery port injected #when i
   expect(fake.frames.filter((frame) => frame.type === "open_session")).toEqual([
     expect.objectContaining({ sessionPath: path }),
   ])
+})
+
+test("#given a state directory no device service answers #when the production port connects #then it reports the failure and says the service may come up later", async () => {
+  const stateDir = mkdtempSync(join(tmpdir(), "consumer-port-none-"))
+  chmodSync(stateDir, 0o700)
+  cleanups.push(() => rmSync(stateDir, { recursive: true, force: true }))
+  const lines: string[] = []
+  const unavailable: number[] = []
+  const port = await connectDeliveryServicePort({
+    version: "test",
+    stateDir,
+    log: (line) => {
+      lines.push(line)
+    },
+    onUnavailable: () => {
+      unavailable.push(1)
+    },
+  })
+  expect(port).toBeUndefined()
+  expect(lines).toHaveLength(1)
+  expect(unavailable).toHaveLength(1)
 })

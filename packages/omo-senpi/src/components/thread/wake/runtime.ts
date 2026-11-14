@@ -22,11 +22,19 @@ import { connectCarrierHost, type CarrierHostConnection } from "./carrier-connec
 import { createOmoNativeProductConfig } from "../../telemetry/product-identity"
 import { connectDeliveryServicePort } from "../consumer/device-service-port"
 import { startDeliveryConsumer, type ServingConsumer } from "./consumer-start"
+import { engineDropsRetainedRecord } from "./engine-minimum"
 import { engineHostEnsure, type EngineLauncher } from "./host-ensure"
+
+/** How long a dead delivery consumer waits before it is started again (#13457's MEDIUM: never restarting left remote
+ * wake off for the engine's life whenever the service was late or restarted). */
+const CONSUMER_RETRY_MS = 20_000
 
 type Env = Readonly<Record<string, string | undefined>>
 
-export type WakeConfigView = { readonly session_wake?: OmoSessionWakeSettings | undefined }
+export type WakeConfigView = {
+  readonly session_wake?: OmoSessionWakeSettings | undefined
+  readonly task?: { readonly host_idle_exit_ms?: number | undefined } | undefined
+}
 
 /** Every field is a seam; production passes none of them. */
 export type ThreadWakeOptions = {
@@ -85,20 +93,40 @@ const unrefSchedule = (run: () => void, ms: number): (() => void) => {
 /** A carry that ended: the session is no longer this carrier's, so its intake marks may now be drained. */
 const ENDED: ReadonlySet<CarrierEvaluation["kind"]> = new Set(["released", "handed_over", "closed_waiting", "held"])
 
-/** `session_wake` as the machine's omo configuration says it now, read at each send and each open. */
+/**
+ * `session_wake` as the machine's omo configuration says it now, read at each send and each open. The `same_device`
+ * switch is read for the TARGET session's cwd (its project's configuration); every other read (such as `wake_limit`)
+ * falls back to the caller's workspace root, the first registering session's.
+ */
 export function wakeSettingsReader(
   options: ThreadWakeOptions,
   cwd: () => string,
   warn: (line: string) => void,
-): () => ResolvedSessionWakeSettings {
+): (cwd?: string) => ResolvedSessionWakeSettings {
+  const env = options.env ?? process.env
+  const load = options.loadConfig ?? ((input) => loadOmoConfig({ cwd: input.cwd, env, harness: "senpi" }))
+  return (at?: string) => {
+    try {
+      return resolveSessionWakeSettings(load({ cwd: at ?? cwd() }).config)
+    } catch (error) {
+      warn(`thread wake: the session_wake settings were not read: ${error instanceof Error ? error.message : String(error)}`)
+      return resolveSessionWakeSettings({})
+    }
+  }
+}
+
+/** `task.host_idle_exit_ms` as the machine's omo configuration says it, for the host the carrier ensures. */
+export function wakeHostIdleExitMs(
+  options: ThreadWakeOptions,
+  cwd: () => string,
+): () => number | undefined {
   const env = options.env ?? process.env
   const load = options.loadConfig ?? ((input) => loadOmoConfig({ cwd: input.cwd, env, harness: "senpi" }))
   return () => {
     try {
-      return resolveSessionWakeSettings(load({ cwd: cwd() }).config)
-    } catch (error) {
-      warn(`thread wake: the session_wake settings were not read: ${error instanceof Error ? error.message : String(error)}`)
-      return resolveSessionWakeSettings({})
+      return load({ cwd: cwd() }).config.task?.host_idle_exit_ms
+    } catch {
+      return undefined
     }
   }
 }
@@ -109,7 +137,7 @@ export function processSameDeviceWake(input: {
   readonly store: GatewayStore
   readonly agentDir: () => string
   readonly sessionsDirectory: () => string
-  readonly settings: () => ResolvedSessionWakeSettings
+  readonly settings: (cwd?: string) => ResolvedSessionWakeSettings
 }): SameDeviceWake {
   const latch = input.options.latch ?? processLatch()
   return {
@@ -118,7 +146,7 @@ export function processSameDeviceWake(input: {
       return await createSameDeviceWake({
         store: input.store,
         sessionsDirectory: input.sessionsDirectory(),
-        enabled: () => input.settings().sameDevice,
+        enabled: (cwd) => input.settings(cwd).sameDevice,
         ...(running === undefined ? {} : { carrier: { wake: running.wake } }),
       }).afterSend(result)
     },
@@ -138,8 +166,10 @@ export type ThreadWakeStart = {
   readonly options: ThreadWakeOptions
   readonly agentDir: () => string
   readonly sessionsDirectory: () => string
-  readonly settings: () => ResolvedSessionWakeSettings
+  readonly settings: (cwd?: string) => ResolvedSessionWakeSettings
   readonly engineVersion: string | undefined
+  /** `task.host_idle_exit_ms` for the host the carrier ensures; absent, the launch spec's default runs. */
+  readonly hostIdleExitMs?: () => number | undefined
   readonly ensureHost: (() => Promise<void>) | undefined
   readonly warn: (line: string) => void
 }
@@ -148,6 +178,8 @@ export type ThreadWakeStart = {
  * Starts the process's carrier (#13037 A3.1.3) for this agent directory on the first `session_start` of a `tui` or `rpc`
  * engine, never in a task child or under CI, and at most once per process: the operator host it opens woken sessions on
  * is the one `thread_create` opens on (`resolveThreadSocket`). The delivery consumer starts beside it (`consumer-start.ts`).
+ * The same engine minimum the consumer reads (A8.1) gates the whole wake: below it no carrier starts, so a send to a
+ * session that is not running answers as it did before the wake existed (`queued_offline`, reason `wake_unavailable`).
  */
 export function startThreadWakeAtSession(eventCtx: unknown, input: ThreadWakeStart): void {
   const mode = (eventCtx as { readonly mode?: unknown } | null | undefined)?.mode
@@ -156,6 +188,8 @@ export function startThreadWakeAtSession(eventCtx: unknown, input: ThreadWakeSta
   if (isCi(env) || env[OMO_SENPI_TASK_RPC_CHILD] === "1") return
   const agentDir = input.agentDir()
   if (!isAbsolute(agentDir)) return
+  if (!engineDropsRetainedRecord(input.options.engineVersion ?? input.engineVersion, input.options.minimumEngine))
+    return
   const latch = input.options.latch ?? processLatch()
   const running = (latch.running ??= new Map())
   if (running.has(agentDir)) return
@@ -175,6 +209,8 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart): Runni
     engineHostEnsure({
       env,
       socket: resolveThreadSocket(env),
+      agentDir,
+      ...(input.hostIdleExitMs === undefined ? {} : { idleExitMs: input.hostIdleExitMs }),
       ...(options.launchSpecPath === undefined ? {} : { launchSpecPath: options.launchSpecPath }),
       ...(options.engineLaunch === undefined ? {} : { launch: options.engineLaunch }),
       warn: input.warn,
@@ -194,7 +230,7 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart): Runni
           background: true,
         })),
     wakeLimit: () => input.settings().wakeLimit,
-    sameDevice: () => input.settings().sameDevice,
+    sameDevice: (cwd) => input.settings(cwd).sameDevice,
     // Owner ruling 2026-11-14: a device whose service serves this engine's consumer wakes; no switch has to be told on.
     remoteWake: () => consumer?.serving() ?? false,
     schedule: options.schedule ?? unrefSchedule,
@@ -208,33 +244,56 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart): Runni
     if (outcome.kind === "failed") input.warn(`thread wake: ${durableId} was not started after ${outcome.attempts} attempts`)
     options.onWake?.(durableId, outcome)
   }
-  const ready = startDeliveryConsumer({
-    store,
-    agentDir,
-    sessionsDirectory,
-    deliveries:
-      options.deliveries ??
-      (() =>
-        connectDeliveryServicePort({
-          version: createOmoNativeProductConfig().packageVersion,
-          ...(options.deviceServiceStateDir === undefined ? {} : { stateDir: options.deviceServiceStateDir }),
-        })),
-    onConsumer: (created) => {
-      consumer = created
-    },
-    onClosed: () => {
-      serving = undefined
-    },
-    engineVersion: options.engineVersion ?? input.engineVersion,
-    minimumEngine: options.minimumEngine,
-    wake,
-    sameDevice: () => input.settings().sameDevice,
-    log: input.warn,
-  }).then(
-    (started) => {
-      serving = started
-    },
-    (error: unknown) => input.warn(`thread wake: the delivery consumer did not start: ${String(error)}`),
+  // #13457's MEDIUM: the consumer is started again after every death - a connect failure, a refused declaration, a
+  // service restart - so a device whose daemon is up keeps its remote wake whatever the startup order was.
+  let consumerStopped = false
+  let cancelConsumerRetry: (() => void) | undefined
+  const armConsumerRetry = (): void => {
+    if (consumerStopped) return
+    cancelConsumerRetry?.()
+    cancelConsumerRetry = (options.schedule ?? unrefSchedule)(() => {
+      cancelConsumerRetry = undefined
+      void startConsumer().catch((error: unknown) =>
+        input.warn(`thread wake: the delivery consumer did not start: ${String(error)}`),
+      )
+    }, CONSUMER_RETRY_MS)
+  }
+  const startConsumer = async (): Promise<void> => {
+    const attempt = await startDeliveryConsumer({
+      store,
+      agentDir,
+      sessionsDirectory,
+      deliveries:
+        options.deliveries ??
+        (() =>
+          connectDeliveryServicePort({
+            version: createOmoNativeProductConfig().packageVersion,
+            ...(options.deviceServiceStateDir === undefined ? {} : { stateDir: options.deviceServiceStateDir }),
+            log: input.warn,
+            onUnavailable: armConsumerRetry,
+          })),
+      onConsumer: (created) => {
+        consumer = created
+      },
+      onDied: armConsumerRetry,
+      onClosed: () => {
+        serving = undefined
+      },
+      engineVersion: options.engineVersion ?? input.engineVersion,
+      minimumEngine: options.minimumEngine,
+      wake,
+      sameDevice: () => input.settings().sameDevice,
+      log: input.warn,
+    }).catch((error: unknown) => {
+      input.warn(`thread wake: the delivery consumer did not start: ${String(error)}`)
+      return undefined
+    })
+    serving = attempt
+    consumer = attempt?.consumer
+  }
+  const ready = startConsumer().then(
+    () => undefined,
+    () => undefined,
   )
   return {
     carrier,
@@ -245,6 +304,8 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart): Runni
     },
     ready,
     stop: async () => {
+      consumerStopped = true
+      cancelConsumerRetry?.()
       await ready
       serving?.close()
       await carrier.stop()
