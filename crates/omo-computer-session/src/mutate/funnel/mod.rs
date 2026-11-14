@@ -18,7 +18,6 @@ use super::report::{self, Sent};
 use super::{Mutation, Refused, MARKER_UNAVAILABLE, TRANSACTION_FAILED};
 use crate::budget::PermitKind;
 use crate::{Session, NOT_OPEN};
-use omo_computer_safety::Gate;
 
 impl Session {
     /// Runs one mutating call through the funnel.
@@ -44,16 +43,8 @@ impl Session {
             self.guard
                 .admit_on_with(self.backend.as_mut(), &mutation.call, plan.stages)
         {
-            let detail = match refused.gate {
-                Gate::Consent => plan.consent_detail.clone(),
-                Gate::Lease => plan.lease_detail.clone(),
-                _ => None,
-            };
-            let out = Refused {
-                detail: detail.map(Box::new),
-                ..refused.refusal.into()
-            };
-            return Err(self.refuse(record, Some(format!("{:?}", refused.gate)), out));
+            let (stage, out) = readmit::gate_refused(refused, &plan);
+            return Err(self.refuse(record, Some(stage), out));
         }
         if let Some(frame) = mutation.frame_refusal {
             return Err(self.refuse(record, Some("Frame".to_owned()), frame.refusal().into()));
