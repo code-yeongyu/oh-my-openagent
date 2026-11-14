@@ -128,7 +128,8 @@ impl Session {
         };
         // Time passes between the first gate and here (the busy wait, another holder of the
         // interaction lock): on every path the gate runs again once the lock is held, and
-        // nothing is taken or sent before it. A refusal drops the lock with nothing sent.
+        // nothing is SENT before it. (The exec permit and the marker recovery come earlier;
+        // they send nothing.) A refusal drops the lock with nothing sent.
         // Row 21 on #13391's re-admit (R70bg(2)): the stop is reconciled through the funnel, the
         // epoch is read fresh and the gate runs on a fresh plan's stages, so a stop or a consent
         // change while another holder kept the lock refuses here too.
