@@ -261,8 +261,19 @@ fn open_session_with(
     file_hotkey: Option<&str>,
     settings_hotkey: Option<&str>,
 ) -> (Session, Result<omo_computer_core::results::SessionOpened, omo_computer_core::backend::Refusal>) {
+    open_session_on(omo_computer_backend_fake::Persona::X11, file_hotkey, settings_hotkey)
+}
+
+/// R70bq(2): every leg names its persona, so the documented default it expects is that persona's
+/// on every host, before and after the fake's default persona changes.
+fn open_session_on(
+    persona: omo_computer_backend_fake::Persona,
+    file_hotkey: Option<&str>,
+    settings_hotkey: Option<&str>,
+) -> (Session, Result<omo_computer_core::results::SessionOpened, omo_computer_core::backend::Refusal>) {
     let consent = json!({ "stopHotkey": file_hotkey });
     let backend = FakeBackend::with_parts(scenario(&json!({ "consent": consent })), FakeClock::default(), RecordingSink::default())
+        .with_persona(persona)
         .with_stop_path(StopPathScript::Live);
     let dir = tempfile::tempdir().expect("tempdir");
     let mut s = Session::for_roots(Box::new(backend), &Roots { state: dir.path().join("s"), runtime: dir.path().join("run") });
@@ -298,9 +309,13 @@ fn a_is_62_open_stop_hotkey_must_equal_the_consent_file() {
     assert!(open_with(Some("ctrl+alt+shift+f12"), Some("ctrl+alt+shift+f12")).is_ok(), "equal");
     assert!(open_with(Some("ctrl+alt+shift+f12"), None).is_ok(), "absent");
     // An absent file key is the OS default; the same chord passed explicitly is accepted.
-    let default = crate::consent::default_stop_hotkey(omo_computer_safety::protected::Os::host());
-    assert!(open_with(None, Some(default)).is_ok(), "the documented default");
+    // The documented default of the named persona (X11 here, and macOS below).
+    let default = crate::consent::default_stop_hotkey(omo_computer_safety::protected::Os::Linux);
+    assert!(open_with(None, Some(default)).is_ok(), "the X11 persona's documented default");
     assert!(open_with(None, Some("ctrl+alt+shift+f12")).is_err(), "differs from the default");
+    let mac = omo_computer_backend_fake::Persona::Macos;
+    assert!(open_session_on(mac, None, Some("ctrl+opt+cmd+escape")).1.is_ok(), "the macOS persona's documented default");
+    assert!(open_session_on(mac, None, Some("ctrl+alt+shift+escape")).1.is_err(), "the Linux default is not macOS's");
 }
 
 /// A-IS-62: an unparseable stopHotkey in the file is not a chord and never falls back to the default.
@@ -310,7 +325,7 @@ fn a_is_62_unparseable_file_chord_never_falls_back_to_the_default() {
     assert_eq!(view.stop_chord(omo_computer_safety::protected::Os::Linux), crate::consent::StopChord::Unparseable("ctrl+".to_owned()));
     let absent = crate::consent::ConsentView::from_host(json!({ "stopHotkey": null }));
     assert_eq!(absent.stop_chord(omo_computer_safety::protected::Os::Linux), crate::consent::StopChord::Chord("ctrl+alt+shift+escape".to_owned()));
-    let default = crate::consent::default_stop_hotkey(omo_computer_safety::protected::Os::host());
+    let default = crate::consent::default_stop_hotkey(omo_computer_safety::protected::Os::Linux);
     assert!(open_with(Some("ctrl+"), Some(default)).is_err(), "the default never stands in for an unparseable chord");
 }
 
@@ -604,4 +619,20 @@ fn the_refusal_line_names_the_call_that_carried_the_chord() {
     let audit = std::fs::read_to_string(path).expect("audit");
     let line = audit.lines().find(|l| l.contains("\"stop_hotkey\"")).expect("the refusal line");
     assert!(line.contains("\"action\":\"stopPath.start\""), "{line}");
+}
+
+/// A-IS-64 item 9 (R70bp(2)): the code-built Consent::default() is never the consent of a session
+/// that admits an exec or arms a chord. Before session.open an exec answers NOT_OPEN with nothing
+/// sent, and no chord is armed.
+#[test]
+fn the_code_built_default_consent_admits_no_exec_and_arms_no_chord() {
+    let sink = RecordingSink::default();
+    let backend = FakeBackend::with_parts(scenario(&json!({})), FakeClock::default(), sink.clone())
+        .with_stop_path(StopPathScript::Live);
+    let mut s = Session::new(Box::new(backend));
+    let refused = s.click(params(json!({ "target": "1", "x": 5, "y": 5 }))).expect_err("no session is open");
+    assert_eq!(refused.refusal, crate::NOT_OPEN);
+    assert!(sink.lines().is_empty(), "nothing sent: {:?}", sink.lines());
+    assert!(!s.stop_path_status().global_live, "no chord armed");
+    assert!(s.funnel.control.armed_chord.is_none(), "no chord armed");
 }
