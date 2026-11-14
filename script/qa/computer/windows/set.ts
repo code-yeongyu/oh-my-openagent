@@ -61,7 +61,8 @@ export function gateSet(lines: readonly string[]): string[] {
   if (fail !== 0) problems.push(`fail=${fail}`)
   const blocks = lines.filter((line) => line.startsWith("BLOCKED "))
   for (const block of blocks) {
-    if (block.split(" ").length < 3) problems.push(`${block} names no reason`)
+    // 'BLOCKED <name> <reason>': the reason is everything after the name, and blank is none (review L1 of #13443).
+    if (block.split(" ").slice(2).join(" ").trim() === "") problems.push(`${block} names no reason`)
   }
   if (blocks.length !== blocked) problems.push(`blocked=${blocked} but ${blocks.length} BLOCKED lines`)
   return problems
