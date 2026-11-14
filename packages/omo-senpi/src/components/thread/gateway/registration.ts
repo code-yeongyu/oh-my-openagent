@@ -123,6 +123,8 @@ export type ControlEndpointRegistrantOptions = {
    * Ordinary edges (idle, submission, the inbox watcher) never call it.
    */
   readonly onCommandWake?: (durableId: string) => Promise<void>
+  /** Whether a row's sending device is admitted now (#13037 5.6); absent, every row from another device waits. */
+  readonly admitIntake?: InboxDrainOptions["admitIntake"]
   readonly log?: (line: string) => void
   /** Test seams: the store to use, and drain options (clock, crash hooks, a foreign identity). */
   readonly _test?: {
@@ -230,12 +232,16 @@ export function createControlEndpointRegistrant(options: ControlEndpointRegistra
       admitExternalMessage: (input) => control.admitExternalMessage(input),
       listAdmittedDeliveries: () => control.listAdmittedDeliveries(),
     }
+    const gate = store
     const drain = createInboxDrain({
       store,
       runtime,
       durableId: session.durableId,
       sessionPath: session.sessionPath,
       log,
+      // A3.1.5: while a carrier is opening this session under a live lease, the session's own drain admits nothing.
+      wakeGated: () => gate.woken.gated({ durable_id: session.durableId }),
+      ...(options.admitIntake === undefined ? {} : { admitIntake: options.admitIntake }),
       ...(session.notify === undefined ? {} : { notify: session.notify }),
       ...options._test?.drain,
     })

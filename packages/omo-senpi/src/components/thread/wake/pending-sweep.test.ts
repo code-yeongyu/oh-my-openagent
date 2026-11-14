@@ -36,7 +36,7 @@ function intake(h: GatewayHarness, deliveryId: string, device: string, sessionId
 async function sweep(
   h: GatewayHarness,
   admit: (device: string) => IntakeAdmission,
-  sameDevice = false,
+  sameDevice: (durableId: string) => boolean = () => false,
 ): Promise<string[]> {
   const woken: string[] = []
   await runPendingSweep({
@@ -66,6 +66,33 @@ describe("the pending sweep", () => {
     expect(await store.list({ target_durable_id: "t-silent" })).toMatchObject([{ state: "queued" }])
   })
 
+  test("#given a session whose only row is from another device #when the sweep runs #then it wakes on admission without ever reading its project's same_device setting", async () => {
+    const h = (harness = createGatewayHarness())
+    const outcome = await h.store().intake({
+      now: h.clock.now,
+      attested_device: "dev-b",
+      record: {
+        sessionId: "t-remote",
+        deliveryId: "d-remote",
+        text: "d-remote",
+        displayText: "d-remote",
+        sender: { kind: "agent", session_id: "sender-s" },
+        deliverAs: "followUp",
+        chainCount: 1,
+      },
+      provenance: { workspace: "remote", project: "remote" },
+      target_session_kind: "interactive",
+    })
+    expect(outcome.kind).toBe("queued")
+    let asked = 0
+    const woken = await sweep(h, () => "admitted", () => {
+      asked += 1
+      return true
+    })
+    expect(woken).toEqual(["t-remote"])
+    expect(asked).toBe(0)
+  })
+
   test("#given a session with same-device rows only #when the sweep runs #then it is woken only with the same-device switch on", async () => {
     const h = (harness = createGatewayHarness())
     const sender = h.session("a")
@@ -73,6 +100,6 @@ describe("the pending sweep", () => {
     const sent = await sender.engine.deliver({ sender: { kind: "session", durable_id: "a" }, target: "t", text: "hi" })
     expect(sent).toMatchObject({ kind: "ok", delivery: { kind: "queued_offline" } })
     expect(await sweep(h, () => "admitted")).toEqual([])
-    expect(await sweep(h, () => "admitted", true)).toEqual(["t"])
+    expect(await sweep(h, () => "admitted", () => true)).toEqual(["t"])
   })
 })
