@@ -387,6 +387,10 @@ class TaskManagerImpl implements TaskManager {
           },
           record,
         ),
+      ownedByLiveHost: (record) =>
+        record.host_pid !== undefined &&
+        record.host_pid !== this.#hostPid &&
+        (options.isProcessAlive ?? defaultSignaller.isAlive)(record.host_pid),
       track: (taskId, handle, model, epoch, turn) => this.#outcome.trackOutcome(taskId, handle, model, epoch, turn),
     })
     this.#outcome = createOutcomeTracker({
