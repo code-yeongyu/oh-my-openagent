@@ -13,6 +13,8 @@ import {
 } from "node:fs"
 import { dirname, join, posix, resolve, win32 } from "node:path"
 
+import { foldNtfsCase } from "./ntfs-upcase"
+
 export type EmbeddedFile = Blob & {
   name: string
   arrayBuffer?: () => Promise<ArrayBuffer>
@@ -33,6 +35,8 @@ export type EmbeddedManifest = {
 // One spelling per file. On Windows the JS realpath keeps 8.3 short names (RUNNER~1, which tmpdir()
 // and homedir() can return) while the running exe reports the long one, so only the native resolver
 // meets both; NTFS paths are case-insensitive and may carry the \\?\ prefix (#12769).
+// NTFS compares names after upcasing each UTF-16 unit, so a path is folded the same way, through a frozen
+// table (`ntfs-upcase.ts`) rather than JS case mapping (#12780, #12809).
 function canonicalExecutablePath(path: string, platform: NodeJS.Platform, realpath: (path: string) => string): string {
   let canonical: string
   try {
@@ -41,7 +45,7 @@ function canonicalExecutablePath(path: string, platform: NodeJS.Platform, realpa
     canonical = (platform === "win32" ? win32 : posix).resolve(path)
   }
   if (platform !== "win32") return canonical
-  return win32.resolve(canonical.replace(/^\\\\\?\\UNC\\/i, "\\\\").replace(/^\\\\\?\\/, "")).toLowerCase()
+  return foldNtfsCase(win32.resolve(canonical.replace(/^\\\\\?\\UNC\\/i, "\\\\").replace(/^\\\\\?\\/, "")))
 }
 
 export function isProvisionedExecutable(
