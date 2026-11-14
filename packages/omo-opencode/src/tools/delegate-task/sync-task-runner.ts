@@ -9,6 +9,7 @@ import { buildRecoveredSyncTaskCompletion, buildSyncTaskCompletion } from "./syn
 import { shouldAttemptPollErrorRecovery } from "./sync-poll-error-recovery"
 import type { SyncTaskDeps } from "./sync-task-deps"
 import { getNextSyncFallbackModel, retrySyncPromptWithFallbacks } from "./sync-task-fallback"
+import { SYNC_POLL_HANDED_OFF, handOffSyncTask, startForegroundHandoffTimer } from "./sync-foreground-handoff"
 import type { DelegatedModelConfig, DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 
 type SyncTaskRunnerInput = {
@@ -36,6 +37,8 @@ type SyncTaskRunnerInput = {
   ) => Promise<void>
   readonly cleanupRetrySession: (currentSessionID: string) => void
   readonly setSyncSessionID: (currentSessionID: string) => void
+  /** Called once the child was handed to the background, so the caller leaves its session running. */
+  readonly onHandedOff?: () => void
 }
 
 function addRetryTaskToast(input: {
@@ -144,19 +147,38 @@ export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<strin
       }
     }
 
-    const pollError = await deps.pollSyncSession(
-      ctx,
-      client,
-      {
-        sessionID: activeSessionID,
-        agentToUse,
-        toastManager,
-        taskId,
-        hasActiveChildBackgroundTasks,
-        hasPendingParentWake,
-      },
-      syncPollTimeoutMs,
+    const handoffTimer = startForegroundHandoffTimer(
+      typeof executorCtx.manager?.adoptForegroundSession === "function" ? executorCtx.foregroundHandoffMs : undefined,
     )
+    const pollError = await deps
+      .pollSyncSession(
+        ctx,
+        client,
+        {
+          sessionID: activeSessionID,
+          agentToUse,
+          toastManager,
+          taskId,
+          hasActiveChildBackgroundTasks,
+          hasPendingParentWake,
+          ...(handoffTimer.signal ? { handoffSignal: handoffTimer.signal } : {}),
+        },
+        syncPollTimeoutMs,
+      )
+      .finally(handoffTimer.cancel)
+    if (pollError === SYNC_POLL_HANDED_OFF) {
+      input.onHandedOff?.()
+      return handOffSyncTask({
+        manager: executorCtx.manager,
+        taskId,
+        sessionID: activeSessionID,
+        parentSessionID: parentContext.sessionID,
+        parentAgent: parentContext.agent,
+        args,
+        agentToUse,
+        startTime,
+      })
+    }
     if (pollError) {
       if (shouldAttemptPollErrorRecovery(pollError)) {
         const recoveredResult = await deps.fetchSyncResult(client, activeSessionID, undefined, {
