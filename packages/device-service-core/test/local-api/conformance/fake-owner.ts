@@ -25,6 +25,7 @@ import { UploadAssembler } from "../../../src/local-api/upload.ts"
 import { validateHello, validateRequest } from "../../../src/local-api/validate.ts"
 import { compareVersions } from "../../../src/release/version.ts"
 import { dispatch } from "./fake-owner-handlers.ts"
+import { type FakeOwnerMode, TERMINAL_COMMANDS, type Withheld } from "./fake-owner-modes.ts"
 import type { Conn, OwnerState } from "./fake-owner-state.ts"
 import type { World } from "./world.ts"
 
@@ -47,6 +48,12 @@ export type FakeOwnerOptions = {
   readonly capabilities?: readonly Capability[]
   /** Called after each authenticated request was answered, so a test can await one instead of polling the state. */
   readonly onRequest?: (type: LocalRequest["type"]) => void
+  /** A failure mode (fake-owner-modes.ts); a fully answering owner by default. */
+  readonly mode?: FakeOwnerMode
+  /** What a `terminal` owner's endpoint takes; TERMINAL_COMMANDS by default. */
+  readonly terminalCommands?: readonly string[]
+  /** Called when the mode keeps an answer back, so a test can await it before moving a fake clock. */
+  readonly onWithheld?: (what: Withheld) => void
 }
 
 const noopSecure: SecureFile = async () => {}
@@ -91,10 +98,13 @@ export const startFakeOwner = async (options: FakeOwnerOptions): Promise<FakeOwn
     now: options.now ?? Date.now,
     mint: mintId,
     stop: async () => {},
+    ...(options.mode === undefined ? {} : { mode: options.mode }),
+    terminalCommands: new Set(options.terminalCommands ?? TERMINAL_COMMANDS),
+    withheld: (what) => options.onWithheld?.(what),
   }
   let listener: LocalListener | undefined
   const serve = (transport: Transport): void => {
-    let phase: "hello" | "proof" | "ready" = "hello"
+    let phase: "hello" | "silent" | "proof" | "ready" = "hello"
     let client: ClientInfo | undefined
     let serverNonce = ""
     const send = (message: unknown): void => transport.write(encodeLine(message))
@@ -111,6 +121,7 @@ export const startFakeOwner = async (options: FakeOwnerOptions): Promise<FakeOwn
       for (const attach of conn.attaches) state.attaches.delete(attach)
     })
     const onMessage = (message: unknown): void => {
+      if (phase === "silent") return
       if (phase === "hello") {
         const hello = validateHello(message)
         if (!hello.ok) {
@@ -119,6 +130,11 @@ export const startFakeOwner = async (options: FakeOwnerOptions): Promise<FakeOwn
           return
         }
         client = hello.hello.client
+        if (state.mode === "silent-handshake") {
+          phase = "silent"
+          state.withheld("welcome")
+          return
+        }
         serverNonce = mintNonce()
         send({
           type: "welcome",
@@ -151,6 +167,11 @@ export const startFakeOwner = async (options: FakeOwnerOptions): Promise<FakeOwn
         }
         phase = "ready"
         send({ id: request.id, type: "response", ok: true, data: {} })
+        return
+      }
+      if (state.mode === "silent-requests") {
+        state.log.push(request.type)
+        state.withheld("response")
         return
       }
       const outcome = dispatch(state, conn, request)

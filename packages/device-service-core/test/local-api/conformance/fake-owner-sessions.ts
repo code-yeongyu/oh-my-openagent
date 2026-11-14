@@ -1,6 +1,7 @@
 import { blobEvents, chunkPayload, LOCAL_INLINE_MAX, lineBytes, sha256Hex } from "../../../src/local-api/chunking.ts"
 import { pageListing } from "../../../src/local-api/listing.ts"
 import type {
+  CommandOutcome,
   CommandRpc,
   JsonObject,
   ListingRow,
@@ -15,6 +16,7 @@ import type {
 import { MESSAGE_LIMIT_CHARS } from "../../../src/local-api/upload.ts"
 import { assertNever, jsonObject } from "../../../src/local-api/validate-fields.ts"
 import { readPage } from "./fake-owner-history.ts"
+import { engineReply, isProgress, terminalTakes } from "./fake-owner-modes.ts"
 import { rowsAs, rowsRefused } from "./fake-owner-rows.ts"
 import { type Conn, eventOf, ok, type Outcome, type OwnerState, refuse, utf8 } from "./fake-owner-state.ts"
 import type { WorldSession } from "./world.ts"
@@ -75,6 +77,7 @@ const attachTo = (state: OwnerState, conn: Conn, request: SessionAttach): Outcom
   state.attaches.set(attach, session)
   conn.attaches.add(attach)
   return ok({ attach }, () => {
+    if (state.mode === "attach-stall") return state.withheld("snapshot")
     if (session.attach_pending === true)
       conn.send(eventOf("session.attach_pending", { attach, reason: "stream_key_pending" }))
     const inline = eventOf("session.snapshot", { attach, ...session.snapshot })
@@ -85,6 +88,7 @@ const attachTo = (state: OwnerState, conn: Conn, request: SessionAttach): Outcom
       const target = { of: "state", position: { attach_id: session.snapshot.attach_id } } as const
       for (const event of blobEvents(attach, blob, target, utf8(JSON.stringify(session.snapshot)))) conn.send(event)
     }
+    if (state.mode === "silent-session") return state.withheld("records")
     sendRecords(conn, attach, session, state.mint)
   })
 }
@@ -138,17 +142,41 @@ const endpointCommand = (
   if (bound !== undefined) return ok({ command_id })
   state.bindings.set(command_id, binding)
   state.commands.push(request.rpc)
-  return ok({ command_id }, () => {
-    const response = {
-      type: "response",
-      id: request.rpc["id"] ?? null,
-      command: request.rpc["type"] ?? null,
-      success: true,
-      data: answer.data,
-    }
-    sendCommandEvent(conn, state.mint, request.device, { command_id, response })
-    for (const outcome of answer.outcome) conn.send(eventOf("session.command_state", { command_id, ...outcome }))
-  })
+  return ok({ command_id }, () =>
+    answerCommand(
+      state,
+      conn,
+      request.device,
+      command_id,
+      request.rpc,
+      { data: answer.data, frames: [] },
+      answer.outcome,
+    ),
+  )
+}
+
+// The host's answer to a dispatched command: the delegated frames, the engine's reply, then the outcome states. A
+// `terminal` endpoint answers a record it does not take as an unknown command; `ack-no-final` sends only the progress
+// states, as an engine that never finishes would.
+const answerCommand = (
+  state: OwnerState,
+  conn: Conn,
+  device: string,
+  command_id: string,
+  rpc: CommandRpc,
+  delegated: { readonly data: JsonObject; readonly frames: readonly JsonObject[] } | undefined,
+  outcome: readonly CommandOutcome[],
+): void => {
+  if (state.mode === "ack-no-final") {
+    for (const sent of outcome.filter(isProgress)) conn.send(eventOf("session.command_state", { command_id, ...sent }))
+    return state.withheld("final_state")
+  }
+  if (delegated !== undefined) {
+    for (const frame of delegated.frames) sendCommandEvent(conn, state.mint, device, { frame })
+    const accepted = state.mode !== "terminal" || terminalTakes(state.terminalCommands, rpc)
+    sendCommandEvent(conn, state.mint, device, { command_id, response: engineReply(rpc, delegated.data, accepted) })
+  }
+  for (const sent of outcome) conn.send(eventOf("session.command_state", { command_id, ...sent }))
 }
 
 const command = (state: OwnerState, conn: Conn, request: SessionCommand): Outcome => {
@@ -168,21 +196,10 @@ const command = (state: OwnerState, conn: Conn, request: SessionCommand): Outcom
   if (bound !== undefined) return ok({ command_id })
   state.bindings.set(command_id, binding)
   state.commands.push(resolved.rpc)
-  return ok({ command_id }, () => {
-    if (request.delegated === true && session.delegated !== undefined) {
-      const { data, frames } = session.delegated
-      for (const frame of frames) sendCommandEvent(conn, state.mint, session.device, { frame })
-      const response = {
-        type: "response",
-        id: resolved.rpc["id"] ?? null,
-        command: resolved.rpc["type"] ?? null,
-        success: true,
-        data,
-      }
-      sendCommandEvent(conn, state.mint, session.device, { command_id, response })
-    }
-    for (const outcome of session.outcome) conn.send(eventOf("session.command_state", { command_id, ...outcome }))
-  })
+  const delegated = request.delegated === true ? session.delegated : undefined
+  return ok({ command_id }, () =>
+    answerCommand(state, conn, session.device, command_id, resolved.rpc, delegated, session.outcome),
+  )
 }
 
 // A command event inline, or, when its line would pass LOCAL_INLINE_MAX, as a blob of the body's UTF-8 JSON.
