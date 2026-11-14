@@ -2,6 +2,7 @@
 
 use crate::input::ledger::{replay, Entry, Ledger, Step};
 use crate::input::{KeyUnit, ENGINE_TAG, VK_CONTROL, VK_MENU, VK_SHIFT};
+use crate::foreground::admit_leased;
 use crate::input_lock::{lock_verdict, LockVerdict};
 use crate::stop_path::{
     is_chord, is_stop_chord_key, liveness, normalize_vk, HookEvent, HotkeyVerdict, Liveness,
@@ -193,6 +194,39 @@ fn the_physical_chord_typed_with_left_or_right_modifiers_stops() {
             "a left/right key-up releases the generic key"
         );
     }
+}
+
+/// Review L1 of the #13350 delta: with both Shifts (or both Ctrls) down, releasing one side leaves
+/// the generic key held - for the user-held modifier refusal and for the stop chord alike.
+#[test]
+fn releasing_one_of_two_held_sides_keeps_the_generic_key_held() {
+    let mut tracker = PhysicalChord::default();
+    for vk in [VK_LSHIFT, VK_RSHIFT] {
+        tracker.on_key(&key(vk, true, Origin::Physical, 1));
+    }
+    tracker.on_key(&key(VK_LSHIFT, false, Origin::Physical, 2));
+    assert_eq!(tracker.held(), vec![VK_SHIFT], "right Shift is still down");
+    assert_eq!(
+        admit_leased(&tracker, &[]).expect_err("the user still holds Shift").keys,
+        vec!["shift"]
+    );
+    tracker.on_key(&key(VK_RSHIFT, false, Origin::Physical, 3));
+    assert!(tracker.held().is_empty(), "both sides up releases Shift");
+    assert!(admit_leased(&tracker, &[]).is_ok());
+
+    let mut tracker = PhysicalChord::default();
+    for vk in [VK_LCONTROL, VK_RCONTROL] {
+        tracker.on_key(&key(vk, true, Origin::Physical, 1));
+    }
+    tracker.on_key(&key(VK_RCONTROL, false, Origin::Physical, 2));
+    for vk in [VK_LMENU, VK_LSHIFT] {
+        tracker.on_key(&key(vk, true, Origin::Physical, 3));
+    }
+    assert_eq!(
+        tracker.on_key(&key(VK_ESCAPE, true, Origin::Physical, 4)),
+        Some(Origin::Physical),
+        "left Ctrl is still down, so the chord stops"
+    );
 }
 
 #[test]
