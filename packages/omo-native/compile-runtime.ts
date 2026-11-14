@@ -33,6 +33,21 @@ export type EmbeddedManifest = {
 // One spelling per file. On Windows the JS realpath keeps 8.3 short names (RUNNER~1, which tmpdir()
 // and homedir() can return) while the running exe reports the long one, so only the native resolver
 // meets both; NTFS paths are case-insensitive and may carry the \\?\ prefix (#12769).
+// NTFS folds case by upcasing each UTF-16 unit through its upcase table, one unit to one unit, so a
+// path is folded the same way: a unit keeps itself unless JS gives it a single-unit uppercase, the
+// closest JS has to that table (it is not a byte-for-byte copy of any volume's $UpCase). JS
+// toLowerCase() on the whole string folds more (KELVIN SIGN U+212A lowers to "k", which NTFS keeps
+// distinct from "K") and toUpperCase() can change the length ("\u00df" becomes "SS") (#12780).
+function foldNtfsCase(path: string): string {
+  let folded = ""
+  for (let index = 0; index < path.length; index += 1) {
+    const unit = path[index] as string
+    const upper = unit.toUpperCase()
+    folded += upper.length === 1 ? upper : unit
+  }
+  return folded
+}
+
 function canonicalExecutablePath(path: string, platform: NodeJS.Platform, realpath: (path: string) => string): string {
   let canonical: string
   try {
@@ -41,7 +56,7 @@ function canonicalExecutablePath(path: string, platform: NodeJS.Platform, realpa
     canonical = (platform === "win32" ? win32 : posix).resolve(path)
   }
   if (platform !== "win32") return canonical
-  return win32.resolve(canonical.replace(/^\\\\\?\\UNC\\/i, "\\\\").replace(/^\\\\\?\\/, "")).toLowerCase()
+  return foldNtfsCase(win32.resolve(canonical.replace(/^\\\\\?\\UNC\\/i, "\\\\").replace(/^\\\\\?\\/, "")))
 }
 
 export function isProvisionedExecutable(

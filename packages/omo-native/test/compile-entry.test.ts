@@ -273,6 +273,38 @@ describe("compiled omo entry launcher parity", () => {
       expect(isProvisionedExecutable(long, short.replace("9.0.0", "9.0.1"), "win32", nativeRealpath)).toBe(false)
     })
 
+    test("#when the native resolver returns the \\\\?\\UNC\\ form of a share path #then it is the same executable as the plain UNC spelling", () => {
+      const share = "\\\\fileserver\\tools\\omo\\binary-runtime\\9.0.0\\omo.exe"
+      const extendedUnc = (path: string) => path.replace(/^\\\\/, "\\\\?\\UNC\\")
+      expect(isProvisionedExecutable(share, share.toUpperCase(), "win32", extendedUnc)).toBe(true)
+      expect(isProvisionedExecutable(share, share.replace("9.0.0", "9.0.1"), "win32", extendedUnc)).toBe(false)
+    })
+
+    test("#when only one side resolves and the other falls back to its own spelling #then they still compare as one executable", () => {
+      const resolvesLongOnly = (path: string) => path === long ? `\\\\?\\${long}` : missing(path)
+      expect(isProvisionedExecutable(long, long.toUpperCase(), "win32", resolvesLongOnly)).toBe(true)
+      expect(isProvisionedExecutable(long.toUpperCase(), long, "win32", resolvesLongOnly)).toBe(true)
+    })
+
+    test("#when two names differ by a character JS lowercase folds but NTFS keeps apart #then they are different executables", () => {
+      // KELVIN SIGN (U+212A) lowercases to "k" in JS; NTFS upcases "k" to "K" and keeps U+212A as is.
+      expect(isProvisionedExecutable("C:\\\u212Aomo.exe", "C:\\komo.exe", "win32", missing)).toBe(false)
+      expect(isProvisionedExecutable("C:\\Komo.exe", "C:\\komo.exe", "win32", missing)).toBe(true)
+    })
+
+    test("#when a name holds a character whose uppercase is two characters #then it is kept as is, not expanded", () => {
+      // JS uppercases "\u00df" to "SS"; NTFS maps one UTF-16 unit to one unit, so "stra\u00dfe" and "STRASSE" differ.
+      expect(isProvisionedExecutable("C:\\stra\u00dfe\\omo.exe", "C:\\STRASSE\\omo.exe", "win32", missing)).toBe(false)
+      expect(isProvisionedExecutable("C:\\stra\u00dfe\\omo.exe", "C:\\STRA\u00dfE\\omo.exe", "win32", missing)).toBe(true)
+    })
+
+    test("#when a name holds a surrogate pair #then each of its UTF-16 units folds to itself", () => {
+      // U+1D400 is a surrogate pair; neither unit has a single-unit uppercase, so only the ASCII around it folds.
+      // (A lone surrogate is not testable here: Bun's win32.resolve replaces it with U+FFFD before folding.)
+      expect(isProvisionedExecutable("C:\\\uD835\uDC00omo.exe", "C:\\\uD835\uDC00OMO.exe", "win32", missing)).toBe(true)
+      expect(isProvisionedExecutable("C:\\\uD835\uDC00omo.exe", "C:\\\uD835\uDC01omo.exe", "win32", missing)).toBe(false)
+    })
+
     test("#when POSIX paths differ only in case #then they stay different executables", () => {
       expect(isProvisionedExecutable("/home/u/.omo/omo", "/home/u/.OMO/omo", "linux", missing)).toBe(false)
     })
