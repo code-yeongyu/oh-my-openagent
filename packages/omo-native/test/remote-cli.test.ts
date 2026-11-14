@@ -793,6 +793,21 @@ describe("omo remote session verbs", () => {
     expect(err.join("\n")).toContain("interrupted")
   })
 
+  test("a waiting send queued behind a running turn whose own turn is interrupted fails with a typed line (transcript mode)", async () => {
+    const engine = { ...ENGINE, streaming: true, pending: 2 }
+    const a = fixture.account({
+      engine,
+      records: [{ type: "agent_settled" }],
+      entriesAfterAnswer: [
+        { role: "user", content: "hi" },
+        { role: "assistant", content: "part", stopReason: "aborted" },
+      ],
+    })
+    const { code, err } = await run(["send", "b/dur-on-b", "hi"], undefined, SIGNED_IN, testBootstrap(), a.remote)
+    expect(code).toBe(REMOTE_EXIT.failed)
+    expect(err.join("\n")).toContain("was interrupted before it finished")
+  })
+
   test("#13268: a waiting send queued behind a running turn names its position on stderr at once, never on stdout, and --json carries it only in the typed result", async () => {
     const engine = { ...ENGINE, streaming: true, pending: 2 }
     const human = await run(

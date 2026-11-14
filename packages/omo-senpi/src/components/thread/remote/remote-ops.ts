@@ -319,6 +319,7 @@ export async function followRemote(
       const answer: string[] = []
       let superseded = false
       let answerAtTail = false
+      let stopReason: unknown
       for (let index = anchor + 1; index < entries.length; index++) {
         const entry = entries[index]
         const message = isRecord(entry["message"]) ? entry["message"] : entry
@@ -327,6 +328,7 @@ export async function followRemote(
           break
         }
         if (message["role"] !== "assistant") continue
+        stopReason = message["stopReason"]
         const entryText = entryTextOf(entry)
         if (entryText !== undefined && entryText !== "") {
           answer.push(entryText)
@@ -335,22 +337,25 @@ export async function followRemote(
       }
       // A later message's turn makes this send's turn final whether it wrote text or not: the wait ends instead of
       // living until the session closes (#13272 review).
+      // A turn stopped before it finished stores its last assistant message as "aborted" (#13272 review).
+      const interrupted = stopReason === "aborted"
       if (superseded) {
         for (const [index, entryText] of answer.entries()) {
           if (index > 0) onText("\n")
           onText(entryText)
         }
-        return end("settled")
+        return end(interrupted ? "interrupted" : "settled")
       }
       // A queued send whose run settled without writing any answer keeps waiting: its run may simply not have
-      // started yet, and the attach's own end still ends the wait with a typed reason.
-      if (answer.length === 0) return
-      if (settleSignal && answerAtTail) {
+      // started yet, and the attach's own end still ends the wait with a typed reason. An interrupted turn is final
+      // with or without text.
+      if (answer.length === 0 && !(settleSignal && interrupted)) return
+      if (settleSignal && (answerAtTail || interrupted)) {
         for (const [index, entryText] of answer.entries()) {
           if (index > 0) onText("\n")
           onText(entryText)
         }
-        end("settled")
+        end(interrupted ? "interrupted" : "settled")
       }
     } finally {
       checking = false
@@ -401,6 +406,7 @@ export async function followRemote(
     const answer: string[] = []
     let superseded = false
     let answerAtTail = false
+    let stopReason: unknown
     for (let index = anchor + 1; index < entries.length; index++) {
       const entry = entries[index]
       const message = isRecord(entry["message"]) ? entry["message"] : entry
@@ -409,6 +415,7 @@ export async function followRemote(
         break
       }
       if (message["role"] !== "assistant") continue
+      stopReason = message["stopReason"]
       const entryText = entryTextOf(entry)
       if (entryText !== undefined && entryText !== "") {
         answer.push(entryText)
@@ -417,12 +424,14 @@ export async function followRemote(
     }
     // Final once a later message supersedes the turn, or once a run settled (the buffer's own trailing settle
     // counts: the turn finished before the aim) with this answer as the transcript's tail.
-    if (!(superseded || (settleSignal && answerAtTail)) || answer.length === 0) return
+    const interrupted = stopReason === "aborted"
+    if (!(superseded || (settleSignal && (answerAtTail || interrupted)))) return
+    if (answer.length === 0 && !interrupted) return
     for (const [index, entryText] of answer.entries()) {
       if (index > 0) onText("\n")
       onText(entryText)
     }
-    end("settled")
+    end(interrupted ? "interrupted" : "settled")
   }
   const buffer: JsonObject[] = []
   const receive = (record: JsonObject): void => {
