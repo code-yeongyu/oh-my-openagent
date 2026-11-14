@@ -59,7 +59,7 @@ jobs:
           git fetch --no-tags origin "$CHANGELOG_GATE_BASE_REF"
           git archive "origin/$CHANGELOG_GATE_BASE_REF" script | tar -x -C "$gate"
           if [ -f "$gate/script/check-pr-changelog.ts" ] && [ -f "$gate/script/release-pr-marker.ts" ]; then
-            bun "$gate/script/check-pr-changelog.ts"
+            bun --config=/dev/null --tsconfig-override=/dev/null --no-env-file "$gate/script/check-pr-changelog.ts"
           else
             echo "changelog-gate: NOTICE - the base branch predates this gate; running the PR's copy (bootstrap only)"
             bun script/check-pr-changelog.ts

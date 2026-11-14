@@ -1,20 +1,18 @@
 /// <reference types="bun-types" />
 
-import { afterEach, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
-import { runSenpiInstaller, runSenpiUninstaller } from "./install-senpi"
-import { createPluginFixture } from "./install-test-fixture"
+import { createInstallSandbox, createPluginFixture, type InstallSandbox } from "./install-test-fixture"
 import { localLauncherPath } from "./local-launcher"
 
 const repoRoot = resolve(import.meta.dir, "../../../..")
 const tempDirs: string[] = []
 
+// Installs run in a sandbox (#13192, #13253): these temp dirs are inside its root, and it refuses an install whose
+// launcher or settings path would land outside.
 async function makeTempDir(prefix: string): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), prefix))
-  tempDirs.push(dir)
-  return dir
+  return sandbox.tempDir(prefix)
 }
 
 async function makePluginFixture(): Promise<string> {
@@ -27,7 +25,13 @@ async function readSettings(agentDir: string): Promise<Record<string, unknown>> 
   return JSON.parse(await readFile(join(agentDir, "settings.json"), "utf8")) as Record<string, unknown>
 }
 
+let sandbox: InstallSandbox
+beforeEach(async () => {
+  sandbox = await createInstallSandbox()
+})
+
 afterEach(async () => {
+  await sandbox.dispose()
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
 })
 
@@ -39,7 +43,7 @@ describe("runSenpiInstaller local launcher", () => {
     const pluginPath = await makePluginFixture()
 
     // when
-    const result = await runSenpiInstaller({
+    const result = await sandbox.install({
       env: { HOME: homeDir, SENPI_CODING_AGENT_DIR: agentDir },
       repoRoot,
       pluginPath,
@@ -61,7 +65,7 @@ describe("runSenpiInstaller local launcher", () => {
     await writeFile(join(agentDir, "settings.json"), JSON.stringify({ packages: ["keep-me"] }))
 
     // when
-    const result = await runSenpiInstaller({
+    const result = await sandbox.install({
       env: { HOME: homeDir, SENPI_CODING_AGENT_DIR: agentDir },
       repoRoot,
       pluginPath,
@@ -79,10 +83,10 @@ describe("runSenpiInstaller local launcher", () => {
     const homeDir = await makeTempDir("omo-senpi-launcher-home-")
     const pluginPath = await makePluginFixture()
     const env = { HOME: homeDir, SENPI_CODING_AGENT_DIR: agentDir }
-    await runSenpiInstaller({ env, repoRoot, pluginPath })
+    await sandbox.install({ env, repoRoot, pluginPath })
 
     // when
-    await runSenpiUninstaller({ env, repoRoot, pluginPath })
+    await sandbox.uninstall({ env, repoRoot, pluginPath })
 
     // then
     await expect(readFile(localLauncherPath(homeDir), "utf8")).rejects.toThrow()

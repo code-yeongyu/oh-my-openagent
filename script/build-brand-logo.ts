@@ -1,3 +1,4 @@
+import { renameSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 
 // The engine shows the brand logo on the provider sign-in result page (SENPI_BRAND `logo`, a base64
@@ -18,15 +19,20 @@ export function brandLogoModule(svg: string): string {
   ].join("\n")
 }
 
-export async function buildBrandLogo(check = false): Promise<void> {
+// The output path is a parameter so a test can build into a throwaway file instead of the shared module.
+export async function buildBrandLogo(check = false, output = target): Promise<void> {
   const text = brandLogoModule(await Bun.file(source).text())
+  const current = (await Bun.file(output).exists()) ? await Bun.file(output).text() : undefined
   if (check) {
-    if (!(await Bun.file(target).exists()) || (await Bun.file(target).text()) !== text) {
-      throw new Error("Brand logo module is stale; run bun script/build-brand-logo.ts")
-    }
-  } else {
-    await Bun.write(target, text)
+    if (current !== text) throw new Error("Brand logo module is stale; run bun script/build-brand-logo.ts")
+    return
   }
+  // The root build bundles the CLIs from this module while build-install.mjs regenerates it, so an unchanged module is
+  // left alone and a changed one is replaced in one rename, never truncated in place.
+  if (current === text) return
+  const temporary = `${output}.${process.pid}.tmp`
+  await Bun.write(temporary, text)
+  renameSync(temporary, output)
 }
 
 if (import.meta.main) {

@@ -1,5 +1,14 @@
 import { describe, expect, test } from "bun:test"
-import { discoverPluginBuiltRuntimes, evaluateBuiltRuntimeProbe, KNOWN_BUILT_RUNTIMES } from "./no-raw-tls-client-scan"
+import { readFileSync } from "node:fs"
+
+import {
+  discoverGeneratedOutputs,
+  discoverPluginBuiltRuntimes,
+  evaluateBuiltRuntimeProbe,
+  evaluateGeneratedOutputProbe,
+  generatedOutputScanRequirements,
+  KNOWN_BUILT_RUNTIMES,
+} from "./no-raw-tls-client-scan"
 
 describe("built omowright runtime probe (CI)", () => {
   test("#given CI and a missing KNOWN_BUILT_RUNTIMES file #when probed #then the failure names the expected path", () => {
@@ -45,5 +54,61 @@ describe("built omowright runtime probe (CI)", () => {
   test("#given the built tree #when runtime directories are discovered #then every staged omowright file is a KNOWN_BUILT_RUNTIMES entry", () => {
     const unlisted = discoverPluginBuiltRuntimes().filter((file) => !KNOWN_BUILT_RUNTIMES.includes(file))
     expect(unlisted, "built omowright runtimes missing from KNOWN_BUILT_RUNTIMES").toEqual([])
+  })
+})
+
+// The shipped bundles are untracked build outputs (#13192); the scan reads them from the built tree, so in CI an
+// output the plugin needs that is absent means the job did not build it, and the guard would silently stop looking at
+// what ships. The requirement is per output: a list pattern is never met by any one built file.
+describe("built generated outputs probe (CI)", () => {
+  const requirements = generatedOutputScanRequirements()
+  const built = requirements.map((requirement) => requirement.label)
+
+  test("#given the requirements #when derived #then each names one output", () => {
+    expect(built.filter((label) => label.startsWith("a path matching"))).toEqual([])
+    expect(built).toContain("packages/omo-senpi/plugin/runtime/bunshin-ts/sdk.js")
+    expect(built).toContain("packages/omo-senpi/plugin/extensions/omo-task.js")
+  })
+
+  test("#given CI and every required output built #when probed #then it passes", () => {
+    expect(evaluateGeneratedOutputProbe({ requirements, discovered: built, ci: "true" })).toEqual([])
+  })
+
+  test.each([
+    "packages/omo-senpi/plugin/runtime/bunshin-ts/sdk.js",
+    "packages/omo-senpi/plugin/extensions/omo-task.js",
+    "packages/omo-senpi/plugin/extensions/omo-side-panel.js",
+  ])(
+    "#given CI and %s absent while its pattern's other outputs are built #when probed #then it fails naming it",
+    (absent) => {
+      const failures = evaluateGeneratedOutputProbe({
+        requirements,
+        discovered: built.filter((file) => file !== absent),
+        ci: "true",
+      })
+      expect(failures.length, JSON.stringify(failures)).toBe(1)
+      expect(failures[0]).toContain(absent)
+    },
+  )
+
+  test.each(built)("#given CI and %s absent #when probed #then it fails", (absent) => {
+    expect(
+      evaluateGeneratedOutputProbe({ requirements, discovered: built.filter((file) => file !== absent), ci: "true" }),
+    ).toHaveLength(1)
+  })
+
+  test("#given no CI and nothing built #when probed #then it does not fail", () => {
+    expect(evaluateGeneratedOutputProbe({ requirements, discovered: [], ci: undefined })).toEqual([])
+  })
+
+  test("#given the built tree #when discovered #then every discovered output is a listed path", () => {
+    const patterns: string[] = JSON.parse(
+      readFileSync(new URL("./generated-bundles.json", import.meta.url), "utf8"),
+    ).patterns
+    for (const file of discoverGeneratedOutputs())
+      expect(
+        patterns.some((pattern) => new RegExp(pattern).test(file)),
+        file,
+      ).toBe(true)
   })
 })

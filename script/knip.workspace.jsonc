@@ -8,6 +8,8 @@
         "script/build-brand-logo.ts",
         "script/build-cli-node.ts",
         "script/build-codex-install.ts",
+        // #9903, #13192: run by path from ci.yml, .github/scripts/ci-root-shard-2.sh and the publish workflows
+        "script/build-generated.ts",
         "script/build-model-capabilities.ts",
         "script/build-omo-binary.ts",
         "script/build-omo-native.ts",
@@ -20,6 +22,7 @@
         "script/changelog-section.ts",
         "script/check-cargo-pinned-deps.mjs",
         "script/check-copy.ts",
+        "script/check-generated-tree.ts",
         "script/check-pr-changelog.ts",
         "script/check-temp-leak-report-only.mjs",
         "script/ci-fast-path.mjs",
@@ -197,8 +200,16 @@
   "preExistingExports": {
     // pre-existing at origin dev 4686e425b5: unused export(s) AGENT_COMMAND_RE, HUMAN_COMMAND_RE, BARE_BIN_RE, ALLOWLIST_RELATIVE_PATH, AUDIT_TEST_RELATIVE_PATH, SCAN_MODULE_RELATIVE_PATH, SCAN_TEST_RELATIVE_PATH, trackedSourceFiles
     "script/agent-command-string-scan.ts": ["AGENT_COMMAND_RE", "HUMAN_COMMAND_RE", "BARE_BIN_RE", "ALLOWLIST_RELATIVE_PATH", "AUDIT_TEST_RELATIVE_PATH", "SCAN_MODULE_RELATIVE_PATH", "SCAN_TEST_RELATIVE_PATH", "trackedSourceFiles"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) generatedCodexInstallerPath, CODEX_INSTALL_BUILD_MARKER_PREFIX, buildCodexInstaller
-    "script/build-codex-install.ts": ["generatedCodexInstallerPath", "CODEX_INSTALL_BUILD_MARKER_PREFIX", "buildCodexInstaller"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) generatedCodexInstallerPath, CODEX_INSTALL_BUILD_MARKER_PREFIX.
+    // bundledWorkspaceSources, digestCodexInstallerSources, parseCodexInstallerArtifact: their only importer was the retired
+    // committed-bundle freshness test (#9903); the generator is a bundle input, so its exports are left as they are.
+    "script/build-codex-install.ts": [
+      "generatedCodexInstallerPath",
+      "CODEX_INSTALL_BUILD_MARKER_PREFIX",
+      "bundledWorkspaceSources",
+      "digestCodexInstallerSources",
+      "parseCodexInstallerArtifact",
+    ],
     // pre-existing at origin dev 4686e425b5: unused export(s) buildReleaseBinary
     "script/build-omo-binary.ts": ["buildReleaseBinary"],
     // pre-existing at origin dev 4686e425b5: unused export(s) CATEGORY_COVERAGE_ENTRY, CATEGORY_COVERAGE_ARTIFACT, CATEGORY_COVERAGE_PRELUDE_ASSET, TASK_CONFIG_ENTRY, TASK_CONFIG_ARTIFACT

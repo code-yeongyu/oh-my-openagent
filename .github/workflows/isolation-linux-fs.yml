@@ -28,6 +28,11 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.4.4"
+      # Generated outputs are built with node scripts; pin the major the release preflight proves (#13192).
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
       - run: bun install --frozen-lockfile
       - name: Prepare real filesystems
         shell: bash

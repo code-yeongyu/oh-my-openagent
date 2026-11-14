@@ -3,6 +3,9 @@
   "workspaces": {
     "packages/omo-senpi/plugin": {
       "includeEntryExports": true,
+      // #bunshin-ts maps to runtime/bunshin-ts/sdk.js, a build output that is not tracked (#13192); only its bundle test
+      // imports it, so knip's verdict must not depend on whether the tree was built.
+      "ignoreUnresolved": ["#bunshin-ts"],
       // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
       // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
       // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
@@ -21,49 +24,16 @@
         "scripts/sync-version.mjs",
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
-        "extensions/omo-claim-receipt.js",
-        "extensions/omo-computer-use.js",
-        "extensions/omo-desktop-toolkit.js",
-        "extensions/omo-device-account.js",
-        "extensions/omo-feedback.js",
-        "extensions/omo-memory-commands.js",
-        "extensions/omo-memory-doctor.js",
-        "extensions/omo-memory-memfs.js",
-        "extensions/omo-memory-palace.js",
-        "extensions/omo-memory-sync.js",
-        "extensions/omo-recall-store.js",
-        "extensions/omo-device-service.js",
-        "extensions/omo-session-history.js",
-        "extensions/omo-task.js",
-        "extensions/omo-telemetry-otlp.js",
-        "extensions/omo-telemetry-posthog.js",
-        "extensions/omo-telemetry-recovery.js",
-        "extensions/omo-thread-client.js",
-        "runtime/agent-toolkit-sdk/sdk.js",
       ],
       "ignoreFiles": [
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "extensions/gateway-store-worker.mjs",
-        // the bundled computer.run QuickJS sandbox Worker, loaded by path by senpi-desktop-service src/run/sandbox/quickjs.ts
-        "extensions/omo-computer-run-worker.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "extensions/omo-init-deep-advisor.js",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "extensions/omo-member.js",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "runtime/dag/library.js",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "runtime/dag/sdk.js",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "runtime/rollback-migrate.js",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "runtime/thread-sdk/sdk.js",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/build-extension.d.mts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/bundle-inputs-trace.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/install.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/native-skill-sources.d.mts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs

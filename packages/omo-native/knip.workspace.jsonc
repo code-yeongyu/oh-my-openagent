@@ -43,8 +43,6 @@
   "preExistingExports": {
     // pre-existing at origin dev 4686e425b5: unused export(s) AGENT_DIR_ENV_NAMES, ADOPTED_STATE_FILES, defaultAgentDir
     "packages/omo-native/bin/lib/agent-dir.js": ["AGENT_DIR_ENV_NAMES", "ADOPTED_STATE_FILES", "defaultAgentDir"],
-    // added on dev by #11445 after the baseline: the declaration of the sibling generated .js, which every importer resolves to
-    "packages/omo-native/bin/lib/brand-logo.generated.d.ts": ["OMO_BRAND_LOGO"],
     // pre-existing at origin dev 4686e425b5: unused export(s) BUN_MIN_VERSION, resolveBunGuard, findNodeBinary
     "packages/omo-native/bin/lib/bun-runtime.js": ["BUN_MIN_VERSION", "resolveBunGuard", "findNodeBinary"],
     // pre-existing at origin dev 4686e425b5: unused export(s) COMPUTER_USE_RUNTIME
@@ -63,8 +61,6 @@
     "packages/omo-native/bin/lib/model-chains.js": ["formatModelChainLines"],
     // pre-existing at origin dev 4686e425b5: unused export(s) readInstalledVersion
     "packages/omo-native/bin/lib/self-update.js": ["readInstalledVersion"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) default
-    "packages/omo-native/bin/lib/service-auth.generated.js": ["default"],
     // pre-existing at origin dev 4686e425b5: unused export(s) API_KEY_TYPE_ACCEPTLIST
     "packages/omo-native/bin/lib/setup-credentials.js": ["API_KEY_TYPE_ACCEPTLIST"],
     // pre-existing at origin dev 4686e425b5: unused export(s) KNOWN_AUTH_SCHEMA_VERSIONS

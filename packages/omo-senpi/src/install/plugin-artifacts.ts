@@ -10,6 +10,11 @@ import { isRecord } from "./senpi-settings"
 export const REQUIRED_PLUGIN_ARTIFACTS: readonly string[] = [
   join("extensions", "omo.js"),
   join("extensions", "omo-task.js"),
+  // Loaded by path at runtime, not through the import map (side-panel/constants.ts, onboarding/scan-component.ts,
+  // init-deep-advisor): a payload without them installs and then fails when the feature first runs.
+  join("extensions", "omo-side-panel.js"),
+  join("extensions", "omo-onboarding-scan.js"),
+  join("extensions", "omo-init-deep-advisor.js"),
   join("extensions", "omo-computer-use.js"),
   join("extensions", "omo-memory-doctor.js"),
   join("extensions", "omo-memory-memfs.js"),
@@ -115,18 +120,28 @@ export async function ensurePluginArtifacts(context: {
     })
   }
 
-  if (await hasMissingPluginArtifact(context.pluginPath)) {
-    throw new Error(`Packed omo-senpi plugin is missing required runtime artifacts at ${context.pluginPath}`)
+  // Bundles are build outputs, never tracked (#13192): a checkout nobody built has none.
+  if (!(await fileExists(join(context.pluginPath, "extensions", "omo.js")))) {
+    throw new Error(
+      `omo-senpi plugin is not built at ${context.pluginPath}: extensions/omo.js is missing. From a repository checkout, run \`bun run build:senpi-plugin\` at the repository root; a packed or published plugin without it is incomplete, so reinstall that package`,
+    )
+  }
+
+  const missing = await firstMissingPluginArtifact(context.pluginPath)
+  if (missing !== undefined) {
+    throw new Error(
+      `Packed omo-senpi plugin is missing required runtime artifacts at ${context.pluginPath}: ${missing}`,
+    )
   }
 
   await verifyAstGrepRuntimeIntegrity(context.pluginPath, context.platform)
 }
 
-async function hasMissingPluginArtifact(pluginPath: string): Promise<boolean> {
+async function firstMissingPluginArtifact(pluginPath: string): Promise<string | undefined> {
   for (const artifact of REQUIRED_PLUGIN_ARTIFACTS) {
-    if (!(await fileExists(join(pluginPath, artifact)))) return true
+    if (!(await fileExists(join(pluginPath, artifact)))) return artifact
   }
-  return false
+  return undefined
 }
 
 async function verifyAstGrepRuntimeIntegrity(pluginPath: string, platform: NodeJS.Platform): Promise<void> {

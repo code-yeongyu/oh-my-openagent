@@ -368,6 +368,11 @@ jobs:
         with:
           bun-version: "1.4.4"
 
+      # Generated outputs are built with node scripts; pin the major the release preflight proves (#13192).
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
 
@@ -600,6 +605,13 @@ jobs:
         with:
           name: keychain-helper
           path: .omo/keychain-helper
+
+      # Generated bundles are not tracked (#13192). The compiled entry imports bin/lib/*.generated.js,
+      # so every generator runs before the binary is built. It sits outside the step ranges the workflow tests slice
+      # and run as shell (Stage target-specific Rust engine .. Download keychain helper, Stage keychain helper .. Build release binary).
+      - name: Build generated files
+        if: steps.release-assets.outputs.binary_exists != 'true'
+        run: bun script/build-generated.ts
 
       # build-omo-binary embeds packages/omo-native/bin/darwin/omo-keychain into every darwin binary (at
       # the payload root, so execDir/omo-keychain) and fails without it; the platform package ships the

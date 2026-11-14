@@ -37,7 +37,9 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.4.4"
-      - run: bun install --frozen-lockfile
+      # packages/get-worker is its own project (own bun.lock, not a root workspace) and imports no generated output.
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
       - name: Type check
         run: bun run type-check
       - name: Unit tests
