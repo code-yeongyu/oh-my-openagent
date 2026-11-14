@@ -29,6 +29,7 @@
         "test/fixtures/trust-ensure-probe.ts",
         "test/fixtures/trust-stage-probe.ts",
         "test/packed-consumer.mjs",
+        "test/remote-attach-support.ts",
         "test/teardown.test-support.ts",
         "test/trust-certificate-fixtures.ts",
       ],
