@@ -16,7 +16,10 @@ use omo_computer_core::params::Point;
 use serde::Deserialize;
 use serde_json::Value;
 
-pub use additions::{AxNotification, BusyMark, ClipboardScript, FrameAxis, FramePolicy, HandIdentity, NotificationPost, SecureFocus, StopPress, TargetExit};
+pub use additions::{
+    AxNotification, BusyMark, ClipboardScript, FrameAxis, FramePolicy, HandIdentity,
+    NotificationPost, SecureFocus, StopPress, TargetExit,
+};
 pub use events::{DisplaysChange, EpochEvent, EpochReason, IdentityChange};
 pub use invalid::{field_names, InvalidKind, ScenarioInvalid};
 pub use records::{

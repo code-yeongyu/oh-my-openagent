@@ -36,7 +36,9 @@ fn wait_for_settle_is_bounded_by_the_call_timeout() {
     let mut rig = Rig::new(json!({ "ax_notification_timeline": events }));
     let result = rig
         .session
-        .wait_for(params(json!({"target": "101", "predicate": {"settle": {}}, "timeout": 300})))
+        .wait_for(params(
+            json!({"target": "101", "predicate": {"settle": {}}, "timeout": 300}),
+        ))
         .expect("waitFor");
     let settle = result.observation.settle.expect("the settle it ran");
     assert_eq!(
@@ -57,7 +59,9 @@ fn wait_for_settle_is_bounded_by_the_call_timeout() {
     }));
     let result = rig
         .session
-        .wait_for(params(json!({"target": "101", "predicate": {"settle": {}}})))
+        .wait_for(params(
+            json!({"target": "101", "predicate": {"settle": {}}}),
+        ))
         .expect("waitFor");
     let settle = result.observation.settle.expect("the settle it ran");
     assert_eq!(
@@ -76,17 +80,29 @@ fn window_gone_and_event_waits_ignore_an_unrelated_destroyed_element() {
         "predicate": {"window": {"state": "gone", "title": "Save"}},
         "timeout": 1000
     });
-    let property = json!({"target": "101", "predicate": {"event": {"kind": "property"}}, "timeout": 1000});
+    let property =
+        json!({"target": "101", "predicate": {"event": {"kind": "property"}}, "timeout": 1000});
     let unrelated = json!({"ax_notification_timeline": [
         {"t_ms": 100, "window": "101", "kind": "AXUIElementDestroyed"},
         {"t_ms": 200, "window": "102", "kind": "AXValueChanged"}
     ]});
     let mut rig = Rig::new(unrelated.clone());
     let result = rig.session.wait_for(params(gone.clone())).expect("waitFor");
-    assert_eq!(result.outcome, WaitOutcome::Timeout, "an element of 101 is not the Save window");
+    assert_eq!(
+        result.outcome,
+        WaitOutcome::Timeout,
+        "an element of 101 is not the Save window"
+    );
     let mut rig = Rig::new(unrelated);
-    let result = rig.session.wait_for(params(property.clone())).expect("waitFor");
-    assert_eq!(result.outcome, WaitOutcome::Timeout, "the change was on 102, not 101");
+    let result = rig
+        .session
+        .wait_for(params(property.clone()))
+        .expect("waitFor");
+    assert_eq!(
+        result.outcome,
+        WaitOutcome::Timeout,
+        "the change was on 102, not 101"
+    );
     let related = json!({"ax_notification_timeline": [
         {"t_ms": 100, "window": "101", "kind": "AXUIElementDestroyed"},
         {"t_ms": 200, "window": "101", "kind": "AXValueChanged"},
@@ -127,6 +143,13 @@ fn a_gone_wait_whose_listing_fails_refuses_instead_of_timing_out() {
             "timeout": 1000
         })))
         .expect_err("the failed listing is answered, not waited out");
-    assert_eq!(refused.refusal.code, omo_computer_core::error::EngineCode::Internal);
-    assert!(rig.clock.now_ms() < 1_000, "no wait ran: {}", rig.clock.now_ms());
+    assert_eq!(
+        refused.refusal.code,
+        omo_computer_core::error::EngineCode::Internal
+    );
+    assert!(
+        rig.clock.now_ms() < 1_000,
+        "no wait ran: {}",
+        rig.clock.now_ms()
+    );
 }
