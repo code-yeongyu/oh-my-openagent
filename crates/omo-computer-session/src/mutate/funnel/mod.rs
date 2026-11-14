@@ -8,13 +8,15 @@ use omo_computer_core::report::Disposition;
 use omo_computer_core::results::ExecReply;
 use serde_json::json;
 
+mod binding;
+mod readmit;
+mod refusal;
+
 use super::record::{target_id, Record};
 use super::recovery::Verdict;
 use super::report::{self, Sent};
 use super::{Mutation, Refused, MARKER_UNAVAILABLE, TRANSACTION_FAILED};
-use crate::audit::AuditEvent;
 use crate::budget::PermitKind;
-use crate::marker::Receipt;
 use crate::{Session, NOT_OPEN};
 use omo_computer_safety::Gate;
 
@@ -67,18 +69,12 @@ impl Session {
             // R70s(1), the fold: a stop during the wait ends the lease through the funnel, the
             // epoch is read fresh, the plan (consent, lease, reservations) is made again, and the
             // gate admits the call again on that new plan before anything is taken or sent.
-            self.reconcile_stop();
-            epoch = self.guard.supervisor().stop_epoch();
-            plan = self.funnel.control.plan(self.backend.as_mut(), call, epoch);
-            if let Err(refused) =
-                self.guard
-                    .admit_on_with(self.backend.as_mut(), &mutation.call, plan.stages)
-            {
-                return Err(self.refuse(
-                    record,
-                    Some(format!("{:?}", refused.gate)),
-                    refused.refusal.into(),
-                ));
+            match self.readmit(&mutation) {
+                Ok(fresh) => (plan, epoch) = fresh,
+                Err(refused) => {
+                    let (stage, out) = *refused;
+                    return Err(self.refuse(record, Some(stage), out));
+                }
             }
         }
         if let Err((refusal, detail)) = self.funnel.control.commit(self.backend.as_mut(), &plan, epoch) {
@@ -103,10 +99,7 @@ impl Session {
         binding: Option<(bool, Option<Vec<u8>>)>,
     ) -> Result<ExecReply, Refused> {
         let target = target_id(&mutation.call.target);
-        let identity_unavailable = binding.as_ref().is_some_and(|(by_identity, _)| !by_identity);
-        if let Some((by_identity, observed)) = &binding {
-            record.event.bind_app(*by_identity, observed.as_deref());
-        }
+        let identity_unavailable = binding::bind_audit(&mut record, binding.as_ref());
         // `&mut Session` serialises a session's calls, so no exec permit free means one leaked:
         // refused with nothing sent, never sent without one.
         let Some(_permit) = self.funnel.permits.try_take(PermitKind::Exec) else {
@@ -148,20 +141,10 @@ impl Session {
         // Row 21 on #13391's re-admit (R70bg(2)): the stop is reconciled through the funnel, the
         // epoch is read fresh and the gate runs on a fresh plan's stages, so a stop or a consent
         // change while another holder kept the lock refuses here too.
-        self.reconcile_stop();
-        let epoch = self.guard.supervisor().stop_epoch();
-        let call = (mutation.method, &mutation.call.target, mutation.route);
-        let fresh = self.funnel.control.plan(self.backend.as_mut(), call, epoch);
-        if let Err(refused) = self
-            .guard
-            .admit_on_with(self.backend.as_mut(), &mutation.call, fresh.stages)
-        {
+        if let Err(refused) = self.readmit(&mutation) {
+            let (stage, out) = *refused;
             drop(lock);
-            return Err(self.refuse(
-                record,
-                Some(format!("{:?}", refused.gate)),
-                refused.refusal.into(),
-            ));
+            return Err(self.refuse(record, Some(stage), out));
         }
         if let Err(error) = self.funnel.markers.create(&record.marker) {
             self.funnel.warn(format!("marker not written: {error}"));
@@ -261,49 +244,6 @@ impl Session {
             }
         }
         (count, None)
-    }
-
-    fn store_receipt(&mut self, record: &mut Record, reply: serde_json::Value) {
-        record.marker.receipt = Some(Receipt { reply });
-        if let Err(error) = self.funnel.markers.record_receipt(&record.marker) {
-            self.funnel
-                .warn(format!("marker receipt not stored: {error}"));
-        }
-    }
-
-    /// Writes the refusal's audit line and answers it.
-    fn refuse(&mut self, record: Record, stage: Option<String>, refused: Refused) -> Refused {
-        let mut record = record;
-        record.refused(stage, &refused.refusal);
-        let warning = self.append_or_warn(record.event);
-        Refused { warning, ..refused }
-    }
-
-    /// Appends one audit line. A failure degrades the sink (every later admission refuses);
-    /// it is logged and answers `write_failed`.
-    fn append_or_warn(&mut self, event: AuditEvent) -> Option<String> {
-        let error = self.funnel.audit().append(event).err()?;
-        self.funnel.warn(format!("audit line not written: {error}"));
-        Some("write_failed".to_owned())
-    }
-
-    /// A marker refusal: its audit line, then (on a re-drive) the marker cleared by it.
-    fn refuse_and_clear(&mut self, record: Record, refused: Refused, clear: bool) -> Refused {
-        let mut record = record;
-        record.refused(Some("Marker".to_owned()), &refused.refusal);
-        if let Some(interrupted) = refused.interrupted {
-            record.sent(0, 0, interrupted, "unverifiable", None);
-            record.event.delivered = None;
-        }
-        let warning = self.append_or_warn(record.event);
-        if clear && warning.is_none() {
-            let binding = self.funnel.binding.clone();
-            if let Err(error) = self.funnel.markers.clear(&binding.issuer, &binding.scope) {
-                self.funnel
-                    .warn(format!("recovered marker not cleared: {error}"));
-            }
-        }
-        Refused { warning, ..refused }
     }
 }
 
