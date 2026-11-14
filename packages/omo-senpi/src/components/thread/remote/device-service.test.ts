@@ -1114,6 +1114,42 @@ describe("device-service adapter: the account listing is shared across the reads
     expect(s.calls()).toBe(2)
   })
 
+  test("#given a round still running #when a session is closed before it ends #then that round is not kept, and the next read lists again", async () => {
+    const s = countingService()
+    const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: async () => s.service, now: () => 0 })
+    const inFlight = port.sessions()
+    await Promise.resolve()
+    await Promise.resolve()
+    await port.sessionCommand("b", "s1", { type: "unload_session" }).catch(() => undefined)
+    s.finish()
+    await inFlight
+    const next = port.sessions()
+    await Promise.resolve()
+    await Promise.resolve()
+    s.finish()
+    await next
+    expect(s.calls()).toBe(2)
+  })
+
+  test("#given a round that fails #when the next read comes within the reuse window #then it lists again instead of reusing the failure", async () => {
+    let calls = 0
+    const service = {
+      status: async () => ({ state: "connected" }),
+      thisDevice: async () => ({ id: "here", name: "this mac" }),
+      devices: async () => [],
+      sessions: async () => {
+        calls += 1
+        if (calls === 1) throw new Error("listing failed")
+        return { rows: [], incomplete: [], revision: calls, query_id: "q", devices: {} }
+      },
+      closed: new Promise(() => {}),
+    } as unknown as DeviceService
+    const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: async () => service, now: () => 0 })
+    await expect(port.sessions()).rejects.toThrow("listing failed")
+    expect(await port.sessions()).toEqual([])
+    expect(calls).toBe(2)
+  })
+
   test("#given a round that just ended #when a create goes to a device #then the next read lists again, so the new session can be found", async () => {
     const s = countingService()
     const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: async () => s.service, now: () => 0 })
