@@ -750,3 +750,31 @@ fn a_is_62_stop_hotkey_of_the_wrong_type_never_falls_back_to_the_default() {
     assert!(s.funnel.control.armed_chord.as_deref() != Some("ctrl+alt+shift+escape"), "the OS default is never armed");
     assert!(!s.stop_path_status().global_live, "nothing that hears is armed");
 }
+
+/// Review L5 at a07dff9 (R70cl): reconcile_stop observes the armed listener BEFORE it re-arms a
+/// changed chord, so a stop pressed while the old listener was armed is never dropped with it.
+#[test]
+fn a_stop_queued_in_the_old_listener_is_observed_before_the_re_arm() {
+    let sink = RecordingSink::default();
+    let backend = FakeBackend::with_parts(
+        scenario(&json!({ "consent": { "stopHotkey": "ctrl+alt+shift+f12" } })),
+        FakeClock::default(),
+        sink.clone(),
+    )
+    .with_persona(omo_computer_backend_fake::Persona::X11)
+    .with_stop_path(StopPathScript::Live);
+    let remote = backend.handle();
+    let consent = backend.consent_handle();
+    let mut s = Session::new(Box::new(backend));
+    s.open(params(json!({ "reportMode": "null" }))).expect("open");
+    s.stop_path_start_checked(params(json!({}))).expect("the configured chord arms");
+    capture(&mut s, "1");
+    // The stop key changes; the next exec re-arms. The user pressed stop on the old chord first.
+    consent.set(json!({ "stopHotkey": "ctrl+alt+shift+f11" }));
+    s.open(params(json!({ "reportMode": "null" }))).expect("re-open");
+    remote.press_stop_chord();
+    let refused = s.click(params(json!({ "target": "1", "x": 5, "y": 5 }))).expect_err("the press is observed");
+    assert_eq!(refused.refusal.code.wire(), "Suspended");
+    assert!(sink.lines().iter().all(|line| !line.contains("click") && !line.contains("mouse")), "nothing sent: {:?}", sink.lines());
+    assert_eq!(s.funnel.control.armed_chord.as_deref(), Some("ctrl+alt+shift+f11"), "and the new chord is armed after");
+}

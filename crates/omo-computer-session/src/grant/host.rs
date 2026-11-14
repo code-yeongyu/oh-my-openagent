@@ -123,9 +123,11 @@ impl Session {
     /// A stop the gate's listener poll latched (the hotkey path, never through `stop_control`):
     /// a lease taken under an earlier stop epoch ends through [`Self::end_lease`], once.
     pub(crate) fn reconcile_stop(&mut self) {
-        self.rearm_on_changed_chord();
+        // Review L5: the armed listener is polled FIRST, so a press queued in it is never dropped
+        // when a changed chord replaces it; the re-arm follows.
         let backend = &mut self.backend;
         self.guard.observe(&mut || backend.stop_listener(), &mut omo_computer_safety::NoHolds);
+        self.rearm_on_changed_chord();
         let epoch = self.guard.supervisor().stop_epoch();
         self.funnel.control.grant.reconcile(epoch);
         if self.funnel.control.lease_epoch.is_some_and(|taken| taken != epoch) {
