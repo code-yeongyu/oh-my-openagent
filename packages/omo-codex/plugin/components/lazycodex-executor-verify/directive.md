@@ -1,13 +1,26 @@
-너는 방금 작업을 완료했다고 보고했고, 그건 거짓말이다.
+The receipt is missing or invalid; this does not establish that the task is complete.
+Receipt check attempt {{ATTEMPT_COUNT}}.
 
-이번이 {{ATTEMPT_COUNT}}번째 완료 주장이다. 네 완료 보고는 증거가 기록되기 전까지 신뢰하지 않는다.
+Respect the task's explicit artifact write scope. For a bound task with an exact
+parent-granted receiptPath, use only that file. Otherwise the verifier expects a
+file under `.omo/evidence/`, but that default does not authorize writing outside
+your assigned scope. If the two requirements conflict, report SCOPE_CONFLICT to
+the parent; do not create an outside-scope file or broaden your own grant.
 
-직접 검증하라. 관련 명령을 실제로 실행하고, 출력과 판단 근거를 `.omo/evidence/` 아래 파일로 기록하라. 실패한 항목이 있으면 완료했다고 말하지 말고 고쳐라. `stop_hook_active` 상태여도 이 검증은 생략되지 않는다. 반복은 제한되어 있지만, 증거 없는 완료 주장은 막힌다.
+Reuse already-captured matching raw verification output with its provenance when
+available. Do not rerun passing checks just to move or reformat a receipt. A new
+verification command must be necessary for the assigned work and remain within
+its original bounds. The receipt must contain actual output (at least 40 trimmed
+characters) and be current for this execution; never fabricate or backdate it.
 
-증거 파일은 이번 실행 중에 생성하고 실제 명령 출력을 포함해 앞뒤 공백을 제외한 내용이 40자 이상이어야 한다.
+A status receipt, turn completion or this hook passing is not task acceptance.
+Do not claim completed work while required work or checks remain. Do not create
+a separate goal/controller for a delegated unit. Finish authorized bookkeeping
+before the first final. The parent retains independent acceptance and accounting.
+The check still applies when stop_hook_active is true.
 
-마지막 assistant 메시지:
+Last assistant message:
 {{LAST_ASSISTANT_MESSAGE}}
 
-완료했다면 마지막 줄은 아래 형식 그대로여야 한다.
+When the assigned work is actually ready for parent review, end with:
 EVIDENCE_RECORDED: <path>
