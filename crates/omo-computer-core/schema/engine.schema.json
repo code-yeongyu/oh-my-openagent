@@ -1188,6 +1188,18 @@
           ],
           "default": null
         },
+        "settle": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObservationSettle"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The post-send settle: the regime picked and its outcome.",
+          "default": null
+        },
         "evidence": {
           "type": "array",
           "items": {
@@ -2703,6 +2715,48 @@
         "stopPath",
         "observation"
       ]
+    },
+    "DiffFallback": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "baseline_incomplete",
+            "current_incomplete"
+          ]
+        },
+        {
+          "type": "string",
+          "const": "since_expired",
+          "description": "`since` names no generation in the window's 8-generation window."
+        },
+        {
+          "type": "string",
+          "const": "window_changed",
+          "description": "The window identity (pid, process start, window) changed since the baseline."
+        },
+        {
+          "type": "string",
+          "const": "menu_root",
+          "description": "The baseline or the current root is an open menu."
+        },
+        {
+          "type": "string",
+          "const": "reordered",
+          "description": "The surviving elements changed their relative order."
+        },
+        {
+          "type": "string",
+          "const": "not_shorter",
+          "description": "The diff text is not shorter than the full tree text."
+        },
+        {
+          "type": "string",
+          "const": "query_projection",
+          "description": "A `query` projection keeps its own baseline and never diffs."
+        }
+      ],
+      "description": "Why an `observe({since})` answered the full tree instead of a diff."
     },
     "DisplayAwake": {
       "type": "object",
@@ -4571,6 +4625,37 @@
         "y"
       ]
     },
+    "NotificationMatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "app": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "bodyHash": {
+          "type": "string"
+        },
+        "arrivedAt": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observation": {
+          "$ref": "#/$defs/UntrustedText"
+        }
+      },
+      "required": [
+        "app",
+        "title",
+        "bodyHash",
+        "arrivedAt",
+        "observation"
+      ],
+      "description": "The notification a `waitFor({notification})` matched: its fingerprint only, never the body."
+    },
     "NotificationPredicate": {
       "type": "object",
       "additionalProperties": false,
@@ -4614,6 +4699,26 @@
             "string",
             "null"
           ]
+        },
+        "diffFallback": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DiffFallback"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why a read that named `since` answered the full tree."
+        },
+        "baseline": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0,
+          "description": "The generation `diff` is against."
         },
         "focused": {
           "anyOf": [
@@ -4718,6 +4823,17 @@
           "type": "integer",
           "format": "uint64",
           "minimum": 0
+        },
+        "regime": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SettleRegime"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The regime of `settle_profile` the engine picked."
         }
       },
       "required": [
@@ -6259,6 +6375,26 @@
         "timeout"
       ]
     },
+    "SettleRegime": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "changed",
+          "description": "After an input whose settle saw a change."
+        },
+        {
+          "type": "string",
+          "const": "unchanged",
+          "description": "After an input with no detected change."
+        },
+        {
+          "type": "string",
+          "const": "navigation",
+          "description": "After a navigation: a new window, app, Space or desktop, web-area URL or document."
+        }
+      ],
+      "description": "Which settle numbers an input's settle picked, from what it saw."
+    },
     "SpawnPath": {
       "type": "string",
       "enum": [
@@ -6580,7 +6716,8 @@
             "null"
           ],
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Microseconds the element reference took to resolve."
         },
         "capture": {
           "type": [
@@ -6588,7 +6725,8 @@
             "null"
           ],
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Microseconds the capture took."
         },
         "prime": {
           "type": [
@@ -6596,7 +6734,8 @@
             "null"
           ],
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Microseconds the target took to prime."
         },
         "dispatch": {
           "type": [
@@ -6604,7 +6743,8 @@
             "null"
           ],
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Microseconds the dispatch of the input took."
         },
         "verify": {
           "type": [
@@ -6612,7 +6752,8 @@
             "null"
           ],
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Microseconds the verification read took."
         },
         "restore": {
           "type": [
@@ -6620,10 +6761,20 @@
             "null"
           ],
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Microseconds the focus restore took."
+        },
+        "settleMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0,
+          "description": "Milliseconds the post-send settle waited (its `settle.waitedMs`)."
         }
       },
-      "description": "Stage timings in microseconds; a stage that did not run is absent."
+      "description": "How long each stage took; a stage that did not run is absent. Each field names its unit."
     },
     "ToolkitClass": {
       "type": "string",
@@ -6954,6 +7105,16 @@
         },
         "observation": {
           "$ref": "#/$defs/Observation"
+        },
+        "notification": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NotificationMatch"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [

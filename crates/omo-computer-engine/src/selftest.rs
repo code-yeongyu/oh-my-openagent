@@ -1,0 +1,79 @@
+//! `--selftest`: drives a fake-backend session through the RPC layer and reports each check;
+//! exits 1 when one fails.
+
+use std::process::ExitCode;
+
+use omo_computer_backend_fake::{FakeBackend, FakeClock, FakeScenario, RecordingSink, StopPathScript};
+use omo_computer_session::Session;
+use serde_json::{json, Value};
+
+use crate::rpc;
+
+const CHECKS: &[(&str, &str)] = &[
+    ("session.open", r#"{"jsonrpc":"2.0","id":1,"method":"session.open","params":{}}"#),
+    ("capabilities", r#"{"jsonrpc":"2.0","id":2,"method":"capabilities","params":{}}"#),
+    ("stopPath.start", r#"{"jsonrpc":"2.0","id":3,"method":"stopPath.start","params":{}}"#),
+    ("capture", r#"{"jsonrpc":"2.0","id":4,"method":"capture","params":{"target":"desktop"}}"#),
+    // Row 21: a click with no target lands on the user's pointer, which needs the human grant.
+    ("control.grant", r#"{"jsonrpc":"2.0","id":7,"method":"control.grant","params":{"reason":"selftest"}}"#),
+    ("click", r#"{"jsonrpc":"2.0","id":5,"method":"click","params":{"x":1,"y":1}}"#),
+    ("session.close", r#"{"jsonrpc":"2.0","id":6,"method":"session.close","params":{}}"#),
+];
+
+/// One display, so the click has a frame to map through.
+const SCENARIO: &str = r#"{"displays":[{"id":"1","name":"Display","x":0,"y":0,"width":64,"height":48,"scale":1.0,"pixelX":0,"pixelY":0,"pixelWidth":64,"pixelHeight":48,"isPrimary":true}]}"#;
+
+fn checks() -> Vec<(String, bool)> {
+    let sink = RecordingSink::default();
+    let Ok(scenario) = FakeScenario::from_json(SCENARIO) else {
+        return vec![("scenario".to_owned(), false)];
+    };
+    let backend = FakeBackend::with_parts(scenario, FakeClock::default(), sink.clone())
+        .with_stop_path(StopPathScript::Live);
+    let mut session = Session::new(Box::new(backend));
+    let mut results: Vec<(String, bool)> = CHECKS
+        .iter()
+        .map(|(name, line)| {
+            let reply = rpc::handle_line(&mut session, line.as_bytes())
+                .and_then(|text| serde_json::from_str::<Value>(&text).ok());
+            let ok = reply.is_some_and(|reply| reply.get("result").is_some());
+            ((*name).to_owned(), ok)
+        })
+        .collect();
+    let sent = sink.lines().iter().filter(|line| !line.starts_with("presence ")).count();
+    results.push(("sink".to_owned(), sent == 3));
+    let shown = sink.lines().iter().any(|line| line.starts_with("presence show"));
+    results.push(("presence".to_owned(), shown));
+    results
+}
+
+pub fn run(as_json: bool) -> ExitCode {
+    let results = checks();
+    let ok = results.iter().all(|(_, passed)| *passed);
+    if as_json {
+        let list: Vec<Value> = results
+            .iter()
+            .map(|(name, passed)| json!({ "check": name, "ok": passed }))
+            .collect();
+        println!("{}", json!({ "ok": ok, "backend": "fake", "checks": list }));
+    } else {
+        for (name, passed) in &results {
+            println!("{name}: {}", if *passed { "ok" } else { "FAILED" });
+        }
+        println!("engine: selftest {}", if ok { "ok" } else { "FAILED" });
+    }
+    if ok {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::FAILURE
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn every_selftest_check_passes_on_the_fake() {
+        let results = super::checks();
+        assert!(results.iter().all(|(_, ok)| *ok), "{results:?}");
+    }
+}
