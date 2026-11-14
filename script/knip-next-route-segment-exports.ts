@@ -5,7 +5,7 @@ import type { Preprocessor } from "knip"
 // special files of an app directory, so they are used by the framework, not dead. knip's Next.js plugin recognises them
 // only by leaving every export of those files unchecked, which would also hide a genuinely unused export there (and
 // would shrink the coverage script/knip-coverage.test.ts measures). This preprocessor instead drops exactly the names
-// listed in knip.jsonc `preprocessorOptions.nextRouteSegmentExports`, and only for the special files of the configured
+// listed in knip.base.jsonc `preprocessorOptions.nextRouteSegmentExports`, and only for the special files of the configured
 // app directory; every other export of those files, and every other file, stays checked.
 
 type Scope = { dir: string; files: Set<string>; names: Set<string> }
