@@ -106,7 +106,9 @@ function readPluginRequirements() {
   // A release check with nothing to check, or one whose entries are malformed, must not pass.
   const empty = (value) => Array.isArray(value) && value.length === 0
   if (empty(read?.pluginOutputs) || empty(read?.generated)) {
-    throw new Error("the plugin requirement list is empty: refusing to pass a release check with nothing to check")
+    throw new Error(
+      `${HELPER_NAME} gave an empty list: the plugin requirement list is empty: refusing to pass a release check with nothing to check`,
+    )
   }
   if (!strings(read?.pluginOutputs)) {
     throw new Error(`${HELPER_NAME} gave no usable "pluginOutputs": expected a non-empty array of strings`)
@@ -123,6 +125,10 @@ function readPluginRequirements() {
       throw new Error(
         `${HELPER_NAME} gave a "generated" entry whose source is not a regular expression: ${entry.label}`,
       )
+    }
+    // A source that matches the empty string ("", ".*", "^") matches every path, so its check could never fail.
+    if (new RegExp(entry.source).test("")) {
+      throw new Error(`${HELPER_NAME} gave a "generated" entry whose source matches every path: ${entry.label}`)
     }
   }
   return read

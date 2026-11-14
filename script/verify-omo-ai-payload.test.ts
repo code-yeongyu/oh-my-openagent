@@ -469,6 +469,31 @@ describe("omo-ai payload verifier", () => {
       expect(errorLines(run.output)).toHaveLength(1)
     })
 
+    test("#when it prints empty lists #then one line names the helper and the empty requirement list, with no stack", () => {
+      const run = runWithHelper("console.log(JSON.stringify({ pluginOutputs: [], generated: [] }))\n")
+      expect(run.exitCode).not.toBe(0)
+      expect(run.output).toContain("script/plugin-required-outputs.ts")
+      expect(run.output).toContain("the plugin requirement list is empty")
+      expect(run.output).not.toContain("    at ")
+      expect(errorLines(run.output)).toHaveLength(1)
+    })
+
+    test.each(["", ".*"])(
+      "#when a generated entry's source %p matches every path #then one line names the helper and that label",
+      (source) => {
+        const helperOutput = JSON.stringify({
+          pluginOutputs: ["extensions/omo.js"],
+          generated: [{ label: "match-all-entry", source }],
+        })
+        const run = runWithHelper(`console.log(${JSON.stringify(helperOutput)})\n`)
+        expect(run.exitCode).not.toBe(0)
+        expect(run.output).toContain("script/plugin-required-outputs.ts")
+        expect(run.output).toContain("match-all-entry")
+        expect(run.output).not.toContain("    at ")
+        expect(errorLines(run.output)).toHaveLength(1)
+      },
+    )
+
     test("#when it exits non-zero #then one line names the helper and only the first stderr line", () => {
       const run = runWithHelper(
         'console.error("first stderr line")\nconsole.error("    at somewhere (file.ts:1:1)")\nprocess.exit(3)\n',
