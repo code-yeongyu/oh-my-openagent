@@ -16,6 +16,7 @@ import type {
 import { type CommandResult, openAttach, PROGRESS_STATES, type RemoteAttach } from "./remote-attach.ts"
 import { followDelegatedChannel } from "./delegated-channel.ts"
 import { LocalApiError } from "./local-api/errors.ts"
+import { REFUSED_BEFORE_SENDING } from "./local-api/refused-before-sending.ts"
 import { newestRowsListing } from "./listing-rows.ts"
 import type { CommandRpc } from "./local-api/protocol.ts"
 import type { SessionCandidate } from "./local-api/protocol-delegated.ts"
@@ -108,6 +109,7 @@ const markNotSent = (error: unknown): unknown =>
 
 export type { ListingResult, ListingRevision, ReadPage, ReadPageEntry } from "./local-api/client-assembly.ts"
 export { LocalApiError } from "./local-api/errors.ts"
+export { REFUSED_BEFORE_SENDING } from "./local-api/refused-before-sending.ts"
 export type {
   Capability,
   CommandRpc,
@@ -362,7 +364,13 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
         throw new LocalApiError("unsupported", "this device service does not carry the wake target", { not_sent: true })
       return await followDelegatedCommand(client, device, (commandId) =>
         client.wakeCommand(device, durableId, rpc, commandId).catch((error: unknown) => {
-          throw error instanceof LocalApiError && error.command_id === undefined ? markNotSent(error) : error
+          // Only a code that refuses before sending dispatched nothing (#13238 review): `closed` or
+          // `protocol_violation` can end a wake already written, so they stay unmarked and the caller reports uncertain.
+          throw error instanceof LocalApiError &&
+            error.command_id === undefined &&
+            REFUSED_BEFORE_SENDING.has(error.code)
+            ? markNotSent(error)
+            : error
         }),
       )
     },

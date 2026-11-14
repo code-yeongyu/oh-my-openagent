@@ -536,7 +536,8 @@ export function createRelayTransport(
       if (sent.reason === "unsupported") return wakeRefusal("wake_unsupported", device)
       if (sent.reason === "engine_capability_missing" && sent.detail !== undefined)
         return wakeRefusal(sent.detail, device)
-      return outcomeFailure(sent, device)
+      // The service's refusal can carry the other device's free-form error text: the same allowlist (#13277 review).
+      return outcomeFailure({ ...sent, reason: shownReason(sent.reason) }, device)
     }
     const data = replyData(sent.response)
     const kind = data["kind"]

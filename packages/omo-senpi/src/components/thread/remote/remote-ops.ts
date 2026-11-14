@@ -3,6 +3,7 @@ import type { CommandResult } from "@oh-my-opencode/device-service-core"
 import { outcomeFailure, READ_UNCERTAIN } from "./outcome"
 import {
   endedRow,
+  probeMayBuildEndedRow,
   type AliasError,
   type AliasHolder,
   type JsonObject,
@@ -111,7 +112,7 @@ export async function holderTarget(
   if (row !== undefined) return { where: "remote", row }
   // omo#13037 A4.3.2: the holder's device answered the probe for a session no engine lists: an ended row from that answer,
   // only while this device's service can carry the wake (else today's not_found below).
-  if (located.kind === "ok" && (await remote.sessions.canWake?.()) === true)
+  if (located.kind === "ok" && (await probeMayBuildEndedRow(remote.sessions)))
     return { where: "remote", row: endedRow(holder.device, located.sessionId, holder.session_id) }
   return fail(
     "not_found",

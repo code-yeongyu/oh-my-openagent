@@ -1,7 +1,7 @@
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import type { ThreadResolveResult } from "../addressing"
 import { relayAddressBook, relayAddressEntry, type RelayAddressBook } from "../remote/address-book"
-import { endedRow, rowThreadId, type RemoteSessionRow } from "../remote/ports"
+import { endedRow, probeMayBuildEndedRow, rowThreadId, type RemoteSessionRow } from "../remote/ports"
 import { remoteAvailable } from "../remote/remote-ops"
 import {
   assembleAddressBook,
@@ -308,7 +308,10 @@ export async function replyOnDevice(
     (candidate) => candidate.device === sender.device && rowThreadId(candidate) === sender.session_id,
   )
   if (row !== undefined) return { kind: "ok", entry: relayAddressEntry(row), resolution: "id" }
-  const probed = await remote.sessions.lookup?.(sender.device, sender.session_id)
+  // One rule for a probe-built ended row (probeMayBuildEndedRow): no probe while the wake cannot be carried.
+  const probed = (await probeMayBuildEndedRow(remote.sessions))
+    ? await remote.sessions.lookup?.(sender.device, sender.session_id)
+    : undefined
   if (probed?.kind === "found")
     return {
       kind: "ok",
@@ -440,6 +443,7 @@ async function lookupAcross(
   // answer stays today's. A device round that fails leaves today's answer too.
   const probe = remote.sessions.lookup
   if (probe === undefined || (await remote.sessions.canLookup?.().catch(() => false)) !== true) return undefined
+  if (!(await probeMayBuildEndedRow(remote.sessions))) return undefined
   let online: readonly { readonly device: string; readonly online: boolean }[]
   try {
     const here = await remote.sessions.thisDevice()
