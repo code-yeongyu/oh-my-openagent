@@ -2,6 +2,8 @@
 .omo/*
 !.omo/rules/
 !.omo/rules/**
+!.omo/evidence/
+!.omo/evidence/**
 packages/*/.omo/*
 .sisyphus/*
 !.sisyphus/rules/
