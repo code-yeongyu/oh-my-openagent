@@ -1,6 +1,6 @@
 // `omo remote` usage: the full text and each verb's own entry, the answer to `omo remote --help` and `<verb> --help`.
 
-const USAGE_HEAD = "usage: omo remote <command> [--json]";
+const USAGE_HEAD = "usage: omo remote <command> [--json]"
 
 // One entry per verb (enable and disable share theirs): the full usage is every entry, and `<verb> --help` prints its own.
 const USAGE_ENTRIES: readonly { readonly verbs: readonly string[]; readonly text: string }[] = [
@@ -58,14 +58,14 @@ const USAGE_ENTRIES: readonly { readonly verbs: readonly string[]; readonly text
     verbs: ["close"],
     text: "  close <device>/<session>                 end the session on its device",
   },
-];
+]
 
-export const REMOTE_USAGE = [USAGE_HEAD, ...USAGE_ENTRIES.map((entry) => entry.text)].join("\n");
+export const REMOTE_USAGE = [USAGE_HEAD, ...USAGE_ENTRIES.map((entry) => entry.text)].join("\n")
 
-export const isHelpFlag = (arg: string | undefined): boolean => arg === "--help" || arg === "-h";
+export const isHelpFlag = (arg: string | undefined): boolean => arg === "--help" || arg === "-h"
 
 /** The usage of one verb: the head line and that verb's entry, flags included. */
 export function verbUsage(verb: string): string {
-  const entry = USAGE_ENTRIES.find((candidate) => candidate.verbs.includes(verb));
-  return entry === undefined ? REMOTE_USAGE : `${USAGE_HEAD}\n${entry.text}`;
+  const entry = USAGE_ENTRIES.find((candidate) => candidate.verbs.includes(verb))
+  return entry === undefined ? REMOTE_USAGE : `${USAGE_HEAD}\n${entry.text}`
 }
