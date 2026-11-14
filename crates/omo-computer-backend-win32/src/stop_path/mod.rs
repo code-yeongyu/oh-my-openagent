@@ -207,10 +207,14 @@ impl Sightings {
 }
 
 /// The 500 ms hook re-install, new-before-old: `(keep, unhook)` - the hook that stays installed
-/// and the one to remove, given the installed hook and the fresh install's result.
+/// and the one to remove, given the installed hook and the fresh install's result. A failed
+/// install keeps the old hook (review L4 of the #13350 delta), so no beat leaves the user unheard.
 #[must_use]
 pub fn reinstall<H>(old: Option<H>, fresh: Option<H>) -> (Option<H>, Option<H>) {
-    (fresh, old)
+    match fresh {
+        Some(fresh) => (Some(fresh), old),
+        None => (old, None),
+    }
 }
 
 /// Whether `vk` is one of the stop chord's keys.
