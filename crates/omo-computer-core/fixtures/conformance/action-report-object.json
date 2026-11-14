@@ -1,6 +1,6 @@
 {
   "description": "reportMode object (computer-use v2 P1a): engine.hello lists the action-report feature; a completed background click answers an ActionReport delivered_unverified/unsafe with effect unverifiable and auditIds naming its audit notification, which carries that id; a click refused for a stale frame carries data.disposition not_delivered/safe and focusRestoration.",
-  "scenario": "crates/omo-computer-backend-fake/fixtures/two-displays-one-window-explicit-stop-key.json",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/v3-two-displays-one-window-explicit-stop-key.json",
   "env": {
     "OMO_COMPUTER_FAKE_CLOCK": "1"
   },

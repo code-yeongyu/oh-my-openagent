@@ -1,6 +1,6 @@
 {
   "description": "UserIntervened (#11465, plan todo 17) over a scenario whose user clicks in Notes (pid 4242) right before the first key of a typeText. With a live host-relay stop path: a capture of window 101 starts recording the user's input there; the typeText stops at that click with UserIntervened (input before it may have landed; nothing more sent) and is audited; one second later (fake clock) a typeText waits for the user to pause and, the clock never moving, is refused UserIntervened 'still using' without sending; after 5 more seconds an element inspection (a LOOK) clears nothing and the next typeText is refused 'was using ... nothing was sent'; a capture of the window (a READ that began after the pause) clears the record and the typeText that follows succeeds and is audited.",
-  "scenario": "crates/omo-computer-backend-fake/fixtures/user-intervened-explicit-stop-key.json",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/v3-user-intervened-explicit-stop-key.json",
   "env": {
     "OMO_COMPUTER_FAKE_CLOCK": "1"
   },

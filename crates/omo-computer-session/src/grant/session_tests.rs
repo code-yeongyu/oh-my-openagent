@@ -445,7 +445,7 @@ fn explicit_stop_key_fixtures_equal_their_base_plus_one_member() {
         serde_json::from_str(&std::fs::read_to_string(dir.join(name)).expect("fixture")).expect("json")
     };
     for base in ["two-displays-one-window", "ax-type-text", "ax-unconfirmed", "remote-typing", "user-intervened"] {
-        let mut copy = read(&format!("{base}-explicit-stop-key.json"));
+        let mut copy = read(&format!("v3-{base}-explicit-stop-key.json"));
         let consent = copy.as_object_mut().and_then(|map| map.remove("consent"));
         assert_eq!(consent, Some(json!({ "stopHotkey": "ctrl+alt+shift+escape" })), "{base}: only the recorded chord");
         assert_eq!(copy, read(&format!("{base}.json")), "{base}: the copy equals its base");
