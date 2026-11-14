@@ -113,13 +113,17 @@ export function wakeSettingsReader(
 export function wakeHostIdleExitMs(
   options: ThreadWakeOptions,
   cwd: () => string,
+  warn: (line: string) => void,
 ): () => number | undefined {
   const env = options.env ?? process.env
   const load = options.loadConfig ?? ((input) => loadOmoConfig({ cwd: input.cwd, env, harness: "senpi" }))
   return () => {
     try {
       return load({ cwd: cwd() }).config.task?.host_idle_exit_ms
-    } catch {
+    } catch (error) {
+      warn(
+        `thread wake: the task.host_idle_exit_ms setting was not read, the ensured host runs the launch spec's default: ${error instanceof Error ? error.message : String(error)}`,
+      )
       return undefined
     }
   }
@@ -248,7 +252,7 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart): Runni
     engineVersion: options.engineVersion ?? input.engineVersion,
     minimumEngine: options.minimumEngine,
     wake,
-    sameDevice: () => input.settings().sameDevice,
+    sameDevice: (cwd) => input.settings(cwd).sameDevice,
     onServing: () => {
       servingAcked = true
     },

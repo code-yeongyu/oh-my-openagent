@@ -565,7 +565,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
           sessionsDirectory,
           settings: wakeSettings,
           engineVersion: pi.hostVersion,
-          hostIdleExitMs: wakeHostIdleExitMs(wakeOptions, callerWorkspaceRoot),
+          hostIdleExitMs: wakeHostIdleExitMs(wakeOptions, callerWorkspaceRoot, warn),
           ensureHost: options.ensureHost,
           warn,
         })

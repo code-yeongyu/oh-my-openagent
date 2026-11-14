@@ -459,12 +459,28 @@ export function createCarrier(options: CarrierOptions): Carrier {
           (hasWork) => {
             if (hasWork) arm()
           },
-          () => undefined,
+          // A sweep that threw still had work to tend: the timer stays armed for the next tick (A3.1.4).
+          () => arm(),
         )
       },
       Math.min(CARRIER_RENEW_MS, WAKE_LEASE_MS / 3),
     )
   }
+
+  // A3.1.4: every carrier runs a sweep when it starts, so rows a dead process left requested and leases that ran
+  // out are taken over by the successor without a wake of its own. With an empty table there is no timer: the one
+  // read that decided that arms nothing (#13455's delta review).
+  void store.woken
+    .list()
+    .then((rows) => {
+      if (rows.length > 0)
+        void sweepNow()
+          .then((hasWork) => {
+            if (hasWork) arm()
+          })
+          .catch(() => undefined)
+    })
+    .catch(() => undefined)
 
   return {
     wake: (durableId) =>

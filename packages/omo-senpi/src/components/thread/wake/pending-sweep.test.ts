@@ -36,7 +36,7 @@ function intake(h: GatewayHarness, deliveryId: string, device: string, sessionId
 async function sweep(
   h: GatewayHarness,
   admit: (device: string) => IntakeAdmission,
-  sameDevice = false,
+  sameDevice: (durableId: string) => boolean = () => false,
 ): Promise<string[]> {
   const woken: string[] = []
   await runPendingSweep({
@@ -73,6 +73,6 @@ describe("the pending sweep", () => {
     const sent = await sender.engine.deliver({ sender: { kind: "session", durable_id: "a" }, target: "t", text: "hi" })
     expect(sent).toMatchObject({ kind: "ok", delivery: { kind: "queued_offline" } })
     expect(await sweep(h, () => "admitted")).toEqual([])
-    expect(await sweep(h, () => "admitted", true)).toEqual(["t"])
+    expect(await sweep(h, () => "admitted", () => true)).toEqual(["t"])
   })
 })
