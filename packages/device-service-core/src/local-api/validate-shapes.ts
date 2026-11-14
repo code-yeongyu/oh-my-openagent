@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@5bcdcc296c16a4c9af6f0618d5995e1e7ca0354e packages/local-api/src/validate-shapes.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@4ed58920002306a95bf92fe99ca448be89d7103f packages/local-api/src/validate-shapes.ts
 import { SESSION_DEVICE_MAX_CHARS, SESSION_ID_MAX_CHARS } from "./spec-proto.ts";
 import type {
   DeviceRef,

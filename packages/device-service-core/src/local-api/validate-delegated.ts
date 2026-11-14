@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@5bcdcc296c16a4c9af6f0618d5995e1e7ca0354e packages/local-api/src/validate-delegated.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@4ed58920002306a95bf92fe99ca448be89d7103f packages/local-api/src/validate-delegated.ts
 import { SESSION_ID_MAX_CHARS } from "./spec-proto.ts";
 import { LOCAL_BLOB_MAX, LOCAL_CHUNK_MAX, LOCAL_INLINE_MAX, lineBytes } from "./limits.ts";
 import type { EndpointsRegister, EndpointsUnregister } from "./protocol.ts";

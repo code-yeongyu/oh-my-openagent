@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@08905c110bb10ab2ba725ff8b8c642a64fbd1652 packages/local-api/src/validate-events.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@4ed58920002306a95bf92fe99ca448be89d7103f packages/local-api/src/validate-events.ts
 import { SESSION_READ_TAIL_MAX } from "./spec-proto.ts";
 import type { CommandStateEvent, EventKind, LocalEvent, RoundDeviceState } from "./protocol.ts";
 import {

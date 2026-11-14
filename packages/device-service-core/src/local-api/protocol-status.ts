@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@08905c110bb10ab2ba725ff8b8c642a64fbd1652 packages/local-api/src/protocol-status.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@4ed58920002306a95bf92fe99ca448be89d7103f packages/local-api/src/protocol-status.ts
 import type { DeviceRef, Policy } from "./protocol.ts";
 import type { StatusUpdate } from "./protocol-control.ts";
 import type { StatusState } from "./vocabulary.ts";

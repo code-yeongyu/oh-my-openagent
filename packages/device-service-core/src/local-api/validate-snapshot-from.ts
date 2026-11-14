@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@5bcdcc296c16a4c9af6f0618d5995e1e7ca0354e packages/local-api/src/validate-snapshot-from.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@4ed58920002306a95bf92fe99ca448be89d7103f packages/local-api/src/validate-snapshot-from.ts
 import type { SnapshotBody } from "./protocol.ts";
 import { bool, entryId, known } from "./validate-fields.ts";
 

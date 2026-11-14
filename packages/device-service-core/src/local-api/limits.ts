@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@08905c110bb10ab2ba725ff8b8c642a64fbd1652 packages/local-api/src/limits.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@4ed58920002306a95bf92fe99ca448be89d7103f packages/local-api/src/limits.ts
 import { createHash } from "node:crypto";
 import { toBase64 } from "./bytes-encoding.ts";
 import { SESSION_BLOB_MAX } from "./spec-proto.ts";

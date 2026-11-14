@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@5bcdcc296c16a4c9af6f0618d5995e1e7ca0354e packages/local-api/src/validate-machine-events.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@4ed58920002306a95bf92fe99ca448be89d7103f packages/local-api/src/validate-machine-events.ts
 import { STREAM_INLINE_MAX } from "./spec-proto.ts";
 import { LOCAL_BLOB_MAX, LOCAL_CHUNK_MAX, LOCAL_INLINE_MAX, lineBytes } from "./limits.ts";
 import type { MachineBlobRef, MachineOpResult, MachineOpTiming } from "./protocol-machine.ts";
