@@ -212,6 +212,21 @@ describe("the remove request another device sends removes only a worktree OmO ma
     expect([existsSync(made.worktree.path), branchExists(repo, "inner"), worktreeCount(repo)]).toEqual([true, true, 2])
   })
 
+  test("#given a linked worktree top with uncommitted work #when a remote remove names it #then it is refused worktree_left_behind and the work stays", async () => {
+    const repo = kit.repository()
+    const root = kit.folder("thread-wt-root-")
+    const made = await createThreadWorktree({ repository: repo, request: { branch: "in-use" }, root })
+    if (made.kind !== "ok") throw new Error(JSON.stringify(made))
+    const work = join(made.worktree.path, "draft.txt")
+    writeFileSync(work, "uncommitted\n")
+    const outcome = await answerWorktreeRequest({ remove: { path: made.worktree.path, branch: "in-use" } }, root)
+    expect(errorOf(outcome)).toMatchObject({
+      code: "partial_commit",
+      details: { reason: "worktree_left_behind", path: made.worktree.path },
+    })
+    expect([existsSync(work), branchExists(repo, "in-use"), worktreeCount(repo)]).toEqual([true, true, 2])
+  })
+
   test("#given the worktree a failed open left #when removal is requested with its path and branch #then it and its branch are removed", async () => {
     const repo = kit.repository()
     const root = kit.folder("thread-wt-root-")
