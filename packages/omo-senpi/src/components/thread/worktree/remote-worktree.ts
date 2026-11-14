@@ -7,6 +7,7 @@ import { outcomeFailure } from "../remote/outcome"
 import type { JsonObject, RemoteThreadSurface } from "../remote/ports"
 import { replyData } from "../remote/remote-ops"
 import type { ThreadWorktree, WorktreeOutcome, WorktreeRequest } from "./thread-worktree"
+import { folderFailure } from "./failures"
 import { THREAD_WORKTREE_RPC } from "./worktree-rpc"
 
 const isObject = (value: unknown): value is JsonObject =>
@@ -36,18 +37,15 @@ function farOutcome(data: JsonObject, device: string): WorktreeOutcome {
   return unsupported(device, `Device ${device} answered the worktree request with an unexpected reply.`, "Update omo on that device.")
 }
 
+type FarAnswer = { readonly kind: "answered"; readonly data: JsonObject; readonly leftOpen?: string } | ThreadDataError
+
 /**
- * Creates a thread's worktree on another device. The relay carries only engine records, so the device's own omo does
- * the work: a short-lived session opens in the repository folder there, its `extension_request`
- * (`omo.thread.worktree`, `worktree-rpc.ts`) creates the worktree, and the session is closed again. A device whose omo
- * predates the request answers `unsupported` naming the update; a folder that is not there answers `folder_missing`.
+ * One worktree request to another device. The relay carries only engine records, so the device's own omo does the work:
+ * a short-lived session opens in \`cwd\` there, its \`extension_request\` (\`omo.thread.worktree\`, \`worktree-rpc.ts\`) runs,
+ * and the session is closed again (\`leftOpen\` names it when it would not close). A device whose omo predates the
+ * request answers \`unsupported\` naming the update; a folder that is not there answers \`folder_missing\`.
  */
-export async function prepareRemoteWorktree(
-  remote: RemoteThreadSurface,
-  device: string,
-  cwd: string,
-  request: WorktreeRequest,
-): Promise<WorktreeOutcome> {
+async function farWorktreeRequest(remote: RemoteThreadSurface, device: string, cwd: string, request: JsonObject): Promise<FarAnswer> {
   const opened = await remote.sessions.endpointCommand(
     device,
     { type: "open_session", retain_on_disconnect: true, cwd },
@@ -66,11 +64,11 @@ export async function prepareRemoteWorktree(
     type: "extension_request",
     sessionId: key,
     name: THREAD_WORKTREE_RPC,
-    data: { cwd, ...request },
+    data: request,
   })
-  const result: WorktreeOutcome =
+  const result: FarAnswer =
     answered.kind === "ok"
-      ? farOutcome(replyData(answered.response), device)
+      ? { kind: "answered", data: replyData(answered.response) }
       : answered.kind === "refused" && answered.reason.includes(THREAD_WORKTREE_RPC)
         ? unsupported(device, `omo on device ${device} cannot create worktrees yet.`, "Update omo on that device, then retry.")
         : outcomeFailure(answered, device)
@@ -80,6 +78,44 @@ export async function prepareRemoteWorktree(
     if (outcome.kind !== "ok") throw new ControlRefusal(outcomeFailure(outcome, device).error)
     return { kind: "ok", data: replyData(outcome.response) }
   }).catch((error: unknown) => (error instanceof ControlRefusal ? error.failure.code : String(error)))
-  if (result.kind !== "ok" || closed === "closed" || closed === "not_live") return result
-  return { kind: "ok", worktree: { ...result.worktree, setup_session_left_open: `${key} (${closed})` } }
+  if (result.kind !== "answered" || closed === "closed" || closed === "not_live") return result
+  return { ...result, leftOpen: `${key} (${closed})` }
+}
+
+/** Creates a thread's worktree on another device (\`farWorktreeRequest\`). */
+export async function prepareRemoteWorktree(
+  remote: RemoteThreadSurface,
+  device: string,
+  cwd: string,
+  request: WorktreeRequest,
+): Promise<WorktreeOutcome> {
+  const answer = await farWorktreeRequest(remote, device, cwd, { cwd, ...request })
+  if (answer.kind !== "answered") return answer
+  const result = farOutcome(answer.data, device)
+  if (result.kind !== "ok" || answer.leftOpen === undefined) return result
+  return { kind: "ok", worktree: { ...result.worktree, setup_session_left_open: answer.leftOpen } }
+}
+
+/**
+ * Removes the worktree \`prepareRemoteWorktree\` made on \`device\` for a thread whose open then failed (#13450 review).
+ * Answers undefined once that device confirms it removed the worktree and its branch; otherwise a \`partial_commit\`
+ * failure naming the path and branch left there.
+ */
+export async function removeRemoteWorktree(
+  remote: RemoteThreadSurface,
+  device: string,
+  worktree: ThreadWorktree,
+): Promise<ThreadDataError | undefined> {
+  const answer = await farWorktreeRequest(remote, device, worktree.repository, {
+    remove: { path: worktree.path, branch: worktree.branch },
+  })
+  if (answer.kind === "answered" && answer.data["kind"] === "removed") return undefined
+  const cause = answer.kind === "answered" ? farOutcome(answer.data, device) : answer
+  return folderFailure("worktree_left_behind", `The worktree made on device ${device} could not be removed.`, {
+    device,
+    path: worktree.path,
+    branch: worktree.branch,
+    repository: worktree.repository,
+    ...(cause.kind === "error" ? { cause: cause.error.code } : {}),
+  })
 }

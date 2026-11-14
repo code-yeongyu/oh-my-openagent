@@ -4,6 +4,7 @@ import { listedThread } from "../control/relay-session-host"
 import { rowThreadId, type AliasRegistry, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
 import type { WorktreeRequest } from "../worktree/thread-worktree"
 import { placeFolder } from "./create-folder"
+import { aliasFailure, remoteAvailable } from "./remote-ops"
 import { planCreate as placeCreate, signedOut, type CreatePlan, type LocalAliasReason, type LocalPlacement } from "./plan-create"
 
 /**
@@ -43,7 +44,6 @@ export async function planCreate(
     },
   }
 }
-import { aliasFailure, remoteAvailable } from "./remote-ops"
 
 export {
   type CreatePlan,

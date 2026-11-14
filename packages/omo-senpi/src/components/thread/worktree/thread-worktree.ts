@@ -3,6 +3,7 @@ import { createHash, randomBytes } from "node:crypto"
 import { mkdir, stat } from "node:fs/promises"
 import { basename, dirname, join } from "node:path"
 import type { ThreadDataError } from "../contracts"
+import { discardWorktree } from "./discard-worktree"
 import { errnoReason, folderFailure, gitFailureReason } from "./failures"
 
 export type WorktreeRequest = { readonly branch?: string; readonly base?: string }
@@ -50,7 +51,7 @@ const generatedBranch = (now: Date): string =>
  * Creates the git worktree a new thread starts in: a new `branch` at `base` (default HEAD) of the repository holding
  * `repository`, in `<root>/<repo name>-<hash of its path>/<branch>`, a folder OmO owns (the rule the desktop keeps for
  * the worktrees it may later remove, desktop #2449). Every failure is typed (`failures.ts`); nothing is left behind
- * by a refused create, because each check runs before `git worktree add`.
+ * by a refused create: each check runs before `git worktree add`, and a failed add is undone (`discard-worktree.ts`).
  */
 export async function createThreadWorktree(options: {
   readonly repository: string
@@ -86,13 +87,25 @@ export async function createThreadWorktree(options: {
   const path = join(options.root, repoKey, branch.replaceAll("/", "-"))
   if (await stat(path).then(() => true, () => false))
     return folderFailure("worktree_path_exists", `${path} already exists.`, { path, branch })
+  let createdFolder: string | undefined
   try {
-    await mkdir(dirname(path), { recursive: true })
+    createdFolder = await mkdir(dirname(path), { recursive: true })
   } catch (error) {
     const reason = errnoReason(error) ?? "permission_denied"
     return folderFailure(reason, `The worktrees folder ${dirname(path)} cannot be created (${reason}).`, { path })
   }
   const added = await git(["worktree", "add", "-b", branch, path, commit.stdout.trim()], repository)
-  if (added.exit !== 0) return failedGit(added, { path, branch, repository })
+  if (added.exit !== 0) {
+    // A git killed mid-add (its timeout) can leave the branch, a partial checkout and the folder: undo what this call made.
+    const left = await discardWorktree({
+      repository,
+      path,
+      branch,
+      root: options.root,
+      git,
+      ...(createdFolder === undefined ? {} : { createdFolder: dirname(path) }),
+    })
+    return left ?? failedGit(added, { path, branch, repository })
+  }
   return { kind: "ok", worktree: { path, branch, base: commit.stdout.trim(), repository } }
 }

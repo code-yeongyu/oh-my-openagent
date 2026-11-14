@@ -4,7 +4,8 @@ import type { ThreadSummary } from "../contracts"
 import { summary } from "../tools/internals"
 import type { ThreadHost } from "../tools/ports"
 import { folderFailure } from "../worktree/failures"
-import { checkFolder, createThreadWorktree } from "../worktree/thread-worktree"
+import { discardWorktree } from "../worktree/discard-worktree"
+import { checkFolder, createThreadWorktree, runGit } from "../worktree/thread-worktree"
 import type { SessionHost } from "./session-host"
 
 export const defaultWorktreeRoot = (): string => join(resolveAgentHome({ env: process.env }), "worktrees")
@@ -30,7 +31,17 @@ export function createLocalSessionHost(
         return folderFailure("relative_path", "A worktree needs the repository folder; pass cwd.")
       const made = await createThreadWorktree({ repository: request.cwd, request: worktree, root: worktreeRoot() })
       if (made.kind === "error") return made
-      const opened = await host.openSession({ ...request, cwd: made.worktree.path })
+      const { path, branch, repository } = made.worktree
+      let opened: Awaited<ReturnType<ThreadHost["openSession"]>>
+      try {
+        opened = await host.openSession({ ...request, cwd: path })
+      } catch (error) {
+        // The open failed: undo the worktree this call made, so a retry does not leave another one; the open's own
+        // failure stands unless the worktree could not be removed, which is then the answer, naming what remains.
+        const left = await discardWorktree({ repository, path, branch, root: worktreeRoot(), git: runGit })
+        if (left === undefined) throw error
+        return { ...left, error: { ...left.error, details: { ...left.error.details, cause: String(error) } } }
+      }
       return { kind: "ok", thread: { ...summary(opened), worktree: made.worktree } }
     },
   }
