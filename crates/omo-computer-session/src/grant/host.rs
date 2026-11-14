@@ -276,11 +276,7 @@ fn check_stop_hotkey(view: &ConsentView, requested: Option<&str>) -> Result<(), 
     let Some(requested) = requested else {
         return Ok(());
     };
-    let same = match view.stop_chord(Os::host()) {
-        crate::consent::StopChord::Chord(chord) => chord == requested.trim().to_ascii_lowercase(),
-        crate::consent::StopChord::Unparseable(_) => false,
-    };
-    if same {
+    if view.same_stop_chord(Os::host(), requested) {
         Ok(())
     } else {
         Err(Refusal::new(

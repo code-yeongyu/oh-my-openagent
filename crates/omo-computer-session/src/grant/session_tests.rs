@@ -300,3 +300,18 @@ fn a_is_62_unparseable_file_chord_never_falls_back_to_the_default() {
     let default = crate::consent::default_stop_hotkey(omo_computer_safety::protected::Os::host());
     assert!(open_with(Some("ctrl+"), Some(default)).is_err(), "the default never stands in for an unparseable chord");
 }
+
+/// A-IS-62 rev 5 (R70al): chords compare through the engine's ONE chord parser. On macOS the
+/// v1 host's default 'ctrl+alt+cmd+escape' EQUALS the pin's 'ctrl+opt+cmd+escape'; an unparseable
+/// chord differs.
+#[test]
+fn a_is_62_chords_compare_through_the_one_parser() {
+    use omo_computer_safety::protected::Os;
+    let view = crate::consent::ConsentView::from_host(json!({}));
+    assert!(view.same_stop_chord(Os::Macos, "ctrl+alt+cmd+escape"), "the measured macOS pair");
+    assert!(view.same_stop_chord(Os::Macos, "CMD+Ctrl+Option+Esc"), "order, case and spelling fold");
+    assert!(!view.same_stop_chord(Os::Macos, "ctrl+alt+shift+escape"));
+    assert!(!view.same_stop_chord(Os::Macos, "ctrl+"), "unparseable differs");
+    let bad = crate::consent::ConsentView::from_host(json!({ "stopHotkey": "ctrl+" }));
+    assert!(!bad.same_stop_chord(Os::Linux, "ctrl+"), "nothing equals an unparseable file chord");
+}

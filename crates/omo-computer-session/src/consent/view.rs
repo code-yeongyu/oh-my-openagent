@@ -102,6 +102,18 @@ impl ConsentView {
         }
     }
 
+    /// Whether `requested` is the configured stop chord on `os`, compared through the engine's
+    /// ONE chord parser (A-IS-62 rev 5): spelling, case and order fold; an unparseable chord on
+    /// either side equals nothing.
+    #[must_use]
+    pub fn same_stop_chord(&self, os: omo_computer_safety::protected::Os, requested: &str) -> bool {
+        let StopChord::Chord(configured) = self.stop_chord(os) else {
+            return false;
+        };
+        let parse = omo_computer_safety::protected::Chord::parse;
+        matches!((parse(&configured), parse(requested)), (Some(a), Some(b)) if a == b)
+    }
+
     /// The view a host wrote; a view that does not parse is treated as tampered.
     #[must_use]
     pub fn from_host(value: serde_json::Value) -> Self {

@@ -67,3 +67,7 @@ C24	the consent UI writes the binding into the allow entry and marks an unbound 
 C24	HandInfo.consent.unboundAllowEntries: the count of allow entries with neither identity nor path, in hands() (A-IS-61, name fixed by A-IS-63, R70ah)	21	66	owed
 C24	the tampered marker rides the permission_changed refusal on the wire: session.open's differing stop_hotkey answers ControlRequired{permission_changed, tampered} (d-sdk-skill.md:516) distinguishable from :515 by the SDK, through core Refusal's data member (R52); row 21 encodes it as the tampered-file refusal ControlRequired{reason:"tampered"} until then (A-IS-62, R70aj)	21	27	owed
 C24	the refused session.open audit line names the peer's pid and executable (d-safety.md:335); row 21's line names the call and the refusal only, because the session has no peer identity before the daemon's peer check (A-IS-62, R70aj)	21	29	owed
+C24	the per-OS documented default stop chord is the backend's own (d-safety.md:86-89), read at the listener (A-IS-62 rev 5, R70al/R70am)	21	46	owed
+C24	the conformance consent fixture with the stopHotkey member and its four cases per OS (equal, differing, unparseable, unreadable) (A-IS-62 rev 5, R70al/R70am)	21	28	owed
+C24	the migration of computer.stop_hotkey into the hand's consent key stopHotkey (A-IS-62 rev 5, R70al/R70am)	21	37	owed
+C24	the release gate checks the one-source stop chord on every OS (A-IS-62 rev 5, R70al/R70am)	21	77	owed
