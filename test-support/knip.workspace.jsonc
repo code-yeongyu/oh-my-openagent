@@ -1,0 +1,21 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    ".": {
+      "entry": [
+        "test-support/remove-tree.ts",
+        // preloaded by path from the package bunfig.toml files (the bun plugin adds it with exports unchecked)
+        "test-support/test-deadline.preload.ts",
+        "test-support/test-deadline.ts",
+      ],
+      "ignoreFiles": [
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "test-support/held-test-root.d.mts",
+      ]
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) checkFileEnvironment
+    "test-support/environment-integrity.ts": ["checkFileEnvironment"]
+  }
+}
