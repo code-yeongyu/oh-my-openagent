@@ -1,0 +1,683 @@
+name: Computer conformance fixtures
+
+on:
+  pull_request:
+    branches: [master, dev]
+    paths:
+      - "script/qa/computer/conformance/fixtures/**"
+      - ".github/workflows/computer-fixtures.yml"
+      - "script/qa/computer/conformance/catalog.ts"
+      - "script/qa/computer/conformance/declarations.ts"
+      - "script/qa/computer/conformance/vocabulary.ts"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  native-linux:
+    name: fixture native-linux (ubuntu-26.04)
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # The image carries Xvfb and Tk but no GTK bindings; Tk has no AT-SPI bridge, so the ax cells
+      # need a toolkit that exports AT-SPI. GTK 3 through PyGObject is the route the repo's AT-SPI
+      # fixtures already use.
+      - name: Install GTK 3 bindings
+        id: install
+        shell: bash
+        run: |
+          packages=(python3-gi gir1.2-gtk-3.0 at-spi2-core)
+          for attempt in 1 2 3; do
+            if sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get update > apt.log 2>&1 \
+              && sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y --no-install-recommends \
+                "${packages[@]}" >> apt.log 2>&1; then
+              {
+                echo "result=installed on attempt $attempt"
+                echo "versions<<EOF"
+                dpkg-query -W -f='- ${Package} ${Version}\n' "${packages[@]}" libgtk-3-0t64 xvfb python3 || true
+                echo "EOF"
+              } >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            tail -n 5 apt.log
+            [ "$attempt" -lt 3 ] && sleep 20
+          done
+          line=$(grep -m1 -E '^(E|Err):' apt.log || tail -n 1 apt.log)
+          echo "result=ENVIRONMENT failure, the runner could not install GTK after 3 attempts: $line" >> "$GITHUB_OUTPUT"
+          echo "::error::ENVIRONMENT failure, the runner could not install GTK (not a fixture failure): $line"
+          exit 1
+
+      - name: Self-test
+        run: |
+          xvfb-run -a bun script/qa/computer/conformance/fixtures/self-test.ts --fixture native-linux --app-key dev.omo.conformance-fixture.native -- \
+            /usr/bin/python3 script/qa/computer/conformance/fixtures/native-linux/fixture.py
+
+      - name: Sabotage legs (each must turn the self-test red)
+        run: |
+          for field in value receivedKeys pressCount scrollSteps dragOrder menuSelection title savedDocuments; do
+            xvfb-run -a bun script/qa/computer/conformance/fixtures/self-test.ts --fixture native-linux --app-key dev.omo.conformance-fixture.native --sabotage "$field" -- \
+              /usr/bin/python3 script/qa/computer/conformance/fixtures/native-linux/fixture.py | tail -n 1
+            test "${PIPESTATUS[0]}" -eq 0
+          done
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Conformance fixture native-linux
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - GTK install: ${{ steps.install.outputs.result || 'not reached' }}
+            ${{ steps.install.outputs.versions }}
+            - GTK 3 fixture under Xvfb: each catalog action applied through GTK must change exactly its report field.
+            - Sabotage legs: a pinned report field must turn the self-test red, on that field's legs only.
+          JOB_SUMMARY_NEXT: An ENVIRONMENT failure on the GTK install is the runner, not the fixture; rerun the job. Otherwise start with the first CHECK ... FAIL or SABOTAGE ... line; a STAYED GREEN line means the self-test cannot see that field.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  native-windows:
+    name: fixture native-windows (windows-latest)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build with the in-box C# compiler
+        shell: pwsh
+        run: script/qa/computer/conformance/fixtures/native-windows/build.ps1 -Out "$env:RUNNER_TEMP\ConformanceFixture.exe"
+
+      - name: Self-test
+        shell: bash
+        run: bun script/qa/computer/conformance/fixtures/self-test.ts --fixture native-windows --app-key dev.omo.conformance-fixture.native -- "$RUNNER_TEMP/ConformanceFixture.exe"
+
+      - name: Sabotage legs (each must turn the self-test red)
+        shell: bash
+        run: |
+          for field in value receivedKeys pressCount scrollSteps dragOrder menuSelection title savedDocuments; do
+            bun script/qa/computer/conformance/fixtures/self-test.ts --fixture native-windows --app-key dev.omo.conformance-fixture.native --sabotage "$field" -- \
+              "$RUNNER_TEMP/ConformanceFixture.exe" | tail -n 1
+            test "${PIPESTATUS[0]}" -eq 0
+          done
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Conformance fixture native-windows
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - WinForms fixture built by the in-box .NET Framework C# compiler, no package install.
+            - Each catalog action applied through WinForms must change exactly its report field.
+            - Sabotage legs: a pinned report field must turn the self-test red, on that field's legs only.
+          JOB_SUMMARY_NEXT: A build failure names the csc error; otherwise start with the first CHECK ... FAIL or SABOTAGE ... line.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  electron-linux:
+    name: fixture electron (ubuntu-26.04)
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # No package in the repository carries Electron; the fixture fetches one pinned release.
+      - name: Fetch Electron 45.3.1
+        id: electron
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            dir="$RUNNER_TEMP/electron"
+            if npm install --no-save --prefix "$dir" electron@45.3.1 > electron.log 2>&1 \
+              && node "$dir/node_modules/electron/install.js" >> electron.log 2>&1 \
+              && binary=$(node -p "require(process.argv[1])" "$dir/node_modules/electron") && test -x "$binary"; then
+              echo "result=Electron 45.3.1 fetched on attempt $attempt" >> "$GITHUB_OUTPUT"
+              echo "binary=$binary" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            tail -n 5 electron.log
+            [ "$attempt" -lt 3 ] && sleep 20
+          done
+          echo "result=ENVIRONMENT failure, the runner could not fetch Electron after 3 attempts: $(tail -n 1 electron.log)" >> "$GITHUB_OUTPUT"
+          echo "::error::ENVIRONMENT failure, the runner could not fetch Electron (not a fixture failure)"
+          exit 1
+
+      # Chromium refuses to start unless its setuid sandbox helper is root-owned with mode 4755.
+      - name: Install the Chromium sandbox helper
+        run: |
+          helper="$(dirname "${{ steps.electron.outputs.binary }}")/chrome-sandbox"
+          sudo chown root:root "$helper"
+          sudo chmod 4755 "$helper"
+
+      # The renderer accessibility tree (the a11y leg of the self-test) is served over AT-SPI, which needs
+      # the at-spi bus of a real D-Bus session and the Atspi typelib for the probe.
+      - name: Install the AT-SPI accessibility stack
+        id: atspi
+        shell: bash
+        run: |
+          packages=(at-spi2-core gir1.2-atspi-2.0 dbus)
+          for attempt in 1 2 3; do
+            if sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get update > apt-atspi.log 2>&1 \
+              && sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y --no-install-recommends \
+                "${packages[@]}" >> apt-atspi.log 2>&1; then
+              echo "result=installed on attempt $attempt" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            tail -n 5 apt-atspi.log
+            [ "$attempt" -lt 3 ] && sleep 20
+          done
+          echo "result=ENVIRONMENT failure, the runner could not install the AT-SPI stack after 3 attempts" >> "$GITHUB_OUTPUT"
+          echo "::error::ENVIRONMENT failure, the runner could not install the AT-SPI stack (not a fixture failure)"
+          exit 1
+
+      # Chromium registers with AT-SPI only when ACCESSIBILITY_ENABLED=1 is set at startup.
+      - name: Self-test
+        shell: bash
+        env:
+          ACCESSIBILITY_ENABLED: "1"
+        run: |
+          dbus-run-session -- xvfb-run -a bun script/qa/computer/conformance/fixtures/self-test.ts \
+            --fixture electron-linux --app-key dev.omo.conformance-fixture.electron \
+            --a11y "/usr/bin/python3 script/qa/computer/conformance/fixtures/a11y/linux.py {pid} 'Conformance Document'" -- \
+            "${{ steps.electron.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs
+
+
+      - name: Accessibility sabotage (a page hidden from assistive technology must turn the a11y leg red)
+        shell: bash
+        env:
+          ACCESSIBILITY_ENABLED: "1"
+        run: |
+          dbus-run-session -- xvfb-run -a bun script/qa/computer/conformance/fixtures/self-test.ts \
+            --fixture electron-linux --app-key dev.omo.conformance-fixture.electron \
+            --sabotage a11y --a11y "/usr/bin/python3 script/qa/computer/conformance/fixtures/a11y/linux.py {pid} 'Conformance Document'" -- \
+            "${{ steps.electron.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs
+
+      - name: Sabotage legs (each must turn the self-test red)
+        shell: bash
+        run: |
+          for field in value receivedKeys pressCount scrollSteps dragOrder menuSelection title savedDocuments; do
+            xvfb-run -a bun script/qa/computer/conformance/fixtures/self-test.ts --fixture electron-linux --app-key dev.omo.conformance-fixture.electron --sabotage "$field" -- "${{ steps.electron.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs | tail -n 1
+            test "${PIPESTATUS[0]}" -eq 0
+          done
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Conformance fixture electron (Linux)
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Electron fetch: ${{ steps.electron.outputs.result || 'not reached' }}
+            - AT-SPI stack: ${{ steps.atspi.outputs.result || 'not reached' }}
+            - The shared page (web/) in Electron with renderer accessibility forced on: each catalog action applied in the page must change exactly its report field, and the page's controls (a named button, the text field) must be visible in the AT-SPI tree.
+            - Sabotage legs: a pinned report field must turn the self-test red, on that field's legs only.
+          JOB_SUMMARY_NEXT: An ENVIRONMENT failure on the Electron fetch is the runner, not the fixture; rerun. Otherwise start with the first CHECK ... FAIL or SABOTAGE ... line.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  electron-windows:
+    name: fixture electron (windows-latest)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # No package in the repository carries Electron; the fixture fetches one pinned release.
+      - name: Fetch Electron 45.3.1
+        id: electron
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            dir="$RUNNER_TEMP/electron"
+            if npm install --no-save --prefix "$dir" electron@45.3.1 > electron.log 2>&1 \
+              && node "$dir/node_modules/electron/install.js" >> electron.log 2>&1 \
+              && binary=$(node -p "require(process.argv[1])" "$dir/node_modules/electron") && test -x "$binary"; then
+              echo "result=Electron 45.3.1 fetched on attempt $attempt" >> "$GITHUB_OUTPUT"
+              echo "binary=$binary" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            tail -n 5 electron.log
+            [ "$attempt" -lt 3 ] && sleep 20
+          done
+          echo "result=ENVIRONMENT failure, the runner could not fetch Electron after 3 attempts: $(tail -n 1 electron.log)" >> "$GITHUB_OUTPUT"
+          echo "::error::ENVIRONMENT failure, the runner could not fetch Electron (not a fixture failure)"
+          exit 1
+
+      - name: Self-test
+        shell: bash
+        run: |
+          bun script/qa/computer/conformance/fixtures/self-test.ts --fixture electron-windows --app-key dev.omo.conformance-fixture.electron \
+            --a11y "powershell -NoProfile -ExecutionPolicy Bypass -File script/qa/computer/conformance/fixtures/a11y/windows.ps1 -TargetPid {pid} -Title 'Conformance Document'" -- \
+            "${{ steps.electron.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs
+
+
+      - name: Accessibility sabotage (a page hidden from assistive technology must turn the a11y leg red)
+        shell: bash
+        run: |
+          bun script/qa/computer/conformance/fixtures/self-test.ts --fixture electron-windows --app-key dev.omo.conformance-fixture.electron \
+            --sabotage a11y --a11y "powershell -NoProfile -ExecutionPolicy Bypass -File script/qa/computer/conformance/fixtures/a11y/windows.ps1 -TargetPid {pid} -Title 'Conformance Document'" -- \
+            "${{ steps.electron.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs
+
+      - name: Sabotage legs (each must turn the self-test red)
+        shell: bash
+        run: |
+          for field in value receivedKeys pressCount scrollSteps dragOrder menuSelection title savedDocuments; do
+            bun script/qa/computer/conformance/fixtures/self-test.ts --fixture electron-windows --app-key dev.omo.conformance-fixture.electron --sabotage "$field" -- "${{ steps.electron.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs | tail -n 1
+            test "${PIPESTATUS[0]}" -eq 0
+          done
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Conformance fixture electron (Windows)
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Electron fetch: ${{ steps.electron.outputs.result || 'not reached' }}
+            - The shared page (web/) in Electron with renderer accessibility forced on: each catalog action applied in the page must change exactly its report field, and the page's controls (a named button, the text field) must be visible in the UIA tree.
+            - Sabotage legs: a pinned report field must turn the self-test red, on that field's legs only.
+          JOB_SUMMARY_NEXT: An ENVIRONMENT failure on the Electron fetch is the runner, not the fixture; rerun. Otherwise start with the first CHECK ... FAIL or SABOTAGE ... line.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  webview-linux:
+    name: fixture webview (ubuntu-26.04)
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # The image carries no web view; WebKitGTK 4.1 under GTK 3 is the Linux system web view.
+      - name: Install GTK 3 and WebKitGTK bindings
+        id: install
+        shell: bash
+        run: |
+          packages=(python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1 gir1.2-atspi-2.0 at-spi2-core dbus)
+          for attempt in 1 2 3; do
+            if sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get update > apt.log 2>&1 \
+              && sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y --no-install-recommends \
+                "${packages[@]}" >> apt.log 2>&1; then
+              {
+                echo "result=installed on attempt $attempt"
+                echo "versions<<EOF"
+                dpkg-query -W -f='- ${Package} ${Version}\n' "${packages[@]}" libgtk-3-0t64 libwebkit2gtk-4.1-0 xvfb python3 || true
+                echo "EOF"
+              } >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            tail -n 5 apt.log
+            [ "$attempt" -lt 3 ] && sleep 20
+          done
+          line=$(grep -m1 -E '^(E|Err):' apt.log || tail -n 1 apt.log)
+          echo "result=ENVIRONMENT failure, the runner could not install GTK or WebKitGTK after 3 attempts: $line" >> "$GITHUB_OUTPUT"
+          echo "::error::ENVIRONMENT failure, the runner could not install GTK or WebKitGTK (not a fixture failure): $line"
+          exit 1
+
+      - name: Self-test
+        shell: bash
+        run: |
+          dbus-run-session -- xvfb-run -a bun script/qa/computer/conformance/fixtures/self-test.ts \
+            --fixture webview-linux --app-key dev.omo.conformance-fixture.webview \
+            --a11y "/usr/bin/python3 script/qa/computer/conformance/fixtures/a11y/linux.py {pid} 'Conformance Document'" -- \
+            /usr/bin/python3 script/qa/computer/conformance/fixtures/webview/fixture.py
+
+
+      - name: Accessibility sabotage (a page hidden from assistive technology must turn the a11y leg red)
+        shell: bash
+        run: |
+          dbus-run-session -- xvfb-run -a bun script/qa/computer/conformance/fixtures/self-test.ts \
+            --fixture webview-linux --app-key dev.omo.conformance-fixture.webview \
+            --sabotage a11y --a11y "/usr/bin/python3 script/qa/computer/conformance/fixtures/a11y/linux.py {pid} 'Conformance Document'" -- \
+            /usr/bin/python3 script/qa/computer/conformance/fixtures/webview/fixture.py
+
+      - name: Sabotage legs (each must turn the self-test red)
+        shell: bash
+        run: |
+          for field in value receivedKeys pressCount scrollSteps dragOrder menuSelection title savedDocuments; do
+            xvfb-run -a bun script/qa/computer/conformance/fixtures/self-test.ts --fixture webview-linux --app-key dev.omo.conformance-fixture.webview --sabotage "$field" -- /usr/bin/python3 script/qa/computer/conformance/fixtures/webview/fixture.py | tail -n 1
+            test "${PIPESTATUS[0]}" -eq 0
+          done
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Conformance fixture webview (Linux)
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - GTK/WebKitGTK install: ${{ steps.install.outputs.result || 'not reached' }}
+            ${{ steps.install.outputs.versions }}
+            - The shared page (web/) in a WebKitGTK view inside a D-Bus session: each catalog action applied in the page must change exactly its report field, and the page's controls (a named button, the text field) must be visible in the AT-SPI tree.
+            - Sabotage legs: a pinned report field must turn the self-test red, on that field's legs only.
+          JOB_SUMMARY_NEXT: An ENVIRONMENT failure on the install is the runner, not the fixture; rerun. Otherwise start with the first CHECK ... FAIL or SABOTAGE ... line.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  native-macos:
+    name: fixture native-macos (macos-15)
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build with the image's swiftc
+        id: build
+        run: echo "binary=$(bash script/qa/computer/conformance/fixtures/native-macos/build.sh "$RUNNER_TEMP" | tail -n 1)" >> "$GITHUB_OUTPUT"
+
+      - name: Self-test
+        shell: bash
+        run: bun script/qa/computer/conformance/fixtures/self-test.ts --fixture native-macos --app-key dev.omo.conformance-fixture.native -- "${{ steps.build.outputs.binary }}"
+
+      - name: Sabotage legs (each must turn the self-test red)
+        shell: bash
+        run: |
+          for field in value receivedKeys pressCount scrollSteps dragOrder menuSelection title savedDocuments; do
+            bun script/qa/computer/conformance/fixtures/self-test.ts --fixture native-macos --app-key dev.omo.conformance-fixture.native --sabotage "$field" -- "${{ steps.build.outputs.binary }}" | tail -n 1
+            test "${PIPESTATUS[0]}" -eq 0
+          done
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Conformance fixture native-macos
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - AppKit fixture built by the image's swiftc into an app bundle, no package install, no grant needed (it never posts events).
+            - Each catalog action applied through AppKit must change exactly its report field.
+            - Sabotage legs: a pinned report field must turn the self-test red, on that field's legs only.
+          JOB_SUMMARY_NEXT: A build failure names the swiftc error; otherwise start with the first CHECK ... FAIL or SABOTAGE ... line.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  electron-macos:
+    name: fixture electron (macos-15)
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # No package in the repository carries Electron; the fixture fetches one pinned release.
+      - name: Fetch Electron 45.3.1
+        id: electron
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            dir="$RUNNER_TEMP/electron"
+            if npm install --no-save --prefix "$dir" electron@45.3.1 > electron.log 2>&1 \
+              && node "$dir/node_modules/electron/install.js" >> electron.log 2>&1 \
+              && binary=$(node -p "require(process.argv[1])" "$dir/node_modules/electron") && test -x "$binary"; then
+              echo "result=Electron 45.3.1 fetched on attempt $attempt" >> "$GITHUB_OUTPUT"
+              echo "binary=$binary" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            tail -n 5 electron.log
+            [ "$attempt" -lt 3 ] && sleep 20
+          done
+          echo "result=ENVIRONMENT failure, the runner could not fetch Electron after 3 attempts: $(tail -n 1 electron.log)" >> "$GITHUB_OUTPUT"
+          echo "::error::ENVIRONMENT failure, the runner could not fetch Electron (not a fixture failure)"
+          exit 1
+
+      - name: Give the Electron app the fixture's bundle id
+        id: bundle
+        run: |
+          src=$(dirname "$(dirname "$(dirname "${{ steps.electron.outputs.binary }}")")")
+          dst="$RUNNER_TEMP/Conformance Fixture Electron.app"
+          cp -R "$src" "$dst"
+          plutil -replace CFBundleIdentifier -string dev.omo.conformance-fixture.electron "$dst/Contents/Info.plist"
+          codesign --force --deep --sign - "$dst"
+          echo "binary=$dst/Contents/MacOS/Electron" >> "$GITHUB_OUTPUT"
+
+      # The a11y leg reads the AX tree of another process, which needs accessibility trust: build the
+      # probe, ad-hoc sign it and grant it in TCC. A runner that refuses the grant makes the probe exit 3
+      # (ENVIRONMENT), never a fixture failure.
+      - name: Build the a11y probe and grant it accessibility trust
+        id: probe
+        run: |
+          swiftc -O -o "$RUNNER_TEMP/a11y-probe" script/qa/computer/conformance/fixtures/a11y/macos.swift
+          codesign --force --sign - "$RUNNER_TEMP/a11y-probe"
+          db="/Library/Application Support/com.apple.TCC/TCC.db"
+          if sudo sqlite3 "$db" "INSERT OR REPLACE INTO ACCESSIBILITY(service, client, client_type, auth_value, auth_reason, auth_version, csreq, flags, last_modified) VALUES('kTCCServiceAccessibility', '$RUNNER_TEMP/a11y-probe', 1, 2, 0, 1, NULL, 0, CAST(strftime('%s','now') AS INTEGER));"; then
+            echo "result=probe built and granted accessibility trust" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=TCC insert failed; the a11y leg will classify as ENVIRONMENT" >> "$GITHUB_OUTPUT"
+            echo "::warning::the TCC accessibility insert failed; the a11y leg will classify as ENVIRONMENT"
+          fi
+
+      - name: Self-test
+        shell: bash
+        run: |
+          bun script/qa/computer/conformance/fixtures/self-test.ts --fixture electron-macos --app-key dev.omo.conformance-fixture.electron \
+            --a11y "\"$RUNNER_TEMP/a11y-probe\" {pid} 'Conformance Document'" -- \
+            "${{ steps.bundle.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs
+
+
+      - name: Accessibility sabotage (a page hidden from assistive technology must turn the a11y leg red)
+        shell: bash
+        run: |
+          bun script/qa/computer/conformance/fixtures/self-test.ts --fixture electron-macos --app-key dev.omo.conformance-fixture.electron \
+            --sabotage a11y --a11y "\"$RUNNER_TEMP/a11y-probe\" {pid} 'Conformance Document'" -- \
+            "${{ steps.bundle.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs
+
+      - name: Sabotage legs (each must turn the self-test red)
+        shell: bash
+        run: |
+          for field in value receivedKeys pressCount scrollSteps dragOrder menuSelection title savedDocuments; do
+            bun script/qa/computer/conformance/fixtures/self-test.ts --fixture electron-macos --app-key dev.omo.conformance-fixture.electron --sabotage "$field" -- "${{ steps.bundle.outputs.binary }}" script/qa/computer/conformance/fixtures/electron/main.cjs | tail -n 1
+            test "${PIPESTATUS[0]}" -eq 0
+          done
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Conformance fixture electron (macOS)
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Electron fetch: ${{ steps.electron.outputs.result || 'not reached' }}
+            - A11y probe: ${{ steps.probe.outputs.result || 'not reached' }}
+            - The shared page (web/) in Electron with renderer accessibility forced on: each catalog action applied in the page must change exactly its report field, and the page's controls must be visible in the AX tree.
+          JOB_SUMMARY_NEXT: An ENVIRONMENT failure on the Electron fetch is the runner, not the fixture; rerun. Otherwise start with the first CHECK ... FAIL or SABOTAGE ... line.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  webview-macos:
+    name: fixture webview (macos-15)
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build with the image's swiftc
+        id: build
+        run: echo "binary=$(bash script/qa/computer/conformance/fixtures/webview-macos/build.sh "$RUNNER_TEMP" | tail -n 1)" >> "$GITHUB_OUTPUT"
+
+      # The a11y leg reads the AX tree of another process, which needs accessibility trust: build the
+      # probe, ad-hoc sign it and grant it in TCC. A runner that refuses the grant makes the probe exit 3
+      # (ENVIRONMENT), never a fixture failure.
+      - name: Build the a11y probe and grant it accessibility trust
+        id: probe
+        run: |
+          swiftc -O -o "$RUNNER_TEMP/a11y-probe" script/qa/computer/conformance/fixtures/a11y/macos.swift
+          codesign --force --sign - "$RUNNER_TEMP/a11y-probe"
+          db="/Library/Application Support/com.apple.TCC/TCC.db"
+          if sudo sqlite3 "$db" "INSERT OR REPLACE INTO ACCESSIBILITY(service, client, client_type, auth_value, auth_reason, auth_version, csreq, flags, last_modified) VALUES('kTCCServiceAccessibility', '$RUNNER_TEMP/a11y-probe', 1, 2, 0, 1, NULL, 0, CAST(strftime('%s','now') AS INTEGER));"; then
+            echo "result=probe built and granted accessibility trust" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=TCC insert failed; the a11y leg will classify as ENVIRONMENT" >> "$GITHUB_OUTPUT"
+            echo "::warning::the TCC accessibility insert failed; the a11y leg will classify as ENVIRONMENT"
+          fi
+
+      - name: Self-test
+        shell: bash
+        run: |
+          bun script/qa/computer/conformance/fixtures/self-test.ts --fixture webview-macos --app-key dev.omo.conformance-fixture.webview \
+            --a11y "\"$RUNNER_TEMP/a11y-probe\" {pid} 'Conformance Document'" -- \
+            "${{ steps.build.outputs.binary }}"
+
+
+      - name: Accessibility sabotage (a page hidden from assistive technology must turn the a11y leg red)
+        shell: bash
+        run: |
+          bun script/qa/computer/conformance/fixtures/self-test.ts --fixture webview-macos --app-key dev.omo.conformance-fixture.webview \
+            --sabotage a11y --a11y "\"$RUNNER_TEMP/a11y-probe\" {pid} 'Conformance Document'" -- \
+            "${{ steps.build.outputs.binary }}"
+
+      - name: Sabotage legs (each must turn the self-test red)
+        shell: bash
+        run: |
+          for field in value receivedKeys pressCount scrollSteps dragOrder menuSelection title savedDocuments; do
+            bun script/qa/computer/conformance/fixtures/self-test.ts --fixture webview-macos --app-key dev.omo.conformance-fixture.webview --sabotage "$field" -- "${{ steps.build.outputs.binary }}" | tail -n 1
+            test "${PIPESTATUS[0]}" -eq 0
+          done
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Conformance fixture webview (macOS)
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - WKWebView host of the shared page, built by the image's swiftc, no package install.
+            - A11y probe: ${{ steps.probe.outputs.result || 'not reached' }}
+            - Each catalog action applied in the page must change exactly its report field, and the page's controls must be visible in the AX tree.
+          JOB_SUMMARY_NEXT: A build failure names the swiftc error; otherwise start with the first CHECK ... FAIL or SABOTAGE ... line.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  webview-windows:
+    name: fixture webview (windows-latest)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # The WebView2 SDK ships only as a NuGet package; one pinned release is fetched and checked by digest.
+      - name: Fetch the WebView2 SDK 1.0.4314.35
+        id: sdk
+        shell: bash
+        run: |
+          url=https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/1.0.4314.35/microsoft.web.webview2.1.0.4314.35.nupkg
+          for attempt in 1 2 3; do
+            if curl -fsSL -o "$RUNNER_TEMP/webview2.zip" "$url" \
+              && echo "90778deb1b77e36292828b4b5833c9255c27533f40e0ddd55891ae718944edc4  $RUNNER_TEMP/webview2.zip" | sha256sum -c -; then
+              unzip -q -o "$RUNNER_TEMP/webview2.zip" -d "$RUNNER_TEMP/webview2"
+              echo "result=WebView2 SDK 1.0.4314.35 fetched and verified on attempt $attempt" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            [ "$attempt" -lt 3 ] && sleep 20
+          done
+          echo "result=ENVIRONMENT failure, the runner could not fetch the WebView2 SDK after 3 attempts" >> "$GITHUB_OUTPUT"
+          echo "::error::ENVIRONMENT failure, the runner could not fetch the WebView2 SDK (not a fixture failure)"
+          exit 1
+
+      - name: Check the WebView2 runtime
+        id: runtime
+        shell: pwsh
+        run: |
+          $key = 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+          $version = (Get-ItemProperty -Path $key -ErrorAction SilentlyContinue).pv
+          if (-not $version) {
+            "result=ENVIRONMENT failure, the image carries no WebView2 runtime" >> $env:GITHUB_OUTPUT
+            Write-Output "::error::ENVIRONMENT failure, the image carries no WebView2 runtime (not a fixture failure)"
+            exit 1
+          }
+          "result=WebView2 runtime $version" >> $env:GITHUB_OUTPUT
+
+      - name: Build with the in-box C# compiler
+        shell: pwsh
+        run: script/qa/computer/conformance/fixtures/webview-windows/build.ps1 -Out "$env:RUNNER_TEMP\webview\ConformanceFixtureWeb.exe" -Sdk "$env:RUNNER_TEMP\webview2"
+
+      - name: Self-test
+        shell: bash
+        run: |
+          bun script/qa/computer/conformance/fixtures/self-test.ts --fixture webview-windows --app-key dev.omo.conformance-fixture.webview \
+            --a11y "powershell -NoProfile -ExecutionPolicy Bypass -File script/qa/computer/conformance/fixtures/a11y/windows.ps1 -TargetPid {pid} -Title 'Conformance Document'" -- \
+            "$RUNNER_TEMP/webview/ConformanceFixtureWeb.exe"
+
+
+      - name: Accessibility sabotage (a page hidden from assistive technology must turn the a11y leg red)
+        shell: bash
+        run: |
+          bun script/qa/computer/conformance/fixtures/self-test.ts --fixture webview-windows --app-key dev.omo.conformance-fixture.webview \
+            --sabotage a11y --a11y "powershell -NoProfile -ExecutionPolicy Bypass -File script/qa/computer/conformance/fixtures/a11y/windows.ps1 -TargetPid {pid} -Title 'Conformance Document'" -- \
+            "$RUNNER_TEMP/webview/ConformanceFixtureWeb.exe"
+
+      - name: Sabotage legs (each must turn the self-test red)
+        shell: bash
+        run: |
+          for field in value receivedKeys pressCount scrollSteps dragOrder menuSelection title savedDocuments; do
+            bun script/qa/computer/conformance/fixtures/self-test.ts --fixture webview-windows --app-key dev.omo.conformance-fixture.webview --sabotage "$field" -- "$RUNNER_TEMP/webview/ConformanceFixtureWeb.exe" | tail -n 1
+            test "${PIPESTATUS[0]}" -eq 0
+          done
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Conformance fixture webview (Windows)
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - WebView2 SDK: ${{ steps.sdk.outputs.result || 'not reached' }}
+            - Runtime: ${{ steps.runtime.outputs.result || 'not reached' }}
+            - WebView2 host of the shared page with renderer accessibility forced on; the page's controls must be visible in the UIA tree.
+          JOB_SUMMARY_NEXT: An ENVIRONMENT failure on the SDK fetch or the runtime check is the runner, not the fixture. Otherwise start with the build error or the first CHECK ... FAIL line.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
