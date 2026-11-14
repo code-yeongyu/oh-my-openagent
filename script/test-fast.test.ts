@@ -130,6 +130,25 @@ describe("child registry", () => {
     expect(groupKills).toEqual([-101, -202])
   })
 
+  it("#given a released POSIX group #when the registry kills all #then the finished group is not signalled", () => {
+    // given — a serial phase that completed has no descendant left to escalate to, and its
+    // PGID may already belong to an unrelated process by the time a later signal is sent
+    const registry = createChildRegistry("linux")
+    const groupKills: number[] = []
+    const selfKills: string[] = []
+    const serial = fakeChild(101, selfKills)
+    registry.add(serial)
+    registry.add(fakeChild(202, selfKills))
+    registry.release(serial)
+
+    // when
+    registry.killAll("SIGTERM", (pid) => groupKills.push(pid))
+
+    // then
+    expect(groupKills).toEqual([-202])
+    expect(registry.hasSignalTargets()).toBe(true)
+  })
+
   it("#given a win32 child that already exited #when the registry kills all #then the reaped handle is not signalled", () => {
     // given — win32 has no process groups, so a dead handle really is nothing left to kill
     const registry = createChildRegistry("win32")
@@ -344,6 +363,17 @@ describe("partition tiling", () => {
     expect(paths).toEqual([...ROOT_TEST_SERIAL_QUARANTINE_PATHS])
   })
 
+  it("#given the quarantine list and the sibling group scopes #when the two are compared #then no quarantined file falls inside a sibling group", () => {
+    // given — the split is only disjoint if the serial phase owns nothing a group also runs
+    const scopes = groupScopes(testFastGroups()).map((scope) => scope.slice(0, -3) + "/")
+
+    // when
+    const inside = ROOT_TEST_SERIAL_QUARANTINE_PATHS.filter((path) => scopes.some((scope) => path.startsWith(scope)))
+
+    // then
+    expect(inside).toEqual([])
+  })
+
   it("#given each scope is owned by one group #when the sibling groups are listed #then no scope repeats", () => {
     // given
     const siblingScopes = groupScopes(testFastGroups())
@@ -384,13 +414,16 @@ describe("spawnInheritingStdio", () => {
   const trackingRegistry = () => {
     const added: ChildHandle[] = []
     const removed: ChildHandle[] = []
+    const released: ChildHandle[] = []
     return {
       added,
       removed,
+      released,
       registry: {
         add: (child: ChildHandle) => void added.push(child),
         remove: (child: ChildHandle) => void removed.push(child),
-        hasSignalTargets: () => added.length > removed.length,
+        release: (child: ChildHandle) => void released.push(child),
+        hasSignalTargets: () => added.length > removed.length + released.length,
         killAll: () => {},
       },
     }
@@ -422,6 +455,30 @@ describe("spawnInheritingStdio", () => {
     expect(spawnEnv[pathKey]).toBe(process.env[pathKey])
     expect(call?.options.detached).toBe(process.platform !== "win32")
     expect(call?.options.stdio).toBe("inherit")
+  })
+
+  it("#given a releasing spawner #when the child exits #then its group is released rather than retained", async () => {
+    // given — the serial phase is awaited to completion, so nothing is left to escalate to
+    const { listeners, spawner } = recordingSpawner()
+    const { added, removed, released, registry } = trackingRegistry()
+
+    // when
+    const exit = spawnInheritingStdio(
+      registry,
+      () => {},
+      spawner,
+      true,
+    )({
+      name: "serial-quarantine",
+      args: ["test"],
+    })
+    for (const notifyExit of listeners.exit) notifyExit(0)
+
+    // then
+    expect(await exit).toBe(0)
+    expect(added.map((child) => child.pid)).toEqual([4242])
+    expect(released.map((child) => child.pid)).toEqual([4242])
+    expect(removed).toEqual([])
   })
 
   it("#given a spawned group #when the child starts #then it is registered and deregistered on exit", async () => {
