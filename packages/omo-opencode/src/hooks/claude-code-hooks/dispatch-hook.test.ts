@@ -1,6 +1,7 @@
-const { afterAll, afterEach, beforeEach, describe, expect, mock, test } = require("bun:test")
-const { preserveModuleMocksForTestFile, restoreModuleMocksForTestFile } =
-  await import("../../testing/module-mock-lifecycle")
+const { afterEach, beforeEach, describe, expect, mock, spyOn, test } = require("bun:test")
+import * as sharedModule from "../../shared"
+import { dispatchHook } from "./dispatch-hook"
+import * as executeHttpHookModule from "./execute-http-hook"
 
 const capturedOptions: Array<Record<string, unknown>> = []
 
@@ -11,28 +12,18 @@ const mockExecuteHookCommand = mock(
   },
 )
 
-mock.module("../../shared/command-executor/execute-hook-command", () => ({
-  executeHookCommand: mockExecuteHookCommand,
-}))
-
-mock.module("./execute-http-hook", () => ({
-  executeHttpHook: mock(() => Promise.resolve({ exitCode: 0, stdout: "", stderr: "" })),
-}))
-preserveModuleMocksForTestFile(import.meta.url)
-
-const { dispatchHook } = await import("./dispatch-hook")
-
-afterAll(() => {
-  restoreModuleMocksForTestFile(import.meta.url)
-})
-
+// Spies on the modules dispatch-hook imports, undone by mock.restore() after each test. Module mocks of these leaked
+// into later test files whenever another file had already loaded dispatch-hook (#13331).
 describe("dispatchHook", () => {
   beforeEach(() => {
     mockExecuteHookCommand.mockClear()
     capturedOptions.length = 0
+    spyOn(sharedModule, "executeHookCommand").mockImplementation(mockExecuteHookCommand)
+    spyOn(executeHttpHookModule, "executeHttpHook").mockResolvedValue({ exitCode: 0, stdout: "", stderr: "" })
   })
 
   afterEach(() => {
+    mock.restore()
     mockExecuteHookCommand.mockClear()
     capturedOptions.length = 0
   })
