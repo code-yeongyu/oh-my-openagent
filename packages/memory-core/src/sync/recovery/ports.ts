@@ -218,7 +218,8 @@ export type KeyringAppendRequest = {
   readonly wraps: ReadonlyArray<WrapEntry>
 }
 
-export type TransportRefusal = "stale_base" | "rate_limited" | "not_found" | "refused"
+/** `phrase_keys_not_accepted`: the service refuses a record introducing a phrase key while its flag is off (A1.1-M1). */
+export type TransportRefusal = "stale_base" | "rate_limited" | "not_found" | "refused" | "phrase_keys_not_accepted"
 
 export type AppendResult =
   { readonly ok: true; readonly seq: number } | { readonly ok: false; readonly reason: TransportRefusal }

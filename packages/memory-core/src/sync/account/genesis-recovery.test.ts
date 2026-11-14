@@ -126,13 +126,18 @@ test("same principal cannot start a second native ceremony while the first owns 
     },
   })
   await entered.promise
+  let second: Awaited<ReturnType<typeof enableSync>>
+  let ceremoniesWhileHeld: number
   try {
-    await expect(enableSync(f.input)).rejects.toMatchObject({ name: "LockContentionError" })
-    expect(f.ceremonies()).toBe(0)
+    second = await enableSync(f.input)
+    ceremoniesWhileHeld = f.ceremonies()
   } finally {
     release.resolve()
   }
+  // The first ceremony is always awaited before any assertion, so a failing run cannot leave it writing.
   expect(await pending).toEqual({ kind: "joined", created: true })
+  expect(second).toEqual({ kind: "in_progress" })
+  expect(ceremoniesWhileHeld).toBe(0)
 })
 
 test("two concurrent creators select one root and the loser must pair", async () => {

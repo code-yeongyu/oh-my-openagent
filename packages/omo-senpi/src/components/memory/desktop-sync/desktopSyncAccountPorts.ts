@@ -23,6 +23,7 @@ const stateReply = z.object({
   head: z.object({ seq: SyncInteger, link: z.string(), keyring_link: z.string() }),
   current_epoch: SyncInteger,
   rotation_pending: z.boolean(),
+  accepts_phrase_keys: z.boolean().optional(),
 })
 
 type AppendRequest = Parameters<AccountHttp["appendKeys"]>[0]
@@ -47,6 +48,7 @@ export function desktopSyncAccountPorts(
         case "stale_base":
         case "rate_limited":
         case "not_found":
+        case "phrase_keys_not_accepted":
           return { ok: false as const, reason: error.code }
         default:
           return { ok: false as const, reason: "refused" as const }
@@ -62,7 +64,12 @@ export function desktopSyncAccountPorts(
       listRecoveryWraps: async () => decodeRecoveryWraps(await json({ op: "listRecoveryWraps" })).wraps,
       async state() {
         const state = stateReply.parse(await json({ op: "state" }))
-        return { head: state.head, currentEpoch: state.current_epoch, rotationPending: state.rotation_pending }
+        return {
+          head: state.head,
+          currentEpoch: state.current_epoch,
+          rotationPending: state.rotation_pending,
+          acceptsPhraseKeys: state.accepts_phrase_keys === true,
+        }
       },
       appendKeys: (request) => append("appendKeys", request),
       recoveryJoin: (request) => append("recoveryJoin", request),

@@ -1,5 +1,8 @@
 import type {
   ApprovalProgress,
+  SyncAcknowledgeRequest,
+  SyncAcknowledgeResponse,
+  SyncEnableRequest,
   SyncApproveRequest,
   SyncApproveResponse,
   SyncEnableResponse,
@@ -122,6 +125,20 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
       ? (record.problem ?? refused())
       : { pendingId: record.pendingId ?? "", expiresAt: record.expiresAt, code: record.code, outcome: record.approval }
   const readEnable = (record: Operation): SyncEnableResponse => record.enable ?? unavailable()
+  // A notice that cannot be read is reported as unresolved: never as void, never as saved.
+  const phraseNotice = async (account: SyncRpcAccount) => {
+    const read = options.runtime.phraseNoticeStatus
+    if (read === undefined) return {}
+    try {
+      return await read({
+        pinDir: options.pinDir,
+        account: account.descriptor.accountId,
+        principalId: account.descriptor.syncPrincipalId,
+      })
+    } catch {
+      return { phraseUnresolved: true } as const
+    }
+  }
 
   const start = (record: CeremonyOperation): void => {
     operations.add(record)
@@ -155,7 +172,7 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
         return false
       }
     },
-    async enable(owner: SyncRpcContext): Promise<SyncEnableResponse> {
+    async enable(owner: SyncRpcContext, request: SyncEnableRequest = {}): Promise<SyncEnableResponse> {
       if (enable?.active) {
         if (!ensureOwned(enable, owner)) return refused()
         const record = enable
@@ -164,6 +181,7 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
       }
       if (enable !== undefined) disposeRecord(enable)
       const record = newRecord(owner, "enable")
+      if (request.method !== undefined) record.method = request.method
       enable = record
       start(record)
       await record.ready.promise
@@ -207,9 +225,15 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
         if (account.signal.aborted || !(await account.isCurrent())) return unavailable()
         check(owner)
         const visible = records().filter((record) => ensureOwned(record, owner) && record.identity === identity)
+        const notice = await phraseNotice(account)
+        check(owner)
+        const ownEnable = visible.find((record) => record.kind === "enable")?.enable ?? null
         return {
           ...(sync === undefined ? {} : { sync }),
-          enable: visible.find((record) => record.kind === "enable")?.enable ?? null,
+          // Another process (the CLI) holding the ceremony shows as in progress, never as a void phrase.
+          enable: ownEnable ?? (notice.inProgress === true ? { kind: "in_progress" } : null),
+          ...(notice.phraseVoid !== undefined ? { phraseVoid: notice.phraseVoid } : {}),
+          ...(notice.phraseUnresolved === true ? { phraseUnresolved: true } : {}),
           approvals: visible
             .filter((record) => record.kind === "approve" && record.expiresAt !== undefined)
             .map((record): ApprovalProgress => ({
@@ -223,7 +247,29 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
         return unavailable()
       }
     },
-    async read<T>(owner: SyncRpcContext, use: (ports: SyncRpcOperation) => Promise<T>): Promise<T | SyncRpcProblem> {
+    async acknowledge(owner: SyncRpcContext, request: SyncAcknowledgeRequest): Promise<SyncAcknowledgeResponse> {
+      const acknowledgePhraseVoid = options.runtime.acknowledgePhraseVoid
+      if (acknowledgePhraseVoid === undefined) return unavailable()
+      return this.read(owner, (ports, account, auth) =>
+        acknowledgePhraseVoid({
+          account: account.descriptor.accountId,
+          serviceDeviceId: account.descriptor.serviceDeviceId,
+          serviceOrigin: account.descriptor.serviceOrigin,
+          keyring: ports.keyring,
+          chain: ports.chain,
+          pairing: ports.pairing,
+          pinDir: options.pinDir,
+          authority: auth,
+          signal: auth.signal,
+          purpose: request.purpose,
+          ...(request.credentialId !== undefined ? { credentialId: request.credentialId } : {}),
+        }),
+      )
+    },
+    async read<T>(
+      owner: SyncRpcContext,
+      use: (ports: SyncRpcOperation, account: SyncRpcAccount, auth: SyncRpcAuthority) => Promise<T>,
+    ): Promise<T | SyncRpcProblem> {
       const record = newRecord(owner, "read")
       const task = (async () => {
         let ports: SyncRpcOperation | undefined
@@ -234,7 +280,7 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
           auth.admit(() => undefined)
           ports = await record.account.forOperation(auth)
           auth.admit(() => undefined)
-          const result = await use(ports)
+          const result = await use(ports, record.account, auth)
           auth.admit(() => undefined)
           if (!(await record.account.isCurrent())) return unavailable()
           auth.admit(() => undefined)

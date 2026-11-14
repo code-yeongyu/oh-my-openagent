@@ -1,8 +1,20 @@
-import type { ApproveOutcome } from "@oh-my-opencode/memory-core/sync-engine"
+import type { ApproveOutcome, PhraseVoidNotice } from "@oh-my-opencode/memory-core/sync-engine"
 
 import type { MemoryRpcSync } from "./memory-rpc-sync"
 
-export type SyncEnableRequest = Readonly<Record<string, never>>
+export type SyncEnableMethod = "passkey" | "phrase"
+/** `{}` joins or resumes; creating a genesis needs an explicit `method` (D1). */
+export type SyncEnableRequest = { readonly method?: SyncEnableMethod }
+export type SyncFeaturesRequest = Readonly<Record<string, never>>
+/** The features this engine speaks; an engine older than recovery-phrase genesis answers it as an unknown verb. */
+export type SyncFeature = "enable-method" | "phrase-genesis" | "acknowledge"
+export type SyncFeaturesResponse = { readonly features: readonly SyncFeature[] }
+export type SyncAcknowledgeRequest = {
+  readonly notice: "phrase_void"
+  readonly purpose: PhraseVoidNotice["purpose"]
+  readonly credentialId?: string
+}
+export type SyncAcknowledgeResponse = { readonly ok: true } | SyncRpcProblem
 export type SyncPendingRequest = Readonly<Record<string, never>>
 export type SyncStatusRequest = Readonly<Record<string, never>>
 export type SyncDevicesRequest = Readonly<Record<string, never>>
@@ -23,10 +35,26 @@ export interface JoinProgress {
  * were discarded (#12280): a notice the desktop shows, never a refusal. Additive on the wire.
  */
 export type SyncEnableResponse =
-  | { readonly kind: "joined"; readonly rootChanged?: true }
+  | { readonly kind: "joined"; readonly rootChanged?: true; readonly phraseVoid?: PhraseVoidNotice }
   | { readonly kind: "first_device_created"; readonly rootChanged?: true }
+  /** Legacy: kept decodable for older engines; this engine never emits it. */
   | { readonly kind: "needs_first_device" }
-  | { readonly kind: "join_required"; readonly pairing: JoinProgress }
+  | {
+      readonly kind: "method_required"
+      readonly methods: readonly SyncEnableMethod[]
+      readonly phraseVoid?: PhraseVoidNotice
+    }
+  | { readonly kind: "acknowledge_required"; readonly phraseVoid: PhraseVoidNotice }
+  | { readonly kind: "passkey_unavailable" }
+  | {
+      readonly kind: "phrase_unavailable"
+      readonly reason: "no-surface" | "disabled" | "service-floor-off"
+      readonly deviceSyncLeftOn?: true
+    }
+  | { readonly kind: "cancelled" }
+  /** A recovery ceremony is open on this device (or another process holds it); never carries words. */
+  | { readonly kind: "in_progress"; readonly method?: SyncEnableMethod }
+  | { readonly kind: "join_required"; readonly pairing: JoinProgress; readonly phraseVoid?: PhraseVoidNotice }
   | { readonly kind: "expired" }
   | SyncRpcProblem
 
@@ -57,6 +85,9 @@ export type SyncStatusResponse =
   | {
       readonly sync?: MemoryRpcSync
       readonly enable: SyncEnableResponse | null
+      /** Read-only: a shown recovery phrase that was not saved; a read never clears it. */
+      readonly phraseVoid?: PhraseVoidNotice
+      readonly phraseUnresolved?: true
       readonly approvals: readonly ApprovalProgress[]
     }
   | SyncRpcProblem

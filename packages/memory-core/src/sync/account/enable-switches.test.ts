@@ -96,11 +96,11 @@ for (const missing of ["serviceOrigin", "rpId", "userName"] as const) {
   })
 }
 
-test("a first device without the genesis bridge needs a first device and leaves both switches off", async () => {
+test("a first device without a PRF bridge answers passkey_unavailable for the passkey method and leaves both switches off", async () => {
   const f = await fixture()
   cleanups.push(f.close)
   expect(await enableSync({ ...f.input, genesis: { ...f.input.genesis, prfSupported: false } })).toEqual({
-    kind: "needs_first_device",
+    kind: "passkey_unavailable",
   })
   expect(f.server.switches).toEqual([])
   expect(f.ceremonies()).toBe(0)
