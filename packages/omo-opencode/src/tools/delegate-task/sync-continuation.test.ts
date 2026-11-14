@@ -1019,6 +1019,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
       task: false,
       call_omo_agent: false,
       question: false,
+      lsp_install_decision: true,
       write: false,
       edit: false,
       ...TEAM_TOOL_DENIALS,
@@ -1100,6 +1101,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
       task: false,
       call_omo_agent: false,
       question: false,
+      lsp_install_decision: true,
       write: false,
       edit: false,
       ...TEAM_TOOL_DENIALS,
@@ -1181,6 +1183,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
       task: true,
       call_omo_agent: true,
       question: false,
+      lsp_install_decision: true,
       ...TEAM_TOOL_DENIALS,
     })
   })
