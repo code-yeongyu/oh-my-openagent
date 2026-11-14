@@ -75,6 +75,11 @@ export const TUI_REQUEST_TIMEOUT_MS = 1_500
 /** How long one `host status --all` enumeration is reused before the engine is asked again. */
 export const HOST_ENDPOINTS_CACHE_TTL_MS = 5_000
 const HOST_STATUS_ALL_TIMEOUT_MS = 30_000
+/**
+ * How long a caller waits behind an enumeration that has not answered before it starts a fresh one (#13009): the
+ * CLI is killed at HOST_STATUS_ALL_TIMEOUT_MS, so one still unsettled past that bound never will be.
+ */
+export const HOST_ENDPOINTS_ENUMERATION_DEADLINE_MS = HOST_STATUS_ALL_TIMEOUT_MS
 export const HOST_STATUS_ALL_ARGS = ["host", "status", "--all", "--include-workers", "--json"] as const
 /**
  * Marks a read-only listing as an observation (senpi `OBSERVE_REQUEST_FIELD`): without it the supervisor
@@ -317,7 +322,11 @@ export function createLiveThreadSurface(
   const registry = options.registry ?? (() => listRegistryEndpoints(resolveAgentHome({ env })))
   const readSecret = options.readSecret ?? ((socket: string) => readFileSync(controlSocketSecretPath(socket)))
   const legacy = options.socket ?? resolveThreadSocket(options.env)
-  type Enumeration = { expiresAt: number | undefined; readonly endpoints: Promise<readonly KnownEndpoint[]> }
+  type Enumeration = {
+    expiresAt: number | undefined
+    readonly abandonAt: number
+    readonly endpoints: Promise<readonly KnownEndpoint[]>
+  }
   let enumeration: Enumeration | undefined
   // Session files each endpoint listed on its last answer: a host that stopped cleanly released its
   // claims, and this is then the only record of which threads it held.
@@ -431,8 +440,17 @@ export function createLiveThreadSurface(
   const endpoints = async (): Promise<readonly KnownEndpoint[]> => {
     // One enumeration at a time, and its window starts when it answers: a host whose `status --all` takes longer
     // than the window shares the running one and reuses its answer, instead of enumerating once per view (#12989).
-    if (enumeration === undefined || (enumeration.expiresAt !== undefined && enumeration.expiresAt <= now())) {
-      const started: Enumeration = { expiresAt: undefined, endpoints: enumerate() }
+    // One that has not answered by its deadline is abandoned: the next caller starts afresh and its late answer is dropped.
+    const current = now()
+    if (
+      enumeration === undefined ||
+      (enumeration.expiresAt === undefined ? enumeration.abandonAt <= current : enumeration.expiresAt <= current)
+    ) {
+      const started: Enumeration = {
+        expiresAt: undefined,
+        abandonAt: current + HOST_ENDPOINTS_ENUMERATION_DEADLINE_MS,
+        endpoints: enumerate(),
+      }
       enumeration = started
       started.endpoints.then(
         () => {
