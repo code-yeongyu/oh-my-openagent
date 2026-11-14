@@ -202,11 +202,12 @@ fn durable_rename(temp: &Path, path: &Path, dir: &Path) -> io::Result<()> {
 
 /// Windows (amendment A-IS-60, its security read): the temp file was flushed before this call;
 /// the directory handle opens first (backup semantics, write access), so an access or
-/// filesystem failure surfaces before anything changes; the rename is write-through; then the
-/// directory is flushed, which is the step that makes the entry durable. Ok only when every
-/// call succeeded; any failure is an error carrying its \`GetLastError\` code (no code reads as
-/// "unsupported, skip"); a flush that fails after the rename leaves the marker in place; both
-/// handles close on every path.
+/// filesystem failure surfaces before the marker changes (the flushed temp file stays in the
+/// state directory: fail-closed, the marker is untouched); the rename is write-through; then
+/// the directory is flushed, which is the step that makes the entry durable. Ok only when
+/// every call succeeded; any failure is an error carrying its `GetLastError` code (no code
+/// reads as "unsupported, skip"); a flush that fails after the rename leaves the marker in
+/// place; the one directory handle closes on every path.
 #[cfg(windows)]
 fn durable_rename(temp: &Path, path: &Path, dir: &Path) -> io::Result<()> {
     use std::os::windows::ffi::OsStrExt;
