@@ -117,6 +117,30 @@ describe("createGoalTools", () => {
     expect(result).toContain("Read")
   })
 
+  test("get_goal and update_goal target the calling session when no main session is registered (resumed session, #12976)", async () => {
+    const getCalls: string[] = []
+    const pauseCalls: string[] = []
+    const getGoal = (sessionID: string) => {
+      getCalls.push(sessionID)
+      return makeGoal({ sessionID })
+    }
+    const pauseGoal = (sessionID: string) => {
+      pauseCalls.push(sessionID)
+      return makeGoal({ sessionID, status: "paused" })
+    }
+    const deps = makeDeps({ getGoal, pauseGoal }, undefined)
+    const tools = createGoalTools(deps)
+    const context = { sessionID: "ses_resumed" } as never
+
+    const getResult = await tools.get_goal.execute({}, context)
+    const updateResult = await tools.update_goal.execute({ status: "paused" }, context)
+
+    expect(getResult).not.toContain("no session_id")
+    expect(updateResult).not.toContain("no session_id")
+    expect(getCalls[0]).toBe("ses_resumed")
+    expect(pauseCalls).toEqual(["ses_resumed"])
+  })
+
   test("get_goal returns null when absent", async () => {
     const deps = makeDeps({ getGoal: () => null }, "s1")
     const tools = createGoalTools(deps)
