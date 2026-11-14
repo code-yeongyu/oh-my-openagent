@@ -7,3 +7,4 @@ C3	a `confirmed` pointer / key report from the macOS, X11 or Wayland fake (the r
 C4	`computer-error-table.test.ts`: every `(code, reason)` pair has a row, enumerated from `method_table!` + the gate table + the ref-resolution verdicts of `d-a11y-model.md` + the per-OS preflight refusals + the SDK's typed failures	13	31	owed
 C4	0 `COMPUTER_ERROR` fallthrough on tool	13	34	owed
 C4	0 `COMPUTER_ERROR` fallthrough on adapter	13	35	owed
+T1	`conformance_replay` byte-equal modulo variable pointers on the three CI legs (AC-1 replay leg)	14	28	owed
