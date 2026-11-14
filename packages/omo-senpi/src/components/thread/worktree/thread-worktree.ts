@@ -18,7 +18,11 @@ export type ThreadWorktree = {
 }
 export type WorktreeOutcome = { readonly kind: "ok"; readonly worktree: ThreadWorktree } | ThreadDataError
 
-export type GitResult = { readonly exit: number | "spawn_failed" | "timeout"; readonly stdout: string; readonly stderr: string }
+export type GitResult = {
+  readonly exit: number | "spawn_failed" | "timeout"
+  readonly stdout: string
+  readonly stderr: string
+}
 export type GitRun = (args: readonly string[], cwd: string) => Promise<GitResult>
 
 const GIT_TIMEOUT_MS = 60_000
@@ -85,7 +89,12 @@ export async function createThreadWorktree(options: {
     return folderFailure("branch_exists", `Branch ${branch} already exists in ${repository}.`, { branch, repository })
   const repoKey = `${basename(repository)}-${createHash("sha256").update(repository).digest("hex").slice(0, 8)}`
   const path = join(options.root, repoKey, branch.replaceAll("/", "-"))
-  if (await stat(path).then(() => true, () => false))
+  if (
+    await stat(path).then(
+      () => true,
+      () => false,
+    )
+  )
     return folderFailure("worktree_path_exists", `${path} already exists.`, { path, branch })
   let createdFolder: string | undefined
   try {

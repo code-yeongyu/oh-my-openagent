@@ -21,7 +21,11 @@ describe("a create on another device that opened the session is never lost to a 
 
     expect(first).toMatchObject({
       kind: "ok",
-      thread: { thread_id: "dur-new-on-b", device: "b", warnings: [{ code: "unsupported", details: { reason: "session_not_found" } }] },
+      thread: {
+        thread_id: "dur-new-on-b",
+        device: "b",
+        warnings: [{ code: "unsupported", details: { reason: "session_not_found" } }],
+      },
     })
     expect(replay).toEqual(first)
     expect(opens(a.sent)).toBe(1)
@@ -46,7 +50,10 @@ describe("a create on another device that opened the session is never lost to a 
 
     expect(result).toMatchObject({
       kind: "ok",
-      thread: { thread_id: "dur-new-on-b", warnings: [{ code: "host_unavailable", details: { reason: "name_not_applied" } }] },
+      thread: {
+        thread_id: "dur-new-on-b",
+        warnings: [{ code: "host_unavailable", details: { reason: "name_not_applied" } }],
+      },
     })
     expect(opens(a.sent)).toBe(1)
   })

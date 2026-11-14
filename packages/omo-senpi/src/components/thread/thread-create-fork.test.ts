@@ -10,17 +10,23 @@ describe("thread_create fork_from with an engine that cannot fork on open_sessio
   test.each([
     ["a source on this device", "dur-local", undefined],
     ["a source on device b", "dur-on-b", "b"],
-  ] as const)("#given %s #when thread_create forks it #then unsupported names the resolved source and no session opens", async (_label, source, device) => {
-    const a = account()
-    const { run, openSession } = surface(a.remote)
+  ] as const)(
+    "#given %s #when thread_create forks it #then unsupported names the resolved source and no session opens",
+    async (_label, source, device) => {
+      const a = account()
+      const { run, openSession } = surface(a.remote)
 
-    const result = await run("thread_create", { fork_from: source })
+      const result = await run("thread_create", { fork_from: source })
 
-    expect(result).toMatchObject({
-      kind: "error",
-      error: { code: "unsupported", details: { reason: "fork_unsupported", source, ...(device === undefined ? {} : { device }) } },
-    })
-    expect(openSession).not.toHaveBeenCalled()
-    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")).toEqual([])
-  })
+      expect(result).toMatchObject({
+        kind: "error",
+        error: {
+          code: "unsupported",
+          details: { reason: "fork_unsupported", source, ...(device === undefined ? {} : { device }) },
+        },
+      })
+      expect(openSession).not.toHaveBeenCalled()
+      expect(a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")).toEqual([])
+    },
+  )
 })

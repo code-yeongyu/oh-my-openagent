@@ -51,7 +51,10 @@ async function removeRequested(record: Record<string, unknown>, root: string, gi
   const branch = optionalString(record["branch"])
   if (typeof path !== "string" || !isAbsolute(path) || typeof branch !== "string") return notAbsolute(path)
   if (!(await insideRoot(root, path)))
-    return folderFailure("worktree_left_behind", `${path} is not a worktree OmO made here; it was not removed.`, { path, branch })
+    return folderFailure("worktree_left_behind", `${path} is not a worktree OmO made here; it was not removed.`, {
+      path,
+      branch,
+    })
   if (!(await isLinkedWorktreeTop(path, git)))
     return folderFailure("worktree_left_behind", `${path} is not the top folder of a worktree; it was not removed.`, {
       path,
@@ -60,10 +63,14 @@ async function removeRequested(record: Record<string, unknown>, root: string, gi
   const head = await git(["symbolic-ref", "--short", "HEAD"], path)
   const common = await git(["rev-parse", "--path-format=absolute", "--git-common-dir"], path)
   if (head.exit !== 0 || head.stdout.trim() !== branch || common.exit !== 0)
-    return folderFailure("worktree_left_behind", `${path} is not the worktree of branch ${branch}; it was not removed.`, {
-      path,
-      branch,
-    })
+    return folderFailure(
+      "worktree_left_behind",
+      `${path} is not the worktree of branch ${branch}; it was not removed.`,
+      {
+        path,
+        branch,
+      },
+    )
   const commonDir = common.stdout.trim()
   const repository = basename(commonDir) === ".git" ? dirname(commonDir) : commonDir
   return (await discardWorktree({ repository, path, branch, root, git })) ?? { kind: "removed" }

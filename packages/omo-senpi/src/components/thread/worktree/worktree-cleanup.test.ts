@@ -24,8 +24,7 @@ afterEach(async () => {
 })
 
 const errorOf = (outcome: unknown) => (outcome as { error?: { code: string; details?: Record<string, unknown> } }).error
-const branchExists = (repo: string, branch: string): boolean =>
-  kit.git(repo, "branch", "--list", branch).length > 0
+const branchExists = (repo: string, branch: string): boolean => kit.git(repo, "branch", "--list", branch).length > 0
 const worktreeCount = (repo: string): number => kit.git(repo, "worktree", "list").split("\n").length
 
 describe("L1: a worktree create that fails part way leaves nothing behind", () => {
@@ -46,7 +45,9 @@ describe("L1: a worktree create that fails part way leaves nothing behind", () =
       false,
       1,
     ])
-    expect(await createThreadWorktree({ repository: repo, request: { branch: "slow" }, root })).toMatchObject({ kind: "ok" })
+    expect(await createThreadWorktree({ repository: repo, request: { branch: "slow" }, root })).toMatchObject({
+      kind: "ok",
+    })
   })
 })
 
@@ -137,12 +138,19 @@ describe("M1: a worktree made for a thread whose open fails is removed", () => {
         },
       },
     }
-    const result = await surface(far).run("thread_create", { device: "studio", cwd: repo, worktree: { branch: "far-kept" } })
+    const result = await surface(far).run("thread_create", {
+      device: "studio",
+      cwd: repo,
+      worktree: { branch: "far-kept" },
+    })
     expect(errorOf(result)).toMatchObject({
       code: "scope_denied",
       details: {
         worktree: { branch: "far-kept", repository: repo },
-        cleanup: { code: "partial_commit", details: { reason: "worktree_left_behind", branch: "far-kept", device: "b" } },
+        cleanup: {
+          code: "partial_commit",
+          details: { reason: "worktree_left_behind", branch: "far-kept", device: "b" },
+        },
       },
     })
     expect(branchExists(repo, "far-kept")).toBe(true)
@@ -154,22 +162,25 @@ describe("the remove request another device sends removes only a worktree OmO ma
     ["a worktree outside this device's worktrees folder", "outside"],
     ["a worktree whose branch is not the one named", "branch"],
     ["a relative path", "relative"],
-  ] as const)("#given %s #when removal is requested #then it is refused and the worktree stays", async (_label, kind) => {
-    const repo = kit.repository()
-    const root = kit.folder("thread-wt-root-")
-    const made = await createThreadWorktree({ repository: repo, request: { branch: "keep-me" }, root })
-    if (made.kind !== "ok") throw new Error(JSON.stringify(made))
-    const outside = join(kit.folder("thread-wt-user-"), "wt")
-    kit.git(repo, "worktree", "add", "-q", "-b", "user-branch", outside)
-    const remove = {
-      outside: { path: outside, branch: "user-branch" },
-      branch: { path: made.worktree.path, branch: "main" },
-      relative: { path: "wt", branch: "keep-me" },
-    }[kind]
-    const outcome = await answerWorktreeRequest({ remove }, root)
-    expect(outcome.kind).toBe("error")
-    expect([existsSync(made.worktree.path), existsSync(outside), worktreeCount(repo)]).toEqual([true, true, 3])
-  })
+  ] as const)(
+    "#given %s #when removal is requested #then it is refused and the worktree stays",
+    async (_label, kind) => {
+      const repo = kit.repository()
+      const root = kit.folder("thread-wt-root-")
+      const made = await createThreadWorktree({ repository: repo, request: { branch: "keep-me" }, root })
+      if (made.kind !== "ok") throw new Error(JSON.stringify(made))
+      const outside = join(kit.folder("thread-wt-user-"), "wt")
+      kit.git(repo, "worktree", "add", "-q", "-b", "user-branch", outside)
+      const remove = {
+        outside: { path: outside, branch: "user-branch" },
+        branch: { path: made.worktree.path, branch: "main" },
+        relative: { path: "wt", branch: "keep-me" },
+      }[kind]
+      const outcome = await answerWorktreeRequest({ remove }, root)
+      expect(outcome.kind).toBe("error")
+      expect([existsSync(made.worktree.path), existsSync(outside), worktreeCount(repo)]).toEqual([true, true, 3])
+    },
+  )
 
   test("#given a live worktree with uncommitted work in a subfolder #when removal names that subfolder and the worktree's branch #then it is refused and the subfolder, the worktree and the branch stay", async () => {
     const repo = kit.repository()
@@ -206,8 +217,14 @@ describe("the remove request another device sends removes only a worktree OmO ma
     const root = kit.folder("thread-wt-root-")
     const made = await createThreadWorktree({ repository: repo, request: { branch: "drop-me" }, root })
     if (made.kind !== "ok") throw new Error(JSON.stringify(made))
-    expect(await answerWorktreeRequest({ remove: { path: made.worktree.path, branch: "drop-me" } }, root)).toEqual({ kind: "removed" })
-    expect([existsSync(made.worktree.path), branchExists(repo, "drop-me"), worktreeCount(repo)]).toEqual([false, false, 1])
+    expect(await answerWorktreeRequest({ remove: { path: made.worktree.path, branch: "drop-me" } }, root)).toEqual({
+      kind: "removed",
+    })
+    expect([existsSync(made.worktree.path), branchExists(repo, "drop-me"), worktreeCount(repo)]).toEqual([
+      false,
+      false,
+      1,
+    ])
   })
 })
 

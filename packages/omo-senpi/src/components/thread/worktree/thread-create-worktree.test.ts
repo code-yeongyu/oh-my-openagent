@@ -78,7 +78,8 @@ describe("thread_create with worktree on another device", () => {
     const { run, openSession } = surface(far.remote)
     const result = await run("thread_create", { device: "studio", cwd: repo, worktree: { branch: "remote/x" } })
     expect(result).toMatchObject({ kind: "ok", thread: { device: "b", worktree: { branch: "remote/x" } } })
-    const worktree = (result as unknown as { thread: { worktree: { path: string; setup_session_left_open?: string } } }).thread.worktree
+    const worktree = (result as unknown as { thread: { worktree: { path: string; setup_session_left_open?: string } } })
+      .thread.worktree
     expect(worktree.setup_session_left_open).toBeUndefined()
     expect(far.requests.map((rpc) => rpc["name"])).toEqual([THREAD_WORKTREE_RPC])
     const opens = a.sent.filter((entry) => entry.rpc?.["type"] === "open_session").map((entry) => entry.rpc?.["cwd"])

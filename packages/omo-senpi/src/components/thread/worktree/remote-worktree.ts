@@ -34,7 +34,11 @@ function farOutcome(data: JsonObject, device: string): WorktreeOutcome {
         device,
       }),
     }
-  return unsupported(device, `Device ${device} answered the worktree request with an unexpected reply.`, "Update omo on that device.")
+  return unsupported(
+    device,
+    `Device ${device} answered the worktree request with an unexpected reply.`,
+    "Update omo on that device.",
+  )
 }
 
 type FarAnswer = { readonly kind: "answered"; readonly data: JsonObject; readonly leftOpen?: string } | ThreadDataError
@@ -45,7 +49,12 @@ type FarAnswer = { readonly kind: "answered"; readonly data: JsonObject; readonl
  * and the session is closed again (`leftOpen` names it when it would not close). A device whose omo predates the
  * request answers `unsupported` naming the update; a folder that is not there answers `folder_missing`.
  */
-async function farWorktreeRequest(remote: RemoteThreadSurface, device: string, cwd: string, request: JsonObject): Promise<FarAnswer> {
+async function farWorktreeRequest(
+  remote: RemoteThreadSurface,
+  device: string,
+  cwd: string,
+  request: JsonObject,
+): Promise<FarAnswer> {
   const opened = await remote.sessions.endpointCommand(
     device,
     { type: "open_session", retain_on_disconnect: true, cwd },
@@ -55,10 +64,18 @@ async function farWorktreeRequest(remote: RemoteThreadSurface, device: string, c
   const data = replyData(opened.response)
   const engineId = openedEngineId(data, isObject(data["state"]) ? data["state"] : {})
   if (engineId === undefined)
-    return unsupported(device, `Device ${device} opened no session for the worktree request.`, "Update omo on that device.")
+    return unsupported(
+      device,
+      `Device ${device} opened no session for the worktree request.`,
+      "Update omo on that device.",
+    )
   const located = await remote.sessions.locate(device, engineId, opened.located)
   if (located.kind !== "ok")
-    return unsupported(device, `Device ${device} could not address its worktree session (${located.reason}).`, "Update omo on that device.")
+    return unsupported(
+      device,
+      `Device ${device} could not address its worktree session (${located.reason}).`,
+      "Update omo on that device.",
+    )
   const key = located.sessionId
   const answered = await remote.sessions.sessionCommand(device, key, {
     type: "extension_request",
@@ -70,7 +87,11 @@ async function farWorktreeRequest(remote: RemoteThreadSurface, device: string, c
     answered.kind === "ok"
       ? { kind: "answered", data: replyData(answered.response) }
       : answered.kind === "refused" && answered.reason.includes(THREAD_WORKTREE_RPC)
-        ? unsupported(device, `omo on device ${device} cannot create worktrees yet.`, "Update omo on that device, then retry.")
+        ? unsupported(
+            device,
+            `omo on device ${device} cannot create worktrees yet.`,
+            "Update omo on that device, then retry.",
+          )
         : outcomeFailure(answered, device)
   const closed = await closeLadder(key, async (rpc): Promise<RecordAnswer> => {
     const outcome = await remote.sessions.sessionCommand(device, key, rpc)

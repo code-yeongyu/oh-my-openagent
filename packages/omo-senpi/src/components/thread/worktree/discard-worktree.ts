@@ -4,7 +4,11 @@ import type { ThreadDataError } from "../contracts"
 import { folderFailure } from "./failures"
 import type { GitRun } from "./thread-worktree"
 
-const exists = (path: string): Promise<boolean> => stat(path).then(() => true, () => false)
+const exists = (path: string): Promise<boolean> =>
+  stat(path).then(
+    () => true,
+    () => false,
+  )
 
 const inside = (root: string, path: string): boolean => {
   const rel = relative(root, path)
@@ -36,7 +40,10 @@ export async function discardWorktree(options: {
 }): Promise<ThreadDataError | undefined> {
   const { repository, path, branch, root, git } = options
   if (!(await insideRoot(root, path)))
-    return folderFailure("worktree_left_behind", `${path} is outside OmO's worktrees folder; it was not removed.`, { path, branch })
+    return folderFailure("worktree_left_behind", `${path} is outside OmO's worktrees folder; it was not removed.`, {
+      path,
+      branch,
+    })
   const registered = async (): Promise<boolean> => {
     const list = await git(["worktree", "list", "--porcelain"], repository)
     // git prints the realpath (e.g. /private/tmp on macOS); either spelling counts, so a locked worktree is never rm'd.
@@ -47,7 +54,8 @@ export async function discardWorktree(options: {
   if (options.removeUnregisteredFolder === true && (await exists(path)) && !(await registered()))
     await rm(path, { recursive: true, force: true }).catch(() => {})
   await git(["worktree", "prune"], repository)
-  const hasBranch = async () => (await git(["show-ref", "--verify", "--quiet", `refs/heads/${branch}`], repository)).exit === 0
+  const hasBranch = async () =>
+    (await git(["show-ref", "--verify", "--quiet", `refs/heads/${branch}`], repository)).exit === 0
   if ((await hasBranch()) && !(await registered())) await git(["branch", "-D", branch], repository)
   if (options.createdFolder !== undefined) await rmdir(options.createdFolder).catch(() => {})
   const left = { folder: await exists(path), branch: await hasBranch() }
