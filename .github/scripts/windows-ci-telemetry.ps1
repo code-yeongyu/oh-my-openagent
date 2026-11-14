@@ -29,6 +29,20 @@ if (($TestArguments -contains "test") -and -not ($TestArguments -contains "--tim
   $TestArguments = $withTimeout
 }
 
+# Every bun test run through this wrapper also writes a JUnit report next to its telemetry, so a
+# re-sharded layout can be compared test by test with the layout it replaced (#13315). Bun writes
+# no report at all when the directory is missing, so it is created first.
+if (($TestArguments -contains "test") -and -not ($TestArguments | Where-Object { $_ -like "--reporter*" })) {
+  New-Item -ItemType Directory -Force -Path $ArtifactDirectory | Out-Null
+  $junitPath = Join-Path $ArtifactDirectory "$Invocation.junit.xml"
+  $withJunit = @()
+  foreach ($argument in $TestArguments) {
+    $withJunit += $argument
+    if ($argument -eq "test") { $withJunit += @("--reporter=junit", "--reporter-outfile=$junitPath") }
+  }
+  $TestArguments = $withJunit
+}
+
 $telemetryErrors = [System.Collections.Generic.List[object]]::new()
 
 function Add-TelemetryError {
