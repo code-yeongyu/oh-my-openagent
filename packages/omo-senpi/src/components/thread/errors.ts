@@ -45,6 +45,8 @@ export const THREAD_ERROR_CODES = [
   "device_offline",
   "relay_requires_paid_plan",
   "alias_taken",
+  "device_unknown",
+  "ambiguous_device",
 ] as const
 
 export type ThreadErrorCode = (typeof THREAD_ERROR_CODES)[number]
