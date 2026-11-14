@@ -1,0 +1,104 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/omo-native": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "bin/senpi-patch.mjs",
+        // the engine entry the npm launcher spawns by path for a launch that claims memory sync at boot (launcher.js)
+        "bin/lib/engine-boot.js",
+        // the manual GUI-session QA runner for the keychain helper: a person runs it by path in a dedicated QA login session
+        "keychain-helper/gui-session-runner.ts",
+        "keychain-helper/build.ts",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "test/account-linux-no-gdbus.fixture.ts",
+        "test/bun-bin-shim.fixture.ts",
+        "test/bun-bin-shim.test-support.ts",
+        "test/daemon-test-support.ts",
+        "test/keychain-helper.test-support.ts",
+        "test/fixtures/compiled-setup/entry.ts",
+        "test/fixtures/provisioned-handoff/entry.ts",
+        "test/fixtures/senpi-hooks-state-child.mjs",
+        "test/fixtures/senpi-hooks-state-consumer.mjs",
+        "test/fixtures/trust-ensure-probe.ts",
+        "test/fixtures/trust-stage-probe.ts",
+        "test/packed-consumer.mjs",
+        "test/teardown.test-support.ts",
+        "test/trust-certificate-fixtures.ts",
+      ],
+      "ignoreFiles": [
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "launcher-commands.ts",
+      ],
+      // pre-existing at origin dev 4686e425b5: executables this package runs that it does not declare
+      "ignoreBinaries": ["gdbus", "mkfifo"],
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) AGENT_DIR_ENV_NAMES, ADOPTED_STATE_FILES, defaultAgentDir
+    "packages/omo-native/bin/lib/agent-dir.js": ["AGENT_DIR_ENV_NAMES", "ADOPTED_STATE_FILES", "defaultAgentDir"],
+    // added on dev by #11445 after the baseline: the declaration of the sibling generated .js, which every importer resolves to
+    "packages/omo-native/bin/lib/brand-logo.generated.d.ts": ["OMO_BRAND_LOGO"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) BUN_MIN_VERSION, resolveBunGuard, findNodeBinary
+    "packages/omo-native/bin/lib/bun-runtime.js": ["BUN_MIN_VERSION", "resolveBunGuard", "findNodeBinary"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) COMPUTER_USE_RUNTIME
+    "packages/omo-native/bin/lib/computer-use-doctor.js": ["COMPUTER_USE_RUNTIME"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) aggregateEndpoints
+    "packages/omo-native/bin/lib/daemon-status.js": ["aggregateEndpoints"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) omoInstallsOnPath, findLegacyPackages, findOpenCodeRegistrations, formatMigrationLines, openCodeRoutingReport
+    "packages/omo-native/bin/lib/doctor-migration.js": ["omoInstallsOnPath", "findLegacyPackages", "findOpenCodeRegistrations", "formatMigrationLines", "openCodeRoutingReport"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) PI_CONFIG_FILES
+    "packages/omo-native/bin/lib/doctor-pi-config.js": ["PI_CONFIG_FILES"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) installedDistTag
+    "packages/omo-native/bin/lib/doctor.js": ["installedDistTag"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) engineHostCall, rollbackMigrateCall
+    "packages/omo-native/bin/lib/launcher.js": ["engineHostCall", "rollbackMigrateCall"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) formatModelChainLines
+    "packages/omo-native/bin/lib/model-chains.js": ["formatModelChainLines"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) readInstalledVersion
+    "packages/omo-native/bin/lib/self-update.js": ["readInstalledVersion"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "packages/omo-native/bin/lib/service-auth.generated.js": ["default"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) API_KEY_TYPE_ACCEPTLIST
+    "packages/omo-native/bin/lib/setup-credentials.js": ["API_KEY_TYPE_ACCEPTLIST"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) KNOWN_AUTH_SCHEMA_VERSIONS
+    "packages/omo-native/bin/lib/setup-detect.js": ["KNOWN_AUTH_SCHEMA_VERSIONS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) NATIVE_AGENT_NAMES, readEditionRouting, readModelChoices, hasModelChoices, translateModelRef, convertModelChoices, nativeRoutingLine, openCodeRoutingGap, openCodeRoutingNotice
+    "packages/omo-native/bin/lib/setup-opencode-models.d.ts": ["NATIVE_AGENT_NAMES", "readEditionRouting", "readModelChoices", "hasModelChoices", "translateModelRef", "convertModelChoices", "nativeRoutingLine", "openCodeRoutingGap", "openCodeRoutingNotice"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) translateModelRef, nativeRoutingLine
+    "packages/omo-native/bin/lib/setup-opencode-models.js": ["translateModelRef", "nativeRoutingLine"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) API_BY_NPM
+    "packages/omo-native/bin/lib/setup-opencode-providers.js": ["API_BY_NPM"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) SETUP_SOURCES, canonicalAgentDir, scanSetup, collectSetupPlans, SetupStaleError, staleSetupTargets, authWritesPending, applySetupStages
+    "packages/omo-native/bin/lib/setup-stream.d.ts": ["SETUP_SOURCES", "canonicalAgentDir", "scanSetup", "collectSetupPlans", "SetupStaleError", "staleSetupTargets", "authWritesPending", "applySetupStages"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) threadExitCode
+    "packages/omo-native/bin/lib/thread.js": ["threadExitCode"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) UPDATE_USAGE
+    "packages/omo-native/bin/lib/update-args.js": ["UPDATE_USAGE"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) unixSecondsFromCommittedAt, engineBuildStampFromComponent, engineBuildIdentityLine
+    "packages/omo-native/build-info.ts": ["unixSecondsFromCommittedAt", "engineBuildStampFromComponent", "engineBuildIdentityLine"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) compiledUpdateCommand
+    "packages/omo-native/compile-entry.ts": ["compiledUpdateCommand"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) stripDeletedExecSuffix
+    "packages/omo-native/compile-runtime.ts": ["stripDeletedExecSuffix"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ENGINE_EXTRA_CA_ENV
+    "packages/omo-native/compiled-ca-trust.ts": ["ENGINE_EXTRA_CA_ENV"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) COMPILED_DIAGNOSTIC_RUNTIME
+    "packages/omo-native/compiled-diagnostic-runtime.ts": ["COMPILED_DIAGNOSTIC_RUNTIME"],
+    // pre-existing at origin dev 4d3161eabd (#11430, 950c2dd65f): unused export(s) HashDirectoryRuntimeError
+    "packages/omo-native/openssl-hash-dir.ts": ["HashDirectoryRuntimeError"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) resolveDaemonTaskSettings
+    // resolveGlobalMemorySettings: read by omo doctor --fix through the staged plugin/runtime/task-config bundle (#12479)
+    "packages/omo-native/task-config-entry.ts": ["resolveDaemonTaskSettings", "resolveGlobalMemorySettings"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) SOURCE_ROOT
+    "packages/omo-native/test/bun-bin-shim.fixture.ts": ["SOURCE_ROOT"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) identityRealpath, existsOnly
+    "packages/omo-native/test/bun-bin-shim.test-support.ts": ["identityRealpath", "existsOnly"]
+  }
+}

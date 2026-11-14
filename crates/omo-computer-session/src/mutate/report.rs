@@ -4,10 +4,11 @@
 
 use omo_computer_core::backend::Route;
 use omo_computer_core::methods::Method;
+use omo_computer_core::observation::ObservationSettle;
 use omo_computer_core::params::ReportMode;
 use omo_computer_core::report::{
     ActionReport, Delivered, Disposition, Effect, ReportContext, ReportParts, ReportRejection,
-    VerbClass,
+    Timings, VerbClass,
 };
 use omo_computer_core::results::ExecReply;
 use omo_computer_core::untrusted::UntrustedText;
@@ -17,10 +18,12 @@ pub(super) struct ReadBack {
     pub(super) effect: Effect,
 }
 
-/// The settle stage: a typed step that returns at once with `settle` absent; row 19
-/// supplies the policy behind it.
-pub(super) const fn settle() -> Option<omo_computer_core::report::Settle> {
-    None
+/// The settle stage's verdict for the effect rule: a settle that ran watched the window, so it
+/// is never the quiet suspect (that verdict needs the viewport rows of design row C19).
+pub(super) fn settle(
+    settled: Option<&crate::settle::Settled>,
+) -> Option<omo_computer_core::report::Settle> {
+    settled.map(|_| omo_computer_core::report::Settle::NotQuiet)
 }
 
 pub(super) const fn read_back(_settle: Option<omo_computer_core::report::Settle>) -> ReadBack {
@@ -34,6 +37,7 @@ pub(super) struct Sent {
     pub(super) count: u32,
     pub(super) of: u32,
     pub(super) effect: Effect,
+    pub(super) settle: Option<ObservationSettle>,
     pub(super) audit_id: Option<String>,
     pub(super) warning: Option<String>,
     /// The foreground lease ended under the user since the last report.
@@ -68,7 +72,11 @@ pub(super) fn reply(
         note: None,
         warning: sent.warning,
         audit_ids: sent.audit_id.into_iter().collect(),
-        timings: None,
+        timings: sent.settle.as_ref().map(|settle| Timings {
+            settle_ms: Some(settle.waited_ms),
+            ..Timings::default()
+        }),
+        settle: sent.settle,
         evidence: Vec::new(),
         observation: UntrustedText,
     };

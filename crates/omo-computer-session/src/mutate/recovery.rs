@@ -56,6 +56,7 @@ impl Funnel {
             receipt: None,
             interrupted,
             detail: None,
+            busy: None,
             warning: None,
         };
         Ok(match (marker.receipt.as_ref(), same) {
@@ -113,6 +114,7 @@ fn uncertain(call_id: &str) -> Refused {
         receipt: None,
         interrupted: Some(Disposition::UNCERTAIN_UNSAFE),
         detail: None,
+        busy: None,
         warning: None,
     }
 }

@@ -7,7 +7,7 @@ use omo_computer_core::error::{EngineCode, Reason};
 use omo_computer_core::report::Effect;
 
 use super::super::testkit::{el, Tree};
-use super::super::{Expiry, RefRegistry};
+use super::super::{Drilled, Expiry, RefRegistry};
 use super::{n_of, snap};
 
 fn tree() -> Tree {
@@ -106,4 +106,44 @@ fn the_65537th_object_prunes_the_oldest_generation_and_its_token_resolves_to_not
     let mut tree = Tree::default();
     assert_eq!(refs.resolve(&first_tokens[0], true, &mut tree).map_err(|u| u.refusal), Err(Refusal::bare(EngineCode::StaleRef)));
     assert!(refs.locate(&first_tokens[1], true).is_ok(), "the next oldest stays");
+}
+
+/// Review L1 (#13368): the per-window maps hold only the numbers the kept generations hold, so
+/// element churn in a long session cannot grow them past the retained generations.
+#[test]
+fn element_churn_keeps_the_per_window_maps_to_the_kept_generations() {
+    let mut refs = RefRegistry::default();
+    for read in 0..40_u64 {
+        // Every read shows 50 elements never seen before.
+        refs.mint(&root("w"), &flat_walk(50, 1_000 * (read + 1)), None);
+    }
+    let window = refs.windows.get("w").expect("the window");
+    let held: std::collections::HashSet<u64> =
+        window.generations.values().flat_map(|g| g.entries.iter().map(|e| e.n)).collect();
+    assert_eq!(window.generations.len(), 8, "eight generations kept");
+    assert!(window.last_entry.keys().all(|n| held.contains(n)), "last_entry holds only kept numbers");
+    assert_eq!(window.last_entry.len(), held.len());
+    assert!(window.by_object.values().all(|n| held.contains(n)));
+    assert!(window.by_native_id.values().flatten().all(|n| held.contains(n)));
+}
+
+/// Review L3 (#13368): a hit on a drill sub-generation refreshes the full observation it hangs
+/// under, so heavy drill use keeps that observation (and the drill) through a prune.
+#[test]
+fn heavy_drill_use_keeps_its_parent_observation_through_a_prune() {
+    let mut refs = RefRegistry::with_cap(10);
+    let top = refs.mint(&root("a"), &flat_walk(4, 1_000), None).generation;
+    let anchor = refs.generation("a", top).expect("a").entries[1].identity.clone();
+    let drilled = Drilled { top, from: top, index: 1, identity: &anchor };
+    let sub = refs.mint(&root("a"), &flat_walk(2, 2_000), Some(drilled)).generation;
+    let drill_token = refs.generation("a", sub).expect("the drill").token(1);
+    let other = refs.mint(&root("b"), &flat_walk(4, 3_000), None).generation;
+    // The drill is the most recently used generation of all.
+    for _ in 0..3 {
+        refs.locate(&drill_token, true).expect("the drill resolves");
+    }
+    refs.mint(&root("c"), &flat_walk(3, 4_000), None);
+    assert!(refs.locate(&drill_token, true).is_ok(), "the drill and its parent stay");
+    assert!(refs.generation("a", top).is_some(), "the parent stays");
+    assert!(refs.generation("b", other).is_none(), "the least recently used observation went");
 }

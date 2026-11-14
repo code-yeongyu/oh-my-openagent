@@ -25,6 +25,24 @@ pub struct BusyMark {
     pub indicator: Option<String>,
 }
 
+/// The user presses the stop chord at fake-clock time `t_ms` after backend creation. The press
+/// fires when the fake's observer wait moves the clock past it (a settle or busy wait).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StopPress {
+    pub t_ms: u64,
+}
+
+/// One notification the notification surface lists from fake-clock time `t_ms` on.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NotificationPost {
+    pub t_ms: u64,
+    pub app: String,
+    pub title: String,
+    pub body: String,
+}
+
 /// The focused element of `window` is a secure field.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]

@@ -19,6 +19,7 @@ mod persona;
 mod scenario;
 mod scripting;
 mod seams;
+mod settle_source;
 mod sink;
 mod state;
 #[cfg(test)]

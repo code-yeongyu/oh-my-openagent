@@ -35,9 +35,9 @@ impl Session {
         let secure = self.funnel.secure.secure(self.backend.as_ref(), target);
         let record = Record::new(&self.funnel, &mutation, &call_id, secure);
         self.reconcile_stop();
-        let epoch = self.guard.supervisor().stop_epoch();
+        let mut epoch = self.guard.supervisor().stop_epoch();
         let call = (mutation.method, &mutation.call.target, mutation.route);
-        let plan = self.funnel.control.plan(self.backend.as_mut(), call, epoch);
+        let mut plan = self.funnel.control.plan(self.backend.as_mut(), call, epoch);
         if let Err(refused) =
             self.guard
                 .admit_on_with(self.backend.as_mut(), &mutation.call, plan.stages)
@@ -55,6 +55,31 @@ impl Session {
         }
         if let Some(frame) = mutation.frame_refusal {
             return Err(self.refuse(record, Some("Frame".to_owned()), frame.refusal().into()));
+        }
+        let waited_ms = match self.busy_before_send(target) {
+            Ok(waited_ms) => waited_ms,
+            Err(busy) => return Err(self.refuse(record, Some("Busy".to_owned()), busy)),
+        };
+        // The busy wait let time pass after the gate: a stop, a lock or a lost permission
+        // during it must still refuse, so a wait that took time is admitted again before
+        // anything is taken or sent. A target that was not busy keeps the single gate pass.
+        if waited_ms > 0 {
+            // R70s(1), the fold: a stop during the wait ends the lease through the funnel, the
+            // epoch is read fresh, the plan (consent, lease, reservations) is made again, and the
+            // gate admits the call again on that new plan before anything is taken or sent.
+            self.reconcile_stop();
+            epoch = self.guard.supervisor().stop_epoch();
+            plan = self.funnel.control.plan(self.backend.as_mut(), call, epoch);
+            if let Err(refused) =
+                self.guard
+                    .admit_on_with(self.backend.as_mut(), &mutation.call, plan.stages)
+            {
+                return Err(self.refuse(
+                    record,
+                    Some(format!("{:?}", refused.gate)),
+                    refused.refusal.into(),
+                ));
+            }
         }
         if let Err((refusal, detail)) = self.funnel.control.commit(self.backend.as_mut(), &plan, epoch) {
             let out = Refused {
@@ -77,6 +102,7 @@ impl Session {
         (call_id, report_mode, tag): (String, omo_computer_core::params::ReportMode, u64),
         binding: Option<(bool, Option<Vec<u8>>)>,
     ) -> Result<ExecReply, Refused> {
+        let target = target_id(&mutation.call.target);
         let identity_unavailable = binding.as_ref().is_some_and(|(by_identity, _)| !by_identity);
         if let Some((by_identity, observed)) = &binding {
             record.event.bind_app(*by_identity, observed.as_deref());
@@ -126,7 +152,10 @@ impl Session {
         if let Some((target, frame_id)) = mutation.consume.as_ref().filter(|_| count > 0) {
             self.frames.consume(target, frame_id);
         }
-        let read_back = report::read_back(report::settle());
+        let settled = (failure.is_none() && count > 0)
+            .then(|| self.settle_after_send(target))
+            .flatten();
+        let read_back = report::read_back(report::settle(settled.as_ref()));
         match failure {
             Some(refusal) if count == 0 => {
                 let issuer = record.marker.binding.issuer.clone();
@@ -155,6 +184,7 @@ impl Session {
                     receipt: None,
                     interrupted: Some(Disposition::UNCERTAIN_UNSAFE),
                     detail: None,
+                    busy: None,
                     warning,
                 })
             }
@@ -180,6 +210,7 @@ impl Session {
                     warning: appended.is_err().then(|| "write_failed".to_owned()).or_else(|| {
                         identity_unavailable.then(|| crate::consent::IDENTITY_UNAVAILABLE.to_owned())
                     }),
+                    settle: settled.as_ref().map(crate::settle::Settled::wire),
                     audit_id: appended.ok(),
                 };
                 let reply =

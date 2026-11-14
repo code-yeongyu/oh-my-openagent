@@ -1,0 +1,36 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/senpi-desktop-engine": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "test/fixtures/fake-engine.mjs",
+        "test/refusal-child.ts",
+        "test/support/engine.ts",
+        "test/support/error-code-cases.ts",
+        "test/support/input-calls.ts",
+      ],
+      "ignoreFiles": [
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "bunshin/descriptor.d.mts",
+      ],
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) HELLO_TIMEOUT_MS
+    "packages/senpi-desktop-engine/src/handshake.ts": ["HELLO_TIMEOUT_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DesktopEngineHandshakeError, HELLO_TIMEOUT_MS, DESKTOP_ENGINE_BINARY, getDesktopEngineFileName, QUARANTINE_ATTRIBUTE, DESKTOP_ENGINE_CHECKSUMS_ASSET, DESKTOP_ENGINE_RELEASE_HOSTS
+    "packages/senpi-desktop-engine/src/index.ts": ["DesktopEngineHandshakeError", "HELLO_TIMEOUT_MS", "DESKTOP_ENGINE_BINARY", "getDesktopEngineFileName", "QUARANTINE_ATTRIBUTE", "DESKTOP_ENGINE_CHECKSUMS_ASSET", "DESKTOP_ENGINE_RELEASE_HOSTS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DESKTOP_ENGINE_BINARY, QUARANTINE_ATTRIBUTE
+    "packages/senpi-desktop-engine/src/locator.ts": ["DESKTOP_ENGINE_BINARY", "QUARANTINE_ATTRIBUTE"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) HANG_GUARD_MS, CHORD
+    "packages/senpi-desktop-engine/test/support/engine.ts": ["HANG_GUARD_MS", "CHORD"]
+  }
+}

@@ -56,7 +56,7 @@ fn a_returning_object_never_takes_the_number_a_live_lookalike_held_last() {
         assert_ne!(now[&21], n_held, "{case}: the returning A gets a fresh number");
         let diff = third.diff.unwrap_or_else(|| panic!("{case}: {:?}", third.diff_fallback));
         assert!(!diff.lines().any(|l| l.starts_with("~ ")), "{case}: no element is relabelled:\n{diff}");
-        assert!(diff.lines().any(|l| l.starts_with("+ - listitem \"A\"")), "{case}: A is added:\n{diff}");
+        assert!(diff.lines().any(|l| l.starts_with("+(") && l.contains(") - listitem \"A\"")), "{case}: A is added:\n{diff}");
         for token in [format!("s{}:e{n_held}", second.generation), format!("s{}:e{n_held}", third.generation)] {
             let resolved = refs.resolve(&token, true, &mut tree).expect("resolves");
             assert_eq!(resolved.live.title.as_deref(), Some("N"), "{case}: {token} names N");

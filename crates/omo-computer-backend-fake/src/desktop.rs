@@ -97,6 +97,17 @@ impl Backend for FakeBackend {
     fn host_consent(&self) -> Option<serde_json::Value> {
         self.scripted_host_consent()
     }
+
+    fn clock(&self) -> Option<&dyn omo_computer_core::backend::BackendClock> {
+        Some(&self.clock)
+    }
+
+    fn settle_source(&mut self) -> Option<Box<dyn omo_computer_core::backend::SettleSource>> {
+        Some(Box::new(crate::settle_source::FakeSettleSource::new(
+            self.shared.clone(),
+            self.clock.clone(),
+        )))
+    }
 }
 
 #[cfg(test)]

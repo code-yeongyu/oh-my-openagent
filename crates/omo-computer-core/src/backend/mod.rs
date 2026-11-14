@@ -5,12 +5,16 @@
 
 mod refusal;
 mod refusing;
+mod settle_source;
 mod sources;
 mod types;
 
 pub use refusal::{BackendResult, Refusal};
 pub use refusing::{refusing_capabilities, unknown_session_state};
-pub use sources::{AxEventSource, EpochSource, NoAxEvents, NoEpochSource, Presence, StopListener};
+pub use settle_source::{NotificationFingerprint, SettleSource, NO_NOTIFICATION_SURFACE};
+pub use sources::{
+    AxEventSource, BackendClock, EpochSource, NoAxEvents, NoEpochSource, Presence, StopListener,
+};
 pub use types::{
     AxEvent, AxSnapshot, CaptureOptions, Delivered, EpochChange, FrameBytes, InputEvent,
     PermissionProbe, Ref, Resolved, Route, Semantic, SnapshotRequest, TaggedInput, Target,
@@ -135,6 +139,18 @@ pub trait Backend: Send {
             )),
             _ => Ok(()),
         }
+    }
+
+    /// The backend's monotonic clock and its wait; `None` (the default) when it has none,
+    /// which makes an admission that would pause answer at once instead.
+    fn clock(&self) -> Option<&dyn BackendClock> {
+        None
+    }
+
+    /// The settle reads: observer events with a deadline, the busy predicate and the
+    /// notification surface; `None` (the default) makes every settle read `unsupported`.
+    fn settle_source(&mut self) -> Option<Box<dyn SettleSource>> {
+        None
     }
 }
 
