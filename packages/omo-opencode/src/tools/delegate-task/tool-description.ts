@@ -78,7 +78,8 @@ export function createDelegateTaskPresentation(options: DelegateTaskPresentation
     Available categories:
   ${categoryList}
   - subagent_type: Use specific agent directly (explore, librarian, oracle, metis, momus)
-  - run_in_background: true is the standard spawn: returns a background task ID like \`bg_...\` at once and the completion notification delivers the result. false blocks this response until the child finishes (a 30-minute inactivity window, reset by OpenCode busy/retry/running status, not a total wall-clock limit); use it only for a short child whose result gates your very next call. Omitted counts as false.
+  - run_in_background: true is the standard spawn: returns a background task ID like \`bg_...\` at once, and a notification with the child's final answer arrives when it finishes. false blocks this response until the child finishes (a 30-minute inactivity window, reset by OpenCode busy/retry/running status, not a total wall-clock limit); use it only for a short child whose result gates your very next call. Omitted counts as false.
+  - wake: When a finished background child reports. "each" (default): every finished child starts your next turn with its result; children finishing close together share one turn. "none": no turn is started; the result waits for your next turn.
   - task_id: Continuation session id (\`ses_...\`) from task metadata. Continues the same subagent session with FULL CONTEXT PRESERVED; not the background task id (\`bg_...\`).
   - command: The command that triggered this task (optional, for slash command tracking).
 

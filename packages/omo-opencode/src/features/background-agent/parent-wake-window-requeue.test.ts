@@ -22,13 +22,14 @@ const FINAL_WAKE = "<system-reminder>\n[BACKGROUND TASK COMPLETED]\n[ALL BACKGRO
 function createNotifier(
   options: {
     readonly onPendingWakeRequeued?: (sessionID: string) => void
+    readonly recordDispatchedPrompts?: boolean
   } = {},
 ): {
   readonly notifier: ParentWakeNotifier
   readonly promptAsyncCalls: readonly PromptAsyncCall[]
 } {
   const promptAsyncCalls: PromptAsyncCall[] = []
-  const sessionMessages: readonly SessionMessageStub[] = [
+  const sessionMessages: SessionMessageStub[] = [
     {
       info: {
         role: "assistant",
@@ -43,6 +44,12 @@ function createNotifier(
       status: async () => ({ data: {} }),
       promptAsync: async (call: PromptAsyncCall) => {
         promptAsyncCalls.push(call)
+        if (options.recordDispatchedPrompts === true) {
+          sessionMessages.push({
+            info: { role: "user", time: { created: Date.now() } },
+            parts: [{ type: "text", text: FINAL_WAKE }],
+          })
+        }
         return { data: {} }
       },
     },
@@ -158,6 +165,29 @@ describe("ParentWakeNotifier dispatched wake recovery", () => {
       expect(notifier.getPendingParentWakes().has(sessionID)).toBe(false)
       expect(notifier.getPendingParentWakeTimers().has(sessionID)).toBe(false)
       expect(promptAsyncCalls).toHaveLength(2)
+    } finally {
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
+  test("#given a noReply notice was recorded in the parent #when the recovery window elapses without output #then it is not dispatched again", async () => {
+    // given
+    const { notifier, promptAsyncCalls } = createNotifier({ recordDispatchedPrompts: true })
+    const sessionID = "parent-window-noreply-recorded"
+    notifier.queuePendingParentWake(sessionID, FINAL_WAKE, { agent: "sisyphus" }, false)
+
+    try {
+      await notifier.flushPendingParentWake(sessionID)
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+
+      // when
+      await waitForTimer()
+
+      // then
+      expect(notifier.getDispatchedParentWakes().has(sessionID)).toBe(false)
+      expect(notifier.getPendingParentWakes().has(sessionID)).toBe(false)
     } finally {
       notifier.shutdown()
       releaseAllPromptAsyncReservationsForTesting()

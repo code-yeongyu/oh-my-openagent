@@ -14,6 +14,8 @@ export type PendingParentWake = {
   queuedAt?: number
   dispatchedAt?: number
   noReplyAdmittedAt?: number
+  /** Notices already deposited in the parent by an admit-only dispatch; a later reply dispatch does not repeat them. */
+  admittedNotifications?: string[]
   toolCallDeferralStartedAt?: number
   allowEmptyAssistantTurnRetry?: boolean
   noAssistantOutputRetryCount?: number
@@ -39,6 +41,7 @@ export function cloneParentWake(wake: PendingParentWake): PendingParentWake {
     ...(wake.queuedAt !== undefined ? { queuedAt: wake.queuedAt } : {}),
     ...(wake.dispatchedAt !== undefined ? { dispatchedAt: wake.dispatchedAt } : {}),
     ...(wake.noReplyAdmittedAt !== undefined ? { noReplyAdmittedAt: wake.noReplyAdmittedAt } : {}),
+    ...(wake.admittedNotifications !== undefined ? { admittedNotifications: [...wake.admittedNotifications] } : {}),
     ...(wake.toolCallDeferralStartedAt !== undefined
       ? { toolCallDeferralStartedAt: wake.toolCallDeferralStartedAt }
       : {}),
@@ -64,26 +67,10 @@ export function mergeParentWakeNotifications(
   existingNotifications: readonly string[],
   nextNotification: string,
 ): string[] {
-  if (isFinalBackgroundTaskNotification(nextNotification)) {
-    return [
-      nextNotification,
-      ...existingNotifications.filter(
-        (notification) => notification !== nextNotification && !isBackgroundTaskProgressNotification(notification),
-      ),
-    ]
-  }
-
+  // Every background task notice carries its own result, so none replaces another; only exact repeats collapse.
   if (existingNotifications.includes(nextNotification)) {
     return [...existingNotifications]
   }
-
-  if (
-    isBackgroundTaskProgressNotification(nextNotification) &&
-    existingNotifications.some(isFinalBackgroundTaskNotification)
-  ) {
-    return [...existingNotifications]
-  }
-
   return [...existingNotifications, nextNotification]
 }
 
@@ -113,37 +100,7 @@ function isBackgroundTaskFailureHeader(line: string): boolean {
   return (
     line === "[BACKGROUND TASK ERROR]" ||
     line === "[BACKGROUND TASK CANCELLED]" ||
-    line === "[BACKGROUND TASK INTERRUPTED]" ||
-    (line.startsWith("[ALL BACKGROUND TASKS FINISHED") && line.endsWith("]"))
-  )
-}
-
-function isFinalBackgroundTaskNotification(notification: string): boolean {
-  return getSystemReminderHeaderLines(notification).some(
-    (line) =>
-      line === "[ALL BACKGROUND TASKS COMPLETE]" ||
-      (line.startsWith("[ALL BACKGROUND TASKS FINISHED") && line.endsWith("]")),
-  )
-}
-
-function isBackgroundTaskProgressNotification(notification: string): boolean {
-  if (!getSystemReminderHeaderLines(notification).some(isBackgroundTaskProgressHeader)) {
-    return false
-  }
-
-  return notification
-    .split("\n")
-    .some((line) =>
-      /^\*\*\d+ tasks? still in progress\.\*\* You WILL be notified when ALL complete\.$/.test(line.trim()),
-    )
-}
-
-function isBackgroundTaskProgressHeader(line: string): boolean {
-  return (
-    line === "[BACKGROUND TASK RESULT READY]" ||
-    line === "[BACKGROUND TASK CANCELLED]" ||
-    line === "[BACKGROUND TASK INTERRUPTED]" ||
-    line === "[BACKGROUND TASK ERROR]"
+    line === "[BACKGROUND TASK INTERRUPTED]"
   )
 }
 
