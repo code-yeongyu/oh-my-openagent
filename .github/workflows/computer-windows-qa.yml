@@ -4,7 +4,10 @@ name: Computer Windows QA
 # interactive desktop first (interactive-desktop-smoke.ps1), then runs ONLY the Windows backend's
 # live (#[ignore]d) tests - computer-engine.yml already runs its other tests on Windows - and the
 # live driver's scenarios against the release engine;
-# every scenario's JSON line is kept as the run's evidence artifact. The session0 job runs the one
+# every scenario's JSON line is kept as the run's evidence artifact. The interactive job also films
+# its own desktop session (a pinned ffmpeg, sha256-checked) around the scenario steps and runs the
+# driver's --all, green only when its SET line reads pass >= 1 and fail=0 with every block named
+# (R70br(3)); the video is uploaded with the evidence. The session0 job runs the one
 # Session 0 scenario as SYSTEM from a one-shot scheduled task (Windows starts it in Session 0) and
 # fails unless the recorded session id is 0. The screen-locked scenario, when one exists, is the
 # last step of the interactive job.
@@ -33,6 +36,10 @@ concurrency:
 
 env:
   RUST_TARGET: x86_64-pc-windows-msvc
+  # The screen recorder: GyanD's ffmpeg 8.1 essentials build, pinned by release tag and sha256 (the
+  # hosted image carries no ffmpeg).
+  FFMPEG_URL: https://github.com/GyanD/codexffmpeg/releases/download/8.1/ffmpeg-8.1-essentials_build.zip
+  FFMPEG_SHA256: 8748283d821613d930b0e7be685aaa9df4ca6f0ad4d0c42fd02622b3623463c6
   ENGINE: target/x86_64-pc-windows-msvc/release/omo-computer-engine.exe
 
 jobs:
@@ -78,11 +85,56 @@ jobs:
         shell: bash
         run: cargo build -p omo-computer-engine --release --target "${RUST_TARGET}" --locked
 
+      - name: Fetch the screen recorder (pinned, sha256-checked)
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $zip = Join-Path $env:RUNNER_TEMP 'ffmpeg.zip'
+          Invoke-WebRequest -Uri $env:FFMPEG_URL -OutFile $zip
+          $actual = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToLowerInvariant()
+          if ($actual -ne $env:FFMPEG_SHA256) { throw "ffmpeg sha256 $actual is not the pinned $env:FFMPEG_SHA256" }
+          Expand-Archive -Path $zip -DestinationPath (Join-Path $env:RUNNER_TEMP 'ffmpeg')
+          $exe = Get-ChildItem -Recurse -Filter ffmpeg.exe (Join-Path $env:RUNNER_TEMP 'ffmpeg') | Select-Object -First 1
+          "FFMPEG_EXE=$($exe.FullName)" >> $env:GITHUB_ENV
+
+      # Films only this runner's own desktop session. Matroska stays playable when the recorder is
+      # stopped without a clean trailer.
+      - name: Start the screen recording
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force qa-evidence | Out-Null
+          $video = Join-Path $PWD 'qa-evidence\windows-qa-screen.mkv'
+          $log = Join-Path $env:RUNNER_TEMP 'ffmpeg-record.log'
+          $p = Start-Process -FilePath $env:FFMPEG_EXE -ArgumentList @('-hide_banner', '-loglevel', 'warning', '-f', 'gdigrab', '-framerate', '10', '-i', 'desktop', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-y', $video) -RedirectStandardError $log -PassThru -WindowStyle Hidden
+          Start-Sleep -Seconds 3
+          if ($p.HasExited) { Get-Content $log; throw "the recorder exited at start (code $($p.ExitCode))" }
+          "RECORDER_PID=$($p.Id)" >> $env:GITHUB_ENV
+
       - name: Scenario capture-marker-pixels
         shell: bash
         run: |
           set -euo pipefail
           bun script/qa/computer/windows.ts --scenario capture-marker-pixels --engine "${ENGINE}" --json | tee qa-evidence/capture-marker-pixels.jsonl
+
+      # Every registered scenario; a scenario its own precondition refuses here prints BLOCKED with
+      # the reason. Green only with pass >= 1, fail=0 and every block named and counted (R70br(3)).
+      - name: All scenarios (--all) and their gate
+        shell: bash
+        run: |
+          set -uo pipefail
+          bun script/qa/computer/windows.ts --all --engine "${ENGINE}" 2>&1 | tee qa-evidence/windows-all.txt
+          bun script/qa/computer/windows-set-gate.ts qa-evidence/windows-all.txt
+
+      - name: Stop the screen recording
+        if: always()
+        shell: powershell
+        run: |
+          if ($env:RECORDER_PID) {
+            Stop-Process -Id $env:RECORDER_PID -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 2
+            Get-Item qa-evidence\windows-qa-screen.mkv -ErrorAction SilentlyContinue | Format-List Name, Length
+          }
 
       - name: Keep the engine for the Session 0 job
         uses: actions/upload-artifact@v7

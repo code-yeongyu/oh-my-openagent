@@ -50,6 +50,8 @@
         "script/qa/computer/windows.ts",
         "script/qa/computer/windows/capture-marker-pixels.ts",
         "script/qa/computer/windows/capture-session0-refused.ts",
+        // run by path by computer-windows-qa.yml as the gate over the driver's --all output (R70br(3))
+        "script/qa/computer/windows-set-gate.ts",
         // run by path as the live GNOME Wayland window-input QA (docs/guide/computer-use.md)
         "script/qa/desktop/gnome.ts",
         "script/qa/desktop/hyprland.ts",
