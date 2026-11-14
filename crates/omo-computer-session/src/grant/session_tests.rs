@@ -467,3 +467,40 @@ fn a_is_62_an_unreadable_chord_arms_nothing() {
         assert!(!status.global_live, "{carried:?}: nothing armed: {status:?}");
     }
 }
+
+fn rearm_session(first: &str) -> (Session, omo_computer_backend_fake::FakeConsentHandle) {
+    let backend = FakeBackend::with_parts(scenario(&json!({ "consent": { "stopHotkey": first } })), FakeClock::default(), RecordingSink::default())
+        .with_stop_path(StopPathScript::Live);
+    let handle = backend.consent_handle();
+    let mut s = Session::new(Box::new(backend));
+    s.open(params(json!({ "reportMode": "null" }))).expect("open");
+    s.stop_path_start_checked(params(json!({}))).expect("armed");
+    (s, handle)
+}
+
+/// R70av: the configured chord is remembered at stopPath.start; when the fingerprinted stop key
+/// changes, the listener is re-armed before the next exec is admitted.
+#[test]
+fn a_is_62_a_changed_stop_key_rearms_before_the_next_exec() {
+    let (mut s, handle) = rearm_session("ctrl+alt+shift+f12");
+    assert_eq!(s.funnel.control.armed_chord.as_deref(), Some("ctrl+alt+shift+f12"));
+    handle.set(json!({ "stopHotkey": "ctrl+alt+shift+f11" }));
+    s.open(params(json!({ "reportMode": "null" }))).expect("re-open");
+    capture(&mut s, "1");
+    s.click(params(json!({ "target": "1", "x": 5, "y": 5 }))).expect("admitted after the re-arm");
+    assert_eq!(s.funnel.control.armed_chord.as_deref(), Some("ctrl+alt+shift+f11"), "re-armed on the new chord");
+    assert!(s.stop_path_status().global_live);
+}
+
+/// R70av: a new chord that cannot be read or parsed reads deaf at once (never stale): the next
+/// exec is refused StopPathUnavailable{deaf} before any mutate.
+#[test]
+fn a_is_62_an_unparseable_new_stop_key_reads_deaf_at_once() {
+    let (mut s, handle) = rearm_session("ctrl+alt+shift+f12");
+    handle.set(json!({ "stopHotkey": "ctrl+" }));
+    s.open(params(json!({ "reportMode": "null" }))).expect("re-open");
+    capture(&mut s, "1");
+    let refused = s.click(params(json!({ "target": "1", "x": 5, "y": 5 }))).expect_err("deaf");
+    assert_eq!((refused.refusal.code.wire(), refused.refusal.reason), ("StopPathUnavailable", Some("deaf")));
+    assert!(!s.stop_path_status().global_live, "never read live or stale");
+}

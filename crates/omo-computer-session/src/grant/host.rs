@@ -123,6 +123,7 @@ impl Session {
     /// A stop the gate's listener poll latched (the hotkey path, never through `stop_control`):
     /// a lease taken under an earlier stop epoch ends through [`Self::end_lease`], once.
     pub(crate) fn reconcile_stop(&mut self) {
+        self.rearm_on_changed_chord();
         let backend = &mut self.backend;
         self.guard.observe(&mut || backend.stop_listener(), &mut omo_computer_safety::NoHolds);
         let epoch = self.guard.supervisor().stop_epoch();
@@ -236,20 +237,56 @@ impl Session {
     /// A-IS-62 rev 5: a chord carried by `session.open{settings}` or `stopPath.start` is compared
     /// with the configured one through the one parser; a differing or unparseable chord refuses the
     /// call (one audit line naming both chords) and leaves the hand tampered (R70an C).
+    /// The configured chord as armed: its parsed spelling, or `None` when it cannot be armed.
+    fn configured_chord(&self) -> Option<String> {
+        match self.funnel.control.consent.view().stop_chord(backend_os(self.backend.as_ref())) {
+            crate::consent::StopChord::Chord(chord) => Some(chord),
+            crate::consent::StopChord::Unparseable(_) | crate::consent::StopChord::Unreadable => None,
+        }
+    }
+
+    /// Arms the configured chord (R70av), or a deaf listener when it cannot be read or parsed: the
+    /// stop path then reads deaf at once, never live or stale.
+    pub(crate) fn arm_configured_chord(&mut self) -> omo_computer_core::results::StopPathStatus {
+        if let Some(chord) = self.configured_chord() {
+            self.funnel.control.armed_chord = Some(chord);
+            return self.guard.start_on(self.backend.as_mut());
+        }
+        self.funnel.control.armed_chord = Some(String::new());
+        self.guard.start(
+            Err(Refusal::new(
+                omo_computer_core::error::EngineCode::StopPathUnavailable,
+                omo_computer_core::error::Reason::Deaf.wire(),
+            )),
+            None,
+        )
+    }
+
+    /// R70av: before an exec is admitted, a stop key changed since it was armed re-arms the listener.
+    fn rearm_on_changed_chord(&mut self) {
+        let Some(armed) = self.funnel.control.armed_chord.clone() else {
+            return;
+        };
+        if self.configured_chord().unwrap_or_default() != armed {
+            self.arm_configured_chord();
+        }
+    }
+
     /// R70as(3): where the engine cannot read the configured chord nothing is compared or armed;
     /// the call is refused (the deaf chord-unarmable reading is row 50's or the LEAD's).
     ///
     /// # Errors
     /// `ControlRequired{tampered}` when the view did not carry stopHotkey.
-    pub(crate) fn refuse_unreadable_chord(&self) -> Result<(), Refusal> {
-        let os = backend_os(self.backend.as_ref());
-        match self.funnel.control.consent.view().stop_chord(os) {
-            crate::consent::StopChord::Unreadable => Err(Refusal::new(
-                omo_computer_core::error::EngineCode::ControlRequired,
-                omo_computer_core::error::Reason::Tampered.wire(),
-            )),
-            _ => Ok(()),
+    pub(crate) fn refuse_unreadable_chord(&mut self) -> Result<(), Refusal> {
+        if self.configured_chord().is_some() {
+            return Ok(());
         }
+        // R70au(3): the listener arms no chord and reads deaf; the call answers StopPathUnavailable{deaf}.
+        self.arm_configured_chord();
+        Err(Refusal::new(
+            omo_computer_core::error::EngineCode::StopPathUnavailable,
+            omo_computer_core::error::Reason::Deaf.wire(),
+        ))
     }
 
     pub(crate) fn refuse_carried_chord(&mut self, stop_hotkey: Option<&str>) -> Result<(), Refusal> {

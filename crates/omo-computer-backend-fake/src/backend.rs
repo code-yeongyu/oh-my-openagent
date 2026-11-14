@@ -134,3 +134,25 @@ impl FakeBackend {
         result
     }
 }
+
+// --- Row 21 (R70at(5)): test support, additive. A handle that changes the consent view the fake
+// hands the engine mid-session; no scenario's behaviour changes unless a test uses it. ---
+
+/// Changes the fake host's handed consent view (`scenario.consent`) from a test.
+#[derive(Debug, Clone)]
+pub struct FakeConsentHandle(Arc<Mutex<FakeState>>);
+
+impl FakeConsentHandle {
+    /// The view the next `session.open` reads.
+    pub fn set(&self, view: serde_json::Value) {
+        self.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner).scenario.consent = Some(view);
+    }
+}
+
+impl FakeBackend {
+    /// A handle on this fake's handed consent view (test support, R70at(5)).
+    #[must_use]
+    pub fn consent_handle(&self) -> FakeConsentHandle {
+        FakeConsentHandle(Arc::clone(&self.shared))
+    }
+}

@@ -42,6 +42,8 @@ pub struct Control {
     pub(crate) lease_hook: Box<dyn LeaseHook>,
     /// A-IS-62 rev 5 (R70an C): the hand reads tampered after a refused chord.
     pub(crate) chord_tamper: ChordTamper,
+    /// The stop chord armed at stopPath.start (R70av); `None` before the first arm.
+    pub(crate) armed_chord: Option<String>,
 }
 
 /// The tampered mark a refused stop chord leaves on the hand (A-IS-62 rev 5, R70an C, R70as(2)).
@@ -89,6 +91,7 @@ impl Default for Control {
             clock: wall_clock(),
             lease_hook: Box::new(NoLeaseHook),
             chord_tamper: ChordTamper::default(),
+            armed_chord: None,
         }
     }
 }
