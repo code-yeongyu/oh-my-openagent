@@ -56,7 +56,11 @@ export async function recordThreadCreator(
 }
 
 function output(result: ExtensionCallResult): ExtensionToolOutput {
-  return { content: [{ type: "text", text: JSON.stringify(result) }], details: { result } }
+  return {
+    content: [{ type: "text", text: JSON.stringify(result) }],
+    details: { result },
+    ...(result.kind === "ok" ? {} : { isError: true }),
+  }
 }
 
 function extensionTool(options: ThreadToolSurfaceOptions, op: DeclaredSessionOp): AnyTool {
