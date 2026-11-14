@@ -58,6 +58,7 @@ export function getParentWakeSessionHistoryDeferralDecision(input: {
   readonly messages: readonly ParentWakeSessionMessage[] | undefined
   readonly wake: PendingParentWake
   readonly toolCallDeferMaxMs: number
+  readonly staleToolBlockMaxHoldMs?: number
   readonly now?: number
 }): ToolWaitDeferralDecision {
   if (!input.messages) {
@@ -111,6 +112,19 @@ export function getParentWakeSessionHistoryDeferralDecision(input: {
     // still mid-flight, only its busy signals are quiet (silent tool, blind
     // instance-scoped status). Defer so the wake is admitted as noReply at most
     // and resumed by the idle/consumption machinery (ses_14a3ab27bffe incident).
+    //
+    // The hold is only safe while the turn can still make progress. A turn whose
+    // tool parts will never resolve (zombie "running" tool left behind by an
+    // aborted stream) blocks every future wake forever, so after the hold
+    // ceiling the wake is force-delivered; `toolCallDeferralStartedAt` stays set
+    // so the pre-dispatch confirmation re-check reaches the same decision.
+    if (
+      input.staleToolBlockMaxHoldMs !== undefined
+      && now - input.wake.toolCallDeferralStartedAt >= Math.max(input.staleToolBlockMaxHoldMs, input.toolCallDeferMaxMs)
+    ) {
+      log("[background-agent] Sending parent wake after stale tool-call hold ceiling:", { sessionID: input.sessionID })
+      return { defer: false, skipPromptGateToolStateCheck: true }
+    }
     log("[background-agent] Holding parent wake during stale tool-call deferral:", { sessionID: input.sessionID })
     return { defer: true, skipPromptGateToolStateCheck: true }
   }

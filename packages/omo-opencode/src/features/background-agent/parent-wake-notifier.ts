@@ -48,6 +48,7 @@ export class ParentWakeNotifier {
       directory: deps.directory,
       acceptedMessageSkewMs: options.acceptedMessageSkewMs,
       toolCallDeferMaxMs: options.toolCallDeferMaxMs,
+      staleToolBlockMaxHoldMs: options.staleToolBlockMaxHoldMs,
       userMessageInProgressWindowMs: options.userMessageInProgressWindowMs,
       parentSessionActivityInProgressWindowMs: options.parentSessionActivityInProgressWindowMs,
     })
