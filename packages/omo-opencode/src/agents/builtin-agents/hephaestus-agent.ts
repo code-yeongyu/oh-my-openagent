@@ -67,7 +67,7 @@ export function maybeCreateHephaestusConfig(input: {
   })
 
   if (isFirstRunNoCache && !hephaestusOverride?.model) {
-    hephaestusResolution = getFirstFallbackModel(hephaestusRequirement)
+    hephaestusResolution = getFirstFallbackModel(hephaestusRequirement, availableModels)
   }
 
   if (!hephaestusResolution) {
