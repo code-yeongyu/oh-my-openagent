@@ -176,7 +176,7 @@ async function main(): Promise<number> {
   const appKey = values["app-key"]
   if (name === undefined || appKey === undefined || positionals.length === 0) {
     console.error(
-      "usage: self-test.ts --fixture <name> --app-key <key> [--sabotage <field>] [--a11y <probe command with {pid}>] -- <fixture command...>",
+      "usage: self-test.ts --fixture <name> --app-key <key> [--sabotage <field|a11y>] [--a11y <probe command with {pid}>] -- <fixture command...>",
     )
     return 2
   }
