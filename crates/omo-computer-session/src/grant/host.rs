@@ -228,7 +228,24 @@ impl Session {
     pub(crate) fn open_control(&mut self, session_id: &str, stop_hotkey: Option<&str>) -> Result<(), Refusal> {
         self.funnel.set_session_id(session_id.to_owned());
         self.open_consent()?;
-        check_stop_hotkey(self.funnel.control.consent.view(), stop_hotkey)?;
+        if let Err(refusal) = check_stop_hotkey(self.funnel.control.consent.view(), stop_hotkey) {
+            // One audit line for the refused call; the file is intact, so the view is NOT marked
+            // tampered (R70aj). The peer's pid and executable are owed by row 29's peer check.
+            let _ = self.funnel.audit().append(crate::audit::AuditEvent {
+                action: "session.open".to_owned(),
+                target: "stop_hotkey".to_owned(),
+                gate: crate::audit::Gate {
+                    outcome: crate::audit::GateOutcome::Refused,
+                    stage: Some("Consent".to_owned()),
+                    code: Some(refusal.code.wire().to_owned()),
+                    reason: refusal.reason.map(str::to_owned),
+                },
+                status: crate::audit::Status::Refused,
+                primary_error: Some(refusal.code.wire().to_owned()),
+                ..crate::audit::AuditEvent::default()
+            });
+            return Err(refusal);
+        }
         self.mint_token(session_id)
     }
 
@@ -251,8 +268,10 @@ impl Session {
 /// `session.open{settings}` that differs from it is refused before anything is armed.
 ///
 /// # Errors
-/// `ControlRequired{permission_changed}` when `requested` is not the file's chord (an unparseable
-/// file chord equals nothing, so any requested chord differs).
+/// The pin's `ControlRequired{permission_changed, tampered}` (d-sdk-skill.md:516, d-safety.md:335),
+/// encoded as the tampered-file refusal is today: `ControlRequired{reason:"tampered"}` (R70aj; the
+/// `permission_changed` marker rides the wire with row 27's data member). An unparseable file chord
+/// equals nothing, so any requested chord differs.
 fn check_stop_hotkey(view: &ConsentView, requested: Option<&str>) -> Result<(), Refusal> {
     let Some(requested) = requested else {
         return Ok(());
@@ -266,7 +285,7 @@ fn check_stop_hotkey(view: &ConsentView, requested: Option<&str>) -> Result<(), 
     } else {
         Err(Refusal::new(
             omo_computer_core::error::EngineCode::ControlRequired,
-            omo_computer_core::error::Reason::PermissionChanged.wire(),
+            omo_computer_core::error::Reason::Tampered.wire(),
         ))
     }
 }

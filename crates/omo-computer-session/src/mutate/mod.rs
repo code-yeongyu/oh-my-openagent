@@ -160,7 +160,7 @@ impl Funnel {
     }
 
     /// The audit sink, opened at first use; a file that cannot be opened refuses every exec.
-    fn audit(&mut self) -> &mut dyn AuditSink {
+    pub(crate) fn audit(&mut self) -> &mut dyn AuditSink {
         let sink = match self.audit.take() {
             Some(sink) => sink,
             None => self.open_audit(),

@@ -253,7 +253,9 @@ fn open_session_with(
     }
     let backend = FakeBackend::with_parts(scenario(&json!({ "consent": consent })), FakeClock::default(), RecordingSink::default())
         .with_stop_path(StopPathScript::Live);
-    let mut s = Session::new(Box::new(backend));
+    let dir = tempfile::tempdir().expect("tempdir");
+    let mut s = Session::for_roots(Box::new(backend), &Roots { state: dir.path().join("s"), runtime: dir.path().join("run") });
+    std::mem::forget(dir);
     let mut open = json!({ "reportMode": "null" });
     if let Some(chord) = settings_hotkey {
         open["settings"] = json!({ "stop_hotkey": chord });
@@ -268,9 +270,16 @@ fn open_session_with(
 #[test]
 fn a_is_62_open_stop_hotkey_must_equal_the_consent_file() {
     let refused = open_with(Some("ctrl+alt+shift+f12"), Some("ctrl+alt+shift+escape")).expect_err("differs");
-    assert_eq!((refused.code.wire(), refused.reason), ("ControlRequired", Some("permission_changed")));
-    let (s, refused) = open_session_with(Some("ctrl+alt+shift+f12"), Some("ctrl+alt+shift+escape"));
+    // R70aj: the tampered class, encoded as the tampered-file refusal (the file is intact).
+    assert_eq!((refused.code.wire(), refused.reason), ("ControlRequired", Some("tampered")));
+    let (mut s, refused) = open_session_with(Some("ctrl+alt+shift+f12"), Some("ctrl+alt+shift+escape"));
     assert!(refused.is_err());
+    assert!(!s.funnel.control.consent.view().tampered, "the view is not marked tampered");
+    let path = crate::audit::AuditSink::path(s.funnel.audit()).map(std::path::Path::to_path_buf).expect("an audit file");
+    let audit = std::fs::read_to_string(path).expect("audit");
+    let lines: Vec<&str> = audit.lines().filter(|l| l.contains("\"stop_hotkey\"")).collect();
+    assert_eq!(lines.len(), 1, "one audit line for the refused call: {audit}");
+    assert!(lines[0].contains("\"tampered\""), "{}", lines[0]);
     let status = s.stop_path_status();
     assert!(!status.global_live && !status.host_relay_live, "nothing armed: {status:?}");
     assert!(open_with(Some("ctrl+alt+shift+f12"), Some("ctrl+alt+shift+f12")).is_ok(), "equal");
