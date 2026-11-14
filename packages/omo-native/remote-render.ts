@@ -1,5 +1,6 @@
 import type {
   ControlAttachState,
+  ControlSessionWakeState,
   DeviceRow,
   ListingResult,
   Status,
@@ -144,6 +145,22 @@ export function sendWaitNotice(label: string, result: ThreadToolResult): string 
   if (result.kind !== "ok" || !("delivery" in result)) return null
   const { delivery } = result
   return delivery.kind === "queued" || delivery.kind === "queued_offline" ? queuedLine(label, delivery) : null
+}
+
+export function wakeLines(state: ControlSessionWakeState): string[] {
+  const line = state.enabled
+    ? "Waking is on: sessions on this device that are not running may be started by a message from your other signed-in devices."
+    : "Waking is off: a message from another device waits until this session is opened here."
+  const source =
+    state.stored === null
+      ? "Nothing is stored for this device, so it follows this build's default."
+      : state.stored === "unreadable"
+        ? "The stored value could not be read; set it again to repair it."
+        : `Stored on this device: ${state.stored ? "on" : "off"}.`
+  const lines = [line, source]
+  if (state.overridden)
+    lines.push("This run of the device service cannot wake sessions for other devices whatever the switch says.")
+  return lines
 }
 
 export function controlLines(state: ControlAttachState, now: number): string[] {

@@ -7,6 +7,7 @@ import type { ListingResult, ListingRevision } from "./local-api/client-assembly
 import type {
   Capability,
   ControlAttachState,
+  ControlSessionWakeState,
   DeviceRef,
   DeviceRow,
   SessionFilter,
@@ -111,6 +112,7 @@ export type {
   CommandRpc,
   CommandStateEvent,
   ControlAttachState,
+  ControlSessionWakeState,
   DetachReason,
   DeviceRef,
   DeviceRow,
@@ -148,6 +150,8 @@ export type DeviceService = {
   readonly serviceVersion: string
   /** omo#13037: this service carries the wake mark and the `wake` target (WAKE_MARK_MIN_SERVICE_VERSION). */
   readonly carriesWakeMark: boolean
+  /** The service version the mark (and the wake switch) needs on this build; null while this build carries neither. */
+  readonly wakeMarkMinimum: string | null
   /** omo#13037: this service takes `session.locate {single: true}` (LOCATE_SINGLE_MIN_SERVICE_VERSION). */
   readonly takesSingleLocate: boolean
   /** What the service advertised in its welcome; `control` means it has the host attach setting. */
@@ -161,6 +165,9 @@ export type DeviceService = {
   /** Whether this account's other devices may view and command this device's sessions (the per-device opt-out). */
   readonly attachControl: () => Promise<ControlAttachState>
   readonly setAttachControl: (attached: boolean) => Promise<ControlAttachState>
+  /** omo#13037 A7.2.5: the wake switch, read and set through the owner's own local API (never a capability word). */
+  readonly sessionWake: () => Promise<ControlSessionWakeState>
+  readonly setSessionWake: (enabled: boolean | null) => Promise<ControlSessionWakeState>
   /** The binary the service runs to refresh its access token (absolute path) and that binary's version. */
   readonly registerRefresher: (binaryPath: string, version: string) => Promise<void>
   /** Hands the signed-in device and its keys (base64 PKCS#8 DER) to the service; never logged or echoed. */
@@ -271,10 +278,8 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
     client: { name: "omo", version: options.version },
     ...(options.background === true ? { transport: () => connectLocal(stateDir, { background: true }) } : {}),
   })
-  const carriesWakeMark = serviceAtLeast(
-    client.welcome.service_version,
-    options.minimums?.wakeMark ?? WAKE_MARK_MIN_SERVICE_VERSION,
-  )
+  const wakeMarkMinimum = options.minimums === undefined ? WAKE_MARK_MIN_SERVICE_VERSION : options.minimums.wakeMark
+  const carriesWakeMark = serviceAtLeast(client.welcome.service_version, wakeMarkMinimum)
   const takesSingleLocate = serviceAtLeast(
     client.welcome.service_version,
     options.minimums?.singleLocate ?? LOCATE_SINGLE_MIN_SERVICE_VERSION,
@@ -282,6 +287,7 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
   return {
     serviceVersion: client.welcome.service_version,
     carriesWakeMark,
+    wakeMarkMinimum,
     takesSingleLocate,
     capabilities: client.welcome.capabilities,
     initialStatus: client.welcome.state,
@@ -299,6 +305,8 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
       return stop
     },
     setEnabled: async (enabled) => (await client.request("service.set_enabled", { enabled })).enabled,
+    sessionWake: () => client.request("control.session_wake.get", {}),
+    setSessionWake: (enabled) => client.request("control.session_wake.set", { enabled }),
     attachControl: () => client.request("control.attach.get", {}),
     setAttachControl: (attached) => client.request("control.attach.set", { attached }),
     registerRefresher: async (binaryPath, version) => {

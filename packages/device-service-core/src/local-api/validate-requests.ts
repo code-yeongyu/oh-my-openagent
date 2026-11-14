@@ -77,6 +77,15 @@ const VALIDATORS: RequestValidators<RequestType> = {
     bare(v)
     return { id, type: "status.subscribe" }
   },
+  "control.session_wake.get": (v, id) => {
+    bare(v)
+    return { id, type: "control.session_wake.get" }
+  },
+  "control.session_wake.set": (v, id) => {
+    const value = requestFields(v, ["enabled"])["enabled"]
+    const enabled = value === null || typeof value === "boolean" ? value : fail("enabled")
+    return { id, type: "control.session_wake.set", enabled }
+  },
   "control.attach.get": (v, id) => {
     bare(v)
     return { id, type: "control.attach.get" }

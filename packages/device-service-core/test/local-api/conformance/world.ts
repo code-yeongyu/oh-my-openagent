@@ -37,6 +37,8 @@ export type WorldRevision = {
 }
 export type World = {
   readonly service_version: string
+  // omo#13037 A7.2.1: this run of the service cannot list the wake feature whatever the switch says.
+  readonly wake_overridden?: boolean
   readonly status: Status
   readonly devices: readonly DeviceRow[]
   readonly listing: {
