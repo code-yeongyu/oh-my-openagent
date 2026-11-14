@@ -19,12 +19,12 @@ import {
   parseReply,
   refusalGuidance,
   refusalMessage,
-  requestApi,
   RequestFailure,
   serviceOrigin,
   SignInError,
   tokenSchema,
 } from "./protocol"
+import { requestApi } from "./protocol-request"
 import {
   clearSignedOutMarker,
   readSignedOutMarker,

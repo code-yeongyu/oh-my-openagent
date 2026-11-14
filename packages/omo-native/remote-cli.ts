@@ -16,7 +16,8 @@ import { serveRemoteAttach } from "./remote-attach"
 import { type BootstrapSetup, runBootstrapVerb } from "./remote-bootstrap"
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
 import { controlLines, deviceLines, sessionLines, statusLines } from "./remote-render"
-import { isSessionVerb, parseSession, SESSION_VERBS, type SessionArgs } from "./remote-session-args"
+import { isSessionVerb, parseSession, type SessionArgs } from "./remote-session-args"
+import { VERBS } from "./remote-verbs"
 import { runSession } from "./remote-session-verbs"
 
 // `omo remote`: the sessions on this account's other devices, through this device's service. A thin CLI over the
@@ -70,7 +71,6 @@ export interface RemoteVerbDependencies extends RemoteCommandDependencies {
   readonly bootstrap: BootstrapSetup
 }
 
-const VERBS = ["status", "devices", "sessions", "enable", "disable", "control", "bootstrap", ...SESSION_VERBS] as const
 const CONTROL_VALUES = ["on", "off"] as const
 type ControlValue = (typeof CONTROL_VALUES)[number]
 const isControlValue = (value: string | undefined): value is ControlValue => CONTROL_VALUES.some((v) => v === value)

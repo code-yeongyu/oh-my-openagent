@@ -1,6 +1,7 @@
 import { expect, onTestFinished, spyOn, test } from "bun:test"
 import { inspect } from "node:util"
-import { ApiRefusal, jsonRequest, refusalGuidance, requestApi, serviceOrigin } from "./protocol"
+import { ApiRefusal, jsonRequest, refusalGuidance, serviceOrigin } from "./protocol"
+import { requestApi } from "./protocol-request"
 import { createSession } from "./session"
 import { fakeApi, grant, limitDetail, memorySecrets, minted, privateKeys, temporaryHome } from "./test-support"
 

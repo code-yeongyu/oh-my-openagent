@@ -756,6 +756,7 @@
     "packages/omo-opencode/src/cli/service-auth/keychain-helper/signature.ts",
     "packages/omo-opencode/src/cli/service-auth/keychain-helper/store-binding.ts",
     "packages/omo-opencode/src/cli/service-auth/keystore.ts",
+    "packages/omo-opencode/src/cli/service-auth/protocol-request.ts",
     "packages/omo-opencode/src/cli/service-auth/protocol.ts",
     "packages/omo-opencode/src/cli/service-auth/secret-service-lock.ts",
     "packages/omo-opencode/src/cli/service-auth/session.ts",

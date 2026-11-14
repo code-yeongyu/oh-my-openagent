@@ -5,7 +5,7 @@ import {
   type CommandResult,
   type DeviceService,
   type RemoteAttach,
-} from "@oh-my-opencode/device-service-core"
+} from "@oh-my-opencode/device-service-core/device-service"
 import type { JsonObject, RemoteCommandOutcome, RemoteSessionsPort } from "./ports"
 
 export type DeviceServiceSessionsOptions = {
