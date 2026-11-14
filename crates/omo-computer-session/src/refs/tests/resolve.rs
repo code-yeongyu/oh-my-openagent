@@ -173,3 +173,25 @@ fn an_act_after_ambiguous_target_waits_for_a_new_observe() {
     snap(&mut tree, &mut refs, "w");
     assert_eq!(refs.exec_gate("w"), Ok(()), "a new full observation lifts it");
 }
+
+/// Review M1 of #13368 (at d8305695c6): the candidates' sub-generation is minted under the
+/// stored window key, so an ambiguous resolve after a relaunch does not rebind the key, and the
+/// next observation still expires the old process's tokens (IdentityChanged).
+#[test]
+fn an_ambiguous_resolve_after_a_relaunch_does_not_rebind_the_window_key() {
+    let twins = vec![el("button", "Send").obj(20).at(5.0, 0.0), el("button", "Send").obj(21).at(9.0, 0.0)];
+    let mut tree = Tree::default().window("w", 1, vec![window(vec![el("button", "Send").at(0.0, 0.0)]), window(twins)]);
+    let mut refs = RefRegistry::default();
+    let g1 = snap(&mut tree, &mut refs, "w");
+    let token = format!("s{g1}:e{}", n_of(&refs, "w", g1, "Send"));
+    tree.show("w", 1);
+    tree.relaunch("w", 99);
+    let ambiguous = refs.resolve(&token, true, &mut tree).expect_err("two live twins");
+    assert_eq!(ambiguous.refusal, Refusal::bare(EngineCode::AmbiguousTarget));
+    snap(&mut tree, &mut refs, "w");
+    assert_eq!(
+        refs.resolve(&token, true, &mut tree).map_err(|u| u.refusal),
+        Err(refusal(EngineCode::StaleRef, Reason::IdentityChanged)),
+        "the old process's token expired at the next observation"
+    );
+}
