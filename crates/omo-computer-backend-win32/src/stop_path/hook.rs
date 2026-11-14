@@ -25,7 +25,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 
 use super::{
-    is_chord, liveness, normalize_vk, HookEvent, HotkeyVerdict, Liveness, Origin, PhysicalChord,
+    is_chord, key_held, liveness, HookEvent, HotkeyVerdict, Liveness, Origin, PhysicalChord,
     Sightings, StopCursor, VK_ESCAPE,
 };
 
@@ -44,7 +44,7 @@ struct Shared {
     running: AtomicBool,
     hook_ok: AtomicBool,
     hotkey_ok: AtomicBool,
-    /// One bit per virtual key the user holds physically (generic modifier codes).
+    /// One bit per virtual key the user holds physically (left/right codes as reported).
     held: [AtomicU64; 4],
     /// One bit per virtual key an injector holds down (ours or another's).
     injected_held: [AtomicU64; 4],
@@ -106,14 +106,16 @@ unsafe extern "system" fn keyboard(code: i32, wparam: WPARAM, lparam: LPARAM) ->
             time: u64::from(info.time),
         };
         let origin = event.origin();
-        // Left/right modifier codes are folded to the generic ones (review H1 of #13350).
+        // Left/right codes are kept apart and the chord reads them through `key_held`, so a
+        // left or right modifier counts (review H1 of #13350) and releasing one of two held sides
+        // leaves the generic key held (review L1 of the delta).
         let set = if origin == Origin::Physical {
             &SHARED.held
         } else {
             &SHARED.injected_held
         };
-        set_bit(set, normalize_vk(event.vk), event.down);
-        let chord = is_chord(&event, |vk| bit(set, vk));
+        set_bit(set, event.vk, event.down);
+        let chord = is_chord(&event, |vk| key_held(vk, |raw| bit(set, raw)));
         if chord {
             match origin {
                 Origin::Physical => {

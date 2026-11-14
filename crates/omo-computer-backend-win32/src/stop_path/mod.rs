@@ -31,6 +31,19 @@ pub const fn normalize_vk(vk: u16) -> u16 {
     }
 }
 
+/// Whether generic `vk` is held, given the raw codes held: the generic code itself, or either of its
+/// left/right codes. The sides are tracked apart, so releasing one of two held Shifts still leaves
+/// Shift held (review L1 of the #13350 delta).
+pub fn key_held(vk: u16, raw_held: impl Fn(u16) -> bool) -> bool {
+    let sides: &[u16] = match vk {
+        VK_SHIFT => &[0xA0, 0xA1],
+        VK_CONTROL => &[0xA2, 0xA3],
+        VK_MENU => &[0xA4, 0xA5],
+        _ => &[],
+    };
+    raw_held(vk) || sides.iter().any(|side| raw_held(*side))
+}
+
 /// Whether `event` completes the stop chord, given which keys are held by the SAME origin
 /// (physical keys for a physical event, injected keys for an injected one).
 pub fn is_chord(event: &HookEvent, held: impl Fn(u16) -> bool) -> bool {
@@ -68,7 +81,8 @@ impl HookEvent {
     }
 }
 
-/// The keys the user holds physically, and the stop-chord sighting of each event.
+/// The keys the user holds physically, and the stop-chord sighting of each event. Keys are kept as
+/// the hook reports them (left and right modifier codes apart) and read through [`key_held`].
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct PhysicalChord {
     held: Vec<u16>,
@@ -80,7 +94,7 @@ impl PhysicalChord {
     /// sighting stops; an injected one is recorded for the hotkey dedupe).
     pub fn on_key(&mut self, event: &HookEvent) -> Option<Origin> {
         let origin = event.origin();
-        let vk = normalize_vk(event.vk);
+        let vk = event.vk;
         let keys = if origin == Origin::Physical {
             &mut self.held
         } else {
@@ -94,13 +108,20 @@ impl PhysicalChord {
             keys.retain(|held| *held != vk);
         }
         let keys: &[u16] = keys;
-        is_chord(event, |modifier| keys.contains(&modifier)).then_some(origin)
+        is_chord(event, |modifier| key_held(modifier, |raw| keys.contains(&raw))).then_some(origin)
     }
 
-    /// The virtual keys seen physically down and not yet up.
+    /// The virtual keys seen physically down and not yet up, as generic codes (a modifier is held
+    /// while either of its sides is).
     #[must_use]
     pub fn held(&self) -> Vec<u16> {
-        self.held.clone()
+        let mut keys = Vec::new();
+        for vk in self.held.iter().map(|vk| normalize_vk(*vk)) {
+            if !keys.contains(&vk) {
+                keys.push(vk);
+            }
+        }
+        keys
     }
 }
 
