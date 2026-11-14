@@ -50,6 +50,17 @@ describe("matchDevice", () => {
     ])
   })
 
+  test("#given an id that prefixes another device's name #when matched #then the id still names its device", () => {
+    const hit = matchDevice(
+      [
+        { device: "mac", label: "studio", online: true },
+        { device: "dev-2", label: "macbook", online: true },
+      ],
+      "mac",
+    )
+    expect(hit).toMatchObject({ kind: "ok", row: { device: "mac" } })
+  })
+
   test("#given an id that prefixes another id #when matched #then the id still names its device", () => {
     const hit = matchDevice(
       [
