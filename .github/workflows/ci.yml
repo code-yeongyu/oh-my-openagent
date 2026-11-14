@@ -675,7 +675,7 @@ jobs:
         if: needs.ci-mode.outputs.run_heavy == 'true'
         run: bun run lint:ratchet
 
-      # Unused files, exports and dependencies; pre-existing findings are scoped ignores in knip.jsonc.
+      # Unused files, exports and dependencies; pre-existing findings are scoped ignores in each directory's knip.workspace.jsonc.
       - name: Dead-code check (knip)
         if: needs.ci-mode.outputs.run_heavy == 'true'
         run: bun run knip:check
