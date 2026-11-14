@@ -9,11 +9,16 @@ use std::collections::BTreeMap;
 use omo_computer_core::diagnose::{diagnose, HostFacts};
 use omo_computer_core::methods::Method;
 use omo_computer_core::params::EmptyParams;
-use omo_computer_core::results::{ConsentAuthority, Diagnosis, IdentityMatch, IdentityReport};
+use omo_computer_core::results::{ConsentAuthority, Diagnosis, IdentityMatch, IdentityReport, ProbeCheck, ProbeState};
 use serde_json::{json, Value};
 
 use crate::grant::HostCallError;
 use crate::Session;
+
+/// A-IS-61 interim check names and wording (R70ah).
+pub const CONSENT_BINDING_CHECK: &str = "consent_binding";
+pub const CONSENT_BINDING_INTERIM: &str = "per-app allow needs re-approval; this build cannot record a binding yet";
+pub const UNBOUND_ALLOW_CHECK: &str = "unbound_allow_entries";
 
 /// The lock policy before an OS row names its own.
 pub const UNKNOWN_LOCK_POLICY: &str = "unknown";
@@ -39,7 +44,36 @@ impl Session {
             settings_urls: BTreeMap::new(),
             relaunch_required: BTreeMap::new(),
         };
-        diagnose(self.backend.as_ref(), &facts)
+        let mut diagnosis = diagnose(self.backend.as_ref(), &facts);
+        diagnosis.checks.extend(self.consent_binding_checks());
+        diagnosis
+    }
+
+    /// A-IS-61's interim (R70ah): until the rows that write a binding land, a per-app allow
+    /// needs re-approval, and the allow entries bound to nothing are counted. Never feeds `ok`.
+    fn consent_binding_checks(&self) -> [ProbeCheck; 2] {
+        let unbound = self
+            .funnel
+            .control
+            .consent
+            .view()
+            .apps
+            .allow
+            .iter()
+            .filter(|entry| entry.bound.path.is_none() && entry.bound.identity.is_none())
+            .count();
+        [
+            ProbeCheck {
+                name: CONSENT_BINDING_CHECK.to_owned(),
+                state: ProbeState::Unavailable,
+                reason: Some(CONSENT_BINDING_INTERIM.to_owned()),
+            },
+            ProbeCheck {
+                name: UNBOUND_ALLOW_CHECK.to_owned(),
+                state: if unbound == 0 { ProbeState::Ok } else { ProbeState::Unavailable },
+                reason: Some(unbound.to_string()),
+            },
+        ]
     }
 }
 
@@ -148,5 +182,28 @@ mod tests {
             }
             assert_eq!(live, script == StopPathScript::Live, "the fixture covers both states");
         }
+    }
+
+    /// A-IS-61 interim (R70ah): until the rows that write a binding land, diagnose names that a
+    /// per-app allow needs re-approval, and counts the allow entries bound to nothing.
+    #[test]
+    fn diagnose_names_the_interim_consent_binding_line_and_the_unbound_count() {
+        use super::{CONSENT_BINDING_CHECK, CONSENT_BINDING_INTERIM, UNBOUND_ALLOW_CHECK};
+        let mut scripted = FakeScenario::default();
+        scripted.consent = Some(serde_json::json!({ "apps": { "allow": [
+            { "appKey": "Notes" },
+            { "appKey": "Mail", "path": "/usr/bin/mail" }
+        ] } }));
+        let mut session = Session::new(Box::new(FakeBackend::new(scripted)));
+        session.open(serde_json::from_value(serde_json::json!({ "reportMode": "null" })).expect("params")).expect("open");
+        let wire = serde_json::to_value(session.diagnose()).expect("wire");
+        let checks = wire["checks"].as_array().expect("checks");
+        let named = |name: &str| checks.iter().find(|c| c["name"] == name).cloned();
+        assert_eq!(
+            named(CONSENT_BINDING_CHECK).map(|c| c["reason"].clone()),
+            Some(serde_json::json!(CONSENT_BINDING_INTERIM)),
+            "{wire}"
+        );
+        assert_eq!(named(UNBOUND_ALLOW_CHECK).map(|c| c["reason"].clone()), Some(serde_json::json!("1")), "{wire}");
     }
 }

@@ -107,7 +107,19 @@
               },
               "observation": {
                 "untrustedText": true
-              }
+              },
+              "checks": [
+                {
+                  "name": "consent_binding",
+                  "state": "unavailable",
+                  "reason": "per-app allow needs re-approval; this build cannot record a binding yet"
+                },
+                {
+                  "name": "unbound_allow_entries",
+                  "state": "ok",
+                  "reason": "0"
+                }
+              ]
             }
           },
           "variable": [
