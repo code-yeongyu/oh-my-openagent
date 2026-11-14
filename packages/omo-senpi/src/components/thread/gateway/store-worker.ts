@@ -3,6 +3,7 @@
  * every statement, lock wait, busy retry and inbox-marker write, so a contended store never blocks
  * the session loop that owns the store facade. Requests run strictly one at a time.
  */
+import { createHash, randomUUID } from "node:crypto"
 import { chmodSync, closeSync, existsSync, mkdirSync, openSync } from "node:fs"
 import { join } from "node:path"
 import { setTimeout as delay } from "node:timers/promises"
@@ -21,7 +22,14 @@ import { listSessionOps } from "./extension-registrations"
 import { ExtensionTransactionEndedError } from "./extension-transaction"
 import type { GatewayResolution, GatewayResolve } from "./engine"
 import type { StoreExtensionRegistration } from "./store-extensions"
-import type { GatewayStoreConfig, GatewayStoreEvent, Provenance } from "./types"
+import type {
+  GatewayStoreConfig,
+  GatewayStoreEvent,
+  IntakeOutcome,
+  IntakeRequest,
+  Provenance,
+  StoreRefusal,
+} from "./types"
 
 type WorkerRequest = { readonly type: "request"; readonly id: number; readonly op: string; readonly args: unknown }
 type WorkerControl = { readonly type: "resume"; readonly hook: string }
@@ -36,6 +44,128 @@ const port = parentPort
 if (port === null) throw new Error("the gateway store worker must run as a worker thread")
 
 const WAL_SWITCH_RETRY_MS = 10
+
+// Must match the durable id rule the enqueue applies (store-ops.ts DURABLE_ID_PATTERN).
+const INTAKE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/
+
+function refusal(
+  code: StoreRefusal["code"],
+  message: string,
+  details?: Readonly<Record<string, unknown>>,
+): StoreRefusal {
+  return { kind: "refused", code, message, ...(details === undefined ? {} : { details }) }
+}
+
+function argsHash(value: unknown): string {
+  return createHash("sha256").update(JSON.stringify(value)).digest("hex")
+}
+
+/**
+ * Takes in a record another device's service attested, for a session on this device that is not running (#13037, design
+ * 5.5). Every refusal here happens before the commit; an accepted record is the enqueue transaction's row, receipt, budgets
+ * and inbox marker in one commit, its receipt completed with the answer so a repeat from the same device replays it.
+ */
+async function intake(ctx: ops.StoreContext, request: IntakeRequest): Promise<IntakeOutcome> {
+  const record = request.record
+  const device = request.attested_device
+  if (
+    !INTAKE_ID_PATTERN.test(device) ||
+    !INTAKE_ID_PATTERN.test(record.deliveryId) ||
+    !INTAKE_ID_PATTERN.test(record.sessionId) ||
+    typeof record.text !== "string" ||
+    typeof record.displayText !== "string" ||
+    !Number.isSafeInteger(record.chainCount) ||
+    record.chainCount < 1
+  ) {
+    return refusal("invalid_arguments", "The intake record is malformed.")
+  }
+  const senderSession = record.sender.kind === "agent" ? record.sender.session_id : undefined
+  if (senderSession === undefined || !INTAKE_ID_PATTERN.test(senderSession)) {
+    return refusal("unsupported", "Only an agent sender can reach a session that is not running.", {
+      reason: "sender_not_allowed",
+    })
+  }
+  if (record.deliverAs !== "followUp") {
+    return refusal("turn_conflict", "A session that is not running has no turn to steer.", {
+      target: record.sessionId,
+    })
+  }
+  if (request.target_session_kind !== "interactive") {
+    return refusal("not_resumable", "A child or worker session is not started for a delivery.", {
+      reason: "not_wakeable",
+    })
+  }
+  if (request.chain_count_limit !== undefined && record.chainCount > request.chain_count_limit) {
+    return refusal("unsupported", "The delivery's chain is over this machine's chain limit.", {
+      reason: "chain_count_limit",
+      chain_count: record.chainCount,
+      limit: request.chain_count_limit,
+    })
+  }
+  const ledgerId = `device:${device}/${record.deliveryId}`
+  // The receipt is keyed by the attested device alone, like the ledger id: the session a record claims cannot turn a
+  // repeated delivery id into a second delivery.
+  const principal = `device:${device}`
+  const name = record.sender.name?.trim()
+  const outcome = await ops.enqueue(
+    ctx,
+    {
+      provenance: { ...request.provenance, device },
+      now: request.now,
+      delivery_id: randomUUID(),
+      target_durable_id: record.sessionId,
+      sender_principal: principal,
+      rate_principal: `device:${device}`,
+      sender_node: `${principal}#session:${senderSession}`,
+      sender_turn: null,
+      cause_delivery_id: null,
+      inbound_hop: record.chainCount - 1,
+      claimed_root_id: null,
+      origin: { session: senderSession },
+      actor: name === undefined || name === "" ? senderSession : name,
+      body: record.text,
+      mode: "follow_up",
+      expected_turn_id: null,
+      binding: null,
+      receipt: {
+        idempotency_key: record.deliveryId,
+        args_hash: argsHash({
+          target: record.sessionId,
+          text: record.text,
+          display_text: record.displayText,
+          deliver_as: record.deliverAs,
+          chain_count: record.chainCount,
+        }),
+      },
+      endpoint_kind: null,
+    },
+    {
+      ledger_id: ledgerId,
+      verbatim_text: record.text,
+      verbatim_display_text: record.displayText,
+      answer: (row, position) => ({
+        kind: "queued",
+        delivery_id: record.deliveryId,
+        row_id: row.delivery_id,
+        ledger_id: ledgerId,
+        queue_position: position,
+      }),
+    },
+  )
+  if (outcome.kind === "inserted") {
+    return {
+      kind: "queued",
+      delivery_id: record.deliveryId,
+      row_id: outcome.row.delivery_id,
+      ledger_id: ledgerId,
+      queue_position: outcome.queue_position,
+      deduplicated: false,
+    }
+  }
+  if (outcome.kind === "replay")
+    return { ...(outcome.result as Extract<IntakeOutcome, { kind: "queued" }>), deduplicated: true }
+  return outcome
+}
 
 const queue: WorkerRequest[] = []
 const barriers = new Map<string, () => void>()
@@ -197,6 +327,8 @@ async function dispatch(op: string, args: unknown): Promise<unknown> {
       return await sessions.recordThreadCreation(ctx, args as Parameters<typeof sessions.recordThreadCreation>[1])
     case "enqueue":
       return await ops.enqueue(ctx, args as Parameters<typeof ops.enqueue>[1])
+    case "intake":
+      return await intake(ctx, args as IntakeRequest)
     case "reconcile":
       return await ops.reconcile(ctx, args as Parameters<typeof ops.reconcile>[1])
     case "claim":

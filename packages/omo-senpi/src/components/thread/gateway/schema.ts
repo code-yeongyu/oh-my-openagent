@@ -282,6 +282,18 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
 
   // v11 (#13014): what the receiver was parked on when its drain queued a delivery; NULL when it was not, and on older rows.
   ["ALTER TABLE deliveries ADD COLUMN wait_kind TEXT CHECK (wait_kind IS NULL OR wait_kind = 'approval')"],
+
+  // v12 (#13037): a delivery taken in from another device for a session that is not running. `ledger_id` is the engine's
+  // ledger key for it (`device:<attested device>/<sender's delivery id>`), the key the drain admits it under and the
+  // reconcile, the transcript scan and the cause lookup match on; the two text columns hold the sender's rendered text and
+  // display text verbatim. All three are NULL on every other row, which behaves exactly as before.
+  [
+    "ALTER TABLE deliveries ADD COLUMN ledger_id TEXT",
+    "ALTER TABLE deliveries ADD COLUMN verbatim_text TEXT",
+    "ALTER TABLE deliveries ADD COLUMN verbatim_display_text TEXT",
+    "CREATE UNIQUE INDEX deliveries_ledger ON deliveries (ledger_id) WHERE ledger_id IS NOT NULL",
+    "INSERT OR IGNORE INTO extension_objects (type, name, owner) VALUES ('index', 'deliveries_ledger', NULL)",
+  ],
 ]
 
 export const GATEWAY_TABLES = [
