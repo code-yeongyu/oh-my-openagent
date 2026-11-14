@@ -9,6 +9,9 @@ name = "omo-computer-engine"
 path = "src/main.rs"
 
 [dependencies]
+omo-computer-core = { path = "../omo-computer-core" }
+serde.workspace = true
+serde_json.workspace = true
 omo-computer-session = { path = "../omo-computer-session" }
 omo-computer-backend-fake = { path = "../omo-computer-backend-fake" }
 omo-computer-backend-atspi = { path = "../omo-computer-backend-atspi" }

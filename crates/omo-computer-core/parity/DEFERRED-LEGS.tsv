@@ -7,3 +7,15 @@ C3	a `confirmed` pointer / key report from the macOS, X11 or Wayland fake (the r
 C4	`computer-error-table.test.ts`: every `(code, reason)` pair has a row, enumerated from `method_table!` + the gate table + the ref-resolution verdicts of `d-a11y-model.md` + the per-OS preflight refusals + the SDK's typed failures	13	31	owed
 C4	0 `COMPUTER_ERROR` fallthrough on tool	13	34	owed
 C4	0 `COMPUTER_ERROR` fallthrough on adapter	13	35	owed
+T1	`conformance_replay` byte-equal modulo variable pointers on the three CI legs (AC-1 replay leg)	14	28	owed
+C12	`apps_quit_protected_process` (`apps.quit()` on each protected-process entry -> `ProtectedProcess`, nothing sent, `force:true` included; the verb is built there, the table refusal here)	16	25	owed
+C12	`apps_quit_unprotected_delivered_verified`	16	25	owed
+C12	AC-53 fake leg: `apps.list()` returns every running app with its identity key per OS	16	25	owed
+C12	AC-53 fake leg: `raise()` and `activate()` without the foreground grant return `ControlRequired` with nothing sent (the Lease refusal is proven here; the verbs are built there)	16	31	owed
+C12	`session_open_without_host_self_set_still_refuses_own_pid_chain` (the MCP profile case)	16	28	owed
+C12	`self_set_allowlist_has_exactly_one_entry`	16	40	owed
+C12	`Suspended{hand_latch}`: a host-stage refusal the hand tool host produces before any engine (d-safety.md:548 lists `hand_latch` among the four HOST-stage names); the engine's gate 1 does not carry it	16	37	owed
+C12	`Suspended{host_latch}` at `session.open` and `stopPath.resume` from the live host's `hand.status{latch}` (gate 1 carries the reason; the read of the host reply is built there)	16	28	owed
+C12	Windows `deniedApps`: the Microsoft Store package-family keys of Dashlane, LastPass, NordPass, Proton Pass, KeePassXC and KeePass (d-safety.md:407 "the Microsoft Store AUMIDs of the same managers"; 1Password and Bitwarden ship now, the rest are measured with Get-AppxPackage on a Windows host)	16	60	owed
+C12	Windows `protectedSurfaces` `secure-desktop`: the Windows backend reports a target on an input desktop other than Default under that key (d-safety.md:407 "the secure desktop (OpenInputDesktop != Default)")	16	60	owed
+C12	`capabilities().stopPath.staleSinceMs` while the re-arm ladder runs: core's `StopPathCapability` (row 12's schema, mirrored into the TS protocol package) has no such member; the engine reads the value and `stale:true` is on the wire	16	46	owed
