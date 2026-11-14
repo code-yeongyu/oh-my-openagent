@@ -101,6 +101,8 @@ export function createRemoteThreadFixture() {
       records?: readonly JsonObject[]
       /** Entries the session stores once its turn ran (a queued send is stored when the queue drains): served on reads after the turn's records went out. */
       entriesAfterAnswer?: readonly JsonObject[]
+      /** The turn finishes before its prompt's reply reaches the sender: its records go out at once, before the aim. */
+      recordsBeforeReply?: boolean
       rows?: readonly RemoteSessionRow[]
       registryDown?: "refused" | "throws" | "signed_out"
       /** Only the claim fails (resolve and aliasesOf still answer): a token that expired between the two calls. */
@@ -330,7 +332,10 @@ export function createRemoteThreadFixture() {
         sessionCommand: async (device, session, rpc) => {
           sent.push({ via: "session", device, session, rpc })
           const outcome = answer(rpc, session)
-          if (rpc["type"] === "prompt" && outcome.kind === "ok") answeredPrompt = true
+          if (rpc["type"] === "prompt" && outcome.kind === "ok") {
+            answeredPrompt = true
+            if (options.recordsBeforeReply === true) writeRecords()
+          }
           return outcome
         },
         watch: async (device, session, listener) => {
