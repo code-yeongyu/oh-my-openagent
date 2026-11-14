@@ -778,3 +778,28 @@ fn a_stop_queued_in_the_old_listener_is_observed_before_the_re_arm() {
     assert!(sink.lines().iter().all(|line| !line.contains("click") && !line.contains("mouse")), "nothing sent: {:?}", sink.lines());
     assert_eq!(s.funnel.control.armed_chord.as_deref(), Some("ctrl+alt+shift+f11"), "and the new chord is armed after");
 }
+
+/// Review L6 at a07dff9 (R70cl): the chord sent to the backend and compared at the re-arm is the
+/// one parser's canonical spelling, so a respelled default arms on a backend that takes only the
+/// default, and a respelled same chord is the same chord.
+#[test]
+fn a_respelled_chord_is_armed_in_the_parsers_canonical_spelling() {
+    let backend = FakeBackend::with_parts(
+        scenario(&json!({ "consent": { "stopHotkey": " Shift+Ctrl+Opt+Esc " } })),
+        FakeClock::default(),
+        RecordingSink::default(),
+    )
+    .with_persona(omo_computer_backend_fake::Persona::X11)
+    .with_stop_path(StopPathScript::Live);
+    let consent = backend.consent_handle();
+    let mut s = Session::new(Box::new(backend));
+    s.open(params(json!({ "reportMode": "null" }))).expect("open");
+    s.stop_path_start_checked(params(json!({}))).expect("arms");
+    assert_eq!(s.funnel.control.armed_chord.as_deref(), Some("ctrl+alt+shift+escape"), "the canonical spelling is sent");
+    // Another spelling of the same chord is the same chord: nothing differs and nothing re-arms.
+    consent.set(json!({ "stopHotkey": "control+alt+shift+escape" }));
+    s.open(params(json!({ "reportMode": "null", "settings": { "stop_hotkey": "ctrl+option+shift+escape" } }))).expect("the same chord");
+    capture(&mut s, "1");
+    s.click(params(json!({ "target": "1", "x": 5, "y": 5 }))).expect("sent");
+    assert_eq!(s.funnel.control.armed_chord.as_deref(), Some("ctrl+alt+shift+escape"));
+}

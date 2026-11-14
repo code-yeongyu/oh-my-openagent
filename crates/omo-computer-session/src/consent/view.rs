@@ -110,10 +110,10 @@ impl ConsentView {
         match &self.stop_hotkey {
             None => StopChord::Unreadable,
             Some(None) => StopChord::Chord(default_stop_hotkey(os).to_owned()),
-            Some(Some(text)) if omo_computer_safety::protected::Chord::parse(text).is_some() => {
-                StopChord::Chord(text.trim().to_ascii_lowercase())
-            }
-            Some(Some(text)) => StopChord::Unparseable(text.clone()),
+            // Review L6: the parser's canonical spelling, the one the backend is sent and the
+            // re-arm compares.
+            Some(Some(text)) => omo_computer_safety::protected::Chord::parse(text)
+                .map_or_else(|| StopChord::Unparseable(text.clone()), |chord| StopChord::Chord(chord.canonical())),
         }
     }
 

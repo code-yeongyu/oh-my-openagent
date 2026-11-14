@@ -52,6 +52,19 @@ impl Chord {
         key.map(|key| Self { modifiers, key })
     }
 
+    /// The one spelling of this chord: modifiers in the order ctrl, alt, shift, cmd, win, then the
+    /// key, joined by `+` (the documented default `ctrl+alt+shift+escape` is its own canonical
+    /// form). Row 21, review L6: the stop chord is sent and compared in this spelling.
+    #[must_use]
+    pub fn canonical(&self) -> String {
+        ["ctrl", "alt", "shift", "cmd", "win"]
+            .into_iter()
+            .filter(|modifier| self.modifiers.contains(modifier))
+            .chain(std::iter::once(self.key.as_str()))
+            .collect::<Vec<_>>()
+            .join("+")
+    }
+
     /// Whether this chord hits `entry`: the same key and the same modifiers, or a superset of
     /// them where the table says so.
     #[must_use]
@@ -62,5 +75,33 @@ impl Chord {
             } else {
                 self.modifiers == entry.modifiers
             }
+    }
+}
+
+#[cfg(test)]
+mod canonical_spelling {
+    use super::Chord;
+
+    /// Row 21, review L6: every spelling of one chord has one canonical form, and the documented
+    /// default is its own canonical form.
+    #[test]
+    fn every_spelling_of_one_chord_has_one_canonical_form() {
+        for text in [
+            "ctrl+alt+shift+escape",
+            " Shift+Ctrl+Opt+Esc ",
+            "control+option+shift+esc",
+        ] {
+            assert_eq!(
+                Chord::parse(text).map(|chord| chord.canonical()).as_deref(),
+                Some("ctrl+alt+shift+escape"),
+                "{text}"
+            );
+        }
+        assert_eq!(
+            Chord::parse("cmd+super+q")
+                .map(|chord| chord.canonical())
+                .as_deref(),
+            Some("cmd+win+q")
+        );
     }
 }
