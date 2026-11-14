@@ -77,6 +77,12 @@ describe("omo remote session verbs take the device the table prints", () => {
     expect(result.sent.filter((entry) => entry.device === "studio")).toEqual([])
   })
 
+  test("#given a name/session address #when close runs #then the output names the device by its id", async () => {
+    const result = await run(["close", "studio/dur-on-b"])
+    expect(result.code).toBe(REMOTE_EXIT.ok)
+    expect(result.out).toEqual(["Closed b/dur-on-b."])
+  })
+
   test("#given a device no row matches #when open runs #then it fails with device_unknown and opens nothing", async () => {
     const result = await run(["open", "nowhere", "--json"])
     expect(result.code).toBe(REMOTE_EXIT.failed)

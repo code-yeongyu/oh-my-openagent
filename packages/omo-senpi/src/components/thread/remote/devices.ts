@@ -28,19 +28,25 @@ const ambiguous = (typed: string, rows: readonly RemoteDevice[]): DeviceMatch =>
   ),
 })
 
-/** The device `typed` names among `rows`: its id, else its name, else a unique prefix of an id or a name. */
+/**
+ * The device `typed` names among `rows`. An exact id names its device unless the same string is another device's
+ * name; an exact name names its device unless another device has that name or starts with it; otherwise a prefix of
+ * one id or name names that device. Every collision is ambiguous_device listing each candidate. The id is never
+ * ambiguous against a prefix: it is the handle ambiguous_device asks for, so it must always resolve.
+ */
 export function matchDevice(rows: readonly RemoteDevice[], typed: string): DeviceMatch {
   if (typed === "") return unknown(typed)
+  const named = rows.filter((row) => row.label === typed)
   const byId = rows.find((row) => row.device === typed)
-  if (byId !== undefined) return { kind: "ok", row: byId }
-  for (const tier of [
-    rows.filter((row) => row.label === typed),
-    rows.filter((row) => row.device.startsWith(typed) || row.label.startsWith(typed)),
-  ]) {
-    if (tier.length === 1 && tier[0] !== undefined) return { kind: "ok", row: tier[0] }
-    if (tier.length > 1) return ambiguous(typed, tier)
+  if (byId !== undefined) {
+    const others = named.filter((row) => row !== byId)
+    return others.length === 0 ? { kind: "ok", row: byId } : ambiguous(typed, [byId, ...others])
   }
-  return unknown(typed)
+  const prefixed = rows.filter((row) => row.device.startsWith(typed) || row.label.startsWith(typed))
+  const candidates = named.length > 0 ? [...named, ...prefixed.filter((row) => !named.includes(row))] : prefixed
+  if (candidates.length === 0) return unknown(typed)
+  if (candidates.length === 1 && candidates[0] !== undefined) return { kind: "ok", row: candidates[0] }
+  return ambiguous(typed, candidates)
 }
 
 export async function resolveDevice(remote: RemoteThreadSurface, typed: string): Promise<DeviceMatch> {
@@ -53,9 +59,5 @@ export async function resolveDevice(remote: RemoteThreadSurface, typed: string):
  */
 export function withOneDeviceListing(remote: RemoteThreadSurface): RemoteThreadSurface {
   let listing: ReturnType<RemoteThreadSurface["sessions"]["devices"]> | undefined
-  const sessions: RemoteThreadSurface["sessions"] = Object.create(remote.sessions)
-  Object.defineProperty(sessions, "devices", {
-    value: () => (listing ??= remote.sessions.devices()),
-  })
-  return { ...remote, sessions }
+  return { ...remote, sessions: { ...remote.sessions, devices: () => (listing ??= remote.sessions.devices()) } }
 }

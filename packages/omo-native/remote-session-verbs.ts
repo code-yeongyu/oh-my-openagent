@@ -92,7 +92,7 @@ export async function runSession(
   // The device as the table prints it - id, name or a unique prefix - through the thread tools' one resolver (#13432).
   const device = await resolveDevice(remote, args.target.device)
   if (device.kind === "error") return show(device, "")
-  const label = `${args.target.device}/${args.target.session}`
+  const label = `${device.row.device}/${args.target.session}`
   // Addressed directly, as the SDK does: its device refuses a session it does not hold (unknown_session). The
   // account listing settles only with the slowest device (seconds) and lags a session just opened.
   // The id a caller types is the id above the port (decision 0027 D2); the relay address book turns the device-named
@@ -136,7 +136,7 @@ async function openOn(
   const opened: ThreadToolResult = open.kind === "ok" ? { kind: "ok", thread: open.thread, deduplicated: false } : open
   const wanted = args.model
   if (opened.kind !== "ok" || !("thread" in opened) || wanted === undefined) return show(opened, "")
-  const label = `${args.device}/${opened.thread.thread_id}`
+  const label = `${device.row.device}/${opened.thread.thread_id}`
   const created: RemoteSessionRow = {
     ...namedDeviceRow(device.row.device, opened.thread.thread_id),
     title: opened.thread.name,
