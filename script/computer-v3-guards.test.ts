@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { dirname, join, relative } from "node:path"
+import { dirname, join, relative, sep } from "node:path"
 
 import { generatedPath as protocolGeneratedPath } from "../packages/omo-computer-protocol/scripts/generate-protocol.ts"
 
 import { parseWriteScope, runGuard } from "./computer-v3-guards.ts"
+import nameMap from "./computer-v3-name-map.json"
 
 // Each guard runs against a temporary git repository that this test owns: one tree that passes and one that
 // violates it. A pass exits 0 with no finding; a violation exits 1 with one line per finding naming the path.
@@ -409,6 +410,19 @@ describe("computer-v3-guards --scope <row> <ref> --plan <file>", () => {
       // then a row that does not own it may still regenerate it
       expectPass(scope("2"))
     })
+  })
+
+  test("the_name_maps_generated_entries_in_the_protocol_package_are_exactly_its_generators_output", () => {
+    // given the generated list of the name map and the path the protocol generator writes
+    const repoRoot = join(import.meta.dir, "..")
+    const output = relative(repoRoot, protocolGeneratedPath).split(sep).join("/")
+    const generated: readonly string[] = nameMap.scope.generated
+
+    // when the entries that fall inside the protocol package are taken
+    const inPackage = generated.filter((entry) => entry.startsWith("packages/omo-computer-protocol/"))
+
+    // then the only one is the generator's output, so a stale or misspelt entry cannot widen any row's scope
+    expect(inPackage).toEqual([output])
   })
 
   test("scope_accepts_a_listed_path_owned_by_a_transitive_blocker_and_refuses_an_unlisted_one_or_one_owned_by_a_non_blocker", () => {
