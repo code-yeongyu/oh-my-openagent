@@ -4,7 +4,15 @@ import { locateControl } from "../control/locate"
 import { controlIdentity } from "../control/port"
 import { readTranscript, type ThreadTranscriptEntry } from "../reader"
 import { threadLink } from "../thread-link"
-import { addressBook, degradedSummary, failure, resolveEntries, summary, transcriptRole } from "./internals"
+import {
+  addressBook,
+  degradedSummary,
+  failure,
+  resolveEntries,
+  sendAddressBook,
+  summary,
+  transcriptRole,
+} from "./internals"
 import type { ThreadHostSession, ThreadHostView, ThreadToolSurfaceOptions } from "./ports"
 
 /**
@@ -90,9 +98,9 @@ export function liveReadResult(
 }
 
 /**
- * A thread with no live owner is read from its JSONL only when its ENDPOINT is dead: the address
- * book then carries the durable path and the endpoint's failure. Any other non-live thread stays
- * `not_resumable`, as before endpoints were enumerated.
+ * A thread with no live owner is read from its session file, the one a send to it finds (a closed thread, or one whose
+ * endpoint is dead, which adds the endpoint's failure as `error_note`). Only a thread with no file here is
+ * `not_resumable`.
  */
 function readDegraded(
   options: ThreadToolSurfaceOptions,
@@ -100,8 +108,8 @@ function readDegraded(
   threadId: string,
   value: ThreadReadInput,
 ): ThreadToolResult {
-  const entry = addressBook(options, current).find((candidate) => candidate.thread_id === threadId)
-  if (entry === undefined || entry.error_note === undefined || entry.session_path === null)
+  const entry = sendAddressBook(options, current, threadId, true).find((candidate) => candidate.thread_id === threadId)
+  if (entry === undefined || entry.session_path === null)
     return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live.")
   const durable = readTranscript(
     { kind: "jsonl", path: entry.session_path, live_host_present: false },
@@ -129,6 +137,6 @@ function readDegraded(
     ...(durable.next_cursor === null ? {} : { next_cursor: durable.next_cursor }),
     source: durable.source,
     source_incomplete: durable.source_incomplete,
-    error_note: entry.error_note,
+    ...(entry.error_note === undefined ? {} : { error_note: entry.error_note }),
   }
 }

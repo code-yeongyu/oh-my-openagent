@@ -8,9 +8,14 @@ import { deviceOnline, replyData } from "../remote/remote-ops"
 import { prepareRemoteWorktree } from "../worktree/remote-worktree"
 import { openedEngineId, openRefusal } from "./open-reply"
 import { threadLink } from "../thread-link"
-import { summary } from "../tools/internals"
 import type { ThreadHostSession } from "../tools/ports"
-import type { HostedThread, SessionHost, SessionOpenOutcome, SessionOpenRequest } from "./session-host"
+import {
+  openedThread,
+  type HostedThread,
+  type SessionHost,
+  type SessionOpenOutcome,
+  type SessionOpenRequest,
+} from "./session-host"
 
 const nonEmpty = (value: unknown): string | undefined =>
   typeof value === "string" && value.length > 0 ? value : undefined
@@ -145,7 +150,7 @@ export function createRelaySessionHost(
         name: applied ?? nonEmpty(state["sessionName"]) ?? listed?.title ?? null,
       }
       const extras = { ...(made === undefined ? {} : { worktree: made.worktree }), ...(warnings.length === 0 ? {} : { warnings }) }
-      return { kind: "ok", thread: { ...summary(session), device, ...extras } }
+      return { kind: "ok", thread: { ...openedThread(session), device, ...extras } }
     },
   }
 }

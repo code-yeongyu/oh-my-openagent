@@ -1,6 +1,7 @@
 import type { ThreadDataError, ThreadSummary } from "../contracts"
 import type { ThreadToolFailure } from "../errors"
-import type { ThreadToolSummary } from "../tools/internals"
+import { summary, type ThreadToolSummary } from "../tools/internals"
+import type { ThreadHostSession } from "../tools/ports"
 import type { ThreadWorktree, WorktreeRequest } from "../worktree/thread-worktree"
 
 /**
@@ -28,7 +29,26 @@ export type HostedThread = ThreadToolSummary & {
   readonly warnings?: readonly ThreadToolFailure[]
 }
 
-/** The engine's reply state as the tools report a thread (`summary()`), with `device` when it is not this device's. */
+/**
+ * The one thread thread_create answers on every device: the opened session's identity, folder, name, state and times
+ * through `summary()`, never the rest of the engine's reply state (its lifecycle, holds, questions, endpoint facts).
+ */
+export function openedThread(session: ThreadHostSession): ThreadToolSummary {
+  const { sessionId, durableSessionId, cwd, name, status, createdAt, updatedAt, created_at, updated_at } = session
+  return summary({
+    sessionId,
+    cwd,
+    ...(durableSessionId === undefined ? {} : { durableSessionId }),
+    ...(name === undefined ? {} : { name }),
+    ...(status === undefined ? {} : { status }),
+    ...(createdAt === undefined ? {} : { createdAt }),
+    ...(updatedAt === undefined ? {} : { updatedAt }),
+    ...(created_at === undefined ? {} : { created_at }),
+    ...(updated_at === undefined ? {} : { updated_at }),
+  })
+}
+
+/** The engine's reply state as the tools report a thread (`openedThread()`), with `device` when it is not this device's. */
 export type SessionOpenOutcome = { readonly kind: "ok"; readonly thread: HostedThread } | ThreadDataError
 
 /**
