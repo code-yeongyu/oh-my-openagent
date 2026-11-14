@@ -4,11 +4,17 @@ import { join } from "node:path"
 import { agreementItemsOf, readAgreementsAt, readAgreementsWorktree } from "../agreements/ledger-file"
 import { AGREEMENTS_PATH } from "../agreements/types"
 import type { GitCommitAuthor, GitMemoryRepo, MemoryCommit } from "../git"
+import { formatParentDirtyDetail } from "../git"
 import { PROVENANCE_STRIPPED_TRAILER, strippedLegacyUserHeader } from "../tools/claim-frontmatter"
 import type { FactsApplyRecovery } from "./mutation-plan"
 import { FactsMutationTransaction, FactsOwnershipLostError } from "./recovery-mutation"
-import { captureOwnedFactsState, sameFactsOwnedState } from "./recovery-ownership"
+import { captureOwnedFactsState, describeForeignParentState, sameFactsOwnedState } from "./recovery-ownership"
 import { upgradeAgreementRecovery, type AgreementRecoveryInput } from "./agreement-recovery"
+
+async function describeParentDirty(repo: GitMemoryRepo, recovery: FactsApplyRecovery): Promise<string> {
+  const lines = await describeForeignParentState(repo, recovery)
+  return formatParentDirtyDetail(lines)
+}
 
 export type FactsRecoveryResult =
   | { readonly outcome: "committed"; readonly sha: string; readonly affectedPaths: readonly string[] }
@@ -26,9 +32,13 @@ export async function applyFactsRecovery(
   agreementInput?: AgreementRecoveryInput,
 ): Promise<FactsRecoveryResult> {
   const observed = await captureOwnedFactsState(repo, recovery)
-  if (observed === undefined) return { outcome: "parent_dirty" }
+  if (observed === undefined) {
+    return { outcome: "parent_dirty", detail: await describeParentDirty(repo, recovery) }
+  }
   const boundary = await captureOwnedFactsState(repo, recovery)
-  if (boundary === undefined || !sameFactsOwnedState(observed, boundary)) return { outcome: "parent_dirty" }
+  if (boundary === undefined || !sameFactsOwnedState(observed, boundary)) {
+    return { outcome: "parent_dirty", detail: await describeParentDirty(repo, recovery) }
+  }
   const effective = await upgradeAgreementRecovery(repo, recovery, agreementInput)
   let transaction = new FactsMutationTransaction(repo, recovery, boundary)
   try {
