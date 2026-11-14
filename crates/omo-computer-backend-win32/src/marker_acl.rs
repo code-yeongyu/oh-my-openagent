@@ -10,15 +10,15 @@ pub fn owner_only_sddl(user_sid: &str) -> String {
     format!("D:P(A;;FA;;;{user_sid})(A;;FA;;;SY)")
 }
 
-/// Whether SDDL trustee `trustee` is `user_sid`: the SID itself, or the alias SDDL read-back writes
-/// for a well-known account SID (`LA` = the domain's RID-500 administrator, `LG` = RID-501 guest).
-fn is_user(trustee: &str, user_sid: &str, _resolve: &dyn Fn(&str) -> Option<String>) -> bool {
-    let alias_rid = match trustee {
-        "LA" => "500",
-        "LG" => "501",
-        _ => return trustee == user_sid,
-    };
-    user_sid.starts_with("S-1-5-21-") && user_sid.rsplit('-').next() == Some(alias_rid)
+/// Whether SDDL trustee `trustee` is `user_sid`: the SID itself, or an alias SDDL read-back writes
+/// for a well-known account (`LA`, `LG`) that `resolve` turns into exactly that SID. The aliases
+/// name THIS machine's RID-500/501 accounts, so only the OS can say which SID they are: a domain
+/// RID-500 user is not `LA` (review L2 of the #13350 delta).
+fn is_user(trustee: &str, user_sid: &str, resolve: &dyn Fn(&str) -> Option<String>) -> bool {
+    match trustee {
+        "LA" | "LG" => resolve(trustee).as_deref() == Some(user_sid),
+        _ => trustee == user_sid,
+    }
 }
 
 /// Whether `dacl_sddl` is protected and grants exactly the user and SYSTEM, both present.
@@ -62,12 +62,13 @@ mod os {
     use windows::Win32::Foundation::{CloseHandle, LocalFree, HANDLE, HLOCAL};
     use windows::Win32::Security::Authorization::{
         ConvertSecurityDescriptorToStringSecurityDescriptorW, ConvertSidToStringSidW,
-        ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1,
+        ConvertStringSecurityDescriptorToSecurityDescriptorW, ConvertStringSidToSidW,
+        SDDL_REVISION_1,
     };
     use windows::Win32::Security::{
         GetFileSecurityW, GetTokenInformation, SetFileSecurityW, TokenUser,
         DACL_SECURITY_INFORMATION, PROTECTED_DACL_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR,
-        TOKEN_QUERY, TOKEN_USER,
+        PSID, TOKEN_QUERY, TOKEN_USER,
     };
     use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 
@@ -110,6 +111,24 @@ mod os {
             let sid = text.to_string().unwrap_or_default();
             let _ = LocalFree(Some(HLOCAL(text.0.cast())));
             Ok(sid)
+        }
+    }
+
+    /// The SID an SDDL alias (`LA`, `LG`) stands for on this machine, as a string; the OS resolves
+    /// it, so the comparison is the SID's own (the string form of two equal SIDs is equal).
+    fn resolve_alias(alias: &str) -> Option<String> {
+        let text = wide(alias);
+        let mut sid = PSID::default();
+        // SAFETY: a NUL-terminated SID string; `sid` and `out` are freed with LocalFree.
+        unsafe {
+            ConvertStringSidToSidW(PCWSTR(text.as_ptr()), &mut sid).ok()?;
+            let mut out = PWSTR::null();
+            let converted = ConvertSidToStringSidW(sid, &mut out);
+            let _ = LocalFree(Some(HLOCAL(sid.0)));
+            converted.ok()?;
+            let resolved = out.to_string().ok();
+            let _ = LocalFree(Some(HLOCAL(out.0.cast())));
+            resolved
         }
     }
 
@@ -180,7 +199,7 @@ mod os {
             )?;
             let sddl = text.to_string().unwrap_or_default();
             let _ = LocalFree(Some(HLOCAL(text.0.cast())));
-            Ok(is_owner_only(&sddl, &user_sid()?, &|_| None))
+            Ok(is_owner_only(&sddl, &user_sid()?, &resolve_alias))
         }
     }
 }
