@@ -13,7 +13,8 @@ import { openedThread, type HostedThread, type SessionHost } from "./session-hos
  * another device belongs to the account, so it never carries the note.
  */
 export function workspaceNote(thread: HostedThread, callerWorkspaceRoot: string): ThreadWorkspaceNote {
-  if (thread.device !== undefined) return {}
+  // No caller workspace: scoped addressing answers caller_context_missing for every thread, not scope_denied.
+  if (thread.device !== undefined || callerWorkspaceRoot === "") return {}
   const { thread_id, name, status, cwd, created_at, updated_at } = thread
   const entry = { thread_id, name, status, cwd, created_at, updated_at }
   if (workspaceEntries([entry], callerWorkspaceRoot).length > 0) return {}
