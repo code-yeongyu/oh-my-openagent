@@ -1,0 +1,3 @@
+# tsgo --noEmit -p packages/omo-opencode/tsconfig.json
+
+(no output, exit 0)
