@@ -5,7 +5,6 @@ import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
-const storagePathsSnapshot = { ...(await import("../../shared/opencode-storage-paths")) }
 const constantsSnapshot = { ...(await import("./constants")) }
 
 const TEST_DIR = join(tmpdir(), `omo-test-session-manager-${randomUUID()}`)
@@ -36,13 +35,6 @@ mock.module("../../shared/opencode-storage-detection", () => ({
   resetSqliteBackendCache: () => {},
 }))
 
-mock.module("../../shared/opencode-storage-paths", () => ({
-  OPENCODE_STORAGE: TEST_DIR,
-  MESSAGE_STORAGE: TEST_MESSAGE_STORAGE,
-  PART_STORAGE: TEST_PART_STORAGE,
-  SESSION_STORAGE: TEST_SESSION_STORAGE,
-}))
-
 mock.module("../../shared/opencode-message-dir", () => ({
   getMessageDir: (sessionID: string) => {
     if (!sessionID.startsWith("ses_")) return null
@@ -65,10 +57,29 @@ mock.module("../../shared/opencode-message-dir", () => ({
   },
 }))
 
-afterAll(() => {
+afterAll(async () => {
+  // ./constants re-exports the storage roots from ../../shared, so this restore also puts the real paths back
+  // into shared/opencode-storage-paths. That module is not mocked directly: a direct mock keeps its own
+  // namespace on the deleted fixture for every later test file, even after a re-mock.
   mock.module("./constants", () => constantsSnapshot)
-  mock.module("../../shared/opencode-storage-paths", () => storagePathsSnapshot)
   mock.restore()
+  // Boundary: later test files import these modules fresh, and the compaction-marker fixture writes under
+  // PART_STORAGE. None of them may still name this file's fixture.
+  const storagePaths = await import("../../shared/opencode-storage-paths")
+  const shared = await import("../../shared")
+  const constants = await import("./constants")
+  const { getCompactionPartStorageDir } = await import("../../shared/compaction-marker")
+  const exposed = [
+    ...["OPENCODE_STORAGE", "MESSAGE_STORAGE", "PART_STORAGE", "SESSION_STORAGE"].flatMap((name) => [
+      `opencode-storage-paths.${name}=${String(Reflect.get(storagePaths, name))}`,
+      `shared.${name}=${String(Reflect.get(shared, name))}`,
+      `constants.${name}=${String(Reflect.get(constants, name))}`,
+    ]),
+    `constants.TODO_DIR=${constants.TODO_DIR}`,
+    `constants.TRANSCRIPT_DIR=${constants.TRANSCRIPT_DIR}`,
+    `compaction-marker.part=${getCompactionPartStorageDir("msg_boundary")}`,
+  ]
+  expect(exposed.filter((entry) => entry.includes(TEST_DIR))).toEqual([])
 })
 
 const { getAllSessions, getMessageDir, sessionExists, readSessionMessages, readSessionTodos, getSessionInfo } =
