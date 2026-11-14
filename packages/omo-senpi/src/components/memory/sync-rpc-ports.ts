@@ -98,4 +98,6 @@ export interface SyncRpcOptions {
   readonly signal: AbortSignal
   readonly syncStatus: () => Promise<MemoryRpcSync | undefined>
   readonly clock?: CeremonyClock
+  /** Receives one warning each time the status read's unavailable cause changes. */
+  readonly warn?: (message: string, fields: Record<string, unknown>) => void
 }

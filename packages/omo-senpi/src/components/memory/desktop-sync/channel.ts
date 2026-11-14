@@ -1,4 +1,5 @@
 import type { Duplex } from "node:stream"
+import { DesktopSyncRefused } from "./desktopSyncProtocol"
 import { readFrames, writeFrame } from "./framing"
 import {
   desktopSyncChild,
@@ -49,16 +50,19 @@ export async function attachDesktopSyncChannel(stream: Duplex | undefined): Prom
       if (typeof packet === "object" && packet !== null && "event" in packet) {
         const event = desktopSyncEvent.parse(packet)
         if (child === undefined || event.child !== child) throw new DesktopSyncUnavailable()
+        // `retired` ends main's current account, not the channel: the account source ends that account and the
+        // next resolve opens main's next one (#13325). Only a closed stream ends the channel.
         for (const listener of listeners) listener(event)
-        if (event.event === "retired") close()
         return
       }
       const reply = desktopSyncReply.parse(packet)
       const pending = waiting.get(reply.id)
       if (pending === undefined) throw new DesktopSyncUnavailable()
       waiting.delete(reply.id)
+      // A refusal is main's answer (signed out, or a handle it no longer knows), not a broken channel: the same
+      // DesktopSyncRefused a session Worker's port gives, which the account source reads as signed out.
       if (reply.ok) pending.resolve(reply.value)
-      else pending.reject(new DesktopSyncUnavailable())
+      else pending.reject(new DesktopSyncRefused())
     },
     close,
   )

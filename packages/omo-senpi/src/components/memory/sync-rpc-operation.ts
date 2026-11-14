@@ -1,5 +1,5 @@
 import type { ApproveOutcome } from "@oh-my-opencode/memory-core/sync-engine"
-import type { SyncEnableResponse, SyncRpcProblem } from "./sync-rpc-contract"
+import type { SyncEnableResponse, SyncRpcProblem, SyncUnavailableCode } from "./sync-rpc-contract"
 import type {
   SyncRpcAccount,
   SyncRpcAuthority,
@@ -9,9 +9,10 @@ import type {
   SyncRpcOptions,
 } from "./sync-rpc-ports"
 
-export const unavailable = (): SyncRpcProblem => ({
+export const unavailable = (code?: SyncUnavailableCode): SyncRpcProblem => ({
   kind: "unavailable",
   reason: "Memory sync authority is unavailable.",
+  ...(code === undefined ? {} : { code }),
 })
 export const refused = (): SyncRpcProblem => ({
   kind: "refused",
@@ -25,10 +26,31 @@ export function serviceProblem(error: unknown): SyncRpcProblem {
     error.status >= 400 &&
     error.status < 500
     ? { kind: "refused", reason: "The service refused this sync request." }
-    : unavailable()
+    : unavailable(error instanceof RetiredSyncOperation ? error.code : "operation_failed")
 }
 
-export class RetiredSyncOperation extends Error {}
+const LOGGABLE_CODE = /^[A-Z0-9_]{1,32}$/i
+
+/**
+ * Log fields for the error behind an unavailable problem; a RetiredSyncOperation says all it knows in its code.
+ * Only an AccountHttpError's message is logged (service code and HTTP status). Other messages can quote memory
+ * content (an invalid canonical source, an outbox item), so they log as the error name plus a `code` shaped like an identifier.
+ */
+export function syncErrorFields(error: unknown): { readonly error?: string } {
+  if (error instanceof RetiredSyncOperation) return {}
+  if (!(error instanceof Error)) return { error: typeof error }
+  if (error.name === "AccountHttpError") return { error: `${error.name}: ${error.message}` }
+  // Only an identifier-shaped code is logged (Node errno, memory-core codes); a free-text code could quote memory content.
+  const code =
+    "code" in error && typeof error.code === "string" && LOGGABLE_CODE.test(error.code) ? ` (${error.code})` : ""
+  return { error: `${error.name}${code}` }
+}
+
+export class RetiredSyncOperation extends Error {
+  constructor(readonly code: SyncUnavailableCode = "retired") {
+    super(code)
+  }
+}
 
 /** A record that runs a ceremony and takes a claim; a "read" record never does. */
 export type CeremonyOperation = Operation & { readonly kind: "enable" | "approve" }
@@ -230,6 +252,12 @@ export async function runSyncRpcOperation(
         : refused()
       : serviceProblem(error)
     record.problem = record.controller.signal.aborted ? refused() : serviceProblem(error)
+    if (record.problem.kind === "unavailable")
+      options.warn?.(`memory sync ${record.kind} unavailable`, {
+        path: record.kind,
+        code: record.problem.code,
+        ...syncErrorFields(error),
+      })
     record.approval = record.expired
       ? { kind: "expired" }
       : {
@@ -244,16 +272,20 @@ export async function runSyncRpcOperation(
     if (record.enable?.kind === "join_required")
       record.enable = record.controller.signal.aborted ? refused() : record.enable
     await observed
+    const failed = (code: "close_failed" | "release_failed", error: unknown): void => {
+      record.enable = unavailable(code)
+      options.warn?.(`memory sync ${record.kind} unavailable`, { path: record.kind, code, ...syncErrorFields(error) })
+    }
     try {
       await ports?.close()
-    } catch {
-      record.enable = unavailable()
+    } catch (error) {
+      failed("close_failed", error)
       record.approval = { kind: "refused", reason: "The sync operation could not be closed." }
     } finally {
       try {
         await claim?.release()
-      } catch {
-        record.enable = unavailable()
+      } catch (error) {
+        failed("release_failed", error)
         record.approval = { kind: "refused", reason: "The sync claim could not be released." }
       } finally {
         record.active = false
