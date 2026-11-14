@@ -67,8 +67,8 @@ mod os {
     };
     use windows::Win32::Security::{
         GetFileSecurityW, GetTokenInformation, SetFileSecurityW, TokenUser,
-        DACL_SECURITY_INFORMATION, PROTECTED_DACL_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR,
-        PSID, TOKEN_QUERY, TOKEN_USER,
+        DACL_SECURITY_INFORMATION, PROTECTED_DACL_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR, PSID,
+        TOKEN_QUERY, TOKEN_USER,
     };
     use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 

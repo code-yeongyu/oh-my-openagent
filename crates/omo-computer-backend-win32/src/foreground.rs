@@ -152,7 +152,8 @@ pub fn layout_vk(c: char) -> Option<u16> {
     use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
 
     // SAFETY: plain reads of the foreground window, its thread and that thread's layout.
-    let layout = unsafe { GetKeyboardLayout(GetWindowThreadProcessId(GetForegroundWindow(), None)) };
+    let layout =
+        unsafe { GetKeyboardLayout(GetWindowThreadProcessId(GetForegroundWindow(), None)) };
     layout_vk_in(c, layout)
 }
 
@@ -160,7 +161,10 @@ pub fn layout_vk(c: char) -> Option<u16> {
 /// modifier of its own; `None` otherwise.
 #[cfg(windows)]
 #[must_use]
-pub fn layout_vk_in(c: char, layout: windows::Win32::UI::Input::KeyboardAndMouse::HKL) -> Option<u16> {
+pub fn layout_vk_in(
+    c: char,
+    layout: windows::Win32::UI::Input::KeyboardAndMouse::HKL,
+) -> Option<u16> {
     let unit = u16::try_from(u32::from(c)).ok()?;
     // SAFETY: a pure lookup in the given keyboard layout.
     let scan = unsafe { windows::Win32::UI::Input::KeyboardAndMouse::VkKeyScanExW(unit, layout) };

@@ -30,7 +30,11 @@ fn marker_acl_is_owner_only() {
         USER,
         &local
     ));
-    assert!(!is_owner_only("D:P(A;;FA;;;S-1-5-21-9-9-9-1001)", USER, &local));
+    assert!(!is_owner_only(
+        "D:P(A;;FA;;;S-1-5-21-9-9-9-1001)",
+        USER,
+        &local
+    ));
     assert!(
         !is_owner_only("D:P", USER, &local),
         "an empty DACL locks the owner out too"
@@ -78,7 +82,9 @@ fn marker_acl_alias_is_the_local_machines_account_only() {
         &local
     ));
     assert!(
-        !is_owner_only("D:P(A;;FA;;;LA)(A;;FA;;;SY)", "S-1-5-21-1-2-3-500", &|_| None),
+        !is_owner_only("D:P(A;;FA;;;LA)(A;;FA;;;SY)", "S-1-5-21-1-2-3-500", &|_| {
+            None
+        }),
         "an alias the OS cannot resolve is not the user"
     );
 }

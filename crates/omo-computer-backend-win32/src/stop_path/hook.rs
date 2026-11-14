@@ -25,8 +25,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 
 use super::{
-    is_chord, key_held, liveness, reinstall, HookEvent, HotkeyVerdict, Liveness, Origin, PhysicalChord,
-    Sightings, StopCursor, VK_ESCAPE,
+    is_chord, key_held, liveness, reinstall, HookEvent, HotkeyVerdict, Liveness, Origin,
+    PhysicalChord, Sightings, StopCursor, VK_ESCAPE,
 };
 
 /// The `RegisterHotKey` id of the stop chord backstop.

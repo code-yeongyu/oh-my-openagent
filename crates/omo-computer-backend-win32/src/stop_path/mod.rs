@@ -108,7 +108,10 @@ impl PhysicalChord {
             keys.retain(|held| *held != vk);
         }
         let keys: &[u16] = keys;
-        is_chord(event, |modifier| key_held(modifier, |raw| keys.contains(&raw))).then_some(origin)
+        is_chord(event, |modifier| {
+            key_held(modifier, |raw| keys.contains(&raw))
+        })
+        .then_some(origin)
     }
 
     /// The virtual keys seen physically down and not yet up, as generic codes (a modifier is held

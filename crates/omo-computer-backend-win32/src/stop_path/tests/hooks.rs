@@ -1,12 +1,12 @@
 //! The low-level hooks (d-windows.md '## Capture guard and input lock').
 
+use crate::foreground::admit_leased;
 use crate::input::ledger::{replay, Entry, Ledger, Step};
 use crate::input::{KeyUnit, ENGINE_TAG, VK_CONTROL, VK_MENU, VK_SHIFT};
-use crate::foreground::admit_leased;
 use crate::input_lock::{lock_verdict, LockVerdict};
 use crate::stop_path::{
-    is_chord, is_stop_chord_key, liveness, normalize_vk, reinstall, HookEvent, HotkeyVerdict, Liveness,
-    Origin, PhysicalChord, Sightings, StopCursor, VK_ESCAPE,
+    is_chord, is_stop_chord_key, liveness, normalize_vk, reinstall, HookEvent, HotkeyVerdict,
+    Liveness, Origin, PhysicalChord, Sightings, StopCursor, VK_ESCAPE,
 };
 
 fn key(vk: u16, down: bool, origin: Origin, time: u64) -> HookEvent {
@@ -207,7 +207,9 @@ fn releasing_one_of_two_held_sides_keeps_the_generic_key_held() {
     tracker.on_key(&key(VK_LSHIFT, false, Origin::Physical, 2));
     assert_eq!(tracker.held(), vec![VK_SHIFT], "right Shift is still down");
     assert_eq!(
-        admit_leased(&tracker, &[]).expect_err("the user still holds Shift").keys,
+        admit_leased(&tracker, &[])
+            .expect_err("the user still holds Shift")
+            .keys,
         vec!["shift"]
     );
     tracker.on_key(&key(VK_RSHIFT, false, Origin::Physical, 3));
