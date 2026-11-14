@@ -319,7 +319,7 @@ export function createSealedStore<T>(
       throw new InvalidCredentialState(
         signInRoute() === "cli"
           ? "Stored sign-in data is invalid. Run omo account forget, then omo login."
-          : "The OmO sign-in saved on this computer can't be read. Run omo account forget to remove it, then sign in again in the desktop app.",
+          : "The OmO sign-in saved on this computer can't be read. Run omo account forget to remove it, then sign in again from the OmO desktop app on this computer, or with omo login in a terminal.",
       )
     }
   }
