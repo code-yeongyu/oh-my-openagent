@@ -72,6 +72,8 @@ pub struct FakeScenario {
     pub busy_timeline: Vec<BusyMark>,
     /// Stop-chord presses by fake-clock time.
     pub stop_timeline: Vec<StopPress>,
+    // --- The hand's consent view as a host hands it (row 21 reads it; nothing reads it here).
+    pub consent: Option<serde_json::Value>,
     /// Notifications by fake-clock time; absent scripts a host with no notification surface.
     pub notification_timeline: Option<Vec<NotificationPost>>,
     pub secure_focus: Option<SecureFocus>,
