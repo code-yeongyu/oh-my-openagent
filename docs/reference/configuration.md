@@ -476,12 +476,13 @@ Control parallel agent execution and concurrency limits. `background_task` (came
 | `providerConcurrency`       | -         | Per-provider limits (key = provider name)                             |
 | `modelConcurrency`          | -         | Per-model limits (key = `provider/model`). Overrides provider limits. |
 | `maxDepth`                  | -         | Maximum nested subagent depth (min: 1)                                |
-| `staleTimeoutMs`            | `2700000` | Interrupt tasks with no activity (min: 60000)                         |
-| `messageStalenessTimeoutMs` | `3600000` | Timeout when no progress update was ever received (min: 60000)        |
-| `taskTtlMs`                 | `1800000` | Absolute non-terminal task TTL (min: 300000)                          |
+| `staleTimeoutMs`            | `2700000` | Cancel a running background task with no activity for this long (min: 60000, `0`: never) |
+| `messageStalenessTimeoutMs` | `3600000` | Cancel a running background task that never reported progress this long after start (min: 60000, `0`: never) |
+| `taskTtlMs`                 | `1800000` | Drop a queued or running task whose last activity is this old, with its pending notices (min: 300000, `0`: never) |
 | `sessionGoneTimeoutMs`      | `60000`   | Timeout when a task session disappears (min: 10000)                   |
 | `taskCleanupDelayMs`        | `600000`  | Delay before terminal tasks and completed sync subagent sessions are removed (min: 60000) |
-| `syncPollTimeoutMs`         | -         | Synchronous polling timeout in milliseconds (min: 60000)             |
+| `syncPollTimeoutMs`         | `1800000` | Abort a foreground (`run_in_background=false`) `task` child after this long without observable activity (min: 60000, `0`: never) |
+| `syncMaxAssistantTurns`     | `300`     | Abort a foreground `task` child after this many assistant turns, as a runaway loop (`0`: no cap) |
 | `maxToolCalls`              | `4000`    | Maximum tool calls per subagent task (min: 10)                        |
 | `circuitBreaker`            | -         | Circuit-breaker object: `enabled` (default `true`), `maxToolCalls`, `consecutiveThreshold` |
 

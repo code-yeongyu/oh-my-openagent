@@ -1,6 +1,6 @@
 import type { DelegateTaskArgs, ToolContextWithMetadata, DelegatedModelConfig } from "./types"
 import type { ExecutorContext, ParentContext, SessionMessage } from "./executor-types"
-import { DEFAULT_SYNC_POLL_TIMEOUT_MS, getTimingConfig } from "./timing"
+import { DEFAULT_SYNC_POLL_TIMEOUT_MS, getTimingConfig, resolveSyncPollBudgetMs } from "./timing"
 import { buildTaskPrompt } from "./prompt-builder"
 import { cancelUnstableAgentTask } from "./cancel-unstable-agent-task"
 import { publishToolMetadata } from "../../features/tool-metadata-store"
@@ -109,7 +109,8 @@ export async function executeUnstableAgentTask(
     let terminalStatus: { status: string; error?: string } | undefined
     let completedDuringMonitoring = false
 
-    while (Date.now() - pollStart < (syncPollTimeoutMs ?? DEFAULT_SYNC_POLL_TIMEOUT_MS)) {
+    const timeoutBudgetMs = resolveSyncPollBudgetMs(syncPollTimeoutMs, DEFAULT_SYNC_POLL_TIMEOUT_MS)
+    while (Date.now() - pollStart < timeoutBudgetMs) {
       if (ctx.abort?.aborted) {
         cleanupReason = "Parent aborted while monitoring unstable background task"
         return `Task aborted (was running in background mode).\n\nSession ID: ${sessionID}`
@@ -128,7 +129,6 @@ export async function executeUnstableAgentTask(
         break
       }
 
-      const timeoutBudgetMs = syncPollTimeoutMs ?? DEFAULT_SYNC_POLL_TIMEOUT_MS
       const remainingBudgetMs = timeoutBudgetMs - (Date.now() - pollStart)
       await new Promise((resolve) =>
         setTimeout(resolve, Math.min(timingCfg.POLL_INTERVAL_MS, Math.max(1, remainingBudgetMs))),
@@ -183,7 +183,6 @@ ${taskMetadataBlock}`
     if (!completedDuringMonitoring) {
       cleanupReason = "Monitored unstable background task exceeded timeout budget"
       const duration = formatDuration(startTime)
-      const timeoutBudgetMs = syncPollTimeoutMs ?? DEFAULT_SYNC_POLL_TIMEOUT_MS
       return `SUPERVISED TASK TIMED OUT
 
 Task did not reach a stable completion signal within the monitored timeout budget.

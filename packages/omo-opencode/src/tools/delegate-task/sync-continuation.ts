@@ -214,6 +214,7 @@ export async function executeSyncContinuation(
         taskId,
         anchorMessageCount,
         anchorMessageID,
+        maxAssistantTurns: executorCtx.syncMaxAssistantTurns,
       },
       syncPollTimeoutMs,
     )
