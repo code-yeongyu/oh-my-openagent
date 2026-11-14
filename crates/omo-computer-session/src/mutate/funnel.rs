@@ -83,7 +83,8 @@ impl Session {
         };
         // Time passes between the first gate and here (the busy wait, another holder of the
         // interaction lock): on every path the gate runs again once the lock is held, and
-        // nothing is taken or sent before it. A refusal drops the lock with nothing sent.
+        // nothing is SENT before it. (The exec permit and the marker recovery come earlier;
+        // they send nothing.) A refusal drops the lock with nothing sent.
         if let Err(refused) = self.guard.admit_on(self.backend.as_mut(), &mutation.call) {
             drop(lock);
             return Err(self.refuse(
