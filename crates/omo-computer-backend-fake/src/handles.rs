@@ -78,7 +78,9 @@ impl StopListener for FakeStopListener {
                 Reason::Deaf.wire(),
             ));
         }
-        Ok(std::mem::take(&mut lock(&self.shared).stop_pressed))
+        let mut state = lock(&self.shared);
+        state.stop_polls += 1;
+        Ok(std::mem::take(&mut state.stop_pressed))
     }
 }
 

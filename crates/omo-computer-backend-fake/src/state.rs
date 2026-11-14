@@ -46,6 +46,8 @@ pub struct FakeState {
     pub stop_pressed: bool,
     /// How many `stop_timeline` presses have fired.
     pub stop_press_pos: usize,
+    /// How many times a live stop listener was polled.
+    pub stop_polls: u32,
 }
 
 impl FakeState {
@@ -93,6 +95,7 @@ impl FakeState {
             ax_event_pos: 0,
             stop_pressed: false,
             stop_press_pos: 0,
+            stop_polls: 0,
             scenario,
         }
     }
