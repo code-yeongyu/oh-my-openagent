@@ -1,0 +1,17 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    ".": {
+      "ignoreFiles": [
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        ".agents/skills/codex-qa/scripts/lib/mock-model.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        ".agents/skills/opencode-qa/scripts/lib/fake-openai-branches.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        ".agents/skills/opencode-qa/scripts/lib/fake-openai-events.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        ".agents/skills/opencode-qa/scripts/lib/fake-openai-server.mjs",
+      ]
+    }
+  }
+}
