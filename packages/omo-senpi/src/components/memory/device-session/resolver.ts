@@ -19,8 +19,7 @@ import type { SyncSessionRequest, SyncSessionResolution } from "../sync-runner"
 import { SyncSessionDeferredError } from "../sync-session-deferred"
 import type { DeviceAccountSource } from "./account-source"
 
-const REPO_NOT_CREATED =
-  "the memory repository is not created yet; sync starts after the first memory write."
+const REPO_NOT_CREATED = "the memory repository is not created yet; sync starts after the first memory write."
 
 export interface DeviceSessionRuntime {
   readonly openAccountSession: (options: AccountSessionOptions) => Promise<AccountSessionOutcome>
