@@ -5,9 +5,10 @@
 // omo.js only classifies the launch and memoizes the selection.
 //
 // The sidecar bundles its own copy of `#senpi-private-fds`, and evaluating that module captures the table (it removes
-// SENPI_PRIVATE_FDS from the environment). It is imported only when claimInheritedDesktopSync runs, through
-// inheritedPrivateChannel.ts, so importing the sidecar captures nothing: an entry that claims at boot reads the gate
-// first and passes its engine's own `take` (bootClaim.ts).
+// SENPI_PRIVATE_FDS from the environment). It is imported only when claimInheritedDesktopSync runs, so importing the
+// sidecar captures nothing: an entry that claims at boot reads the gate first and passes its engine's own `take`
+// (bootClaim.ts). Under every senpi host the engine has already captured the table before any extension module
+// evaluates (its CLI entries, and the extension loader's own import graph), so this copy reuses that capture.
 
 import type { Duplex } from "node:stream"
 import { attachDesktopSyncChannel } from "./channel"
@@ -26,6 +27,8 @@ export async function claimDesktopSync(options: {
 }): Promise<MemorySyncSelection> {
   const stream = options.take(MEMORY_SYNC_CHANNEL)
   if (options.deadline.aborted) {
+    // senpi's take hands disposal of the stream to the caller; past the bound the answer is already unavailable, so
+    // the descriptor is closed here, once, instead of starting an exchange nobody waits for.
     stream?.destroy()
     return { kind: "unavailable", reason: "private_channel_unavailable" }
   }
@@ -53,6 +56,6 @@ export async function claimDesktopSync(options: {
 
 /** The engine's own claim: senpi's inherited descriptor and the framed desktop channel, within the selection's bound. */
 export async function claimInheritedDesktopSync(deadline: AbortSignal): Promise<MemorySyncSelection> {
-  const { takeInheritedPrivateChannel } = await import("./inheritedPrivateChannel")
+  const { takeInheritedPrivateChannel } = await import("#senpi-private-fds")
   return claimDesktopSync({ take: takeInheritedPrivateChannel, attach: attachDesktopSyncChannel, deadline })
 }
