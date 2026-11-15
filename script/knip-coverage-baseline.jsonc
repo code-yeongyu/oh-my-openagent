@@ -1008,8 +1008,6 @@
         "src/sync/engine/index.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) MAX_RECEIPTS
         "src/sync/item/capture-receipts.ts": ["exports"],
-        // pre-existing at origin dev 4686e425b5: unused export(s) x25519PublicKey
-        "src/sync/recovery/derive.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) VETO_WINDOW_MS
         "src/sync/recovery/index.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) VETO_WINDOW_MS
