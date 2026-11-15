@@ -5,12 +5,13 @@ import { join } from "node:path"
 
 /**
  * Temporary folders and a one-commit git repository for worktree tests; `cleanup` removes everything made. Folders are
- * returned canonical (macOS's tmpdir is under the /var -> /private/var symlink, and git reports real paths).
+ * returned canonical (macOS's tmpdir is under the /var -> /private/var symlink, Windows' under an 8.3 short name, and git
+ * reports real long paths); `gitPath` spells a path the way git prints it (forward slashes on Windows).
  */
 export function gitRepoKit() {
   const made: string[] = []
   const folder = (prefix: string): string => {
-    const path = realpathSync(mkdtempSync(join(tmpdir(), prefix)))
+    const path = realpathSync.native(mkdtempSync(join(tmpdir(), prefix)))
     made.push(path)
     return path
   }
@@ -32,5 +33,6 @@ export function gitRepoKit() {
   const cleanup = (): void => {
     for (const path of made.splice(0)) rmSync(path, { recursive: true, force: true })
   }
-  return { folder, git, repository, cleanup }
+  const gitPath = (path: string): string => (process.platform === "win32" ? path.replaceAll("\\", "/") : path)
+  return { folder, git, gitPath, repository, cleanup }
 }

@@ -48,7 +48,10 @@ describe("thread_create with worktree on this device", () => {
     const repo = kit.repository()
     const { run, openSession } = surface(account().remote)
     const result = await run("thread_create", { cwd: repo, worktree: { branch: "feat/thread" } })
-    expect(result).toMatchObject({ kind: "ok", thread: { worktree: { branch: "feat/thread", repository: repo } } })
+    expect(result).toMatchObject({
+      kind: "ok",
+      thread: { worktree: { branch: "feat/thread", repository: kit.gitPath(repo) } },
+    })
     const path = (result as unknown as { thread: { worktree: { path: string } } }).thread.worktree.path
     expect(path.startsWith(agentDir)).toBe(true)
     expect(openSession.mock.calls.map((call) => call[0])).toEqual([{ cwd: path }])

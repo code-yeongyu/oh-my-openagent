@@ -147,7 +147,7 @@ describe("M1: a worktree made for a thread whose open fails is removed", () => {
     expect(errorOf(result)).toMatchObject({
       code: "scope_denied",
       details: {
-        worktree: { branch: "far-kept", repository: repo },
+        worktree: { branch: "far-kept", repository: kit.gitPath(repo) },
         cleanup: {
           code: "partial_commit",
           details: { reason: "worktree_left_behind", branch: "far-kept", device: "b" },

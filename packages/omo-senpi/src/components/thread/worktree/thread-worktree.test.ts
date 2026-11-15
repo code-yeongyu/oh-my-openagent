@@ -20,7 +20,7 @@ describe("createThreadWorktree", () => {
     expect(outcome.worktree.path.endsWith("feat-x")).toBe(true)
     expect(outcome.worktree.base).toBe(kit.git(repo, "rev-parse", "HEAD"))
     expect(kit.git(outcome.worktree.path, "branch", "--show-current")).toBe("feat/x")
-    expect(kit.git(repo, "worktree", "list")).toContain(outcome.worktree.path)
+    expect(kit.git(repo, "worktree", "list")).toContain(kit.gitPath(outcome.worktree.path))
   })
 
   test("#given no branch #when the worktree is created #then a fresh omo/thread-* branch is generated", async () => {

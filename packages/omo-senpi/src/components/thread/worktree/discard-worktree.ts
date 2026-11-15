@@ -46,9 +46,17 @@ export async function discardWorktree(options: {
     })
   const registered = async (): Promise<boolean> => {
     const list = await git(["worktree", "list", "--porcelain"], repository)
-    // git prints the realpath (e.g. /private/tmp on macOS); either spelling counts, so a locked worktree is never rm'd.
-    const spellings = new Set([path, await realpath(path).catch(() => path)])
-    return list.exit !== 0 || list.stdout.split("\n").some((line) => spellings.has(line.slice("worktree ".length)))
+    if (list.exit !== 0) return true
+    // git prints its own spelling of each worktree: the realpath with long names, and forward slashes on Windows (e.g.
+    // /private/tmp on macOS, C:/Users/... for C:\Users\RUNNER~1\...). Compare canonical paths, so a locked worktree is
+    // never rm'd whichever way the caller spelled it.
+    const canonical = (spelled: string): Promise<string> => realpath(spelled).catch(() => resolve(spelled))
+    const target = await canonical(path)
+    const listed = list.stdout
+      .split("\n")
+      .filter((line) => line.startsWith("worktree "))
+      .map((line) => line.slice("worktree ".length))
+    return (await Promise.all(listed.map(canonical))).includes(target)
   }
   if (await exists(path)) await git(["worktree", "remove", "--force", path], repository)
   if (options.removeUnregisteredFolder === true && (await exists(path)) && !(await registered()))
