@@ -27,7 +27,7 @@ import type { EngineDeps } from "./engine-deps"
 import { dischargeOwed, oweRender } from "./held"
 import { acceptedItems, acceptedKeys, rejectItem } from "./item-keys"
 import { type CycleRecord, fromBase64, type RenderRecord, type SyncJournal } from "./journal"
-import { prepareLanding, readWorking } from "./landing"
+import { fsRefusal, prepareLanding, readWorking } from "./landing"
 import { adoptLegacyRenders } from "./legacy-cycle"
 import { diskLister, type ItemPaths, itemPaths, landingPath, scanWorkingTree } from "./working-tree"
 
@@ -70,8 +70,12 @@ export async function adoptLandedRenders(
     if ((await deps.store.version(record.key)) !== record.frontier) continue
     await deps.store.markMaterialized(record.key, record.text)
   }
+  // A leaf this device refuses to read (a symlink, a FIFO, a socket) holds no legacy render: not adoptable.
   await adoptLegacyRenders(deps, cycle, new Set(latest.keys()), (key) =>
-    readWorking(deps.repo.root, landingPath(paths, key) ?? key),
+    readWorking(deps.repo.root, landingPath(paths, key) ?? key).catch((error: unknown) => {
+      if (fsRefusal(error) === null) throw error
+      return undefined
+    }),
   )
 }
 

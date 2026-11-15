@@ -10,7 +10,7 @@
 
 import { dirname, isAbsolute, join, relative, sep } from "node:path"
 
-import { constants, existsSync, lstat, mkdir, open, realpath } from "../../fs/resilient"
+import { constants, existsSync, lstat, mkdir, open, realpath, retryOnEintr } from "../../fs/resilient"
 import { caseFold } from "../item/casefold"
 
 const FS_REFUSALS = new Set(["EISDIR", "ENOTDIR", "ENAMETOOLONG", "EACCES", "EPERM", "ELOOP", "EEXIST", "EINVAL"])
@@ -55,10 +55,12 @@ export function fsRefusal(error: unknown): string | null {
 
 // O_NONBLOCK: opening a FIFO with no writer returns at once instead of blocking, and the fstat below
 // then refuses it. O_NOFOLLOW: a leaf swapped for a symlink fails with ELOOP instead of being read
-// through. A socket, or a device node with no device, fails this open with ENXIO before fstat can
-// see it; that is the same refusal. Windows has neither flag (and no FIFOs in a working tree), so
-// they are 0 there.
+// through. A socket, or a device node with no device, fails this open before fstat can see it: with
+// ENXIO on Linux, with EOPNOTSUPP (or ENOTSUP) for a socket on macOS. Each is the same refusal.
+// Windows has neither flag (and no FIFOs in a working tree), so they are 0 there.
 const READ_WORKING_FLAGS = constants.O_RDONLY | (constants.O_NONBLOCK ?? 0) | (constants.O_NOFOLLOW ?? 0)
+const NON_REGULAR_OPEN_ERRORS = new Set(["ENXIO", "EOPNOTSUPP", "ENOTSUP"])
+const READ_CHUNK_BYTES = 64 * 1024
 
 /**
  * The working text at `path`, or null when nothing is there. The kind of file is judged on the opened
@@ -71,14 +73,24 @@ export async function readWorking(root: string, path: string): Promise<string | 
     handle = await open(join(root, path), READ_WORKING_FLAGS)
   } catch (error) {
     if (error instanceof Error && "code" in error && error.code === "ENOENT") return null
-    if (error instanceof Error && "code" in error && error.code === "ENXIO") {
+    if (error instanceof Error && "code" in error && NON_REGULAR_OPEN_ERRORS.has(String(error.code))) {
       throw new NonRegularLeafError(`not a regular file: ${path}`)
     }
     throw error
   }
   try {
     if (!(await handle.stat()).isFile()) throw new NonRegularLeafError(`not a regular file: ${path}`)
-    return await handle.readFile("utf8")
+    // Positional reads, each retried on EINTR: a handle's readFile moves the file position, so the
+    // EINTR-resilient handle cannot replay it, while a read at an explicit offset is idempotent.
+    const chunks: Buffer[] = []
+    for (let position = 0; ; ) {
+      const buffer = Buffer.alloc(READ_CHUNK_BYTES)
+      const { bytesRead } = await retryOnEintr(() => handle.read(buffer, 0, buffer.length, position))
+      if (bytesRead === 0) break
+      chunks.push(buffer.subarray(0, bytesRead))
+      position += bytesRead
+    }
+    return Buffer.concat(chunks).toString("utf8")
   } finally {
     await handle.close()
   }
