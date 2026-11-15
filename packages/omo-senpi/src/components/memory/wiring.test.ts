@@ -17,7 +17,7 @@ import { withinMs } from "./kibitzer/sidecar.test-support"
 import { MEMORY_NOTICE_CUSTOM_TYPE, MEMORY_PRESSURE_METADATA_TOKEN } from "./prompt"
 import { RECALL_CUSTOM_TYPE } from "./recall-wiring"
 import { SESSION_SHUTDOWN_DRAIN_BUDGET_MS } from "./shutdown-drain"
-import { createMemoryWiring } from "./wiring"
+import { createMemoryWiring, type MemorySessionStateLike } from "./wiring"
 import { composeOmoSenpiExtension } from "../../extension/compose"
 import type { SenpiModelPort } from "@oh-my-opencode/senpi-task"
 import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
@@ -1053,4 +1053,62 @@ describe("memory footer live wiring", () => {
     harness.advanceFrames(10)
     expect(harness.statusCalls).toHaveLength(afterShutdown)
   })
+
+  // #13695: the open-session case proves the settle refresh does repaint after a clear, so the closing case's
+  // silence comes from the shutting-down flag, not from a refresh that had nothing to publish.
+  for (const shuttingDown of [false, true] as const) {
+    test(`#given a settle refresh still running when the footer is cleared #when the session ${shuttingDown ? "is marked shutting down" : "stays open"} #then the refresh ${shuttingDown ? "repaints nothing" : "repaints the footer"}`, async () => {
+      // given: a committed memory repo, and a sync status read the test holds, so the refresh is running at the clear.
+      const fixture = await createFixture()
+      await new GitMemoryRepo({ dir: fixture.context.identityPaths.repo, agentId: fixture.identity }).init({
+        seedFiles: [{ relativePath: "system/persona.md", content: "---\ndescription: Persona\n---\npersona\n" }],
+      })
+      const readEntered = Promise.withResolvers<void>()
+      const readGate = Promise.withResolvers<void>()
+      let held = false
+      const state: MemorySessionStateLike = { context: fixture.context }
+      const wiring = createMemoryWiring({
+        sessions: new Map([[fixture.sessionId, state]]),
+        loadConfig: () => loadedMemoryConfig(memorySettings()),
+        cwd: () => fixture.cwd,
+        env: fixture.env,
+        createRuntime: () => ({ reconcile: async () => {} }) as unknown as MemoryIdentityRuntime,
+        syncStatus: async () => {
+          if (!held) {
+            held = true
+            readEntered.resolve()
+            await readGate.promise
+          }
+          return null
+        },
+      })
+      const pi = new MemoryFakeExtensionAPI()
+      wiring.registerStatic(pi, componentContext())
+      const statusCalls: Array<{ key: string; text: string | undefined }> = []
+      const eventCtx = sessionContext(fixture.sessionId, statusCalls)
+      await pi.dispatch("agent_settled", {}, eventCtx)
+      await withinMs(readEntered.promise, "the settle refresh", remainingTestTime())
+
+      // when
+      if (shuttingDown) state.shuttingDown = true
+      wiring.clearStatus(eventCtx)
+      readGate.resolve()
+      // The drain waits for the refresh (status-settle) before it disposes the footer.
+      await wiring.onSessionShutdown({
+        reason: "quit",
+        sessionId: fixture.sessionId,
+        deadlineAt: Date.now() + remainingTestTime(),
+        now: () => Date.now(),
+      })
+
+      // then
+      expect(statusCalls[0]).toEqual({ key: MEMORY_STATUS_KEY, text: undefined })
+      if (shuttingDown) {
+        expect(statusCalls).toHaveLength(1)
+      } else {
+        expect(statusCalls).toHaveLength(2)
+        expectRelativeStatus(statusCalls[1], fixture.identity)
+      }
+    })
+  }
 })
