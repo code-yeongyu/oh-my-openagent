@@ -7,6 +7,7 @@ export {
   KeychainApprovalPendingError,
   quietNotice,
 } from "./keystore"
+export { machineBindingAfterRefresh } from "./machine-binding"
 export { type Credentials, SignInError, serviceOrigin } from "./protocol"
 export { type BeforeKeysDiscarded, createSession, type DiscardedCredential, type Session } from "./session"
 export { retireSyncPinOnDiscard } from "./sync-pin-retire"

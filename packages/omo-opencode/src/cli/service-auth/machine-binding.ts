@@ -6,6 +6,7 @@ import { z } from "zod"
 import { credentialId } from "./keystore"
 import { advertisesMachineIdentity, readMachineDigest } from "./machine-digest"
 import { ApiRefusal, type Credentials, parseReply, SignInError } from "./protocol"
+import { requestApi } from "./protocol-request"
 
 type Request = (path: string, init: RequestInit) => Promise<unknown>
 
@@ -13,7 +14,7 @@ type Request = (path: string, init: RequestInit) => Promise<unknown>
  * Binds a device registered before machine identity to this machine (#6503 FINAL contract section 4): the session calls
  * it after a refresh, outside the credential lock, with the refreshed credential.
  */
-export type MachineBinding = (held: Credentials, request: Request) => Promise<void>
+export type MachineBinding = (held: Credentials) => Promise<void>
 
 const MACHINE_BIND_CONTEXT = "omo-machine-bind-v1"
 
@@ -133,6 +134,9 @@ export function machineBindingAfterRefresh(options: {
   readonly home?: string
   readonly readDigest?: () => Promise<string | undefined>
   readonly now?: () => number
+  /** The fetch the caller's own service requests use (memory sync injects one); the global fetch otherwise. */
+  readonly fetch?: typeof fetch
+  readonly signal?: AbortSignal
 }): MachineBinding {
   const markerPath = machineBindingMarkerPath(options.home ?? homedir(), options.api)
   const binder = {
@@ -140,7 +144,8 @@ export function machineBindingAfterRefresh(options: {
     readDigest: options.readDigest ?? (() => readMachineDigest()),
     now: options.now ?? Date.now,
   }
-  return async (held, request) => {
+  const request: Request = (path, init) => requestApi(options.api, path, init, options.signal, options.fetch)
+  return async (held) => {
     if ((await answeredFor(markerPath)) === held.device.id) return
     let outcome: Outcome
     try {

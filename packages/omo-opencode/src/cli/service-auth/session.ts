@@ -139,7 +139,7 @@ export function createSession(options: {
       if (next !== current) successor = next
       return next
     })
-    if (successor !== undefined) await options.machineBinding?.(successor, request)
+    if (successor !== undefined) await options.machineBinding?.(successor)
     return value
   }
   /** The account a token's sign-in belongs to; undefined when the service does not say (never blocks logout). */

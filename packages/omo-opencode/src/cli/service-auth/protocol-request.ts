@@ -24,12 +24,18 @@ const envelopeSchema = z.object({
 const machineExistsDetail = z.object({ deviceId: nonempty })
 const clockSkewDetail = z.object({ serverTime: z.number().int().nonnegative() })
 
-export async function requestApi(api: string, path: string, init: RequestInit, signal?: AbortSignal): Promise<unknown> {
+export async function requestApi(
+  api: string,
+  path: string,
+  init: RequestInit,
+  signal?: AbortSignal,
+  fetchImpl: typeof fetch = fetch,
+): Promise<unknown> {
   refuseIfLocalOnly("service-auth/protocol-request.ts requestApi")
   let response: Response
   let body: unknown
   try {
-    response = await fetch(`${api}${path}`, {
+    response = await fetchImpl(`${api}${path}`, {
       ...init,
       redirect: "error",
       signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(30_000)]) : AbortSignal.timeout(30_000),

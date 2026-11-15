@@ -12,6 +12,7 @@ import {
   currentServiceDevice,
   retireSyncPinOnDiscard,
   KeychainApprovalPendingError,
+  machineBindingAfterRefresh,
   quietNotice,
   serviceOrigin,
   SignInError,
@@ -120,6 +121,8 @@ export function createCliAccountSource(options: {
   readonly logger?: { warn(line: string): void }
   /** This machine's device service; absent, it is never told anything. */
   readonly relay?: HeldCredentialRelay
+  /** This machine's hardware digest (#6503); absent, the platform's validated hardware id is read. */
+  readonly machineDigest?: () => Promise<string | undefined>
 }): () => Promise<CliDeviceAccount | null> {
   const configured = options.api === undefined ? options.env?.OMO_SERVICE_API_URL : undefined
   let api: string
@@ -185,6 +188,15 @@ export function createCliAccountSource(options: {
       store,
       ...(options.home === undefined ? {} : { home: options.home }),
       beforeKeysDiscarded,
+      // On a computer with only the CLI this sync session is what refreshes the sign-in, so a refresh here binds its
+      // device to this machine (#6503), over the same fetch as the source's own service reads.
+      machineBinding: machineBindingAfterRefresh({
+        api,
+        fetch: doFetch,
+        log: (line) => options.logger?.warn(line),
+        ...(options.home === undefined ? {} : { home: options.home }),
+        ...(options.machineDigest === undefined ? {} : { readDigest: options.machineDigest }),
+      }),
       // A sign-in the service ends on refresh is a local end of the sign-in: the device service forgets the device.
       ...(relay === undefined
         ? {}

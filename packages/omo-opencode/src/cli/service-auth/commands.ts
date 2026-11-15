@@ -106,7 +106,11 @@ async function run(
       store,
       signal: controller.signal,
       ...(deviceService === undefined ? {} : { deviceService }),
-      machineBinding: machineBindingAfterRefresh({ api, log: (line) => console.error(line) }),
+      machineBinding: machineBindingAfterRefresh({
+        api,
+        signal: controller.signal,
+        log: (line) => console.error(line),
+      }),
       beforeKeysDiscarded: retireSyncPinOnDiscard({
         pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())),
         log: (line) => console.error(line),
