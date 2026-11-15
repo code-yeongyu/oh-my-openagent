@@ -224,6 +224,7 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
     const session = resolved
     if (session.deviceName !== undefined) nameLookups.set(identity, session.deviceName)
     hooks.stage("engine open")
+    if (hooks.replaced()) return null
     if (options.open === undefined) {
       // A missing or unloadable sidecar is an install defect, not a sync failure: report it as a
       // typed status and keep the session running without sync.
@@ -249,6 +250,11 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
       ...(options.onStatusChange === undefined ? {} : { onStatusChange: () => options.onStatusChange?.(paths.repo) }),
     })
     if (device === null) {
+      // The lease may be held by this process's own replaced start, which is still finishing: retry, never idle.
+      if (hooks.ownStartInFlight()) {
+        hooks.deferred("an earlier start of this memory's sync is still finishing.")
+        return null
+      }
       logger.info("memory sync idle: another OmO process on this device is syncing this memory", { identity })
       return null
     }
