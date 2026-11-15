@@ -13,6 +13,7 @@ import {
   reportFailure,
   runLocalRemoteVerb,
 } from "./remote-local"
+import { isHelpFlag, REMOTE_USAGE, verbUsage } from "./remote-usage"
 import { VERBS } from "./remote-verbs"
 
 export type { RemoteCommandDependencies } from "./remote-local"
@@ -20,41 +21,30 @@ export type { RemoteCommandDependencies } from "./remote-local"
 // device-service SDK: every command has a human table and a --json form that prints the SDK's typed value as is.
 export { REMOTE_EXIT } from "./remote-exit"
 
-const REMOTE_USAGE = `usage: omo remote <command> [--json]
-  status                                   the device service's connection state
-  devices                                  the devices on this account
-  sessions [--device D] [--project P] [--state running|idle|ended]
-                                           sessions across the account's devices
-  enable | disable                         turn remote sessions on or off for this device
-  control [on|off]                         whether your other signed-in devices can view and command this
-                                           device's sessions (on unless you turn it off)
-  bootstrap                                set up this device's service for your sign-in (every omo start runs it)
-  attach <device>/<session>                open a session on another device in the terminal UI, to watch and type
-  open <device> [--project P] [--model M] [--permission-preset MODE]
-                                           start a session on another device; prints <device>/<session>; it runs
-                                           in MODE (default: this device's own setting, else full-access)
-  send <device>/<session> <text> [--steer|--follow-up] [--no-wait]
-                                           send a message and print the answer as it arrives (--steer: into the
-                                           running turn; --no-wait: return once the session took it)
-  model <device>/<session> <provider/id>   switch the session's model
-  interrupt <device>/<session>             stop the session's running turn
-  close <device>/<session>                 end the session on its device`
-
 /** `omo remote` verbs; `bootstrap` also needs the pinned install, the stored keys and this omo binary. */
 export interface RemoteVerbDependencies extends RemoteCommandDependencies {
   readonly bootstrap: BootstrapSetup
 }
 
 export async function runRemoteVerb(dependencies: RemoteVerbDependencies, args: readonly string[]): Promise<number> {
+  // Help is an answer, not a usage error: stdout and exit 0, before anything is parsed or contacted.
+  const [first, ...afterFirst] = args
+  if (first === "help" || isHelpFlag(first)) {
+    dependencies.output(REMOTE_USAGE)
+    return REMOTE_EXIT.ok
+  }
+  // Only the options before a `--` terminator count: after it, `--help` is text (a message to send). The `--` terminator itself lands with #13431.
+  const terminator = afterFirst.indexOf("--")
+  const options = terminator === -1 ? afterFirst : afterFirst.slice(0, terminator)
+  if (VERBS.some((verb) => verb === first) && options.some(isHelpFlag)) {
+    dependencies.output(verbUsage(first ?? ""))
+    return REMOTE_EXIT.ok
+  }
   let parsed: Parsed
   try {
     parsed = parse(args)
     if (!VERBS.some((verb) => verb === parsed.command))
-      throw new UsageError(
-        parsed.command === "" || parsed.command === "help" || parsed.command === "--help"
-          ? ""
-          : `omo remote: unknown command ${parsed.command}`,
-      )
+      throw new UsageError(parsed.command === "" ? "" : `omo remote: unknown command ${parsed.command}`)
   } catch (error) {
     if (!(error instanceof UsageError)) throw error
     if (error.message) dependencies.error(error.message)
@@ -78,6 +68,10 @@ export async function prepareRemoteAttach(
   dependencies: RemoteCommandDependencies,
   args: readonly string[],
 ): Promise<RemoteAttachLaunch | number> {
+  if (args.some(isHelpFlag)) {
+    dependencies.output(verbUsage("attach"))
+    return REMOTE_EXIT.ok
+  }
   const [target, ...extra] = args
   const slash = target?.indexOf("/") ?? -1
   if (target === undefined || extra.length > 0 || slash <= 0 || slash === target.length - 1) {
