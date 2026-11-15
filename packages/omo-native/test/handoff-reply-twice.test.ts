@@ -66,6 +66,8 @@ type Script = {
   readonly queued?: boolean
   /** Records the session writes before the prompt's reply reaches the sender (before the aim). */
   readonly beforeReply?: readonly JsonObject[]
+  /** b's engine stamps no client message id on the prompt's message (an engine that keeps none). */
+  readonly unstamped?: boolean
   /** Per read (1-based): records written before that read's page reaches the follow, the page, records written after. */
   readonly reads: ReadonlyArray<{
     readonly before?: readonly JsonObject[]
@@ -84,7 +86,8 @@ async function send(script: Script) {
   // The run's prompt message streams stamped with the client message id this send's prompt named, as senpi streams it.
   let promptClientMessageId: unknown
   const emit = (records: readonly JsonObject[] = []) => {
-    for (const record of records) listener?.(stampPromptRecord(record, promptClientMessageId))
+    for (const record of records)
+      listener?.(script.unstamped === true ? record : stampPromptRecord(record, promptClientMessageId))
   }
   let reads = 0
   const remote: RemoteThreadSurface = {
@@ -192,6 +195,10 @@ describe("omo remote send prints its own turn's answer exactly once, whatever th
       { beforeReply: [...RUN, SETTLE], reads: [{ entries: STORED }] },
     ],
     [
+      "C' started, an engine that stamps no client message id: deltas + settle before the reply (buffered), transcript holds the answer",
+      { unstamped: true, beforeReply: [...RUN, SETTLE], reads: [{ entries: STORED }] },
+    ],
+    [
       "D started: deltas before the reply, settle after the probe's read",
       { beforeReply: RUN, reads: [{ entries: STORED, after: [SETTLE] }] },
     ],
@@ -226,6 +233,7 @@ describe("omo remote send prints its own turn's answer exactly once, whatever th
     const row = async () => {
       const result = await send(script)
       expect(result.printed).toBe("pong\n")
+      expect(result.code).toBe(0)
     }
     // Ordering D (deltas before the reply, settle after the probe's read) loses the answer: a separate defect.
     if (name.startsWith("D started")) test.todo(`${name} (oh-my-openagent#13512)`, row)

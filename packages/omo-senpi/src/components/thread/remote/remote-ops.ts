@@ -401,24 +401,30 @@ export async function followRemote(
     onText(delta)
   }
   // Whether a buffered stream record is this send's own prompt: senpi streams the prompt's user message as the run
-  // starts, and stores its entry at that message's end. A send with a client message id owns only the message carrying
-  // that id: an earlier identical prompt with no id (a send without --wait, text typed in the TUI) is not its own. Only
-  // a send with no id of its own matches by text, as the transcript readers match an engine that keeps no id (#13481
-  // review M1).
-  const isOwnPrompt = (record: JsonObject): boolean => {
+  // starts, and stores its entry at that message's end. A message carrying this send's client message id is its own
+  // ("id"); one carrying any other id never is, whether this send has an id or not. An unstamped message carrying the
+  // send's text matches by text ("text"): a send with no id stores no id, and an engine that keeps no id stamps none
+  // (#13481 review M1, L1).
+  const promptMatchOf = (record: JsonObject): "id" | "text" | undefined => {
     const text = options?.text
-    if (text === undefined || record["type"] !== "message_end" || !isUserEntry(record)) return false
-    const clientMessageId = options?.clientMessageId
-    if (clientMessageId !== undefined) return entryClientMessageIdOf(record) === clientMessageId
-    return entryTextOf(record)?.includes(text) === true
+    if (text === undefined || record["type"] !== "message_end" || !isUserEntry(record)) return undefined
+    const stamped = entryClientMessageIdOf(record)
+    if (stamped !== undefined) return stamped === options?.clientMessageId ? "id" : undefined
+    return entryTextOf(record)?.includes(text) === true ? "text" : undefined
   }
+  // Whether a record shows the engine stamps client message ids: then an id-carrying send's own prompt carries its id,
+  // and an unstamped same-text prompt is an earlier send's (a send without --wait, text typed in the TUI) (#13481 review M1).
+  const showsStamping = (record: JsonObject): boolean =>
+    isUserEntry(record) && entryClientMessageIdOf(record) !== undefined
   /**
    * Reads the transcript once for a started turn that may have finished, or been superseded, before the aim.
    * `settleSignal`: this turn's own run settled before the aim. `promptStored`: the stream showed this send's prompt
    * stored before the read, so the newest entry carrying its text is its own; without that (and without its client
    * message id on an entry) the newest text match may be an earlier identical send, and nothing prints (#13481 review M1).
+   * `storedByText`: an id-carrying send's prompt was matched only by its text (an engine that keeps no id), which holds
+   * only while the transcript shows no stamped entry either (#13481 review L1).
    */
-  const probe = async (settleSignal: boolean, promptStored: boolean): Promise<void> => {
+  const probe = async (settleSignal: boolean, promptStored: boolean, storedByText: boolean): Promise<void> => {
     const text = options?.text
     if (done || text === undefined) return
     const page = await remote.sessions.read(row.device, row.session_id, READ_TAIL)
@@ -434,6 +440,9 @@ export async function followRemote(
     let anchor = own
     if (anchor < 0) {
       if (!promptStored) return
+      // A prompt matched only by its text is this id-carrying send's only on an engine that stamps no id: a stamped
+      // entry in the transcript says the matched prompt is an earlier send's (#13481 review M1, L1).
+      if (storedByText && entries.some(showsStamping)) return
       const matches = anchorMatches(entries, text)
       if (matches.length === 0) return
       anchor = matches[matches.length - 1]
@@ -463,11 +472,6 @@ export async function followRemote(
     if (!(superseded || (settleSignal && (answerAtTail || interrupted)))) return
     if (answer.length === 0 && !interrupted) return
     const stored = answer.join("\n")
-    // An interrupted turn whose partial text the stream already printed ends without printing it again; deltas that
-    // are not this turn's text (a later message's turn) never drop its partial answer, which prints below (#13481
-    // review L3).
-    if (interrupted && streamed !== "" && (stored.startsWith(streamed) || streamed.startsWith(stored)))
-      return end("interrupted")
     if (streamed === "")
       for (const [index, entryText] of answer.entries()) {
         if (index > 0) onText("\n")
@@ -532,10 +536,15 @@ export async function followRemote(
     if (lane === "started") {
       // This send's run ended before the aim only when the buffer holds a settle AFTER this send's own prompt: a settle
       // buffered with no prompt of its own before it is an earlier run's, never this turn's signal (#13481 review M1).
-      const ownPrompt = buffer.findLastIndex(isOwnPrompt)
+      // A send with an id takes a prompt matched by its text only while nothing buffered shows the engine stamps ids:
+      // an engine that keeps no id stamps none, so its turn that finished before the aim still prints (#13481 review L1).
+      const byId = buffer.findLastIndex((record) => promptMatchOf(record) === "id")
+      const textAllowed = options?.clientMessageId === undefined || !buffer.some(showsStamping)
+      const byText = byId >= 0 || !textAllowed ? -1 : buffer.findLastIndex((record) => promptMatchOf(record) === "text")
+      const ownPrompt = byId >= 0 ? byId : byText
       const settledAlready =
         ownPrompt >= 0 && buffer.slice(ownPrompt + 1).some((record) => record["type"] === "agent_settled")
-      void probe(settledAlready, ownPrompt >= 0)
+      void probe(settledAlready, ownPrompt >= 0, byId < 0 && options?.clientMessageId !== undefined)
     }
   }
   const watched = await remote.sessions.watch(row.device, row.session_id, receive)

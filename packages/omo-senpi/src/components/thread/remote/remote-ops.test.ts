@@ -570,51 +570,80 @@ describe("followRemote: an earlier run's stop reason does not mark this send's r
 })
 
 describe("#13481 review: a started send prints its own turn, never an earlier identical send's", () => {
-  // The earlier send carries another client message id, or none at all (a send without --wait, text typed in the
-  // TUI): either way a send with its own id never counts it as its prompt (#13481 review M1).
-  for (const earlierId of ["cm-old", undefined]) {
-    test(`#given an earlier identical send ${earlierId === undefined ? "with no client message id" : "with another client message id"} whose whole run and settle reached the buffer before this send's reply #when this send's own turn streams after the aim #then only its answer prints, never the earlier one`, async () => {
-      const transcript = [
-        earlierId === undefined ? message("u1", "user", "ping") : stampedUser("u1", "ping", earlierId),
+  // A prompt carrying another client message id is never this send's, whether this send has an id or not. An earlier
+  // prompt with no id (a send without --wait, text typed in the TUI) is not an id-carrying send's own on an engine
+  // that shows it stamps ids (#13481 review M1).
+  const cases: ReadonlyArray<{ name: string; earlierId?: string; ownId?: string; transcript: JsonObject[] }> = [
+    {
+      name: "with another client message id",
+      earlierId: "cm-old",
+      ownId: "cm-new",
+      transcript: [stampedUser("u1", "ping", "cm-old"), message("a1", "assistant", "EARLIER")],
+    },
+    {
+      name: "with no client message id, on an engine that stamps ids",
+      ownId: "cm-new",
+      transcript: [
+        stampedUser("u0", "hello", "cm-older"),
+        message("a0", "assistant", "hi"),
+        message("u1", "user", "ping"),
         message("a1", "assistant", "EARLIER"),
-      ]
+      ],
+    },
+    {
+      name: "with a client message id, before a send that has none",
+      earlierId: "cm-old",
+      transcript: [stampedUser("u1", "ping", "cm-old"), message("a1", "assistant", "EARLIER")],
+    },
+  ]
+  for (const { name, earlierId, ownId, transcript } of cases) {
+    test(`#given an earlier identical send ${name} whose whole run and settle reached the buffer before this send's reply #when this send's own turn streams after the aim #then only its answer prints, never the earlier one`, async () => {
       const { remote, deliver } = followSurface(transcript)
       const printed: string[] = []
       const follow = await followRemote(remote, ROW, (text) => printed.push(text), {
         text: "ping",
-        clientMessageId: "cm-new",
+        ...(ownId === undefined ? {} : { clientMessageId: ownId }),
       })
       if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
       deliver([{ type: "agent_start" }, prompted("ping", earlierId), delta("EARLIER"), { type: "agent_settled" }])
       follow.aim("started")
       // The probe's transcript read completes before this send's own run streams.
       await flush()
-      deliver([{ type: "agent_start" }, prompted("ping", "cm-new"), delta("pong"), { type: "agent_settled" }])
+      deliver([{ type: "agent_start" }, prompted("ping", ownId), delta("pong"), { type: "agent_settled" }])
       expect(await withTimeout(follow.settled, 2000, "the follow never settled")).toBe("settled")
       expect(printed).toEqual(["pong"])
       follow.stop()
     })
   }
 
-  test("#given an interrupted turn whose partial text already streamed #when the probe finds it final in the transcript #then it ends interrupted without printing the text again", async () => {
-    const transcript = [
-      stampedUser("u1", "ping", "cm-1"),
-      { ...message("a1", "assistant", "part"), message: { role: "assistant", content: "part", stopReason: "aborted" } },
-      message("u2", "user", "later"),
-    ]
-    const { remote, deliver } = followSurface(transcript)
-    const printed: string[] = []
-    const follow = await followRemote(remote, ROW, (text) => printed.push(text), {
-      text: "ping",
-      clientMessageId: "cm-1",
+  // The stream printed all of the partial text, or only a prefix of it: the unprinted tail still prints (#13481 review L2).
+  for (const [streamedText, expected] of [
+    ["part", ["part"]],
+    ["pa", ["pa", "rt"]],
+  ] as const) {
+    test(`#given an interrupted turn whose partial text streamed ${streamedText === "part" ? "whole" : "only in part"} #when the probe finds it final in the transcript #then it ends interrupted with the text printed once, tail included`, async () => {
+      const transcript = [
+        stampedUser("u1", "ping", "cm-1"),
+        {
+          ...message("a1", "assistant", "part"),
+          message: { role: "assistant", content: "part", stopReason: "aborted" },
+        },
+        message("u2", "user", "later"),
+      ]
+      const { remote, deliver } = followSurface(transcript)
+      const printed: string[] = []
+      const follow = await followRemote(remote, ROW, (text) => printed.push(text), {
+        text: "ping",
+        clientMessageId: "cm-1",
+      })
+      if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
+      follow.aim("started")
+      deliver([delta(streamedText)])
+      expect(await withTimeout(follow.settled, 2000, "the follow never settled")).toBe("interrupted")
+      expect(printed).toEqual([...expected])
+      follow.stop()
     })
-    if ("kind" in follow) throw new Error(`follow refused: ${JSON.stringify(follow)}`)
-    follow.aim("started")
-    deliver([delta("part")])
-    expect(await withTimeout(follow.settled, 2000, "the follow never settled")).toBe("interrupted")
-    expect(printed).toEqual(["part"])
-    follow.stop()
-  })
+  }
 
   // An interrupted turn keeps its partial answer too: the deltas that streamed are the later turn's (#13481 review L3).
   for (const interrupted of [false, true]) {
