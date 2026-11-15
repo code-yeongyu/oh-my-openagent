@@ -12,7 +12,7 @@ import type {
   SnapshotBody,
 } from "../device-service-core/src/index.ts"
 import { outcomeFailure, outcomeOf } from "../omo-senpi/src/components/thread/remote/outcome"
-import { MirroredDialogs } from "./remote-attach-dialogs"
+import { MirroredDialogs, withoutRaiserOnly } from "./remote-attach-dialogs"
 
 // `omo remote attach` serves one remote session to the engine's unchanged attach TUI (`--attach <socket> --session
 // <ref>`): a private endpoint that speaks the RPC subset the TUI uses, answered from the device service's attach.
@@ -57,7 +57,8 @@ const outcomeText = (outcome: CommandStateEvent, device: string): string => {
 }
 
 function stateOf(snapshot: SnapshotBody): Json {
-  const state = isRecord(snapshot.state) ? snapshot.state : {}
+  const raw = isRecord(snapshot.state) ? snapshot.state : {}
+  const state = withoutRaiserOnly(raw)
   return { ...state, sessionId: LOCAL_SESSION_ID, isStreaming: state.isStreaming === true }
 }
 
