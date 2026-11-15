@@ -105,6 +105,8 @@ export const startFakeOwner = async (options: FakeOwnerOptions): Promise<FakeOwn
       attaches: new Set(),
       subscribed: false,
       client: () => client,
+      handed: new Set(),
+      asks: new Set(),
     }
     state.conns.add(conn)
     transport.onClose(() => {

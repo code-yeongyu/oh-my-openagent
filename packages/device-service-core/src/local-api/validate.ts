@@ -32,6 +32,7 @@ import {
   uint,
 } from "./validate-fields.ts"
 import { endpointsData, locateData } from "./validate-delegated.ts"
+import { DELIVERIES_DATA } from "./validate-deliveries.ts"
 import { isRequestType, REQUEST_TYPES, validateRequestFields } from "./validate-requests.ts"
 import { deviceRef, deviceRowOf, errorBodyOf, snapshotBlobOf, statusOf } from "./validate-shapes.ts"
 import { CAPABILITIES, CLIENT_NAMES, LOCAL_API_VERSION, OPTIONAL_CAPABILITIES, REFUSED_REASONS } from "./vocabulary.ts"
@@ -182,6 +183,7 @@ const DATA: { readonly [T in RequestType]: (v: unknown) => ResponseData[T] } = {
   "owner.shutdown_for_upgrade": empty,
   "session.endpoints": endpointsData,
   "session.locate": locateData,
+  ...DELIVERIES_DATA,
   "control.session_wake.get": sessionWakeState,
   "control.session_wake.set": sessionWakeState,
   "control.attach.get": attachState,

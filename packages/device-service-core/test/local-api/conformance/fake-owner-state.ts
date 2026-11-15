@@ -18,6 +18,10 @@ export type Conn = {
   readonly attaches: Set<string>
   readonly client: () => ClientInfo | undefined
   subscribed: boolean
+  // omo#13037: the agent dir this connection serves deliveries for, its waiting hand-offs and open questions.
+  serving?: string
+  readonly handed?: Set<string>
+  readonly asks?: Set<string>
 }
 export type OwnerState = {
   readonly stateDir: string

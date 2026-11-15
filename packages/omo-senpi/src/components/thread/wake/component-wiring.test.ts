@@ -322,7 +322,7 @@ describe("the same-device wake through the registered thread component", () => {
   })
 
   test("#given an empty wake table #when the component starts on an engine at the minimum #then the carrier arms no sweep timer and opens no session", async () => {
-    const w = await wire(ENGINE_AT_MINIMUM)
+    const w = await wire({ ...ENGINE_AT_MINIMUM, deliveries: async () => undefined })
     await w.start()
     expect(w.latch.running?.size).toBe(1)
     expect(w.scheduled).toEqual([])

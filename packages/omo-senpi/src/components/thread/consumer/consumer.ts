@@ -22,6 +22,8 @@ export type DeliveryConsumerOptions = {
 
 export type DeliveryConsumer = {
   readonly start: () => Promise<ConsumerStart>
+  /** From this start's acknowledgement until the consumer stops: the service hands this consumer its deliveries. */
+  readonly serving: () => boolean
   /** One `delivery.drained` report per marked pair whose intake rows are all applied (the newest answered command id). */
   readonly reportDrained: () => Promise<void>
   readonly idle: () => Promise<void>
@@ -65,6 +67,7 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
   const { store, port } = options
   const follow = new Set<Promise<void>>()
   let marksKept = true
+  let serving = false
   let unsubscribe: (() => void)[] = []
 
   const track = (work: Promise<void>): void => {
@@ -160,6 +163,7 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
   }
 
   return {
+    serving: () => serving,
     start: async () => {
       try {
         await store.identity()
@@ -167,15 +171,8 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
         if (error instanceof GatewayMigrationError || /schema/i.test(String(error))) return "schema_too_new"
         throw error
       }
-      let ack: unknown
-      try {
-        ack = await port.serve({ agent_dir: options.agentDir, v: DELIVERY_PROTOCOL_VERSION })
-      } catch (error) {
-        if (UNKNOWN_SHAPE.has(refusalCode(error) ?? "")) return "unsupported"
-        throw error
-      }
-      const decoded = decodeServeAck(ack)
-      if (decoded === undefined) return "unsupported"
+      // The service hands its waiting records right after the acknowledgement, on the same connection, so the listeners
+      // are in place before the declaration is sent.
       unsubscribe = [
         port.onInbound((event) => track(onInbound(event))),
         port.onHolds((event) => {
@@ -183,6 +180,24 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
           track(port.held(event.ask_id, holds))
         }),
       ]
+      const unsubscribeAll = (): void => {
+        for (const off of unsubscribe) off()
+        unsubscribe = []
+      }
+      let ack: unknown
+      try {
+        ack = await port.serve({ agent_dir: options.agentDir, v: DELIVERY_PROTOCOL_VERSION })
+      } catch (error) {
+        unsubscribeAll()
+        if (UNKNOWN_SHAPE.has(refusalCode(error) ?? "")) return "unsupported"
+        throw error
+      }
+      const decoded = decodeServeAck(ack)
+      if (decoded === undefined) {
+        unsubscribeAll()
+        return "unsupported"
+      }
+      serving = true
       await reportPending()
       return "serving"
     },
@@ -215,6 +230,7 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
     stop: () => {
       for (const off of unsubscribe) off()
       unsubscribe = []
+      serving = false
     },
   }
 }

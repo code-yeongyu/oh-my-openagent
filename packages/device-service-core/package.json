@@ -5,7 +5,9 @@
   "private": true,
   "description": "Typed SDK over the OmO device service's local API v1 (vendored client, pinned in PIN.json).",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./conformance/fake-owner": "./test/local-api/conformance/fake-owner.ts",
+    "./conformance/world": "./test/local-api/conformance/world.ts"
   },
   "scripts": {
     "typecheck": "bun check --no-script --all -p tsconfig.json",
