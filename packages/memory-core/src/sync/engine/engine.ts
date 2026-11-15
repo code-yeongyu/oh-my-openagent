@@ -291,7 +291,8 @@ export class SyncEngine {
     this.tracker.frozen = pushedCycle.frozen
     const pushed = pushedCycle.pushed
     const settled = refused === 0 ? { lastSyncedAt: deps.clock.now(), updatedWhileOffline: memories } : {}
-    const heldKeys = await recordHeld(deps, journal, holds.held, holds.withheld, settled)
+    // A refused entry was recorded in the state this cycle (receive.ts), so the hold is written with it.
+    const heldKeys = await recordHeld(deps, journal, holds.held, holds.withheld, settled, refused > 0)
     const heldNow = (await journal.state()).held
     this.nextHeldKey = heldNow === null ? null : failureKey(heldShown(heldNow, batchBound(deps)).failure)
     this.appliedMirror = (await journal.state()).applied

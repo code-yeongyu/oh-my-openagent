@@ -40,17 +40,18 @@ const sameHold = (a: HeldItems | null, b: HeldItems | null): boolean =>
 /**
  * Records this cycle's held keys and returns them: `captured` by fingerprint, plus the stuck ones (pending
  * ops no batch can carry and this device could not wind back, and the `withheld` keys it must not send).
- * `settled` is what the cycle writes to the state anyway (its sync time, when it saw no refusal). The hold
- * rides on that write, and is written on its own only when it begins, ends or names other items (#12393):
- * a hold that only lasts one more cycle in a cycle that writes nothing else costs no write, and its count
- * waits for the next write.
+ * `settled` is what the cycle writes to the state at its end (its sync time, when it saw no refusal); the
+ * hold rides on that write. `wroteState` says the cycle already wrote the state elsewhere (a refusal while
+ * paused): a hold then gets its own write, so its count goes up on every such cycle too. Only a cycle that
+ * writes nothing else and leaves the hold unchanged (no hold before or after included) skips the write (#12393).
  */
 export async function recordHeld(
   deps: EngineDeps,
   journal: SyncJournal,
   captured: ReadonlyMap<string, string>,
   withheld: ReadonlySet<string>,
-  settled: Partial<EngineState> = {},
+  settled: Partial<EngineState>,
+  wroteState: boolean,
 ): Promise<readonly string[]> {
   const stuck = [
     ...new Set([
@@ -70,7 +71,8 @@ export async function recordHeld(
           cycles: (previous?.cycles ?? 0) + 1,
           prints: Object.fromEntries(captured),
         }
-  if (Object.keys(settled).length > 0 || !sameHold(previous, held)) await journal.updateState({ ...settled, held })
+  if (Object.keys(settled).length > 0 || (wroteState && held !== null) || !sameHold(previous, held))
+    await journal.updateState({ ...settled, held })
   return keys
 }
 
