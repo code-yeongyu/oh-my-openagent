@@ -54,22 +54,9 @@ export async function openSettled(run) {
 }
 
 /** The harness's reopenState() (O8 headless: reopen, get_state, close) with the reopened client's MCP startup settled. */
-export async function reopenStateSettled(run, { memoryStatusRefreshed = false } = {}) {
+export async function reopenStateSettled(run) {
   await run.open({ resume: true })
   await settleMcpStartup(run)
-  // The memory component publishes its status line at session start and again when its async refresh lands
-  // (wiring-reflection-live refreshInitialStatus); get_state and close must not race that second publish.
-  if (memoryStatusRefreshed) {
-    const memoryStatus = (event) =>
-      event.type === "extension_ui_request" && event.method === "setStatus" && event.statusKey === "memory"
-    if (run.client.events.filter(memoryStatus).length < 2)
-      await run.client.waitForEvent(
-        (event) => memoryStatus(event) && run.client.events.filter(memoryStatus).length >= 2,
-        {
-          timeoutMs: STARTUP_SETTLE_MS,
-        },
-      )
-  }
   const state = await run.send({ type: "get_state" })
   run.states.push(state.data)
   await run.close()

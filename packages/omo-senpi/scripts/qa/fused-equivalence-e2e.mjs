@@ -245,7 +245,7 @@ const cases = [
       await run.prompt("drive display 2 with one per-call display handle")
       assertClickAudited(run)
       await run.close()
-      await reopenStateSettled(run, { memoryStatusRefreshed: true })
+      await reopenStateSettled(run)
     },
   },
   {
