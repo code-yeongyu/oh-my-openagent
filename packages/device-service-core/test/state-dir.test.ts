@@ -6,6 +6,11 @@ import { deviceServiceStateDir } from "../src/index.ts"
 
 const dirs: string[] = []
 
+// The discovery cases below read a real discovery file under a real temp dir. A simulated POSIX platform only accepts a
+// POSIX-absolute state_dir, and a Windows temp path (C:\...) is not one, so those cases need a POSIX host; the simulated
+// win32 cases accept a POSIX host's rooted temp path and run everywhere.
+const posixHost = test.skipIf(process.platform === "win32")
+
 afterEach(() => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
 })
@@ -54,17 +59,25 @@ describe("deviceServiceStateDir", () => {
       expect(deviceServiceStateDir("linux", { OMO_DEVICE_SERVICE_STATE_DIR: value }, home)).toBe(
         join(home, ".omo", "device-service"),
       )
-    const named = location(join(home, ".omo"))
-    expect(deviceServiceStateDir("linux", { OMO_DEVICE_SERVICE_STATE_DIR: "ds-alt" }, home)).toBe(named)
     expect(deviceServiceStateDir("win32", { OMO_DEVICE_SERVICE_STATE_DIR: "C:ds-alt", LOCALAPPDATA: home }, home)).toBe(
       join(home, "OmO", "device-service"),
     )
   })
 
-  test("with no env var, the discovery file beside the default dir names the state dir", () => {
+  posixHost("a relative OMO_DEVICE_SERVICE_STATE_DIR falls through to the discovery file", () => {
+    const home = tempDir()
+    const named = location(join(home, ".omo"))
+    expect(deviceServiceStateDir("linux", { OMO_DEVICE_SERVICE_STATE_DIR: "ds-alt" }, home)).toBe(named)
+  })
+
+  posixHost("with no env var, the discovery file beside ~/.omo names the state dir on POSIX", () => {
     const home = tempDir()
     const posix = location(join(home, ".omo"))
     expect(deviceServiceStateDir("darwin", {}, home)).toBe(posix)
+  })
+
+  test("with no env var, the discovery file beside the Windows default dir names the state dir", () => {
+    const home = tempDir()
     const localAppData = join(home, "Local")
     const windows = location(join(localAppData, "OmO"))
     expect(deviceServiceStateDir("win32", { LOCALAPPDATA: localAppData }, home)).toBe(windows)
@@ -72,7 +85,7 @@ describe("deviceServiceStateDir", () => {
     expect(deviceServiceStateDir("win32", {}, home)).toBe(fallback)
   })
 
-  test("a malformed, wrong-version, relative or dangling discovery file falls through to the default", () => {
+  posixHost("a malformed, wrong-version, relative or dangling discovery file falls through to the default", () => {
     const entries: readonly ((dir: string) => void)[] = [
       (dir) => writeLocation(dir, "{not json"),
       (dir) => writeLocation(dir, "null"),
