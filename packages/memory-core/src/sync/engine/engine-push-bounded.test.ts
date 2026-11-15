@@ -2,6 +2,7 @@ import { afterEach, expect, spyOn, test } from "bun:test"
 
 import { awaitWithinTestBudget, useTestTimeout } from "../../../../../test-support/test-deadline"
 import * as resilient from "../../fs/resilient"
+import { settlesWithin } from "../../git/settles-within.test-support"
 import { CrashInjected } from "./engine"
 import { type Device, GIT_TEST_TIMEOUT, makeDevice } from "./engine-harness.test-support"
 import { FakeSyncServer } from "./fake-server.test-support"
@@ -14,13 +15,21 @@ import { FakeSyncServer } from "./fake-server.test-support"
 // guard far above that; each cycle is a named step that fails before it. A case that fails mid-cycle leaves
 // that cycle running, and stop() waits for it, so a device directory is removed only once nothing writes there.
 const HANG_GUARD_MS = GIT_TEST_TIMEOUT * 4
+// A cycle that truly hangs never lets stop() settle, so each stop has its own bound (the test's budget is
+// already spent when a case timed out) and every device directory is removed either way.
+const STOP_BOUND_MS = GIT_TEST_TIMEOUT
 
 const devices: Device[] = []
 afterEach(async () => {
-  for (const d of devices.splice(0)) {
-    await d.engine.stop()
-    await d.dispose()
+  const stalled: string[] = []
+  try {
+    for (const d of devices)
+      if ((await settlesWithin(d.engine.stop(), STOP_BOUND_MS)).kind === "still-waiting") stalled.push(d.name)
+  } finally {
+    for (const d of devices.splice(0)) await d.dispose()
   }
+  if (stalled.length > 0)
+    throw new Error(`step 'engine stop' did not settle within ${STOP_BOUND_MS} ms for device ${stalled.join(", ")}`)
 }, HANG_GUARD_MS)
 
 const BATCH_BYTES = 16 * 1024
