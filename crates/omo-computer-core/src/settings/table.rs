@@ -83,7 +83,6 @@ pub const SETTINGS_TABLE: &[SettingRow] = &[
         "session.open: Consequential gate URL read",
         true,
     ),
-    row("run_limits", New, "QuickJS run cell ceilings", false),
     row("record", New, "per-run recording writer", true),
     row(
         "pause_ceiling_ms",

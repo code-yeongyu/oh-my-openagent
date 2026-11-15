@@ -16,10 +16,6 @@
         "test/fake-engine.mjs",
         "test/global-input-harness.ts",
         "test/harness.ts",
-        // run by path as a Worker by test/sandbox.test.ts, never imported
-        "test/fixtures/quickjs-crash-worker.mjs",
-        // run by path as the computer.run QuickJS sandbox Worker (src/run/sandbox/quickjs.ts), never imported
-        "src/run/sandbox/worker.ts",
         "vitest.config.ts",
       ],
     }

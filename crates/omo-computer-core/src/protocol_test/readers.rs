@@ -204,7 +204,6 @@ fn reader_test_reports_zero_unread_fields() {
     );
     for round_four in [
         "url_policy",
-        "run_limits",
         "record",
         "pause_ceiling_ms",
         "display_awake_grace_ms",

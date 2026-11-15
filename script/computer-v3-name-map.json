@@ -432,7 +432,6 @@
       "bunfig.win2.parallel.windows.toml",
       "bunfig.win2.toml",
       "docs/guide/computer-use.md",
-      "docs/reference/computer-run-sandbox-threat-model.md",
       "docs/reference/computer.md",
       "docs/reference/desktop-attach-threat-model.md",
       "knip.base.jsonc",

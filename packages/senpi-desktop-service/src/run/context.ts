@@ -11,21 +11,7 @@ import { DesktopServiceError } from "../service/rpc-client"
 
 /** Why a computer run failed inside the runtime; engine failures surface as `DesktopEngineRpcError`. */
 export type ComputerRunErrorReason =
-  | "readOnly"
-  | "timeout"
-  | "aborted"
-  | "ended"
-  | "assertion"
-  | "window"
-  | "wait"
-  | "unavailable"
-  // QuickJS run cell limits (run/sandbox): fatal to the run, except `payloadSize`, which rejects one bridged call.
-  | "calls"
-  | "memory"
-  | "stack"
-  | "payloadSize"
-  | "stalled"
-  | "crashed"
+  "readOnly" | "timeout" | "aborted" | "ended" | "assertion" | "window" | "wait" | "unavailable"
 
 export class ComputerRunError extends Error {
   readonly reason: ComputerRunErrorReason

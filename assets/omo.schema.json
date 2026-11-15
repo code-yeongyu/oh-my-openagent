@@ -2678,14 +2678,6 @@
         "cua_adapter": {
           "type": "boolean"
         },
-        "run_sandbox": {
-          "type": "string",
-          "enum": [
-            "vm",
-            "quickjs"
-          ],
-          "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
-        },
         "intervention": {
           "type": "string",
           "enum": [
@@ -5164,14 +5156,6 @@
             },
             "cua_adapter": {
               "type": "boolean"
-            },
-            "run_sandbox": {
-              "type": "string",
-              "enum": [
-                "vm",
-                "quickjs"
-              ],
-              "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
             },
             "intervention": {
               "type": "string",
@@ -7652,14 +7636,6 @@
             "cua_adapter": {
               "type": "boolean"
             },
-            "run_sandbox": {
-              "type": "string",
-              "enum": [
-                "vm",
-                "quickjs"
-              ],
-              "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
-            },
             "intervention": {
               "type": "string",
               "enum": [
@@ -10138,14 +10114,6 @@
             },
             "cua_adapter": {
               "type": "boolean"
-            },
-            "run_sandbox": {
-              "type": "string",
-              "enum": [
-                "vm",
-                "quickjs"
-              ],
-              "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
             },
             "intervention": {
               "type": "string",
@@ -12632,14 +12600,6 @@
               "cua_adapter": {
                 "type": "boolean"
               },
-              "run_sandbox": {
-                "type": "string",
-                "enum": [
-                  "vm",
-                  "quickjs"
-                ],
-                "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
-              },
               "intervention": {
                 "type": "string",
                 "enum": [
@@ -15118,14 +15078,6 @@
                   },
                   "cua_adapter": {
                     "type": "boolean"
-                  },
-                  "run_sandbox": {
-                    "type": "string",
-                    "enum": [
-                      "vm",
-                      "quickjs"
-                    ],
-                    "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
                   },
                   "intervention": {
                     "type": "string",
@@ -17606,14 +17558,6 @@
                   "cua_adapter": {
                     "type": "boolean"
                   },
-                  "run_sandbox": {
-                    "type": "string",
-                    "enum": [
-                      "vm",
-                      "quickjs"
-                    ],
-                    "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
-                  },
                   "intervention": {
                     "type": "string",
                     "enum": [
@@ -20092,14 +20036,6 @@
                   },
                   "cua_adapter": {
                     "type": "boolean"
-                  },
-                  "run_sandbox": {
-                    "type": "string",
-                    "enum": [
-                      "vm",
-                      "quickjs"
-                    ],
-                    "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
                   },
                   "intervention": {
                     "type": "string",

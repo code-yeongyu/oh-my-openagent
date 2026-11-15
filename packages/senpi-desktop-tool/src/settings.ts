@@ -43,12 +43,6 @@ export const ComputerSettingsSchema = Type.Object(
     cuaAdapter: Type.Optional(
       Type.Boolean({ default: false, description: "Also register computer_actions (OpenAI computer-use actions)" }),
     ),
-    runSandbox: Type.Optional(
-      Type.Union([Type.Literal("vm"), Type.Literal("quickjs")], {
-        default: "vm",
-        description: "Where `run` code executes; reserved: every run uses `vm` until the QuickJS cell lands",
-      }),
-    ),
     intervention: Type.Optional(
       Type.Union([Type.Literal("continue"), Type.Literal("pause")], {
         default: "continue",
@@ -86,7 +80,6 @@ export interface ComputerSettings {
   readonly screenshotGc: { readonly enabled: boolean; readonly staleMs: number; readonly scanIntervalMs: number }
   readonly enginePath: string | undefined
   readonly cuaAdapter: boolean
-  readonly runSandbox: "vm" | "quickjs"
   readonly intervention: "continue" | "pause"
   readonly macosKeyPriming: "on" | "off"
   readonly trace: boolean
@@ -130,7 +123,6 @@ export function resolveComputerSettings(raw: unknown, platform: string = process
     },
     enginePath: value.enginePath,
     cuaAdapter: value.cuaAdapter ?? false,
-    runSandbox: value.runSandbox ?? "vm",
     intervention: value.intervention ?? "continue",
     macosKeyPriming: value.macosKeyPriming ?? "off",
     trace: value.trace ?? false,

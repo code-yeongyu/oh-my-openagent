@@ -4,11 +4,11 @@
 use super::session::{read_trace, TraceMode};
 use crate::settings::{
     AppScope, AuditLog, CapturePolicyRow, CuaAdapter, ExactKeyTable, FleetSettings, HandSelector,
-    Intervention, LinuxDisplayServer, McpSettings, RunLimits, Runtime, ScreenshotGc,
+    Intervention, LinuxDisplayServer, McpSettings, Runtime, ScreenshotGc,
     SendOnEnterRule, Settings, SshHost, Tier, ToolkitClass,
 };
 
-/// Tool registration, the engine locator, the run cell and the dispatcher.
+/// Tool registration, the engine locator and the dispatcher.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct HostConfig {
     pub enabled: Option<bool>,
@@ -17,7 +17,6 @@ pub struct HostConfig {
     pub default_hand: Option<HandSelector>,
     pub mcp_tier: Option<Tier>,
     pub runtime: Option<Runtime>,
-    pub run_limits: Option<RunLimits>,
 }
 
 /// Who can stop the hand, and how a lease ends.
@@ -145,7 +144,6 @@ pub fn read_settings(settings: Settings) -> SessionConfig {
         engine_path,
         send_on_enter,
         url_policy,
-        run_limits,
         record,
         pause_ceiling_ms,
         display_awake_grace_ms,
@@ -190,7 +188,6 @@ pub fn read_settings(settings: Settings) -> SessionConfig {
             default_hand,
             mcp_tier: mcp.map(read_mcp),
             runtime,
-            run_limits,
         },
         stop: StopConfig {
             stop_hotkey,

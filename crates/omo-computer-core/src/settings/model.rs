@@ -6,7 +6,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::limits::{FleetSettings, McpSettings, RunLimits};
+use super::limits::{FleetSettings, McpSettings};
 use super::values::{
     AppScope, AuditLog, CapturePolicyRow, CuaAdapter, ExactKeyTable, HandSelector, Intervention,
     LinuxDisplayServer, Runtime, ScreenshotGc, SendOnEnterRule, SshHost, ToolkitClass, Trace,
@@ -38,7 +38,6 @@ optional_settings! {
         engine_path: String,
         send_on_enter: ExactKeyTable<SendOnEnterRule>,
         url_policy: Vec<String>,
-        run_limits: RunLimits,
         record: bool,
         pause_ceiling_ms: u64,
         display_awake_grace_ms: u64,
